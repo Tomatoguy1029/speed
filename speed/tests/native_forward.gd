@@ -28,7 +28,7 @@ func _ready() -> void:
 	probe.close()
 	print("[native_forward] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
-func compare_frames(comparison, level: int, division: int, guarded := false, spawning := false, budgeting := false) -> void:
+func compare_frames(comparison, level: int, division: int, guarded := false, spawning := false, budgeting := false, enemy_type: StringName = &"drifter") -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 631, "empty": true, "invincible": false})
@@ -42,10 +42,16 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 	# 成長の所有者は別の比較で扱い、ここでは射撃とフレーム順序を独立して確認する。
 	run.cfg.xp_base = 1e9
 	check(run.loadout.grant(&"weapon", &"W01", level), "比較するW01を実際に装備する")
-	var definition: EnemyDef = run.enemies.def_of(&"drifter").duplicate(true)
-	definition.speed = 0.0
+	var definition: EnemyDef = run.enemies.def_of(enemy_type).duplicate(true)
+	if enemy_type == &"drifter": definition.speed = 0.0
 	var core = comparison.create_native()
-	core.configure(DATA.compile_enemy(definition, run.cfg))
+	if not core.configure(DATA.compile_enemy(definition, run.cfg)):
+		check(false,"比較する敵の行動をネイティブへ読み込む: " + String(enemy_type))
+		core.close()
+		lab.free()
+		return
+	if enemy_type == &"biter":
+		check(core.configure_bite_zone(DATA.compile_bite_zone(load("res://.content/attack_visuals.res"))),"噛みつきの範囲判定を準備する")
 	core.configure_ship(values(run.cfg, SHIP.CONFIG_KEYS), values(run.state.stats, SHIP.STAT_KEYS))
 	core.configure_draw(values(run.cfg, SHIP.DRAW_CONFIG), values(run.state.stats, SHIP.DRAW_STATS))
 	core.configure_combat(values(run.cfg, COMBAT.COMBAT_CONFIG), values(run.state.stats, COMBAT.COMBAT_STATS))
@@ -68,8 +74,8 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		phase.rate = 13.2
 		phase.xp_bonus = config.xp_bonus
 		phase.wave_interval = 0.05 if division == 3 else 0.37
-		phase.wave_type = &"" if division == 3 else &"drifter"
-		phase.mix = {"drifter": 1.0}
+		phase.wave_type = &"" if division == 3 else enemy_type
+		phase.mix = {String(enemy_type): 1.0}
 		stage.phases = [phase]
 		if budgeting:
 			phase.attack_budget = 0
@@ -84,10 +90,10 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		clip.length = 1.2
 		clip.groups = 1
 		clip.interval = 0.5
-		clip.prepared = [{"layouts":[{"weight":1.0,"value":-1.0,"markers":[{"type":&"drifter","pos":Vector2.ZERO,"rot":0.0}]}],"entries":[{"weight":1.0,"pos":Vector2(0,-700),"rot":PI}]}]
+		clip.prepared = [{"layouts":[{"weight":1.0,"value":-1.0,"markers":[{"type":enemy_type,"pos":Vector2.ZERO,"rot":0.0}]}],"entries":[{"weight":1.0,"pos":Vector2(0,-700),"rot":PI}]}]
 		stage.clips = [clip]
 		run.state.stage = stage
-		run.enemies.definitions[&"drifter"] = definition
+		run.enemies.definitions[enemy_type] = definition
 		check(core.configure_spawn_timeline(DATA.compile_spawn_timeline(stage,run.cfg)), "フレーム比較の出現条件を生成する")
 		check(core.configure_population(values(run.cfg, ["spawn_recycle_scale", "spawn_region_cap", "spawn_margin", "field_radius", "planet_radius"])), "出現位置の編集値を渡す")
 		check(core.configure_refill(values(run.cfg, ["spawn_total_cap", "spawn_refill_time"])), "フレームで使う補充を準備する")
@@ -106,7 +112,7 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 	var origin := run.state.ship_pos
 	for offset in [Vector2(0,-260),Vector2(0,-340),Vector2(0,-440),Vector2(120,0)]:
 		run.enemies.spawn(definition, origin + offset)
-		core.spawn_enemy(&"drifter", origin + offset)
+		core.spawn_enemy(enemy_type, origin + offset)
 	run.combat.rebuild_grid()
 	core.rebuild_enemy_grid(run.cfg.grid_cell)
 	var hostile := {"kind": 1, "pos": origin + Vector2(700,200), "vel": Vector2(-400,0), "speed": 400.0, "r": 9.0, "life": 4.5, "dmg": 7.0, "slow": 0.1, "turn": 1.6}
@@ -125,6 +131,9 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 	var shot_hits := 0
 	var empty_wave_clip := false
 	var budget_helper = load("res://tests/native_attack_budget.gd").new()
+	var zone_helper = load("res://tests/native_bite_zone.gd").new()
+	zone_helper.comparison = comparison
+	var bite_seen := false
 	var permitted := 0
 	var denied := 0
 	for tick in 360:
@@ -188,6 +197,17 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(values(run.state, SHIP.STATE_KEYS)), comparison.plain(core.ship_snapshot()))
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
 		if difference.is_empty(): difference = comparison.difference({"elapsed": weapon._t, "recoil": weapon.recoil}, core.forward_snapshot())
+		if enemy_type == &"biter":
+			if difference.is_empty(): difference = comparison.difference(zone_helper.hazard_snapshot(run.projectiles),comparison.plain(core.hazards_snapshot()))
+			bite_seen = bite_seen or run.projectiles.hazard_count() > 0
+			var rows_by_id := {}
+			for row in run.enemies.table.alive.size():
+				if run.enemies.table.alive[row]: rows_by_id[run.enemies.table.id[row]] = row
+			for state in core.enemy_motion_snapshot():
+				if not rows_by_id.has(state.id): continue
+				var row: int = rows_by_id[state.id]
+				for key in ["mode","timer","charge","fire_t"]:
+					check(run.enemies.table.get(key)[row] == state[key],"噛みつきの予告と回復の状態が一致する: " + key)
 		check(difference.is_empty(), "W01とフレーム順序が一致する Lv%d 間引き%d tick%d: %s" % [level,division,tick,difference])
 		if tick % 15 == 0:
 			effects.projectiles(run.projectiles)
@@ -204,6 +224,8 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 			if event.type == &"hit" and event.cause == &"shot": shot_hits += 1
 		if not difference.is_empty(): break
 	if budgeting: check(permitted > 0 and denied > 0,"時間帯の予算による許可と待機を両方通る")
+	if enemy_type == &"biter": check(bite_seen,"実際の敵が噛みつきの判定を発生させる")
+	zone_helper.free()
 	budget_helper.free()
 	if spawning and division == 3: check(empty_wave_clip, "出現種類のない波の更新と同時にクリップを実際に出す")
 	check(fired >= 2 and shot_hits > 0, "W01の発射と命中を実際に通る")

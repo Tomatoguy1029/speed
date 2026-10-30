@@ -166,9 +166,10 @@ bool SpeedRunCore::advance_attack_budget(double at) {
                 if (!member.closed) {
                     const auto found = rows_by_id.find(m.key);
                     const bool same = found != rows_by_id.end() && found->second == member.row && !enemies[member.row].dead;
-                    // 現在対応している追跡・盾には、予告中や突進中の行動状態がない。
-                    // それらを持つ敵は行動の移行時に、この寿命更新にも接続する。
-                    if (!same || member.begun || enemies[member.row].fire_t > definitions[enemies[member.row].definition].attack_telegraph || reached(at, member.until)) {
+                    const bool active = same && owns_attack(group.owner, m.key) &&
+                        (enemies[member.row].mode == EnemyMode::Windup || enemies[member.row].mode == EnemyMode::Dash);
+                    if (active) { member.begun = true; member.until = at + 0.05; }
+                    else if (!same || member.begun || enemies[member.row].fire_t > definitions[enemies[member.row].definition].attack_telegraph || reached(at, member.until)) {
                         member.closed = true; member.until = at;
                     }
                 }

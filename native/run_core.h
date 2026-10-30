@@ -21,6 +21,7 @@ class SpeedRunCore : public RefCounted {
     GDCLASS(SpeedRunCore, RefCounted)
     Ref<RandomNumberGenerator> rng;
     std::vector<speed::EnemyDefinition> definitions;
+    enum class EnemyMode { Move, Windup, Dash, Recover };
     struct Enemy {
         int64_t id = 0;
         int64_t attack_group = 0;
@@ -30,6 +31,8 @@ class SpeedRunCore : public RefCounted {
         Vector2 pos, vel;
         double hp = 0.0, max_hp = 0.0, radius = 0.0, armor = 0.0, xp = 0.0, speed = 0.0;
         double facing = 0.0, age = 0.0, fire_t = 0.0;
+        EnemyMode mode = EnemyMode::Move;
+        double timer = 0, charge = 0;
         bool alive = false, dead = false, elite = false;
         double hit_cd = 0, flash = 0;
         double stone = 0, knock_t = 0, shove_time = 0;
@@ -261,6 +264,9 @@ class SpeedRunCore : public RefCounted {
     void step_death(double real_dt);
     bool controls_locked = false, encounter_protected = false, steering_locked = false;
     bool invincible = false, hitstop_enabled = true;
+    StringName enemy_attack_owner(const Enemy &enemy) const;
+    bool admit_bite(Enemy &enemy, double dt);
+    void advance_biter(size_t row, double dt, bool far);
     void update_pushed(Enemy &enemy, double dt);
     void advance_enemies(double delta);
     int64_t ticks = 0;

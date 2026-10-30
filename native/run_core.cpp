@@ -98,6 +98,7 @@ bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) 
     if (forward.ready && !combat_ready) return false;
     if ((draw_ready && !ship_ready) || (combat_ready && (!ship_ready || !pickups_ready))) return false;
     if (frame_ready && (!ship_ready || !draw_ready || !combat_ready || !pickups_ready)) return false;
+    for (const auto &def : definitions) if (def.kind == speed::EnemyDefinition::Kind::Biter && (!ship_ready || !bite_zone_config.ready)) return false;
     next_id = first_id;
     next_gem_seq = first_gem_seq;
     rng.instantiate();
@@ -134,10 +135,11 @@ void SpeedRunCore::advance_enemies(double delta) {
         if (enemy.flash > 0) enemy.flash -= delta;
         enemy.age += delta;
         const auto &def = definitions[enemy.definition];
-        if (def.kind != speed::EnemyDefinition::Kind::Chase && enemy.slash_hold) { enemy.vel = Vector2(); continue; }
+        if (def.kind == speed::EnemyDefinition::Kind::Shield && enemy.slash_hold) { enemy.vel = Vector2(); continue; }
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta); continue; }
         const Vector2 relative = enemy.pos - view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
+        if (def.kind == speed::EnemyDefinition::Kind::Biter) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + ticks) % 3 == 0) {
             if (def.kind == speed::EnemyDefinition::Kind::Shield) {
                 const double bdt = far ? delta * 3.0 : delta;
@@ -221,7 +223,7 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         if (rows[i].get_type() != Variant::DICTIONARY) return false;
         const Dictionary row = rows[i];
         if (!row.has("id") || row["id"].get_type() != Variant::STRING || String(row["id"]).is_empty() ||
-                !row.has("behavior") || row["behavior"].get_type() != Variant::STRING || (String(row["behavior"]) != "chase" && String(row["behavior"]) != "shield")) return false;
+                !row.has("behavior") || row["behavior"].get_type() != Variant::STRING || (String(row["behavior"]) != "chase" && String(row["behavior"]) != "shield" && String(row["behavior"]) != "biter")) return false;
         speed::EnemyDefinition def;
         def.id = String(row["id"]);
         if (String(row["behavior"]) == "shield") {
@@ -237,6 +239,18 @@ bool SpeedRunCore::configure(const Dictionary &data) {
                 *values[k] = double(value);
                 if (!std::isfinite(*values[k]) || *values[k] < 0) return false;
             }
+        }
+        if (String(row["behavior"]) == "biter") {
+            if (row.get("bite", Variant()).get_type() != Variant::DICTIONARY) return false;
+            const Dictionary bite = row["bite"]; def.kind = speed::EnemyDefinition::Kind::Biter;
+            const char *keys[] = {"turn", "bite_reach", "bite_telegraph", "bite_rest", "bite_radius", "bullet_dmg"};
+            double *values[] = {&def.turn, &def.bite.reach, &def.bite.telegraph, &def.bite.rest, &def.bite.radius, &def.bite.damage};
+            for (int k = 0; k < 6; ++k) {
+                const Variant value = bite.get(keys[k], Variant());
+                if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value)) || double(value) < 0) return false;
+                *values[k] = value;
+            }
+            if (def.bite.telegraph <= 0) return false;
         }
         for (const auto &previous : parsed) if (previous.id == def.id) return false;
         const char *keys[] = {"hp", "armor", "radius", "speed", "fire_interval", "xp", "knockback", "hitstop_multiplier"};
@@ -313,8 +327,8 @@ bool SpeedRunCore::configure_enemy_order(const PackedStringArray &order) {
     if (started || closed) return false;
     std::vector<speed::EnemyDefinition::Kind> kinds;
     for (int64_t i = 0; i < order.size(); ++i) {
-        if (order[i] != "chase" && order[i] != "shield") return false;
-        const auto kind = order[i] == "chase" ? speed::EnemyDefinition::Kind::Chase : speed::EnemyDefinition::Kind::Shield;
+        if (order[i] != "chase" && order[i] != "shield" && order[i] != "biter") return false;
+        const auto kind = order[i] == "chase" ? speed::EnemyDefinition::Kind::Chase : order[i] == "shield" ? speed::EnemyDefinition::Kind::Shield : speed::EnemyDefinition::Kind::Biter;
         if (std::find(kinds.begin(), kinds.end(), kind) != kinds.end()) return false;
         kinds.push_back(kind);
     }

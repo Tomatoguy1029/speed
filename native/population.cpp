@@ -103,6 +103,7 @@ double SpeedRunCore::survey_population(double target) {
         enemy.pos = sampled;
         const Vector2 toward = (ship_pos - enemy.pos).normalized();
         enemy.vel = toward * enemy.speed; enemy.facing = toward.angle();
+        enemy.mode = EnemyMode::Move; enemy.timer = 0; enemy.charge = 0;
         enemy.fire_t = definitions[enemy.definition].fire_interval;
         effective += 1.0; ++p.raw;
     }

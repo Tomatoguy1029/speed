@@ -49,7 +49,8 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         Dictionary row; row["id"] = e->id; row["stone"] = e->stone; row["knock_t"] = e->knock_t;
         row["shove_time"] = e->shove_time; row["shove_vel"] = e->shove_vel; row["shove_from"] = e->shove_from;
         row["held"] = int(e->held); row["slash_hold"] = int(e->slash_hold); row["shoved"] = int(e->shoved);
-        row["age"] = e->age; row["fire_t"] = e->fire_t; out.append(row);
+        row["age"] = e->age; row["fire_t"] = e->fire_t;
+        row["mode"] = int(e->mode); row["timer"] = e->timer; row["charge"] = e->charge; out.append(row);
     }
     return out;
 }

@@ -1,13 +1,14 @@
 ## 共通の捕捉・石化・外力を、近距離と遠方の更新で比較する。
 extends "res://tests/native_attack_budget.gd"
-const EXTRA := ["stone","knock_t","shove_time","shove_vel","shove_from","shoved","held","slash_hold","age","fire_t"]
+const SHIP := preload("res://tests/native_ship.gd")
+const EXTRA := ["stone","knock_t","shove_time","shove_vel","shove_from","shoved","held","slash_hold","age","fire_t","mode","timer","charge"]
 func _ready() -> void:
 	comparison = COMPARE.new()
 	var probe = comparison.create_native()
 	if not probe.has_method("set_enemy_motion"):
 		check(false,"捕捉・石化・外力をネイティブが保持する")
 	else:
-		for type in [&"drifter",&"shield"]:
+		for type in [&"drifter",&"shield",&"biter"]:
 			for distant in [false,true]: await compare_effects(type,distant)
 	probe.close()
 	print("[native_enemy_effects] failed=%d" % failed)
@@ -31,6 +32,13 @@ func compare_effects(type: StringName,distant: bool) -> void:
 	var definition := run.enemies.def_of(type)
 	var core = comparison.create_native()
 	core.configure(DATA.compile_enemy(definition,run.cfg,run.state.stage))
+	if type == &"biter":
+		var config := {}
+		var stats := {}
+		for key in SHIP.CONFIG_KEYS: config[key] = run.cfg.get(key)
+		for key in SHIP.STAT_KEYS: stats[key] = run.state.stats.get(key)
+		core.configure_ship(config,stats)
+		core.configure_bite_zone(DATA.compile_bite_zone(load("res://.content/attack_visuals.res")))
 	configure(run.projectiles.director,core,true,0.0)
 	core.start(822,run.enemies._next_id)
 	run.state.rng.seed = 822
