@@ -149,6 +149,7 @@ class SpeedRunCore : public RefCounted {
     int64_t kills = 0;
     Array events;
     void emit_event(StringName type, Dictionary data = Dictionary());
+    void kill_enemy(size_t row, bool crit, StringName cause, Vector2 direction);
     void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock = 160.0, const Vector2 *impact = nullptr);
     bool blocks_front(size_t row, Vector2 hit, Vector2 direction) const;
     struct PickupConfig {

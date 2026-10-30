@@ -50,7 +50,7 @@ func values(object: Object, keys: Array) -> Dictionary:
 	var out := {}
 	for key in keys: out[key] = object.get(key)
 	return out
-func compare_hits(comparison, mode: String) -> void:
+func compare_hits(comparison, mode: String, stone := false) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 287, "empty": true, "invincible": false})
@@ -61,8 +61,10 @@ func compare_hits(comparison, mode: String) -> void:
 	if mode.ends_with("ram"): run.cfg.ram_speed_ratio = 0.0
 	var definition: EnemyDef = run.enemies.def_of(&"shield").duplicate(true)
 	if mode == "rear_zero_ram": definition.weak_arc = 0.0
-	if mode == "glide_cooldown": definition.hp = 1000.0
+	if mode == "glide_cooldown" or stone: definition.hp = 1000.0
+	if stone: definition.armor = 1000.0
 	var core = comparison.create_native()
+	var budget_helper = load("res://tests/native_attack_budget.gd").new()
 	core.configure(DATA.compile_enemy(definition, run.cfg))
 	core.configure_ship(values(run.cfg, SHIP.CONFIG_KEYS), values(run.state.stats, SHIP.STAT_KEYS))
 	core.configure_combat(values(run.cfg, COMBAT.COMBAT_CONFIG), values(run.state.stats, COMBAT.COMBAT_STATS))
@@ -88,8 +90,11 @@ func compare_hits(comparison, mode: String) -> void:
 	var origin := run.state.ship_pos
 	var position := Vector2.ZERO if mode.ends_with("shots") or mode == "front_debris" else origin + (Vector2(40,0) if mode.begins_with("rear") else Vector2(0,40) if mode == "side_ram" else Vector2(-40,0))
 	run.state.events.clear()
-	run.enemies.spawn(definition, position)
-	core.spawn_enemy(&"shield", position)
+	var row := run.enemies.spawn(definition, position)
+	var id: int = core.spawn_enemy(&"shield", position)
+	if stone:
+		run.enemies.table.stone[row] = 1.0
+		check(core.set_enemy_motion(id,{"stone":1.0}),"石化中の接触と射撃を比較する")
 	check(comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events())).is_empty(), "強敵の出現を同じ個体IDで通知する")
 	run.combat.rebuild_grid()
 	core.rebuild_enemy_grid(run.cfg.grid_cell)
@@ -125,10 +130,11 @@ func compare_hits(comparison, mode: String) -> void:
 		difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
 		check(difference.is_empty(), "盾の通知順が一致する: " + mode + difference)
 		check(str(run.state.rng.state) == core.inspect().rng_state, "背面命中とドロップの乱数が一致する: " + mode)
-	if mode == "front_shots": check(core.hostiles_snapshot().size() == 1, "反射の待ち時間中は追加の反射弾を出さない")
-	if mode == "rear_ram": check(run.state.ship_shield_t > 0 and core.ship_snapshot().ship_shield_t > 0, "背面から盾を奪う経路が実際に通る")
+		check(comparison.difference(budget_helper.snapshot(run.projectiles.director),core.attack_budget_snapshot()).is_empty(),"撃破直後の接触枠も一致する: " + mode)
+	if mode == "front_shots" and not stone: check(core.hostiles_snapshot().size() == 1, "反射の待ち時間中は追加の反射弾を出さない")
+	if mode == "rear_ram" and not stone: check(run.state.ship_shield_t > 0 and core.ship_snapshot().ship_shield_t > 0, "背面から盾を奪う経路が実際に通る")
 	if mode == "glide_cooldown": check(run.state.glide and core.ship_snapshot().glide, "接触待ち時間中の盾の前面接触は勢いを保つ")
-	if mode == "rear_ram":
+	if mode == "rear_ram" and not stone:
 		for elapsed in [0.21, 0.01, float(definition.params.shield_time)]:
 			run.state.events.clear()
 			run.ship.intent.touch = true
@@ -144,5 +150,16 @@ func compare_hits(comparison, mode: String) -> void:
 			difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
 			check(difference.is_empty(), "盾の防御と失効通知が一致する: " + difference)
 		check(core.ship_snapshot().ship_hp < run.state.stats.max_hp, "盾が切れた後の被弾を実際に通る")
+	if stone:
+		var pickup_helper = COMBAT.new()
+		check(comparison.difference(comparison.plain(pickup_helper.pickup_snapshot(run)),comparison.plain(core.pickups_snapshot())).is_empty(),"石化の撃破でも同じ報酬を生成する")
+		pickup_helper.free()
+		check(run.state.kills == core.combat_snapshot().kills and run.state.hitstop == core.combat_snapshot().hitstop,"石化の撃破数と停止演出が一致する")
+		if mode.ends_with("shots") or mode == "front_debris":
+			check(run.enemies.table.hp[row] < definition.base_hp(run.cfg) and core.hostiles_snapshot().is_empty(),"石化中は盾で反射せずダメージを受ける")
+		else:
+			check(run.enemies.table.dead[row] != 0 and run.enemies.table.hp[row] > 0.0,"石化した敵はHPと装甲に関係なく接触で砕ける")
+			check(run.state.ship_shield_t == 0.0,"石化した盾から盾を奪わない")
+	budget_helper.free()
 	core.close()
 	lab.free()

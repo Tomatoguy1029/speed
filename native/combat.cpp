@@ -49,7 +49,7 @@ static double angle_difference(double target, double current) {
 bool SpeedRunCore::blocks_front(size_t row, Vector2 hit, Vector2 direction) const {
     const auto &enemy = enemies[row];
     const auto &def = definitions[enemy.definition];
-    if (def.kind != speed::EnemyDefinition::Kind::Shield) return false;
+    if (def.kind != speed::EnemyDefinition::Kind::Shield || enemy.stone > 0) return false;
     Vector2 toward = hit - enemy.pos;
     if (toward.length_squared() < 0.01) toward = -direction;
     return toward.length_squared() > 0 && std::abs(angle_difference(toward.angle(), enemy.facing)) <= def.front_arc;
@@ -87,18 +87,26 @@ void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, boo
         emit_event("text", text);
     }
     if (enemy.hp <= 0) {
-        enemy.dead = true; dead_rows.push_back(row); ++kills;
-        Dictionary killed;
-        killed["pos"] = enemy.pos; killed["r"] = enemy.radius; killed["crit"] = crit;
-        killed["id"] = enemy.id; killed["t"] = time; killed["world_t"] = world_time;
-        killed["enemy_type"] = def.id; killed["meteor_index"] = -1; killed["facing"] = enemy.facing;
-        killed["elite"] = enemy.elite; killed["cause"] = cause; killed["dir"] = direction; killed["color"] = def.color;
-        emit_event("kill", killed);
-        drop_enemy_pickups(enemy);
+        kill_enemy(row, crit, cause, direction);
     } else if (def.knockback > 0) {
         const double mass = std::max(1.0, enemy.radius / 20.0);
         enemy.vel += direction * knock * def.knockback / mass;
     }
+}
+
+void SpeedRunCore::kill_enemy(size_t row, bool crit, StringName cause, Vector2 direction) {
+    auto &enemy = enemies[row];
+    if (enemy.dead || phase != Phase::Play) return;
+    const auto &def = definitions[enemy.definition];
+    enemy.dead = true; dead_rows.push_back(row); ++kills;
+    Dictionary killed;
+    killed["pos"] = enemy.pos; killed["r"] = enemy.radius; killed["crit"] = crit;
+    killed["id"] = enemy.id; killed["t"] = time; killed["world_t"] = world_time;
+    killed["enemy_type"] = def.id; killed["meteor_index"] = -1; killed["facing"] = enemy.facing;
+    killed["elite"] = enemy.elite; killed["cause"] = cause; killed["dir"] = direction; killed["color"] = def.color;
+    emit_event("kill", killed);
+    passive_attack(String::num_int64(enemy.id), enemy.id);
+    drop_enemy_pickups(enemy);
 }
 
 bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
@@ -144,6 +152,14 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (!draw.tracing && enemy.hit_cd > 0) continue;
         const bool rear = std::abs(angle_difference((position - enemy.pos).angle(), enemy.facing + Math_PI)) <= def.weak_arc;
         const bool crit = (def.weak_arc > 0 && rear) || rng->randf() < c.crit_chance;
+        if (enemy.stone > 0) {
+            enemy.hit_cd = c.contact_cooldown;
+            if (draw.tracing) draw.inside[enemy.id] = hit.row;
+            Dictionary event; event["pos"] = enemy.pos; event["normal"] = -direction;
+            event["enemy_pos"] = enemy.pos; event["r"] = enemy.radius; emit_event("block_impact", event);
+            kill_enemy(hit.row, false, fast ? StringName("ram") : StringName("touch"), direction);
+            continue;
+        }
         if (!fast) {
             enemy.hit_cd = c.contact_cooldown;
             damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction, 160.0, &position);
