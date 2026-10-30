@@ -1,0 +1,33 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="GDScript" id="Runner"]
+script/source = "extends Node
+func _ready() -> void:
+	var options := {}
+	for arg in OS.get_cmdline_user_args():
+		var pair := arg.trim_prefix(\"--\").split(\"=\", false, 1)
+		if pair.size() == 2: options[pair[0]] = pair[1]
+	if not options.has(\"input\") or not options.has(\"output\"):
+		push_error(\"--input=入力JSON --output=結果JSON を指定してください\")
+		get_tree().quit(1)
+		return
+	var data = JSON.parse_string(FileAccess.get_file_as_string(options.input))
+	if not data is Dictionary or not data.has_all([\"spec\", \"commands\", \"ticks\"]):
+		push_error(\"入力にはspec・commands・ticksが必要です\")
+		get_tree().quit(1)
+		return
+	var compare = load(\"res://tools/compare_runtime.gd\").new()
+	var result: Dictionary = await compare.record(self, data.spec, data.commands, int(data.ticks))
+	var file := FileAccess.open(options.output, FileAccess.WRITE)
+	if file == null:
+		push_error(\"結果の保存先を開けません\")
+		get_tree().quit(1)
+		return
+	file.store_string(JSON.stringify(result))
+	file.close()
+	print(\"固定入力の結果を保存しました: \", options.output)
+	get_tree().quit()
+"
+
+[node name="CompareRuntime" type="Node"]
+script = SubResource("Runner")
