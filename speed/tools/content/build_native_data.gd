@@ -11,13 +11,15 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig) -> Dictionar
 		"hp": definition.base_hp(config) * config.enemy_hp_mult,
 		"armor": definition.armor * config.enemy_armor_mult, "radius": radius,
 		"speed": definition.speed, "fire_interval": float(definition.params.get("fire_interval", 0.0)),
-		"color": [definition.color.r, definition.color.g, definition.color.b, definition.color.a]}
-	for key in ["hp", "armor", "radius", "speed", "fire_interval"]:
+		"color": [definition.color.r, definition.color.g, definition.color.b, definition.color.a],
+		"xp": definition.xp, "knockback": definition.knockback_scale(config),
+		"hitstop_multiplier": definition.hitstop_multiplier}
+	for key in ["hp", "armor", "radius", "speed", "fire_interval", "xp", "knockback", "hitstop_multiplier"]:
 		if not is_finite(float(row[key])) or float(row[key]) < 0.0:
 			return {}
 	if row.id.is_empty() or row.hp <= 0.0 or row.radius <= 0.0:
 		return {}
-	return {"version": 1, "enemies": [row]}
+	return {"version": 2, "enemies": [row]}
 
 ## 共通生成から使う比較条件。未移行の通常ゲーム用データと混同しない。
 static func build_probe(path: String) -> Error:

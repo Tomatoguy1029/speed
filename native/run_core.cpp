@@ -84,7 +84,7 @@ Dictionary SpeedRunCore::inspect() const {
 // 入力全体を検証してから差し替え、不正な途中結果を残さない。
 bool SpeedRunCore::configure(const Dictionary &data) {
     if (started || closed || !data.has("version") ||
-            (data["version"].get_type() != Variant::INT && data["version"].get_type() != Variant::FLOAT) || double(data["version"]) != 1.0 ||
+            (data["version"].get_type() != Variant::INT && data["version"].get_type() != Variant::FLOAT) || double(data["version"]) != 2.0 ||
             !data.has("enemies") || data["enemies"].get_type() != Variant::ARRAY) return false;
     const Array rows = data["enemies"];
     std::vector<speed::EnemyDefinition> parsed;
@@ -96,9 +96,9 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         speed::EnemyDefinition def;
         def.id = String(row["id"]);
         for (const auto &previous : parsed) if (previous.id == def.id) return false;
-        const char *keys[] = {"hp", "armor", "radius", "speed", "fire_interval"};
-        double *values[] = {&def.hp, &def.armor, &def.radius, &def.speed, &def.fire_interval};
-        for (int k = 0; k < 5; ++k) {
+        const char *keys[] = {"hp", "armor", "radius", "speed", "fire_interval", "xp", "knockback", "hitstop_multiplier"};
+        double *values[] = {&def.hp, &def.armor, &def.radius, &def.speed, &def.fire_interval, &def.xp, &def.knockback, &def.hitstop_multiplier};
+        for (int k = 0; k < 8; ++k) {
             if (!row.has(keys[k])) return false;
             const Variant value = row[keys[k]];
             if (value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) return false;

@@ -34,13 +34,14 @@ func _ready() -> void:
 			var compiler = load(data_path)
 			var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
 			var data: Dictionary = compiler.compile_enemy(definition, ContentManager.base)
+			check(data.enemies[0].has("xp") and data.enemies[0].has("knockback") and data.enemies[0].has("hitstop_multiplier"), "撃破報酬・押出し・停止倍率を編集元から渡す")
 			if not compiler.has_method("build_probe"):
 				check(false, "比較用データを共通生成から保存できる")
 			else:
 				var path := "/tmp/speed-native-generated-probe.json"
 				check(compiler.build_probe(path) == OK, "編集元の実行データを生成する")
 				var saved = JSON.parse_string(FileAccess.get_file_as_string(path))
-				check(saved is Dictionary and saved.version == 1 and saved.enemies.size() == 1, "保存結果を再読込できる")
+				check(saved is Dictionary and saved.version == 2 and saved.enemies.size() == 1, "保存結果を再読込できる")
 			var configured = comparison.create_native()
 			check(configured.configure(data), "追跡敵の定義を読み込める")
 			var broken := data.duplicate(true)

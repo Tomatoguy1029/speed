@@ -13,6 +13,7 @@ struct EnemyDefinition {
     double radius = 0.0;
     double speed = 0.0;
     double fire_interval = 0.0;
+    double xp = 0.0, knockback = 0.0, hitstop_multiplier = 0.0;
     godot::Color color;
 };
 }
