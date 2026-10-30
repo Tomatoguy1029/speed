@@ -12,6 +12,70 @@ var follows: Dictionary = {}
 func follow(i: int, goal: Vector2, until: float, speed_scale: float) -> void:
 	follows[i] = [goal, until, speed_scale]
 
+## ボス専用の期限付き指示。個体IDを保持し、行の再利用には引き継がない。
+var steering: Dictionary = {}
+var quiet_until: Dictionary = {}
+var warning_until: Dictionary = {}
+
+## 期限まで、向いている方へ走る。到着後は止まって face_point を向く。
+func steer_follow(i: int, goal: Vector2, face_point: Vector2, until: float, cfg: Dictionary) -> void:
+	var old: Dictionary = steering.get(i, {})
+	steering[i] = {"id": table.id[i], "goal": goal, "face": face_point, "until": until, "cfg": cfg,
+		"h": old.get("h", table.facing[i]), "v": old.get("v", table.vel[i].length())}
+
+## 輪や突進の指示中は通常の噛みつきを始めない。
+func quiet(i: int, until: float, velocity: Vector2 = Vector2.INF) -> void:
+	quiet_until[i] = [table.id[i], until, velocity]
+
+func mark(i: int, until: float) -> void:
+	warning_until[i] = [table.id[i], until]
+
+func warning(i: int) -> bool:
+	var entry: Array = warning_until.get(i, [])
+	return not entry.is_empty() and entry[0] == table.id[i] and float(entry[1]) > state.world_time
+
+func release_order(i: int) -> void:
+	steering.erase(i)
+	quiet_until.erase(i)
+	warning_until.erase(i)
+	follows.erase(i)
+
+func _move_without_bite(i: int, dt: float) -> bool:
+	var order: Dictionary = steering.get(i, {})
+	if not order.is_empty():
+		if order.id == table.id[i] and float(order.until) > state.world_time:
+			var c: Dictionary = order.cfg
+			var to: Vector2 = order.goal - table.pos[i]
+			var d := to.length()
+			var h := float(order.h)
+			var v := float(order.v)
+			if d < float(c.arrive):
+				v = move_toward(v, 0.0, float(c.decel) * dt)
+				if v < 80.0: h = rotate_toward(h, (Vector2(order.face) - table.pos[i]).angle(), float(c.face_turn) * dt)
+			else:
+				var rate := float(c.turn_slow) if v >= float(c.turn_switch) else float(c.turn_fast)
+				h = rotate_toward(h, to.angle(), rate * dt)
+				var target := minf(float(c.max_speed), d * 2.2) * maxf(0.25, cos(h - to.angle()))
+				v = move_toward(v, target, float(c.accel if target > v else c.decel) * dt)
+			order.h = h
+			order.v = v
+			table.vel[i] = Vector2.from_angle(h) * v
+			table.facing[i] = h
+			table.mode[i] = EnemyTable.Mode.MOVE
+			table.charge[i] = 0.0
+			return true
+		steering.erase(i)
+	var entry: Array = quiet_until.get(i, [])
+	if not entry.is_empty():
+		if entry[0] == table.id[i] and float(entry[1]) > state.world_time:
+			table.vel[i] = _pursuit_velocity(i, state.ship_pos, dt) if entry[2] == Vector2.INF else entry[2]
+			if table.vel[i].length_squared() > 0.01: table.facing[i] = table.vel[i].angle()
+			table.mode[i] = EnemyTable.Mode.MOVE
+			table.charge[i] = 0.0
+			return true
+		quiet_until.erase(i)
+	return false
+
 func setup(system: EnemySystem, behavior_name: StringName, idx: int) -> void:
 	super(system, behavior_name, idx)
 	watches_rows = true
@@ -51,7 +115,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 	_pursuit.clear()
 	# 1回の更新前の位置・速度から全個体を計算し、行を回す順番への依存を避ける。
 	for i in rows:
-		if _running(i): _pursuit[i] = _pack_velocity(i)
+		if _running(i) or quiet_until.has(i): _pursuit[i] = _pack_velocity(i)
 	super(rows, dt)
 
 func _pack_velocity(i: int) -> Vector2:
@@ -119,10 +183,13 @@ func _remove(i: int) -> void:
 	if packs[pack].is_empty(): packs.erase(pack)
 	members.erase(i)
 	_pursuit.erase(i)
-	follows.erase(i)
+	release_order(i)
 
 func clear() -> void:
 	packs.clear()
 	members.clear()
 	_pursuit.clear()
 	follows.clear()
+	steering.clear()
+	quiet_until.clear()
+	warning_until.clear()

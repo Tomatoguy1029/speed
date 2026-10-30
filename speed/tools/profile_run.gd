@@ -31,6 +31,8 @@ var initial_traits := {}
 var loadout_changes := 0
 var previous_us := 0
 var start_us := 0
+var measure_start_clock := 0.0
+var measure_start_world := 0.0
 var counts := {"enemies": 0.0, "hostile": 0.0, "hazards": 0.0, "friendly": 0.0, "gems": 0.0}
 var options: Dictionary = {}
 var saved_rd: RenderingDevice
@@ -164,6 +166,8 @@ func _ready() -> void:
 	rows_rec.clear()
 	previous_us = Time.get_ticks_usec()
 	start_us = previous_us
+	measure_start_clock = run.state.time
+	measure_start_world = run.state.world_time
 	measuring = true
 	print("PROFILE_BEGIN ", JSON.stringify({"options": options, "window": str(DisplayServer.window_get_size()),
 		"viewport": str(get_viewport().get_visible_rect().size), "texture": str(get_viewport().get_texture().get_size()),
@@ -230,6 +234,8 @@ func _process(_delta: float) -> void:
 		"canvas_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS),
 		"draw_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW),
 		"specialization_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION),
+		"run_clock": run.state.time, "world_clock": run.state.world_time,
+		"enemy_capacity": run.enemies.slots.capacity(),
 		"enemies": run.enemies.count(), "hostile": run.projectiles.hostile_count(),
 		"objects": Performance.get_monitor(Performance.OBJECT_COUNT), "nodes": Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
 		"orphans": Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), "static_mb": Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0,
@@ -282,7 +288,13 @@ func _stats(values: Array[float]) -> Dictionary:
 	var total := 0.0
 	for value in values:
 		total += value
-	return {"mean": total / values.size(), "p95": values[int((values.size() - 1) * 0.95)], "max": values[-1]}
+	return {"mean": total / values.size(), "min": values[0],
+		"p95": values[int((values.size() - 1) * 0.95)], "p99": values[int((values.size() - 1) * 0.99)], "max": values[-1]}
+
+func _frame_stats(values: Array[float]) -> Dictionary:
+	var result := _stats(values)
+	result.over_33_33ms = values.filter(func(ms: float): return ms > 1000.0 / 30.0).size()
+	return result
 
 func _finish(seconds: float) -> void:
 	var manager_ms := {}
@@ -311,11 +323,17 @@ func _finish(seconds: float) -> void:
 		"initial_weapons": initial_weapons, "initial_traits": initial_traits,
 		"loadout_changes": loadout_changes, "traits": run.state.traits,
 		"level": run.state.level,
-		"frame_ms": _stats(frames), "gpu_viewport_ms": _stats(gpu_times), "render_cpu_ms": _stats(render_times),
+		"frame_ms": _frame_stats(frames), "gpu_viewport_ms": _stats(gpu_times), "render_cpu_ms": _stats(render_times),
 		"draw_calls": _stats(draws), "counts": counts, "managers": manager_ms, "drawing_ms_frame": draw_ms,
 		"view_ms": view_ms, "view_enemy_rows": view_rows,
 		"phase": run.state.phase, "time": run.state.time, "world_time": run.state.world_time, "weapons": run.state.weapons}
 	result.timeline = timeline
+	result.measure_start_clock = measure_start_clock
+	result.measure_start_world = measure_start_world
+	var enemy_counts: Array[float] = []
+	for row: Dictionary in timeline:
+		enemy_counts.append(float(row.enemies))
+	result.enemy_count_range = _stats(enemy_counts)
 	result.phase_trace = phase_trace
 	result.kills = run.state.kills
 	if options.get("body_benchmark", "off") == "on":

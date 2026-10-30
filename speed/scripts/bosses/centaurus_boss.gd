@@ -24,13 +24,23 @@ var recovery := 0.0
 ## 強弓の発射直前の警告中か
 var alerting := false
 var cooldowns: Dictionary = {}
-var retreat_time := 0.0
+var path_hold_time := 0.0
+var path_side := 1.0
+var sail_side := 1.0
+var sail_guards: Dictionary = {}
+var leap_ready_at := 0.0
+var leap_time := 0.0
+var leap_from := Vector2.ZERO
+var leap_to := Vector2.ZERO
+var combo_pending: StringName = &""
+var combo_gap := 0.0
+var combo_wait := 0.0
 var retreat_ready_at := 0.0
-var turn_time := 0.0
 ## 近くの守る雑魚の中心。足りなければ Vector2.INF
 var guard_point := Vector2.INF
 var turn_motion := 0.0
 var _guard_scan := 0.0
+var _guard_refill := 0.0
 var _defeated := false
 var _presentation: Node
 var entrance_time := 0.0
@@ -84,6 +94,7 @@ func _on_bound() -> void:
 		_presentation = presentation_scene.instantiate()
 		add_child(_presentation)
 		_presentation.bind_centaurus(self)
+	_spawn_guards()
 	_cue(&"spawned")
 	if not run_state.lab_mode: begin_entrance()
 
@@ -112,8 +123,7 @@ func _stop_combat() -> void:
 	_defeated = true
 	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
-	timeline.stop()
-	_clear_rain()
+	cancel_attack()
 	mode = &"defeated"
 	table.vel[body] = Vector2.ZERO
 	table.charge[body] = 0.0
@@ -122,6 +132,7 @@ func _stop_combat() -> void:
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
+	_update_path_hold(dt)
 	table.flash[body] = maxf(0.0, table.flash[body] - dt)
 	table.hit_cd[body] = maxf(0.0, table.hit_cd[body] - dt)
 	turn_motion = 0.0
@@ -143,25 +154,31 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		table.vel[body] = Vector2.ZERO
 		_face(run_state.enemy_aim, def.turn, dt)
 		if phase_time <= 0.0: mode = &"idle"
-	elif mode == &"retreat":
-		_retreat_tick(dt)
-	elif mode == &"turn":
-		turn_time -= dt
+	elif mode == &"leap":
+		_leap_tick(dt)
+	elif mode == &"combo_gap":
 		table.vel[body] = Vector2.ZERO
-		_face(run_state.enemy_aim, def.turn, dt)
-		if turn_time <= 0.0: mode = &"idle"
+		combo_wait -= dt
+		if combo_wait <= 0.0:
+			var next := combo_pending
+			combo_pending = &""
+			_begin_technique(next)
 	elif mode == &"recovery":
 		recovery = maxf(0.0, recovery - dt)
 		table.vel[body] = Vector2.ZERO
 		if recovery <= 0.0:
 			mode = &"idle"
 			technique = &""
+	elif _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley", &"sail_run"] and mode in [&"windup", &"rain", &"shooting", &"strike", &"sail"]:
+		_runner.tick(self, dt)
 	elif mode == &"rain":
 		_rain_tick(dt)
 	elif mode in [&"windup", &"shooting", &"strike"]:
 		table.vel[body] = Vector2.ZERO
-		# 強弓は引き絞りの間、機体の今の位置へ向きを合わせ続ける。背後攻撃は背中を向けたまま構える。
-		if mode == &"windup" and not _tracks_during_warn():
+		# 強弓は赤い警告まで機体を追い、警告後は照準を固定する。背後攻撃は背中を向けたまま構える。
+		if _runner_for().kind() == &"power_shot" and alerting:
+			table.facing[body] = _runner.locked_angle
+		elif mode == &"windup" and not _tracks_during_warn():
 			if _runner_for().kind() != &"rear_attack": _face(warn_aim, def.turn, dt)
 		elif _runner_for().kind() == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
 		elif _runner_for().kind() != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
@@ -172,13 +189,25 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if phase_pending:
 			_begin_phase_two()
 		else:
+			_refill_guards(dt)
 			_cooldown = maxf(0.0, _cooldown - dt)
-			if clock >= retreat_ready_at and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.retreat_trigger) and not _rear_ready():
+			if _leap_ready():
+				_begin_leap()
+			elif _rear_ready():
+				_position_tick(dt)
+				if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
+			elif _conditional_ready(&"stomp"):
+				start_attack(&"stomp")
+			elif path_hold_time >= float(def.params.path_hold) and _conditional_ready(&"shower_path"):
+				if start_attack(&"shower_path"): path_hold_time = 0.0
+			elif clock >= retreat_ready_at and _rules.has(&"shower_wall") and clock >= float(cooldowns.get(&"shower_wall", 0.0)) and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.retreat_trigger):
 				_begin_retreat()
 			else:
 				_position_tick(dt)
 				if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
-	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" else 0.0
+	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" and timeline.is_playing() else 0.0
+	if mode == &"windup" and _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley", &"sail_run"]:
+		table.charge[body] = clampf((clock - _runner.started_at) / maxf(float(rule().warn), 0.001), 0.0, 1.0)
 	_previous_ship = run_state.ship_pos
 	_sync_technique_visuals()
 	presentation_advanced.emit(dt)
@@ -222,10 +251,10 @@ func technique_ready(attack: StringName, gate: Dictionary) -> bool:
 
 ## 技の条件を測る位置。背後攻撃は背後へ回り込んだ機体の今の位置、ほかは共通の遅延照準。
 func _target_of(attack: StringName) -> Vector2:
-	return run_state.ship_pos if attack == &"rear_attack" else run_state.enemy_aim
+	return run_state.ship_pos if attack in [&"rear_attack", &"stomp"] else run_state.enemy_aim
 
 func selection_blocked() -> bool:
-	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"retreat", &"turn", &"final", &"defeated"]
+	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"retreat", &"turn", &"leap", &"final", &"defeated"]
 
 func can_begin_sequence() -> bool:
 	return mode == &"idle" and _cooldown <= 0.0
@@ -237,35 +266,82 @@ func attack_failed() -> bool:
 func can_select(attack: StringName, min_phase: int, min_range: float, max_range: float) -> bool:
 	if mode != &"idle" or phase_pending or _cooldown > 0.0 or phase < min_phase: return false
 	if clock < float(cooldowns.get(attack, 0.0)): return false
+	for part in _combo_parts(attack):
+		if not _rules.has(part) or clock < float(cooldowns.get(part, 0.0)): return false
 	var distance := _target_of(attack).distance_to(table.pos[body])
 	return distance >= min_range and distance <= max_range
 
 func start_attack(attack: StringName) -> bool:
+	if phase < 2 and attack in [&"shower_path", &"sail_run"]: return false
 	if mode != &"idle" or not _rules.has(attack): return false
 	var r: Dictionary = _rules[attack]
 	var length := _attack_length(attack, r)
 	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, length): return false
+	cooldowns[attack] = clock + float(r.cd)
+	var parts := _combo_parts(attack)
+	combo_pending = &""
+	if not parts.is_empty():
+		for part in parts: cooldowns[part] = clock + float(_rules[part].cd)
+		combo_pending = parts[1]
+		combo_gap = float(r.gap)
+		_begin_technique(parts[0])
+	else:
+		_begin_technique(attack)
+	return true
+
+func _begin_technique(attack: StringName) -> void:
 	technique = attack
 	_runner = _moves[attack].make_runner()
 	_support_runners[attack] = _runner
-	cooldowns[attack] = clock + float(r.cd)
-	_begin_windup(r, length)
-	return true
+	_begin_windup(rule(), _attack_length(attack, rule()))
+
+func _combo_parts(attack: StringName) -> Array[StringName]:
+	if attack == &"combo_shower_shot": return [&"shower_chase", &"power_shot"]
+	if attack == &"combo_rain_volley": return [&"rain", &"volley"]
+	return []
+
+## コンボの前半では硬直を挟まず、同じ攻撃枠のまま後半へつなぐ。
+func finish_technique() -> void:
+	timeline.stop()
+	table.vel[body] = Vector2.ZERO
+	alerting = false
+	if not combo_pending.is_empty():
+		mode = &"combo_gap"
+		combo_wait = combo_gap
+	else:
+		mode = &"recovery"
+		recovery = float(rule().recover)
+		_cue(&"recovery_started")
 
 func attack_playing() -> bool:
-	return mode in [&"windup", &"shooting", &"strike", &"rain", &"recovery"]
+	return mode in [&"windup", &"shooting", &"strike", &"rain", &"sail", &"recovery", &"combo_gap"]
 
 func cancel_attack() -> void:
+	_sail_guards(false)
+	combo_pending = &""
+	_support_runners.erase(technique)
+	_runner = null
 	timeline.stop()
 	_clear_rain()
 	alerting = false
 	recovery = 0.0
 	technique = &""
-	if mode in [&"windup", &"shooting", &"strike", &"rain", &"recovery"]: mode = &"idle"
+	if mode in [&"windup", &"shooting", &"strike", &"rain", &"sail", &"recovery", &"combo_gap"]: mode = &"idle"
 
 # ── 射撃 ──────────────────────────────────────────────────
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
+	var parts := _combo_parts(attack)
+	if not parts.is_empty():
+		return _attack_length(parts[0], _rules[parts[0]]) + float(r.gap) + _attack_length(parts[1], _rules[parts[1]]) + float(_rules[parts[1]].recover)
+	var kind: StringName = _moves[attack].make_runner().kind()
+	if kind == &"arrow_shower":
+		var placement := maxi(0, int(r.count) - 1) * float(r.interval) if r.pattern == "chase" else maxi(0, int(r.count) - 1) * 0.5 * float(r.step)
+		if r.pattern == "path": placement = maxi(0, int(r.count) - 1) * float(r.step)
+		return float(r.warn) + placement + float(r.mark_time) + float(r.rain_time)
+	if kind == &"sail_run": return float(r.warn) + float(r.duration)
+	if kind == &"stomp": return float(r.warn) + float(r.active)
+	if kind == &"fan_volley": return float(r.warn) + maxi(0, int(r.shots) - 1) * float(r.interval)
 	if _moves[attack].make_runner().kind() == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
 	if _moves[attack].make_runner().kind() == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
 	if _moves[attack].make_runner().kind() == &"rain":
@@ -278,6 +354,13 @@ func _tracks_during_warn() -> bool:
 
 func _begin_windup(r: Dictionary, length: float) -> void:
 	_runner_for()._begin_windup(self, r, length)
+
+## 赤い照準の起点と方向は発射まで固定する。
+func power_aim_origin() -> Vector2:
+	return _runner.locked_origin if alerting else bow_mouth()
+
+func power_aim_angle() -> float:
+	return _runner.locked_angle if alerting else table.facing[body]
 
 func alert() -> void:
 	_runner_id(&"power_shot").alert(self)
@@ -310,6 +393,15 @@ func _rear_ready() -> bool:
 	if flow_runner.rest_remaining > 0.0 or flow_runner.stamina < float(action_rules.costs.get("rear_attack", 1.0)): return false
 	return action_rules.active_gates_for("rear_attack").any(func(gate): return technique_ready(&"rear_attack", gate))
 
+## 予告は着地の最初のコマ、当たり中は表示と同じ世界時刻のコマを使う。
+func stomp_pose_time() -> float:
+	return maxf(0.0, clock - _runner.started_at - float(rule().warn)) if technique == &"stomp" and mode == &"strike" else 0.0
+
+func stomp_center() -> Vector2:
+	var move = preload("res://scripts/bosses/centaurus/techniques/stomp.gd")
+	var local: Vector2 = move.contact_center(move.PART_ANIMATION, stomp_pose_time())
+	return table.pos[body] + (local * table.r[body] / 135.0).rotated(table.facing[body] - PI * 0.5)
+
 ## 実験場だけが描く攻撃範囲。center・radius・active（当たりが有効か）を持つ。
 ## with_idle なら、構えていない間も背後攻撃の範囲を返す。
 func lab_ranges(with_idle := false) -> Array[Dictionary]:
@@ -319,6 +411,8 @@ func lab_ranges(with_idle := false) -> Array[Dictionary]:
 	elif with_idle and _rules.has(&"rear_attack"):
 		var r: Dictionary = _rules[&"rear_attack"]
 		ranges.append({"center": rear_center(r), "radius": float(r.range_radius), "active": false})
+	if _runner_for().kind() == &"stomp" and mode in [&"windup", &"strike"]:
+		ranges.append({"center": stomp_center(), "radius": float(rule().range_radius), "active": mode == &"strike", "fan": true, "angle": table.facing[body], "half_angle": deg_to_rad(float(rule().half_angle))})
 	return ranges
 
 # ── 矢の雨 ────────────────────────────────────────────────
@@ -342,26 +436,9 @@ func _rain_tick(dt: float) -> void:
 	_runner_id(&"rain")._rain_tick(self, dt)
 
 func _begin_retreat() -> void:
-	mode = &"retreat"
-	retreat_time = 0.0
-	_cue(&"retreat")
-
-## 機体から真っすぐ離れる。フィールドの外縁では縁に沿って走る。
-func _retreat_tick(dt: float) -> void:
-	retreat_time += dt
-	var at := table.pos[body]
-	var away := at - run_state.ship_pos
-	var direction := away.normalized() if away.length_squared() > 1.0 else -Vector2.from_angle(table.facing[body])
-	if at.length() > ctx.cfg.field_radius - 400.0 and direction.dot(at) > 0.0:
-		var along := direction.slide(at.normalized())
-		direction = along.normalized() if along.length_squared() > 0.01 else at.normalized().orthogonal()
-	_face(at + direction, def.turn * 2.0, dt)
-	_move_body(direction * float(param("run_speed")) * dt, dt)
-	if away.length() >= float(def.params.retreat_far) or retreat_time >= float(def.params.retreat_max):
-		mode = &"turn"
-		turn_time = float(def.params.retreat_turn)
-		retreat_ready_at = clock + turn_time + float(def.params.retreat_cd)
-		_cue(&"retreat_finished")
+	# 壁を作るための離脱も、自機を向いた短い後ろ跳びにそろえる。
+	retreat_ready_at = clock + float(def.params.leap_time) + float(def.params.retreat_cd)
+	_begin_leap()
 
 ## 好む距離を保つ。守る雑魚が近くに集まっていれば、機体から見てその集まりの側へ回る。
 ## 距離は好む範囲だけで決める（集まりの奥へ下がると、ボスの前へ並び直す雑魚を追って下がり続けるため）。
@@ -409,11 +486,12 @@ func _move_body(step: Vector2, dt: float) -> void:
 	table.vel[body] = step / maxf(dt, 0.001)
 	ctx.field.collide_enemy(body, from)
 
-func _cue(cue: StringName) -> void:
+func _cue(cue: StringName, position := Vector2.INF) -> void:
 	presentation_event.emit({"cue": cue, "technique": technique, "phase": phase, "mode": mode,
-		"position": table.pos[body], "angle": table.facing[body], "world_time": clock})
+		"position": table.pos[body] if position == Vector2.INF else position, "angle": table.facing[body], "world_time": clock})
 
 func begin_final_strike(charge: float) -> void:
+	cancel_attack()
 	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
 	mode = &"final"
@@ -436,4 +514,100 @@ func _sync_technique_visuals() -> void:
 	technique_pose = _runner_for().body_pose(self)
 	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
 	var elapsed := float(rule().get("recover", 0.0)) - recovery if mode == &"recovery" else timeline.current_animation_position if timeline.is_playing() else 0.0
-	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
+	var visual_phase := mode
+	var duration := float(rule().get(key, 1.0))
+	if _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley", &"sail_run"] and mode in [&"windup", &"rain", &"shooting", &"strike", &"sail"]:
+		elapsed = clock - _runner.started_at
+		if mode != &"windup":
+			visual_phase = &"active"
+			elapsed -= float(rule().warn)
+			duration = _attack_length(technique, rule()) - float(rule().warn)
+	technique_visuals.sync(technique, visual_phase, elapsed, duration)
+
+## 登場時の群れ。並び方は守る雑魚自身に任せる。
+func _spawn_guards() -> void:
+	var guard := ctx.enemies.def_of(&"defender")
+	if guard == null: return
+	var count := int(def.params.guard_count)
+	var back := -Vector2.from_angle(table.facing[body])
+	for k in count:
+		var offset := (float(k) / maxf(count - 1, 1) - 0.5) * 2.2 if count > 1 else 0.0
+		_remember_sail_guard(ctx.enemies.spawn(guard, table.pos[body] + back.rotated(offset) * (table.r[body] + 70.0), {"facing": table.facing[body]}))
+	_guard_refill = float(def.params.guard_refill)
+
+func _refill_guards(dt: float) -> void:
+	_guard_refill = maxf(0.0, _guard_refill - dt)
+	if _guard_refill > 0.0: return
+	_guard_refill = float(def.params.guard_refill)
+	var count := 0
+	var reach := float(def.params.guard_search)
+	for row in table.alive.size():
+		if table.alive[row] != 0 and table.dead[row] == 0 and table.type[row] == &"defender" and table.pos[row].distance_squared_to(table.pos[body]) <= reach * reach:
+			count += 1
+	if count >= int(def.params.guard_count): return
+	var guard := ctx.enemies.def_of(&"defender")
+	if guard == null: return
+	var away := (table.pos[body] - run_state.ship_pos).normalized()
+	if away == Vector2.ZERO: away = -Vector2.from_angle(table.facing[body])
+	var at := table.pos[body] + away.rotated(run_state.rng.randf_range(-0.5, 0.5)) * 70.0
+	_remember_sail_guard(ctx.enemies.spawn(guard, at, {"facing": table.facing[body]}))
+	_guard_refill = float(def.params.guard_refill)
+	_cue(&"guard_called")
+
+func _conditional_ready(id: StringName) -> bool:
+	if not _rules.has(id): return false
+	return technique_ready(id, action_rules.conditions.get(String(id), {}))
+
+func _leap_ready() -> bool:
+	return mode in [&"idle", &"retreat"] and not phase_pending and _rules.has(&"shower_wall") and clock >= leap_ready_at and clock >= float(cooldowns.get(&"shower_wall", 0.0)) and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.leap_trigger)
+
+func _begin_leap() -> void:
+	mode = &"leap"
+	leap_time = 0.0
+	table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
+	leap_from = table.pos[body]
+	var away := (leap_from - run_state.ship_pos).normalized()
+	if away == Vector2.ZERO: away = -Vector2.from_angle(table.facing[body])
+	leap_to = leap_from + away * float(def.params.leap_distance)
+	leap_ready_at = clock + float(def.params.leap_cd)
+	_cue(&"leap")
+
+func _leap_tick(dt: float) -> void:
+	var duration := maxf(0.001, float(def.params.leap_time))
+	var before := clampf(leap_time / duration, 0.0, 1.0)
+	leap_time += dt
+	var k := clampf(leap_time / duration, 0.0, 1.0)
+	# 各更新の移動差分を衝突処理へ渡し、天体に当たった後も表面に沿わせる。
+	_move_body((leap_to - leap_from) * (pow(1.0 - before, 2.0) - pow(1.0 - k, 2.0)), dt)
+	_face(run_state.ship_pos, def.turn * 3.0, dt)
+	if k >= 1.0:
+		_cue(&"leap_landed")
+		mode = &"idle"
+		start_attack(&"shower_wall")
+
+## 横切りが続いた世界時間。待機以外や条件から外れたら数え直す。
+func _update_path_hold(dt: float) -> void:
+	var offset := run_state.ship_pos - table.pos[body]
+	var speed := run_state.ship_vel.length()
+	var p := def.params
+	if phase < 2 or mode != &"idle" or speed < ctx.cfg.base_max_speed * ctx.cfg.steer_cruise * 0.5 or speed < 0.001 or offset.length() < float(p.path_min) or offset.length() > float(p.path_max) or absf(run_state.ship_vel.normalized().dot(offset.normalized())) >= float(p.path_cos):
+		path_hold_time = 0.0
+	else:
+		path_hold_time += dt
+
+## 自分が出した守る雑魚だけを覚える。行が再利用されてもIDが違えば操作しない。
+func _remember_sail_guard(row: int) -> void:
+	sail_guards[row] = {"id": table.id[row], "scale": run_state.rng.randf_range(float(def.params.sail_guard_min), float(def.params.sail_guard_max)), "phase": run_state.rng.randf_range(0.0, TAU)}
+
+func _sail_guards(active: bool) -> void:
+	var behavior = ctx.enemies.behavior(&"defender")
+	if behavior == null: return
+	for row: int in sail_guards.keys():
+		var guard: Dictionary = sail_guards[row]
+		if table.alive[row] == 0 or table.dead[row] != 0 or table.id[row] != int(guard.id):
+			sail_guards.erase(row)
+			continue
+		if active:
+			behavior.boost(row, float(def.params.sail_guard_speed) * float(guard.scale), float(def.params.sail_guard_wobble), run_state.world_time + float(rule().warn) + float(rule().duration), float(guard.phase))
+		else:
+			behavior.clear_boost(row)

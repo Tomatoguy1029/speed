@@ -7,6 +7,7 @@ shader_type canvas_item;
 
 // HDR の描画では頂点の色が線形に直されて届く。そのときは元の値（sRGB）に戻して読む
 uniform bool linear_colors = false;
+uniform float preview_clock = -1.0;
 // 継ぎ目なく並ぶノイズ画像（assets/fx/water_noise.png）。R・G は大きなうねり、B は細かい揺らぎ
 uniform sampler2D noise_tex : repeat_enable, filter_linear_mipmap;
 // ビームの根元の幅の半分、先へ行くほど広がる割合、長さ（世界の単位）
@@ -43,7 +44,7 @@ float dots(vec2 p, float density, float radius) {
 
 // 照射の光：幅いっぱいが白く強く光り、外へ高速で流れる。g が 1 未満なら細くなって飛沫にちぎれていく
 vec4 rushing(float along, float across, float side, float g, float seed) {
-	float t = TIME;
+	float t = preview_clock >= 0.0 ? preview_clock : TIME;
 	float half = half0 + along * slope;
 	float cw = across * half;
 	// 外へ高速で流れる光の筋（流れの向きに引き伸ばしたノイズ）
@@ -69,7 +70,7 @@ vec4 rushing(float along, float across, float side, float g, float seed) {
 
 // 予告のさざ波：ほぼ透明な水の膜に、外へ流れる細い波の線。照射が近いほど k が上がり、流れに勢いが出る
 vec4 ripples(float along, float across, float side, float k, float seed) {
-	float t = TIME;
+	float t = preview_clock >= 0.0 ? preview_clock : TIME;
 	float half = half0 + along * slope;
 	float cw = across * half;
 	float inside = 1.0 - smoothstep(0.97, 1.0, side);
@@ -91,7 +92,7 @@ vec4 ripples(float along, float across, float side, float k, float seed) {
 
 // 照射のあとに残る霧と丸い水滴
 vec4 mist(float along, float across, float side, float life, float seed) {
-	float t = TIME;
+	float t = preview_clock >= 0.0 ? preview_clock : TIME;
 	float half = half0 + along * slope;
 	float cw = across * half;
 	float m = wave_a(vec2(along * 0.003 - t * 0.35, cw * 0.004 + seed));

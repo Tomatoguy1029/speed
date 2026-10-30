@@ -1,5 +1,6 @@
 ## 技の予告・攻撃線・着弾。各技のシーンが表示の値と追加描画を持つ。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 var visual_kind: StringName
 @export var keep_visible := false
@@ -8,6 +9,9 @@ var effects: Array = []
 var retained: bool:
 	get: return keep_visible or not effects.is_empty()
 const FORM = preload("res://scripts/bosses/draco_form.gd")
+
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 
 func update_technique() -> void:
 	var tell := get_node_or_null("Telegraph") as Polygon2D

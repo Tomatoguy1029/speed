@@ -10,17 +10,5 @@ func on_critical(from: Vector2) -> void:
 	_next_time = state.time + float(def.params.cooldown)
 	var v := state.ship_vel
 	var u := v.normalized() if v.length() > 1.0 else state.ship_heading
-	var length := val("length")
-	var width := val("width")
-	var to := from + u * length
-	var pad := Vector2(width / 2.0, width / 2.0)
-	ctx.combat.in_rect(from.min(to) - pad, from.max(to) + pad, _buf)
-	var dmg := atk() * val("damage")
-	var t := ctx.enemies.table
-	for i in _buf:
-		if t.dead[i] != 0 or Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + width / 2.0) < 0.0:
-			continue
-		ctx.combat.damage_enemy(i, dmg, {"cause": &"critBeam", "no_crit": true, "dir": u, "knock": def.params.knock})
-		if state.phase != RunState.Phase.PLAY:
-			return
-	state.emit(&"critical_lance", {"from": from, "to": to, "width": width})
+	ctx.projectiles.attached_attack(&"light_lances").fire(from, u, val("length"),
+		val("width") * ctx.loadout.area_multiplier(), atk() * val("damage"), float(def.params.knock))

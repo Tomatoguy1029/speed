@@ -24,6 +24,7 @@ var _neck_mesh_origin:=Vector2.INF
 var _neck_mesh_radius:=-1.0
 
 const GRID := preload("res://scripts/bosses/hydra_grid.gd")
+const NORMAL_SWIM := preload("res://scripts/bosses/hydra/normal_swim.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 var normal_runners := {}
@@ -75,6 +76,7 @@ class Neck:
 	## 本体から見た付け根の向きと、今の首の向き・長さ
 	var base_angle := 0.0
 	var angle := 0.0
+	var look_angle := 0.0
 	var length := 0.0
 	## 頭の行と id（落ちていれば -1）、前の更新の頭の HP
 	var row := -1
@@ -165,7 +167,7 @@ const TECH_DIR := {&"grid":0.0,&"swarm":-PI/2.0,&"tornado":PI/2.0,&"debris_shatt
 @onready var timeline: AnimationPlayer = $Timeline
 
 var necks: Array[Neck] = []
-var _guard_approach: Array[Neck] = []
+var squad: RefCounted
 ## 今の段階の首の本数
 var count := 0
 ## 不死の首：むき出しの残り時間と、頭の行と id
@@ -281,18 +283,15 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
-	if flow_runner.rest_remaining <= 0.0:
-		if separated: tick_bearer(dt)
-		else: _move(dt)
-	else:
-		table.vel[body] = Vector2.ZERO
-		if separated and immortal_row >= 0: table.vel[immortal_row] = Vector2.ZERO
+	if separated: tick_bearer(dt)
+	elif flow_runner.rest_remaining <= 0.0: _move(dt)
+	else: table.vel[body] = Vector2.ZERO
 	recovery_t = maxf(0.0, recovery_t - dt)
 	# 全滅を先に確定する。同じ更新で期限が来た頭を先に生やさない。
 	_chance_step(dt)
 	if north_aiming:
 		_update_north_targets()
-	_update_guard_approach()
+	if separated and squad != null: squad.tick(dt)
 	for k in necks.size():
 		_tick_neck(necks[k], k, dt)
 	_tech_cd -= dt
@@ -314,7 +313,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	for n in necks:
 		if _alive(n):
 			table.pos[n.row]=_head_pos(n)
-			table.facing[n.row]=n.angle
+			table.facing[n.row]=head_angle(n)
 		if n.row>=0 or n.length>0.0:_follow_neck(n,dt)
 	if separated and immortal_neck!=null:_follow_neck(immortal_neck,dt)
 
@@ -428,6 +427,8 @@ func _unbounded_head_pos(neck: Neck) -> Vector2:
 	if neck.mode in [&"special_aim",&"special_hold"]: return neck.strike_pos
 	if tech_kind(tech) == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
+	if separated and neck != immortal_neck and _normal_moves.has(neck.mode):
+		return neck.strike_pos if neck.motion.get("extension", false) else neck.free_pos
 	if neck.locked and _normal_moves.has(neck.mode): return neck.strike_pos
 	if separated:return neck.free_pos
 	return _neck_base(neck) + Vector2.from_angle(neck.angle) * neck.length
@@ -461,6 +462,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 	else:
 		if table.hp[neck.row] < neck.head_hp:
 			neck.motion.hit=0.35
+			if separated: SNAKE.watch_player(neck, run_state.rng, def.params.squad, squad.profile(neck))
 			_cue(&"hit", neck.mode, k, {"target": &"hydra", "damage": neck.head_hp - maxf(0.0, table.hp[neck.row])})
 		neck.head_hp = table.hp[neck.row]
 		if _normal_moves.has(neck.mode):
@@ -471,7 +473,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 			if flow_controlled: position_head(k, dt)
 		elif not String(neck.mode).begins_with("special_"): _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
-		table.facing[neck.row] = neck.angle
+		table.facing[neck.row] = head_angle(neck)
 
 ## 頭が落ちた：首の残骸を破片にして飛ばし、生え直す時間を決める。
 ## 同じ線で倒した本数と、火の命中に応じて再生待ち時間を延長する。
@@ -578,6 +580,9 @@ func start_normal(index: int, attack: StringName, internal_step := false) -> boo
 	n.locked = false
 	n.step = 0
 	n.emission.clear()
+	n.motion.erase("normal_phase")
+	n.motion.erase("lunge_done")
+	n.motion.erase("extension")
 	n.target = run_state.ship_pos
 	if attack==&"thunder_drop":n.target+=run_state.ship_vel*float(move_params(attack).thunder_lead)
 	_cue(&"warning_started",attack,index)
@@ -587,38 +592,18 @@ func finish_normal(n: Neck) -> void:
 	var cooldown := float(move_params(n.mode).attack_cd)
 	var at := _head_pos(n)
 	_release_attack(n)
-	n.angle = (at-_neck_base(n)).angle()
+	if not separated: n.angle = (at-_neck_base(n)).angle()
 	n.length = at.distance_to(_neck_base(n))
 	n.free_pos=at
 	n.locked = false
 	n.mode = &"idle"
 	n.cd = cooldown
-	if separated and immortal_row >= 0: n.motion.guard_angle = (at - table.pos[immortal_row]).angle()
+	if separated: SNAKE.watch_player(n, run_state.rng, def.params.squad, &"bearer" if n == immortal_neck else squad.profile(n))
 	_cue(&"finished",&"",head_index(n))
 
 func position_head(index: int, dt: float) -> void:
 	var n := necks[index]
-	if separated:
-		var desired:=_guard_patrol(n,index)
-		var entering:=false
-		# 次の攻撃予算に入る蛇だけ画面内へ向かい、残りは護衛位置へ散る。
-		if _guard_approach.has(n):
-			var view: Rect2=run_state.view_rect().grow(-table.r[n.row]-24.0).intersection(arena.bounds.grow(-float(def.params.neck_rest)-table.r[n.row]-24.0))
-			if not view.has_area():
-				view=run_state.view_rect().grow(-table.r[n.row]-24.0).intersection(arena.bounds.grow(-table.r[n.row]-24.0))
-				entering=true
-			var heading:=Vector2.from_angle(n.base_angle)
-			desired=view.get_center()+heading*view.size*0.4
-		var spacing: float=float(def.params.neck_rest)*0.6+table.r[n.row]*2.0
-		for other in necks:
-			if other==n or not _alive(other):continue
-			var offset:=n.free_pos-table.pos[other.row]
-			var distance:=offset.length()
-			if distance>=spacing:continue
-			var direction:=offset/distance if distance>1.0 else Vector2.from_angle(n.base_angle)
-			desired+=direction*(spacing-distance)*1.5
-		steer_snake(n,desired,dt,1.0,entering)
-		return
+	if separated: return
 	var facing := n.base_angle+table.facing[body]
 	n.motion.aim_wait=maxf(0.0,float(n.motion.get("aim_wait",0.0))-dt)
 	if not n.motion.has("aim_target") or n.motion.aim_wait<=0.0:
@@ -632,51 +617,11 @@ func position_head(index: int, dt: float) -> void:
 	aim_neck(n,defend+sin(_time+n.base_angle)*0.06,dt)
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
 
-## 護衛範囲を壁の内側へ収め、内外の持ち場をそれぞれ異なる周期で泳ぐ。
-func _guard_patrol(n: Neck,index: int)->Vector2:
-	var center: Vector2=table.pos[immortal_row]
-	var away:=(center-run_state.ship_pos).normalized()
-	var reach:=float(def.params.guard_radius)*3.0
-	center-=away*float(def.params.guard_radius)*0.4
-	var margin: float=float(def.params.neck_rest)+table.r[n.row]+24.0
-	var region:=Rect2(center-Vector2.ONE*reach,Vector2.ONE*reach*2.0).intersection(arena.bounds.grow(-margin))
-	if not region.has_area():region=arena.bounds.grow(-margin)
-	var phase:=_time*(0.23+index*0.017)+n.base_angle*2.0
-	if not n.motion.has("guard_angle"): n.motion.guard_angle = (n.free_pos - center).angle()
-	n.motion.guard_angle = float(n.motion.guard_angle) + _sim_dt * (0.11 + index * 0.009) * (1.0 if index % 2 == 0 else -1.0)
-	var angle: float = n.motion.guard_angle + sin(phase) * 0.18
-	var ring:=0.55+0.35*(index%2)+sin(phase*0.7+index)*0.06
-	return region.get_center()+Vector2.from_angle(angle)*region.size*0.5*ring
-
-## 通常攻撃の予算と待ち順から、画面内へ入る護衛だけを先に選ぶ。
-func _update_guard_approach()->void:
-	_guard_approach.clear()
-	if not separated or busy or recovery_t>0.0:return
-	var budget:=float(def.params.normal_budget)
-	if flow_controlled and flow_runner.flow != null:
-		budget = minf(flow_runner.stamina, float(flow_runner.flow.sections[flow_runner.index].get("cap", flow_runner.flow.maximum_stamina)))
-	var pending: Array[Neck]=[]
-	for n in necks:
-		if not _alive(n):continue
-		if _normal_moves.has(n.mode):
-			budget-=_normal_cost(n.mode)*maxf(0.0,table.attack_value[n.row])
-		elif n.mode==&"idle" and n.cd<=0.0:
-			if not n.motion.has("guard_ready_since"):n.motion.guard_ready_since=_time
-			pending.append(n)
-		else:n.motion.erase("guard_ready_since")
-	pending.sort_custom(func(a,b):
-		if a.motion.guard_ready_since!=b.motion.guard_ready_since:return a.motion.guard_ready_since<b.motion.guard_ready_since
-		return a.free_pos.distance_squared_to(run_state.ship_pos)<b.free_pos.distance_squared_to(run_state.ship_pos))
-	for n in pending:
-		var cost:=INF
-		for settings: HydraTechnique in _moves.values():
-			if settings.head_kind==n.kind:cost=minf(cost,_normal_cost(settings.technique))
-		if cost>budget:continue
-		budget-=cost
-		_guard_approach.append(n)
-
 func aim_neck(n: Neck, desired: float, dt: float) -> void:
 	if dt<=0.0:return
+	if separated and n != immortal_neck:
+		n.look_angle = rotate_toward(n.look_angle, desired, float(def.params.squad.look_player_turn) * dt)
+		return
 	var offset:=angle_difference(n.angle,desired)
 	var accel:=float(def.params.aim_accel)
 	var speed:=minf(float(def.params.aim_turn),sqrt(2.0*accel*absf(offset)))
@@ -1008,7 +953,7 @@ func _warning_duration(name: StringName) -> float:
 ## -1 は本体、-2 は不死首、0 以上は通常首の配列の添字。戻り値はワールド座標。
 func presentation_anchor(index := -1) -> Transform2D:
 	if index >= 0 and index < necks.size():
-		return Transform2D(necks[index].angle, _head_pos(necks[index]))
+		return Transform2D(head_angle(necks[index]), _head_pos(necks[index]))
 	if index == -2 and immortal_row >= 0 and ctx.enemies.is_same(immortal_row, immortal_id):
 		return Transform2D(0.0, table.pos[immortal_row])
 	return Transform2D(table.facing[body], table.pos[body])
@@ -1215,7 +1160,9 @@ func begin_separation()->void:
 	interrupt_tech()
 	attack_field.clear_effects()
 	_set_count(count)
-	for n in necks:n.free_pos=_head_pos(n)
+	for n in necks:
+		n.free_pos=_head_pos(n)
+		n.look_angle=n.angle
 	separated=true
 	separation_pending=false
 	chance_t=0.0
@@ -1225,6 +1172,7 @@ func begin_separation()->void:
 	immortal_neck.kind=&"immortal"
 	immortal_neck.free_pos=table.pos[body]
 	immortal_neck.angle=(table.pos[body]-run_state.ship_pos).angle()
+	immortal_neck.look_angle=immortal_neck.angle
 	immortal_row=ctx.enemies.spawn_part(body,ctx.enemies.def_of(&"hydra_immortal"),immortal_neck.free_pos)
 	immortal_id=table.id[immortal_row]
 	immortal_neck.row=immortal_row
@@ -1238,6 +1186,7 @@ func begin_separation()->void:
 	table.max_hp[body]=hp
 	table.hp[body]=hp
 	table.guard[immortal_row]=separation_t
+	squad = preload("res://scripts/bosses/hydra/squad_commander.gd").new(self)
 	_cue(&"separation_started",&"",-2,{"duration":separation_t})
 
 func tick_bearer(dt: float)->void:
@@ -1260,11 +1209,14 @@ func tick_bearer(dt: float)->void:
 		n.step=0
 		n.target=run_state.ship_pos
 		_cue(&"warning_started",&"bite_thrust",-2)
+	elif not alone and not busy:
+		n.cd=maxf(0.0,n.cd-dt)
+		squad.tick_bearer(dt)
 	else:
 		n.cd=maxf(0.0,n.cd-dt)
 		var away: Vector2=(n.free_pos-run_state.ship_pos).normalized()
 		if away==Vector2.ZERO:away=Vector2.LEFT
-		var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.bearer_distance)
+		var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.solo_bearer_distance)
 		var grid_hold: bool=busy and tech_kind(tech) == &"grid" and special.state.has("plan")
 		if grid_hold:target=special.state.plan.bearer
 		target=arena.clamp_point(target,table.r[n.row]+12.0 if grid_hold else float(def.params.neck_rest)+60.0)
@@ -1272,9 +1224,10 @@ func tick_bearer(dt: float)->void:
 			n.free_pos=n.free_pos.lerp(target,1.0-exp(-4.0*dt))
 			n.velocity=Vector2.ZERO
 		else:steer_snake(n,target,dt,float(def.params.bearer_speed)/float(def.params.snake_speed),grid_hold)
+	if not alone and not busy: SNAKE.update_look(n, run_state.ship_pos, dt, _time, run_state.rng, def.params.squad, &"bearer", false)
 	var at:=_head_pos(n)
 	table.pos[immortal_row]=at
-	table.facing[immortal_row]=n.angle
+	table.facing[immortal_row]=n.angle if alone or busy else n.look_angle
 	table.pos[body]=at
 	table.hp[body]=table.hp[immortal_row]
 
@@ -1303,36 +1256,62 @@ func grid_plan()->Dictionary:
 
 ## 通常移動は胴の長さぶん手前で回り込み、陣形への移動は指定された内側の配置へ進む。
 func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formation:=false) -> void:
-	var radius: float=table.r[n.row]
-	var margin:=radius+12.0 if formation else float(def.params.neck_rest)+radius+24.0
-	var from: Vector2=arena.safe_point(n.free_pos,radius+1.0)
-	n.free_pos=from
-	var destination: Vector2=arena.safe_point(target,margin)
-	# 障害物へ直進して停止する代わりに、その手前から表面に沿って回り込む。
+	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
+	n.free_pos = from
+	SNAKE.steer(n, snake_destination(n, target, formation), dt, def.params, speed_scale)
+	_finish_snake_step(n, from)
+
+func snake_destination(n: Neck, target: Vector2, formation: bool) -> Vector2:
+	var radius: float = table.r[n.row]
+	var margin := radius + 12.0 if formation else float(def.params.neck_rest) + radius + 24.0
+	var from: Vector2 = arena.safe_point(n.free_pos, radius + 1.0)
+	var destination: Vector2 = arena.safe_point(target, margin)
 	for obstacle in ctx.field.bodies:
-		var clearance: float=obstacle.r+radius+60.0
-		if from.distance_to(obstacle.pos)<clearance+120.0 and Geom.seg_circle_t(from,destination,obstacle.pos,clearance)>=0.0:
-			var outward: Vector2=(from-obstacle.pos).normalized()
-			if outward.is_zero_approx():outward=Vector2.RIGHT
-			var turn:=signf(outward.cross(destination-obstacle.pos))
-			if turn==0.0:turn=1.0
-			destination=arena.safe_point(obstacle.pos+outward.rotated(turn*0.6)*clearance,radius+1.0)
+		var clearance: float = obstacle.r + radius + 60.0
+		if from.distance_to(obstacle.pos) < clearance + 120.0 and Geom.seg_circle_t(from, destination, obstacle.pos, clearance) >= 0.0:
+			var outward: Vector2 = (from - obstacle.pos).normalized()
+			if outward.is_zero_approx(): outward = Vector2.RIGHT
+			var turn := signf(outward.cross(destination - obstacle.pos))
+			if turn == 0.0: turn = 1.0
+			destination = arena.safe_point(obstacle.pos + outward.rotated(turn * 0.6) * clearance, radius + 1.0)
 			break
-	SNAKE.steer(n,destination,dt,def.params,speed_scale)
-	table.pos[n.row]=n.free_pos
-	table.vel[n.row]=n.velocity
-	ctx.field.collide_enemy(n.row,from)
-	n.free_pos=arena.safe_point(table.pos[n.row],radius+1.0)
-	n.velocity=table.vel[n.row]
-	var inside: Vector2=arena.clamp_point(n.free_pos,radius)
-	if inside!=n.free_pos:
-		var inward: Vector2=(inside-n.free_pos).normalized()
-		n.velocity-=inward*minf(0.0,n.velocity.dot(inward))
-		n.free_pos=inside
+	return destination
+
+func swim_snake(n: Neck, force: Vector2, speed: float, turn: float, dt: float) -> void:
+	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
+	n.free_pos = from
+	SNAKE.apply_force(n, force, speed, turn, dt, def.params.squad)
+	_finish_snake_step(n, from)
+
+func swim_bearer(n: Neck, target: Vector2, speed: float, turn: float, dt: float) -> void:
+	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
+	n.free_pos = from
+	var offset := snake_destination(n, target, true) - from
+	if offset.length() > 4.0: n.angle = rotate_toward(n.angle, offset.angle(), turn * clampf(offset.length() / 90.0, 0.2, 1.0) * dt)
+	var amount := speed * minf(1.0, offset.length() / 130.0) * (0.3 + 0.7 * maxf(0.0, cos(angle_difference(n.angle, offset.angle()))))
+	n.velocity = n.velocity.lerp(Vector2.from_angle(n.angle) * amount, 1.0 - exp(-2.5 * dt))
+	n.free_pos += n.velocity * dt
+	_finish_snake_step(n, from)
+
+func _finish_snake_step(n: Neck, from: Vector2) -> void:
+	var radius: float = table.r[n.row]
+	table.pos[n.row] = n.free_pos
+	table.vel[n.row] = n.velocity
+	ctx.field.collide_enemy(n.row, from)
+	n.free_pos = arena.safe_point(table.pos[n.row], radius + 1.0)
+	n.velocity = table.vel[n.row]
+	var inside: Vector2 = arena.clamp_point(n.free_pos, radius)
+	if inside != n.free_pos:
+		var inward: Vector2 = (inside - n.free_pos).normalized()
+		n.velocity -= inward * minf(0.0, n.velocity.dot(inward))
+		n.free_pos = inside
 
 func move_reach(id: StringName) -> Dictionary:
 	return _moves[id].range_info(move_params(id)) if _moves.has(id) else {"origin": "head", "max": INF}
 func tick_normal(neck, dt: float) -> void:
+	if separated and neck != immortal_neck:
+		NORMAL_SWIM.tick(self, neck, dt)
+		return
 	var id: StringName = neck.mode
 	if not normal_runners.has(id): normal_runners[id] = _moves[id].make_runner()
 	normal_runners[id].tick_neck(self, neck, dt)
@@ -1347,3 +1326,6 @@ func _runner_north() -> RefCounted:
 
 func tech_kind(id: StringName) -> StringName:
 	return _move_kinds.get(id, id)
+
+func head_angle(n: Neck) -> float:
+	return n.look_angle if separated and (n.mode == &"idle" or _normal_moves.has(n.mode)) else n.angle

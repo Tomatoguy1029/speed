@@ -26,5 +26,7 @@ func spawn(ps: ProjectileSystem, from: Vector2, angle: float, dmg: float, opts :
 	var speed: float = opts.get("speed", 1300.0)
 	var i := ps._add_friend(ProjectileSystem.FriendKind.SHOT, StringName(opts.get("cause", &"shot")), from, Vector2.from_angle(angle) * speed,
 		opts.get("r", 5.0), dmg, opts.get("life", 0.9), false, opts.get("pierce_left", 0),
-		opts.get("color", Color("#ffe46b")), false, float(opts.get("knock", 250.0)), 0.0, 0.0, -1)
+		opts.get("color", Color("#ffe46b")), false, float(opts.get("knock", 250.0)), 0.0, 0.0, -1,
+		&"", StringName(opts.get("visual_key", "")))
 	ps.friend_on_hit[i] = opts.get("on_hit", Callable())
+	ps.friend_weapon_id[i] = StringName(opts.get("weapon_id", &""))

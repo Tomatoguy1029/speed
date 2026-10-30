@@ -5,6 +5,7 @@ extends RefCounted
 static func area(origin: Vector2, facing: float, reach: float, half: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for j in 25: points.append(origin+Vector2.from_angle(facing+PI-half*pow(j/24.0,2.0))*reach*j/24.0)
-	for j in 49: points.append(origin+Vector2.from_angle(facing+PI+lerpf(-half,half,j/48.0))*reach)
-	for j in range(24,-1,-1): points.append(origin+Vector2.from_angle(facing+PI+half*pow(j/24.0,2.0))*reach*j/24.0)
+	# 境界の接点は前の列に含まれる。重複すると描画時の三角形分割が失敗する。
+	for j in range(1,49): points.append(origin+Vector2.from_angle(facing+PI+lerpf(-half,half,j/48.0))*reach)
+	for j in range(23,0,-1): points.append(origin+Vector2.from_angle(facing+PI+half*pow(j/24.0,2.0))*reach*j/24.0)
 	return points

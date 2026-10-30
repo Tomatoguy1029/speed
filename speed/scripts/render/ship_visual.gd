@@ -2,6 +2,7 @@
 extends RefCounted
 const AIRSHIP := preload("res://assets/pixel/airship.png")
 const AIRSHIP_FLAME := preload("res://assets/pixel/airship_flame.png")
+const AIRSHIP_BLUE_FLAME := preload("res://assets/pixel/airship_blue_flame.png")
 const AIRSHIP_SPARK := preload("res://assets/pixel/airship_spark.png")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 var rm: RunPresentation
@@ -48,6 +49,8 @@ func update(dt: float) -> void:
 		_exhaust.pop_front()
 
 func draw_exhaust(c: CanvasItem) -> void:
+	var escort = run.loadout.weapon_behaviors.get(&"W26")
+	if escort != null and escort.active: return
 	var sonic := rm._blue_exhaust()
 	var trail_color := Color(0.3, 0.65, 1.0) if sonic else Color(1.0, 0.57, 0.3)
 	for i in range(1, _exhaust.size()):
@@ -63,7 +66,7 @@ func draw_exhaust(c: CanvasItem) -> void:
 	var frame := int(_jet_time * 12.0) % 3
 	var region := Rect2(frame * AIRSHIP.get_width(), 0, AIRSHIP.get_width(), AIRSHIP.get_height())
 	c.draw_set_transform(state.ship_pos, state.ship_heading.angle() + PI / 2.0)
-	var flame := load("res://assets/pixel/airship_blue_flame.png") if sonic else AIRSHIP_FLAME
+	var flame := AIRSHIP_BLUE_FLAME if sonic else AIRSHIP_FLAME
 	c.draw_texture_rect_region(flame, rect, region)
 	c.draw_texture_rect_region(AIRSHIP_SPARK, rect, region, Color(1, 1, 1, 0.65))
 	c.draw_set_transform(Vector2.ZERO)
@@ -72,6 +75,9 @@ func draw_ship(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING and run.sequence_t >= cfg.death_freeze_time:
 		return
 	var p := state.ship_pos
+	for id in [&"W01", &"W02"]:
+		var gun = run.loadout.weapon_behaviors.get(id)
+		if gun != null and gun.recoil > 0.0: p -= state.ship_heading * (2.0 if gun.recoil > 0.06 else 1.0) * 1.82 * cfg.character_scale
 	var R := cfg.ship_radius
 	var col := Color.WHITE
 	var hurt := state.ship_hurt > 0.0

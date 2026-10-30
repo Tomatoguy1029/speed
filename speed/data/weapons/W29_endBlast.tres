@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_steps = PackedInt32Array(1, 2, 3, 4, 5)
+params = {
+"damage_by_level": [1.8, 1.95, 2.1, 2.25, 2.4],
+"radius_by_level": [225.0, 235.0, 245.0, 255.0, 270.0],
+"secondary_by_level": [0, 0, 4, 5, 7],
+"secondary_damage": 0.4,
+"secondary_radius": 0.35,
+"secondary_delay": 0.14,
+"secondary_step": 0.03,
+"knock": 500.0
+}
+id = &"W29"
+code_id = &"endBlast"

@@ -142,7 +142,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.interval_total | MAX後の実効短縮累計 | Effective reduction since MAX |
 | postmax.interval.interval | 発射 | Fire |
 | postmax.interval.interval_by_level | 発射 | Fire |
-| postmax.interval.block_interval | 防弾 | Block |
+| postmax.interval.revive_by_level | 殻の復活 | Shell recovery |
 | postmax.interval.burst_interval | 連射 | Burst |
 | postmax.tag | 追加強化 | Enhancement |
 | postmax.keep_hp | 現在HPはそのまま | Current HP stays the same |
@@ -176,18 +176,18 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.pickup_speed | XP吸引速度 | XP attraction speed |
 | postmax.xp_gain | XP獲得量 | XP gain |
 | postmax.target.W03.area | 衝角の船体・破片半径 | Ram hull and fragment radius |
-| postmax.target.W04.area | 接触波動の半径 | Contact wave radius |
-| postmax.target.W08.area | ソニックブームの半径 | Sonic wave radius |
+| postmax.target.W04.area | 震空の半径 | Contact wave radius |
+| postmax.target.W08.area | ソニックブームの輪の広がり | Sonic wave radius |
 | postmax.target.W17.area | 電撃の到達距離 | Electric reach |
 | postmax.target.W21.area | 船体回収半径 | Hull collection radius |
 | postmax.target.W22.area | 双極ビームの幅 | Bipolar beam width |
 | postmax.target.W26.area | 各ドローンの接触半径 | Each drone hit radius |
 | postmax.target.W01.followup | ブラスター弾 | Blaster shots |
-| postmax.target.W02.followup | 散弾砲の弾 | Scatter shots |
-| postmax.target.W23.followup | 後方ブラスター弾 | Rear shots |
-| postmax.target.W25.followup | 迎撃ドローン弾 | Interceptor shots |
+| postmax.target.W02.followup | スプレッドブラスターの弾 | Scatter shots |
+| postmax.target.W23.followup | リアブラスター弾 | Rear shots |
+| postmax.target.W25.followup | ストライクウィング弾 | Interceptor shots |
 | postmax.target.W05.followup | バリアの波動 | Barrier waves |
-| postmax.target.W07.followup | 軌跡機雷 | Trail mines |
+| postmax.target.W07.followup | マインランチャー | Trail mines |
 | postmax.target.W21.followup | 牽引した船体弾 | Towed hull shots |
 | postmax.target.W22.followup | 双極ビーム | Bipolar beam |
 | card.heal&#95;tag | 回復 | Repair |
@@ -241,65 +241,78 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | codex.unknown&#95;detail | まだ手に入れていない | Not obtained yet. |
 | codex.art&#95;custom | 専用ビジュアル | Artwork |
 | codex.art&#95;placeholder | 仮ビジュアル（専用素材未設定） | Placeholder (No Artwork Yet) |
+| codex.comet&#95;relics | 彗星の遺物 | Comet Relics |
 | codex.art&#95;effect | 効果イメージ | Effect Preview |
 |  | ■ 武器（weapon.&lt;ID&gt;） |  |
 | weapon.W01.name | ブラスター | Blaster |
-| weapon.W01.desc | 進む向きへ自動で撃つ。Lv で威力・連射・弾数・貫通が伸びる | Fires automatically in your heading. Levels raise damage, fire rate, shot count and piercing. |
-| weapon.W02.name | 散弾砲 | Scattergun |
-| weapon.W02.desc | 進む向きへ扇状に撃つ。群れに向けて進むとまとめて当たる | Fires a spread in your heading. Fly at a swarm to hit many at once. |
-| weapon.W03.name | 吹き飛ばし衝角 | Knockback Ram |
-| weapon.W03.desc | 高速で触れた敵を進む向きへ吹き飛ばし、ほかの敵にぶつける | Enemies you touch at high speed are knocked forward into other enemies. |
-| weapon.W04.name | 接触波動 | Contact Wave |
-| weapon.W04.desc | 高速で敵に触れるたび、周りへ波動。弾かれた接触でも出る | Every high-speed contact sends out a wave. Works even when you bounce off. |
+| weapon.W01.desc | 前方へ強い光弾を1発ずつ撃つ。光弾は敵を貫く。 | Fires one powerful piercing bolt forward at a time. |
+| weapon.W02.name | スプレッドブラスター | Spread Blaster |
+| weapon.W02.desc | 1発ずつは弱いが、広い扇状に光弾をばらまく。 | Scatters weaker bolts in a wide fan. |
+| weapon.W03.name | 星砕き | Star Shatter |
+| weapon.W03.desc | 一撃で倒した敵が、確率で星屑になって飛び散る。 | Enemies defeated in one blow may shatter into flying stardust. |
+| weapon.W04.name | 震空 | Void Quake |
+| weapon.W04.desc | 触れてきた敵を、空間を歪ませて押し返しながら攻撃する。 | Distorts space to carry nearby enemies outward and damage them. |
 | weapon.W05.name | バリアシステム | Barrier System |
-| weapon.W05.desc | 周りに定期的な波動を出し、敵の弾を防ぐ | Emits waves around you at intervals and blocks enemy shots. |
-| weapon.W07.name | 軌跡機雷 | Trail Mines |
-| weapon.W07.desc | 高速で実際に通った線に機雷を残す。遅れて入った敵を爆破 | Leaves mines along the line you flew at high speed. Blasts enemies that wander in. |
+| weapon.W05.desc | 殻が敵の弾を受け止め、そのたびに波動で周りを押し返す。耐えきれなくなると砕け、しばらくすると戻る。 | A shell blocks enemy shots and releases a repelling wave on each hit. It shatters when depleted and returns after a while. |
+| weapon.W07.name | マインランチャー | Mine Launcher |
+| weapon.W07.desc | ブーストが終わるたびに、前方へ機雷をばらまく。 | Scatters mines forward whenever a boost ends. |
 | weapon.W08.name | ソニックブーム | Sonic Boom |
-| weapon.W08.desc | 駆け抜け始めと一定間隔で、進路ごと大きな衝撃波 | A huge shockwave along your path when a dash starts and at regular intervals. |
-| weapon.W17.name | 接触電撃 | Contact Arc |
-| weapon.W17.desc | 敵に触れると、周りの敵へ電撃が枝分かれして広がる。Lv ごとにつながる数が増える | Touching an enemy branches lightning out to surrounding enemies. Each level reaches more. |
-| weapon.W21.name | 質量牽引砲 | Mass Tow Cannon |
-| weapon.W21.desc | なぞり中に機体の近くで倒れた敵の船体を牽引し、なぞり終えると進む向きへ次々と撃ち出す | Tows the hulls of enemies defeated near your ship mid-dash, then fires them ahead one by one when the dash ends. |
+| weapon.W08.desc | ブースト中とブーストのあとの勢いの間、一定の距離ごとに衝撃波を出し、進路の横の敵を押して倒す。 | During a boost and its momentum, shockwaves push enemies beside your path away at distance intervals. |
+| weapon.W17.name | アークフィールド | Arc Field |
+| weapon.W17.desc | 敵に触れると、周りの敵へ雷が枝分かれして飛ぶ。 | Contact branches lightning toward surrounding enemies. |
+| weapon.W21.name | アンカーキャノン | Anchor Cannon |
+| weapon.W21.desc | ブースト中に倒した敵の船体を引き連れ、ブーストが終わると弾にして撃ち出す。 | Tows hulls of enemies defeated during a boost and fires them when the boost ends. |
 | weapon.W22.name | 双極ビーム | Bipolar Beam |
-| weapon.W22.desc | なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く | Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends. |
-| weapon.W23.name | 後方ブラスター | Rear Blaster |
-| weapon.W23.desc | 機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇 | Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage. |
-| weapon.W25.name | 迎撃ドローン | Interceptor Drones |
-| weapon.W25.desc | 周回編隊から近くの敵へ弾を撃ってダメージを与える。Lvで機数と連射が増える | Orbiting escorts shoot nearby enemies for damage. Levels add drones and bursts. |
-| weapon.W26.name | 突進範囲ドローン | Dash Range Drones |
-| weapon.W26.desc | 突進時に左右へ編隊を展開し、横の敵まで貫く。Lvで機数と編隊幅、光跡が成長 | Deploy a formation beside the ship during a dash to pierce enemies across a wider path. Levels add drones, width, and longer light trails. |
-| weapon.W27.name | 残像機 | Afterimage |
-| weapon.W27.desc | 光の分身が突進軌道を追撃。Lvで機数と合計追撃威力が増える | Light echoes retrace your dash with a delay, sharing a portion of normal ram damage. Levels increase echo count and total follow-up damage. |
+| weapon.W22.desc | ブーストの始点に発射器を置き、ブーストが終わると発射器と機体の間を太いビームで貫く。 | Leaves an emitter at the boost start and fires a thick beam between it and the ship when the boost ends. |
+| weapon.W23.name | リアブラスター | Rear Blaster |
+| weapon.W23.desc | 背中の砲台から、後ろから迫る敵へ光弾を撃つ。 | The rear turret fires at enemies approaching from behind. |
+| weapon.W25.name | ストライクウィング | Strike Wing |
+| weapon.W25.desc | 周りを回るドローンが、近い敵へ向きを変えて連射する。 | Orbiting drones turn toward nearby enemies and fire bursts. |
+| weapon.W26.name | エスコートウィング | Escort Wing |
+| weapon.W26.desc | ブーストするとV字の編隊に広がり、機体の横の敵を貫く。 | Boosting deploys a V formation that pierces enemies beside the ship. |
+| weapon.W27.name | ミラージュ | Mirage |
+| weapon.W27.desc | 光の分身がブーストの跡を追いかけ、残った敵を斬る。 | Light doubles follow your boost trail and slash enemies left behind. |
+| weapon.W28.name | 閃光斬 | Flash Slash |
+| weapon.W28.desc | ブーストで当てた敵に印を付け、ブーストが終わると光の筋が一斉に斬る。 | Marks enemies hit during a boost, then slashes them with streaks of light when the boost ends. |
+| weapon.W29.name | エンドブラスト | End Blast |
+| weapon.W29.desc | ブーストの終点で爆発する。 | Explodes at the end of a boost. |
 |  | ■ 特性（trait.&lt;ID&gt;） |  |
-| trait.T01.name | 終端爆縮 | End Implosion |
-| trait.T01.desc | 線の終点で爆発 | Explodes at the end of your line. |
-| trait.T03.name | 余韻の渦 | Lingering Vortex |
-| trait.T03.desc | 線の終点に、敵を吸い寄せる渦 | Leaves a vortex at the end of your line that pulls enemies in. |
-| trait.T04.name | 満タン突撃 | Full-Charge Assault |
-| trait.T04.desc | 満タンから使うと、装甲を無視して威力も上がる | Starting from a full gauge ignores armor and boosts damage. |
-| trait.T05.name | 連鎖ソニック | Chain Sonic |
-| trait.T05.desc | 1回で何体も倒すと衝撃波 | Defeating many enemies in one line releases a shockwave. |
+| trait.T03.name | エンドホール | End Hole |
+| trait.T03.desc | ブーストが終わると機体を中心に重力が生まれ、周りの敵を引きずり込む。 | When a boost ends, gravity around the ship draws in surrounding enemies. |
+| trait.T04.name | ギアアップ | Gear Up |
+| trait.T04.desc | ブースト中、進むほど攻撃力が上がる。 | Attack power rises with distance traveled during a boost. |
+| trait.T05.name | チェインショック | Chain Shock |
+| trait.T05.desc | ブースト中に一定数倒すたびに、倒した敵から衝撃波が出て連鎖する。 | Every group of kills during a boost triggers a chaining shockwave from the defeated enemy. |
 | trait.T06.name | クリティカルランス | Critical Lance |
-| trait.T06.desc | クリティカルのたびに前方へ貫く光の槍を飛ばす | Every critical hit fires a piercing lance of light forward. |
+| trait.T06.desc | クリティカルのたびに、光の槍が前へ貫く。 | Critical hits launch a piercing lance of light forward. |
 | trait.T07.name | 急速充填 | Quick Charge |
-| trait.T07.desc | ゲージの充填速度が上がる（初回+25%、以降+12.5%ずつ） | The gauge charges faster (+25% first, then +12.5% per level). |
+| trait.T07.desc | ゲージがたまるのが速くなる。 | Charges the gauge faster. |
 | trait.T08.name | 大容量チャージ | High-Capacity Charge |
-| trait.T08.desc | 1回で描ける長さが伸びる（容量 +20% ずつ） | Draw longer lines in one go (+20% capacity each). |
-| trait.T09.name | クリティカル率 | Critical Rate |
-| trait.T09.desc | 体当たりのクリティカル率が上がる（Lv1〜3は各+5%、Lv4・5は各+3%） | Ram critical chance rises (+5% at Lv1–3, +3% at Lv4–5). |
+| trait.T08.desc | ゲージの容量が増え、1回で描ける長さと勢いが伸びる。 | Increases gauge capacity, line length and momentum. |
+| trait.T09.name | 急所見切り | Weak-Point Insight |
+| trait.T09.desc | クリティカルが出やすくなる。 | Makes critical hits more likely. |
 | trait.T10.name | 最高速度 | Top Speed |
-| trait.T10.desc | 速くなり、描ける長さも伸びる（初回+12%、以降+7%ずつ） | Fly faster and draw longer lines (+12% first, then +7% per level). |
+| trait.T10.desc | 最高速度が上がる。 | Increases top speed. |
 | trait.T11.name | 攻撃力 | Attack Power |
-| trait.T11.desc | すべての攻撃が強くなる（初回+20%、以降+10%ずつ） | All attacks get stronger (+20% first, then +10% per level). |
+| trait.T11.desc | すべての攻撃の威力が上がる。 | Increases the damage of all attacks. |
 | trait.T12.name | 広域回収 | Wide Pickup |
-| trait.T12.desc | 遠くのアイテムも拾える（回収範囲 +30% ずつ） | Collect items from farther away (+30% pickup range each). |
-| trait.T13.name | 反応波動 | Reactive Wave |
-| trait.T13.desc | ダメージを受けたとき、周りを押し返す | Pushes nearby enemies away when you take damage. |
+| trait.T12.desc | アイテムを拾える範囲が広がる。 | Increases item pickup range. |
 | trait.T14.name | 軌跡延長 | Trail Extension |
-| trait.T14.desc | 描ける長さが伸びる（初回+25%、以降+15%ずつ） | Draw longer lines (+25% first, then +15% per level). |
-| trait.T31.name | 高速持続 | Extended Glide |
-| trait.T31.desc | 突進後の高速状態が長く続く | Stay fast longer after a dash. |
+| trait.T14.desc | 描ける線の長さが伸びる。 | Increases the length of lines you can draw. |
+| trait.T31.name | 慣性航行 | Inertial Cruise |
+| trait.T31.desc | ブーストのあとの高速と減速の時間が延びる。 | Extends high-speed travel and deceleration after a boost. |
+| trait.T33.name | 快進撃 | Rampage |
+| trait.T33.desc | 1回のブーストで倒した数が多いほど、次のブーストまですべての攻撃の威力が上がる。 | Kills during one boost increase all attack damage until the next boost. |
+| trait.T32.name | 助走 | Run-Up |
+| trait.T32.desc | 最初の敵に当たるまでの距離が長いほど、強い一撃と範囲攻撃になる。 | Traveling farther before the first enemy increases the first hit and its area attack. |
+| trait.T34.name | 大振り | Big Swing |
+| trait.T34.desc | すべての攻撃の範囲が広がる。 | Increases the area of every attack. |
+| trait.T35.name | マルチショット | Multishot |
+| trait.T35.desc | すべての射撃の弾数が増える。 | Increases the shot count of all shooting weapons. |
+| trait.T36.name | フルバースト | Full Burst |
+| trait.T36.desc | ゲージが満タンの間、射撃の連射が上がる。 | Increases shooting fire rate while the gauge is full. |
+| trait.T37.name | デュプリケーター | Duplicator |
+| trait.T37.desc | 弾や破片が当たると、確率で2つに分かれる。 | Shots and debris may split into two on impact. |
 |  | ■ 伝説のモジュール（legendary.&lt;ID&gt;） |  |
 | legendary.legendary&#95;compass.name | 羅針盤のモジュール | Compass Module |
 | legendary.legendary&#95;compass.desc | らしんばん座を解放したときに残された、錆びついたモジュール。 | A rusted module left behind when Pyxis was freed. |

@@ -10,6 +10,7 @@ params = {
 "clump_spacing": 40.0,
 "damage": 1.1,
 "follow": 18.0,
+"hold": 0.25,
 "interval": 0.06,
 "knock": 1200.0,
 "life": 1.2,

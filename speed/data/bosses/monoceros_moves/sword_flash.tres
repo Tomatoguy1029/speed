@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/monoceros/techniques/sword_flash.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros/sword_flash_visual.tscn" id="visual"]
+
+[resource]
+script = ExtResource("1")
+technique = &"sword_flash"
+category = &"single"
+display_name = "光の剣の連撃"
+track_during_warn = false
+visual = ExtResource("visual")
+cuts = 3
+first_windup = 0.6
+windup = 0.42
+lock_time = 0.2
+aim_turn = 7.993607974134029
+pull = 0.7853981633974483
+swing_time = 0.1
+lunge_speed = 420.0
+lunge_decay = 10.0
+slash_min = 260.0
+slash_max = 700.0
+slash_angle = 1.2566370614359172
+slash_length = 800.0
+slash_width = 24.0
+slash_hit_time = 0.06
+cut_gap = 0.08
+return_time = 0.3
+damage = 20.0
+recover = 1.4
+cd = 7.0

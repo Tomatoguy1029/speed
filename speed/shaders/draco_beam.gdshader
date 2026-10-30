@@ -14,6 +14,7 @@ uniform float beam_len = 1800.0;
 uniform float clock = 0.0;
 uniform float pixel = 3.0;
 uniform vec3 tint = vec3(0.83, 0.73, 1.0);
+uniform float opacity = 1.0;
 
 vec3 to_srgb(vec3 c) {
 	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
@@ -78,5 +79,5 @@ void fragment() {
 	color = mix(color, vec3(1.0), core);
 	float emission = 1.0 + core * 1.2 + spark * 0.8;
 	float alpha = max(max(rim * 0.92, haze * 0.38), spark) * strength;
-	COLOR = vec4(color * emission, alpha);
+	COLOR = vec4(color * emission, alpha * opacity);
 }

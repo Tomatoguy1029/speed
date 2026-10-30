@@ -1,6 +1,9 @@
 ## 世界時間で頭から胴体・尾へ旋回を伝え、攻撃の向きは戦闘方向へ同期する。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var pixel_size := 3.0
+@export var booster_length_scale := 1.0
+@export var booster_core_color := Color("#e0fbff")
 @export_group("Turning")
 @export_range(0.01, 0.5) var body_follow_seconds := 0.16
 @export_range(0.01, 0.5) var neck_follow_seconds := 0.075
@@ -10,11 +13,8 @@ extends Node2D
 @export_range(0.0, 45.0) var body_lag_degrees := 24.0
 @export_range(0.0, 45.0) var head_turn_degrees := 32.0
 @export_range(0.0, 30.0) var tail_turn_degrees := 18.0
-var lance_afterglow := 0.0
-var lance_points := PackedVector2Array()
 const PartsVisual = preload("res://scripts/bosses/monoceros_parts.gd")
 const WARNING := Color("#f2b567")
-const DANGER := Color("#ff667d")
 const ENERGY := Color("#9fe8ff")
 const REAR_LEGS := ["RearLeftLeg", "RearRightLeg"]
 ## 後ろ蹴りで畳んだ後脚の、付け根から蹄の付け根までの長さ（元絵の画素）
@@ -29,6 +29,9 @@ var _head_facing := 0.0
 var _tail_facing := 0.0
 var _flame_facing := 0.0
 @onready var parts: PartsVisual = $Parts
+
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 
 func bind_monoceros(owner_actor: MonocerosBoss) -> void:
 	actor = owner_actor
@@ -64,6 +67,11 @@ func _sync_parts(dt: float) -> void:
 	var k := actor.table.r[actor.body] / 96.0
 	parts.scale = Vector2.ONE * k
 	parts.apply_appearance(actor.def.part_appearance)
+	# 角を使う全技で同じ光を絵に乗せ、首の振りと外観の位置補正へ追従させる。
+	var horn_glow := _horn_glow()
+	var horn_light := 1.0 + horn_glow * 3.0
+	var horn_tint := Color(horn_light, horn_light, horn_light)
+	parts.get_node("Head/Lower/Sprite/head_gold_armor").self_modulate = horn_tint
 	_update_turn(dt)
 	# 胴体中心を固定して見た目だけ遅らせる。移動・判定・予告線は役者の方向を使う。
 	parts.rotation = -PI * 0.5 + angle_difference(actor.table.facing[actor.body], _body_facing)
@@ -85,9 +93,6 @@ func _sync_parts(dt: float) -> void:
 		leg.rotation = 0.0
 		leg.scale = Vector2.ONE
 	var pose: Dictionary = actor._runner_for().body_pose(actor, parts)
-	if actor.technique == &"sweep" and actor.mode == &"recovery":
-		parts.get_node("Head").rotation = angle_difference(_body_facing, actor.table.facing[actor.body]) + pose.neck
-		parts.get_node("Head/Lower").rotation = 0.0
 	for leg_pose: Dictionary in pose.legs:
 		var leg := parts.get_node(leg_pose.path) as Node2D
 		leg.rotation = leg_pose.rotation
@@ -95,14 +100,26 @@ func _sync_parts(dt: float) -> void:
 		leg.get_node("Foot").position.y = leg_pose.foot
 	var sword := parts.get_node("Head/Lower/SwordGlow") as Polygon2D
 	sword.visible = actor.phase == 2
+	sword.color = WARNING
+	sword.self_modulate = horn_tint
 	sword.polygon = PackedVector2Array([Vector2(-4, 105), Vector2(-9, 111), Vector2(0, actor.horn_length() / k - 46), Vector2(9, 111), Vector2(4, 105)])
 	parts.get_node("Head/Lower/SwordGlow/Guard").visible = sword.visible
+
+## 技の進行から角の明るさだけを読む。攻撃中も溜めと同じ色で光らせる。
+func _horn_glow() -> float:
+	if actor.technique == &"kick" or actor.mode not in [&"windup", &"active"]: return 0.0
+	var runner := actor._runner_for()
+	# 槍は砕けた瞬間に消灯し、ほかの技は攻撃が終わるまで光を保つ。
+	if actor.technique == &"lance": return float(runner.glow(actor))
+	if actor.mode == &"active": return 1.0
+	if runner.sequenced(): return float(runner.glow(actor))
+	return clampf(actor.timeline.current_animation_position / maxf(float(actor.rule().warn), 0.001), 0.0, 1.0)
 
 func _update_turn(dt: float) -> void:
 	if dt <= 0.0: return
 	var target := actor.table.facing[actor.body]
 	var attacking := actor.mode == &"active" or actor.mode == &"stuck" or (actor.mode == &"windup" and actor.locked)
-	var sweeping := actor.technique == &"sweep" and actor.mode in [&"windup", &"active"]
+	var sweeping: bool = (actor.technique == &"sweep" or (actor._runner != null and actor._runner.sequenced())) and actor.mode in [&"windup", &"active"]
 	_body_facing = _follow_angle(_body_facing, target, dt, body_follow_seconds * (0.3 if attacking else 1.0))
 	_body_facing = _limit_angle(target, _body_facing, body_lag_degrees)
 	if attacking or sweeping:
@@ -134,6 +151,9 @@ func _body_point(world_point: Vector2) -> Vector2:
 func booster_strength() -> float:
 	if actor == null or actor.mode == &"defeated": return 0.0
 	if actor.mode == &"entrance": return 2.0
+	if actor._runner != null and actor._runner.sequenced() and actor.mode in [&"windup", &"active"]:
+		var strength: float = actor._runner.booster(actor)
+		if strength >= 0.0: return strength
 	return 2.5 if actor.mode == &"active" and actor.technique in [&"charge", &"return_charge"] else 0.55
 
 func _booster() -> void:
@@ -141,7 +161,7 @@ func _booster() -> void:
 	if strength <= 0.0: return
 	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
 	var anchor := to_local(nozzle.to_global(Vector2(37, 0))) / (actor.table.r[actor.body] / 96.0)
-	var length := (50.0 + sin(actor.clock * 27.0) * 9.0) * strength
+	var length := (50.0 + sin(actor.clock * 27.0) * 9.0) * strength * booster_length_scale
 	var root_angle := _tail_facing - actor.table.facing[actor.body] + PI
 	var tip_angle := _flame_facing - actor.table.facing[actor.body] + PI
 	for layer in 3:
@@ -157,7 +177,7 @@ func _booster() -> void:
 			var thickness := side.abs() * height
 			var at := (center.min(next) + wobble - thickness * 0.5).snapped(Vector2.ONE * pixel_size)
 			var size := ((next - center).abs() + thickness).snapped(Vector2.ONE * pixel_size).max(Vector2.ONE * pixel_size)
-			draw_rect(Rect2(at, size), [Color("#245c96"), Color("#61c9ff"), Color("#e0fbff")][layer])
+			draw_rect(Rect2(at, size), [Color("#245c96"), Color("#61c9ff"), booster_core_color][layer])
 			center = next
 
 func _draw() -> void:

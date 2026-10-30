@@ -131,7 +131,7 @@ func release_bow(interval := 0.4) -> void:
 	_shot_interval = maxf(0.05, interval)
 	_clip_time = 0.0
 
-func set_bow_pose(technique: StringName, mode: StringName, progress: float, delta := 0.0) -> void:
+func set_bow_pose(technique: StringName, mode: StringName, progress: float, delta := 0.0, pose_time := -1.0) -> void:
 	var clip := "idle"
 	if technique in [&"volley", &"power_shot"]:
 		if mode == &"windup": clip = "shot_windup"
@@ -141,6 +141,24 @@ func set_bow_pose(technique: StringName, mode: StringName, progress: float, delt
 		if mode == &"windup": clip = "rain_windup"
 		elif mode == &"rain": clip = "rain"
 		elif mode == &"recovery": clip = "rain_recovery"
+	elif technique in [&"shower_chase", &"shower_wall", &"shower_path"]:
+		if mode == &"windup": clip = "shower_windup"
+		elif mode == &"rain": clip = "shower"
+		elif mode == &"recovery": clip = "shower_recovery"
+	elif technique == &"fan_volley":
+		if mode == &"windup": clip = "fan_windup"
+		elif mode == &"shooting": clip = "fan_release"
+		elif mode == &"recovery": clip = "fan_recovery"
+	elif technique == &"sail_run":
+		if mode == &"windup": clip = "sail_windup"
+		elif mode == &"sail": clip = "sail_run"
+		elif mode == &"recovery": clip = "sail_recovery"
+	elif technique == &"stomp":
+		if mode == &"windup": clip = "stomp_windup"
+		elif mode == &"strike": clip = "stomp"
+		elif mode == &"recovery": clip = "stomp_recovery"
+	if mode == &"leap": clip = "leap"
+	elif mode == &"retreat": clip = "run"
 	if clip != _clip:
 		_clip = clip
 		_clip_time = 0.0
@@ -148,8 +166,9 @@ func set_bow_pose(technique: StringName, mode: StringName, progress: float, delt
 	var length: float = animation_data.duration(clip)
 	var time := _clip_time
 	if mode == &"windup": time = clampf(progress, 0.0, 1.0) * length
-	elif clip == "shot_release": time = _clip_time / _shot_interval * length
-	elif clip in ["idle", "rain"] and length > 0.0: time = fmod(_clip_time, length)
+	elif clip in ["shot_release", "fan_release", "sail_run"]: time = _clip_time / _shot_interval * length
+	elif clip in ["idle", "rain", "shower", "run"] and length > 0.0: time = fmod(_clip_time, length)
+	if clip == "stomp" and pose_time >= 0.0: time = pose_time
 	apply_pose(animation_data.sample(clip, time))
 
 

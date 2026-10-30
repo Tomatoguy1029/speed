@@ -11,6 +11,9 @@ const PERF_INTERVAL_US := 3000000
 ## 保存したファイル名を出しておく時間（実秒）
 const SAVED_NOTICE := 5.0
 const IDENTITY := preload("res://scripts/dev/recording_identity.gd")
+const WEAPON_CAUSES := {"contactWave": "W04", "barrier": "W05", "mine": "W07", "sonic": "W08",
+	"contactArc": "W17", "towShot": "W21", "bipolar": "W22", "interceptor": "W25",
+	"dashRangeDrone": "W26", "afterimage": "W27", "flashSlash": "W28", "endBlast": "W29"}
 
 var _real_start_us := 0
 var _perf_last_us := 0
@@ -60,6 +63,12 @@ var _kills: Dictionary = {}
 ## 倒した原因ごとの数と、与えたダメージの原因ごとの合計（倒しきった分の余りも含む）
 var _kills_by: Dictionary = {}
 var _dealt: Dictionary = {}
+## 命中はJSONLへ1件ずつ書かず、武器・敵種・敵級・原因ごとにsampleへ集約する。
+var _effective: Dictionary = {}
+## 個体ID → 出現時刻と初被弾。開始時点で既存の個体は出現時刻を不明とする。
+var _enemy_seen: Dictionary = {}
+var _enemy_life: Dictionary = {}
+var _enemy_contacts: Dictionary = {}
 ## 受けたダメージ（攻撃の種類/撃った敵ごと）
 var _damage: Dictionary = {}
 var _budget_max := 0.0
@@ -67,6 +76,7 @@ var _budget_max := 0.0
 var _strong: Dictionary = {}
 ## 直前に出たカードと、最後に受けた攻撃
 var _offered: Array = []
+var _offer_id := 0
 var _last_hurt: Dictionary = {}
 var _label: Label
 ## 保存したファイル名の表示の残り時間と、その文字
@@ -159,6 +169,7 @@ func _begin(session: RunSession, during_run := false) -> void:
 	_io_failed = false
 	_combat_bytes = 0
 	_combat_dropped = 0
+	_offer_id = 0
 	_recording_id = "%s-%d" % [run.bosses.diagnostics.run_id, Time.get_ticks_usec()]
 	var directory := _recording_directory()
 	if DirAccess.make_dir_recursive_absolute(directory) != OK:
@@ -179,15 +190,23 @@ func _begin(session: RunSession, during_run := false) -> void:
 	run.phase_changed.connect(_on_phase_changed)
 	run.loadout.cards_opened.connect(_on_cards)
 	run.loadout.loadout_recorded.connect(_on_loadout)
+	run.loadout.choice_recorded.connect(_on_choice)
 	run.pickups.xp_recorded.connect(_write)
 	run.ship.hurt_recorded.connect(_on_hurt)
+	run.ship.recording_hurt_attempt.connect(_on_enemy_contact)
+	run.enemies.recording_spawned.connect(_on_enemy_spawned)
+	run.enemies.recording_released.connect(_on_enemy_released)
+	run.combat.recording_damage.connect(_on_damage_recorded)
 	_skip_events = run.state.events.size() if during_run else 0
 	session.tree_exiting.connect(_end.bind("quit"))
 	_reset_counts()
-	_on_cards(run.state.cards)
+	_enemy_seen.clear()
+	_seed_existing_enemies()
+	_on_cards(run.state.cards, false)
 	_last_xp_gained = run.state.xp_gained
 	_last_xp_dropped = run.state.xp_dropped
 	_next_sample = run.state.time + INTERVAL
+	var git_state := IDENTITY.git_state()
 	_open_profiles()
 	_perf_start(Time.get_ticks_usec())
 	var names_path := "res://.content/dev/stage_%d.json" % run.state.stage_index
@@ -213,12 +232,14 @@ func _begin(session: RunSession, during_run := false) -> void:
 		recording_start.conditions["enemy_tuning"] = IDENTITY.plain(run.enemies.get("stage_tuning"))
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
-		"schema_version": 4, "measurement_version": 2, "combat_version": 1,
+		"schema_version": 4, "measurement_version": 3, "combat_version": 1,
 		"combat_config": {"level": combat_level, "events_per_second": clampi(combat_events_per_second, 1, 1000), "max_events": clampi(combat_max_events, 1, 1000000), "max_bytes": maxi(0, combat_max_bytes), "line_bytes": COMBAT_LINE_BYTES}, "run_start": run_start, "recording_start": recording_start, "missing_prefix": during_run,
 		"xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
 		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
+		"git_state": git_state,
 		"perf_excludes_ui_pause": true,
 		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
+	if not run.state.cards.is_empty(): _on_cards(run.state.cards, true, true)
 	# 途中録画に存在する結晶は、生成時刻・出所を推定せず、ID と現値だけ引き継ぐ。
 	if during_run:
 		var gems := []
@@ -301,10 +322,13 @@ func _sample() -> void:
 		if pk.gem_alive[g] != 0:
 			field_xp += pk.gem_value[g]
 	var phase: PhaseDef = _run.spawn.current_phase()
-	_write({"type": "sample", "t": _r(s.time), "band": String(phase.id),
+	_finish_removed_enemies()
+	_write({"type": "sample", "t": _r(s.time), "world_t": s.world_time, "band": String(phase.id),
 		"xp_picked": _r(s.xp_gained - _last_xp_gained), "xp_dropped": _r(s.xp_dropped - _last_xp_dropped), "xp_field": _r(field_xp),
 		"level": s.level, "hp": _r(s.ship_hp), "hp_max": _r(s.stats.max_hp),
-		"enemies": total, "in_view": in_view, "by_star": by_star, "kills": _kills, "kills_by": _kills_by, "dealt": _dealt, "damage": _damage, "attack_budget_max": _r(_budget_max)})
+		"enemies": total, "in_view": in_view, "by_star": by_star, "kills": _kills, "kills_by": _kills_by, "dealt": _dealt,
+		"effective_damage": _effective.values(), "enemy_life": _enemy_life.values(), "enemy_contacts": _enemy_contacts.values(),
+		"damage": _damage, "attack_budget_max": _r(_budget_max)})
 	_last_xp_gained = s.xp_gained
 	_last_xp_dropped = s.xp_dropped
 	_reset_counts()
@@ -314,13 +338,121 @@ func _reset_counts() -> void:
 	_kills = {}
 	_kills_by = {}
 	_dealt = {}
+	_effective = {}
+	_enemy_life = {}
+	_enemy_contacts = {}
 	_damage = {}
 	_budget_max = 0.0
 
-func _on_cards(cards: Array) -> void:
+func _on_enemy_contact(contact: Dictionary) -> void:
+	var cause := String(contact.cause)
+	var source := String(contact.source)
+	var reason := String(contact.reason)
+	var key := "%s/%s/%s" % [cause, source, reason]
+	if not _enemy_contacts.has(key):
+		_enemy_contacts[key] = {"cause": cause, "source": source, "reason": reason, "count": 0}
+	_enemy_contacts[key].count += 1
+
+func _enemy_class(boss: bool, meteor: bool, rank: int) -> String:
+	if boss: return "boss"
+	if meteor: return "meteor"
+	return "strong" if rank >= 3 else "regular"
+
+func _life_row(enemy_type: String, enemy_class: String, elite: bool) -> Dictionary:
+	var key := "%s/%s/%s" % [enemy_class, enemy_type, elite]
+	if not _enemy_life.has(key):
+		_enemy_life[key] = {"enemy": enemy_type, "class": enemy_class, "elite": elite, "spawned": 0, "killed": 0,
+			"removed": 0, "alive_at_end": 0, "unknown_spawn": 0, "life_world_sum": 0.0,
+			"life_world_count": 0, "first_hit_to_kill_world_sum": 0.0, "first_hit_to_kill_count": 0,
+			"max_hp_at_spawn_sum": 0.0, "max_hp_at_spawn_count": 0}
+	return _enemy_life[key]
+
+func _on_enemy_spawned(row: int) -> void:
+	var t := _run.enemies.table
+	var enemy_type := String(t.type[row])
+	var enemy_class := _enemy_class(t.is_boss[row] != 0, t.meteor_index[row] >= 0,
+		t.def[row].rank if t.def[row] != null else 0)
+	var elite := t.elite[row] != 0
+	_enemy_seen[t.id[row]] = {"enemy": enemy_type, "class": enemy_class, "elite": elite, "t": _run.state.time,
+		"world_t": _run.state.world_time, "observed_spawn": true, "first_hit_world_t": -1.0, "released": false}
+	var life := _life_row(enemy_type, enemy_class, elite)
+	life.spawned += 1
+	life.max_hp_at_spawn_sum += t.max_hp[row]
+	life.max_hp_at_spawn_count += 1
+
+func _seed_existing_enemies() -> void:
+	var t := _run.enemies.table
+	for row in t.alive.size():
+		if t.alive[row] == 0 or t.dead[row] != 0: continue
+		var enemy_type := String(t.type[row])
+		_enemy_seen[t.id[row]] = {"enemy": enemy_type,
+			"class": _enemy_class(t.is_boss[row] != 0, t.meteor_index[row] >= 0,
+				t.def[row].rank if t.def[row] != null else 0),
+			"elite": t.elite[row] != 0, "t": _run.state.time, "world_t": _run.state.world_time,
+			"observed_spawn": false, "first_hit_world_t": -1.0, "released": false}
+
+func _on_enemy_released(row: int) -> void:
+	var id: int = _run.enemies.table.id[row]
+	if _enemy_seen.has(id): _enemy_seen[id].released = true
+
+func _finish_enemy(id: int, result: String, event_world_t := -1.0) -> void:
+	if not _enemy_seen.has(id): return
+	var seen: Dictionary = _enemy_seen[id]
+	var row := _life_row(seen.enemy, seen["class"], bool(seen.elite))
+	var world_t := event_world_t if event_world_t >= 0.0 else _run.state.world_time
+	match result:
+		"killed": row.killed += 1
+		"removed": row.removed += 1
+		"alive": row.alive_at_end += 1
+	if not seen.observed_spawn:
+		row.unknown_spawn += 1
+	elif result == "killed":
+		row.life_world_sum += maxf(0.0, world_t - float(seen.world_t))
+		row.life_world_count += 1
+		if float(seen.first_hit_world_t) >= 0.0:
+			row.first_hit_to_kill_world_sum += maxf(0.0, world_t - float(seen.first_hit_world_t))
+			row.first_hit_to_kill_count += 1
+	_enemy_seen.erase(id)
+
+func _finish_removed_enemies() -> void:
+	for id in _enemy_seen.keys():
+		if _enemy_seen[id].released: _finish_enemy(id, "removed")
+
+func _on_damage_recorded(hit: Dictionary) -> void:
+	var cause := String(hit.cause)
+	var weapon_id := String(hit.weapon_id)
+	if weapon_id == "": weapon_id = WEAPON_CAUSES.get(cause, "")
+	var enemy_type := String(hit.enemy_type)
+	var enemy_class := _enemy_class(bool(hit.boss), bool(hit.meteor), int(hit.rank))
+	var elite := bool(hit.elite)
+	var key := "%s/%s/%s/%s/%s" % [weapon_id, enemy_class, enemy_type, elite, cause]
+	if not _effective.has(key):
+		_effective[key] = {"weapon_id": weapon_id, "enemy": enemy_type, "class": enemy_class, "elite": elite,
+			"cause": cause, "hits": 0, "resolved": 0.0, "applied": 0.0, "overkill": 0.0, "discarded": 0.0}
+	var item: Dictionary = _effective[key]
+	item.hits += 1
+	item.resolved += float(hit.resolved)
+	item.applied += float(hit.applied)
+	item.overkill += float(hit.overkill)
+	item.discarded += maxf(0.0, float(hit.resolved) - float(hit.applied) - float(hit.overkill))
+	var id: int = hit.id
+	if float(hit.applied) > 0.0 and _enemy_seen.has(id) and float(_enemy_seen[id].first_hit_world_t) < 0.0:
+		_enemy_seen[id].first_hit_world_t = _run.state.world_time
+
+func _on_cards(cards: Array, observed := true, snapshot := false) -> void:
 	_offered = []
 	for c in cards:
 		_offered.append("%s:%s:%d" % [c.kind, c.id, int(c.get("level", 0))])
+	if observed and not _offered.is_empty() and _run != null:
+		_offer_id += 1
+		_write({"type": "offer", "t": _r(_run.state.time), "world_t": _run.state.world_time,
+			"offer_id": _offer_id, "source": "initial_choice" if _run.state.start_pick else "comet_swap" if _run.state.swap_pick != &"" else "card",
+			"offered": _offered.duplicate(), "rerolls_left": _run.state.rerolls_left, "snapshot": snapshot})
+
+func _on_choice(card: Dictionary, source: StringName) -> void:
+	_write({"type": "choice", "t": _r(_run.state.time), "world_t": _run.state.world_time,
+		"level": _run.state.level, "source": String(source), "offer_id": _offer_id if _offer_id > 0 else null,
+		"offered": _offered.duplicate(), "chosen": "%s:%s:%d" % [card.kind, card.id, int(card.get("level", 0))]})
 
 func _on_loadout(change: Dictionary) -> void:
 	if int(change.current) > 0:
@@ -355,19 +487,24 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_write(record)
 			&"bonus":
 				_write({"type": "bonus", "t": time, "enter": bool(e.enter), "remaining": _run.state.bonus_t})
+			&"barrier_hit":
+				_on_enemy_contact({"cause": "hostile_projectile", "source": "", "reason": "barrier"})
 			&"kill":
+				var id: int = e.get("id", -1)
+				_finish_enemy(id, "killed", float(e.get("world_t", -1.0)))
 				if e.get("cause", &"") == &"finale":
 					continue
 				var ty := String(e.get("enemy_type", &""))
 				_kills[ty] = int(_kills.get(ty, 0)) + 1
 				var by := String(e.get("cause", &""))
 				_kills_by[by] = int(_kills_by.get(by, 0)) + 1
-				var id: int = e.get("id", -1)
 				if _strong.has(id):
 					var rec: Array = _strong[id]
 					_write({"type": "strong", "t": time, "enemy": rec[0], "spawned": rec[1], "life": _r(time - rec[1]),
 						"rams": rec[2], "weapon_damage": _r(rec[3]), "by_cause": rec[4], "killed_by": by, "result": "killed"})
 					_strong.erase(id)
+			&"boss_defeated":
+				_finish_enemy(int(e.get("id", -1)), "killed", float(e.get("world_t", -1.0)))
 			&"hit":
 				var cause: StringName = e.get("cause", &"")
 				var dmg := float(e.get("dmg", 0.0))
@@ -393,7 +530,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_write({"type": "levelup", "t": time, "level": e.level})
 			&"upgrade":
 				var c: Dictionary = e.card
-				pick = {"type": "pick", "t": time, "level": _run.state.level, "offered": _offered,
+				pick = {"type": "pick", "t": time, "level": _run.state.level, "offered": _offered.duplicate(),
 					"chosen": "%s:%s:%d" % [c.kind, c.id, int(c.get("level", 0))], "bonus": 0}
 			&"level_bonus":
 				if not pick.is_empty():
@@ -420,6 +557,8 @@ func _end(result: String) -> void:
 	for actor in _run.bosses.actors: actor.combat_trace.finish("observation_end", "recording_end")
 	_run.projectiles.clear_combat_observations()
 	_flush_performance(_perf_last_us)
+	for id in _enemy_seen.keys():
+		_finish_enemy(id, "removed" if _enemy_seen[id].released else "alive")
 	_sample()
 	for id in _strong:
 		var rec: Array = _strong[id]
@@ -439,7 +578,10 @@ func _end(result: String) -> void:
 	if _run.bosses.diagnostics.recorded.is_connected(_on_combat): _run.bosses.diagnostics.recorded.disconnect(_on_combat)
 	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.loadout.cards_opened, _on_cards],
 		[_run.pickups.big_crystal_dropped, _on_big_crystal], [_run.pickups.xp_recorded, _write], [_run.loadout.loadout_recorded, _on_loadout],
-		[_run.ship.hurt_recorded, _on_hurt]]:
+		[_run.loadout.choice_recorded, _on_choice],
+		[_run.ship.hurt_recorded, _on_hurt], [_run.ship.recording_hurt_attempt, _on_enemy_contact],
+		[_run.enemies.recording_spawned, _on_enemy_spawned],
+		[_run.enemies.recording_released, _on_enemy_released], [_run.combat.recording_damage, _on_damage_recorded]]:
 		if sig[0].is_connected(sig[1]):
 			sig[0].disconnect(sig[1])
 	for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
@@ -450,6 +592,7 @@ func _end(result: String) -> void:
 	_session = null
 	_big_crystals = {}
 	_strong = {}
+	_enemy_seen = {}
 	_offered = []
 	_last_hurt = {}
 	_skip_events = 0

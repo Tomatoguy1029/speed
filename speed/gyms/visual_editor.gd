@@ -8,6 +8,7 @@ const TOOLS := [
 	["map", "マップ", "res://gyms/map_reveal_preview.gd"],
 	["landmark", "目印の星", "res://gyms/enemy_mark_preview.gd"],
 	["elite", "エリート", "res://gyms/enemy_mark_preview.gd"],
+	["boss_effects", "戦闘エフェクト", "res://gyms/effect_settings_preview.gd"],
 ]
 
 var _sessions: Dictionary = {}
@@ -94,7 +95,7 @@ func _ready() -> void:
 	var target_row := HBoxContainer.new()
 	layout.add_child(target_row)
 	var target_label := Label.new()
-	target_label.text = "編集対象"
+	target_label.text = "ツール"
 	target_row.add_child(target_label)
 	_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_selector.fit_to_longest_item = false

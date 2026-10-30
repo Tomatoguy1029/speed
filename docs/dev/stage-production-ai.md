@@ -489,7 +489,7 @@ Hydraの `move_params()` は本体の `params` に技別 `parameters` を重ね�
 
 開始の許可には、実験場の攻撃directorが別に作用する場合もある。Hydraの `start_normal()` は非formationモードで個体の `attack_priority` と消費×`attack_value` をdirectorへ要求し、大技は別の要求を出す。一角獣は `BossSystem.admit()` を使う。通常のformationモードではこの要求を迂回する。候補へ入ったのに開始しない場合は、共通の割合だけでなく実行側の許可も確認する。
 
-Hydraの分離後は `_update_guard_approach()` が残量・区間上限・技消費から画面内へ向かう首を選び、待ち始めた時刻と自機までの距離で並べる。この位置取りが画面内の実行可能候補へ影響するが、共通選択器の技別優先順位を設定するUIではない。
+Hydraの分離後は `hydra/squad_commander.gd` が役割と攻撃位置を決め、消費を予約した攻め手を候補へ渡す。群れと区間フローの分担は[専用仕様](../game/bosses/hydra.md#73-行動選択と戦闘フロー)を参照する。
 
 #### スタミナ・休息・技後待ち
 

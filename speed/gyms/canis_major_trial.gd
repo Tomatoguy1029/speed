@@ -7,7 +7,7 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 ## ボスが連れて出る群れとは別に、ボスのまわりへ置く猟犬の群れの数（1群れは猟犬の pack_count 体）
 @export_range(0, 10) var trial_extra_packs := 0
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
-@export_enum("normal", "pounce", "command", "sirius", "howl") var trial_technique := "normal"
+@export_enum("normal", "pounce", "command", "sirius", "howl", "stream", "bay", "hunt_pounce", "sirius_flame", "blaze", "relay", "hunt", "nova") var trial_technique := "normal"
 ## 有効なら、始めてすぐシリウスを強く輝かせて第2形態へ移る
 @export var trial_phase_two := false
 
@@ -15,6 +15,7 @@ var capture_path := ""
 var capture_at := 3.0
 var _clock := 0.0
 var _capturing := false
+var _repeat_id: StringName = &""
 
 func _ready() -> void:
 	await super._ready()
@@ -43,6 +44,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	_repeat_technique()
 	if capture_path.is_empty() or _capturing: return
 	session.playing = true
 	if session.run.state.phase == RunState.Phase.PAUSED: session.run.command(&"resume")
@@ -61,16 +63,18 @@ func _process(delta: float) -> void:
 
 ## 編集元を変更せず、選んだ技だけが候補になる試遊用のフローにする。
 func _only(id: StringName) -> void:
-	var actor: BossActor = session.run.bosses.actor
+	var actor := session.run.bosses.actor as CanisMajorBoss
 	if actor == null: return
-	var program: Resource = ResourceLoader.load("res://.content/boss_canis_major.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	var rules: Resource = program.data.rules
-	for node in rules.node_ids():
-		var binding: Dictionary = rules.graph_nodes.get(node, {}).duplicate()
-		binding.source = rules.source_for(node)
-		binding.connected = binding.source == String(id)
-		rules.graph_nodes[node] = binding
-	actor.configure_flow(program)
+	_repeat_id = id
+	actor.selection_enabled = false
+	if id in [&"sirius_flame", &"sirius", &"blaze", &"relay", &"hunt", &"nova"]: _phase_two()
+
+func _repeat_technique() -> void:
+	if _repeat_id.is_empty() or not session.playing or session.run == null: return
+	var actor := session.run.bosses.actor as CanisMajorBoss
+	if actor == null or not actor.body_alive() or actor.mode != &"idle" or actor.phase_pending: return
+	if session.run.state.phase != RunState.Phase.PLAY: return
+	actor.start_attack(_repeat_id)
 
 ## HPを変えずに、次の追跡で第2形態へ移らせる。
 func _phase_two() -> void:

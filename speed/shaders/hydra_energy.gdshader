@@ -6,9 +6,10 @@ uniform float span = 300.0;
 uniform float thickness = 32.0;
 uniform int style = 0;
 uniform bool warning = false;
+uniform float cell_size = 4.0;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void fragment(){
- vec2 grid=vec2(max(span/4.0,2.0),max(thickness/4.0,2.0));
+ vec2 grid=vec2(max(span/cell_size,2.0),max(thickness/cell_size,2.0));
  vec2 cell=floor(UV*grid);
  vec2 uv=(cell+0.5)/grid;
  float edge=abs(uv.y-0.5)*2.0;
@@ -53,5 +54,5 @@ void fragment(){
   col=mix(tint.rgb,vec3(1.0,0.85,0.45),0.7);
   alpha=rim*(0.18+0.4*marks)*step(0.65,edge)+0.08*rim;
  }
- COLOR=vec4(col,clamp(alpha,0.0,1.0));
+ COLOR=vec4(col,clamp(alpha,0.0,1.0)*tint.a);
 }

@@ -30,6 +30,8 @@ func on_launch(_full: bool) -> void:
 	pass
 func on_trail(_run: TraceRun, _p0: Vector2, _p1: Vector2) -> void:
 	pass
+func on_contact(_i: int, _hit: Vector2, _dir: Vector2, _damage: float) -> void:
+	pass
 func on_kill(_cause: StringName) -> void:
 	pass
 func on_critical(_p: Vector2) -> void:

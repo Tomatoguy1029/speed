@@ -1,0 +1,24 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/fan_volley.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/fan_volley_visual.tscn" id="visual"]
+
+[resource]
+script = ExtResource("1")
+technique = &"fan_volley"
+display_name = "扇状連射"
+category = &"major"
+track_during_warn = true
+warn = 0.9
+shots = 3
+interval = 0.8
+count = 9
+spread = 100.0
+speed = 380.0
+length = 56.0
+travel = 1600.0
+radius = 6.0
+damage = 14.0
+recover = 1.6
+cd = 14.0
+visual = ExtResource("visual")

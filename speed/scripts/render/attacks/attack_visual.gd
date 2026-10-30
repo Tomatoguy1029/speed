@@ -3,12 +3,15 @@ class_name AttackVisual
 extends Node2D
 
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 var rm: RunPresentation
+var effect_tint := Color.WHITE
 var state: RunState:
 	get: return rm.state
 
 func setup(render: RunPresentation) -> void:
 	rm = render
+	_apply_effect_settings()
 	if get_parent() == null: rm.add_child(self)
 	for phase in ["Flight", "Hit", "Fade"]:
 		var node := get_node_or_null(phase) as CanvasItem
@@ -27,6 +30,10 @@ func update(_dt: float) -> void:
 
 func _px(px: float) -> float:
 	return rm._px(px)
+
+func _apply_effect_settings() -> void:
+	EFFECT_SETTINGS.apply_to(self)
+	effect_tint = EFFECT_SETTINGS.values_for(scene_file_path).get("effect_tint", Color.WHITE)
 
 func draw_friend(_c: CanvasItem, _projectiles: ProjectileSystem, _row: int, _pos: Vector2) -> void:
 	pass
@@ -64,16 +71,16 @@ func end_batch() -> void:
 func render_shot(canvas: CanvasItem, projectiles: ProjectileSystem, row: int, at: Vector2) -> bool:
 	if _flight_batch == null and _sprite_batches.is_empty(): return draw_shot(canvas, projectiles, row, at)
 	var angle := projectiles.hostile_vel[row].angle() if turn_with_velocity else 0.0
-	if _flight_batch != null: _flight_batch.add(at, angle, flight_scale, Color.WHITE)
-	for batch in _sprite_batches: batch.add(at, angle, flight_scale, Color.WHITE)
+	if _flight_batch != null: _flight_batch.add(at, angle, flight_scale, effect_tint)
+	for batch in _sprite_batches: batch.add(at, angle, flight_scale, effect_tint)
 	return true
 func render_hazard(canvas: CanvasItem, projectiles: ProjectileSystem, row: int, view: Rect2) -> void:
 	if _flight_mesh == null and _sprite_pieces.is_empty():
 		draw_hazard(canvas, projectiles, row, view)
 		return
 	var transform := Transform2D(projectiles.hazard_angle[row], projectiles.hazard_pos[row]).scaled_local(Vector2.ONE * flight_scale)
-	if _flight_mesh != null: canvas.draw_mesh(_flight_mesh, null, transform)
-	for piece: Dictionary in _sprite_pieces: canvas.draw_mesh(piece.mesh, piece.texture, transform)
+	if _flight_mesh != null: canvas.draw_mesh(_flight_mesh, null, transform, effect_tint)
+	for piece: Dictionary in _sprite_pieces: canvas.draw_mesh(piece.mesh, piece.texture, transform, effect_tint)
 
 ## 着弾と消えるときの表示時間。図形はシーンのHitとFadeに置く。
 @export_range(0.01, 10.0, 0.01) var hit_duration := 0.25
@@ -93,12 +100,13 @@ func advance_end_effects(dt: float) -> void:
 	_end_effects = _end_effects.filter(func(effect): return effect.age < effect.duration)
 func draw_end_effects(canvas: CanvasItem) -> void:
 	for effect in _end_effects:
-		canvas.draw_mesh(effect.mesh, effect.texture, Transform2D(0.0, effect.pos), Color(1, 1, 1, 1.0 - effect.age / effect.duration))
+		canvas.draw_mesh(effect.mesh, effect.texture, Transform2D(0.0, effect.pos), Color(1, 1, 1, 1.0 - effect.age / effect.duration) * effect_tint)
 
 var _shape_sprite_pieces: Array = []
 var _shape_mesh: Mesh
 var _shape: Dictionary
 func configure(actor: Node, _kind: StringName, _points: PackedVector2Array, _white: Texture2D) -> void:
+	_apply_effect_settings()
 	var library: Resource = actor.ctx.resources.resources.get("res://.content/attack_visuals.res")
 	if library == null and actor.run_state.lab_mode: library = load("res://.content/attack_visuals.res")
 	if library != null:

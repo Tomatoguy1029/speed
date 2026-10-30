@@ -179,3 +179,19 @@ func begin_rest(next_index: int) -> void:
 
 func _record_decision(adapter: Object, query: Dictionary, result: Dictionary, section: Dictionary, actions: Array, selection: Dictionary, reason: String) -> void:
 	if adapter.has_method("record_decision"): adapter.record_decision(query, result, section, last, actions, selection, reason)
+
+## 接近への反応も同じスタミナを使う。実行中の区間と完了回数は保つ。
+func try_start_reactive(adapter: Object, action: Dictionary) -> bool:
+	if flow == null or flow.sections.is_empty() or rest_remaining > 0.0 or adapter.blocked(): return false
+	var section: Dictionary = flow.sections[index]
+	if section.get("request", "normal") == "rest": return false
+	var cost := float(action.get("cost", INF))
+	var cap := minf(float(section.get("cap", flow.maximum_stamina)), flow.maximum_stamina)
+	if cost < 0.0 or cost > stamina or cost > cap or cost > float(section.get("section_budget", INF)) - section_spent: return false
+	var started: bool = adapter.start_reactive(action) if adapter.has_method("start_reactive") else adapter.start([action])
+	if not started: return false
+	stamina = maxf(0.0, stamina - cost)
+	section_spent += cost
+	last = [action]
+	_record_decision(adapter, {"reactive": true, "section": index}, {"candidates": [action]}, section, [action], {}, "reactive")
+	return true

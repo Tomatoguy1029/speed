@@ -5,6 +5,7 @@ extends WeaponBehavior
 ## 発射器の位置（なぞっていない間は null）
 var origin = null
 var _buf := PackedInt32Array()
+var pending: Array[Dictionary] = []
 
 func on_launch(_full: bool) -> void:
 	origin = state.ship_pos
@@ -19,6 +20,18 @@ func on_end() -> void:
 	var length := d.length()
 	if length <= float(p("min_length")):
 		return
+	pending.append({"from":from,"to":to,"delay":0.18})
+	state.emit(&"bipolar_charge",{"from":from,"to":to})
+
+func tick(dt: float, _busy: bool) -> void:
+	for shot in pending:
+		shot.delay-=dt
+		if shot.delay<=0.0:_fire(shot.from,shot.to)
+	pending=pending.filter(func(s):return s.delay>0.0)
+
+func _fire(from: Vector2, to: Vector2) -> void:
+	var d:=to-from
+	var length:=d.length()
 	var u := d / length
 	var width := float(p("width")) * radius_k()
 	var pad := Vector2(width / 2.0, width / 2.0)
@@ -33,6 +46,9 @@ func on_end() -> void:
 			return
 	var color := Color(p("color", "#69fff0"))
 	var life := float(p("life"))
-	state.emit(&"beam", {"from": from, "to": to, "width": width, "color": color, "life": life})
-	state.emit(&"ring", {"pos": from, "radius": 65.0, "color": color, "life": life})
-	state.emit(&"ring", {"pos": to, "radius": 65.0, "color": color, "life": life})
+	state.emit(&"beam", {"from": from, "to": to, "width": width, "color": color, "life": life,
+		"visual_key": "weapon/bipolar", "width_scale": radius_k()})
+	state.emit(&"ring", {"pos": from, "radius": 65.0, "color": color, "life": life,
+		"visual_key": "weapon/bipolar"})
+	state.emit(&"ring", {"pos": to, "radius": 65.0, "color": color, "life": life,
+		"visual_key": "weapon/bipolar"})

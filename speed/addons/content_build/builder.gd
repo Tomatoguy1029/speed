@@ -7,7 +7,7 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 		var path := directory.path_join(name)
 		if path == "res://data/content_catalog.tres": continue
 		if path.begins_with("res://data/bosses/ai/") or "_moves/" in path: continue
-		if path.get_extension() in ["gd", "tres", "tscn", "gdshader", "png", "svg", "jpg", "jpeg", "webp", "mp3", "wav", "import"]: result.append(path)
+		if path.get_extension() in ["gd", "tres", "res", "tscn", "gdshader", "gdshaderinc", "png", "svg", "jpg", "jpeg", "webp", "mp3", "wav", "import"]: result.append(path)
 	for name in DirAccess.get_directories_at(directory):
 		if not name.begins_with("."): _files(directory.path_join(name), result)
 static func signature() -> String:
@@ -40,6 +40,8 @@ static func build_all(force := false, output := ROOT) -> Error:
 	if attack_error != OK: return attack_error
 	var aura_error: Error = preload("res://tools/content/build_hero_aura.gd").build(output)
 	if aura_error != OK: return aura_error
+	var codex_error: Error = preload("res://tools/content/build_codex_thumbnails.gd").build(output)
+	if codex_error != OK: return codex_error
 	var catalog_path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
 	var error: Error = load("res://tools/content/build_catalog.gd").build(catalog_path)
 	if error != OK: return error

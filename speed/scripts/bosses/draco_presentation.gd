@@ -1,10 +1,16 @@
 ## Shared armored silhouette, cosmic energy and explicit attack geometry.
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+@export var core_glow_radius := 43.0
+@export var core_glow_opacity := 0.16
+@export var core_glow_color := Color(0.38, 0.59, 1.0)
+@export var rift_color := Color("#5a4d91")
 var actor: BossActor
 const FORM = preload("res://scripts/bosses/draco_form.gd")
 const MODULE_GEOMETRY = preload("res://scripts/ui/legendary_module_geometry.gd")
 func _ready() -> void:
 	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
+	EFFECT_SETTINGS.apply_key(self, "boss/body/draco")
 func _process(_dt: float) -> void:
 	var sample := {"white":0.0,"offset":Vector2.ZERO,"angle":0.0}
 	if actor != null and actor.has_body(): sample = actor.hit_feedback.sample(actor.body_id)
@@ -39,7 +45,7 @@ func _draw() -> void:
 		if actor.entrance.active: core_glow=float(actor.entrance.get("chest_glow") if actor.entrance.get("chest_glow")!=null else actor.entrance.emerged)
 		if actor.finale.stage!=&"": core_glow=0.12 if actor.finale.split<=0.0 else 0.0
 		var pulse := 0.85+sin(actor.clock*3.0)*0.15
-		draw_circle(core,43.0*actor.perspective_scale,Color(0.38,0.59,1.0,core_glow*0.16*pulse))
+		draw_circle(core,core_glow_radius*actor.perspective_scale,Color(core_glow_color,core_glow*core_glow_opacity*pulse))
 		FORM.star(self,core,27.0*actor.perspective_scale,Color(0.85,0.96,1.0,core_glow))
 	if actor.finale.stage==&"strikes":
 		for trail: Dictionary in actor.finale.strike_trails:
@@ -96,7 +102,7 @@ func _draw_rift() -> void:
 		var side := (sin(j*2.3)*24.0+sin(j*4.9)*12.0)*opening
 		line.append(actor.to_local(center+axis*along+axis.orthogonal()*side))
 	draw_polyline(line,Color(0.41,0.25,0.88,0.22),160.0*opening,false)
-	draw_polyline(line,Color("#5a4d91"),105.0*opening,false)
+	draw_polyline(line,rift_color,105.0*opening,false)
 	draw_polyline(line,Color("#050612"),88.0*opening,false)
 	var eyes: float=float(actor.entrance.get("eyes") if actor.entrance.get("eyes")!=null else opening)
 	if eyes>0.0 and actor.entrance.emerged<0.4:

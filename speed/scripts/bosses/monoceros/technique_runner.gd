@@ -1,6 +1,21 @@
 ## 技に共通する予告・照準・終了処理。技のRunnerが継承する。
 extends BossTechnique.Runner
 
+func sequenced() -> bool:
+	return false
+
+func advance_sequence(_host: MonocerosBoss, _dt: float) -> void:
+	pass
+
+func horn_angle(host: MonocerosBoss) -> float:
+	return host.table.facing[host.body]
+
+func glow(_host: MonocerosBoss) -> float:
+	return 0.0
+
+func booster(_host: MonocerosBoss) -> float:
+	return -1.0
+
 func _begin_pass(host: MonocerosBoss) -> void:
 	host.mode = &"windup"
 	host.locked = false
@@ -35,11 +50,10 @@ func _aim(host: MonocerosBoss, dt: float) -> void:
 func _strike_aim(host: MonocerosBoss, attack: StringName = &"", lead := -1.0) -> Vector2:
 	# ボス固有の捕捉。選択時・予告中だけ現在位置と速度から接触時点を狙う。
 	if attack == &"": attack = host.technique
-	if host.tech_kind(attack) == &"combo": attack = &"charge"
 	var velocity := host.run_state.ship_vel
 	var target := host.run_state.ship_pos + velocity * (float(host.def.params.lock_lead) if lead < 0.0 else lead)
-	if host.tech_kind(attack) not in [&"charge", &"return_charge", &"lance"]: return target
-	var r: Dictionary = host._moves[attack].values()
+	if host.tech_kind(attack) not in [&"charge", &"return_charge"]: return target
+	var r: Dictionary = host._values_of(attack)
 	var speed := float(r.distance) / float(r.active)
 	var reach := float(r.get("reach", host.horn_length()))
 	var offset := target - host.table.pos[host.body]
@@ -82,23 +96,27 @@ func launch_strike(host: MonocerosBoss) -> void:
 		host._cue(&"recovery_started")
 		return
 	if kind() in [&"charge", &"return_charge", &"lance"] and host._path_blocked():
-		host.combat_trace.finish("interrupted", "path_obstructed")
-		host.combo_pending = false
-		host.passes_left = 0
-		host.timeline.stop()
-		host.mode = &"idle"
-		host.technique = &""
-		host.reposition = float(host.def.params.reposition_time)
-		var toward := (host.aim_point - host.table.pos[host.body]).normalized()
-		var side := toward.orthogonal()
-		var a := host.ctx.field.body_gap(host.table.pos[host.body] + side * 220.0, host.table.r[host.body])
-		var b := host.ctx.field.body_gap(host.table.pos[host.body] - side * 220.0, host.table.r[host.body])
-		host.reposition_direction = side if a >= b else -side
-		host._cue(&"reposition")
+		begin_reposition(host)
 		return
 	host.mode = &"active"
 	host.previous_horn = host.horn_points()
 	host._cue(&"attack_started")
+
+## 地形が狙いを塞ぐときは発進を見送り、横へ位置を変える。
+func begin_reposition(host: MonocerosBoss) -> void:
+	host.combat_trace.finish("interrupted", "path_obstructed")
+	host.combo_pending = false
+	host.passes_left = 0
+	host.timeline.stop()
+	host.mode = &"idle"
+	host.technique = &""
+	host.reposition = float(host.def.params.reposition_time)
+	var toward := (host.aim_point - host.table.pos[host.body]).normalized()
+	var side := toward.orthogonal()
+	var a := host.ctx.field.body_gap(host.table.pos[host.body] + side * 220.0, host.table.r[host.body])
+	var b := host.ctx.field.body_gap(host.table.pos[host.body] - side * 220.0, host.table.r[host.body])
+	host.reposition_direction = side if a >= b else -side
+	host._cue(&"reposition")
 
 func _path_blocked(host: MonocerosBoss) -> bool:
 	var at := host.table.pos[host.body]
@@ -118,9 +136,6 @@ func end_strike(host: MonocerosBoss) -> void:
 	if kind() == &"return_charge" and host.passes_left > 0:
 		host.mode = &"turnaround"
 		host.recovery = float(host.def.params.turnaround_time)
-	elif host.combo_pending:
-		host.mode = &"recovery"
-		host.recovery = host._begin_settle() + float(host.def.params.combo_gap)
 	else:
 		host.mode = &"recovery"
 		host.recovery = host._begin_settle() + float(host.rule().recover)
@@ -132,10 +147,10 @@ func _begin_settle(host: MonocerosBoss) -> float:
 	host.settle_at = host.clock
 	host.settle_hold = 0.0
 	host.settle_return = 0.0
-	if kind() not in [&"sweep", &"kick"]: return 0.0
+	if kind() != &"kick": return 0.0
 	var r := host.rule()
-	# 戻す角度：薙ぎは振り終えた端から正面まで、蹴りは後ろへ回した後脚を前へ戻すまで。
-	var angle := float(r.get("arc", 0.0)) * 0.5 if kind() == &"sweep" else PI
+	# 後ろへ回した後脚を正面へ戻す。
+	var angle := PI
 	var speed := float(r.get("return_speed", 0.0))
 	host.settle_hold = maxf(0.0, float(r.get("hold", 0.0)))
 	host.settle_return = angle / speed if speed > 0.0 else 0.0
@@ -145,7 +160,7 @@ func _begin_settle(host: MonocerosBoss) -> float:
 
 func horn_points(host: MonocerosBoss, _sweep_fraction := -1.0) -> PackedVector2Array:
 	var at := host.table.pos[host.body]
-	var direction := Vector2.from_angle(host.table.facing[host.body])
+	var direction := Vector2.from_angle(horn_angle(host))
 	return PackedVector2Array([at + direction * host.table.r[host.body] * 0.65, at + direction * host.horn_length()])
 
 func warning_points(host: MonocerosBoss) -> PackedVector2Array:
@@ -154,10 +169,13 @@ func warning_points(host: MonocerosBoss) -> PackedVector2Array:
 		points[1] += host.direction * float(host.rule().distance)
 	return points
 
+func hit_width(host: MonocerosBoss) -> float:
+	return float(host.def.params.horn_width)
+
 func _damage_shape(host: MonocerosBoss, prior: PackedVector2Array, points: PackedVector2Array) -> void:
 	if host.attack_hit or host.mode != &"active": return
 	host.combat_trace.evaluate()
-	var radius := float(host.def.params.horn_width) * 0.5 + host.ctx.cfg.ship_radius
+	var radius := hit_width(host) * 0.5 + host.ctx.cfg.ship_radius
 	var paths: Array[PackedVector2Array] = [points, prior]
 	if prior.size() == 2:
 		paths.append(PackedVector2Array([prior[0], points[0]]))

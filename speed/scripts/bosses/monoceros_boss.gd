@@ -44,7 +44,12 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var _rules := {}
 var _move_kinds := {}
+var _sequenced := {}
+var horn_waves: Array[Dictionary] = []
+var sweep_side := 1
+var last_slash := PackedVector2Array()
 var _runner: RefCounted
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 
@@ -52,14 +57,18 @@ func configure_flow(program: Resource) -> void:
 	action_rules = program.data.rules
 	_moves.clear()
 	_move_kinds.clear()
+	_sequenced.clear()
 	for move in action_rules.techniques:
 		_moves[move.technique] = move
-		_move_kinds[move.technique] = move.make_runner().kind()
+		var runner: RefCounted = move.make_runner()
+		_move_kinds[move.technique] = runner.kind()
+		_sequenced[move.technique] = runner.sequenced()
 	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
 	selection_enabled = true
+	_apply_phase()
 
 func _on_bound() -> void:
 	draws_self = true
@@ -112,12 +121,14 @@ func _stop_combat() -> void:
 	table.vel[body] = Vector2.ZERO
 	table.charge[body] = 0.0
 	previous_horn.clear()
+	horn_waves.clear()
 	_cue(&"defeated")
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
 	table.flash[body] = maxf(0.0, table.flash[body] - dt)
+	_advance_horn_waves(dt)
 	table.hit_cd[body] = maxf(0.0, table.hit_cd[body] - dt)
 	turn_motion = 0.0
 	if mode == &"entrance":
@@ -148,16 +159,6 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if recovery <= 0.0:
 			if mode == &"turnaround":
 				_begin_pass()
-			elif combo_pending:
-				combo_pending = false
-				# 仮連携も、突進後の現在位置から薙ぎが届く時だけ続ける。
-				if _close_ready(&"sweep"):
-					technique = &"sweep"
-					cooldowns[technique] = clock + float(rule().cd)
-					_begin_pass()
-				else:
-					mode = &"recovery"
-					recovery = float(rule().recover)
 			else:
 				combat_trace.finish()
 				mode = &"idle"
@@ -166,18 +167,22 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		phase_time -= dt
 		if phase_time <= 0.0: mode = &"idle"
 	elif mode in [&"windup", &"active"]:
-		if mode == &"windup" and not locked and _tracks_during_warn(): _aim(dt)
-		var prior_mode := mode
-		var prior_horn := horn_points()
-		# 発進したフレームでは移動を次の固定更新まで待つ。
-		if prior_mode == &"active":
-			_tick_strike(dt, prior_horn)
-		if timeline.is_playing(): timeline.advance(dt)
+		if _runner != null and _runner.sequenced():
+			_runner.advance_sequence(self, dt)
+		else:
+			if mode == &"windup" and not locked and _tracks_during_warn(): _aim(dt)
+			var prior_mode := mode
+			var prior_horn := horn_points()
+			# 発進したフレームでは移動を次の固定更新まで待つ。
+			if prior_mode == &"active":
+				_tick_strike(dt, prior_horn)
+			if timeline.is_playing(): timeline.advance(dt)
 	else:
 		on_body_threshold()
 		if phase_pending:
 			phase_pending = false
 			phase = 2
+			_apply_phase()
 			mode = &"phase"
 			phase_time = float(def.params.phase_time)
 			_cue(&"phase_changed")
@@ -185,16 +190,49 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			_cooldown = maxf(0.0, _cooldown - dt)
 			_reposition_tick(dt)
 			if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
-	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" else 0.0
+	if _runner != null and _runner.sequenced():
+		table.charge[body] = _runner.glow(self)
+	else:
+		table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" else 0.0
 	previous_ship = run_state.ship_pos
 	_sync_technique_visuals(dt)
 	presentation_advanced.emit(dt)
+
+## 衝撃波は技を終えたあとも、放ったときの値で世界時間を進める。
+func _advance_horn_waves(dt: float) -> void:
+	for index in range(horn_waves.size() - 1, -1, -1):
+		var wave := horn_waves[index]
+		wave.radius = float(wave.radius) + float(wave.speed) * dt
+		var offset: Vector2 = run_state.ship_pos - Vector2(wave.center)
+		if not wave.hit and absf(offset.length() - float(wave.radius)) <= float(wave.width) * 0.5 + ctx.cfg.ship_radius and absf(angle_difference(float(wave.angle), offset.angle())) <= float(wave.half):
+			combat_trace.damage(float(wave.damage) * ctx.cfg.atk_scale, 0.0, &"horn_wave", &"monoceros")
+			wave.hit = true
+		if float(wave.radius) >= float(wave.max): horn_waves.remove_at(index)
 
 func on_body_threshold() -> void:
 	if phase == 1 and table.hp[body] / table.max_hp[body] <= float(def.params.phase_threshold): phase_pending = true
 
 func rule() -> Dictionary:
-	return _moves[technique].values() if _moves.has(technique) else {}
+	return _values_of(technique)
+
+func _values_of(id: StringName) -> Dictionary:
+	return _rules.get(id, {})
+
+## 技の値を形態ごとに写す。技の途中では形態を変えない。
+func _apply_phase() -> void:
+	_rules.clear()
+	for id in _moves:
+		var base: Dictionary = _moves[id].values()
+		var values := {}
+		for key: String in base:
+			if not key.ends_with("_p2"): values[key] = base[key]
+		if phase >= 2:
+			for key: String in base:
+				if key.ends_with("_p2"): values[key.trim_suffix("_p2")] = base[key]
+		_rules[id] = values
+
+func is_sequenced(id: StringName) -> bool:
+	return _sequenced.get(id, false)
 
 func technique_ready(attack: StringName, gate: Dictionary) -> bool:
 	return technique_rejection(attack, gate).is_empty()
@@ -209,26 +247,28 @@ func technique_rejection(attack: StringName, gate: Dictionary) -> String:
 	var distance := table.pos[body].distance_to(run_state.ship_pos)
 	if distance < float(gate.get("min", 0.0)): return "distance_below_min"
 	if distance > float(gate.get("max", INF)): return "distance_above_max"
-	if distance > _reach(attack): return "out_of_reach"
+	var reach: float = _moves[attack].reach_limit(horn_length()) if is_sequenced(attack) else _reach(attack)
+	if distance > reach: return "out_of_reach"
 	if not _gate_allows(gate): return "direction_or_range_gate"
+	if is_sequenced(attack): return ""
 	if tech_kind(attack) != &"kick":
-		var r: Dictionary = _moves[attack].values()
+		var r: Dictionary = _values_of(attack)
 		var turn_window := maxf(0.0, float(r.warn) - float(def.params.lock_lead))
 		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return "insufficient_turn_time"
-	if table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) > _reach(attack): return "predicted_target_out_of_reach"
+	if table.pos[body].distance_to(_strike_aim(attack, float(_values_of(attack).warn))) > _reach(attack): return "predicted_target_out_of_reach"
 	return ""
 
 func _gate_allows(gate: Dictionary) -> bool:
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos - table.pos[body]).rotated(-table.facing[body]))
 
 func _reach(attack: StringName) -> float:
-	var r: Dictionary = _moves[&"charge" if tech_kind(attack) == &"combo" else attack].values()
+	var r: Dictionary = _values_of(attack)
 	return float(r.get("distance", 0.0)) + float(r.get("reach", horn_length())) + float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
 
 func _close_ready(attack: StringName) -> bool:
 	if not _moves.has(attack): return false
 	var gate: Dictionary = action_rules.conditions.get(String(attack), {})
-	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) <= _reach(attack)
+	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_values_of(attack).warn))) <= _reach(attack)
 
 func selection_blocked() -> bool:
 	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"final", &"defeated"]
@@ -251,26 +291,39 @@ func start_attack(attack: StringName) -> bool:
 	if mode != &"idle" or not _moves.has(attack):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "busy" if mode != &"idle" else "unknown_technique", "origin": combat_origin, "action_id": null})
 		return false
-	var r: Dictionary = _moves[attack].values()
+	var r: Dictionary = _values_of(attack)
 	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, _attack_length(attack)):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 		return false
 	combat_trace.begin(attack, combat_origin)
-	technique = &"charge" if tech_kind(attack) == &"combo" else attack
+	technique = attack
 	cooldowns[attack] = clock + float(r.cd)
-	combo_pending = tech_kind(attack) == &"combo"
-	passes_left = int(def.params.return_passes) if tech_kind(attack) == &"return_charge" else 1
+	combo_pending = false
+	passes_left = int(r.passes) if tech_kind(attack) == &"return_charge" else 1
 	_begin_pass()
 	return true
 
-## 攻撃予算に申告する長さ。コンボは中の突進・切り返し・薙ぎの予告と実行の合計。
+## 攻撃予算に申告する予告と実行の長さ。
 func _attack_length(attack: StringName) -> float:
-	if tech_kind(attack) == &"combo":
-		var charge: Dictionary = _moves[&"charge"].values()
-		var sweep: Dictionary = _moves[&"sweep"].values() if _moves.has(&"sweep") else {}
-		return float(charge.warn) + float(charge.active) + float(def.params.combo_gap) + float(sweep.get("warn", 0.0)) + float(sweep.get("active", 0.0))
-	var r: Dictionary = _moves[attack].values()
+	if is_sequenced(attack):
+		if tech_kind(attack) == &"return_charge": return _moves[attack].attack_length(_values_of(attack))
+		return _moves[attack].attack_length()
+	var r: Dictionary = _values_of(attack)
 	return float(r.warn) + float(r.active)
+
+## 段で進む技を終え、隙に入る。
+func finish_sequence(recover_time: float) -> void:
+	timeline.stop()
+	table.vel[body] = Vector2.ZERO
+	previous_horn.clear()
+	passes_left = 0
+	locked = false
+	mode = &"recovery"
+	settle_at = clock
+	settle_hold = 0.0
+	settle_return = 0.0
+	recovery = recover_time
+	_cue(&"recovery_started")
 
 func attack_playing() -> bool:
 	return mode != &"idle"
@@ -328,7 +381,7 @@ func _reposition_tick(dt: float) -> void:
 		var keep := float(def.params.approach_range)
 		var closing := toward.length() > keep
 		if not closing and _moves.has(&"charge"):
-			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].values().warn))) > _reach(&"charge")
+			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_values_of(&"charge").warn))) > _reach(&"charge")
 		if closing:
 			# approach_range の距離まで寄って止まり、その内側では向きだけを合わせる。
 			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(toward.normalized()))
@@ -346,7 +399,7 @@ func _move_body(step: Vector2) -> void:
 	ctx.field.collide_enemy(body, from)
 
 func horn_length() -> float:
-	return table.r[body] * float(def.params.horn_length_ratio)
+	return table.r[body] * float(def.params.horn_length_ratio_p2 if phase >= 2 else def.params.horn_length_ratio)
 
 ## 判定と表示が共有する角／蹄の線分。ワールド座標。
 func horn_points(sweep_fraction := -1.0) -> PackedVector2Array:
@@ -379,6 +432,7 @@ func begin_final_strike(charge: float) -> void:
 	selection_enabled = false
 	combo_pending = false
 	previous_horn.clear()
+	horn_waves.clear()
 	mode = &"final"
 	super(charge)
 	_cue(&"final_strike")

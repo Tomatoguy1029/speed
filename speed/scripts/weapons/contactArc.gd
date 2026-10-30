@@ -20,7 +20,7 @@ func on_any_contact(target: int) -> void:
 	var segments := PackedVector2Array([state.ship_pos, origin])
 	if t.dead[target] == 0:
 		ctx.combat.damage_enemy(target, dmg, {"cause": &"contactArc"})
-	var reach: float = p("range")
+	var reach: float = area(float(p("range")))
 	var remaining := level * int(p("chains_per_level"))
 	var tips: Array[Vector2] = []
 	var counts: Array = p("branches_by_level")
