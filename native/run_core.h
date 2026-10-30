@@ -6,6 +6,8 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <unordered_map>
+#include <unordered_set>
+#include <deque>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
@@ -83,7 +85,7 @@ class SpeedRunCore : public RefCounted {
     int64_t kills = 0;
     Array events;
     void emit_event(StringName type, Dictionary data = Dictionary());
-    void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction);
+    void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock = 160.0);
     struct PickupConfig {
         int64_t gem_max = 0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;
@@ -104,6 +106,21 @@ class SpeedRunCore : public RefCounted {
     bool pickups_ready = false;
     void drop_enemy_pickups(const Enemy &enemy);
     void drop_gem(Vector2 position, double value);
+    struct Friendly {
+        bool alive = true, pierce = false, no_crit = false;
+        int64_t kind = 0, generation = 0, pierce_left = 0;
+        Vector2 pos, vel;
+        float radius = 5, life = 0.9f, age = 0, knock = 250, angle = 0, spin = 0;
+        double damage = 0;
+        StringName cause = "shot", weapon_id, visual, type;
+        Color color;
+        std::unordered_set<int64_t> hit_ids;
+        PackedVector2Array trail;
+    };
+    // 命中中に後ろへ追加しても、処理中の弾への参照を保つ。
+    std::deque<Friendly> friends;
+    std::vector<size_t> free_friends;
+    size_t add_friend(Friendly shot);
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
@@ -116,6 +133,9 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool fire_shot(Vector2 from, double angle, double damage, const Dictionary &options);
+    bool step_projectiles(double world_dt);
+    Array projectiles_snapshot() const;
     bool configure(const Dictionary &data);
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
     bool step_ship(double real_dt, double world_dt, const Dictionary &input);

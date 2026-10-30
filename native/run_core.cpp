@@ -5,6 +5,9 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("fire_shot", "from", "angle", "damage", "options"), &SpeedRunCore::fire_shot, DEFVAL(Dictionary()));
+    ClassDB::bind_method(D_METHOD("step_projectiles", "world_dt"), &SpeedRunCore::step_projectiles);
+    ClassDB::bind_method(D_METHOD("projectiles_snapshot"), &SpeedRunCore::projectiles_snapshot);
     ClassDB::bind_method(D_METHOD("configure_frame", "config"), &SpeedRunCore::configure_frame);
     ClassDB::bind_method(D_METHOD("step_frame", "real_dt", "input", "center", "half", "camera_zoom"), &SpeedRunCore::step_frame);
     ClassDB::bind_method(D_METHOD("configure", "data"), &SpeedRunCore::configure);
@@ -95,6 +98,7 @@ void SpeedRunCore::close() {
     draw = Draw();
     grid = EnemyGrid();
     events.clear();
+    friends.clear(); free_friends.clear();
     gems.clear(); coins.clear(); free_gems.clear(); free_coins.clear(); gem_queue.clear(); collections.clear();
 }
 

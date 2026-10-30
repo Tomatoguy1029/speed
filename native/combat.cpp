@@ -40,7 +40,7 @@ static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double ra
     return t >= 0 && t <= 1 ? t : -1;
 }
 
-void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction) {
+void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock) {
     auto &enemy = enemies[row];
     if (enemy.dead || amount <= 0) return;
     const auto &def = definitions[enemy.definition];
@@ -81,7 +81,7 @@ void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, boo
         drop_enemy_pickups(enemy);
     } else if (def.knockback > 0) {
         const double mass = std::max(1.0, def.radius / 20.0);
-        enemy.vel += direction * 160.0 * def.knockback / mass;
+        enemy.vel += direction * knock * def.knockback / mass;
     }
 }
 
