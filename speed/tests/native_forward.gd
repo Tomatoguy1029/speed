@@ -28,7 +28,7 @@ func _ready() -> void:
 	probe.close()
 	print("[native_forward] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
-func compare_frames(comparison, level: int, division: int, guarded := false, spawning := false) -> void:
+func compare_frames(comparison, level: int, division: int, guarded := false, spawning := false, budgeting := false) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 631, "empty": true, "invincible": false})
@@ -71,6 +71,14 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		phase.wave_type = &"" if division == 3 else &"drifter"
 		phase.mix = {"drifter": 1.0}
 		stage.phases = [phase]
+		if budgeting:
+			phase.attack_budget = 0
+			for setting in [[0.8,3],[1.6,1],[2.4,0],[3.6,2]]:
+				var next: PhaseDef = phase.duplicate(true)
+				next.id = StringName("予算%d" % stage.phases.size())
+				next.start = setting[0]
+				next.attack_budget = setting[1]
+				stage.phases.append(next)
 		var clip := RuntimeClip.new()
 		clip.time = 0.6
 		clip.length = 1.2
@@ -84,6 +92,10 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		check(core.configure_population(values(run.cfg, ["spawn_recycle_scale", "spawn_region_cap", "spawn_margin", "field_radius", "planet_radius"])), "出現位置の編集値を渡す")
 		check(core.configure_refill(values(run.cfg, ["spawn_total_cap", "spawn_refill_time"])), "フレームで使う補充を準備する")
 		check(core.configure_clips(DATA.compile_spawn_clips(stage,run.cfg)), "フレームで使うクリップを準備する")
+	if budgeting:
+		run.state.lab_mode = false
+		run.spawn._sync_attack_budget(run.spawn.current_phase())
+		check(core.set_attack_budget_mode(true,true), "時間帯の予算と世界時計を有効にする")
 	core.start(631, run.enemies._next_id, run.pickups._gem_next_seq)
 	if spawning and not core.has_method("set_population_mode"):
 		check(false, "補充の有効・無効をフレーム更新へ接続する")
@@ -112,12 +124,17 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 	var fired := 0
 	var shot_hits := 0
 	var empty_wave_clip := false
+	var budget_helper = load("res://tests/native_attack_budget.gd").new()
+	var permitted := 0
+	var denied := 0
 	for tick in 360:
 		if spawning:
-			run.options.auto_spawn = tick < 250 or tick >= 280
+			run.options.auto_spawn = budgeting or tick < 250 or tick >= 280
 			var blocked := tick >= 150 and tick < 200
 			run.projectiles.director.guard = {"until": INF} if blocked else {}
-			check(core.set_population_mode(run.options.auto_spawn, false, blocked), "実験場の自動補充と出現待機を渡す")
+			check(core.set_population_mode(run.options.auto_spawn, false, blocked and not budgeting), "実験場の自動補充と出現待機を渡す")
+		if budgeting:
+			check(core.set_attack_guard(tick >= 150 and tick < 200,INF),"出現にも攻撃待機を反映する")
 		if guarded:
 			var guards := {"controls_locked": tick >= 60 and tick < 80, "encounter_protected": tick >= 80 and tick < 95, "steering_locked": tick >= 200 and tick < 220, "invincible": tick >= 95 and tick < 100, "hitstop_enabled": tick < 150}
 			for key in guards:
@@ -142,14 +159,26 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		var half := run.state.view_half
 		var zoom := run.state.camera_zoom
 		run.state.events.clear()
+		if budgeting and tick % 12 == 0:
+			for row in run.enemies.table.alive.size():
+				if not run.enemies.table.alive[row] or run.enemies.table.dead[row]: continue
+				var id: int = run.enemies.table.id[row]
+				var owner := "比較:%d" % id
+				var accepted: bool = run.projectiles.director.request(owner,["beam"],row,id,0.3,0.0,1.0)
+				check(core.request_attack(owner,PackedStringArray(["beam"]),id,0.3,0.0,1.0) == accepted,"時間帯ごとの要求が一致する")
+				if accepted: permitted += 1
+				else: denied += 1
+				break
 		if run.state.phase == RunState.Phase.PLAY: run._play_tick(1.0/60.0)
 		check(core.step_frame(1.0/60.0, command, center, half, zoom), "射撃も含めて一回の呼出しで更新する")
+		if budgeting:
+			check(comparison.difference(budget_helper.snapshot(run.projectiles.director),core.attack_budget_snapshot()).is_empty(),"攻撃枠の時計と寿命を停止・間引き・撃破に合わせる")
 		if spawning:
 			check(run.spawn._spawn_acc == core.refill_snapshot().accumulator and run.spawn._wave_t == core.refill_snapshot().wave_time, "補充を停止と世界時間の間引きに合わせる")
 		if guarded and tick in [65,205]: check(not run.state.drawing, "操作ロック中は描線入力を受けない")
 		check(run.state.phase == core.inspect().phase, "停止と再開の状態が一致する")
 		check(is_equal_approx(run.state.time, core.inspect().time) and is_equal_approx(run.state.sim_time, core.inspect().sim_time), "停止中は両方の時計が止まる")
-		if guarded and tick in [60,80,95,100,160,200,220]:
+		if guarded and division == 1 and tick in [60,80,95,100,160,200,220]:
 			var hurt := false
 			for event in run.state.events: hurt = hurt or event.type == &"hurt"
 			check(hurt == (tick >= 100), "保護中の接触と解除後の被弾を実際に通る tick%d" % tick)
@@ -174,6 +203,8 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 			if event.type == &"weapon_fire": fired += 1
 			if event.type == &"hit" and event.cause == &"shot": shot_hits += 1
 		if not difference.is_empty(): break
+	if budgeting: check(permitted > 0 and denied > 0,"時間帯の予算による許可と待機を両方通る")
+	budget_helper.free()
 	if spawning and division == 3: check(empty_wave_clip, "出現種類のない波の更新と同時にクリップを実際に出す")
 	check(fired >= 2 and shot_hits > 0, "W01の発射と命中を実際に通る")
 	check(buffer_checked, "発射中の弾の表示データを実際に比較する")

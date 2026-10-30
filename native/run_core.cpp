@@ -7,6 +7,7 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_attack_budget_mode", "enabled", "from_stage"), &SpeedRunCore::set_attack_budget_mode);
     ClassDB::bind_method(D_METHOD("advance_attack_budget", "at"), &SpeedRunCore::advance_attack_budget);
     ClassDB::bind_method(D_METHOD("cancel_attack_wait", "owner", "id"), &SpeedRunCore::cancel_attack_wait, DEFVAL(-1));
     ClassDB::bind_method(D_METHOD("cancel_attack", "owner", "id"), &SpeedRunCore::cancel_attack);
@@ -523,6 +524,10 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     const double accumulated = world_accum;
     if (world_step) {
         world_accum = 0; world_steps = 0;
+        if (attack_budget.frame_enabled) {
+            sync_attack_budget();
+            if (!advance_attack_budget(world_time)) return false;
+        }
         advance_enemies(accumulated);
         if (check_run_end()) return true;
         rebuild_enemy_grid(frame_grid_cell);
@@ -537,7 +542,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     for (size_t row : dead_rows) if (enemies[row].alive && enemies[row].dead) remove_enemy(enemies[row].id);
     dead_rows.clear();
     if (world_step) {
-        if (population.frame_enabled && !population.blocked && !step_population(accumulated, population.bonus)) return false;
+        if (population.frame_enabled && !population.blocked && !attack_guard_active() && !step_population(accumulated, population.bonus)) return false;
         step_pickups(accumulated);
     }
     return true;

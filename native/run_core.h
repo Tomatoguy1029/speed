@@ -59,10 +59,12 @@ class SpeedRunCore : public RefCounted {
         HashMap<int64_t, Group> groups;
         HashMap<StringName, int64_t> owners;
         HashMap<StringName, Waiting> waiting;
-        bool enabled = false, guard = false;
+        bool enabled = false, guard = false, frame_enabled = false, stage_budget = false;
         double budget = 4, jitter = 0.3, now = 0, guard_until = -1;
         int64_t serial = 0;
     } attack_budget;
+    void sync_attack_budget();
+    bool attack_guard_active() const;
     double used_attack_cost() const;
     StringName next_attack_owner() const;
     struct Formation {
@@ -244,6 +246,7 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool set_attack_budget_mode(bool enabled, bool from_stage);
     bool advance_attack_budget(double at);
     void cancel_attack_wait(StringName owner, int64_t id);
     void cancel_attack(StringName owner, int64_t id);

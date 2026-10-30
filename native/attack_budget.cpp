@@ -196,3 +196,24 @@ bool SpeedRunCore::advance_attack_budget(double at) {
     for (const auto &owner : cancelled) budget.waiting.erase(owner);
     return true;
 }
+
+bool SpeedRunCore::attack_guard_active() const {
+    return attack_budget.guard && attack_budget.now <= attack_budget.guard_until;
+}
+void SpeedRunCore::sync_attack_budget() {
+    if (!attack_budget.stage_budget) return;
+    size_t phase = 0;
+    for (size_t i = 1; i < spawn_timeline.phases.size(); ++i) {
+        if (spawn_timeline.phases[i].start > time) break;
+        phase = i;
+    }
+    attack_formation_mode = true; attack_budget.enabled = true;
+    attack_budget.budget = std::max(int64_t(0), spawn_timeline.phases[phase].budget);
+    attack_budget.jitter = 0;
+}
+bool SpeedRunCore::set_attack_budget_mode(bool enabled, bool from_stage) {
+    if (closed || (enabled && !frame_ready) || (from_stage && (!spawn_timeline_ready || spawn_timeline.phases.empty()))) return false;
+    attack_budget.frame_enabled = enabled; attack_budget.stage_budget = from_stage;
+    if (enabled) sync_attack_budget();
+    return true;
+}
