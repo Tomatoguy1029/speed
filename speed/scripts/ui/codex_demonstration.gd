@@ -1,11 +1,14 @@
 ## 試作の実演配置を固定データとして再生する。記録は試作の描画命令（1ドット＝画面の1画素）で、
-## 塗り・円・輪・線・光弾・砲口・針は試作と同じ規則のドット描画（PixelPainter）、炎は fire_burst、
-## 重力レンズと空間の歪みは本番と同じ shader で描く。
+## 塗り・円・輪・線・光・円弧・光弾・砲口・針は試作と同じ規則のドット描画（PixelPainter）、炎は fire_burst、
+## 重力レンズと空間の歪みは本番と同じ shader、ギアアップの炎は本番と同じ GearFire で描く。
+## 命令の番号：0 塗り、1 絵、2 円、3 輪（太さ・揺らぎ）、4 線、5 炎、6 針、7 快進撃のオーラ、8 砲口、9 光弾、
+## 10 レンズ、11 歪み、12 ミラージュの分身、13 隙間のない輪、14 光、15 円弧、16 ギアアップの炎。
 extends Node2D
 const FLAT := preload("res://shaders/codex_flat.gdshader")
 const FIRE := preload("res://shaders/fire_burst.gdshader")
 const LENS := preload("res://shaders/hole_lens.gdshader")
 const RIPPLE := preload("res://shaders/space_ripple.gdshader")
+const GLOW := preload("res://shaders/codex_glow.gdshader")
 const VALUE_NOISE := preload("res://assets/effects/build/value_noise.png")
 const NOISE := preload("res://assets/effects/build/aura_noise.png")
 const SHIP := preload("res://assets/pixel/airship.png")
@@ -22,10 +25,13 @@ var key := ""
 var _sprites: Array[Sprite2D] = []
 var _rectangles: Array[PixelPainter] = []
 ## 炎・レンズ・歪みの面。種類ごとに使い回す
-var _surfaces := {"fire": [], "lens": [], "ripple": []}
+var _surfaces := {"fire": [], "lens": [], "ripple": [], "glow": []}
 var _used := {}
 var _sprite_count := 0
 var clock := 0.0
+var _gear: GearFire
+var _gear_clock := -1.0
+var _gear_seen := false
 
 func setup(module: Resource, prepared_animation: Resource = null) -> void:
 	code = String(module.code_id)
@@ -39,7 +45,10 @@ func sample(time: float) -> void:
 	clock = fposmod(time, animation.period)
 	var frame: Array = animation.frames[mini(animation.frames.size() - 1, floori(clock * 30.0))]
 	_sprite_count = 0
-	_used = {"fire": 0, "lens": 0, "ripple": 0}
+	_used = {"fire": 0, "lens": 0, "ripple": 0, "glow": 0}
+	_gear_seen = false
+	var stroke := ""
+	var stroke_cells := {}
 	for batch in _rectangles: batch.begin()
 	var order := 0
 	for command: Array in frame:
@@ -56,12 +65,19 @@ func sample(time: float) -> void:
 			_rectangles.append(batch)
 		var painter := _rectangles[tier]
 		var at := Vector2(command[1], command[2]) if command.size() > 2 and command[1] is float else Vector2.ZERO
+		if opcode != 4: stroke = ""
 		match opcode:
 			0: painter.add_rect(at, Vector2(command[3], command[4]) * 0.5, command[5], _color(command, 6))
 			1: _sprite(command, z)
 			2: painter.disk(at, command[3], _color(command, 4))
-			3: painter.thick_ring(at, command[3], int(command[4]), _color(command, 5))
-			4: painter.line(at, Vector2(command[3], command[4]), _color(command, 6), int(command[5]))
+			3: painter.thick_ring(at, command[3], int(command[4]), _color(command, 5), float(command[9]) if command.size() > 9 else 0.0)
+			4:
+				# 試作の1本の線（同じ色・太さで続く線分）は、重なるドットを1回だけ塗る。透ける線が濃くならない
+				var key := str(command.slice(5))
+				if key != stroke:
+					stroke = key
+					stroke_cells = {}
+				_line(painter, at, Vector2(command[3], command[4]), maxi(1, roundi(command[5])), _color(command, 6), stroke_cells)
 			5: _fire(command, z)
 			6: painter.spindle(at, command[3], command[4], command[5], command[6])
 			7: _aura(command, z)
@@ -69,6 +85,10 @@ func sample(time: float) -> void:
 			9: painter.bolt(at, command[3], int(command[4]), int(command[5]))
 			10: _lens(at, command[3], z)
 			11: _ripple(at, command[3], command[4], z)
+			13: painter.ring(at, command[3], _color(command, 4))
+			14: _glow(at, command[3], Color(command[4], command[5], command[6], command[7]), z)
+			15: _arc(painter, at, command[3], command[4], command[5], command[6], _color(command, 7))
+			16: _gear_fire(at, command[3], command[4], command[5] > 0.5, z)
 			12:
 				_sprite([1,"echo",command[1],command[2]+2.0,31*0.55,70*0.55,float(command[3])+PI*0.5,command[6],0,0,31,70],z)
 				_sprites[_sprite_count-1].modulate=Color(float(command[5])/8.0,0,0,command[6])
@@ -76,6 +96,61 @@ func sample(time: float) -> void:
 	for i in _sprites.size(): _sprites[i].visible = i < _sprite_count
 	for kind in _surfaces:
 		for i in _surfaces[kind].size(): _surfaces[kind][i].visible = i < _used[kind]
+	if is_instance_valid(_gear): _gear.visible = _gear_seen
+
+## 試作の glow：中心から外へ薄れる光を加算で重ねる。
+func _glow(at: Vector2, radius: float, color: Color, z: int) -> void:
+	var rect := _surface("glow", z) as ColorRect
+	rect.position = at - Vector2.ONE * radius
+	rect.size = Vector2.ONE * radius * 2.0
+	(rect.material as ShaderMaterial).set_shader_parameter("glow_color", color)
+
+## 太さ width の線。cells に塗ったドットを記録し、同じ線の中で二度塗らない。
+func _line(painter: PixelPainter, a: Vector2, b: Vector2, width: int, color: Color, cells: Dictionary) -> void:
+	var n := maxi(1, ceili(maxf(absf(b.x - a.x), absf(b.y - a.y))))
+	for i in range(n + 1):
+		var at := (a + (b - a) * float(i) / n - Vector2.ONE * (width >> 1)).round()
+		for y in width:
+			for x in width:
+				var cell := at + Vector2(x, y)
+				if cells.has(cell): continue
+				cells[cell] = true
+				painter.fill(cell.x, cell.y, color)
+
+## 線幅 width の円弧（角度 from から to）。
+func _arc(painter: PixelPainter, at: Vector2, radius: float, width: float, from: float, to: float, color: Color) -> void:
+	var span := to - from
+	if span >= TAU: span = TAU
+	var steps := maxi(8, ceili(radius * absf(span) * 2.0))
+	var seen := {}
+	for i in steps + 1:
+		var a := from + span * i / steps
+		var k := -width * 0.5
+		while k < width * 0.5:
+			var p := (at + Vector2.from_angle(a) * (radius + k + 0.5)).floor()
+			if not seen.has(p):
+				seen[p] = true
+				painter.fill(p.x, p.y, color)
+			k += 0.5
+
+## ギアアップの炎。記録の時刻に合わせて進め、巻き戻ったり飛んだりしたら作り直して今の強さで温める。
+func _gear_fire(at: Vector2, angle: float, power: float, on: bool, z: int) -> void:
+	_gear_seen = true
+	if _gear == null:
+		_gear = GearFire.new()
+		add_child(_gear)
+		_gear.setup(1.0)
+	_gear.z_index = maxi(0, mini(z, 4095) - 1)
+	_gear.position = at + Vector2.from_angle(angle) * 9.0
+	_gear.set_power(power, on)
+	var dt := clock - _gear_clock
+	if _gear_clock < 0.0 or dt < 0.0 or dt > 0.2:
+		_gear.fire.restart()
+		_gear.fire.emitting = on
+		if on: _gear.fire.warmup(0.3)
+		dt = 0.0
+	_gear_clock = clock
+	_gear.step(dt, angle)
 
 ## 種類ごとの面を1枚取り出す。足りなければ作る。
 func _surface(kind: String, z: int) -> CanvasItem:
@@ -94,7 +169,7 @@ func _surface(kind: String, z: int) -> CanvasItem:
 		else:
 			var rect := ColorRect.new()
 			rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			mat.shader = LENS if kind == "lens" else RIPPLE
+			mat.shader = LENS if kind == "lens" else RIPPLE if kind == "ripple" else GLOW
 			item = rect
 		item.material = mat
 		item.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -119,6 +194,7 @@ func _fire(c: Array, z: int) -> void:
 	mat.set_shader_parameter("origin", center)
 	mat.set_shader_parameter("seed", c[21])
 	for i in 4: mat.set_shader_parameter("c%d" % i, _color(c, 5 + i * 4))
+	ShaderTuning.apply(mat, key)
 
 ## 試作の lens：暗黒の半径 shadow、レンズの届く範囲は shadow の7倍（最大120）。
 func _lens(at: Vector2, shadow: float, z: int) -> void:
@@ -130,6 +206,7 @@ func _lens(at: Vector2, shadow: float, z: int) -> void:
 	mat.set_shader_parameter("half_size", reach)
 	mat.set_shader_parameter("shadow", shadow)
 	mat.set_shader_parameter("reach", reach)
+	ShaderTuning.apply(mat, key)
 
 ## 試作の ripple：半径 r の帯の中を外へずらす。ずれが 0.5 ドット未満なら描かない。
 func _ripple(at: Vector2, radius: float, amp: float, z: int) -> void:
@@ -143,6 +220,7 @@ func _ripple(at: Vector2, radius: float, amp: float, z: int) -> void:
 	var ripples: Array[Vector4] = [Vector4(at.x, at.y, radius, amp)]
 	for i in 7: ripples.append(Vector4.ZERO)
 	mat.set_shader_parameter("ripples", ripples)
+	ShaderTuning.apply(mat, key)
 
 func _color(data: Array, at: int) -> Color:
 	return Color(float(data[at]),float(data[at+1]),float(data[at+2]),float(data[at+3]))

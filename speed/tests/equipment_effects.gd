@@ -118,7 +118,7 @@ func _ready() -> void:
 							for echo in mirage.echoes: check(echo.copies.size()==level,"ミラージュの本体はLvごとの1〜5機")
 							var visual = presentation._equipment_visuals.get(mirage.get_instance_id())
 							if visual != null: check(visual.node._body._count<=level,"ミラージュの描画で本体を重複させない")
-						if key == "trait/fullCharge": observed = observed or not _visual(presentation, key).flames.is_empty()
+						if key == "trait/fullCharge": observed = observed or not _visual(presentation, key).gear.fire.particles.is_empty()
 						if key == "trait/rampage": observed = observed or (not session.run.state.tracing and session.run.loadout.trait_behaviors[entry.id].strength>0.9)
 					if gpu and frame%4 == 0:
 						await RenderingServer.frame_post_draw
