@@ -53,11 +53,11 @@ params = {
 "bullet_dmg": 10.0,
 "fire_interval": 3.2,
 "keep": 260.0,
-"telegraph": 0.6,
+"telegraph": 1.4,
 "wave_arc": 3.14159,
 "wave_radius": 320.0,
-"wave_speed": 520.0,
-"wave_width": 20.0
+"wave_speed": 300.0,
+"wave_width": 6.25
 }
 id = &"pulser"
 display_name = "波動の敵"

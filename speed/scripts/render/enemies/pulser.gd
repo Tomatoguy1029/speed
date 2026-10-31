@@ -1,26 +1,35 @@
-## 波動の敵の見た目。
+## 元の敵画像を保ち、光筋を集めて発射輪を作る。
 extends EnemyVisual
 
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super(render, behavior_name)
-	always_marked = true
+const LASER = preload("res://scripts/render/pulser_laser.gd")
+const PULSER = preload("res://scripts/enemies/pulser.gd")
+var _rings: Array[LASER] = []
+var _count := 0
 
-## 波動の敵：次の輪までの溜まり具合で中心の光が強まり、構えると光の輪が中心へ縮んで集まる。
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var dp: Dictionary = t.def[i].params
-	var col := t.color[i].lightened(0.4)
-	if t.mode[i] == EnemyTable.Mode.WINDUP:
-		var k := 1.0 - clampf(t.timer[i] / float(dp.telegraph), 0.0, 1.0)
-		for n in 3:
-			var f := fmod(k * 1.5 + n / 3.0, 1.0)
-			c.draw_arc(p, r * (2.4 - 2.0 * f), 0, TAU, 32, Color(col, f * 0.8), _px(2.0))
-		c.draw_circle(p, r * (0.25 + 0.2 * k), Color(1, 1, 1, 0.6 + 0.4 * k))
-		return
-	var ready := 1.0 - clampf(t.fire_t[i] / float(dp.fire_interval), 0.0, 1.0)
-	c.draw_circle(p, r * (0.12 + 0.14 * ready), Color(col, 0.3 + 0.6 * ready))
-	var spin := state.world_time * 2.0
-	for n in 3:
-		var a := spin + n * TAU / 3.0
-		c.draw_arc(p, r * 1.18, a, a + 0.8 * ready, 8, Color(col, 0.6 * ready), _px(2.0))
+func draw_marks(_c: CanvasItem, _t: EnemyTable, _i: int) -> void:
+	pass
+
+## 装甲のCanvasLayerより前に置く。通常の白い被弾表示には触れない。
+func draw_layer(_c: CanvasItem, view: Rect2) -> void:
+	_count = 0
+	var t: EnemyTable = run.enemies.table
+	if not state.cinematic_hide_enemies:
+		for i in behavior.rows():
+			if t.dead[i] != 0 or t.held[i] != 0 or t.stone[i] > 0.0 or t.pump_owner[i] >= 0:
+				continue
+			if t.mode[i] != EnemyTable.Mode.WINDUP:
+				continue
+			var radius: float = PULSER.ring_radius(t, i)
+			var p: Dictionary = t.def[i].params
+			var width: float = float(p.wave_width)
+			if not view.grow(radius + width * 16.0).has_point(t.pos[i]):
+				continue
+			if _count == _rings.size():
+				var ring: LASER = LASER.new()
+				ring.setup(rm._lit_enemy_marks)
+				_rings.append(ring)
+			var progress: float = 1.0 - clampf(t.timer[i] / maxf(float(p.telegraph), 0.001), 0.0, 1.0)
+			_rings[_count].show_ring(t.pos[i], radius, width, progress, t.id[i] % 4093)
+			_count += 1
+	for i in range(_count, _rings.size()):
+		_rings[i].visible = false

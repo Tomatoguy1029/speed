@@ -1,7 +1,20 @@
 ## 広がる輪・扇の見た目（いるか座の数層の弧を含む）。
 extends AttackVisual
 
+const LASER = preload("res://scripts/render/pulser_laser.gd")
+var _rings: Array[LASER] = []
+var _count := 0
+
+## 前の描画で使った分だけ隠す。死亡・寿命終了・行の再利用でも古い輪を残さない。
+func update(_dt: float) -> void:
+	for n in _count:
+		_rings[n].visible = false
+	_count = 0
+
 func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> void:
+	if pr.hazard_style[i] == ProjectileSystem.HazardStyle.PULSER:
+		_draw_pulser(c, pr, i, view)
+		return
 	var p := pr.hazard_pos[i]
 	var t := pr.hazard_t[i]
 	var delay := pr.hazard_delay[i]
@@ -37,3 +50,17 @@ func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> vo
 		c.draw_arc(p, rad, g + gap_w, g + TAU - gap_w, 48, Color(col, 0.85 * fade), w)
 	else:
 		c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.85 * fade), w)
+
+func _draw_pulser(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> void:
+	if pr.hazard_t[i] < pr.hazard_delay[i]:
+		return
+	var radius: float = pr.wave_radius(i)
+	var width: float = pr.hazard_width[i]
+	if not view.grow(radius + width * 2.0).has_point(pr.hazard_pos[i]):
+		return
+	if _count == _rings.size():
+		var ring: LASER = LASER.new()
+		ring.setup(c)
+		_rings.append(ring)
+	_rings[_count].show_ring(pr.hazard_pos[i], radius, width, -1.0)
+	_count += 1

@@ -120,7 +120,7 @@ enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）。
 ## FLOOD は広がるビームで、予告の間も照射する範囲全体を見せる（みずがめ座）。TRAIL は付いている敵の見た目が描く
 ## 残る線（みなみのさんかく座の赤いレーザーの軌跡）。GUIDE は予告の間、ビームの通り道を予告線で示す（ビームの敵）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL, TELESCOPE, PHOENIX, GUIDE, AQUILA, DRACO }
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL, TELESCOPE, PHOENIX, GUIDE, AQUILA, DRACO, PULSER }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
@@ -151,6 +151,8 @@ var hazard_enemy_hit: Array[Dictionary] = []
 var hazard_block := PackedByteArray()
 ## 広がる波の速さ、扇の左右の角度（広がるビームでは広がる角度）、切れ目の向きと左右の角度
 var hazard_speed := PackedFloat32Array()
+## 波の発射時の半径。完成輪から出る波は表示と判定で同じ値を使う。
+var hazard_start_radius := PackedFloat32Array()
 var hazard_arc := PackedFloat32Array()
 var hazard_gap := PackedFloat32Array()
 var hazard_gap_w := PackedFloat32Array()
@@ -607,8 +609,8 @@ func fire_zone(center: Vector2, radius: float, delay: float, dmg: float, style :
 ## 広がる輪・扇を出す。arc は扇の左右の角度（PI で全周）。gap_w が 0 より大きければ、gap の向きに切れ目を空ける。
 ## delay の予告のあと、速さ speed で半径 radius まで広がる。
 func fire_wave(center: Vector2, angle: float, arc: float, radius: float, speed: float, width: float, delay: float,
-		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff")) -> int:
-	return emit_attack(&"wave", [center, angle, arc, radius, speed, width, delay, dmg, gap, gap_w, color])
+		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff"), start_radius := 0.0) -> int:
+	return emit_attack(&"wave", [center, angle, arc, radius, speed, width, delay, dmg, gap, gap_w, color, start_radius])
 
 ## 何層もの輪を出す。層ごとに interval ずつ遅れて広がり、切れ目の向きが gap_step ずつずれる。
 func fire_rings(center: Vector2, layers: int, interval: float, radius: float, speed: float, width: float, delay: float,
@@ -738,6 +740,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_owner[i] = -1
 	hazard_owner_id[i] = 0
 	hazard_speed[i] = speed
+	hazard_start_radius[i] = 0.0
 	hazard_arc[i] = arc
 	hazard_gap[i] = gap
 	hazard_gap_w[i] = gap_w
@@ -746,7 +749,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 
 ## 広がる波（行 i）の、今の半径。
 func wave_radius(i: int) -> float:
-	return minf(hazard_len[i], maxf(0.0, hazard_t[i] - hazard_delay[i]) * hazard_speed[i])
+	return minf(hazard_len[i], hazard_start_radius[i] + maxf(0.0, hazard_t[i] - hazard_delay[i]) * hazard_speed[i])
 
 ## 使用中の攻撃の形の数。
 func hazard_count() -> int:
@@ -769,6 +772,10 @@ func _update_hazards(dt: float) -> void:
 			hazard_enemy_hit[i].clear()
 			hazard_slots.release(i)
 			continue
+		# 完成輪の発射直前まで発生元のID・生存を確認する。飛び始めた波は独立させる。
+		if hazard_style[i] == HazardStyle.PULSER and owner >= 0 and t >= delay:
+			hazard_owner[i] = -1
+			hazard_owner_id[i] = 0
 		var shape := _hazard_shape(hazard_kind[i])
 		if t >= delay and not shape.act(self, i, dt):
 			return
