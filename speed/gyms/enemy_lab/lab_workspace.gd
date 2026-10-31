@@ -134,7 +134,12 @@ func build(owner: Control) -> void:
 	lab._messages.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab._messages.mouse_filter = Control.MOUSE_FILTER_STOP
 	UI.button(_notice, tr("lab.ui.close"), func(): lab._messages.text = "", "close", true)
+	lab.canvas.selection_changing.connect(lab.controls.commit_appearance_fields)
 	lab.canvas.picked.connect(func(_row):
+		if lab.controls.current_tab == 5 and (settings.visible or (_right_collapsed and _restore_settings)):
+			lab._right.hide()
+			lab.controls.sync_from_session()
+			return
 		lab.inspector.refresh(true)
 		if lab.session.selected >= 0:
 			_restore_settings = false

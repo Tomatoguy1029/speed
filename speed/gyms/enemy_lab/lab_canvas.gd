@@ -4,6 +4,7 @@ extends Control
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 
 signal picked(row: int)
+signal selection_changing
 signal route_edited
 signal zoom_changed
 
@@ -93,6 +94,7 @@ func _can_drop_data(_position: Vector2, data: Variant) -> bool:
 	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ContentManager.enemies.has(StringName(data.lab_enemy)) or ContentManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
 
 func _drop_data(position: Vector2, data: Variant) -> void:
+	selection_changing.emit()
 	spawn_type = String(data.lab_enemy)
 	session.playing = false
 	_place(world(position))
@@ -129,6 +131,7 @@ func _gui_input(event: InputEvent) -> void:
 			if _pan: follow = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				selection_changing.emit()
 				grab_focus()
 				var p := world(event.position)
 				if mode == 5:

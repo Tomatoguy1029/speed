@@ -17,7 +17,6 @@ var _camera: Camera2D
 var _highlight: Line2D
 var _playing := true
 var _updating := false
-var _saved_hash := ""
 
 
 func open_editor(owner_lab) -> void:
@@ -31,9 +30,9 @@ func open_editor(owner_lab) -> void:
 		_keys.append(String(key))
 		_selector.add_item(String(rig.editable_parts[key].get_meta("part_label")))
 	_values = _definition().part_appearance.duplicate(true)
-	_saved_hash = FileAccess.get_sha256(ContentManager.bosses[&"monoceros"].resource_path)
 	rig.apply_appearance(_values)
 	_sync_fields()
+	refresh_saved_state()
 	popup_centered_ratio(0.85)
 
 
@@ -111,6 +110,7 @@ func _build() -> void:
 	_number(panel, tr("lab.boss_parts.normal_strength"), 0, 3, 1, _preview_normal_strength, 0.05)
 	_label(panel, tr("lab.boss_parts.preview_only"))
 	_button(panel, tr("lab.boss_parts.save"), _save)
+	_button(panel, tr("lab.appearance.save_all"), _save_all)
 	_status = _label(panel, "")
 	_label(panel, tr("lab.boss_parts.collision_help"))
 
@@ -189,28 +189,26 @@ func _reset_part() -> void:
 func _commit() -> void:
 	lab.session.perform("boss_appearance", {"type": "monoceros", "parts": _values.duplicate(true)})
 	rig.apply_appearance(_values)
-	_status.text = tr("lab.boss_parts.unsaved")
+	refresh_saved_state()
 
 
 func _save() -> void:
+	commit_fields()
+	_status.text = lab.controls.save_appearance_targets([{"type": &"monoceros", "boss": true}])
+
+
+func _save_all() -> void:
+	lab.controls._save_all_appearance()
+	_status.text = lab._messages.text
+
+
+func commit_fields() -> void:
 	_x.apply()
 	_y.apply()
-	var original: BossDef = ContentManager.bosses[&"monoceros"]
-	var path := original.resource_path
-	if FileAccess.get_sha256(path) != _saved_hash:
-		_status.text = tr("lab.appearance.file_changed")
-		return
-	var saved := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as BossDef
-	if saved == null: return
-	saved.part_appearance = _values.duplicate(true)
-	var error := ResourceSaver.save(saved, path)
-	if error != OK:
-		_status.text = tr("lab.appearance.save_failed") + " " + error_string(error)
-		return
-	original.part_appearance = _values.duplicate(true)
-	_saved_hash = FileAccess.get_sha256(path)
-	ContentManager.source_hashes[path] = _saved_hash
-	_status.text = tr("lab.boss_parts.saved")
+
+
+func refresh_saved_state() -> void:
+	_status.text = tr("lab.boss_parts.unsaved") if _definition().part_appearance != ContentManager.bosses[&"monoceros"].part_appearance else tr("lab.boss_parts.saved")
 
 
 func _layout_preview() -> void:
@@ -225,6 +223,7 @@ func _process(delta: float) -> void:
 		_values = current.duplicate(true)
 		rig.apply_appearance(_values)
 		_sync_fields()
+		refresh_saved_state()
 	rig.advance_gait(delta, _playing)
 	var part: Node2D = rig.editable_parts[_keys[_selector.selected]]
 	var rect := _part_bounds(part)
