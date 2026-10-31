@@ -56,8 +56,10 @@ const NUMBER_LIMITS := {
 }
 const DIRECT_FIELDS := {
 	BOOST_GAUGE.KEY: [
-		["1周目（内側）の太さ", "first_ring_width", 1.0, 12.0, 0.5, BOOST_GAUGE.DEFAULT_WIDTHS.first_ring_width],
-		["2周目以降（外側）の太さ", "outer_ring_width", 0.5, 6.0, 0.5, BOOST_GAUGE.DEFAULT_WIDTHS.outer_ring_width],
+		["1周目：内側の半径（px）", "first_inner_radius", 0.0, 127.5, 0.25, BOOST_GAUGE.DEFAULT_RADII.first_inner_radius],
+		["1周目：外側の半径（px）", "first_outer_radius", 0.5, 128.0, 0.25, BOOST_GAUGE.DEFAULT_RADII.first_outer_radius],
+		["2周目：内側の半径（px）", "second_inner_radius", 0.0, 127.5, 0.25, BOOST_GAUGE.DEFAULT_RADII.second_inner_radius],
+		["2周目：外側の半径（px）", "second_outer_radius", 0.5, 128.0, 0.25, BOOST_GAUGE.DEFAULT_RADII.second_outer_radius],
 		["目盛り線の太さ（1周目の幅の半分が上限）", "tick_width", 0.5, 6.0, 0.25, BOOST_GAUGE.DEFAULT_WIDTHS.tick_width],
 	],
 	BOMBER_PREVIEW: [
@@ -260,6 +262,7 @@ var _technique_names := {}
 var _expanded_bosses := {}
 var _editing_label := Label.new()
 var _fields := VBoxContainer.new()
+var _boost_boundary_inputs: Dictionary = {}
 var _sample: Node2D
 var _standalone_controls: HBoxContainer
 var _standalone_play: Button
@@ -508,6 +511,8 @@ func _collect(folder: String) -> void:
 
 func _select(path: String) -> void:
 	_selected = path
+	if path == BOOST_GAUGE.KEY:
+		_working.profiles[path] = BOOST_GAUGE.migrated_values(_working.profiles.get(path, {}))
 	_standalone_controls.visible = path in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]
 	_standalone_play.set_pressed_no_signal(false)
 	_standalone_play.text = "⏸"
@@ -539,6 +544,7 @@ func _select(path: String) -> void:
 	_boss_preview.set_effect(preview_path)
 
 func _build_fields() -> void:
+	_boost_boundary_inputs.clear()
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
@@ -620,7 +626,11 @@ func _value(name: String, fallback: Variant) -> Variant:
 
 func _set_value(name: String, value: Variant) -> void:
 	var values: Dictionary = _working.profiles.get(_selected, {}).duplicate()
-	values[name] = value
+	if _selected == BOOST_GAUGE.KEY:
+		values = BOOST_GAUGE.edited_values(values, name, value)
+		for key in _boost_boundary_inputs: _boost_boundary_inputs[key].set_value_no_signal(values[key])
+	else:
+		values[name] = value
 	_working.profiles[_selected] = values
 	_dirty = true
 	_message = "未保存: " + _selected
@@ -653,9 +663,11 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 	var caption := Label.new()
 	caption.text = label
 	caption.tooltip_text = help
+	if _selected == BOOST_GAUGE.KEY: caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(caption)
 	var spin := SpinBox.new()
+	if _selected == BOOST_GAUGE.KEY: spin.custom_minimum_size = Vector2(90, 32)
 	spin.tooltip_text = help
 	var parts := hint.split(",")
 	var limits: Array = NUMBER_LIMITS.get(name, [0.0, maxf(100.0, original * 4.0), 0.05])
@@ -665,6 +677,7 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 	spin.value = _value(name, original)
 	spin.value_changed.connect(func(value: float): _set_value(name, value))
 	row.add_child(spin)
+	if _selected == BOOST_GAUGE.KEY and name in BOOST_GAUGE.BOUNDARY_KEYS: _boost_boundary_inputs[name] = spin
 
 func _apply_preview() -> void:
 	_swatch.color = _value("effect_tint", Color.WHITE)
