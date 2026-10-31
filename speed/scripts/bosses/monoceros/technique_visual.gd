@@ -6,6 +6,11 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 var actor: MonocerosBoss
 const WARNING := Color("#f2b567")
 const ENERGY := Color("#9fe8ff")
+@export_range(0.5, 16.0, 0.25) var telegraph_line_width := 6.0
+@export_range(0.5, 16.0, 0.25) var locked_line_width := 7.0
+@export_range(0.0, 1.0, 0.05) var warning_opacity := 0.3
+@export_range(0.25, 3.0, 0.05) var jet_radius_scale := 1.0
+@export_range(0.0, 1.0, 0.05) var jet_opacity := 0.35
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_to(self)
 func _draw() -> void:
@@ -24,15 +29,15 @@ func _draw() -> void:
 		var a := _body_point(points[0])
 		var b := _body_point(points[1])
 		if technique_id in [&"charge", &"return_charge"] and actor.mode == &"windup" and (technique_id != &"return_charge" or actor._runner.stage == &"aim"):
-			draw_line(a, _body_point(actor.warning_points()[1]), Color(WARNING, 0.3), 6.0, false)
+			draw_line(a, _body_point(actor.warning_points()[1]), Color(WARNING, warning_opacity), telegraph_line_width, false)
 		if technique_id == &"kick" and actor.mode == &"windup":
-			draw_line(a, b, Color(WARNING, 0.3), float(actor.def.params.horn_width), false)
-			draw_line(a, b, WARNING, 7.0, false)
+			draw_line(a, b, Color(WARNING, warning_opacity), float(actor.def.params.horn_width), false)
+			draw_line(a, b, WARNING, locked_line_width, false)
 			if actor.locked: draw_rect(Rect2(b - Vector2(6, 6), Vector2(12, 12)), WARNING)
 	if actor.mode==&"stuck":
 		var at := _body_point(actor.table.pos[actor.body]+actor.direction*actor.horn_length())
 		for j in 3:
-			draw_line(at+Vector2(-15,j*10-10),at+Vector2(15,j*10-10),WARNING,3.0,false)
+			draw_line(at+Vector2(-15,j*10-10),at+Vector2(15,j*10-10),WARNING,pixel_size,false)
 
 ## 仮表示。正式は shader。前向きの噴射を、広がって薄くなる3つの円で示す。
 func _reverse_jet(k: float) -> void:
@@ -40,7 +45,7 @@ func _reverse_jet(k: float) -> void:
 	var at := actor.table.pos[actor.body] + forward * actor.table.r[actor.body] * 0.65
 	for j in 3:
 		var offset := forward * float(j) * 8.0 + forward.orthogonal() * float(j - 1) * 8.0
-		draw_circle(_body_point(at + offset), lerpf(10.0, 24.0, k), Color(ENERGY, 0.35 * (1.0 - k)))
+		draw_circle(_body_point(at + offset), lerpf(10.0, 24.0, k) * jet_radius_scale, Color(ENERGY, jet_opacity * (1.0 - k)))
 
 func _body_point(world_point: Vector2) -> Vector2:
 	# 旋回したフレームも、役者ノードの描画更新を待たず戦闘方向を使う。

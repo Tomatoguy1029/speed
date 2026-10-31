@@ -40,6 +40,8 @@ const VISUAL_FIELDS := [
 	"hit_color", "line_width", "flash_duration", "base_color", "progress_color",
 	"outline_color", "outline_width", "flight_scale", "burst_pixel_scale",
 	"body_radius_scale", "head_radius", "pulse_scale",
+	"telegraph_line_width", "active_line_width", "telegraph_fill_opacity", "telegraph_progress_opacity", "telegraph_edge_opacity", "motion_trail_opacity", "impact_lifetime", "collapse_lifetime", "warning_opacity", "attack_opacity",
+	"gather_rate", "gather_lifetime", "shard_count", "shard_speed_scale", "beam_width_scale", "streak_count", "streak_length_scale", "needle_width_scale", "streak_lifetime_scale", "wave_width_scale", "ring_width", "ring_lifetime", "ring_end_radius", "locked_line_width", "jet_radius_scale", "jet_opacity",
 ]
 const NUMBER_LIMITS := {
 	"pixel_size": [1.0, 8.0, 0.25], "line_width": [0.5, 12.0, 0.25],
@@ -167,6 +169,32 @@ const FIELD_LABELS := {
 	"body_radius_scale": "胴体の表示倍率", "head_radius": "頭の表示半径（px）", "pulse_scale": "光芒の広がり（倍）",
 	"glow_opacity": "円内の光の不透明度", "ring_opacity": "輪郭の不透明度", "ring_width": "輪郭の太さ（px）",
 	"arm_count": "稲妻の本数", "lightning_reach": "稲妻の長さ（半径比）", "lightning_width": "稲妻の太さ（px）",
+	"telegraph_line_width": "予告線の太さ（px）",
+	"active_line_width": "攻撃線の太さ（px）",
+	"telegraph_fill_opacity": "予告面の濃さ",
+	"telegraph_progress_opacity": "進行する予告面の濃さ",
+	"telegraph_edge_opacity": "予告の縁の濃さ",
+	"motion_trail_opacity": "移動の軌跡の濃さ",
+	"impact_lifetime": "着弾の余韻（秒）",
+	"collapse_lifetime": "崩壊の余韻（秒）",
+	"warning_opacity": "予告面の濃さ",
+	"attack_opacity": "攻撃面の濃さ",
+	"gather_rate": "集まる光粒の数（毎秒）",
+	"gather_lifetime": "集まる光粒の寿命（秒）",
+	"shard_count": "砕ける光片の数",
+	"shard_speed_scale": "光片の広がる速さ（倍）",
+	"beam_width_scale": "槍の表示幅（倍）",
+	"streak_count": "斬撃の光筋の数",
+	"streak_length_scale": "光筋の長さ（倍）",
+	"needle_width_scale": "光筋の太さ（倍）",
+	"streak_lifetime_scale": "光筋の余韻（倍）",
+	"wave_width_scale": "衝撃波の表示幅（倍）",
+	"ring_width": "光の輪の太さ（px）",
+	"ring_lifetime": "光の輪の寿命（秒）",
+	"ring_end_radius": "光の輪の最終半径（px）",
+	"locked_line_width": "固定した照準の太さ（px）",
+	"jet_radius_scale": "逆噴射の光の大きさ（倍）",
+	"jet_opacity": "逆噴射の光の濃さ",
 }
 const FIELD_HELP := {
 	"effect_tint": "描画結果の色に掛ける値。白で元の色。",
@@ -280,6 +308,38 @@ const SHADER_LABELS := {
 	"ring_opacity": ["光の輪の濃さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
 	"ray_opacity": ["光条の濃さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
 	"brightness": ["光全体の明るさ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"grain_speed": ["ノイズが切り替わる速さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"flow_frequency": ["流れる模様の密度", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"flow_speed": ["模様の流速", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"edge_noise": ["縁ノイズの強さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"core_wobble": ["芯の太さの揺れ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"spark_threshold": ["火花のしきい値", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"wind_spacing": ["風の筋の間隔", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"wind_speed": ["風の筋の流速", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"wind_sharpness": ["風の筋の鋭さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"lightning_jitter": ["雷の揺れ幅", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"lightning_thickness": ["雷の主幹の太さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"branch_threshold": ["雷の枝分かれのしきい値", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"visual_opacity": ["全体の不透明度", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"visual_brightness": ["全体の明るさ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"branch_count": ["雷の枝の数", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"branch_sharpness": ["雷の枝の鋭さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"halo_sharpness": ["雷の暈の細さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"noise_density": ["ノイズの密度", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"center_ratio": ["中央の光の大きさ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"circuit_speed": ["同心模様の流速", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"circuit_width": ["同心模様の太さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"spiral_turns": ["渦の筋の数", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"spiral_frequency": ["渦の半径方向の密度", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"spiral_speed": ["渦の回る速さ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"wake_turns": ["後流の筋の数", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"wake_frequency": ["後流の模様の密度", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"wake_speed": ["後流の流速", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"band_threshold": ["渦の太い筋のしきい値", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"thread_threshold": ["渦の細い筋のしきい値", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"grit_size": ["渦の粒模様の大きさ", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"cloud_frequency": ["雲模様の密度", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
+	"cloud_speed": ["雲模様の流速", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
 }
 const GROUP_ORDER := ["色", "形・大きさ", "動き・時間", "粒子", "シェーダ", "品質・負荷"]
 
@@ -430,6 +490,8 @@ func _collect_boss_techniques() -> void:
 			var path := "boss/move/%s/%s" % [boss_id, move.technique]
 			_move_targets[path] = {"boss": boss_id, "id": String(move.technique), "visual": move.visual.resource_path if move.visual != null else "", "move": move, "projectile": move.get("shot_visual") if "shot_visual" in move else null}
 			_move_order[path] = _move_order.size()
+			if boss_id == "centaurus" and String(move.technique) in ["shower_chase", "shower_wall", "shower_path"]:
+				_move_targets[path].projectile = preload("res://scenes/attacks/light_arrow.tscn")
 			_paths.append(path)
 			var names: PackedStringArray = _technique_names.get(path, PackedStringArray())
 			var name: String = move.display_name if not move.display_name.is_empty() else String(move.technique)
@@ -630,6 +692,15 @@ func _build_fields() -> void:
 			if not (info.usage & PROPERTY_USAGE_EDITOR): continue
 			if info.type in [TYPE_COLOR, TYPE_FLOAT, TYPE_INT]:
 				entries.append({"name": name, "value": _sample.get(name), "hint": info.hint_string})
+	var unique := {}
+	for entry in entries:
+		if not unique.has(entry.name): unique[entry.name] = entry
+	entries.assign(unique.values())
+	if entries.is_empty():
+		var note := Label.new()
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.text = "この技は本体・猟犬の移動、または登録された構成技の表示を使います。独立した表示部品はありません。試遊で動きを確認できます。"
+		_fields.add_child(note)
 	for group in GROUP_ORDER:
 		var grouped: Array[Dictionary] = []
 		for entry in entries:
@@ -695,11 +766,41 @@ func _component_entries(key: String) -> Array[Dictionary]:
 					entries.append({"name": prefix + "/" + "xyz"[axis], "value": value[axis], "hint": ("64,1024,8" if axis == 1 else "32,1024,8") if name == "field_size" else "0,4,0.05", "fallback": label + " · " + suffix, "help": help, "group": group})
 			else:
 				entries.append({"name": prefix, "value": value, "hint": info.hint_string, "fallback": label, "help": help, "group": group})
+	if key.begins_with("boss/move/"):
+		var body_key := "boss/body/" + key.get_slice("/", 2)
+		var base: Dictionary = _working.values_for(body_key)
+		for field in DIRECT_FIELDS.get(body_key, []):
+			entries.append({"name": "body/" + field[1], "value": base.get(field[1], field[5]), "hint": "%s,%s,%s" % [field[2], field[3], field[4]], "fallback": "本体 · " + String(field[0]), "help": "この技の間だけ使う本体の表示値。技が切り替わると共通設定へ戻ります。", "group": "形・大きさ"})
+		for field in DIRECT_COLOR_FIELDS.get(body_key, []):
+			entries.append({"name": "body/" + field[1], "value": base.get(field[1], field[2]), "fallback": "本体 · " + String(field[0]), "help": "この技の間だけ使う本体の色。技が切り替わると共通設定へ戻ります。", "group": "色"})
+
+	if key.begins_with("boss/move/hydra/"):
+		var id := key.get_slice("/", 3)
+		var shaders: Array[Shader] = []
+		if id == "tornado": shaders.append(preload("res://shaders/hydra_tornado.gdshader"))
+		else:
+			if id != "thunder_drop": shaders.append(preload("res://shaders/hydra_energy.gdshader"))
+			if id in ["thunder_drop", "thunder_headbutt", "bite_thrust"]: shaders.append(preload("res://shaders/hydra_area.gdshader"))
+		var legacy_shape: Dictionary = _working.values_for("res://scenes/attacks/hydra_shape.tscn")
+		entries.append({"name": "shape/pixel_scale", "value": legacy_shape.get("pixel_scale", 1.0), "hint": "0.5,4,0.05", "fallback": "攻撃本体 · ドット倍率", "group": "形・大きさ"})
+		entries.append({"name": "shape/effect_tint", "value": legacy_shape.get("effect_tint", Color.WHITE), "fallback": "攻撃本体 · 全体色", "group": "色"})
+		for shader in shaders:
+			var legacy_key := "boss/shared/tornado_shader" if id == "tornado" else "res://scenes/attacks/hydra_shape.tscn"
+			var legacy: Dictionary = _working.values_for(legacy_key)
+			for info in ShaderTuning.tunables(shader):
+				if shader.resource_path.ends_with("hydra_energy.gdshader"):
+					if String(info.name).begins_with("wind_") and id not in ["wind_band", "wind_blades"]: continue
+					if (String(info.name).begins_with("lightning_") or info.name == "branch_threshold") and not id.begins_with("thunder"): continue
+					if info.name in ["core_ratio", "core_wobble", "flow_frequency", "flow_speed"] and id in ["wind_band", "wind_blades"]: continue
+				var field := ShaderTuning.field(shader, info.name)
+				var label: Array = SHADER_LABELS.get(info.name, [info.name, "表示だけを調整します。判定と攻撃時間は維持します。"])
+				entries.append({"name": "shape/" + field, "value": legacy.get(field, ShaderTuning.default_value(shader, info.name)), "hint": info.hint_string, "fallback": "攻撃本体 · " + String(label[0]), "help": label[1], "group": "シェーダ"})
+
 	if _move_targets.has(key) and _move_targets[key].projectile != null:
 		var scene: PackedScene = _move_targets[key].projectile
 		var visual := scene.instantiate() as AttackVisual
 		if visual != null:
-			var legacy := _working.values_for(visual.visual_profile_fallback)
+			var legacy := _working.values_for(visual.visual_profile_fallback if not visual.visual_profile_fallback.is_empty() else visual.scene_file_path)
 			for info in visual.get_property_list():
 				var name: String = info.name
 				if name not in ["effect_tint", "flight_scale", "shot_length_scale", "shot_width_scale", "core_width", "arrow_color", "cosmic_color_a", "cosmic_color_b", "cosmic_speed", "cosmic_star_count"]: continue

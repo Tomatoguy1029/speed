@@ -3,6 +3,7 @@ extends RefCounted
 var actor: BossActor
 var nodes := {}
 var selected: StringName
+var _body_revision := -1
 
 func configure(owner_actor: BossActor, moves: Dictionary) -> void:
 	clear()
@@ -17,10 +18,18 @@ func configure(owner_actor: BossActor, moves: Dictionary) -> void:
 		if "actor" in node: node.actor = actor
 		if "visual_kind" in node: node.visual_kind = node.technique_id
 		if "technique_id" in node: node.technique_id = StringName(id)
+		# 独自の_readyを持つ専用表示も、同じ所有元の設定を初期化する。
+		preload("res://data/visuals/effect_settings.tres").apply_to(node)
 		node.visible = false
 		nodes[id] = node
 
 func sync(id: StringName, phase: StringName, elapsed: float, duration: float) -> void:
+	var settings := preload("res://data/visuals/effect_settings.tres")
+	if selected != id or _body_revision != settings.preview_revision:
+		var body := actor.get("_presentation") as CanvasItem
+		if body != null:
+			settings.apply_body(body, String(actor.def.id), String(id))
+			_body_revision = settings.preview_revision
 	selected = id
 	for key in nodes:
 		var node: Node2D = nodes[key]
@@ -47,3 +56,5 @@ func clear() -> void:
 	for node: Node2D in nodes.values():
 		if is_instance_valid(node): node.queue_free()
 	nodes.clear()
+	selected = &""
+	_body_revision = -1

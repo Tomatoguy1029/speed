@@ -27,6 +27,11 @@ func add_shape(points: PackedVector2Array, width: float, delay: float, life: flo
 		var settings: Resource = actor.move_settings(id)
 		if settings != null and settings.has_field("shot_visual"): scene = settings.field("shot_visual")
 	var line := scene.instantiate() as Node2D
+	if line is AttackVisual:
+		var move_id: StringName = actor.tech if "tech" in actor and actor.tech != &"" else actor.technique if "technique" in actor and actor.technique != &"" else id
+		line.visual_profile_key = "boss/move/%s/%s" % [actor.def.id, move_id]
+		line.visual_profile_fallback = scene.resource_path
+		line.visual_component = "shape"
 	add_child(line)
 	line.configure(actor, kind, points, white)
 	var effect := {"id": serial, "points": points, "width": width, "delay": delay, "life": life,

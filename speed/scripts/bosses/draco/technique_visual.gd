@@ -4,6 +4,14 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 var visual_kind: StringName
 @export var keep_visible := false
+@export_range(0.5, 12.0, 0.25) var telegraph_line_width := 3.0
+@export_range(0.5, 12.0, 0.25) var active_line_width := 4.0
+@export_range(0.0, 0.5, 0.01) var telegraph_fill_opacity := 0.12
+@export_range(0.0, 0.8, 0.01) var telegraph_progress_opacity := 0.3
+@export_range(0.0, 0.6, 0.01) var telegraph_edge_opacity := 0.42
+@export_range(0.0, 1.0, 0.01) var motion_trail_opacity := 0.24
+@export_range(0.1, 2.0, 0.05) var impact_lifetime := 0.65
+@export_range(0.1, 3.0, 0.05) var collapse_lifetime := 1.1
 var actor: BossActor
 var effects: Array = []
 var retained: bool:
@@ -21,7 +29,7 @@ func update_technique() -> void:
 			var points: PackedVector2Array = actor.telegraph_areas[0].polygon if not actor.telegraph_areas.is_empty() else actor.telegraph_paths[0] if not actor.telegraph_paths.is_empty() else PackedVector2Array()
 			for point in points: shape.append(actor.to_local(point))
 		tell.polygon = shape
-	effects = effects.filter(func(effect): return actor.clock - float(effect.time) < (1.1 if effect.cue == &"cosmic_collapse" else 0.65))
+	effects = effects.filter(func(effect): return actor.clock - float(effect.time) < (collapse_lifetime if effect.cue == &"cosmic_collapse" else impact_lifetime))
 
 func on_event(event: Dictionary) -> void:
 	if actor.technique == technique_id and event.cue in [&"rock_break", &"arrow_impact", &"cosmic_collapse", &"tail_impact"]:
@@ -42,16 +50,16 @@ func _draw_current() -> void:
 			for j in range(1,line.size()-1):
 				if absf((line[j]-line[0]).cross(line[j+1]-line[0]))>0.1:
 					draw_colored_polygon(PackedVector2Array([line[0],line[j],line[j+1]]),Color(0.34,0.46,1.0,0.5))
-			draw_polyline(line,Color(0.68,0.86,1.0,0.8),4.0,false)
+			draw_polyline(line,Color(0.68,0.86,1.0,0.8),active_line_width,false)
 		elif FORM.length(line)>=8.0:
 			var active: bool=actor.mode==&"active"
 			if visual_kind in [&"bite",&"charge",&"leap",&"tail_slam",&"tail_sweep"]:
 				# The moving creature is the physical hit shape; a restrained motion seam is not a debug hitbox.
-				draw_polyline(line,Color(0.52,0.72,1.0,0.24),14.0,false)
-				draw_polyline(line,Color(0.86,0.95,1.0,0.7),3.0,false)
+				draw_polyline(line,Color(0.52,0.72,1.0,motion_trail_opacity),14.0,false)
+				draw_polyline(line,Color(0.86,0.95,1.0,0.7),telegraph_line_width,false)
 			else:
 				draw_polyline(line,Color(0.6,0.78,1.0,0.32) if active else Color(1.0,0.71,0.3,0.14),actor.attack_width*2.0,false)
-				draw_polyline(line,Color("#e5f7ff") if active else Color("#efb56c"),4.0,false)
+				draw_polyline(line,Color("#e5f7ff") if active else Color("#efb56c"),active_line_width,false)
 
 func _local_points(world: PackedVector2Array) -> PackedVector2Array:
 	var result := PackedVector2Array()
@@ -64,15 +72,15 @@ func _draw_telegraphs() -> void:
 		var shape := _local_points(area.polygon)
 		if shape.size() < 3: continue
 		# 範囲全体を薄く塗り、中心から外へ広がる濃い塗りが端へ届くと攻撃が出る。
-		draw_colored_polygon(shape,Color(1.0,0.61,0.25,0.12))
+		draw_colored_polygon(shape,Color(1.0,0.61,0.25,telegraph_fill_opacity))
 		var center: Vector2=actor.to_local(area.center)
 		var far := 0.0
 		for point in shape: far=maxf(far,point.distance_to(center))
 		var circle := PackedVector2Array()
 		for j in 64: circle.append(center+Vector2.from_angle(TAU*j/64.0)*far*progress)
 		if progress > 0.0:
-			for part in Geometry2D.intersect_polygons(shape,circle): draw_colored_polygon(part,Color(1.0,0.66,0.3,0.3))
-		draw_polyline(shape+PackedVector2Array([shape[0]]),Color(1.0,0.69,0.36,0.42+progress*0.4),3.0,false)
+			for part in Geometry2D.intersect_polygons(shape,circle): draw_colored_polygon(part,Color(1.0,0.66,0.3,telegraph_progress_opacity))
+		draw_polyline(shape+PackedVector2Array([shape[0]]),Color(1.0,0.69,0.36,telegraph_edge_opacity+progress*0.4),telegraph_line_width,false)
 	for i in actor.telegraph_paths.size():
 		var path := _local_points(actor.telegraph_paths[i])
 		if path.size()<2: continue
@@ -81,7 +89,7 @@ func _draw_telegraphs() -> void:
 		for j in range(path.size()-1):
 			var normal := (path[j+1]-path[j]).normalized().orthogonal()*width
 			for side in [-1,1]:
-				draw_line(path[j]+normal*side,path[j+1]+normal*side,Color(1.0,0.69,0.36,0.42+progress*0.4),3.0,false)
+				draw_line(path[j]+normal*side,path[j+1]+normal*side,Color(1.0,0.69,0.36,telegraph_edge_opacity+progress*0.4),telegraph_line_width,false)
 		FORM.star(self,path[-1],10.0,Color(1.0,0.86,0.6,0.7))
 	for target in actor.telegraph_points:
 		var at: Vector2=actor.to_local(target)
@@ -90,23 +98,23 @@ func _draw_telegraphs() -> void:
 			FORM.star(self,at,8.0+progress*4.0,Color(1.0,0.78,0.48,0.85))
 			continue
 		var radius: float=float(actor.rule().get("radius",actor.rule().get("width",60.0)))
-		draw_arc(at,radius,0,TAU,48,Color(1.0,0.7,0.35,0.8),3.0,false)
+		draw_arc(at,radius,0,TAU,48,Color(1.0,0.7,0.35,0.8),telegraph_line_width,false)
 		draw_arc(at,radius*(1.7-progress*0.7),-PI*0.5,TAU-PI*0.5,48,Color(1.0,0.77,0.5,0.8),4.0,false)
 		for side in [-1,1]:
-			draw_line(at+Vector2(side*(radius+10.0),0),at+Vector2(side*(radius+25.0),0),Color("#f8c879"),3.0,false)
-			draw_line(at+Vector2(0,side*(radius+10.0)),at+Vector2(0,side*(radius+25.0)),Color("#f8c879"),3.0,false)
+			draw_line(at+Vector2(side*(radius+10.0),0),at+Vector2(side*(radius+25.0),0),Color("#f8c879"),telegraph_line_width,false)
+			draw_line(at+Vector2(0,side*(radius+10.0)),at+Vector2(0,side*(radius+25.0)),Color("#f8c879"),telegraph_line_width,false)
 
 func _draw_impacts() -> void:
 	for effect: Dictionary in effects:
 		var age: float=actor.clock-float(effect.time)
-		var duration := 1.1 if effect.cue==&"cosmic_collapse" else 0.65
+		var duration := collapse_lifetime if effect.cue==&"cosmic_collapse" else impact_lifetime
 		if age>=duration: continue
 		var f := clampf(age/duration,0.0,1.0)
 		var center: Vector2=actor.to_local(effect.pos)
 		var radius: float=float(effect.radius)
 		var size := radius*(0.35+f*1.4)
 		draw_arc(center,size,0,TAU,48,Color(0.42,0.55,1.0,(1.0-f)*0.6),maxf(2.0,12.0*(1.0-f)),false)
-		draw_arc(center,size*0.72,0,TAU,48,Color(0.72,0.87,1.0,(1.0-f)*0.8),3.0,false)
+		draw_arc(center,size*0.72,0,TAU,48,Color(0.72,0.87,1.0,(1.0-f)*0.8),telegraph_line_width,false)
 		FORM.star(self,center,radius*0.8*(1.0-f),Color(0.88,0.96,1.0,(1.0-f)*0.9))
 		for j in 8:
 			var direction := Vector2.from_angle(float(j)*TAU/8.0+0.2)

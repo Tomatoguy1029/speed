@@ -448,7 +448,7 @@ func refresh_effects() -> void:
 			actor.sirius_effects._sync_fire_displays()
 		var presentation: CanvasItem = actor.get("_presentation") as CanvasItem
 		if presentation != null:
-			EFFECT_SETTINGS.apply_key(presentation, "boss/body/" + _boss)
+			EFFECT_SETTINGS.apply_body(presentation, _boss, _technique)
 			presentation.queue_redraw()
 	var render := _render()
 	if render == null: return
@@ -466,7 +466,7 @@ func _hide_preview_hud() -> void:
 
 func _refresh_scene_visuals(node: Node) -> void:
 	if node is CanvasItem and node.has_meta("shader_tuning_profile"):
-		ShaderTuning.apply((node as CanvasItem).material as ShaderMaterial, node.get_meta("shader_tuning_profile"), node.get_meta("shader_tuning_fallback", ""))
+		ShaderTuning.apply((node as CanvasItem).material as ShaderMaterial, node.get_meta("shader_tuning_profile"), node.get_meta("shader_tuning_fallback", ""), node.get_meta("shader_tuning_component", ""))
 	if node is AttackVisual:
 		(node as AttackVisual)._apply_effect_settings()
 	elif node is CanvasItem:

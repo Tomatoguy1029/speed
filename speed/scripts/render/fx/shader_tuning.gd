@@ -10,9 +10,9 @@ const PREFIX := "shader/"
 static func field(shader: Shader, uniform: String) -> String:
 	return PREFIX + shader.resource_path.get_file().get_basename() + "/" + uniform
 
-static func apply(mat: ShaderMaterial, key: String, fallback := "") -> void:
+static func apply(mat: ShaderMaterial, key: String, fallback := "", component := "") -> void:
 	if mat == null or mat.shader == null: return
-	var values := SETTINGS.resolved_values(key, fallback)
+	var values := SETTINGS.component_values(key, component, fallback) if not component.is_empty() else SETTINGS.resolved_values(key, fallback)
 	if values.is_empty(): return
 	var prefix := PREFIX + mat.shader.resource_path.get_file().get_basename() + "/"
 	for name in values:

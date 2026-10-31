@@ -11,6 +11,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export_range(4.0, 200.0) var head_radius := 42.0
 @export_range(1.0, 12.0) var line_width := 3.0
 @export_range(0.05, 2.0) var flash_duration := 0.25
+@export_range(0.5, 3.0, 0.05) var burst_pixel_scale := 1.0
 ## VisualTimeline の装飾トラックで編集する。予告の有無はイベントが決める。
 @export var pulse_scale := 1.0
 var hydra: Node
@@ -136,7 +137,7 @@ func _flash(event: Dictionary)->void:
 	var color: Color={&"vortex":Color("#70ffe0"),&"thunder":Color("#77bbff"),&"debris":Color("#dbac68"),&"immortal":Color("#ffe69a")}.get(event.kind,attack_color)
 	if event.cue==&"hit":color=hit_color
 	sprite.material.set_shader_parameter("tint",color)
-	sprite.material.set_shader_parameter("pixels",diameter/4.0 * EFFECT_SETTINGS.number("boss/body/hydra", "burst_pixel_scale", 1.0))
+	sprite.material.set_shader_parameter("pixels",diameter/4.0 * burst_pixel_scale)
 	sprite.material.set_shader_parameter("seed",float(serial%19))
 	add_child(sprite)
 	sprites[serial]=sprite

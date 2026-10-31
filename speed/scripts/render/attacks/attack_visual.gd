@@ -9,6 +9,7 @@ var effect_tint := Color.WHITE
 ## 専用の使用元を持つ弾シーンだけが指定する。旧sceneキーは互換値として引き継ぐ。
 @export var visual_profile_key := ""
 @export var visual_profile_fallback := ""
+@export var visual_component := "projectile"
 var state: RunState:
 	get: return rm.state
 
@@ -40,7 +41,7 @@ func _apply_effect_settings() -> void:
 		EFFECT_SETTINGS.apply_to(self)
 		values = EFFECT_SETTINGS.values_for(scene_file_path)
 	else:
-		values = EFFECT_SETTINGS.component_values(visual_profile_key, "projectile", visual_profile_fallback)
+		values = EFFECT_SETTINGS.component_values(visual_profile_key, visual_component, visual_profile_fallback)
 		EFFECT_SETTINGS.apply_values(self, values)
 	effect_tint = values.get("effect_tint", Color.WHITE)
 

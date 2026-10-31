@@ -7,29 +7,46 @@ uniform float thickness = 32.0;
 uniform int style = 0;
 uniform bool warning = false;
 uniform float cell_size = 4.0;
+group_uniforms tuning;
+uniform float grain_speed : hint_range(1,40,1) = 14.0;
+uniform float flow_frequency : hint_range(4,100,1) = 45.0;
+uniform float flow_speed : hint_range(0,30,0.5) = 10.0;
+uniform float edge_noise : hint_range(0,0.5,0.01) = 0.1;
+uniform float core_ratio : hint_range(0,0.9,0.01) = 0.22;
+uniform float core_wobble : hint_range(0,0.4,0.01) = 0.14;
+uniform float spark_threshold : hint_range(0,1,0.01) = 0.90;
+uniform float wind_spacing : hint_range(8,100,1) = 45.0;
+uniform float wind_speed : hint_range(0,40,0.5) = 13.0;
+uniform float wind_sharpness : hint_range(1,32,1) = 10.0;
+uniform float lightning_jitter : hint_range(0,0.8,0.01) = 0.45;
+uniform float lightning_thickness : hint_range(0.01,0.2,0.005) = 0.065;
+uniform float branch_threshold : hint_range(0,1,0.01) = 0.84;
+uniform float visual_opacity : hint_range(0,1,0.05) = 1.0;
+uniform float visual_brightness : hint_range(0,3,0.05) = 1.0;
+group_uniforms;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void fragment(){
  vec2 grid=vec2(max(span/cell_size,2.0),max(thickness/cell_size,2.0));
  vec2 cell=floor(UV*grid);
  vec2 uv=(cell+0.5)/grid;
  float edge=abs(uv.y-0.5)*2.0;
- float grain=hash(cell+floor(clock*14.0));
- float flow=sin(uv.x*45.0-clock*10.0+uv.y*4.0)*0.5+0.5;
- float rim=step(edge,0.95-grain*0.1);
- float core=step(edge,0.22+flow*0.14);
- float sparks=step(0.90,grain)*step(edge,0.85);
+ float grain=hash(cell+floor(clock*grain_speed));
+ float flow=sin(uv.x*flow_frequency-clock*flow_speed+uv.y*4.0)*0.5+0.5;
+ float rim=step(edge,0.95-grain*edge_noise);
+ float core=step(edge,core_ratio+flow*core_wobble);
+ float sparks=step(spark_threshold,grain)*step(edge,0.85);
  float alpha=rim*(0.45+core*0.55);
  vec3 col=tint.rgb*(0.7+flow*0.6)+core*vec3(1.2)+sparks*tint.rgb*1.5;
  if(style==1){
   // 風の帯：外へ流れる短い筋と圧縮された縁。
-  float streak=pow(max(0.0,sin(uv.x*span/45.0-clock*13.0+sin(uv.y*16.0)*2.0)),10.0);
+  float streak=pow(max(0.0,sin(uv.x*span/wind_spacing-clock*wind_speed+sin(uv.y*16.0)*2.0 )),wind_sharpness);
   col=tint.rgb*(0.7+streak*1.4)+vec3(streak*0.8);
   alpha=rim*(0.16+streak*0.7+sparks*0.4)+step(0.87,edge)*rim*0.3;
  }else if(style==2){
   // 雷：時間で刻む主幹、分枝、白い瞬間光。
-  float jitter=(hash(vec2(floor(uv.x*grid.x/3.0),floor(clock*24.0)))-0.5)*0.45;
-  float trunk=1.0-step(0.065,abs(uv.y-0.5-jitter));
-  float branch=step(0.84,hash(vec2(floor(uv.x*12.0),floor(clock*18.0))))*(1.0-step(0.04,abs(fract(uv.x*5.0+uv.y*1.8)-0.5)));
+  float jitter=(hash(vec2(floor(uv.x*grid.x/3.0),floor(clock*24.0)))-0.5)*lightning_jitter;
+  float trunk=1.0-step(lightning_thickness,abs(uv.y-0.5-jitter));
+  float branch=step(branch_threshold,hash(vec2(floor(uv.x*12.0),floor(clock*18.0))))*(1.0-step(0.04,abs(fract(uv.x*5.0+uv.y*1.8)-0.5)));
   col=tint.rgb*(0.5+branch*2.0)+vec3(trunk*2.1);
   alpha=rim*(0.15+trunk*0.85+branch*0.65+sparks*0.3);
  }else if(style==3){
@@ -54,5 +71,5 @@ void fragment(){
   col=mix(tint.rgb,vec3(1.0,0.85,0.45),0.7);
   alpha=rim*(0.18+0.4*marks)*step(0.65,edge)+0.08*rim;
  }
- COLOR=vec4(col,clamp(alpha,0.0,1.0)*tint.a);
+ COLOR=vec4(col*visual_brightness,clamp(alpha,0.0,1.0)*tint.a*visual_opacity);
 }
