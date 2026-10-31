@@ -177,7 +177,7 @@ func steal_shield(i: int) -> void:
 	state.ship_shield_max = duration
 	state.ship_shield_flash = 0.2
 	state.emit(&"shield_stolen", {"pos": t.pos[i], "facing": t.facing[i], "r": t.r[i],
-		"arc": float(t.def[i].params.front_arc)})
+		"arc": float(t.def[i].params.front_arc), "enemy_type": t.type[i]})
 
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 ## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。

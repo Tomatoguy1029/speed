@@ -88,6 +88,7 @@ var _enemy_textures: Dictionary = {}
 var bolts: Array = []
 var _bolt_seed := 0
 var shield_transfers: Array = []
+var shield_source_type: StringName = &"shield"
 var _attack_visuals: Dictionary = {}
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
@@ -471,6 +472,7 @@ func _handle_events(events: Array[Dictionary]) -> void:
 				_sparks(ev.pos, ev.normal, 8, Color("#ffa4ef"))
 				_ring(ev.pos, 22.0, Color("#ff9de9"), 0.18)
 			&"shield_stolen":
+				shield_source_type = StringName(ev.get("enemy_type", &"shield"))
 				shield_transfers.append({"pos": ev.pos, "facing": ev.facing, "r": ev.r, "arc": ev.arc,
 					"life": 0.3, "max": 0.3})
 				_ring(ev.pos, ev.r * 1.7, Color("#65e8ff"), 0.3)

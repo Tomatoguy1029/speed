@@ -133,7 +133,7 @@
 
 ## たて座から奪った盾
 
-- 装備中の盾は `assets/pixel/shield/scutum_guard_base.png`・`scutum_guard_armor.png`・`scutum_guard_normal.png` を重ねる。共通cropと元のpivotで上側の盾部位を分離し、元の塗装領域キー・濃淡・NormalのRGBを保つ。保存済みの対象装甲領域は同じ青白の塗装を使う。
+- 装備中の盾は `assets/pixel/shield/scutum_guard_base.png`・`scutum_guard_armor.png`・`scutum_guard_normal.png` をBaseとArmorの別描画へ接続する。共通cropと元のpivotで上側の盾部位を分離し、元の塗装領域キー・濃淡・NormalのRGBを保つ。Armorは専用CanvasTextureへ切出しArmorとNormalを設定し、元の敵の保存済み塗装を同じ画像座標で参照する。`shaders/scutum_guard_armor.gdshader` は敵装甲と同じ法線照明を使い、敵の種類ごとの主光・補助光・高さ・環境光・法線強度と、盾の回転を陰影へ反映する。光膜は別の非照明シェーダーで描く。
 - 機体の可視中心を内側の円の中心に置き、盾との交点から前方の円弧を切る。厚い青白いピクセルの光膜と外側の淡い光を盾に重ねずつなぐ。`shaders/scutum_guard.gdshader` は光膜の局所的な輝度を不規則に変え、実物の盾と機体の表示を保つ。
 - 防御範囲・持続時間・攻撃を防ぐ規則は、盾の既存の装備状態と `shield.tres` に従う。
 

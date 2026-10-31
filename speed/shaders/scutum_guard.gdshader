@@ -2,9 +2,7 @@ shader_type canvas_item;
 render_mode unshaded;
 uniform sampler2D guard_base : source_color, filter_nearest;
 uniform sampler2D guard_armor : source_color, filter_nearest;
-uniform sampler2D guard_normal : hint_normal, filter_nearest;
 uniform float clock = 0.0;
-uniform vec4 armor_paint : source_color = vec4(0.8, 0.8627451, 0.8784314, 1.0);
 uniform bool linear_output = false;
 varying vec2 local_pixel;
 void vertex() { local_pixel = VERTEX; }
@@ -19,10 +17,6 @@ void fragment() {
 	bool in_guard = all(greaterThanEqual(q, vec2(0.0))) && all(lessThan(q, vec2(1.0)));
 	vec4 base = in_guard ? texture(guard_base, source_uv) : vec4(0.0);
 	vec4 armor = in_guard ? texture(guard_armor, source_uv) : vec4(0.0);
-	// 元の5領域キー22/157/170/1035/1076はすべて保存済みccdce0。
-	vec4 solid = mix(base, armor_paint, armor.a);
-	vec3 n = texture(guard_normal, source_uv).rgb;
-	NORMAL_MAP = n;
 	float a = atan(p.y, p.x);
 	float cut = a < 0.0 ? 0.7955211 : 0.7620108;
 	float d = length(p) - 42.0;
@@ -46,5 +40,5 @@ void fragment() {
 	float dip = max(0.0, noise(vec3(region, k + 7.0, 2)) - 0.38) * 0.6;
 	membrane.a *= clamp(0.8 + 0.43 * coarse + 0.11 * fine - dip, 0.24, 1.16);
 	if (linear_output) membrane.rgb = to_linear(membrane.rgb);
-	COLOR = solid.a > 0.0 ? solid : membrane;
+	COLOR = membrane;
 }

@@ -99,7 +99,7 @@ func draw_ship(c: CanvasItem) -> void:
 	for visual in rm._equipment_visuals.values():
 		if visual.active:
 			visual.draw_extra(c, p, col)
-	SHIELD_VISUAL.equipped(c, state, R, cfg.character_scale, p)
+	SHIELD_VISUAL.equipped(c, rm, R, cfg.character_scale, p)
 	for effect in rm.shield_transfers:
 		SHIELD_VISUAL.transfer(c, effect, state.ship_pos)
 	# HP バー（機体の真下、仕様書 17）
