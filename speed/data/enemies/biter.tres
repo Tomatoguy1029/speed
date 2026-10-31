@@ -5,7 +5,21 @@
 [resource]
 script = ExtResource("1")
 visual_settings = {
-"scale": 1.4000000000000001
+"height": 0.29,
+"key_energy": 1.0,
+"scale": 1.4
+}
+armor_colors = {
+"res://assets/pixel/biter/armor.png|20x34|110f9e0c0932768367b47009602297ce970462042c504a0313fcd192858d3fe6": {
+"13": "4480a6",
+"308": "4480a6",
+"342": "4480a6",
+"356": "4480a6",
+"5": "4480a6",
+"506": "4480a6",
+"513": "4480a6",
+"569": "4480a6"
+}
 }
 rank = 1
 radius = 13.0

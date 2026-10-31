@@ -5,7 +5,20 @@
 [resource]
 script = ExtResource("1")
 visual_settings = {
-"scale": 1.4000000000000001
+"fill_energy": 0.5,
+"height": 0.4,
+"key_energy": 1.0,
+"scale": 1.4
+}
+armor_colors = {
+"res://assets/pixel/splitling/splitling_armor.png|21x18|131d1ee845dce6167f31544d84850ca9477b8b0bd1f2bebd034c7bebd1d7b2b8": {
+"10": "4ba3aa",
+"237": "4ba3aa",
+"245": "4ba3aa",
+"283": "4ba3aa",
+"49": "4ba3aa",
+"55": "4ba3aa"
+}
 }
 rank = 1
 radius = 13.0

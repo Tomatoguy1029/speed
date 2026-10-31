@@ -4,6 +4,22 @@
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"height": 0.4,
+"key_energy": 1.8,
+"scale": 1.7000000000000002
+}
+armor_colors = {
+"res://assets/pixel/marlin/swordfish_armor.png|64x64|0dc56d0da46c66c9c4eec227ca771757b6b459128d245adc624a5e8129e5a6bd": {
+"1055": "648adc",
+"1692": "648adc",
+"1698": "648adc",
+"2265": "648adc",
+"2275": "648adc",
+"2845": "42628c",
+"351": "ccdce0"
+}
+}
 rank = 5
 radius = 26.0
 hp = 70.0

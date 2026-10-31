@@ -4,6 +4,17 @@
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"height": 0.4,
+"key_energy": 1.6
+}
+armor_colors = {
+"res://assets/pixel/triangle/triangle_nodes_armor.png|32x32|36e4b68509eaa678058a18a22d41bc936b54a5ca54fd54ad2b1355ce50be21af": {
+"15": "bda268",
+"551": "bda268",
+"567": "bda268"
+}
+}
 radius = 12.0
 hp = 8.0
 accel = 1.0

@@ -4,6 +4,23 @@
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"height": 0.46,
+"key_energy": 1.6,
+"scale": 0.85
+}
+armor_colors = {
+"res://assets/pixel/pump/armor.png|24x37|35da6c50f03d898b07572b61f349a823bf2794c0f28ea4c899ea1679c06d78d5": {
+"169": "428c69",
+"189": "428c69",
+"200": "8cc3a8",
+"222": "428c69",
+"440": "8cc3a8",
+"445": "8cc3a8",
+"5": "8cc3a8",
+"674": "8cc3a8"
+}
+}
 rank = 3
 radius = 26.0
 hp = 60.0
