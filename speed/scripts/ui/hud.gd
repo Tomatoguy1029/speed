@@ -865,7 +865,7 @@ func _draw() -> void:
 	if show_status:
 		# 素材の体力枠の内側に、現在のHPの割合を描く。
 		var hp := clampf(s.ship_hp / maxf(1.0, s.stats.max_hp), 0.0, 1.0)
-		var health_color := Color("#ff526e") if hp < 0.3 else CYAN
+		var health_color := Color("#ff526e") if hp <= 0.1 else Color("#ffe46b") if hp < 0.5 else Color("#67e8b1")
 		_draw_bar(HEALTH, _health_fill, hp, health_color)
 		draw_string(_font, Vector2(7, 40), "%d/%d" % [ceili(maxf(0.0, s.ship_hp)), roundi(s.stats.max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CYAN)
 		draw_string(_font, Vector2(7, 52), "ATK %.1f  %s  Lv %d  %s" % [run.combat.attack_power(), tr("hud.kills").format({n = s.kills}), s.level, tr("common.parts").format({n = s.coins})], HORIZONTAL_ALIGNMENT_LEFT, 260, 8, CYAN)
