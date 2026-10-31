@@ -166,7 +166,7 @@ const FIELD_LABELS := {
 	"open_color": "開放の輪色", "sirius_color": "シリウス色", "sirius_halo_color": "光の暈色",
 	"booster_core_color": "推進炎の芯色", "vortex_tint": "渦の色",
 	"body_radius_scale": "胴体の表示倍率", "head_radius": "頭の表示半径（px）", "pulse_scale": "光芒の広がり（倍）",
-	"glow_opacity": "円内の光の不透明度", "ring_opacity": "輪郭の不透明度", "ring_width": "輪郭の太さ（px）",
+	"glow_opacity": "円内の光の不透明度", "ring_opacity": "輪郭の不透明度",
 	"arm_count": "稲妻の本数", "lightning_reach": "稲妻の長さ（半径比）", "lightning_width": "稲妻の太さ（px）",
 	"telegraph_line_width": "予告線の太さ（px）",
 	"active_line_width": "攻撃線の太さ（px）",
@@ -842,6 +842,7 @@ func _field_group(name: String) -> String:
 	return "形・大きさ"
 
 func _field_label(name: String, fallback: String) -> String:
+	if _selected == "enemy/aquila" and name == "ring_width": return "輪郭の太さ（px）"
 	return FIELD_LABELS.get(name, fallback)
 
 func _add_group(title: String) -> void:
