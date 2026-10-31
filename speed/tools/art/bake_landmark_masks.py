@@ -88,13 +88,14 @@ def bake(key, name, alpha, layers, extra=None):
     # Import configuration is a source asset. Godot creates its own cache later.
     digest = hashlib.md5(resource_path(file).encode()).hexdigest()
     cache = "res://.godot/imported/" + file.name + "-" + digest + ".ctex"
-    file.with_suffix(".png.import").write_text(
-        '[remap]\nimporter="texture"\ntype="CompressedTexture2D"\n'
-        + 'path=' + json.dumps(cache) + '\n\n[deps]\nsource_file='
-        + json.dumps(resource_path(file)) + '\ndest_files=[' + json.dumps(cache)
-        + ']\n\n[params]\ncompress/mode=0\ncompress/normal_map=0\n'
-        + 'mipmaps/generate=false\nprocess/fix_alpha_border=false\n'
-        + 'process/premult_alpha=false\nprocess/size_limit=0\n')
+    if not file.with_suffix(".png.import").exists():
+        file.with_suffix(".png.import").write_text(
+            '[remap]\nimporter="texture"\ntype="CompressedTexture2D"\n'
+            + 'path=' + json.dumps(cache) + '\n\n[deps]\nsource_file='
+            + json.dumps(resource_path(file)) + '\ndest_files=[' + json.dumps(cache)
+            + ']\n\n[params]\ncompress/mode=0\ncompress/normal_map=0\n'
+            + 'mipmaps/generate=false\nprocess/fix_alpha_border=false\n'
+            + 'process/premult_alpha=false\nprocess/size_limit=0\n')
     h, w = alpha.shape
     entry = {"file": resource_path(file), "source_size": (w, h),
              "texture_size": (w + PAD * 2, h + PAD * 2),
