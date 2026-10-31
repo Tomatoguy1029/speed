@@ -31,6 +31,7 @@ const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
 const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
 const SLOTS := preload(ART + "combat_ui_components.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
+const CARD_VIEW := preload("res://scripts/ui/reward_card_view.gd")
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := preload("res://scripts/ui/module_icons.gd").IDS
 
@@ -496,18 +497,7 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 	draw_texture(frame, Vector2.ZERO)
 
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
-	if definition == null or definition is HeroDef:
-		return
-	var texture: Texture2D = preload("res://scripts/ui/module_icons.gd").texture_for(definition)
-	if texture == null: return
-	var icon := TextureRect.new()
-	icon.texture = texture
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.position = area.position
-	icon.size = area.size
-	parent.add_child(icon)
+	CARD_VIEW.add_icon(parent, definition, area)
 
 func _refresh_loadout_icons() -> void:
 	if run.state == null:
@@ -568,18 +558,7 @@ func _build_cards() -> void:
 	_build_swap_cards()
 
 func _card_art(button: Button, region: Rect2) -> void:
-	var texture := AtlasTexture.new()
-	texture.atlas = CARDS
-	texture.region = region
-	var style := StyleBoxTexture.new()
-	style.texture = texture
-	button.add_theme_stylebox_override("normal", style)
-	for state in ["hover", "pressed", "focus", "disabled"]:
-		var variant := style.duplicate() as StyleBoxTexture
-		variant.modulate_color = Color(0.5, 0.5, 0.5) if state == "disabled" else Color(1.3, 1.3, 1.3)
-		button.add_theme_stylebox_override(state, variant)
-	button.add_theme_color_override("font_color", CYAN)
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	CARD_VIEW.apply_art(button, region)
 
 func _build_swap_cards() -> void:
 	_swap_box = VBoxContainer.new()
@@ -668,42 +647,12 @@ func _show_cards() -> void:
 		var left := 89.0 + (464.0 - (cards.size() * width + maxi(0, cards.size() - 1) * 16.0)) / 2.0
 		for i in cards.size():
 			var info := card_info(cards[i], run.cfg.trait_max_stacks)
-			var b := Button.new()
-			b.position = Vector2(left + i * (width + 16), 83)
-			b.size = Vector2(width, 193)
-			if cards[i].kind == &"post_max":
-				var style := _card_style(info.color)
-				style.bg_color = Color("#233c49")
-				style.set_corner_radius_all(0)
-				style.set_border_width_all(2)
-				b.add_theme_stylebox_override("normal", style)
-				var focus_style := style.duplicate() as StyleBoxFlat
-				focus_style.border_color = Color("#c0ffff")
-				for visual_state in ["focus", "hover", "pressed"]:
-					b.add_theme_stylebox_override(visual_state, focus_style)
-			else:
-				_card_art(b, Rect2(89, 83, 145, 193))
-			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
-			_cards_row.add_child(b)
-			var font_size := 10 if cards.size() <= 3 else 8
-			for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
-				[Vector2(7, 34), Vector2(width - 14, 28), info.name],
-				[Vector2(7, 65), Vector2(width - 14, 122 if cards[i].kind == &"post_max" else 57), info.desc]]:
-				var label := Label.new()
-				label.position = entry[0]
-				label.size = entry[1]
-				label.text = entry[2]
-				label.add_theme_font_size_override("font_size", (17 if entry[0].y == 65 else 13) if cards[i].kind == &"post_max" else font_size)
-				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-				label.clip_text = true
-				label.max_lines_visible = (2 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
-				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				b.add_child(label)
 			var card: Dictionary = cards[i]
 			var definition: Resource = ContentManager.catalog.find(&"traits" if card.kind == &"trait" else &"weapons", card.id)
-			_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
+			var b := CARD_VIEW.create(info, i, width, 10 if cards.size() <= 3 else 8, definition, card.kind == &"post_max")
+			b.position = Vector2(left + i * (width + 16), 83)
+			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
+			_cards_row.add_child(b)
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
 	_reroll_button.disabled = left <= 0
