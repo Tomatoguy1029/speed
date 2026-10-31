@@ -35,7 +35,7 @@ track = 1
 types = Array[StringName]([&"ruler"])
 formations = Array[PackedScene]([ExtResource("4_ttetq")])
 time = 56.0
-length = 79.0
+length = 73.0
 
 [sub_resource type="Resource" id="Resource_cnhb3"]
 script = ExtResource("2_5plhc")
@@ -44,7 +44,7 @@ track = 2
 types = Array[StringName]([&"shield"])
 formations = Array[PackedScene]([ExtResource("5_3y6x8")])
 time = 56.0
-length = 79.0
+length = 73.0
 
 [sub_resource type="Resource" id="Resource_7hkhu"]
 script = ExtResource("2_5plhc")
@@ -87,7 +87,7 @@ types = Array[StringName]([&"telescope"])
 formations = Array[PackedScene]([ExtResource("6_fv8bx")])
 attack_priority = 1
 time = 216.0
-length = 44.0
+length = 39.0
 groups = 5
 interval = 2.0
 
@@ -120,7 +120,7 @@ track = 0
 types = Array[StringName]([&"beamer"])
 formations = Array[PackedScene]([ExtResource("3_hhbsv")])
 time = 260.0
-length = 30.0
+length = 26.0
 groups = 2
 interval = 6.0
 
@@ -141,7 +141,7 @@ track = 1
 types = Array[StringName]([&"ruler"])
 formations = Array[PackedScene]([ExtResource("4_ttetq")])
 time = 290.0
-length = 96.0
+length = 90.0
 
 [sub_resource type="Resource" id="Resource_olek3"]
 script = ExtResource("2_5plhc")
@@ -192,6 +192,7 @@ track = 0
 types = Array[StringName]([&"beamer"])
 formations = Array[PackedScene]([ExtResource("3_hhbsv")])
 time = 415.0
+length = 55.0
 groups = 3
 interval = 2.0
 
@@ -202,6 +203,7 @@ track = 4
 types = Array[StringName]([&"crab"])
 formations = Array[PackedScene]([ExtResource("7_esfk7")])
 time = 415.0
+length = 56.0
 groups = 2
 interval = 5.0
 
@@ -212,6 +214,7 @@ track = 1
 types = Array[StringName]([&"ruler"])
 formations = Array[PackedScene]([ExtResource("4_ttetq")])
 time = 415.0
+length = 55.0
 
 [sub_resource type="Resource" id="Resource_2v223"]
 script = ExtResource("2_5plhc")
@@ -220,6 +223,7 @@ track = 3
 types = Array[StringName]([&"telescope"])
 formations = Array[PackedScene]([ExtResource("6_fv8bx")])
 time = 415.0
+length = 55.0
 groups = 4
 interval = 2.0
 
@@ -229,7 +233,7 @@ label = "たて座"
 track = 2
 types = Array[StringName]([&"shield"])
 formations = Array[PackedScene]([ExtResource("5_3y6x8")])
-time = 475.0
+time = 663.0
 length = 425.0
 groups = 10
 interval = 0.5
@@ -240,7 +244,7 @@ label = "ビームの敵ふつう"
 track = 0
 types = Array[StringName]([&"beamer"])
 formations = Array[PackedScene]([ExtResource("3_hhbsv")])
-time = 521.0
+time = 661.0
 length = 377.0
 groups = 2
 interval = 2.0
@@ -251,7 +255,7 @@ label = "じょうぎ座"
 track = 1
 types = Array[StringName]([&"ruler"])
 formations = Array[PackedScene]([ExtResource("4_ttetq")])
-time = 548.0
+time = 661.0
 length = 389.0
 
 [sub_resource type="Resource" id="Resource_n3m5q"]
@@ -260,7 +264,7 @@ label = "かに座定期的に"
 track = 4
 types = Array[StringName]([&"crab"])
 formations = Array[PackedScene]([ExtResource("7_esfk7")])
-time = 588.0
+time = 661.0
 length = 313.0
 interval = 5.0
 
@@ -323,21 +327,41 @@ mix = {
 id = &"phase_6315931189886180248"
 display_name = "ボス戦"
 
+[sub_resource type="Resource" id="Resource_vp438"]
+script = ExtResource("9_5plhc")
+start = 661.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+attack_budget = 4
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_9125328042912577426"
+display_name = "ボス後強化"
+
 [sub_resource type="Resource" id="Resource_fv8bx"]
 script = ExtResource("10_hhbsv")
 type = &"splitter"
-points = PackedVector2Array(0, 10, 55, 47, 56, 0, 136, 12, 151, 90, 170, 121, 170.1, 59, 260, 53, 271, 183, 290.9, 277, 291, 100, 386, 113, 394, 318, 412, 408, 415, 162, 476, 153, 479, 22)
+points = PackedVector2Array(0, 10, 10, 104, 27, 59, 39, 118, 52, 76, 56, 0, 69, 109, 120, 86, 136, 12, 142, 134, 166, 128, 170.1, 59, 260, 53, 268, 138, 288, 174, 292, 70, 385, 42, 392, 162, 412, 223, 417, 114, 473, 118, 482, 0, 660, 0, 664, 175)
 
 [sub_resource type="Resource" id="Resource_0kvk0"]
 script = ExtResource("10_hhbsv")
 type = &"defender"
-points = PackedVector2Array(0, 0, 55, 53, 57, 304, 134, 288, 136, 45, 169, 51, 171, 336, 259, 329, 261, 57, 290, 65, 291, 367, 386, 378, 386.1, 0, 415, 0, 416, 436, 476, 444, 479, 202)
+points = PackedVector2Array(0, 0, 10, 198, 39, 179, 55, 53, 57, 304, 97, 170, 134, 288, 136, 45, 152, 103, 169, 51, 171, 336, 259, 329, 261, 57, 267, 174, 277, 48, 285, 178, 290, 65, 291, 367, 311, 202, 332, 412, 360, 254, 386, 378, 386.1, 0, 393, 143, 407, 143, 415, 0, 418, 484, 430, 297, 441, 527, 454, 325, 464, 519, 476, 444, 485, 0, 654, 12, 662, 361)
 
 [resource]
 script = ExtResource("1")
 index = 2
 scene_path = "res://scenes/stages/stage_2.tscn"
-phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq")]
+phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq"), SubResource("Resource_vp438")]
 enemies = Array[StringName]([&"beamer", &"crab", &"defender", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])
 enemy_attack_values = {
 "defender": 0.001,
@@ -347,13 +371,13 @@ enemy_attack_values = {
 zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_fv8bx"), SubResource("Resource_0kvk0")])
 clips = Array[ExtResource("2_5plhc")]([SubResource("Resource_esfk7"), SubResource("Resource_k0r5q"), SubResource("Resource_cnhb3"), SubResource("Resource_7hkhu"), SubResource("Resource_axpqg"), SubResource("Resource_20pjy"), SubResource("Resource_hqnda"), SubResource("Resource_q0aev"), SubResource("Resource_70vkp"), SubResource("Resource_j3iar"), SubResource("Resource_lg16d"), SubResource("Resource_hb46m"), SubResource("Resource_olek3"), SubResource("Resource_3d53o"), SubResource("Resource_yrkec"), SubResource("Resource_ksojn"), SubResource("Resource_6qln1"), SubResource("Resource_nhqsb"), SubResource("Resource_yy5kg"), SubResource("Resource_2v223"), SubResource("Resource_qt8ge"), SubResource("Resource_gq3rn"), SubResource("Resource_w1utx"), SubResource("Resource_n3m5q")])
 track_names = PackedStringArray("ビームの敵", "じょうぎ座", "たて座", "ぼうえんきょう座", "かに座")
-boss_time = 475.0
-boss_enabled = false
+boss_time = 495.0
 surge_phases = {
 "escape": false,
 "phase_347783990498013494": false,
 "phase_6315931189886180248": false,
-"phase_6374603078355179547": false
+"phase_6374603078355179547": false,
+"phase_9125328042912577426": true
 }
 time_limit = 900.0
 boss_id = &"centaurus"

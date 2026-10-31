@@ -86,7 +86,7 @@ types = Array[StringName]([&"pump"])
 formations = Array[PackedScene]([ExtResource("3_b421h")])
 layouts = Array[StringName]([&"pump/単体", &"pump/二体並び"])
 time = 265.0
-length = 25.0
+length = 22.0
 interval = 16.0
 
 [sub_resource type="Resource" id="Clip_7"]
@@ -130,7 +130,7 @@ types = Array[StringName]([&"pump"])
 formations = Array[PackedScene]([ExtResource("3_b421h")])
 layouts = Array[StringName]([&"pump/単体", &"pump/二体並び"])
 time = 45.0
-length = 45.0
+length = 40.0
 interval = 18.0
 
 [sub_resource type="Resource" id="Clip_11"]
@@ -175,7 +175,7 @@ types = Array[StringName]([&"crab"])
 formations = Array[PackedScene]([ExtResource("10_l47qx")])
 layouts = Array[StringName]([&"s2_crab/単体"])
 time = 115.0
-length = 55.0
+length = 51.0
 groups = 2
 interval = 16.0
 
@@ -187,7 +187,7 @@ types = Array[StringName]([&"cross"])
 formations = Array[PackedScene]([ExtResource("5_b421h")])
 layouts = Array[StringName]([&"cross/1体", &"cross/2体"])
 time = 115.0
-length = 55.0
+length = 51.0
 interval = 16.0
 
 [sub_resource type="Resource" id="Clip_16"]
@@ -221,7 +221,7 @@ types = Array[StringName]([&"dolphin"])
 formations = Array[PackedScene]([ExtResource("11_l47qx")])
 layouts = Array[StringName]([&"dolphin/1体"])
 time = 195.0
-length = 70.0
+length = 65.0
 interval = 18.0
 
 [sub_resource type="Resource" id="Clip_19"]
@@ -232,7 +232,7 @@ types = Array[StringName]([&"crab"])
 formations = Array[PackedScene]([ExtResource("10_l47qx")])
 layouts = Array[StringName]([&"s2_crab/単体"])
 time = 195.0
-length = 70.0
+length = 65.0
 groups = 2
 interval = 18.0
 
@@ -245,7 +245,7 @@ formations = Array[PackedScene]([ExtResource("aquila")])
 layouts = Array[StringName]([&"aquila/1体"])
 attack_priority = 1
 time = 290.0
-length = 80.0
+length = 75.0
 interval = 30.0
 
 [sub_resource type="Resource" id="Clip_21"]
@@ -268,7 +268,7 @@ formations = Array[PackedScene]([ExtResource("5_b421h")])
 layouts = Array[StringName]([&"cross/1体", &"cross/2体"])
 attack_priority = 1
 time = 290.0
-length = 80.0
+length = 75.0
 interval = 15.0
 
 [sub_resource type="Resource" id="Clip_23"]
@@ -465,17 +465,17 @@ display_name = "新しい時間帯"
 [sub_resource type="Resource" id="Curve_biter"]
 script = ExtResource("curve")
 type = &"biter"
-points = PackedVector2Array(0, 24, 10, 120, 23, 183, 36, 174, 45, 120, 49, 339, 69, 237, 86, 330, 90, 150, 99, 165, 107, 185, 115, 175, 121, 384, 144, 375, 163, 375, 170, 185, 178, 85, 189, 80, 195, 200, 204, 460, 226, 195, 249, 451, 261, 379, 265, 210, 274, 174, 282, 240, 290, 230, 297, 527, 313, 286, 338, 570, 349, 521, 364, 567, 370, 235, 378, 194, 387, 260, 395, 250, 399, 706, 424, 631, 438, 373, 450, 721, 464, 750, 475, 718, 480, 0, 532, 20, 570, 60, 600, 90)
+points = PackedVector2Array(0, 24, 10, 120, 23, 183, 36, 174, 45, 120, 49, 339, 69, 237, 86, 330, 90, 150, 99, 165, 107, 185, 115, 175, 121, 384, 144, 375, 163, 375, 170, 185, 178, 85, 189, 80, 195, 200, 204, 460, 226, 195, 249, 451, 261, 379, 265, 210, 274, 174, 282, 240, 290, 230, 297, 527, 313, 286, 338, 570, 349, 521, 364, 567, 370, 235, 378, 194, 387, 260, 395, 250, 399, 706, 424, 631, 438, 373, 450, 721, 464, 750, 475, 718, 480, 0, 600, 0, 603, 819)
 
 [sub_resource type="Resource" id="Curve_splitter"]
 script = ExtResource("curve")
 type = &"splitter"
-points = PackedVector2Array(0, 18, 10, 32, 25, 52, 36, 38, 45, 18, 55, 42, 68, 47, 82, 49, 90, 24, 99, 52, 107, 68, 115, 22, 126, 31, 141, 35, 155, 33, 170, 30, 178, 62, 187, 78, 195, 24, 207, 40, 225, 47, 242, 56, 257, 53, 265, 36, 273, 70, 282, 86, 290, 26, 305, 50, 322, 46, 339, 51, 355, 48, 364, 47, 370, 42, 379, 82, 387, 98, 395, 30, 409, 20, 423, 28, 437.5, 20, 450, 22, 462, 28, 473, 18, 477, 12, 480, 0, 530, 2, 570, 6, 601, 15)
+points = PackedVector2Array(0, 18, 10, 32, 25, 52, 36, 38, 45, 18, 55, 42, 68, 47, 82, 49, 90, 24, 99, 52, 107, 68, 115, 22, 126, 31, 141, 35, 155, 33, 170, 30, 178, 62, 187, 78, 195, 24, 207, 40, 225, 47, 242, 56, 257, 53, 265, 36, 273, 70, 282, 86, 290, 26, 305, 50, 322, 46, 339, 51, 355, 48, 364, 47, 370, 42, 379, 82, 387, 98, 395, 30, 409, 20, 423, 28, 437.5, 20, 450, 22, 462, 28, 473, 18, 477, 12, 480, 0, 600, 0, 602, 99)
 
 [sub_resource type="Resource" id="Curve_bomber"]
 script = ExtResource("curve")
 type = &"bomber"
-points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 8, 90, 3, 99, 4, 107, 3, 115, 4, 128, 10, 141, 6, 156, 14, 170, 5, 178, 6, 187, 5, 195, 6, 210, 16, 225, 8, 242, 20, 255, 12, 265, 7, 273, 7, 282, 7, 290, 8, 306, 24, 321, 12, 337, 28, 351, 16, 362, 30, 370, 8, 379, 10, 387, 8, 395, 10, 409, 32, 423, 18, 437.5, 22, 450, 36, 462, 20, 473, 40, 477, 20, 480, 0, 529, 0, 570, 3, 600, 6)
+points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 8, 90, 3, 99, 4, 107, 3, 115, 4, 128, 10, 141, 6, 156, 14, 170, 5, 178, 6, 187, 5, 195, 6, 210, 16, 225, 8, 242, 20, 255, 12, 265, 7, 273, 7, 282, 7, 290, 8, 306, 24, 321, 12, 337, 28, 351, 16, 362, 30, 370, 8, 379, 10, 387, 8, 395, 10, 409, 32, 423, 18, 437.5, 22, 450, 36, 462, 20, 473, 40, 477, 20, 480, 0, 600, 0, 602, 35)
 
 [resource]
 script = ExtResource("stage")
