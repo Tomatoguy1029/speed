@@ -12,6 +12,7 @@ const EDITOR_ORDER := 1
 ## 発動の値（params）の名前・説明・単位
 const PARAMS_DOCS := {
 	"back_speed": ["後ろへ押す速さ", "後ろへ押す速さを定義する。Lv別の配列はLv1から順に読む。", "—"],
+	"chain_limit_by_level": ["Lv別の連鎖上限", "星砕きの再発動世代数の上限。初回発動を深さ0とし、Lv1から順に読む。", "回"],
 	"chance_by_level": ["Lv別の発動率", "Lv別の発動率を定義する。Lv別の配列はLv1から順に読む。", "—"],
 	"count_by_level": ["Lv別の個数", "Lv別の個数を定義する。Lv別の配列はLv1から順に読む。", "—"],
 	"cuts_by_level": ["Lv別の斬撃の本数", "Lv別の斬撃の本数を定義する。Lv別の配列はLv1から順に読む。", "—"],
