@@ -15,6 +15,7 @@ var _wave_speed := 0.0
 ## 命中判定中に同じ輪のDictionaryと設定を読み直さない。次の更新でも配列を使い回す。
 var _ring_positions := PackedVector2Array()
 var _ring_radii := PackedFloat64Array()
+var _rows := PackedInt32Array()
 
 func setup(context: RunContext, d: WeaponDef) -> void:
 	super.setup(context, d)
@@ -44,8 +45,13 @@ func tick(dt: float, _busy: bool) -> void:
 	var scale := 1.82 * character_scale
 	var ship_pos := state.ship_pos
 	var move := _last.distance_to(ship_pos)
-	for f in frames: f.age += dt
-	frames = frames.filter(func(f): return f.age < life)
+	var kept_frames := 0
+	for f in frames:
+		f.age += dt
+		if f.age < life:
+			frames[kept_frames] = f
+			kept_frames += 1
+	frames.resize(kept_frames)
 	pulse = maxf(0.0, pulse - dt)
 	if dt > 0.0: speed = move / dt
 	if _active and (state.tracing or state.glide) and not (speed > float(p("min_speed")) * 1.82 * character_scale):
@@ -81,10 +87,10 @@ func tick(dt: float, _busy: bool) -> void:
 			_ring_positions[ring_count] = f.pos
 			_ring_radii[ring_count] = radius
 			ring_count += 1
-		var rows := PackedInt32Array()
+		_rows.clear()
 		if ring_count >= 3:
 			var reach := ring_speed * life
-			ctx.combat.nearby(ship_pos, reach + state.ship_vel.length() * life, rows)
+			ctx.combat.nearby(ship_pos, reach + state.ship_vel.length() * life, _rows)
 		var forward := state.ship_heading
 		var side := forward.orthogonal()
 		# 威力などは最初の命中まで評価を遅らせ、同じ更新の命中で共有する。
@@ -93,7 +99,7 @@ func tick(dt: float, _busy: bool) -> void:
 		var delay := 0.0
 		var side_speed := 0.0
 		var back_speed := 0.0
-		for i in rows:
+		for i in _rows:
 			if t.dead[i] != 0 or hits.has(t.id[i]): continue
 			var enemy_pos: Vector2 = t.pos[i]
 			var relative := enemy_pos - ship_pos
@@ -139,4 +145,9 @@ func tick(dt: float, _busy: bool) -> void:
 			hit.hit = true
 			ctx.combat.damage_enemy(i, hit.damage, {"cause": &"sonic", "knock": 0.0})
 			state.emit(&"sonic_impact", {"pos": t.pos[i], "dir": hit.velocity.normalized(), "dead": t.dead[i] != 0})
-	pending = pending.filter(func(h): return h.age < 0.7 and enemies.is_same(h.row, h.id) and t.dead[h.row] == 0)
+	var kept_hits := 0
+	for hit in pending:
+		if hit.age < 0.7 and enemies.is_same(hit.row, hit.id) and t.dead[hit.row] == 0:
+			pending[kept_hits] = hit
+			kept_hits += 1
+	pending.resize(kept_hits)

@@ -3,6 +3,7 @@ extends WeaponBehavior
 var durability := -1.0
 var restore := 0.0
 var waves: Array[Dictionary] = []
+var _rows := PackedInt32Array()
 func radius() -> float: return area(at_level("radius_by_level"))
 func shell_radius() -> float: return float(p("shell_radius")) * 1.82 * cfg.character_scale
 func ready() -> bool: return restore <= 0.0
@@ -34,11 +35,15 @@ func tick(dt: float, _busy: bool) -> void:
 		if wave.age < 0.21: continue
 		var step := 4 + floori((wave.age - 0.21) / 0.05)
 		var reach := minf(wave.radius, step * sqrt(3.0) * 4.0 * 1.82 * cfg.character_scale)
-		var rows := PackedInt32Array()
-		ctx.combat.nearby(wave.pos, reach, rows)
+		ctx.combat.nearby(wave.pos, reach, _rows)
 		var t := ctx.enemies.table
-		for i in rows:
+		for i in _rows:
 			if t.dead[i] != 0 or wave.hit.has(t.id[i]) or t.pos[i].distance_to(wave.pos) > reach + t.r[i]: continue
 			wave.hit[t.id[i]] = true
 			ctx.combat.damage_enemy(i, wave.damage, {"cause": &"barrier", "dir": (t.pos[i] - wave.pos).normalized(), "knock": p("knock")})
-	waves = waves.filter(func(w): return w.age < 0.26 + ceil(w.radius / (sqrt(3.0) * 4.0 * 1.82 * cfg.character_scale) - 4.0) * 0.05)
+	var kept := 0
+	for wave in waves:
+		if wave.age < 0.26 + ceil(wave.radius / (sqrt(3.0) * 4.0 * 1.82 * cfg.character_scale) - 4.0) * 0.05:
+			waves[kept] = wave
+			kept += 1
+	waves.resize(kept)

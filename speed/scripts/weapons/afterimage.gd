@@ -61,8 +61,13 @@ func replay(dt: float) -> void:
 				clear()
 				return
 	# 最後の分身が消えたら経路と敵IDの集合を一緒に解放する。異常に長い記録も打ち切る。
-	echoes = echoes.filter(func(e): return _clock < float(e.start) + MAX_RECORD_SECONDS + 4.0 \
-		and (not e.end or _clock <= float(e.until) + float(e.copies.back().delay) + FADE_SECONDS))
+	var kept := 0
+	for echo in echoes:
+		if _clock < float(echo.start) + MAX_RECORD_SECONDS + 4.0 \
+			and (not echo.end or _clock <= float(echo.until) + float(echo.copies.back().delay) + FADE_SECONDS):
+			echoes[kept] = echo
+			kept += 1
+	echoes.resize(kept)
 
 func clear() -> void:
 	echoes.clear()

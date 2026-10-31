@@ -2,6 +2,8 @@
 extends WeaponBehavior
 var mines: Array[Dictionary] = []
 var _serial := 0
+var _rows := PackedInt32Array()
+var _queue: Array[Dictionary] = []
 func on_end() -> void:
 	var direction := state.ship_heading
 	var trace: TraceRun = ctx.draw.run
@@ -19,21 +21,23 @@ func on_end() -> void:
 			"damage": atk() * at_level("damage_by_level"), "radius": area(at_level("radius_by_level")), "detonate": false})
 	while mines.size() > int(p("max")): mines.pop_front()
 func tick(dt: float, _busy: bool) -> void:
-	var queue: Array[Dictionary] = []
+	_queue.clear()
 	for m in mines:
 		m.life -= dt
 		m.age += dt
 		m.pos = m.from.lerp(m.to, 1.0 - pow(1.0 - minf(1.0, m.age / 0.14), 3.0))
 		if m.life <= 0.0 or m.age < 0.14: continue
-		var rows := PackedInt32Array()
-		ctx.combat.nearby(m.pos, area(float(p("trigger"))), rows)
-		for i in rows:
-			if ctx.enemies.table.dead[i] == 0 and ctx.enemies.table.pos[i].distance_to(m.pos) <= area(float(p("trigger"))) + ctx.enemies.table.r[i]:
+		var trigger := area(float(p("trigger")))
+		ctx.combat.nearby(m.pos, trigger, _rows)
+		for i in _rows:
+			if ctx.enemies.table.dead[i] == 0 and ctx.enemies.table.pos[i].distance_to(m.pos) <= trigger + ctx.enemies.table.r[i]:
 				m.detonate = true
-				queue.append(m)
+				_queue.append(m)
 				break
-	while not queue.is_empty():
-		var m: Dictionary = queue.pop_front()
+	var queue_index := 0
+	while queue_index < _queue.size():
+		var m: Dictionary = _queue[queue_index]
+		queue_index += 1
 		if m.life <= 0.0: continue
 		m.life = 0.0
 		ctx.combat.explode(m.pos, m.radius, m.damage, {"cause": &"mine", "knock": 300.0 * post_factor(&"knockback"), "life": 0.6})
@@ -41,5 +45,11 @@ func tick(dt: float, _busy: bool) -> void:
 			for other in mines:
 				if other.life > 0.0 and other.age >= 0.14 and not other.detonate and other.pos.distance_to(m.pos) <= m.radius:
 					other.detonate = true
-					queue.append(other)
-	mines = mines.filter(func(m): return m.life > 0.0)
+					_queue.append(other)
+	_queue.clear()
+	var kept := 0
+	for mine in mines:
+		if mine.life > 0.0:
+			mines[kept] = mine
+			kept += 1
+	mines.resize(kept)

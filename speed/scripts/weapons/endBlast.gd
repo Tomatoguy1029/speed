@@ -18,4 +18,9 @@ func tick(dt: float, _busy: bool) -> void:
 	for blast in pending:
 		blast.delay -= dt
 		if blast.delay <= 0.0: _blast(blast.pos, blast.radius, blast.damage)
-	pending = pending.filter(func(b): return b.delay > 0.0)
+	var kept := 0
+	for blast in pending:
+		if blast.delay > 0.0:
+			pending[kept] = blast
+			kept += 1
+	pending.resize(kept)

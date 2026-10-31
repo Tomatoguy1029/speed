@@ -27,7 +27,12 @@ func tick(dt: float, _busy: bool) -> void:
 	for shot in pending:
 		shot.delay-=dt
 		if shot.delay<=0.0:_fire(shot.from,shot.to)
-	pending=pending.filter(func(s):return s.delay>0.0)
+	var kept := 0
+	for shot in pending:
+		if shot.delay > 0.0:
+			pending[kept] = shot
+			kept += 1
+	pending.resize(kept)
 
 func _fire(from: Vector2, to: Vector2) -> void:
 	var d:=to-from

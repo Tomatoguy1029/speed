@@ -58,9 +58,13 @@ func tick(dt: float, _busy: bool) -> void:
 	active = active and state.tracing and state.phase == RunState.Phase.PLAY
 	for i in drones.size():
 		var d := drones[i]
+		var kept := 0
 		for point in d.trail:
 			point.life -= dt
-		d.trail = d.trail.filter(func(point): return point.life > 0.0)
+			if point.life > 0.0:
+				d.trail[kept] = point
+				kept += 1
+		d.trail.resize(kept)
 		if not active:
 			# 復帰中は攻撃・光跡追加を行わない。
 			d.pos = d.pos.lerp(_idle(i), 1.0 - exp(-float(p("return_rate")) * dt))
