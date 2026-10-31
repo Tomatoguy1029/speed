@@ -193,3 +193,5 @@ func _update_ripples(dt: float, view_center: Vector2, zoom: float) -> void:
 	mat.set_shader_parameter("count", _ripples.size())
 	mat.set_shader_parameter("ripples", arr)
 	mat.set_shader_parameter("cell", cell)
+	# 中心・半径・格子と同じ論理座標で画面を読む。canvas_itemsの拡大率を混ぜない。
+	mat.set_shader_parameter("logical_size", size)
