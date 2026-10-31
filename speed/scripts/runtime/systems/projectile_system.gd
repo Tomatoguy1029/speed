@@ -338,18 +338,20 @@ func _update_friendly(dt: float) -> void:
 		if not wall_hit.is_empty() and (body_hit == null or wall_hit.t < body_hit.t):
 			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		var to: Vector2 = pos if body_hit == null else body_hit.point
-		var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
-		combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
 		var hit: Dictionary = friend_hit[i]
 		_hits.clear()
-		for row in _buf:
-			if hit.has(et.id[combat.damage_target(row)]):
-				continue
-			var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
-			if t >= 0.0:
-				_hits.append([t, row])
-		if _hits.size() > 1:
-			_hits.sort_custom(func(a, b): return a[0] < b[0])
+		# 寿命切れの行は下の命中処理も実行しない。地形との接触と終了処理は共通で残す。
+		if life > 0.0:
+			var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
+			combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
+			for row in _buf:
+				if hit.has(et.id[combat.damage_target(row)]):
+					continue
+				var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
+				if t >= 0.0:
+					_hits.append([t, row])
+			if _hits.size() > 1:
+				_hits.sort_custom(func(a, b): return a[0] < b[0])
 		var sp := vel.length()
 		var pierce := friend_pierce[i] != 0
 		for h in _hits:
@@ -873,9 +875,11 @@ func flying_count() -> int:
 func duplicate_friend(source: int, impact: Vector2) -> bool:
 	var vectors := build.split_vectors(friend_vel[source], friend_generation[source])
 	if vectors.is_empty(): return false
+	# このループでは同じ種類の子を追加するだけなので、上限の残り枠を1回で数える。
+	var remaining: int = 200 - debris_count() if friend_kind[source] == FriendKind.DEBRIS else vectors.size()
 	for v in vectors:
 		# 星屑は200個まで。ほかの飛ぶ攻撃と分裂全体の上限も共有する。
-		if friend_kind[source] == FriendKind.DEBRIS and debris_count() >= 200: break
+		if remaining <= 0: break
 		var child := _add_friend(friend_kind[source], friend_cause[source], impact, v, friend_r[source],
 			friend_dmg[source] * build.split_damage(), friend_life[source], friend_pierce[source] != 0,
 			friend_pierce_left[source], friend_color[source], friend_no_crit[source] != 0, friend_knock[source],
@@ -885,6 +889,7 @@ func duplicate_friend(source: int, impact: Vector2) -> bool:
 		friend_shatter_depth[child] = friend_shatter_depth[source]
 		friend_age[child] = friend_age[source]
 		friend_on_hit[child] = friend_on_hit[source]
+		remaining -= 1
 	state.emit(&"duplicate", {"pos": impact, "directions": vectors})
 	return true
 

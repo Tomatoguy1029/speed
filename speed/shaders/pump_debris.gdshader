@@ -15,7 +15,15 @@ uniform int kind = -1;
 uniform bool linear_output = false;
 varying vec2 local_pixel;
 const vec2 PATCH[8] = vec2[8](vec2(8,22),vec2(17,22),vec2(6,24),vec2(18,24),vec2(8,33),vec2(15,33),vec2(10,13),vec2(14,13));
-void vertex() { local_pixel = VERTEX - vec2(128.0,0); }
+void vertex() {
+	float fade = clamp(life/0.18,0.0,1.0);
+	float tail_length = min(178.0+mod(seed*11.0,70.0),speed*age)*fade;
+	// 発生直後の短い尾まで毎回288pxの透明な四角を重ねない。
+	// fragmentのドット丸めで見える端まで余白を取り、座標と元の絵を保つ。
+	float left = max(-272.0,floor(min(-tail_length,-16.0)/pixel-0.5)*pixel);
+	local_pixel = vec2(mix(left,16.0,UV.x),mix(-16.0,16.0,UV.y));
+	VERTEX = local_pixel+vec2(128.0,0.0);
+}
 vec3 to_linear(vec3 c) { return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c)); }
 void fragment() {
 	vec2 p = floor(local_pixel / pixel + 0.5) * pixel;

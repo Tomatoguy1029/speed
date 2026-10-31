@@ -27,6 +27,8 @@ func _release(j: int) -> void:
 func on_row_gone(i: int) -> void:
 	var t := table
 	_release(i)
+	# 所有者になるのはポンプだけ。巻き込み撃破の各雑魚で全敵を再走査しない。
+	if t.beh[i] != index: return
 	for j in t.alive.size():
 		if t.alive[j] != 0 and t.pump_owner[j] == i:
 			_release(j)
