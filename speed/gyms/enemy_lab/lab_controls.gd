@@ -78,6 +78,7 @@ func _appearance(page: Node) -> void:
 	_armor_color.edit_alpha = false
 	_armor_color.custom_minimum_size = Vector2(100, 32)
 	paint_row.add_child(_armor_color)
+	UI.edit_shortcuts(_armor_color.get_popup(), lab)
 	_armor_view = ARMOR_VIEW.new()
 	_armor_view.piece_pressed.connect(_paint_armor_piece)
 	paint_box.add_child(_armor_view)

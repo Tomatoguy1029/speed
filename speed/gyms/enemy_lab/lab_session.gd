@@ -344,7 +344,8 @@ func perform(kind: String, args := {}) -> void:
 	if seeking or not is_instance_valid(run):
 		return
 	if kind != "input":
-		edit_undo.append({"history": history.duplicate(true), "end": furthest, "tick": tick})
+		edit_undo.append({"history": history.duplicate(true), "end": furthest, "tick": tick,
+			"commands": _inverse_edit(kind, args), "opposite": [{"kind": kind, "args": args.duplicate(true)}]})
 		if edit_undo.size() > 20: edit_undo.pop_front()
 		edit_redo.clear()
 	if tick < furthest:
@@ -576,9 +577,13 @@ func _edit_definition(args: Dictionary) -> void:
 			t.max_hp[i] *= def.base_hp(run.cfg) / maxf(old.base_hp(run.cfg), 0.001)
 			t.hp[i] = t.max_hp[i] * ratio
 		elif key == "armor":
-			t.armor[i] *= def.armor / maxf(old.armor, 0.001)
+			if old.armor > 0.0:
+				t.armor[i] *= def.armor / old.armor
+			else:
+				var size_factor := sqrt(t.max_hp[i] / maxf(0.001, old.base_hp(run.cfg) * run.cfg.enemy_hp_mult * (3.0 if t.elite[i] else 1.0)))
+				t.armor[i] = def.armor * size_factor * run.cfg.enemy_armor_mult * (1.3 if t.elite[i] else 1.0)
 		elif key == "speed":
-			t.speed[i] *= def.speed / maxf(old.speed, 0.001)
+			t.speed[i] = t.speed[i] * def.speed / old.speed if old.speed > 0.0 else def.speed
 		elif key == "radius":
 			t.r[i] *= def.radius / maxf(old.radius, 0.001)
 		elif key in ["visual.scale", "visual.collision_scale"]:
@@ -595,7 +600,7 @@ func row_for_id(id: int) -> int:
 			return i
 	return -1
 
-func seek(target: int) -> void:
+func seek(target: int, instant := false) -> void:
 	_seek_serial += 1
 	var request := _seek_serial
 	playing = false
@@ -634,8 +639,10 @@ func seek(target: int) -> void:
 	while tick < target:
 		for n in mini(120, target - tick):
 			step()
-		seek_progress.emit(float(tick) / maxf(1, target))
-		await get_tree().process_frame
+		# Reset と編集の復元は、完成した状態だけを次の描画へ渡す。
+		if not instant:
+			seek_progress.emit(float(tick) / maxf(1, target))
+			await get_tree().process_frame
 		if epoch != _epoch or request != _seek_serial:
 			return
 	furthest = end
@@ -664,7 +671,9 @@ func back_to_play_start() -> void:
 			scene.queue_free()
 		scene = null
 		run = null
-	await seek(at)
+	await seek(at, true)
+	edit_undo.clear()
+	edit_redo.clear()
 
 func cancel_seek() -> void:
 	_seek_serial += 1
@@ -789,17 +798,82 @@ static func safe_parameter(key: String, value):
 	return int(number) if value is int else number
 
 func undo_edit() -> void:
-	if edit_undo.is_empty() or seeking: return
-	edit_redo.append({"history": history.duplicate(true), "end": furthest, "tick": tick})
-	var item: Dictionary = edit_undo.pop_back()
-	history.assign(item.history)
-	furthest = int(item.end)
-	await seek(int(item.tick))
+	await _restore_edit(edit_undo, edit_redo)
 
 func redo_edit() -> void:
-	if edit_redo.is_empty() or seeking: return
-	edit_undo.append({"history": history.duplicate(true), "end": furthest, "tick": tick})
-	var item: Dictionary = edit_redo.pop_back()
+	await _restore_edit(edit_redo, edit_undo)
+
+## 値の編集は現在のランに逆操作を適用する。移動や攻撃の時計は進め直さない。
+## 逆操作も現在時刻の命令として残し、記録の再生でも同じ結果にする。
+func _inverse_edit(kind: String, args: Dictionary) -> Array:
+	var previous := args.duplicate(true)
+	match kind:
+		"armor_paint":
+			var def := run.enemies.def_of(StringName(args.get("type", "")))
+			if def == null: return []
+			previous.colors = def.armor_colors.duplicate(true)
+		"boss_appearance":
+			var def: BossDef = run.bosses.definitions.get(StringName(args.get("type", "")))
+			if def == null: return []
+			previous.parts = def.part_appearance.duplicate(true)
+		"parameter", "boss_parameter":
+			var type := StringName(args.get("type", ""))
+			var def: Resource = run.bosses.definitions.get(type) if kind == "boss_parameter" else run.enemies.def_of(type)
+			if def == null: return []
+			var key := String(args.get("key", ""))
+			if key.begins_with("visual.") and def is EnemyDef:
+				var field := key.trim_prefix("visual.")
+				previous.value = def.visual_value(field, 1.0)
+				previous.inherit = not def.visual_settings.has(field)
+			elif key.begins_with("params."):
+				previous.value = def.params.get(key.trim_prefix("params."), 0)
+			else:
+				previous.value = def.get(key)
+		"move":
+			var row := row_for_id(int(args.get("id", -1)))
+			if row < 0: return []
+			previous.pos = FORMAT.plain(run.enemies.table.pos[row])
+			previous.angle = run.enemies.table.facing[row]
+		"config": previous.value = run.cfg.get(String(args.get("key", "")))
+		"invincible": previous.value = run.ship.invincible
+		"time": previous.value = run.state.time
+		"level": previous.value = run.state.level
+		"schedule": previous.entries = schedule.duplicate(true)
+		_: return []
+	return [{"kind": kind, "args": previous}]
+
+func _restore_edit(source: Array[Dictionary], target: Array[Dictionary]) -> void:
+	if source.is_empty() or seeking or not is_instance_valid(run): return
+	var item: Dictionary = source.pop_back()
+	target.append({"history": history.duplicate(true), "end": furthest, "tick": tick,
+		"commands": item.get("opposite", []), "opposite": item.get("commands", [])})
+	var commands: Array = item.get("commands", [])
+	if not commands.is_empty():
+		# 過去を見ている場合は、新しい編集と同じように分岐する。
+		if tick < furthest:
+			branches.append({"name": current_branch, "history": history.duplicate(true), "end": furthest})
+			branch_serial += 1
+			current_branch = tr("lab.message_549e9c3c03") % branch_serial
+			history = history.filter(func(e): return int(e.tick) <= tick)
+			furthest = tick
+		for command: Dictionary in commands:
+			history.append({"tick": tick, "kind": command.kind, "args": command.args.duplicate(true)})
+			_apply(command.kind, command.args)
+		_cursor = history.size()
+		_state_key = _checkpoint_key(tick)
+		revision += 1
+		run.combat.rebuild_grid()
+		changed.emit()
+		return
+	# 配置・削除などは同じ時刻まで非表示で復元し、編集時刻には戻さない。
+	var at := tick
+	var end := furthest
+	var inputs := history.slice(item.history.size()).filter(func(e): return String(e.kind) == "input" and int(e.tick) <= at)
 	history.assign(item.history)
-	furthest = int(item.end)
-	await seek(int(item.tick))
+	for input: Dictionary in inputs:
+		var index := 0
+		while index < history.size() and int(history[index].tick) <= int(input.tick): index += 1
+		history.insert(index, input)
+	furthest = maxi(at, int(item.end))
+	await seek(at, true)
+	furthest = maxi(end, furthest)

@@ -2,6 +2,7 @@
 extends Window
 
 const PARTS = preload("res://scenes/bosses/monoceros_parts.tscn")
+const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 var lab
 var rig
 var _values: Dictionary = {}
@@ -21,6 +22,7 @@ var _saved_hash := ""
 
 func open_editor(owner_lab) -> void:
 	lab = owner_lab
+	UI.edit_shortcuts(self, lab)
 	title = tr("lab.boss_parts.title")
 	min_size = Vector2i(640, 420)
 	close_requested.connect(queue_free)
@@ -94,6 +96,7 @@ func _build() -> void:
 	_color.edit_alpha = false
 	_color.color_changed.connect(_paint)
 	panel.add_child(_color)
+	UI.edit_shortcuts(_color.get_popup(), lab)
 	_x = _number(panel, tr("lab.boss_parts.x"), -256, 256, 0, _move)
 	_y = _number(panel, tr("lab.boss_parts.y"), -256, 256, 0, _move)
 	_button(panel, tr("lab.boss_parts.reset_part"), _reset_part)

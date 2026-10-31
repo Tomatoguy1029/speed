@@ -338,7 +338,7 @@ func _fill_palette() -> void:
 			canvas.spawn_type = id
 			_refresh_hitstop()
 			workspace._last_mode = -1
-			_set_mode(1))
+			_set_mode(1, true))
 		workspace.palette_buttons[id] = button
 		_palette.add_child(button)
 	workspace._last_mode = -1
@@ -390,18 +390,20 @@ func _palette_class(def: Resource) -> int:
 	if rank >= 6: return 4
 	return 7
 
-func _set_mode(mode: int) -> void:
+func _set_mode(mode: int, place_once := false) -> void:
 	canvas.finish_route()
 	# 試遊からほかのモードへ切り替えたら、再生を止める
 	if canvas.mode == 3 and mode != 3:
 		session.playing = false
 	canvas.mode = mode
+	canvas.place_once = place_once
 	canvas.cancel_gesture()
 	# 試遊を選んだら、そのまま再生して操作できるようにする
 	if mode == 3 and not session.playing and not session.seeking:
 		session.playing = true
 	_focus_play_area()
 	workspace._last_mode = -1
+	_refresh()
 
 ## 試遊では本番の表示枠に、編集では編集用の層に、入力を向ける。試遊に入る前にたまった入力は捨てる。
 func _focus_play_area() -> void:
@@ -440,6 +442,8 @@ func _select_branch(index: int) -> void:
 	var branch: Dictionary = session.branches[index - 1]
 	session.current_branch = branch.name
 	session.history.assign(branch.history)
+	session.edit_undo.clear()
+	session.edit_redo.clear()
 	session.furthest = int(branch.end)
 	session.branches[index - 1] = current
 	await session.seek(session.furthest)
@@ -738,6 +742,7 @@ func _on_canvas_zoom_changed() -> void:
 ## Space で再生・停止を切り替える（実験場のどこにフォーカスがあっても。文字を入力している間を除く）。
 ## ボタンや本番の入力（描画の補助）には渡さない。
 func _input(event: InputEvent) -> void:
+	if handle_edit_shortcut(event, get_viewport()): return
 	if not (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE):
 		return
 	var focus := get_viewport().gui_get_focus_owner()
@@ -749,6 +754,31 @@ func _input(event: InputEvent) -> void:
 	_toggle_play()
 	# 表示枠を通って本番の入力に届いた Space（描画の補助）は捨てる
 	session.run.input.poll()
+
+## GUI より先に受けるが、文字入力の undo/redo はその入力欄へ渡す。
+func handle_edit_shortcut(event: InputEvent, scope: Viewport) -> bool:
+	if not (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_Z and event.is_command_or_control_pressed()):
+		return false
+	var focus := scope.gui_get_focus_owner()
+	if (focus is LineEdit and focus.is_editing()) or focus is TextEdit:
+		return false
+	scope.set_input_as_handled()
+	if session == null or session.seeking or not is_instance_valid(session.run): return true
+	var route_edit: bool = canvas.mode == 2 and (focus == canvas or focus == null) and scope == get_viewport()
+	_undo(event.shift_pressed, route_edit)
+	return true
+
+func _undo(redo := false, route_edit := false) -> void:
+	if session == null or session.seeking or not is_instance_valid(session.run): return
+	if route_edit:
+		canvas.undo_route(redo)
+	else:
+		canvas.cancel_gesture()
+		if redo: await session.redo_edit()
+		else: await session.undo_edit()
+		var render: RunPresentation = controls._render()
+		if render != null: render._apply_lighting()
+	_refresh()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and session != null:

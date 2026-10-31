@@ -14,6 +14,7 @@ func _init() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	focus_mode = Control.FOCUS_ALL
 	mouse_exited.connect(func(): _hover = -1; queue_redraw())
 
 func show_armor(texture: Texture2D, palettes: Dictionary) -> void:
@@ -51,6 +52,7 @@ func _gui_input(event: InputEvent) -> void:
 			_hover = region
 			queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		grab_focus()
 		var region := region_at(event.position)
 		if region >= 0:
 			piece_pressed.emit(region, event.button_index == MOUSE_BUTTON_RIGHT)
