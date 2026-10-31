@@ -670,7 +670,6 @@ func _show_cards() -> void:
 			var b := Button.new()
 			b.position = Vector2(left + i * (width + 16), 83)
 			b.size = Vector2(width, 193)
-			b.tooltip_text = "%s: %s" % [info.name, info.get("tooltip_desc", info.desc)]
 			if cards[i].kind == &"post_max":
 				var style := _card_style(info.color)
 				style.bg_color = Color("#233c49")
