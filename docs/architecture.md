@@ -874,6 +874,7 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 | 固定の敵外観 | `build_visuals.gd` が `.content/look_<外観名>.res` へ本体・塗装・合成画像を保存し、ステージの依存一覧へ登録する。表示はScope内のEnemyLookを使う | 戦闘・サムネイル・牽引船体で同じ結果を使い、分離する外観との対応も維持する |
 | 装甲の領域と塗装 | `visual_transforms.gd` が領域・濃淡を解析し、確定した塗装を生成する。領域データは `.content/dev/armor_<外観名>.res` へ保存する | 部位キーと保存済み塗装の対応・濃淡・アルファを維持する。実験場は `live_visuals` で同じ変換を明示的に接続し、塗装変更を表示へ反映する。解析用スクリプトと領域データは配布から除外する |
 | 外観の索引 | `.content/visual_index.tres` の外観名と生成物パスをStageResourcesへ引き継ぎ、照明はその順序を使う | 外観の差し替え・追加・削除、照明の層順とHUDとの関係を維持し、資源は必要な種類の利用範囲で保持する |
+| 爆発のノイズ | `tools/art/bake_burst_noise.py` が既存の格子点を `assets/effects/build/burst_noise_volume.png` に保存し、8×8のスライスとして64×64×64のTexture3Dへ取り込む。`burst_noise.tres` は版・入力と出力のハッシュ・画像参照を持ち、共通ビルドが照合する | L8・可逆圧縮・mipmapなしで格子値を保持する。`burst_noise.gdshaderinc` は周期64とsmoothstepの補間座標を使い、linear・repeatの1回の参照で読む。時刻・位置・seedによる動きとプラズマの3オクターブを保つ。BlastBurstsとPlasmaBurstsが同じ資源を依存として取得する |
 
 共通生成の署名は画像とimport設定も含め、外観・領域データの欠落を出力一覧から検出する。外観の索引が指す生成物を配布し、開発用の領域データを分ける。実験場のランの外観・塗装はSessionの表示で保持・解放し、一覧の合成画像は実験場画面の上限付きキャッシュで保持する。
 

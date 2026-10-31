@@ -6,7 +6,7 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-uniform sampler2D value_noise : repeat_disable, filter_nearest;
+#include "res://shaders/burst_noise.gdshaderinc"
 uniform float half_cells = 30.0;
 uniform float radius = 20.0;
 // 置いてからの秒と、球が消えきるまでの秒
@@ -14,6 +14,10 @@ uniform float age = 0.0;
 uniform float ball = 0.42;
 // 球ごとにノイズの場所をずらす種
 uniform float seed = 0.0;
+// 爆発全体で共通の時間係数は頂点で求める。
+varying flat vec4 shape;
+varying flat vec2 phase;
+varying vec2 burst_position;
 group_uniforms tuning;
 uniform vec4 hot : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform vec4 pale : source_color = vec4(0.902, 0.824, 1.0, 1.0);
@@ -22,21 +26,6 @@ uniform vec4 deep : source_color = vec4(0.541, 0.235, 0.878, 1.0);
 uniform vec4 soft : source_color = vec4(0.784, 0.627, 1.0, 1.0);
 uniform vec4 rim : source_color = vec4(0.541, 0.298, 0.941, 1.0);
 group_uniforms;
-
-float lattice(vec3 p) {
-	vec3 i = mod(p, 64.0);
-	vec2 tile = vec2(mod(i.z, 8.0), floor(i.z / 8.0));
-	return texture(value_noise, (tile * 64.0 + i.xy + 0.5) / 512.0).r;
-}
-
-float vnoise(vec3 p) {
-	vec3 i = floor(p);
-	vec3 f = fract(p);
-	vec3 u = f * f * (3.0 - 2.0 * f);
-	float a = mix(mix(lattice(i), lattice(i + vec3(1, 0, 0)), u.x), mix(lattice(i + vec3(0, 1, 0)), lattice(i + vec3(1, 1, 0)), u.x), u.y);
-	float b = mix(mix(lattice(i + vec3(0, 0, 1)), lattice(i + vec3(1, 0, 1)), u.x), mix(lattice(i + vec3(0, 1, 1)), lattice(i + vec3(1, 1, 1)), u.x), u.y);
-	return mix(a, b, u.z);
-}
 
 // -1〜1 の2D値ノイズ。layer ごとに別の面を読む
 float noise2(vec2 p, float layer) {
@@ -62,22 +51,33 @@ float bayer(vec2 c) {
 	return (float(b[i.y * 4 + i.x]) + 0.5) / 16.0;
 }
 
+void vertex() {
+	float u = age / ball;
+	float grow = 1.0 - pow(1.0 - clamp(u, 0.0, 1.0), 3.0);
+	float r = radius * (0.14 + 0.86 * grow);
+	shape = vec4(r, smoothstep(0.35, 1.0, u), floor(age * 20.0), 35.0 / radius);
+	phase = vec2(u, 1.0 - smoothstep(0.75, 1.0, u));
+	// ノイズの最大変位とセルの半ドットを含めた、現在の外周だけを囲む。
+	float bound = min(half_cells, ceil(r * 1.11 + 1.0));
+	burst_position = (UV - 0.5) * 2.0 * bound;
+	VERTEX = burst_position / half_cells;
+}
+
 void fragment() {
-	vec2 cell = floor((UV - 0.5) * 2.0 * half_cells);
+	vec2 cell = floor(burst_position);
 	vec2 c = cell + 0.5;
 	float t = age;
-	float u = t / ball;
+	float u = phase.x;
 	if (u >= 1.0) {
 		discard;
 	}
-	if (u > 0.75 && 1.0 - smoothstep(0.75, 1.0, u) <= bayer(cell)) {
+	if (u > 0.75 && phase.y <= bayer(cell)) {
 		discard;
 	}
-	float grow = 1.0 - pow(1.0 - clamp(u, 0.0, 1.0), 3.0);
-	float r = radius * (0.14 + 0.86 * grow);
-	float hollow = smoothstep(0.35, 1.0, u);
-	float boil = floor(t * 20.0);
-	float f = 35.0 / radius;
+	float r = shape.x;
+	float hollow = shape.y;
+	float boil = shape.z;
+	float f = shape.w;
 	float d = length(c);
 	// edge は r の 0.9〜1.1 倍。丸め誤差の余裕を取り、確実に透明な外側と中空を先に除く。
 	if (d > r * 1.11 || d < r * 0.89 * hollow) {

@@ -4,6 +4,8 @@ extends RefCounted
 const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 
 static func build(output: String) -> Error:
+	var burst_error := _validate_burst_noise()
+	if burst_error != OK: return burst_error
 	var mask_error := _validate_landmark_masks()
 	if mask_error != OK: return mask_error
 	var biter_error := _validate_biter_parts()
@@ -35,6 +37,26 @@ static func build(output: String) -> Error:
 	var error := ResourceSaver.save(index, output.path_join("visual_index.tres"))
 	TRANSFORM._layouts.clear()
 	return _build_meteor_pieces(output) if error == OK else error
+
+## 制作済みノイズの格子点・版と、Texture3Dの取り込み条件を照合する。
+static func _validate_burst_noise() -> Error:
+	var baked := ResourceLoader.load("res://assets/effects/build/burst_noise.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if baked == null or baked.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for group in ["inputs", "outputs"]:
+		for path: String in baked.get_meta(group, {}):
+			if FileAccess.get_sha256(path) != baked.get_meta(group)[path]:
+				push_error("爆発ノイズをtools/art/bake_burst_noise.pyでベイクしてください: " + path)
+				return ERR_INVALID_DATA
+	var texture := baked.get_meta("texture") as Texture3D
+	if texture == null or Vector3i(texture.get_width(), texture.get_height(), texture.get_depth()) != Vector3i(64, 64, 64) or texture.has_mipmaps(): return ERR_INVALID_DATA
+	var settings := ConfigFile.new()
+	var error := settings.load("res://assets/effects/build/burst_noise_volume.png.import")
+	if error != OK: return error
+	var expected := {"compress/mode": 0, "compress/channel_pack": 1, "mipmaps/generate": false, "slices/horizontal": 8, "slices/vertical": 8}
+	if settings.get_value("remap", "importer", "") != "3d_texture": return ERR_INVALID_DATA
+	for field in expected:
+		if settings.get_value("params", field) != expected[field]: return ERR_INVALID_DATA
+	return OK
 
 ## 制作工程のCPUベイカーが保存した固定素材を、正規ビルドでも検査する。
 ## サイズ・塗装の値は実行時の本体と共有し、透過形状の入力だけを固定する。

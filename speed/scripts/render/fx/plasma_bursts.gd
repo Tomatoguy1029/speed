@@ -4,7 +4,7 @@ class_name PlasmaBursts
 extends Node2D
 
 const SHADER := preload("res://shaders/plasma_burst.gdshader")
-const VALUE_NOISE := preload("res://assets/effects/build/value_noise.png")
+const NOISE := preload("res://assets/effects/build/burst_noise.tres")
 var px := 2.366
 ## 戦闘エフェクトツールの装備キー（ShaderTuning）
 var key := ""
@@ -23,7 +23,7 @@ func add(pos: Vector2, radius: float, ball: float) -> void:
 	node.scale = Vector2.ONE * half * px
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER
-	mat.set_shader_parameter("value_noise", VALUE_NOISE)
+	mat.set_shader_parameter("value_noise", NOISE.get_meta("texture"))
 	mat.set_shader_parameter("half_cells", half)
 	mat.set_shader_parameter("radius", radius)
 	mat.set_shader_parameter("ball", ball)
