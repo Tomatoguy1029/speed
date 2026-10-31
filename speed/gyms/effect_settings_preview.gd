@@ -34,6 +34,17 @@ const ATTACK_SCENES := [
 	"res://scenes/attacks/zone_bomber.tscn",
 ]
 const BOMBER_PREVIEW := "res://scenes/attacks/zone_bomber.tscn"
+const ATTACK_LABELS := {
+	"res://scenes/attacks/star_bolt.tscn": ["星形の光弾", "星形の輪郭と芯を持つ光弾。試遊はりゅう座の星弾を使います。"],
+	"res://scenes/attacks/hydra_shape.tscn": ["うみへびの共通演出", "うみへび座の首が使う光線・風刃・雷・瓦礫・竜巻の共通表示。試遊は風刃を使います。"],
+	"res://scenes/attacks/beam_draco.tscn": ["竜の吐出光線", "りゅう座の口元の溜めと、口から伸びる吐き出し光線。"],
+	"res://scenes/attacks/bolt.tscn": ["細い光弾", "ケフェウス座の兵などが撃つ細長い光弾。"],
+	"res://scenes/attacks/light_arrow.tscn": ["光の矢", "通常色の光の矢の輪郭と尾を描く共通表示。"],
+	"res://scenes/attacks/cosmic_arrow.tscn": ["コズミック矢", "紫・水色の変化と尾の星を持つ、光の矢のコズミック色。"],
+	"res://scenes/attacks/beam.tscn": ["ビーム", "共通ビームの予告と発射表示。"],
+	"res://scenes/attacks/zone.tscn": ["範囲攻撃", "共通の範囲攻撃の予告と円形の発動表示。"],
+	BOMBER_PREVIEW: ["自爆の爆発", "自爆する雑魚専用のピクセル炎。シェーダで炎の色・ノイズ・崩れ方を調整します。"],
+}
 const ATTACK_PREVIEWS := {
 	"res://scenes/attacks/star_bolt.tscn": "res://scenes/bosses/draco/star_fan_visual.tscn",
 	"res://scenes/attacks/hydra_shape.tscn": "res://scenes/bosses/hydra/wind_blades_visual.tscn",
@@ -402,7 +413,9 @@ func _add_target_button(path: String, parent: HFlowContainer) -> void:
 	var name: String = definition.get_display_name() if definition != null else _effect_label(path)
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(76, 70) if definition != null else Vector2(220, 46) if _group_for(path) == "ボス技" else Vector2(94, 42)
-	if definition != null:
+	if ATTACK_LABELS.has(path):
+		button.tooltip_text = name + "\n" + ATTACK_LABELS[path][1] + "\n" + path
+	elif definition != null:
 		button.tooltip_text = name + "\n" + definition.get_description()
 	elif _technique_names.has(path):
 		var names: PackedStringArray = _technique_names[path]
@@ -413,6 +426,20 @@ func _add_target_button(path: String, parent: HFlowContainer) -> void:
 	parent.add_child(button)
 	_target_buttons[path] = button
 	if definition == null:
+		if _group_for(path) == "共通攻撃":
+			button.custom_minimum_size = Vector2(112, 56)
+			button.clip_contents = true
+			var caption := Label.new()
+			caption.text = name
+			caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			button.add_child(caption)
+			caption.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			caption.offset_left = 6
+			caption.offset_right = -6
+			return
 		if _group_for(path) == "ボス技": button.text = name
 		else: button.text = name.substr(0, 8) + "…" if name.length() > 8 else name
 		button.clip_text = true
@@ -486,10 +513,11 @@ func _refresh_target_selection() -> void:
 		_target_buttons[path].add_theme_stylebox_override("normal", _target_style(selected))
 		_target_buttons[path].add_theme_stylebox_override("hover", _target_style(selected))
 	_editing_label.text = "編集中: " + _effect_label(_selected) if not _selected.is_empty() else "編集対象を選択してください"
+	_editing_label.tooltip_text = _selected
 
 func _effect_label(path: String) -> String:
 	if path == BOOST_GAUGE.KEY: return "ブーストゲージ"
-	if path == BOMBER_PREVIEW: return "自爆する雑魚：ピクセル炎"
+	if ATTACK_LABELS.has(path): return ATTACK_LABELS[path][0]
 	if path == "boss/final_strike": return "制限時間の一撃（共通）"
 	if _technique_names.has(path):
 		var names: PackedStringArray = _technique_names[path]
