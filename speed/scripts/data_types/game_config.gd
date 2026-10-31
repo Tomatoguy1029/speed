@@ -106,14 +106,6 @@ extends Resource
 ## 弾いた敵の、接触した側の装甲を光らせる長さ。
 ## 単位：秒
 @export var block_impact_life: float
-## クリティカル：炎の数
-## クリティカルで貫いたとき、接触位置から出す炎の数。
-## 単位：個
-@export var weak_flame_count: int
-## クリティカル：赤熱の時間
-## クリティカルで貫いた敵を赤く光らせる長さ。
-## 単位：秒
-@export var weak_impact_life: float
 ## 吹き飛んだ破片：光の跡の時間
 ## 吹き飛ばした敵の破片が通った跡の光が消えるまでの時間。
 ## 単位：実秒

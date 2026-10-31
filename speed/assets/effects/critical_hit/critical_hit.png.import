@@ -1,0 +1,22 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/critical_hit.png-073320957e18573e628ea3f168bf29c9.ctex"
+metadata={
+"vram_texture": false
+}
+
+[deps]
+
+source_file="res://assets/effects/critical_hit/critical_hit.png"
+dest_files=["res://.godot/imported/critical_hit.png-073320957e18573e628ea3f168bf29c9.ctex"]
+
+[params]
+
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0
+detect_3d/compress_to=1

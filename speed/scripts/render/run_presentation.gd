@@ -98,6 +98,7 @@ var _star_batch: InstanceBatch
 var _hostile_batch: InstanceBatch
 var _coin_batch: InstanceBatch
 var _ship_visual: RefCounted
+var _critical_hits: RefCounted
 var _meteor_visual: RefCounted
 var _body_visual: RefCounted
 var _equipment_visuals: Dictionary = {}
@@ -119,6 +120,7 @@ func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	_ship_visual = load("res://scripts/render/ship_visual.gd").new()
 	_ship_visual.setup(self)
+	_critical_hits = load("res://scripts/render/critical_hit.gd").new()
 	_body_visual = load("res://scripts/render/body_visual.gd").new()
 	_read_settings()
 	SaveManager.settings_changed.connect(_read_settings)
@@ -180,6 +182,7 @@ func _build_directional_lights(world: Node2D) -> void:
 	marks.follow_viewport_enabled = true
 	world.add_child(marks)
 	_lit_enemy_marks = DrawLayer.new()
+	_lit_enemy_marks.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_lit_enemy_marks.draw_fn = _timed(&"draw_lit_enemy_marks", _draw_lit_enemy_marks)
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
@@ -465,10 +468,8 @@ func _handle_events(events: Array[Dictionary]) -> void:
 			&"block_impact":
 				_sparks(ev.pos, ev.normal, cfg.block_spark_count, Color("#ffd28a"))
 				impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": ev.normal, "life": cfg.block_impact_life, "max": cfg.block_impact_life, "color": Color("#ffe9a8")})
-			&"weak_impact":
-				var d: Vector2 = (ev.pos - ev.enemy_pos).normalized()
-				_sparks(ev.pos, d, cfg.weak_flame_count, Color("#ff6a2a"))
-				impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": d, "life": cfg.weak_impact_life, "max": cfg.weak_impact_life, "color": Color("#ff5a2a")})
+			&"critical_hit":
+				_critical_hits.add(ev.pos, ev.enemy_pos + Vector2(0, -ev.r - _px(10.0)), ev.dir)
 			&"shield_reflect":
 				_sparks(ev.pos, ev.normal, 8, Color("#ffa4ef"))
 				_ring(ev.pos, 22.0, Color("#ff9de9"), 0.18)
@@ -610,6 +611,7 @@ func _shatter_meteor(ev: Dictionary) -> void:
 	_meteors().shatter(ev)
 
 func _update_fx(dt: float) -> void:
+	_critical_hits.update(dt)
 	for shard in meteor_shards:
 		shard.pos += shard.vel * dt
 		shard.angle += shard.spin * dt
@@ -1026,6 +1028,7 @@ func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	for i in t.alive.size():
 		if t.alive[i] != 0 and t.dead[i] == 0 and _armor_batches.has(t.type[i]) and view.has_point(t.pos[i]):
 			_draw_enemy_marks(c, t, i)
+	_critical_hits.draw(c, cam_zoom)
 
 ## 彗星：光る核と、進む向きの反対へ伸びる尾。レアな彗星は金色で、周りを光の粒が回る（デザインとアートスタイル）。
 ## 専用の絵ができるまでの仮の描き方。

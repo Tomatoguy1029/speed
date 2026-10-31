@@ -599,7 +599,7 @@
 | 場面 | 内容 |
 |---|---|
 | 装甲に弾かれた | 接触面の左右へ `config.block_spark_count` 本の火花。止めた敵の接触側の装甲が `config.block_impact_life` 秒光る |
-| クリティカルで貫いた | 接触位置から `config.weak_flame_count` 個の炎。`config.weak_impact_life` 秒赤熱する |
+| クリティカル命中 | 接触位置へ小さな白黄の閃光・欠ける弧・短い火花を出し、敵の頭上へ小さな「CRIT」を表示する。[外観](game/art-style.md#クリティカル命中)に従う |
 | 吹き飛ばした敵の破片 | 金属色・橙の縁の角張った破片が回転して飛ぶ。通った跡の光は実時間 `config.corpse_trail_life` 秒で消える（各破片の履歴は最大 `config.corpse_trail_points` 点） |
 | ソニックブーム | その場に残って広がる音の輪。重なる円錐のふちを強く光らせる |
 | 普段の被弾 | 機体を `config.ship_hurt_time` 実秒赤くし、機体だけを横に最大 `config.ship_hurt_shake` px 震わせる。カメラは揺らさない |
