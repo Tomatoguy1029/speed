@@ -253,7 +253,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W04.name | 震空 | Void Quake |
 | weapon.W04.desc | 触れてきた敵を、空間を歪ませて押し返しながら攻撃する。 | Distorts space to carry nearby enemies outward and damage them. |
 | weapon.W05.name | バリアシステム | Barrier System |
-| weapon.W05.desc | 殻が敵の弾を受け止め、そのたびに波動で周りを押し返す。耐えきれなくなると砕け、しばらくすると戻る。 | A shell blocks enemy shots and releases a repelling wave on each hit. It shatters when depleted and returns after a while. |
+| weapon.W05.desc | 殻が攻撃を受け止め、そのたびに波動で周りを押し返す。耐えきれなくなると砕け、しばらくすると戻る。 | A shell blocks attacks and releases a repelling wave on each hit. It shatters when depleted and returns after a while. |
 | weapon.W07.name | マインランチャー | Mine Launcher |
 | weapon.W07.desc | ブーストが終わるたびに、前方へ機雷をばらまく。 | Scatters mines forward whenever a boost ends. |
 | weapon.W08.name | ソニックブーム | Sonic Boom |
