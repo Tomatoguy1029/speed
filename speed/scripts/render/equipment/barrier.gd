@@ -118,15 +118,19 @@ func _hit(p: PixelPainter, h: Dictionary, center: Vector2) -> void:
 ## 欠片：外向きに散り、毎秒0.1倍に減速し、残り4割で市松に透けて消える。外周のマスに白い十字の閃光（0.1秒）。
 func _shards(p: PixelPainter, dt: float) -> void:
 	var damping := pow(0.1, dt)
+	var kept := 0
 	for s in shards:
 		s.age += dt
+		if s.age < s.life:
+			shards[kept] = s
+			kept += 1
 		if s.age < 0.0 or s.age >= s.life: continue
 		s.pos += s.vel * p.px * dt
 		s.vel *= damping
 		var cell := p.cell(s.pos)
 		if s.age / s.life > 0.6 and (int(cell.x) + int(cell.y)) % 2 != 0: continue
 		p.fill(cell.x, cell.y, s.color, s.size, s.size)
-	shards = shards.filter(func(s): return s.age < s.life)
+	shards.resize(kept)
 	for c in crosses:
 		c.age += dt
 		var q: float = c.age / 0.1

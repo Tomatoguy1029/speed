@@ -337,6 +337,8 @@ func _friend_shape(kind: int) -> FriendShape:
 	return _friend_shapes[kind]
 
 func _update_friendly(dt: float) -> void:
+	if friend_slots.live == 0:
+		return
 	var et := combat.enemies.table
 	var i := 0
 	# 命中で増えた破片が後ろの行に入った場合は、この更新で一緒に進める
@@ -477,6 +479,8 @@ func hostile_count() -> int:
 	return hostile_slots.live
 
 func _update_hostile(dt: float) -> void:
+	if hostile_slots.live == 0:
+		return
 	var R := cfg.ship_radius
 	var body_move := field.body_speed_max * dt
 	var ship_pos := state.ship_pos
@@ -576,6 +580,8 @@ func _hazard_shape(kind: int) -> HazardShape:
 	return _hazard_shapes[kind]
 
 func block_one(center: Vector2, radius: float) -> bool:
+	if hostile_slots.live == 0:
+		return false
 	for i in hostile_alive.size():
 		if hostile_alive[i] != 0 and hostile_life[i] > 0.0 and hostile_pos[i].distance_to(center) <= radius + hostile_r[i]:
 			hostile_life[i] = 0.0
@@ -662,6 +668,8 @@ func _hazard_owner_pulled(h: int) -> bool:
 ## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。
 func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 	var best := {}
+	if hazard_slots.live == 0:
+		return best
 	var best_t := INF
 	for h in hazard_alive.size():
 		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
@@ -692,6 +700,8 @@ func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 ## 重なっていなければ空の辞書。重なっていれば pos（押し出した位置）と normal（押し出す向き）。中心線の上なら vel の向きの側へ出す。
 func block_overlap(pos: Vector2, radius: float, vel := Vector2.ZERO) -> Dictionary:
 	var best := {}
+	if hazard_slots.live == 0:
+		return best
 	var best_push := INF
 	for h in hazard_alive.size():
 		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
@@ -777,6 +787,8 @@ func hazard_count() -> int:
 	return hazard_slots.live
 
 func _update_hazards(dt: float) -> void:
+	if hazard_slots.live == 0:
+		return
 	var R := cfg.ship_radius
 	var ship_pos := state.ship_pos
 	for i in hazard_alive.size():

@@ -150,8 +150,12 @@ func _hulls(p: PixelPainter, dt: float) -> void:
 			var back := pos - u * cells * p.px + u.orthogonal() * (randf() - 0.5) * cells * p.px
 			var vel := -u * (30.0 + randf() * 30.0) + u.orthogonal() * (randf() - 0.5) * 20.0
 			flames.append({"pos": back, "vel": vel, "age": 0.0, "life": 0.18 + randf() * 0.12})
+	var kept := 0
 	for f in flames:
 		f.age += dt
+		if f.age < f.life:
+			flames[kept] = f
+			kept += 1
 		var q: float = f.age / f.life
 		if q >= 1.0: continue
 		f.pos += f.vel * p.px * dt
@@ -160,7 +164,7 @@ func _hulls(p: PixelPainter, dt: float) -> void:
 		var color := Color.WHITE if q < 0.2 else Color("#fff2a8") if q < 0.45 else Color("#ffb030") if q < 0.7 else Color("#d2461c")
 		var size := 2 if q < 0.35 else 1
 		p.fill(cell.x, cell.y, color, size, size)
-	flames = flames.filter(func(f): return f.age < f.life)
+	flames.resize(kept)
 
 func dispose() -> void:
 	if is_instance_valid(_under): _under.queue_free()

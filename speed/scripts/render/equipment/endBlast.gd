@@ -76,7 +76,9 @@ func _step(b: Dictionary, dt: float) -> void:
 	if t > 0.1 and t < BALL * 1.4 and rng.randf() < 70.0 * minf(1.0, rad / 90.0) * dt:
 		var dir := Vector2.from_angle(rng.randf() * TAU)
 		b.parts.append(_part(STAR, dir * _shell(rad, t), dir * rng.randf_range(10.0, 40.0) * rad / 70.0, rng.randf_range(0.25, 0.5), C[5] if rng.randf() < 0.5 else V[4], rng.randf_range(0.6, 1.8), rng))
-	for q in b.parts:
+	var parts: Array[Dictionary] = b.parts
+	var kept := 0
+	for q in parts:
 		q.life -= dt
 		match q.kind:
 			MOTE: q.vel -= q.vel * 0.6 * dt
@@ -88,8 +90,11 @@ func _step(b: Dictionary, dt: float) -> void:
 				q.vel -= q.vel * 1.6 * dt
 				q.vel.y -= 5.0 * dt
 		q.at += q.vel * dt
-	# 試作の画面の外へ出た粒は消す
-	b.parts = b.parts.filter(func(q): return q.life > 0.0 and (q.at as Vector2).length() < rad * 1.45)
+		# 試作の画面の外へ出た粒は消す。残る粒の順番を保ち、同じ列へ詰める。
+		if q.life > 0.0 and (q.at as Vector2).length() < rad * 1.45:
+			parts[kept] = q
+			kept += 1
+	parts.resize(kept)
 
 func _draw(p: PixelPainter, b: Dictionary) -> void:
 	var o: Vector2 = (b.pos / p.px).round()
