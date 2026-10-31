@@ -684,6 +684,8 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 英雄星座の光雲は、共通生成で曲面関数の一次元表と単位四角形を保存する。StageResourcesが準備対象へ含め、SessionのScopeが保持し、ロード中にshaderを事前描画する。表示は生成済みの表から星座の回転後の範囲・カメラ倍率に応じた格子を参照し、呼吸の明るさだけ時刻から更新する。表示固有のmaterialはランごとに持ち、固定の表と形状は共有する。
 
+目印の敵の輪郭は、制作時の `tools/art/bake_landmark_masks.py` が本体・装甲・装飾のアルファから距離場を作り、`assets/effects/landmark/masks.tres` とPNGへ保存する。画像空間の距離をRへ8段階/画素で符号化し、32画素の余白・元寸法・入力ハッシュ・サイズ観測値を素材に持つ。サイズは画像へ焼かず、本体と同じ個体半径・表示倍率で描く。塗装のRGBは同じマスクを共有する。固定素材の入力・出力・候補と外観差替えの整合を共通生成の `build_visuals.gd` が確認する。通常の依存収集がマスク・ノイズ・設定・shaderをStageResourcesへ登録し、SessionのScopeがラン開始時から保持する。表示は開始時に用意した少数のSpriteとmaterialを再利用し、位置・向き・時刻・マスクとゲーム中の変形だけを更新する。じょうぎ座は上下と合体のマスクを選び、見えない三角の中心は生存する星へ表示する。ポンプ座はG/Bの前後別距離場と、本体と共有する後部の逆変形を使う。`build_aura.gdshader` は機体用の寸法・原点・色の既定値を保ち、目印専用モードを `landmark_mark.tres` で調整する。
+
 敵の表示半径は、そのランの定義と生成済み外観の数値を種類ごとに1描画パスだけ共有する。共有値は衝突倍率・画像寸法・基準半径などの数値だけとし、個体の半径をその場で反映する。パス終了時に破棄し、次の描画でライブ編集後の値を読む。Resourceの所有は既存のSessionとScopeに保つ。
 
 - 背景・敵・演出を描画の層に分ける。Forward+・Mobile ではメインViewportの2D HDRとグローを使う。Compatibility では発光対象に `visibility_layer` を設定し、メインViewportと同じ `World2D` を共有する半解像度のSubViewportを `canvas_cull_mask` で絞り込み、ぼかして加算合成する。

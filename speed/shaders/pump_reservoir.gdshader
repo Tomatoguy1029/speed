@@ -15,8 +15,7 @@ varying vec2 local_pixel;
 varying vec2 basis_x;
 varying vec2 basis_y;
 varying vec4 albedo;
-// 元のBase+Armor後部輪郭。固定入力の解析を実行時に繰り返さない。
-const float OUTLINE[72] = float[72](8.975,9.1,8.225,8.35,8.6,7.85,8.225,8.725,8.1,8.725,8.1,8.725,8.225,7.85,8.6,8.35,8.225,9.1,9.1,9.1,9.225,9.225,8.6,8.975,8.6,8.725,9.35,8.725,9.35,9.1,9.35,8.975,9.6,9.35,9.225,10.1,10.1,10.1,10.225,9.35,9.6,9.975,9.35,9.975,10.6,11.6,11.975,11.1,10.475,9.975,9.6,9.35,9.225,9.1,9.1,9.1,9.225,9.35,9.6,9.975,10.475,11.1,11.225,10.1,9.35,8.725,8.6,8.975,8.6,9.225,9.225,9.1);
+#include "res://shaders/pump_outline.gdshaderinc"
 void vertex() {
 	local_pixel = VERTEX + vec2(12.0, 27.0);
 	basis_x = normalize(MODEL_MATRIX[0].xy);
@@ -28,11 +27,10 @@ void fragment() {
 	bool front = p.y < 18.0 && p.x >= 0.0 && p.x < 24.0 && p.y >= 0.0;
 	if (front) front = max(texture(base_tex,(p+0.5)/vec2(24,37)).a,texture(armor_tex,(p+0.5)/vec2(24,37)).a)>0.0;
 	vec2 delta = p - vec2(12.0, 27.0);
-	float a = mod(atan(delta.y, delta.x) + TAU, TAU);
-	float original = OUTLINE[int(round(a / TAU * 72.0)) % 72];
-	float target = mix(original, 16.5, full);
+	vec2 radii = pump_radii(p, full);
+	float target = radii.y;
 	bool rear = full <= 0.001 || length(delta) <= target;
-	if (!front && full > 0.001) source = floor(vec2(12.0, 27.0) + delta * original / target + 0.5);
+	if (!front && full > 0.001) source = pump_source(p, radii);
 	bool valid = source.x >= 0.0 && source.x < 24.0 && source.y >= (front ? 0.0 : 18.0) && source.y < 37.0;
 	vec2 sample_uv = (source + 0.5) / vec2(24.0, 37.0);
 	vec4 base = valid && (front || rear) ? texture(base_tex, sample_uv) : vec4(0.0);

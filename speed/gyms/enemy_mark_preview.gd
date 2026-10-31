@@ -10,11 +10,14 @@ const SHADERS := {
 	"elite": preload("res://shaders/elite_mark.gdshader"),
 }
 const SAMPLE := preload("res://assets/pixel/telescope.png")
+const LANDMARK := preload("res://scripts/render/landmark_aura.gd")
 const LABELS := {
 	"pixel_grid": "ドット密度", "inner_radius": "内側の空白", "outer_radius": "外側の広がり",
 	"noise_scale": "模様の細かさ", "motion_speed": "変化の速度", "intensity": "明るさ",
 	"color": "基調色", "highlight": "光る色",
+	"aura_width": "輪郭の幅", "aura_variation": "幅の揺らぎ", "pixel_size": "ドット幅",
 }
+const AURA_FIELDS := ["aura_width", "aura_variation", "pixel_size", "motion_speed", "intensity", "color", "highlight"]
 
 var preview_host: Control
 var controls_host: Control
@@ -28,6 +31,8 @@ var _viewport: SubViewport
 var _fields := VBoxContainer.new()
 var _clock := 0.0
 var _paused := false
+var _aura: Sprite2D
+var _enemy: Sprite2D
 
 func _ready() -> void:
 	var controls := ScrollContainer.new()
@@ -55,6 +60,7 @@ func _ready() -> void:
 	container.add_child(_viewport)
 	var backdrop := ColorRect.new()
 	backdrop.color = Color("#10141e")
+	backdrop.z_index = -2
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_viewport.add_child(backdrop)
 	_batch = InstanceBatch.new()
@@ -64,12 +70,21 @@ func _ready() -> void:
 	_batch.begin()
 	_batch.add_upright(Vector2(240, 240), 80.0, Color(0.4, 0, 0, 1))
 	_batch.end()
-	var enemy := Sprite2D.new()
-	enemy.texture = SAMPLE
-	enemy.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	enemy.position = Vector2(240, 240)
-	enemy.scale = Vector2.ONE * 1.5
-	_viewport.add_child(enemy)
+	_aura = Sprite2D.new()
+	_aura.position = Vector2(240, 240)
+	_aura.z_index = -1
+	_aura.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var aura_material := ShaderMaterial.new()
+	aura_material.shader = LANDMARK.SHADER
+	aura_material.set_shader_parameter("noise_tex", LANDMARK.NOISE)
+	_aura.material = aura_material
+	var assets := load(LANDMARK.ASSETS_PATH) as Resource
+	LANDMARK.configure(_aura, assets.get_meta("masks")["res://data/visuals/looks/telescope.tres"])
+	_viewport.add_child(_aura)
+	_enemy = Sprite2D.new()
+	_enemy.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_enemy.position = Vector2(240, 240)
+	_viewport.add_child(_enemy)
 	_load(_section)
 	_show_section()
 
@@ -78,6 +93,8 @@ func _process(delta: float) -> void:
 		_clock += delta
 	if is_instance_valid(_batch):
 		(_batch.material as ShaderMaterial).set_shader_parameter("mark_time", _clock)
+	if is_instance_valid(_aura):
+		(_aura.material as ShaderMaterial).set_shader_parameter("clock", _clock)
 
 func _load(section: String) -> void:
 	var path: String = PATHS[section]
@@ -104,6 +121,19 @@ func _show_section() -> void:
 	(_working[_section] as EnemyMarkSettings).apply_to(material)
 	_batch.material = material
 	material.set_shader_parameter("mark_time", _clock)
+	var landmark := _section == "landmark"
+	_batch.visible = not landmark
+	_aura.visible = landmark
+	if landmark:
+		var definition: EnemyDef = ContentManager.enemies[&"telescope"]
+		var look := RunPresentation.load_look(&"telescope")
+		_enemy.texture = RunPresentation.look_texture(look, {}, definition.armor_colors)
+		_enemy.scale = Vector2.ONE * ContentManager.cfg.character_scale * definition.visual_value("scale", 1.0)
+		_aura.scale = _enemy.scale
+		(_working[_section] as EnemyMarkSettings).apply_aura_to(_aura.material as ShaderMaterial)
+	else:
+		_enemy.texture = SAMPLE
+		_enemy.scale = Vector2.ONE * 1.5
 	_rebuild_fields()
 
 func _rebuild_fields() -> void:
@@ -112,7 +142,7 @@ func _rebuild_fields() -> void:
 		child.queue_free()
 	var description := Label.new()
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description.text = "星座の手掛かり。船体を隠さない粒状の光。" if _section == "landmark" else "強化された個体。装甲の外側に断続する発光片。"
+	description.text = "星座の手掛かり。船体の輪郭に沿って揺れる濃い金色のオーラ。本編と同じマスク・設定を使います。" if _section == "landmark" else "強化された個体。装甲の外側に断続する発光片。"
 	_fields.add_child(description)
 	var pause := CheckButton.new()
 	pause.text = "一時停止"
@@ -125,11 +155,14 @@ func _rebuild_fields() -> void:
 			continue
 		var key: String = property.name
 		if not LABELS.has(key): continue
+		if _section == "landmark" and key not in AURA_FIELDS: continue
+		if _section != "landmark" and key in ["aura_width", "aura_variation", "pixel_size"]: continue
 		var label := Label.new()
 		label.text = LABELS[key]
 		_fields.add_child(label)
 		if property.type == TYPE_COLOR:
 			var picker := ColorPickerButton.new()
+			picker.custom_minimum_size = Vector2(72, 32)
 			picker.color = settings.get(key)
 			picker.color_changed.connect(_set_color.bind(key))
 			_fields.add_child(picker)
@@ -156,7 +189,10 @@ func _set_color(value: Color, key: String) -> void:
 
 func _changed() -> void:
 	_dirty[_section] = true
-	(_working[_section] as EnemyMarkSettings).apply_to(_batch.material as ShaderMaterial)
+	if _section == "landmark":
+		(_working[_section] as EnemyMarkSettings).apply_aura_to(_aura.material as ShaderMaterial)
+	else:
+		(_working[_section] as EnemyMarkSettings).apply_to(_batch.material as ShaderMaterial)
 	_message = "未保存の調整値: " + PATHS[_section]
 
 func editing_state() -> Dictionary:

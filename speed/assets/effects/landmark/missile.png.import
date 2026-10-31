@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/missile.png-aa84448d827de2dbd553fd52e32603a6.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/missile.png"
+dest_files=["res://.godot/imported/missile.png-aa84448d827de2dbd553fd52e32603a6.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

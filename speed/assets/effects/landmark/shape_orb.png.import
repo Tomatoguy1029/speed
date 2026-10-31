@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/shape_orb.png-3c7141c5ac93a21d9797a30b10786671.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/shape_orb.png"
+dest_files=["res://.godot/imported/shape_orb.png-3c7141c5ac93a21d9797a30b10786671.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

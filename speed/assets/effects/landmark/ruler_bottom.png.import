@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/ruler_bottom.png-141fd6ba552862ece5aa989fb3882df9.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/ruler_bottom.png"
+dest_files=["res://.godot/imported/ruler_bottom.png-141fd6ba552862ece5aa989fb3882df9.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

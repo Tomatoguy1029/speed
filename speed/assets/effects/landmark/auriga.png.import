@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/auriga.png-7c007b7cae4e59c92d5402741780588a.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/auriga.png"
+dest_files=["res://.godot/imported/auriga.png-7c007b7cae4e59c92d5402741780588a.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

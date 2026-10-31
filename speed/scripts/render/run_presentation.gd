@@ -108,6 +108,7 @@ var _drawing_enemies := false
 var _hero_aura: MeshInstance2D
 var _hero_aura_material: ShaderMaterial
 var _field_boundary: DrawLayer
+var _landmark_aura: Node2D
 ## 開発版の計測の記録先：表示側の処理時間と、敵の描画1回あたりの行の数
 var perf := PerfLog.new()
 var perf_rows := PerfLog.new()
@@ -156,6 +157,10 @@ func _ready() -> void:
 	_path_band_group.add_child(_path_band)
 	_build_batches()
 	_build_directional_lights(world)
+	_landmark_aura = load("res://scripts/render/landmark_aura.gd").new()
+	_landmark_aura.z_index = -2
+	_layers.enemies.add_child(_landmark_aura)
+	_landmark_aura.setup(self)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _look_names.size() + 2)
@@ -909,6 +914,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	_landmark_aura.begin()
 	var wave_deformations := {}
 	var quake = run.loadout.weapon_behaviors.get(&"W04")
 	if quake != null:
@@ -967,6 +973,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
+		if landmark[i] != 0:
+			_landmark_aura.add_enemy(t, i, wave_deformations.get(t.id[i], {}))
 		# g成分は自爆予告の赤い装甲。被弾の白いフラッシュとは分ける。
 		if t.def[i] != null and t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
 			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
@@ -1162,14 +1170,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	if weak > 0.0 and t.type[i] not in EnemyDef.NATIVE_SPRITES and (v == null or v.draws_weak_arc):
 		var f := t.facing[i]
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
-	if t.landmark[i] != 0:
-		# 目印の星：金色とも白ともつかない特別な光
-		var tw := 0.75 + 0.25 * sin(state.world_time * 5.0 + float(t.id[i]))
-		c.draw_circle(p, r * 2.2 * tw, Color(1.0, 0.95, 0.8, 0.16))
-		c.draw_circle(p, r * 0.5, Color(1.0, 0.97, 0.88, 0.95))
-		for k in 4:
-			var u := Vector2.from_angle(k * PI / 2.0 + state.world_time) * r * 1.8 * tw
-			c.draw_line(p - u, p + u, Color(1.0, 0.95, 0.75, 0.6), _px(2.0))
 	if t.stone[i] > 0.0:
 		# 石になっている
 		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))

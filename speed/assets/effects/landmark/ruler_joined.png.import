@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/ruler_joined.png-1d42a8406e837c50e515222d3e891e32.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/ruler_joined.png"
+dest_files=["res://.godot/imported/ruler_joined.png-1d42a8406e837c50e515222d3e891e32.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

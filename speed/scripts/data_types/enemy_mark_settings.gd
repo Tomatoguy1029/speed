@@ -11,6 +11,21 @@ extends Resource
 @export_range(0.0, 2.0, 0.05) var intensity := 0.9
 @export var color := Color("#e9c872")
 @export var highlight := Color("#fff0c6")
+## 目印は画像空間の距離場を使い、本体と同じ倍率で表示する。
+@export_range(1.0, 10.0, 0.25) var aura_width := 5.0
+@export_range(0.0, 12.0, 0.25) var aura_variation := 6.25
+@export_range(1.0, 4.0, 0.25) var pixel_size := 2.0
+
+func apply_aura_to(material: ShaderMaterial) -> void:
+	material.set_shader_parameter("landmark_mode", true)
+	material.set_shader_parameter("distance_scale", 1.0)
+	material.set_shader_parameter("aura_width", aura_width)
+	material.set_shader_parameter("aura_variation", aura_variation)
+	material.set_shader_parameter("aura_intensity", intensity)
+	material.set_shader_parameter("aura_core", highlight)
+	material.set_shader_parameter("aura_outer", color)
+	material.set_shader_parameter("pixel_scale", pixel_size)
+	material.set_shader_parameter("flicker_speed", motion_speed)
 
 func apply_to(material: ShaderMaterial) -> void:
 	material.set_shader_parameter("pixel_grid", pixel_grid)

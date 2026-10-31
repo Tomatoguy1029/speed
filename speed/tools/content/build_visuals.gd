@@ -4,6 +4,8 @@ extends RefCounted
 const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 
 static func build(output: String) -> Error:
+	var mask_error := _validate_landmark_masks()
+	if mask_error != OK: return mask_error
 	TRANSFORM._layouts.clear()
 	var palettes: Array[Dictionary] = [{}]
 	for file in DirAccess.get_files_at("res://data/enemies"):
@@ -31,6 +33,42 @@ static func build(output: String) -> Error:
 	var error := ResourceSaver.save(index, output.path_join("visual_index.tres"))
 	TRANSFORM._layouts.clear()
 	return _build_meteor_pieces(output) if error == OK else error
+
+## 制作工程のCPUベイカーが保存した固定素材を、正規ビルドでも検査する。
+## サイズ・塗装の値は実行時の本体と共有し、透過形状の入力だけを固定する。
+static func _validate_landmark_masks() -> Error:
+	var masks := ResourceLoader.load("res://assets/effects/landmark/masks.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as Resource
+	if masks == null or masks.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for path: String in masks.get_meta("inputs", {}):
+		if FileAccess.get_sha256(path) != masks.get_meta("inputs")[path]:
+			push_error("目印マスクの入力が変わりました。tools/art/bake_landmark_masks.pyでベイク: " + path)
+			return ERR_INVALID_DATA
+	var candidates: Array = masks.get_meta("candidates", [])
+	for entry: Dictionary in masks.get_meta("masks", {}).values():
+		if entry.texture == null or FileAccess.get_sha256(entry.file) != entry.mask_sha256:
+			push_error("目印マスクの生成物が欠落・不一致: " + str(entry.file))
+			return ERR_INVALID_DATA
+	var current: Array[String] = []
+	for file in DirAccess.get_files_at("res://data/enemies"):
+		if not file.ends_with(".tres"): continue
+		var definition := load("res://data/enemies/" + file) as EnemyDef
+		if definition.rank >= 2 and definition.rank <= 5: current.append(file.get_basename())
+		var expected: String = masks.get_meta("fallback_shapes", {}).get(file.get_basename(), "")
+		if not expected.is_empty() and String(definition.shape) != expected: return ERR_INVALID_DATA
+	current.sort()
+	if current != candidates:
+		push_error("目印候補が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
+		return ERR_INVALID_DATA
+	var aliases := {}
+	for file in DirAccess.get_files_at("res://data/stages"):
+		if not file.begins_with("stage_") or not file.ends_with(".tres"): continue
+		var stage := load("res://data/stages/" + file) as StageDef
+		for id: String in stage.enemy_looks:
+			if id in candidates: aliases[id + ":" + file.get_basename()] = stage.enemy_looks[id]
+	if aliases != masks.get_meta("stage_aliases", {}):
+		push_error("目印候補の外観が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
+		return ERR_INVALID_DATA
+	return OK
 
 ## 隣の破片が切り出し矩形へ入り込む部分を、制作時に除く。
 static func _build_meteor_pieces(output: String) -> Error:

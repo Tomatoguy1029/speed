@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/pump.png-18cf9256429ada8b866da2849860c391.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/pump.png"
+dest_files=["res://.godot/imported/pump.png-18cf9256429ada8b866da2849860c391.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0
