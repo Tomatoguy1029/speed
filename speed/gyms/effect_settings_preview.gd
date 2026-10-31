@@ -92,13 +92,6 @@ const DIRECT_FIELDS := {
 		["雷のドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["雷の表示秒数", "visible_seconds", 0.05, 1.0, 0.01, 0.22],
 	],
-	"weapon/sonic": [
-		["航跡の長さ", "wake_length", 20.0, 300.0, 1.0, 150.0],
-		["航跡の幅", "wake_width", 2.0, 40.0, 0.5, 18.0],
-		["航跡の余韻", "wake_fade_seconds", 0.05, 0.5, 0.01, 0.20],
-		["航跡の透明度", "wake_opacity", 0.0, 1.0, 0.01, 0.55],
-		["航跡シェーダの筋", "wake_filaments", 0.0, 2.0, 0.05, 0.7],
-	],
 	"boss/body/hydra": [
 		["予告線の太さ", "line_width", 1.0, 12.0, 0.25, 3.0],
 		["閃光の秒数", "flash_duration", 0.05, 2.0, 0.05, 0.25],
@@ -149,7 +142,6 @@ const DIRECT_COLOR_FIELDS := {
 		["目盛り：不足", "unavailable_tick_color", BOOST_GAUGE.DEFAULT_COLORS.unavailable_tick_color],
 		["満タン時のフラッシュ", "full_flash_color", BOOST_GAUGE.DEFAULT_COLORS.full_flash_color],
 	],
-	"weapon/sonic": [["航跡シェーダの色", "wake_color", Color(0.25, 0.65, 1.0)]],
 	"boss/body/hydra": [["予告色", "warning_color", Color("#ffd16c")], ["攻撃色", "attack_color", Color("#ff765c")]],
 	"boss/body/draco": [["胸の光色", "core_glow_color", Color(0.38, 0.59, 1.0)], ["裂け目の色", "rift_color", Color("#5a4d91")]],
 	"boss/body/centaurus": [["帆の星色", "sail_star_color", Color("#fff6c8")], ["開放の輪色", "open_color", Color("#9fe8ff")]],
@@ -164,9 +156,6 @@ const FIELD_LABELS := {
 	"beam_core_ratio": "ビーム芯の割合", "ring_width_scale": "輪の太さ（倍）",
 	"visible_time_scale": "輪の残光（倍）", "visible_seconds": "稲妻の表示（秒）",
 	"distortion_strength": "空間のゆがみ（倍）", "body_opacity": "分身の不透明度",
-	"wake_length": "航跡の長さ（px）", "wake_width": "航跡の半幅（px）",
-	"wake_fade_seconds": "航跡の消失（秒）", "wake_opacity": "航跡の不透明度",
-	"wake_filaments": "航跡の筋の密度", "wake_color": "航跡の色",
 	"pixel_size": "描画ドット幅（px）", "line_width": "予告線の幅（px）",
 	"flash_duration": "閃光の時間（秒）", "burst_pixel_scale": "爆発ドット幅（倍）",
 	"core_glow_radius": "胸の光の半径（px）", "core_glow_opacity": "胸の光の不透明度",
@@ -222,14 +211,8 @@ const FIELD_HELP := {
 	"visible_seconds": "接触雷が画面に残る秒数。判定時間は変えない。",
 	"distortion_strength": "シェーダで背景をずらす量の倍率。",
 	"body_opacity": "残像として描く機体の不透明度。0で透明、1で不透明。",
-	"wake_length": "機体の後ろへ残す航跡の最大長。画面上のピクセル数。",
-	"wake_width": "航跡の中心から片側の幅。画面上のピクセル数。",
-	"wake_fade_seconds": "航跡が消えるまでの秒数。",
-	"wake_opacity": "航跡の濃さ。0で透明、1で不透明。",
 	"core_glow_radius": "りゅう座の胸の光が広がる半径。画面上のピクセル数。",
 	"core_glow_opacity": "りゅう座の胸の光の透明度。",
-	"wake_color": "機体後方へ残る航跡の色。",
-	"wake_filaments": "航跡シェーダの細い筋の寄与。大きいほど筋が目立つ。",
 	"pixel_size": "攻撃描画の1ドットの幅。画面上のピクセル数。",
 	"line_width": "うみへび座の攻撃前に出る予告線の表示幅。",
 	"flash_duration": "うみへび座の攻撃時の閃光が残る秒数。",
@@ -875,8 +858,8 @@ func _component_entries(key: String) -> Array[Dictionary]:
 func _field_group(name: String) -> String:
 	if name.begins_with(ShaderTuning.PREFIX): return "シェーダ"
 	if name.ends_with("color") or name.ends_with("tint") or name == "effect_tint": return "色"
-	if name in ["duration_scale", "visible_time_scale", "visible_seconds", "flash_duration", "wake_fade_seconds"]: return "動き・時間"
-	if name in ["particle_count_scale", "wake_filaments"]: return "粒子"
+	if name in ["duration_scale", "visible_time_scale", "visible_seconds", "flash_duration"]: return "動き・時間"
+	if name == "particle_count_scale": return "粒子"
 	return "形・大きさ"
 
 func _field_label(name: String, fallback: String) -> String:
