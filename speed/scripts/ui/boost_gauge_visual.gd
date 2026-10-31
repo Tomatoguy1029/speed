@@ -1,6 +1,5 @@
 ## カーソルのブーストゲージ。本番HUDとビジュアル編集が同じ色・形を使う。
 extends RefCounted
-const SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const KEY := "hud/boost_gauge"
 const DEFAULT_COLORS := {
 	"normal_color": Color("#5dffa0"),
@@ -56,15 +55,24 @@ static func edited_values(values: Dictionary, key: String, value: Variant) -> Di
 			result[inner_key] = minf(result[inner_key], result[outer_key] - MIN_BAND_WIDTH)
 	return result
 
+## 制作画面だけで現在の調整値を解決する。本番は保存済みのStyleを共有する。
+static func style_for(values: Dictionary, radius := 14.0, gap := 7.0) -> BoostGaugeStyle:
+	var style := BoostGaugeStyle.new()
+	for key in DEFAULT_COLORS: style.set(key, values.get(key, DEFAULT_COLORS[key]))
+	style.bounds = radii_for(values, radius, gap)
+	style.tick_width = minf(maxf(0.5, _number(values, "tick_width", DEFAULT_WIDTHS.tick_width)), (style.bounds.y - style.bounds.x) * 0.5)
+	var half_stroke := style.tick_width * 0.5
+	style.tick_start = style.bounds.x + half_stroke
+	style.tick_end = maxf(style.tick_start, sqrt(maxf(0.0, style.bounds.y * style.bounds.y - half_stroke * half_stroke)) - half_stroke)
+	return style
+
 static func draw(c: CanvasItem, at: Vector2, amount: float, capacity: float, min_charge: float,
-		drawing: bool, usable: bool, flash: float, pulse: float, radius: float, gap: float) -> void:
-	var colors := SETTINGS.values_for(KEY)
-	var col: Color = colors.get("unavailable_color", DEFAULT_COLORS.unavailable_color) if amount < 0.25 else colors.get("normal_color", DEFAULT_COLORS.normal_color)
-	if drawing: col = colors.get("path_color", DEFAULT_COLORS.path_color)
-	var bounds := radii_for(colors, radius, gap)
-	var first_width := bounds.y - bounds.x
+		drawing: bool, usable: bool, flash: float, pulse: float, style: BoostGaugeStyle, gap: float) -> void:
+	var col: Color = style.unavailable_color if amount < 0.25 else style.normal_color
+	if drawing: col = style.path_color
+	var bounds := style.bounds
 	if flash > 0.0:
-		col = col.lerp(colors.get("full_flash_color", DEFAULT_COLORS.full_flash_color), flash)
+		col = col.lerp(style.full_flash_color, flash)
 	var laps := ceili(capacity - 1e-6)
 	if laps <= 0: return
 	for lap in laps:
@@ -74,20 +82,15 @@ static func draw(c: CanvasItem, at: Vector2, amount: float, capacity: float, min
 		var lap_cap := minf(1.0, capacity - lap)
 		var fill := clampf(amount - lap, 0.0, lap_cap)
 		var width := outside - inside
-		c.draw_arc(at, r, -PI / 2.0, -PI / 2.0 + TAU * lap_cap, 32, colors.get("background_color", DEFAULT_COLORS.background_color), width)
+		c.draw_arc(at, r, -PI / 2.0, -PI / 2.0 + TAU * lap_cap, 32, style.background_color, width)
 		if fill > 0.0: c.draw_arc(at, r, -PI / 2.0, -PI / 2.0 + TAU * fill, 32, col, minf(r * 2.0, width + 2.0 * flash))
 	if not drawing:
 		var tick := Vector2.from_angle(-PI / 2.0 + TAU * min_charge)
-		var tick_color: Color = colors.get("ready_tick_color", DEFAULT_COLORS.ready_tick_color) if usable else colors.get("unavailable_tick_color", DEFAULT_COLORS.unavailable_tick_color)
-		var tick_width := minf(maxf(0.5, _number(colors, "tick_width", DEFAULT_WIDTHS.tick_width)), first_width * 0.5)
-		var half_stroke := tick_width * 0.5
-		var outside := bounds.y
-		# 線の角と端の半幅まで第一周の外縁へ収める。第二周には渡さない。
-		var end := sqrt(maxf(0.0, outside * outside - half_stroke * half_stroke)) - half_stroke
-		var start := bounds.x + half_stroke
-		c.draw_line(at + tick * start, at + tick * maxf(start, end), tick_color, tick_width)
+		var tick_color: Color = style.ready_tick_color if usable else style.unavailable_tick_color
+		# 線の角と端まで第一周の外縁へ収めた制作済みの位置を使う。
+		c.draw_line(at + tick * style.tick_start, at + tick * style.tick_end, tick_color, style.tick_width)
 	if pulse >= 0.0:
-		var pulse_color: Color = colors.get("ready_pulse_color", DEFAULT_COLORS.ready_pulse_color)
+		var pulse_color: Color = style.ready_pulse_color
 		pulse_color.a *= 1.0 - pulse
 		var outermost := (bounds.x + bounds.y) * 0.5 if laps == 1 else (bounds.z + bounds.w) * 0.5 + gap * (laps - 2)
 		c.draw_arc(at, outermost + 12.0 * pulse, 0, TAU, 32, pulse_color, 3.0)

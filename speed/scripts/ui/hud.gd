@@ -8,8 +8,8 @@ extends Control
 const RING_PULSE_TIME := 0.35
 ## リングが1周溜まりきったときに白く光る時間（実秒）
 const RING_FLASH_TIME := 0.3
-## 内側のリングの半径と、外側のリングまでの間隔
-const RING_RADIUS := 14.0
+## 制作済みの色・円帯・目盛りと、3周目以降の間隔
+const BOOST_STYLE := preload("res://data/visuals/boost_gauge_runtime.tres")
 const RING_GAP := 7.0
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（素材のpx）
@@ -1108,7 +1108,7 @@ func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 
 ## カーソル付近のリング：描画前は溜まっている量、描画中は残りの長さ（仕様書 6.2）。
 ## 内側の1周が容量1、大容量チャージで増えた容量は外側の弧。内側から順に埋まる。
-## 描けるまでは同じ色を暗くし、描ける量に目盛りを置く。描けるようになった瞬間に広がる輪、1周溜まりきった瞬間に白い光を出す。
+## 描けるまでは専用の不足色を使い、描ける量に目盛りを置く。描けるようになった瞬間に広がる輪、1周溜まりきった瞬間に白い光を出す。
 func _draw_gauge_ring() -> void:
 	var s := run.state
 	var c := get_viewport().get_mouse_position() + Vector2(26, 26)
@@ -1128,7 +1128,7 @@ func _draw_gauge_ring() -> void:
 		amount = s.draw_gauge * (1.0 - s.draw_length / maxf(1.0, s.draw_limit))
 	var flash := _ring_flash_t / _ring_flash_max if _ring_flash_t > 0.0 else 0.0
 	var pulse := 1.0 - _ring_pulse_t / RING_PULSE_TIME if _ring_pulse_t > 0.0 else -1.0
-	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, s.drawing, usable, flash, pulse, RING_RADIUS, RING_GAP)
+	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, s.drawing, usable, flash, pulse, BOOST_STYLE, RING_GAP)
 
 ## 内側・外側のどれかのリングが、before から after の間に溜まりきったか
 func _lap_filled(before: float, after: float, capacity: float) -> bool:
