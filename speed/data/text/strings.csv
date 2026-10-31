@@ -278,7 +278,7 @@ trait.T35.desc,すべての射撃の弾数が増える。,Increases the shot cou
 trait.T36.name,フルバースト,Full Burst
 trait.T36.desc,ゲージが満タンの間、射撃の連射が上がる。,Increases shooting fire rate while the gauge is full.
 trait.T37.name,デュプリケーター,Duplicator
-trait.T37.desc,弾や破片が最初に当たると、確率で2つに分かれる。,Shots and debris may split into two on their first impact.
+trait.T37.desc,弾や破片が出ると、確率で複製が2つ増える。,Shots and debris may gain two extra copies when created.
 ,■ 伝説のモジュール（legendary.<ID>）,
 legendary.legendary_compass.name,羅針盤のモジュール,Compass Module
 legendary.legendary_compass.desc,らしんばん座を解放したときに残された、錆びついたモジュール。,A rusted module left behind when Pyxis was freed.

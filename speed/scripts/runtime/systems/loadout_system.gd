@@ -589,13 +589,13 @@ func damage_multiplier() -> float:
 	var rampage = trait_behaviors.get(&"T33")
 	return rampage.multiplier() if rampage != null else 1.0
 
-## 弾・星屑・槍は同じ確率と同時数の上限を共有する。
-func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
+## 元の弾・星屑・槍の生成時に1回抽選する。同じ確率と同時数の上限を共有する。
+func split_vectors(velocity: Vector2) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	var n := _n(&"T37")
 	if n == 0: return out
 	var d: TraitDef = trait_behaviors[&"T37"].def if trait_behaviors.has(&"T37") else ContentManager.definition(&"traits", &"T37") as TraitDef
-	if generation >= int(d.params.generations) or projectiles.flying_count() + 2 > int(d.params.max): return out
+	if projectiles.flying_count() + 2 > int(d.params.max): return out
 	if state.rng.randf() >= float(d.params.chance_by_level[n - 1]): return out
 	for side in [-1.0, 1.0]:
 		var angle: float = deg_to_rad(state.rng.randf_range(float(d.params.angle_min), float(d.params.angle_max))) * side

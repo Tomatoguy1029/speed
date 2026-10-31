@@ -44,27 +44,21 @@ func _test_duplication() -> void:
 	var behavior = run.loadout.trait_behaviors[&"T37"]
 	behavior.def = behavior.def.duplicate(true)
 	behavior.def.params.chance_by_level = [0.0,0.0,0.0,0.0,0.0]
-	_check(run.loadout.split_vectors(Vector2.RIGHT,0).is_empty(),"分裂は装備した定義を使い、局所的な試遊の設定も反映する")
+	_check(run.loadout.split_vectors(Vector2.RIGHT).is_empty(),"複製は装備した定義を使い、局所的な試遊の設定も反映する")
 	behavior.def.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
 	var ps := run.projectiles
-	ps.fire_shot(Vector2.ZERO, 0.0, 10.0)
-	var original := 0
-	var source_hit := {123: true}
-	ps.friend_hit[original] = source_hit
 	var before := ps.friend_count()
-	for attempt in 100:
-		if ps.duplicate_friend(original, Vector2.ONE): break
-	_check(ps.friend_count() == before + 2, "分裂で2発増える")
+	ps.fire_hull(Vector2.ZERO, Vector2.RIGHT, 1.0, 10.0, 1.0, 0.0, &"drifter", 0.0, 123)
+	_check(ps.friend_count() == before + 3, "生成時に元1個と複製2個を加え、複製からの再抽選を止める")
 	for i in range(1, 3):
-		_check(ps.friend_generation[i] == 1 and is_equal_approx(ps.friend_dmg[i], 8.0), "Lv5の子は8割・次の世代")
-		_check(ps.friend_hit[i].has(123), "同じ敵へ分裂直後に再命中しない")
+		_check(is_equal_approx(ps.friend_dmg[i], 8.0), "Lv5の複製は8割の威力")
+		_check(ps.friend_hit[i].has(123), "複製も発射元の敵を命中対象から除く")
 	ps.friend_hit[1][456] = true
 	_check(not ps.friend_hit[2].has(456), "左右の命中履歴を独立させる")
-	ps.friend_generation[1] = 6
-	_check(not ps.duplicate_friend(1, Vector2.ONE), "6世代で止まる")
 	while ps.friend_count() < 219:
 		ps.fire_shot(Vector2.ZERO, 0.0, 1.0)
-	_check(not ps.duplicate_friend(0, Vector2.ZERO), "220を超える分裂を止める")
+	ps.fire_shot(Vector2.ZERO, 0.0, 1.0)
+	_check(ps.friend_count() == 220, "元の弾の生成後に220を超える複製を止める")
 	ps.friend_slots.clear()
 	run.loadout.reset_loadout()
 

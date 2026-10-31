@@ -48,9 +48,6 @@ class FriendSlots extends RowSlots:
 ## 1 なら使用中の行
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
-var friend_generation := PackedByteArray()
-## 最初の対象命中で分裂の抽選機会を消費したら1。子は新しい機会を持つ。
-var friend_split_used := PackedByteArray()
 ## 星砕きの再発動世代。通常攻撃は0、初回に生まれた破片は1。弾の分裂とは別に引き継ぐ。
 var friend_shatter_depth := PackedInt32Array()
 var friend_age := PackedFloat32Array()
@@ -185,6 +182,10 @@ var _attached_attacks: Dictionary = {}
 
 ## 使った攻撃の生成器だけを保持する。外から登録した種類も同じ入口で使える。
 var _attack_kinds: Dictionary = {}
+## 元の味方攻撃だけを生成後に複製する。敵弾・敵の攻撃の形は対象外。
+const DUPLICABLE_ATTACK_KINDS := [&"friend_shot", &"friend_hull", &"scatter_hull", &"burst_debris", &"fling_corpse", &"saw"]
+## 生成器が属性を設定し終えてから抽選する。入れ子の生成は別の組で扱う。
+var _friend_birth_batches: Array[Array] = []
 
 func register_attack(kind: StringName, attack: AttackKind) -> void:
 	_attack_kinds[kind] = attack
@@ -196,7 +197,13 @@ func emit_attack(kind: StringName, args: Array, visual: PackedScene = null) -> V
 		register_attack(kind, load("res://scripts/attacks/%s.gd" % kind).new())
 	var previous := visual_context
 	if visual != null: visual_context = visual
+	var duplicate_births := kind in DUPLICABLE_ATTACK_KINDS
+	if duplicate_births: _friend_birth_batches.append([])
 	var result: Variant = _attack_kinds[kind].emit(self, args)
+	if duplicate_births:
+		var originals: Array = _friend_birth_batches.pop_back()
+		for row: int in originals:
+			duplicate_friend_on_spawn(row)
 	visual_context = previous
 	return result
 
@@ -295,13 +302,11 @@ func fling_corpse(i: int, vel: Vector2, dmg: float, radius_mult := 1.0, knock_mu
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。
 func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2, r: float, dmg: float,
 		life: float, pierce: bool, pierce_left: int, color: Color, no_crit: bool, knock: float,
-		angle: float, spin: float, hit_id: int, type := &"", visual := &"", weapon_id := &"") -> int:
+		angle: float, spin: float, hit_id: int, type := &"", visual := &"", weapon_id := &"", duplicate := false) -> int:
 	var i := friend_slots.take()
 	friend_kind[i] = kind
 	if kind == FriendKind.DEBRIS:
 		friend_slots.debris_live += 1
-	friend_generation[i] = 0
-	friend_split_used[i] = 0
 	friend_shatter_depth[i] = 0
 	friend_age[i] = 0.0
 	friend_cause[i] = cause
@@ -323,6 +328,8 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 	friend_trail[i] = PackedVector2Array()
 	friend_type[i] = type
 	friend_on_hit[i] = Callable()
+	if not duplicate and not _friend_birth_batches.is_empty():
+		_friend_birth_batches.back().append(i)
 	return i
 
 ## 使用中の味方の弾・破片の数。
@@ -395,7 +402,6 @@ func _update_friendly(dt: float) -> void:
 			else:
 				combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "weapon_id": friend_weapon_id[i], "no_crit": friend_no_crit[i] != 0,
 					"shatter_depth": friend_shatter_depth[i], "dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
-			duplicate_friend(i, impact)
 			state.emit(&"shot_hit", {"pos": impact, "dir": vel.normalized(), "visual_key": String(friend_visual[i]), "kind": friend_kind[i]})
 			if state.phase != RunState.Phase.PLAY:
 				# 残りの行は進めずにそのまま残す
@@ -906,28 +912,27 @@ func flying_count() -> int:
 	var lances = _attached_attacks.get(&"light_lances")
 	return friend_count() + (lances.items.size() if lances != null else 0)
 
-func duplicate_friend(source: int, impact: Vector2) -> bool:
-	if friend_split_used[source] != 0: return false
-	# 失敗や生成上限でも機会を消費し、貫通後の命中では再抽選しない。
-	friend_split_used[source] = 1
-	var vectors := build.split_vectors(friend_vel[source], friend_generation[source])
+## 生成を完了した元の攻撃からだけ呼ぶ。複製は生成器へ戻さず、そのまま加える。
+func duplicate_friend_on_spawn(source: int) -> bool:
+	if friend_kind[source] == FriendKind.DEBRIS and debris_count() >= 200: return false
+	var vectors := build.split_vectors(friend_vel[source])
 	if vectors.is_empty(): return false
+	var origin := friend_pos[source]
 	# このループでは同じ種類の子を追加するだけなので、上限の残り枠を1回で数える。
 	var remaining: int = 200 - debris_count() if friend_kind[source] == FriendKind.DEBRIS else vectors.size()
 	for v in vectors:
 		# 星屑は200個まで。ほかの飛ぶ攻撃と分裂全体の上限も共有する。
 		if remaining <= 0: break
-		var child := _add_friend(friend_kind[source], friend_cause[source], impact, v, friend_r[source],
+		var child := _add_friend(friend_kind[source], friend_cause[source], origin, v, friend_r[source],
 			friend_dmg[source] * build.split_damage(), friend_life[source], friend_pierce[source] != 0,
 			friend_pierce_left[source], friend_color[source], friend_no_crit[source] != 0, friend_knock[source],
-			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source], friend_weapon_id[source])
+			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source], friend_weapon_id[source], true)
 		friend_hit[child] = friend_hit[source].duplicate()
-		friend_generation[child] = friend_generation[source] + 1
 		friend_shatter_depth[child] = friend_shatter_depth[source]
 		friend_age[child] = friend_age[source]
 		friend_on_hit[child] = friend_on_hit[source]
 		remaining -= 1
-	state.emit(&"duplicate", {"pos": impact, "directions": vectors})
+	state.emit(&"duplicate", {"pos": origin, "directions": vectors})
 	return true
 
 func debris_count() -> int:
