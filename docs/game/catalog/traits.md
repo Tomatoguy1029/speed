@@ -23,7 +23,7 @@
 | No.15 | フルバースト | ゲージが満タンの間、射撃の連射が上がる。 | 能力値を伸ばす | `data/traits/T36_fullBurst.tres`、`scripts/traits/fullBurst.gd` | 英語・素材・見た目は確認待ち |
 | No.16 | 攻撃力 | すべての攻撃の威力が上がる。 | 能力値を伸ばす | `data/traits/T11_attack.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.17 | 広域回収 | アイテムを拾える範囲が広がる。 | 能力値を伸ばす | `data/traits/T12_pickup.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
-| No.18 | デュプリケーター | 弾や破片が当たると、確率で2つに分かれる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T37_duplicator.tres`、`scripts/traits/duplicator.gd` | 英語・素材・見た目は確認待ち |
+| No.18 | デュプリケーター | 弾や破片が当たると、確率で2つに分かれる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T37_duplicator.tres`、`scripts/traits/duplicator.gd`、`scripts/runtime/systems/projectile_system.gd`、`scripts/render/equipment/duplicator.gd` | 英語・素材・見た目は確認待ち |
 
 ### 発動条件と倍率
 

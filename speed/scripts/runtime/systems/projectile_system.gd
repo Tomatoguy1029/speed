@@ -28,6 +28,23 @@ var build: LoadoutSystem:
 ## 味方の弾と破片。項目ごとの列で持つ。1行が1つで、行は前へ詰めない（設計書 6）。
 ## HULL は質量牽引砲（W21）が撃ち出す船体
 enum FriendKind { SHOT, DEBRIS, HULL }
+
+## 直接の release/clear（開発用の全消去を含む）でも星屑数を更新する。
+class FriendSlots extends RowSlots:
+	var debris_live := 0
+
+	func _init(projectiles: ProjectileSystem) -> void:
+		super(projectiles, "friend_")
+
+	func release(i: int) -> void:
+		if owner.get(&"friend_kind")[i] == FriendKind.DEBRIS:
+			debris_live -= 1
+		super(i)
+
+	func clear() -> void:
+		super()
+		debris_live = 0
+
 ## 1 なら使用中の行
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
@@ -61,7 +78,7 @@ var friend_type: Array[StringName] = []
 ## 敵に当たったときに、ダメージの代わりに呼ぶ処理（敵の行・ダメージ・当たった位置。撃った武器が決める。なければ通常のダメージ）
 var friend_on_hit: Array[Callable] = []
 var _friend_shapes: Dictionary = {}
-var friend_slots: RowSlots
+var friend_slots: FriendSlots
 var _buf := PackedInt32Array()
 var _hits: Array = []
 
@@ -204,7 +221,7 @@ func setup(context: RunContext) -> void:
 	super(context)
 	_hostile_shapes.resize(HostileKind.size())
 	_hazard_shapes.resize(HazardKind.size())
-	friend_slots = RowSlots.new(self, "friend_")
+	friend_slots = FriendSlots.new(self)
 	hostile_slots = RowSlots.new(self, "hostile_")
 	# 追加の関数が、使い回す行の全部の列を書き直すか（デバッグ版だけ）
 	assert(Columns.check_add(self, friend_slots.cols,
@@ -279,6 +296,8 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 		angle: float, spin: float, hit_id: int, type := &"", visual := &"", weapon_id := &"") -> int:
 	var i := friend_slots.take()
 	friend_kind[i] = kind
+	if kind == FriendKind.DEBRIS:
+		friend_slots.debris_live += 1
 	friend_generation[i] = 0
 	friend_shatter_depth[i] = 0
 	friend_age[i] = 0.0
@@ -894,7 +913,4 @@ func duplicate_friend(source: int, impact: Vector2) -> bool:
 	return true
 
 func debris_count() -> int:
-	var count := 0
-	for i in friend_alive.size():
-		if friend_alive[i] != 0 and friend_kind[i] == FriendKind.DEBRIS: count += 1
-	return count
+	return friend_slots.debris_live if friend_slots != null else 0

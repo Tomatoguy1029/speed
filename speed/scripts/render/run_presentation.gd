@@ -395,7 +395,10 @@ func _present(delta: float) -> void:
 	_ship_visual.update(dt)
 	for key in _equipment_visuals.keys():
 		var visual: WeaponVisual = _equipment_visuals[key]
+		t0 = Time.get_ticks_usec() if perf.active else 0
 		visual.tick(dt)
+		if perf.active:
+			perf.since(StringName("process.equipment." + String(visual.behavior.def.id)), t0)
 		if visual.finished():
 			visual.dispose()
 			_equipment_visuals.erase(key)
