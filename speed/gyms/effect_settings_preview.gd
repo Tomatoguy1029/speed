@@ -822,7 +822,7 @@ func _component_entries(key: String) -> Array[Dictionary]:
 		var scene: PackedScene = _move_targets[key].projectile
 		var visual := scene.instantiate() as AttackVisual
 		if visual != null:
-			var legacy := _working.values_for(visual.visual_profile_fallback if not visual.visual_profile_fallback.is_empty() else visual.scene_file_path)
+			var legacy: Dictionary = _working.values_for(visual.visual_profile_fallback if not visual.visual_profile_fallback.is_empty() else visual.scene_file_path)
 			for info in visual.get_property_list():
 				var name: String = info.name
 				if name not in ["effect_tint", "flight_scale", "shot_length_scale", "shot_width_scale", "core_width", "arrow_color", "cosmic_color_a", "cosmic_color_b", "cosmic_speed", "cosmic_star_count"]: continue
