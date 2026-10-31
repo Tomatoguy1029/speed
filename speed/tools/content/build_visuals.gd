@@ -6,6 +6,8 @@ const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 static func build(output: String) -> Error:
 	var mask_error := _validate_landmark_masks()
 	if mask_error != OK: return mask_error
+	var biter_error := _validate_biter_parts()
+	if biter_error != OK: return biter_error
 	TRANSFORM._layouts.clear()
 	var palettes: Array[Dictionary] = [{}]
 	for file in DirAccess.get_files_at("res://data/enemies"):
@@ -68,6 +70,16 @@ static func _validate_landmark_masks() -> Error:
 	if aliases != masks.get_meta("stage_aliases", {}):
 		push_error("目印候補の外観が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
 		return ERR_INVALID_DATA
+	return OK
+
+static func _validate_biter_parts() -> Error:
+	var parts := ResourceLoader.load("res://data/visuals/biter_parts.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as Resource
+	if parts == null or parts.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for group in ["inputs", "outputs"]:
+		for path: String in parts.get_meta(group, {}):
+			if FileAccess.get_sha256(path) != parts.get_meta(group)[path]:
+				push_error("噛みつく雑魚の分割素材をtools/art/bake_biter_parts.pyで更新してください: " + path)
+				return ERR_INVALID_DATA
 	return OK
 
 ## 隣の破片が切り出し矩形へ入り込む部分を、制作時に除く。

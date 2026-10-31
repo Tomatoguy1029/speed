@@ -49,7 +49,7 @@
 
 | type ID | 名称 | 区分 | 星 | 採用状態 | 実装状況 | 行動・攻撃 | 倒し方 | 特徴・備考 | 登場ステージ | データ・コード |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `biter` | 噛みつく雑魚 | 雑魚 | 1 | 採用 | 実装済み。専用のBase・Armor・平面状の法線画像を適用済み | 追跡し、接近すると一瞬光ってから短く噛みつく | 群れの中を駆け抜けながら倒す | 外観はステージ別（`enemy_looks`）。ステージ4はヘビ。ステージ1の噛みつきダメージはステージ内の値で上書きする | 1・4・5 | `data/enemies/biter.tres`、`data/stages/stage_1.tres` の `enemy_tuning`（`params.bullet_dmg`）、`scripts/enemies/biter.gd` |
+| `biter` | 噛みつく雑魚 | 雑魚 | 1 | 採用 | 実装済み。事前分割した本体・顎のBase・Armor・Normalを使い、共通塗装と部位回転に合う照明を適用 | 追跡し、接近すると顎を開いて構え、短く噛みつく。閉鎖時の火花は専用描画を使う。攻撃の範囲・時機は共通の噛みつき判定に従う | 群れの中を駆け抜けながら倒す | 外観はステージ別（`enemy_looks`）。ステージ4のヘビは元の船体と専用火花を使う。ステージ1の噛みつきダメージはステージ内の値で上書きする | 1・4・5 | `data/enemies/biter.tres`、`data/stages/stage_1.tres` の `enemy_tuning`（`params.bullet_dmg`）、`scripts/enemies/biter.gd`、`scripts/render/enemies/biter.gd`、`data/visuals/biter_parts.tres` |
 | 未定 | 突進する雑魚 | 雑魚 | 1 | 採用 | 未実装 | 自機へ寄り、一定の距離で止まって光り、光り終わると決めた向きへ短く突進する。詳細は[ステージ1](../stages/stage-1.md#突進する雑魚) | 光っている間に貫き、突進させずに倒す | — | 1 | — |
 | `defender` | 守る雑魚 | 雑魚 | 1 | 採用 | 実装済み。数値は試遊用の仮値。専用のBase・Armor・平面状の法線画像を適用済み | 近くに強敵かボスがいる間は、その相手と自機を結ぶ線の上に仲間と並んで道をふさぐ。いない間は噛みつく雑魚と同じ。詳細は[ステージ2](../stages/stage-2.md#守る雑魚) | 並んだ列ごと一筆で貫き、その先の強敵・ボスへ届く | — | 2 | `data/enemies/defender.tres`、行動 `defender`。並ぶ数は近くに配置した個体数、距離・間隔・減速は `params.guard_*` |
 | `hound` | 猟犬 | 雑魚 | 1 | 採用 | 実装済み。数値は試遊用の仮値。専用のBase・Armor・法線画像を適用済み | 近くの仲間と向きと速さをそろえ、ひとかたまりで追ってくる。おおいぬ座に率いられている間は、[おおいぬ座](../bosses/canis-major.md#3-群れの統率)の隊形に並ぶ。攻撃は噛みつく雑魚と同じ。詳細は[ステージ3](../stages/stage-3.md#猟犬) | まとまって追ってくる群れを、正面から一筆で丸ごと貫く | — | 3 | `data/enemies/hound.tres`、行動 `hound`。群れの数・間隔・同期の強さは `params.pack_*`。ステージ3の出現目標数は `data/stages/stage_3.tres` の `zako_curves` で設定し、各山で急増と減少を繰り返す |
@@ -110,6 +110,8 @@
 通常敵とパーツの種類ごとの外観調整・保存は、[実験場の仕様](../../spec.md#201-敵ルート実験場)に従う。見た目・当たり判定を共に変えるサイズ倍率と、当たり判定のみの倍率を種類ごとに保存する。調整値と装甲片ごとの塗装色の正は、各敵データの `visual_settings`・`armor_colors` とする。
 
 ステージ1の `biter`・`bomber`・`splitter`・`splitling`・`pulser`・`pump`・`shield`・`marlin`・`triangle_star` は、共通定義の照明・サイズ倍率と装甲片ごとの塗装を使う。照明・サイズ倍率は同じ種類が登場する全ステージへ適用し、塗装は保存した画像と透過マスクが一致する外観へ適用する。
+
+- `biter` の専用外観は `assets/pixel/biter/parts/` の事前分割素材を使う。塗装は分割前の確定画像を共有し、部位ごとのアルファと法線を重ねる。素材の更新は `python3 speed/tools/art/bake_biter_parts.py`。顎の表現は[敵のアート](../art-style.md#42-敵)に従う。
 
 - `ruler`（じょうぎ座）は `assets/pixel/ruler/` の上下の専用画像を重ねて出現し、分離後は各個体が片側の画像を使う。装甲の塗装は上下を選んで編集する。
 

@@ -8,7 +8,7 @@ func setup(system: EnemySystem, behavior_name: StringName, idx: int) -> void:
 func admit_duration(i: int) -> float:
 	return float(table.def[i].params.bite_telegraph) + 0.1
 
-## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると一瞬光って構え（WINDUP）、
+## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると構え（WINDUP）、
 ## その場で小さく噛みつく（体の前の小さな範囲が一瞬当たる）。噛みついたあとは少し休む（RECOVER）。弾は出さない。
 ## 数の多い雑魚なので、関数をまとめて呼ばずにここで計算する。定義の数値は、同じ定義が続くあいだは読み直さない。
 func tick_rows(rows: PackedInt32Array, dt: float) -> void:
@@ -101,7 +101,10 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 				charge[i] = 1.0 - maxf(0.0, timer[i]) / telegraph
 				if timer[i] <= 0.0:
 					var at := from + Vector2.from_angle(facing[i]) * (r[i] + half_reach)
-					projectiles.fire_zone(at, bite_radius, 0.0, bite_dmg, ProjectileSystem.HazardStyle.BITE, t.color[i].lightened(0.4))
+					var hit := projectiles.fire_zone(at, bite_radius, 0.0, bite_dmg, ProjectileSystem.HazardStyle.BITE, t.color[i].lightened(0.4))
+					if t.type[i] == &"biter" and hit >= 0:
+						# 判定は共通のまま、円の表示だけを専用の顎と火花へ渡す。
+						projectiles.hazard_visual[hit] = &"res://scenes/attacks/zone_biter.tscn"
 					charge[i] = 0.0
 					mode[i] = EnemyTable.Mode.RECOVER
 					timer[i] = rest
@@ -122,7 +125,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 						if not managed or _lab_admit(i, bdt):
 							mode[i] = EnemyTable.Mode.WINDUP
 							timer[i] = telegraph
-							flash[i] = 0.1
+							if t.type[i] != &"biter": flash[i] = 0.1
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt

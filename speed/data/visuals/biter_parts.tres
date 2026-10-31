@@ -1,0 +1,39 @@
+[gd_resource type="Resource" load_steps=10 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/body/base.png" id="1"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/body/armor.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/body/normal.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/jaw_left/base.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/jaw_left/armor.png" id="5"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/jaw_left/normal.png" id="6"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/jaw_right/base.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/jaw_right/armor.png" id="8"]
+[ext_resource type="Texture2D" path="res://assets/pixel/biter/parts/jaw_right/normal.png" id="9"]
+
+[resource]
+metadata/bake_version = 1
+metadata/source_size = Vector2(20, 34)
+metadata/source_look = "res://data/visuals/looks/biter.tres"
+metadata/inputs = {
+"res://assets/pixel/biter/armor.png": "0aba3db4248a10d90fa0ea8a4b735da898095b2a3dcf3dd7d11659e79608d700",
+"res://assets/pixel/biter/base.png": "bc76dcc343d4767c2f12558a23dbf81fa678cf9d281f0b28039a8cc121e40f4a",
+"res://assets/pixel/biter/normal.png": "cc953a79c8c393e8f4384cf4540e35c34e0509f62812b1ca00a3955ed2a6bb6d",
+"res://assets/pixel/biter/parts/body/mask.png": "bbc1386ec7bf4d6165e51528334cde57f5b9f7cb995423f2dfcb8c22db5efd91",
+"res://assets/pixel/biter/parts/jaw_left/mask.png": "ad588744fb47c07c09b534ec36341f31dd5adfdeaaf818921316bf3c9c19b875",
+"res://assets/pixel/biter/parts/jaw_right/mask.png": "3cac0003dd5f323d809be618f5d392ee62c8f66f38d24ffcc1694c56189d7b04",
+"res://data/visuals/looks/biter.tres": "7a130549a8a7a2455b8c079fbbec1e3c835aa0726ccad2a52afee0466d36e927"
+}
+metadata/outputs = {
+"res://assets/pixel/biter/parts/body/armor.png": "8bc6d18c4781437f95352b7826e301b38854d81608188a9976d3199c95eec85d",
+"res://assets/pixel/biter/parts/body/base.png": "4155e69949aa9fd5678cd8cef97e86897921765bdbfa697bbb9a81036d6c2404",
+"res://assets/pixel/biter/parts/body/normal.png": "a4b5d784bb7db13788cc0fd6e89b298e4364f779fff4cf075f5f7680debe4398",
+"res://assets/pixel/biter/parts/jaw_left/armor.png": "d86f47997c00fc12bc51f20219a95531054b0c90fc73daf0f726cf4b8b86b08b",
+"res://assets/pixel/biter/parts/jaw_left/base.png": "17a44a06399a96e270eadd2685d66cf4f07261d6cfeac3fb674c7bdaec9de110",
+"res://assets/pixel/biter/parts/jaw_left/normal.png": "dbb6bed837d9d43d1df6108d9720b330265265487c459538a890d211bb0156cf",
+"res://assets/pixel/biter/parts/jaw_right/armor.png": "2351948770f53c3ff34c0cdb501eaeccfcde9ce1d04c301f6be48c6b362cc466",
+"res://assets/pixel/biter/parts/jaw_right/base.png": "ec6baa09af292276bec42521a6e0cc3b833a608ea208d247a9a43baca836d963",
+"res://assets/pixel/biter/parts/jaw_right/normal.png": "32270cbcaf21a7e4212efea93742bd4fbd4f5ab0188ea5c8ddb9c751327c724a"
+}
+metadata/parts = [{"name": "body", "pivot": Vector2(10, 17), "base": ExtResource("1"), "armor": ExtResource("2"), "normal": ExtResource("3")},
+{"name": "jaw_left", "pivot": Vector2(6, 16), "base": ExtResource("4"), "armor": ExtResource("5"), "normal": ExtResource("6")},
+{"name": "jaw_right", "pivot": Vector2(13, 16), "base": ExtResource("7"), "armor": ExtResource("8"), "normal": ExtResource("9")}]

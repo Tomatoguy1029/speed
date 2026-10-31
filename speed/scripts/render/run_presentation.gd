@@ -104,6 +104,7 @@ var _glide_wake: Node2D
 var _equipment_visuals: Dictionary = {}
 ## 1回の敵描画で共有する数値だけ。Resource参照を持たず、パスの前後で破棄する。
 var _enemy_sprite_metrics: Dictionary = {}
+var _enemy_wave_deformations: Dictionary = {}
 var _drawing_enemies := false
 var _hero_aura: MeshInstance2D
 var _hero_aura_material: ShaderMaterial
@@ -927,6 +928,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	var t0 := Time.get_ticks_usec()
 	_enemy_sprite_metrics.clear()
 	_drawing_enemies = true
+	_enemy_wave_deformations = wave_deformations
 	_sync_visuals()
 	var query_padding := run.combat.enemy_query_padding
 	var view := view_rect().grow(query_padding)
@@ -1015,6 +1017,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	perf.since(&"draw_enemies.visual_layers", t0)
 	_drawing_enemies = false
 	_enemy_sprite_metrics.clear()
+	_enemy_wave_deformations.clear()
 	if perf_rows.active:
 		perf_rows.add(&"rows", alive.size())
 		perf_rows.add(&"live", live)
