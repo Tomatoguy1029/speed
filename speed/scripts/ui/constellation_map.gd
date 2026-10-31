@@ -9,6 +9,8 @@ const CONSTELLATION_RADIUS := 84.0
 const SYMBOL_ANGLES := [90.0, 180.0, 270.0, 0.0]
 const DRAG_THRESHOLD := 4.0
 const REVEAL_SETTINGS := preload("res://data/map_reveal_settings.tres")
+## 周辺装飾画像の四隅のブラケットを囲う、元画像のピクセル範囲。
+const BRACKET_ART_RECT := Rect2(282, 414, 224, 118)
 const TEXTURES := [
 	preload("res://assets/ui/map/constellations_unicorn.png"),
 	preload("res://assets/ui/map/constellations_centeur.png"),
@@ -34,6 +36,7 @@ var _projection: Node2D
 var _origin := ORIGIN
 var _flatten := 0.5
 var _details: Control
+var _detail_art: TextureRect
 var _detail_fade: Tween
 var _detail_material: ShaderMaterial
 var _monitor_material: ShaderMaterial
@@ -73,9 +76,6 @@ func _ready() -> void:
 		star.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		star.tooltip_text = tr("stage.%d.name" % (i + 1))
 		star.pressed.connect(select_constellation.bind(i))
-		star.draw.connect(_draw_star_focus.bind(star))
-		star.focus_entered.connect(star.queue_redraw)
-		star.focus_exited.connect(star.queue_redraw)
 		star.focus_entered.connect(_on_stage_focus.bind(i))
 		add_child(star)
 		_stars.append(star)
@@ -98,10 +98,10 @@ func _ready() -> void:
 	_details.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_details.size = size
 	add_child(_details)
-	var detail_art := _artwork(preload("res://assets/ui/map/selection_screen_decorations.png"), self)
+	_detail_art = _artwork(preload("res://assets/ui/map/selection_screen_decorations.png"), self)
 	_detail_material = ShaderMaterial.new()
 	_detail_material.shader = preload("res://assets/ui/map/information_reveal.gdshader")
-	detail_art.material = _detail_material
+	_detail_art.material = _detail_material
 	_preview = TextureRect.new()
 	_preview.position = Vector2(451, 88)
 	_preview.size = Vector2(135, 82)
@@ -201,6 +201,9 @@ func _draw() -> void:
 	if selected == null:
 		return
 	var source := selected.position + selected.size * selected.scale * Vector2(1.0, 0.5)
+	if _selected < _stars.size():
+		var brackets := _selection_bracket_rect()
+		source = Vector2(brackets.end.x, brackets.position.y)
 	var points := PackedVector2Array([source.round(), Vector2(396, source.y).round(), Vector2(423, 210), Vector2(430, 210)])
 	var total := 0.0
 	for i in range(1, points.size()):
@@ -213,6 +216,11 @@ func _draw() -> void:
 		remaining -= length
 		if remaining <= 0.0:
 			break
+
+## 星座ボタンの矩形ではなく、実際に表示する装飾画像と同じ座標から線を伸ばす。
+func _selection_bracket_rect() -> Rect2:
+	var factor := _detail_art.size / _detail_art.texture.get_size()
+	return Rect2(_detail_art.position + BRACKET_ART_RECT.position * factor, BRACKET_ART_RECT.size * factor)
 
 func _ring(parent: Node2D, texture: Texture2D) -> Sprite2D:
 	var sprite := Sprite2D.new()
@@ -394,10 +402,6 @@ func _apply_rotation(degrees: float) -> void:
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
 	if _final_stage != null:
 		_final_stage.add_theme_color_override("font_color", CYAN if _selected == 4 else Color.WHITE)
-
-func _draw_star_focus(star: TextureButton) -> void:
-	if star.has_focus():
-		star.draw_rect(Rect2(Vector2.ZERO, star.size), CYAN, false, 1.0)
 
 func set_transition(progress: float) -> void:
 	_transition_progress = progress
