@@ -6,6 +6,8 @@
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/draco/inhale_visual.tscn" id="visual"]
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/draco_inhale.tscn" id="effect_owner"]
+
 [sub_resource type="Resource" id="Resource_cxxdc"]
 script = ExtResource("arc")
 offset = Vector2(40, -100)
@@ -20,9 +22,6 @@ radius = 260.0
 angle_degrees = 38.0
 spread_degrees = 20.0
 count = 12
-
-
-[ext_resource type="PackedScene" path="res://scenes/attacks/owned/draco_inhale.tscn" id="effect_owner"]
 
 [resource]
 script = ExtResource("1")
