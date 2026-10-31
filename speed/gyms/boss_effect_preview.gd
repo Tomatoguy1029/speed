@@ -40,6 +40,9 @@ var _visual_time := 0.0
 var _preview_origin := Vector2.ZERO
 var _preview_heading := Vector2.RIGHT
 var _loop_seconds := 0.0
+var _boss_frame := Rect2()
+var _boss_frame_ready := false
+var _preview_target := Vector2.ZERO
 ## 装備の試遊で映す世界の横幅（演出の試作の画面は横300ドット＝約710）
 const EQUIPMENT_VIEW_WIDTH := 1000.0
 var _dragging_origin := false
@@ -187,6 +190,7 @@ func set_effect(path: String, resume: Variant = null) -> void:
 	_serial += 1
 	var serial := _serial
 	_loop_seconds = 0.0
+	_boss_frame_ready = false
 	if manual != null: manual.finish()
 	manual = null
 	actor = null
@@ -251,6 +255,7 @@ func set_effect(path: String, resume: Variant = null) -> void:
 		_status.text = "ボスを配置できません: " + _boss
 		return
 	actor.configure_flow(program)
+	_preview_target = session.run.state.ship_pos
 	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud") if session.scene.view != null else null
 	if hud != null: hud.visible = false
 	if _boss != "hydra" and not _final_preview:
@@ -378,6 +383,10 @@ func _execute_selected(keep_playing: bool) -> void:
 	if not is_instance_valid(actor): return
 	var started: bool = _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
 	if started:
+		# この画面の標的だけを固定し、吹き飛びで技の狙いと構図が流れるのを防ぐ。
+		_preview_target = session.run.state.ship_pos
+		session.pinned = _preview_target
+		_boss_frame_ready = false
 		session.playing = keep_playing
 		_set_scene_processing(keep_playing)
 		_sync_play_button()
@@ -396,6 +405,7 @@ func refresh_effects() -> void:
 	var render := _render()
 	if render == null: return
 	_refresh_scene_visuals(session.scene.view)
+	_update_preview_camera(render)
 	render._present(0.0)
 	_hide_preview_hud()
 	if not _equipment_key.is_empty(): _show_effect_canvas()
@@ -451,6 +461,7 @@ func _process(_delta: float) -> void:
 		session.run._begin_death()
 	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
 	if render == null: return
+	_update_preview_camera(render)
 	if session.playing:
 		_visual_time += _delta * session.speed
 		render._present(_delta * session.speed)
@@ -463,15 +474,35 @@ func _process(_delta: float) -> void:
 				return
 	_sync_preview_shader_time(session.scene.view)
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
-	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
-	var center: Vector2 = session.run.state.view_center
+
+## ボスと技の範囲を映す、このプレビューだけのカメラ。標的や本編のカメラ状態を追わない。
+func _update_preview_camera(render: RunPresentation) -> void:
 	if not _equipment_key.is_empty():
-		# 装備の試遊は機体を追い、演出の試作の画面に近い広さまで寄せる
-		center = session.run.state.ship_pos
-		zoom = 1280.0 / EQUIPMENT_VIEW_WIDTH
-	var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
-	render.view_override = {"center": center,
-		"zoom": zoom * fit, "shake": _equipment_key.is_empty()}
+		var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
+		render.view_override = {"center": session.run.state.ship_pos, "zoom": 1280.0 / EQUIPMENT_VIEW_WIDTH * fit, "shake": false}
+		return
+	if not is_instance_valid(actor) or not actor.has_body(): return
+	var origin: Vector2 = actor.table.pos[actor.body]
+	if not _boss_frame_ready:
+		var width := 2800.0 if _boss == "hydra" else 1800.0
+		var size := Vector2(width, width * 9.0 / 16.0)
+		_boss_frame = Rect2((origin + _preview_target) * 0.5 - size * 0.5, size)
+		_boss_frame_ready = true
+	var body_radius := maxf(180.0, float(actor.table.r[actor.body]))
+	_boss_frame = _boss_frame.merge(Rect2(origin, Vector2.ZERO).grow(body_radius + 100.0))
+	var pr: ProjectileSystem = session.run.projectiles
+	for row in pr.hazard_alive.size():
+		if pr.hazard_alive[row] == 0: continue
+		var start: Vector2 = pr.hazard_pos[row]
+		var end := start
+		var margin := maxf(80.0, float(pr.hazard_len[row]))
+		if pr.hazard_kind[row] in [ProjectileSystem.HazardKind.BEAM, ProjectileSystem.HazardKind.WALL]:
+			end += Vector2.from_angle(pr.hazard_angle[row]) * pr.hazard_len[row]
+			margin = maxf(80.0, pr.flood_half(row, pr.hazard_len[row]))
+		_boss_frame = _boss_frame.merge(Rect2(start, Vector2.ZERO).expand(end).grow(margin))
+	# 一回の試行中は範囲を広げるだけにし、攻撃が消える瞬間の急なズームを避ける。
+	var zoom := minf(_frame.size.x / _boss_frame.size.x, _frame.size.y / _boss_frame.size.y)
+	render.view_override = {"center": _boss_frame.get_center(), "zoom": maxf(zoom, 0.001), "shake": false}
 
 func _step() -> void:
 	if not is_instance_valid(actor) and (session == null or not is_instance_valid(session.run)): return
