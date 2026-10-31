@@ -25,9 +25,12 @@ func tick(dt: float, busy: bool) -> void:
 	var count := shots(1)
 	var backwards := aim_direction()
 	var origin := mount_position() + backwards * 12.5 * cfg.character_scale
+	var a := backwards.angle()
+	var spread := float(p("spread_step"))
+	var damage := atk() * float(p("damage_by_level")[index])
+	var opts := {"life": p("life"), "pierce_left": int(at_level("pierce_by_level")), "knock": def.params.knock, "color": Color(p("color")), "visual_key": "weapon/rear"}
 	for i in count:
-		var angle := backwards.angle() + (i - (count - 1) / 2.0) * float(p("spread_step"))
-		fire_shot(origin, angle, atk() * float(p("damage_by_level")[index]),
-			{"life": p("life"), "pierce_left": int(at_level("pierce_by_level")), "knock": def.params.knock, "color": Color(p("color")), "visual_key": "weapon/rear"})
+		var angle := a + (i - (count - 1) / 2.0) * spread
+		fire_shot(origin, angle, damage, opts)
 	recoil = 0.12
-	state.emit(&"weapon_fire", {"id": def.id, "pos": origin, "angle": backwards.angle(), "visual_key": "weapon/rear"})
+	state.emit(&"weapon_fire", {"id": def.id, "pos": origin, "angle": a, "visual_key": "weapon/rear"})
