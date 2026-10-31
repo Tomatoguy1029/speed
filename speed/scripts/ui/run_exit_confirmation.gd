@@ -47,7 +47,7 @@ func _ready() -> void:
 	_confirm = Button.new()
 	_confirm.name = "Confirm"
 	_confirm.text = "common.to_main_menu"
-	for button in [_cancel, _confirm]:
+	for button in [_confirm, _cancel]:
 		button.custom_minimum_size.y = 52
 		column.add_child(button)
 	_cancel.pressed.connect(_from_button.bind(false))
