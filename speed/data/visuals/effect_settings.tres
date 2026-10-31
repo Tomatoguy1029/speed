@@ -7,16 +7,16 @@ script = ExtResource("1")
 profiles = {
 "hud/boost_gauge": {
 "background_color": Color(1, 1, 1, 0.14901961),
-"first_inner_radius": 6.75,
-"first_outer_radius": 16.25,
-"normal_color": Color(0.08656776, 0.6632837, 1, 1),
-"path_color": Color(0.5529412, 0.96862745, 1, 1),
-"ready_pulse_color": Color(0, 0.6807794, 1.6221282, 0.8666667),
+"first_inner_radius": 5.75,
+"first_outer_radius": 11.25,
+"normal_color": Color(1, 0.99607843, 0.24313726, 1),
+"path_color": Color(0.9924146, 0.9924146, 0.93311095, 1),
+"ready_pulse_color": Color(1, 0.8156863, 0.34509805, 0.54509807),
 "ready_tick_color": Color(18.892157, 18.892157, 18.892157, 1),
-"second_inner_radius": 18.25,
-"second_outer_radius": 22.5,
+"second_inner_radius": 14.75,
+"second_outer_radius": 17.25,
 "tick_width": 2.0,
-"unavailable_color": Color(1, 0.65882355, 0.22352941, 1),
+"unavailable_color": Color(0.8627451, 0.039215688, 0.023529412, 1),
 "unavailable_tick_color": Color(1, 1, 1, 1)
 },
 "res://scenes/attacks/zone_bomber.tscn": {
