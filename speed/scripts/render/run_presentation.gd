@@ -100,7 +100,6 @@ var _coin_batch: InstanceBatch
 var _ship_visual: RefCounted
 var _meteor_visual: RefCounted
 var _body_visual: RefCounted
-var _glide_wake: Node2D
 var _equipment_visuals: Dictionary = {}
 ## 1回の敵描画で共有する数値だけ。Resource参照を持たず、パスの前後で破棄する。
 var _enemy_sprite_metrics: Dictionary = {}
@@ -166,8 +165,6 @@ func _ready() -> void:
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _look_names.size() + 2)
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
-	_glide_wake = load("res://scenes/fx/glide_wake.tscn").instantiate()
-	_layers.exhaust.add_child(_glide_wake)
 	run.loadout.equipment_changed.connect(_sync_equipment_visuals)
 	_sync_equipment_visuals()
 	_build_star_batch()
@@ -393,8 +390,6 @@ func _present(delta: float) -> void:
 	_update_fx(dt)
 	perf.since(&"process.fx", t0)
 	_ship_visual.update(dt)
-	_glide_wake.visible = not state.weapons.has(&"W08") and not (state.weapons.has(&"W26") and state.tracing)
-	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
 		var visual: WeaponVisual = _equipment_visuals[key]
 		visual.tick(dt)

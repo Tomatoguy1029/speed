@@ -51,7 +51,7 @@ func _ready() -> void:
 	_check(GameManager.screen == GameManager.Screen.INTRO, "初回の選択前に導入")
 	_check(app._current.get("visual") != null and app._current.get("_hud") != null, "映像と操作 UI の初期化")
 	_check(app._current.run.state.stage.resources != null, "導入の戦場は生成済みの外観索引を持つ")
-	_check(app._current.session.view.get_node("RunPresentation")._glide_wake != null, "導入の戦闘表示は描画パイプラインまで初期化する")
+	_check(app._current.session.view.get_node("RunPresentation").pipeline != null, "導入の戦闘表示は描画パイプラインまで初期化する")
 	if failed:
 		get_tree().quit(1)
 		return
