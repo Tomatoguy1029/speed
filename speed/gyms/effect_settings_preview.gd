@@ -30,7 +30,9 @@ const ATTACK_SCENES := [
 	"res://scenes/attacks/beam_draco.tscn", "res://scenes/attacks/bolt.tscn",
 	"res://scenes/attacks/light_arrow.tscn", "res://scenes/attacks/cosmic_arrow.tscn",
 	"res://scenes/attacks/beam.tscn", "res://scenes/attacks/zone.tscn",
+	"res://scenes/attacks/zone_bomber.tscn",
 ]
+const BOMBER_PREVIEW := "res://scenes/attacks/zone_bomber.tscn"
 const ATTACK_PREVIEWS := {
 	"res://scenes/attacks/star_bolt.tscn": "res://scenes/bosses/draco/star_fan_visual.tscn",
 	"res://scenes/attacks/hydra_shape.tscn": "res://scenes/bosses/hydra/wind_blades_visual.tscn",
@@ -52,6 +54,11 @@ const NUMBER_LIMITS := {
 	"burst_pixel_scale": [0.5, 3.0, 0.05],
 }
 const DIRECT_FIELDS := {
+	BOMBER_PREVIEW: [
+		["炎の表示（秒）", "visible_seconds", 0.05, 2.0, 0.01, 0.65],
+		["ドット幅（倍）", "pixel_scale", 0.5, 4.0, 0.05, 1.0],
+		["描画サイズ（倍）", "effect_scale", 0.25, 3.0, 0.05, 0.8333333333333333],
+	],
 	"res://scenes/bosses/canis_major/nova_visual.tscn": [
 		["溜めの光芒の長さ", "warning_ray_length", 20.0, 180.0, 1.0, 100.0],
 		["溜めの光芒の太さ", "warning_ray_width", 1.0, 12.0, 0.5, 4.0],
@@ -238,6 +245,8 @@ var _expanded_bosses := {}
 var _editing_label := Label.new()
 var _fields := VBoxContainer.new()
 var _sample: Node2D
+var _standalone_controls: HBoxContainer
+var _standalone_play: Button
 var _viewport: SubViewport
 var _swatch := ColorRect.new()
 var _static_container: SubViewportContainer
@@ -278,6 +287,30 @@ func _ready() -> void:
 	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	(preview_host if preview_host != null else self).add_child(preview)
+	_standalone_controls = HBoxContainer.new()
+	_standalone_controls.visible = false
+	preview.add_child(_standalone_controls)
+	_standalone_play = Button.new()
+	_standalone_play.toggle_mode = true
+	_standalone_play.text = "⏸"
+	_standalone_play.tooltip_text = "再生・一時停止"
+	_standalone_play.toggled.connect(func(paused: bool):
+		_standalone_play.text = "▶" if paused else "⏸"
+		if is_instance_valid(_sample): _sample.set("preview_paused", paused))
+	_standalone_controls.add_child(_standalone_play)
+	var standalone_step := Button.new()
+	standalone_step.text = "⏭"
+	standalone_step.tooltip_text = "1コマ進める"
+	standalone_step.pressed.connect(func():
+		_standalone_play.button_pressed = true
+		if is_instance_valid(_sample): _sample.call("preview_step", 1.0 / 60.0))
+	_standalone_controls.add_child(standalone_step)
+	var standalone_restart := Button.new()
+	standalone_restart.text = "⏮"
+	standalone_restart.tooltip_text = "先頭から再生し直す"
+	standalone_restart.pressed.connect(func():
+		if is_instance_valid(_sample): _sample.call("preview_restart"))
+	_standalone_controls.add_child(standalone_restart)
 	_static_container = SubViewportContainer.new()
 	_static_container.stretch = true
 	_static_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -435,6 +468,7 @@ func _refresh_target_selection() -> void:
 	_editing_label.text = "編集中: " + _effect_label(_selected) if not _selected.is_empty() else "編集対象を選択してください"
 
 func _effect_label(path: String) -> String:
+	if path == BOMBER_PREVIEW: return "自爆する雑魚：ピクセル炎"
 	if path == "boss/final_strike": return "制限時間の一撃（共通）"
 	if _technique_names.has(path):
 		var names: PackedStringArray = _technique_names[path]
@@ -456,6 +490,9 @@ func _collect(folder: String) -> void:
 
 func _select(path: String) -> void:
 	_selected = path
+	_standalone_controls.visible = path == BOMBER_PREVIEW
+	_standalone_play.set_pressed_no_signal(false)
+	_standalone_play.text = "⏸"
 	if _group_for(path) != _target_group: _show_target_group(_group_for(path))
 	else: _refresh_target_selection()
 	if is_instance_valid(_sample): _sample.queue_free()
@@ -493,7 +530,7 @@ func _build_fields() -> void:
 		_fields.add_child(note)
 		return
 	var entries: Array[Dictionary] = []
-	if not BODY_EFFECTS.has(_selected): entries.append({"name": "effect_tint", "value": Color.WHITE})
+	if not BODY_EFFECTS.has(_selected) and _selected != BOMBER_PREVIEW: entries.append({"name": "effect_tint", "value": Color.WHITE})
 	for field in DIRECT_FIELDS.get(_selected, []):
 		entries.append({"name": field[1], "value": field[5], "hint": "%s,%s,%s" % [field[2], field[3], field[4]], "fallback": field[0]})
 	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
@@ -520,13 +557,18 @@ func _build_fields() -> void:
 			if entry.value is Color: _add_color(label, name, entry.value, help)
 			else: _add_number(label, name, entry.value, String(entry.get("hint", "")), help)
 
-## 装備の表示（render/equipment/<code_id>.gd）が TUNED_SHADERS で示す shader の調整値。
+## 装備の表示と、AttackVisualがTUNED_SHADERSで示すshaderの調整値。
 func _shader_entries(path: String) -> Array[Dictionary]:
 	var entries: Array[Dictionary] = []
-	if not path.begins_with("weapon/") and not path.begins_with("trait/"): return entries
-	var script_path := "res://scripts/render/equipment/%s.gd" % path.get_slice("/", 1)
-	if not ResourceLoader.exists(script_path): return entries
-	var constants: Dictionary = (load(script_path) as Script).get_script_constant_map()
+	var script: Script
+	if path.begins_with("weapon/") or path.begins_with("trait/"):
+		var script_path := "res://scripts/render/equipment/%s.gd" % path.get_slice("/", 1)
+		if not ResourceLoader.exists(script_path): return entries
+		script = load(script_path) as Script
+	elif is_instance_valid(_sample) and _sample is AttackVisual:
+		script = _sample.get_script() as Script
+	else: return entries
+	var constants: Dictionary = script.get_script_constant_map()
 	var defaults: Dictionary = constants.get("SHADER_DEFAULTS", {})
 	for shader: Shader in constants.get("TUNED_SHADERS", []):
 		for info in ShaderTuning.tunables(shader):
@@ -544,6 +586,7 @@ func _field_group(name: String) -> String:
 	return "形・大きさ"
 
 func _field_label(name: String, fallback: String) -> String:
+	if _selected == BOMBER_PREVIEW and name == "visible_seconds": return "炎の表示（秒）"
 	return FIELD_LABELS.get(name, fallback)
 
 func _add_group(title: String) -> void:
@@ -603,11 +646,12 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 
 func _apply_preview() -> void:
 	_swatch.color = _value("effect_tint", Color.WHITE)
-	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _selected == BOMBER_PREVIEW or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
 	_working.apply_to(_sample)
+	if _selected == BOMBER_PREVIEW: _sample.call("preview_step", 0.0)
 	_sample.queue_redraw()
 
 func editing_state() -> Dictionary:
@@ -643,7 +687,7 @@ func set_active(active: bool) -> void:
 	var live_effect := _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
 	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)
 	if not active: EFFECT_SETTINGS.clear_preview_profiles()
-	elif _working != null and live_effect: EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
+	elif _working != null and (live_effect or _selected == BOMBER_PREVIEW): EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if is_instance_valid(_viewport):
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
 

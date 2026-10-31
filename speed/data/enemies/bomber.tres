@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dxa5n78vlsk8j"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=3 format=3 uid="uid://dxa5n78vlsk8j"]
 
 [ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/attacks/zone_bomber.tscn" id="2"]
 
 [resource]
 script = ExtResource("1")
@@ -31,6 +32,7 @@ xp = 1.0
 color = Color(1, 0.36, 0.36, 1)
 shape = &"orb"
 behavior = &"bomber"
+attack_visual = ExtResource("2")
 params = {
 "blast_delay": 1.0,
 "blast_dmg": 10.0,
