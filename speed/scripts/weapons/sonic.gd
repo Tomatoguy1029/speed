@@ -51,7 +51,8 @@ func tick(dt: float, _busy: bool) -> void:
 	_last = state.ship_pos
 	if pulse > 0.0:
 		var rows := PackedInt32Array()
-		var reach := wave_speed() * wave_life()
+		var ring_speed := wave_speed()
+		var reach := ring_speed * wave_life()
 		ctx.combat.nearby(state.ship_pos, reach + state.ship_vel.length() * wave_life(), rows)
 		var forward := state.ship_heading
 		var side := forward.orthogonal()
@@ -59,7 +60,7 @@ func tick(dt: float, _busy: bool) -> void:
 			if t.dead[i] != 0 or hits.has(t.id[i]) or (t.pos[i] - state.ship_pos).dot(forward) >= 0.0: continue
 			var overlaps := 0
 			for f in frames:
-				var radius := wave_speed() * float(f.age)
+				var radius := ring_speed * float(f.age)
 				if radius > 2.0 * 1.82 * cfg.character_scale and absf(t.pos[i].distance_to(f.pos) - radius) < 4.0 * 1.82 * cfg.character_scale + t.r[i]:
 					overlaps += 1
 					if overlaps >= 3: break
