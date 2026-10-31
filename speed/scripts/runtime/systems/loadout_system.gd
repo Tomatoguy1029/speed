@@ -111,7 +111,8 @@ func refresh_stats() -> void:
 	s.capacity = 1.0 + _trait_bonus(&"T08")
 	s.charge_time = cfg.dash_charge_time * float(ctx.profile.reduce.get(&"charge_time", 1.0)) / (1.0 + _trait_bonus(&"T07"))
 	var crit_def := ContentManager.definition(&"traits", &"T09") as TraitDef
-	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + (crit_def.stack_bonus(_n(&"T09")) if crit_def != null else 0.0))
+	var crit_max := float(crit_def.params.get("max", 1.0)) if crit_def != null else 1.0
+	s.crit_chance = minf(crit_max, cfg.base_crit_chance + (crit_def.stack_bonus(_n(&"T09")) if crit_def != null else 0.0))
 	s.crit_mult = cfg.crit_mult
 	s.pickup_radius = cfg.pickup_radius * float(ctx.profile.mult.get(&"pickup", 1.0)) * (1.0 + _trait_bonus(&"T12"))
 	s.length_mult = float(ctx.profile.mult.get(&"length", 1.0)) * (1.0 + _trait_bonus(&"T14"))
@@ -153,14 +154,12 @@ func normal_progression_complete() -> bool:
 func _n(id: StringName) -> int:
 	return state.traits.get(id, 0)
 
-## 能力値を変える特性の値（.tres の params）。
-func _trait_param(id: StringName, key: String, default := 0.0) -> float:
-	var def := ContentManager.definition(&"traits", id) as TraitDef
-	return float(def.params.get(key, default)) if def != null else default
-
 func _trait_bonus(id: StringName) -> float:
+	var stacks := _n(id)
+	# 未取得なら stack_bonus() も 0。定義と依存資源の取得を省く。
+	if stacks <= 0: return 0.0
 	var def := ContentManager.definition(&"traits", id) as TraitDef
-	return def.stack_bonus(_n(id)) if def != null else 0.0
+	return def.stack_bonus(stacks) if def != null else 0.0
 
 # ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 
@@ -579,8 +578,12 @@ func shot_count(base: int) -> int:
 	return count + (1 if state.rng.randf() < amount - count else 0)
 
 func shooting_rate() -> float:
-	if _n(&"T36") == 0 or state.gauge < 1.0: return 1.0
-	return 1.0 + (_trait_param(&"T36", "rate_base") + _trait_param(&"T36", "rate_per") * _n(&"T36")) * state.gauge
+	var stacks := _n(&"T36")
+	if stacks == 0 or state.gauge < 1.0: return 1.0
+	var def := ContentManager.definition(&"traits", &"T36") as TraitDef
+	var rate_base := float(def.params.get("rate_base", 0.0)) if def != null else 0.0
+	var rate_per := float(def.params.get("rate_per", 0.0)) if def != null else 0.0
+	return 1.0 + (rate_base + rate_per * stacks) * state.gauge
 
 func damage_multiplier() -> float:
 	var rampage = trait_behaviors.get(&"T33")
@@ -600,8 +603,10 @@ func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
 	return out
 
 func split_damage() -> float:
+	var stacks := _n(&"T37")
+	if stacks <= 0: return 1.0
 	var d: TraitDef = trait_behaviors[&"T37"].def if trait_behaviors.has(&"T37") else ContentManager.definition(&"traits", &"T37") as TraitDef
-	return float(d.params.damage_by_level[_n(&"T37") - 1]) if _n(&"T37") > 0 else 1.0
+	return float(d.params.damage_by_level[stacks - 1])
 
 func prepare_ram(extra_distance: float) -> float:
 	var distance := boost_distance + extra_distance
