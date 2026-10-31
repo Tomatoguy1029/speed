@@ -409,6 +409,7 @@ func grant(kind: StringName, id: StringName, levels := 1, source := &"direct") -
 		state.modules_obtained.append(id)
 	_claim_resources(category, id)
 	_sync_behavior(weapon, id, def, owned[id])
+	if id == &"T34": refresh_sonic_wave_speed()
 	refresh_stats()
 	_record_change(kind, id, lv, int(owned[id]), source)
 	equipment_changed.emit()
@@ -433,8 +434,13 @@ func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> voi
 		table[id] = b
 	if weapon:
 		table[id].level = lv
+		if id == &"W08": refresh_sonic_wave_speed()
 	else:
 		table[id].n = lv
+
+func refresh_sonic_wave_speed() -> void:
+	var sonic = weapon_behaviors.get(&"W08")
+	if sonic != null and sonic.has_method(&"refresh_wave_speed"): sonic.refresh_wave_speed()
 
 ## 武器を外す（彗星限定の武器と入れ替えるとき）。
 func remove_weapon(id: StringName, source := &"direct") -> void:

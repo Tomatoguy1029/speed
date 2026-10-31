@@ -11,6 +11,16 @@ var _distance := 0.0
 var pulse := 0.0
 ## 前のフレームから実際に進んだ速さ（世界の単位/秒）
 var speed := 0.0
+var _wave_speed := 0.0
+
+func setup(context: RunContext, d: WeaponDef) -> void:
+	super.setup(context, d)
+	refresh_wave_speed()
+
+## 装備・追加強化・実行時設定が変わったときだけ更新する。既存の輪にも新しい値を使う。
+func refresh_wave_speed() -> void:
+	_wave_speed = at_level("speed_by_level") * 1.82 * cfg.character_scale * ctx.loadout.area_multiplier()
+
 func on_launch(_full: bool) -> void:
 	_active = true
 	hits.clear()
@@ -18,7 +28,7 @@ func on_launch(_full: bool) -> void:
 	_distance = 0.0
 	_emission = 0.0
 func wave_speed() -> float:
-	return at_level("speed_by_level") * 1.82 * cfg.character_scale * ctx.loadout.area_multiplier()
+	return _wave_speed
 func wave_life() -> float: return float(p("life"))
 ## 音の輪を出す速さか。
 func fast() -> bool:
