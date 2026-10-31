@@ -2,7 +2,7 @@
 extends RefCounted
 
 const GROUPS := [
-	["待機・再生", ["selection_seconds", "anticipation_seconds", "hold_seconds", "preview_speed"]],
+	["待機・再生", ["selection_seconds", "anticipation_seconds", "hold_seconds"]],
 	["背景の暗転", ["dim_delay", "cover_seconds", "dim_easing", "dim_color", "background_dim"]],
 	["画面移行", ["transition_delay", "opening_seconds", "transition_easing", "easing_power", "focus", "pixel_size", "rim_width", "glow_strength", "glow_width", "transition_opacity", "transition_color", "highlight_color"]],
 	["Star Irisの形", ["inner_ratio", "spin_turns"]],
@@ -17,7 +17,7 @@ const LABELS := {
 	"glow_width": "輪郭の光の広がり（px）", "card_frame_color": "カードの枠・区切りの色", "card_fill_color": "カードの面の色",
 	"badge_lines_seconds": "文字まわりの線の時間（秒）", "badge_glow_radius": "文字まわりの光の広がり（px）",
 	"crack_flash_width": "割れる瞬間の光の長さ（進行割合）", "crack_tint_strength": "割れる瞬間の色の強さ", "shard_ink_mix": "破片の陰影の濃さ", "shard_fade_start": "破片が薄くなる開始（進行割合）",
-	"selection_seconds": "選択前の表示（自動再生・秒）", "anticipation_seconds": "暗くしてから待つ（秒）", "hold_seconds": "着地後の保持（自動再生・秒）", "preview_speed": "再生速度（編集用・倍）",
+	"selection_seconds": "選択前の表示（自動再生・秒）", "anticipation_seconds": "暗くしてから待つ（秒）", "hold_seconds": "着地後の保持（自動再生・秒）",
 	"dim_delay": "選択→暗転の遅延（秒）", "cover_seconds": "暗くする時間（秒）", "dim_easing": "暗くなり方", "dim_color": "暗転の色", "background_dim": "背景を覆う透明度",
 	"transition_delay": "待機→移行の遅延（秒）", "opening_seconds": "開く・割れる時間（秒）", "transition_easing": "形状の進み方", "easing_power": "進行の偏り", "focus": "移行の中心（横・縦）", "pixel_size": "移行のドット幅（px）", "rim_width": "輪郭・割れ線の太さ（px）", "glow_strength": "輪郭・割れ線の光", "transition_opacity": "輪郭・破片の透明度", "transition_color": "輪郭・割れ線の色", "highlight_color": "一番明るい輪郭の色",
 	"inner_ratio": "星の切り込み", "spin_turns": "星の回転（回）",
@@ -32,7 +32,6 @@ const HELP := {
 	"selection_seconds": "自動再生のときに通常3択を見せる時間。手動では実際にカードを選ぶまで待ちます。",
 	"anticipation_seconds": "暗転が終わった状態でこの秒数だけ待機してから、移行を始めます。",
 	"hold_seconds": "自動再生で次へ進むまで。手動では保持中に画面をクリックして次へ進めます。",
-	"preview_speed": "編集再生だけの速度です。保存値を本番の速度として固定する処理は行いません。",
 	"focus": "画面の左上が0・0、右下が1・1。カード位置とは独立しています。",
 	"card_position": "画面に対する位置。0.5・0.5で中央です。",
 	"card_start_position": "出始めの位置。画面の外から入れる値も指定できます。",

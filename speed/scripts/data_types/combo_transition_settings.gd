@@ -7,7 +7,8 @@ extends Resource
 @export_range(0.0, 4.0, 0.01) var selection_seconds := 0.60
 @export_range(0.0, 4.0, 0.01) var anticipation_seconds := 0.22
 @export_range(0.0, 4.0, 0.01) var hold_seconds := 1.50
-@export_range(0.1, 3.0, 0.05) var preview_speed := 1.0
+## 旧制作ファイルの値を保持する。再生速度はtransportの共通操作へ分離した。
+@export_storage var preview_speed := 1.0
 @export_group("背景")
 @export_range(0.0, 2.0, 0.01) var dim_delay := 0.0
 @export_range(0.02, 2.0, 0.01) var cover_seconds := 0.10

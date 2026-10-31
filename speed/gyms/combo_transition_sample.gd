@@ -40,6 +40,7 @@ var _shape_key := ""
 var _active := true
 var _background := ColorRect.new()
 var _selecting := false
+var _frozen_choice := -2
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -155,6 +156,7 @@ func _build_scenes() -> void:
 	var incoming := _root(_new_view)
 	var foreground := _root(_foreground_view, false)
 	_choices.clear()
+	_frozen_choice = -2
 	if _kind == 0:
 		var title := Label.new()
 		title.position = Vector2(89, 61)
@@ -240,6 +242,7 @@ func _pose_card(button: Button, value: ComboTransitionSettings, time: float) -> 
 func set_time(value: float) -> void:
 	_clock = value
 	if settings == null: return
+	_update_selection_snapshot()
 	var dim_start := settings.selection_seconds + settings.dim_delay
 	var dim_amount := settings.background_dim * ComboTransitionSettings.eased((value - dim_start) / settings.cover_seconds, settings.dim_easing)
 	_dim.color = Color(settings.dim_color, settings.dim_color.a * dim_amount)
@@ -284,11 +287,38 @@ func _input_on_surface(event: InputEvent) -> void:
 
 func select_choice(index: int) -> void:
 	_selected = index
-	if index >= 0 and index < _choices.size(): _choices[index].grab_focus()
+	if _selecting and index >= 0 and index < _choices.size(): _choices[index].grab_focus()
+	_update_selection_snapshot()
 	_old_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func set_selecting(selecting: bool) -> void:
 	_selecting = selecting
+	_update_selection_snapshot()
+
+func _update_selection_snapshot() -> void:
+	if _kind != 0 or _choices.is_empty(): return
+	if _selecting:
+		if _frozen_choice == -1: return
+		for button in _choices:
+			CARD.apply_art(button, Rect2(89, 83, 145, 193))
+			button.focus_mode = Control.FOCUS_ALL
+			button.mouse_filter = Control.MOUSE_FILTER_STOP
+		_old_view.gui_disable_input = false
+		_choices[clampi(_selected, 0, 2)].grab_focus()
+		_frozen_choice = -1
+	else:
+		var selected := _selected if _clock >= settings.selection_seconds else 0
+		if _frozen_choice == selected: return
+		for i in _choices.size():
+			var button := _choices[i]
+			var style := button.get_theme_stylebox("normal").duplicate() as StyleBoxTexture
+			style.modulate_color = Color(1.3, 1.3, 1.3) if i == selected else Color.WHITE
+			for state in ["normal", "hover", "pressed", "focus"]: button.add_theme_stylebox_override(state, style)
+			button.focus_mode = Control.FOCUS_NONE
+			button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_old_view.gui_disable_input = true
+		_frozen_choice = selected
+	_old_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if settings == null or not is_visible_in_tree() or not _active or not (event is InputEventKey): return
