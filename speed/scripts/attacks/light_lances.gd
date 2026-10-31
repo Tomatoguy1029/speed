@@ -3,7 +3,7 @@ extends RunSystem
 var items: Array[Dictionary] = []
 func fire(from: Vector2, direction: Vector2, length: float, width: float, damage: float, knock: float) -> void:
 	var queue: Array[Dictionary] = [{"from": from, "velocity": direction * length / 0.18, "length": length, "width": width,
-		"damage": damage, "knock": knock, "generation": 0, "hit": {}}]
+		"damage": damage, "knock": knock, "generation": 0, "hit": {}, "split_used": false}]
 	var next := 0
 	while next < queue.size() and state.phase == RunState.Phase.PLAY:
 		var lance: Dictionary = queue[next]
@@ -28,11 +28,15 @@ func fire(from: Vector2, direction: Vector2, length: float, width: float, damage
 			lance.hit[t.id[i]] = true
 			var impact: Vector2 = lance.from.lerp(to, hit[0])
 			ctx.combat.damage_enemy(i, lance.damage, {"cause": &"critBeam", "no_crit": true, "dir": lance.velocity.normalized(), "knock": lance.knock})
+			if lance.split_used: continue
+			# 成否と生成上限にかかわらず、最初の対象命中で抽選機会を使う。
+			lance.split_used = true
 			var vectors := ctx.loadout.split_vectors(lance.velocity, lance.generation)
 			if ctx.projectiles.flying_count() + queue.size() - next + vectors.size() > 220: continue
 			for velocity in vectors:
 				queue.append({"from": impact, "velocity": velocity, "length": lance.length * (1.0 - hit[0]), "width": lance.width,
-					"damage": lance.damage * ctx.loadout.split_damage(), "knock": lance.knock, "generation": lance.generation + 1, "hit": lance.hit.duplicate()})
+					"damage": lance.damage * ctx.loadout.split_damage(), "knock": lance.knock, "generation": lance.generation + 1,
+					"hit": lance.hit.duplicate(), "split_used": false})
 			if not vectors.is_empty(): state.emit(&"duplicate", {"pos": impact, "directions": vectors})
 func tick(_real_dt: float, world_dt: float) -> void:
 	var kept := 0

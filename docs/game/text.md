@@ -312,7 +312,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T36.name | フルバースト | Full Burst |
 | trait.T36.desc | ゲージが満タンの間、射撃の連射が上がる。 | Increases shooting fire rate while the gauge is full. |
 | trait.T37.name | デュプリケーター | Duplicator |
-| trait.T37.desc | 弾や破片が当たると、確率で2つに分かれる。 | Shots and debris may split into two on impact. |
+| trait.T37.desc | 弾や破片が最初に当たると、確率で2つに分かれる。 | Shots and debris may split into two on their first impact. |
 |  | ■ 伝説のモジュール（legendary.&lt;ID&gt;） |  |
 | legendary.legendary&#95;compass.name | 羅針盤のモジュール | Compass Module |
 | legendary.legendary&#95;compass.desc | らしんばん座を解放したときに残された、錆びついたモジュール。 | A rusted module left behind when Pyxis was freed. |

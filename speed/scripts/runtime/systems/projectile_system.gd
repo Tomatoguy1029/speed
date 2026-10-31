@@ -49,6 +49,8 @@ class FriendSlots extends RowSlots:
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
 var friend_generation := PackedByteArray()
+## 最初の対象命中で分裂の抽選機会を消費したら1。子は新しい機会を持つ。
+var friend_split_used := PackedByteArray()
 ## 星砕きの再発動世代。通常攻撃は0、初回に生まれた破片は1。弾の分裂とは別に引き継ぐ。
 var friend_shatter_depth := PackedInt32Array()
 var friend_age := PackedFloat32Array()
@@ -299,6 +301,7 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 	if kind == FriendKind.DEBRIS:
 		friend_slots.debris_live += 1
 	friend_generation[i] = 0
+	friend_split_used[i] = 0
 	friend_shatter_depth[i] = 0
 	friend_age[i] = 0.0
 	friend_cause[i] = cause
@@ -904,6 +907,9 @@ func flying_count() -> int:
 	return friend_count() + (lances.items.size() if lances != null else 0)
 
 func duplicate_friend(source: int, impact: Vector2) -> bool:
+	if friend_split_used[source] != 0: return false
+	# 失敗や生成上限でも機会を消費し、貫通後の命中では再抽選しない。
+	friend_split_used[source] = 1
 	var vectors := build.split_vectors(friend_vel[source], friend_generation[source])
 	if vectors.is_empty(): return false
 	# このループでは同じ種類の子を追加するだけなので、上限の残り枠を1回で数える。
