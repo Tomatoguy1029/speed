@@ -444,6 +444,7 @@ func _handle_events(events: Array[Dictionary]) -> void:
 			&"ring":
 				_ring(ev.pos, ev.radius, ev.color, ev.life, String(ev.get("visual_key", "")))
 			&"explode":
+				if ev.get("cause", &"") == &"pump_burst": continue
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 				if ev.radius >= 150.0:
 					pipeline.add_wave(ev.pos, ev.radius, 0.4)
@@ -559,6 +560,7 @@ func _handle_events(events: Array[Dictionary]) -> void:
 
 ## 予告と実際の撃破・結晶演出で同じ値を使う。他の演出は下限に含めない。
 func _common_burst_count(event: Dictionary) -> int:
+	if event.type == &"kill" and event.get("enemy_type", &"") == &"pump": return 0
 	match event.type:
 		&"kill": return 6+roundi(float(event.r)/3.0)
 		&"gem_burst": return 14

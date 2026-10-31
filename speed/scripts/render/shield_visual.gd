@@ -4,6 +4,10 @@ extends RefCounted
 const STEEL := Color("#8db9cf")
 const EDGE := Color("#bcefff")
 const GUARD := Color("#65e8ff")
+const EQUIPPED_SHADER := preload("res://shaders/scutum_guard.gdshader")
+const GUARD_BASE := preload("res://assets/pixel/shield/scutum_guard_base.png")
+const GUARD_ARMOR := preload("res://assets/pixel/shield/scutum_guard_armor.png")
+const GUARD_NORMAL := preload("res://assets/pixel/shield/scutum_guard_normal.png")
 
 static func plate(c: CanvasItem, p: Vector2, facing: float, r: float, arc: float, flash := 0.0) -> void:
 	var outer := PackedVector2Array()
@@ -26,26 +30,38 @@ static func plate(c: CanvasItem, p: Vector2, facing: float, r: float, arc: float
 static func enemy(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	plate(c, t.pos[i], t.facing[i], t.r[i], float(t.def[i].params.front_arc), minf(1.0, t.flash[i] * 10.0))
 
-static func equipped(c: CanvasItem, state: RunState, ship_radius: float, scale: float) -> void:
+static func equipped(c: CanvasItem, state: RunState, ship_radius: float, scale: float, visual_pos := Vector2.INF) -> void:
+	var node := c.get_node_or_null("ScutumGuard") as MeshInstance2D
 	if state.ship_shield_t <= 0.0:
+		if node != null: node.hide()
 		return
-	var fraction := clampf(state.ship_shield_t / maxf(0.01, state.ship_shield_max), 0.0, 1.0)
-	var r := maxf(ship_radius * 2.5, 36.0 * scale)
-	var p := state.ship_pos
-	var flash := minf(1.0, state.ship_shield_flash * 8.0)
-	var color := GUARD.lerp(Color.WHITE, flash)
-	var alpha := 1.0 if fraction > 0.2 else 0.65 + 0.35 * sin(state.world_time * 24.0)
-	c.draw_circle(p, r, Color(color, (0.07 + flash * 0.14) * alpha))
-	c.draw_arc(p, r * 0.88, 0, TAU, 48, Color(color, 0.3 * alpha), 1.5 * scale, true)
-	# 残り時間とともに外周の板が欠ける。最後の板が消えると盾が砕ける。
-	for k in 8:
-		var left := clampf(fraction * 8.0 - k, 0.0, 1.0)
-		if left <= 0.0:
-			continue
-		var a := state.ship_heading.angle() + k * TAU / 8.0
-		c.draw_arc(p, r, a + 0.07, a + 0.07 + (TAU / 8.0 - 0.14) * left, 8,
-			Color(color, 0.9 * alpha), 4.0 * scale, true)
-	plate(c, p, state.ship_heading.angle(), r * 0.9, 0.6, flash)
+	if node == null:
+		node = MeshInstance2D.new()
+		node.name = "ScutumGuard"
+		var mesh := QuadMesh.new()
+		mesh.size = Vector2(112, 112)
+		node.mesh = mesh
+		var material := ShaderMaterial.new()
+		material.shader = EQUIPPED_SHADER
+		material.set_shader_parameter("guard_base", GUARD_BASE)
+		material.set_shader_parameter("guard_armor", GUARD_ARMOR)
+		material.set_shader_parameter("guard_normal", GUARD_NORMAL)
+		material.set_shader_parameter("armor_paint", Color("#ccdce0"))
+		material.set_shader_parameter("linear_output", c.get_viewport().use_hdr_2d)
+		node.material = material
+		c.add_child(node)
+	var heading := state.ship_heading.angle()
+	# airship.pngの可視範囲(0,10)-(30,50)と、実際の描画原点(-15.5,-30)。
+	var center: Vector2 = state.ship_pos if visual_pos == Vector2.INF else visual_pos
+	node.position = center + Vector2(-0.5 * scale, 0).rotated(heading + PI * 0.5)
+	node.rotation = heading
+	node.scale = Vector2.ONE * maxf(ship_radius * 2.5, 36.0 * scale) / 65.0
+	node.show()
+	(node.material as ShaderMaterial).set_shader_parameter("clock", state.world_time)
+
+static func hide_equipped(c: CanvasItem) -> void:
+	var node := c.get_node_or_null("ScutumGuard") as MeshInstance2D
+	if node != null: node.hide()
 
 static func transfer(c: CanvasItem, effect: Dictionary, target: Vector2) -> void:
 	var k := clampf(1.0 - float(effect.life) / float(effect.max), 0.0, 1.0)

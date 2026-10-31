@@ -49,7 +49,7 @@ func on_death(i: int, atk: float) -> void:
 	var dp: Dictionary = t.def[i].params
 	var full := float(t.buds[i]) / float(dp.store_max)
 	projectiles.burst_debris(t.pos[i], int(dp.release_base) + int(float(dp.release_per) * float(t.buds[i])),
-		float(dp.release_speed), atk * float(dp.release_dmg), t.color[i].lightened(0.3), t.id[i])
+		float(dp.release_speed), atk * float(dp.release_dmg), t.color[i].lightened(0.3), t.id[i], int(dp.release_base))
 	projectiles.combat.explode(t.pos[i], float(dp.release_radius) * (1.0 + full), atk * float(dp.release_dmg),
 		{"cause": &"pump_burst", "no_crit": true, "color": t.color[i].lightened(0.4), "life": 0.35, "knock": 500.0 + 400.0 * full})
 
@@ -73,7 +73,7 @@ func _pump(i: int, dt: float) -> void:
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = float(p.telegraph)
 		EnemyTable.Mode.WINDUP:
-			_hold(i, dt)
+			t.vel[i] = Vector2.ZERO
 			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
 			# 撃つ直前の lock_time は向きを固定する
 			if t.timer[i] > float(p.lock_time):

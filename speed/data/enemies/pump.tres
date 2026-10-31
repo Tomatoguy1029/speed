@@ -48,11 +48,11 @@ params = {
 "release_speed": 900.0,
 "shell_r": 26.0,
 "shell_range": 640.0,
-"shell_speed": 520.0,
+"shell_speed": 900.0,
 "store_max": 20,
 "swallow_interval": 0.12,
 "swallow_reach": 30.0,
-"telegraph": 1.4
+"telegraph": 0.25
 }
 id = &"pump"
 display_name = "ポンプ座"

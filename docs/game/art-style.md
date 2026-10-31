@@ -105,7 +105,7 @@
 
 やまねこ座（`lynx`）は、元画像の寸法を保ち、Base → Decorations → Armorの順に重ねる。Normalは装甲の法線マップに使う。ディテールは装甲片の塗装時にも元の色を保つ。
 
-たて座（`shield`）は、`assets/pixel/shield/` の `scutum_base.png`・`scutum_armor.png`・`scutum_normal.png` を使う。BaseにArmorを重ね、Normalで装甲の陰影を付ける。原画の上側の盾を敵の正面へ向け、盾の見た目は原画の装甲で表す。奪って機体へ装備した盾と転送中の盾は共通の盾の演出を使う。
+たて座（`shield`）は、`assets/pixel/shield/` の `scutum_base.png`・`scutum_armor.png`・`scutum_normal.png` を使う。BaseにArmorを重ね、Normalで装甲の陰影を付ける。原画の上側の盾を敵の正面へ向け、盾の見た目は原画の装甲で表す。奪って機体へ装備した盾は[敵一覧の装備表示](catalog/enemies.md#たて座から奪った盾)を使い、転送中は盾の移動演出を使う。
 
 じょうぎ座（`ruler`）は上下各58×46ピクセルの共通キャンバスを同じ位置に重ねる。分離後もキャンバスの中心と寸法を保ち、それぞれの装甲へ対応する法線画像を使う。
 

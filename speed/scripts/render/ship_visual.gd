@@ -73,6 +73,7 @@ func draw_exhaust(c: CanvasItem) -> void:
 
 func draw_ship(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING and run.sequence_t >= cfg.death_freeze_time:
+		SHIELD_VISUAL.hide_equipped(c)
 		return
 	var p := state.ship_pos
 	for id in [&"W01", &"W02"]:
@@ -98,7 +99,7 @@ func draw_ship(c: CanvasItem) -> void:
 	for visual in rm._equipment_visuals.values():
 		if visual.active:
 			visual.draw_extra(c, p, col)
-	SHIELD_VISUAL.equipped(c, state, R, cfg.character_scale)
+	SHIELD_VISUAL.equipped(c, state, R, cfg.character_scale, p)
 	for effect in rm.shield_transfers:
 		SHIELD_VISUAL.transfer(c, effect, state.ship_pos)
 	# HP バー（機体の真下、仕様書 17）

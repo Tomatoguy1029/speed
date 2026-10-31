@@ -250,8 +250,8 @@ func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 	emit_attack(&"friend_shot", [from, angle, dmg, opts])
 
 ## 位置 pos から、攻撃する破片を count 個、全方向へ飛ばす（うみへび座の首の残骸など）。source_id の敵には当たらない。
-func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Color, source_id: int) -> void:
-	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id])
+func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Color, source_id: int, pump_armor_count := -1) -> void:
+	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id, pump_armor_count])
 
 ## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
 func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0, shatter_depth := 1) -> bool:

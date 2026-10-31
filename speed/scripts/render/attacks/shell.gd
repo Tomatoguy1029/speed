@@ -1,32 +1,35 @@
-## SHELLの弾の表示。
+## 実雑魚の凝縮塊と、短い緑白の尾。描画ノードは同時表示数の範囲で再利用する。
 extends AttackVisual
-
+const SHADER := preload("res://shaders/pump_shell.gdshader")
+const CONTENTS := [preload("res://assets/pixel/drifter.png"), preload("res://assets/pixel/swarm.png"), preload("res://assets/pixel/splitling.png")]
+var _mesh: QuadMesh
+var _nodes: Array[MeshInstance2D] = []
+var _count := 0
+func setup(render: RunPresentation) -> void:
+	super.setup(render)
+	_mesh = QuadMesh.new()
+	_mesh.size = Vector2(190, 80)
+func begin_batch() -> void:
+	_count = 0
+func end_batch() -> void:
+	for n in range(_count, _nodes.size()): _nodes[n].hide()
 func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> bool:
-	# ポンプ座の圧縮弾：後ろに尾を引く
-	var u := pr.hostile_vel[i].normalized()
-	var n := Vector2(-u.y, u.x) * pr.hostile_r[i] * 0.8
-	c.draw_polygon(PackedVector2Array([pos + n, pos - u * pr.hostile_r[i] * 2.2, pos - n]),
-		PackedColorArray([Color(0.85, 0.7, 1.0, 0.45), Color(0.85, 0.7, 1.0, 0.0), Color(0.85, 0.7, 1.0, 0.45)]))
-	draw_ball(c, pos, pr.hostile_r[i], Color("#b78cff"), state.world_time)
+	if _count == _nodes.size():
+		var created := MeshInstance2D.new()
+		created.mesh = _mesh
+		var material := ShaderMaterial.new()
+		material.shader = SHADER
+		for k in 3: material.set_shader_parameter("enemy%d" % k, CONTENTS[k])
+		created.material = material
+		c.add_child(created)
+		_nodes.append(created)
+	var node := _nodes[_count]
+	_count += 1
+	var scale_px := pr.hostile_r[i] / 38.0
+	var dir := pr.hostile_vel[i].normalized()
+	node.position = pos - dir * 55.0 * scale_px
+	node.rotation = dir.angle()
+	node.scale = Vector2.ONE * scale_px
+	node.show()
+	(node.material as ShaderMaterial).set_shader_parameter("clock", state.world_time)
 	return true
-
-func draw_ball(c: CanvasItem, at: Vector2, r: float, base: Color, now: float) -> void:
-	var pulse := 0.5 + 0.5 * sin(now * 14.0)
-	c.draw_circle(at, r * (1.25 + 0.08 * pulse), Color(base.lightened(0.5), 0.22))
-	c.draw_circle(at, r, base.darkened(0.45))
-	var kinds: Array[StringName] = [&"drifter", &"swarm", &"drifter", &"splitling", &"swarm", &"drifter", &"swarm"]
-	for k in kinds.size():
-		var ring := 0.0 if k == 0 else 0.55
-		var a := now * (1.5 if k % 2 == 0 else -1.1) + k * TAU / 6.0
-		var q := at + Vector2.from_angle(a) * r * ring
-		var tex := rm._enemy_texture(kinds[k])
-		var size := r * (0.62 if k == 0 else 0.5)
-		if tex == null:
-			c.draw_circle(q, size * 0.5, base)
-			continue
-		var ext := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * size
-		c.draw_set_transform(q, a * 2.0)
-		c.draw_texture_rect(tex, Rect2(-ext / 2.0, ext), false, Color(1, 1, 1, 0.9))
-		c.draw_set_transform(Vector2.ZERO)
-	c.draw_circle(at, r, Color(base.lightened(0.3), 0.18))
-	c.draw_arc(at, r, 0, TAU, 40, Color("#fff0c8", 0.75 + 0.25 * pulse), maxf(_px(1.5), r * 0.1))
