@@ -9,8 +9,8 @@ varying float fuse_flash;
 varying vec2 instance_x;
 varying vec2 instance_y;
 
-vec4 armor_at(vec2 uv) {
-	return vec4(texture(painted_armor, uv * vec2(1.0, 28.0 / 42.0)).rgb, texture(TEXTURE, uv).a);
+vec4 armor_at(sampler2D diffuse, vec2 uv) {
+	return vec4(texture(painted_armor, uv * vec2(1.0, 28.0 / 42.0)).rgb, texture(diffuse, uv).a);
 }
 void vertex() {
 	hit_flash = COLOR.r;
@@ -19,7 +19,7 @@ void vertex() {
 	instance_y = normalize(MODEL_MATRIX[1].xy);
 }
 void fragment() {
-	vec4 armor = armor_at(UV);
+	vec4 armor = armor_at(TEXTURE, UV);
 	vec3 base = mix(armor.rgb, vec3(1.0), hit_flash * 0.8) * ambient;
 	base = mix(base, vec3(1.0, 0.045, 0.02), fuse_flash * 0.9 * (1.0 - hit_flash));
 	COLOR = vec4(base * brightness, armor.a);
@@ -27,7 +27,7 @@ void fragment() {
 	NORMAL = vec3(mat2(instance_x, instance_y) * surface_normal.xy, surface_normal.z);
 }
 void light() {
-	vec3 albedo = mix(armor_at(UV).rgb, vec3(1.0, 0.045, 0.02), fuse_flash * 0.9);
+	vec3 albedo = mix(armor_at(TEXTURE, UV).rgb, vec3(1.0, 0.045, 0.02), fuse_flash * 0.9);
 	albedo = mix(albedo, vec3(1.0), hit_flash * 0.8);
 	float diffuse = max(dot(NORMAL, LIGHT_DIRECTION), 0.0);
 	LIGHT = vec4(albedo * brightness * LIGHT_COLOR.rgb * LIGHT_ENERGY * diffuse, LIGHT_COLOR.a);
