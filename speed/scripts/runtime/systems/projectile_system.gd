@@ -662,6 +662,37 @@ func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 		best = {"t": t, "normal": n, "pos": from.lerp(to, t)}
 	return best
 
+## 機体（半径 radius）が pos の時点で、移動を止める壁の帯に重なっていれば、近い側の外へ出た位置。
+## 重なっていなければ空の辞書。重なっていれば pos（押し出した位置）と normal（押し出す向き）。中心線の上なら vel の向きの側へ出す。
+func block_overlap(pos: Vector2, radius: float, vel := Vector2.ZERO) -> Dictionary:
+	var best := {}
+	var best_push := INF
+	for h in hazard_alive.size():
+		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
+			continue
+		if _hazard_owner_pulled(h):
+			continue
+		if hazard_t[h] < hazard_delay[h] or hazard_t[h] > hazard_delay[h] + hazard_active[h]:
+			continue
+		var a := hazard_pos[h]
+		var u := Vector2.from_angle(hazard_angle[h])
+		var m := hazard_width[h] * 0.5 + radius
+		var d := u.cross(pos - a)
+		var along := u.dot(pos - a)
+		# 弾いた直後は帯の縁に止まるので、縁から1px以内は重なりに数えない。
+		if absf(d) >= m - 1.0 or along < -m or along > hazard_len[h] + m:
+			continue
+		var side := signf(d) if absf(d) > 0.5 else signf(u.cross(vel))
+		if side == 0.0:
+			side = 1.0
+		var push := m + 1.0 - side * d
+		if push >= best_push:
+			continue
+		best_push = push
+		var n := Vector2(-u.y, u.x) * side
+		best = {"normal": n, "pos": pos + n * push}
+	return best
+
 ## 付いている攻撃の形（行 h）を動かす。length が 0 以上なら長さも変える。
 func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 	hazard_pos[h] = pos
