@@ -14,13 +14,17 @@ func add(pos: Vector2, count: int, angle: float, spread: float, v0: float, v1: f
 
 func draw(painter: PixelPainter, dt: float) -> void:
 	var damping := pow(0.04, dt)
+	var kept := 0
 	for p in _items:
 		p.age += dt
+		if p.age < p.life:
+			_items[kept] = p
+			kept += 1
 		if p.age >= p.life: continue
 		p.pos += p.vel * painter.px * dt
 		p.vel *= damping
 		painter.dot(p.pos, p.color, 2 if p.age < p.life * 0.4 else 1)
-	_items = _items.filter(func(p): return p.age < p.life)
+	_items.resize(kept)
 
 func clear() -> void:
 	_items.clear()

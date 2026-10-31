@@ -675,6 +675,8 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 ビルドの攻撃は、装備ごとの WeaponVisual（`scripts/render/equipment/<code_id>.gd`）が演出の試作と同じドット単位の規則で描く。共通部品は `scripts/render/fx/` にあり、`PixelPainter` が円・輪・線・光弾・砲口などを1ドットの格子にそろえて MultiMesh へまとめ、`PixelSparks` が火花、`FireBursts` がノイズで縁の崩れるピクセル炎、`BlastBursts` がピクセル炎と同じ4段の色で閃光・火球・衝撃波の輪・煙・燃えかす・火の粉をまとめた爆発を描く。数の多い輪・針・太い輪・六角形は `PixelShapes` が同じドットの規則を shader で判定し、1つの図形を1枚の四角として GPU でまとめて描く。武器・特性の演出は途中で手に入るので、出撃前の shader の準備（`build_stage_resources.gd`）は `scripts/render/equipment`・`friendly`・`fx` が使う shader をすべて含める。重力レンズ・帯状のビームなど面の大きい演出は装備専用の shader を使う。WeaponVisual は描く出来事を `claims` で示し、`RunPresentation` はその出来事の既定の描画（死亡の破片・輪・ビーム）を行わない。ギアアップの炎は共通ピクセル炎を後ろ向きに置いた `GearFire` で描く。表示の上書きは `effect_settings.tres` の装備キーで保持する。shader の調整値は各 shader の `group_uniforms tuning;` にまとめ、`ShaderTuning` が装備キーの `shader/<shader名>/<uniform名>` の値を material へ当てる。
 
+共通の `PixelSparks` と `ShotFlashes` は、粒子と命中閃光の配列を表示順のまま再利用し、更新中に期限切れを整理する。命中閃光は種類ごとの描画時間と共通の保持期限を持つ。
+
 図鑑は `CodexAnimation` の固定の実演配置（演出の試作の描画命令）を `data/codex/*.res` から読み、`SubViewport` の中で同じ描画部品（`PixelPainter`・炎・レンズ・空間の歪みの shader・`GearFire`）で再生する。命令の番号は [codex_demonstration.gd](../speed/scripts/ui/codex_demonstration.gd) の冒頭にある。共通生成の `build_codex_thumbnails.gd` は実演の42%の1コマを `.content/codex_thumbnail_*.res` へ保存し、生成物の欠落検査とexportへ含める。たる型の対応表は固定画像を読み、投影の走査線・横ずれ・段階色・ディザはshaderで合成する。
 
 一覧は画面内に見える項目の固定の1コマを1フレームに1件ずつ準備し、最初の描画結果を保持して実演の資源を解放する。詳細は選択した実演を非同期で読み、表示中だけ保持する。読み込み待ちは投影を弱参照で扱い、選択変更・画面を閉じたあとの古い読み込み結果を受け取って解放する。項目選択は一覧を再生成せず、選択枠と詳細を更新する。
