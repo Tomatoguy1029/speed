@@ -142,10 +142,13 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 			field.collide_enemy(i, from)
 	projectiles.lab_context = 0
 
-## 機体へまっすぐ、決まった速さで向かう（_chase と同じ）。
-func _pursuit_velocity(i: int, ship: Vector2, _dt: float) -> Vector2:
+## 世界秒で種類ごとの旋回速度まで向き直り、鼻先へ進む（_chase と同じ）。
+func _pursuit_velocity(i: int, ship: Vector2, dt: float) -> Vector2:
 	var d := ship - table.pos[i]
-	return d.normalized() * table.speed[i] if d.length_squared() >= 0.000001 else Vector2.ZERO
+	if d.length_squared() < 0.000001:
+		return Vector2.ZERO
+	_turn_toward(i, d.angle(), table.turn[i], dt)
+	return Vector2.from_angle(table.facing[i]) * table.speed[i]
 
 ## 守る雑魚など、噛みつきを休んで別の移動をする種類の入口。
 ## true のときも、共通の石化・外力・移動・天体衝突は同じ更新で処理する。

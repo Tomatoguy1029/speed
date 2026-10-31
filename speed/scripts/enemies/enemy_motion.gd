@@ -80,17 +80,16 @@ func _turn_moving(i: int, rate: float, dt: float) -> void:
 	if face.length_squared() > 0.0025:
 		_turn_toward(i, face.angle(), rate, dt)
 
-## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 11.5）。
-func _chase(i: int, _dt: float) -> void:
+## 追跡：世界秒で種類ごとの旋回速度まで向き直り、鼻先へ一定速で進む（仕様書 11.5）。
+func _chase(i: int, dt: float) -> void:
 	var t := table
 	var d := state.ship_pos - t.pos[i]
 	var dist := d.length()
 	if dist < 0.001:
 		t.vel[i] = Vector2.ZERO
 		return
-	var u := d / dist
-	t.vel[i] = u * t.speed[i]
-	t.facing[i] = u.angle()
+	_turn_toward(i, d.angle(), t.turn[i], dt)
+	t.vel[i] = Vector2.from_angle(t.facing[i]) * t.speed[i]
 
 ## 狙った位置へ速さ speed で向かい（加速 accel）、進む向きと機体への向きを混ぜた向きへ毎秒 turn まで回る。
 ## 追跡と距離を保つ動きの共通部分（よく呼ぶので、関数をまとめて呼び出しを減らす）。

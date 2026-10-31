@@ -6,6 +6,8 @@
 
 敵とボスの種類ごとの停止時間は `hitstop_multiplier` で調整する。[ヒットストップの適用条件・継承・上限](../../spec.md#74-ヒットストップ)に従い、[敵設定の編集手順](../../dev/stage-production.md#53-保存戻すエディターで編集する)から保存する。
 
+共通追跡の適用先は、行動 `chase`、噛みつく雑魚、守る相手がいない守る雑魚と、待機・接近で `_chase()` を使う敵。旋回と進行方向は[共通の動き](../../spec.md#115-動き)、旋回速度は各定義の `turn` に従う。
+
 同じ敵をステージ別に調整する値は `speed/data/stages/stage_*.tres` の `enemy_tuning` に持つ。[ステージ敵調整](../../spec.md#20-調整機能)で編集する。
 
 ステージ1の強敵と三角の星のHP上書きは、[Stage1の調整箇所](../stages/stage-1.md#調整する場所)を参照する。
@@ -102,7 +104,7 @@
 
 | type ID | 名称 | 星 | 採用状態 | 行動・攻撃 | データ・コード |
 | --- | --- | --- | --- | --- | --- |
-| `spreader` | 拡散弾の敵 | 2 | 保留 | 追ってきて、予告のあと扇状に弾をばらまく | `data/enemies/spreader.tres`（行動は `battleship`） |
+| `spreader` | 拡散弾の敵 | 2 | 保留 | 追ってきて、予告のあと本体の正面へ扇状に弾をばらまく | `data/enemies/spreader.tres`（行動は `battleship`） |
 | `clock` | とけい座 | 5 | 採用 | 長針と短針が刃として回り続ける。2本の速さが違う | `data/enemies/clock.tres`、行動 `clock` |
 
 ### 見た目の実装
@@ -202,7 +204,7 @@
 
 | type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | データ・コード |
 | --- | --- | --- | --- | --- | --- | --- |
-| `drifter` | ドリフター | 採用 | 実装済み | 機体へまっすぐ追跡 | 全時間帯 | `data/enemies/drifter.tres`。導入でも複数体を仮の練習相手に流用する（[仕様書](../../spec.md#3-画面の流れ)）。[demo](../../../demo/docs/enemies.md) |
+| `drifter` | ドリフター | 採用 | 実装済み | 機体へ追跡 | 全時間帯 | `data/enemies/drifter.tres`。導入でも複数体を仮の練習相手に流用する（[仕様書](../../spec.md#3-画面の流れ)）。[demo](../../../demo/docs/enemies.md) |
 | `swarm` | スウォーム | 採用 | 実装済み | 小型の追跡敵 | 強化期・強化期II・無双期・脱出期 | `data/enemies/swarm.tres` |
 | `darter` | ダーター | 採用 | 実装済み | 近づくと予告してから突進し、しばらく止まる | 無双期以外 | `data/enemies/darter.tres` |
 | `armored` | 装甲型 | 採用 | 実装済み | 装甲の硬い追跡敵。背面に当てると必ずクリティカル | 圧力期・緊張期・脱出期、危険地帯 | `data/enemies/armored.tres` |
@@ -211,6 +213,6 @@
 | `gunner` | 射撃型 | 採用 | 実装済み | 距離を保って回り込み、予告のあと弾を撃つ | 圧力期以降（無双期を除く）、危険地帯 | `data/enemies/gunner.tres` |
 | `missile` | ミサイル艇 | 採用 | 実装済み | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `data/enemies/missile.tres` |
 | `titan` | タイタン | 採用 | 実装済み | 大型の追跡敵。生成時に大きさが変わる | 無双期以外。同時に出る数に上限 | `data/enemies/titan.tres` |
-| `battleship` | 戦艦 | 採用 | 実装済み | 追跡し、予告のあと扇状に弾を撃つ。背面が弱点 | 緊張期・脱出期 | `data/enemies/battleship.tres` |
+| `battleship` | 戦艦 | 採用 | 実装済み | 追跡し、予告のあと本体の正面へ扇状に弾を撃つ。背面が弱点 | 緊張期・脱出期 | `data/enemies/battleship.tres` |
 
 `missile` は試遊用のスプライトを使う。

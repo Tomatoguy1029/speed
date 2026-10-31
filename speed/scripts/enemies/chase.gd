@@ -1,4 +1,4 @@
-## 追跡（いちばん多い雑魚）：機体へまっすぐ、決まった速さで向かう（仕様書 11.5）。
+## 追跡（いちばん多い雑魚）：種類ごとの速さで向き直り、鼻先へ進む（仕様書 11.5）。
 extends EnemyBehavior
 
 func setup(system: EnemySystem, behavior_name: StringName, idx: int) -> void:
@@ -22,6 +22,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 	var shove_time := t.shove_time
 	var knock_t := t.knock_t
 	var speed := t.speed
+	var turn := t.turn
 	var r := t.r
 	var now := state.world_time
 	var body_move := field.body_speed_max
@@ -52,21 +53,24 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 		var from := pos[i]
 		var rel := from - vc
 		# 画面から遠い敵は、m.LOD 回に1回だけ向きを決め直す。間の回は今の速度で進むだけ
+		var bdt := dt
 		if absf(rel.x) > lod_lim.x or absf(rel.y) > lod_lim.y:
 			if (t.id[i] + m._lod) % m.LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
 				pos[i] = from + vel[i] * dt
 				continue
+			bdt = dt * m.LOD
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			m.motion._update_pushed(i, dt)
 		else:
-			# 機体へまっすぐ、決まった速さで向かう（旋回・慣性なし）
+			# 共通追跡と同じ旋回上限。向きと進行方向は同じに保つ。
 			var d := ship - from
 			var dist := d.length()
 			var v := Vector2.ZERO
 			if dist > 0.001:
-				var u := d / dist
-				v = u * speed[i]
-				facing[i] = u.angle()
+				var f := facing[i]
+				var turn_max := turn[i] * bdt
+				facing[i] = f + clampf(wrapf(d.angle() - f, -PI, PI), -turn_max, turn_max)
+				v = Vector2.from_angle(facing[i]) * speed[i]
 			vel[i] = v
 			pos[i] = from + v * dt
 		var at := pos[i]
