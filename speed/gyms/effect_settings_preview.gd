@@ -629,10 +629,13 @@ func _add_color(label: String, name: String, original: Color, help := "") -> voi
 	var caption := Label.new()
 	caption.text = label
 	caption.tooltip_text = help
+	caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(caption)
 	var picker := ColorPickerButton.new()
-	picker.tooltip_text = help
+	picker.custom_minimum_size = Vector2(72, 32)
+	picker.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	picker.tooltip_text = help + "\nクリックして色を変更"
 	picker.color = _value(name, original)
 	picker.color_changed.connect(func(color: Color): _set_value(name, color))
 	row.add_child(picker)
