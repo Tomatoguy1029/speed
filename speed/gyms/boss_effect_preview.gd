@@ -551,6 +551,19 @@ func _update_preview_camera(render: RunPresentation) -> void:
 	if is_instance_valid(actor) and "attack_points" in actor:
 		for point: Vector2 in actor.attack_points:
 			_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(100.0))
+	if is_instance_valid(actor):
+		if "attack_field" in actor: _fit_attack_field(actor.attack_field)
+		if "retained_fields" in actor:
+			for host: Node in actor.retained_fields:
+				if is_instance_valid(host) and "attack_field" in host: _fit_attack_field(host.attack_field)
+		if "technique_visuals" in actor:
+			for visual: Node2D in actor.technique_visuals.nodes.values():
+				if not is_instance_valid(visual) or not "effects" in visual: continue
+				for effect: Dictionary in visual.effects:
+					if effect.has("pos"):
+						_boss_frame = _boss_frame.merge(Rect2(effect.pos, Vector2.ZERO).grow(maxf(100.0, float(effect.get("radius", 0.0)))))
+					for point: Vector2 in effect.get("line", PackedVector2Array()):
+						_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(100.0))
 	var pr: ProjectileSystem = session.run.projectiles
 	for row in pr.hazard_alive.size():
 		if pr.hazard_alive[row] == 0: continue
@@ -564,6 +577,13 @@ func _update_preview_camera(render: RunPresentation) -> void:
 	# 一回の試行中は範囲を広げるだけにし、攻撃が消える瞬間の急なズームを避ける。
 	var zoom := minf(_frame.size.x / _boss_frame.size.x, _frame.size.y / _boss_frame.size.y)
 	render.view_override = {"center": _boss_frame.get_center(), "zoom": maxf(zoom, 0.001), "shake": false}
+
+func _fit_attack_field(field: Node) -> void:
+	if not is_instance_valid(field) or not "effects" in field: return
+	for effect: Dictionary in field.effects:
+		var margin := maxf(100.0, float(effect.get("width", 0.0)))
+		for point: Vector2 in effect.get("points", PackedVector2Array()):
+			_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(margin))
 
 func _step() -> void:
 	if not is_instance_valid(actor) and (session == null or not is_instance_valid(session.run)): return
