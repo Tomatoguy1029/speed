@@ -159,8 +159,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.projectile_speed | 武器の弾速 | Weapon projectile speed |
 | postmax.duration | 弾・機雷・衝撃波の持続 | Shot, mine and wave duration |
 | postmax.knockback | 武器の吹き飛ばし | Weapon knockback |
-| postmax.crit_chance | RAMクリティカル率 | RAM critical chance |
-| postmax.crit_mult | RAMクリティカル倍率 | RAM critical multiplier |
+| postmax.crit_chance | クリティカル率 | Critical chance |
+| postmax.crit_mult | クリティカル倍率 | Critical multiplier |
 | postmax.area | 巻き込み範囲 | Area of effect |
 | postmax.followup | 追撃威力 | Follow-up damage |
 | postmax.max_speed | 最高速度 | Maximum speed |
