@@ -14,6 +14,11 @@ const BODY_EFFECTS := {
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const BOSS_PREVIEW := preload("res://gyms/boss_effect_preview.gd")
 const MODULE_ICONS := preload("res://scripts/ui/module_icons.gd")
+const COMPONENTS := preload("res://scripts/render/fx/visual_effect_components.gd")
+const ENEMY_EFFECTS := {
+	"enemy/phoenix": {"title": "ほうおう座 · 着地の炎", "scene": ""},
+	"enemy/aquila": {"title": "わし座 · 進路の雷撃", "scene": "res://scenes/attacks/zone_aquila.tscn"},
+}
 const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
 const TARGET_GROUPS := ["武器", "特性", "ボス本体", "ボス技", "敵の技", "HUD"]
 const DIRECT_EFFECTS := [
@@ -114,8 +119,9 @@ const DIRECT_FIELDS := {
 	"res://scenes/attacks/hydra_shape.tscn": [
 		["ドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 	],
-	"res://scenes/attacks/beam_draco.tscn": [
+	"boss/move/draco/inhale": [
 		["ドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
+		["消える間の薄まり（秒）", "fade_seconds", 0.02, 0.5, 0.01, 0.15],
 	],
 }
 const DIRECT_COLOR_FIELDS := {
@@ -159,6 +165,8 @@ const FIELD_LABELS := {
 	"open_color": "開放の輪色", "sirius_color": "シリウス色", "sirius_halo_color": "光の暈色",
 	"booster_core_color": "推進炎の芯色", "vortex_tint": "渦の色",
 	"body_radius_scale": "胴体の表示倍率", "head_radius": "頭の表示半径（px）", "pulse_scale": "光芒の広がり（倍）",
+	"glow_opacity": "円内の光の不透明度", "ring_opacity": "輪郭の不透明度", "ring_width": "輪郭の太さ（px）",
+	"arm_count": "稲妻の本数", "lightning_reach": "稲妻の長さ（半径比）", "lightning_width": "稲妻の太さ（px）",
 }
 const FIELD_HELP := {
 	"effect_tint": "描画結果の色に掛ける値。白で元の色。",
@@ -231,8 +239,49 @@ const SHADER_LABELS := {
 	"blue_rim": ["青の縁の色", "中くらいのときのオーラの縁の色。"], "blue_mid": ["青の中の色", "中くらいのときのオーラの中ほどの色。"], "blue_outer": ["青の外の色", "中くらいのときのオーラの外側の色。"],
 	"gold_rim": ["金の縁の色", "最大のときのオーラの縁の色。"], "gold_mid": ["金の中の色", "最大のときのオーラの中ほどの色。"], "gold_outer": ["金の外の色", "最大のときのオーラの外側の色。"],
 	"flicker_speed": ["揺らめきの速さ", "オーラの模様が流れる速さ。"], "rise": ["上へ伸びる強さ", "オーラが機体の後ろへ伸びる強さ。"],
+	"pale_mix": ["光の筋の白さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"core_emission": ["芯の発光倍率", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"spark_emission": ["光の筋の発光倍率", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"rim_opacity": ["光線本体の濃さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"haze_opacity": ["光線の揺れる縁の濃さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"width_wobble": ["光線の幅の揺れ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"width_frequency": ["光線の幅のノイズ密度", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"width_speed": ["光線の幅の流速", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"haze_width": ["揺れる縁の広がり", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"haze_noise_x": ["縁ノイズの長手方向の密度", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"haze_noise_y": ["縁ノイズの横方向の密度", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"haze_speed": ["縁ノイズの流速", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"haze_threshold": ["縁が光るしきい値", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"streak_noise_x": ["光の筋の長手方向の密度", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"streak_noise_y": ["光の筋の横方向の密度", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"streak_speed": ["光の筋の流速", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"streak_threshold": ["光の筋のしきい値", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"orb_reach": ["口元の光の広がり", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"orb_start": ["口元の光の初期サイズ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"orb_growth": ["口元の光の成長幅", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"orb_core_ratio": ["口元の芯の太さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"orb_mid_ratio": ["口元の内側の太さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"orb_ring_shrink": ["口元の輪が縮む割合", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"orb_spark_speed": ["口元の粒の流速", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"arrow_color": ["矢の色", "光の矢の表示色。"],
+	"orb_spark_threshold": ["口元の粒のしきい値", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"spokes": ["光条の密度", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ring_start": ["光の輪の初期半径比", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ring_growth": ["光の輪の広がり", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ring_noise": ["輪のノイズの強さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ring_thickness": ["光の輪の太さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ring_thickness_start": ["輪の出始めの太さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"inner_size": ["中央の閃光の大きさ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ray_threshold": ["光条のしきい値", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ray_reach": ["光条の長さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ray_thickness": ["光条の太さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"chip_threshold": ["飛び散る破片のしきい値", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"chip_density": ["破片の密度", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ring_opacity": ["光の輪の濃さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"ray_opacity": ["光条の濃さ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
+	"brightness": ["光全体の明るさ", "表示だけを調整します。攻撃の判定・時間・範囲は維持します。"],
 }
-const GROUP_ORDER := ["色", "形・大きさ", "動き・時間", "粒子", "シェーダ"]
+const GROUP_ORDER := ["色", "形・大きさ", "動き・時間", "粒子", "シェーダ", "品質・負荷"]
 
 var preview_host: Control
 var controls_host: Control
@@ -266,6 +315,7 @@ func _ready() -> void:
 	_collect_boss_techniques()
 	_paths.append_array(DIRECT_EFFECTS)
 	_paths.append(BOMBER_PREVIEW)
+	_paths.append_array(ENEMY_EFFECTS.keys())
 	for key in BODY_EFFECTS:
 		if key != "boss/shared/tornado_shader": _paths.append(key)
 	_paths.sort()
@@ -378,7 +428,7 @@ func _collect_boss_techniques() -> void:
 			var move: Resource = item
 			if move == null: continue
 			var path := "boss/move/%s/%s" % [boss_id, move.technique]
-			_move_targets[path] = {"boss": boss_id, "id": String(move.technique), "visual": move.visual.resource_path if move.visual != null else "", "move": move}
+			_move_targets[path] = {"boss": boss_id, "id": String(move.technique), "visual": move.visual.resource_path if move.visual != null else "", "move": move, "projectile": move.get("shot_visual") if "shot_visual" in move else null}
 			_move_order[path] = _move_order.size()
 			_paths.append(path)
 			var names: PackedStringArray = _technique_names.get(path, PackedStringArray())
@@ -502,6 +552,7 @@ func _refresh_target_selection() -> void:
 
 func _effect_label(path: String) -> String:
 	if path == BOOST_GAUGE.KEY: return "ブーストゲージ"
+	if ENEMY_EFFECTS.has(path): return ENEMY_EFFECTS[path].title
 	if path.begins_with("boss/body/"):
 		for section in _boss_sections:
 			if section.id == path.get_slice("/", 2): return String(section.title) + " · 本体"
@@ -529,13 +580,13 @@ func _select(path: String) -> void:
 	else: _refresh_target_selection()
 	if is_instance_valid(_sample): _sample.queue_free()
 	_sample = null
-	var boss_effect := _move_targets.has(path) or path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path)
+	var boss_effect := ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path)
 	var live_effect := boss_effect or path == "boss/final_strike" or path.begins_with("weapon/") or path.begins_with("trait/")
 	_static_container.visible = not live_effect
 	_boss_preview.visible = live_effect
 	_boss_preview.set_active(live_effect)
-	if _move_targets.has(path) or path.begins_with("res://") or path == BOOST_GAUGE.KEY:
-		var scene_path: String = _move_targets[path].visual if _move_targets.has(path) else "res://gyms/boost_gauge_preview.tscn" if path == BOOST_GAUGE.KEY else path
+	if ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with("res://") or path == BOOST_GAUGE.KEY:
+		var scene_path: String = ENEMY_EFFECTS[path].scene if ENEMY_EFFECTS.has(path) else _move_targets[path].visual if _move_targets.has(path) else "res://gyms/boost_gauge_preview.tscn" if path == BOOST_GAUGE.KEY else path
 		var scene := load(scene_path) as PackedScene if not scene_path.is_empty() else null
 		_sample = scene.instantiate() as Node2D if scene != null else null
 		if not boss_effect and _sample != null:
@@ -549,7 +600,7 @@ func _select(path: String) -> void:
 		_sample.free()
 		_sample = null
 	_apply_preview()
-	var preview_path := path if _move_targets.has(path) else String(BODY_EFFECTS.get(path, path)) if boss_effect else (path if live_effect else "")
+	var preview_path := path if ENEMY_EFFECTS.has(path) or _move_targets.has(path) else String(BODY_EFFECTS.get(path, path)) if boss_effect else (path if live_effect else "")
 	_boss_preview.set_effect(preview_path)
 
 func _build_fields() -> void:
@@ -564,24 +615,25 @@ func _build_fields() -> void:
 		_fields.add_child(note)
 		return
 	var entries: Array[Dictionary] = []
-	if not BODY_EFFECTS.has(_selected) and _selected not in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] and (not _move_targets.has(_selected) or _sample != null): entries.append({"name": "effect_tint", "value": Color.WHITE})
+	if not BODY_EFFECTS.has(_selected) and _selected not in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] and (not _move_targets.has(_selected) or _sample != null) and _selected != "enemy/phoenix": entries.append({"name": "effect_tint", "value": Color.WHITE})
 	for field in DIRECT_FIELDS.get(_selected, []):
 		entries.append({"name": field[1], "value": field[5], "hint": "%s,%s,%s" % [field[2], field[3], field[4]], "fallback": field[0]})
 	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
 		entries.append({"name": field[1], "value": field[2], "fallback": field[0]})
 	entries.append_array(_shader_entries(_selected))
+	entries.append_array(_component_entries(_selected))
 	if is_instance_valid(_sample):
 		for info in _sample.get_property_list():
 			var name: String = info.name
-			if name not in VISUAL_FIELDS: continue
+			if name not in VISUAL_FIELDS and not (_selected == "enemy/aquila" and name in ["glow_opacity", "ring_opacity", "ring_width", "arm_count", "lightning_reach", "lightning_width"]): continue
 			if name == "flight_scale" and _selected != "res://scenes/attacks/star_bolt.tscn": continue
 			if not (info.usage & PROPERTY_USAGE_EDITOR): continue
-			if info.type in [TYPE_COLOR, TYPE_FLOAT]:
+			if info.type in [TYPE_COLOR, TYPE_FLOAT, TYPE_INT]:
 				entries.append({"name": name, "value": _sample.get(name), "hint": info.hint_string})
 	for group in GROUP_ORDER:
 		var grouped: Array[Dictionary] = []
 		for entry in entries:
-			if _field_group(entry.name) == group: grouped.append(entry)
+			if entry.get("group", _field_group(entry.name)) == group: grouped.append(entry)
 		if grouped.is_empty(): continue
 		_add_group(group)
 		for entry in grouped:
@@ -602,14 +654,61 @@ func _shader_entries(path: String) -> Array[Dictionary]:
 	elif is_instance_valid(_sample):
 		script = _sample.get_script() as Script
 	else: return entries
-	var constants: Dictionary = script.get_script_constant_map()
-	var defaults: Dictionary = constants.get("SHADER_DEFAULTS", {})
-	for shader: Shader in constants.get("TUNED_SHADERS", []):
-		for info in ShaderTuning.tunables(shader):
-			var name := ShaderTuning.field(shader, info.name)
-			var label: Array = SHADER_LABELS.get(info.name, [info.name, ""])
-			entries.append({"name": name, "value": defaults.get(name, ShaderTuning.default_value(shader, info.name)),
-				"hint": info.hint_string, "fallback": label[0], "help": label[1]})
+	var seen := {}
+	var defaults := {}
+	while script != null:
+		var constants: Dictionary = script.get_script_constant_map()
+		defaults.merge(constants.get("SHADER_DEFAULTS", {}), false)
+		for shader: Shader in constants.get("TUNED_SHADERS", []):
+			if seen.has(shader.resource_path): continue
+			seen[shader.resource_path] = true
+			for info in ShaderTuning.tunables(shader):
+				var name := ShaderTuning.field(shader, info.name)
+				var label: Array = SHADER_LABELS.get(info.name, [info.name, ""])
+				entries.append({"name": name, "value": defaults.get(name, ShaderTuning.default_value(shader, info.name)),
+					"hint": info.hint_string, "fallback": label[0], "help": label[1]})
+		script = script.get_base_script()
+	return entries
+
+## 部品の明示したartist値だけを列挙する。sampler・時刻・判定値は対象外。
+func _component_entries(key: String) -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	var components := COMPONENTS.fire_presets(key)
+	if key == "enemy/phoenix": components.append({"resource": preload("res://data/visuals/phoenix_flames.tres"), "title": "着地の炎"})
+	for component in components:
+		var resource: Resource = component.resource
+		var allowed: Array = COMPONENTS.PHOENIX_FIELDS if key == "enemy/phoenix" else COMPONENTS.FIRE_FIELDS
+		for info in resource.get_property_list():
+			var name: String = info.name
+			if name not in allowed: continue
+			var value: Variant = resource.get(name)
+			var label: String = component.title + " · " + COMPONENTS.LABELS.get(name, name)
+			var prefix := COMPONENTS.prefix(resource) + name
+			var quality: bool = name in COMPONENTS.QUALITY_FIELDS
+			var group := "品質・負荷" if quality else "色" if value is Color else "粒子" if name.begins_with("layer_") or name in ["birth_rate", "particle_size"] else "動き・時間" if name in ["lifetime", "speed", "rise_speed", "sway", "update_fps"] else "形・大きさ"
+			var help := "表示だけを変更します。判定・弾速・射程・攻撃時間を維持します。"
+			if quality: help = "描画品質と負荷の設定。大きな描画域・粒数・FPSや細かい密度画素は負荷が増えます。"
+			if value is Vector2 or value is Vector3:
+				var axes := 2 if value is Vector2 else 3
+				for axis in axes:
+					var suffix: String = ["横", "縦"][axis] if axes == 2 else ["外炎", "内炎", "芯"][axis]
+					entries.append({"name": prefix + "/" + "xyz"[axis], "value": value[axis], "hint": ("64,1024,8" if axis == 1 else "32,1024,8") if name == "field_size" else "0,4,0.05", "fallback": label + " · " + suffix, "help": help, "group": group})
+			else:
+				entries.append({"name": prefix, "value": value, "hint": info.hint_string, "fallback": label, "help": help, "group": group})
+	if _move_targets.has(key) and _move_targets[key].projectile != null:
+		var scene: PackedScene = _move_targets[key].projectile
+		var visual := scene.instantiate() as AttackVisual
+		if visual != null:
+			var legacy := _working.values_for(visual.visual_profile_fallback)
+			for info in visual.get_property_list():
+				var name: String = info.name
+				if name not in ["effect_tint", "flight_scale", "shot_length_scale", "shot_width_scale", "core_width", "arrow_color", "cosmic_color_a", "cosmic_color_b", "cosmic_speed", "cosmic_star_count"]: continue
+				var cosmic := visual.visual_profile_fallback.ends_with("cosmic_arrow.tscn")
+				if name.begins_with("cosmic_") and not cosmic: continue
+				if name == "arrow_color" and cosmic: continue
+				var value: Variant = legacy.get(name, visual.get(name))
+				entries.append({"name": "projectile/" + name, "value": value, "hint": info.hint_string, "fallback": "弾の表示 · " + FIELD_LABELS.get(name, "矢の色" if name == "arrow_color" else "芯の太さ（px）" if name == "core_width" else {"effect_tint": "弾の色", "cosmic_color_a": "変化する色1", "cosmic_color_b": "変化する色2", "cosmic_speed": "色が変わる速さ", "cosmic_star_count": "尾の星の数"}.get(name, name)), "help": "この技の弾の表示だけを変更します。弾速・威力・判定を維持します。", "group": "色" if value is Color else "形・大きさ"})
+			visual.free()
 	return entries
 
 func _field_group(name: String) -> String:
@@ -631,7 +730,9 @@ func _add_group(title: String) -> void:
 	_fields.add_child(heading)
 
 func _value(name: String, fallback: Variant) -> Variant:
-	var legacy: String = _move_targets[_selected].visual if _move_targets.has(_selected) else ""
+	var legacy: String = _move_targets[_selected].visual if _move_targets.has(_selected) else ENEMY_EFFECTS[_selected].scene if ENEMY_EFFECTS.has(_selected) else ""
+	if _selected == "boss/move/draco/inhale" and (name.begins_with("shader/") or name in ["pixel_scale", "fade_seconds"]):
+		legacy = "res://scenes/attacks/beam_draco.tscn"
 	return _working.resolved_values(_selected, legacy).get(name, fallback)
 
 func _set_value(name: String, value: Variant) -> void:
@@ -645,7 +746,7 @@ func _set_value(name: String, value: Variant) -> void:
 	_dirty = true
 	_message = "未保存: " + _selected
 	_apply_preview()
-	if _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		_boss_preview.refresh_effects()
 
 func _add_color(label: String, name: String, original: Color, help := "") -> void:
@@ -673,11 +774,11 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 	var caption := Label.new()
 	caption.text = label
 	caption.tooltip_text = help
-	if _selected == BOOST_GAUGE.KEY: caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(caption)
 	var spin := SpinBox.new()
-	if _selected == BOOST_GAUGE.KEY: spin.custom_minimum_size = Vector2(90, 32)
+	spin.custom_minimum_size = Vector2(90, 32)
 	spin.tooltip_text = help
 	var parts := hint.split(",")
 	var limits: Array = NUMBER_LIMITS.get(name, [0.0, maxf(100.0, original * 4.0), 0.05])
@@ -691,7 +792,7 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 
 func _apply_preview() -> void:
 	_swatch.color = _value("effect_tint", Color.WHITE)
-	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] or ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
@@ -729,7 +830,7 @@ func reload_current() -> void:
 
 func set_active(active: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
-	var live_effect := _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
+	var live_effect := ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
 	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)
 	if not active: EFFECT_SETTINGS.clear_preview_profiles()
 	elif _working != null and (live_effect or _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]): EFFECT_SETTINGS.set_preview_profiles(_working.profiles)

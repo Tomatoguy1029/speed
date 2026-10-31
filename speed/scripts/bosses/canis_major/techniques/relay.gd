@@ -88,6 +88,12 @@ extends BossTechnique
 		cd = value
 		_values_dirty = true
 
+## 放射粒の物理寿命。表示用の炎の寿命と独立して、弾速と到達範囲を保つ。
+@export_range(0.1, 2.5, 0.05) var beam_particle_life := 0.65:
+	set(value):
+		beam_particle_life = value
+		_values_dirty = true
+
 ## 放射するピクセル炎。ビジュアル編集の「炎」で調整する。
 @export var flame_settings: PixelFireSettings = preload("res://data/visuals/canis_fire_jet.tres"):
 	set(value):

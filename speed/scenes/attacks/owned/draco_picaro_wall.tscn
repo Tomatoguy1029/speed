@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/attacks/cosmic_arrow.tscn" id="1"]
+
+[node name="OwnedAttackVisual" instance=ExtResource("1")]
+visual_profile_key = "boss/move/draco/picaro_wall"
+visual_profile_fallback = "res://scenes/attacks/cosmic_arrow.tscn"

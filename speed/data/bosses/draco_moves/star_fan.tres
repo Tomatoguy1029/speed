@@ -4,6 +4,8 @@
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/draco/star_fan_visual.tscn" id="visual"]
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/draco_star_fan.tscn" id="effect_owner"]
+
 [resource]
 script = ExtResource("1")
 technique = &"star_fan"
@@ -20,3 +22,5 @@ arc = 1.134464
 radius = 260.0
 speed = 800.0
 visual = ExtResource("visual")
+
+shot_visual = ExtResource("effect_owner")

@@ -6,6 +6,9 @@ const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 var rm: RunPresentation
 var effect_tint := Color.WHITE
+## 専用の使用元を持つ弾シーンだけが指定する。旧sceneキーは互換値として引き継ぐ。
+@export var visual_profile_key := ""
+@export var visual_profile_fallback := ""
 var state: RunState:
 	get: return rm.state
 
@@ -32,8 +35,14 @@ func _px(px: float) -> float:
 	return rm._px(px)
 
 func _apply_effect_settings() -> void:
-	EFFECT_SETTINGS.apply_to(self)
-	effect_tint = EFFECT_SETTINGS.values_for(scene_file_path).get("effect_tint", Color.WHITE)
+	var values: Dictionary
+	if visual_profile_key.is_empty():
+		EFFECT_SETTINGS.apply_to(self)
+		values = EFFECT_SETTINGS.values_for(scene_file_path)
+	else:
+		values = EFFECT_SETTINGS.component_values(visual_profile_key, "projectile", visual_profile_fallback)
+		EFFECT_SETTINGS.apply_values(self, values)
+	effect_tint = values.get("effect_tint", Color.WHITE)
 
 func draw_friend(_c: CanvasItem, _projectiles: ProjectileSystem, _row: int, _pos: Vector2) -> void:
 	pass

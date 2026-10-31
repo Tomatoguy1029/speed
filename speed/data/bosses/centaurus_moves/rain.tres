@@ -4,6 +4,8 @@
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/rain_visual.tscn" id="visual"]
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/centaurus_rain.tscn" id="effect_owner"]
+
 [resource]
 script = ExtResource("1")
 technique = &"rain"
@@ -30,3 +32,5 @@ traces = 4
 traces_p2 = 6
 warn = 0.8
 visual = ExtResource("visual")
+
+shot_visual = ExtResource("effect_owner")

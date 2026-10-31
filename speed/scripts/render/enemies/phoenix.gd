@@ -2,6 +2,7 @@
 extends EnemyVisual
 
 var flame_settings: Resource = preload("res://data/visuals/phoenix_flames.tres")
+const COMPONENTS := preload("res://scripts/render/fx/visual_effect_components.gd")
 var _flame_layer: DrawLayer
 
 func update(_dt: float) -> void:
@@ -13,6 +14,7 @@ func draw_marks(_c: CanvasItem, _t: EnemyTable, _i: int) -> void:
 
 ## 本体が画面外でも、画面内にある着地点を描く。
 func draw_layer(c: CanvasItem, view: Rect2) -> void:
+	flame_settings = COMPONENTS.phoenix("enemy/phoenix", preload("res://data/visuals/phoenix_flames.tres"))
 	_ensure_flames(c)
 	var t := run.enemies.table
 	for i in behavior.rows():

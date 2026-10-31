@@ -33,6 +33,9 @@ var _final_picker := OptionButton.new()
 var _boss := ""
 var _technique := ""
 var _equipment_key := ""
+var _enemy_key := ""
+var _enemy_row := -1
+var _enemy_id := -1
 var _final_preview := false
 var _final_boss := "canis_major"
 var _serial := 0
@@ -200,6 +203,7 @@ func set_effect(path: String, resume: Variant = null) -> void:
 		_weapon_key = ""
 		_trait_key = ""
 	_equipment_key = ""
+	_enemy_key = ""
 	_loadout_row.visible = path.begins_with("weapon/") or path.begins_with("trait/")
 	_refresh_equipment_labels()
 	_final_preview = path == "boss/final_strike"
@@ -210,6 +214,10 @@ func set_effect(path: String, resume: Variant = null) -> void:
 	if path.begins_with("weapon/") or path.begins_with("trait/"):
 		_equipment_key = path
 		await _setup_equipment(path, serial, keep_playing)
+		return
+	if path.begins_with("enemy/"):
+		_enemy_key = path
+		await _setup_enemy(serial, keep_playing)
 		return
 	if _final_preview:
 		_boss = _final_boss
@@ -333,6 +341,28 @@ func _setup_equipment(_key: String, serial: int, keep_playing: bool) -> void:
 	if play_key in ["weapon/knockback","trait/duplicator"]: _status.text += "（試遊では確率の演出を必ず発動）"
 	refresh_effects()
 
+func _setup_enemy(serial: int, keep_playing: bool) -> void:
+	var type := _enemy_key.get_slice("/", 1)
+	_boss = ""
+	_technique = ""
+	_status.text = "敵の技を準備中: " + type
+	await session.reset({"empty": true, "stage": 1, "ship_pos": [400, 0], "invincible": true, "director": {"enabled": false}})
+	if serial != _serial: return
+	_pause_render_process()
+	session.perform("spawn", {"type": type, "pos": [0, 0], "count": 1})
+	_enemy_row = session.selected
+	if _enemy_row < 0:
+		_status.text = "敵を配置できません: " + type
+		return
+	_enemy_id = session.run.enemies.table.id[_enemy_row]
+	_preview_target = session.run.state.ship_pos
+	_boss_frame_ready = false
+	session.playing = keep_playing
+	_set_scene_processing(keep_playing)
+	_sync_play_button()
+	_status.text = "敵の行動と専用の描画を試遊: " + type
+	refresh_effects()
+
 func _show_effect_canvas() -> void:
 	if not is_instance_valid(session.scene) or session.scene.view == null: return
 	var render := _render()
@@ -385,6 +415,9 @@ func _change_loadout() -> void:
 	if not _equipment_key.is_empty(): set_effect(_equipment_key)
 
 func _replay() -> void:
+	if not _enemy_key.is_empty():
+		set_effect(_enemy_key, false)
+		return
 	if not _equipment_key.is_empty():
 		set_effect(_equipment_key, false)
 		return
@@ -411,6 +444,8 @@ func _execute_selected(keep_playing: bool) -> void:
 
 func refresh_effects() -> void:
 	if is_instance_valid(actor):
+		if "sirius_effects" in actor and is_instance_valid(actor.sirius_effects):
+			actor.sirius_effects._sync_fire_displays()
 		var presentation: CanvasItem = actor.get("_presentation") as CanvasItem
 		if presentation != null:
 			EFFECT_SETTINGS.apply_key(presentation, "boss/body/" + _boss)
@@ -430,10 +465,13 @@ func _hide_preview_hud() -> void:
 	if hud != null: hud.visible = false
 
 func _refresh_scene_visuals(node: Node) -> void:
+	if node is CanvasItem and node.has_meta("shader_tuning_profile"):
+		ShaderTuning.apply((node as CanvasItem).material as ShaderMaterial, node.get_meta("shader_tuning_profile"), node.get_meta("shader_tuning_fallback", ""))
 	if node is AttackVisual:
 		(node as AttackVisual)._apply_effect_settings()
 	elif node is CanvasItem:
 		EFFECT_SETTINGS.apply_to(node as CanvasItem)
+	if node.has_method("refresh_visual_settings"): node.refresh_visual_settings()
 	if node is CanvasItem: (node as CanvasItem).queue_redraw()
 	for child in node.get_children(): _refresh_scene_visuals(child)
 
@@ -479,11 +517,11 @@ func _process(_delta: float) -> void:
 		_visual_time += _delta * session.speed
 		render._present(_delta * session.speed)
 		_hide_preview_hud()
-		if not _equipment_key.is_empty():
-			_show_effect_canvas()
+		if not _equipment_key.is_empty() or not _enemy_key.is_empty():
+			if not _equipment_key.is_empty(): _show_effect_canvas()
 			_loop_seconds += _delta * session.speed
 			if _loop_seconds >= 10.0:
-				set_effect(_equipment_key, true)
+				set_effect(_enemy_key if not _enemy_key.is_empty() else _equipment_key, true)
 				return
 	_sync_preview_shader_time(session.scene.view)
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
@@ -494,16 +532,23 @@ func _update_preview_camera(render: RunPresentation) -> void:
 		var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
 		render.view_override = {"center": session.run.state.ship_pos, "zoom": 1280.0 / EQUIPMENT_VIEW_WIDTH * fit, "shake": false}
 		return
-	if not is_instance_valid(actor) or not actor.has_body(): return
-	var origin: Vector2 = actor.table.pos[actor.body]
+	var origin := Vector2.ZERO
+	var body_radius := 180.0
+	if not _enemy_key.is_empty():
+		if session.run.enemies.is_same(_enemy_row, _enemy_id):
+			origin = session.run.enemies.table.pos[_enemy_row]
+			body_radius = maxf(body_radius, float(session.run.enemies.table.r[_enemy_row]))
+	else:
+		if not is_instance_valid(actor) or not actor.has_body(): return
+		origin = actor.table.pos[actor.body]
+		body_radius = maxf(body_radius, float(actor.table.r[actor.body]))
 	if not _boss_frame_ready:
 		var width := 2800.0 if _boss == "hydra" else 1800.0
 		var size := Vector2(width, width * 9.0 / 16.0)
 		_boss_frame = Rect2((origin + _preview_target) * 0.5 - size * 0.5, size)
 		_boss_frame_ready = true
-	var body_radius := maxf(180.0, float(actor.table.r[actor.body]))
 	_boss_frame = _boss_frame.merge(Rect2(origin, Vector2.ZERO).grow(body_radius + 100.0))
-	if "attack_points" in actor:
+	if is_instance_valid(actor) and "attack_points" in actor:
 		for point: Vector2 in actor.attack_points:
 			_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(100.0))
 	var pr: ProjectileSystem = session.run.projectiles

@@ -1,5 +1,6 @@
 ## 絵担当の差し替え用の最小実装。イベントを受け取り、判定と同じ世界時間で表示する。
 extends Node2D
+const TUNED_SHADERS := [preload("res://shaders/hydra_burst.gdshader")]
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 @export var warning_color := Color("#ffd16c")
@@ -147,11 +148,22 @@ func _flash(event: Dictionary)->void:
 	if event.cue==&"hit":color=hit_color
 	sprite.material.set_shader_parameter("tint",color)
 	sprite.material.set_shader_parameter("pixels",diameter/4.0 * burst_pixel_scale)
+	sprite.set_meta("burst_diameter", diameter)
 	sprite.material.set_shader_parameter("seed",float(serial%19))
+	var profile: String = get_meta("visual_profile", scene_file_path)
+	ShaderTuning.apply(sprite.material, profile, scene_file_path)
+	sprite.set_meta("shader_tuning_profile", profile)
+	sprite.set_meta("shader_tuning_fallback", scene_file_path)
 	add_child(sprite)
 	sprites[serial]=sprite
 	var duration:=0.8 if large else maxf(flash_duration,0.3)
 	flashes.append({"id":serial,"position":event.position,"cue":event.cue,"life":duration,"duration":duration})
+
+## 編集中の停止フレームへ、描画だけを反映する。
+func refresh_visual_settings() -> void:
+	for sprite: Sprite2D in sprites.values():
+		var material := sprite.material as ShaderMaterial
+		material.set_shader_parameter("pixels", float(sprite.get_meta("burst_diameter")) / 4.0 * burst_pixel_scale)
 
 func phase_state() -> Dictionary:
 	if slots.is_empty() or hydra == null: return {}

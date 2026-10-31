@@ -22,6 +22,8 @@ spread_degrees = 20.0
 count = 12
 
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/draco_inhale.tscn" id="effect_owner"]
+
 [resource]
 script = ExtResource("1")
 technique = &"inhale"
@@ -47,3 +49,5 @@ recover = 1.4
 warn = 1.2
 width = 120.0
 visual = ExtResource("visual")
+
+shot_visual = ExtResource("effect_owner")

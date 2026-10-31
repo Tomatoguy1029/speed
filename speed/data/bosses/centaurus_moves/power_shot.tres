@@ -4,6 +4,8 @@
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/power_shot_visual.tscn" id="visual"]
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/centaurus_power_shot.tscn" id="effect_owner"]
+
 [resource]
 script = ExtResource("1")
 technique = &"power_shot"
@@ -20,3 +22,5 @@ spread = 0.22
 travel = 1600.0
 warn = 1.4
 visual = ExtResource("visual")
+
+shot_visual = ExtResource("effect_owner")
