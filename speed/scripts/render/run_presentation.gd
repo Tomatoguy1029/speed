@@ -93,9 +93,7 @@ var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
 var flash := 0.0
-var _stars: PackedVector3Array
 var _star_batch: InstanceBatch
-var _star_material: ShaderMaterial
 var _hostile_batch: InstanceBatch
 var _coin_batch: InstanceBatch
 var _ship_visual: RefCounted
@@ -165,10 +163,6 @@ func _ready() -> void:
 	_layers.exhaust.add_child(_glide_wake)
 	run.loadout.equipment_changed.connect(_sync_equipment_visuals)
 	_sync_equipment_visuals()
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	for i in 400:
-		_stars.append(Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(0.2, 1.0)))
 	_build_star_batch()
 	_build_stage_background()
 	run.frame_events.connect(_on_events)
@@ -679,19 +673,7 @@ func view_rect() -> Rect2:
 
 ## 星の円メッシュと乱数データは開始時に作り、GPUで位置・視差だけ更新する。
 func _build_star_batch() -> void:
-	_star_batch = InstanceBatch.new()
-	_star_batch.setup_polygon(InstanceBatch.circle_points(16))
-	var mm := _star_batch.multimesh
-	mm.use_custom_data = true
-	mm.instance_count = _stars.size()
-	for i in _stars.size():
-		var star := _stars[i]
-		mm.set_instance_transform_2d(i, Transform2D.IDENTITY)
-		mm.set_instance_custom_data(i, Color(star.x, star.y, star.z, 0.0))
-		mm.set_instance_color(i, Color(0.7, 0.8, 1.0, 0.25 + 0.5 * star.z))
-	_star_material = ShaderMaterial.new()
-	_star_material.shader = preload("res://shaders/background_stars.gdshader")
-	_star_batch.material = _star_material
+	_star_batch = preload("res://scripts/render/background_star_field.gd").create()
 	_layers.background.add_child(_star_batch)
 
 ## 透明な余白を除く画像の中心を、開始地点からの距離に合わせる。
@@ -746,7 +728,7 @@ func _build_stage_background() -> void:
 
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
-	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else Color(0.02, 0.03, 0.07))
+	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else state.stage.background_color)
 	_star_batch.visible = show_background
 	for i in _background_sprites.size():
 		var sprite := _background_sprites[i]
@@ -758,9 +740,7 @@ func _draw_background(c: CanvasItem) -> void:
 		fire.position = _background_origin + _fire_placements[i].position_at(cam_center - _background_origin) + _fire_placements[i].fire_offset
 	for fire in _static_fires:
 		fire.visible = show_background
-	_star_material.set_shader_parameter("view_center", cam_center)
-	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
-	_star_material.set_shader_parameter("camera_zoom", cam_zoom)
+	preload("res://scripts/render/background_star_field.gd").update_view(_star_batch, cam_center, view_rect().size / 2.0, cam_zoom)
 
 func _draw_field_boundary(c: CanvasItem) -> void:
 	if run.field.battle_arenas.is_empty():

@@ -5,6 +5,7 @@ const CANVAS := preload("res://gyms/background_lab/background_canvas.gd")
 const ASSETS := "res://assets/pixel/background"
 
 var items: Array[BackgroundPlacement] = []
+var background_color: Color
 var selected := -1
 var canvas: CANVAS
 var _stage: OptionButton
@@ -13,6 +14,7 @@ var _assets: ItemList
 var _placed: ItemList
 var _fields: Dictionary = {}
 var _color: ColorPickerButton
+var _background_color: ColorPickerButton
 var _status: Label
 var _details: Label
 var _save: Button
@@ -117,6 +119,17 @@ func _ready() -> void:
 	var inspector := VBoxContainer.new()
 	inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(inspector)
+	_label(inspector, tr("bg.background_color"))
+	_background_color = ColorPickerButton.new()
+	_background_color.edit_alpha = false
+	_background_color.custom_minimum_size.y = 36
+	_background_color.color_changed.connect(_set_background_color)
+	inspector.add_child(_background_color)
+	var stars := CheckButton.new()
+	stars.text = tr("bg.stars")
+	stars.button_pressed = true
+	stars.toggled.connect(func(on: bool): canvas.show_stars = on; canvas.queue_redraw())
+	inspector.add_child(stars)
 	_label(inspector, tr("bg.properties")).add_theme_font_size_override("font_size", 18)
 	_details = _label(inspector, "")
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -161,18 +174,18 @@ func _asset_name(path: String) -> String:
 	var translated := tr(key)
 	return translated if translated != key else name
 
-func snapshot() -> Array:
+func snapshot() -> Dictionary:
 	var result: Array = []
 	for item in items: result.append(item.copy())
-	return result
+	return {"items": result, "background_color": background_color}
 
 func _key() -> String:
 	var values := []
 	for item in items:
 		values.append([item.texture.resource_path if item.texture != null else "", item.offset, item.scale, item.rotation_degrees, item.tint, item.parallax])
-	return var_to_str(values)
+	return var_to_str([background_color, values])
 
-func remember(before: Array) -> void:
+func remember(before: Dictionary) -> void:
 	_undo.append(before)
 	if _undo.size() > 50: _undo.pop_front()
 	_redo.clear()
@@ -201,6 +214,7 @@ func _load_stage(index: int) -> void:
 	var source: StageDef = ContentManager.stage(index)
 	_source = ResourceLoader.load(source.resource_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
 	_source_hash = FileAccess.get_sha256(_source.resource_path)
+	background_color = _source.background_color
 	items.clear()
 	for item in _source.backgrounds:
 		var copy := item.copy()
@@ -222,6 +236,7 @@ func select(index: int) -> void:
 
 func refresh(rebuild := true) -> void:
 	_updating = true
+	_background_color.color = background_color
 	if rebuild:
 		_placed.clear()
 		for item in items: _placed.add_item(_asset_name(item.texture.resource_path), item.texture)
@@ -283,6 +298,12 @@ func _set_color(value: Color) -> void:
 	items[selected].tint = Color(value, items[selected].tint.a)
 	remember(before)
 
+func _set_background_color(value: Color) -> void:
+	if _updating: return
+	var before := snapshot()
+	background_color = Color(value, 1.0)
+	remember(before)
+
 func _duplicate() -> void:
 	if selected < 0: return
 	var before := snapshot()
@@ -312,16 +333,20 @@ func _reorder(direction: int) -> void:
 func _undo_edit() -> void:
 	if _undo.is_empty(): return
 	_redo.append(snapshot())
-	items.assign(_undo.pop_back())
+	_restore(_undo.pop_back())
 	selected = mini(selected, items.size() - 1)
 	refresh()
 
 func _redo_edit() -> void:
 	if _redo.is_empty(): return
 	_undo.append(snapshot())
-	items.assign(_redo.pop_back())
+	_restore(_redo.pop_back())
 	selected = mini(selected, items.size() - 1)
 	refresh()
+
+func _restore(value: Dictionary) -> void:
+	items.assign(value.items)
+	background_color = value.background_color
 
 func _save_stage() -> void:
 	canvas.finish_drag()
@@ -335,7 +360,8 @@ func _save_stage() -> void:
 	if saved == null:
 		_status.text = tr("bg.failed")
 		return
-	saved.backgrounds.assign(snapshot())
+	saved.backgrounds.assign(snapshot().items)
+	saved.background_color = background_color
 	var error := ResourceSaver.save(saved, path)
 	if error != OK:
 		_status.text = tr("bg.failed") + " " + error_string(error)

@@ -6,10 +6,13 @@ var center := Vector2.ZERO
 var zoom := 0.65
 var guides := true
 var parallax_preview := false
+var show_stars := true
+var _backdrop: ColorRect
+var _stars: InstanceBatch
 var _panning := false
 var _dragging := false
 var _grab := Vector2.ZERO
-var _before: Array = []
+var _before: Dictionary = {}
 var _original_offset := Vector2.ZERO
 
 func _ready() -> void:
@@ -17,6 +20,15 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Control.CURSOR_CROSS
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_backdrop = ColorRect.new()
+	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_backdrop.show_behind_parent = true
+	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_backdrop)
+	_stars = preload("res://scripts/render/background_star_field.gd").create()
+	_stars.show_behind_parent = true
+	_stars.material.set_shader_parameter("local_coordinates", true)
+	add_child(_stars)
 	resized.connect(queue_redraw)
 
 func screen(world: Vector2) -> Vector2:
@@ -87,7 +99,7 @@ func finish_drag() -> void:
 	if _dragging and editor.selected >= 0 and editor.items[editor.selected].offset != _original_offset:
 		editor.remember(_before)
 	_dragging = false
-	_before = []
+	_before = {}
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_FOCUS_EXIT:
@@ -95,9 +107,13 @@ func _notification(what: int) -> void:
 		_panning = false
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.03, 0.07))
 	if editor == null:
 		return
+	_backdrop.color = editor.background_color
+	_stars.visible = show_stars
+	var cfg: GameConfig = ContentManager.base
+	var camera_center := center + Vector2(-cfg.start_radius, 0.0)
+	preload("res://scripts/render/background_star_field.gd").update_view(_stars, camera_center, size * 0.5 / zoom, zoom)
 	if guides:
 		var step := 100.0
 		while step * zoom < 50.0: step *= 5.0
@@ -108,7 +124,6 @@ func _draw() -> void:
 		for y in range(int(floor(first.y / step)), int(ceil(world(size).y / step)) + 1):
 			var py := screen(Vector2(0, y * step)).y
 			draw_line(Vector2(0, py), Vector2(size.x, py), Color(0.22, 0.35, 0.48, 0.18))
-		var cfg: GameConfig = ContentManager.base
 		draw_arc(screen(Vector2(cfg.start_radius, 0)), cfg.field_radius * zoom, 0, TAU, 256, Color(0.3, 0.5, 0.6, 0.4), 1)
 	for item: BackgroundPlacement in editor.items:
 		if item.texture == null: continue

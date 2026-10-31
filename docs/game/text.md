@@ -986,6 +986,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bg.help | 左ドラッグで配置を移動 · ホイールでズーム · 中央ドラッグで視点移動。視差プレビュー中は中央ドラッグで背景の流れを確認できます。配置のドラッグはプレビューをOFFにしてください。座標はステージ開始地点を原点にします。 | Left-drag to move · Wheel to zoom · Middle-drag to pan. Preview parallax by panning; turn preview off to drag placements. Coordinates are relative to the stage start. |
 | bg.origin | 開始地点 (0, 0) | Start (0, 0) |
 | bg.properties | 選択した背景 | Selected background |
+| bg.background&#95;color | 背景の地色 | Background color |
+| bg.stars | 星を表示 | Show stars |
 | bg.x | 位置 X | Position X |
 | bg.y | 位置 Y | Position Y |
 | bg.scale | サイズ倍率 | Scale |
