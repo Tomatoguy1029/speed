@@ -3,7 +3,8 @@ class_name VisualEffectComponents
 extends RefCounted
 const SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const FIRE_FIELDS := ["birth_rate", "lifetime", "rise_speed", "sway", "particle_size", "capacity", "layer_rates", "layer_lifetimes", "layer_sizes", "outer_color", "inner_color", "core_color", "field_size", "density_pixel_size", "merge_threshold", "edge_softness", "deformation", "pixel_size", "update_fps", "glow_strength", "glow_radius"]
-const PHOENIX_FIELDS := ["ember_color", "flame_color", "hot_color", "smoke_color", "amount", "speed", "pixel_size", "turbulence", "sparks", "opacity", "emission", "stretch", "lift"]
+## ほうおう座の着地の予告（影の輪・降る火の粉）で使う値。着地の炎は爆発の shader の値で調整する。
+const PHOENIX_FIELDS := ["ember_color", "flame_color", "hot_color", "speed", "pixel_size", "sparks", "emission"]
 const QUALITY_FIELDS := ["capacity", "field_size", "density_pixel_size", "update_fps"]
 const LABELS := {
 	"birth_rate": "炎の密度", "lifetime": "表示粒の寿命（秒）", "rise_speed": "模様の上昇速度", "sway": "横揺れ", "particle_size": "表示粒の半径",

@@ -1,4 +1,4 @@
-## 影で着地点を示し、炎と火の粉を専用shaderで描く。外観は本人レビューで調整する。
+## 影で着地点を示し、予告の火の粉を専用shaderで描く。着地の炎は攻撃の表示（render/attacks/zone_phoenix.gd）が爆発で描く。
 extends EnemyVisual
 
 var flame_settings: Resource = preload("res://data/visuals/phoenix_flames.tres")
@@ -67,14 +67,6 @@ func _draw_flames(c: CanvasItem) -> void:
 			if view.grow(radius * (1.2 + float(flame_settings.lift))).has_point(t.anchor[i]):
 				_flame_quad(c, t.anchor[i], radius, t.charge[i] if t.mode[i] == EnemyTable.Mode.WINDUP else 1.0,
 					float(t.id[i] % 31) / 31.0, false)
-	var pr := run.projectiles
-	for i in pr.hazard_alive.size():
-		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.PHOENIX:
-			continue
-		var radius := pr.hazard_len[i]
-		if view.grow(radius * (1.2 + float(flame_settings.lift))).has_point(pr.hazard_pos[i]):
-			var age := clampf((pr.hazard_t[i] - pr.hazard_delay[i]) / maxf(0.001, pr.hazard_active[i]), 0.0, 1.0)
-			_flame_quad(c, pr.hazard_pos[i], radius, age, float(i % 31) / 31.0, true)
 
 func _flame_quad(c: CanvasItem, center: Vector2, radius: float, age: float, seed: float, attack: bool) -> void:
 	# 上へ立ち上がる先端だけ余白を増やし、消失時も四角形の端で切らない。

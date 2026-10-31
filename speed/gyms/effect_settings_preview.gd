@@ -744,6 +744,8 @@ func _shader_entries(path: String) -> Array[Dictionary]:
 		var script_path := "res://scripts/render/equipment/%s.gd" % path.get_slice("/", 1)
 		if not ResourceLoader.exists(script_path): return entries
 		script = load(script_path) as Script
+	elif path == "enemy/phoenix":
+		script = load("res://scripts/render/attacks/zone_phoenix.gd") as Script
 	elif is_instance_valid(_sample):
 		script = _sample.get_script() as Script
 	else: return entries
@@ -767,7 +769,7 @@ func _shader_entries(path: String) -> Array[Dictionary]:
 func _component_entries(key: String) -> Array[Dictionary]:
 	var entries: Array[Dictionary] = []
 	var components := COMPONENTS.fire_presets(key)
-	if key == "enemy/phoenix": components.append({"resource": preload("res://data/visuals/phoenix_flames.tres"), "title": "着地の炎"})
+	if key == "enemy/phoenix": components.append({"resource": preload("res://data/visuals/phoenix_flames.tres"), "title": "着地の予告"})
 	for component in components:
 		var resource: Resource = component.resource
 		var allowed: Array = COMPONENTS.PHOENIX_FIELDS if key == "enemy/phoenix" else COMPONENTS.FIRE_FIELDS
