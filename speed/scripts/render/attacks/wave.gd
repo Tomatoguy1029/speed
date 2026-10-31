@@ -56,7 +56,7 @@ func _draw_pulser(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> v
 		return
 	var radius: float = pr.wave_radius(i)
 	var width: float = pr.hazard_width[i]
-	if not view.grow(radius + width * 2.0).has_point(pr.hazard_pos[i]):
+	if not view.grow(radius + width * 2.4).has_point(pr.hazard_pos[i]):
 		return
 	if _count == _rings.size():
 		var ring: LASER = LASER.new()

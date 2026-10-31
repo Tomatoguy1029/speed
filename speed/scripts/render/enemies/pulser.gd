@@ -22,7 +22,8 @@ func draw_layer(_c: CanvasItem, view: Rect2) -> void:
 			var radius: float = PULSER.ring_radius(t, i)
 			var p: Dictionary = t.def[i].params
 			var width: float = float(p.wave_width)
-			if not view.grow(radius + width * 16.0).has_point(t.pos[i]):
+			# 最遠120pixelの光筋と端の発光まで含めて予兆を表示する。
+			if not view.grow(radius + width * 26.0).has_point(t.pos[i]):
 				continue
 			if _count == _rings.size():
 				var ring: LASER = LASER.new()

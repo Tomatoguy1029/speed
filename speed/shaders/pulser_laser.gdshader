@@ -32,7 +32,7 @@ void vertex() {
 	kind = 0.0;
 	segment = vec4(0.0);
 	if (INSTANCE_ID == 0) {
-		VERTEX.xy = corner * (radius + 7.0 * pixel) * 2.0;
+		VERTEX.xy = corner * (radius + 12.0 * pixel) * 2.0;
 	} else {
 		float slot = float(INSTANCE_ID - 1);
 		float key = slot * 19.13 + seed * 3.17;
@@ -44,27 +44,27 @@ void vertex() {
 		vec2 head;
 		vec2 tail;
 		kind = 1.0;
-		if (progress < 0.0 || phase < 0.0 || elapsed - end > 0.085) {
+		if (progress < 0.0 || phase < 0.0 || elapsed - end > 0.12) {
 			strength = 0.0;
 			head = vec2(0.0);
 			tail = head;
 		} else if (phase < 1.0) {
-			float distance = mix(32.0, 68.0, hash01(key + 1.0));
+			float distance = mix(60.0, 120.0, hash01(key + 1.0));
 			float curve = mix(-0.27, 0.27, hash01(key + 2.0));
 			float tail_time = mix(0.018, 0.034, hash01(key + 3.0));
 			head = path(angle, distance, curve, phase);
 			tail = path(angle, distance, curve, phase - tail_time / duration);
-			strength = smoothstep(0.0, 0.12, phase) * mix(0.72, 1.0, hash01(key + 4.0));
+			strength = smoothstep(0.0, 0.07, phase) * mix(0.9, 1.35, hash01(key + 4.0));
 		} else {
 			// 到着点だけ白熱し、別の集積輪へ光を残す。
 			head = vec2(cos(angle), sin(angle)) * radius;
 			tail = head;
 			kind = 2.0;
-			strength = 1.0 - (elapsed - end) / 0.085;
+			strength = 1.35 * (1.0 - (elapsed - end) / 0.12);
 		}
 		segment = vec4(head, tail);
-		vec2 lo = min(head, tail) - vec2(3.0 * pixel);
-		vec2 hi = max(head, tail) + vec2(3.0 * pixel);
+		vec2 lo = min(head, tail) - vec2(5.0 * pixel);
+		vec2 hi = max(head, tail) + vec2(5.0 * pixel);
 		VERTEX.xy = mix(lo, hi, corner + vec2(0.5));
 	}
 	at = VERTEX.xy;
@@ -82,23 +82,24 @@ void fragment() {
 		if (progress >= 0.0 && progress < 1.0) {
 			float angle = mod(atan(p.y, p.x) + TAU, TAU);
 			float slot = mod(floor(angle * 84.0 / TAU + 0.5), 84.0);
-			deposited = step(arrival(slot), progress * 1.4) * (0.7 + 0.3 * progress);
+			deposited = step(arrival(slot), progress * 1.4) * (0.9 + 0.1 * progress);
 		}
-		float core = 1.0 - smoothstep(0.3, 0.8, distance);
-		float beam = 1.0 - smoothstep(1.0, 1.7, distance);
-		float edge = 1.0 - smoothstep(2.0, 2.6, distance);
-		float glow = exp(-distance * 1.05) * 0.18;
+		// ズームアウト時も芯を残す。中心半径と判定幅はCPUの値を保つ。
+		float core = 1.0 - smoothstep(0.55, 1.3, distance);
+		float beam = 1.0 - smoothstep(1.2, 2.2, distance);
+		float edge = 1.0 - smoothstep(2.5, 3.5, distance);
+		float glow = exp(-distance * 0.58) * 0.65;
 		light = (vec3(0.24, 0.001, 0.012) * edge + vec3(0.76, 0.046, 0.13) * beam
-			+ vec3(0.0, 0.90, 0.88) * core + vec3(1.0, 0.006, 0.028) * glow) * deposited;
+			+ vec3(0.1, 1.2, 1.15) * core + vec3(1.0, 0.006, 0.028) * glow) * deposited;
 	} else if (strength > 0.0) {
 		vec2 line = segment.zw - segment.xy;
 		float along = clamp(dot(p - segment.xy, line) / max(dot(line, line), 0.001), 0.0, 1.0);
 		float distance = length(p - segment.xy - line * along) / pixel;
 		float head = length(p - segment.xy) / pixel;
-		float body = (1.0 - smoothstep(0.35, 1.05, distance)) * (1.0 - along * 0.85);
-		float hot = 1.0 - smoothstep(0.35, kind > 1.5 ? 1.25 : 0.95, head);
-		light = (vec3(1.0, 0.025, 0.09) * body + vec3(0.0, 0.94, 0.91) * hot
-			+ vec3(0.24, 0.002, 0.015) * exp(-distance * 1.4) * (1.0 - along)) * strength;
+		float body = (1.0 - smoothstep(0.65, 1.85, distance)) * (1.0 - along * 0.7);
+		float hot = 1.0 - smoothstep(0.65, kind > 1.5 ? 2.3 : 1.8, head);
+		light = (vec3(1.0, 0.025, 0.09) * body + vec3(0.1, 1.2, 1.15) * hot
+			+ vec3(0.7, 0.004, 0.025) * exp(-distance * 0.85) * (1.0 - along)) * strength;
 	}
 	light = clamp(light, vec3(0.0), vec3(1.0));
 	COLOR = vec4(linear_output ? to_linear(light) : light, 1.0);
