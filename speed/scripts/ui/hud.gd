@@ -27,6 +27,7 @@ const CYAN := Color("#5bc8db")
 const ART := "res://assets/ui/combat/"
 const RADAR := preload(ART + "combat_ui_radar.png")
 const HEALTH := preload(ART + "combat_ui_health_bar.png")
+const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
 const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
 const SLOTS := preload(ART + "combat_ui_components.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
@@ -1113,7 +1114,6 @@ func _draw_gauge_ring() -> void:
 	var c := get_viewport().get_mouse_position() + Vector2(26, 26)
 	var min_charge := run.cfg.draw_min_charge
 	var capacity := s.stats.capacity
-	var laps := ceili(capacity - 1e-6)
 	var amount := s.gauge_amount()
 	var usable := amount >= min_charge
 	var charging := not s.drawing and not s.tracing
@@ -1124,30 +1124,11 @@ func _draw_gauge_ring() -> void:
 		_ring_flash_t = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
 		_ring_flash_max = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
 	_ring_amount = amount
-	var col := Color("#5dffa0")
-	if not usable:
-		col.a = 0.4
 	if s.drawing:
 		amount = s.draw_gauge * (1.0 - s.draw_length / maxf(1.0, s.draw_limit))
-		col = Color("#c8f7ff")
-	var width := 4.0
-	if _ring_flash_t > 0.0:
-		var k := _ring_flash_t / _ring_flash_max
-		col = col.lerp(Color.WHITE, k)
-		width += 2.0 * k
-	for lap in laps:
-		var r := RING_RADIUS + RING_GAP * lap
-		var lap_cap := minf(1.0, capacity - lap)
-		var fill := clampf(amount - lap, 0.0, lap_cap)
-		draw_arc(c, r, -PI / 2.0, -PI / 2.0 + TAU * lap_cap, 32, Color(1, 1, 1, 0.15), 4.0)
-		if fill > 0.0:
-			draw_arc(c, r, -PI / 2.0, -PI / 2.0 + TAU * fill, 32, col, width)
-	if not s.drawing:
-		var tick := Vector2.from_angle(-PI / 2.0 + TAU * min_charge)
-		draw_line(c + tick * (RING_RADIUS - 4.0), c + tick * (RING_RADIUS + 5.0), Color(1, 1, 1, 0.9 if usable else 0.5), 2.0)
-	if _ring_pulse_t > 0.0:
-		var k := 1.0 - _ring_pulse_t / RING_PULSE_TIME
-		draw_arc(c, RING_RADIUS + RING_GAP * (laps - 1) + 12.0 * k, 0, TAU, 32, Color(0.36, 1.0, 0.63, 1.0 - k), 3.0)
+	var flash := _ring_flash_t / _ring_flash_max if _ring_flash_t > 0.0 else 0.0
+	var pulse := 1.0 - _ring_pulse_t / RING_PULSE_TIME if _ring_pulse_t > 0.0 else -1.0
+	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, s.drawing, usable, flash, pulse, RING_RADIUS, RING_GAP)
 
 ## 内側・外側のどれかのリングが、before から after の間に溜まりきったか
 func _lap_filled(before: float, after: float, capacity: float) -> bool:

@@ -14,7 +14,8 @@ const BODY_EFFECTS := {
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const BOSS_PREVIEW := preload("res://gyms/boss_effect_preview.gd")
 const MODULE_ICONS := preload("res://scripts/ui/module_icons.gd")
-const TARGET_GROUPS := ["武器", "特性", "ボス本体", "ボス技", "共通攻撃"]
+const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
+const TARGET_GROUPS := ["武器", "特性", "ボス本体", "ボス技", "共通攻撃", "HUD"]
 const DIRECT_EFFECTS := [
 	"weapon/forward", "weapon/scatter", "weapon/knockback", "weapon/contactArc",
 	"weapon/barrier", "weapon/contactWave", "weapon/mines", "weapon/rear", "weapon/bipolar",
@@ -23,7 +24,7 @@ const DIRECT_EFFECTS := [
 	"trait/killSonic", "trait/fullCharge", "trait/runUp", "trait/rampage", "trait/fullBurst", "trait/duplicator",
 	"trait/quickCharge", "trait/capacity", "trait/critRate", "trait/speed", "trait/attack", "trait/pickup",
 	"trait/length", "trait/glideDuration", "trait/bigSwing", "trait/multiShot",
-	"boss/final_strike",
+	"boss/final_strike", BOOST_GAUGE.KEY,
 ]
 const ATTACK_SCENES := [
 	"res://scenes/attacks/star_bolt.tscn", "res://scenes/attacks/hydra_shape.tscn",
@@ -124,6 +125,15 @@ const DIRECT_FIELDS := {
 	],
 }
 const DIRECT_COLOR_FIELDS := {
+	BOOST_GAUGE.KEY: [
+		["通常（不足時は不透明度40%）", "normal_color", BOOST_GAUGE.DEFAULT_COLORS.normal_color],
+		["経路描画中", "path_color", BOOST_GAUGE.DEFAULT_COLORS.path_color],
+		["使用可能時の波紋（通常色と独立）", "ready_pulse_color", BOOST_GAUGE.DEFAULT_COLORS.ready_pulse_color],
+		["下地", "background_color", BOOST_GAUGE.DEFAULT_COLORS.background_color],
+		["目盛り：使用可能", "ready_tick_color", BOOST_GAUGE.DEFAULT_COLORS.ready_tick_color],
+		["目盛り：不足", "unavailable_tick_color", BOOST_GAUGE.DEFAULT_COLORS.unavailable_tick_color],
+		["満タン時のフラッシュ", "full_flash_color", BOOST_GAUGE.DEFAULT_COLORS.full_flash_color],
+	],
 	"weapon/sonic": [["航跡シェーダの色", "wake_color", Color(0.25, 0.65, 1.0)]],
 	"boss/body/hydra": [["予告色", "warning_color", Color("#ffd16c")], ["攻撃色", "attack_color", Color("#ff765c")]],
 	"boss/body/draco": [["胸の光色", "core_glow_color", Color(0.38, 0.59, 1.0)], ["裂け目の色", "rift_color", Color("#5a4d91")]],
@@ -333,6 +343,7 @@ func _ready() -> void:
 	_show_target_group(_target_group)
 
 func _group_for(path: String) -> String:
+	if path == BOOST_GAUGE.KEY: return "HUD"
 	if path.begins_with("weapon/"): return "武器"
 	if path.begins_with("trait/"): return "特性"
 	if path.begins_with("boss/body/"): return "ボス本体"
@@ -468,6 +479,7 @@ func _refresh_target_selection() -> void:
 	_editing_label.text = "編集中: " + _effect_label(_selected) if not _selected.is_empty() else "編集対象を選択してください"
 
 func _effect_label(path: String) -> String:
+	if path == BOOST_GAUGE.KEY: return "ブーストゲージ"
 	if path == BOMBER_PREVIEW: return "自爆する雑魚：ピクセル炎"
 	if path == "boss/final_strike": return "制限時間の一撃（共通）"
 	if _technique_names.has(path):
@@ -490,7 +502,7 @@ func _collect(folder: String) -> void:
 
 func _select(path: String) -> void:
 	_selected = path
-	_standalone_controls.visible = path == BOMBER_PREVIEW
+	_standalone_controls.visible = path in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]
 	_standalone_play.set_pressed_no_signal(false)
 	_standalone_play.text = "⏸"
 	if _group_for(path) != _target_group: _show_target_group(_group_for(path))
@@ -502,8 +514,9 @@ func _select(path: String) -> void:
 	_static_container.visible = not live_effect
 	_boss_preview.visible = live_effect
 	_boss_preview.set_active(live_effect)
-	if path.begins_with("res://"):
-		var scene := load(path) as PackedScene
+	if path.begins_with("res://") or path == BOOST_GAUGE.KEY:
+		var scene_path := "res://gyms/boost_gauge_preview.tscn" if path == BOOST_GAUGE.KEY else path
+		var scene := load(scene_path) as PackedScene
 		_sample = scene.instantiate() as Node2D
 		if not boss_effect:
 			var base_modulate := _sample.modulate
@@ -530,7 +543,7 @@ func _build_fields() -> void:
 		_fields.add_child(note)
 		return
 	var entries: Array[Dictionary] = []
-	if not BODY_EFFECTS.has(_selected) and _selected != BOMBER_PREVIEW: entries.append({"name": "effect_tint", "value": Color.WHITE})
+	if not BODY_EFFECTS.has(_selected) and _selected not in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]: entries.append({"name": "effect_tint", "value": Color.WHITE})
 	for field in DIRECT_FIELDS.get(_selected, []):
 		entries.append({"name": field[1], "value": field[5], "hint": "%s,%s,%s" % [field[2], field[3], field[4]], "fallback": field[0]})
 	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
@@ -646,12 +659,12 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 
 func _apply_preview() -> void:
 	_swatch.color = _value("effect_tint", Color.WHITE)
-	if _selected == BOMBER_PREVIEW or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
 	_working.apply_to(_sample)
-	if _selected == BOMBER_PREVIEW: _sample.call("preview_step", 0.0)
+	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]: _sample.call("preview_step", 0.0)
 	_sample.queue_redraw()
 
 func editing_state() -> Dictionary:
@@ -687,7 +700,7 @@ func set_active(active: bool) -> void:
 	var live_effect := _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
 	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)
 	if not active: EFFECT_SETTINGS.clear_preview_profiles()
-	elif _working != null and (live_effect or _selected == BOMBER_PREVIEW): EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
+	elif _working != null and (live_effect or _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]): EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if is_instance_valid(_viewport):
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
 

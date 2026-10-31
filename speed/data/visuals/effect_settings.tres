@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1")
 profiles = {
+"hud/boost_gauge": {},
 "res://scenes/attacks/zone_bomber.tscn": {
 "visible_seconds": 0.65,
 "pixel_scale": 1.0,
