@@ -32,6 +32,8 @@ enum FriendKind { SHOT, DEBRIS, HULL }
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
 var friend_generation := PackedByteArray()
+## 星砕きの再発動世代。通常攻撃は0、初回に生まれた破片は1。弾の分裂とは別に引き継ぐ。
+var friend_shatter_depth := PackedInt32Array()
 var friend_age := PackedFloat32Array()
 var friend_cause: Array[StringName] = []
 var friend_weapon_id: Array[StringName] = []
@@ -252,8 +254,8 @@ func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Col
 	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id])
 
 ## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
-func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0) -> bool:
-	return emit_attack(&"scatter_hull", [i, dir, speed, dmg, knock, radius_mult, life_mult])
+func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0, shatter_depth := 1) -> bool:
+	return emit_attack(&"scatter_hull", [i, dir, speed, dmg, knock, radius_mult, life_mult, shatter_depth])
 
 ## 牽引した船体を撃ち出す（質量牽引砲 W21）。敵を貫き、クリティカルにならない。source_id の敵には当たらない。
 func fire_hull(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float, knock: float, type: StringName,
@@ -276,6 +278,7 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 	var i := friend_slots.take()
 	friend_kind[i] = kind
 	friend_generation[i] = 0
+	friend_shatter_depth[i] = 0
 	friend_age[i] = 0.0
 	friend_cause[i] = cause
 	friend_weapon_id[i] = weapon_id
@@ -363,7 +366,7 @@ func _update_friendly(dt: float) -> void:
 				friend_on_hit[i].call(row, friend_dmg[i], impact)
 			else:
 				combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "weapon_id": friend_weapon_id[i], "no_crit": friend_no_crit[i] != 0,
-					"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
+					"shatter_depth": friend_shatter_depth[i], "dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
 			duplicate_friend(i, impact)
 			state.emit(&"shot_hit", {"pos": impact, "dir": vel.normalized(), "visual_key": String(friend_visual[i]), "kind": friend_kind[i]})
 			if state.phase != RunState.Phase.PLAY:
@@ -662,6 +665,37 @@ func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 		best = {"t": t, "normal": n, "pos": from.lerp(to, t)}
 	return best
 
+## 機体（半径 radius）が pos の時点で、移動を止める壁の帯に重なっていれば、近い側の外へ出た位置。
+## 重なっていなければ空の辞書。重なっていれば pos（押し出した位置）と normal（押し出す向き）。中心線の上なら vel の向きの側へ出す。
+func block_overlap(pos: Vector2, radius: float, vel := Vector2.ZERO) -> Dictionary:
+	var best := {}
+	var best_push := INF
+	for h in hazard_alive.size():
+		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
+			continue
+		if _hazard_owner_pulled(h):
+			continue
+		if hazard_t[h] < hazard_delay[h] or hazard_t[h] > hazard_delay[h] + hazard_active[h]:
+			continue
+		var a := hazard_pos[h]
+		var u := Vector2.from_angle(hazard_angle[h])
+		var m := hazard_width[h] * 0.5 + radius
+		var d := u.cross(pos - a)
+		var along := u.dot(pos - a)
+		# 弾いた直後は帯の縁に止まるので、縁から1px以内は重なりに数えない。
+		if absf(d) >= m - 1.0 or along < -m or along > hazard_len[h] + m:
+			continue
+		var side := signf(d) if absf(d) > 0.5 else signf(u.cross(vel))
+		if side == 0.0:
+			side = 1.0
+		var push := m + 1.0 - side * d
+		if push >= best_push:
+			continue
+		best_push = push
+		var n := Vector2(-u.y, u.x) * side
+		best = {"normal": n, "pos": pos + n * push}
+	return best
+
 ## 付いている攻撃の形（行 h）を動かす。length が 0 以上なら長さも変える。
 func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 	hazard_pos[h] = pos
@@ -841,6 +875,7 @@ func duplicate_friend(source: int, impact: Vector2) -> bool:
 			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source], friend_weapon_id[source])
 		friend_hit[child] = friend_hit[source].duplicate()
 		friend_generation[child] = friend_generation[source] + 1
+		friend_shatter_depth[child] = friend_shatter_depth[source]
 		friend_age[child] = friend_age[source]
 		friend_on_hit[child] = friend_on_hit[source]
 	state.emit(&"duplicate", {"pos": impact, "directions": vectors})

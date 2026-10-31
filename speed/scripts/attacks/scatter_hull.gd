@@ -1,6 +1,6 @@
 extends AttackKind
 
-func spawn(ps: ProjectileSystem, i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0) -> bool:
+func spawn(ps: ProjectileSystem, i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0, shatter_depth := 1) -> bool:
 	var t := ps.combat.enemies.table
 	var r := t.r[i]
 	if t.meteor_index[i] >= 0 or t.is_boss[i] != 0:
@@ -20,9 +20,10 @@ func spawn(ps: ProjectileSystem, i: int, dir: Vector2, speed: float, dmg: float,
 		a += (ps.state.rng.randf() - 0.5) * 0.25
 		var u := Vector2.from_angle(a)
 		var v := speed * (0.7 + 0.6 * ps.state.rng.randf())
-		ps._add_friend(ProjectileSystem.FriendKind.DEBRIS, &"hullDebris", pos + u * r * 0.3, u * v,
+		var debris := ps._add_friend(ProjectileSystem.FriendKind.DEBRIS, &"hullDebris", pos + u * r * 0.3, u * v,
 			4.0 * 1.82 * ps.cfg.character_scale * radius_mult, dmg, ps.cfg.hull_debris_life * life_mult, true, 0, t.color[i], true,
 			ps.cfg.hull_debris_knock if knock < 0.0 else knock, ps.state.rng.randf() * TAU,
 			10.0 * (1.0 if k % 2 == 0 else -1.0), t.id[i], &"", &"weapon/knockback", &"W03")
+		ps.friend_shatter_depth[debris] = shatter_depth
 	ps.state.emit(&"hull_scatter", {"pos": pos, "count": count, "visual_key": "weapon/knockback"})
 	return true

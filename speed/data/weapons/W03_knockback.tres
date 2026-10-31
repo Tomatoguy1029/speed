@@ -6,7 +6,8 @@
 script = ExtResource("1")
 level_steps = PackedInt32Array(1, 3, 5, 6, 8)
 params = {
-"chance_by_level": [0.1, 0.1375, 0.175, 0.2125, 0.25],
+"chance_by_level": [0.05, 0.075, 0.1, 0.125, 0.15],
+"chain_limit_by_level": [1, 2, 3, 4, 5],
 "life": 1.6,
 "max": 200,
 "speed": 470.0
