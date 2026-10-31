@@ -15,7 +15,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const BOSS_PREVIEW := preload("res://gyms/boss_effect_preview.gd")
 const MODULE_ICONS := preload("res://scripts/ui/module_icons.gd")
 const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
-const TARGET_GROUPS := ["武器", "特性", "ボス本体", "ボス技", "共通攻撃", "HUD"]
+const TARGET_GROUPS := ["武器", "特性", "ボス本体", "ボス技", "敵の技", "HUD"]
 const DIRECT_EFFECTS := [
 	"weapon/forward", "weapon/scatter", "weapon/knockback", "weapon/contactArc",
 	"weapon/barrier", "weapon/contactWave", "weapon/mines", "weapon/rear", "weapon/bipolar",
@@ -26,39 +26,15 @@ const DIRECT_EFFECTS := [
 	"trait/length", "trait/glideDuration", "trait/bigSwing", "trait/multiShot",
 	"boss/final_strike", BOOST_GAUGE.KEY,
 ]
-const ATTACK_SCENES := [
-	"res://scenes/attacks/star_bolt.tscn", "res://scenes/attacks/hydra_shape.tscn",
-	"res://scenes/attacks/beam_draco.tscn", "res://scenes/attacks/bolt.tscn",
-	"res://scenes/attacks/light_arrow.tscn", "res://scenes/attacks/cosmic_arrow.tscn",
-	"res://scenes/attacks/beam.tscn", "res://scenes/attacks/zone.tscn",
-	"res://scenes/attacks/zone_bomber.tscn",
-]
 const BOMBER_PREVIEW := "res://scenes/attacks/zone_bomber.tscn"
 const ATTACK_LABELS := {
-	"res://scenes/attacks/star_bolt.tscn": ["星形の光弾", "星形の輪郭と芯を持つ光弾。試遊はりゅう座の星弾を使います。"],
-	"res://scenes/attacks/hydra_shape.tscn": ["うみへびの共通演出", "うみへび座の首が使う光線・風刃・雷・瓦礫・竜巻の共通表示。試遊は風刃を使います。"],
-	"res://scenes/attacks/beam_draco.tscn": ["竜の吐出光線", "りゅう座の口元の溜めと、口から伸びる吐き出し光線。"],
-	"res://scenes/attacks/bolt.tscn": ["細い光弾", "ケフェウス座の兵などが撃つ細長い光弾。"],
-	"res://scenes/attacks/light_arrow.tscn": ["光の矢", "通常色の光の矢の輪郭と尾を描く共通表示。"],
-	"res://scenes/attacks/cosmic_arrow.tscn": ["コズミック矢", "紫・水色の変化と尾の星を持つ、光の矢のコズミック色。"],
-	"res://scenes/attacks/beam.tscn": ["ビーム", "共通ビームの予告と発射表示。"],
-	"res://scenes/attacks/zone.tscn": ["範囲攻撃", "共通の範囲攻撃の予告と円形の発動表示。"],
-	BOMBER_PREVIEW: ["自爆の爆発", "自爆する雑魚専用のピクセル炎。シェーダで炎の色・ノイズ・崩れ方を調整します。"],
-}
-const ATTACK_PREVIEWS := {
-	"res://scenes/attacks/star_bolt.tscn": "res://scenes/bosses/draco/star_fan_visual.tscn",
-	"res://scenes/attacks/hydra_shape.tscn": "res://scenes/bosses/hydra/wind_blades_visual.tscn",
-	"res://scenes/attacks/beam_draco.tscn": "res://scenes/bosses/draco/inhale_visual.tscn",
-	"res://scenes/attacks/bolt.tscn": "res://scenes/bosses/draco/inhale_visual.tscn",
-	"res://scenes/attacks/light_arrow.tscn": "res://scenes/bosses/centaurus/power_shot_visual.tscn",
-	"res://scenes/attacks/cosmic_arrow.tscn": "res://scenes/bosses/draco/picaro_wall_visual.tscn",
-	"res://scenes/attacks/beam.tscn": "res://scenes/bosses/canis_major/sirius_visual.tscn",
-	"res://scenes/attacks/zone.tscn": "res://scenes/bosses/draco/picaro_wall_visual.tscn",
+	BOMBER_PREVIEW: ["自爆する雑魚 · 自爆の爆発", "自爆する雑魚専用のピクセル炎。色・形・ノイズ・崩れ方を調整します。"],
 }
 const VISUAL_FIELDS := [
 	"pixel_size", "warning_color", "locked_color", "attack_color", "recovery_color",
 	"hit_color", "line_width", "flash_duration", "base_color", "progress_color",
 	"outline_color", "outline_width", "flight_scale", "burst_pixel_scale",
+	"body_radius_scale", "head_radius", "pulse_scale",
 ]
 const NUMBER_LIMITS := {
 	"pixel_size": [1.0, 8.0, 0.25], "line_width": [0.5, 12.0, 0.25],
@@ -182,6 +158,7 @@ const FIELD_LABELS := {
 	"core_glow_color": "胸の光色", "rift_color": "裂け目の色", "sail_star_color": "帆の星色",
 	"open_color": "開放の輪色", "sirius_color": "シリウス色", "sirius_halo_color": "光の暈色",
 	"booster_core_color": "推進炎の芯色", "vortex_tint": "渦の色",
+	"body_radius_scale": "胴体の表示倍率", "head_radius": "頭の表示半径（px）", "pulse_scale": "光芒の広がり（倍）",
 }
 const FIELD_HELP := {
 	"effect_tint": "描画結果の色に掛ける値。白で元の色。",
@@ -270,6 +247,8 @@ var _target_buttons := {}
 var _target_list := VBoxContainer.new()
 var _boss_sections: Array[Dictionary] = []
 var _technique_names := {}
+var _move_targets: Dictionary = {}
+var _move_order: Dictionary = {}
 var _expanded_bosses := {}
 var _editing_label := Label.new()
 var _fields := VBoxContainer.new()
@@ -283,11 +262,11 @@ var _static_container: SubViewportContainer
 var _boss_preview
 
 func _ready() -> void:
-	_collect(ROOT)
 	_collect_boss_techniques()
 	_paths.append_array(DIRECT_EFFECTS)
-	_paths.append_array(ATTACK_SCENES)
-	_paths.append_array(BODY_EFFECTS.keys())
+	_paths.append(BOMBER_PREVIEW)
+	for key in BODY_EFFECTS:
+		if key != "boss/shared/tornado_shader": _paths.append(key)
 	_paths.sort()
 	var groups := HFlowContainer.new()
 	groups.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -367,8 +346,8 @@ func _group_for(path: String) -> String:
 	if path.begins_with("weapon/"): return "武器"
 	if path.begins_with("trait/"): return "特性"
 	if path.begins_with("boss/body/"): return "ボス本体"
-	if path.begins_with(ROOT + "/") or path == "boss/final_strike": return "ボス技"
-	return "共通攻撃"
+	if _move_targets.has(path) or path.begins_with(ROOT + "/") or path == "boss/final_strike": return "ボス技"
+	return "敵の技"
 
 func _definition_for(path: String) -> Resource:
 	if not path.begins_with("weapon/") and not path.begins_with("trait/"): return null
@@ -396,10 +375,14 @@ func _collect_boss_techniques() -> void:
 		_boss_sections.append({"id": boss_id, "title": "ステージ%d · %s" % [number, boss.get("display_name")]})
 		for item in rules.get("techniques"):
 			var move: Resource = item
-			if move == null or move.visual == null or move.display_name.is_empty(): continue
-			var path: String = move.visual.resource_path
+			if move == null: continue
+			var path := "boss/move/%s/%s" % [boss_id, move.technique]
+			_move_targets[path] = {"boss": boss_id, "id": String(move.technique), "visual": move.visual.resource_path if move.visual != null else "", "move": move}
+			_move_order[path] = _move_order.size()
+			_paths.append(path)
 			var names: PackedStringArray = _technique_names.get(path, PackedStringArray())
-			if not names.has(move.display_name): names.append(move.display_name)
+			var name: String = move.display_name if not move.display_name.is_empty() else String(move.technique)
+			if not names.has(name): names.append(name)
 			_technique_names[path] = names
 
 func _toggle_boss_section(boss_id: String, items: HFlowContainer, heading: Button) -> void:
@@ -426,7 +409,7 @@ func _add_target_button(path: String, parent: HFlowContainer) -> void:
 	parent.add_child(button)
 	_target_buttons[path] = button
 	if definition == null:
-		if _group_for(path) == "共通攻撃":
+		if _group_for(path) == "敵の技":
 			button.custom_minimum_size = Vector2(112, 56)
 			button.clip_contents = true
 			var caption := Label.new()
@@ -477,14 +460,15 @@ func _show_target_group(group: String) -> void:
 			var boss_id: String = section.id
 			var paths: Array[String] = []
 			for path in _paths:
-				if path.begins_with(ROOT + "/" + boss_id + "/"): paths.append(path)
+				if path.begins_with("boss/move/" + boss_id + "/"): paths.append(path)
+			paths.sort_custom(func(a: String, b: String): return _move_order[a] < _move_order[b])
 			if paths.is_empty(): continue
 			var heading := Button.new()
 			heading.set_meta("title", section.title)
 			var items := HFlowContainer.new()
 			items.add_theme_constant_override("h_separation", 4)
 			items.add_theme_constant_override("v_separation", 4)
-			var expanded: bool = _expanded_bosses.get(boss_id, _selected.begins_with(ROOT + "/" + boss_id + "/") or String(_boss_sections[0]["id"]) == boss_id)
+			var expanded: bool = _expanded_bosses.get(boss_id, _selected.begins_with("boss/move/" + boss_id + "/") or String(_boss_sections[0]["id"]) == boss_id)
 			items.visible = expanded
 			heading.text = ("▼ " if expanded else "▶ ") + String(section.title)
 			heading.pressed.connect(_toggle_boss_section.bind(boss_id, items, heading))
@@ -517,6 +501,9 @@ func _refresh_target_selection() -> void:
 
 func _effect_label(path: String) -> String:
 	if path == BOOST_GAUGE.KEY: return "ブーストゲージ"
+	if path.begins_with("boss/body/"):
+		for section in _boss_sections:
+			if section.id == path.get_slice("/", 2): return String(section.title) + " · 本体"
 	if ATTACK_LABELS.has(path): return ATTACK_LABELS[path][0]
 	if path == "boss/final_strike": return "制限時間の一撃（共通）"
 	if _technique_names.has(path):
@@ -530,13 +517,6 @@ func _effect_label(path: String) -> String:
 	if path.begins_with(ROOT + "/"): return "技名未設定"
 	return path.trim_prefix(ROOT+"/").trim_suffix("_visual.tscn")
 
-func _collect(folder: String) -> void:
-	for filename in DirAccess.get_files_at(folder):
-		if filename.ends_with("_visual.tscn"):
-			_paths.append(folder.path_join(filename))
-	for directory in DirAccess.get_directories_at(folder):
-		_collect(folder.path_join(directory))
-
 func _select(path: String) -> void:
 	_selected = path
 	if path == BOOST_GAUGE.KEY:
@@ -548,16 +528,16 @@ func _select(path: String) -> void:
 	else: _refresh_target_selection()
 	if is_instance_valid(_sample): _sample.queue_free()
 	_sample = null
-	var boss_effect := path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path) or ATTACK_PREVIEWS.has(path)
+	var boss_effect := _move_targets.has(path) or path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path)
 	var live_effect := boss_effect or path == "boss/final_strike" or path.begins_with("weapon/") or path.begins_with("trait/")
 	_static_container.visible = not live_effect
 	_boss_preview.visible = live_effect
 	_boss_preview.set_active(live_effect)
-	if path.begins_with("res://") or path == BOOST_GAUGE.KEY:
-		var scene_path := "res://gyms/boost_gauge_preview.tscn" if path == BOOST_GAUGE.KEY else path
-		var scene := load(scene_path) as PackedScene
-		_sample = scene.instantiate() as Node2D
-		if not boss_effect:
+	if _move_targets.has(path) or path.begins_with("res://") or path == BOOST_GAUGE.KEY:
+		var scene_path: String = _move_targets[path].visual if _move_targets.has(path) else "res://gyms/boost_gauge_preview.tscn" if path == BOOST_GAUGE.KEY else path
+		var scene := load(scene_path) as PackedScene if not scene_path.is_empty() else null
+		_sample = scene.instantiate() as Node2D if scene != null else null
+		if not boss_effect and _sample != null:
 			var base_modulate := _sample.modulate
 			_sample.position = Vector2(240, 240)
 			_viewport.add_child(_sample)
@@ -568,7 +548,7 @@ func _select(path: String) -> void:
 		_sample.free()
 		_sample = null
 	_apply_preview()
-	var preview_path := String(ATTACK_PREVIEWS.get(path, BODY_EFFECTS.get(path, path))) if boss_effect else (path if live_effect else "")
+	var preview_path := path if _move_targets.has(path) else String(BODY_EFFECTS.get(path, path)) if boss_effect else (path if live_effect else "")
 	_boss_preview.set_effect(preview_path)
 
 func _build_fields() -> void:
@@ -583,7 +563,7 @@ func _build_fields() -> void:
 		_fields.add_child(note)
 		return
 	var entries: Array[Dictionary] = []
-	if not BODY_EFFECTS.has(_selected) and _selected not in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]: entries.append({"name": "effect_tint", "value": Color.WHITE})
+	if not BODY_EFFECTS.has(_selected) and _selected not in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] and (not _move_targets.has(_selected) or _sample != null): entries.append({"name": "effect_tint", "value": Color.WHITE})
 	for field in DIRECT_FIELDS.get(_selected, []):
 		entries.append({"name": field[1], "value": field[5], "hint": "%s,%s,%s" % [field[2], field[3], field[4]], "fallback": field[0]})
 	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
@@ -618,7 +598,7 @@ func _shader_entries(path: String) -> Array[Dictionary]:
 		var script_path := "res://scripts/render/equipment/%s.gd" % path.get_slice("/", 1)
 		if not ResourceLoader.exists(script_path): return entries
 		script = load(script_path) as Script
-	elif is_instance_valid(_sample) and _sample is AttackVisual:
+	elif is_instance_valid(_sample):
 		script = _sample.get_script() as Script
 	else: return entries
 	var constants: Dictionary = script.get_script_constant_map()
@@ -650,7 +630,8 @@ func _add_group(title: String) -> void:
 	_fields.add_child(heading)
 
 func _value(name: String, fallback: Variant) -> Variant:
-	return (_working.profiles.get(_selected, {}) as Dictionary).get(name, fallback)
+	var legacy: String = _move_targets[_selected].visual if _move_targets.has(_selected) else ""
+	return _working.resolved_values(_selected, legacy).get(name, fallback)
 
 func _set_value(name: String, value: Variant) -> void:
 	var values: Dictionary = _working.profiles.get(_selected, {}).duplicate()
@@ -663,7 +644,7 @@ func _set_value(name: String, value: Variant) -> void:
 	_dirty = true
 	_message = "未保存: " + _selected
 	_apply_preview()
-	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		_boss_preview.refresh_effects()
 
 func _add_color(label: String, name: String, original: Color, help := "") -> void:
@@ -709,7 +690,7 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 
 func _apply_preview() -> void:
 	_swatch.color = _value("effect_tint", Color.WHITE)
-	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
@@ -747,7 +728,7 @@ func reload_current() -> void:
 
 func set_active(active: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
-	var live_effect := _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
+	var live_effect := _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
 	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)
 	if not active: EFFECT_SETTINGS.clear_preview_profiles()
 	elif _working != null and (live_effect or _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]): EFFECT_SETTINGS.set_preview_profiles(_working.profiles)

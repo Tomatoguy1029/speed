@@ -17,6 +17,10 @@ func clear_preview_profiles() -> void:
 func values_for(key: String) -> Dictionary:
 	return (_preview_profiles if _preview_enabled else profiles).get(key, {})
 
+## 個々の使用元の設定を優先し、未移行の保存キーは既定値として引き継ぐ。
+func resolved_values(key: String, fallback := "") -> Dictionary:
+	return values_for(fallback).merged(values_for(key), true) if not fallback.is_empty() else values_for(key)
+
 func tinted(key: String, original: Color) -> Color:
 	var tint: Color = values_for(key).get("effect_tint", Color.WHITE)
 	return original * tint
@@ -25,10 +29,10 @@ func number(key: String, field: String, original: float) -> float:
 	return float(values_for(key).get(field, original))
 
 func apply_to(node: CanvasItem) -> void:
-	apply_key(node, node.scene_file_path)
+	apply_key(node, node.get_meta("visual_profile", node.scene_file_path), node.scene_file_path)
 
-func apply_key(node: CanvasItem, key: String) -> void:
-	var values := values_for(key)
+func apply_key(node: CanvasItem, key: String, fallback := "") -> void:
+	var values := resolved_values(key, fallback)
 	for name in values:
 		if name == "effect_tint":
 			if not node.has_meta("visual_base_modulate"):

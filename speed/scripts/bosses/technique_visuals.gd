@@ -12,6 +12,7 @@ func configure(owner_actor: BossActor, moves: Dictionary) -> void:
 		if scene == null: continue
 		var node := scene.instantiate() as Node2D
 		if node == null: continue
+		node.set_meta("visual_profile", "boss/move/%s/%s" % [actor.def.id, id])
 		actor.add_child(node)
 		if "actor" in node: node.actor = actor
 		if "visual_kind" in node: node.visual_kind = node.technique_id

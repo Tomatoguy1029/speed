@@ -214,16 +214,30 @@ func set_effect(path: String, resume: Variant = null) -> void:
 	if _final_preview:
 		_boss = _final_boss
 		_technique = "final_strike"
+	elif path.begins_with("boss/move/"):
+		var parts := path.split("/")
+		if parts.size() != 4: return
+		_boss = parts[2]
+		_technique = parts[3]
 	else:
-		var relative := path.trim_prefix(ROOT).trim_suffix("_visual.tscn")
-		var parts := relative.split("/")
+		# 本体表示の入口だけは既存scene参照を受け、登録された技IDへ解決する。
+		var parts := path.trim_prefix(ROOT).split("/")
 		if not path.begins_with(ROOT) or parts.size() != 2:
 			_boss = ""
 			_technique = ""
 			_status.text = "ボス技の描画を選ぶと実戦プレビューを表示します"
 			return
 		_boss = parts[0]
-		_technique = parts[1]
+		_technique = ""
+		var rules: Resource = load("res://data/bosses/ai/%s_action_rules.tres" % _boss)
+		if rules != null:
+			for move: Resource in rules.get("techniques"):
+				if move != null and move.visual != null and move.visual.resource_path == path:
+					_technique = String(move.technique)
+					break
+		if _technique.is_empty():
+			_status.text = "この表示に対応する登録技がありません: " + path
+			return
 	if not ContentManager.bosses.has(StringName(_boss)):
 		_status.text = "登録されていないボス: " + _boss
 		return
@@ -383,9 +397,8 @@ func _execute_selected(keep_playing: bool) -> void:
 	if not is_instance_valid(actor): return
 	var started: bool = _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
 	if started:
-		# この画面の標的だけを固定し、吹き飛びで技の狙いと構図が流れるのを防ぐ。
+		# 構図の基準だけを記録する。吸引・吐出による標的の移動は本番処理へ任せる。
 		_preview_target = session.run.state.ship_pos
-		session.pinned = _preview_target
 		_boss_frame_ready = false
 		session.playing = keep_playing
 		_set_scene_processing(keep_playing)
@@ -490,6 +503,9 @@ func _update_preview_camera(render: RunPresentation) -> void:
 		_boss_frame_ready = true
 	var body_radius := maxf(180.0, float(actor.table.r[actor.body]))
 	_boss_frame = _boss_frame.merge(Rect2(origin, Vector2.ZERO).grow(body_radius + 100.0))
+	if "attack_points" in actor:
+		for point: Vector2 in actor.attack_points:
+			_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(100.0))
 	var pr: ProjectileSystem = session.run.projectiles
 	for row in pr.hazard_alive.size():
 		if pr.hazard_alive[row] == 0: continue
@@ -535,7 +551,6 @@ func _execute_hydra() -> bool:
 			neck.length = float(actor.def.params.neck_rest)
 			origin = actor._head_pos(neck) if int(gate.get("distance_origin", 0)) == 1 else actor._neck_base(neck)
 	var point := origin + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance
-	session.pinned = point
 	session.run.state.ship_pos = point
 	session.run.state.enemy_aim = point
 	session.run.state.view_center = point
