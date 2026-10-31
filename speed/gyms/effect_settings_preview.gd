@@ -370,6 +370,8 @@ var _viewport: SubViewport
 var _swatch := ColorRect.new()
 var _static_container: SubViewportContainer
 var _boss_preview
+var _game_context
+var _context_active := false
 
 func _ready() -> void:
 	_collect_boss_techniques()
@@ -449,6 +451,9 @@ func _ready() -> void:
 	_boss_preview = BOSS_PREVIEW.new()
 	_boss_preview.visible = false
 	preview.add_child(_boss_preview)
+	_game_context = load("res://gyms/game_context_preview.gd").new()
+	_game_context.visible = false
+	preview.add_child(_game_context)
 	reload_current()
 	_show_target_group(_target_group)
 
@@ -635,7 +640,7 @@ func _select(path: String) -> void:
 	_selected = path
 	if path == BOOST_GAUGE.KEY:
 		_working.profiles[path] = BOOST_GAUGE.migrated_values(_working.profiles.get(path, {}))
-	_standalone_controls.visible = path in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]
+	_standalone_controls.visible = path == BOMBER_PREVIEW
 	_standalone_play.set_pressed_no_signal(false)
 	_standalone_play.text = "⏸"
 	if _group_for(path) != _target_group: _show_target_group(_group_for(path))
@@ -644,11 +649,14 @@ func _select(path: String) -> void:
 	_sample = null
 	var boss_effect := ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path)
 	var live_effect := boss_effect or path == "boss/final_strike" or path.begins_with("weapon/") or path.begins_with("trait/")
-	_static_container.visible = not live_effect
+	_static_container.visible = not live_effect and path != BOOST_GAUGE.KEY
+	_game_context.visible = path == BOOST_GAUGE.KEY
+	if path == BOOST_GAUGE.KEY: _game_context.set_boost_values(_working.profiles.get(path, {}))
+	_game_context.set_active(_context_active and path == BOOST_GAUGE.KEY)
 	_boss_preview.visible = live_effect
 	_boss_preview.set_active(live_effect)
-	if ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with("res://") or path == BOOST_GAUGE.KEY:
-		var scene_path: String = ENEMY_EFFECTS[path].scene if ENEMY_EFFECTS.has(path) else _move_targets[path].visual if _move_targets.has(path) else "res://gyms/boost_gauge_preview.tscn" if path == BOOST_GAUGE.KEY else path
+	if ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with("res://"):
+		var scene_path: String = ENEMY_EFFECTS[path].scene if ENEMY_EFFECTS.has(path) else _move_targets[path].visual if _move_targets.has(path) else path
 		var scene := load(scene_path) as PackedScene if not scene_path.is_empty() else null
 		_sample = scene.instantiate() as Node2D if scene != null else null
 		if not boss_effect and _sample != null:
@@ -892,13 +900,15 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 	if _selected == BOOST_GAUGE.KEY and name in BOOST_GAUGE.BOUNDARY_KEYS: _boost_boundary_inputs[name] = spin
 
 func _apply_preview() -> void:
+	if _selected == BOOST_GAUGE.KEY:
+		_game_context.set_boost_values(_working.profiles.get(BOOST_GAUGE.KEY, {}))
 	_swatch.color = _value("effect_tint", Color.WHITE)
 	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] or ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
 	_working.apply_to(_sample)
-	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]: _sample.call("preview_step", 0.0)
+	if _selected == BOMBER_PREVIEW: _sample.call("preview_step", 0.0)
 	_sample.queue_redraw()
 
 func editing_state() -> Dictionary:
@@ -930,6 +940,8 @@ func reload_current() -> void:
 	if not _selected.is_empty(): _select(_selected)
 
 func set_active(active: bool) -> void:
+	_context_active = active
+	if is_instance_valid(_game_context): _game_context.set_active(active and _selected == BOOST_GAUGE.KEY)
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
 	var live_effect := ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
 	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)

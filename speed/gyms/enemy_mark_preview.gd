@@ -10,7 +10,6 @@ const SHADERS := {
 	"elite": preload("res://shaders/elite_mark.gdshader"),
 }
 const SAMPLE := preload("res://assets/pixel/telescope.png")
-const LANDMARK := preload("res://scripts/render/landmark_aura.gd")
 const LABELS := {
 	"pixel_grid": "ドット密度", "inner_radius": "内側の空白", "outer_radius": "外側の広がり",
 	"noise_scale": "模様の細かさ", "motion_speed": "変化の速度", "intensity": "明るさ",
@@ -30,8 +29,10 @@ var _viewport: SubViewport
 var _fields := VBoxContainer.new()
 var _clock := 0.0
 var _paused := false
-var _aura: Sprite2D
 var _enemy: Sprite2D
+var _game_context
+var _context_active := false
+var _sample_container: SubViewportContainer
 
 func _ready() -> void:
 	var controls := ScrollContainer.new()
@@ -48,6 +49,7 @@ func _ready() -> void:
 	title.text = "敵のプレビュー（本体の背後へ表示）"
 	right.add_child(title)
 	var container := SubViewportContainer.new()
+	_sample_container = container
 	container.stretch = true
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -69,31 +71,20 @@ func _ready() -> void:
 	_batch.begin()
 	_batch.add_upright(Vector2(240, 240), 80.0, Color(0.4, 0, 0, 1))
 	_batch.end()
-	_aura = Sprite2D.new()
-	_aura.position = Vector2(240, 240)
-	_aura.z_index = -1
-	_aura.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	var aura_material := ShaderMaterial.new()
-	aura_material.shader = preload("res://shaders/build_aura.gdshader")
-	aura_material.set_shader_parameter("noise_tex", preload("res://assets/effects/build/aura_noise.png"))
-	_aura.material = aura_material
-	var assets := load(LANDMARK.ASSETS_PATH) as Resource
-	LANDMARK.configure(_aura, assets.get_meta("masks")["res://data/visuals/looks/telescope.tres"])
-	_viewport.add_child(_aura)
 	_enemy = Sprite2D.new()
 	_enemy.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_enemy.position = Vector2(240, 240)
 	_viewport.add_child(_enemy)
+	_game_context = load("res://gyms/game_context_preview.gd").new()
+	right.add_child(_game_context)
 	_load(_section)
 	_show_section()
 
 func _process(delta: float) -> void:
 	if not _paused:
 		_clock += delta
-	if is_instance_valid(_batch):
+	if _section == "elite" and is_instance_valid(_batch):
 		(_batch.material as ShaderMaterial).set_shader_parameter("mark_time", _clock)
-	if is_instance_valid(_aura):
-		(_aura.material as ShaderMaterial).set_shader_parameter("clock", _clock)
 
 func _load(section: String) -> void:
 	var path: String = PATHS[section]
@@ -115,24 +106,21 @@ func set_section(section: String) -> void:
 
 func _show_section() -> void:
 	if not _working.has(_section): return
-	var material := ShaderMaterial.new()
-	material.shader = SHADERS[_section]
-	(_working[_section] as EnemyMarkSettings).apply_to(material)
-	_batch.material = material
-	material.set_shader_parameter("mark_time", _clock)
 	var landmark := _section == "landmark"
-	_batch.visible = not landmark
-	_aura.visible = landmark
+	_sample_container.visible = not landmark
+	_game_context.visible = landmark
 	if landmark:
-		var definition: EnemyDef = ContentManager.enemies[&"telescope"]
-		var look := RunPresentation.load_look(&"telescope")
-		_enemy.texture = RunPresentation.look_texture(look, {}, definition.armor_colors)
-		_enemy.scale = Vector2.ONE * ContentManager.cfg.character_scale * definition.visual_value("scale", 1.0)
-		_aura.scale = _enemy.scale
-		(_working[_section] as EnemyMarkSettings).apply_aura_to(_aura.material as ShaderMaterial)
+		_game_context.set_landmark_settings(_working[_section] as EnemyMarkSettings)
 	else:
+		var material := ShaderMaterial.new()
+		material.shader = SHADERS[_section]
+		(_working[_section] as EnemyMarkSettings).apply_to(material)
+		_batch.material = material
+		material.set_shader_parameter("mark_time", _clock)
 		_enemy.texture = SAMPLE
 		_enemy.scale = Vector2.ONE * 1.5
+	_game_context.set_active(_context_active and landmark)
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if _context_active and not landmark else SubViewport.UPDATE_DISABLED
 	_rebuild_fields()
 
 func _rebuild_fields() -> void:
@@ -143,11 +131,12 @@ func _rebuild_fields() -> void:
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description.text = "星座の手掛かり。船体の輪郭に沿って揺れる濃い金色のオーラ。本編と同じマスク・設定を使います。" if _section == "landmark" else "強化された個体。装甲の外側に断続する発光片。"
 	_fields.add_child(description)
-	var pause := CheckButton.new()
-	pause.text = "一時停止"
-	pause.button_pressed = _paused
-	pause.toggled.connect(func(value): _paused = value)
-	_fields.add_child(pause)
+	if _section != "landmark":
+		var pause := CheckButton.new()
+		pause.text = "一時停止"
+		pause.button_pressed = _paused
+		pause.toggled.connect(func(value): _paused = value)
+		_fields.add_child(pause)
 	var settings := _working[_section] as EnemyMarkSettings
 	if _section == "landmark":
 		for group in EnemyMarkSettings.AURA_GROUPS:
@@ -204,7 +193,7 @@ func _set_color(value: Color, key: String) -> void:
 func _changed() -> void:
 	_dirty[_section] = true
 	if _section == "landmark":
-		(_working[_section] as EnemyMarkSettings).apply_aura_to(_aura.material as ShaderMaterial)
+		_game_context.set_landmark_settings(_working[_section] as EnemyMarkSettings)
 	else:
 		(_working[_section] as EnemyMarkSettings).apply_to(_batch.material as ShaderMaterial)
 	_message = "未保存の調整値: " + PATHS[_section]
@@ -237,6 +226,8 @@ func reload_current() -> void:
 	_show_section()
 
 func set_active(active: bool) -> void:
+	_context_active = active
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
+	if is_instance_valid(_game_context): _game_context.set_active(active and _section == "landmark")
 	if is_instance_valid(_viewport):
-		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
+		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active and _section != "landmark" else SubViewport.UPDATE_DISABLED
