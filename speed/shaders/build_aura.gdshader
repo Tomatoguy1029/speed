@@ -19,6 +19,39 @@ uniform vec4 aura_outer : source_color=vec4(0.710,0.439,0.102,1.0);
 uniform bool pump_mask=false;
 uniform float pump_full=0.0;
 uniform float mask_padding=32.0;
+group_uniforms landmark;
+uniform float lm_edge_falloff=1.0;
+uniform float lm_core_width=3.0;
+uniform float lm_flow_angle=-90.0;
+uniform float lm_flow_coherence=1.0;
+uniform float lm_flow_spread=90.0;
+uniform float lm_flow_field_scale=1.0;
+uniform float lm_flow_field_speed=0.15;
+uniform float lm_noise_span=64.0;
+uniform float lm_noise_frequency_1=1.2;
+uniform float lm_noise_frequency_2=0.96;
+uniform float lm_noise_speed_1=28.0;
+uniform float lm_noise_speed_2=16.0;
+uniform float lm_noise_weight_1=1.0;
+uniform float lm_noise_weight_2=1.0;
+uniform float lm_noise_offset_x=23.0;
+uniform float lm_noise_offset_y=41.0;
+uniform float lm_noise_bias=0.5;
+uniform float lm_noise_contrast=1.0;
+uniform float lm_breakup_span=37.0;
+uniform float lm_breakup_speed=9.0;
+uniform float lm_breakup_strength=0.35;
+uniform float lm_breakup_offset_x=17.0;
+uniform float lm_breakup_offset_y=0.0;
+uniform float lm_core_noise_threshold=0.4;
+uniform float lm_core_noise_gain=1.6;
+uniform float lm_edge_opacity=0.8627451;
+uniform float lm_core_opacity=0.43137255;
+uniform float lm_max_opacity=0.89411765;
+uniform float lm_pulse_amount=0.07;
+uniform float lm_pulse_seconds=4.0;
+uniform float lm_opacity_step=12.0;
+group_uniforms;
 #include "res://shaders/pump_outline.gdshaderinc"
 // tuning の値は戦闘エフェクトツールで上書きする（ShaderTuning）。強さで銀→青→金に変わり、各段は縁・中・外の3色
 group_uniforms tuning;
@@ -40,6 +73,22 @@ vec3 palette(float stage, int band){
  vec3 c[3]=vec3[](gold_rim.rgb,gold_mid.rgb,gold_outer.rgb);
  return stage<1.0?mix(a[band],b[band],stage):mix(b[band],c[band],min(1.0,stage-1.0));
 }
+vec2 landmark_flow(vec2 p, float layer){
+ float angle=radians(lm_flow_angle);
+ vec2 aligned=vec2(cos(angle),sin(angle));
+ if(lm_flow_coherence>=1.0) return aligned;
+ vec2 offset=vec2(lm_noise_offset_x,lm_noise_offset_y)*layer;
+ float field=texture(noise_tex,(p*lm_flow_field_scale+offset)/64.0+vec2(clock*flicker_speed*lm_flow_field_speed)).r;
+ float scattered_angle=angle+(field*2.0-1.0)*radians(lm_flow_spread);
+ vec2 scattered=vec2(cos(scattered_angle),sin(scattered_angle));
+ return normalize(mix(scattered,aligned,lm_flow_coherence));
+}
+float landmark_noise(vec2 p){
+ float t=clock*flicker_speed;
+ float a=texture(noise_tex,(p*lm_noise_frequency_1-landmark_flow(p,0.0)*t*lm_noise_speed_1)/lm_noise_span).r;
+ float b=texture(noise_tex,(p*lm_noise_frequency_2+vec2(lm_noise_offset_x,lm_noise_offset_y)-landmark_flow(p,1.0)*t*lm_noise_speed_2)/lm_noise_span).r;
+ return clamp((a*lm_noise_weight_1+b*lm_noise_weight_2-lm_noise_bias)*lm_noise_contrast,0.0,1.0);
+}
 void fragment(){
  vec2 p=(floor(UV*mask_size*distance_scale/pixel_scale)+0.5)*pixel_scale;
  vec2 uv=p/(mask_size*distance_scale);
@@ -57,7 +106,7 @@ void fragment(){
   raw=distance*8.0;
  }
  float base=0.5+3.3*strength*strength+0.7*pop;
- float n=clamp(texture(noise_tex,(p*1.2+vec2(0,clock*flicker_speed*28.0))/64.0).r+texture(noise_tex,(p*0.96+vec2(23,clock*flicker_speed*16.0+41.0))/64.0).r-0.5,0.0,1.0);
+ float n=landmark_mode?landmark_noise(p):clamp(texture(noise_tex,(p*1.2+vec2(0,clock*flicker_speed*28.0))/64.0).r+texture(noise_tex,(p*0.96+vec2(23,clock*flicker_speed*16.0+41.0))/64.0).r-0.5,0.0,1.0);
  float up=max(0.0,rise_origin-p.y)/50.0;
  float e=base*(0.75+0.55*n)+up*base*rise*n;
  float inner=e-distance;
@@ -67,11 +116,12 @@ void fragment(){
   float width=aura_width+aura_variation*n;
   if(raw>0.0 && distance<width){
    float edge=distance/max(width,0.001);
-   float broken=0.65+0.35*texture(noise_tex,(p+vec2(17,clock*9.0))/37.0).r;
-   float core=max(0.0,1.0-distance/3.0)*max(0.0,(n-0.4)*1.6);
-   float alpha=(220.0*(1.0-edge)*broken+110.0*core)*aura_intensity;
-   alpha*=0.93+0.07*sin(clock*TAU/4.0);
-   alpha=min(228.0,floor(alpha/12.0+0.5)*12.0)/255.0;
+   float breakup=texture(noise_tex,(p+vec2(lm_breakup_offset_x,lm_breakup_offset_y)-landmark_flow(p,2.0)*clock*flicker_speed*lm_breakup_speed)/lm_breakup_span).r;
+   float broken=(1.0-lm_breakup_strength)+lm_breakup_strength*breakup;
+   float core=max(0.0,1.0-distance/lm_core_width)*max(0.0,(n-lm_core_noise_threshold)*lm_core_noise_gain);
+   float alpha=(lm_edge_opacity*pow(1.0-edge,lm_edge_falloff)*broken+lm_core_opacity*core)*255.0*aura_intensity;
+   alpha*=1.0-lm_pulse_amount+lm_pulse_amount*sin(clock*TAU/lm_pulse_seconds);
+   alpha=min(lm_max_opacity*255.0,floor(alpha/lm_opacity_step+0.5)*lm_opacity_step)/255.0;
    col=mix(aura_core,aura_outer,edge);
    col.a*=alpha;
   }

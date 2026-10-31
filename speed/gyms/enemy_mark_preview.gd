@@ -17,7 +17,6 @@ const LABELS := {
 	"color": "基調色", "highlight": "光る色",
 	"aura_width": "輪郭の幅", "aura_variation": "幅の揺らぎ", "pixel_size": "ドット幅",
 }
-const AURA_FIELDS := ["aura_width", "aura_variation", "pixel_size", "motion_speed", "intensity", "color", "highlight"]
 
 var preview_host: Control
 var controls_host: Control
@@ -150,33 +149,48 @@ func _rebuild_fields() -> void:
 	pause.toggled.connect(func(value): _paused = value)
 	_fields.add_child(pause)
 	var settings := _working[_section] as EnemyMarkSettings
-	for property in settings.get_property_list():
-		if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_EDITOR):
-			continue
-		var key: String = property.name
-		if not LABELS.has(key): continue
-		if _section == "landmark" and key not in AURA_FIELDS: continue
-		if _section != "landmark" and key in ["aura_width", "aura_variation", "pixel_size"]: continue
-		var label := Label.new()
-		label.text = LABELS[key]
-		_fields.add_child(label)
-		if property.type == TYPE_COLOR:
-			var picker := ColorPickerButton.new()
-			picker.custom_minimum_size = Vector2(72, 32)
-			picker.color = settings.get(key)
-			picker.color_changed.connect(_set_color.bind(key))
-			_fields.add_child(picker)
-		elif property.type == TYPE_INT or property.type == TYPE_FLOAT:
-			var spin := SpinBox.new()
-			var range_parts: PackedStringArray = String(property.hint_string).split(",")
-			if range_parts.size() >= 2:
-				spin.min_value = float(range_parts[0])
-				spin.max_value = float(range_parts[1])
-			if range_parts.size() >= 3: spin.step = float(range_parts[2])
-			spin.value = settings.get(key)
-			spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			spin.value_changed.connect(_set_number.bind(key))
-			_fields.add_child(spin)
+	if _section == "landmark":
+		for group in EnemyMarkSettings.AURA_GROUPS:
+			_fields.add_child(HSeparator.new())
+			var heading := Label.new()
+			heading.text = group
+			_fields.add_child(heading)
+			for property in settings.get_property_list():
+				var details: Array = EnemyMarkSettings.AURA_FIELDS.get(property.name, [])
+				if details.is_empty() or details[0] != group: continue
+				_add_setting(property, settings, details[1], details[2])
+	else:
+		for property in settings.get_property_list():
+			if LABELS.has(property.name) and property.name not in ["aura_width", "aura_variation", "pixel_size"]:
+				_add_setting(property, settings, LABELS[property.name], "")
+
+func _add_setting(property: Dictionary, settings: EnemyMarkSettings, caption: String, help: String) -> void:
+	if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_EDITOR): return
+	var key: String = property.name
+	var label := Label.new()
+	label.text = caption
+	label.tooltip_text = help
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_fields.add_child(label)
+	if property.type == TYPE_COLOR:
+		var picker := ColorPickerButton.new()
+		picker.custom_minimum_size = Vector2(72, 32)
+		picker.tooltip_text = help
+		picker.color = settings.get(key)
+		picker.color_changed.connect(_set_color.bind(key))
+		_fields.add_child(picker)
+	elif property.type == TYPE_INT or property.type == TYPE_FLOAT:
+		var spin := SpinBox.new()
+		spin.tooltip_text = help
+		var range_parts: PackedStringArray = String(property.hint_string).split(",")
+		if range_parts.size() >= 2:
+			spin.min_value = float(range_parts[0])
+			spin.max_value = float(range_parts[1])
+		if range_parts.size() >= 3: spin.step = float(range_parts[2])
+		spin.value = settings.get(key)
+		spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		spin.value_changed.connect(_set_number.bind(key))
+		_fields.add_child(spin)
 
 func _set_number(value: float, key: String) -> void:
 	var settings := _working[_section] as EnemyMarkSettings
