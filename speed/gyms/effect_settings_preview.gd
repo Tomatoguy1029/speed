@@ -32,8 +32,13 @@ const DIRECT_EFFECTS := [
 	"boss/final_strike", BOOST_GAUGE.KEY,
 ]
 const BOMBER_PREVIEW := "res://scenes/attacks/zone_bomber.tscn"
+const PUMP_SHELL := "res://scenes/attacks/shell.tscn"
+const PUMP_BLAST := "res://scenes/attacks/zone_pump.tscn"
+const STANDALONE_ATTACKS := [BOMBER_PREVIEW, PUMP_SHELL, PUMP_BLAST]
 const ATTACK_LABELS := {
 	BOMBER_PREVIEW: ["自爆する雑魚 · 自爆の爆発", "自爆する雑魚専用のドット単位の爆発。閃光・火球・衝撃波の輪・煙・燃えかす・火の粉を調整します。"],
+	PUMP_SHELL: ["ポンプ座 · 圧縮弾", "Laser bolt風の白い芯・緑の色帯・パルス・光点・短い尾を調整します。"],
+	PUMP_BLAST: ["ポンプ座 · 着弾の爆発", "自爆・機雷と同じ爆発shaderを、ポンプ専用の色・形・時間・粒子で調整します。"],
 }
 const VISUAL_FIELDS := [
 	"pixel_size", "warning_color", "locked_color", "attack_color", "recovery_color",
@@ -59,6 +64,14 @@ const DIRECT_FIELDS := {
 	BOMBER_PREVIEW: [
 		["ドット幅（倍）", "pixel_scale", 0.5, 4.0, 0.05, 1.0],
 		["描画サイズ（倍）", "effect_scale", 0.25, 3.0, 0.05, 0.8333333333333333],
+	],
+	PUMP_SHELL: [
+		["弾の表示サイズ（倍）", "flight_scale", 0.25, 3.0, 0.05, 1.0],
+	],
+	PUMP_BLAST: [
+		["ドット幅（倍）", "pixel_scale", 0.5, 4.0, 0.05, 1.0],
+		["描画サイズ（倍）", "effect_scale", 0.25, 3.0, 0.05, 0.8333333333333333],
+		["爆発の発光倍率", "glow_energy", 0.0, 4.0, 0.05, 1.0],
 	],
 	"res://scenes/bosses/canis_major/nova_visual.tscn": [
 		["溜めの光芒の長さ", "warning_ray_length", 20.0, 180.0, 1.0, 100.0],
@@ -245,6 +258,25 @@ const FIELD_HELP := {
 }
 ## shader の調整値（ShaderTuning の tuning の組）の表示名と説明。uniform 名で引く
 const SHADER_LABELS := {
+	"bolt_dark": ["光弾の外縁色", "光弾の最外周の暗い緑。"],
+	"bolt_edge": ["光弾の縁の色", "芯の外側を包む緑の帯。周囲の発光にも使います。"],
+	"bolt_mid": ["光弾の中間色", "帯と尾の鮮やかな緑。"],
+	"bolt_pale": ["光弾の明るい色", "帯と尾の明るい部分の色。"],
+	"bolt_light": ["光弾の薄い色", "芯の周囲と先端のきらめきの色。"],
+	"bolt_core": ["光弾の芯の色", "白く光る中心と光点の色。"],
+	"bolt_scale": ["光弾のドット倍率", "元のLaser boltのドット幅を拡大します。判定は維持します。"],
+	"bolt_length": ["光弾の帯の長さ", "後ろへ細く伸びる帯の長さ。元絵のドット単位。"],
+	"bolt_width": ["光弾の帯の太さ", "丸い頭と帯の幅の倍率。"],
+	"bolt_period": ["光弾の反復秒数", "光点・尾・先端のきらめきが一周する秒数。"],
+	"bolt_brightness": ["光弾の明るさ", "芯・帯・光点と周囲光の明るさ。"],
+	"pulse_speed": ["帯のパルスの速さ", "帯を後方へ走る明るい節の速さ。弾速は維持します。"],
+	"pulse_strength": ["帯のパルスの強さ", "帯を走る節を一段明るくする強さ。"],
+	"spiral_opacity": ["らせんの光点の濃さ", "芯を回る二重らせんの光点の不透明度。"],
+	"tail_count": ["分離する尾の本数", "帯の後ろへ流れ、揺れながら冷える短い尾の本数。最大14。"],
+	"tail_opacity": ["分離する尾の濃さ", "短い尾と、その周囲光の濃さ。"],
+	"glint_scale": ["先端のきらめきの大きさ", "光弾の丸い頭で明滅する星形の光の倍率。"],
+	"glow_strength": ["光弾の発光", "光の帯と先端の周囲へ足す明るさ。"],
+	"contents_opacity": ["芯の中の実雑魚の濃さ", "元の実雑魚を芯の中へ縮尺表示します。0で光芯を優先します。"],
 	"c0": ["炎の芯の色", "炎の一番明るい部分の色。"], "c1": ["炎の明るい色", "芯の外側の色。"],
 	"c2": ["炎の中間色", "炎の本体の色。"], "c3": ["炎の外側の色", "一番外の市松で透ける部分の色。"],
 	"noise_scale": ["炎の模様の細かさ", "縁を崩すノイズの細かさ。大きいほど細かく崩れる。"],
@@ -390,7 +422,7 @@ var _context_active := false
 func _ready() -> void:
 	_collect_boss_techniques()
 	_paths.append_array(DIRECT_EFFECTS)
-	_paths.append(BOMBER_PREVIEW)
+	_paths.append_array(STANDALONE_ATTACKS)
 	_paths.append_array(ENEMY_EFFECTS.keys())
 	for key in BODY_EFFECTS:
 		if key != "boss/shared/tornado_shader": _paths.append(key)
@@ -654,7 +686,7 @@ func _select(path: String) -> void:
 	_selected = path
 	if path == BOOST_GAUGE.KEY:
 		_working.profiles[path] = BOOST_GAUGE.migrated_values(_working.profiles.get(path, {}))
-	_standalone_controls.visible = path == BOMBER_PREVIEW
+	_standalone_controls.visible = path in STANDALONE_ATTACKS
 	_standalone_play.set_pressed_no_signal(false)
 	_standalone_play.text = "⏸"
 	if _group_for(path) != _target_group: _show_target_group(_group_for(path))
@@ -751,10 +783,14 @@ func _shader_entries(path: String) -> Array[Dictionary]:
 	else: return entries
 	var seen := {}
 	var defaults := {}
+	var owned_shader: Shader
+	if not path.begins_with("weapon/") and not path.begins_with("trait/") and is_instance_valid(_sample) and _sample.has_method("burst_shader"):
+		owned_shader = _sample.call("burst_shader") as Shader
 	while script != null:
 		var constants: Dictionary = script.get_script_constant_map()
 		defaults.merge(constants.get("SHADER_DEFAULTS", {}), false)
-		for shader: Shader in constants.get("TUNED_SHADERS", []):
+		var shaders: Array = [owned_shader] if owned_shader != null else constants.get("TUNED_SHADERS", [])
+		for shader: Shader in shaders:
 			if seen.has(shader.resource_path): continue
 			seen[shader.resource_path] = true
 			for info in ShaderTuning.tunables(shader):
@@ -858,7 +894,7 @@ func _value(name: String, fallback: Variant) -> Variant:
 	var legacy: String = _move_targets[_selected].visual if _move_targets.has(_selected) else ENEMY_EFFECTS[_selected].scene if ENEMY_EFFECTS.has(_selected) else ""
 	if _selected == "boss/move/draco/inhale" and (name.begins_with("shader/") or name in ["pixel_scale", "fade_seconds"]):
 		legacy = "res://scenes/attacks/beam_draco.tscn"
-	return _working.resolved_values(_selected, legacy).get(name, fallback)
+	return ShaderTuning.saved_value(_working.resolved_values(_selected, legacy), name, fallback)
 
 func _set_value(name: String, value: Variant) -> void:
 	var values: Dictionary = _working.profiles.get(_selected, {}).duplicate()
@@ -919,12 +955,12 @@ func _apply_preview() -> void:
 	if _selected == BOOST_GAUGE.KEY:
 		_game_context.set_boost_values(_working.profiles.get(BOOST_GAUGE.KEY, {}))
 	_swatch.color = _value("effect_tint", Color.WHITE)
-	if _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY] or ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _selected in STANDALONE_ATTACKS or _selected == BOOST_GAUGE.KEY or ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
 	_working.apply_to(_sample)
-	if _selected == BOMBER_PREVIEW: _sample.call("preview_step", 0.0)
+	if _selected in STANDALONE_ATTACKS: _sample.call("preview_step", 0.0)
 	_sample.queue_redraw()
 
 func editing_state() -> Dictionary:
@@ -962,7 +998,7 @@ func set_active(active: bool) -> void:
 	var live_effect := ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
 	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)
 	if not active: EFFECT_SETTINGS.clear_preview_profiles()
-	elif _working != null and (live_effect or _selected in [BOMBER_PREVIEW, BOOST_GAUGE.KEY]): EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
+	elif _working != null and (live_effect or _selected in STANDALONE_ATTACKS or _selected == BOOST_GAUGE.KEY): EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if is_instance_valid(_viewport):
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
 

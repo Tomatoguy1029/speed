@@ -6,7 +6,8 @@ func _damage_ship(_ps: ProjectileSystem, _i: int) -> void:
 
 func on_end(ps: ProjectileSystem, i: int, at: Vector2, _reached: bool) -> void:
 	if ps.hostile_life[i] > 0.0:
-		ps.fire_zone(at, ps.hostile_burst[i], 0.0, ps.hostile_dmg[i], ProjectileSystem.HazardStyle.BLAST, Color("#c9a6ff"))
+		var zone: int = ps.fire_zone(at, ps.hostile_burst[i], 0.0, ps.hostile_dmg[i], ProjectileSystem.HazardStyle.BLAST, Color("#4ee591"))
+		ps.hazard_visual[zone] = &"res://scenes/attacks/zone_pump.tscn"
 
 func spawn(ps: ProjectileSystem, i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float) -> void:
 	var t := ps.combat.enemies.table
