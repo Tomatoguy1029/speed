@@ -1,4 +1,4 @@
-## 猟犬の仮表示。共通の矢じりに耳の図形を添える。正式アートは別途差し替える。
+## 猟犬の攻撃予告。専用外観がないときだけ共通の矢じりに耳を添える。
 extends EnemyVisual
 
 func setup(render: RunPresentation, behavior_name: StringName) -> void:
@@ -7,6 +7,7 @@ func setup(render: RunPresentation, behavior_name: StringName) -> void:
 
 func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	super(c, t, i)
+	if rm.look_of(t.type[i]) != null: return
 	var u := Vector2.from_angle(t.facing[i])
 	var side := u.orthogonal()
 	var r := t.r[i]

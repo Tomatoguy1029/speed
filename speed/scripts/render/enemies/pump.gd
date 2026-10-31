@@ -23,8 +23,8 @@ func update(dt: float) -> void:
 func draw_layer(c: CanvasItem, _view: Rect2) -> void:
 	_draw_swallows(c)
 
-## ポンプ座の絵（pump.png、48px）の継ぎ目の帯。前（画像の下）を + にした絵の中心からの位置と、半分の長さ（px）
-const PUMP_SEAMS := [[-10.5, 14.7], [-3.0, 16.4], [4.5, 14.7]]
+## ポンプ座の原画（24×37px）の継ぎ目。口がある画像の上側を正に取る。
+const PUMP_SEAMS := [[10.0, 9.0], [0.5, 6.0], [-7.5, 9.0]]
 
 ## ポンプ座：吸い込んだ数に応じて継ぎ目から光が漏れ、口へ流れ込む吸い込みの筋を描く。
 ## 構えている間は胴体が張り詰めて脈打ち、継ぎ目が強く光り、口元に巨大な塊がせり出す。
@@ -34,7 +34,7 @@ func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var dp: Dictionary = t.def[i].params
 	var full := clampf(float(t.buds[i]) / float(dp.store_max), 0.0, 1.0)
 	var aiming := t.mode[i] == EnemyTable.Mode.WINDUP
-	var px := r / 24.0
+	var px := r * 2.0 / 37.0
 	var u := Vector2.from_angle(t.facing[i])
 	var side := Vector2(-u.y, u.x)
 	var mouth := p + u * r * PUMP.MOUTH
