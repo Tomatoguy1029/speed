@@ -1,9 +1,9 @@
 extends WeaponVisual
 ## マインランチャー：ブーストの終点から機雷が飛び出し（後ろに青白い軌跡）、着地すると小さな輪が光り、
-## 中心の灯りが点滅して待つ。敵が踏むとピクセル炎の爆発と、外へ飛ぶ白い破片が出る。
+## 中心の灯りが点滅して待つ。敵が踏むとドット単位の爆発と、外へ飛ぶ白い破片が出る。
 
 ## 戦闘エフェクトツールで調整する shader
-const TUNED_SHADERS := [preload("res://shaders/fire_burst.gdshader")]
+const TUNED_SHADERS := [preload("res://shaders/blast_burst.gdshader")]
 var booms: Array[Dictionary] = []
 
 func setup(render: RunPresentation, owner_behavior) -> void:
@@ -18,7 +18,7 @@ func on_event(ev: Dictionary) -> void:
 	if not claims(ev): return
 	var px := painter().px
 	# 試作は踏まれた範囲 28 ドットに半径 23 の炎
-	fires().add(ev.pos, float(ev.radius) / px * 23.0 / 28.0, 0.6)
+	blasts().add(ev.pos, float(ev.radius) / px * 23.0 / 28.0)
 	var debris: Array[Dictionary] = []
 	for i in 14: debris.append({"dir": Vector2.from_angle(randf() * TAU), "v": 40.0 + randf() * 70.0})
 	booms.append({"pos": ev.pos, "age": 0.0, "debris": debris})
@@ -42,7 +42,7 @@ func tick(_dt: float) -> void:
 		for d in b.debris:
 			p.dot(b.pos + d.dir * d.v * q * p.px, Color.WHITE if q < 0.5 else Color("#8fb8ff"))
 	booms = booms.filter(func(b): return b.age < 0.4)
-	fires().step(dt)
+	blasts().step(dt)
 	p.end()
 
 ## 機雷の絵（試作の pmine）。紺の十字の胴、4本の突起、中心の灯り。

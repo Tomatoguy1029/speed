@@ -37,6 +37,8 @@ func dispose() -> void:
 		_painter.queue_free()
 	if is_instance_valid(_fires):
 		_fires.queue_free()
+	if is_instance_valid(_blasts):
+		_blasts.queue_free()
 	behavior = null
 	rm = null
 
@@ -62,6 +64,17 @@ func fires() -> FireBursts:
 		_fires.modulate = RenderPipeline.plain_color(rm._layers.fx)
 		rm._layers.fx.add_child(_fires)
 	return _fires
+var _blasts: BlastBursts
+## ドット単位の爆発。初めて使うときに演出の層へ置く。進めるのは各表示の tick（blasts().step）。
+func blasts() -> BlastBursts:
+	if _blasts == null:
+		_blasts = BlastBursts.new()
+		_blasts.setup(1.82 * cfg.character_scale)
+		_blasts.key = _effect_key()
+		_blasts.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		_blasts.modulate = RenderPipeline.plain_color(rm._layers.fx)
+		rm._layers.fx.add_child(_blasts)
+	return _blasts
 ## 前回から進んだ世界秒。ヒットストップや停止の間は 0。
 func world_dt() -> float:
 	var now := state.world_time

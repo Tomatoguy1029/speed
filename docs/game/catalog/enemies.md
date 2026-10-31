@@ -130,7 +130,7 @@
 
 ## 自爆する雑魚の炎
 
-自爆する雑魚（`bomber`）の自爆は `attack_visual` の `scenes/attacks/zone_bomber.tscn` を使い、既存の `FireBursts` と `fire_burst.gdshader` でピクセル炎を描く。判定半径をドット単位へ変換して表示へ渡し、炎の表示時間は攻撃判定の寿命から独立させる。専用シーンの色・崩れ方・表示秒数・ドット幅・描画倍率は[ビジュアル編集](../../dev/tools/visual-editor.md#戦闘エフェクトの調整項目)で調整する。カウントダウン・判定・威力は `bomber.tres` の設定を使う。
+自爆する雑魚（`bomber`）の自爆は `attack_visual` の `scenes/attacks/zone_bomber.tscn` を使い、`BlastBursts` と `blast_burst.gdshader` でドット単位の爆発を描く。機雷の爆発も同じ爆発を使う。判定半径をドット単位へ変換して表示へ渡し、爆発の表示時間は攻撃判定の寿命から独立させ、火球・煙・燃えかす・火の粉の秒数から決める。専用シーンの色・各要素の大きさ・数・秒数・ドット幅・描画倍率は[ビジュアル編集](../../dev/tools/visual-editor.md#戦闘エフェクトの調整項目)で調整する。カウントダウン・判定・威力は `bomber.tres` の設定を使う。
 
 ## ポンプ座の吸引と解放
 

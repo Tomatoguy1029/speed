@@ -33,7 +33,7 @@ const DIRECT_EFFECTS := [
 ]
 const BOMBER_PREVIEW := "res://scenes/attacks/zone_bomber.tscn"
 const ATTACK_LABELS := {
-	BOMBER_PREVIEW: ["自爆する雑魚 · 自爆の爆発", "自爆する雑魚専用のピクセル炎。色・形・ノイズ・崩れ方を調整します。"],
+	BOMBER_PREVIEW: ["自爆する雑魚 · 自爆の爆発", "自爆する雑魚専用のドット単位の爆発。閃光・火球・衝撃波の輪・煙・燃えかす・火の粉を調整します。"],
 }
 const VISUAL_FIELDS := [
 	"pixel_size", "warning_color", "locked_color", "attack_color", "recovery_color",
@@ -57,7 +57,6 @@ const DIRECT_FIELDS := {
 		["目盛り線の太さ（1周目の幅の半分が上限）", "tick_width", 0.5, 6.0, 0.25, BOOST_GAUGE.DEFAULT_WIDTHS.tick_width],
 	],
 	BOMBER_PREVIEW: [
-		["炎の表示（秒）", "visible_seconds", 0.05, 2.0, 0.01, 0.65],
 		["ドット幅（倍）", "pixel_scale", 0.5, 4.0, 0.05, 1.0],
 		["描画サイズ（倍）", "effect_scale", 0.25, 3.0, 0.05, 0.8333333333333333],
 	],
@@ -254,6 +253,21 @@ const SHADER_LABELS := {
 	"start_size": ["炎の出始めの大きさ", "爆発の瞬間の大きさ（最大に対する割合）。"],
 	"flash_boost": ["炎の最初の閃き", "爆発の最初の一瞬だけ明るく大きくする量。"],
 	"outer_dither": ["外炎の市松の強さ", "0で半透明の連続した外炎、1で市松の間引き。中間値では両方を混ぜます。"],
+	"outer_alpha": ["外炎の不透明度", "爆発の火球の一番外の帯の濃さ。"],
+	"grow_seconds": ["火球の膨らむ秒数", "火球が最大の大きさになるまでの秒数。"],
+	"fire_seconds": ["火球の秒数", "火球が出てから消えるまでの秒数。燃えかすの出る時刻もこれに合わせる。"],
+	"cool_speed": ["火の輪の冷める速さ", "後半に火の輪が細り、赤く途切れていく強さ。"],
+	"hole_size": ["中心の抜ける大きさ", "火球の中心から燃え尽きて輪になる広さ（半径に対する割合）。0で抜けない。"],
+	"flash_seconds": ["閃光の秒数", "最初の白い円を出す秒数。"], "flash_size": ["閃光の大きさ", "白い円の広がる半径（爆発の半径に対する割合）。"],
+	"ring_seconds": ["衝撃波の秒数", "衝撃波の輪が広がって消えるまでの秒数。"], "ring_size": ["衝撃波の広さ", "輪が広がる半径（爆発の半径に対する割合）。"],
+	"ring_alpha": ["衝撃波の濃さ", "衝撃波の輪の不透明度。"],
+	"spark_count": ["火の粉の数", "外へ飛ぶ火の粉の数。最大64。"], "spark_speed": ["火の粉の速さ", "火の粉が飛ぶ速さ（爆発の半径に比例）。"],
+	"spark_seconds": ["火の粉の秒数", "火の粉が消えるまでの最長の秒数。"],
+	"cinder_count": ["燃えかすの数", "火の輪から流れ出る燃えかすの粒の数。最大96。"], "cinder_speed": ["燃えかすの速さ", "燃えかすが外へ流れる速さ（爆発の半径に比例）。"],
+	"cinder_seconds": ["燃えかすの秒数", "燃えかすが冷えて消えるまでの最長の秒数。"],
+	"smoke_count": ["煙の塊の数", "火の後ろに残る煙の塊の数。最大24。"], "smoke_alpha": ["煙の濃さ", "煙の塊の最初の不透明度。"],
+	"smoke_seconds": ["煙の秒数", "煙が薄れて消えるまでの最長の秒数。"],
+	"smoke_dark": ["煙の暗い色", "煙の塊の本体の色。"], "smoke_mid": ["煙の中間の色", "煙の塊の明るい側の色。"], "smoke_light": ["煙の明るい色", "煙の塊の一番明るい部分の色。"],
 	"core_color": ["帯の芯の色", "ビームの中心の色。"], "mid_color": ["帯の色", "ビームの本体の色。"],
 	"edge_color": ["帯の縁の色", "ビームの縁（市松）とねじれの影の色。"], "helix_color": ["ねじれの光の色", "帯の中を走る明るい光の色。"],
 	"core_ratio": ["芯の太さ", "帯の幅に占める芯の割合。"], "mid_ratio": ["帯の本体の太さ", "帯の幅に占める本体の割合。残りが縁。"],
@@ -828,7 +842,6 @@ func _field_group(name: String) -> String:
 	return "形・大きさ"
 
 func _field_label(name: String, fallback: String) -> String:
-	if _selected == BOMBER_PREVIEW and name == "visible_seconds": return "炎の表示（秒）"
 	return FIELD_LABELS.get(name, fallback)
 
 func _add_group(title: String) -> void:
