@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+
+[ext_resource type="Shader" path="res://shaders/landmark_aura_runtime.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/effects/build/aura_noise.png" id="2_noise"]
+
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/noise_tex = ExtResource("2_noise")
+metadata/bake_version = 1
+metadata/inputs = {
+    "res://data/visuals/landmark_mark.tres": "3c29fec7b114e793c792ad3a30ca3e6e52775ed304e962633e544c2ba1e871aa",
+    "res://scripts/data_types/enemy_mark_settings.gd": "99001fdceab3b549bc3ad3ac1b339a8df898c3c4f97eddcf5096bfa93e03093b",
+    "res://shaders/build_aura.gdshader": "4177ddfe650962f160486a6f3351ce07e26c4725243744ed796ee51798035cd2",
+    "res://tools/art/bake_landmark_aura.py": "12516bc0b48d4a268abbd9c87582416656d922e454a8330f924a13311295de34"
+}
+metadata/shader_sha256 = "94b11ed245af22e3a7434b90694425c00bb0eeceb9ba579813b73a6bcac96b61"

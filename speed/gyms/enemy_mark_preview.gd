@@ -74,8 +74,8 @@ func _ready() -> void:
 	_aura.z_index = -1
 	_aura.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var aura_material := ShaderMaterial.new()
-	aura_material.shader = LANDMARK.SHADER
-	aura_material.set_shader_parameter("noise_tex", LANDMARK.NOISE)
+	aura_material.shader = preload("res://shaders/build_aura.gdshader")
+	aura_material.set_shader_parameter("noise_tex", preload("res://assets/effects/build/aura_noise.png"))
 	_aura.material = aura_material
 	var assets := load(LANDMARK.ASSETS_PATH) as Resource
 	LANDMARK.configure(_aura, assets.get_meta("masks")["res://data/visuals/looks/telescope.tres"])

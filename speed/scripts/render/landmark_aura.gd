@@ -1,48 +1,49 @@
 ## 制作時に焼いた敵の距離場を使う目印。画像の取得・解析・生成を描画中に行わない。
 extends Node2D
 const ASSETS_PATH := "res://assets/effects/landmark/masks.tres"
-const SETTINGS_PATH := "res://data/visuals/landmark_mark.tres"
-const SHADER := preload("res://shaders/build_aura.gdshader")
-const NOISE := preload("res://assets/effects/build/aura_noise.png")
+const MATERIAL_PATH := "res://data/visuals/landmark_aura_material.tres"
 var _rm: RunPresentation
 var _assets: Resource
-var _settings: EnemyMarkSettings
 var _masks: Dictionary
 var _sprites: Array[Sprite2D] = []
+var _material: ShaderMaterial
+var _clock := -INF
+var _pump_full := PackedFloat64Array([0.0, 0.0, 0.0])
 var _count := 0
 
 func setup(render: RunPresentation) -> void:
 	_rm = render
 	var scope := render.run.ctx.resources
-	for path in [ASSETS_PATH, SETTINGS_PATH]:
+	for path in [ASSETS_PATH, MATERIAL_PATH]:
 		if not scope.resources.has(path) and render.state.lab_mode:
 			# 実験場だけは任意の追加対象を開始時に取得し、同じScopeへ渡す。
 			scope.provide(path, load(path))
 		assert(scope.resources.has(path), "目印オーラの事前準備が必要: " + path)
 	_assets = scope.resources.get(ASSETS_PATH)
-	_settings = scope.resources.get(SETTINGS_PATH) as EnemyMarkSettings
-	if _assets == null or _settings == null: return
+	var template := scope.resources.get(MATERIAL_PATH) as ShaderMaterial
+	if _assets == null or template == null: return
 	_masks = _assets.get_meta("masks", {})
+	# ランごとの時刻だけを独立させ、3つの可視部では同じmaterialを共有する。
+	_material = template.duplicate() as ShaderMaterial
+	_material.set_shader_parameter("linear_colors", RenderingServer.get_current_rendering_method() != "gl_compatibility")
 	# 目印は同時に1体。見えない三角の中心だけは3つの可視部へ表示する。
 	for slot in 3:
 		var sprite := Sprite2D.new()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var mat := ShaderMaterial.new()
-		mat.shader = SHADER
-		mat.set_shader_parameter("noise_tex", NOISE)
-		_settings.apply_aura_to(mat)
-		sprite.material = mat
+		sprite.material = _material
 		sprite.hide()
 		add_child(sprite)
 		_sprites.append(sprite)
 
 ## 編集画面も本番も同じマスクの寸法・変形条件を使う。
-static func configure(sprite: Sprite2D, entry: Dictionary) -> void:
+static func configure(sprite: Sprite2D, entry: Dictionary, instance_values := false) -> void:
 	sprite.texture = entry.texture
-	var mat := sprite.material as ShaderMaterial
-	mat.set_shader_parameter("mask_size", sprite.texture.get_size())
-	mat.set_shader_parameter("mask_padding", float(entry.padding))
-	mat.set_shader_parameter("pump_mask", bool(entry.get("pump", false)))
+	var values := {"mask_size": sprite.texture.get_size(), "mask_padding": float(entry.padding), "pump_mask": bool(entry.get("pump", false))}
+	for key in values:
+		if instance_values:
+			sprite.set_instance_shader_parameter(key, values[key])
+		else:
+			(sprite.material as ShaderMaterial).set_shader_parameter(key, values[key])
 
 func begin() -> void:
 	_count = 0
@@ -84,9 +85,10 @@ func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
 		var visual := _rm._visual_of(t, row)
 		scale_px = visual._source_scale(t, row)
 		full = 1.0 if t.mode[row] == EnemyTable.Mode.WINDUP else clampf((t.r[row] / maxf(visual._base_radius(t, row), 0.001) - 1.0) / maxf(float(t.def[row].params.grow), 0.001), 0.0, 1.0)
-	var sprite := _sprites[_count]
+	var slot := _count
+	var sprite := _sprites[slot]
 	_count += 1
-	if sprite.texture != entry.texture: configure(sprite, entry)
+	if sprite.texture != entry.texture: configure(sprite, entry, true)
 	var pose := Transform2D(angle, t.pos[row]).scaled_local(Vector2.ONE * scale_px)
 	if not deformation.is_empty():
 		var radial: Vector2 = deformation.direction
@@ -97,7 +99,10 @@ func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
 				var basis := pose[column]
 				pose[column] = n * basis.dot(n) * (1.0 - 0.5 * deformation.amount) + side * basis.dot(side) * (1.0 + 0.6 * deformation.amount)
 	sprite.transform = pose
-	var mat := sprite.material as ShaderMaterial
-	mat.set_shader_parameter("clock", _rm.state.world_time)
-	mat.set_shader_parameter("pump_full", full)
+	if _clock != _rm.state.world_time:
+		_clock = _rm.state.world_time
+		_material.set_shader_parameter("clock", _clock)
+	if _pump_full[slot] != full:
+		_pump_full[slot] = full
+		sprite.set_instance_shader_parameter("pump_full", full)
 	sprite.show()
