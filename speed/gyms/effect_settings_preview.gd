@@ -55,6 +55,11 @@ const NUMBER_LIMITS := {
 	"burst_pixel_scale": [0.5, 3.0, 0.05],
 }
 const DIRECT_FIELDS := {
+	BOOST_GAUGE.KEY: [
+		["1周目（内側）の太さ", "first_ring_width", 1.0, 12.0, 0.5, BOOST_GAUGE.DEFAULT_WIDTHS.first_ring_width],
+		["2周目以降（外側）の太さ", "outer_ring_width", 0.5, 6.0, 0.5, BOOST_GAUGE.DEFAULT_WIDTHS.outer_ring_width],
+		["目盛り線の太さ（1周目の幅の半分が上限）", "tick_width", 0.5, 6.0, 0.25, BOOST_GAUGE.DEFAULT_WIDTHS.tick_width],
+	],
 	BOMBER_PREVIEW: [
 		["炎の表示（秒）", "visible_seconds", 0.05, 2.0, 0.01, 0.65],
 		["ドット幅（倍）", "pixel_scale", 0.5, 4.0, 0.05, 1.0],
@@ -126,7 +131,8 @@ const DIRECT_FIELDS := {
 }
 const DIRECT_COLOR_FIELDS := {
 	BOOST_GAUGE.KEY: [
-		["通常（不足時は不透明度40%）", "normal_color", BOOST_GAUGE.DEFAULT_COLORS.normal_color],
+		["通常（25%以上）", "normal_color", BOOST_GAUGE.DEFAULT_COLORS.normal_color],
+		["不足（25%未満）", "unavailable_color", BOOST_GAUGE.DEFAULT_COLORS.unavailable_color],
 		["経路描画中", "path_color", BOOST_GAUGE.DEFAULT_COLORS.path_color],
 		["使用可能時の波紋（通常色と独立）", "ready_pulse_color", BOOST_GAUGE.DEFAULT_COLORS.ready_pulse_color],
 		["下地", "background_color", BOOST_GAUGE.DEFAULT_COLORS.background_color],
