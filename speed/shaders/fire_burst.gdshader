@@ -21,6 +21,7 @@ uniform float roughness : hint_range(0.0, 2.0, 0.05) = 0.95;
 uniform float burn_speed : hint_range(0.3, 3.0, 0.05) = 1.15;
 uniform float start_size : hint_range(0.0, 1.0, 0.05) = 0.35;
 uniform float flash_boost : hint_range(0.0, 1.5, 0.05) = 0.7;
+uniform float outer_dither : hint_range(0.0, 1.0, 0.05) = 1.0;
 group_uniforms;
 
 float lattice(vec3 p) {
@@ -54,8 +55,10 @@ void fragment() {
 		COLOR = c1;
 	} else if (den > 0.33) {
 		COLOR = c2;
-	} else if (den > 0.16 && mod(at.x + at.y, 2.0) < 1.0) {
-		COLOR = c3;
+	} else if (den > 0.16) {
+		float coverage = mix(0.5, 1.0 - mod(at.x + at.y, 2.0), outer_dither);
+		if (coverage <= 0.0) discard;
+		COLOR = vec4(c3.rgb, c3.a * coverage);
 	} else {
 		discard;
 	}

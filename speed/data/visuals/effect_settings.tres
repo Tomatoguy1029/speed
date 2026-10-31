@@ -28,6 +28,7 @@ profiles = {
 "shader/fire_burst/c2": Color(1, 0.32, 0.08, 1),
 "shader/fire_burst/c3": Color(0.7, 0.08, 0.03, 1),
 "shader/fire_burst/noise_scale": 0.19,
+"shader/fire_burst/outer_dither": 0.0,
 "shader/fire_burst/roughness": 1.1,
 "shader/fire_burst/burn_speed": 1.45,
 "shader/fire_burst/start_size": 0.45,
