@@ -340,9 +340,9 @@ scene_path = "res://scenes/stages/stage_2.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq")]
 enemies = Array[StringName]([&"beamer", &"crab", &"defender", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])
 enemy_attack_values = {
-"defender": 0.001,
-"splitling": 0.001,
-"splitter": 0.001
+"defender": 0.0,
+"splitling": 0.0,
+"splitter": 0.0
 }
 zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_fv8bx"), SubResource("Resource_0kvk0")])
 clips = Array[ExtResource("2_5plhc")]([SubResource("Resource_esfk7"), SubResource("Resource_k0r5q"), SubResource("Resource_cnhb3"), SubResource("Resource_7hkhu"), SubResource("Resource_axpqg"), SubResource("Resource_20pjy"), SubResource("Resource_hqnda"), SubResource("Resource_q0aev"), SubResource("Resource_70vkp"), SubResource("Resource_j3iar"), SubResource("Resource_lg16d"), SubResource("Resource_hb46m"), SubResource("Resource_olek3"), SubResource("Resource_3d53o"), SubResource("Resource_yrkec"), SubResource("Resource_ksojn"), SubResource("Resource_6qln1"), SubResource("Resource_nhqsb"), SubResource("Resource_yy5kg"), SubResource("Resource_2v223"), SubResource("Resource_qt8ge"), SubResource("Resource_gq3rn"), SubResource("Resource_w1utx"), SubResource("Resource_n3m5q")])

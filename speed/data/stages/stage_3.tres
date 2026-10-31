@@ -69,10 +69,9 @@ label = "新しいクリップ"
 track = 4
 types = Array[StringName]([&"phoenix"])
 formations = Array[PackedScene]([ExtResource("6_fori7")])
-time = 320.0
-length = 105.0
-groups = 2
-interval = 3.0
+attack_priority = 1
+time = 330.0
+interval = 30.0
 
 [sub_resource type="Resource" id="Resource_q0ddx"]
 script = ExtResource("2_mgob6")
@@ -408,9 +407,10 @@ scene_path = "res://scenes/stages/stage_3.tscn"
 phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u")]
 enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
 enemy_attack_values = {
-"bomber": 0.001,
-"hound": 0.001,
-"splitter": 0.001
+"bomber": 0.0,
+"hound": 0.0,
+"phoenix": 3.0,
+"splitter": 0.0
 }
 zako_curves = Array[ExtResource("10_gibww")]([SubResource("Resource_2vgpk"), SubResource("Resource_mgob6"), SubResource("Resource_uudoi")])
 clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela"), SubResource("Resource_fori7"), SubResource("Resource_5d1dk"), SubResource("Resource_luhxi"), SubResource("Resource_kpaf0"), SubResource("Resource_nf088"), SubResource("Resource_4tdib"), SubResource("Resource_d5nqe"), SubResource("Resource_7rw0m"), SubResource("Resource_ariil"), SubResource("Resource_x5ksi")])
