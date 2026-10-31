@@ -21,7 +21,24 @@ func fill(x: float, y: float, color: Color, w := 1, h := 1) -> void:
 	if color.a <= 0.0: return
 	var ix := roundf(x)
 	var iy := roundf(y)
-	add_rect(Vector2(ix + w * 0.5, iy + h * 0.5) * px, Vector2(w, h) * px * 0.5, 0.0, color)
+	# 全ドットが軸に平行なので、回転と単位矩形の変換を経由せず書く。
+	var need := (_count + 1) * STRIDE
+	if _buf.size() < need:
+		_buf.resize(maxi(need, _buf.size() * 2))
+	var i := _count * STRIDE
+	_buf[i] = w * px * 0.5
+	_buf[i + 1] = 0.0
+	_buf[i + 2] = 0.0
+	_buf[i + 3] = (ix + w * 0.5) * px
+	_buf[i + 4] = 0.0
+	_buf[i + 5] = h * px * 0.5
+	_buf[i + 6] = 0.0
+	_buf[i + 7] = (iy + h * 0.5) * px
+	_buf[i + 8] = color.r
+	_buf[i + 9] = color.g
+	_buf[i + 10] = color.b
+	_buf[i + 11] = color.a
+	_count += 1
 
 ## 世界座標の1ドット。
 func dot(p: Vector2, color: Color, size := 1) -> void:

@@ -70,12 +70,19 @@ void fragment() {
 	if (u >= 1.0) {
 		discard;
 	}
+	if (u > 0.75 && 1.0 - smoothstep(0.75, 1.0, u) <= bayer(cell)) {
+		discard;
+	}
 	float grow = 1.0 - pow(1.0 - clamp(u, 0.0, 1.0), 3.0);
 	float r = radius * (0.14 + 0.86 * grow);
 	float hollow = smoothstep(0.35, 1.0, u);
 	float boil = floor(t * 20.0);
 	float f = 35.0 / radius;
 	float d = length(c);
+	// edge は r の 0.9〜1.1 倍。丸め誤差の余裕を取り、確実に透明な外側と中空を先に除く。
+	if (d > r * 1.11 || d < r * 0.89 * hollow) {
+		discard;
+	}
 	float a = atan(c.y, c.x);
 	// 角度は cos/sin でノイズへ渡す（±180° でノイズが切れない）
 	float edge = r * (1.0 + 0.1 * noise2(vec2(cos(a) * 2.0 + boil * 0.35, sin(a) * 2.0), 3.0));
@@ -84,9 +91,6 @@ void fragment() {
 	}
 	float v = d / edge;
 	if (v < hollow) {
-		discard;
-	}
-	if (u > 0.75 && 1.0 - smoothstep(0.75, 1.0, u) <= bayer(cell)) {
 		discard;
 	}
 	if (u > 0.45) {
