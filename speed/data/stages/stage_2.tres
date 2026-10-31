@@ -350,7 +350,7 @@ display_name = "ボス後強化"
 [sub_resource type="Resource" id="Resource_fv8bx"]
 script = ExtResource("10_hhbsv")
 type = &"splitter"
-points = PackedVector2Array(0, 10, 10, 104, 27, 59, 39, 118, 52, 76, 56, 0, 69, 109, 120, 86, 136, 12, 142, 134, 166, 128, 170.1, 59, 260, 53, 268, 138, 288, 174, 292, 70, 385, 42, 392, 162, 412, 223, 417, 114, 473, 118, 482, 0, 660, 0, 664, 175)
+points = PackedVector2Array(0, 10, 10, 23, 27, 8, 37, 21, 53, 24, 56, 0, 66, 13, 121, 16, 136, 12, 140, 33, 165, 31, 170, 12, 260, 18, 267, 41, 284, 43, 290, 19, 383, 14, 390, 36, 409, 47, 418, 19, 475, 32, 482, 0, 660, 0, 663, 37)
 
 [sub_resource type="Resource" id="Resource_0kvk0"]
 script = ExtResource("10_hhbsv")
