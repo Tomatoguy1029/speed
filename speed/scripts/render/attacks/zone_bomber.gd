@@ -2,7 +2,7 @@
 extends AttackVisual
 const KEY := "res://scenes/attacks/zone_bomber.tscn"
 const BLAST_BURSTS := preload("res://scripts/render/fx/blast_bursts.gd")
-const TUNED_SHADERS := [preload("res://shaders/blast_burst.gdshader")]
+const TUNED_SHADERS := [preload("res://shaders/bomber_burst.gdshader")]
 @export_range(0.5, 4.0, 0.05) var pixel_scale := 1.0
 @export_range(0.25, 3.0, 0.05) var effect_scale := 0.8333333333333333
 var _blasts: BlastBursts
@@ -20,8 +20,13 @@ func setup(render: RunPresentation) -> void:
 func _ready() -> void:
 	if rm == null: preview_restart()
 
+## 派生する着弾表示は、所有するshaderをここで指定する。
+func burst_shader() -> Shader:
+	return TUNED_SHADERS[0]
+
 func _create_blasts() -> void:
 	_blasts = BLAST_BURSTS.new()
+	_blasts.shader = burst_shader()
 	_blasts.key = KEY
 	_blasts.setup(1.82 * (rm.cfg.character_scale if rm != null else 1.3) * pixel_scale)
 	if rm != null:
@@ -74,7 +79,7 @@ func preview_step(dt: float) -> void:
 
 func _preview_life() -> float:
 	var mat := ShaderMaterial.new()
-	mat.shader = TUNED_SHADERS[0]
+	mat.shader = burst_shader()
 	ShaderTuning.apply(mat, KEY)
 	return BlastBursts._life(mat)
 

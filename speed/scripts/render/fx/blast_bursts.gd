@@ -5,6 +5,8 @@ extends Node2D
 
 const SHADER := preload("res://shaders/blast_burst.gdshader")
 const NOISE := preload("res://assets/effects/build/burst_noise.tres")
+## add前に指定する、使用元が所有するshader。火球・煙・粒の共通の描画契約を持つ。
+var shader: Shader = SHADER
 var px := 2.366
 ## 戦闘エフェクトツールの装備・攻撃キー（ShaderTuning）
 var key := ""
@@ -21,7 +23,7 @@ func setup(cell: float) -> void:
 func add(pos: Vector2, radius: float, delay := 0.0) -> void:
 	var node := Node2D.new()
 	var mat := ShaderMaterial.new()
-	mat.shader = SHADER
+	mat.shader = shader
 	ShaderTuning.apply(mat, key)
 	var center := (pos / px).round()
 	var half := ceilf(radius * _reach(mat, radius)) + 3.0
@@ -102,4 +104,4 @@ static func _life(mat: ShaderMaterial) -> float:
 
 static func _value(mat: ShaderMaterial, uniform: String) -> float:
 	var value: Variant = mat.get_shader_parameter(uniform)
-	return float(value) if value != null else float(ShaderTuning.default_value(SHADER, uniform))
+	return float(value) if value != null else float(ShaderTuning.default_value(mat.shader, uniform))

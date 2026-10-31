@@ -66,9 +66,10 @@ func fires() -> FireBursts:
 	return _fires
 var _blasts: BlastBursts
 ## ドット単位の爆発。初めて使うときに演出の層へ置く。進めるのは各表示の tick（blasts().step）。
-func blasts() -> BlastBursts:
+func blasts(shader: Shader = null) -> BlastBursts:
 	if _blasts == null:
 		_blasts = BlastBursts.new()
+		if shader != null: _blasts.shader = shader
 		_blasts.setup(1.82 * cfg.character_scale)
 		_blasts.key = _effect_key()
 		_blasts.visibility_layer = 1 | RenderPipeline.GLOW_LAYER

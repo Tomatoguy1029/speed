@@ -31,11 +31,13 @@ func add(pos: Vector2, radius: float, ball: float) -> void:
 	ShaderTuning.apply(mat, key)
 	node.material = mat
 	add_child(node)
-	_items.append({"node": node, "age": 0.0, "life": ball})
+	_items.append({"node": node, "age": 0.0, "life": ball,
+		"tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
 	if _items.size() > 48: _items.pop_front().node.queue_free()
 
 ## dt は世界の秒。
 func step(dt: float) -> void:
+	var revision: int = ShaderTuning.SETTINGS.preview_revision
 	for item in _items:
 		item.age += dt
 		if item.age >= item.life:
@@ -43,5 +45,8 @@ func step(dt: float) -> void:
 			continue
 		var mat := item.node.material as ShaderMaterial
 		mat.set_shader_parameter("age", item.age)
-		ShaderTuning.apply(mat, key)
+		if item.tuning_revision != revision or item.tuning_key != key:
+			ShaderTuning.apply(mat, key)
+			item.tuning_revision = revision
+			item.tuning_key = key
 	_items = _items.filter(func(item): return item.age < item.life)
