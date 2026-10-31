@@ -199,4 +199,4 @@ func _show(def: Resource, has: bool, number: int, rare: bool, button: Button) ->
 	_detail_scroll.scroll_vertical=0
 	_detail_panel.add_theme_stylebox_override("panel",_style(rare,true))
 	_caption.text="No.%02d  %s%s" % [number,tr(SECTIONS[_tab][0]),("  "+tr("codex.comet_relics")) if rare else ""]
-	_detail.text=(def.get_display_name()+"\n\n"+def.get_description()) if has else tr("codex.unknown_name")+"\n\n"+tr("codex.unknown_detail")
+	_detail.text=(def.get_display_name()+"\n\n"+def.get_codex_description()) if has else tr("codex.unknown_name")+"\n\n"+tr("codex.unknown_detail")

@@ -4,7 +4,9 @@
 
 ## 編集と反映
 
-日本語は分かりやすさを優先し、次に [世界観と用語](world.md) を合わせる。武器・特性の説明は効果と発動条件を短く書く。図鑑は効果の明快さに加えて世界観を伝える。名前は既存用語に沿う。
+日本語は分かりやすさを優先し、次に [世界観と用語](world.md) を合わせる。名前は既存用語に沿う。
+
+武器・特性・伝説のモジュールの `.desc` は、戦闘中のカードなどで使う短い効果説明とする。図鑑用の `.codex_desc` は、効果が分かる文章に世界観を添え、必要なら少し詳しく書く。図鑑用の文章がある項目は専用文を表示し、ほかの項目は `.desc` を使う。確率の各値、対象の詳細、複製や再発動の制限、上限などの厳密な定義は、仕様書と個別一覧へ置く。
 
 `keys`・管理 ID・言語列を保ち、名前も説明も該当セルを編集する。`{n}` などの置換名、`%s`・`%.1f` などの書式指定、全角空白、末尾空白を用途に合わせて保持する。翻訳表の空のキーは CSV の説明・見出しになる。
 
@@ -312,7 +314,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T36.name | フルバースト | Full Burst |
 | trait.T36.desc | ゲージが満タンの間、射撃の連射が上がる。 | Increases shooting fire rate while the gauge is full. |
 | trait.T37.name | デュプリケーター | Duplicator |
-| trait.T37.desc | 弾や破片が出ると、確率で複製が2つ増える。 | Shots and debris may gain two extra copies when created. |
+| trait.T37.desc | 弾・破片・光の槍が出ると、確率で2つ複製する。 | Shots, debris and light lances may appear with two extra copies. |
+| trait.T37.codex&#95;desc | 一筋の攻撃が、三筋の軌跡になる。弾や星屑、光の槍が生まれる瞬間、左右へ複製を放つことがある。複製の一撃は元より弱いが、攻撃を広く届ける。 | One trail of fire becomes three. Shots, stardust and light lances may send copies to either side as they appear. Each copy strikes with less force, spreading the attack farther across the battlefield. |
 |  | ■ 伝説のモジュール（legendary.&lt;ID&gt;） |  |
 | legendary.legendary&#95;compass.name | 羅針盤のモジュール | Compass Module |
 | legendary.legendary&#95;compass.desc | らしんばん座を解放したときに残された、錆びついたモジュール。 | A rusted module left behind when Pyxis was freed. |
