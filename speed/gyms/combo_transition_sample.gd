@@ -22,40 +22,47 @@ var _clock := 0.0
 var _selected := 1
 var _canvas := Control.new()
 var _old_view := SubViewport.new()
-var _new_view := SubViewport.new()
 var _foreground_view := SubViewport.new()
 var _old_output := TextureRect.new()
-var _new_output := TextureRect.new()
 var _foreground_output := TextureRect.new()
 var _dim := ColorRect.new()
+var _copy := BackBufferCopy.new()
+var _old_material: ShaderMaterial
 var _flash := ColorRect.new()
 var _faces := MeshInstance2D.new()
 var _edges := MeshInstance2D.new()
 var _materials: Array[ShaderMaterial] = []
 var _card: Button
 var _badge
-var _new_background_dim: ColorRect
 var _choices: Array[Button] = []
 var _shape_key := ""
 var _active := true
-var _background := ColorRect.new()
 var _selecting := false
 var _frozen_choice := -2
+
+func owned_snapshot() -> Dictionary:
+	# 獲得例の直前に所持している装備。通常HUDの装備欄も同じ前提で表示する。
+	var weapons := {&"W02": 1}
+	var traits: Dictionary = {}
+	for event in EXAMPLES:
+		var owned: Dictionary = weapons if event.kind == &"weapon" else traits
+		owned[event.id] = maxi(1, int(event.level) - 1)
+	return {"weapons": weapons, "traits": traits}
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	custom_minimum_size = Vector2(220, 140)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_background.color = Color("#060b14")
-	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(_background)
+	# 実ステージと通常HUDはこのControlの下の同じviewportに描かれる。
+	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_dim)
 	_canvas.size = DESIGN
 	_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_canvas)
-	for viewport in [_old_view, _new_view, _foreground_view]:
+	for viewport in [_old_view, _foreground_view]:
 		viewport.size = Vector2i(DESIGN)
 		viewport.disable_3d = true
 		viewport.transparent_bg = true
@@ -63,20 +70,16 @@ func _ready() -> void:
 		viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		add_child(viewport)
 	_old_view.gui_disable_input = false
-	_new_view.gui_disable_input = true
 	_foreground_view.gui_disable_input = true
 	_old_output.texture = _old_view.get_texture()
-	_new_output.texture = _new_view.get_texture()
 	_foreground_output.texture = _foreground_view.get_texture()
-	for output in [_old_output, _new_output]:
-		output.size = DESIGN
-		output.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		output.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_canvas.add_child(output)
-	_dim.size = DESIGN
-	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(_dim)
-	_canvas.move_child(_new_output, -1)
+	_old_output.size = DESIGN
+	_old_output.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_old_output.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(_old_output)
+	# Shatterは実背景/HUDをここで取得し、旧カードUIのtextureと合成する。
+	_copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+	_canvas.add_child(_copy)
 	_canvas.add_child(_faces)
 	_canvas.add_child(_edges)
 	_foreground_output.size = DESIGN
@@ -102,7 +105,11 @@ func configure(values: Dictionary, kind: int, rebuild_scene := true) -> void:
 	if rebuild_scene:
 		_build_scenes()
 	_materials.clear()
-	_new_output.material = null
+	_old_material = ShaderMaterial.new()
+	_old_material.shader = SHADERS[1 if kind == 1 else 0]
+	settings.apply_to(_old_material)
+	_old_material.set_shader_parameter("progress", -1.0)
+	_old_output.material = _old_material
 	if kind == 2:
 		var key := str([settings.focus, settings.rim_width, settings.ray_count, settings.band_count, settings.pattern_seed, settings.angle_jitter, settings.radius_jitter, settings.ring_gap, settings.radius_distribution])
 		if _shape_key != key or _faces.mesh == null:
@@ -122,11 +129,12 @@ func configure(values: Dictionary, kind: int, rebuild_scene := true) -> void:
 		var material := ShaderMaterial.new()
 		material.shader = SHADERS[kind]
 		settings.apply_to(material)
-		_new_output.material = material
+		_old_output.material = material
+		_old_material = material
 		_materials.append(material)
 	set_time(_clock)
 
-func _root(viewport: SubViewport, opaque := true) -> Control:
+func _root(viewport: SubViewport) -> Control:
 	for child in viewport.get_children():
 		viewport.remove_child(child)
 		child.queue_free()
@@ -135,12 +143,6 @@ func _root(viewport: SubViewport, opaque := true) -> Control:
 	root.theme = load("res://assets/ui/theme.tres")
 	root.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	viewport.add_child(root)
-	if opaque:
-		var background := ColorRect.new()
-		background.size = DESIGN
-		background.color = Color("#060b14")
-		background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		root.add_child(background)
 	return root
 
 func _definition(event: Dictionary) -> Resource:
@@ -153,8 +155,7 @@ func _card_view(event: Dictionary, index := 0) -> Button:
 
 func _build_scenes() -> void:
 	var old := _root(_old_view)
-	var incoming := _root(_new_view)
-	var foreground := _root(_foreground_view, false)
+	var foreground := _root(_foreground_view)
 	_choices.clear()
 	_frozen_choice = -2
 	if _kind == 0:
@@ -185,15 +186,10 @@ func _build_scenes() -> void:
 		var prior := _result(old, previous, _kind - 1)
 		_pose_card(prior.card, previous, previous.landing_at() + 1.0)
 		prior.badge.set_age(10.0)
-	_new_background_dim = ColorRect.new()
-	_new_background_dim.size = DESIGN
-	_new_background_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	incoming.add_child(_new_background_dim)
 	var result := _result(foreground, settings, _kind)
 	_card = result.card
 	_badge = result.badge
 	_old_view.render_target_update_mode = SubViewport.UPDATE_ONCE
-	_new_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func _result(parent: Control, value: ComboTransitionSettings, kind: int) -> Dictionary:
 	var button := _card_view(EXAMPLES[kind])
@@ -246,20 +242,18 @@ func set_time(value: float) -> void:
 	var dim_start := settings.selection_seconds + settings.dim_delay
 	var dim_amount := settings.background_dim * ComboTransitionSettings.eased((value - dim_start) / settings.cover_seconds, settings.dim_easing)
 	_dim.color = Color(settings.dim_color, settings.dim_color.a * dim_amount)
-	_background.color = Color("#060b14").lerp(settings.dim_color, settings.dim_color.a * dim_amount)
-	_background.color.a = 1.0
-	_new_background_dim.color = Color(settings.dim_color, settings.dim_color.a * settings.background_dim)
 	var progress := clampf((value - settings.opening_at()) / settings.opening_seconds, 0.0, 1.0)
-	_new_output.visible = value >= settings.opening_at()
-	_old_output.visible = not (_new_output.visible and (settings.kind == 2 or progress >= 1.0))
-	_dim.visible = _old_output.visible
-	_faces.visible = settings.kind == 2 and _new_output.visible and progress < 1.0
+	var opening := value >= settings.opening_at()
+	_old_output.visible = not (opening and (settings.kind == 2 or progress >= 1.0))
+	_faces.visible = settings.kind == 2 and opening and progress < 1.0
 	_edges.visible = _faces.visible
+	_copy.visible = _faces.visible
+	_old_material.set_shader_parameter("dim_amount", dim_amount)
 	var shader_progress := progress
 	if settings.kind == 2:
 		var eased := progress if settings.transition_easing == 0 else ComboTransitionSettings.eased(progress, settings.transition_easing - 1)
 		shader_progress = pow(eased, settings.easing_power)
-	for material in _materials: material.set_shader_parameter("progress", shader_progress)
+	for material in _materials: material.set_shader_parameter("progress", shader_progress if opening else -1.0)
 	_pose_card(_card, settings, value)
 	_badge.set_age(value - settings.badge_at())
 	var flash_age := value - settings.flash_at()
@@ -329,5 +323,4 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func set_active(active: bool) -> void:
 	_active = active
 	_old_view.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED
-	_new_view.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED
 	_foreground_view.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED

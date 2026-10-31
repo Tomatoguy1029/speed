@@ -3,7 +3,9 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-uniform float progress = 0.0;
+uniform float progress = -1.0;
+uniform vec4 dim_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform float dim_amount = 0.54;
 uniform int transition_easing = 0;
 uniform float transition_opacity = 1.0;
 uniform vec2 design_size = vec2(640.0, 360.0);
@@ -27,6 +29,9 @@ float shaped(float u) {
 }
 
 void fragment() {
+	vec4 source_ui = texture(TEXTURE, UV);
+	source_ui.rgb = mix(source_ui.rgb, dim_color.rgb, dim_amount * dim_color.a);
+	if (progress < 0.0) { COLOR = source_ui; } else {
 	vec2 p = (floor(UV * design_size / pixel_size) + 0.5) * pixel_size;
 	vec2 center = focus * design_size;
 	vec2 extent = max(center, design_size - center);
@@ -37,20 +42,17 @@ void fragment() {
 	float distance_to_rim = length(p - center) - radius;
 	float edge = abs(distance_to_rim);
 	bool outside = distance_to_rim >= 0.0;
-	// TEXTURE is the incoming background; card and badge keep independent clocks.
-	// The old dimmed view stays
-	// visible outside the aperture. No solid black cover or unrelated circle UI.
-	vec4 incoming = texture(TEXTURE, UV);
-	vec3 color = incoming.rgb;
-	float alpha = outside ? 0.0 : incoming.a;
+	vec3 color = source_ui.rgb;
+	float alpha = outside ? source_ui.a : 0.0;
 	if (outside && edge < rim_width) {
 		color = edge < rim_width * 0.32 ? highlight_color.rgb : transition_color.rgb;
 		alpha = (edge < rim_width * 0.32 ? highlight_color.a : transition_color.a) * transition_opacity * (1.0 - u);
 	}
 	float light = pow(max(0.0, 1.0 - edge / glow_width), 2.0) * glow_strength * (1.0 - u);
 	if (outside && edge >= rim_width) {
-		color = transition_color.rgb;
-		alpha = light * transition_color.a * transition_opacity;
+		color = source_ui.a > 0.0 ? mix(source_ui.rgb, transition_color.rgb, light) : transition_color.rgb;
+		alpha = max(alpha, light * transition_color.a * transition_opacity);
 	}
-	COLOR = u >= 1.0 ? incoming : vec4(color, alpha);
+	COLOR = u >= 1.0 ? vec4(0.0) : vec4(color, alpha);
+	}
 }

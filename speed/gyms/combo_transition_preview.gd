@@ -8,6 +8,7 @@ const NAMES := ["×2 Combo · Iris", "×3 Combo · Star Iris", "×4 Combo · Sha
 const FIELDS := preload("res://gyms/combo_transition_fields.gd")
 const SAMPLE := preload("res://gyms/combo_transition_sample.gd")
 const TRANSPORT := preload("res://gyms/combo_playback_controls.gd")
+const GAME_CONTEXT := preload("res://gyms/game_context_preview.gd")
 var preview_host: Control
 var controls_host: Control
 var _editing_kind := 0
@@ -33,7 +34,12 @@ var _choice := 1
 var _sequence: Array[int] = [0]
 var _sequence_index := 0
 var _normal_window: Window
-var _normal_presentation
+var _game_context
+var _context_ready := false
+var _closing := false
+var _return_focus: WeakRef
+var _return_window: Window
+var _return_window_top := false
 var _window_open := false
 var _started := false
 var _message := "制作データを保存し、調整後に本番用の最適化を依頼してください。まだ定数化していません。"
@@ -58,7 +64,12 @@ func _ready() -> void:
 	_sample = SAMPLE.new()
 	_sample.card_chosen.connect(_chosen)
 	_sample.next_requested.connect(_surface_next)
-	preview_host.add_child(_sample)
+	_sample.set_active(false)
+	_game_context = GAME_CONTEXT.new()
+	_game_context.set_reward_surface(_sample)
+	_game_context.reward_context_ready.connect(_context_became_ready)
+	_game_context.reward_context_error.connect(_context_failed)
+	preview_host.add_child(_game_context)
 	for kind in 3:
 		if not _load(kind): return
 	set_section("combo_iris")
@@ -69,8 +80,11 @@ func _button(parent: Control, text: String, action: Callable) -> void:
 	button.pressed.connect(action)
 	parent.add_child(button)
 
-func _make_transport() -> Control:
+func _make_transport(native := false) -> Control:
 	var bar := TRANSPORT.new()
+	bar.compact = native
+	bar.allow_return = native
+	bar.return_requested.connect(_request_return)
 	bar.play_requested.connect(_play)
 	bar.pause_requested.connect(_pause)
 	bar.step_requested.connect(func(direction): _seek_frame(_frame + direction))
@@ -89,6 +103,32 @@ func _make_transport() -> Control:
 func _select_range(index: int) -> void:
 	if index == 0: _start([0, 1, 2])
 	else: _start([index - 1])
+
+func _ensure_context() -> bool:
+	if not _active or _closing: return false
+	return _game_context.ensure_reward_context()
+
+func _context_became_ready() -> void:
+	if _closing or not _active:
+		_game_context.set_active(false)
+		return
+	_context_ready = true
+	_sample.set_active(_active)
+	if _working.size() == 3:
+		if not _started:
+			_started = true
+			_sequence = [_editing_kind]
+			_sequence_index = 0
+			_waiting_choice = _editing_kind == 0 and not _auto
+		_sample.configure(_working, _sequence[_sequence_index])
+		_apply_cursor(true)
+	_reset_wall_clock()
+
+func _context_failed(message: String) -> void:
+	_context_ready = false
+	_sample.set_active(false)
+	_pause()
+	_message = message
 
 func set_section(section: String) -> void:
 	if not KINDS.has(section): return
@@ -175,6 +215,7 @@ func _apply_cursor(force := false) -> void:
 
 func _start(sequence: Array[int]) -> void:
 	if _working.size() != 3: return
+	if not _ensure_context(): return
 	_started = true
 	_sequence = sequence
 	_sequence_index = 0
@@ -202,6 +243,7 @@ func _chosen(index: int) -> void:
 
 func _play() -> void:
 	if _working.size() != 3: return
+	if not _ensure_context(): return
 	if _waiting_choice:
 		_chosen(_choice)
 		return
@@ -223,6 +265,7 @@ func _pause() -> void:
 
 func _seek_frame(frame: int) -> void:
 	if _working.size() != 3: return
+	if not _ensure_context(): return
 	_playing = false
 	_waiting_choice = false
 	_waiting_next = false
@@ -277,7 +320,7 @@ func _process(_delta: float) -> void:
 	var now := Time.get_ticks_usec()
 	var elapsed := maxf(0.0, (now - _last_tick_usec) / 1000000.0)
 	_last_tick_usec = now
-	if not _active or _working.size() != 3 or not _playing or _waiting_choice: return
+	if not _active or not _context_ready or _working.size() != 3 or not _playing or _waiting_choice: return
 	# Engine.time_scaleや制作Resourceの速度から独立した、1つの実時間時計。
 	var target := _cursor + elapsed * _speed
 	var end_frame := _offset_frames(_sequence_index + 1) - 1
@@ -309,64 +352,94 @@ func _sync_controls() -> void:
 	for bar in _bars: bar.sync(state)
 
 func _open_normal_ui() -> void:
-	if _working.size() != 3: return
+	if _working.size() != 3 or _closing: return
 	if is_instance_valid(_normal_window):
 		_normal_window.show()
+		_normal_window.grab_focus()
 		return
+	_pause()
+	_return_window = get_window()
+	_return_window_top = DisplayServer.window_get_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, _return_window.get_window_id())
+	var focus := get_viewport().gui_get_focus_owner()
+	_return_focus = weakref(focus) if focus != null else null
 	_normal_window = Window.new()
-	_normal_window.title = "SPEED — 通常報酬UIで調整再生"
+	_normal_window.title = "SPEED — 実ステージと通常HUDで報酬を再生"
 	_normal_window.force_native = true
 	_normal_window.exclusive = false
 	_normal_window.transient = false
+	_normal_window.popup_window = false
 	_normal_window.min_size = Vector2i(480, 420)
 	_normal_window.theme = load("res://assets/ui/theme.tres")
 	_normal_window.visible = false
+	# 表示や資源準備より先に、全ての終了入口を接続する。
+	_normal_window.close_requested.connect(_request_return)
+	_normal_window.window_input.connect(_normal_window_input)
 	add_child(_normal_window)
-	_normal_presentation = preload("res://scripts/ui/reward_presentation.gd").new()
-	_normal_window.add_child(_normal_presentation)
 	var surface := VBoxContainer.new()
+	surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_normal_window.add_child(surface)
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#171b24")
 	for side in ["left", "right", "top", "bottom"]: style.set("content_margin_" + side, 6.0)
 	panel.add_theme_stylebox_override("panel", style)
 	surface.add_child(panel)
-	_normal_bar = _make_transport()
+	_normal_bar = _make_transport(true)
 	panel.add_child(_normal_bar)
-	_sample.get_parent().remove_child(_sample)
-	surface.add_child(_sample)
-	if not _normal_presentation.attach_authoring_surface(surface):
-		surface.remove_child(_sample)
-		preview_host.add_child(_sample)
-		_bars.erase(_normal_bar)
-		surface.queue_free()
-		_normal_window.queue_free()
-		_normal_window = null
-		_message = "通常報酬UIへ再生面を移せませんでした。"
-		return
-	_normal_window.close_requested.connect(_close_normal_ui)
+	# 実ステージviewportと、その通常HUDへ接続済みの報酬面を一緒に移す。
+	_game_context.get_parent().remove_child(_game_context)
+	surface.add_child(_game_context)
 	_window_open = true
-	var usable := DisplayServer.screen_get_usable_rect(get_window().current_screen)
+	var usable := DisplayServer.screen_get_usable_rect(_return_window.current_screen)
 	_normal_window.min_size = _normal_window.min_size.min(usable.size)
-	var target := Vector2i(get_window().size * 0.9).min(Vector2i(1280, 800)).min(usable.size)
-	_normal_window.popup_centered(target.max(_normal_window.min_size))
+	_normal_window.size = Vector2i(_return_window.size * 0.9).min(Vector2i(1280, 800)).min(usable.size).max(_normal_window.min_size)
+	_normal_window.position = usable.position + (usable.size - _normal_window.size) / 2
+	_return_window.always_on_top = false
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, false, _return_window.get_window_id())
+	# popup系はtransientへ変えるため使わない。親の編集UIを非モーダルで操作できる。
+	_normal_window.show()
+	_normal_window.grab_focus()
 	_start([0, 1, 2])
 
-func _close_normal_ui() -> void:
-	if not is_instance_valid(_normal_window): return
-	var surface: Control = _normal_presentation.detach_authoring_surface()
-	_sample.get_parent().remove_child(_sample)
-	_sample.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	preview_host.add_child(_sample)
-	preview_host.move_child(_sample, 3)
+func _normal_window_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_normal_window.set_input_as_handled()
+		_request_return()
+
+func _request_return() -> void:
+	if _closing or not is_instance_valid(_normal_window): return
+	_closing = true
+	_pause()
+	_sample.set_active(false)
+	_game_context.set_active(false)
+	_normal_window.hide()
+	_finish_return.call_deferred()
+
+func _finish_return() -> void:
+	# GUIの入力配送中にviewport/HUDを破棄しない。未保存Resourceはこの所有者へ保持する。
+	_game_context.release_reward_context()
+	_context_ready = false
+	if _game_context.get_parent() != null: _game_context.get_parent().remove_child(_game_context)
+	_game_context.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	preview_host.add_child(_game_context)
+	preview_host.move_child(_game_context, 3)
+	_game_context.set_idle_ui_active(_active)
 	_bars.erase(_normal_bar)
 	_normal_bar = null
-	surface.queue_free()
-	_normal_window.queue_free()
+	var previous_window := _normal_window
 	_normal_window = null
-	_normal_presentation = null
 	_window_open = false
+	if is_instance_valid(previous_window): previous_window.queue_free()
+	if is_instance_valid(_return_window):
+		_return_window.always_on_top = _return_window_top
+		_return_window.grab_focus()
+	var focus: Control = _return_focus.get_ref() as Control if _return_focus != null else null
+	if is_instance_valid(focus) and focus.is_visible_in_tree(): focus.grab_focus()
+	_return_focus = null
+	_return_window = null
+	_closing = false
 	_reset_wall_clock()
+	_sync_controls()
 
 func editing_state() -> Dictionary:
 	var paths: Array[String] = []
@@ -401,8 +474,13 @@ func reload_current() -> void:
 func set_active(active: bool) -> void:
 	_active = active
 	_reset_wall_clock()
-	if _sample != null: _sample.set_active(active)
-	if is_instance_valid(_normal_window): _normal_window.visible = active and _window_open
+	if not active and is_instance_valid(_normal_window): _request_return()
+	if _game_context != null:
+		if active and not _context_ready: _game_context.set_idle_ui_active(true)
+		else: _game_context.set_active(active)
+	if _sample != null: _sample.set_active(active and _context_ready)
 
 func _exit_tree() -> void:
+	_playing = false
+	if is_instance_valid(_return_window): _return_window.always_on_top = _return_window_top
 	if is_instance_valid(_normal_window): _normal_window.queue_free()

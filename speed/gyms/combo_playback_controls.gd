@@ -11,6 +11,10 @@ signal phase_requested(phase: String)
 signal speed_changed(speed: float)
 signal fps_changed(fps: int)
 signal auto_changed(enabled: bool)
+signal return_requested
+
+var allow_return := false
+var compact := false
 
 const FPS := [30, 60, 120]
 var _play := Button.new()
@@ -30,6 +34,9 @@ func _ready() -> void:
 	theme.default_font_size = 14
 	var actions := HFlowContainer.new()
 	add_child(actions)
+	if allow_return:
+		var back := _button(actions, "編集に戻る（Esc）", func(): return_requested.emit())
+		back.tooltip_text = "再生を停止し、表示用ランを解放して編集画面へ戻ります。未保存値は保持します。"
 	_play.text = "再生"
 	_play.pressed.connect(func(): play_requested.emit())
 	actions.add_child(_play)
@@ -44,11 +51,22 @@ func _ready() -> void:
 	actions.add_child(_forward)
 	_button(actions, "先頭へ", func(): head_requested.emit())
 	var options := HFlowContainer.new()
-	add_child(options)
+	var details := VBoxContainer.new()
+	if compact:
+		var toggle := Button.new()
+		toggle.text = "段階・FPS・頭出し"
+		toggle.toggle_mode = true
+		toggle.toggled.connect(func(open): details.visible = open)
+		actions.add_child(toggle)
+		add_child(details)
+		details.hide()
+	else: add_child(details)
+	details.add_child(options)
 	for item in ["全段階", "×2 Combo · Iris", "×3 Combo · Star Iris", "×4 Combo · Shatter"]: _range.add_item(item)
 	_range.item_selected.connect(func(index): range_requested.emit(index))
 	options.add_child(_range)
-	_label(options, "再生速度")
+	var speed_row: Control = actions if compact else options
+	_label(speed_row, "再生速度")
 	_speed.min_value = 0.1
 	_speed.max_value = 3.0
 	_speed.step = 0.05
@@ -56,8 +74,8 @@ func _ready() -> void:
 	_speed.suffix = "倍"
 	_speed.custom_minimum_size.x = 104
 	_speed.value_changed.connect(func(value): speed_changed.emit(value))
-	options.add_child(_speed)
-	_button(options, "1倍へ", func(): speed_changed.emit(1.0))
+	speed_row.add_child(_speed)
+	_button(speed_row, "1倍へ", func(): speed_changed.emit(1.0))
 	_label(options, "コマ基準")
 	for fps in FPS: _fps.add_item("%d fps" % fps)
 	_fps.select(1)
@@ -67,7 +85,7 @@ func _ready() -> void:
 	_auto.toggled.connect(func(enabled): auto_changed.emit(enabled))
 	options.add_child(_auto)
 	var jumps := HFlowContainer.new()
-	add_child(jumps)
+	details.add_child(jumps)
 	for item in [["暗転", "dim"], ["開く", "opening"], ["最大", "peak"], ["着地", "landing"], ["保持", "hold"], ["割れ直前", "crack"]]:
 		var button := _button(jumps, item[0], func(): phase_requested.emit(item[1]))
 		if item[1] == "crack": _crack = button

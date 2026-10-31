@@ -6,6 +6,7 @@ render_mode unshaded;
 
 uniform float progress = 0.0;
 uniform sampler2D source_scene : filter_nearest, repeat_disable;
+uniform sampler2D game_backdrop : hint_screen_texture, filter_nearest, repeat_disable;
 uniform vec4 dim_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float background_dim = 0.54;
 uniform float transition_opacity = 1.0;
@@ -53,9 +54,11 @@ void fragment() {
 	float alpha = 1.0 - smoothstep(shard_fade_start, 1.0, shard_age);
 	vec4 source = texture(source_scene, UV);
 	vec3 dimmed = mix(source.rgb, dim_color.rgb, dim_color.a * background_dim);
-	vec3 color = mix(dimmed, ink_color.rgb, shard_ink_mix);
+	vec4 backdrop = texture(game_backdrop, UV);
+	vec3 composite = mix(backdrop.rgb, dimmed, source.a);
+	vec3 color = mix(composite, ink_color.rgb, shard_ink_mix);
 	color = mix(color, transition_color.rgb, flash * crack_tint_strength);
-	alpha *= source.a * ink_color.a;
+	alpha *= ink_color.a;
 	if (edge_pass) {
 		float arrival = length(UV * design_size - focus * design_size) / 410.0;
 		alpha *= step(arrival, progress / crack_fraction);

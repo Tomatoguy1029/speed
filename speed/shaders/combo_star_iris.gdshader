@@ -3,7 +3,9 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-uniform float progress = 0.0;
+uniform float progress = -1.0;
+uniform vec4 dim_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform float dim_amount = 0.54;
 uniform int transition_easing = 0;
 uniform float transition_opacity = 1.0;
 uniform vec2 design_size = vec2(640.0, 360.0);
@@ -36,6 +38,9 @@ float shaped(float u) {
 }
 
 void fragment() {
+	vec4 source_ui = texture(TEXTURE, UV);
+	source_ui.rgb = mix(source_ui.rgb, dim_color.rgb, dim_amount * dim_color.a);
+	if (progress < 0.0) { COLOR = source_ui; } else {
 	vec2 p = (floor(UV * design_size / pixel_size) + 0.5) * pixel_size - focus * design_size;
 	float u = clamp(progress, 0.0, 1.0);
 	float eased = u < 0.5 ? 4.0 * u * u * u : 1.0 - pow(-2.0 * u + 2.0, 3.0) / 2.0;
@@ -54,17 +59,17 @@ void fragment() {
 			if (p.x < a.x + (p.y - a.y) * e.x / e.y) { inside = !inside; }
 		}
 	}
-	vec4 incoming = texture(TEXTURE, UV);
-	vec3 color = incoming.rgb;
-	float alpha = inside ? incoming.a : 0.0;
+	vec3 color = source_ui.rgb;
+	float alpha = inside ? 0.0 : source_ui.a;
 	if (!inside && edge < rim_width) {
 		color = edge < rim_width * 0.32 ? highlight_color.rgb : transition_color.rgb;
 		alpha = (edge < rim_width * 0.32 ? highlight_color.a : transition_color.a) * transition_opacity * (1.0 - u);
 	}
 	float light = pow(max(0.0, 1.0 - edge / glow_width), 2.0) * glow_strength * (1.0 - u);
 	if (!inside && edge >= rim_width) {
-		color = transition_color.rgb;
-		alpha = light * transition_color.a * transition_opacity;
+		color = source_ui.a > 0.0 ? mix(source_ui.rgb, transition_color.rgb, light) : transition_color.rgb;
+		alpha = max(alpha, light * transition_color.a * transition_opacity);
 	}
-	COLOR = u >= 1.0 ? incoming : vec4(color, alpha);
+	COLOR = u >= 1.0 ? vec4(0.0) : vec4(color, alpha);
+	}
 }

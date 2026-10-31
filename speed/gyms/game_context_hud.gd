@@ -7,6 +7,7 @@ var preview_clock := 0.0
 var preview_cursor := Vector2.ZERO
 var follow_cursor := false
 var preview_paused := false
+var reward_preview := false
 
 func _input(_event: InputEvent) -> void:
 	pass
@@ -29,6 +30,9 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw_gauge_ring() -> void:
+	if reward_preview:
+		super._draw_gauge_ring()
+		return
 	var s := run.state
 	var cursor := get_viewport().get_mouse_position() if follow_cursor else preview_cursor
 	var at := cursor + Vector2(26, 26)
