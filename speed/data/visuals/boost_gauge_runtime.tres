@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="BoostGaugeStyle" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="BoostGaugeStyle" format=3 uid="uid://c6coao54ptccg"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boost_gauge_style.gd" id="1"]
+[ext_resource type="Script" uid="uid://byjapjg0v65bs" path="res://scripts/data_types/boost_gauge_style.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -15,5 +15,5 @@ full_flash_color = Color(1, 1, 1, 1)
 bounds = Vector4(5.75, 11.25, 14.75, 17.25)
 tick_width = 2.0
 tick_start = 6.75
-tick_end = 10.205467415507485
+tick_end = 10.205467415507483
 metadata/profile_sha256 = "3314928f835d0b3cb533d41741b8ca6c834f73783009f685b08e6e17b04f904e"
