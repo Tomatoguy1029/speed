@@ -83,8 +83,7 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 	var entry: Dictionary = visuals[id]
 	var batch: InstanceBatch
 	if entry.role==2:
-		batch = PixelPainter.new()
-		(batch as PixelPainter).setup_painter(_pixel)
+		batch = preload("res://scripts/render/attacks/friend_shot.gd").create_batch(_pixel)
 	else:
 		batch = InstanceBatch.new()
 		if entry.role==4: batch.setup_polygon(InstanceBatch.circle_points(24))
@@ -149,9 +148,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		if batch.get_parent()!=_layer(row.layer): batch.reparent(_layer(row.layer))
 		batch.get_parent().move_child(batch,-1)
 		if visuals[row.visual_id].role==2:
-			for i in row.ids.size():
-				var n: int = i*6
-				(batch as PixelPainter).bolt(Vector2(row.transforms[n+4],row.transforms[n+5]),atan2(row.transforms[n+1],row.transforms[n]),17,2)
+			preload("res://scripts/render/attacks/friend_shot.gd").apply_frame(batch as PixelPainter,row.transforms)
 		else: batch.apply_frame(row.transforms,row.colors)
 	for batch: InstanceBatch in batches.values(): batch.end()
 	for display: Node in enemy_frames.values(): display.end()

@@ -172,6 +172,7 @@ struct RunState {
     int64_t gem_absorber=-1,gem_absorber_seq=-1;
     bool pickups_ready = false;
     struct Friendly {
+        uint32_t definition=0;
         bool alive = true, pierce = false, no_crit = false;
         int64_t kind = 0, generation = 0, pierce_left = 0, id = 0;
         speed::AttackHandle attack;

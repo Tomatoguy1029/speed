@@ -1,5 +1,7 @@
 #include "run_core.h"
 #include "../cpp/behaviors/weapons/forward.h"
+#include "../cpp/systems/attacks/friend_shot.h"
+#include "../cpp/systems/attack_system.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -48,7 +50,7 @@ void SpeedRunCore::step_forward(double world_dt) {
     shot.damage = runtime.state.combat_config.base_attack * runtime.state.combat_config.attack_mult * runtime.state.combat_config.atk_scale * runtime.state.forward.damage;
     shot.life = runtime.state.forward.life; shot.pierce_left = runtime.state.forward.pierce; shot.knock = runtime.state.forward.knock;
     shot.color = Color::html("ffe46b"); shot.weapon_id = "W01"; shot.visual = "weapon/forward";
-    if (add_friend(std::move(shot))==SIZE_MAX) return;
+    if (!speed::AttackSystem::get(runtime.state,speed::FriendShotSystem::emit(runtime,std::move(shot)))) return;
     runtime.state.forward.recoil = 0.12;
     Dictionary event; event["id"] = StringName("W01"); event["pos"] = origin; event["angle"] = angle; event["visual_key"] = "weapon/forward";
     emit_event("weapon_fire", event);

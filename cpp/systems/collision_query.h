@@ -2,6 +2,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <variant>
 #include <vector>
+namespace godot {struct RunState;}
 namespace speed {
 using Point=godot::Vector2;
 struct PointCircle {Point center;double radius=0;};
@@ -17,6 +18,7 @@ struct ShipMotion {Point before,now;double radius=0;};
 struct ContactGeometry {bool add_ship_radius=true,ship_sweep=false;};
 class CollisionQuery {
 public:
+    static std::vector<size_t> enemy_rows(const godot::RunState &,Point lo,Point hi);
     static double segment_circle_t(Point from,Point to,Point center,double radius);
     static double point_segment_squared(Point point,Point from,Point to);
     static bool sweep_segment(Point ship_before,Point ship_now,Point from,Point to,double radius);

@@ -116,6 +116,23 @@
           "ref": "ContactDefinition"
         }
       ]
+    },
+    {
+      "name": "FriendShotDefinition",
+      "section": 27,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {
@@ -165,6 +182,20 @@
       {
         "name": "Reflected",
         "value": "reflected"
+      }
+    ],
+    "FriendKind": [
+      {
+        "name": "Shot",
+        "value": "shot"
+      },
+      {
+        "name": "Debris",
+        "value": "debris"
+      },
+      {
+        "name": "Hull",
+        "value": "hull"
       }
     ]
   }

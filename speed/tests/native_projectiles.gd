@@ -5,7 +5,10 @@ const DATA := preload("res://tools/content/build_native_data.gd")
 const SHIP := preload("res://tests/native_ship.gd")
 const COMBAT := preload("res://tests/native_combat.gd")
 var failed := 0
+var friend_finished := false
+var friend_retry := false
 func check(ok: bool, label: String) -> void:
+	if friend_retry and not ("の位置・寿命・命中済みID" in label or "の命中順と敵HP" in label or label=="味方弾の確認が最後まで進んだ"): return
 	if not ok:
 		failed += 1
 		push_error(label)
@@ -14,6 +17,13 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-friend-shot" in OS.get_cmdline_user_args() or "--cpp-friend-shot-fixes" in OS.get_cmdline_user_args():
+		friend_retry = "--cpp-friend-shot-fixes" in OS.get_cmdline_user_args()
+		await check_cpp_friend_shot()
+		check(friend_finished,"味方弾の確認が最後まで進んだ")
+		print("[cpp_friend_shot] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	var comparison = COMPARE.new()
 	var probe = comparison.create_native()
 	if not probe.has_method("burst_debris"):
@@ -114,5 +124,158 @@ func snapshot(ps: ProjectileSystem) -> Array:
 		if ps.friend_alive[row] == 0: continue
 		var ids: Array = ps.friend_hit[row].keys()
 		ids.sort()
-		out.append({"row": row, "kind": ps.friend_kind[row], "generation": ps.friend_generation[row], "pos": ps.friend_pos[row], "vel": ps.friend_vel[row], "radius": ps.friend_r[row], "damage": ps.friend_dmg[row], "life": ps.friend_life[row], "age": ps.friend_age[row], "pierce_left": ps.friend_pierce_left[row], "hit_ids": ids, "angle": ps.friend_angle[row], "trail": ps.friend_trail[row]})
+		out.append({"row": row, "kind": ps.friend_kind[row], "pos": ps.friend_pos[row], "vel": ps.friend_vel[row], "radius": ps.friend_r[row], "damage": ps.friend_dmg[row], "life": ps.friend_life[row], "age": ps.friend_age[row], "pierce_left": ps.friend_pierce_left[row], "hit_ids": ids, "angle": ps.friend_angle[row], "trail": ps.friend_trail[row]})
 	return out
+
+func friend_states(run: RunSimulation, core, comparison, label: String, id_map: Dictionary, source_rows: Array, check_snapshot: bool) -> void:
+	var old_shots := snapshot(run.projectiles)
+	for row: Dictionary in old_shots:
+		row.erase("row")
+		row.hit_ids = row.hit_ids.map(func(id): return id_map[id])
+	var current: Array = core.projectiles_snapshot()
+	for row: Dictionary in current:
+		for key in ["row","generation","cause","type","pierce"]: row.erase(key)
+	var diff: String = comparison.difference(comparison.plain(old_shots),comparison.plain(current))
+	if check_snapshot: check(diff.is_empty(),label+"の位置・寿命・命中済みID: "+diff)
+	var hp := []
+	for row: Dictionary in core.enemies_snapshot(): hp.append(row.hp)
+	var old := []
+	for i: int in source_rows: old.append(run.enemies.table.hp[i])
+	check(comparison.difference(comparison.plain(old),comparison.plain(hp)).is_empty(),label+"の命中順と敵HP")
+
+func check_cpp_friend_shot() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 85
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"])
+	var output := "res://.content/dev/run_friend_shot"
+	var builder = load("res://tools/content/build_run_content.gd")
+	var built: Error = builder.build(stage,config,output,"味方弾の地形・貫通・盾".sha256_text())
+	check(built==OK,"味方弾の型と当たり定義を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_85.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":763},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"味方弾の通常の状態・表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	bridge.command("dev_ship_motion",{"position":Vector2(-900,0),"velocity":Vector2.ZERO})
+	var initial: Dictionary = bridge.checkpoint()
+	var comparison = COMPARE.new()
+	for kind in ["pierce","history","expiry","terrain","shield"]:
+		bridge.restore(initial.value)
+		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+		add_child(lab)
+		await lab.reset({"seed":763,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
+			"config":{"start_radius":900.0,"planet_radius":100.0}})
+		var run: RunSimulation = lab.run
+		var from := Vector2(-900,400)
+		var angle := 0.0
+		var positions := [from+Vector2(60,0),from+Vector2(100,0),from+Vector2(160,0),from+Vector2(200,0)]
+		var definition := run.enemies.def_of(&"drifter")
+		var opts := {"speed":720.0,"life":0.7,"pierce_left":2,"knock":0.0,"visual_key":"weapon/forward","weapon_id":&"W01"}
+		var steps := [0.05,0.05,0.05,0.05,0.05]
+		if kind=="history":
+			positions = [from+Vector2(5,0)]
+			opts.speed = 100.0
+			steps = [0.01,0.01]
+		elif kind=="expiry":
+			positions = [from+Vector2(20,0)]
+			opts.life = 0.05
+			steps = [0.1]
+		elif kind=="terrain":
+			from = Vector2(-200,0)
+			positions = [Vector2(-150,0),Vector2(150,0)]
+			opts.speed = 800.0
+			steps = [0.5]
+		elif kind=="shield":
+			from = Vector2(-400,300)
+			positions = [Vector2(-600,300)]
+			definition = run.enemies.def_of(&"shield")
+			angle = PI
+			opts.speed = 800.0
+			steps = [0.25]
+		var source_rows := []
+		var id_map := {}
+		for at: Vector2 in positions:
+			var row := run.enemies.spawn(definition,at)
+			source_rows.append(row)
+			var created: Dictionary = bridge.command("dev_spawn",{"definition_id":String(definition.id),"position":at})
+			id_map[run.enemies.table.id[row]] = created.value
+		var full_hp: Array = core.enemies_snapshot().map(func(row): return row.hp)
+		run.combat.rebuild_grid()
+		run.projectiles.fire_shot(from,angle,1.0,opts)
+		check(core.fire_shot(from,angle,1.0,opts),"W01の武器IDと編集値から味方弾を生成する: "+kind)
+		if kind=="pierce" and not friend_retry:
+			var presentation: RunPresentation = session.view.get_node("RunPresentation")
+			presentation._present_cpp(0.0)
+			var frame: Dictionary = bridge.read_render(Rect2(-1600,-100,1500,1000)).value
+			check(presentation.frame_view.apply_frame(frame),"味方弾の位置と向きを通常の表示へ渡す")
+			var shown := false
+			for visual: Dictionary in session.cpp_resources.visuals:
+				if visual.role==2:
+					var batch: InstanceBatch = presentation.frame_view.batches.get(visual.id)
+					shown = batch!=null and batch.multimesh.visible_instance_count>0
+			check(shown,"通常のドットの味方弾を表示する")
+			await get_tree().process_frame
+		var step_index := 0
+		for dt: float in steps:
+			run.projectiles._update_friendly(dt)
+			core.step_projectiles(dt)
+			friend_states(run,core,comparison,kind,id_map,source_rows,not friend_retry or kind=="history" or (kind=="pierce" and step_index in [1,2]))
+			step_index += 1
+		if kind=="pierce":
+			var enemies: Array = core.enemies_snapshot()
+			check(enemies[0].hp<full_hp[0] and enemies[1].hp<full_hp[1] and enemies[2].hp<full_hp[2] and enemies[3].hp==full_hp[3],"貫通回数を使い切った弾は次の敵へ届かない")
+		elif kind=="terrain":
+			var enemies: Array = core.enemies_snapshot()
+			check(enemies[0].hp<full_hp[0] and enemies[1].hp==full_hp[1] and core.projectiles_snapshot().is_empty(),"地形の手前だけ命中し奥の敵へ届かない")
+		elif kind=="shield":
+			check(core.projectiles_snapshot().is_empty() and core.hostiles_snapshot().size()==1 and run.projectiles.hostile_slots.live==1,"盾の正面で貫通弾も止まり危険な反射弾へ変わる")
+		elif kind=="history" and not friend_retry:
+			var held: Dictionary = bridge.checkpoint()
+			var before: Array = core.projectiles_snapshot()
+			core.step_projectiles(0.1)
+			var after: Array = core.projectiles_snapshot()
+			bridge.restore(held.value)
+			check(core.projectiles_snapshot()==before,"貫通弾の命中済みIDと残り回数を復元する")
+			core.step_projectiles(0.1)
+			check(core.projectiles_snapshot()==after,"保持点から同じ飛行と一度だけの命中を再現する")
+			bridge.release_checkpoint(held.value)
+		lab.free()
+	if friend_retry:
+		bridge.release_checkpoint(initial.value)
+		session.free()
+		friend_finished = true
+		return
+	# 同じ本体の複数部位を通っても、ダメージと命中履歴は本体IDで一度だけ。
+	bridge.restore(initial.value)
+	var parent: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-650,400)}).value
+	var part: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-750,400)}).value
+	bridge.command("dev_enemy_combat",{"entity_id":part,"damage_target":parent})
+	var full_hp: Array = core.enemies_snapshot().map(func(row): return row.hp)
+	core.fire_shot(Vector2(-900,400),0.0,1.0,{"speed":1000.0,"life":1.0,"pierce_left":3,"weapon_id":&"W01"})
+	core.step_projectiles(0.3)
+	var enemies: Array = core.enemies_snapshot()
+	var live: Array = core.projectiles_snapshot()
+	check(is_equal_approx(enemies[0].hp,full_hp[0]-1.0) and enemies[1].hp==full_hp[1] and live.size()==1 and live[0].hit_ids==[parent],"部位と本体への重複命中を本体IDで避ける")
+	var weapon_seen := false
+	for event: Dictionary in core.drain_events():
+		if event.type==&"combat_damage" and event.get("weapon_id")==1: weapon_seen = true
+	check(weapon_seen,"味方弾の武器IDを共通のダメージ記録へ渡す")
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	friend_finished = true

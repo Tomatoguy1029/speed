@@ -286,6 +286,21 @@ inline bool parse_symbol(std::string_view value, HostileKind &out) {
     if (value=="reflected") {out=HostileKind::Reflected;return true;}
     return false;
 }
+enum class FriendKind : uint32_t {Shot=0,Debris=1,Hull=2,Count};
+inline const char *symbol_name(FriendKind value) {
+    switch(value) {
+    case FriendKind::Shot: return "shot";
+    case FriendKind::Debris: return "debris";
+    case FriendKind::Hull: return "hull";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, FriendKind &out) {
+    if (value=="shot") {out=FriendKind::Shot;return true;}
+    if (value=="debris") {out=FriendKind::Debris;return true;}
+    if (value=="hull") {out=FriendKind::Hull;return true;}
+    return false;
+}
 enum class AttackCategory : uint32_t {Aimed=0,Homing=1,Dash=2,Beam=3,Zone=4,Wave=5,Residue=6,Count};
 inline const char *symbol_name(AttackCategory value) {
     switch(value) {

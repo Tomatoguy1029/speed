@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/collision_query.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -46,21 +47,7 @@ bool SpeedRunCore::rebuild_enemy_grid(double cell_size) {
 }
 
 std::vector<size_t> SpeedRunCore::query_enemy_rows(Vector2 lo, Vector2 hi) const {
-    std::vector<size_t> out;
-    if (runtime.state.grid.cols == 0 || hi.x < runtime.state.grid.origin.x || hi.y < runtime.state.grid.origin.y ||
-            lo.x > runtime.state.grid.origin.x + runtime.state.grid.cols * runtime.state.grid.cell || lo.y > runtime.state.grid.origin.y + runtime.state.grid.rows * runtime.state.grid.cell) return out;
-    const int64_t x0 = std::clamp(int64_t((double(lo.x) - runtime.state.grid.origin.x) / runtime.state.grid.cell), int64_t(0), runtime.state.grid.cols - 1);
-    const int64_t x1 = std::clamp(int64_t((double(hi.x) - runtime.state.grid.origin.x) / runtime.state.grid.cell), int64_t(0), runtime.state.grid.cols - 1);
-    const int64_t y0 = std::clamp(int64_t((double(lo.y) - runtime.state.grid.origin.y) / runtime.state.grid.cell), int64_t(0), runtime.state.grid.rows - 1);
-    const int64_t y1 = std::clamp(int64_t((double(hi.y) - runtime.state.grid.origin.y) / runtime.state.grid.cell), int64_t(0), runtime.state.grid.rows - 1);
-    for (int64_t y = y0; y <= y1; ++y) for (int64_t x = x0; x <= x1; ++x) {
-        int64_t row = runtime.state.grid.head[y * runtime.state.grid.cols + x];
-        while (row != -1) {
-            if (size_t(row) < runtime.state.enemies.size() && runtime.state.enemies[row].alive && !runtime.state.enemies[row].dead) out.push_back(row);
-            row = runtime.state.grid.next[row];
-        }
-    }
-    return out;
+    return speed::CollisionQuery::enemy_rows(runtime.state,lo,hi);
 }
 
 PackedInt64Array SpeedRunCore::query_enemy_ids(Vector2 lo, Vector2 hi) const {

@@ -57,6 +57,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
     bundle->beams=records.BeamDefinition_rows;
+    bundle->friend_shots=records.FriendShotDefinition_rows;
     for (const auto &shot:bundle->hostile_definitions) {
         if (shot.life<=0 || shot.radius<=0) return {};
         for (double value:{shot.radius,shot.life,shot.slow,shot.turn}) if (!std::isfinite(float(value))) return {};

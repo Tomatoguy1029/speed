@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/systems/field.h"
+#include "../cpp/systems/attacks/friend_shot.h"
 #include "../cpp/systems/attacks/reflected.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/systems/attack_system.h"
@@ -52,78 +53,13 @@ bool SpeedRunCore::fire_shot(Vector2 from, double angle, double damage, const Di
     if (shot.cause != StringName("shot")) return false;
     shot.weapon_id = options.get("weapon_id", StringName());
     shot.visual = options.get("visual_key", StringName());
-    return add_friend(std::move(shot))!=SIZE_MAX;
+    const auto handle=speed::FriendShotSystem::emit(runtime,std::move(shot));
+    return speed::AttackSystem::get(runtime.state,handle)!=nullptr;
 }
 
 
 bool SpeedRunCore::step_projectiles(double world_dt) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.combat_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
-    struct Hit { double time; size_t row; };
-    struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
-    std::vector<Hit> hits;
-    // 命中で末尾へ増えた弾は同じ更新で進め、既に通った空き行は次回に進める。
-    for (size_t i = 0; i < runtime.state.friends.size(); ++i) {
-        auto &shot = runtime.state.friends[i];
-        if (!shot.alive) continue;
-        const auto processing_handle=shot.attack;
-        const Vector2 from = shot.pos, vel = shot.vel, destination = from + vel * world_dt;
-        auto body_hit=speed::FieldSystem::first_body_hit(runtime,from,destination,shot.radius);
-        const Vector2 to=body_hit?body_hit->point:destination;
-        Vector2 position = destination;
-        double life = double(shot.life) - world_dt;
-        auto end_reason=speed::AttackEndReason::Lifetime;
-        shot.age = double(shot.age) + world_dt;
-        shot.angle = double(shot.angle) + double(shot.spin) * world_dt;
-        if (shot.kind == 1 && shot.visual != StringName("weapon/knockback")) {
-            shot.trail.append(destination);
-            if (shot.trail.size() > runtime.state.projectile_config.trail_points) shot.trail.remove_at(0);
-        }
-        const double padding = double(shot.radius) + std::max(runtime.state.combat_config.max_enemy_radius, runtime.state.grid.max_radius);
-        const Vector2 pad(padding, padding);
-        hits.clear();
-        for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
-            const auto &enemy = runtime.state.enemies[row];
-            if (shot.hit_ids.count(enemy.id)) continue;
-            const double t = speed::CollisionQuery::segment_circle_t(from, to, enemy.pos, double(shot.radius) + enemy.radius);
-            if (t >= 0) hits.push_back({t, row});
-        }
-        SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
-        const double speed = vel.length();
-        for (const auto &hit : hits) {
-            const auto &enemy = runtime.state.enemies[hit.row];
-            if (life <= 0 || enemy.dead || shot.hit_ids.count(enemy.id)) continue;
-            const Vector2 impact = from.lerp(to, hit.time);
-            if (shot.kind == 0 && blocks_front(hit.row, impact, vel)) {
-                speed::ReflectedSystem::reflect(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),impact,vel,shot.radius);
-                position = impact;life = 0;body_hit.reset();end_reason=speed::AttackEndReason::Hit;break;
-            }
-            shot.hit_ids.insert(enemy.id);
-            damage_enemy(hit.row, shot.damage, shot.cause, false, speed > 0 ? vel / speed : Vector2(), shot.knock, &impact);
-            if (!speed::AttackSystem::get(runtime.state,processing_handle)) break;
-            duplicate_friend(i, impact);
-            Dictionary event; event["pos"] = impact; event["dir"] = vel.normalized();
-            event["visual_key"] = String(shot.visual); event["kind"] = shot.kind;
-            emit_event("shot_hit", event);
-            if (runtime.state.phase != Phase::Play) { shot.pos=position;shot.life=life;return true; }
-            if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else {life=0;end_reason=speed::AttackEndReason::Hit;} }
-        }
-        if (!speed::AttackSystem::get(runtime.state,processing_handle)) continue;
-        if (body_hit) {
-            position=body_hit->point;life=0;end_reason=speed::AttackEndReason::Hit;
-            Dictionary event;event["pos"]=position;event["radius"]=22.0;event["color"]=Color::html("ffd19a");event["life"]=0.18;emit_event("ring",event);
-        }
-        shot.pos = position; shot.life = life;
-        if (life <= 0) {
-            if (shot.kind == 1) {
-                if (shot.visual != StringName("weapon/knockback") && shot.trail.size() > 1) {
-                    Dictionary ended; ended["points"] = shot.trail; ended["color"] = shot.color;
-                    emit_event("debris_trail", ended);
-                }
-            }
-            speed::AttackSystem::end(runtime.state,processing_handle,end_reason);
-        }
-    }
-    return true;
+    return speed::AttackSystem::step_friendly(runtime,world_dt);
 }
 
 Array SpeedRunCore::projectiles_snapshot() const {

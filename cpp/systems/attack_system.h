@@ -4,6 +4,7 @@ namespace speed {
 struct ContentBundle;class RunRuntime;
 class AttackSystem {
 public:
+    static bool step_friendly(RunRuntime &,double dt);
     static bool step_hazards(RunRuntime &,double dt);
     static bool mark_ship_hit(godot::RunState &,AttackHandle);
     static bool has_attached(const godot::RunState &,EnemyHandle);

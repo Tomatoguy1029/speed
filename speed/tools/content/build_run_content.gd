@@ -41,8 +41,10 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.ContactDefinition = [
 		{"id":1,"shape":1,"scale":0,"hit_policy":1,"add_ship_radius":true,"ship_sweep":false,"width":0.0},
 		{"id":2,"shape":0,"scale":0,"hit_policy":0,"add_ship_radius":true,"ship_sweep":false,"width":0.0},
-		{"id":3,"shape":7,"scale":0,"hit_policy":0,"add_ship_radius":true,"ship_sweep":false,"width":0.0}]
+		{"id":3,"shape":7,"scale":0,"hit_policy":0,"add_ship_radius":true,"ship_sweep":false,"width":0.0},
+		{"id":4,"shape":1,"scale":0,"hit_policy":0,"add_ship_radius":false,"ship_sweep":false,"width":0.0}]
 	data.BeamDefinition = [{"id":1,"contact":3}]
+	data.FriendShotDefinition = [{"id":1,"contact":4}]
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.EnemyRecord = [row]
@@ -174,6 +176,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.RunConfig = resolved.RunConfig
 		data.ContactDefinition = resolved.ContactDefinition
 		data.BeamDefinition = resolved.BeamDefinition
+		data.FriendShotDefinition = resolved.FriendShotDefinition
 		data.BudgetPhase = resolved.BudgetPhase
 		if data.ResourceKey.is_empty():
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)

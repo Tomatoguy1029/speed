@@ -20,6 +20,7 @@ struct ContentBundle {
     std::vector<ContactDefinition> contacts;
     std::vector<HostileDefinition> hostile_definitions;
     std::vector<BeamDefinition> beams;
+    std::vector<FriendShotDefinition> friend_shots;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;
     LifecycleDefinition lifecycle;
