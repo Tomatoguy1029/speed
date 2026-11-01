@@ -3,6 +3,8 @@
 
 Manual authoring command; never starts Godot or changes saved profiles.
 EndBlast and its plasma shader are deliberately outside this bake.
+The command writes candidate assets only; runtime integration is a separate step.
+Editable explosion settings remain the normal rendering path.
 """
 import argparse
 import hashlib
@@ -84,7 +86,6 @@ def generate():
     read("tools/art/bake_burst_profiles.py")
     read("shaders/burst_noise.gdshaderinc")
     read("scripts/render/fx/blast_bursts.gd")
-    read("scripts/render/fx/burst_runtime.gd")
     fire_owner = read("scripts/render/fx/fire_bursts.gd")
     read("scripts/render/attacks/zone_bomber.gd")
     read("scripts/render/attacks/zone_pump.gd")

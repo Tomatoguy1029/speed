@@ -26,7 +26,7 @@ func on_event(ev: Dictionary) -> void:
 
 func tick(_dt: float) -> void:
 	var dt := world_dt()
-	var time_scale := BurstRuntime.time_scale(_effect_key())
+	var time_scale := ShaderTuning.burst_time_scale(_effect_key())
 	var p := painter()
 	p.begin()
 	var t := state.world_time
@@ -41,7 +41,7 @@ func tick(_dt: float) -> void:
 		b.age += dt
 		var q: float = b.age / time_scale / 0.4
 		if q >= 1.0: continue
-		var energy := BurstRuntime.number(_effect_key(), "glow_energy", 1.0)
+		var energy := visual_number("glow_energy", 1.0)
 		var color: Color = (Color.WHITE if q < 0.5 else Color("#8fb8ff")) * Color(energy, energy, energy, 1.0)
 		for d in b.debris:
 			p.dot(b.pos + d.dir * d.v * q * p.px, color)

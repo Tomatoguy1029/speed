@@ -142,24 +142,22 @@ func _flash(event: Dictionary)->void:
 	var large: bool=event.cue in [&"growth_started",&"separation_started"]
 	var diameter:=520.0 if large else (220.0 if event.cue==&"head_destroyed" else 140.0)
 	sprite.scale=Vector2.ONE*diameter/2.0
-	var fixed := BurstRuntime.profile(_burst_profile())
-	sprite.material = BurstRuntime.material(fixed) if not fixed.is_empty() else ShaderMaterial.new()
-	if fixed.is_empty(): sprite.material.shader = burst_shader
+	sprite.material=ShaderMaterial.new()
+	sprite.material.shader=burst_shader
 	var color: Color={&"vortex":Color("#70ffe0"),&"thunder":Color("#77bbff"),&"debris":Color("#dbac68"),&"immortal":Color("#ffe69a")}.get(event.kind,attack_color)
 	if event.cue==&"hit":color=hit_color
 	sprite.material.set_shader_parameter("tint",color)
-	sprite.material.set_shader_parameter("pixels",diameter/4.0 * (float(fixed.burst_pixel_scale) if not fixed.is_empty() else burst_pixel_scale))
+	sprite.material.set_shader_parameter("pixels",diameter/4.0 * burst_pixel_scale)
 	sprite.set_meta("burst_diameter", diameter)
 	sprite.material.set_shader_parameter("seed",float(serial%19))
 	var profile: String = get_meta("visual_profile", scene_file_path)
-	if fixed.is_empty():
-		ShaderTuning.apply(sprite.material, profile, scene_file_path)
-		sprite.set_meta("shader_tuning_profile", profile)
-		sprite.set_meta("shader_tuning_fallback", scene_file_path)
+	ShaderTuning.apply(sprite.material, profile, scene_file_path)
+	sprite.set_meta("shader_tuning_profile", profile)
+	sprite.set_meta("shader_tuning_fallback", scene_file_path)
 	add_child(sprite)
 	sprites[serial]=sprite
 	var duration:=0.8 if large else maxf(flash_duration,0.3)
-	flashes.append({"id":serial,"position":event.position,"cue":event.cue,"life":duration,"duration":duration,"age":0.0,"large":large,"fixed":fixed})
+	flashes.append({"id":serial,"position":event.position,"cue":event.cue,"life":duration,"duration":duration,"age":0.0,"large":large})
 	if flashes.size() > 96:
 		var oldest: Dictionary = flashes.pop_front()
 		sprites[oldest.id].queue_free()
@@ -170,9 +168,8 @@ func refresh_visual_settings() -> void:
 	for flash in flashes:
 		var sprite: Sprite2D = sprites[flash.id]
 		var material := sprite.material as ShaderMaterial
-		if flash.fixed.is_empty():
-			ShaderTuning.apply(material, _burst_profile(), scene_file_path)
-			material.set_shader_parameter("pixels", float(sprite.get_meta("burst_diameter")) / 4.0 * burst_pixel_scale)
+		ShaderTuning.apply(material, _burst_profile(), scene_file_path)
+		material.set_shader_parameter("pixels", float(sprite.get_meta("burst_diameter")) / 4.0 * burst_pixel_scale)
 		_update_burst(flash)
 
 func phase_state() -> Dictionary:
@@ -187,17 +184,9 @@ func _burst_profile() -> String:
 	return String(get_meta("visual_profile", scene_file_path))
 
 func _update_burst(flash: Dictionary) -> void:
-	var fixed: Dictionary = flash.fixed
-	var duration: float
-	var time_scale: float
-	if fixed.is_empty():
-		var values := EFFECT_SETTINGS.resolved_values(_burst_profile(), scene_file_path)
-		duration = maxf(0.01, float(values.get("burst_large_seconds" if flash.large else "burst_small_seconds", 0.8 if flash.large else maxf(flash_duration, 0.3))))
-		time_scale = ShaderTuning.burst_time_scale(_burst_profile(), scene_file_path)
-	else:
-		duration = fixed.large_seconds if flash.large else fixed.small_seconds
-		time_scale = fixed.time_scale
-	var age: float = flash.age / time_scale
+	var values := EFFECT_SETTINGS.resolved_values(_burst_profile(), scene_file_path)
+	var duration := maxf(0.01, float(values.get("burst_large_seconds" if flash.large else "burst_small_seconds", 0.8 if flash.large else maxf(flash_duration, 0.3))))
+	var age: float = flash.age / ShaderTuning.burst_time_scale(_burst_profile(), scene_file_path)
 	flash.duration = duration
 	flash.life = duration - age
 	var sprite: Sprite2D = sprites[flash.id]
