@@ -15,6 +15,7 @@ struct ContentBundle {
     std::vector<EnemyDefinition> definitions;
     std::vector<ResourceKey> visuals;
     std::vector<ForwardDefinition> forward_levels;
+    std::vector<BiteDefinition> bites;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);
 };
 }

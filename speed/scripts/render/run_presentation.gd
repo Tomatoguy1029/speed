@@ -1590,7 +1590,10 @@ func _ready_cpp() -> void:
 	bridge.subscribe("presentation",frame_view.receive_frame)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
-	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],2)
+	var layer_count: int = cpp_resources.visuals.size()-3
+	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],layer_count)
+	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
+	if hud!=null: hud.layer = maxi(hud.layer,layer_count+3)
 
 func _present_cpp(delta: float) -> void:
 	if frame_view==null: return

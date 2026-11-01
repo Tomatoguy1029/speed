@@ -4,11 +4,11 @@ const Schema = preload("res://tools/content/generated/run_schema.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_records(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior != &"chase": return {}
+	if definition == null or definition.behavior not in [&"chase",&"biter"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1}
+	var row := {"id":1,"kind":0 if definition.behavior==&"chase" else 2,"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -37,13 +37,30 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.RunConfig[0].time_limit = stage.time_limit if stage != null else -1.0
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
-	data.ChaseDefinition = [row]
+	data.EnemyRecord = [row]
+	if definition.behavior==&"biter":
+		var visual_scene := "res://scenes/attacks/zone_biter.tscn"
+		var visual: Node = load(visual_scene).instantiate()
+		data.BiteDefinition = [{"id":1,"reach":source.bite.bite_reach,"warn":source.bite.bite_telegraph,
+			"rest":source.bite.bite_rest,"radius":source.bite.bite_radius,"damage":source.bite.bullet_dmg,
+			"duration":ProjectileSystem.ZONE_FLASH,"scene":visual_scene,
+			"hit":visual.get_node_or_null("Hit")!=null,"fade":visual.get_node_or_null("Fade")!=null}]
+		visual.free()
 	var sprite := stage.enemy_sprite_path(definition.id) if stage!=null else "res://assets/pixel/%s.png" % definition.id
+	var look: EnemyLook
+	var skin := sprite.get_file().get_basename()
+	var visual_index: StageResources = stage.resources if stage!=null and stage.resources!=null and not stage.resources.look_paths.is_empty() else ContentManager.visual_index
+	if visual_index!=null and visual_index.look_paths.has(skin):
+		sprite = visual_index.look_paths[skin]
+		look = load(sprite) as EnemyLook
+		if look==null or not look.prepared: return {}
+		row.sprite_angle = look.angle
+		if not look.size_from_collision: row.sprite_scale *= maxf(look.base.get_width(),look.base.get_height())*0.5/maxf(definition.radius,0.001)
 	if not ResourceLoader.exists(sprite): return {}
 	data.ResourceKey = [{"id":1,"role":1,"path":"res://assets/pixel/airship.png"},
 		{"id":2,"role":2,"path":""},{"id":3,"role":3,"path":"res://assets/pixel/xp_crystal_facets.tres"},
 		{"id":4,"role":4,"path":""},{"id":5,"role":5,"path":"res://assets/pixel/airship_canon.png"},
-		{"id":6,"role":0,"path":sprite}]
+		{"id":6,"role":6 if look!=null else 0,"path":sprite}]
 	var weapon := load("res://data/weapons/W01_forward.tres") as WeaponDef
 	if weapon==null: return {}
 	data.LoadoutDefinition = [{"id":1,"kind":0,"maximum_level":weapon.level_steps.size()}]
@@ -61,6 +78,7 @@ static func compile_chase(definition: EnemyDef, config: GameConfig, input_sha256
 static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
+	var appearance_metadata := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	for i in stage.resources.enemy_ids.size():
 		var id: String = stage.resources.enemy_ids[i]
@@ -73,10 +91,13 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		definition = StageEnemyTuning.resolve(definition,tuning)
 		var resolved := chase_records(definition,config,stage)
 		if resolved.is_empty(): return ERR_UNAVAILABLE
-		var row: Dictionary = resolved.ChaseDefinition[0]
+		var row: Dictionary = resolved.EnemyRecord[0]
 		row.id = i+1
 		row.visual_id = i+6
-		data.ChaseDefinition.append(row)
+		data.EnemyRecord.append(row)
+		for bite: Dictionary in resolved.BiteDefinition:
+			bite.id = row.id
+			data.BiteDefinition.append(bite)
 		data.StringEntry.append({"id":i+1,"value":id})
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.RunConfig = resolved.RunConfig
@@ -87,17 +108,28 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		var visual: Dictionary = resolved.ResourceKey.back().duplicate()
 		visual.id = i+6
 		data.ResourceKey.append(visual)
+		if visual.role==6:
+			var look: EnemyLook = load(visual.path)
+			var lighting: Resource = load("res://data/visuals/enemy_lighting.tres")
+			var settings := {}
+			for key in ["key_energy","fill_energy","key_angle","fill_angle","height","ambient","normal_strength"]:
+				settings[key] = definition.visual_value(key,lighting.get(key))
+			appearance_metadata[visual.id] = {"settings":settings,"paint":look.colors_key(definition.armor_colors),"biting":definition.behavior==&"biter",
+				"biter_parts":"res://data/visuals/biter_parts.tres" if id=="biter" and look.source_path=="res://data/visuals/looks/biter.tres" else ""}
 	if data.RunConfig.is_empty(): return ERR_INVALID_DATA
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	for visual: Dictionary in data.ResourceKey:
 		if not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
+	for metadata: Dictionary in appearance_metadata.values():
+		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
 	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]:
 		if not paths.has(asset): paths.append(asset)
 	paths.sort()
 	var resolved_input := source_sha256.to_utf8_buffer()
 	resolved_input.append_array(Schema.write_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])))
 	resolved_input.append_array("\n".join(paths).to_utf8_buffer())
+	resolved_input.append_array(var_to_bytes(appearance_metadata))
 	input_sha256 = Schema.sha256(resolved_input).hex_encode()
 	var bytes := Schema.write_content(data,input_sha256.hex_decode())
 	if bytes.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
@@ -118,7 +150,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var resources = preload("res://tools/content/run_resources.gd").new()
 	resources.input_sha256 = input_sha256
 	resources.paths = paths
-	resources.visuals.assign(data.ResourceKey)
+	resources.visuals.assign(data.ResourceKey.duplicate(true))
+	for visual: Dictionary in resources.visuals:
+		if appearance_metadata.has(visual.id): visual.merge(appearance_metadata[visual.id])
 	for visual: Dictionary in data.ResourceKey:
 		if not visual.path.is_empty(): resources.keys[visual.id] = visual.path
 	if not FileAccess.file_exists(resources_path):

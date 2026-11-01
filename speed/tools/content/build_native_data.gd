@@ -12,7 +12,7 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 	var row := {"id": String(definition.id), "behavior": String(definition.behavior),
 		"hp": definition.base_hp(config) * config.enemy_hp_mult,
 		"armor": definition.armor * config.enemy_armor_mult, "radius": radius,
-		"speed": definition.speed, "fire_interval": float(definition.params.get("fire_interval", 0.0)),
+		"speed": definition.speed, "turn":definition.turn if definition.turn>0.0 else 4.0, "fire_interval": float(definition.params.get("fire_interval", 0.0)),
 		"color": [definition.color.r, definition.color.g, definition.color.b, definition.color.a],
 		"xp": definition.xp, "knockback": definition.knockback_scale(config),
 		"hitstop_multiplier": definition.hitstop_multiplier}

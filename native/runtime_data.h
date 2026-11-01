@@ -17,7 +17,7 @@ struct EnemyDefinition {
     double attack_value = 1, attack_priority = 0, attack_weight = 0, attack_telegraph = 0;
     bool attack_managed = true;
     int64_t rank = 0;
-    double accel = 0, turn = 0, weak_arc = 0;
+    double accel = 2, turn = 4, weak_arc = 0;
     double front_arc = 0, reflect_speed = 0, reflect_life = 0, reflect_damage = 0, reflect_interval = 0, shield_time = 0;
     struct Scaling {
         bool ready = false, fixed_sprite = false;

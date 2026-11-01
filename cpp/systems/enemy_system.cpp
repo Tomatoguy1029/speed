@@ -35,14 +35,4 @@ bool EnemySystem::retire(godot::RunState &state,EnemyHandle handle,RetireReason 
 void EnemySystem::release(godot::RunState &state, uint32_t slot) {
     state.enemy_handles.release(state.enemy_handles.at(slot));
 }
-void EnemySystem::aim_chase(godot::RunState::Enemy &enemy, godot::Vector2 ship) {
-    const auto toward = ship - enemy.pos;
-    const double distance = toward.length();
-    enemy.vel = godot::Vector2();
-    if (distance > 0.001) {
-        const auto unit = toward / distance;
-        enemy.vel = unit * enemy.speed;
-        enemy.facing = unit.angle();
-    }
-}
 }

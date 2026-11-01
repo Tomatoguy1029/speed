@@ -23,7 +23,8 @@ bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
     for (int i = 0; i < keys.size(); ++i) {
         if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return false;
         const String key = keys[i]; const Variant value = state[keys[i]];
-        if (key == "held" || key == "slash_hold") { if (value.get_type() != Variant::BOOL) return false; }
+        if (key == "pump_owner") { if (value.get_type()!=Variant::INT || int64_t(value)<0 || (int64_t(value)>0 && !runtime.state.rows_by_id.count(int64_t(value)))) return false; }
+        else if (key == "held" || key == "slash_hold") { if (value.get_type() != Variant::BOOL) return false; }
         else if (key == "stone" || key == "knock_t" || key == "shove_time") {
             if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
         } else if (key == "vel" || key == "shove_vel") {
@@ -31,6 +32,10 @@ bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
         } else return false;
     }
     auto &enemy = runtime.state.enemies[found->second];
+    if (state.has("pump_owner")) {
+        const int64_t owner=state["pump_owner"];
+        enemy.pump_owner=owner>0?runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(owner))):speed::EnemyHandle();
+    }
     if (state.has("held")) enemy.held = state["held"];
     if (state.has("slash_hold")) enemy.slash_hold = state["slash_hold"];
     if (state.has("stone")) enemy.stone = state["stone"];
@@ -49,6 +54,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
     for (const auto *e : ordered) {
         Dictionary row; row["id"] = e->id; row["stone"] = e->stone; row["knock_t"] = e->knock_t;
         row["shove_time"] = e->shove_time; row["shove_vel"] = e->shove_vel; row["shove_from"] = e->shove_from;
+        row["turn_locked"]=runtime.state.draw.tracing && !e->held && !runtime.state.enemy_handles.contains(e->pump_owner);
         row["held"] = int(e->held); row["slash_hold"] = int(e->slash_hold); row["shoved"] = int(e->shoved);
         row["age"] = e->age; row["fire_t"] = e->fire_t;
         row["mode"] = int(e->mode); row["timer"] = e->timer; row["charge"] = e->charge; out.append(row);

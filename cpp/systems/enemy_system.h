@@ -7,6 +7,5 @@ public:
     static bool retire(godot::RunState &state,EnemyHandle enemy,RetireReason reason);
     static void leave_hound(godot::RunState &state,size_t row);
     static void release(godot::RunState &state, uint32_t slot);
-    static void aim_chase(godot::RunState::Enemy &enemy, godot::Vector2 ship);
 };
 }

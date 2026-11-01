@@ -67,10 +67,10 @@ def generate():
     for f in records[0]['fields']:
         if 'runtime' in f:cpp += [f'    state.{f["runtime"]}=config.{f["name"]};']
     cpp+=['}']
-    cpp+=['inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringName &id) {','    EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;']
-    for f in next(r for r in records if r['name']=='ChaseDefinition')['fields']:
+    cpp+=['inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {','    EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;']
+    for f in next(r for r in records if r['name']=='EnemyRecord')['fields']:
         if 'native' in f:cpp += [f'    out.{f["native"]}=row.{f["name"]};']
-    cpp+=['    return out;','}',f'inline constexpr uint32_t FORMAT_VERSION={schema["format_version"]}, ABI_VERSION={schema["abi_version"]}, SECTION_COUNT={len(records)};','}']
+    cpp+=['    out.kind=static_cast<EnemyDefinition::Kind>(row.kind);','    return out;','}',f'inline constexpr uint32_t FORMAT_VERSION={schema["format_version"]}, ABI_VERSION={schema["abi_version"]}, SECTION_COUNT={len(records)};','}']
     gd=['## 共通スキーマから生成。直接編集しない。','extends RefCounted','',f'const SCHEMA = {json.dumps(schema,ensure_ascii=False).replace("false","false").replace("true","true")}']
     gd += [GD_WRITER]
     return {'cpp/content/generated/combat_ids.h':'\n'.join(enums)+'\n','cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd)+'\n'}

@@ -16,7 +16,9 @@ Dictionary RenderBatchBuffer::value() {
         t[i*6]=c;t[i*6+1]=s;t[i*6+2]=-s;t[i*6+3]=c;t[i*6+4]=v.at.x;t[i*6+5]=v.at.y;
     }
     Dictionary out;out["visual_id"]=visual;out["layer"]=layer;out["order"]=order;out["ids"]=ids;
-    out["transforms"]=transforms;out["colors"]=colors;out["flags"]=flags;return out;
+    out["transforms"]=transforms;out["colors"]=colors;out["flags"]=flags;
+    if (biter) {Dictionary values;values["modes"]=modes;values["charges"]=charges;values["timers"]=timers;values["rests"]=rests;out["biter"]=values;}
+    return out;
 }
 namespace {
 PreviousPose interpolate(const PreviousPoseState &old,const PreviousPose &now,size_t slot,bool friendly,double alpha) {
@@ -36,7 +38,10 @@ void RenderBuilder::capture_previous(RunRuntime &run) {
 Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     const auto &state=run.state;const auto &config=run.content->config;const auto &previous=state.previous_poses;
     auto &groups=run.render_workspace.batches;
-    for (auto &group:groups) group.second.instances.clear();
+    for (auto &group:groups) {
+        auto &out=group.second;out.instances.clear();out.biter=false;
+        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();
+    }
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -46,7 +51,12 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
         const double radius=enemy.radius*definition.sprite_scale;
         if (!view.grow(radius*1.4142135623730951).has_point(pose.position)) continue;
-        batch(definition.visual_id,8,int32_t(enemy.definition)).add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,
+        auto &enemy_batch=batch(definition.visual_id,8,int32_t(enemy.definition));
+        if (definition.kind==EnemyDefinition::Kind::Biter) {
+            enemy_batch.biter=true;enemy_batch.modes.push_back(int32_t(enemy.mode));enemy_batch.charges.push_back(enemy.charge);
+            enemy_batch.timers.push_back(enemy.timer);enemy_batch.rests.push_back(definition.bite.rest);
+        }
+        enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,
             Color(enemy.flash>0?1.0:0.0,0,0,1),enemy.flash>0?1:0);
     }
     for (size_t i=0;i<state.friends.size();++i) {

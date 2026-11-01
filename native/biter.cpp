@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/attack_system.h"
 #include "geometry.h"
+#include "../cpp/behaviors/enemies/pursuit.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -30,12 +31,10 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     const int64_t token = enemy.attack_managed && enemy.mode == EnemyMode::Windup ? attack_token(enemy_attack_owner(enemy)) : 0;
     if (far && (enemy.id + runtime.state.ticks) % 3 != 0) { enemy.pos += enemy.vel * dt; return; }
     const double bdt = far ? dt * 3.0 : dt;
+    const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
     if (enemy.mode == EnemyMode::Windup) {
         enemy.vel *= std::max(0.0, 1.0 - 8.0 * bdt);
-        const double difference = double((runtime.state.ship_pos - from).angle()) - enemy.facing;
-        const double wrapped = speed::angle_difference(difference);
-        const double turn = def.turn * 2.0 * bdt;
-        enemy.facing += std::clamp(wrapped, -turn, turn);
+        speed::PursuitBehavior::turn(enemy,(runtime.state.ship_pos-from).angle(),def.turn*2.0,bdt,policy);
         enemy.timer = speed::remaining_time(enemy.timer,bdt);
         enemy.charge = 1.0 - std::max(0.0, enemy.timer) / def.bite.telegraph;
         if (enemy.timer <= 0) {
@@ -52,20 +51,21 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         const Vector2 toward = runtime.state.ship_pos - from;
         const double distance = toward.length();
         const Vector2 previous_velocity = enemy.vel;
-        enemy.vel = toward.length_squared() >= 0.000001 ? toward.normalized() * enemy.speed : Vector2();
+        enemy.vel=speed::PursuitBehavior::velocity(enemy,runtime.state.ship_pos,def.turn,bdt,policy);
         if (def.kind == speed::EnemyDefinition::Kind::Hound) {
             const Vector2 target = enemy.pursuit_ready ? enemy.pursuit : toward.normalized() * enemy.speed;
             // 下の共通追跡値ではなく、更新前の速度から補間する。
-            enemy.vel = previous_velocity.lerp(target, std::clamp(def.accel * bdt, 0.0, 1.0));
+            enemy.vel = previous_velocity.lerp(policy.velocity(previous_velocity,enemy.facing,target), std::clamp(def.accel * bdt, 0.0, 1.0));
         }
-        if (enemy.vel.length_squared() > 0.000001) enemy.facing = enemy.vel.angle();
+        if (enemy.vel.length_squared() > 0.000001 && !policy.locked()) enemy.facing = enemy.vel.angle();
         if (enemy.mode == EnemyMode::Recover) {
             enemy.timer = speed::remaining_time(enemy.timer,bdt);
             if (enemy.timer <= 0) enemy.mode = EnemyMode::Move;
         } else {
             const double reach = enemy.radius + (def.bite.reach + runtime.state.ship_config.ship_radius);
             if (distance * distance <= reach * reach && admit_bite(enemy, bdt)) {
-                enemy.mode = EnemyMode::Windup; enemy.timer = def.bite.telegraph; enemy.flash = 0.1;
+                enemy.mode = EnemyMode::Windup; enemy.timer = def.bite.telegraph;
+                if (def.id!=StringName("biter")) enemy.flash = 0.1;
             }
         }
     }

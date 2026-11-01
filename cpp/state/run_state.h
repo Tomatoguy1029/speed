@@ -41,6 +41,7 @@ struct RunState {
         bool alive = false, dead = false, elite = false, is_boss = false, hull_scattered = false;
         double guard = 0;
         speed::EnemyHandle damage_target;
+        speed::EnemyHandle pump_owner;
         double hit_cd = 0, flash = 0;
         double stone = 0, knock_t = 0, shove_time = 0;
         Vector2 shove_vel, shove_from;

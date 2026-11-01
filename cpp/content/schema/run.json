@@ -625,12 +625,12 @@
           "name": "enemy",
           "type": "u32",
           "min": 1,
-          "ref": "ChaseDefinition"
+          "ref": "EnemyRecord"
         }
       ]
     },
     {
-      "name": "ChaseDefinition",
+      "name": "EnemyRecord",
       "section": 4,
       "fields": [
         {
@@ -836,9 +836,20 @@
           "name": "sprite_angle",
           "type": "f64",
           "native": "sprite_angle"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0,
+          "native": "turn"
         }
       ],
-      "version": 3
+      "version": 4
     },
     {
       "name": "LoadoutDefinition",
@@ -946,14 +957,14 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 5
+          "max": 6
         },
         {
           "name": "path",
           "type": "string"
         }
       ],
-      "version": 2
+      "version": 3
     },
     {
       "name": "ForwardDefinition",
@@ -1002,6 +1013,60 @@
         {
           "name": "pierce",
           "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "BiteDefinition",
+      "section": 14,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "scene",
+          "type": "string"
+        },
+        {
+          "name": "hit",
+          "type": "bool"
+        },
+        {
+          "name": "fade",
+          "type": "bool"
         }
       ]
     }

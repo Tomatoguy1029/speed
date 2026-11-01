@@ -2,6 +2,7 @@
 #include "../output/event_builder.h"
 #include "../../native/geometry.h"
 #include "../systems/enemy_system.h"
+#include "../behaviors/enemies/pursuit.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <algorithm>
@@ -178,7 +179,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         if (enemy.flash > 0) enemy.flash=speed::remaining_time(enemy.flash,delta);
         enemy.age += delta;
         const auto &def = runtime.content->definitions[enemy.definition];
-        if (def.kind == speed::EnemyDefinition::Kind::Shield && enemy.slash_hold) { enemy.vel = Vector2(); continue; }
+        if (enemy.slash_hold) { enemy.vel = Vector2(); continue; }
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta); continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
@@ -195,7 +196,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 const double wrapped = speed::angle_difference(difference);
                 enemy.facing += std::clamp(wrapped, -def.turn * bdt, def.turn * bdt);
             } else {
-                speed::EnemySystem::aim_chase(enemy, runtime.state.ship_pos);
+                const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
+                enemy.vel=speed::PursuitBehavior::velocity(enemy,runtime.state.ship_pos,def.turn,far?delta*3.0:delta,policy);
             }
         }
         enemy.pos += enemy.vel * delta;
@@ -278,6 +280,11 @@ bool SpeedRunCore::configure(const Dictionary &data) {
                 !row.has("behavior") || row["behavior"].get_type() != Variant::STRING || (String(row["behavior"]) != "chase" && String(row["behavior"]) != "shield" && String(row["behavior"]) != "biter" && String(row["behavior"]) != "hound")) return false;
         speed::EnemyDefinition def;
         def.id = String(row["id"]);
+        if (row.has("turn")) {
+            const Variant turn=row["turn"];
+            if ((turn.get_type()!=Variant::FLOAT && turn.get_type()!=Variant::INT) || !std::isfinite(double(turn)) || double(turn)<0) return false;
+            def.turn=turn;
+        }
         if (String(row["behavior"]) == "shield") {
             if (aim_lag <= 0 || !row.has("shield") || row["shield"].get_type() != Variant::DICTIONARY) return false;
             def.kind = speed::EnemyDefinition::Kind::Shield;
@@ -684,6 +691,11 @@ bool SpeedRunCore::configure_content(const PackedByteArray &bytes) {
     runtime.state.enemy_aim_lag=content->aim_lag;
     runtime.state.enemy_aim_speed=content->aim_speed;
     runtime.state.aim_ready=true;
+    if (!content->bites.empty()) {
+        const auto &bite=content->bites.front();
+        auto &config=runtime.state.bite_zone_config;
+        config.ready=true;config.duration=bite.duration;config.scene=String::utf8(bite.scene.c_str());config.hit=bite.hit;config.fade=bite.fade;
+    }
     runtime.content=std::move(content);
     return true;
 }

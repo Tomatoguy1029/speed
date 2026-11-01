@@ -3,6 +3,7 @@ extends Node2D
 var visuals: Dictionary = {}
 var batches: Dictionary = {}
 var parts: Dictionary = {}
+var enemy_frames: Dictionary = {}
 var _layers: Dictionary = {}
 var _lines: Array[Line2D] = []
 var _scope: ContentResourceScope
@@ -70,6 +71,10 @@ func _valid(frame: Dictionary) -> bool:
 		if not row is Dictionary or not visuals.has(row.get("visual_id")) or not row.get("ids") is PackedInt64Array or not row.get("transforms") is PackedFloat32Array or not row.get("colors") is PackedColorArray or not row.get("flags") is PackedInt32Array: return false
 		var count: int = row.ids.size()
 		if row.transforms.size()!=count*6 or row.colors.size()!=count or row.flags.size()!=count: return false
+		if visuals[row.visual_id].role==6 and visuals[row.visual_id].get("biting",false):
+			if not row.get("biter") is Dictionary: return false
+			for key in ["modes","charges","timers","rests"]:
+				if not row.biter.has(key) or row.biter[key].size()!=count: return false
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
@@ -85,11 +90,21 @@ func apply_frame(frame: Dictionary) -> bool:
 	if not _valid(frame): return false
 	var begin := Time.get_ticks_usec()
 	for batch: InstanceBatch in batches.values(): batch.begin()
+	for display: Node in enemy_frames.values(): display.begin()
 	for node: Sprite2D in parts.values(): node.hide()
 	for line in _lines: line.hide()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	for row: Dictionary in rows:
+		if visuals[row.visual_id].role==6:
+			if not enemy_frames.has(row.visual_id):
+				var display = preload("res://scripts/render/run_enemy_frame.gd").new()
+				add_child(display)
+				display.setup(_scope,visuals[row.visual_id])
+				display.begin()
+				enemy_frames[row.visual_id] = display
+			enemy_frames[row.visual_id].apply_frame(row)
+			continue
 		var batch := _batch(row.visual_id,row.layer)
 		if batch.get_parent()!=_layer(row.layer): batch.reparent(_layer(row.layer))
 		batch.get_parent().move_child(batch,-1)
@@ -99,6 +114,7 @@ func apply_frame(frame: Dictionary) -> bool:
 				(batch as PixelPainter).bolt(Vector2(row.transforms[n+4],row.transforms[n+5]),atan2(row.transforms[n+1],row.transforms[n]),17,2)
 		else: batch.apply_frame(row.transforms,row.colors)
 	for batch: InstanceBatch in batches.values(): batch.end()
+	for display: Node in enemy_frames.values(): display.end()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		for i in row.widths.size():

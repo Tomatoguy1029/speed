@@ -282,7 +282,7 @@ inline bool read(BinaryReader &input, DefinitionIndex &out) {
     if (out.enemy < 1) return false;
     return true;
 }
-struct ChaseDefinition {
+struct EnemyRecord {
     uint32_t id{};
     double hp{};
     double armor{};
@@ -319,8 +319,10 @@ struct ChaseDefinition {
     uint32_t visual_id{};
     double sprite_scale{};
     double sprite_angle{};
+    uint32_t kind{};
+    double turn{};
 };
-inline bool read(BinaryReader &input, ChaseDefinition &out) {
+inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_f64(out.hp)) return false;
@@ -379,6 +381,10 @@ inline bool read(BinaryReader &input, ChaseDefinition &out) {
     if (!input.read_f64(out.sprite_scale)) return false;
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 2) return false;
+    if (!input.read_f64(out.turn)) return false;
+    if (out.turn < 0) return false;
     return true;
 }
 struct LoadoutDefinition {
@@ -452,7 +458,7 @@ inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 5) return false;
+    if (out.role > 6) return false;
     if (!input.read_string(out.path)) return false;
     return true;
 }
@@ -486,11 +492,43 @@ inline bool read(BinaryReader &input, ForwardDefinition &out) {
     if (!input.read_u32(out.pierce)) return false;
     return true;
 }
+struct BiteDefinition {
+    uint32_t id{};
+    double reach{};
+    double warn{};
+    double rest{};
+    double radius{};
+    double damage{};
+    double duration{};
+    std::string scene{};
+    bool hit{};
+    bool fade{};
+};
+inline bool read(BinaryReader &input, BiteDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.reach)) return false;
+    if (out.reach < 0) return false;
+    if (!input.read_f64(out.warn)) return false;
+    if (out.warn < 0) return false;
+    if (!input.read_f64(out.rest)) return false;
+    if (out.rest < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (out.duration < 0) return false;
+    if (!input.read_string(out.scene)) return false;
+    if (!input.read_bool(out.hit)) return false;
+    if (!input.read_bool(out.fade)) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
     std::vector<DefinitionIndex> DefinitionIndex_rows;
-    std::vector<ChaseDefinition> ChaseDefinition_rows;
+    std::vector<EnemyRecord> EnemyRecord_rows;
     std::vector<LoadoutDefinition> LoadoutDefinition_rows;
     std::vector<HeroDefinition> HeroDefinition_rows;
     std::vector<FieldDefinition> FieldDefinition_rows;
@@ -500,6 +538,7 @@ struct ContentRecords {
     std::vector<TechniqueDefinition> TechniqueDefinition_rows;
     std::vector<ResourceKey> ResourceKey_rows;
     std::vector<ForwardDefinition> ForwardDefinition_rows;
+    std::vector<BiteDefinition> BiteDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -522,9 +561,9 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 3) return false;
-        if (count > input.remaining()/224) return false;
-        for (uint32_t i=0; i<count; ++i) { ChaseDefinition row; if (!read(input,row)) return false; out.ChaseDefinition_rows.push_back(std::move(row)); }
+        if (version != 4) return false;
+        if (count > input.remaining()/236) return false;
+        for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 5: {
@@ -576,7 +615,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 2) return false;
+        if (version != 3) return false;
         if (count > input.remaining()/12) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -585,6 +624,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/56) return false;
         for (uint32_t i=0; i<count; ++i) { ForwardDefinition row; if (!read(input,row)) return false; out.ForwardDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 14: {
+        if (version != 1) return false;
+        if (count > input.remaining()/58) return false;
+        for (uint32_t i=0; i<count; ++i) { BiteDefinition row; if (!read(input,row)) return false; out.BiteDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -597,8 +642,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.StringEntry_rows) if (!StringEntry_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DefinitionIndex_ids;
     for (const auto &row:data.DefinitionIndex_rows) if (!DefinitionIndex_ids.insert(row.id).second) return false;
-    std::unordered_set<uint32_t> ChaseDefinition_ids;
-    for (const auto &row:data.ChaseDefinition_rows) if (!ChaseDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> EnemyRecord_ids;
+    for (const auto &row:data.EnemyRecord_rows) if (!EnemyRecord_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LoadoutDefinition_ids;
     for (const auto &row:data.LoadoutDefinition_rows) if (!LoadoutDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HeroDefinition_ids;
@@ -617,16 +662,19 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ResourceKey_rows) if (!ResourceKey_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ForwardDefinition_ids;
     for (const auto &row:data.ForwardDefinition_rows) if (!ForwardDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BiteDefinition_ids;
+    for (const auto &row:data.BiteDefinition_rows) if (!BiteDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.coin_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.cannon_visual)) return false;
     for (const auto &row:data.DefinitionIndex_rows) if (!StringEntry_ids.count(row.id)) return false;
-    for (const auto &row:data.DefinitionIndex_rows) if (!ChaseDefinition_ids.count(row.enemy)) return false;
-    for (const auto &row:data.ChaseDefinition_rows) if (!StringEntry_ids.count(row.id)) return false;
-    for (const auto &row:data.ChaseDefinition_rows) if (!ResourceKey_ids.count(row.visual_id)) return false;
+    for (const auto &row:data.DefinitionIndex_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.EnemyRecord_rows) if (!StringEntry_ids.count(row.id)) return false;
+    for (const auto &row:data.EnemyRecord_rows) if (!ResourceKey_ids.count(row.visual_id)) return false;
     for (const auto &row:data.ForwardDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.BiteDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -706,7 +754,7 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.projectile_config.debris_knock=config.debris_knock;
     state.projectile_config.trail_points=config.trail_points;
 }
-inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringName &id) {
+inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {
     EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;
     out.hp=row.hp;
     out.armor=row.armor;
@@ -743,7 +791,9 @@ inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringN
     out.visual_id=row.visual_id;
     out.sprite_scale=row.sprite_scale;
     out.sprite_angle=row.sprite_angle;
+    out.turn=row.turn;
+    out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=13;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=14;
 }

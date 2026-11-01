@@ -42,7 +42,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     if (end!=uint64_t(bytes.size()) || !validate_references(records) || records.RunConfig_rows.size()!=1 ||
         records.RunConfig_rows[0].aim_lag<=0 || records.RunConfig_rows[0].aim_speed<=0 ||
-        records.DefinitionIndex_rows.size()!=records.ChaseDefinition_rows.size()) return {};
+        records.DefinitionIndex_rows.size()!=records.EnemyRecord_rows.size()) return {};
     auto bundle=std::make_shared<ContentBundle>();
     std::copy(bytes.ptr()+24,bytes.ptr()+56,bundle->input_sha256.begin());
     std::copy(bytes.ptr()+56,bytes.ptr()+88,bundle->payload_sha256.begin());
@@ -51,6 +51,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->crystal_values={records.RunConfig_rows[0].crystal_low,records.RunConfig_rows[0].crystal_mid,records.RunConfig_rows[0].crystal_high};
     bundle->visuals=records.ResourceKey_rows;
     bundle->forward_levels=records.ForwardDefinition_rows;
+    bundle->bites=records.BiteDefinition_rows;
+    for (const auto &bite:bundle->bites) {
+        const auto &first=bundle->bites.front();
+        if (bite.duration!=first.duration || bite.scene!=first.scene || bite.hit!=first.hit || bite.fade!=first.fade) return {};
+    }
     if (records.LoadoutDefinition_rows.size()!=1 || records.LoadoutDefinition_rows[0].id!=1 ||
         records.LoadoutDefinition_rows[0].kind!=0 || bundle->forward_levels.size()!=records.LoadoutDefinition_rows[0].maximum_level) return {};
     for (size_t i=0;i<bundle->forward_levels.size();++i) {
@@ -58,15 +63,22 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
     }
     for (const auto &visual:bundle->visuals) {
-        if (visual.role>5 || (visual.path.empty() && visual.role!=2 && visual.role!=4)) return {};
+        if (visual.role>6 || (visual.path.empty() && visual.role!=2 && visual.role!=4)) return {};
     }
     std::unordered_set<std::string> names;
-    for (const auto &row:records.ChaseDefinition_rows) {
+    for (const auto &row:records.EnemyRecord_rows) {
         auto string=std::find_if(records.StringEntry_rows.begin(),records.StringEntry_rows.end(),[&](const auto &s){return s.id==row.id;});
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        bundle->definitions.push_back(to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size())));
+        if (row.kind!=0 && row.kind!=2) return {};
+        auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
+        const auto bite=std::find_if(bundle->bites.begin(),bundle->bites.end(),[&](const auto &b){return b.id==row.id;});
+        if (row.kind==2) {
+            if (bite==bundle->bites.end() || bite->warn<=0 || bite->duration<=0 || bite->scene.empty()) return {};
+            definition.bite={bite->reach,bite->warn,bite->rest,bite->radius,bite->damage};
+        } else if (bite!=bundle->bites.end()) return {};
+        bundle->definitions.push_back(std::move(definition));
     }
     return bundle;
 }

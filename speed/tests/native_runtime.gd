@@ -151,10 +151,10 @@ func check_schema() -> bool:
 	var core = comparison.create_native()
 	check(not bytes.is_empty() and core.configure_content(bytes), "共通スキーマの生成物をC++が読める")
 	var bad: Dictionary = data.duplicate(true)
-	bad.ChaseDefinition[0].extra = 1
+	bad.EnemyRecord[0].extra = 1
 	check(schema.write_content(bad, signature).is_empty(), "未登録フィールドを生成時に拒否する")
 	bad = data.duplicate(true)
-	bad.ChaseDefinition[0].hp = NAN
+	bad.EnemyRecord[0].hp = NAN
 	check(schema.write_content(bad, signature).is_empty(), "非有限値を生成時に拒否する")
 	bad = data.duplicate(true)
 	bad.DefinitionIndex[0].enemy = 99
@@ -183,7 +183,7 @@ func check_schema() -> bool:
 	var id: int = core.spawn_enemy(definition.id,Vector2.ZERO,{})
 	check(id>0 and core.step(0.1), "Resourceから生成した追跡敵を更新できる")
 	var row: Dictionary = core.enemies_snapshot()[0]
-	check(row.pos[0]>0 and row.hp==data.ChaseDefinition[0].hp, "移植したHPと移動速度が実行へ反映する")
+	check(row.pos[0]>0 and row.hp==data.EnemyRecord[0].hp, "移植したHPと移動速度が実行へ反映する")
 	core.close()
 	return true
 
