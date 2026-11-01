@@ -111,7 +111,8 @@ func on_enemy_killed(i: int) -> void:
 			else:
 				drop_crystal(t.pos[i], kind, &"enemy", t.type[i], t.id[i])
 			index += 1
-	if scattered and count > 0: state.emit(&"gem_burst", {"pos": t.pos[i], "r": t.r[i]})
+	if scattered and count > 0 and t.type[i] != &"splitter":
+		state.emit(&"gem_burst", {"pos": t.pos[i], "r": t.r[i]})
 	if reward.gold_eligible:
 		_gold_eligible += 1
 		var won := state.rng.randf() < cfg.strong_gold_chance
