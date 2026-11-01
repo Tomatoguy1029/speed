@@ -2,6 +2,7 @@
 #include "../state/run_state.h"
 #include "../content/content_bundle.h"
 #include <memory>
+#include "../systems/combat_hooks.h"
 
 namespace speed {
 struct RunWorkspace {
@@ -13,6 +14,7 @@ public:
     godot::RunState state;
     std::shared_ptr<const ContentBundle> content = std::make_shared<const ContentBundle>();
     RunWorkspace workspace;
+    CombatHooks combat_hooks;
     int64_t epoch=1;
     int64_t api_run_id=0, last_command_id=0;
     bool api_configured=false, api_development=false, busy=false;

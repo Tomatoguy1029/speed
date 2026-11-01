@@ -57,6 +57,32 @@ struct RunConfig {
     uint32_t world_tick_div{};
     double grid_cell{};
     double time_limit{};
+    double combat_base_attack{};
+    double combat_atk_scale{};
+    double combat_ram_speed_ratio{};
+    double combat_crit_armor{};
+    double combat_touch_damage{};
+    double combat_contact_cooldown{};
+    double combat_bounce_keep{};
+    double combat_bounce_min_speed{};
+    double combat_kill_hitstop{};
+    double combat_kill_hitstop_cap{};
+    double combat_kill_hitstop_regen{};
+    double combat_hitstop_big_mult{};
+    double combat_hitstop_crit_mult{};
+    double combat_max_enemy_radius{};
+    double combat_attack_mult{};
+    double combat_crit_chance{};
+    double combat_crit_mult{};
+    bool combat_ready{};
+    bool pickups_ready{};
+    int64_t gem_max{};
+    double strong_gold_chance{};
+    double coin_radius{};
+    double pickup_xp_mult{};
+    double pickup_speed_mult{};
+    double pickup_xp_radius{};
+    bool fixed_rewards{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -160,6 +186,55 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_f64(out.grid_cell)) return false;
     if (out.grid_cell < 0) return false;
     if (!input.read_f64(out.time_limit)) return false;
+    if (!input.read_f64(out.combat_base_attack)) return false;
+    if (out.combat_base_attack < 0) return false;
+    if (!input.read_f64(out.combat_atk_scale)) return false;
+    if (out.combat_atk_scale < 0) return false;
+    if (!input.read_f64(out.combat_ram_speed_ratio)) return false;
+    if (out.combat_ram_speed_ratio < 0) return false;
+    if (!input.read_f64(out.combat_crit_armor)) return false;
+    if (out.combat_crit_armor < 0) return false;
+    if (!input.read_f64(out.combat_touch_damage)) return false;
+    if (out.combat_touch_damage < 0) return false;
+    if (!input.read_f64(out.combat_contact_cooldown)) return false;
+    if (out.combat_contact_cooldown < 0) return false;
+    if (!input.read_f64(out.combat_bounce_keep)) return false;
+    if (out.combat_bounce_keep < 0) return false;
+    if (!input.read_f64(out.combat_bounce_min_speed)) return false;
+    if (out.combat_bounce_min_speed < 0) return false;
+    if (!input.read_f64(out.combat_kill_hitstop)) return false;
+    if (out.combat_kill_hitstop < 0) return false;
+    if (!input.read_f64(out.combat_kill_hitstop_cap)) return false;
+    if (out.combat_kill_hitstop_cap < 0) return false;
+    if (!input.read_f64(out.combat_kill_hitstop_regen)) return false;
+    if (out.combat_kill_hitstop_regen < 0) return false;
+    if (!input.read_f64(out.combat_hitstop_big_mult)) return false;
+    if (out.combat_hitstop_big_mult < 0) return false;
+    if (!input.read_f64(out.combat_hitstop_crit_mult)) return false;
+    if (out.combat_hitstop_crit_mult < 0) return false;
+    if (!input.read_f64(out.combat_max_enemy_radius)) return false;
+    if (out.combat_max_enemy_radius < 0) return false;
+    if (!input.read_f64(out.combat_attack_mult)) return false;
+    if (out.combat_attack_mult < 0) return false;
+    if (!input.read_f64(out.combat_crit_chance)) return false;
+    if (out.combat_crit_chance < 0) return false;
+    if (!input.read_f64(out.combat_crit_mult)) return false;
+    if (out.combat_crit_mult < 0) return false;
+    if (!input.read_bool(out.combat_ready)) return false;
+    if (!input.read_bool(out.pickups_ready)) return false;
+    if (!input.read_i64(out.gem_max)) return false;
+    if (out.gem_max < 1) return false;
+    if (!input.read_f64(out.strong_gold_chance)) return false;
+    if (out.strong_gold_chance < 0) return false;
+    if (!input.read_f64(out.coin_radius)) return false;
+    if (out.coin_radius < 0) return false;
+    if (!input.read_f64(out.pickup_xp_mult)) return false;
+    if (out.pickup_xp_mult < 0) return false;
+    if (!input.read_f64(out.pickup_speed_mult)) return false;
+    if (out.pickup_speed_mult < 0) return false;
+    if (!input.read_f64(out.pickup_xp_radius)) return false;
+    if (out.pickup_xp_radius < 0) return false;
+    if (!input.read_bool(out.fixed_rewards)) return false;
     return true;
 }
 struct StringEntry {
@@ -356,8 +431,8 @@ struct ContentRecords {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 4) return false;
-        if (count > input.remaining()/400) return false;
+        if (version != 5) return false;
+        if (count > input.remaining()/587) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -514,6 +589,32 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.control.world_tick_div=config.world_tick_div;
     state.frame_grid_cell=config.grid_cell;
     state.control.time_limit=config.time_limit;
+    state.combat_config.base_attack=config.combat_base_attack;
+    state.combat_config.atk_scale=config.combat_atk_scale;
+    state.combat_config.ram_speed_ratio=config.combat_ram_speed_ratio;
+    state.combat_config.crit_armor=config.combat_crit_armor;
+    state.combat_config.touch_damage=config.combat_touch_damage;
+    state.combat_config.contact_cooldown=config.combat_contact_cooldown;
+    state.combat_config.bounce_keep=config.combat_bounce_keep;
+    state.combat_config.bounce_min_speed=config.combat_bounce_min_speed;
+    state.combat_config.kill_hitstop=config.combat_kill_hitstop;
+    state.combat_config.kill_hitstop_cap=config.combat_kill_hitstop_cap;
+    state.combat_config.kill_hitstop_regen=config.combat_kill_hitstop_regen;
+    state.combat_config.hitstop_big_mult=config.combat_hitstop_big_mult;
+    state.combat_config.hitstop_crit_mult=config.combat_hitstop_crit_mult;
+    state.combat_config.max_enemy_radius=config.combat_max_enemy_radius;
+    state.combat_config.attack_mult=config.combat_attack_mult;
+    state.combat_config.crit_chance=config.combat_crit_chance;
+    state.combat_config.crit_mult=config.combat_crit_mult;
+    state.combat_ready=config.combat_ready;
+    state.pickups_ready=config.pickups_ready;
+    state.pickup_config.gem_max=config.gem_max;
+    state.pickup_config.strong_gold_chance=config.strong_gold_chance;
+    state.pickup_config.coin_radius=config.coin_radius;
+    state.pickup_config.xp_mult=config.pickup_xp_mult;
+    state.pickup_config.speed_mult=config.pickup_speed_mult;
+    state.pickup_config.xp_radius=config.pickup_xp_radius;
+    state.pickup_config.fixed_rewards=config.fixed_rewards;
 }
 inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringName &id) {
     EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;

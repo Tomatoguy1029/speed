@@ -81,7 +81,7 @@ int64_t CheckpointStore::hold(const RunRuntime &runtime) {
     checkpoint->state=clone_state(runtime.state);
     if (!rebuild_state_indexes(checkpoint->state,*checkpoint->content)) return 0;
     // 配信済みの音・結果や、外部の要求を再発行しない。
-    checkpoint->state.events.clear();checkpoint->state.collections.clear();
+    checkpoint->state.events.clear();checkpoint->state.combat_events.clear();checkpoint->state.collections.clear();
     checkpoint->state.progression.resource_requests.clear();
     const int64_t id=next_checkpoint_id++;
     checkpoints.emplace(id,std::move(checkpoint));return id;

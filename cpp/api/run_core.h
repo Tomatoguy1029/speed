@@ -23,6 +23,7 @@ class SpeedRunCore : public RefCounted {
     GDCLASS(SpeedRunCore, RefCounted)
     speed::RunRuntime runtime;
     friend class speed::RunRunner;
+    Dictionary development_combat_command(const String &kind,const Dictionary &payload);
     bool step_ship_input(double real_dt,double world_dt,const speed::InputFrame &input);
     bool handle_draw_input(const speed::InputFrame &input,int64_t clock_msec,double camera_zoom);
     using EnemyMode = RunState::EnemyMode;
@@ -80,8 +81,6 @@ class SpeedRunCore : public RefCounted {
     void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock = 160.0, const Vector2 *impact = nullptr);
     bool blocks_front(size_t row, Vector2 hit, Vector2 direction) const;
     void collect_pickup(StringName kind, double value = 0);
-    void drop_enemy_pickups(const Enemy &enemy);
-    void drop_gem(Vector2 position, double value);
     size_t add_friend(Friendly shot);
     void duplicate_friend(size_t source, Vector2 impact);
     void end_bite_visual(bool hit, Vector2 at);

@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--combat-only" in OS.get_cmdline_user_args():
+		check(check_run_combat(), "共通戦闘の固定場面を最後まで確認する")
+		print("[run_combat] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--clock-only" in OS.get_cmdline_user_args():
 		check(check_run_clock(), "時計と世界更新の確認が最後まで完了する")
 		print("[run_clock] failed=%d" % failed)
@@ -418,4 +423,80 @@ func check_run_clock() -> bool:
 		if children.size()==2:
 			check(absf(children[0].age-(dt if reuse else 2*dt))<1e-6 and absf(children[1].age-2*dt)<1e-6, "後ろへ足した行と通過済み空き行の再利用を区別する")
 		shots.dispose()
+	return true
+
+func combat_fixture(hp := 100.0, armor := 0.0):
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.kill_hitstop = 0.0
+	config.ram_speed_ratio = 0.0
+	config.strong_gold_chance = 0.0
+	config.base_attack = 10.0
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.stage_hp = hp
+	definition.xp_reward_counts = PackedInt32Array([1,0,0])
+	definition.armor = armor
+	definition.speed = 0.0
+	return clock_fixture(config,definition)
+
+func combat_enemy(bridge, position := Vector2(100,0)) -> int:
+	var spawn: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":position})
+	check(spawn.ok, "戦闘の固定対象を出す")
+	return int(spawn.value) if spawn.ok else 0
+
+func check_run_combat() -> bool:
+	var bridge = combat_fixture()
+	var id: int = combat_enemy(bridge)
+	for guard in ["controls_locked","encounter_protected"]:
+		check(bridge._core.set_run_guards({guard:true}), "保護を有効にする")
+		var hit: Dictionary = bridge.command("dev_damage",{"entity_id":id,"amount":200.0})
+		var kill: Dictionary = bridge.command("dev_kill",{"entity_id":id})
+		check(hit.ok and hit.value.reason==guard and hit.value.applied==0.0 and not kill.value.killed, "保護は通常命中と直接撃破の両方を止める")
+		bridge._core.set_run_guards({guard:false})
+	check(bridge.command("dev_enemy_combat",{"entity_id":id,"guard":1.0}).ok, "敵自身の保護を設定する")
+	check(bridge.command("dev_kill",{"entity_id":id}).value.reason=="guard", "直接撃破も敵の保護を読む")
+	bridge.command("dev_enemy_combat",{"entity_id":id,"guard":0.0})
+	var part: int = combat_enemy(bridge,Vector2(150,0))
+	check(bridge.command("dev_enemy_combat",{"entity_id":part,"damage_target":id}).ok, "HPを共有する部位を設定する")
+	var transferred: Dictionary = bridge.command("dev_damage",{"entity_id":part,"amount":30.0}).value
+	check(transferred.struck_id==part and transferred.target_id==id and transferred.applied==30.0, "当たった部位とHP転送先を両方残す")
+	check(bridge._core.enemies_snapshot()[0].hp==70.0 and bridge._core.enemies_snapshot()[1].hp==100.0, "共有先だけのHPを減らす")
+	var dead: Dictionary = bridge.command("dev_damage",{"entity_id":part,"amount":90.0}).value
+	check(dead.killed and dead.applied==70.0 and dead.overkill==20.0, "実際のHP減少と過剰な量を分ける")
+	var count: int = bridge._core.pickups_snapshot().gems.size()
+	var supplied: float = bridge._core.pickups_snapshot().xp_dropped
+	check(count>0 and supplied>0.0, "通常入口から撃破報酬を生成する")
+	check(not bridge.command("dev_kill",{"entity_id":id}).value.killed and bridge._core.combat_snapshot().kills==1, "同tickの二重撃破を拒否する")
+	check(bridge._core.pickups_snapshot().gems.size()==count and bridge._core.pickups_snapshot().xp_dropped==supplied, "二度目の撃破は供給を増やさない")
+	var trace: Array = bridge.read_frame().value.events
+	check(trace.any(func(e): return e.get("type")==&"combat_damage" and e.get("struck_id")==part and e.get("target_id")==id and e.get("applied")==70.0), "転送と実ダメージを観測へ残す")
+	clock_step(bridge)
+	check(bridge._core.enemies_snapshot().size()==1 and not bridge._core.valid_enemy_handle(PackedInt64Array([0,1])), "撃破した行を所定のcleanupで回収する")
+	var before: int = bridge._core.combat_snapshot().kills
+	check(bridge.command("dev_remove",{"entity_id":part}).ok and bridge._core.combat_snapshot().kills==before and bridge._core.pickups_snapshot().xp_dropped==supplied, "退場は撃破数と報酬を増やさない")
+	bridge.dispose()
+	for armor in [0.0,100000.0]:
+		var contact = combat_fixture(100.0,armor)
+		var ship: Vector2 = contact.read_frame().value.ui.ship.ship_pos
+		var boundary: int = combat_enemy(contact,ship+Vector2(100,0))
+		var row: Dictionary = contact._core.enemies_snapshot()[0]
+		var radius: float = 100.0-float(row.radius)
+		check(radius>=0.0, "境界場面の半径を構成する")
+		var bounced: bool = contact._core.collide_ship(ship,radius)
+		check(bounced==(armor>0.0), "境界ちょうどの接触でも装甲を判定する")
+		var hit_events: Array = contact._core.drain_events()
+		check(hit_events.any(func(e): return e.get("type")==&"hit" and e.get("id")==boundary), "境界接触を命中通知へ届ける")
+		contact.dispose()
+	var ship_run = combat_fixture()
+	var hp: float = ship_run.read_frame().value.ui.ship.ship_hp
+	ship_run._core.set_run_guards({"encounter_protected":true})
+	var rejected: Dictionary = ship_run.command("dev_ship_damage",{"amount":2.0,"cause":"shot"}).value
+	check(not rejected.accepted and rejected.reason=="encounter_protected" and rejected.hp_after==hp, "機体の保護中の被弾も拒否理由を残す")
+	ship_run._core.set_run_guards({"encounter_protected":false})
+	var accepted: Dictionary = ship_run.command("dev_ship_damage",{"amount":2.0,"cause":"shot"}).value
+	check(accepted.accepted and accepted.hp_after==hp-2.0, "機体のHPを共通窓口で減らす")
+	var repeated: Dictionary = ship_run.command("dev_ship_damage",{"amount":2.0,"cause":"shot"}).value
+	check(not repeated.accepted and repeated.reason=="invulnerability", "被弾後の無敵を二重に通らない")
+	trace = ship_run.read_frame().value.events
+	check(trace.filter(func(e): return e.get("type")==&"combat_player_damage").size()==3, "受理と拒否の全試行を記録する")
+	ship_run.dispose()
 	return true

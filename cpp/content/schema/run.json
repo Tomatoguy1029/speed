@@ -350,9 +350,188 @@
           "type": "f64",
           "value": -1,
           "runtime": "control.time_limit"
+        },
+        {
+          "name": "combat_base_attack",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.base_attack",
+          "config": "base_attack"
+        },
+        {
+          "name": "combat_atk_scale",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.atk_scale",
+          "config": "atk_scale"
+        },
+        {
+          "name": "combat_ram_speed_ratio",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.ram_speed_ratio",
+          "config": "ram_speed_ratio"
+        },
+        {
+          "name": "combat_crit_armor",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.crit_armor",
+          "config": "crit_armor"
+        },
+        {
+          "name": "combat_touch_damage",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.touch_damage",
+          "config": "touch_damage"
+        },
+        {
+          "name": "combat_contact_cooldown",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.contact_cooldown",
+          "config": "contact_cooldown"
+        },
+        {
+          "name": "combat_bounce_keep",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.bounce_keep",
+          "config": "bounce_keep"
+        },
+        {
+          "name": "combat_bounce_min_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.bounce_min_speed",
+          "config": "bounce_min_speed"
+        },
+        {
+          "name": "combat_kill_hitstop",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.kill_hitstop",
+          "config": "kill_hitstop"
+        },
+        {
+          "name": "combat_kill_hitstop_cap",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.kill_hitstop_cap",
+          "config": "kill_hitstop_cap"
+        },
+        {
+          "name": "combat_kill_hitstop_regen",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.kill_hitstop_regen",
+          "config": "kill_hitstop_regen"
+        },
+        {
+          "name": "combat_hitstop_big_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.hitstop_big_mult",
+          "config": "hitstop_big_mult"
+        },
+        {
+          "name": "combat_hitstop_crit_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.hitstop_crit_mult",
+          "config": "hitstop_crit_mult"
+        },
+        {
+          "name": "combat_max_enemy_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.max_enemy_radius",
+          "config": "max_enemy_radius"
+        },
+        {
+          "name": "combat_attack_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.attack_mult",
+          "value": 1
+        },
+        {
+          "name": "combat_crit_chance",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.crit_chance",
+          "config": "base_crit_chance"
+        },
+        {
+          "name": "combat_crit_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.crit_mult",
+          "config": "crit_mult"
+        },
+        {
+          "name": "combat_ready",
+          "type": "bool",
+          "runtime": "combat_ready",
+          "value": true
+        },
+        {
+          "name": "pickups_ready",
+          "type": "bool",
+          "runtime": "pickups_ready",
+          "value": true
+        },
+        {
+          "name": "gem_max",
+          "type": "i64",
+          "min": 1,
+          "config": "gem_max",
+          "runtime": "pickup_config.gem_max"
+        },
+        {
+          "name": "strong_gold_chance",
+          "type": "f64",
+          "min": 0,
+          "config": "strong_gold_chance",
+          "runtime": "pickup_config.strong_gold_chance"
+        },
+        {
+          "name": "coin_radius",
+          "type": "f64",
+          "min": 0,
+          "config": "pickup_radius",
+          "runtime": "pickup_config.coin_radius"
+        },
+        {
+          "name": "pickup_xp_mult",
+          "type": "f64",
+          "min": 0,
+          "value": 1,
+          "runtime": "pickup_config.xp_mult"
+        },
+        {
+          "name": "pickup_speed_mult",
+          "type": "f64",
+          "min": 0,
+          "value": 1,
+          "runtime": "pickup_config.speed_mult"
+        },
+        {
+          "name": "pickup_xp_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "pickup_config.xp_radius",
+          "config": "pickup_radius"
+        },
+        {
+          "name": "fixed_rewards",
+          "type": "bool",
+          "value": true,
+          "runtime": "pickup_config.fixed_rewards"
         }
       ],
-      "version": 4
+      "version": 5
     },
     {
       "name": "StringEntry",
@@ -677,5 +856,121 @@
         }
       ]
     }
-  ]
+  ],
+  "enums": {
+    "Cause": [
+      {
+        "name": "None",
+        "value": ""
+      },
+      {
+        "name": "Ram",
+        "value": "ram"
+      },
+      {
+        "name": "Touch",
+        "value": "touch"
+      },
+      {
+        "name": "Bump",
+        "value": "bump"
+      },
+      {
+        "name": "Shot",
+        "value": "shot"
+      },
+      {
+        "name": "Debris",
+        "value": "debris"
+      },
+      {
+        "name": "Fire",
+        "value": "fire"
+      },
+      {
+        "name": "Blast",
+        "value": "blast"
+      },
+      {
+        "name": "Afterimage",
+        "value": "afterimage"
+      },
+      {
+        "name": "FinalStrike",
+        "value": "final_strike"
+      },
+      {
+        "name": "Debug",
+        "value": "debug"
+      },
+      {
+        "name": "Missile",
+        "value": "missile"
+      },
+      {
+        "name": "Homing",
+        "value": "homing"
+      },
+      {
+        "name": "Slash",
+        "value": "slash"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "Chain",
+        "value": "chain"
+      },
+      {
+        "name": "PumpBurst",
+        "value": "pump_burst"
+      },
+      {
+        "name": "Marlin",
+        "value": "marlin"
+      },
+      {
+        "name": "Collapse",
+        "value": "collapse"
+      },
+      {
+        "name": "Rain",
+        "value": "rain"
+      },
+      {
+        "name": "ArrowShower",
+        "value": "arrow_shower"
+      },
+      {
+        "name": "InhaleBite",
+        "value": "inhale_bite"
+      },
+      {
+        "name": "SwordFlash",
+        "value": "sword_flash"
+      },
+      {
+        "name": "HoundLunge",
+        "value": "hound_lunge"
+      },
+      {
+        "name": "Pounce",
+        "value": "pounce"
+      },
+      {
+        "name": "FlameJet",
+        "value": "flame_jet"
+      },
+      {
+        "name": "Bullet",
+        "value": "bullet"
+      },
+      {
+        "name": "Reflected",
+        "value": "reflected"
+      }
+    ]
+  }
 }

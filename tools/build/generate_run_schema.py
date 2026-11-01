@@ -10,7 +10,18 @@ WIDTH = {'u8':1,'u32':4,'u64':8,'i64':8,'f32':4,'f64':8,'bool':1,'string':4}
 
 def generate():
     schema=json.loads((ROOT/'cpp/content/schema/run.json').read_text())
-    assert set(schema)=={'schema_version','format_version','abi_version','records'}
+    assert set(schema)=={'schema_version','format_version','abi_version','records','enums'}
+    enums=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include <cstdint>','#include <string_view>','namespace speed {']
+    for name, entries in schema['enums'].items():
+        assert len({e['name'] for e in entries})==len(entries) and len({e['value'] for e in entries})==len(entries)
+        enums += [f'enum class {name} : uint32_t {{'+','.join(f"{e['name']}={i}" for i,e in enumerate(entries))+',Count};']
+        enums += [f'inline const char *symbol_name({name} value) {{', '    switch(value) {']
+        enums += [f'    case {name}::{e["name"]}: return {json.dumps(e["value"])};' for e in entries]
+        enums += ['    default: return "";','    }','}']
+        enums += [f'inline bool parse_symbol(std::string_view value, {name} &out) {{']
+        enums += [f'    if (value=={json.dumps(e["value"])}) {{out={name}::{e["name"]};return true;}}' for e in entries]
+        enums += ['    return false;','}']
+    enums += ['}']
     records=schema['records']; names={r['name'] for r in records}
     assert len(names)==len(records) and len({r['section'] for r in records})==len(records)
     for record in records:
@@ -56,7 +67,7 @@ def generate():
     cpp+=['    return out;','}',f'inline constexpr uint32_t FORMAT_VERSION={schema["format_version"]}, ABI_VERSION={schema["abi_version"]}, SECTION_COUNT={len(records)};','}']
     gd=['## 共通スキーマから生成。直接編集しない。','extends RefCounted','',f'const SCHEMA = {json.dumps(schema,ensure_ascii=False).replace("false","false").replace("true","true")}']
     gd += [GD_WRITER]
-    return {'cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd)+'\n'}
+    return {'cpp/content/generated/combat_ids.h':'\n'.join(enums)+'\n','cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd)+'\n'}
 
 GD_WRITER = r'''
 static func write_content(data: Dictionary, input_sha256: PackedByteArray) -> PackedByteArray:

@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/enemy_system.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -64,13 +65,7 @@ void SpeedRunCore::prepare_hounds(const std::vector<size_t> &rows) {
         if (e.pursuit_ready) e.pursuit = hound_velocity(row);
     }
 }
-void SpeedRunCore::remove_hound(size_t row) {
-    auto &e = runtime.state.enemies[row]; if (!e.in_pack) return;
-    auto &members = runtime.state.hound_packs[e.pack];
-    members.erase(std::remove(members.begin(), members.end(), row), members.end());
-    if (members.empty()) runtime.state.hound_packs.erase(e.pack);
-    e.in_pack = false; e.pursuit_ready = false; e.follow_ready = false;
-}
+void SpeedRunCore::remove_hound(size_t row) {speed::EnemySystem::leave_hound(runtime.state,row);}
 bool SpeedRunCore::follow_hound(int64_t id, Vector2 goal, double until, double scale) {
     if (!runtime.state.started || runtime.state.closed || !goal.is_finite() || !std::isfinite(until) || !std::isfinite(scale) || scale < 0) return false;
     const auto found = runtime.state.rows_by_id.find(id); if (found == runtime.state.rows_by_id.end()) return false;

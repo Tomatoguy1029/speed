@@ -1,6 +1,7 @@
 #pragma once
 #include "../../native/runtime_data.h"
 #include "entity_store.h"
+#include "combat_types.h"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include "run_control_state.h"
 #include <godot_cpp/variant/dictionary.hpp>
@@ -32,7 +33,9 @@ struct RunState {
         double facing = 0.0, age = 0.0, fire_t = 0.0;
         EnemyMode mode = EnemyMode::Move;
         double timer = 0, charge = 0;
-        bool alive = false, dead = false, elite = false;
+        bool alive = false, dead = false, elite = false, is_boss = false, hull_scattered = false;
+        double guard = 0;
+        speed::EnemyHandle damage_target;
         double hit_cd = 0, flash = 0;
         double stone = 0, knock_t = 0, shove_time = 0;
         Vector2 shove_vel, shove_from;
@@ -44,7 +47,7 @@ struct RunState {
         int64_t dash_seen = -1;
         bool dash_fresh = false;
     };
-    std::vector<Enemy> enemies;
+    std::deque<Enemy> enemies;
     speed::EntityStore<speed::EnemyTag> enemy_handles;
     HashMap<int64_t, std::vector<size_t>> hound_packs;
     bool attack_formation_mode = false;
@@ -152,13 +155,17 @@ struct RunState {
     double hitstop = 0, dash_stop = 0;
     int64_t kills = 0;
     Array events;
+    std::vector<speed::CombatEvent> combat_events;
+    bool boss_dead=false;
     struct PickupConfig {
         int64_t gem_max = 0;
+        bool fixed_rewards=false;
+        double strong_gold_chance=0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;
         double xp_radius = 0, coin_radius = 0, speed_mult = 1;
         std::vector<double> xp, start_weights, end_weights;
     } pickup_config;
-    struct Gem { Vector2 pos; double value = 0; int64_t seq = 0; bool alive = false, pulled = false; };
+    struct Gem { Vector2 pos; double value = 0; int64_t seq = 0; bool alive = false, pulled = false; uint8_t kind=0; };
     struct Coin { Vector2 pos; bool alive = true, pulled = false; };
     std::vector<Gem> gems;
     std::vector<Coin> coins;
@@ -168,6 +175,7 @@ struct RunState {
     size_t gem_queue_head = 0;
     int64_t next_gem_seq = 0, live_gems = 0;
     double xp_dropped = 0;
+    int64_t gem_absorber=-1,gem_absorber_seq=-1;
     bool pickups_ready = false;
     struct Friendly {
         bool alive = true, pierce = false, no_crit = false;

@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../runtime/run_runner.h"
+#include "../output/event_builder.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <climits>
@@ -73,6 +74,7 @@ Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,co
     if (!size.is_finite() || size.x<=0 || size.y<=0) return failure(1,"logical_size","論理サイズは有限の正数にしてください");
     if (runtime.state.control.tick==INT64_MAX || runtime.state.control.revision==INT64_MAX) return failure(9,"tick","更新番号が上限です");
     if (!speed::RunRunner::step_play(*this,1.0/120.0,input,size)) return failure(8,"step","更新の整合を確認してください");
+    speed::EventBuilder::flush_combat(runtime);
     ++runtime.state.control.tick;++runtime.state.control.revision;return success(progress(runtime));
 }
 Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
@@ -108,7 +110,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         const bool removed=remove_enemy(int64_t(payload["entity_id"]));
         if (removed) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=removed?success():failure(5,"entity_id","対象がありません");
-    } else response=failure(1,"kind/payload","未登録の命令または引数です");
+    } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat") response=development_combat_command(kind,payload);
+    else response=failure(1,"kind/payload","未登録の命令または引数です");
     if (bool(response["ok"])) ++runtime.state.control.revision;
     runtime.last_command_id=id;runtime.last_command_response=response.duplicate(true);return response;
 }

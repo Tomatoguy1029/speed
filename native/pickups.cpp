@@ -41,63 +41,6 @@ bool SpeedRunCore::configure_pickups(const Dictionary &config, const Dictionary 
     return true;
 }
 
-void SpeedRunCore::drop_gem(Vector2 position, double value) {
-    if (runtime.state.live_gems > runtime.state.pickup_config.gem_max) {
-        while (runtime.state.gem_queue_head < runtime.state.gem_queue.size()) {
-            const auto entry = runtime.state.gem_queue[runtime.state.gem_queue_head++];
-            auto &old = runtime.state.gems[entry.first];
-            if (old.alive && old.seq == entry.second) {
-                value += old.value;
-                old.alive = false;
-                runtime.state.free_gems.push_back(entry.first);
-                --runtime.state.live_gems;
-                break;
-            }
-        }
-        if (runtime.state.gem_queue_head >= 1024 && runtime.state.gem_queue_head * 2 >= runtime.state.gem_queue.size()) {
-            runtime.state.gem_queue.erase(runtime.state.gem_queue.begin(), runtime.state.gem_queue.begin() + runtime.state.gem_queue_head);
-            runtime.state.gem_queue_head = 0;
-        }
-    }
-    const double angle = runtime.state.control.rng.randf() * (2.0 * godot::Math::PI);
-    const Vector2 at = position + Vector2::from_angle(angle) * 8.0;
-    size_t row = runtime.state.gems.size();
-    if (runtime.state.free_gems.empty()) runtime.state.gems.emplace_back();
-    else { row = runtime.state.free_gems.back(); runtime.state.free_gems.pop_back(); }
-    runtime.state.gems[row] = {at, value, runtime.state.next_gem_seq, true, false};
-    runtime.state.gem_queue.push_back({row, runtime.state.next_gem_seq++});
-    ++runtime.state.live_gems;
-}
-
-void SpeedRunCore::drop_enemy_pickups(const Enemy &enemy) {
-    const auto &c = runtime.state.pickup_config;
-    const double value = enemy.xp * c.xp_mult * (c.xp_bonus > 0 ? c.xp_bonus : 1.0);
-    runtime.state.xp_dropped += value;
-    drop_gem(enemy.pos, value);
-    const int64_t coin_count = enemy.elite ? 3 + runtime.state.control.rng.randi_range(0, 3).value() : (runtime.state.control.rng.randf() < 0.03 ? 1 : 0);
-    for (int64_t k = 0; k < coin_count; ++k) {
-        const double angle = runtime.state.control.rng.randf() * (2.0 * godot::Math::PI);
-        const double share = runtime.state.control.rng.randf();
-        const Coin coin{enemy.pos + Vector2::from_angle(angle) * share * enemy.radius, true, false};
-        if (runtime.state.free_coins.empty()) runtime.state.coins.push_back(coin);
-        else { runtime.state.coins[runtime.state.free_coins.back()] = coin; runtime.state.free_coins.pop_back(); }
-    }
-    if (runtime.state.control.rng.randf() < std::min(c.drop_max, c.drop_base * std::pow(enemy.xp, c.drop_power))) {
-        const double fraction = std::clamp(runtime.state.time / c.shift_time, 0.0, 1.0);
-        std::vector<float> weights;
-        double total = 0;
-        for (size_t k = 0; k < c.xp.size(); ++k) {
-            const double weight = Math::lerp(c.start_weights[k], c.end_weights[k], fraction);
-            weights.push_back(weight); total += weight;
-        }
-        double roll = runtime.state.control.rng.randf() * total;
-        size_t tier = weights.size() - 1;
-        for (size_t k = 0; k < weights.size(); ++k) { roll -= weights[k]; if (roll < 0) { tier = k; break; } }
-        runtime.state.xp_dropped += c.xp[tier];
-        drop_gem(enemy.pos, c.xp[tier]);
-    }
-}
-
 Dictionary SpeedRunCore::pickups_snapshot() const {
     Array visible_gems, visible_coins;
     for (const auto &gem : runtime.state.gems) if (gem.alive) {

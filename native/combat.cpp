@@ -1,5 +1,7 @@
 #include "run_core.h"
 #include "geometry.h"
+#include "../cpp/systems/combat_resolver.h"
+#include "../cpp/output/event_builder.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -23,8 +25,8 @@ bool SpeedRunCore::configure_combat(const Dictionary &config, const Dictionary &
     return true;
 }
 
-void SpeedRunCore::emit_event(StringName type, Dictionary data) { data["type"] = type; runtime.state.events.append(data); }
-Array SpeedRunCore::drain_events() { Array out = runtime.state.events; runtime.state.events = Array(); return out; }
+void SpeedRunCore::emit_event(StringName type, Dictionary data) { speed::EventBuilder::flush_combat(runtime); data["type"] = type; runtime.state.events.append(data); }
+Array SpeedRunCore::drain_events() { speed::EventBuilder::flush_combat(runtime); Array out = runtime.state.events; runtime.state.events = Array(); return out; }
 Dictionary SpeedRunCore::combat_snapshot() const {
     Dictionary out; out["hitstop"] = runtime.state.hitstop; out["dash_stop"] = runtime.state.dash_stop; out["kills"] = runtime.state.kills; return out;
 }
@@ -48,67 +50,24 @@ static double angle_difference(double target, double current) {
 }
 
 bool SpeedRunCore::blocks_front(size_t row, Vector2 hit, Vector2 direction) const {
-    const auto &enemy = runtime.state.enemies[row];
-    const auto &def = runtime.content->definitions[enemy.definition];
-    if (def.kind != speed::EnemyDefinition::Kind::Shield || enemy.stone > 0) return false;
-    Vector2 toward = hit - enemy.pos;
-    if (toward.length_squared() < 0.01) toward = -direction;
-    return toward.length_squared() > 0 && std::abs(angle_difference(toward.angle(), enemy.facing)) <= def.front_arc;
+    speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(row));
+    request.impact=hit;request.has_impact=true;request.direction=direction;
+    return !speed::CombatResolver::allows_hit(runtime,request.struck,request);
 }
 
-void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock, const Vector2 *impact) {
-    auto &enemy = runtime.state.enemies[row];
-    if (enemy.dead || amount <= 0 || runtime.state.phase != Phase::Play || runtime.state.controls_locked || runtime.state.encounter_protected) return;
-    const auto &def = runtime.content->definitions[enemy.definition];
-    if (cause != StringName("ram") && cause != StringName("bump") && blocks_front(row, impact ? *impact : enemy.pos, direction)) return;
-    bool fresh = enemy.hp >= enemy.max_hp - 1e-6;
-    if (runtime.state.draw.tracing) {
-        if (enemy.dash_seen != runtime.state.draw.dash_id) { enemy.dash_seen = runtime.state.draw.dash_id; enemy.dash_fresh = fresh; }
-        fresh = enemy.dash_fresh;
-    }
-    const double before = enemy.hp;
-    enemy.hp -= amount;
-    if (runtime.state.hitstop_enabled && cause == StringName("ram") && before > std::max(0.0, enemy.hp)) {
-        double seconds = 0;
-        if (fresh && enemy.hp <= 0) seconds = runtime.state.combat_config.kill_hitstop * (enemy.radius > 25 ? runtime.state.combat_config.hitstop_big_mult : 1.0) * (crit ? runtime.state.combat_config.hitstop_crit_mult : 1.0);
-        if (crit) seconds = std::max(seconds, enemy.hp <= 0 ? 0.05 : 0.035);
-        if (def.hitstop_multiplier > 0) {
-            const double stop = std::min(seconds * def.hitstop_multiplier, std::max(0.0, runtime.state.combat_config.kill_hitstop_cap - runtime.state.dash_stop));
-            runtime.state.hitstop = std::max(runtime.state.hitstop, stop); runtime.state.dash_stop += stop;
-        }
-    }
-    enemy.flash = 0.12;
-    Dictionary hit;
-    hit["pos"] = enemy.pos; hit["crit"] = crit; hit["dmg"] = amount; hit["cause"] = cause; hit["id"] = enemy.id;
-    emit_event("hit", hit);
-    if (crit) {
-        Dictionary text;
-        text["pos"] = enemy.pos + Vector2(0, -enemy.radius - 10.0); text["text"] = "CRIT";
-        text["color"] = Color::html("ffe46b"); text["size"] = 16;
-        emit_event("text", text);
-    }
-    if (enemy.hp <= 0) {
-        kill_enemy(row, crit, cause, direction);
-    } else if (def.knockback > 0) {
-        const double mass = std::max(1.0, enemy.radius / 20.0);
-        enemy.vel += direction * knock * def.knockback / mass;
-    }
+void SpeedRunCore::damage_enemy(size_t row,double amount,StringName cause,bool crit,Vector2 direction,double knock,const Vector2 *impact) {
+    speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(row));
+    if (!speed::parse_symbol(String(cause).utf8().get_data(),request.cause)) return;
+    request.amount=amount;request.crit=crit;request.direction=direction;request.knock=knock;
+    request.has_impact=impact!=nullptr;if (impact) request.impact=*impact;
+    speed::CombatResolver::damage_enemy(runtime,request);speed::EventBuilder::flush_combat(runtime);
 }
 
-void SpeedRunCore::kill_enemy(size_t row, bool crit, StringName cause, Vector2 direction) {
-    auto &enemy = runtime.state.enemies[row];
-    if (enemy.dead || runtime.state.phase != Phase::Play) return;
-    const auto &def = runtime.content->definitions[enemy.definition];
-    enemy.dead = true; runtime.state.dead_rows.push_back(row); ++runtime.state.kills;
-    remove_hound(row);
-    Dictionary killed;
-    killed["pos"] = enemy.pos; killed["r"] = enemy.radius; killed["crit"] = crit;
-    killed["id"] = enemy.id; killed["t"] = runtime.state.time; killed["world_t"] = runtime.state.world_time;
-    killed["enemy_type"] = def.id; killed["meteor_index"] = -1; killed["facing"] = enemy.facing;
-    killed["elite"] = enemy.elite; killed["cause"] = cause; killed["dir"] = direction; killed["color"] = def.color;
-    emit_event("kill", killed);
-    passive_attack(String::num_int64(enemy.id), enemy.id);
-    drop_enemy_pickups(enemy);
+void SpeedRunCore::kill_enemy(size_t row,bool crit,StringName cause,Vector2 direction) {
+    speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(row));
+    if (!speed::parse_symbol(String(cause).utf8().get_data(),request.cause)) return;
+    request.crit=crit;request.direction=direction;
+    speed::CombatResolver::kill_enemy(runtime,request);speed::EventBuilder::flush_combat(runtime);
 }
 
 bool SpeedRunCore::collide_ship(Vector2 from, double radius) {

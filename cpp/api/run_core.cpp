@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../output/event_builder.h"
 #include "../../native/geometry.h"
 #include "../systems/enemy_system.h"
 #include <godot_cpp/core/class_db.hpp>
@@ -200,6 +201,7 @@ void SpeedRunCore::advance_enemies(double delta) {
 void SpeedRunCore::close() {
     runtime.state.closed = true;
     runtime.state.control.rng = {};
+    runtime.combat_hooks=speed::CombatHooks();
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
     runtime.state.progression = Progression();
     runtime.state.hound_packs.clear();
@@ -215,7 +217,7 @@ void SpeedRunCore::close() {
     runtime.state.attack_budget = AttackBudget();
     runtime.state.draw = Draw();
     runtime.state.grid = EnemyGrid();
-    runtime.state.events.clear();
+    runtime.state.events.clear();runtime.state.combat_events.clear();
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.bite_zones.clear(); runtime.state.free_bite_zones.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;
@@ -489,20 +491,11 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
 
 bool SpeedRunCore::remove_enemy(int64_t id) {
     if (!runtime.state.started || runtime.state.closed) return false;
-    auto found = runtime.state.rows_by_id.find(id);
-    if (found == runtime.state.rows_by_id.end()) return false;
-    remove_hound(found->second);
-    auto &enemy = runtime.state.enemies[found->second];
-    auto &active_rows = runtime.state.behavior_rows[enemy.behavior_group];
-    const size_t last = active_rows.back();
-    active_rows[enemy.behavior_slot] = last;
-    runtime.state.enemies[last].behavior_slot = enemy.behavior_slot;
-    active_rows.pop_back();
-    enemy.alive = false;
-    speed::EnemySystem::release(runtime.state, uint32_t(found->second));
-    if (runtime.state.enemy_handles.reusable(found->second)) runtime.state.free_rows.push_back(found->second);
-    runtime.state.rows_by_id.erase(found);
-    return true;
+    const auto found=runtime.state.rows_by_id.find(id);if (found==runtime.state.rows_by_id.end()) return false;
+    const auto handle=runtime.state.enemy_handles.at(uint32_t(found->second));
+    const auto reason=runtime.state.enemies[found->second].dead?speed::RetireReason::DeathCleanup:speed::RetireReason::Development;
+    const bool removed=speed::EnemySystem::retire(runtime.state,handle,reason);
+    speed::EventBuilder::flush_combat(runtime);return removed;
 }
 
 Array SpeedRunCore::enemies_snapshot() const {

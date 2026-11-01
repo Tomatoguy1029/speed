@@ -1,5 +1,7 @@
 #include "run_core.h"
 #include "geometry.h"
+#include "../cpp/systems/combat_resolver.h"
+#include "../cpp/output/event_builder.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -44,22 +46,11 @@ int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
     return add_hostile(std::move(shot));
 }
 
-bool SpeedRunCore::damage_ship(double amount, double slow, StringName cause, StringName source) {
-    if (runtime.state.phase != Phase::Play || runtime.state.controls_locked || runtime.state.encounter_protected) return false;
-    if (runtime.state.ship.shield_t > 0) {
-        if (runtime.state.ship.shield_flash <= 0) { Dictionary event; event["pos"] = runtime.state.ship.pos; emit_event("shield_block", event); }
-        runtime.state.ship.shield_flash = 0.12;
-        return false;
-    }
-    if (runtime.state.ship.invuln > 0 || runtime.state.invincible) return false;
-    runtime.state.ship.hp -= amount;
-    if (slow > 0) runtime.state.ship.glide = false;
-    runtime.state.ship.vel *= 1.0 - std::min(0.9, slow);
-    runtime.state.ship.invuln = runtime.state.ship_config.invulnerability;
-    runtime.state.ship.hurt = runtime.state.ship_config.ship_hurt_time;
-    Dictionary hit; hit["pos"] = runtime.state.ship.pos; hit["amount"] = amount; hit["cause"] = cause; hit["source"] = source;
-    hit["t"] = runtime.state.time; hit["world_t"] = runtime.state.world_time; hit["hp_after"] = runtime.state.ship.hp; emit_event("hurt", hit);
-    return true;
+bool SpeedRunCore::damage_ship(double amount,double slow,StringName cause,StringName source) {
+    speed::ShipDamageRequest request;request.amount=amount;request.slow=slow;
+    if (!speed::parse_symbol(String(cause).utf8().get_data(),request.cause)) return false;
+    for (size_t i=0;i<runtime.content->definitions.size();++i) if (runtime.content->definitions[i].id==source) {request.source=uint32_t(i+1);break;}
+    const auto result=speed::CombatResolver::ship_damage(runtime,request);speed::EventBuilder::flush_combat(runtime);return result.accepted;
 }
 
 static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double radius) {
