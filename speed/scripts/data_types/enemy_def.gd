@@ -262,10 +262,13 @@ const PARAMS_DOCS := {
 ## 機体の方を向く速さ。
 ## 単位：ラジアン/秒
 @export var turn: float
-## 経験値
-## 倒したときに落とす経験値。強さの目安でもあり、カプセルの落としやすさにも効く。
-## 単位：経験値
-@export var xp: float
+## 旧資源の経験値の読み取り互換。撃破報酬は星数とxp_reward_countsから解決する。
+@export_storage var xp: float
+## 確定する結晶の個数。空なら星数の規則、指定時はlow・mid・highの3要素で上書きする。
+## 単位：個
+@export var xp_reward_counts := PackedInt32Array()
+## ランの定義解決・出現境界で準備する固定報酬。資源へ保存せず、撃破時は参照だけ行う。
+var resolved_xp_reward: Dictionary = {}
 ## 色
 ## 敵の色。
 ## 単位：色
@@ -293,7 +296,7 @@ const PARAMS_DOCS := {
 ## 単位：オン／オフ
 @export var ranged: bool
 ## 大きさのばらつき
-## オンにすると、標準の 0.85〜1.30 倍の大きさで出る。大きいほど HP・装甲・経験値も増える。
+## オンにすると、標準の 0.85〜1.30 倍の大きさで出る。大きいほどHP・装甲も増える。結晶の報酬は同じ星数の規則を使う。
 ## 単位：オン／オフ
 @export var size_var: bool
 ## 背面の弱点の広さ
@@ -319,6 +322,14 @@ const PARAMS_DOCS := {
 ## 作り手が見分けるための名前。
 ## 単位：文字
 @export var display_name: String
+
+## 星数から決まる確定個数。編集元の上書きと、記録の星数別基準が共有する。
+static func default_xp_reward_counts(stars: int) -> PackedInt32Array:
+	if stars == 1: return PackedInt32Array([1, 0, 0])
+	if stars == 2: return PackedInt32Array([2, 0, 0])
+	if stars >= 3 and stars <= 4: return PackedInt32Array([0, 1, 0])
+	if stars >= 5 and stars <= 10: return PackedInt32Array([0, 2, 0])
+	return PackedInt32Array([0, 0, 0])
 
 ## 標準の大きさのときの最大 HP。config.rank_hits の対象の敵は、星の標準の体当たりの回数に HP の属性を足した回数 n で、
 ## 素の体当たり（config.base_attack）が装甲を通る場合に n 回で倒れる HP の真ん中（攻撃力 ×（n − 1）＋ 攻撃力 ÷ 2）。それ以外は hp。

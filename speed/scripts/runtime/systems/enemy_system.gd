@@ -26,6 +26,7 @@ func dispose() -> void:
 	_row_watchers.clear()
 	definitions.clear()
 	_stage_bases.clear()
+	_xp_reward_snapshot.clear()
 	stage_tuning.clear()
 	super()
 
@@ -41,6 +42,8 @@ var _source_row := -1
 ## このランだけのステージ差分。共通定義や別のランと辞書を共有しない。
 var stage_tuning: Dictionary = {}
 var _stage_bases: Dictionary = {}
+## 読み取り専用の録画用スナップショット。解決済みの種類だけをラン単位で保持する。
+var _xp_reward_snapshot: Dictionary = {}
 
 func set_stage_tuning(values: Dictionary) -> void:
 	stage_tuning = values.duplicate(true)
@@ -64,6 +67,7 @@ func update_stage_tuning(values: Dictionary) -> void:
 		var type := StringName(id)
 		var definition := _stage_definition(type)
 		definitions[type] = definition
+		_prepare_xp_reward(definition)
 		for i in t.alive.size():
 			if not t.alive[i] or t.dead[i] or t.is_boss[i] or t.type[i] != type: continue
 			var old: EnemyDef = t.def[i]
@@ -120,6 +124,16 @@ var _face_move := 0.0
 func setup(context: RunContext) -> void:
 	super(context)
 	motion.setup(self)
+	# ステージの依存に含まれる固定報酬を、録画開始より前に一度解決する。
+	var reward_ids := PackedStringArray()
+	if state.stage is RuntimeStage:
+		var runtime := state.stage as RuntimeStage
+		if runtime.resources != null: reward_ids = runtime.resources.enemy_ids.duplicate()
+	elif state.stage != null:
+		for type in state.stage.enemies: reward_ids.append(String(type))
+	for type in definitions:
+		if String(type) not in reward_ids: reward_ids.append(String(type))
+	for type in reward_ids: def_of(StringName(type))
 	state.enemy_aim = state.ship_pos
 	slots = RowSlots.new(table, "")
 	# 敵を出す関数が、使い回す行の全部の列を書き直すか（デバッグ版だけ）
@@ -135,6 +149,7 @@ func setup(context: RunContext) -> void:
 func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	def=_inherit_picaro(def)
 	if stage_tuning.has(String(def.id)) and not def.params.get("picaro",false): def = def_of(def.id)
+	_prepare_xp_reward(def)
 	var i := slots.take()
 	_reset_row(i)
 	var t := table
@@ -207,7 +222,8 @@ func apply_scaling(i: int, def: EnemyDef, opts := {}) -> void:
 	t.max_hp[i] = def.base_hp(cfg) * z * z * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
 	t.hp[i] = t.max_hp[i]
 	t.armor[i] = def.armor * z * cfg.enemy_armor_mult * (1.3 if elite else 1.0)
-	t.xp[i] = def.xp * z * (4.0 if elite else 1.0)
+	# 旧列は読み取り互換。色別報酬へサイズ比・エリート倍率を含めない。
+	t.xp[i] = 0.0
 	t.speed[i] = def.speed
 
 ## 部位を1つ出し、親（行 i）に付ける。
@@ -236,8 +252,9 @@ func parts_alive(i: int) -> int:
 	return n
 
 ## ボスの当たり判定の行を出し、その行番号を返す。ボスの行動は BossActor が動かす。
+## _xpは呼び出し元の互換用の位置引数。ボス本体の報酬は専用の決着処理が持つ。
 func spawn_boss(type: StringName, pos: Vector2, r: float, max_hp: float, armor: float,
-		xp: float, speed: float, weak_arc: float, facing: float, color: Color) -> int:
+		_xp: float, speed: float, weak_arc: float, facing: float, color: Color) -> int:
 	var i := slots.take()
 	_reset_row(i)
 	var t := table
@@ -248,7 +265,7 @@ func spawn_boss(type: StringName, pos: Vector2, r: float, max_hp: float, armor: 
 	t.max_hp[i] = max_hp
 	t.hp[i] = max_hp
 	t.armor[i] = armor
-	t.xp[i] = xp
+	t.xp[i] = 0.0
 	t.speed[i] = speed
 	t.weak_arc[i] = weak_arc
 	t.facing[i] = facing
@@ -474,11 +491,46 @@ func _behavior_index(name: StringName) -> int:
 	return k
 
 func def_of(type: StringName) -> EnemyDef:
+	var definition: EnemyDef
 	if stage_tuning.has(String(type)):
 		if not definitions.has(type) or definitions[type] == _stage_bases.get(type):
 			definitions[type] = _stage_definition(type)
-		return definitions[type]
-	return (definitions[type] if definitions.has(type) else ContentManager.definition(&"enemies", type)) as EnemyDef
+		definition = definitions[type]
+	else:
+		definition = (definitions[type] if definitions.has(type) else ContentManager.definition(&"enemies", type)) as EnemyDef
+	if definition != null: _prepare_xp_reward(definition)
+	return definition
+
+## 固定入力の報酬を、定義の解決と生成境界で準備する。ライブ編集時は入力が変わった分だけ更新する。
+func _prepare_xp_reward(definition: EnemyDef) -> void:
+	var reward := definition.resolved_xp_reward
+	if reward.is_empty() or reward.rank != definition.rank or reward.override != definition.xp_reward_counts:
+		assert(definition.xp_reward_counts.is_empty() or definition.xp_reward_counts.size() == 3, "報酬個数はlow・mid・highの3要素")
+		var counts := EnemyDef.default_xp_reward_counts(definition.rank) if definition.xp_reward_counts.is_empty() else definition.xp_reward_counts.duplicate()
+		for kind in counts.size(): counts[kind] = maxi(0, counts[kind])
+		reward = {"rank": definition.rank, "counts": counts,
+			"gold_eligible": definition.rank >= 3 and definition.rank <= 10 and counts[1] > 0,
+			"override": definition.xp_reward_counts.duplicate()}
+		definition.resolved_xp_reward = reward
+	var type := String(definition.id)
+	var snapshot: Dictionary = _xp_reward_snapshot.get(type, {})
+	if snapshot.is_empty() or snapshot.rank != reward.rank or snapshot.override != reward.override:
+		_xp_reward_snapshot[type] = {"rank": reward.rank, "counts": reward.counts.duplicate(),
+			"gold_eligible": reward.gold_eligible, "override": reward.override.duplicate()}
+
+## 撃破時は解決済みの報酬だけを読む。参照先の探索や星数からの再計算を行わない。
+func reward_of(definition: EnemyDef) -> Dictionary:
+	assert(not definition.resolved_xp_reward.is_empty(), "出現前に固定報酬を解決する")
+	return definition.resolved_xp_reward
+
+## 録画開始は報酬の定義解決を追加せず、準備済みの内容を読む。
+func xp_reward_snapshot() -> Dictionary:
+	var result := {}
+	for type in _xp_reward_snapshot:
+		var reward: Dictionary = _xp_reward_snapshot[type]
+		result[type] = {"rank": reward.rank, "counts": Array(reward.counts),
+			"gold_eligible": reward.gold_eligible, "override": Array(reward.override)}
+	return result
 
 ## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。
 # ── 更新 ──────────────────────────────────────────────────────────

@@ -167,8 +167,19 @@ func xp_needed() -> float:
 	var L := float(state.level)
 	return cfg.xp_base + cfg.xp_growth * L + cfg.xp_curve * L * L
 
+## 回収開始時の機体倍率とラン内倍率。ビーコンはこの値を一度確定して全量へ使う。
+func crystal_multiplier() -> float:
+	return state.stats.xp_mult * state.stats.xp_gain_mult
+
+## 保持していた基準XPを回収するときだけ倍率を適用し、実取得XPを返す。
+func add_crystal_xp(base_xp: float, multiplier: float = -1.0) -> float:
+	var applied := crystal_multiplier() if multiplier < 0.0 else multiplier
+	var acquired := base_xp * applied
+	add_xp(acquired)
+	return acquired
+
+## 最終取得XPを直接加える。開発用レベル操作もこの入口を使う。
 func add_xp(v: float) -> void:
-	v *= state.stats.xp_gain_mult
 	state.xp += v
 	state.xp_gained += v
 	var need := xp_needed()

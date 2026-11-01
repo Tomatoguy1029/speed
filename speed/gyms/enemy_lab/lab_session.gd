@@ -294,7 +294,7 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 			# 経験値の結晶を12個、半径 radius の中に散らす（からす座の回収を試す）
 			for k in 12:
 				var u := Vector2.from_angle(k * 2.399963) * sqrt((k + 0.5) / 12.0) * radius
-				run.pickups.drop_gem(at + u, 1.0)
+				run.pickups.drop_crystal(at + u, PickupSystem.GemKind.LOW)
 
 ## 機体を固定している間は、毎回の更新の前後で機体を固定した位置に戻し、速度を0にする。
 func _hold_ship() -> void:

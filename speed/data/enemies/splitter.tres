@@ -40,6 +40,7 @@ speed = 60.0
 accel = 1.5
 turn = 1.5
 xp = 12.0
+xp_reward_counts = PackedInt32Array(6, 0, 0)
 color = Color(0.6588, 1, 0.4784, 1)
 shape = &"blob"
 behavior = &"split"

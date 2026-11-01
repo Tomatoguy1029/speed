@@ -460,36 +460,22 @@ extends Resource
 ## 単位：度
 @export var hull_debris_spread: float
 
-## 経験値・大きい結晶・カプセル・修理キット・部品の出方
+## 経験値の結晶・カプセル・修理キット・部品の出方
 @export_group("ドロップ")
-## 大きい結晶のドロップ率の係数
-## 敵が大きい結晶を落とす確率 ＝ この値 × 敵の経験値 ^ ドロップ率の指数（上限あり）。
-## 単位：割合
-@export var drop_base: float
-## ドロップ率の指数
-## 強い敵ほど大きい結晶を落としやすくする度合い。
-## 単位：指数
-@export var drop_power_exp: float
-## 大きい結晶のドロップ率の上限
-## 敵が大きい結晶を落とす確率は、これを超えない。
+## 色別の基準経験値。low・mid・highの順で、生成・運搬中は倍率を含めず保持する。
+## 単位：基準XP
+@export var xp_crystal_values := PackedFloat32Array([1.0, 50.0, 200.0])
+## 星3〜10の対象を実際に倒したとき、確定報酬へ黄色1個を追加する確率。
 ## 単位：割合（0〜1）
-@export var drop_max: float
-## 大きい結晶の経験値
-## 左から小・中・大の段の経験値。
-## 単位：経験値
-@export var big_crystal_xp: PackedFloat32Array
-## 大きい結晶の段の出やすさ：開始
-## ラン開始のときに、落ちた大きい結晶が小・中・大のどの段になるかの重み。左から小・中・大。
-## 単位：重み
-@export var big_crystal_weights_start: PackedFloat32Array
-## 大きい結晶の段の出やすさ：終わり
-## 段の重みは、ラン開始の値からこの値へ、段の移り変わりの時間をかけてまっすぐ移る。以後はこの値のまま。
-## 単位：重み
-@export var big_crystal_weights_end: PackedFloat32Array
-## 大きい結晶の段の移り変わりの時間
-## 段の重みが開始の値から終わりの値へ移りきるまでの時間。
-## 単位：ラン秒
-@export var big_crystal_shift_time: float
+@export_range(0.0, 1.0, 0.01) var strong_gold_chance := 0.05
+## 旧資源の読み取り互換。報酬仕様v2は色別の固定XPと強敵の黄色確率を使う。
+@export_storage var drop_base: float
+@export_storage var drop_power_exp: float
+@export_storage var drop_max: float
+@export_storage var big_crystal_xp: PackedFloat32Array
+@export_storage var big_crystal_weights_start: PackedFloat32Array
+@export_storage var big_crystal_weights_end: PackedFloat32Array
+@export_storage var big_crystal_shift_time: float
 ## 隕石の密度
 ## 隕石の配置の基準の数。隕石地帯・漂う岩の数がこれに合わせて決まる。
 ## 単位：個
@@ -635,7 +621,7 @@ extends Resource
 ## 単位：世界秒
 @export var pickup_life: float
 ## 経験値の結晶の最大数
-## フィールドの経験値の結晶がこの数を超えたら、古いものをまとめる。性能の調整用。
+## 画面外と集約先を含む全色の合計上限。空き枠へ生成し、余剰の基準XPは指定黄色へ集約する。
 ## 単位：個
 @export var gem_max: int
 

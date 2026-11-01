@@ -58,7 +58,7 @@ static func play(session, key: String, use_sample_weapon := true, heading := Vec
 			# 実際にブーストが始まってから対象特性の発動条件を作る。
 			run.frame_events.connect(_seed_trait_conditions.bind(weakref(run),key,{"done":false}))
 		"trait/pickup":
-			for pos in [Vector2(80,80),Vector2(160,80),Vector2(230,80)]: run.pickups.drop_gem(origin+pos.rotated(heading.angle()),1.0)
+			for pos in [Vector2(80,80),Vector2(160,80),Vector2(230,80)]: run.pickups.drop_crystal(origin+pos.rotated(heading.angle()),PickupSystem.GemKind.LOW)
 		"trait/fullBurst":
 			run.state.gauge = 0.99
 			behavior.tick(0.01,false)

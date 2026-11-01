@@ -28,6 +28,7 @@ speed = 250.0
 accel = 2.5
 turn = 4.0
 xp = 0.4
+xp_reward_counts = PackedInt32Array(1, 0, 0)
 color = Color(0.8118, 1, 0.6039, 1)
 shape = &"blob"
 behavior = &"chase"
