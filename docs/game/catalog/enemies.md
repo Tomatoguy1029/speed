@@ -126,7 +126,7 @@
 - ステージ4の `biter`（ヘビ）は `assets/pixel/snake/`、`pulser` は `assets/pixel/pulser/` の本体・装甲・法線画像を重ねて描く。星コアは照明に左右されず、装甲は法線付き照明を受ける。表示の基準寸法と接触半径は各種類の設定に従う。
 
 - 各敵は `speed/assets/pixel/` のピクセルスプライトを Nearest で描く（`RunPresentation`・`InstanceBatch`）。素材の一覧は [素材README](../../../speed/assets/pixel/README.md)。
-- `splitter`・`splitling` は各専用フォルダのBase・Armor・Normalを使い、透明な余白を含む元画像の寸法で表示する。エリートも同じ基準サイズ。接触半径とその調整値は各敵データに従う。
+- `splitter`・`splitling` は各専用フォルダのBase・Armor・Normalを使い、透明な余白を含む元画像の寸法を表示の基準にする。エリート倍率は表示と接触半径へ共に適用する。接触半径とその調整値は各敵データに従う。
 - `phoenix`（ほうおう座）は `assets/pixel/phoenix/` のBase・Decoration・Armorを重ね、装甲へNormalの陰影を適用する。装甲の塗装でも羽のディテールを保持する。
 - `cepheus`・`cepheus_soldier` は各専用フォルダの本体・装甲・法線を使う。召喚する兵にも同じ専用画像を適用する。
 - `corona` は [冠の描画](../art-style.md#46-みなみのかんむり座) を使う。

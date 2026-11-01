@@ -196,10 +196,11 @@ func apply_scaling(i: int, def: EnemyDef, opts := {}) -> void:
 	t.elite[i] = 1 if elite else 0
 	var size: float = opts.get("size", def.radius)
 	var z := size / def.radius
-	var r := size * (1.25 if elite else 1.0)
-	# 手描き素材はエリートも同じ基準サイズで運用する。
+	var r := size
+	# 手描き素材の基準サイズを揃えてから、個体のエリート倍率を適用する。
 	if def.id in EnemyDef.NATIVE_SPRITES:
 		r = def.radius
+	r *= 1.25 if elite else 1.0
 	if opts.get("meteor_index", -1) < 0:
 		r *= cfg.character_scale
 	t.r[i] = r * def.visual_value("scale", 1.0) * def.visual_value("collision_scale", 1.0)
