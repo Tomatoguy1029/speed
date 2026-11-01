@@ -3,6 +3,7 @@ extends RefCounted
 var _core: RefCounted
 var _busy := false
 var _disposed := false
+var _closing := false
 var _run_id := 0
 var _epoch := 1
 var _next_command := 1
@@ -34,6 +35,7 @@ func configure(bytes: PackedByteArray, options: Dictionary) -> Dictionary:
 	return result
 
 func start(seed_value: int, options := {}) -> Dictionary:
+	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"start","更新中は再入できません")
 	if _core == null: return _error(4,"start","設定前です")
 	_busy = true
@@ -48,6 +50,7 @@ static func pack_intent(intent: Intent) -> Dictionary:
 		"finale_released":intent.pen_release,"finale_pen":intent.pen}
 
 func step(dt: float, input: Dictionary, viewport: Dictionary) -> Dictionary:
+	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"step","更新中は再入できません")
 	if _core == null: return _error(4,"step","設定前または破棄済みです")
 	_busy = true
@@ -58,6 +61,7 @@ func step(dt: float, input: Dictionary, viewport: Dictionary) -> Dictionary:
 
 ## 押下を消費するpollも再入防止の範囲内で一度だけ呼ぶ。
 func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictionary:
+	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"input","入力の取得中は再入できません")
 	if _core == null: return _error(4,"input","破棄済みです")
 	_busy = true
@@ -77,6 +81,7 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 	return result
 
 func command(kind: String, payload := {}) -> Dictionary:
+	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"command","更新中は再入できません")
 	if _next_command == 9223372036854775807: return _error(9,"command_id","命令番号が上限です")
 	var envelope := {"run_id":_run_id,"epoch":_epoch,"command_id":_next_command,"kind":kind,"payload":payload}
@@ -84,6 +89,7 @@ func command(kind: String, payload := {}) -> Dictionary:
 	return send_envelope(envelope)
 
 func send_envelope(envelope: Dictionary) -> Dictionary:
+	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"command","更新中は再入できません")
 	if _core == null: return _error(4,"command","破棄済みです")
 	_busy = true
@@ -103,12 +109,14 @@ func read_frame() -> Dictionary:
 	return _read_locked() if _core != null else _error(4,"read_frame","破棄済みです")
 
 func checkpoint() -> Dictionary:
+	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"checkpoint","更新中は保持できません")
 	if _core == null or not _development: return _error(4,"checkpoint","開発中のランだけを保持できます")
 	var id: int = _core.hold_checkpoint()
 	return _ok(id) if id>0 else _error(8,"checkpoint","状態の保持に失敗しました")
 
 func restore(id: int) -> Dictionary:
+	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"restore","更新中は復帰できません")
 	if _core == null or not _development: return _error(4,"restore","開発中のランだけ復帰できます")
 	if not _core.restore_checkpoint(id): return _error(5,"checkpoint","保持点がありません")
@@ -124,6 +132,12 @@ func release_checkpoint(id: int) -> Dictionary:
 	if _busy: return _error(7,"release_checkpoint","更新中は解除できません")
 	if _core == null or not _development: return _error(4,"checkpoint","開発中のランだけ解除できます")
 	return _ok() if _core.release_checkpoint(id) else _error(5,"checkpoint","保持点がありません")
+
+## 記録の終端を届ける間は読取だけを許す。
+func begin_close() -> Dictionary:
+	if _busy: return _error(7,"close","配信中は終了処理を始められません")
+	_closing = true
+	return _ok()
 
 func dispose() -> Dictionary:
 	if _busy: return _error(7,"dispose","更新中は破棄できません")

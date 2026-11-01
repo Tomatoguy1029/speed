@@ -91,7 +91,7 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="cannon") {out=VisualRole::Cannon;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -139,6 +139,7 @@ inline const char *symbol_name(EventType value) {
     case EventType::Offer: return "offer";
     case EventType::Choice: return "choice";
     case EventType::Loadout: return "loadout";
+    case EventType::RunFinished: return "run_finished";
     default: return "";
     }
 }
@@ -188,6 +189,22 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="offer") {out=EventType::Offer;return true;}
     if (value=="choice") {out=EventType::Choice;return true;}
     if (value=="loadout") {out=EventType::Loadout;return true;}
+    if (value=="run_finished") {out=EventType::RunFinished;return true;}
+    return false;
+}
+enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
+inline const char *symbol_name(ResultKind value) {
+    switch(value) {
+    case ResultKind::Clear: return "Clear";
+    case ResultKind::Death: return "Death";
+    case ResultKind::Abort: return "Abort";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, ResultKind &out) {
+    if (value=="Clear") {out=ResultKind::Clear;return true;}
+    if (value=="Death") {out=ResultKind::Death;return true;}
+    if (value=="Abort") {out=ResultKind::Abort;return true;}
     return false;
 }
 enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,Count};
@@ -304,6 +321,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::Offer: return field=="offer_id" || field=="initial" || field=="count";
     case EventType::Choice: return field=="offer_id" || field=="candidate_id" || field=="kind" || field=="id" || field=="level";
     case EventType::Loadout: return field=="kind" || field=="id" || field=="level";
+    case EventType::RunFinished: return field=="result_id" || field=="kind";
     default: return false;
     }
 }

@@ -1142,6 +1142,7 @@ func _draw_banner() -> void:
 	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)
 
 func _exit_tree() -> void:
+	if bridge!=null: bridge.unsubscribe("hud")
 	AudioManager.set_slow_motion(false)
 	if run != null and run.state != null and not run.state.lab_mode:
 		AudioManager.stop_music(self)
@@ -1164,6 +1165,7 @@ func apply_snapshot(ui: Dictionary) -> void:
 
 
 func _ready_cpp() -> void:
+	bridge.subscribe("hud",_receive_cpp_frame)
 	_font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1207,6 +1209,7 @@ func _draw_cpp() -> void:
 	var seconds := int(_cpp_ui.run_time)
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	draw_set_transform(Vector2.ZERO)
+	_draw_banner()
 
 func _cpp_card_visibility() -> void:
 	_cards_box.visible = not _cpp_ui.is_empty() and int(_cpp_ui.phase)==RunState.Phase.LEVELUP and int(_cpp_ui.get("cards",{}).get("offer_id",0))!=0
@@ -1265,3 +1268,14 @@ func _input_cpp(event: InputEvent) -> void:
 	if event.is_action_pressed(&"reroll"):
 		_card_command(&"reroll")
 		get_viewport().set_input_as_handled()
+
+func _receive_cpp_frame(frame: Dictionary) -> bool:
+	apply_snapshot(frame.ui)
+	for event: Dictionary in frame.events:
+		if event.type=="game_over":
+			_banner = tr("hud.game_over")
+			_banner_color = Color("#ff6b5a")
+		elif event.type=="clear_banner":
+			_banner = tr("hud.clear")
+			_banner_color = Color("#ffe46b")
+	return true

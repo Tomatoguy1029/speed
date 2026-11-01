@@ -593,6 +593,7 @@ func _end(result: String) -> void:
 		_cpp_session_id = 0
 		for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
 			if c.callable.get_object()==self: _session.tree_exiting.disconnect(c.callable)
+		if is_instance_valid(_session) and _session.closing.is_connected(_end): _session.closing.disconnect(_end)
 		_session = null
 		_update_label()
 		return
@@ -893,6 +894,7 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 		return
 	_session = session
 	_cpp_session_id = session.id
+	if not session.closing.is_connected(_end): session.closing.connect(_end)
 	_cpp_time = snapshot.value.ui.run_time
 	_io_failed = false
 	_real_start_us = Time.get_ticks_usec()

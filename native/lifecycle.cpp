@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/runtime/lifecycle.h"
 #include <cmath>
 using namespace godot;
 
@@ -36,6 +37,7 @@ void SpeedRunCore::step_death(double real_dt) {
         Dictionary event; event["pos"] = runtime.state.ship.pos; emit_event("ship_explode", event);
     }
     if (runtime.state.sequence_t >= t2 && runtime.state.sequence_t - real_dt < t2) emit_event("game_over");
+    if (runtime.state.sequence_t >= t3 && runtime.api_configured) {speed::Lifecycle::finish(runtime,speed::ResultKind::Death);return;}
     if (runtime.state.sequence_t >= t3) {
         runtime.state.draw.drawing = false; runtime.state.draw.tracing = false;
         runtime.state.ship.vel = Vector2();

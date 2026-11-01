@@ -1592,6 +1592,7 @@ func _ready_cpp() -> void:
 	add_child(pipeline)
 	var layer_count: int = cpp_resources.visuals.size()-3
 	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],layer_count)
+	frame_view.pipeline = pipeline
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	if hud!=null: hud.layer = maxi(hud.layer,layer_count+3)
 
@@ -1617,4 +1618,4 @@ func _present_cpp(delta: float) -> void:
 	frame_view.update_effects(frame,delta)
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")
 	if hud!=null: hud.apply_snapshot(frame.ui)
-	pipeline.step(delta if frame.ui.input_enabled else 0.0,cam_center,cam_zoom)
+	pipeline.step(0.0 if frame.ui.get("presentation_frozen",not frame.ui.input_enabled) else delta,cam_center,cam_zoom)

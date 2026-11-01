@@ -74,6 +74,7 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 	var weapon := load("res://data/weapons/W01_forward.tres") as WeaponDef
 	if weapon==null: return {}
 	data.LoadoutDefinition = [{"id":1,"kind":0,"maximum_level":weapon.level_steps.size(),"external_id":String(weapon.id),"comet_only":weapon.comet_only}]
+	data.LifecycleDefinition = [{"id":1,"death_freeze_time":config.death_freeze_time,"death_explosion_time":config.death_explosion_time,"death_game_over_time":config.death_game_over_time,"clear_bonus":config.clear_bonus,"legendary":String(stage.legendary_module_id) if stage!=null else "","death_world_dim":config.death_world_dim}]
 	data.ProgressionDefinition = [{"id":1}]
 	for field in Schema.SCHEMA.records:
 		if field.name == "ProgressionDefinition":
@@ -133,6 +134,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.LoadoutDefinition = resolved.LoadoutDefinition
 			data.ForwardDefinition = resolved.ForwardDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
+			data.LifecycleDefinition = resolved.LifecycleDefinition
 			equipment_resources = resolved.ResourceKey.filter(func(key: Dictionary): return key.role==7)
 		var visual: Dictionary = resolved.ResourceKey[5].duplicate()
 		visual.id = i+6

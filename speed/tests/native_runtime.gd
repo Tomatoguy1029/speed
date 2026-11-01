@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--lifecycle-only" in OS.get_cmdline_user_args() or "--lifecycle-display-only" in OS.get_cmdline_user_args():
+		check(await check_run_lifecycle("--lifecycle-display-only" in OS.get_cmdline_user_args()),"終了結果と保存を最後まで確認する")
+		print("[run_lifecycle] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--hound-only" in OS.get_cmdline_user_args() or "--hound-bite-only" in OS.get_cmdline_user_args():
 		check(check_hound_groups("--hound-bite-only" in OS.get_cmdline_user_args()),"猟犬の群れ・指示・離脱と復帰を最後まで確認する")
 		print("[hound_groups] failed=%d" % failed)
@@ -1184,3 +1189,114 @@ func check_hound_bite(bridge, member: int) -> void:
 	for event: Dictionary in observed:
 		if event.type=="attack_retired" and hazards.has(event.payload.id) and event.payload.reason=="lifetime": retired = true
 	check(retired,"噛みつきの攻撃を自然寿命で解放する")
+
+func check_run_lifecycle(display_only := false) -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.death_freeze_time = 0.02
+	config.death_explosion_time = 0.02
+	config.death_game_over_time = 0.02
+	var stage := RuntimeStage.new()
+	stage.index = 1
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var builder = load("res://tools/content/build_run_content.gd")
+	var output := "res://.content/dev/run_lifecycle"
+	if builder.build(stage,config,output,"終了と保存の固定入力".sha256_text())!=OK: return false
+	var index_path := output.path_join("stage_1.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+	var options := {"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":42,"manage_result":true}
+	if display_only: return await check_death_display(options,config)
+	var initial_runs := int(SaveManager.data.best.runs)
+	var initial_clears := int(SaveManager.data.best.clears)
+	var initial_coins := SaveManager.coins()
+	var previous_id := 0
+	for kind in ["Death","Abort","Clear"]:
+		var session: RunSession = RunManager.create_session(self,options,true)
+		session.auto_step = false
+		if session.bridge==null: return false
+		var bridge = session.bridge
+		check(session.id>previous_id,"連続出撃で新しいランIDを使う")
+		previous_id = session.id
+		var terminal: Array = []
+		session.cpp_finished.connect(func(value: Dictionary): terminal.append(value))
+		bridge.command("pause",{"paused":true})
+		bridge.command("pause",{"paused":false})
+		check(bridge.read_frame().value.ui.phase==RunState.Phase.PLAY,"停止前のPLAYへ戻す")
+		if kind=="Death":
+			check(bridge.command("dev_ship_damage",{"amount":1000000.0,"cause":"shot"}).ok,"致死被弾を共通ダメージへ通す")
+			clock_step(bridge)
+			check(bridge.read_frame().value.ui.phase==RunState.Phase.DYING,"C++が敗北の演出へ移る")
+			var frozen: Dictionary = bridge.read_frame().value.ui
+			bridge.command("pause",{"paused":true})
+			clock_step(bridge)
+			bridge.command("pause",{"paused":false})
+			check(bridge.read_frame().value.ui.phase==RunState.Phase.DYING,"停止前のDYINGへ戻す")
+			for tick in 10: clock_step(bridge)
+			check(bridge.read_frame().value.ui.run_time==frozen.run_time and bridge.read_frame().value.ui.world_time==frozen.world_time,"敗北の演出中に戦闘の時計を進めない")
+		elif kind=="Abort":
+			check(bridge.command("abort",{"reason":0}).ok,"中断結果を一度確定する")
+		else:
+			check(bridge.command("dev_finish",{"cleared":true}).ok,"通常クリアの確定境界を通す")
+		var result: Dictionary = bridge.read_frame().value.result
+		check(result.kind==kind and result.result_id>0 and bridge.read_frame().value.ui.phase==RunState.Phase.ENDED,"種類を区別したResultIdで終了する")
+		check(not bridge.command("abort",{"reason":0}).ok and not bridge.command("dev_finish",{"cleared":true}).ok,"確定後の終了命令で結果を書き換えない")
+		if kind=="Death": check(result.last_damage.cause=="shot" and result.last_damage.accepted,"最後の致死被弾を結果へ残す")
+		check(terminal.is_empty(),"Bridge配信中に画面遷移を呼ばない")
+		session.flush_cpp_result()
+		bridge.collect_frame()
+		session.flush_cpp_result()
+		check(terminal.size()==1,"再表示と再通知で終了を二重送信しない")
+		var runs := int(SaveManager.data.best.runs)
+		var coins := SaveManager.coins()
+		GameManager.finish_cpp_run(result)
+		check(int(SaveManager.data.best.runs)==runs and SaveManager.coins()==coins,"同じ結果をGameManagerへ再通知しても報酬を増やさない")
+		if kind=="Abort":
+			check(not SaveManager.record_run(result) and runs==initial_runs+1 and coins==initial_coins,"中断は保存と報酬の対象にしない")
+		else:
+			check(not SaveManager.record_run(GameManager.last_result),"SaveManagerも同じResultIdを二重記録しない")
+			var screen = load("res://scenes/app/result.tscn").instantiate()
+			add_child(screen)
+			check(screen.get_node("%Heading").text==tr("result.cleared" if kind=="Clear" else "result.failed"),"今の結果画面が終了結果を表示する")
+			await get_tree().process_frame
+			screen.free()
+		var root_scope: ContentResourceScope = session.resources
+		var closed: Array = []
+		session.closing.connect(func(_reason: String):
+			closed.append(bridge.read_frame().ok and not bridge.command("pause",{"paused":true}).ok and not root_scope.cancelled))
+		var disposed_id := session.id
+		session.free()
+		check(closed==[true] and root_scope.cancelled and RunManager.session(disposed_id)==null,"受付停止と記録終端を資源解放より先に届け、最後に登録解除する")
+		check(not bridge.read_frame().ok and bridge.dispose().ok,"解放後の旧窓口を使わせず繰返し解放も安全にする")
+	check(int(SaveManager.data.best.runs)==initial_runs+2 and int(SaveManager.data.best.clears)==initial_clears+1,"3出撃のうち敗北とクリアだけ保存する")
+	check(SaveManager.coins()==initial_coins+config.clear_bonus,"クリアの報酬を一度だけ保存する")
+	var disk: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SaveManager.SAVE_PATH))
+	check(int(disk.best.runs)==initial_runs+2 and int(disk.coins)==SaveManager.coins(),"独立セーブのファイルにも同じ結果を書き込む")
+	return true
+
+func check_death_display(options: Dictionary, config: GameConfig) -> bool:
+	options.manage_result = false
+	var session: RunSession = RunManager.create_session(self,options,true)
+	session.auto_step = false
+	if session.bridge==null: return false
+	var bridge = session.bridge
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var hud = session.view.get_node("Hud/HudRoot")
+	bridge.command("dev_ship_damage",{"amount":1000000.0,"cause":"shot"})
+	clock_step(bridge)
+	presentation._present_cpp(0.0)
+	check(bridge.read_frame().value.ui.presentation_frozen and presentation.frame_view._dim_strength==config.death_world_dim,"敗北直後は演出を止め、生成値どおり暗くする")
+	var any_visible := false
+	for sprite: Sprite2D in presentation.frame_view.parts.values(): any_visible = any_visible or sprite.visible
+	check(any_visible,"爆発前の機体は表示する")
+	for tick in 3: clock_step(bridge)
+	presentation._present_cpp(1.0/60.0)
+	var all_hidden := true
+	for sprite: Sprite2D in presentation.frame_view.parts.values(): all_hidden = all_hidden and not sprite.visible
+	check(all_hidden and not bridge.read_frame().value.ui.presentation_frozen,"爆発時刻を越えたら機体を消し、演出時計だけ再開する")
+	check(presentation.pipeline.sparks.available() or not presentation.frame_view._particles.is_empty(),"GPUまたは簡易表示で機体の爆発を描く")
+	for tick in 3: clock_step(bridge)
+	presentation._present_cpp(1.0/60.0)
+	check(hud._banner==tr("hud.game_over"),"game_over通知をHUDへ表示する")
+	await get_tree().process_frame
+	session.free()
+	return true

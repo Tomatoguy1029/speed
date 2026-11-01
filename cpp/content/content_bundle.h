@@ -20,6 +20,7 @@ struct ContentBundle {
     std::vector<ContactDefinition> contacts;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;
+    LifecycleDefinition lifecycle;
     std::vector<LoadoutDefinition> equipment;
     std::vector<LoadoutAsset> equipment_assets;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);

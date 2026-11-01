@@ -21,6 +21,11 @@ var cpp_input_source: Callable
 var recording_initial: Dictionary = {}
 
 signal started
+signal cpp_finished(result: Dictionary)
+signal closing(reason: String)
+var _cpp_accepting := true
+var _cpp_pending_result: Dictionary = {}
+var _cpp_published_result := 0
 var resources: ContentResourceScope
 var _pending_options: Dictionary = {}
 var _loading: CanvasLayer
@@ -113,7 +118,7 @@ func start(options: Dictionary, with_view: bool) -> void:
 
 func _physics_process(delta: float) -> void:
 	if bridge != null:
-		if auto_step and cpp_input_source.is_valid():
+		if _cpp_accepting and auto_step and cpp_input_source.is_valid():
 			var response: Dictionary = bridge.poll_and_step(delta,cpp_input_source,get_viewport().get_visible_rect().size)
 			if not response.ok:
 				auto_step = false
@@ -124,7 +129,9 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	if bridge != null:
+		if not _cpp_accepting: return
 		if cpp_choices!=null: cpp_choices.poll()
+		flush_cpp_result()
 		return
 	if sim.state == null:
 		if resources == null or _pending_options.is_empty(): return
@@ -153,13 +160,20 @@ func _process(delta: float) -> void:
 ## 実験場はチェックポイントのために木から外して持つので、片付けは消えるときに行う。
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
-		# 記録の終了と役者の退出は、シミュレーションの参照が使える間に済ませる。
+		# 受付停止後、記録・資源・表示・C++・登録の順に片付ける。
+		_cpp_accepting = false
+		auto_step = false
+		if bridge!=null: bridge.begin_close()
+		closing.emit(str(_cpp_pending_result.get("kind","quit")))
 		if is_inside_tree():
 			get_parent().remove_child(self)
 		if cpp_choices!=null: cpp_choices.close()
 		cpp_choices = null
 		if resources != null: resources.cancel()
 		_pending_options.clear()
+		if bridge!=null and is_instance_valid(view):
+			view.free()
+			view = null
 		if bridge != null: bridge.dispose()
 		elif cpp_core != null: cpp_core.close()
 		bridge = null
@@ -183,10 +197,14 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	if not configured.ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA
-	if not next_bridge.start(seed_value,options.get("cpp_start",{})).ok:
+	var start_options: Dictionary = options.get("cpp_start",{}).duplicate(true)
+	start_options.endless = options.get("endless",false)
+	if not next_bridge.start(seed_value,start_options).ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA
 	bridge = next_bridge
+	bridge.subscribe("result",_consume_cpp_result)
+	if RunManager.current_id==id or options.get("manage_result",false): cpp_finished.connect(GameManager.finish_cpp_run)
 	cpp_core = bridge._core
 	cpp_resources = prepared.resources
 	cpp_choices = preload("res://scripts/runtime/run_choice_resources.gd").new()
@@ -221,3 +239,15 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	var delivered: Dictionary = bridge.collect_frame()
 	if not delivered.ok: push_warning(delivered.message)
 	return OK
+
+func _consume_cpp_result(frame: Dictionary) -> bool:
+	_cpp_pending_result = frame.result if frame.result is Dictionary else {}
+	return true
+
+## 画面遷移の通知は、Bridgeの配信を抜けた後に一度だけ返す。
+func flush_cpp_result() -> void:
+	if not _cpp_accepting or _cpp_pending_result.is_empty(): return
+	var result_id := int(_cpp_pending_result.result_id)
+	if result_id==_cpp_published_result: return
+	_cpp_published_result = result_id
+	cpp_finished.emit(_cpp_pending_result.duplicate(true))

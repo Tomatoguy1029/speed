@@ -163,6 +163,7 @@ ShipDamageResult CombatResolver::ship_damage(RunRuntime &run,const ShipDamageReq
         state.ship.invuln=state.ship_config.invulnerability;state.ship.hurt=state.ship_config.ship_hurt_time;
         result.hp_after=state.ship.hp;result.accepted=true;result.reason=CombatReason::Applied;
     }
+    if (result.accepted) {state.lifecycle.last_request=request;state.lifecycle.last_damage=result;state.lifecycle.has_damage=true;}
     EventBuilder::player_damage(run,request,result);
     if (result.accepted && result.hp_after>0) run.combat_hooks.hurt(run,request,result);
     return result;

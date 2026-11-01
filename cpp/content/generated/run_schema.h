@@ -528,6 +528,32 @@ inline bool read(BinaryReader &input, BiteDefinition &out) {
     if (!input.read_bool(out.fade)) return false;
     return true;
 }
+struct LifecycleDefinition {
+    uint32_t id{};
+    double death_freeze_time{};
+    double death_explosion_time{};
+    double death_game_over_time{};
+    uint32_t clear_bonus{};
+    std::string legendary{};
+    double death_world_dim{};
+};
+inline bool read(BinaryReader &input, LifecycleDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.death_freeze_time)) return false;
+    if (out.death_freeze_time < 0) return false;
+    if (!input.read_f64(out.death_explosion_time)) return false;
+    if (out.death_explosion_time < 0) return false;
+    if (!input.read_f64(out.death_game_over_time)) return false;
+    if (out.death_game_over_time < 0) return false;
+    if (!input.read_u32(out.clear_bonus)) return false;
+    if (out.clear_bonus < 0) return false;
+    if (!input.read_string(out.legendary)) return false;
+    if (!input.read_f64(out.death_world_dim)) return false;
+    if (out.death_world_dim < 0) return false;
+    if (out.death_world_dim > 1) return false;
+    return true;
+}
 struct ContactDefinition {
     uint32_t id{};
     uint32_t shape{};
@@ -668,6 +694,7 @@ struct ContentRecords {
     std::vector<ResourceKey> ResourceKey_rows;
     std::vector<ForwardDefinition> ForwardDefinition_rows;
     std::vector<BiteDefinition> BiteDefinition_rows;
+    std::vector<LifecycleDefinition> LifecycleDefinition_rows;
     std::vector<ContactDefinition> ContactDefinition_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
@@ -766,6 +793,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { BiteDefinition row; if (!read(input,row)) return false; out.BiteDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 20: {
+        if (version != 1) return false;
+        if (count > input.remaining()/44) return false;
+        for (uint32_t i=0; i<count; ++i) { LifecycleDefinition row; if (!read(input,row)) return false; out.LifecycleDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 15: {
         if (version != 1) return false;
         if (count > input.remaining()/26) return false;
@@ -828,6 +861,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ForwardDefinition_rows) if (!ForwardDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BiteDefinition_ids;
     for (const auto &row:data.BiteDefinition_rows) if (!BiteDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> LifecycleDefinition_ids;
+    for (const auto &row:data.LifecycleDefinition_rows) if (!LifecycleDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ContactDefinition_ids;
     for (const auto &row:data.ContactDefinition_rows) if (!ContactDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
@@ -972,5 +1007,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=19;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=20;
 }

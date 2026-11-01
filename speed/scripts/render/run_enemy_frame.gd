@@ -117,3 +117,8 @@ func _draw() -> void:
 	for i in range(0,_glows.size(),3):
 		for layer in range(3,0,-1):
 			draw_circle(Vector2(_glows[i],_glows[i+1]),_glows[i+2]*(1.0+layer*0.22),Color(1,1,1,0.08))
+
+func set_death_brightness(value: float) -> void:
+	for part: Dictionary in _parts:
+		part.base.material.set_shader_parameter("brightness",value)
+		part.armor.material.set_shader_parameter("brightness",value)

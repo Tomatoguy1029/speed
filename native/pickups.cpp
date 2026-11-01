@@ -60,6 +60,7 @@ void SpeedRunCore::collect_pickup(StringName kind, double value) {
     if (runtime.state.loadout.ready && kind == StringName("gem")) speed::ProgressionSystem::add_experience(*this,value*runtime.state.pickup_config.xp_mult*runtime.state.loadout.xp_gain_mult);
     else if (runtime.state.legacy_progression.ready && kind == StringName("gem")) add_xp(value);
     else { Dictionary item; item["kind"] = kind; item["value"] = value; runtime.state.collections.append(item); }
+    if (runtime.api_configured && kind==StringName("coin")) ++runtime.state.lifecycle.coins;
     Dictionary event; event["kind"] = kind; emit_event("pickup", event);
 }
 

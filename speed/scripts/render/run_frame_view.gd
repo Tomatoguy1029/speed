@@ -13,6 +13,13 @@ var _flashes := ShotFlashes.new()
 var _queued_events: Array[Dictionary] = []
 var _epoch := 0
 var _jet_time := 0.0
+var pipeline: RenderPipeline
+var _particles: Array[Dictionary] = []
+var _particle_canvas: Node2D
+var _dim: Node2D
+var _dim_strength := 0.0
+var _dim_rect := Rect2()
+
 var _flame: Sprite2D
 var _spark: Sprite2D
 var build_us := 0
@@ -25,6 +32,17 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_effects = PixelPainter.new()
 	_effects.setup_painter(_pixel)
 	_layer(14).add_child(_effects)
+	_particle_canvas = Node2D.new()
+	_layer(14).add_child(_particle_canvas)
+	_particle_canvas.draw.connect(func():
+		for p: Dictionary in _particles:
+			var color: Color = p.color
+			color.a = clampf(p.life/p.max,0.0,1.0)
+			_particle_canvas.draw_circle(p.pos,maxf(1.0,roundf(p.size*0.6))*_pixel,color))
+	_dim = Node2D.new()
+	_layer(16).add_child(_dim)
+	_dim.draw.connect(func():
+		if _dim_strength>0.0: _dim.draw_rect(_dim_rect.grow(400.0),Color(0,0,0,_dim_strength)))
 	_flame = _exhaust("res://assets/pixel/airship_flame.png",character_scale)
 	_spark = _exhaust("res://assets/pixel/airship_spark.png",character_scale)
 	_spark.modulate.a = 0.65
@@ -155,6 +173,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_epoch = frame.epoch
 		_queued_events.clear()
 		_flashes = ShotFlashes.new()
+		_particles.clear()
 	for event: Dictionary in frame.events:
 		var payload: Dictionary = event.payload.duplicate(true)
 		payload["type"] = event.type
@@ -163,10 +182,22 @@ func receive_frame(frame: Dictionary) -> bool:
 
 func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
+		if event.type==&"ship_explode": _death_burst(event.pos)
 		if event.type==&"weapon_fire" and event.get("id")==&"W01": _flashes.fire(event.angle)
 		if event.type==&"shot_hit" and event.get("visual_key")=="weapon/forward": _flashes.hit(event.pos,event.dir,2)
 	_queued_events.clear()
 	var ui: Dictionary = frame.ui
+	_dim_strength = float(ui.get("death_dim",0.0))
+	_dim_rect = Rect2(frame.camera.center-frame.camera.half,frame.camera.half*2.0)
+	_dim.queue_redraw()
+	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
+	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	for p: Dictionary in _particles:
+		p.pos += p.vel*effect_dt
+		p.vel *= 1.0-2.5*effect_dt
+		p.life -= effect_dt
+	_particles = _particles.filter(func(p: Dictionary): return p.life>0.0)
+	_particle_canvas.queue_redraw()
 	var active: bool = ui.input_enabled
 	var world_dt: float = dt*ui.world_scale if active else 0.0
 	_effects.begin()
@@ -179,3 +210,13 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		sprite.rotation = ui.ship.ship_heading.angle()+PI/2.0
 		sprite.frame = int(_jet_time*12.0)%3
 		sprite.visible = ui.phase==0 or ui.phase==4
+
+func _death_burst(at: Vector2) -> void:
+	if pipeline!=null and pipeline.sparks.available():
+		pipeline.sparks.burst(at,Color("#9fe8ff"),120,Vector2.ZERO,500.0,0.7,5.0)
+		return
+	if _particles.size()>500: return
+	for i in 8:
+		var angle := randf()*TAU
+		var speed := 500.0*(0.3+randf())
+		_particles.append({"pos":at,"vel":Vector2.from_angle(angle)*speed*0.6,"life":0.5+randf()*0.4,"max":0.9,"color":Color("#9fe8ff"),"size":2.0+randf()*4.0})

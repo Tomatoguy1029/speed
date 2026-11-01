@@ -223,7 +223,10 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 			&"weapon_fire":
 				if data.id in [&"W01",&"W23"]: play(&"blaster",-12.0)
 			&"launch": play(&"dash",-6.0)
-			&"trace_end", &"game_over": end_dash()
+			&"trace_end": end_dash()
+			&"game_over":
+				end_dash()
+				play_music(&"game_over",1.0,self)
 			&"block_impact": play(&"bounce",-8.0)
 			&"shield_reflect": play(&"block",-10.0,1.8)
 			&"shield_stolen": play(&"pickup",-5.0,0.7)

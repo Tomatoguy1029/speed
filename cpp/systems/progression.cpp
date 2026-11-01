@@ -75,6 +75,7 @@ bool grant(RunRuntime &run,const CardCandidate &card) {
     forward.damage=level.damage;forward.pierce=level.pierce;forward.life=level.life;forward.spread=level.spread;forward.knock=level.knock;
     forward.character_scale=run.content->config.character_scale;forward.ready=true;
     if (current==owned.end()) owned.push_back({card.definition,card.level});else current->level=card.level;
+    if (std::find(run.state.lifecycle.obtained.begin(),run.state.lifecycle.obtained.end(),card.definition)==run.state.lifecycle.obtained.end()) run.state.lifecycle.obtained.push_back(card.definition);
     return true;
 }
 Dictionary card_value(const RunRuntime &run,const CardCandidate &card) {

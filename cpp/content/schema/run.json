@@ -1077,6 +1077,47 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "LifecycleDefinition",
+      "section": 20,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "death_freeze_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "death_explosion_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "death_game_over_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clear_bonus",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "legendary",
+          "type": "string"
+        },
+        {
+          "name": "death_world_dim",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        }
+      ]
     }
   ],
   "enums": {
@@ -1404,6 +1445,24 @@
       {
         "name": "Loadout",
         "value": "loadout"
+      },
+      {
+        "name": "RunFinished",
+        "value": "run_finished"
+      }
+    ],
+    "ResultKind": [
+      {
+        "name": "Clear",
+        "value": "Clear"
+      },
+      {
+        "name": "Death",
+        "value": "Death"
+      },
+      {
+        "name": "Abort",
+        "value": "Abort"
       }
     ]
   },
@@ -1628,6 +1687,10 @@
       "kind",
       "id",
       "level"
+    ],
+    "run_finished": [
+      "result_id",
+      "kind"
     ]
   },
   "includes": [

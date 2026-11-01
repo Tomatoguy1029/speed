@@ -6,6 +6,7 @@
 #include "world_state.h"
 #include "loadout_state.h"
 #include "group_state.h"
+#include "lifecycle_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -241,6 +242,7 @@ struct RunState {
     } population;
     speed::SpawnTimeline spawn_timeline;
     bool spawn_timeline_ready = false;
+    speed::LifecycleState lifecycle;
     bool lifecycle_ready = false;
     double sequence_t = 0, death_freeze = 0, death_explosion = 0, death_game_over = 0;
     bool controls_locked = false, encounter_protected = false, steering_locked = false;

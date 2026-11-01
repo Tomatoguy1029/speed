@@ -57,6 +57,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->budget_phases=records.BudgetPhase_rows;
     if (records.ProgressionDefinition_rows.size()!=1 || records.ProgressionDefinition_rows.front().xp_base<=0) return {};
     bundle->progression=records.ProgressionDefinition_rows.front();
+    if (records.LifecycleDefinition_rows.size()!=1) return {};
+    bundle->lifecycle=records.LifecycleDefinition_rows.front();
     bundle->equipment=records.LoadoutDefinition_rows;
     bundle->equipment_assets=records.LoadoutAsset_rows;
     for (size_t i=1;i<bundle->budget_phases.size();++i) if (bundle->budget_phases[i].start<bundle->budget_phases[i-1].start) return {};
