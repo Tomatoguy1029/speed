@@ -72,7 +72,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (core.check_run_end()) return true;
         if (!state.hostiles.empty() && !core.step_hostiles(wd)) return false;
         if (core.check_run_end()) return true;
-        if (state.bite_zone_config.ready && !core.step_hazards(wd)) return false;
+        if (!state.hazards.empty() && !core.step_hazards(wd)) return false;
     }
     if (core.check_run_end()) return true;
     for (size_t row:state.dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);

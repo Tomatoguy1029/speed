@@ -25,6 +25,7 @@ class SpeedRunCore : public RefCounted {
     friend class speed::RunRunner;
     friend class speed::ProgressionSystem;
     friend class speed::FieldSystem;
+    Dictionary development_beam_command(const String &kind,const Dictionary &payload);
     Dictionary development_hostile_command(const String &kind,const Dictionary &payload);
     Dictionary development_attack_command(const String &kind,const Dictionary &payload);
     Dictionary development_contact_command(const Dictionary &payload);
@@ -51,7 +52,7 @@ class SpeedRunCore : public RefCounted {
     using Friendly = RunState::Friendly;
     using ProjectileConfig = RunState::ProjectileConfig;
     using Hostile = RunState::Hostile;
-    using BiteZone = RunState::BiteZone;
+    using BiteZone = RunState::Hazard;
     using BiteZoneConfig = RunState::BiteZoneConfig;
     using ForwardWeapon = RunState::ForwardWeapon;
     using Phase = RunState::Phase;

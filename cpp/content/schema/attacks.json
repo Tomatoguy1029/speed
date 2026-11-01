@@ -12,7 +12,7 @@
         {
           "name": "shape",
           "type": "u32",
-          "max": 6
+          "max": 7
         },
         {
           "name": "scale",
@@ -99,6 +99,23 @@
           "ref": "ContactDefinition"
         }
       ]
+    },
+    {
+      "name": "BeamDefinition",
+      "section": 26,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {
@@ -130,6 +147,10 @@
       {
         "name": "Rect",
         "value": "rect"
+      },
+      {
+        "name": "TaperedBeam",
+        "value": "tapered_beam"
       }
     ],
     "HostileKind": [

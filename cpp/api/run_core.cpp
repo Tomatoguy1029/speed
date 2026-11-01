@@ -233,7 +233,7 @@ void SpeedRunCore::close() {
     runtime.state.events.clear();runtime.state.combat_events.clear();runtime.state.previous_poses={};
     runtime.frame_workspace={};
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
-    runtime.state.bite_zones.clear(); runtime.state.free_bite_zones.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
+    runtime.state.hazards.clear(); runtime.state.free_hazards.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;
     runtime.state.gems.clear(); runtime.state.coins.clear();runtime.state.capsules.clear(); runtime.state.free_gems.clear(); runtime.state.free_coins.clear(); runtime.state.gem_queue.clear(); runtime.state.collections.clear();
 }

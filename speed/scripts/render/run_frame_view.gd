@@ -7,6 +7,7 @@ var parts: Dictionary = {}
 var enemy_frames: Dictionary = {}
 var _layers: Dictionary = {}
 var _lines: Array[Line2D] = []
+var _shape_displays: Dictionary = {}
 var _scope: ContentResourceScope
 var _pixel := 1.82
 var _effects: PixelPainter
@@ -116,7 +117,8 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind")!=0 or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [0,1] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
 		for i in range(1,row.offsets.size()):
 			if row.offsets[i]<row.offsets[i-1]: return false
@@ -153,15 +155,37 @@ func apply_frame(frame: Dictionary) -> bool:
 		else: batch.apply_frame(row.transforms,row.colors)
 	for batch: InstanceBatch in batches.values(): batch.end()
 	for display: Node in enemy_frames.values(): display.end()
+	for display: Dictionary in _shape_displays.values():
+		display.node.hide()
+		display.circles.clear()
+		display.node.queue_redraw()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
+		var parent: Node2D = _layer(row.layer)
+		var display: Dictionary = {}
+		if int(row.owner_id)>0 or row.kind==1:
+			var key := "%d:%d" % [row.layer,row.order]
+			if not _shape_displays.has(key):
+				var circles: Array = []
+				var node := preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
+				parent.add_child(node)
+				_shape_displays[key] = {"node":node,"circles":circles}
+			display = _shape_displays[key]
+			parent = display.node
+			parent.show()
+			parent.get_parent().move_child(parent,-1)
 		for i in row.widths.size():
+			if row.kind==1:
+				if display.is_empty() or row.offsets[i+1]-row.offsets[i]!=1: return false
+				display.circles.append({"position":row.points[row.offsets[i]],"radius":row.widths[i],"color":row.colors[i]})
+				display.node.queue_redraw()
+				continue
 			if line_index==_lines.size():
 				var line := Line2D.new()
 				_layer(row.layer).add_child(line)
 				_lines.append(line)
 			var line := _lines[line_index]
-			if line.get_parent()!=_layer(row.layer): line.reparent(_layer(row.layer))
+			if line.get_parent()!=parent: line.reparent(parent)
 			line.points = row.points.slice(row.offsets[i],row.offsets[i+1])
 			line.width = row.widths[i]
 			line.default_color = row.colors[i]

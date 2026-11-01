@@ -89,21 +89,22 @@ AttackHandle AttackSystem::emit_hostile(State &state,State::Hostile value,Attack
     if (state.free_hostiles.empty()) state.hostiles.push_back(std::move(value));else {state.free_hostiles.pop_back();state.hostiles[row]=std::move(value);}
     return handle;
 }
-AttackHandle AttackSystem::emit_hazard(State &state,State::BiteZone value,AttackSpec spec) {
-    if (!state.bite_zone_config.ready) return {};
-    if (value.duration<=0) value.duration=state.bite_zone_config.duration;
-    if (!std::isfinite(value.duration) || value.duration<=0) return {};
-    const size_t row=state.free_bite_zones.empty()?state.bite_zones.size():state.free_bite_zones.back();if (row>=UINT32_MAX) return {};
+AttackHandle AttackSystem::emit_hazard(State &state,State::Hazard value,AttackSpec spec) {
+    const bool circle=std::holds_alternative<CircleHazard>(value.shape);
+    if (circle && !state.bite_zone_config.ready) return {};
+    if (circle && value.duration<=0) value.duration=state.bite_zone_config.duration;
+    if (!std::isfinite(value.duration) || value.duration<0 || (circle && value.duration==0)) return {};
+    const size_t row=state.free_hazards.empty()?state.hazards.size():state.free_hazards.back();if (row>=UINT32_MAX) return {};
     const auto handle=register_attack(state,AttackPool::Hazard,uint32_t(row),spec);if (!get(state,handle)) return {};
     value.attack=handle;value.alive=true;
-    if (state.free_bite_zones.empty()) state.bite_zones.push_back(std::move(value));else {state.free_bite_zones.pop_back();state.bite_zones[row]=std::move(value);}
+    if (state.free_hazards.empty()) state.hazards.push_back(std::move(value));else {state.free_hazards.pop_back();state.hazards[row]=std::move(value);}
     return handle;
 }
 bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) {
     const auto *entry=get(state,handle);if (!entry) return false;
     const auto record=*entry;auto &all=state.attacks;
     all.records[handle.slot].alive=false;
-    godot::Vector2 pos;
+    godot::Vector2 pos;bool circle=false;
     switch(record.pool) {
     case AttackPool::Friendly: {
         auto &value=state.friends[record.row];pos=value.pos;
@@ -116,8 +117,8 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
         if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hostiles.push_back(record.row);}break;
     }
     case AttackPool::Hazard: {
-        auto &value=state.bite_zones[record.row];pos=value.pos;
-        if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_bite_zones.push_back(record.row);}break;
+        auto &value=state.hazards[record.row];pos=value.pos;circle=std::holds_alternative<CircleHazard>(value.shape);
+        if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hazards.push_back(record.row);}break;
     }
     }
     const auto &s=record.spec;
@@ -127,7 +128,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     AttackBudgetSystem::release(state,s.owner.budget);
     all.handles.release(handle);if (all.handles.reusable(handle.slot)) all.free_records.push_back(handle.slot);
     CombatEvent event;event.kind=CombatEventKind::AttackRetired;event.target_id=record.id;event.source_entity_id=s.owner.source_id;
-    event.source=s.owner.source_definition;event.attack_pool=record.pool;event.attack_end_reason=reason;event.pos=pos;
+    event.source=s.owner.source_definition;event.attack_pool=record.pool;event.attack_end_reason=reason;event.pos=pos;event.circle_hazard=circle;
     event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);return true;
 }
 void AttackSystem::source_ended(State &state,EnemyHandle source,AttackEndReason reason) {
@@ -194,7 +195,7 @@ bool AttackSystem::rebuild(State &state) {
         switch(record.pool) {
         case AttackPool::Friendly:valid=record.row<state.friends.size() && state.friends[record.row].alive && same_handle(state.friends[record.row].attack,h) && state.friends[record.row].id==record.id;break;
         case AttackPool::Hostile:valid=record.row<state.hostiles.size() && state.hostiles[record.row].alive && same_handle(state.hostiles[record.row].attack,h);break;
-        case AttackPool::Hazard:valid=record.row<state.bite_zones.size() && state.bite_zones[record.row].alive && same_handle(state.bite_zones[record.row].attack,h);break;
+        case AttackPool::Hazard:valid=record.row<state.hazards.size() && state.hazards[record.row].alive && same_handle(state.hazards[record.row].attack,h);break;
         }
         if (!valid || !AttackBudgetSystem::retain(state,record.spec.owner.budget)) return false;
         add_indexes(state,h,record);
@@ -202,7 +203,7 @@ bool AttackSystem::rebuild(State &state) {
     for (auto slot:all.free_records) if (slot>=all.records.size() || all.records[slot].alive || !all.handles.reusable(slot) || !free.insert(slot).second) return false;
     for (const auto &value:state.friends) if (value.alive && !get(state,value.attack)) return false;
     for (const auto &value:state.hostiles) if (value.alive && !get(state,value.attack)) return false;
-    for (const auto &value:state.bite_zones) if (value.alive && !get(state,value.attack)) return false;
+    for (const auto &value:state.hazards) if (value.alive && !get(state,value.attack)) return false;
     return true;
 }
 }

@@ -8,6 +8,7 @@
 #include "group_state.h"
 #include "lifecycle_state.h"
 #include "field_state.h"
+#include "hazard_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -202,16 +203,9 @@ struct RunState {
         float speed = 0, radius = 0, life = 0, slow = 0, turn = 0, gap = 0, stone = 0, wait = 0;
         double damage = 0;
     };
-    struct BiteZone {
-        Vector2 pos;
-        float radius = 0, time = 0, delay = 0, duration = 0;
-        double damage = 0;
-        Color color;
-        speed::AttackHandle attack;
-        bool alive = true, hit = false;
-    };
-    std::deque<BiteZone> bite_zones;
-    std::vector<size_t> free_bite_zones;
+    using Hazard=speed::HazardState;
+    std::deque<Hazard> hazards;
+    std::vector<size_t> free_hazards;
     struct BiteZoneConfig {
         uint32_t visual_key=0;
         bool ready = false, hit = false, fade = false;

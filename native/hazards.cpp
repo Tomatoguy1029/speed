@@ -21,8 +21,8 @@ int64_t SpeedRunCore::fire_bite_zone(Vector2 at, double radius, double delay, do
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.bite_zone_config.ready || !at.is_finite() || token < 0) return -1;
     for (double value : {radius, delay, damage}) if (!std::isfinite(value) || value < 0) return -1;
     for (int k = 0; k < 4; ++k) if (!std::isfinite(color[k])) return -1;
-    BiteZone zone; zone.pos = at; zone.radius = radius; zone.delay = delay; zone.damage = damage; zone.color = color;
-    if (!std::isfinite(zone.radius) || !std::isfinite(zone.delay)) return -1;
+    BiteZone zone; zone.pos = at; zone.shape=speed::CircleHazard{float(radius)}; zone.delay = delay; zone.damage = damage; zone.color = color;
+    if (!std::isfinite(std::get<speed::CircleHazard>(zone.shape).radius) || !std::isfinite(zone.delay)) return -1;
     speed::AttackSpec spec;spec.owner.budget.value=token;
     spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;spec.cause=speed::Cause::Blast;
     if (!runtime.content->contacts.empty()) speed::AttackSystem::configure_contact(*runtime.content,2,spec);
@@ -37,42 +37,19 @@ void SpeedRunCore::end_bite_visual(bool hit, Vector2 at) {
 }
 
 bool SpeedRunCore::step_hazards(double dt) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !std::isfinite(dt) || dt < 0) return false;
-    const int64_t update_cutoff=runtime.state.attacks.next_id;
-    for (size_t row = 0; row < runtime.state.bite_zones.size(); ++row) {
-        auto &zone = runtime.state.bite_zones[row]; if (!zone.alive) continue;
-        const auto processing_handle=zone.attack;const auto *record=speed::AttackSystem::get(runtime.state,processing_handle);
-        if (!record || record->id>=update_cutoff) continue;
-        // 元の配列への保存は単精度、同じ更新の分岐は保存前の倍精度で判断する。
-        const double time = double(zone.time) + dt; zone.time = time;
-        if (time >= double(zone.delay) + double(zone.duration)) {
-            speed::AttackSystem::end(runtime.state,processing_handle,speed::AttackEndReason::Lifetime);continue;
-        }
-        if (time>=zone.delay && !speed::AttackSystem::hazard_act(runtime.state,processing_handle,dt)) return true;
-        if (time < zone.delay || zone.hit) continue;
-        if (!speed::AttackSystem::hazard_before_touch(runtime.state,processing_handle)) return true;
-        // 円形判定は発動時の一回だけ。範囲外でも以後は表示だけ残す。
-        zone.hit = true;
-        const auto *contact_record=speed::AttackSystem::get(runtime.state,processing_handle);
-        if (!contact_record) continue;
-        const auto &policy=contact_record->spec.contact;
-        const auto previous=contact_record->ship_previous_ready?contact_record->ship_previous:runtime.state.ship.pos;
-        if (!speed::CollisionQuery::touches(speed::PointCircle{zone.pos,double(zone.radius)},
-            {previous,runtime.state.ship.pos,runtime.state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) continue;
-        end_bite_visual(true, runtime.state.ship.pos);
-        speed::CombatResolver::attack_ship_damage(runtime,processing_handle,speed::PointCircle{zone.pos,double(zone.radius)},zone.damage,0.0);
-        speed::EventBuilder::flush_combat(runtime);
-        if (runtime.state.phase != Phase::Play) return true;
-    }
-    return true;
+    return speed::AttackSystem::step_hazards(runtime,dt);
 }
 
 Array SpeedRunCore::hazards_snapshot() const {
     Array out;
-    for (size_t i = 0; i < runtime.state.bite_zones.size(); ++i) {
-        const auto &zone = runtime.state.bite_zones[i]; if (!zone.alive) continue;
-        Dictionary row; row["row"] = int64_t(i); row["pos"] = zone.pos; row["radius"] = zone.radius;
+    for (size_t i = 0; i < runtime.state.hazards.size(); ++i) {
+        const auto &zone = runtime.state.hazards[i]; if (!zone.alive) continue;
+        Dictionary row; row["row"] = int64_t(i); row["pos"] = zone.pos; row["radius"] = std::holds_alternative<speed::CircleHazard>(zone.shape)?std::get<speed::CircleHazard>(zone.shape).radius:0.0;
         row["time"] = zone.time; row["delay"] = zone.delay; row["active"] = zone.duration;
+        if (const auto *beam=std::get_if<speed::BeamHazard>(&zone.shape)) {
+            row["kind"]=0;row["angle"]=beam->angle;row["length"]=beam->length;row["half_width"]=beam->half_width;row["arc"]=beam->arc;
+            const auto *record=speed::AttackSystem::get(runtime.state,zone.attack);row["owner_id"]=record?record->spec.owner.source_id:0;
+        }
         row["damage"] = zone.damage; row["color"] = zone.color; row["hit"] = zone.hit; const auto *record=speed::AttackSystem::get(runtime.state,zone.attack);row["token"]=record?record->spec.owner.budget.value:0; out.append(row);
     }
     return out;

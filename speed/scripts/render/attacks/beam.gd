@@ -31,3 +31,11 @@ func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> vo
 
 func _color(pr: ProjectileSystem, i: int) -> Color:
 	return pr.hazard_color[i] * effect_tint
+
+## C++の表示用の値を受け、予告の円とLine2Dを同じ所有者の描画帯へ置く。
+static func frame_group(circles: Array) -> DrawLayer:
+	var node := DrawLayer.new()
+	node.z_index = -1
+	node.draw_fn = func(canvas: CanvasItem):
+		for circle: Dictionary in circles: canvas.draw_circle(circle.position,circle.radius,circle.color)
+	return node

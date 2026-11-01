@@ -70,6 +70,13 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     }
     for (auto row:state.dead_rows) if (row>=state.enemies.size() || !state.enemies[row].alive || !state.enemies[row].dead) return false;
     for (const auto &shot:state.hostiles) if (shot.alive && shot.definition>content.hostile_definitions.size()) return false;
+    for (const auto &hazard:state.hazards) if (hazard.alive) {
+        if (!hazard.pos.is_finite() || !std::isfinite(hazard.time) || !std::isfinite(hazard.delay) || !std::isfinite(hazard.duration) || !std::isfinite(hazard.damage)) return false;
+        if (const auto *beam=std::get_if<BeamHazard>(&hazard.shape)) {
+            if (!beam->definition || beam->definition>content.beams.size() || !std::isfinite(beam->angle) || !std::isfinite(beam->length) || beam->length<0 ||
+                !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
+        }
+    }
     if (!FieldSystem::validate(state,content)) return false;
     if (!GroupSystem::validate(state)) return false;
     return AttackSystem::rebuild(state);

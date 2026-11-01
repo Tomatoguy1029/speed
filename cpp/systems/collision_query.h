@@ -11,7 +11,8 @@ struct Polyline {std::vector<Point> points,before;double half_width=0;};
 struct Fan {Point center;double radius=0,angle=0,arc=0;};
 struct RingBand {Point center;double radius=0,half_width=0,angle=0,arc=0,gap_angle=0,gap_arc=0;};
 struct ContactRect {Point center,half;double angle=0;};
-using ContactShape=std::variant<PointCircle,SegmentCircle,SweptSegment,Polyline,Fan,RingBand,ContactRect>;
+struct TaperedBeam {Point from;double angle=0,length=0,half_width=0,arc=0;};
+using ContactShape=std::variant<PointCircle,SegmentCircle,SweptSegment,Polyline,Fan,RingBand,ContactRect,TaperedBeam>;
 struct ShipMotion {Point before,now;double radius=0;};
 struct ContactGeometry {bool add_ship_radius=true,ship_sweep=false;};
 class CollisionQuery {

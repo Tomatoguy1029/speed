@@ -1,0 +1,20 @@
+#pragma once
+#include "../../runtime/run_runtime.h"
+#include "../collision_query.h"
+#include <optional>
+namespace speed {
+struct BeamParams {
+    godot::Vector2 position;
+    double angle=0,length=0,half_width=0,arc=0,delay=0,active=0,damage=0;
+    godot::Color color=godot::Color::html("ff5a6e");
+    EnemyHandle owner;
+    BudgetToken budget;
+};
+class BeamSystem {
+public:
+    static AttackHandle emit(RunRuntime &,const BeamParams &);
+    static bool move(RunRuntime &,AttackHandle,godot::Vector2,double angle,std::optional<double> length={});
+    static ContactShape geometry(const HazardState &);
+    static void render(const RunRuntime &,uint32_t row,godot::Rect2 view,godot::Array &shapes);
+};
+}

@@ -566,7 +566,7 @@ inline bool read(BinaryReader &input, ContactDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.shape)) return false;
-    if (out.shape > 6) return false;
+    if (out.shape > 7) return false;
     if (!input.read_u32(out.scale)) return false;
     if (out.scale > 1) return false;
     if (!input.read_u32(out.hit_policy)) return false;
@@ -608,6 +608,17 @@ inline bool read(BinaryReader &input, HostileDefinition &out) {
     if (out.visual < 1) return false;
     if (!input.read_u32(out.stone_visual)) return false;
     if (out.stone_visual < 1) return false;
+    if (!input.read_u32(out.contact)) return false;
+    if (out.contact < 1) return false;
+    return true;
+}
+struct BeamDefinition {
+    uint32_t id{};
+    uint32_t contact{};
+};
+inline bool read(BinaryReader &input, BeamDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
     if (!input.read_u32(out.contact)) return false;
     if (out.contact < 1) return false;
     return true;
@@ -882,6 +893,7 @@ struct ContentRecords {
     std::vector<LifecycleDefinition> LifecycleDefinition_rows;
     std::vector<ContactDefinition> ContactDefinition_rows;
     std::vector<HostileDefinition> HostileDefinition_rows;
+    std::vector<BeamDefinition> BeamDefinition_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
@@ -1001,6 +1013,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { HostileDefinition row; if (!read(input,row)) return false; out.HostileDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 26: {
+        if (version != 1) return false;
+        if (count > input.remaining()/8) return false;
+        for (uint32_t i=0; i<count; ++i) { BeamDefinition row; if (!read(input,row)) return false; out.BeamDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 16: {
         if (version != 1) return false;
         if (count > input.remaining()/20) return false;
@@ -1087,6 +1105,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ContactDefinition_rows) if (!ContactDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HostileDefinition_ids;
     for (const auto &row:data.HostileDefinition_rows) if (!HostileDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BeamDefinition_ids;
+    for (const auto &row:data.BeamDefinition_rows) if (!BeamDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
@@ -1118,6 +1138,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HostileDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.HostileDefinition_rows) if (!ResourceKey_ids.count(row.stone_visual)) return false;
     for (const auto &row:data.HostileDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
+    for (const auto &row:data.BeamDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -1254,5 +1275,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=25;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=26;
 }

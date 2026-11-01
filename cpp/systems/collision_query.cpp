@@ -88,10 +88,19 @@ bool CollisionQuery::touches(const ContactShape &shape,const ShipMotion &ship,Co
             const double inner=std::max(0.0,value.radius-value.half_width-radius),outer=value.radius+value.half_width+radius;
             const auto contains=[&](Point p){const auto rel=p-value.center;const double dist=rel.length();return dist>=inner && dist<=outer && std::abs(angle_difference(rel.angle()-value.angle))<=value.arc && (value.gap_arc<=0 || std::abs(angle_difference(rel.angle()-value.gap_angle))>=value.gap_arc);};
             return radial_sweep(before,now,value.center,{inner,outer},{value.angle-value.arc,value.angle+value.arc,value.gap_angle-value.gap_arc,value.gap_angle+value.gap_arc},contains);
-        } else {
+        } else if constexpr (std::is_same_v<T,ContactRect>) {
             const Point a=(before-value.center).rotated(-value.angle),b=(now-value.center).rotated(-value.angle),half=value.half+Point(radius,radius);
             const auto contains=[&](Point p){return std::abs(p.x)<=half.x && std::abs(p.y)<=half.y;};
             return contains(a) || contains(b) || crosses(a,b,{-half.x,-half.y},{half.x,-half.y}) || crosses(a,b,{half.x,-half.y},{half.x,half.y}) || crosses(a,b,{half.x,half.y},{-half.x,half.y}) || crosses(a,b,{-half.x,half.y},{-half.x,-half.y});
+        } else {
+            const Point direction=Point::from_angle(value.angle);
+            const auto local=[&](Point p) {const auto relative=p-value.from;return Point(relative.dot(direction),relative.cross(direction));};
+            const Point a=local(before),b=local(now);const double base=value.half_width+radius,slope=std::tan(value.arc),end=value.length+radius;
+            const auto contains=[&](Point p){return p.x>=-radius && p.x<=end && std::abs(p.y)<=base+std::max(0.0,double(p.x))*slope;};
+            if (contains(a) || contains(b)) return true;
+            const Point edges[]={Point(-radius,-base),Point(0,-base),Point(end,-base-end*slope),Point(end,base+end*slope),Point(0,base),Point(-radius,base)};
+            for (size_t i=0;i<6;++i) if (crosses(a,b,edges[i],edges[(i+1)%6])) return true;
+            return false;
         }
     },shape);
 }
