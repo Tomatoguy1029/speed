@@ -1,5 +1,5 @@
-## プレイの記録（開発版だけ。設計書 14.3）。F9 で記録を入・切し、プレイ中ならその場で開始する。
-## 待機中に始めたランを、終わる（クリア・やられた・やめた）まで1つのファイルに書く。待機は F9 で切るまで続き、
+## プレイの記録（開発版だけ。設計書 14.3）。Ctrl+F9 で記録を入・切し、プレイ中ならその場で開始する。
+## 待機中に始めたランを、終わる（クリア・やられた・やめた）まで1つのファイルに書く。待機は Ctrl+F9 で切るまで続き、
 ## 次のランは別のファイルにする。実験場のランは記録しない。
 ## ファイルは書類フォルダの SPEED/recordings/stage<番号>_<日時>.jsonl。1行に1つの記録（JSON）で、メモリにためずに書き出す。
 ## 記録を閉じたら、保存したファイル名を画面の隅に少しのあいだ出す。性能は実時間窓で集約し、全フレームは保存しない。
@@ -82,7 +82,7 @@ var _label: Label
 ## 保存したファイル名の表示の残り時間と、その文字
 var _saved_t := 0.0
 var _saved_text := ""
-## F9 の直前から表示待ちだった出来事は、観測区間へ混ぜない。
+## Ctrl+F9 の直前から表示待ちだった出来事は、観測区間へ混ぜない。
 var _skip_events := 0
 
 ## 記録を置くフォルダ（書類フォルダの SPEED/recordings。書類フォルダが分からなければユーザーデータの中）。
@@ -124,6 +124,9 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
+		return
+	# Godot の埋め込み実行は F9/F10 を停止・コマ送りに使う。
+	if not key.ctrl_pressed or key.alt_pressed or key.shift_pressed or key.meta_pressed:
 		return
 	if key.keycode == KEY_F9:
 		_set_armed(not armed)
