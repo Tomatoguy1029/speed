@@ -41,7 +41,7 @@
 | 通常敵の同時攻撃 | ステージの `phases[].attack_budget`・`enemy_attack_values`、クリップの `attack_priority`・`formation_values` | [攻撃の管理](../spec.md#117-敵の攻撃の形)、`scripts/encounters/attack_director.gd` |
 | ステージ内の敵数値 | 対象ステージの `enemy_tuning` | `scripts/data_types/stage_enemy_tuning.gd` の許可項目と `scripts/runtime/systems/enemy_system.gd`、[敵一覧](../game/catalog/enemies.md)を照合する。共通定義を保ってラン専用の値へ解決する |
 | 敵の共通基準と行動（基礎担当の依頼範囲） | `data/enemies/<type ID>.tres`、種類別の `scripts/enemies/` | `scripts/data_types/enemy_def.gd`、`scripts/runtime/systems/enemy_system.gd`、[敵一覧](../game/catalog/enemies.md) |
-| 成長とドロップ | ステージ固有の時間帯の `xp_bonus` 等。共通の `data/config.tres`・敵の報酬値は基礎担当の依頼範囲 | [成長](../spec.md#9-成長)・[ドロップ](../spec.md#10-ドロップと回収)、`scripts/runtime/systems/loadout_system.gd`・`pickup_system.gd` |
+| 成長とドロップ | [結晶と成長の共通規則](../spec.md#10-ドロップと回収)。`data/config.tres`・敵の報酬上書きは基礎担当の依頼範囲 | [成長](../spec.md#9-成長)・[ドロップ](../spec.md#10-ドロップと回収)、`scripts/runtime/systems/loadout_system.gd`・`pickup_system.gd` |
 | ボス | 対象の `data/bosses/`・`scenes/bosses/`・`scripts/bosses/` | ボスの個別仕様と[AI・技・演出の分担](../architecture.md#61-敵とボスの-ai) |
 | 敵の絵・攻撃の描画 | `assets/pixel/`、`scripts/render/run_presentation.gd`、対象の描画処理 | [アートスタイル](../game/art-style.md)・[素材の入口](../../speed/assets/pixel/README.md)。ヒュドラは[個別素材と演出](../game/bosses/hydra.md#8-素材と演出) |
 

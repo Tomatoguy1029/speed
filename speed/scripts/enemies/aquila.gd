@@ -26,7 +26,7 @@ func step(i: int, dt: float) -> void:
 			if t.timer[i] <= lock_time and t.charge[i] == 0.0:
 				# この時点で進路を固定。地形に遮られる分も予告と実走行で共通にする。
 				var to_ship := state.ship_pos - t.pos[i]
-				t.facing[i] = to_ship.angle()
+				t.facing[i] = m.motion.tracking_angle(i, to_ship.angle())
 				var stop_gap := t.r[i] + cfg.ship_radius + 12.0
 				var advance := minf(float(p.dash_speed) * float(p.dash_time), maxf(0.0, to_ship.length() - stop_gap))
 				var end := t.pos[i] + Vector2.from_angle(t.facing[i]) * advance

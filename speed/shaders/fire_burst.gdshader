@@ -11,6 +11,9 @@ uniform float life = 0.0;
 // 炎の中心のドット座標と種（ノイズを場所ごと・炎ごとに変える）
 uniform vec2 origin = vec2(0.0);
 uniform float seed = 0.0;
+// 表示用の全体色と明るさ。CanvasItemのmodulateとは独立して適用する。
+uniform vec4 effect_color : source_color = vec4(1.0);
+uniform float effect_energy = 1.0;
 group_uniforms tuning;
 uniform vec4 c0 : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform vec4 c1 : source_color = vec4(1.0, 0.949, 0.659, 1.0);
@@ -21,6 +24,7 @@ uniform float roughness : hint_range(0.0, 2.0, 0.05) = 0.95;
 uniform float burn_speed : hint_range(0.3, 3.0, 0.05) = 1.15;
 uniform float start_size : hint_range(0.0, 1.0, 0.05) = 0.35;
 uniform float flash_boost : hint_range(0.0, 1.5, 0.05) = 0.7;
+uniform float outer_dither : hint_range(0.0, 1.0, 0.05) = 1.0;
 group_uniforms;
 
 float lattice(vec3 p) {
@@ -54,9 +58,13 @@ void fragment() {
 		COLOR = c1;
 	} else if (den > 0.33) {
 		COLOR = c2;
-	} else if (den > 0.16 && mod(at.x + at.y, 2.0) < 1.0) {
-		COLOR = c3;
+	} else if (den > 0.16) {
+		float coverage = mix(0.5, 1.0 - mod(at.x + at.y, 2.0), outer_dither);
+		if (coverage <= 0.0) discard;
+		COLOR = vec4(c3.rgb, c3.a * coverage);
 	} else {
 		discard;
 	}
+	COLOR *= effect_color;
+	COLOR.rgb *= effect_energy;
 }

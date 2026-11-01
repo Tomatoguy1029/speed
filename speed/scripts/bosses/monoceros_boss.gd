@@ -339,7 +339,12 @@ func _aim(dt: float) -> void:
 	_runner_for()._aim(self, dt)
 
 func _strike_aim(attack: StringName = &"", lead := -1.0) -> Vector2:
-	return _runner_for()._strike_aim(self, attack, lead)
+	var target: Vector2 = _runner_for()._strike_aim(self, attack, lead)
+	if tracking_locked():
+		var id := technique if attack == &"" else attack
+		var angle := table.facing[body] + (PI if tech_kind(id) == &"kick" else 0.0)
+		return table.pos[body] + Vector2.from_angle(angle) * maxf(1.0, table.pos[body].distance_to(target))
+	return target
 
 func lock_aim() -> void:
 	_runner_for().lock_aim(self)
@@ -370,12 +375,12 @@ func _reposition_tick(dt: float) -> void:
 		reposition = maxf(0.0, reposition - dt)
 		_move_body(reposition_direction * def.speed * dt)
 		var prior := table.facing[body]
-		table.facing[body] = rotate_toward(prior, reposition_direction.angle(), def.turn * dt)
+		if not tracking_locked(): table.facing[body] = rotate_toward(prior, reposition_direction.angle(), def.turn * dt)
 		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
 	else:
 		var toward := run_state.ship_pos - table.pos[body]
 		var prior := table.facing[body]
-		if not _close_ready(&"kick"):
+		if not _close_ready(&"kick") and not tracking_locked():
 			table.facing[body] = rotate_toward(prior, toward.angle(), def.turn * dt)
 		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
 		var keep := float(def.params.approach_range)

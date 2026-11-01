@@ -34,7 +34,7 @@ func _final_strike_tick(dt: float) -> void:
 	var widen := clampf((final_strike_t - (_final_charge - widen_time)) / widen_time, 0.0, 1.0)
 	var t := table
 	var i := body
-	var d := run_state.ship_pos - t.pos[i]
+	var d := tracking_target(run_state.ship_pos) - t.pos[i]
 	t.vel[i] = Vector2.ZERO
 	t.facing[i] += clampf(Geom.angle_diff(d.angle(), t.facing[i]), -def.turn * dt, def.turn * dt)
 	t.guard[i] = 1.0

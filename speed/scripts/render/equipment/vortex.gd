@@ -1,16 +1,24 @@
 extends WeaponVisual
 ## エンドホール：ブーストのあと、飛び続ける機体を中心に紫と白の粒が集まり（溜め）、真っ黒の暗黒が生まれて
 ## 重力レンズで周りの光を曲げる（機体のすぐ下で画面を読む hole_lens）。引き込みの瞬間は周りが暗い紫に沈み、
-## 敵は紫の尾を引いて中心へ引きずられながら、その敵の色の細かい粒に砕けていく。暗黒は一気に縮んで消え、
-## 消えきった瞬間に機体の周りへ緑のやわらかい光が広がり、緑の粒が舞い上がる。
+## 敵は紫の尾を引いて中心へ引きずられながら、その敵の色の細かい粒に砕けていく。暗黒は一気に縮んで消え、そのあいだ
+## 中心へ白い点が潰れ、輪が1本縮む。消えきると白い点が一瞬震えて十字にはじけ、同時に機体の周りへブーストゲージ色の
+## やわらかい光が広がり、同じ色の粒が舞い上がる。
 
 const CHARGE := 0.15
 const PULL := 0.07
 const HOLD := 0.22
 const COLLAPSE := 0.15
+## 消えたあと白い点が震える秒と、はじける秒
+const CRUSH := 0.08
+const POP := 0.3
+const MID := Color("#a080f0")
+const PALE := Color("#d8c8ff")
+const BOOST_STYLE := preload("res://data/visuals/boost_gauge_runtime.tres")
 var holes: Array[Dictionary] = []
 var captures: Array[Dictionary] = []
 var heals: Array[Dictionary] = []
+var pops: Array[Dictionary] = []
 var _add: PixelPainter
 
 const LENS := preload("res://shaders/hole_lens.gdshader")
@@ -55,7 +63,7 @@ func on_event(ev: Dictionary) -> void:
 		&"hole_recover":
 			var dots: Array[Dictionary] = []
 			for i in 14: dots.append({"a": randf() * TAU, "v": 14.0 + randf() * 26.0, "up": 10.0 + randf() * 22.0, "s": 1.2 + randf() * 1.6, "dl": randf() * 0.12})
-			heals.append({"age": 0.0, "dots": dots, "outer": _glow_rect(), "inner": _glow_rect()})
+			heals.append({"age": -CRUSH, "dots": dots, "outer": _glow_rect(), "inner": _glow_rect()})
 
 func tick(_dt: float) -> void:
 	var dt := world_dt()
@@ -72,17 +80,23 @@ func tick(_dt: float) -> void:
 	var center := state.ship_pos
 	for h in holes:
 		h.age += dt
-		_hole(h, center)
+		_hole(p, h, center)
 	for h in holes:
-		if h.age >= CHARGE + HOLD + COLLAPSE: _free_lens(h)
+		if h.age >= CHARGE + HOLD + COLLAPSE:
+			_free_lens(h)
+			pops.append({"age": 0.0})
 	holes = holes.filter(func(h): return h.age < CHARGE + HOLD + COLLAPSE)
 	for c in captures:
 		c.age += dt
 		_capture(p, c, center)
 	captures = captures.filter(func(c): return c.age < 0.6)
+	for g in pops:
+		g.age += dt
+		_pop(p, g.age, center)
+	pops = pops.filter(func(g): return g.age < CRUSH + POP)
 	for g in heals:
 		g.age += dt
-		_heal(p, g, center)
+		if g.age >= 0.0: _heal(p, g, center)
 	for g in heals:
 		if g.age >= 0.7:
 			g.outer.queue_free()
@@ -91,7 +105,7 @@ func tick(_dt: float) -> void:
 	p.end()
 	_add.end()
 
-func _hole(h: Dictionary, center: Vector2) -> void:
+func _hole(p: PixelPainter, h: Dictionary, center: Vector2) -> void:
 	var a: float = h.age
 	var px := _add.px
 	var shadow := 0.0
@@ -120,6 +134,15 @@ func _hole(h: Dictionary, center: Vector2) -> void:
 	mat.set_shader_parameter("glow_radius", glow_radius * px)
 	mat.set_shader_parameter("glow", glow)
 	tune(mat)
+	# 崩壊：中心へ白い点が潰れて熱くなり、輪が1本、暗黒のふちへ縮む
+	if a >= CHARGE + HOLD:
+		var k := clampf((a - CHARGE - HOLD) / COLLAPSE, 0.0, 1.0)
+		p.disk(center, 2.2 + 1.5 * k, MID)
+		p.disk(center, 1.0 + 1.5 * k, Color.WHITE)
+		var ring := 60.0 * (1.0 - k * k) + shadow
+		var color := Color(PALE if k > 0.5 else MID, 0.4 + 0.6 * k)
+		p.ring(center, ring, color)
+		if k > 0.6: p.ring(center, ring - 1.0, color)
 	if a >= CHARGE and a < CHARGE + PULL + 0.12: rm.shake = maxf(rm.shake, 6.0 * (1.0 - (a - CHARGE) / (PULL + 0.12)))
 	# 溜め：粒が中心へ集まる。中心に近いほど薄れて暗黒に消える
 	for q in h.particles:
@@ -168,16 +191,44 @@ func _capture(p: PixelPainter, c: Dictionary, center: Vector2) -> void:
 		shade.a = fade
 		p.dot(pos, shade, s.s)
 
-## 回復：機体を中心に緑のやわらかい光が広がり（外の光と、白っぽい内の光）、緑の丸い粒が舞い上がる。
+## 暗黒が消えたあと：白い点が CRUSH 秒震え、POP 秒で十字にはじける（斜め4本の光ときらめき）。
+func _pop(p: PixelPainter, age: float, center: Vector2) -> void:
+	if age < CRUSH:
+		var at := center + Vector2(0.5 if floori(age * 40.0) % 2 == 1 else -0.5, 0.0) * p.px
+		p.disk(at, 2.8, MID)
+		p.disk(at, 1.6, Color.WHITE)
+		return
+	var q := (age - CRUSH) / POP
+	if q < 0.12: p.disk(center, 5.0 * (1.0 - q / 0.12) + 1.0, Color.WHITE)
+	if q < 0.5:
+		var length := (1.0 - q / 0.5) * 26.0 + 3.0
+		for i in 4:
+			var dir := Vector2.from_angle(i * PI / 2.0 + PI / 4.0) * p.px
+			var d := 0.0
+			while d <= length:
+				var fade := 1.0 if d < length * 0.7 else 1.0 - (d / length - 0.7) / 0.3
+				p.dot(center + dir * d, Color(Color.WHITE if d < length * 0.4 else PALE, fade))
+				d += 0.5
+	if q < 0.7:
+		var n := roundi(5.0 * (1.0 - q / 0.7))
+		for d in range(1, n + 1):
+			for e in [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP]:
+				p.dot(center + e * d * p.px, PALE if d > n * 0.6 else Color.WHITE)
+		if n >= 3:
+			for e in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]: p.dot(center + e * p.px, Color.WHITE)
+		p.dot(center, Color.WHITE)
+
+## 回復：ブーストゲージの通常色で光と粒を描き、内側の光は白に近づける。
 func _heal(p: PixelPainter, g: Dictionary, center: Vector2) -> void:
 	var h: float = g.age / 0.7
-	_glow(g.outer, center, (12.0 + 40.0 * h) * p.px, Color(110.0 / 255.0, 1.0, 170.0 / 255.0, 0.55 * (1.0 - h)))
-	_glow(g.inner, center, (8.0 + 14.0 * h) * p.px, Color(220.0 / 255.0, 1.0, 230.0 / 255.0, 0.5 * (1.0 - h) * (1.0 - h)))
+	var color := BOOST_STYLE.normal_color
+	_glow(g.outer, center, (12.0 + 40.0 * h) * p.px, Color(color, 0.55 * (1.0 - h)))
+	_glow(g.inner, center, (8.0 + 14.0 * h) * p.px, Color(color.lightened(0.8), 0.5 * (1.0 - h) * (1.0 - h)))
 	for dot in g.dots:
 		var k := clampf((h - dot.dl) / (1.0 - dot.dl), 0.0, 1.0)
 		if k <= 0.0 or k >= 1.0: continue
 		var pos: Vector2 = center + Vector2(cos(dot.a) * dot.v * k, sin(dot.a) * dot.v * k * 0.6 - dot.up * k) * p.px
-		p.disk(pos, dot.s, Color(Color("#8fffbe"), 1.0 - k))
+		p.disk(pos, dot.s, Color(color, 1.0 - k))
 
 func _glow(rect: ColorRect, center: Vector2, radius: float, color: Color) -> void:
 	rect.position = center - Vector2.ONE * radius

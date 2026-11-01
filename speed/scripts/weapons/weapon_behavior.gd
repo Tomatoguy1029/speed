@@ -5,6 +5,8 @@
 class_name WeaponBehavior
 extends RefCounted
 
+const PARAMETER_FACTORS := [&"projectile_speed", &"duration", &"knockback", &"area"]
+
 var ctx: RunContext
 var def: WeaponDef
 var level := 1
@@ -35,9 +37,9 @@ func radius_k() -> float:
 func p(key: String, default = 0.0):
 	var value: Variant = def.params.get(key, default)
 	var targets := cfg.post_max.target(def.id)
-	if key in targets.get("area", []):
+	if targets.has("area") and key in targets["area"]:
 		return value.map(func(v):return float(v)*post_factor(&"area")) if value is Array else float(value)*post_factor(&"area")
-	if key in targets.get("duration", []):
+	if targets.has("duration") and key in targets["duration"]:
 		return value.map(func(v):return float(v)*post_factor(&"duration")) if value is Array else float(value)*post_factor(&"duration")
 	if key == "knock" or key == "chain_knock":
 		return float(value) * post_factor(&"knockback")
@@ -46,7 +48,7 @@ func p(key: String, default = 0.0):
 func post_factor(id: StringName) -> float:
 	var key := String(id)
 	if id == &"projectile_speed": key = "projectile"
-	if id in [&"projectile_speed", &"duration", &"knockback", &"area"] and not cfg.post_max.target(def.id).has(key):
+	if id in PARAMETER_FACTORS and not cfg.post_max.target(def.id).has(key):
 		return 1.0
 	return cfg.post_max.factor(id, state.post_max_stacks)
 
@@ -78,8 +80,15 @@ func shooting_interval(base: float) -> float:
 	return interval(base) / ctx.loadout.shooting_rate()
 
 func at_level(key: String) -> float:
-	var values: Array = p(key)
-	return float(values[clampi(level - 1, 0, values.size() - 1)])
+	# 必要な段階を選んでから補正し、参照のたびにLv配列全体を作り直さない。
+	var values: Array = def.params.get(key, 0.0)
+	var value := float(values[clampi(level - 1, 0, values.size() - 1)])
+	var targets := cfg.post_max.target(def.id)
+	if targets.has("area") and key in targets["area"]:
+		return value * post_factor(&"area")
+	if targets.has("duration") and key in targets["duration"]:
+		return value * post_factor(&"duration")
+	return value
 
 func atk() -> float:
 	return ctx.combat.attack_power() * damage_factor()

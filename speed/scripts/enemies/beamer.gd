@@ -18,7 +18,7 @@ func _beamer(i: int, dt: float) -> void:
 	if t.mode[i] == EnemyTable.Mode.MOVE:
 		t.fire_t[i] -= dt
 		if t.fire_t[i] <= 0.0:
-			var a := (state.enemy_aim - t.pos[i]).angle()
+			var a := m.motion.tracking_angle(i, (state.enemy_aim - t.pos[i]).angle())
 			t.facing[i] = a
 			t.mode[i] = EnemyTable.Mode.WINDUP
 			t.timer[i] = float(p.telegraph) + float(p.beam_time)

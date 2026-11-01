@@ -53,14 +53,14 @@ func make_runner() -> RefCounted:
 
 class Runner extends "res://scripts/bosses/hydra/technique_runner.gd":
 	func _update_north_targets(host: Node) -> void:
-		host.north_target = host.run_state.ship_pos
+		host.north_target = host.tracking_target(host.run_state.ship_pos)
 		var direction = (host.north_target-host.table.pos[host.body]).normalized()
 		var side = direction.orthogonal()
 		var center = host.table.pos[host.body]+direction*maxf(host.north_target.distance_to(host.table.pos[host.body]),host.table.r[host.body]+float(host.def.params.neck_rest))
 		var ordered = host.participants.duplicate()
 		ordered.sort_custom(func(a,b):return host._neck_base(a).dot(side) < host._neck_base(b).dot(side))
 		for i in ordered.size():
-			ordered[i].target = center+side*float(host.move_params(host.tech).north_spread)*(i-1)
+			ordered[i].target = host.neck_tracking_target(ordered[i], center+side*float(host.move_params(host.tech).north_spread)*(i-1))
 
 	func north_curl(host: Node) -> void:
 		host._update_north_targets()
@@ -77,6 +77,7 @@ class Runner extends "res://scripts/bosses/hydra/technique_runner.gd":
 				neck.strike_pos = neck.strike_from
 				neck.mode = &"tech_lunge"
 				neck.t = 0.0
+				neck.target = host.neck_tracking_target(neck, neck.target)
 				neck.angle = (neck.target - neck.strike_from).angle()
 				host._cue(&"attack_started", host.tech, host.necks.find(neck), {"target_position": neck.target})
 

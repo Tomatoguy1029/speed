@@ -5,15 +5,10 @@ const PATHS := {
 	"landmark": "res://data/visuals/landmark_mark.tres",
 	"elite": "res://data/visuals/elite_mark.tres",
 }
-const SHADERS := {
-	"landmark": preload("res://shaders/landmark_mark.gdshader"),
-	"elite": preload("res://shaders/elite_mark.gdshader"),
-}
-const SAMPLE := preload("res://assets/pixel/telescope.png")
 const LABELS := {
-	"pixel_grid": "ドット密度", "inner_radius": "内側の空白", "outer_radius": "外側の広がり",
-	"noise_scale": "模様の細かさ", "motion_speed": "変化の速度", "intensity": "明るさ",
-	"color": "基調色", "highlight": "光る色",
+ "interval_min": "最短の発生間隔（秒）", "interval_random": "発生間隔のばらつき（秒）",
+ "interval_max": "最長の発生間隔（秒）", "arc_count": "同時放電の中心本数",
+ "spark_count": "火花の上限", "intensity": "濃さ", "color": "赤い光", "highlight": "放電の芯", "shadow": "黒い縁",
 }
 
 var preview_host: Control
@@ -23,11 +18,9 @@ var _working: Dictionary = {}
 var _hashes: Dictionary = {}
 var _dirty: Dictionary = {}
 var _message := ""
-var _batch: InstanceBatch
-var _viewport: SubViewport
 var _fields := VBoxContainer.new()
-var _clock := 0.0
-var _paused := false
+var _game_context
+var _context_active := false
 
 func _ready() -> void:
 	var controls := ScrollContainer.new()
@@ -40,44 +33,10 @@ func _ready() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	(preview_host if preview_host != null else self).add_child(right)
-	var title := Label.new()
-	title.text = "敵のプレビュー（本体の背後へ表示）"
-	right.add_child(title)
-	var container := SubViewportContainer.new()
-	container.stretch = true
-	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right.add_child(container)
-	_viewport = SubViewport.new()
-	_viewport.size = Vector2i(480, 480)
-	_viewport.disable_3d = true
-	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	container.add_child(_viewport)
-	var backdrop := ColorRect.new()
-	backdrop.color = Color("#10141e")
-	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_viewport.add_child(backdrop)
-	_batch = InstanceBatch.new()
-	_batch.setup_shader_quad()
-	_batch.z_index = -1
-	_viewport.add_child(_batch)
-	_batch.begin()
-	_batch.add_upright(Vector2(240, 240), 80.0, Color(0.4, 0, 0, 1))
-	_batch.end()
-	var enemy := Sprite2D.new()
-	enemy.texture = SAMPLE
-	enemy.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	enemy.position = Vector2(240, 240)
-	enemy.scale = Vector2.ONE * 1.5
-	_viewport.add_child(enemy)
+	_game_context = load("res://gyms/game_context_preview.gd").new()
+	right.add_child(_game_context)
 	_load(_section)
 	_show_section()
-
-func _process(delta: float) -> void:
-	if not _paused:
-		_clock += delta
-	if is_instance_valid(_batch):
-		(_batch.material as ShaderMaterial).set_shader_parameter("mark_time", _clock)
 
 func _load(section: String) -> void:
 	var path: String = PATHS[section]
@@ -99,11 +58,11 @@ func set_section(section: String) -> void:
 
 func _show_section() -> void:
 	if not _working.has(_section): return
-	var material := ShaderMaterial.new()
-	material.shader = SHADERS[_section]
-	(_working[_section] as EnemyMarkSettings).apply_to(material)
-	_batch.material = material
-	material.set_shader_parameter("mark_time", _clock)
+	if _section == "landmark":
+		_game_context.set_landmark_settings(_working[_section] as EnemyMarkSettings)
+	else:
+		_game_context.set_elite_settings(_working[_section] as EnemyMarkSettings)
+	_game_context.set_active(_context_active)
 	_rebuild_fields()
 
 func _rebuild_fields() -> void:
@@ -112,42 +71,55 @@ func _rebuild_fields() -> void:
 		child.queue_free()
 	var description := Label.new()
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description.text = "星座の手掛かり。船体を隠さない粒状の光。" if _section == "landmark" else "強化された個体。装甲の外側に断続する発光片。"
+	description.text = "星座の手掛かり。船体の輪郭に沿って揺れる濃い金色のオーラ。本編と同じマスク・設定を使います。" if _section == "landmark" else "輪郭の異なる場所に、赤黒い短い放電が不規則に走る強化個体。本編と同じ接点・描画を使います。"
 	_fields.add_child(description)
-	var pause := CheckButton.new()
-	pause.text = "一時停止"
-	pause.button_pressed = _paused
-	pause.toggled.connect(func(value): _paused = value)
-	_fields.add_child(pause)
 	var settings := _working[_section] as EnemyMarkSettings
-	for property in settings.get_property_list():
-		if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_EDITOR):
-			continue
-		var key: String = property.name
-		if not LABELS.has(key): continue
-		var label := Label.new()
-		label.text = LABELS[key]
-		_fields.add_child(label)
-		if property.type == TYPE_COLOR:
-			var picker := ColorPickerButton.new()
-			picker.color = settings.get(key)
-			picker.color_changed.connect(_set_color.bind(key))
-			_fields.add_child(picker)
-		elif property.type == TYPE_INT or property.type == TYPE_FLOAT:
-			var spin := SpinBox.new()
-			var range_parts: PackedStringArray = String(property.hint_string).split(",")
-			if range_parts.size() >= 2:
-				spin.min_value = float(range_parts[0])
-				spin.max_value = float(range_parts[1])
-			if range_parts.size() >= 3: spin.step = float(range_parts[2])
-			spin.value = settings.get(key)
-			spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			spin.value_changed.connect(_set_number.bind(key))
-			_fields.add_child(spin)
+	if _section == "landmark":
+		for group in EnemyMarkSettings.AURA_GROUPS:
+			_fields.add_child(HSeparator.new())
+			var heading := Label.new()
+			heading.text = group
+			_fields.add_child(heading)
+			for property in settings.get_property_list():
+				var details: Array = EnemyMarkSettings.AURA_FIELDS.get(property.name, [])
+				if details.is_empty() or details[0] != group: continue
+				_add_setting(property, settings, details[1], details[2])
+	else:
+		for property in settings.get_property_list():
+			if LABELS.has(property.name):
+				_add_setting(property, settings, LABELS[property.name], "")
+
+func _add_setting(property: Dictionary, settings: EnemyMarkSettings, caption: String, help: String) -> void:
+	if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_EDITOR): return
+	var key: String = property.name
+	var label := Label.new()
+	label.text = caption
+	label.tooltip_text = help
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_fields.add_child(label)
+	if property.type == TYPE_COLOR:
+		var picker := ColorPickerButton.new()
+		picker.custom_minimum_size = Vector2(72, 32)
+		picker.tooltip_text = help
+		picker.color = settings.get(key)
+		picker.color_changed.connect(_set_color.bind(key))
+		_fields.add_child(picker)
+	elif property.type == TYPE_INT or property.type == TYPE_FLOAT:
+		var spin := SpinBox.new()
+		spin.tooltip_text = help
+		var range_parts: PackedStringArray = String(property.hint_string).split(",")
+		if range_parts.size() >= 2:
+			spin.min_value = float(range_parts[0])
+			spin.max_value = float(range_parts[1])
+		if range_parts.size() >= 3: spin.step = float(range_parts[2])
+		spin.value = settings.get(key)
+		spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		spin.value_changed.connect(_set_number.bind(key))
+		_fields.add_child(spin)
 
 func _set_number(value: float, key: String) -> void:
 	var settings := _working[_section] as EnemyMarkSettings
-	settings.set(key, int(value) if key == "pixel_grid" else value)
+	settings.set(key, int(value) if key in ["arc_count", "spark_count"] else value)
 	_changed()
 
 func _set_color(value: Color, key: String) -> void:
@@ -156,7 +128,10 @@ func _set_color(value: Color, key: String) -> void:
 
 func _changed() -> void:
 	_dirty[_section] = true
-	(_working[_section] as EnemyMarkSettings).apply_to(_batch.material as ShaderMaterial)
+	if _section == "landmark":
+		_game_context.set_landmark_settings(_working[_section] as EnemyMarkSettings)
+	else:
+		_game_context.set_elite_settings(_working[_section] as EnemyMarkSettings)
 	_message = "未保存の調整値: " + PATHS[_section]
 
 func editing_state() -> Dictionary:
@@ -187,6 +162,6 @@ func reload_current() -> void:
 	_show_section()
 
 func set_active(active: bool) -> void:
+	_context_active = active
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
-	if is_instance_valid(_viewport):
-		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
+	if is_instance_valid(_game_context): _game_context.set_active(active)

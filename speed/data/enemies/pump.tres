@@ -1,9 +1,26 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://cofap4b6byj5s"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"height": 0.3,
+"key_energy": 1.6,
+"scale": 0.85
+}
+armor_colors = {
+"res://assets/pixel/pump/armor.png|24x37|35da6c50f03d898b07572b61f349a823bf2794c0f28ea4c899ea1679c06d78d5": {
+"169": "2f425e",
+"189": "2f425e",
+"200": "b68e2c",
+"222": "2f425e",
+"440": "8a6a2f",
+"445": "8a6a2f",
+"5": "b68e2c",
+"674": "8a6a2f"
+}
+}
 rank = 3
 radius = 26.0
 hp = 60.0
@@ -31,11 +48,11 @@ params = {
 "release_speed": 900.0,
 "shell_r": 26.0,
 "shell_range": 640.0,
-"shell_speed": 520.0,
+"shell_speed": 900.0,
 "store_max": 20,
 "swallow_interval": 0.12,
 "swallow_reach": 30.0,
-"telegraph": 1.4
+"telegraph": 0.25
 }
 id = &"pump"
 display_name = "ポンプ座"

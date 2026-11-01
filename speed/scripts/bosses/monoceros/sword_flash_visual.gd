@@ -1,6 +1,10 @@
 ## 仮表示。正式は shader。斬撃の判定線と、表示専用の乱数で針状の光を描く。
 extends Node2D
 @export var technique_id: StringName = &"sword_flash"
+@export_range(0, 24, 1) var streak_count := 7
+@export_range(0.25, 3.0, 0.05) var streak_length_scale := 1.0
+@export_range(0.25, 3.0, 0.05) var needle_width_scale := 1.0
+@export_range(0.25, 3.0, 0.05) var streak_lifetime_scale := 1.0
 var actor: MonocerosBoss
 var rng := RandomNumberGenerator.new()
 var effects: Array[Dictionary] = []
@@ -16,13 +20,13 @@ func on_event(event: Dictionary) -> void:
 	elif event.technique == technique_id and event.cue == &"slash_release":
 		var line := actor.last_slash.duplicate()
 		var width := float(actor.rule().slash_width)
-		effects.append({"line": line, "width": width, "age": 0.0, "life": 0.6})
+		effects.append({"line": line, "width": width, "age": 0.0, "life": 0.6 * streak_lifetime_scale})
 		var heading := (line[1] - line[0]).angle()
-		for j in 7:
+		for j in streak_count:
 			var center := line[0].lerp(line[1], rng.randf_range(0.15, 0.95))
 			var u := Vector2.from_angle(heading + rng.randf_range(-0.25, 0.25))
-			var half := rng.randf_range(120.0, 340.0) * 0.5
-			effects.append({"line": PackedVector2Array([center - u * half, center + u * half]), "width": rng.randf_range(4.0, 8.0), "age": 0.0, "life": rng.randf_range(0.45, 0.65)})
+			var half := rng.randf_range(120.0, 340.0) * 0.5 * streak_length_scale
+			effects.append({"line": PackedVector2Array([center - u * half, center + u * half]), "width": rng.randf_range(4.0, 8.0), "age": 0.0, "life": rng.randf_range(0.45, 0.65) * streak_lifetime_scale})
 
 func advance(dt: float) -> void:
 	for index in range(effects.size() - 1, -1, -1):
@@ -34,7 +38,7 @@ func _body_point(world_point: Vector2) -> Vector2:
 
 func _needle(a: Vector2, b: Vector2, width: float, color: Color) -> void:
 	var center := (a + b) * 0.5
-	var side := (b - a).normalized().orthogonal() * width * 0.5
+	var side := (b - a).normalized().orthogonal() * width * 0.5 * needle_width_scale
 	draw_colored_polygon(PackedVector2Array([a, center + side, b, center - side]), color)
 
 func _draw() -> void:

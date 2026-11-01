@@ -25,3 +25,9 @@ func get_display_name() -> String:
 	return tr("%s.%s.name" % [text_prefix, str(index) if category == &"stages" else String(id)])
 func get_description() -> String:
 	return tr("%s.%s.desc" % [text_prefix, String(id)])
+
+## 図鑑用の文章。専用の翻訳がある項目はカード用の短い説明と使い分ける。
+func get_codex_description() -> String:
+	var key := "%s.%s.codex_desc" % [text_prefix, String(id)]
+	var description := tr(key)
+	return get_description() if description == key else description

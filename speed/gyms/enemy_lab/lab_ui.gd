@@ -101,3 +101,14 @@ static func fold(parent: Node, title: String, open := false) -> VBoxContainer:
 	group.add_child(content)
 	toggle.toggled.connect(func(on): content.visible = on; toggle.icon = icon("chevron" if on else "chevron_right"))
 	return content
+
+## 別 Window の色ピッカー・パーツ編集でも、同じ編集ショートカットを受ける。
+class EditShortcuts extends Node:
+	var lab
+	func _input(event: InputEvent) -> void:
+		if is_instance_valid(lab): lab.handle_edit_shortcut(event, get_viewport())
+
+static func edit_shortcuts(window: Window, lab) -> void:
+	var handler := EditShortcuts.new()
+	handler.lab = lab
+	window.add_child(handler)

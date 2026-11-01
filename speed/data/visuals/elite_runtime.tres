@@ -1,0 +1,28 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://shaders/elite_crackle_runtime.gdshader" id="1"]
+
+[resource]
+metadata/bake_version = 1
+metadata/shader = ExtResource("1")
+metadata/values = {"arc_count": 3, "interval_max": 0.65, "interval_min": 0.075, "interval_random": 0.21, "spark_count": 3}
+metadata/resolved_values = {
+    "arc_count": "3",
+    "color": "Color(0.7411765, 0.1098039, 0.1607843, 1)",
+    "highlight": "Color(1, 0.2588235, 0.2901961, 1)",
+    "intensity": "1.0",
+    "interval_max": "0.65",
+    "interval_min": "0.075",
+    "interval_random": "0.21",
+    "shadow": "Color(0.03137255, 0.01568628, 0.02745098, 1)",
+    "spark_count": "3"
+}
+metadata/inputs = {
+    "res://data/visuals/elite_mark.tres": "ec6452ebbd6031efae293ef87ff2c76bd99fe7bc7a0fcd6fa1fd74fdc4d7254d",
+    "res://scripts/data_types/enemy_mark_settings.gd": "aee06995f6c7a7b704c65eb85b6346f5d9220b3c2c3399626775e4894e0beedc",
+    "res://shaders/elite_mark.gdshader": "b9db807f61612d238c3a41e62ccf9ae80f7870587cb5ea44c48764d1635d216e",
+    "res://tools/art/bake_elite_crackle.py": "ac35a458cab1b798b07993842fdc34bb7ddd05e1f4b482b18057bed59f00e163"
+}
+metadata/outputs = {
+    "res://shaders/elite_crackle_runtime.gdshader": "c4d2ae855a6eb700efc8e0a78ce48961c0ebe9d4d0bfbf55962ea2958d82b66d"
+}

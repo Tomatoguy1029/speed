@@ -7,7 +7,6 @@ script = ExtResource("1")
 params = {
 "chance_by_level": [0.15, 0.2, 0.25, 0.25, 0.25],
 "damage_by_level": [0.6, 0.6, 0.6, 0.7, 0.8],
-"generations": 6,
 "max": 220,
 "angle_min": 15.0,
 "angle_max": 45.0

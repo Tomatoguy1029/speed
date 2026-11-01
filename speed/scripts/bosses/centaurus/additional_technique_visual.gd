@@ -1,5 +1,8 @@
 ## 追加技の仮表示。円と扇は戦闘処理と同じ中心・半径・角度・世界時刻から描く。
 extends Node2D
+@export_range(0.5, 12.0, 0.25) var line_width := 3.0
+@export_range(0.0, 0.5, 0.01) var warning_opacity := 0.12
+@export_range(0.0, 1.0, 0.01) var attack_opacity := 0.28
 @export var technique_id: StringName
 var visual_kind: StringName
 var actor: CentaurusBoss
@@ -42,10 +45,10 @@ func _draw() -> void:
 		var radius := float(r.range_radius)
 		var points := PackedVector2Array([center])
 		for j in 25: points.append(center + Vector2.from_angle(angle - half + half * 2.0 * j / 24.0) * radius)
-		draw_colored_polygon(points, Color(RED, 0.12 if actor.mode == &"windup" else 0.28))
+		draw_colored_polygon(points, Color(RED, warning_opacity if actor.mode == &"windup" else attack_opacity))
 		if actor.mode == &"strike":
 			var age: float = actor.clock - actor._runner.started_at - float(r.warn)
-			draw_arc(center, radius * clampf(age / maxf(float(r.active), 0.001), 0.0, 1.0), angle - half, angle + half, 24, RED, 3.0)
+			draw_arc(center, radius * clampf(age / maxf(float(r.active), 0.001), 0.0, 1.0), angle - half, angle + half, 24, RED, line_width)
 	elif visual_kind == &"fan_volley" and actor.mode == &"windup":
 		ARROW.draw_arrow(self, actor.bow_mouth(), actor.table.facing[actor.body], 10.0 + actor.table.charge[actor.body] * 6.0, false, actor.clock)
 
@@ -75,9 +78,11 @@ func _draw_shower(r: Dictionary) -> void:
 ## 扇状連射と同じ描画・寸法・色を使う。
 static func draw_rain_arrow(canvas: CanvasItem, owner_actor: CentaurusBoss, at: Vector2, angle: float, opacity: float) -> void:
 	var fan: Dictionary = owner_actor._rules[&"fan_volley"]
-	var scene: PackedScene = fan.get("shot_visual")
-	var tint: Color = EFFECT_SETTINGS.values_for(scene.resource_path).get("effect_tint", Color.WHITE) if scene != null else Color.WHITE
-	ARROW.draw_arrow(canvas, at, angle, float(fan.radius), false, owner_actor.clock, opacity, tint, float(fan.length))
+	var key: String = canvas.get_meta("visual_profile", "boss/move/centaurus/" + String(owner_actor.technique))
+	var values := EFFECT_SETTINGS.component_values(key, "projectile", "res://scenes/attacks/light_arrow.tscn")
+	var tint: Color = values.get("effect_tint", Color.WHITE)
+	var scale := float(values.get("flight_scale", 1.0))
+	ARROW.draw_arrow(canvas, at, angle, float(fan.radius) * scale, false, owner_actor.clock, opacity, tint, float(fan.length) * scale, values)
 
 ## カメラの拡大率・移動・画面サイズに合わせ、画面上端の外を降下の始点にする。
 static func fall_origin(canvas: CanvasItem, target: Vector2, minimum_height := 0.0) -> Vector2:

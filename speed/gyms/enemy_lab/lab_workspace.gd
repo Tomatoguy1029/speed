@@ -134,7 +134,12 @@ func build(owner: Control) -> void:
 	lab._messages.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab._messages.mouse_filter = Control.MOUSE_FILTER_STOP
 	UI.button(_notice, tr("lab.ui.close"), func(): lab._messages.text = "", "close", true)
+	lab.canvas.selection_changing.connect(lab.controls.commit_appearance_fields)
 	lab.canvas.picked.connect(func(_row):
+		if lab.controls.current_tab == 5 and (settings.visible or (_right_collapsed and _restore_settings)):
+			lab._right.hide()
+			lab.controls.sync_from_session()
+			return
 		lab.inspector.refresh(true)
 		if lab.session.selected >= 0:
 			_restore_settings = false
@@ -232,7 +237,7 @@ func _palette(parent: Node) -> void:
 func _toolbar(parent: Node) -> void:
 	var bar := HFlowContainer.new()
 	parent.add_child(bar)
-	for item in [[0, "lab.ui.select", "pointer"], [2, "lab.ui.route", "pencil"], [3, "lab.ui.try", ""], [5, "lab.ui.range", "ruler"]]:
+	for item in [[0, "lab.ui.select", "pointer"], [1, "lab.ui.place", "plus"], [2, "lab.ui.route", "pencil"], [3, "lab.ui.try", ""], [5, "lab.ui.range", "ruler"]]:
 		var button := UI.button(bar, tr(item[1]), lab._set_mode.bind(item[0]), item[2])
 		button.toggle_mode = true
 		tools[item[0]] = button
@@ -247,11 +252,9 @@ func _toolbar(parent: Node) -> void:
 		lab.canvas.grab_focus())
 	bar.add_child(_route_tool)
 	UI.button(bar, tr("lab.undo"), func():
-		if lab.canvas.mode == 2: lab.canvas.undo_route()
-		else: await lab.session.undo_edit(), "undo", true)
+		await lab._undo(false, lab.canvas.mode == 2), "undo", true)
 	UI.button(bar, tr("lab.redo"), func():
-		if lab.canvas.mode == 2: lab.canvas.undo_route(true)
-		else: await lab.session.redo_edit(), "redo", true)
+		await lab._undo(true, lab.canvas.mode == 2), "redo", true)
 	var view := MenuButton.new()
 	view.icon = UI.icon("eye")
 	view.tooltip_text = tr("lab.ui.view")

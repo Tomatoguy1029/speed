@@ -5,7 +5,35 @@
 [resource]
 script = ExtResource("1")
 visual_settings = {
+"collision_scale": 1.4,
+"fill_angle": 90.0,
+"fill_energy": 0.6,
+"key_angle": -90.0,
+"key_energy": 1.6,
+"normal_strength": 0.8,
 "scale": 1.2000000000000002
+}
+armor_colors = {
+"res://assets/pixel/crab/cancer_armor.png|80x80|d387acc27655d77276c1951f46ee7f9f8f6f97f236ea345d4f664b66a59a1011": {
+"102": "b68e2c",
+"135": "b68e2c",
+"1473": "2f425e",
+"1485": "4b658f",
+"1524": "4b658f",
+"1593": "4b658f",
+"2100": "2f425e",
+"2135": "2f425e",
+"2748": "4b658f",
+"2769": "2f425e",
+"3466": "4b658f",
+"3491": "2f425e",
+"3539": "4b658f",
+"3578": "4b658f",
+"4002": "8a6a2f",
+"4075": "8a6a2f",
+"4356": "2f425e",
+"759": "2f425e"
+}
 }
 rank = 5
 radius = 30.0

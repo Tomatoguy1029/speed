@@ -6,7 +6,7 @@ func _begin_windup(host: CanisMajorBoss, r: Dictionary, length: float) -> void:
 	host.locked = false
 	host.attack_hit = false
 	host.table.vel[host.body] = Vector2.ZERO
-	host.aim_point = host.run_state.enemy_aim
+	host.aim_point = host.tracking_target(host.run_state.enemy_aim)
 	var anim := host.timeline.get_animation(&"attack")
 	anim.length = length
 	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
@@ -21,13 +21,14 @@ func _begin_windup(host: CanisMajorBoss, r: Dictionary, length: float) -> void:
 ## 構えの間は共通の遅延照準を追い、飛びかかりの着地点を決める。
 
 func _aim(host: CanisMajorBoss, dt: float) -> void:
-	host.aim_point = host.run_state.enemy_aim
+	host.aim_point = host.tracking_target(host.run_state.enemy_aim)
 	host._face(host.aim_point, host.def.turn, dt)
 
 ## 飛びかかりは着地点を、シリウスの光は向きを固定する。
 
 func lock_aim(host: CanisMajorBoss) -> void:
 	if host.mode != &"windup": return
+	if host.tracking_locked(): host.aim_point = host.tracking_target(host.aim_point)
 	host.locked = true
 	if kind() == &"sirius":
 		host.direction = Vector2.from_angle(host.table.facing[host.body])
@@ -143,7 +144,8 @@ func launch_hound(host: CanisMajorBoss, i: int, speed: float, duration: float, d
 	var hounds = host._hounds()
 	if hounds == null: return
 	hounds.release_order(i)
-	var toward := (host.run_state.ship_pos - host.table.pos[i]).normalized()
+	var target := host.ctx.enemies.motion.tracking_target(i, host.run_state.ship_pos)
+	var toward := (target - host.table.pos[i]).normalized()
 	var until := host.run_state.world_time + duration
 	hounds.follow(i, host.table.pos[i] + toward * speed * (duration + 0.2), until, speed / maxf(host.table.speed[i], 1.0))
 	hounds.quiet(i, until, toward * speed)

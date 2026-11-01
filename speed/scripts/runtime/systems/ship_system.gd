@@ -87,12 +87,14 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 
 func _step(dt: float, accel: Vector2) -> void:
 	if state.glide:
-		# 勢い：glide_hold の間は速さを保ち、そのあと glide_fade かけて巡航の速さまで落として終える（仕様書 6.6）
+		# 実走距離に応じて保持・減速時間を伸縮し、慣性航行の時間倍率を掛ける（仕様書 6.6）。
 		state.glide_t += dt
 		var cruise := state.stats.max_speed * cfg.steer_cruise
 		var sp := state.glide_speed
-		var hold := cfg.glide_hold * state.stats.glide_duration_mult
-		var fade := cfg.glide_fade * state.stats.glide_duration_mult
+		var distance_ratio := clampf(state.trace_total / maxf(cfg.draw_length, 1.0), 0.0, 1.0)
+		var duration_mult := distance_ratio * state.stats.glide_duration_mult
+		var hold := cfg.glide_hold * duration_mult
+		var fade := cfg.glide_fade * duration_mult
 		if state.glide_t > hold:
 			var k := (state.glide_t - hold) / maxf(0.001, fade)
 			if k >= 1.0:
@@ -177,7 +179,7 @@ func steal_shield(i: int) -> void:
 	state.ship_shield_max = duration
 	state.ship_shield_flash = 0.2
 	state.emit(&"shield_stolen", {"pos": t.pos[i], "facing": t.facing[i], "r": t.r[i],
-		"arc": float(t.def[i].params.front_arc)})
+		"arc": float(t.def[i].params.front_arc), "enemy_type": t.type[i]})
 
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 ## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。

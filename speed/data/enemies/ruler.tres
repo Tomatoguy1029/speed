@@ -1,9 +1,34 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://b8ob4dm22igvr"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"collision_scale": 1.3,
+"fill_angle": 90.0,
+"height": 0.5,
+"key_energy": 1.6,
+"scale": 1.0
+}
+armor_colors = {
+"res://assets/pixel/ruler/ruler_top_armor.png|58x46|fbe6bc9ef9f1395bccaa5bca0a8f666f73ff62e18cc44f000208b3d7ce05fc57": {
+"1022": "4b658f",
+"1184": "2f425e",
+"153": "4b658f",
+"185": "2f425e",
+"25": "4b658f",
+"367": "4b658f",
+"398": "8a6a2f",
+"467": "ba912e",
+"520": "d4a72c",
+"682": "ba912e",
+"755": "ba912e",
+"914": "8a6a2f",
+"946": "2f425e",
+"995": "4b658f"
+}
+}
 rank = 4
 radius = 22.0
 hp = 40.0

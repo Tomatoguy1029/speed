@@ -88,14 +88,18 @@ func tick(_dt: float) -> void:
 	for bm in beams:
 		if bm.age >= BEAM_SECONDS: bm.node.queue_free()
 	beams = beams.filter(func(bm): return bm.age < BEAM_SECONDS)
+	var kept := 0
 	for m in motes:
 		m.age += dt
+		if m.age < m.life:
+			motes[kept] = m
+			kept += 1
 		if m.age < 0.0 or m.age >= m.life: continue
 		m.pos += m.vel * p.px * dt
 		var color: Color = Color("#cffff9") if m.age < m.life * 0.4 else Color("#69fff0")
 		color.a = 1.0 - m.age / m.life
 		p.dot(m.pos, color)
-	motes = motes.filter(func(m): return m.age < m.life)
+	motes.resize(kept)
 	sparks.draw(p, dt)
 	fires().step(dt)
 	p.end()

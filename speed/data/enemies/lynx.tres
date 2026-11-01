@@ -1,9 +1,52 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://c1baisayyxt78"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"collision_scale": 0.45,
+"height": 0.27,
+"key_energy": 1.6,
+"normal_strength": 1.0,
+"scale": 1.15
+}
+armor_colors = {
+"res://assets/pixel/lynx/lynx_armor.png|76x58|623e7633881859b5bd46f459b663a5d02b5331f0c8305af6f1e409bd3fd5c993": {
+"1010": "2f425e",
+"1041": "2f425e",
+"112": "2f425e",
+"130": "4b658f",
+"1387": "2f425e",
+"1424": "2f425e",
+"1546": "4b658f",
+"1568": "4b658f",
+"184": "4b658f",
+"1903": "8c6c31",
+"194": "4b658f",
+"1972": "8c6c31",
+"2313": "4b658f",
+"2373": "2f425e",
+"2412": "2f425e",
+"2683": "2f425e",
+"2712": "2f425e",
+"2745": "304460",
+"2801": "304460",
+"2978": "ba912e",
+"3024": "ba912e",
+"3042": "ba912e",
+"3112": "ba912e",
+"3199": "ba912e",
+"3257": "ba912e",
+"3511": "d8aa2e",
+"3555": "d8aa2e",
+"3575": "d8aa2e",
+"3641": "d8aa2e",
+"3808": "d8aa2e",
+"3864": "d8aa2e",
+"96": "4b658f"
+}
+}
 rank = 4
 radius = 85.0
 hp = 160.0

@@ -17,7 +17,7 @@ func act(ps: ProjectileSystem, i: int, dt: float) -> bool:
 		return true
 	var t := ps.combat.enemies.table
 	var now := ps.wave_radius(i)
-	var before := minf(ps.hazard_len[i], maxf(0.0, ps.hazard_t[i] - dt - ps.hazard_delay[i]) * ps.hazard_speed[i])
+	var before := minf(ps.hazard_len[i], ps.hazard_start_radius[i] + maxf(0.0, ps.hazard_t[i] - dt - ps.hazard_delay[i]) * ps.hazard_speed[i])
 	var half := ps.hazard_width[i] * 0.5
 	var lo := maxf(before - half, 30.0)
 	var rows := PackedInt32Array()
@@ -41,6 +41,9 @@ func act(ps: ProjectileSystem, i: int, dt: float) -> bool:
 	return true
 
 func spawn(ps: ProjectileSystem, center: Vector2, angle: float, arc: float, radius: float, speed: float, width: float, delay: float,
-		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff")) -> int:
-	return ps._add_hazard(ProjectileSystem.HazardKind.WAVE, ProjectileSystem.HazardStyle.PLAIN, center, angle, radius, width, delay, radius / maxf(speed, 1.0),
+		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff"), start_radius := 0.0) -> int:
+	var start: float = clampf(start_radius, 0.0, radius)
+	var h: int = ps._add_hazard(ProjectileSystem.HazardKind.WAVE, ProjectileSystem.HazardStyle.PLAIN, center, angle, radius, width, delay, (radius - start) / maxf(speed, 1.0),
 		dmg, color, speed, arc, gap, gap_w)
+	ps.hazard_start_radius[h] = start
+	return h

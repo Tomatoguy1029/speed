@@ -6,6 +6,8 @@
 extends Node
 
 const MAX_VOICES := 12
+const MENU_RESUME_TRACKS := [&"menu", &"stage_select"]
+const MENU_RESUME_WINDOW_MS := 10000
 const DASH_VOICE = preload("res://scripts/managers/dash_audio_voice.gd")
 var _dash_voice: Node
 
@@ -16,6 +18,11 @@ var _missing_sounds: Dictionary = {}
 var _music: Dictionary = {}
 var _music_player: AudioStreamPlayer
 var _music_track: StringName = &""
+## フェード待ちの要求と、再生口が実際に鳴らしている曲を区別する。
+var _playing_music_track: StringName = &""
+var _music_request := 0
+var _music_departed_at := -1
+var _menu_music_positions: Dictionary = {}
 var _music_owner: Node
 var _music_fade: Tween
 var _slow_motion := false
@@ -93,26 +100,67 @@ func play_music(name: StringName, fade_seconds := 1.0, owner: Node = null) -> vo
 	if song == null:
 		push_error("音声バンクにBGMがありません: %s" % name)
 		return
+	var requested_at := Time.get_ticks_msec()
 	var gain := 1.0 / 3.0 if name in [&"battle", &"boss"] else 1.0
+	_music_request += 1
+	var request := _music_request
 	_music_track = name
 	_music_owner = owner
 	if _music_fade != null: _music_fade.kill()
 	_music_fade = create_tween()
+	# まだ元のメニュー曲のフェードアウト中なら、止めずに音量だけ戻す。
+	if name in MENU_RESUME_TRACKS and name == _playing_music_track and _music_player.playing and _music_player.stream == song:
+		_music_departed_at = -1
+		_music_fade.tween_property(_music_player, "volume_linear", gain, minf(fade_seconds, 0.6))
+		return
+	if _music_player.playing and _music_departed_at < 0:
+		_music_departed_at = requested_at
+	var start := _music_start_position(name, song, requested_at)
 	if _music_player.playing and fade_seconds > 0.0:
 		_music_fade.tween_property(_music_player, "volume_linear", 0.0, fade_seconds)
 	_music_fade.tween_callback(func():
+		if request != _music_request: return
+		_remember_menu_music()
 		_music_player.stop()
 		_music_player.stream = song
+		_playing_music_track = name
+		_music_departed_at = -1
 		_music_player.volume_linear = 0.0 if fade_seconds > 0.0 else gain
-		_music_player.play(song.loop_offset if song is AudioStreamMP3 else 0.0))
+		_music_player.play(start)
+		_menu_music_positions.erase(name))
 	_music_fade.tween_property(_music_player, "volume_linear", gain, minf(fade_seconds, 0.6))
+
+## 離脱要求の実時刻と、フェード後に実際に止めた位置を曲ごとに保持する。
+func _remember_menu_music() -> void:
+	if _playing_music_track not in MENU_RESUME_TRACKS or not _music_player.playing: return
+	_menu_music_positions[_playing_music_track] = {"stream": _music_player.stream,
+		"position": _music_player.get_playback_position(),
+		"left_at": _music_departed_at if _music_departed_at >= 0 else Time.get_ticks_msec()}
+
+func _music_start_position(name: StringName, song: AudioStream, requested_at: int) -> float:
+	var beginning: float = song.loop_offset if song is AudioStreamMP3 else 0.0
+	if name not in MENU_RESUME_TRACKS: return beginning
+	var saved: Dictionary = _menu_music_positions.get(name, {})
+	if saved.is_empty() or saved.stream != song or requested_at - int(saved.left_at) > MENU_RESUME_WINDOW_MS:
+		return beginning
+	var position := float(saved.position)
+	var length := song.get_length()
+	if not is_finite(position) or position < beginning or length <= beginning: return beginning
+	if song is AudioStreamMP3 and song.loop:
+		return beginning + fmod(position - beginning, length - beginning)
+	return position if position < length else beginning
+
 func stop_music(owner: Node = null) -> void:
 	if owner != null and _music_owner != owner: return
+	_music_request += 1
 	_music_owner = null
 	if _music_fade != null:
 		_music_fade.kill()
 		_music_fade = null
+	_remember_menu_music()
 	_music_track = &""
+	_playing_music_track = &""
+	_music_departed_at = -1
 	_music_player.stop()
 	_music_player.stream = null
 

@@ -1,5 +1,6 @@
 ## おおいぬ座だけが持つ、技の終了後も残る炎。更新・判定は世界時間、描画は同じ状態を読む。
 extends Node2D
+const COMPONENTS := preload("res://scripts/render/fx/visual_effect_components.gd")
 const VISUAL_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const NOVA_KEY := "res://scenes/bosses/canis_major/nova_visual.tscn"
 var tints: Dictionary = {}
@@ -37,14 +38,14 @@ func bind(host: CanisMajorBoss) -> void:
 ## 射程は保ち、口元で生まれた炎だけが順に前へ進む。
 func start_jet(from: Vector2, angle: float, length: float, width: float, duration: float, damage: float, preset: PixelFireSettings, source := -1) -> Dictionary:
 	var jet := {"from":from,"angle":angle,"length":length,"width":width,"duration":duration,"damage":damage,"preset":preset,
-		"age":0.0,"emit":0.0,"source":source,"id":actor.table.id[source] if source>=0 else 0,"attack":actor.technique,"hit":false}
+		"particle_life": float(actor.rule().get("beam_particle_life", 0.65)), "age":0.0,"emit":0.0,"source":source,"id":actor.table.id[source] if source>=0 else 0,"attack":actor.technique,"hit":false}
 	if source>=0: jet.from = actor.table.pos[source]+Vector2.from_angle(angle)*actor.table.r[source]
 	jets.append(jet)
 	_emit_jet_particle(jet)
 	return jet
 
 func _emit_jet_particle(jet: Dictionary) -> void:
-	var life: float = maxf(0.1,jet.preset.lifetime)
+	var life: float = maxf(0.1, float(jet.particle_life))
 	var drag := 0.7
 	var spread := rad_to_deg(atan2(float(jet.width)*1.4,maxf(1.0,float(jet.length))))*2.0
 	var r := {"spread":spread,"particle_speed":float(jet.length)*drag/(1.0-exp(-drag*life)),"life":life,"drag":drag,
@@ -52,6 +53,7 @@ func _emit_jet_particle(jet: Dictionary) -> void:
 	flame_particle(jet.from,float(jet.angle),r,true,jet.preset)
 	var particle: Dictionary = particles.back()
 	particle.attack = jet.attack
+	particle.visual_owner = jet.attack
 	particle.shot = jet
 	particle.range = jet.length
 	particle.origin = jet.from
@@ -90,7 +92,7 @@ func tick(dt: float) -> void:
 	_tick_jets(dt)
 	_tick_particles(dt)
 	for burst in bursts: burst.age = float(burst.age)+dt
-	bursts = bursts.filter(func(burst): return float(burst.age)<burst.preset.lifetime)
+	bursts = bursts.filter(func(burst): return float(burst.age)<_visual_preset(&"blaze", burst.preset).lifetime)
 	for trail in trails:
 		trail.age = float(trail.age) + dt
 		if float(trail.age) < float(trail.delay) or float(trail.age) >= float(trail.life): continue
@@ -140,7 +142,7 @@ func _draw() -> void:
 func flame_particle(at: Vector2, angle: float, r: Dictionary, harmful: bool, preset: PixelFireSettings = FLAME_FIRE) -> void:
 	var spread := actor.run_state.rng.randf_range(-float(r.spread), float(r.spread)) * 0.5 if harmful else sin(actor.clock * 39.0) * 20.0
 	var speed := float(r.particle_speed) * actor.run_state.rng.randf_range(0.9, 1.1) if harmful else 100.0
-	particles.append({"pos": at, "vel": Vector2.from_angle(angle + deg_to_rad(spread)) * speed, "age": 0.0, "life": float(r.life) if harmful else 0.3, "r_start": float(r.r_start) if harmful else 4.0, "r_end": float(r.r_end) if harmful else 9.0, "drag": r.drag, "hit_scale": r.hit_scale, "damage": r.damage, "harmful": harmful, "preset":preset, "attack":&"sirius_flame"})
+	particles.append({"pos": at, "vel": Vector2.from_angle(angle + deg_to_rad(spread)) * speed, "age": 0.0, "life": float(r.life) if harmful else 0.3, "r_start": float(r.r_start) if harmful else 4.0, "r_end": float(r.r_end) if harmful else 9.0, "drag": r.drag, "hit_scale": r.hit_scale, "damage": r.damage, "harmful": harmful, "preset":preset, "attack":&"sirius_flame", "visual_owner": actor.technique})
 
 func _tick_particles(dt: float) -> void:
 	for particle in particles:
@@ -291,13 +293,19 @@ func clear_tint(i: int, id: int) -> void:
 	if _valid(i,id): actor.table.color[i] = tints[i].base
 	tints.erase(i)
 
-func _fire_display(key: String, preset: PixelFireSettings) -> Node2D:
+func _visual_preset(owner: StringName, preset: PixelFireSettings) -> PixelFireSettings:
+	return COMPONENTS.fire("boss/move/canis_major/" + String(owner), preset)
+
+func _fire_display(key: String, preset: PixelFireSettings, owner: StringName = &"blaze") -> Node2D:
+	var visual := _visual_preset(owner, preset)
 	if not fire_displays.has(key):
 		var fire := FIRE_DISPLAY.new()
-		fire.setup(preset)
+		fire.setup(visual)
 		add_child(fire)
 		fire_displays[key] = fire
-	return fire_displays[key]
+	var display = fire_displays[key]
+	if display.settings != visual: display.settings = visual
+	return display
 
 func _sync_fire_displays() -> void:
 	var seen := {}
@@ -333,12 +341,14 @@ func _sync_fire_displays() -> void:
 	var clouds := {}
 	for particle in particles:
 		var preset: PixelFireSettings = particle.preset
-		if not clouds.has(preset): clouds[preset] = []
-		clouds[preset].append(particle)
-	for preset: PixelFireSettings in clouds:
-		var key := "放射:"+str(preset.get_instance_id())
+		var owner: StringName = particle.visual_owner
+		var key := "放射:" + String(owner) + ":" + str(preset.get_instance_id())
+		if not clouds.has(key): clouds[key] = {"preset": preset, "owner": owner, "samples": []}
+		clouds[key].samples.append(particle)
+	for key: String in clouds:
+		var cloud: Dictionary = clouds[key]
 		seen[key] = true
-		_fire_display(key,preset).cloud(clouds[preset],clock,actor.table.facing[actor.body])
+		_fire_display(key, cloud.preset, cloud.owner).cloud(cloud.samples, clock, actor.table.facing[actor.body])
 	for k in trails.size():
 		var trail: Dictionary = trails[k]
 		if float(trail.length)<=0.0: continue
@@ -351,13 +361,13 @@ func _sync_fire_displays() -> void:
 			var offset := sin(n*2.4)*float(trail.width)*0.3
 			var pos: Vector2 = trail.from+Vector2(distance,offset).rotated(float(trail.angle))
 			samples.append({"pos":pos,"radius":float(trail.width)*(0.7+0.3*sin(n*1.7+clock*4.0)),"seed":n})
-		var fire := _fire_display(key,TRAIL_FIRE)
+		var fire := _fire_display(key,TRAIL_FIRE, &"sirius")
 		fire.cloud(samples,clock,float(trail.angle))
 		fire.modulate.a = 0.8*(1.0-smoothstep(0.5,1.0,float(trail.age)/float(trail.life)))
 	for burst in bursts:
 		var key := "爆発:"+str(burst.key)
 		seen[key] = true
-		_fire_display(key,burst.preset).burst(burst.pos,float(burst.radius),float(burst.age)/burst.preset.lifetime,clock)
+		_fire_display(key,burst.preset).burst(burst.pos,float(burst.radius),float(burst.age)/_visual_preset(&"blaze", burst.preset).lifetime,clock)
 	for key in fire_displays.keys():
 		if not seen.has(key):
 			fire_displays[key].queue_free()

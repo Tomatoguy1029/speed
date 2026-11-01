@@ -167,7 +167,7 @@ class Runner extends "res://scripts/bosses/monoceros/technique_runner.gd":
 		host.table.vel[host.body] = Vector2.ZERO
 		host.aim_point = host._strike_aim()
 		host.direction = Vector2.from_angle(host.table.facing[host.body])
-		target = host.run_state.ship_pos
+		target = host.tracking_target(host.run_state.ship_pos)
 		angle = host.table.facing[host.body]
 		_enter(&"aim")
 		host._cue(&"telegraph")
@@ -206,8 +206,8 @@ class Runner extends "res://scripts/bosses/monoceros/technique_runner.gd":
 				var duration := float(r.first_windup) if i == 0 else float(r.windup)
 				var k := clampf(stage_time / maxf(duration, 0.001), 0.0, 1.0)
 				if not host.locked:
-					host.table.facing[host.body] = rotate_toward(host.table.facing[host.body], (host.run_state.ship_pos - host.table.pos[host.body]).angle(), float(r.aim_turn) * dt)
-					target = host.run_state.ship_pos
+					host.table.facing[host.body] = host.tracking_angle(rotate_toward(host.table.facing[host.body], (host.run_state.ship_pos - host.table.pos[host.body]).angle(), float(r.aim_turn) * dt))
+					target = host.tracking_target(host.run_state.ship_pos)
 					if stage_time >= duration - float(r.lock_time):
 						host.locked = true
 						host._cue(&"aim_locked")
@@ -236,7 +236,7 @@ class Runner extends "res://scripts/bosses/monoceros/technique_runner.gd":
 				if stage_time >= float(r.cut_gap):
 					i += 1
 					side = 1 if i % 2 == 0 else -1
-					target = host.run_state.ship_pos
+					target = host.tracking_target(host.run_state.ship_pos)
 					_enter(&"aim")
 			&"return":
 				var k := clampf(stage_time / maxf(float(r.return_time), 0.001), 0.0, 1.0)

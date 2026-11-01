@@ -9,6 +9,9 @@ const TOOLS := [
 	["landmark", "目印の星", "res://gyms/enemy_mark_preview.gd"],
 	["elite", "エリート", "res://gyms/enemy_mark_preview.gd"],
 	["boss_effects", "戦闘エフェクト", "res://gyms/effect_settings_preview.gd"],
+	["combo_iris", "連続強化 · Iris", "res://gyms/combo_transition_preview.gd"],
+	["combo_star_iris", "連続強化 · Star Iris", "res://gyms/combo_transition_preview.gd"],
+	["combo_shatter", "連続強化 · Shatter Wipe", "res://gyms/combo_transition_preview.gd"],
 ]
 
 var _sessions: Dictionary = {}
@@ -129,6 +132,7 @@ func _ready() -> void:
 	select_tool(0)
 
 func _key(index: int) -> String:
+	if String(TOOLS[index][0]).begins_with("combo_"): return "combo_transitions"
 	if index in [1, 2]: return "legendary"
 	if index in [4, 5]: return "enemy_marks"
 	return TOOLS[index][0]
@@ -165,7 +169,7 @@ func select_tool(index: int) -> void:
 		session.preview.process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
 		session.editor.visible = active
 		session.editor.set_active(active)
-	if key == "legendary" or key == "enemy_marks":
+	if key in ["legendary", "enemy_marks", "combo_transitions"]:
 		_current().set_section(TOOLS[index][0])
 	_selector.select(index)
 	_refresh()
@@ -209,7 +213,7 @@ func _refresh() -> void:
 	for index in TOOLS.size():
 		var key := _key(index)
 		var changed: bool = _sessions.has(key) and not _sessions[key].editor.editing_state().dirty_paths.is_empty()
-		if key == "enemy_marks" and _sessions.has(key):
+		if key in ["enemy_marks", "combo_transitions"] and _sessions.has(key):
 			changed = _sessions[key].editor.is_section_dirty(TOOLS[index][0])
 		_selector.set_item_text(index, TOOLS[index][1] + (" ●" if changed else ""))
 	_selector.disabled = busy

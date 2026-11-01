@@ -4,11 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-pixel_grid = 64
-inner_radius = 0.29
-outer_radius = 0.43
-noise_scale = 7.0
-motion_speed = 0.65
-intensity = 0.85
-color = Color(0.89, 0.47, 0.18, 1)
-highlight = Color(1, 0.82, 0.43, 1)
+intensity = 1.0
+color = Color(0.7411765, 0.1098039, 0.1607843, 1)
+highlight = Color(1, 0.2588235, 0.2901961, 1)
+shadow = Color(0.03137255, 0.01568628, 0.02745098, 1)
+interval_min = 0.075
+interval_random = 0.21
+interval_max = 0.65
+arc_count = 3
+spark_count = 3

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="BoostGaugeStyle" format=3 uid="uid://c6coao54ptccg"]
+
+[ext_resource type="Script" uid="uid://byjapjg0v65bs" path="res://scripts/data_types/boost_gauge_style.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+normal_color = Color(1, 0.99607843, 0.24313726, 1)
+unavailable_color = Color(0.8627451, 0.039215688, 0.023529412, 1)
+path_color = Color(0.9924146, 0.9924146, 0.93311095, 1)
+ready_pulse_color = Color(1, 0.8156863, 0.34509805, 0.54509807)
+background_color = Color(1, 1, 1, 0.14901961)
+ready_tick_color = Color(18.892157, 18.892157, 18.892157, 1)
+unavailable_tick_color = Color(1, 1, 1, 1)
+full_flash_color = Color(1, 1, 1, 1)
+bounds = Vector4(5.75, 11.25, 14.75, 17.25)
+tick_width = 2.0
+tick_start = 6.75
+tick_end = 10.205467415507483
+metadata/profile_sha256 = "3314928f835d0b3cb533d41741b8ca6c834f73783009f685b08e6e17b04f904e"

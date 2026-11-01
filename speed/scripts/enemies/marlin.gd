@@ -19,8 +19,8 @@ func step(i: int, dt: float) -> void:
 			t.fire_t[i] = maxf(float(p.telegraph), t.fire_t[i] - dt)
 			if t.fire_t[i] <= float(p.telegraph) and _lab_admit(i, dt):
 				# 停止した瞬間の現在位置を固定する。共通の遅延照準と移動予測は使わない。
-				t.anchor[i] = state.ship_pos
-				t.facing[i] = (t.anchor[i] - t.pos[i]).angle()
+				t.anchor[i] = m.motion.tracking_target(i, state.ship_pos)
+				t.facing[i] = m.motion.tracking_angle(i, (t.anchor[i] - t.pos[i]).angle())
 				t.vel[i] = Vector2.ZERO
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = maxf(0.0, t.fire_t[i])
@@ -65,7 +65,7 @@ func _cruise(i: int, dt: float) -> void:
 func after_tick(_dt: float) -> void:
 	var t := table
 	for i in rows():
-		if t.dead[i] == 0 and t.mode[i] == EnemyTable.Mode.MOVE and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.vel[i].length_squared() > 0.001:
+		if t.dead[i] == 0 and t.mode[i] == EnemyTable.Mode.MOVE and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.vel[i].length_squared() > 0.001 and not m.motion.turn_locked(i):
 			t.facing[i] = t.vel[i].angle()
 
 ## 通常の移動・地形衝突の前に、実際に進む区間を掃引する。

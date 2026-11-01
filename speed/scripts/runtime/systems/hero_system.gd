@@ -14,10 +14,12 @@ var combat: CombatSystem:
 var projectiles: ProjectileSystem:
 	get: return ctx.projectiles
 
-## 目印の星を選ぶまでの時間と、目印の星を持つ敵（行番号と id。いなければ -1）
-var _landmark_t := 0.0
-var _landmark_row := -1
-var _landmark_id := 0
+## 目印2枠の予定ラン秒、担当する敵の行・id、回収済み状態。
+## 1体目の生存とは独立して2体目を出し、撃破以外の退場では同じ枠を補充する。
+var _landmark_times := PackedFloat64Array()
+var _landmark_rows := PackedInt32Array([-1, -1])
+var _landmark_ids := PackedInt32Array([0, 0])
+var _landmark_done := PackedByteArray([0, 0])
 ## 機体が近くまで来て、英雄の星座の場所を見たか（ミニマップに出す）
 var seen := false
 var _discovery_announced := false
@@ -63,8 +65,7 @@ func _random_hero(except: StringName) -> HeroDef:
 ## 星座をフィールドの端のほうの、機体から離れたランダムな位置に置く。
 func _place(def: HeroDef) -> void:
 	# 前の英雄の目印を持つ敵が残っていても、次の英雄の手掛かりに混ぜない。
-	if _landmark_row >= 0 and enemies.is_same(_landmark_row, _landmark_id):
-		enemies.table.landmark[_landmark_row] = 0
+	_clear_landmark_carriers()
 	hero = def
 	if def == null:
 		return
@@ -90,8 +91,14 @@ func _place(def: HeroDef) -> void:
 	_discovery_announced = false
 	_last_star = -1
 	state.landmarks = PackedVector2Array()
-	_landmark_row = -1
-	_landmark_t = cfg.landmark_interval
+	_landmark_done.fill(0)
+	_landmark_times.clear()
+	var origin := state.time if state.endless else 0.0
+	for window: Vector2 in [cfg.landmark_first_window, cfg.landmark_second_window]:
+		# 終端の1秒手前までの整数秒を選び、固定更新の境界で窓を越えない。
+		var first := ceili(window.x)
+		var last := maxi(first, ceili(window.y) - 1)
+		_landmark_times.append(origin + rng.randi_range(first, last))
 
 func tick(real_dt: float, _world_dt: float) -> void:
 	if state.hero_cd > 0.0:
@@ -114,7 +121,7 @@ func tick(real_dt: float, _world_dt: float) -> void:
 		_spawn_guards()
 	if state.ship_pos.distance_squared_to(center) < cfg.hero_glow_range * cfg.hero_glow_range:
 		seen = true
-	_tick_landmark(real_dt)
+	_tick_landmark()
 	if not _discovery_announced and revealed():
 		_discovery_announced = true
 		state.emit(&"hero_discovered", {"id": hero.id})
@@ -133,40 +140,115 @@ func guidance_visible() -> bool:
 func revealed() -> bool:
 	return hero != null and (seen or state.landmarks.size() >= 2 or not is_captive())
 
-## 目印の星：間隔ごとに、機体の近くの強めの敵から1体を選んで持たせる（仕様書 13.1）。実験場では持たせない。
-func _tick_landmark(dt: float) -> void:
-	if state.lab_mode or state.landmarks.size() >= 2:
+## ステージ時計で2枠を独立して出す。ボーナスでは時計も選定も止める。
+func _tick_landmark() -> void:
+	if state.lab_mode or state.bonus_t > 0.0 or state.landmarks.size() >= 2:
 		return
 	var t := enemies.table
-	if _landmark_row >= 0 and enemies.is_same(_landmark_row, _landmark_id) and t.dead[_landmark_row] == 0:
-		return
-	_landmark_row = -1
-	_landmark_t -= dt
-	if _landmark_t > 0.0:
-		return
-	_landmark_t = cfg.landmark_interval
-	if state.rng.randf() >= cfg.landmark_chance or combat.grid.table == null:
-		return
-	var rows := PackedInt32Array()
-	combat.grid.query_radius(state.ship_pos, state.view_half.length() * 1.3, combat.enemy_query_padding, rows)
+	for slot in _landmark_times.size():
+		if _landmark_done[slot] != 0 or state.time < _landmark_times[slot]:
+			continue
+		var row := _landmark_rows[slot]
+		if enemies.is_same(row, _landmark_ids[slot]) and t.dead[row] == 0:
+			continue
+		row = _pick_landmark_carrier()
+		if row < 0:
+			row = _spawn_landmark_carrier()
+		if row < 0:
+			continue
+		t.landmark[row] = 1
+		_landmark_rows[slot] = row
+		_landmark_ids[slot] = t.id[row]
+
+func _pick_landmark_carrier() -> int:
+	var t := enemies.table
+	var nearby := PackedInt32Array()
 	var picks := PackedInt32Array()
-	for i in rows:
-		if t.dead[i] != 0 or t.def[i] == null or t.def[i].rank < 2 or t.def[i].rank > 5 or t.parent[i] >= 0:
+	var reach := state.view_half.length() * 1.3
+	for i in t.alive.size():
+		if t.alive[i] == 0 or t.dead[i] != 0 or t.landmark[i] != 0 or t.is_boss[i] != 0 \
+				or not _landmark_eligible(t.def[i]) or t.parent[i] >= 0:
 			continue
-		if t.pos[i].distance_to(center) < cfg.landmark_spacing:
+		if t.pos[i].distance_squared_to(state.ship_pos) > reach * reach:
 			continue
-		var far := true
-		for q in state.landmarks:
-			if t.pos[i].distance_to(q) < cfg.landmark_spacing:
-				far = false
-		if far:
+		nearby.append(i)
+		if _landmark_spaced(t.pos[i]):
 			picks.append(i)
+	# 距離は分散の優先条件。予定時刻の保証を優先して近くの適格敵へ緩和する。
 	if picks.is_empty():
-		return
-	var i := picks[state.rng.randi_range(0, picks.size() - 1)]
-	t.landmark[i] = 1
-	_landmark_row = i
-	_landmark_id = t.id[i]
+		picks = nearby
+	return -1 if picks.is_empty() else picks[state.rng.randi_range(0, picks.size() - 1)]
+
+func _landmark_eligible(def: EnemyDef) -> bool:
+	return def != null and def.rank >= 2 and def.rank <= 5
+
+func _landmark_spaced(pos: Vector2) -> bool:
+	if pos.distance_to(center) < cfg.landmark_spacing:
+		return false
+	for previous in state.landmarks:
+		if pos.distance_to(previous) < cfg.landmark_spacing:
+			return false
+	for slot in _landmark_rows.size():
+		var row := _landmark_rows[slot]
+		if enemies.is_same(row, _landmark_ids[slot]) and enemies.table.dead[row] == 0 \
+				and pos.distance_to(enemies.table.pos[row]) < cfg.landmark_spacing:
+			return false
+	return true
+
+## 候補不在なら、このステージで既に出現区間を迎えた適格種類を1体だけ補う。
+## シーンの解析や生成は行わず、実行用ステージの種類と既存の敵定義を使う。
+func _spawn_landmark_carrier() -> int:
+	if state.stage == null:
+		return -1
+	var types: Array[StringName] = []
+	for clip: RuntimeClip in state.stage.clips:
+		if clip.time > state.time or clip.length <= 0.0 or clip.groups <= 0: continue
+		for formation: Dictionary in clip.prepared:
+			if not formation.entries.any(func(entry: Dictionary): return float(entry.weight) > 0.0): continue
+			for layout: Dictionary in formation.layouts:
+				if float(layout.weight) <= 0.0: continue
+				for marker: Dictionary in layout.markers:
+					var type := StringName(marker.type)
+					if not clip.types.is_empty() and not clip.types.has(type): continue
+					if not types.has(type): types.append(type)
+	# 通常補充と同じ実効候補を使う。曲線があるステージの旧phase.mixは参照しない。
+	if ctx.spawn != null and not state.stage.phases.is_empty():
+		var target := ctx.spawn.target()
+		var weights: Dictionary = target.per_type if target.has("per_type") else target.phase.mix
+		for type in weights:
+			if float(weights[type]) > 0.0 and not types.has(StringName(type)):
+				types.append(StringName(type))
+	var defs: Array[EnemyDef] = []
+	for type in types:
+		var def := enemies.def_of(type)
+		if _landmark_eligible(def): defs.append(def)
+	if defs.is_empty():
+		return -1
+	var def := defs[state.rng.randi_range(0, defs.size() - 1)]
+	var margin := def.radius + cfg.ship_radius + 160.0
+	var distance := maxf(margin, minf(state.view_half.x, state.view_half.y) * 0.85)
+	var angle := state.rng.randf() * TAU
+	var pos := field.push_out(state.ship_pos + Vector2.from_angle(angle) * distance, def.radius + 16.0)
+	for attempt in 24:
+		var candidate := state.ship_pos + Vector2.from_angle(angle + TAU * attempt / 24.0) * distance
+		candidate = field.push_out(candidate, def.radius + 16.0)
+		if candidate.length() + def.radius < cfg.field_radius and field.body_gap(candidate, def.radius) >= 0.0:
+			pos = candidate
+			break
+	return enemies.spawn(def, pos, {"facing": (state.ship_pos - pos).angle()})
+
+## 撃破による回収を、消去・行の再利用による退場と区別する。
+func landmark_recovered(row: int) -> void:
+	for slot in _landmark_rows.size():
+		if _landmark_rows[slot] == row and enemies.is_same(row, _landmark_ids[slot]):
+			_landmark_done[slot] = 1
+
+func _clear_landmark_carriers() -> void:
+	for slot in _landmark_rows.size():
+		var row := _landmark_rows[slot]
+		if enemies.is_same(row, _landmark_ids[slot]): enemies.table.landmark[row] = 0
+	_landmark_rows.fill(-1)
+	_landmark_ids.fill(0)
 
 ## まだ解放されていない星座がフィールドにあるか。
 func is_captive() -> bool:
@@ -206,6 +288,7 @@ func _light(a: int, b: int) -> void:
 
 ## 全部の星座線が光った：特別な枠に、その星座の力が入る。
 func _free() -> void:
+	_clear_landmark_carriers()
 	state.hero_power = hero.id
 	state.hero_cd = 0.0
 	state.hero_active_t = 0.0

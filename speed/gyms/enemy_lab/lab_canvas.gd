@@ -4,11 +4,13 @@ extends Control
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 
 signal picked(row: int)
+signal selection_changing
 signal route_edited
 signal zoom_changed
 
 var session
 var mode := 0 # 0 選択、1 配置、2 線、3 試遊
+var place_once := false # パレットで選んだ1回の配置。配置ツールでは連続して置ける。
 var spawn_type := "drifter"
 var spawn_count := 1
 var center := Vector2.ZERO
@@ -92,6 +94,7 @@ func _can_drop_data(_position: Vector2, data: Variant) -> bool:
 	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ContentManager.enemies.has(StringName(data.lab_enemy)) or ContentManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
 
 func _drop_data(position: Vector2, data: Variant) -> void:
+	selection_changing.emit()
 	spawn_type = String(data.lab_enemy)
 	session.playing = false
 	_place(world(position))
@@ -128,6 +131,7 @@ func _gui_input(event: InputEvent) -> void:
 			if _pan: follow = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				selection_changing.emit()
 				grab_focus()
 				var p := world(event.position)
 				if mode == 5:
@@ -144,6 +148,10 @@ func _gui_input(event: InputEvent) -> void:
 					_resize_region = event.alt_pressed
 				elif mode == 1:
 					_place(p)
+					# 置いた敵は選択状態で編集する。連続配置は Shift 中だけ続ける。
+					if place_once and not event.shift_pressed:
+						mode = 0
+						session.changed.emit()
 				elif mode == 2:
 					if event.alt_pressed: finish_route()
 					if route_tool == 0 and not event.alt_pressed:
@@ -168,9 +176,10 @@ func _gui_input(event: InputEvent) -> void:
 				elif mode == 3:
 					session.perform("input", {"cursor": [p.x, p.y], "press": true})
 				else:
+					cancel_gesture()
 					var row := _pick(p, event.alt_pressed)
 					session.selected = row
-					if row < 0 and not event.shift_pressed: selection.clear()
+					if row < 0: selection.clear()
 					picked.emit(row)
 					if row >= 0:
 						_drag_id = session.run.enemies.table.id[row]
@@ -184,6 +193,7 @@ func _gui_input(event: InputEvent) -> void:
 							if j >= 0: _drag_positions[id] = session.run.enemies.table.pos[j]
 						_ghost = p
 						_dragging = true
+					session.changed.emit()
 			else:
 				if _freehand:
 					if _stroke_pressed and _stroke_dragged:
@@ -199,9 +209,10 @@ func _gui_input(event: InputEvent) -> void:
 				_range_drag = false
 				if _dragging and _drag_id >= 0:
 					var p := world(event.position)
-					for id in _drag_positions:
-						var to: Vector2 = _drag_positions[id] + p - _group_origin
-						session.perform("move", {"id": id, "pos": [to.x, to.y]})
+					if p.distance_to(_group_origin) * zoom > 3.0:
+						for id in _drag_positions:
+							var to: Vector2 = _drag_positions[id] + p - _group_origin
+							session.perform("move", {"id": id, "pos": [to.x, to.y]})
 				_dragging = false
 				_drag_point = -1
 				_region = -1
@@ -250,12 +261,7 @@ func _gui_input(event: InputEvent) -> void:
 			session.perform("input", {"cursor": [p.x, p.y]})
 		queue_redraw()
 	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_Z and event.ctrl_pressed:
-			if mode == 2:
-				undo_route(event.shift_pressed)
-			elif event.shift_pressed: await session.redo_edit()
-			else: await session.undo_edit()
-		elif mode == 3 and event.keycode == KEY_Q:
+		if mode == 3 and event.keycode == KEY_Q:
 			session.perform("input", {"has_cursor": false, "hero": true})
 		elif event.keycode == KEY_DELETE or event.keycode == KEY_BACKSPACE:
 			for id in selection: session.perform("delete", {"id": id})

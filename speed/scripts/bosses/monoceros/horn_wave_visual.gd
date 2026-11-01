@@ -2,6 +2,10 @@
 extends Node2D
 const ENERGY := preload("res://scripts/bosses/monoceros/technique_visual.gd").ENERGY
 @export var technique_id: StringName = &"horn_wave"
+@export_range(0.25, 3.0, 0.05) var wave_width_scale := 1.0
+@export_range(0.5, 8.0, 0.25) var ring_width := 3.0
+@export_range(0.05, 1.0, 0.05) var ring_lifetime := 0.3
+@export_range(12.0, 160.0, 1.0) var ring_end_radius := 60.0
 var actor: MonocerosBoss
 var rings: Array[Dictionary] = []
 var retained: bool:
@@ -16,7 +20,7 @@ func on_event(event: Dictionary) -> void:
 func advance(dt: float) -> void:
 	for index in range(rings.size() - 1, -1, -1):
 		rings[index].time = float(rings[index].time) + dt
-		if float(rings[index].time) >= 0.3: rings.remove_at(index)
+		if float(rings[index].time) >= ring_lifetime: rings.remove_at(index)
 
 func _body_point(world_point: Vector2) -> Vector2:
 	return (world_point - actor.table.pos[actor.body]).rotated(-actor.table.facing[actor.body])
@@ -26,7 +30,7 @@ func _draw() -> void:
 	var color := ENERGY.lerp(Color.WHITE, 0.5)
 	for wave: Dictionary in actor.horn_waves:
 		var facing := float(wave.angle) - actor.table.facing[actor.body]
-		draw_arc(_body_point(wave.center), float(wave.radius), facing - float(wave.half), facing + float(wave.half), 48, Color(color, 1.0 - float(wave.radius) / maxf(float(wave.max), 0.001)), float(wave.width), false)
+		draw_arc(_body_point(wave.center), float(wave.radius), facing - float(wave.half), facing + float(wave.half), 48, Color(color, 1.0 - float(wave.radius) / maxf(float(wave.max), 0.001)), float(wave.width) * wave_width_scale, false)
 	for ring: Dictionary in rings:
-		var t := clampf(float(ring.time) / 0.3, 0.0, 1.0)
-		draw_arc(_body_point(ring.center), lerpf(10.0, 60.0, t), 0.0, TAU, 32, Color(ENERGY, 1.0 - t), 3.0, false)
+		var t := clampf(float(ring.time) / ring_lifetime, 0.0, 1.0)
+		draw_arc(_body_point(ring.center), lerpf(10.0, ring_end_radius, t), 0.0, TAU, 32, Color(ENERGY, 1.0 - t), ring_width, false)

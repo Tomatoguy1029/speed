@@ -4,7 +4,9 @@
 
 ## 編集と反映
 
-日本語は分かりやすさを優先し、次に [世界観と用語](world.md) を合わせる。武器・特性の説明は効果と発動条件を短く書く。図鑑は効果の明快さに加えて世界観を伝える。名前は既存用語に沿う。
+日本語は分かりやすさを優先し、次に [世界観と用語](world.md) を合わせる。名前は既存用語に沿う。
+
+武器・特性・伝説のモジュールの `.desc` は、戦闘中のカードなどで使う短い効果説明とする。図鑑用の `.codex_desc` は、効果が分かる文章に世界観を添え、必要なら少し詳しく書く。図鑑用の文章がある項目は専用文を表示し、ほかの項目は `.desc` を使う。確率の各値、対象の詳細、複製や再発動の制限、上限などの厳密な定義は、仕様書と個別一覧へ置く。
 
 `keys`・管理 ID・言語列を保ち、名前も説明も該当セルを編集する。`{n}` などの置換名、`%s`・`%.1f` などの書式指定、全角空白、末尾空白を用途に合わせて保持する。翻訳表の空のキーは CSV の説明・見出しになる。
 
@@ -159,8 +161,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.projectile_speed | 武器の弾速 | Weapon projectile speed |
 | postmax.duration | 弾・機雷・衝撃波の持続 | Shot, mine and wave duration |
 | postmax.knockback | 武器の吹き飛ばし | Weapon knockback |
-| postmax.crit_chance | RAMクリティカル率 | RAM critical chance |
-| postmax.crit_mult | RAMクリティカル倍率 | RAM critical multiplier |
+| postmax.crit_chance | クリティカル率 | Critical chance |
+| postmax.crit_mult | クリティカル倍率 | Critical multiplier |
 | postmax.area | 巻き込み範囲 | Area of effect |
 | postmax.followup | 追撃威力 | Follow-up damage |
 | postmax.max_speed | 最高速度 | Maximum speed |
@@ -195,9 +197,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | card.heal&#95;desc | HP を 30% 回復 | Restores 30% HP |
 | card.swap&#95;tag | 入れ替える | Replace |
 | card.swap&#95;desc | この武器を外して、{name}を付ける | Remove this weapon and equip {name} |
-| card.keep&#95;tag | 見送る | Skip |
-| card.keep&#95;name | 今の装備を残す | Keep Current Loadout |
-| card.keep&#95;desc | {name}は受け取らない | Leave {name} behind |
+| card.discard&#95;weapon | {name}を破棄 | Discard {name} |
 |  | ■ 結果 |  |
 | result.title | 結果 | Results |
 | result.cleared | クリア | Cleared |
@@ -312,7 +312,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T36.name | フルバースト | Full Burst |
 | trait.T36.desc | ゲージが満タンの間、射撃の連射が上がる。 | Increases shooting fire rate while the gauge is full. |
 | trait.T37.name | デュプリケーター | Duplicator |
-| trait.T37.desc | 弾や破片が当たると、確率で2つに分かれる。 | Shots and debris may split into two on impact. |
+| trait.T37.desc | 投擲武器(弾・破片・クリティカルランス)を放つと、一定の確率で攻撃を複製する。 | Projectile weapons (shots, debris and Critical Lances) have a chance to duplicate their attacks when launched. |
+| trait.T37.codex&#95;desc | 一筋の攻撃が、三筋の軌跡になる。弾や星屑、光の槍が生まれる瞬間、左右へ複製を放つことがある。複製の一撃は元より弱いが、攻撃を広く届ける。 | One trail of fire becomes three. Shots, stardust and light lances may send copies to either side as they appear. Each copy strikes with less force, spreading the attack farther across the battlefield. |
 |  | ■ 伝説のモジュール（legendary.&lt;ID&gt;） |  |
 | legendary.legendary&#95;compass.name | 羅針盤のモジュール | Compass Module |
 | legendary.legendary&#95;compass.desc | らしんばん座を解放したときに残された、錆びついたモジュール。 | A rusted module left behind when Pyxis was freed. |
@@ -960,12 +961,17 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.appearance.type&#95;help | 選択した種類の全個体へ即時反映します。サイズは見た目と当たり判定の両方に適用します。保存すると全ステージの同じ種類に使います。照明は法線画像を持つ敵だけ調整できます。 | Edits apply to all instances of the selected type. Size changes visuals and collision. Save to use settings in every stage. Lighting requires a normal map. |
 | lab.appearance.restore&#95;saved | この種類を保存済みの外観へ戻す | Restore saved appearance for this type |
 | lab.appearance.save&#95;type | この種類の設定をステージへ保存 | Save this type for all stages |
+| lab.appearance.save&#95;all | 変更した外観を一括保存 | Save all changed appearances |
+| lab.appearance.pending&#95;count | 未保存の外観：{count}種類 | Unsaved appearances: {count} types |
+| lab.appearance.saved&#95;all | {count}種類の外観を保存しました。次のステージ開始から使います。 | Saved appearances for {count} types. New runs will use these settings. |
+| lab.appearance.no&#95;changes | 保存する外観の変更はありません。 | There are no appearance changes to save. |
+| lab.appearance.save&#95;partial | 保存済み：{saved}種類。次の外観は未保存です：{failed} | Saved: {saved} types. These appearances remain unsaved: {failed} |
 | lab.appearance.select&#95;type | 配置した通常敵またはパーツを選択してください（ボス・地形は対象外） | Select a placed enemy or part (bosses and terrain are excluded). |
 | lab.appearance.target | {name} [{id}] — {state} | {name} [{id}] — {state} |
 | lab.appearance.unsaved | 未保存 | Unsaved |
 | lab.appearance.saved&#95;state | 保存済み | Saved |
 | lab.appearance.save&#95;failed | 外観を保存できませんでした | Could not save appearance |
-| lab.appearance.file&#95;changed | 敵データが外部で変更されています。実験場を開き直してから保存してください。 | Enemy data changed externally. Reopen the lab before saving. |
+| lab.appearance.file&#95;changed | 敵データが外部で変更されています。保存先を確認してください。編集値は実験場に保持しています。 | Enemy data changed externally. Check the source file. Your edits remain in the lab. |
 | lab.appearance.saved&#95;type | {name} の外観を保存しました。次のステージ開始から使います。 | Saved appearance for {name}. New runs will use these settings. |
 | bg.title | 背景エディター | Background editor |
 | bg.back | 戻る | Back |
@@ -986,6 +992,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bg.help | 左ドラッグで配置を移動 · ホイールでズーム · 中央ドラッグで視点移動。視差プレビュー中は中央ドラッグで背景の流れを確認できます。配置のドラッグはプレビューをOFFにしてください。座標はステージ開始地点を原点にします。 | Left-drag to move · Wheel to zoom · Middle-drag to pan. Preview parallax by panning; turn preview off to drag placements. Coordinates are relative to the stage start. |
 | bg.origin | 開始地点 (0, 0) | Start (0, 0) |
 | bg.properties | 選択した背景 | Selected background |
+| bg.background&#95;color | 背景の地色 | Background color |
+| bg.stars | 星を表示 | Show stars |
 | bg.x | 位置 X | Position X |
 | bg.y | 位置 Y | Position Y |
 | bg.scale | サイズ倍率 | Scale |

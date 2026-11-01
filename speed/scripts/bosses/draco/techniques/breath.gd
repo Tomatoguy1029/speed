@@ -102,7 +102,9 @@ class Runner extends BossTechnique.Runner:
 			var definition: EnemyDef=METEOR.duplicate(true)
 			definition.hp=float(a.rule().rock_hp)
 			definition.stage_hp=definition.hp
-			definition.radius=rock.size;definition.speed=0.0;definition.xp=0.0
+			definition.radius=rock.size;definition.speed=0.0
+			# 技が作る投石は、通常隕石の撃破報酬を引き継がない。
+			definition.xp_reward_counts=PackedInt32Array([0,0,0])
 			var index: int=a.ctx.field.rocks.size()
 			a.ctx.field.rocks.append(rock)
 			rock.row=a.ctx.enemies.spawn(definition,mouth,{"meteor_index":index})

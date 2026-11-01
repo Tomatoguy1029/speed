@@ -180,7 +180,7 @@ class Runner extends "res://scripts/bosses/monoceros/technique_runner.gd":
 			&"approach":
 				v = minf(float(r.approach_speed_max), v + float(r.approach_accel) * dt)
 				var target := (host.run_state.ship_pos - host.table.pos[host.body]).angle()
-				host.table.facing[host.body] = rotate_toward(host.table.facing[host.body], target, float(r.approach_turn) * dt)
+				host.table.facing[host.body] = host.tracking_angle(rotate_toward(host.table.facing[host.body], target, float(r.approach_turn) * dt))
 				host.direction = Vector2.from_angle(host.table.facing[host.body])
 				host._move_body(host.direction * v * dt)
 				var k := clampf(stage_time / maxf(float(r.twist_time), 0.001), 0.0, 1.0)

@@ -37,6 +37,7 @@ func _begin_pass(host: MonocerosBoss) -> void:
 	host._cue(&"telegraph")
 
 func _aim(host: MonocerosBoss, dt: float) -> void:
+	if host.tracking_locked(): return
 	host.aim_point = host._strike_aim()
 	if kind() == &"kick":
 		host.direction = (host.aim_point - host.table.pos[host.body]).normalized()
@@ -74,6 +75,7 @@ func _strike_aim(host: MonocerosBoss, attack: StringName = &"", lead := -1.0) ->
 
 func lock_aim(host: MonocerosBoss) -> void:
 	if host.mode != &"windup" or host.locked: return
+	if host.tracking_locked(): host.aim_point = host._strike_aim()
 	# 固定後は再捕捉せず、予告で見せた方向へ発進する。
 	# 蹴りは背後への攻撃なので本体の向きを保つ。
 	if kind() != &"kick" and not host.aim_point.is_equal_approx(host.table.pos[host.body]):

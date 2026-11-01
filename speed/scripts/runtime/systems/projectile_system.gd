@@ -6,6 +6,7 @@ class_name ProjectileSystem
 extends RunSystem
 
 func dispose() -> void:
+	pump_shells.clear()
 	clear_combat_observations()
 	for attack in _attached_attacks.values():
 		attack.dispose()
@@ -28,10 +29,26 @@ var build: LoadoutSystem:
 ## 味方の弾と破片。項目ごとの列で持つ。1行が1つで、行は前へ詰めない（設計書 6）。
 ## HULL は質量牽引砲（W21）が撃ち出す船体
 enum FriendKind { SHOT, DEBRIS, HULL }
+
+## 直接の release/clear（開発用の全消去を含む）でも星屑数を更新する。
+class FriendSlots extends RowSlots:
+	var debris_live := 0
+
+	func _init(projectiles: ProjectileSystem) -> void:
+		super(projectiles, "friend_")
+
+	func release(i: int) -> void:
+		if owner.get(&"friend_kind")[i] == FriendKind.DEBRIS:
+			debris_live -= 1
+		super(i)
+
+	func clear() -> void:
+		super()
+		debris_live = 0
+
 ## 1 なら使用中の行
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
-var friend_generation := PackedByteArray()
 ## 星砕きの再発動世代。通常攻撃は0、初回に生まれた破片は1。弾の分裂とは別に引き継ぐ。
 var friend_shatter_depth := PackedInt32Array()
 var friend_age := PackedFloat32Array()
@@ -61,7 +78,7 @@ var friend_type: Array[StringName] = []
 ## 敵に当たったときに、ダメージの代わりに呼ぶ処理（敵の行・ダメージ・当たった位置。撃った武器が決める。なければ通常のダメージ）
 var friend_on_hit: Array[Callable] = []
 var _friend_shapes: Dictionary = {}
-var friend_slots: RowSlots
+var friend_slots: FriendSlots
 var _buf := PackedInt32Array()
 var _hits: Array = []
 
@@ -96,6 +113,8 @@ var hostile_wait := PackedFloat32Array()
 ## 圧縮弾が破裂する範囲の半径（圧縮弾のほかは 0）
 var hostile_burst := PackedFloat32Array()
 var hostile_slots: RowSlots
+## ポンプ圧縮弾だけの表示用スナップショット。敵の種類・充填率・口の位置を弾の寿命で持つ。
+var pump_shells: Dictionary = {}
 ## 実験の攻撃グループ。行の再利用時に必ず上書きする。
 var lab_context := 0
 var lab_hostile_group: Dictionary = {}
@@ -120,7 +139,7 @@ enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）。
 ## FLOOD は広がるビームで、予告の間も照射する範囲全体を見せる（みずがめ座）。TRAIL は付いている敵の見た目が描く
 ## 残る線（みなみのさんかく座の赤いレーザーの軌跡）。GUIDE は予告の間、ビームの通り道を予告線で示す（ビームの敵）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL, TELESCOPE, PHOENIX, GUIDE, AQUILA, DRACO }
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL, TELESCOPE, PHOENIX, GUIDE, AQUILA, DRACO, PULSER }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
@@ -151,6 +170,8 @@ var hazard_enemy_hit: Array[Dictionary] = []
 var hazard_block := PackedByteArray()
 ## 広がる波の速さ、扇の左右の角度（広がるビームでは広がる角度）、切れ目の向きと左右の角度
 var hazard_speed := PackedFloat32Array()
+## 波の発射時の半径。完成輪から出る波は表示と判定で同じ値を使う。
+var hazard_start_radius := PackedFloat32Array()
 var hazard_arc := PackedFloat32Array()
 var hazard_gap := PackedFloat32Array()
 var hazard_gap_w := PackedFloat32Array()
@@ -164,6 +185,10 @@ var _attached_attacks: Dictionary = {}
 
 ## 使った攻撃の生成器だけを保持する。外から登録した種類も同じ入口で使える。
 var _attack_kinds: Dictionary = {}
+## 元の味方攻撃だけを生成後に複製する。敵弾・敵の攻撃の形は対象外。
+const DUPLICABLE_ATTACK_KINDS := [&"friend_shot", &"friend_hull", &"scatter_hull", &"burst_debris", &"fling_corpse", &"saw"]
+## 生成器が属性を設定し終えてから抽選する。入れ子の生成は別の組で扱う。
+var _friend_birth_batches: Array[Array] = []
 
 func register_attack(kind: StringName, attack: AttackKind) -> void:
 	_attack_kinds[kind] = attack
@@ -175,7 +200,13 @@ func emit_attack(kind: StringName, args: Array, visual: PackedScene = null) -> V
 		register_attack(kind, load("res://scripts/attacks/%s.gd" % kind).new())
 	var previous := visual_context
 	if visual != null: visual_context = visual
+	var duplicate_births := kind in DUPLICABLE_ATTACK_KINDS
+	if duplicate_births: _friend_birth_batches.append([])
 	var result: Variant = _attack_kinds[kind].emit(self, args)
+	if duplicate_births:
+		var originals: Array = _friend_birth_batches.pop_back()
+		for row: int in originals:
+			duplicate_friend_on_spawn(row)
 	visual_context = previous
 	return result
 
@@ -202,7 +233,7 @@ func setup(context: RunContext) -> void:
 	super(context)
 	_hostile_shapes.resize(HostileKind.size())
 	_hazard_shapes.resize(HazardKind.size())
-	friend_slots = RowSlots.new(self, "friend_")
+	friend_slots = FriendSlots.new(self)
 	hostile_slots = RowSlots.new(self, "hostile_")
 	# 追加の関数が、使い回す行の全部の列を書き直すか（デバッグ版だけ）
 	assert(Columns.check_add(self, friend_slots.cols,
@@ -250,8 +281,8 @@ func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 	emit_attack(&"friend_shot", [from, angle, dmg, opts])
 
 ## 位置 pos から、攻撃する破片を count 個、全方向へ飛ばす（うみへび座の首の残骸など）。source_id の敵には当たらない。
-func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Color, source_id: int) -> void:
-	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id])
+func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Color, source_id: int, pump_armor_count := -1) -> void:
+	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id, pump_armor_count])
 
 ## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
 func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0, shatter_depth := 1) -> bool:
@@ -274,10 +305,11 @@ func fling_corpse(i: int, vel: Vector2, dmg: float, radius_mult := 1.0, knock_mu
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。
 func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2, r: float, dmg: float,
 		life: float, pierce: bool, pierce_left: int, color: Color, no_crit: bool, knock: float,
-		angle: float, spin: float, hit_id: int, type := &"", visual := &"", weapon_id := &"") -> int:
+		angle: float, spin: float, hit_id: int, type := &"", visual := &"", weapon_id := &"", duplicate := false) -> int:
 	var i := friend_slots.take()
 	friend_kind[i] = kind
-	friend_generation[i] = 0
+	if kind == FriendKind.DEBRIS:
+		friend_slots.debris_live += 1
 	friend_shatter_depth[i] = 0
 	friend_age[i] = 0.0
 	friend_cause[i] = cause
@@ -299,6 +331,8 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 	friend_trail[i] = PackedVector2Array()
 	friend_type[i] = type
 	friend_on_hit[i] = Callable()
+	if not duplicate and not _friend_birth_batches.is_empty():
+		_friend_birth_batches.back().append(i)
 	return i
 
 ## 使用中の味方の弾・破片の数。
@@ -316,6 +350,8 @@ func _friend_shape(kind: int) -> FriendShape:
 	return _friend_shapes[kind]
 
 func _update_friendly(dt: float) -> void:
+	if friend_slots.live == 0:
+		return
 	var et := combat.enemies.table
 	var i := 0
 	# 命中で増えた破片が後ろの行に入った場合は、この更新で一緒に進める
@@ -336,18 +372,20 @@ func _update_friendly(dt: float) -> void:
 		if not wall_hit.is_empty() and (body_hit == null or wall_hit.t < body_hit.t):
 			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		var to: Vector2 = pos if body_hit == null else body_hit.point
-		var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
-		combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
 		var hit: Dictionary = friend_hit[i]
 		_hits.clear()
-		for row in _buf:
-			if hit.has(et.id[combat.damage_target(row)]):
-				continue
-			var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
-			if t >= 0.0:
-				_hits.append([t, row])
-		if _hits.size() > 1:
-			_hits.sort_custom(func(a, b): return a[0] < b[0])
+		# 寿命切れの行は下の命中処理も実行しない。地形との接触と終了処理は共通で残す。
+		if life > 0.0:
+			var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
+			combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
+			for row in _buf:
+				if hit.has(et.id[combat.damage_target(row)]):
+					continue
+				var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
+				if t >= 0.0:
+					_hits.append([t, row])
+			if _hits.size() > 1:
+				_hits.sort_custom(func(a, b): return a[0] < b[0])
 		var sp := vel.length()
 		var pierce := friend_pierce[i] != 0
 		for h in _hits:
@@ -367,7 +405,6 @@ func _update_friendly(dt: float) -> void:
 			else:
 				combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "weapon_id": friend_weapon_id[i], "no_crit": friend_no_crit[i] != 0,
 					"shatter_depth": friend_shatter_depth[i], "dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
-			duplicate_friend(i, impact)
 			state.emit(&"shot_hit", {"pos": impact, "dir": vel.normalized(), "visual_key": String(friend_visual[i]), "kind": friend_kind[i]})
 			if state.phase != RunState.Phase.PLAY:
 				# 残りの行は進めずにそのまま残す
@@ -405,8 +442,8 @@ func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void
 	emit_attack(&"lump", [i, angle, speed, r, dmg])
 
 ## ポンプ座の圧縮弾を撃つ。距離 range を飛ぶか何かに当たると、半径 burst で破裂して dmg を与える。
-func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float) -> void:
-	emit_attack(&"shell", [i, angle, speed, r, range, burst, dmg])
+func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float, contents: PackedStringArray = PackedStringArray()) -> void:
+	emit_attack(&"shell", [i, angle, speed, r, range, burst, dmg, contents])
 
 ## ケフェウス座の兵の細長い光弾を、from から向き angle へ撃つ。直進し、追尾しない。
 func fire_bolt(from: Vector2, angle: float, speed: float, dmg: float) -> void:
@@ -421,6 +458,7 @@ func fire_slash(from: Vector2, angle: float, speed: float, size: float, range: f
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:
 	var i := hostile_slots.take()
+	pump_shells.erase(i)
 	if director != null and lab_context > 0:
 		lab_hostile_group[i] = lab_context
 	else:
@@ -454,6 +492,8 @@ func hostile_count() -> int:
 	return hostile_slots.live
 
 func _update_hostile(dt: float) -> void:
+	if hostile_slots.live == 0:
+		return
 	var R := cfg.ship_radius
 	var body_move := field.body_speed_max * dt
 	var ship_pos := state.ship_pos
@@ -540,6 +580,7 @@ func _update_hostile(dt: float) -> void:
 	if _hostile_clear_pending:
 		_hostile_clear_pending = false
 		hostile_slots.clear()
+		pump_shells.clear()
 
 ## 機体の周り radius に入った敵の弾を1つ消す（バリアシステム）。消したら true。
 func _hostile_shape(kind: int) -> HostileShape:
@@ -553,6 +594,8 @@ func _hazard_shape(kind: int) -> HazardShape:
 	return _hazard_shapes[kind]
 
 func block_one(center: Vector2, radius: float) -> bool:
+	if hostile_slots.live == 0:
+		return false
 	for i in hostile_alive.size():
 		if hostile_alive[i] != 0 and hostile_life[i] > 0.0 and hostile_pos[i].distance_to(center) <= radius + hostile_r[i]:
 			hostile_life[i] = 0.0
@@ -562,6 +605,7 @@ func block_one(center: Vector2, radius: float) -> bool:
 
 ## ボスの撃破などで、敵の弾と攻撃の形をすべて消す。
 func clear_hostile() -> void:
+	pump_shells.clear()
 	clear_combat_observations("cleared")
 	hazard_slots.clear()
 	if _hostile_updating:
@@ -607,8 +651,8 @@ func fire_zone(center: Vector2, radius: float, delay: float, dmg: float, style :
 ## 広がる輪・扇を出す。arc は扇の左右の角度（PI で全周）。gap_w が 0 より大きければ、gap の向きに切れ目を空ける。
 ## delay の予告のあと、速さ speed で半径 radius まで広がる。
 func fire_wave(center: Vector2, angle: float, arc: float, radius: float, speed: float, width: float, delay: float,
-		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff")) -> int:
-	return emit_attack(&"wave", [center, angle, arc, radius, speed, width, delay, dmg, gap, gap_w, color])
+		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff"), start_radius := 0.0) -> int:
+	return emit_attack(&"wave", [center, angle, arc, radius, speed, width, delay, dmg, gap, gap_w, color, start_radius])
 
 ## 何層もの輪を出す。層ごとに interval ずつ遅れて広がり、切れ目の向きが gap_step ずつずれる。
 func fire_rings(center: Vector2, layers: int, interval: float, radius: float, speed: float, width: float, delay: float,
@@ -639,6 +683,8 @@ func _hazard_owner_pulled(h: int) -> bool:
 ## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。
 func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 	var best := {}
+	if hazard_slots.live == 0:
+		return best
 	var best_t := INF
 	for h in hazard_alive.size():
 		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
@@ -669,6 +715,8 @@ func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 ## 重なっていなければ空の辞書。重なっていれば pos（押し出した位置）と normal（押し出す向き）。中心線の上なら vel の向きの側へ出す。
 func block_overlap(pos: Vector2, radius: float, vel := Vector2.ZERO) -> Dictionary:
 	var best := {}
+	if hazard_slots.live == 0:
+		return best
 	var best_push := INF
 	for h in hazard_alive.size():
 		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
@@ -738,6 +786,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_owner[i] = -1
 	hazard_owner_id[i] = 0
 	hazard_speed[i] = speed
+	hazard_start_radius[i] = 0.0
 	hazard_arc[i] = arc
 	hazard_gap[i] = gap
 	hazard_gap_w[i] = gap_w
@@ -746,13 +795,15 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 
 ## 広がる波（行 i）の、今の半径。
 func wave_radius(i: int) -> float:
-	return minf(hazard_len[i], maxf(0.0, hazard_t[i] - hazard_delay[i]) * hazard_speed[i])
+	return minf(hazard_len[i], hazard_start_radius[i] + maxf(0.0, hazard_t[i] - hazard_delay[i]) * hazard_speed[i])
 
 ## 使用中の攻撃の形の数。
 func hazard_count() -> int:
 	return hazard_slots.live
 
 func _update_hazards(dt: float) -> void:
+	if hazard_slots.live == 0:
+		return
 	var R := cfg.ship_radius
 	var ship_pos := state.ship_pos
 	for i in hazard_alive.size():
@@ -769,6 +820,10 @@ func _update_hazards(dt: float) -> void:
 			hazard_enemy_hit[i].clear()
 			hazard_slots.release(i)
 			continue
+		# 完成輪の発射直前まで発生元のID・生存を確認する。飛び始めた波は独立させる。
+		if hazard_style[i] == HazardStyle.PULSER and owner >= 0 and t >= delay:
+			hazard_owner[i] = -1
+			hazard_owner_id[i] = 0
 		var shape := _hazard_shape(hazard_kind[i])
 		if t >= delay and not shape.act(self, i, dt):
 			return
@@ -831,6 +886,7 @@ func clear_combat_observations(reason := "recording_end") -> void:
 	for row: int in _combat_hazards.keys(): _combat_end(_combat_hazards, row, reason, hazard_pos[row])
 
 func _end_hostile(row: int, reason: String, at: Vector2) -> void:
+	pump_shells.erase(row)
 	var scene: StringName = hostile_visual[row]
 	if scene == &"": scene = StringName("res://scenes/attacks/%s.tscn" % HostileKind.keys()[hostile_kind[row]].to_lower())
 	end_attack_visual(scene, "Hit" if reason in ["contact", "obstacle"] else "Fade", at)
@@ -863,26 +919,28 @@ func flying_count() -> int:
 	var lances = _attached_attacks.get(&"light_lances")
 	return friend_count() + (lances.items.size() if lances != null else 0)
 
-func duplicate_friend(source: int, impact: Vector2) -> bool:
-	var vectors := build.split_vectors(friend_vel[source], friend_generation[source])
+## 生成を完了した元の攻撃からだけ呼ぶ。複製は生成器へ戻さず、そのまま加える。
+func duplicate_friend_on_spawn(source: int) -> bool:
+	if friend_kind[source] == FriendKind.DEBRIS and debris_count() >= 200: return false
+	var vectors := build.split_vectors(friend_vel[source])
 	if vectors.is_empty(): return false
+	var origin := friend_pos[source]
+	# このループでは同じ種類の子を追加するだけなので、上限の残り枠を1回で数える。
+	var remaining: int = 200 - debris_count() if friend_kind[source] == FriendKind.DEBRIS else vectors.size()
 	for v in vectors:
 		# 星屑は200個まで。ほかの飛ぶ攻撃と分裂全体の上限も共有する。
-		if friend_kind[source] == FriendKind.DEBRIS and debris_count() >= 200: break
-		var child := _add_friend(friend_kind[source], friend_cause[source], impact, v, friend_r[source],
+		if remaining <= 0: break
+		var child := _add_friend(friend_kind[source], friend_cause[source], origin, v, friend_r[source],
 			friend_dmg[source] * build.split_damage(), friend_life[source], friend_pierce[source] != 0,
 			friend_pierce_left[source], friend_color[source], friend_no_crit[source] != 0, friend_knock[source],
-			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source], friend_weapon_id[source])
+			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source], friend_weapon_id[source], true)
 		friend_hit[child] = friend_hit[source].duplicate()
-		friend_generation[child] = friend_generation[source] + 1
 		friend_shatter_depth[child] = friend_shatter_depth[source]
 		friend_age[child] = friend_age[source]
 		friend_on_hit[child] = friend_on_hit[source]
-	state.emit(&"duplicate", {"pos": impact, "directions": vectors})
+		remaining -= 1
+	state.emit(&"duplicate", {"pos": origin, "directions": vectors})
 	return true
 
 func debris_count() -> int:
-	var count := 0
-	for i in friend_alive.size():
-		if friend_alive[i] != 0 and friend_kind[i] == FriendKind.DEBRIS: count += 1
-	return count
+	return friend_slots.debris_live if friend_slots != null else 0

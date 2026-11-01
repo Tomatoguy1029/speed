@@ -61,6 +61,7 @@ class Runner extends "res://scripts/bosses/hydra/technique_runner.gd":
 			if not n.locked:
 				if a.tracks_during_warn(a.tech):n.target=a.run_state.ship_pos
 				if local<float(p.sequence_charge):continue
+				n.target=a.neck_tracking_target(n,n.target)
 				n.locked=true
 				n.strike_from=n.strike_pos
 				n.angle=(n.target-n.strike_from).angle()

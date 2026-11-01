@@ -76,6 +76,7 @@ func _split_ruler(i: int) -> void:
 	var d := Vector2(signf(rel.x), 0.0) if absf(rel.x) > absf(rel.y) else Vector2(0.0, signf(rel.y))
 	if d == Vector2.ZERO:
 		d = Vector2.DOWN
+	if m.motion.turn_locked(i): d = Vector2.from_angle(t.facing[i])
 	var halves := [i, spawn(t.def[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i], "attack_priority": t.attack_priority[i]})]
 	for k in 2:
 		var j: int = halves[k]

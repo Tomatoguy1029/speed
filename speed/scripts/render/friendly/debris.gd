@@ -2,8 +2,14 @@ extends AttackVisual
 ## 飛ぶ破片。星砕きの破片は星屑（またたく小さな四角と、後ろへ引く紫の尾）をドット単位で描く。
 
 var _painter: PixelPainter
+const PUMP_SHADER := preload("res://shaders/pump_debris.gdshader")
+const PUMP_ENEMIES := [preload("res://assets/pixel/drifter.png"), preload("res://assets/pixel/swarm.png"), preload("res://assets/pixel/splitling.png")]
+var _pump_mesh: QuadMesh
+var _pump_nodes: Array[MeshInstance2D] = []
+var _pump_count := 0
 
 func begin_batch() -> void:
+	_pump_count = 0
 	if _painter == null:
 		_painter = PixelPainter.new()
 		_painter.setup_painter(1.82 * rm.cfg.character_scale)
@@ -14,10 +20,14 @@ func begin_batch() -> void:
 	super()
 
 func end_batch() -> void:
+	for n in range(_pump_count, _pump_nodes.size()): _pump_nodes[n].hide()
 	if _painter != null: _painter.end()
 	super()
 
 func draw_friend(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> void:
+	if pr.friend_visual[i] == &"enemy/pump_burst":
+		_pump_debris(c, pr, i, pos)
+		return
 	if pr.friend_visual[i] == &"weapon/knockback":
 		_stardust(pr, i, pos)
 		return
@@ -33,6 +43,39 @@ func draw_friend(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> v
 	c.draw_colored_polygon(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v]), Color("#aeb6c4") * tint)
 	c.draw_polyline(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v, pos + u]),
 		Color("#ff9a3c") * tint, _px(1.5))
+
+func _pump_debris(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> void:
+	if _pump_count == _pump_nodes.size():
+		if _pump_mesh == null:
+			_pump_mesh = QuadMesh.new()
+			_pump_mesh.size = Vector2(288, 32)
+		var created := MeshInstance2D.new()
+		created.mesh = _pump_mesh
+		var created_material := ShaderMaterial.new()
+		created_material.shader = PUMP_SHADER
+		created_material.set_shader_parameter("linear_output", c.get_viewport().use_hdr_2d)
+		for k in 3: created_material.set_shader_parameter("enemy%d" % k, PUMP_ENEMIES[k])
+		created.material = created_material
+		c.add_child(created)
+		_pump_nodes.append(created)
+	var node := _pump_nodes[_pump_count]
+	_pump_count += 1
+	var dir := pr.friend_vel[i].normalized()
+	node.position = pos - dir * 128.0
+	node.rotation = dir.angle()
+	node.show()
+	var material := node.material as ShaderMaterial
+	material.set_shader_parameter("age", pr.friend_age[i])
+	material.set_shader_parameter("life", pr.friend_life[i])
+	material.set_shader_parameter("speed", pr.friend_vel[i].length())
+	material.set_shader_parameter("clock", state.world_time)
+	material.set_shader_parameter("seed", float(i))
+	material.set_shader_parameter("pixel", 1.82 * rm.cfg.character_scale)
+	material.set_shader_parameter("spin", pr.friend_angle[i] - dir.angle())
+	material.set_shader_parameter("kind", -1 if pr.friend_type[i] == &"pump" else PUMP_ENEMIES_TYPE.find(pr.friend_type[i]))
+	material.set_shader_parameter("pump_art", rm._enemy_texture(&"pump"))
+
+const PUMP_ENEMIES_TYPE := [&"drifter", &"swarm", &"splitling"]
 
 ## 星屑：0.07秒前の位置から今の位置まで、1ドットおきに紫の尾（1.2秒まで）。本体は 2〜4 ドット角で、またたく。
 ## 1.3秒を過ぎると点滅して消える。

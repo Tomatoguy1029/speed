@@ -88,6 +88,12 @@ extends BossTechnique
 		cd = value
 		_values_dirty = true
 
+## 放射粒の物理寿命。表示用の炎の寿命と独立して、弾速と到達範囲を保つ。
+@export_range(0.1, 2.5, 0.05) var beam_particle_life := 0.65:
+	set(value):
+		beam_particle_life = value
+		_values_dirty = true
+
 ## 放射するピクセル炎。ビジュアル編集の「炎」で調整する。
 @export var flame_settings: PixelFireSettings = preload("res://data/visuals/canis_fire_jet.tres"):
 	set(value):
@@ -137,7 +143,7 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 			if not item.marked and host.clock >= float(item.at):
 				item.marked = true
 				item.from = host.table.pos[i]
-				item.angle = (host.run_state.ship_pos - host.table.pos[i]).angle()
+				item.angle = host.ctx.enemies.motion.tracking_angle(i, (host.run_state.ship_pos - host.table.pos[i]).angle())
 				host.lunging.append(i)
 				host._hounds().release_order(i)
 				host._hounds().quiet(i, host.run_state.world_time + float(values.each_warn)+float(values.hound_beam_time), Vector2.ZERO)

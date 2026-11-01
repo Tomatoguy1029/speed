@@ -201,9 +201,9 @@ class Runner extends "res://scripts/bosses/monoceros/techniques/charge.gd".Runne
 				fd = df
 				if not host.locked:
 					var q := clampf(stage_time / maxf(float(r.turn_time) - float(r.turn_lock), 0.001), 0.0, 1.0)
-					host.table.facing[host.body] = fa + df * q * q * (3.0 - 2.0 * q)
-					angle = host.table.facing[host.body] + clampf(wrapf(target - host.table.facing[host.body], -PI, PI), -float(r.head_lead), float(r.head_lead)) * sin(PI * q)
-					host.aim_point = host.run_state.ship_pos
+					host.table.facing[host.body] = host.tracking_angle(fa + df * q * q * (3.0 - 2.0 * q))
+					if not host.tracking_locked(): angle = host.table.facing[host.body] + clampf(wrapf(target - host.table.facing[host.body], -PI, PI), -float(r.head_lead), float(r.head_lead)) * sin(PI * q)
+					host.aim_point = host.tracking_target(host.run_state.ship_pos)
 					host.direction = Vector2.from_angle(host.table.facing[host.body])
 					if stage_time >= float(r.turn_time) - float(r.turn_lock):
 						host.locked = true

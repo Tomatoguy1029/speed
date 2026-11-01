@@ -7,6 +7,8 @@ var effect_tint := Color.WHITE
 var wind: Sprite2D
 var stones: Array[Sprite2D]=[]
 var feed_stones: Array[Sprite2D]=[]
+func _visual_values() -> Dictionary:
+	return EFFECT_SETTINGS.component_values(get_meta("shape_owner", "boss/shared/tornado_shader"), "shape", "boss/shared/tornado_shader")
 func _ready() -> void:
 	texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
 	wind=Sprite2D.new()
@@ -15,8 +17,13 @@ func _ready() -> void:
 	wind.texture=ImageTexture.create_from_image(pixels)
 	wind.material=ShaderMaterial.new()
 	wind.material.shader=vortex_shader
-	wind.material.set_shader_parameter("tint",effect_tint * EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("vortex_tint", Color.WHITE))
-	wind.material.set_shader_parameter("pixel_size",3.0 * EFFECT_SETTINGS.number("boss/shared/tornado_shader", "pixel_scale", 1.0))
+	var profile: String = get_meta("shape_owner", "boss/shared/tornado_shader")
+	ShaderTuning.apply(wind.material, profile, "boss/shared/tornado_shader", "shape")
+	wind.set_meta("shader_tuning_profile", profile)
+	wind.set_meta("shader_tuning_fallback", "boss/shared/tornado_shader")
+	wind.set_meta("shader_tuning_component", "shape")
+	wind.material.set_shader_parameter("tint",effect_tint * _visual_values().get("vortex_tint", Color.WHITE))
+	wind.material.set_shader_parameter("pixel_size",3.0 * float(EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("pixel_scale", 1.0)))
 	wind.z_index=1
 	add_child(wind)
 	for i in 14:
@@ -32,9 +39,9 @@ func _ready() -> void:
 		add_child(rock)
 func set_effect_tint(value: Color) -> void:
 	effect_tint=value
-	if is_instance_valid(wind): wind.material.set_shader_parameter("tint",effect_tint * EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("vortex_tint", Color.WHITE))
+	if is_instance_valid(wind): wind.material.set_shader_parameter("tint",effect_tint * _visual_values().get("vortex_tint", Color.WHITE))
 func set_pixel_size(value: float) -> void:
-	if is_instance_valid(wind): wind.material.set_shader_parameter("pixel_size",value * EFFECT_SETTINGS.number("boss/shared/tornado_shader", "pixel_scale", 1.0))
+	if is_instance_valid(wind): wind.material.set_shader_parameter("pixel_size",value * float(EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("pixel_scale", 1.0)))
 func update_effect(effect: Dictionary, clock: float) -> void:
 	var points: PackedVector2Array=effect.points
 	var delta:=points[-1]-points[0]

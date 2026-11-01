@@ -37,21 +37,29 @@ func add(pos: Vector2, radius: float, life: float, colors: Array = EMBER, delay 
 	node.material = mat
 	add_child(node)
 	node.visible = delay <= 0.0
-	_items.append({"node": node, "age": -delay, "life": life})
+	_items.append({"node": node, "age": -delay, "life": life, "tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
 	if _items.size() > 96: _items.pop_front().node.queue_free()
 
 ## dt は世界の秒。
 func step(dt: float) -> void:
+	var time_scale := ShaderTuning.burst_time_scale(key)
+	var revision: int = ShaderTuning.SETTINGS.preview_revision
 	for item in _items:
 		item.age += dt
-		if item.age >= item.life:
+		var age: float = item.age / time_scale
+		var life := maxf(0.01, ShaderTuning.burst_number(key, "burst_fire_seconds", item.life))
+		item.node.visible = age >= 0.0 and age < life
+		if age >= life and not ShaderTuning.previewing():
 			item.node.queue_free()
 			continue
-		item.node.visible = item.age >= 0.0
 		var mat := item.node.material as ShaderMaterial
-		mat.set_shader_parameter("life", maxf(0.0, item.age) / item.life)
-		ShaderTuning.apply(mat, key)
-	_items = _items.filter(func(item): return item.age < item.life)
+		mat.set_shader_parameter("life", maxf(0.0, age) / life)
+		if item.tuning_revision != revision or item.tuning_key != key:
+			ShaderTuning.apply(mat, key)
+			item.tuning_revision = revision
+			item.tuning_key = key
+	if not ShaderTuning.previewing():
+		_items = _items.filter(func(item): return item.age / time_scale < maxf(0.01, ShaderTuning.burst_number(key, "burst_fire_seconds", item.life)))
 
 static func _mesh() -> ArrayMesh:
 	if _quad != null: return _quad

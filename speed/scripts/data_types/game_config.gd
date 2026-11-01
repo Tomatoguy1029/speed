@@ -106,14 +106,6 @@ extends Resource
 ## 弾いた敵の、接触した側の装甲を光らせる長さ。
 ## 単位：秒
 @export var block_impact_life: float
-## クリティカル：炎の数
-## クリティカルで貫いたとき、接触位置から出す炎の数。
-## 単位：個
-@export var weak_flame_count: int
-## クリティカル：赤熱の時間
-## クリティカルで貫いた敵を赤く光らせる長さ。
-## 単位：秒
-@export var weak_impact_life: float
 ## 吹き飛んだ破片：光の跡の時間
 ## 吹き飛ばした敵の破片が通った跡の光が消えるまでの時間。
 ## 単位：実秒
@@ -243,11 +235,11 @@ extends Resource
 ## 単位：割合（突進の速さに対して）
 @export var glide_speed_ratio: float
 ## 勢いが続く時間
-## なぞり終えてからこの時間は、勢いの速さを保つ。
+## 基準距離 draw_length を走ったとき、勢いの速さを保つ時間。短い距離ではその割合に縮め、慣性航行の時間倍率を掛ける。
 ## 単位：世界秒
 @export var glide_hold: float
 ## 勢いを落とす時間
-## 勢いが続く時間のあと、この時間をかけて巡航の速さまで直線で落とし、勢いを終える。
+## 基準距離 draw_length を走ったとき、巡航の速さまで直線で落とす時間。短い距離ではその割合に縮め、慣性航行の時間倍率を掛ける。
 ## 単位：世界秒
 @export var glide_fade: float
 ## 向きを保つ速さ
@@ -468,36 +460,22 @@ extends Resource
 ## 単位：度
 @export var hull_debris_spread: float
 
-## 経験値・大きい結晶・カプセル・修理キット・部品の出方
+## 経験値の結晶・カプセル・修理キット・部品の出方
 @export_group("ドロップ")
-## 大きい結晶のドロップ率の係数
-## 敵が大きい結晶を落とす確率 ＝ この値 × 敵の経験値 ^ ドロップ率の指数（上限あり）。
-## 単位：割合
-@export var drop_base: float
-## ドロップ率の指数
-## 強い敵ほど大きい結晶を落としやすくする度合い。
-## 単位：指数
-@export var drop_power_exp: float
-## 大きい結晶のドロップ率の上限
-## 敵が大きい結晶を落とす確率は、これを超えない。
+## 色別の基準経験値。low・mid・highの順で、生成・運搬中は倍率を含めず保持する。
+## 単位：基準XP
+@export var xp_crystal_values := PackedFloat32Array([1.0, 50.0, 200.0])
+## 星3〜10の対象を実際に倒したとき、確定報酬へ黄色1個を追加する確率。
 ## 単位：割合（0〜1）
-@export var drop_max: float
-## 大きい結晶の経験値
-## 左から小・中・大の段の経験値。
-## 単位：経験値
-@export var big_crystal_xp: PackedFloat32Array
-## 大きい結晶の段の出やすさ：開始
-## ラン開始のときに、落ちた大きい結晶が小・中・大のどの段になるかの重み。左から小・中・大。
-## 単位：重み
-@export var big_crystal_weights_start: PackedFloat32Array
-## 大きい結晶の段の出やすさ：終わり
-## 段の重みは、ラン開始の値からこの値へ、段の移り変わりの時間をかけてまっすぐ移る。以後はこの値のまま。
-## 単位：重み
-@export var big_crystal_weights_end: PackedFloat32Array
-## 大きい結晶の段の移り変わりの時間
-## 段の重みが開始の値から終わりの値へ移りきるまでの時間。
-## 単位：ラン秒
-@export var big_crystal_shift_time: float
+@export_range(0.0, 1.0, 0.01) var strong_gold_chance := 0.05
+## 旧資源の読み取り互換。報酬仕様v2は色別の固定XPと強敵の黄色確率を使う。
+@export_storage var drop_base: float
+@export_storage var drop_power_exp: float
+@export_storage var drop_max: float
+@export_storage var big_crystal_xp: PackedFloat32Array
+@export_storage var big_crystal_weights_start: PackedFloat32Array
+@export_storage var big_crystal_weights_end: PackedFloat32Array
+@export_storage var big_crystal_shift_time: float
 ## 隕石の密度
 ## 隕石の配置の基準の数。隕石地帯・漂う岩の数がこれに合わせて決まる。
 ## 単位：個
@@ -582,16 +560,16 @@ extends Resource
 ## 機体と英雄の星座の中心がこの距離より近いと、星が恒星のように強く光る。
 ## 単位：単位（距離）
 @export var hero_glow_range: float
-## 目印の星を選ぶ間隔
-## この間隔ごとに、確率 `landmark_chance` で、機体の近くの強めの敵（星2〜5）から1体に目印の星を持たせる。
-## 単位：実秒
-@export var landmark_interval: float
-## 目印の星の確率
-## 間隔ごとに目印の星を持たせる確率。目印の星を持つ敵が生きている間と、線が2本そろったあとは選ばない。
-## 単位：割合（0〜1）
-@export var landmark_chance: float
+## 1体目の目印の星の時間帯
+## ランの時計で、開始秒（x）から終了秒（y）までに1体を出す。時刻はランの乱数で秒単位に選ぶ。
+## 単位：ラン秒（開始・終了）
+@export var landmark_first_window := Vector2(180.0, 210.0)
+## 2体目の目印の星の時間帯
+## 1体目の生存・回収とは独立して出す。エンドレスでは英雄を配置してからのラン秒を使う。
+## 単位：ラン秒（開始・終了）
+@export var landmark_second_window := Vector2(330.0, 360.0)
 ## 目印の星の間隔の距離
-## 目印の星は、前に取り戻した位置と英雄の星座から、この距離より離れた敵から選ぶ（フィールドに散らばるように）。
+## 英雄の星座・回収済み位置・別の目印持ちから、この距離以上離れた敵を優先する。候補がなければ距離を緩めて予定時刻を守る。
 ## 単位：単位（距離）
 @export var landmark_spacing: float
 ## 次の英雄の星座が現れるまで
@@ -643,7 +621,7 @@ extends Resource
 ## 単位：世界秒
 @export var pickup_life: float
 ## 経験値の結晶の最大数
-## フィールドの経験値の結晶がこの数を超えたら、古いものをまとめる。性能の調整用。
+## 画面外と集約先を含む全色の合計上限。空き枠へ生成し、余剰の基準XPは指定黄色へ集約する。
 ## 単位：個
 @export var gem_max: int
 

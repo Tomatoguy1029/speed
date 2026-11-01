@@ -4,6 +4,8 @@
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/draco/picaro_wall_visual.tscn" id="visual"]
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/draco_picaro_wall.tscn" id="effect_owner"]
+
 [resource]
 script = ExtResource("1")
 technique = &"picaro_wall"
@@ -21,3 +23,5 @@ flight = 0.75
 impact_warn = 1.0
 radius = 85.0
 visual = ExtResource("visual")
+
+shot_visual = ExtResource("effect_owner")

@@ -6,6 +6,21 @@ uniform float thickness = 210.0;
 uniform float power = 1.0;
 uniform vec4 tint : source_color = vec4(1.0);
 uniform float pixel_size = 3.0;
+group_uniforms tuning;
+uniform float spiral_turns : hint_range(1,12,0.5) = 3.0;
+uniform float spiral_frequency : hint_range(2,40,0.5) = 15.0;
+uniform float spiral_speed : hint_range(0,40,0.5) = 15.0;
+uniform float wake_turns : hint_range(1,12,0.5) = 5.0;
+uniform float wake_frequency : hint_range(2,48,0.5) = 22.0;
+uniform float wake_speed : hint_range(0,32,0.5) = 9.0;
+uniform float band_threshold : hint_range(0,1,0.01) = 0.55;
+uniform float thread_threshold : hint_range(0,1,0.01) = 0.94;
+uniform float grit_size : hint_range(1,24,0.5) = 6.0;
+uniform float cloud_frequency : hint_range(2,48,0.5) = 24.0;
+uniform float cloud_speed : hint_range(0,16,0.5) = 4.0;
+uniform float visual_opacity : hint_range(0,1,0.05) = 1.0;
+uniform float visual_brightness : hint_range(0,3,0.05) = 1.0;
+group_uniforms;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void fragment(){
  vec2 extent=vec2(span+thickness,thickness);
@@ -15,12 +30,12 @@ void fragment(){
  float angle=atan(p.y,p.x);
  float edge=length(vec2(max(abs(pixel.x)-span*0.5,0.0),pixel.y))/(thickness*0.5);
  float mask=1.0-step(0.98,edge);
- float spiral=sin(angle*3.0+r*15.0-clock*15.0);
- float wake=sin(angle*5.0-r*22.0-clock*9.0);
- float band=step(0.55,spiral);
- float thread=step(0.94,spiral)*step(0.23,r);
- float grit=hash(floor(pixel/6.0));
- float clouds=floor((sin(r*24.0-angle*3.0+clock*4.0)*0.5+0.5)*3.0)/3.0;
+ float spiral=sin(angle*spiral_turns+r*spiral_frequency-clock*spiral_speed);
+ float wake=sin(angle*wake_turns-r*wake_frequency-clock*wake_speed);
+ float band=step(band_threshold,spiral);
+ float thread=step(thread_threshold,spiral)*step(0.23,r);
+ float grit=hash(floor(pixel/grit_size));
+ float clouds=floor((sin(r*cloud_frequency-angle*spiral_turns+clock*cloud_speed)*0.5+0.5)*3.0)/3.0;
  vec3 shadow=vec3(0.06,0.12,0.15);
  vec3 wind=vec3(0.23,0.52,0.53);
  vec3 light=vec3(0.70,0.90,0.85);
@@ -30,5 +45,5 @@ void fragment(){
  float rim=step(0.90,edge);
  color=mix(color,vec3(0.10,0.24,0.27),rim);
  float alpha=mask*(0.40+band*0.30+thread*0.30)*(0.45+power*0.55);
- COLOR=vec4(color*tint.rgb,alpha*tint.a);
+ COLOR=vec4(color*tint.rgb*visual_brightness,alpha*tint.a*visual_opacity);
 }

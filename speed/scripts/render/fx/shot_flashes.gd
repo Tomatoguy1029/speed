@@ -25,10 +25,14 @@ func hit(pos: Vector2, dir: Vector2, big: int) -> void:
 ## muzzle_pos は今の砲口の位置（機体と一緒に動く）。
 func draw(painter: PixelPainter, dt: float, muzzle_pos: Vector2) -> void:
 	muzzle_time += dt
+	var kept := 0
 	for h in hits:
 		h.age += dt
+		if h.age < 0.18:
+			hits[kept] = h
+			kept += 1
 		var duration := 0.18 if h.big == 2 else 0.14
 		if h.age < duration: painter.hit_flash(h.pos, h.age / duration, h.big)
-	hits = hits.filter(func(h): return h.age < 0.18)
+	hits.resize(kept)
 	sparks.draw(painter, dt)
 	painter.muzzle(muzzle_pos, muzzle_angle, muzzle_time / muzzle_seconds, muzzle_big)

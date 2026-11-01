@@ -12,8 +12,9 @@ func _rocket(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	if t.mode[i] == EnemyTable.Mode.MOVE:
-		var a := (state.enemy_aim - t.pos[i]).angle()
-		t.facing[i] = a
+		if not m.motion.turn_locked(i):
+			t.facing[i] = (state.enemy_aim - t.pos[i]).angle()
+		var a := t.facing[i]
 		t.vel[i] = Vector2.from_angle(a) * t.speed[i]
 		t.mode[i] = EnemyTable.Mode.DASH
 		t.timer[i] = float(p.life)

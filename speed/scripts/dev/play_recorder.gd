@@ -56,8 +56,9 @@ var _file: FileAccess = null
 var _next_sample := 0.0
 var _last_xp_gained := 0.0
 var _last_xp_dropped := 0.0
-## 大きい結晶の段（"1"〜"3"）ごとの、落ちた数と経験値の累計
-var _big_crystals: Dictionary = {}
+## 録画開始以前の供給を観測区間へ混ぜず、基準XPと実取得XPを別々に集計する。
+var _xp_start_summary: Dictionary = {}
+var _last_xp_summary: Dictionary = {}
 ## 間隔のあいだにたまった数
 var _kills: Dictionary = {}
 ## 倒した原因ごとの数と、与えたダメージの原因ごとの合計（倒しきった分の余りも含む）
@@ -208,6 +209,8 @@ func _begin(session: RunSession, during_run := false) -> void:
 	_on_cards(run.state.cards, false)
 	_last_xp_gained = run.state.xp_gained
 	_last_xp_dropped = run.state.xp_dropped
+	_xp_start_summary = run.pickups.xp_summary().duplicate(true)
+	_last_xp_summary = _xp_start_summary.duplicate(true)
 	_next_sample = run.state.time + INTERVAL
 	var git_state := IDENTITY.git_state()
 	_open_profiles()
@@ -224,39 +227,34 @@ func _begin(session: RunSession, during_run := false) -> void:
 		var p: PhaseDef = phases[k]
 		bands.append({"id": String(p.id), "name": _record_names.get("phases", {}).get(String(p.id), p.display_name), "start": p.start})
 	var recording_start: Dictionary = run.recording_snapshot()
+	var xp_config := _xp_config()
 	recording_start["trigger"] = "during_run" if during_run else "armed_before_run"
 	var run_start := run.recording_origin.duplicate(true)
 	if not session.recording_initial.is_empty():
 		run_start["conditions"] = session.recording_initial
 	recording_start["conditions"] = {"config": IDENTITY.plain(run.cfg), "profile": IDENTITY.plain(run.ctx.profile),
 		"stats": IDENTITY.stats(run.state.stats), "hitstop_enabled": run.state.hitstop_enabled, "invincible": run.ship.invincible,
-		"rng_seed": str(run.state.rng.seed), "rng_state": str(run.state.rng.state)}
+		"rng_seed": str(run.state.rng.seed), "rng_state": str(run.state.rng.state),
+		"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "xp_config": xp_config}
 	if "stage_tuning" in run.enemies:
 		recording_start.conditions["enemy_tuning"] = IDENTITY.plain(run.enemies.get("stage_tuning"))
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
-		"schema_version": 4, "measurement_version": 3, "combat_version": 1,
+		"schema_version": 4, "measurement_version": 3, "combat_version": 1, "xp_reward_version": PickupSystem.XP_REWARD_VERSION,
 		"combat_config": {"level": combat_level, "events_per_second": clampi(combat_events_per_second, 1, 1000), "max_events": clampi(combat_max_events, 1, 1000000), "max_bytes": maxi(0, combat_max_bytes), "line_bytes": COMBAT_LINE_BYTES}, "run_start": run_start, "recording_start": recording_start, "missing_prefix": during_run,
-		"xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
+		"xp_config": xp_config, "xp_cumulative_at_start": _xp_start_summary,
+		"equipment_progress": _equipment_progress(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
 		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
 		"git_state": git_state,
 		"perf_excludes_ui_pause": true,
 		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
 	if not run.state.cards.is_empty(): _on_cards(run.state.cards, true, true)
-	# 途中録画に存在する結晶は、生成時刻・出所を推定せず、ID と現値だけ引き継ぐ。
+	# 途中録画の個体はID・種類・保持基準XPと吸収先だけを引き継ぎ、生成時刻・出所を推定しない。
 	if during_run:
-		var gems := []
-		var pk := run.pickups
-		for i in pk.gem_alive.size():
-			if pk.gem_alive[i] != 0: gems.append([pk.gem_seq[i], pk.gem_value[i]])
-		var carried := []
-		var table := run.enemies.table
-		for i in table.alive.size():
-			if table.alive[i] != 0 and table.dead[i] == 0 and table.carry[i] > 0.0:
-				carried.append([table.id[i], table.carry[i]])
-		_write({"type": "xp_existing", "t": run.state.time, "world_t": run.state.world_time, "gems": gems, "carried": carried, "origin": "unobserved"})
-	_big_crystals = {}
-	_run.pickups.big_crystal_dropped.connect(_on_big_crystal)
+		var existing := run.pickups.xp_snapshot()
+		existing.merge({"type": "xp_existing", "t": run.state.time, "world_t": run.state.world_time,
+			"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "origin": "unobserved"}, true)
+		_write(existing)
 	run.bosses.diagnostics.recorded.connect(_on_combat)
 	run.bosses.diagnostics.configure(0 if _io_failed else combat_level, combat_events_per_second, combat_max_events)
 	_flush()
@@ -270,23 +268,45 @@ func _meta_levels() -> Dictionary:
 	return out
 
 func _xp_config() -> Dictionary:
-	var out := {}
-	for key in ["drop_base", "drop_power_exp", "drop_max", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end",
-			"big_crystal_shift_time", "xp_base", "xp_growth", "xp_curve"]:
-		var v = _run.cfg.get(key)
-		out[key] = Array(v) if v is PackedFloat32Array else v
+	return IDENTITY.xp_config(_run)
+
+## カウンタは区間差、地面・運搬中・指定黄色は書いた時点の値。色跨ぎの保存則は基準XP合計で照合する。
+func _xp_window(current: Dictionary, previous: Dictionary, scope: String) -> Dictionary:
+	var out := {"scope": scope, "counter_color_basis": "supplied_before_absorption_collected_after_conversion"}
+	for key in ["supplied", "collected", "lost", "gold_rolls"]:
+		out[key] = _counter_difference(current.get(key, {}), previous.get(key, {}))
+	out["collected_actual_xp"] = float(current.get("collected_actual_xp", 0.0)) - float(previous.get("collected_actual_xp", 0.0))
+	for key in ["ground", "carried", "cap"]:
+		out[key] = current.get(key, {})
 	return out
 
-## 大きい結晶が落ちた。t はラン秒、level は落ちたときのレベル。
-func _on_big_crystal(tier: int, xp: float, enemy: StringName) -> void:
-	if _run == null:
-		return
-	_write({"type": "big_crystal", "t": _r(_run.state.time), "level": _run.state.level, "tier": tier, "xp": xp, "enemy": String(enemy)})
-	var key := str(tier)
-	var counts: Dictionary = _big_crystals.get(key, {"count": 0, "xp": 0.0})
-	counts.count += 1
-	counts.xp += xp
-	_big_crystals[key] = counts
+func _counter_difference(current: Dictionary, previous: Dictionary) -> Dictionary:
+	var out := {}
+	for key in current:
+		if current[key] is Dictionary:
+			out[key] = _counter_difference(current[key], previous.get(key, {}))
+		elif current[key] is int or current[key] is float:
+			out[key] = current[key] - previous.get(key, 0)
+	return out
+
+func _base_xp_total(colors: Dictionary) -> float:
+	var total := 0.0
+	for item in colors.values():
+		total += float(item.get("base_xp", 0.0))
+	return total
+
+## 空き枠は0段として、装備段数を設定上の全枠・全段で割る。選択回数・おまけとは分ける。
+func _equipment_progress() -> Dictionary:
+	var cfg := _run.cfg
+	var weapon_levels := 0
+	for level in _run.state.weapons.values():
+		weapon_levels += clampi(int(level), 0, cfg.weapon_max_level)
+	var trait_levels := 0
+	for level in _run.state.traits.values():
+		trait_levels += clampi(int(level), 0, cfg.trait_max_stacks)
+	var maximum := cfg.weapon_slots * cfg.weapon_max_level + cfg.trait_slots * cfg.trait_max_stacks
+	return {"weapon_levels": weapon_levels, "trait_levels": trait_levels, "max_levels": maximum,
+		"completion": float(weapon_levels + trait_levels) / maximum if maximum > 0 else 0.0}
 
 func _process(delta: float) -> void:
 	if _saved_t > 0.0:
@@ -319,21 +339,23 @@ func _sample() -> void:
 		by_star[star] = int(by_star.get(star, 0)) + 1
 		if view.has_point(t.pos[i]):
 			in_view += 1
-	var field_xp := 0.0
-	var pk = _run.pickups
-	for g in pk.gem_alive.size():
-		if pk.gem_alive[g] != 0:
-			field_xp += pk.gem_value[g]
+	var xp_summary := _run.pickups.xp_summary()
+	var xp_window := _xp_window(xp_summary, _last_xp_summary, "recording_interval")
+	var field_xp := _base_xp_total(xp_summary.get("ground", {}))
 	var phase: PhaseDef = _run.spawn.current_phase()
 	_finish_removed_enemies()
 	_write({"type": "sample", "t": _r(s.time), "world_t": s.world_time, "band": String(phase.id),
 		"xp_picked": _r(s.xp_gained - _last_xp_gained), "xp_dropped": _r(s.xp_dropped - _last_xp_dropped), "xp_field": _r(field_xp),
+		"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "xp": xp_window,
+		"xp_picked_actual": xp_window.collected_actual_xp, "xp_dropped_base": _base_xp_total(xp_window.supplied), "xp_field_base": field_xp,
+		"equipment_progress": _equipment_progress(),
 		"level": s.level, "hp": _r(s.ship_hp), "hp_max": _r(s.stats.max_hp),
 		"enemies": total, "in_view": in_view, "by_star": by_star, "kills": _kills, "kills_by": _kills_by, "dealt": _dealt,
 		"effective_damage": _effective.values(), "enemy_life": _enemy_life.values(), "enemy_contacts": _enemy_contacts.values(),
 		"damage": _damage, "attack_budget_max": _r(_budget_max)})
 	_last_xp_gained = s.xp_gained
 	_last_xp_dropped = s.xp_dropped
+	_last_xp_summary = xp_summary.duplicate(true)
 	_reset_counts()
 	_flush()
 
@@ -567,7 +589,9 @@ func _end(result: String) -> void:
 			"rams": rec[2], "weapon_damage": _r(rec[3]), "by_cause": rec[4], "result": "alive"})
 	_write({"type": "end", "t": _r(s.time), "result": result, "level": s.level, "kills": s.kills,
 		"weapons": _plain(s.weapons), "traits": _plain(s.traits), "last_hurt": _last_hurt if result == "death" else {},
-		"big_crystals": _big_crystals, "combat_summary": {"emitted": _run.bosses.diagnostics.emitted, "rate_or_count_dropped": _run.bosses.diagnostics.dropped,
+		"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "xp_cumulative": _last_xp_summary,
+		"xp_observed": _xp_window(_last_xp_summary, _xp_start_summary, "recording_total"), "equipment_progress": _equipment_progress(),
+		"combat_summary": {"emitted": _run.bosses.diagnostics.emitted, "rate_or_count_dropped": _run.bosses.diagnostics.dropped,
 			"size_dropped": _combat_dropped, "bytes": _combat_bytes, "transport_complete": _run.bosses.diagnostics.dropped == 0 and _combat_dropped == 0}})
 	_flush()
 	_saved_text = "記録に失敗しました" if _io_failed else "保存：" + _file.get_path().get_file()
@@ -578,7 +602,7 @@ func _end(result: String) -> void:
 	_run.projectiles.clear_combat_observations()
 	if _run.bosses.diagnostics.recorded.is_connected(_on_combat): _run.bosses.diagnostics.recorded.disconnect(_on_combat)
 	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.loadout.cards_opened, _on_cards],
-		[_run.pickups.big_crystal_dropped, _on_big_crystal], [_run.pickups.xp_recorded, _write], [_run.loadout.loadout_recorded, _on_loadout],
+		[_run.pickups.xp_recorded, _write], [_run.loadout.loadout_recorded, _on_loadout],
 		[_run.loadout.choice_recorded, _on_choice],
 		[_run.ship.hurt_recorded, _on_hurt], [_run.ship.recording_hurt_attempt, _on_enemy_contact],
 		[_run.enemies.recording_spawned, _on_enemy_spawned],
@@ -591,7 +615,8 @@ func _end(result: String) -> void:
 	_close_profiles()
 	_run = null
 	_session = null
-	_big_crystals = {}
+	_xp_start_summary = {}
+	_last_xp_summary = {}
 	_strong = {}
 	_enemy_seen = {}
 	_offered = []

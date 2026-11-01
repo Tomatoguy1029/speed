@@ -211,7 +211,7 @@ class Runner extends "res://scripts/bosses/monoceros/techniques/charge.gd".Runne
 		if host._path_blocked():
 			begin_reposition(host)
 			return
-		if from_circle: host.table.facing[host.body] = (host.run_state.ship_pos - host.table.pos[host.body]).angle()
+		if from_circle: host.table.facing[host.body] = host.tracking_angle((host.run_state.ship_pos - host.table.pos[host.body]).angle())
 		host.direction = Vector2.from_angle(host.table.facing[host.body])
 		var r := host.rule()
 		travel = maxf(float(r.min_run), host.table.pos[host.body].distance_to(host.run_state.ship_pos) + float(r.overshoot))
@@ -237,8 +237,8 @@ class Runner extends "res://scripts/bosses/monoceros/techniques/charge.gd".Runne
 		match stage:
 			&"aim":
 				if not host.locked:
-					host.table.facing[host.body] = rotate_toward(host.table.facing[host.body], (host.run_state.ship_pos - host.table.pos[host.body]).angle(), float(r.aim_turn) * dt)
-					host.aim_point = host.run_state.ship_pos
+					host.table.facing[host.body] = host.tracking_angle(rotate_toward(host.table.facing[host.body], (host.run_state.ship_pos - host.table.pos[host.body]).angle(), float(r.aim_turn) * dt))
+					host.aim_point = host.tracking_target(host.run_state.ship_pos)
 					if stage_time >= float(r.aim_time) - float(r.aim_lock):
 						host.locked = true
 						host._cue(&"aim_locked")
@@ -270,10 +270,10 @@ class Runner extends "res://scripts/bosses/monoceros/techniques/charge.gd".Runne
 				host.table.facing[host.body] = heading
 				var target := host.run_state.ship_pos - host.table.pos[host.body]
 				var off := wrapf(target.angle() - heading, -PI, PI)
-				angle = heading + clampf(off, -float(r.head_lead), float(r.head_lead))
+				if not host.tracking_locked(): angle = heading + clampf(off, -float(r.head_lead), float(r.head_lead))
 				glow_level = maxf(0.0, 1.0 - absf(off) / maxf(float(r.glow_angle), 0.001))
 				if absf(off) < float(r.align_angle) and target.length() > float(r.align_min_distance) and stage_time > float(r.align_min_time):
-					host.aim_point = host.run_state.ship_pos
+					host.aim_point = host.tracking_target(host.run_state.ship_pos)
 					host._cue(&"aim_locked")
 					_launch(host, maxf(float(r.speed), v), true)
 				elif stage_time > float(r.circle_max_time): _end(host)

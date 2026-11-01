@@ -2,7 +2,6 @@
 extends TraitBehavior
 
 var _next_time := 0.0
-var _buf := PackedInt32Array()
 
 func on_critical(from: Vector2) -> void:
 	if state.time < _next_time or state.phase != RunState.Phase.PLAY:

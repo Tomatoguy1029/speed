@@ -6,9 +6,11 @@ shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_nearest;
 uniform int count = 0;
-// x, y：中心（画面の画素）、z：半径（画面の画素）、w：ずれの強さ（ドット数。負は内向き）
+// 本番は論理画面の大きさを渡す。等倍の図鑑SubViewportは描画解像度を使う。
+uniform vec2 logical_size = vec2(0.0);
+// x, y：中心（論理画面の単位）、z：半径（同単位）、w：ずれの強さ（ドット数。負は内向き）
 uniform vec4 ripples[8];
-// 1ドットの画面の画素数
+// 1ドットの論理画面での大きさ
 uniform float cell = 2.0;
 group_uniforms tuning;
 uniform float band_cells : hint_range(2.0, 20.0, 0.5) = 8.0;
@@ -18,7 +20,7 @@ uniform vec4 highlight : source_color = vec4(0.149, 0.149, 0.171, 1.0);
 group_uniforms;
 
 void fragment() {
-	vec2 size = 1.0 / SCREEN_PIXEL_SIZE;
+	vec2 size = logical_size.x > 0.0 ? logical_size : 1.0 / SCREEN_PIXEL_SIZE;
 	vec2 p = SCREEN_UV * size;
 	vec2 q = (floor(p / cell) + 0.5) * cell;
 	vec4 color = texture(screen, SCREEN_UV);
