@@ -30,6 +30,11 @@ const HEALTH := preload(ART + "combat_ui_health_bar.png")
 const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
 const SLOTS := preload(ART + "combat_ui_components.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
+const SPEED_METERS := [preload(ART + "speed_indicator_meter.png"), preload(ART + "speed_indicator_fast.png"), preload(ART + "speed_indicator_boost.png")]
+const SPEED_NEEDLE := preload(ART + "speed_indicator_needle.png")
+const SPEED_NEEDLE_COLORS := [Color.WHITE, Color("#fff1b8"), Color("#ffd2ab")]
+## 針画像の丸い根元の中心。目盛りの右下の支点へ重ねる。
+const SPEED_NEEDLE_PIVOT := Vector2(6.5, 36.5)
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := preload("res://scripts/ui/module_icons.gd").IDS
 
@@ -876,6 +881,7 @@ func _draw() -> void:
 		_draw_loadout()
 	draw_set_transform(Vector2.ZERO)
 	if show_status:
+		_draw_speed_indicator(factor)
 		_draw_boss(W)
 		if _hero_notice_t > 0.0 and run.heroes.guidance_visible() and not _rewards.is_active():
 			var text := tr("hud.hero_discovered")
@@ -893,6 +899,25 @@ func _draw() -> void:
 var _dense := PackedVector2Array()
 var _minimap_at := Vector2.ZERO
 var _minimap_r := 0.0
+
+func _speed_indicator_mode() -> int:
+	var s := run.state
+	if s.tracing or s.ship_boost_t > 0.0: return 2
+	if s.glide or s.ship_vel.length() > s.stats.max_speed * run.cfg.steer_cruise + 1.0: return 1
+	return 0
+
+func _speed_indicator_angle() -> float:
+	var amount := clampf(run.state.ship_vel.length() / maxf(1.0, run.state.stats.max_speed), 0.0, 1.0)
+	return lerpf(-PI / 2.0, 0.0, amount)
+
+func _draw_speed_indicator(factor: float) -> void:
+	var mode := _speed_indicator_mode()
+	var meter: Texture2D = SPEED_METERS[mode]
+	var origin := (size - (meter.get_size() + Vector2.ONE * 8.0) * factor).round()
+	draw_texture_rect(meter, Rect2(origin, meter.get_size() * factor), false)
+	draw_set_transform(origin + meter.get_size() * factor, _speed_indicator_angle(), Vector2.ONE * factor)
+	draw_texture(SPEED_NEEDLE, -SPEED_NEEDLE_PIVOT, SPEED_NEEDLE_COLORS[mode])
+	draw_set_transform(Vector2.ZERO)
 
 ## ミニマップ（右上）。自機を中心に、世界の方角と縮尺を保って出す（仕様書 17）。
 ## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
