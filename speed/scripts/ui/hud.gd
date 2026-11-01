@@ -30,6 +30,7 @@ const HEALTH := preload(ART + "combat_ui_health_bar.png")
 const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
 const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
 const SLOTS := preload(ART + "combat_ui_components.png")
+const COMET_SLOT_FRAME := preload(ART + "comet_slot_frame.gdshader")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const CARD_VIEW := preload("res://scripts/ui/reward_card_view.gd")
 const ICONS := preload(ART + "icons.png")
@@ -520,7 +521,10 @@ func _refresh_loadout_icons() -> void:
 		for id in owned:
 			var at := (LOADOUT_WEAPON if row == 0 else LOADOUT_TRAIT) + Vector2(index * LOADOUT_STEP, 0)
 			var area := Rect2(at + Vector2(2, 2), Vector2(12, 10))
-			_add_icon(_loadout_icons, ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id), area)
+			var definition: Resource = ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id)
+			if row == 0 and definition != null and definition.comet_only:
+				_add_comet_slot_frame(Rect2(at, Vector2(LOADOUT_SLOT, 17)))
+			_add_icon(_loadout_icons, definition, area)
 			index += 1
 		row += 1
 	for j in run.state.final_modules.size():
@@ -529,6 +533,21 @@ func _refresh_loadout_icons() -> void:
 		preview.size=Vector2(12,10)
 		preview.module_id=run.state.final_modules[j]
 		_loadout_icons.add_child(preview)
+
+func _add_comet_slot_frame(area: Rect2) -> void:
+	var texture := AtlasTexture.new()
+	texture.atlas = SLOTS
+	texture.region = area
+	var material := ShaderMaterial.new()
+	material.shader = COMET_SLOT_FRAME
+	material.set_shader_parameter("frame_color", COMET_ONLY_COLOR)
+	var frame := TextureRect.new()
+	frame.texture = texture
+	frame.material = material
+	frame.position = area.position
+	frame.size = area.size
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loadout_icons.add_child(frame)
 
 # ── 3択 ──────────────────────────────────────────────────────────
 
@@ -1008,7 +1027,6 @@ func _draw_slot_row(origin: Vector2, weapon: bool, slots: int, max_level: int, o
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
 		var definition = defs[ids[k]]
 		if weapon and definition.comet_only:
-			draw_rect(rect.grow(1), COMET_ONLY_COLOR, false, 1)
 			continue
 		var pip_w := (LOADOUT_SLOT - 4.0) / max_level
 		for j in max_level:
