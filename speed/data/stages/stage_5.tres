@@ -500,7 +500,7 @@ enemy_tuning = {
 enemy_attack_values = {
 "aquila": 3.0,
 "auriga": 1.0,
-"biter": 0.1,
+"biter": 0.0,
 "bomber": 0.0,
 "cepheus": 1.0,
 "cepheus_soldier": 0.5,
@@ -510,7 +510,7 @@ enemy_attack_values = {
 "dolphin": 1.0,
 "pump": 1.0,
 "splitling": 0.0,
-"splitter": 0.1
+"splitter": 0.0
 }
 zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_splitter"), SubResource("Curve_bomber")])
 clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Clip_13"), SubResource("Clip_14"), SubResource("Clip_15"), SubResource("Clip_16"), SubResource("Clip_17"), SubResource("Clip_18"), SubResource("Clip_19"), SubResource("Clip_20"), SubResource("Clip_21"), SubResource("Clip_22"), SubResource("Clip_23"), SubResource("Clip_24"), SubResource("Clip_25"), SubResource("Clip_26"), SubResource("Clip_28"), SubResource("Clip_29"), SubResource("Clip_30")])
