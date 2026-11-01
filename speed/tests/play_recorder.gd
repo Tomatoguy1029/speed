@@ -23,6 +23,7 @@ func check(ok: bool, label: String) -> void:
 		push_error("[play_recorder] " + label)
 
 func _ready() -> void:
+	await verify_recording_shortcuts()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			shots = arg.trim_prefix("--out=")
@@ -48,6 +49,39 @@ func _ready() -> void:
 	await verify_live_tuning(true)
 	print("[play_recorder] passed=%d failed=%d output=%s" % [passed, failed, recording_path])
 	get_tree().quit(1 if failed else 0)
+
+func verify_recording_shortcuts() -> void:
+	var rec := TempRecorder.new()
+	add_child(rec)
+	var key := InputEventKey.new()
+	key.keycode = KEY_F9
+	key.pressed = true
+	var suspend := Shortcut.new()
+	suspend.events = [key.duplicate()]
+	rec._input(key)
+	check(not rec.armed, "Godot の停止キー F9 単独で記録を切り替えない")
+	key.ctrl_pressed = true
+	check(not suspend.matches_event(key), "Ctrl+F9 は Godot の埋め込み停止キーと一致しない")
+	rec._input(key)
+	check(rec.armed, "Ctrl+F9 で記録待機を有効にする")
+	key.echo = true
+	rec._input(key)
+	check(rec.armed, "キーリピートで記録を切り替えない")
+	key.echo = false
+	key.pressed = false
+	rec._input(key)
+	check(rec.armed, "キーを離したときに記録を切り替えない")
+	key.pressed = true
+	rec._input(key)
+	check(not rec.armed, "Ctrl+F9 で記録待機を無効にする")
+	key.ctrl_pressed = false
+	key.keycode = KEY_F10
+	var next_frame := Shortcut.new()
+	next_frame.events = [key.duplicate()]
+	key.ctrl_pressed = true
+	check(not next_frame.matches_event(key), "Ctrl+F10 は Godot のコマ送りキーと一致しない")
+	rec.queue_free()
+	await get_tree().process_frame
 
 func verify_mid_run_start() -> void:
 	var scene := RunManager.create_run() as Node
@@ -75,8 +109,9 @@ func verify_mid_run_start() -> void:
 	var key := InputEventKey.new()
 	key.keycode = KEY_F9
 	key.pressed = true
+	key.ctrl_pressed = true
 	rec._input(key)
-	check(rec._file != null, "プレイ中の F9 で既存ランの記録を開始する")
+	check(rec._file != null, "プレイ中の Ctrl+F9 で既存ランの記録を開始する")
 	check(before == [run.state.time, run.state.level, run.state.xp, run.state.rng.state], "録画開始は時計・成長・乱数を変えない")
 	if rec._file != null:
 		var path := rec._file.get_path()
@@ -94,7 +129,7 @@ func verify_mid_run_start() -> void:
 		rec._begin(scene)
 		check(rec._file.get_path() == path and read_rows(path).size() == 2, "重複開始でファイルを作り直さない")
 		run.flush_events()
-		check(read_rows(path).filter(func(row): return row.type == "hurt").is_empty(), "F9前から通知待ちの被弾を観測区間へ混ぜない")
+		check(read_rows(path).filter(func(row): return row.type == "hurt").is_empty(), "Ctrl+F9前から通知待ちの被弾を観測区間へ混ぜない")
 		rec._process(0.0)
 		await capture("mid-run")
 		run.state.time += 3.0
@@ -105,7 +140,7 @@ func verify_mid_run_start() -> void:
 		check(sample.xp_picked == 2.0 and sample.xp_dropped == 4.0, "最初の sample は録画開始後の XP だけを集計する")
 		rec._input(key)
 		var closed := FileAccess.get_file_as_bytes(path)
-		check(read_rows(path).back().result == "stopped", "F9 停止を記録する")
+		check(read_rows(path).back().result == "stopped", "Ctrl+F9 停止を記録する")
 		rec._set_armed(false)
 		rec._end("stopped")
 		check(FileAccess.get_file_as_bytes(path) == closed, "重複停止で記録を書き足さない")
@@ -142,7 +177,7 @@ func verify_start_routes() -> void:
 			await get_tree().process_frame
 			check(GameManager.run_start_time == 0.0 and GameManager.run_start_source == "stage_start", "開始条件を次のランへ持ち越さない")
 			if delayed:
-				# 初期武器を選び、実際のラン更新を短く進めてから F9。
+				# 初期武器を選び、実際のラン更新を短く進めてから Ctrl+F9。
 				run.choose_card(0)
 				run.combat.rebuild_grid()
 				for tick in 12:
@@ -151,6 +186,7 @@ func verify_start_routes() -> void:
 				var rng := run.state.rng.state
 				var key := InputEventKey.new()
 				key.keycode = KEY_F9
+				key.ctrl_pressed = true
 				key.pressed = true
 				rec._input(key)
 				check(run.recording_snapshot() == snapshot and run.state.rng.state == rng, "途中開始も実更新後の状態を保全する")
