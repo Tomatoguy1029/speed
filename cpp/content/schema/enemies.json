@@ -1,0 +1,52 @@
+{
+  "records": [
+    {
+      "name": "HoundDefinition",
+      "section": 19,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "alignment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cohesion",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "separation",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

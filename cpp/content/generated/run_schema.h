@@ -382,7 +382,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 2) return false;
+    if (out.kind > 3) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     return true;
@@ -624,6 +624,35 @@ inline bool read(BinaryReader &input, LoadoutAsset &out) {
     if (out.asset < 1) return false;
     return true;
 }
+struct HoundDefinition {
+    uint32_t id{};
+    uint32_t count{};
+    double gap{};
+    double reach{};
+    double alignment{};
+    double cohesion{};
+    double separation{};
+    double accel{};
+};
+inline bool read(BinaryReader &input, HoundDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count < 1) return false;
+    if (!input.read_f64(out.gap)) return false;
+    if (out.gap < 0) return false;
+    if (!input.read_f64(out.reach)) return false;
+    if (out.reach < 0) return false;
+    if (!input.read_f64(out.alignment)) return false;
+    if (out.alignment < 0) return false;
+    if (!input.read_f64(out.cohesion)) return false;
+    if (out.cohesion < 0) return false;
+    if (!input.read_f64(out.separation)) return false;
+    if (out.separation < 0) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -643,6 +672,7 @@ struct ContentRecords {
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
+    std::vector<HoundDefinition> HoundDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -665,7 +695,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 4) return false;
+        if (version != 5) return false;
         if (count > input.remaining()/236) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -760,6 +790,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { LoadoutAsset row; if (!read(input,row)) return false; out.LoadoutAsset_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 19: {
+        if (version != 1) return false;
+        if (count > input.remaining()/56) return false;
+        for (uint32_t i=0; i<count; ++i) { HoundDefinition row; if (!read(input,row)) return false; out.HoundDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -800,6 +836,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ProgressionDefinition_rows) if (!ProgressionDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LoadoutAsset_ids;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutAsset_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HoundDefinition_ids;
+    for (const auto &row:data.HoundDefinition_rows) if (!HoundDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -813,6 +851,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BiteDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
+    for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -933,5 +972,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=18;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=19;
 }

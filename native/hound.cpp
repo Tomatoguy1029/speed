@@ -1,5 +1,8 @@
 #include "run_core.h"
 #include "../cpp/systems/enemy_system.h"
+#include "../cpp/systems/group_system.h"
+#include "../cpp/systems/tracking_policy.h"
+#include "../cpp/behaviors/enemies/hound.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -7,11 +10,12 @@ using namespace godot;
 void SpeedRunCore::spawn_hounds(size_t row, const Dictionary &options) {
     auto &enemy = runtime.state.enemies[row];
     const auto &def = runtime.content->definitions[enemy.definition];
-    enemy.pack = options.get("hound_pack", enemy.id); enemy.in_pack = true;
-    runtime.state.hound_packs[enemy.pack].push_back(row);
+    const int64_t pack=options.get("hound_pack",enemy.id);
+    speed::GroupSystem::join(runtime.state,runtime.state.enemy_handles.at(uint32_t(row)),pack);
     if (!options.has("vel")) {
-        enemy.vel = (runtime.state.ship_pos - enemy.pos).normalized() * enemy.speed;
-        enemy.facing = enemy.vel.angle();
+        const speed::TrackingPolicy tracking{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
+        enemy.vel=tracking.velocity(enemy.vel,enemy.facing,(runtime.state.ship_pos-enemy.pos).normalized()*enemy.speed);
+        if (!tracking.locked()) enemy.facing=enemy.vel.angle();
     }
     if (options.has("hound_pack")) return;
     // 子の追加で格納配列が伸びるため、親の値は先に取り出す。
@@ -20,72 +24,33 @@ void SpeedRunCore::spawn_hounds(size_t row, const Dictionary &options) {
     const double gap = std::max(0.0, def.pack.gap);
     for (int64_t k = 1; k < def.pack.count; ++k) {
         const Vector2 at = parent.pos - direction * gap * double((k + 1) / 2) + side * gap * (k % 2 ? 0.5 : -0.5);
-        Dictionary child = options.duplicate(); child["hound_pack"] = parent.pack; child["facing"] = parent.facing;
+        Dictionary child = options.duplicate(); child["hound_pack"] = pack; child["facing"] = parent.facing;
         child["attack_group"] = parent.attack_group; child["attack_value"] = parent.attack_value; child["attack_priority"] = parent.attack_priority;
         spawn_enemy(def.id, at, child);
     }
 }
-bool SpeedRunCore::running_hound(size_t row) const {
-    const auto &e = runtime.state.enemies[row];
-    return e.alive && !e.dead && !e.held && e.stone <= 0 && e.shove_time <= 0 && e.knock_t <= 0 && e.mode != EnemyMode::Windup;
-}
-Vector2 SpeedRunCore::hound_velocity(size_t row) const {
-    const auto &e = runtime.state.enemies[row]; const auto &pack = runtime.content->definitions[e.definition].pack;
-    const auto *members = runtime.state.hound_packs.getptr(e.pack);
-    const double gap = std::max(1.0, pack.gap), reach = std::max(1.0, pack.reach);
-    Vector2 separation, center, velocity;
-    int count = 0;
-    const bool following = e.follow_ready && e.follow_until >= runtime.state.world_time;
-    for (size_t other : *members) {
-        if (other == row || !running_hound(other)) continue;
-        const auto &neighbor = runtime.state.enemies[other];
-        const Vector2 offset = e.pos - neighbor.pos;
-        const double distance = offset.length();
-        if (!following && distance > reach) continue;
-        center += neighbor.pos; velocity += neighbor.vel; ++count;
-        if (distance > 0.001 && distance < gap) separation += offset / distance * (1.0 - distance / gap);
-    }
-    if (following) {
-        const Vector2 to = e.follow_goal - e.pos;
-        const double top = e.speed * e.follow_scale;
-        Vector2 desired = to.length_squared() > 1.0 ? to.normalized() * std::min(top, double(to.length()) / 0.25) : Vector2();
-        desired += separation * e.speed * pack.separation;
-        return desired.limit_length(top);
-    }
-    const Vector2 chase = (runtime.state.ship_pos - e.pos).normalized() * e.speed;
-    if (count == 0) return chase;
-    Vector2 desired = chase.lerp(velocity / count, std::clamp(pack.alignment, 0.0, 1.0));
-    desired += (center / count - e.pos) / reach * e.speed * pack.cohesion;
-    desired += separation * e.speed * pack.separation;
-    return desired.limit_length(e.speed);
-}
-void SpeedRunCore::prepare_hounds(const std::vector<size_t> &rows) {
-    for (size_t row : rows) {
-        auto &e = runtime.state.enemies[row]; e.pursuit_ready = running_hound(row);
-        if (e.pursuit_ready) e.pursuit = hound_velocity(row);
-    }
-}
+bool SpeedRunCore::running_hound(size_t row) const {return speed::HoundBehavior::running(runtime.state,uint32_t(row));}
+Vector2 SpeedRunCore::hound_velocity(size_t row) const {return speed::HoundBehavior::pack_velocity(runtime,uint32_t(row));}
+void SpeedRunCore::prepare_hounds(const std::vector<size_t> &rows) {speed::HoundBehavior::prepare(runtime,rows);}
 void SpeedRunCore::remove_hound(size_t row) {speed::EnemySystem::leave_hound(runtime.state,row);}
 bool SpeedRunCore::follow_hound(int64_t id, Vector2 goal, double until, double scale) {
     if (!runtime.state.started || runtime.state.closed || !goal.is_finite() || !std::isfinite(until) || !std::isfinite(scale) || scale < 0) return false;
     const auto found = runtime.state.rows_by_id.find(id); if (found == runtime.state.rows_by_id.end()) return false;
-    auto &e = runtime.state.enemies[found->second]; if (!e.in_pack || e.dead) return false;
-    e.follow_ready = true; e.follow_goal = goal; e.follow_until = until; e.follow_scale = scale;
-    return true;
+    return speed::GroupSystem::follow(runtime.state,runtime.state.enemy_handles.at(uint32_t(found->second)),goal,until,scale);
 }
 Dictionary SpeedRunCore::hound_snapshot() const {
     Array packs, follows;
-    for (const auto &entry : runtime.state.hound_packs) {
-        Dictionary pack; Array members;
-        for (size_t row : entry.value) members.append(runtime.state.enemies[row].id);
-        pack["id"] = entry.key; pack["members"] = members; packs.append(pack);
+    for (const auto &entry:runtime.state.groups.groups) {
+        Dictionary pack;Array members;
+        for (const auto &member:entry.value.members) members.append(member.key);
+        pack["id"]=entry.key;pack["members"]=members;packs.append(pack);
     }
-    std::vector<const Enemy *> ordered;
-    for (const auto &e : runtime.state.enemies) if (e.alive && e.follow_ready) ordered.push_back(&e);
-    std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) { return a->id < b->id; });
-    for (const auto *e : ordered) {
-        Dictionary follow; follow["id"] = e->id; follow["goal"] = e->follow_goal;
-        follow["until"] = e->follow_until; follow["scale"] = e->follow_scale; follows.append(follow);
+    for (const auto &entry:runtime.state.groups.groups) for (const auto &member:entry.value.members) {
+        const auto &o=member.value.order;if (!o.follow) continue;
+        Dictionary f;f["id"]=member.key;f["goal"]=o.follow_goal;f["until"]=o.follow_until;f["scale"]=o.follow_scale;follows.append(f);
     }
+    std::vector<Dictionary> ordered;for (int64_t i=0;i<follows.size();++i) ordered.push_back(follows[i]);
+    std::sort(ordered.begin(),ordered.end(),[](const auto &a,const auto &b){return int64_t(a["id"])<int64_t(b["id"]);});
+    follows.clear();for (const auto &f:ordered) follows.append(f);
     Dictionary out; out["packs"] = packs; out["follows"] = follows; return out;
 }

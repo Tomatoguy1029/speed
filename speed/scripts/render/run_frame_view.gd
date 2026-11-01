@@ -75,6 +75,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.get("biter") is Dictionary: return false
 			for key in ["modes","charges","timers","rests"]:
 				if not row.biter.has(key) or row.biter[key].size()!=count: return false
+		if row.has("glows"):
+			if not row.glows is PackedFloat32Array or row.glows.size()%3!=0: return false
+			for value: float in row.glows:
+				if not is_finite(value): return false
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:

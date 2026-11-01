@@ -4,6 +4,7 @@
 #include "../cpp/systems/enemy_system.h"
 #include "geometry.h"
 #include "../cpp/behaviors/enemies/pursuit.h"
+#include "../cpp/behaviors/enemies/hound.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -29,6 +30,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     if (far && (enemy.id + runtime.state.ticks) % 3 != 0) { enemy.pos += enemy.vel * dt; return; }
     const double bdt = far ? dt * 3.0 : dt;
     const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
+    if (def.kind==speed::EnemyDefinition::Kind::Hound && speed::HoundBehavior::ordered_move(runtime,uint32_t(row),bdt,policy)) {enemy.pos+=enemy.vel*dt;return;}
     if (enemy.mode == EnemyMode::Windup) {
         enemy.vel *= std::max(0.0, 1.0 - 8.0 * bdt);
         speed::PursuitBehavior::turn(enemy,(runtime.state.ship_pos-from).angle(),def.turn*2.0,bdt,policy);
@@ -48,13 +50,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     } else {
         const Vector2 toward = runtime.state.ship_pos - from;
         const double distance = toward.length();
-        const Vector2 previous_velocity = enemy.vel;
-        enemy.vel=speed::PursuitBehavior::velocity(enemy,runtime.state.ship_pos,def.turn,bdt,policy);
-        if (def.kind == speed::EnemyDefinition::Kind::Hound) {
-            const Vector2 target = enemy.pursuit_ready ? enemy.pursuit : toward.normalized() * enemy.speed;
-            // 下の共通追跡値ではなく、更新前の速度から補間する。
-            enemy.vel = previous_velocity.lerp(policy.velocity(previous_velocity,enemy.facing,target), std::clamp(def.accel * bdt, 0.0, 1.0));
-        }
+        enemy.vel=def.kind==speed::EnemyDefinition::Kind::Hound?speed::HoundBehavior::pursuit(runtime,uint32_t(row),bdt,policy):speed::PursuitBehavior::velocity(enemy,runtime.state.ship_pos,def.turn,bdt,policy);
         if (enemy.vel.length_squared() > 0.000001 && !policy.locked()) enemy.facing = enemy.vel.angle();
         if (enemy.mode == EnemyMode::Recover) {
             enemy.timer = speed::remaining_time(enemy.timer,bdt);

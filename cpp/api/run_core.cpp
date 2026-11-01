@@ -212,7 +212,7 @@ void SpeedRunCore::close() {
     runtime.combat_hooks=speed::CombatHooks();runtime.render_workspace={};
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
     runtime.state.legacy_progression = Progression();
-    runtime.state.hound_packs.clear();
+    runtime.state.groups={};
     runtime.state.enemies.clear(); runtime.state.enemy_handles = {};
     runtime.state.enemies.shrink_to_fit();
     runtime.state.free_rows.clear();

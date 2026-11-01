@@ -16,6 +16,7 @@ struct ContentBundle {
     std::vector<ResourceKey> visuals;
     std::vector<ForwardDefinition> forward_levels;
     std::vector<BiteDefinition> bites;
+    std::vector<HoundDefinition> hounds;
     std::vector<ContactDefinition> contacts;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;

@@ -840,7 +840,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 2
+          "max": 3
         },
         {
           "name": "turn",
@@ -849,7 +849,7 @@
           "native": "turn"
         }
       ],
-      "version": 4
+      "version": 5
     },
     {
       "name": "LoadoutDefinition",
@@ -1633,6 +1633,7 @@
   "includes": [
     "attacks.json",
     "population.json",
-    "progression.json"
+    "progression.json",
+    "enemies.json"
   ]
 }

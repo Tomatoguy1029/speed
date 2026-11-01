@@ -26,6 +26,7 @@ class SpeedRunCore : public RefCounted {
     friend class speed::ProgressionSystem;
     Dictionary development_attack_command(const String &kind,const Dictionary &payload);
     Dictionary development_contact_command(const Dictionary &payload);
+    Dictionary development_hound_command(const Dictionary &payload);
     Dictionary development_combat_command(const String &kind,const Dictionary &payload);
     bool step_ship_input(double real_dt,double world_dt,const speed::InputFrame &input);
     bool handle_draw_input(const speed::InputFrame &input,int64_t clock_msec,double camera_zoom);

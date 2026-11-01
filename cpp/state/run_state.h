@@ -5,6 +5,7 @@
 #include "attack_state.h"
 #include "world_state.h"
 #include "loadout_state.h"
+#include "group_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -48,16 +49,15 @@ struct RunState {
         double stone = 0, knock_t = 0, shove_time = 0;
         Vector2 shove_vel, shove_from;
         bool held = false, slash_hold = false, shoved = false;
-        int64_t pack = 0;
-        bool in_pack = false, pursuit_ready = false, follow_ready = false;
-        Vector2 pursuit, follow_goal;
-        double follow_until = 0, follow_scale = 1;
+        int64_t group_id = 0;
+        bool pursuit_ready = false;
+        Vector2 pursuit;
         int64_t dash_seen = -1;
         bool dash_fresh = false;
     };
     std::deque<Enemy> enemies;
     speed::EntityStore<speed::EnemyTag> enemy_handles;
-    HashMap<int64_t, std::vector<size_t>> hound_packs;
+    speed::GroupState groups;
     using AttackBudget=speed::AttackBudgetState;
     speed::WorldState world;
     struct Formation {

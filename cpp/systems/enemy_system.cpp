@@ -1,5 +1,6 @@
 #include "enemy_system.h"
 #include "attack_system.h"
+#include "group_system.h"
 #include "tracking_policy.h"
 #include "../runtime/run_runtime.h"
 #include <algorithm>
@@ -33,13 +34,7 @@ EnemyHandle EnemySystem::insert(godot::RunState &state, uint32_t slot, const god
     return handle;
 }
 void EnemySystem::leave_hound(godot::RunState &state,size_t row) {
-    auto &enemy=state.enemies[row];if (!enemy.in_pack) return;
-    auto *members=state.hound_packs.getptr(enemy.pack);
-    if (members) {
-        members->erase(std::remove(members->begin(),members->end(),row),members->end());
-        if (members->empty()) state.hound_packs.erase(enemy.pack);
-    }
-    enemy.in_pack=false;enemy.pursuit_ready=false;enemy.follow_ready=false;
+    GroupSystem::leave(state,state.enemy_handles.at(uint32_t(row)));
 }
 bool EnemySystem::retire(godot::RunState &state,EnemyHandle handle,RetireReason reason) {
     if (!state.enemy_handles.contains(handle)) return false;

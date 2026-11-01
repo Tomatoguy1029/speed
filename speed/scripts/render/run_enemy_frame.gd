@@ -5,6 +5,7 @@ var _parts: Array[Dictionary] = []
 var _sparks: InstanceBatch
 var _biter := false
 var _biting := false
+var _glows := PackedFloat32Array()
 const SNAP := 0.034
 const CLOSED_HOLD := 0.051
 const RETURN_TIME := 0.12
@@ -66,6 +67,8 @@ func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, 
 	_parts.append({"name":name,"base":base,"armor":armor,"pivot":pivot})
 
 func begin() -> void:
+	_glows.clear()
+	queue_redraw()
 	for part: Dictionary in _parts:
 		part.base.begin()
 		part.armor.begin()
@@ -80,6 +83,8 @@ func _jaw(mode: int, charge: float, timer: float, rest: float) -> float:
 	return 12.0*(1.0-smoothstep(SNAP+CLOSED_HOLD,SNAP+CLOSED_HOLD+RETURN_TIME,age))
 
 func apply_frame(row: Dictionary) -> void:
+	_glows = row.get("glows",PackedFloat32Array())
+	queue_redraw()
 	for i in row.ids.size():
 		var n: int = i*6
 		var radius := Vector2(row.transforms[n],row.transforms[n+1]).length()
@@ -107,3 +112,8 @@ func end() -> void:
 		part.base.end()
 		part.armor.end()
 	if _sparks!=null: _sparks.end()
+
+func _draw() -> void:
+	for i in range(0,_glows.size(),3):
+		for layer in range(3,0,-1):
+			draw_circle(Vector2(_glows[i],_glows[i+1]),_glows[i+2]*(1.0+layer*0.22),Color(1,1,1,0.08))

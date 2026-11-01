@@ -1,6 +1,7 @@
 #include "render_builder.h"
 #include "../runtime/run_runtime.h"
 #include "../systems/motion_math.h"
+#include "../systems/group_system.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <map>
@@ -18,6 +19,7 @@ Dictionary RenderBatchBuffer::value() {
     Dictionary out;out["visual_id"]=visual;out["layer"]=layer;out["order"]=order;out["ids"]=ids;
     out["transforms"]=transforms;out["colors"]=colors;out["flags"]=flags;
     if (biter) {Dictionary values;values["modes"]=modes;values["charges"]=charges;values["timers"]=timers;values["rests"]=rests;out["biter"]=values;}
+    if (!glows.is_empty()) out["glows"]=glows;
     return out;
 }
 namespace {
@@ -40,7 +42,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     auto &groups=run.render_workspace.batches;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
-        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();
+        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();
     }
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
@@ -56,8 +58,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             enemy_batch.biter=true;enemy_batch.modes.push_back(int32_t(enemy.mode));enemy_batch.charges.push_back(enemy.charge);
             enemy_batch.timers.push_back(enemy.timer);enemy_batch.rests.push_back(definition.bite.rest);
         }
+        const bool warning=definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
+        if (warning) {enemy_batch.glows.push_back(pose.position.x);enemy_batch.glows.push_back(pose.position.y);enemy_batch.glows.push_back(radius);}
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,
-            Color(enemy.flash>0?1.0:0.0,0,0,1),enemy.flash>0?1:0);
+            Color(enemy.flash>0 || warning?1.0:0.0,0,0,1),enemy.flash>0 || warning?1:0);
     }
     for (size_t i=0;i<state.friends.size();++i) {
         const auto &shot=state.friends[i];if (!shot.alive) continue;

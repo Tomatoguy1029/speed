@@ -4,11 +4,11 @@ const Schema = preload("res://tools/content/generated/run_schema.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_records(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"biter"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"biter",&"hound"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":0 if definition.behavior==&"chase" else 2,"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"biter":2,&"hound":3}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -44,7 +44,7 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.EnemyRecord = [row]
-	if definition.behavior==&"biter":
+	if definition.behavior in [&"biter",&"hound"]:
 		var visual_scene := "res://scenes/attacks/zone_biter.tscn"
 		var visual: Node = load(visual_scene).instantiate()
 		data.BiteDefinition = [{"id":1,"reach":source.bite.bite_reach,"warn":source.bite.bite_telegraph,
@@ -52,6 +52,10 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 			"duration":ProjectileSystem.ZONE_FLASH,"scene":visual_scene,
 			"hit":visual.get_node_or_null("Hit")!=null,"fade":visual.get_node_or_null("Fade")!=null}]
 		visual.free()
+	if definition.behavior==&"hound":
+		var pack: Dictionary = source.pack.duplicate()
+		pack.id = 1
+		data.HoundDefinition = [pack]
 	var sprite := stage.enemy_sprite_path(definition.id) if stage!=null else "res://assets/pixel/%s.png" % definition.id
 	var look: EnemyLook
 	var skin := sprite.get_file().get_basename()
@@ -116,6 +120,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
+		for hound: Dictionary in resolved.HoundDefinition:
+			hound.id = row.id
+			data.HoundDefinition.append(hound)
 		data.StringEntry.append({"id":i+1,"value":id})
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.RunConfig = resolved.RunConfig

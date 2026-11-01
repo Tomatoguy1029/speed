@@ -52,6 +52,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->visuals=records.ResourceKey_rows;
     bundle->forward_levels=records.ForwardDefinition_rows;
     bundle->bites=records.BiteDefinition_rows;
+    bundle->hounds=records.HoundDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->budget_phases=records.BudgetPhase_rows;
     if (records.ProgressionDefinition_rows.size()!=1 || records.ProgressionDefinition_rows.front().xp_base<=0) return {};
@@ -79,13 +80,18 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=2) return {};
+        if (row.kind!=0 && row.kind!=2 && row.kind!=3) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto bite=std::find_if(bundle->bites.begin(),bundle->bites.end(),[&](const auto &b){return b.id==row.id;});
-        if (row.kind==2) {
+        if (row.kind==2 || row.kind==3) {
             if (bite==bundle->bites.end() || bite->warn<=0 || bite->duration<=0 || bite->scene.empty()) return {};
             definition.bite={bite->reach,bite->warn,bite->rest,bite->radius,bite->damage};
         } else if (bite!=bundle->bites.end()) return {};
+        const auto hound=std::find_if(bundle->hounds.begin(),bundle->hounds.end(),[&](const auto &h){return h.id==row.id;});
+        if (row.kind==3) {
+            if (hound==bundle->hounds.end()) return {};
+            definition.pack={hound->count,hound->gap,hound->reach,hound->alignment,hound->cohesion,hound->separation};definition.accel=hound->accel;
+        } else if (hound!=bundle->hounds.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;

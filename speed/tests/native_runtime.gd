@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--hound-only" in OS.get_cmdline_user_args() or "--hound-bite-only" in OS.get_cmdline_user_args():
+		check(check_hound_groups("--hound-bite-only" in OS.get_cmdline_user_args()),"猟犬の群れ・指示・離脱と復帰を最後まで確認する")
+		print("[hound_groups] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--choice-only" in OS.get_cmdline_user_args():
 		check(check_run_choices(),"カード選択と資源保持を最後まで確認する")
 		print("[run_choices] failed=%d" % failed)
@@ -1076,3 +1081,106 @@ func check_choice_scopes() -> bool:
 	hud.free()
 	bridge.dispose()
 	return true
+
+func hound_row(bridge, id: int) -> Dictionary:
+	for row: Dictionary in bridge._core.enemies_snapshot():
+		if row.id==id: return row
+	return {}
+
+func hound_order(bridge, id: int, action: String, values := {}) -> bool:
+	var payload: Dictionary = values.duplicate()
+	payload.entity_id = id
+	payload.action = action
+	return bridge.command("dev_hound_order",payload).ok
+
+func check_hound_groups(bite_only := false) -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.world_tick_div = 1
+	config.start_radius = 0.0
+	var definition: EnemyDef = ContentManager.enemies[&"hound"].duplicate(true)
+	definition.params.pack_count = 3
+	var bridge = clock_fixture(config,definition)
+	var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"hound","position":Vector2(500,500)})
+	if not spawned.ok: return false
+	var root: int = spawned.value
+	if bite_only:
+		check_hound_bite(bridge,root)
+		bridge.dispose()
+		return true
+	var pack: Dictionary = bridge._core.hound_snapshot().packs[0]
+	check(pack.id==root and pack.members.size()==3,"生成で親と随伴を同じ群れへ登録する")
+	var member: int = pack.members[1]
+	check(bridge.command("dev_kill",{"entity_id":pack.members[2]}).ok,"群れの一部を実撃破する")
+	check(bridge._core.hound_snapshot().packs[0].members.size()==2,"撃破した構成員を一度だけ外す")
+	check(hound_order(bridge,member,"follow",{"goal":Vector2(800,900),"until":5.0,"scale":1.7}),"個体への走行先を型付きで保持する")
+	var saved: Dictionary = bridge.checkpoint()
+	if not saved.ok: return false
+	check(bridge.command("dev_remove",{"entity_id":root}).ok,"最初に生成した個体を失わせる")
+	pack = bridge._core.hound_snapshot().packs[0]
+	check(pack.id==root and pack.members==[member],"群れ番号は生存する親を必要としない")
+	var row: Dictionary = hound_row(bridge,member)
+	var at := Vector2(row.pos[0],row.pos[1])
+	check(hound_order(bridge,member,"quiet",{"until":5.0,"velocity":Vector2.ZERO}),"噛みつきを始めない静止指示を受ける")
+	clock_step(bridge)
+	row = hound_row(bridge,member)
+	check(Vector2(row.pos[0],row.pos[1]).is_equal_approx(at),"quietの速度指定でその場に止まる")
+	check(hound_order(bridge,member,"release"),"個体への指示を解除する")
+	check(bridge._core.hound_snapshot().follows.is_empty(),"解除で走行先も消す")
+	var steering := {"arrive":20.0,"decel":500.0,"face_turn":5.0,"turn_slow":2.0,"turn_fast":7.0,"turn_switch":100.0,"max_speed":250.0,"accel":500.0}
+	check(hound_order(bridge,member,"steer",{"goal":at+Vector2(0,200),"face":Vector2.ZERO,"until":5.0,"config":steering}),"到着・旋回・加減速の指示を受ける")
+	check(hound_order(bridge,member,"mark",{"until":5.0}),"予告の期限を個体に付ける")
+	clock_step(bridge)
+	row = hound_row(bridge,member)
+	check(Vector2(row.vel[0],row.vel[1]).length()>0.0,"操舵指示の向きへ加速する")
+	var render: Dictionary = bridge.read_render(Rect2(-2000,-2000,4000,4000)).value
+	var glow_count := 0
+	for batch: Dictionary in render.batches: glow_count += batch.get("glows",PackedFloat32Array()).size()/3
+	check(glow_count==1,"指示された個体だけ予告の表示値を出す")
+	check(bridge.restore(saved.value).ok,"群れと共有指示を保持点へ戻す")
+	check(bridge._core.hound_snapshot().packs[0].members.size()==2 and bridge._core.hound_snapshot().follows.size()==1,"親・残る構成員・走行先を復帰する")
+	var before: Array = bridge._core.enemies_snapshot()
+	clock_step(bridge)
+	var after: Array = bridge._core.enemies_snapshot()
+	var groups: Dictionary = bridge._core.hound_snapshot()
+	check(bridge.restore(saved.value).ok,"同じ保持点を再利用する")
+	check(bridge._core.enemies_snapshot()==before,"保持点の値は更新側から独立している")
+	clock_step(bridge)
+	check(bridge._core.enemies_snapshot()==after and bridge._core.hound_snapshot()==groups,"復帰後も同じ指示と更新結果になる")
+	check(hound_order(bridge,member,"release"),"復帰した個体の指示を解除する")
+	check(bridge.command("dev_relocate",{"entity_id":member,"position":Vector2(50,0)}).ok,"再配置で群れを保つ")
+	check(bridge._core.set_enemy_motion(member,{"slash_hold":true}),"閃光斬の停止条件を設定する")
+	row = hound_row(bridge,member)
+	at = Vector2(row.pos[0],row.pos[1])
+	clock_step(bridge)
+	row = hound_row(bridge,member)
+	check(row.vel==[0.0,0.0] and Vector2(row.pos[0],row.pos[1])==at,"猟犬もslash_holdで移動と噛みつきを止める")
+	bridge._core.set_enemy_motion(member,{"slash_hold":false})
+	check_hound_bite(bridge,member)
+	for id in bridge._core.hound_snapshot().packs[0].members.duplicate(): bridge.command("dev_remove",{"entity_id":id})
+	check(bridge._core.hound_snapshot().packs.is_empty() and bridge._core.hound_snapshot().follows.is_empty(),"全員の離脱で群れと指示を破棄する")
+	check(not hound_order(bridge,member,"mark",{"until":8.0}),"死亡した個体への古い指示を拒否する")
+	var next: Dictionary = bridge.command("dev_spawn",{"definition_id":"hound","position":Vector2(700,700)})
+	check(next.ok and next.value>root and bridge._core.hound_snapshot().follows.is_empty(),"行を再利用しても旧群れの指示を引き継がない")
+	bridge._core.release_checkpoint(saved.value)
+	bridge.dispose()
+	return true
+
+func check_hound_bite(bridge, member: int) -> void:
+	var ship: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
+	bridge.command("dev_relocate",{"entity_id":member,"position":ship+Vector2(50,0)})
+	var observed: Array = []
+	bridge.subscribe("hound_observe",func(frame: Dictionary):
+		observed.append_array(frame.events)
+		return true)
+	var emitted := false
+	var hazards := {}
+	for tick in 90:
+		clock_step(bridge)
+		if not bridge._core.hazards_snapshot().is_empty(): emitted = true
+		for attack: Dictionary in bridge._core.attack_snapshot():
+			if attack.pool==2: hazards[attack.id] = true
+	check(emitted,"共通の噛みつきの攻撃を生成する")
+	var retired := false
+	for event: Dictionary in observed:
+		if event.type=="attack_retired" and hazards.has(event.payload.id) and event.payload.reason=="lifetime": retired = true
+	check(retired,"噛みつきの攻撃を自然寿命で解放する")
