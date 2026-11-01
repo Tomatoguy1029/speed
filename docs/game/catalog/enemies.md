@@ -154,7 +154,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `meteor` | 隕石 | 採用 | 実装済み。りゅうの投射・遮蔽用の耐久・ブレス終了とHP段階移行時の崩壊も接続する | 追跡しない。固い障害物で、普段の速さでは上を通り抜けられない（仕様書7.2）。地帯の岩は固定、漂流は世界秒で決まった軌道を進み、回転する。彗星はラン中に画面の端の近くをまっすぐ横切る。描画・なぞり中は敵と同じスロー倍率 | 地帯と漂流はラン開始時に世界の決まった位置へ配置し、画面の近くだけ有効。彗星はときどき現れる（仕様書13.1章）。りゅうが投射する隕石の配置・耐久・遮蔽と崩壊・ドロップは[りゅう専用仕様](../bosses/draco.md#41-隕石投射と薙ぎ払いブレス)に従う | `scripts/gimmicks/meteors.gd`・`comets.gd`、`scripts/enemies/meteor.gd`、`data/enemies/meteor.tres`。地帯・漂流・彗星の隕石は撃破で修理キット・回収ビーコン・部品を落とす。レアな彗星は彗星限定の武器のカプセルを必ず落とす。破壊時の素材は[障害物](art-assets.md#鉄のがれき)を参照 |
 | `iron` | 鉄のがれき | 採用 | 実装済み | 動かない。装甲がとても高い固い障害物で、十分な攻撃力なら割れる。ぶつかると火花が出る | ラン開始時に塊で配置し、画面の近くだけ有効（置き方は仮。仕様書13.1章） | `scripts/gimmicks/meteors.gd`、`data/enemies/iron.tres`。素材は[障害物](art-assets.md#鉄のがれき)を参照 |
-| `saw` | 回る丸鋸 | 採用 | 実装済み | その場で回る。触れると機体の進んでいた向きへ飛んでいき、その先の敵を巻き込む。1回で壊れる。攻撃では壊れない | ラン開始時に散らして配置し、画面の近くだけ有効（置き方は仮。仕様書13.1章） | `scripts/gimmicks/meteors.gd`、`scripts/enemies/saw.gd` の接触処理、`data/enemies/saw.tres`。見た目は `speed/assets/pixel/saw.png`。編集元は `speed/assets/pixel/saw/sawblade.aseprite` |
+| `saw` | 回る丸鋸 | 採用 | 実装済み。専用の丸鋸画像を適用 | その場で回る。触れると機体の進んでいた向きへ飛んでいき、その先の敵を巻き込む。1回で壊れる。攻撃では壊れない | ラン開始時に散らして配置し、画面の近くだけ有効（置き方は仮。仕様書13.1章） | `scripts/gimmicks/meteors.gd`、`scripts/enemies/saw.gd` の接触処理、`data/enemies/saw.tres`。見た目は `speed/assets/pixel/saw.png`。編集元は `speed/assets/pixel/saw/sawblade.aseprite` |
 
 ### 見た目の実装
 
