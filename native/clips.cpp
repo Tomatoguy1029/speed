@@ -61,7 +61,7 @@ bool SpeedRunCore::step_clips() {
     auto pick = [&](const std::vector<double> &weights) -> int64_t {
         double total = 0; for (double weight : weights) total += weight;
         if (weights.empty() || total <= 0) return -1;
-        double roll = runtime.state.rng->randf() * total;
+        double roll = runtime.state.control.rng.randf() * total;
         for (size_t i = 0; i < weights.size(); ++i) { roll -= weights[i]; if (roll < 0) return i; }
         return weights.size() - 1;
     };

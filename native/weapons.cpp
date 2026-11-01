@@ -42,7 +42,7 @@ void SpeedRunCore::step_forward(double world_dt) {
     if (runtime.state.forward.elapsed < runtime.state.forward.interval) return;
     runtime.state.forward.elapsed = std::fmod(runtime.state.forward.elapsed, runtime.state.forward.interval);
     // 弾数が整数でも、元の共通弾数処理は乱数を一回進める。
-    runtime.state.rng->randf();
+    runtime.state.control.rng.randf();
     const double angle = runtime.state.ship.heading.angle();
     const Vector2 origin = runtime.state.ship.pos + runtime.state.ship.heading * 16.0 * 1.82 * runtime.state.forward.character_scale;
     Friendly shot;

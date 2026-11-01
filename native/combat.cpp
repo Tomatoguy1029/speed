@@ -153,7 +153,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         }
         if (!runtime.state.draw.tracing && enemy.hit_cd > 0) continue;
         const bool rear = std::abs(angle_difference((position - enemy.pos).angle(), enemy.facing + godot::Math::PI)) <= def.weak_arc;
-        const bool crit = (def.weak_arc > 0 && rear) || runtime.state.rng->randf() < c.crit_chance;
+        const bool crit = (def.weak_arc > 0 && rear) || runtime.state.control.rng.randf() < c.crit_chance;
         if (enemy.stone > 0) {
             enemy.hit_cd = c.contact_cooldown;
             if (runtime.state.draw.tracing) runtime.state.draw.inside[enemy.id] = hit.row;

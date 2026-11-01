@@ -93,7 +93,7 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
             }
         }
         if (candidates.empty() || total <= 0) continue;
-        double roll = runtime.state.rng->randf() * total;
+        double roll = runtime.state.control.rng.randf() * total;
         size_t selected = candidates.back().first;
         for (const auto &entry : candidates) {
             if (by_shortage) { roll -= entry.second; if (roll < 0) { selected = entry.first; break; } }
@@ -102,9 +102,9 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
         if (p.maximum[selected] > 0 && p.type_counts[selected] >= p.maximum[selected]) continue;
         const auto &definition = runtime.content->definitions[selected];
         Dictionary options;
-        options["elite"] = p.maximum[selected] == 0 && runtime.state.rng->randf() < 0.01 + double(surge["elite"]);
+        options["elite"] = p.maximum[selected] == 0 && runtime.state.control.rng.randf() < 0.01 + double(surge["elite"]);
         options["facing"] = (runtime.state.ship_pos - Vector2(point)).angle();
-        if (definition.size_var) options["size"] = definition.scaling.radius * (0.85 + runtime.state.rng->randf() * 0.45);
+        if (definition.size_var) options["size"] = definition.scaling.radius * (0.85 + runtime.state.control.rng.randf() * 0.45);
         const size_t before = runtime.state.rows_by_id.size();
         if (spawn_enemy(definition.id, point, options) < 0) return false;
         if (p.maximum[selected] > 0) ++p.type_counts[selected];
@@ -122,25 +122,25 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
                 const size_t type = index_of(current.wave_type);
                 if (type != runtime.content->definitions.size()) {
                     const size_t before = runtime.state.rows_by_id.size();
-                    const bool ring = runtime.state.rng->randf() < 0.5;
+                    const bool ring = runtime.state.control.rng.randf() < 0.5;
                     if (ring) {
                         for (int64_t k = 0; k < count; ++k) {
                             if (double(runtime.state.rows_by_id.size() - before) >= remaining) break;
-                            const double angle = (double(k) + double(runtime.state.rng->randf())) / double(count) * (2.0 * godot::Math::PI);
+                            const double angle = (double(k) + double(runtime.state.control.rng.randf())) / double(count) * (2.0 * godot::Math::PI);
                             const Vector2 unit(std::cos(angle), std::sin(angle));
                             const double distance = std::min((runtime.state.view_half.x + p.margin) / std::max(0.0001, std::abs(double(unit.x))),
-                                (runtime.state.view_half.y + p.margin) / std::max(0.0001, std::abs(double(unit.y)))) + runtime.state.rng->randf() * 90.0;
+                                (runtime.state.view_half.y + p.margin) / std::max(0.0001, std::abs(double(unit.y)))) + runtime.state.control.rng.randf() * 90.0;
                             Dictionary options; options["facing"] = angle + godot::Math::PI;
                             if (spawn_enemy(current.wave_type, runtime.state.view_center + unit * distance, options) < 0) return false;
                         }
                     } else {
-                        const double angle = runtime.state.rng->randf() * (2.0 * godot::Math::PI);
+                        const double angle = runtime.state.control.rng.randf() * (2.0 * godot::Math::PI);
                         const Vector2 unit(std::cos(angle), std::sin(angle));
                         for (int64_t k = 0; k < count; ++k) {
                             if (double(runtime.state.rows_by_id.size() - before) >= remaining) break;
                             const double distance = std::min(runtime.state.view_half.x / std::max(0.0001, std::abs(double(unit.x))),
                                 runtime.state.view_half.y / std::max(0.0001, std::abs(double(unit.y)))) + p.margin + k * 12.0;
-                            const double offset = (runtime.state.rng->randf() - 0.5) * 120.0;
+                            const double offset = (runtime.state.control.rng.randf() - 0.5) * 120.0;
                             Dictionary options; options["facing"] = angle + godot::Math::PI;
                             if (spawn_enemy(current.wave_type, runtime.state.ship_pos + unit * distance + Vector2(-unit.y,unit.x) * offset, options) < 0) return false;
                         }

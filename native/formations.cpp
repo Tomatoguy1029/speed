@@ -11,11 +11,11 @@ bool point(const Variant &v, Vector2 &out) {
     if (v.get_type() != Variant::VECTOR2) return false;
     out = v; return out.is_finite();
 }
-template<class T> int64_t pick(const std::vector<T> &items, const Ref<RandomNumberGenerator> &rng) {
+template<class T> int64_t pick(const std::vector<T> &items, speed::RunRandom &rng) {
     double total = 0;
     for (const auto &item : items) total += item.weight;
     if (items.empty() || total <= 0) return -1;
-    double roll = rng->randf() * total;
+    double roll = rng.randf() * total;
     for (size_t k = 0; k < items.size(); ++k) { roll -= items[k].weight; if (roll < 0) return k; }
     return items.size() - 1;
 }
@@ -88,8 +88,8 @@ PackedInt64Array SpeedRunCore::spawn_formation(int64_t index, int64_t layout, in
     if (managed.get_type() != Variant::NIL && managed.get_type() != Variant::BOOL) return ids;
     const auto &formation = runtime.state.formations[index];
     const int64_t group = value >= 0 ? runtime.state.next_id : 0;
-    const int64_t li = layout >= 0 && layout < int64_t(formation.layouts.size()) ? layout : pick(formation.layouts, runtime.state.rng);
-    const int64_t ei = entry >= 0 && entry < int64_t(formation.entries.size()) ? entry : pick(formation.entries, runtime.state.rng);
+    const int64_t li = layout >= 0 && layout < int64_t(formation.layouts.size()) ? layout : pick(formation.layouts, runtime.state.control.rng);
+    const int64_t ei = entry >= 0 && entry < int64_t(formation.entries.size()) ? entry : pick(formation.entries, runtime.state.control.rng);
     if (li < 0 || ei < 0) return ids;
     Vector2 heading = runtime.state.ship.vel.length() > 40.0 ? runtime.state.ship.vel.normalized() : runtime.state.ship.heading;
     if (heading == Vector2()) heading = Vector2(0,-1);

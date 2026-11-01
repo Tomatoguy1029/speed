@@ -20,11 +20,6 @@ bool value_only(const godot::Variant &value,unsigned depth=0) {
 }
 godot::RunState clone_state(const godot::RunState &source) {
     auto state=source;
-    if (source.rng.is_valid()) {
-        state.rng.instantiate();
-        state.rng->set_seed(source.rng->get_seed());
-        state.rng->set_state(source.rng->get_state());
-    }
     state.events=source.events.duplicate(true);
     state.collections=source.collections.duplicate(true);
     state.progression.data=source.progression.data.duplicate(true);
@@ -37,7 +32,7 @@ godot::RunState clone_state(const godot::RunState &source) {
     return state;
 }
 bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) {
-    if (!state.started || state.closed || state.next_id<=0 || !state.rng.is_valid() ||
+    if (!state.started || state.closed || state.next_id<=0 ||
         !std::isfinite(state.time) || !std::isfinite(state.world_time) || !std::isfinite(state.sim_time) ||
         !std::isfinite(state.grid.cell) || state.grid.cell<=0 || state.enemies.size()>=UINT32_MAX ||
         state.behavior_kinds.size()!=state.behavior_rows.size()) return false;
@@ -83,9 +78,6 @@ int64_t CheckpointStore::hold(const RunRuntime &runtime) {
     checkpoint->state=clone_state(runtime.state);
     if (!rebuild_state_indexes(checkpoint->state,*checkpoint->content)) return 0;
     // 配信済みの音・結果や、外部の要求を再発行しない。
-    checkpoint->rng_seed=checkpoint->state.rng->get_seed();
-    checkpoint->rng_state=checkpoint->state.rng->get_state();
-    checkpoint->state.rng.unref();
     checkpoint->state.events.clear();checkpoint->state.collections.clear();
     checkpoint->state.progression.resource_requests.clear();
     const int64_t id=next_checkpoint_id++;

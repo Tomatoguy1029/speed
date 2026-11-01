@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--random-only" in OS.get_cmdline_user_args():
+		check(check_run_random(), "戦闘乱数の確認が最後まで完了する")
+		print("[run_random] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--restore-only" in OS.get_cmdline_user_args():
 		check(check_runtime_restore(), "保持と復帰の確認が最後まで完了する")
 		print("[run_restore] failed=%d" % failed)
@@ -197,4 +202,33 @@ func check_runtime_restore() -> bool:
 	changed.close()
 	restored.close()
 	independent.close()
+	return true
+
+func check_run_random() -> bool:
+	var comparison = load("res://tools/compare_runtime.gd").new()
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var bytes: PackedByteArray = builder.compile_chase(definition,ContentManager.base,schema.sha256("乱数の固定入力".to_utf8_buffer()))
+	var first = comparison.create_native()
+	var second = comparison.create_native()
+	check(first.configure_content(bytes) and second.configure_content(bytes) and first.start(42) and second.start(42), "同じ定義とseedで開始する")
+	check(first.inspect().rng_state=="-7531428700269491564", "PCG32の規定のseed初期化を使う")
+	first.set_motion_context(Vector2(300,0),Vector2.ZERO,Vector2(1000,1000))
+	second.set_motion_context(Vector2(300,0),Vector2.ZERO,Vector2(1000,1000))
+	for tick in range(20):
+		check(first.spawn_enemy(definition.id,Vector2(tick*3,0),{})==second.spawn_enemy(definition.id,Vector2(tick*3,0),{}), "同じ入力で生成IDが一致する")
+		check(first.step(0.01) and second.step(0.01), "固定入力を更新できる")
+		check(first.inspect().rng_state==second.inspect().rng_state and first.enemies_snapshot()==second.enemies_snapshot(), "同じ入力の乱数と戦闘結果が再現する")
+	var saved: int = first.hold_checkpoint()
+	check(saved>0 and second.restore_checkpoint(saved), "乱数を含めて保持・復帰する")
+	for tick in range(10):
+		first.spawn_enemy(definition.id,Vector2(tick,20),{})
+		second.spawn_enemy(definition.id,Vector2(tick,20),{})
+		first.step(0.01)
+		second.step(0.01)
+		check(first.inspect().rng_state==second.inspect().rng_state and first.enemies_snapshot()==second.enemies_snapshot(), "復帰後も乱数の消費位置と結果が一致する")
+	check(first.release_checkpoint(saved), "確認に使った保持点を解除する")
+	first.close()
+	second.close()
 	return true

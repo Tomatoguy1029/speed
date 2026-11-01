@@ -118,10 +118,10 @@ Array SpeedRunCore::roll_cards(bool initial) {
     const int64_t count=initial?int64_t(c["start_weapon_choices"]):3;
     while (out.size()<count && !pool.is_empty()) {
         int64_t index=0;
-        if (initial) index=runtime.state.rng->randi_range(0,pool.size()-1);
+        if (initial) index=runtime.state.control.rng.randi_range(0,pool.size()-1).value();
         else {
             double total=0; for (int i=0;i<pool.size();++i) total+=double(Dictionary(pool[i])["weight"]);
-            double roll=runtime.state.rng->randf()*total;
+            double roll=runtime.state.control.rng.randf()*total;
             while (index<pool.size()-1 && roll>=double(Dictionary(pool[index])["weight"])) { roll-=double(Dictionary(pool[index])["weight"]); ++index; }
         }
         out.append(pool[index]); pool.remove_at(index);
@@ -150,14 +150,14 @@ bool SpeedRunCore::reroll_cards() {
 void SpeedRunCore::level_bonus() {
     auto &p=runtime.state.progression; const Dictionary c=p.data["config"]; int count=0;
     for (const char *chance:{"levelup_bonus_chance","levelup_bonus_more","levelup_bonus_last"}) {
-        if (runtime.state.rng->randf()>=number(c,chance)) return;
+        if (runtime.state.control.rng.randf()>=number(c,chance)) return;
         Array choices;
         for (const char *kind:{"weapon","trait"}) {
             const bool weapon=String(kind)=="weapon"; const Dictionary owned=weapon?p.weapons:p.traits; const Array ids=owned.keys(); const int64_t maximum=c[weapon?"weapon_max_level":"trait_max_stacks"];
             for (int i=0;i<ids.size();++i) if (int64_t(owned[ids[i]])<maximum) choices.append(card(kind,ids[i],0));
         }
         if (choices.is_empty()) return;
-        const Dictionary picked=choices[runtime.state.rng->randi_range(0,choices.size()-1)]; const StringName kind=picked["kind"], id=picked["id"];
+        const Dictionary picked=choices[runtime.state.control.rng.randi_range(0,choices.size()-1).value()]; const StringName kind=picked["kind"], id=picked["id"];
         grant_equipment(kind,id,1); Dictionary event; event["kind"]=kind; event["id"]=id; event["level"]=(kind==StringName("weapon")?p.weapons:p.traits)[id]; event["count"]=++count; emit_event("level_bonus",event);
     }
 }
@@ -194,13 +194,13 @@ Dictionary SpeedRunCore::progression_snapshot() const {
     out["revision"]=p.revision; out["pending_choice"]=p.pending_choice; out["ship_hp"]=runtime.state.ship.hp; return out;
 }
 
-int64_t SpeedRunCore::random_state() const { return runtime.state.rng.is_valid()?int64_t(runtime.state.rng->get_state()):0; }
+int64_t SpeedRunCore::random_state() const { return (runtime.state.started && !runtime.state.closed)?int64_t(runtime.state.control.rng.get_state()):0; }
 bool SpeedRunCore::apply_external_progression(const Dictionary &stats, double hp, bool waiting, int64_t random_state) {
     if (!runtime.state.started || runtime.state.closed || runtime.state.progression.ready || !runtime.state.ship_ready || (runtime.state.phase!=Phase::Play && runtime.state.phase!=Phase::LevelUp) || !std::isfinite(hp) || hp<0) return false;
     for (const char *key:{"max_hp","max_speed","acceleration","turn_rate","glide_duration_mult","invulnerability","capacity","charge_time","length_mult","attack_mult","crit_chance","crit_mult","xp_mult","xp_pickup_radius","pickup_radius","pickup_speed_mult"})
         if (!numeric(stats.get(key,Variant())) || double(stats[key])<0) return false;
     if (double(stats["max_hp"])<=0 || double(stats["capacity"])<=0 || double(stats["charge_time"])<=0 || hp>double(stats["max_hp"])) return false;
-    apply_stat_values(stats); runtime.state.ship.hp=hp; runtime.state.phase=waiting?Phase::LevelUp:Phase::Play; runtime.state.rng->set_state(uint64_t(random_state)); return true;
+    apply_stat_values(stats); runtime.state.ship.hp=hp; runtime.state.phase=waiting?Phase::LevelUp:Phase::Play; runtime.state.control.rng.set_state(uint64_t(random_state)); return true;
 }
 
 int64_t SpeedRunCore::progression_revision() const { return runtime.state.progression.revision; }

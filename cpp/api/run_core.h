@@ -2,7 +2,7 @@
 #include "../../native/runtime_data.h"
 #include "../runtime/run_runtime.h"
 #include <godot_cpp/classes/ref_counted.hpp>
-#include <godot_cpp/classes/random_number_generator.hpp>
+#include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>

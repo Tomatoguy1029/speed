@@ -128,8 +128,7 @@ bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) 
     for (const auto &def : runtime.content->definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) && (!runtime.state.ship_ready || !runtime.state.bite_zone_config.ready)) return false;
     runtime.state.next_id = first_id;
     runtime.state.next_gem_seq = first_gem_seq;
-    runtime.state.rng.instantiate();
-    runtime.state.rng->set_seed(seed);
+    runtime.state.control.rng.set_seed(seed);
     runtime.state.started = true;
     return true;
 }
@@ -193,7 +192,7 @@ void SpeedRunCore::advance_enemies(double delta) {
 
 void SpeedRunCore::close() {
     runtime.state.closed = true;
-    runtime.state.rng.unref();
+    runtime.state.control.rng = {};
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
     runtime.state.progression = Progression();
     runtime.state.hound_packs.clear();
@@ -226,7 +225,7 @@ Dictionary SpeedRunCore::inspect() const {
     out["world_time"] = runtime.state.world_time;
     out["sim_time"] = runtime.state.sim_time;
     out["ticks"] = runtime.state.ticks;
-    out["rng_state"] = runtime.state.rng.is_valid() ? String::num_int64(runtime.state.rng->get_state()) : String();
+    out["rng_state"] = (runtime.state.started && !runtime.state.closed) ? String::num_int64(runtime.state.control.rng.get_state()) : String();
     return out;
 }
 
@@ -463,7 +462,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     auto &active_rows = runtime.state.behavior_rows[enemy.behavior_group];
     enemy.behavior_slot = active_rows.size(); active_rows.push_back(row);
     enemy.id = runtime.state.next_id++;
-    enemy.fire_t = runtime.content->definitions[definition].fire_interval * (0.5 + runtime.state.rng->randf() * 0.5);
+    enemy.fire_t = runtime.content->definitions[definition].fire_interval * (0.5 + runtime.state.control.rng.randf() * 0.5);
     enemy.alive = true;
     speed::EnemySystem::insert(runtime.state, uint32_t(row), enemy);
     runtime.state.rows_by_id[enemy.id] = row;

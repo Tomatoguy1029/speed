@@ -2,7 +2,7 @@
 #include "../../native/runtime_data.h"
 #include "entity_store.h"
 #include <godot_cpp/classes/ref_counted.hpp>
-#include <godot_cpp/classes/random_number_generator.hpp>
+#include "run_control_state.h"
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
@@ -19,7 +19,7 @@
 namespace godot {
 // ランの値状態。保持・複製は全フィールドをまとめてコピーする。
 struct RunState {
-    Ref<RandomNumberGenerator> rng;
+    speed::RunControlState control;
     enum class EnemyMode { Move, Windup, Dash, Recover };
     struct Enemy {
         int64_t id = 0;

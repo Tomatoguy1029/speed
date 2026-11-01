@@ -50,9 +50,6 @@ bool SpeedRunCore::restore_checkpoint(int64_t id) {
     Ref<SpeedRunCore> candidate;candidate.instantiate();
     candidate->runtime.state=speed::clone_state(checkpoint->state);
     candidate->runtime.content=checkpoint->content;
-    candidate->runtime.state.rng.instantiate();
-    candidate->runtime.state.rng->set_seed(checkpoint->rng_seed);
-    candidate->runtime.state.rng->set_state(checkpoint->rng_state);
     const double grid_cell=candidate->runtime.state.grid.cell;
     candidate->runtime.state.grid={};
     if (!speed::rebuild_state_indexes(candidate->runtime.state,*candidate->runtime.content) ||

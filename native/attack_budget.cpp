@@ -78,7 +78,7 @@ bool SpeedRunCore::request_attack(StringName owner, const PackedStringArray &cat
         waiting->has_ready = false; return false;
     }
     if (budget.enabled && budget.now > waiting->since + 0.001 && budget.jitter > 0) {
-        if (!waiting->has_ready) { waiting->ready = budget.now + runtime.state.rng->randf() * budget.jitter; waiting->has_ready = true; }
+        if (!waiting->has_ready) { waiting->ready = budget.now + runtime.state.control.rng.randf() * budget.jitter; waiting->has_ready = true; }
         if (!reached(budget.now, waiting->ready)) return false;
     }
     AttackBudget::Group group;

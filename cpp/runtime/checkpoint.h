@@ -9,7 +9,6 @@ struct RunCheckpoint {
     std::array<uint8_t,32> payload_sha256{};
     std::shared_ptr<const ContentBundle> content;
     godot::RunState state;
-    uint64_t rng_seed=0, rng_state=0;
 };
 // COW型を含む先行経路の複製も同じ入口へ集約する。
 godot::RunState clone_state(const godot::RunState &source);

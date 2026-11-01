@@ -34,11 +34,11 @@ Variant SpeedRunCore::population_spawn_point(double extra) {
             weights[edge] = double(edge < 2 ? runtime.state.view_half.y : runtime.state.view_half.x) / (p.edges[edge] + 8);
             total += weights[edge];
         }
-        double roll = runtime.state.rng->randf() * total;
+        double roll = runtime.state.control.rng.randf() * total;
         int side = 0;
         while (side < 3 && roll >= weights[side]) { roll -= weights[side]; ++side; }
-        const double margin = p.margin + extra + runtime.state.rng->randf() * 80.0;
-        const double along = runtime.state.rng->randf() * 2.0 - 1.0;
+        const double margin = p.margin + extra + runtime.state.control.rng.randf() * 80.0;
+        const double along = runtime.state.control.rng.randf() * 2.0 - 1.0;
         Vector2 point = runtime.state.view_center;
         if (side < 2) point += Vector2((side == 0 ? -1.0 : 1.0) * (runtime.state.view_half.x + margin), along * runtime.state.view_half.y);
         else point += Vector2(along * runtime.state.view_half.x, (side == 2 ? -1.0 : 1.0) * (runtime.state.view_half.y + margin));
