@@ -19,6 +19,8 @@ from elite_contacts import PackedPoints, contacts_for
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "assets/effects/landmark"
 PAD = 32
+# Unused enemy definitions remain in the catalog; these masks are outside the asset set.
+EXCLUDED_CANDIDATES = ("clock", "missile", "spreader")
 inputs = {}
 entries = {}
 observed_sizes = {}
@@ -186,9 +188,9 @@ def main():
     candidates = {}
     for path in sorted((ROOT / "data/enemies").glob("*.tres")):
         text = path.read_text()
-        if 2 <= int(value(text, "rank", "0")) <= 5:
+        if path.stem not in EXCLUDED_CANDIDATES and 2 <= int(value(text, "rank", "0")) <= 5:
             candidates[path.stem] = text
-    elites = elite_candidates()
+    elites = [ident for ident in elite_candidates() if ident not in EXCLUDED_CANDIDATES]
     covered = dict(candidates)
     for ident in elites:
         covered[ident] = (ROOT / "data/enemies" / (ident + ".tres")).read_text()
@@ -255,7 +257,8 @@ def main():
         header += '[ext_resource type="Texture2D" path=%s id="%s"]\n' % (json.dumps(path), index)
     metadata = {"bake_version": 1, "padding": PAD, "distance_units_per_channel": 8,
                 "size_policy": "source pixels; body scale applied at runtime; size changes need no rebake",
-                "inputs": inputs, "candidates": sorted(candidates), "elite_candidates": elites, "stage_aliases": aliases,
+                "inputs": inputs, "candidates": sorted(candidates), "excluded_candidates": list(EXCLUDED_CANDIDATES),
+                "elite_candidates": elites, "stage_aliases": aliases,
                 "fallback_shapes": fallback_shapes,
                 "observed_size_inputs": observed_sizes, "masks": masks}
     body = "\n[resource]\n" + "\n".join("metadata/" + k + " = " + gd(v) for k, v in metadata.items()) + "\n"

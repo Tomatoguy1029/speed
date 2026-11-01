@@ -47,6 +47,8 @@
 
 目印の表示は `scripts/render/landmark_aura.gd` が事前生成した輪郭マスクを使い、種類ごとの可視部・サイズ・変形へ追従する。素材は `assets/effects/landmark/`、本編とビジュアル編集の共通設定は `data/visuals/landmark_mark.tres`。外観は[英雄の星座と目印の星](../art-style.md#45-英雄の星座と目印の星)に従う。
 
+輪郭素材の生成対象は `tools/art/bake_landmark_masks.py` が管理する。未使用の `spreader`・`clock`・`missile` を対象から除き、ビジュアル編集の目印・エリート表示は生成済みの対象を一覧に使う。
+
 エリートの表示は `scripts/render/elite_crackle.gd` が共用の輪郭素材から保存した接点・放電経路を使う。本編と敵実験場は `data/visuals/elite_runtime.tres`、ビジュアル編集は編集元の `data/visuals/elite_mark.tres` を使い、[敵の外観](../art-style.md#42-敵)に従う。通常補充のエリート抽選と目印の星の選出は、それぞれの出現条件を使う。
 
 分裂・召喚・群れの構成員・部位・ボスの技で生まれる瓦礫は、[生成の共通規則](../../spec.md#113-出現と補充)を使う。各行動の固有数・間隔と、生成後の通常補充の数への反映を実装する。

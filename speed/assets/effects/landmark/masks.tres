@@ -1,4 +1,4 @@
-[gd_resource type="Resource" load_steps=27 format=3]
+[gd_resource type="Resource" load_steps=24 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/auriga.png" id="1"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/beamer.png" id="2"]
@@ -12,15 +12,12 @@
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/hound.png" id="10"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/lynx.png" id="11"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/marlin.png" id="12"]
-[ext_resource type="Texture2D" path="res://assets/effects/landmark/missile.png" id="13"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/pulser.png" id="14"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/pump.png" id="15"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/reticle.png" id="16"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/ruler.png" id="17"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/ruler_bottom.png" id="18"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/ruler_joined.png" id="19"]
-[ext_resource type="Texture2D" path="res://assets/effects/landmark/shape_orb.png" id="20"]
-[ext_resource type="Texture2D" path="res://assets/effects/landmark/shape_square.png" id="21"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/shield.png" id="22"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/snake.png" id="23"]
 [ext_resource type="Texture2D" path="res://assets/effects/landmark/splitter.png" id="24"]
@@ -83,8 +80,6 @@ metadata/inputs = {"res://assets/pixel/auriga/armor.png": "e65957d950fb25e7e58d9
 "res://assets/pixel/marlin/swordfish_armor.png.import": "77b7f206572a2929a22836afc60d2ba3e8a7eb6c84ee850d3ca89385692adfc3",
 "res://assets/pixel/marlin/swordfish_base.png": "6c9a9b96526967db06be1472ff67229e37fd10035ef313c9c31ab3fbfffae920",
 "res://assets/pixel/marlin/swordfish_base.png.import": "97b5f37637b28009f03c221c04268b02b9be288456479f03f035c0fbcf5a7b02",
-"res://assets/pixel/missile.png": "04677827540528abab2e66ef973a58137d26d802e331f2e0301c3883e462ab3b",
-"res://assets/pixel/missile.png.import": "a4811b71c25a42cd9350fbf016f98f7b10c052e0e162d7b292934e49f978d4ec",
 "res://assets/pixel/pulser/pulser_armor.png": "393cf023cce28186cc66e419641e7f21964fff0e234edd1b94f7b03ef751b946",
 "res://assets/pixel/pulser/pulser_armor.png.import": "fc57110fcc38b720db99c64ba2662b33d8c2b6977c6fe247a318b2f249ffbc88",
 "res://assets/pixel/pulser/pulser_base.png": "9d8f2e572a6405379436b7ca03bb14c4935210270137f2d8d1dbe8abdb93d78b",
@@ -148,13 +143,13 @@ metadata/inputs = {"res://assets/pixel/auriga/armor.png": "e65957d950fb25e7e58d9
 "res://data/visuals/looks/telescope.tres": "1c1490ab2587bef78da7d27c9b2dce7fe90ddcdd6f20769c2bdc07d3b7fe5d0e",
 "res://data/visuals/looks/triangle_star.tres": "d9f0617718c9cabab3c77466c8a49785ce0c2304aa445dc7f989a5e5ea113221",
 "res://shaders/pump_outline.gdshaderinc": "92af1c88b47b77d4aaf1de15c31ff283bbb72e94d32be60e26a3f7fc3d9df174",
-"res://tools/art/bake_landmark_masks.py": "0599afcf725bf4a4cbdc01ca4c444428a392f4f06cd2b1ab7c7ffc804d44b25a",
+"res://tools/art/bake_landmark_masks.py": "b1ad753195fe85e3609f517a583f8e6784eb84289867daee56179adbce115bc8",
 "res://tools/art/elite_contacts.py": "ba9770537d012ba01ebc833df9691f8c4804b353ef5a9b1d541891563aade3c0"}
-metadata/candidates = ["auriga", "beamer", "clock", "crab", "cross", "crow", "dolphin", "lynx", "marlin", "missile", "pulser", "pump", "reticle", "ruler", "shield", "spreader", "telescope", "triangle"]
+metadata/candidates = ["auriga", "beamer", "crab", "cross", "crow", "dolphin", "lynx", "marlin", "pulser", "pump", "reticle", "ruler", "shield", "telescope", "triangle"]
+metadata/excluded_candidates = ["clock", "missile", "spreader"]
 metadata/elite_candidates = ["biter", "bomber", "defender", "hound", "pulser", "splitter"]
 metadata/stage_aliases = {"biter:stage_4": "snake"}
-metadata/fallback_shapes = {"clock": "orb",
-"spreader": "square"}
+metadata/fallback_shapes = {}
 metadata/observed_size_inputs = {"auriga": {"radius": 30.0,
 "size_input_sha256": "eda173be1c051c899410d3570101412ca7c90838b88fe1e7ec998e7ae085335a",
 "visual_settings": "\"collision_scale\": 1.1,\n\"scale\": 1.6"},
@@ -167,9 +162,6 @@ metadata/observed_size_inputs = {"auriga": {"radius": 30.0,
 "bomber": {"radius": 12.0,
 "size_input_sha256": "ba0903ca5c9c6b19a479103472af9b73b737e260ecde1c69ff1f6fd469e351a9",
 "visual_settings": "\"ambient\": 0.08,\n\"collision_scale\": 1.05,\n\"height\": 0.2,\n\"key_angle\": -45.0,\n\"key_energy\": 1.0"},
-"clock": {"radius": 26.0,
-"size_input_sha256": "dd9bb158191224a7df65c479f57638f3306ed37e22efcd56da539db678f212a8",
-"visual_settings": ""},
 "crab": {"radius": 30.0,
 "size_input_sha256": "04c8584079b5be39e2bd6db797d5876283218af44bffec148bc9d0fa558c7dee",
 "visual_settings": "\"collision_scale\": 1.4000000000000001,\n\"scale\": 1.2000000000000002"},
@@ -194,9 +186,6 @@ metadata/observed_size_inputs = {"auriga": {"radius": 30.0,
 "marlin": {"radius": 26.0,
 "size_input_sha256": "1a7db2e92c933b1d906b02d5992ee16559baaf8e0bb3140485f1de96967c171d",
 "visual_settings": "\"collision_scale\": 1.05,\n\"height\": 0.4,\n\"key_energy\": 1.8,\n\"scale\": 1.7000000000000002"},
-"missile": {"radius": 22.0,
-"size_input_sha256": "62939f4bad3af40f008cba60a6c1870c2aa9b24a8202e75f48831ce87e5f2c3a",
-"visual_settings": ""},
 "pulser": {"radius": 18.0,
 "size_input_sha256": "6eb7bde59902f0fe0cae2974696d33f445bd24be377e25aa10ae7bad4d49755a",
 "visual_settings": "\"ambient\": 0.0,\n\"collision_scale\": 1.2000000000000002,\n\"fill_angle\": 180.0,\n\"fill_energy\": 0.8,\n\"height\": 0.5,\n\"key_energy\": 1.3,\n\"normal_strength\": 1.4,\n\"scale\": 1.1"},
@@ -215,9 +204,6 @@ metadata/observed_size_inputs = {"auriga": {"radius": 30.0,
 "splitter": {"radius": 22.5,
 "size_input_sha256": "90d2ca866213ceca3c50208363c11a733de84516893e4d41c6268c9111c8c2db",
 "visual_settings": "\"ambient\": 0.08,\n\"collision_scale\": 0.9,\n\"height\": 0.6,\n\"key_angle\": -45.0,\n\"key_energy\": 1.3,\n\"scale\": 1.5"},
-"spreader": {"radius": 20.0,
-"size_input_sha256": "fabbee65c59e5878bd522b172ea2cdc77d5c3e92ba02c1a31e9cc8209ac6a7db",
-"visual_settings": ""},
 "telescope": {"radius": 20.0,
 "size_input_sha256": "dbb6105bdac99938c9c98f7a3662245127519d2cdbb950e6811d5e773d6ebe80",
 "visual_settings": "\"ambient\": 0.0,\n\"collision_scale\": 1.7000000000000002,\n\"key_energy\": 1.6,\n\"scale\": 1.1"},
@@ -470,30 +456,6 @@ metadata/masks = {"res://data/visuals/looks/auriga.tres": {"alpha_sha256": "1fcc
 "source_size": Vector2(32, 32),
 "texture": ExtResource("26"),
 "texture_size": Vector2(96, 96)},
-"shape:orb": {"alpha_sha256": "ec37b5556338e3973e4062605053719f2f15d4c7df668f65dd96ab1cb6c9c33d",
-"body_origin": Vector2(32.0, 32.0),
-"file": "res://assets/effects/landmark/shape_orb.png",
-"layers": [],
-"mask_origin": Vector2(64.0, 64.0),
-"mask_sha256": "6ea8a26ecdee2120cb49454e3fa108b811e32479c844129d962762defbf3700e",
-"padding": 32,
-"polygon": [Vector2(1.0, 0.0), Vector2(0.9510565162951535, 0.3090169943749474), Vector2(0.8090169943749475, 0.5877852522924731), Vector2(0.5877852522924731, 0.8090169943749475), Vector2(0.30901699437494745, 0.9510565162951535), Vector2(6.123233995736766e-17, 1.0), Vector2(-0.30901699437494734, 0.9510565162951536), Vector2(-0.587785252292473, 0.8090169943749475), Vector2(-0.8090169943749473, 0.5877852522924732), Vector2(-0.9510565162951535, 0.3090169943749475), Vector2(-1.0, 1.2246467991473532e-16), Vector2(-0.9510565162951538, -0.3090169943749469), Vector2(-0.8090169943749475, -0.587785252292473), Vector2(-0.5877852522924732, -0.8090169943749473), Vector2(-0.30901699437494756, -0.9510565162951535), Vector2(-1.8369701987210297e-16, -1.0), Vector2(0.30901699437494723, -0.9510565162951536), Vector2(0.5877852522924729, -0.8090169943749476), Vector2(0.8090169943749473, -0.5877852522924734), Vector2(0.9510565162951535, -0.3090169943749477)],
-"source_radius": 32.0,
-"source_size": Vector2(64, 64),
-"texture": ExtResource("20"),
-"texture_size": Vector2(128, 128)},
-"shape:square": {"alpha_sha256": "48fd97847b7caf31900763018360313fbc5d8387f591ef3ffaac76d8248bafeb",
-"body_origin": Vector2(32.0, 32.0),
-"file": "res://assets/effects/landmark/shape_square.png",
-"layers": [],
-"mask_origin": Vector2(64.0, 64.0),
-"mask_sha256": "496ac6d5052049947ae96d2fcbf34a20bcc181300c2a65c077f94a000d1148f2",
-"padding": 32,
-"polygon": [Vector2(0.8, -0.8), Vector2(0.8, 0.8), Vector2(-0.8, 0.8), Vector2(-0.8, -0.8)],
-"source_radius": 32.0,
-"source_size": Vector2(64, 64),
-"texture": ExtResource("21"),
-"texture_size": Vector2(128, 128)},
 "sprite:beamer": {"alpha_sha256": "b0bdb49371af403f57605dcaf6d99f3131275a65efefffe63477dc7af9e39bc8",
 "body_origin": Vector2(18.0, 18.0),
 "file": "res://assets/effects/landmark/beamer.png",
@@ -504,15 +466,4 @@ metadata/masks = {"res://data/visuals/looks/auriga.tres": {"alpha_sha256": "1fcc
 "source_radius": 18.0,
 "source_size": Vector2(36, 36),
 "texture": ExtResource("2"),
-"texture_size": Vector2(100, 100)},
-"sprite:missile": {"alpha_sha256": "d5e11926130d355ae24ff68487b68c84041d3cd120d3b7a6ca598ab6caef37e9",
-"body_origin": Vector2(17.5, 20.0),
-"file": "res://assets/effects/landmark/missile.png",
-"layers": ["res://assets/pixel/missile.png"],
-"mask_origin": Vector2(49.5, 52.0),
-"mask_sha256": "fcaa3f6991268941a2ead5fa654962767e5250ffcc2e3f698ec61c2c78360f1a",
-"padding": 32,
-"source_radius": 20.0,
-"source_size": Vector2(35, 40),
-"texture": ExtResource("13"),
-"texture_size": Vector2(99, 104)}}
+"texture_size": Vector2(100, 100)}}

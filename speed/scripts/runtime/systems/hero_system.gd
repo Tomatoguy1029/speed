@@ -201,17 +201,23 @@ func _spawn_landmark_carrier() -> int:
 	if state.stage == null:
 		return -1
 	var types: Array[StringName] = []
-	for clip: SpawnClip in state.stage.clips:
-		if clip.time <= state.time and clip.length > 0.0 and clip.groups > 0:
-			for type in clip.types:
-				if not types.has(type): types.append(type)
-	for phase: PhaseDef in state.stage.phases:
-		if phase.start > state.time: continue
-		for type in phase.mix:
-			if float(phase.mix[type]) > 0.0 and not types.has(StringName(type)):
+	for clip: RuntimeClip in state.stage.clips:
+		if clip.time > state.time or clip.length <= 0.0 or clip.groups <= 0: continue
+		for formation: Dictionary in clip.prepared:
+			if not formation.entries.any(func(entry: Dictionary): return float(entry.weight) > 0.0): continue
+			for layout: Dictionary in formation.layouts:
+				if float(layout.weight) <= 0.0: continue
+				for marker: Dictionary in layout.markers:
+					var type := StringName(marker.type)
+					if not clip.types.is_empty() and not clip.types.has(type): continue
+					if not types.has(type): types.append(type)
+	# 通常補充と同じ実効候補を使う。曲線があるステージの旧phase.mixは参照しない。
+	if ctx.spawn != null and not state.stage.phases.is_empty():
+		var target := ctx.spawn.target()
+		var weights: Dictionary = target.per_type if target.has("per_type") else target.phase.mix
+		for type in weights:
+			if float(weights[type]) > 0.0 and not types.has(StringName(type)):
 				types.append(StringName(type))
-	for curve: SpawnCurve in state.stage.zako_curves:
-		if curve.value_at(state.time) > 0.0 and not types.has(curve.type): types.append(curve.type)
 	var defs: Array[EnemyDef] = []
 	for type in types:
 		var def := enemies.def_of(type)

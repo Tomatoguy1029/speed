@@ -81,6 +81,7 @@ static func _validate_landmark_masks() -> Error:
 			push_error("目印マスクの入力が変わりました。tools/art/bake_landmark_masks.pyでベイク: " + path)
 			return ERR_INVALID_DATA
 	var candidates: Array = masks.get_meta("candidates", [])
+	var excluded: Array = masks.get_meta("excluded_candidates", [])
 	for entry: Dictionary in masks.get_meta("masks", {}).values():
 		if entry.texture == null or FileAccess.get_sha256(entry.file) != entry.mask_sha256:
 			push_error("目印マスクの生成物が欠落・不一致: " + str(entry.file))
@@ -89,7 +90,7 @@ static func _validate_landmark_masks() -> Error:
 	for file in DirAccess.get_files_at("res://data/enemies"):
 		if not file.ends_with(".tres"): continue
 		var definition := load("res://data/enemies/" + file) as EnemyDef
-		if definition.rank >= 2 and definition.rank <= 5: current.append(file.get_basename())
+		if definition.rank >= 2 and definition.rank <= 5 and file.get_basename() not in excluded: current.append(file.get_basename())
 		var expected: String = masks.get_meta("fallback_shapes", {}).get(file.get_basename(), "")
 		if not expected.is_empty() and String(definition.shape) != expected: return ERR_INVALID_DATA
 	current.sort()
@@ -103,7 +104,7 @@ static func _validate_landmark_masks() -> Error:
 		var stage := load("res://data/stages/" + file) as StageDef
 		for curve: SpawnCurve in stage.zako_curves:
 			var definition := load("res://data/enemies/%s.tres" % curve.type) as EnemyDef
-			if definition != null and definition.max_alive == 0: elites[String(curve.type)] = true
+			if definition != null and definition.max_alive == 0 and String(curve.type) not in excluded: elites[String(curve.type)] = true
 		for id: String in stage.enemy_looks:
 			if id in candidates or id in masks.get_meta("elite_candidates", []): aliases[id + ":" + file.get_basename()] = stage.enemy_looks[id]
 	var elite_ids := elites.keys()

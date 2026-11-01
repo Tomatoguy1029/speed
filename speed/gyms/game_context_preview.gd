@@ -261,12 +261,15 @@ func set_elite_settings(settings: EnemyMarkSettings) -> void:
 func _refresh_enemy_choices() -> void:
 	var previous: StringName = _enemy_ids[_enemy.selected] if not _enemy_ids.is_empty() and _enemy.selected >= 0 else &""
 	var masks := load("res://assets/effects/landmark/masks.tres")
+	var candidates: Array = masks.get_meta("candidates", [])
 	var elites: Array = masks.get_meta("elite_candidates", [])
 	_enemy_ids.clear()
 	_enemy.clear()
 	for key in ContentManager.enemies:
 		var definition: EnemyDef = ContentManager.enemies[key]
-		if definition.rank >= 2 and definition.rank <= 5 or (_mode == "elite" and String(key) in elites): _enemy_ids.append(StringName(key))
+		var eligible := definition.rank >= 2 and definition.rank <= 5
+		if _mode in ["landmark", "elite"]: eligible = String(key) in candidates
+		if eligible or (_mode == "elite" and String(key) in elites): _enemy_ids.append(StringName(key))
 	_enemy_ids.sort()
 	for key in _enemy_ids: _enemy.add_item(ContentManager.enemies[key].display_name)
 	var preferred: StringName = previous if previous in _enemy_ids else &"pulser" if _mode == "elite" else &"telescope"
