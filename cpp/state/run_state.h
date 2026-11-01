@@ -2,6 +2,7 @@
 #include "../../native/runtime_data.h"
 #include "entity_store.h"
 #include "combat_types.h"
+#include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include "run_control_state.h"
 #include <godot_cpp/variant/dictionary.hpp>
@@ -225,7 +226,8 @@ struct RunState {
     std::vector<size_t> free_hostiles;
     struct ForwardWeapon {
         bool ready = false;
-        double elapsed = 0, recoil = 0;
+        speed::IntervalTimer fire;
+        double recoil = 0;
         double interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
         int64_t pierce = 0;
     } forward;

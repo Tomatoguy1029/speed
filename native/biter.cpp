@@ -35,7 +35,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         const double wrapped = speed::angle_difference(difference);
         const double turn = def.turn * 2.0 * bdt;
         enemy.facing += std::clamp(wrapped, -turn, turn);
-        enemy.timer -= bdt;
+        enemy.timer = speed::remaining_time(enemy.timer,bdt);
         enemy.charge = 1.0 - std::max(0.0, enemy.timer) / def.bite.telegraph;
         if (enemy.timer <= 0) {
             const Vector2 at = from + Vector2::from_angle(enemy.facing) * (enemy.radius + def.bite.reach * 0.5);
@@ -54,7 +54,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         }
         if (enemy.vel.length_squared() > 0.000001) enemy.facing = enemy.vel.angle();
         if (enemy.mode == EnemyMode::Recover) {
-            enemy.timer -= bdt;
+            enemy.timer = speed::remaining_time(enemy.timer,bdt);
             if (enemy.timer <= 0) enemy.mode = EnemyMode::Move;
         } else {
             const double reach = enemy.radius + (def.bite.reach + runtime.state.ship_config.ship_radius);

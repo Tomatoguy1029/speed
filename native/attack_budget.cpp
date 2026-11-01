@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/timing.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -6,7 +7,7 @@ using namespace godot;
 namespace {
 constexpr double rounding = 4.0 * std::numeric_limits<double>::epsilon();
 bool greater(double a, double b) { return a > b && a - b > std::max(std::abs(a), std::abs(b)) * rounding; }
-bool reached(double time, double deadline) { return time >= deadline || deadline - time <= std::max(std::abs(time), std::abs(deadline)) * rounding; }
+bool reached(double time,double deadline) {return speed::expired(time,deadline);}
 bool number(const Variant &v, double &out) {
     if (v.get_type() != Variant::FLOAT && v.get_type() != Variant::INT) return false;
     out = v; return std::isfinite(out);

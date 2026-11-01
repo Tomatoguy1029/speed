@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/behaviors/weapons/forward.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -28,6 +29,7 @@ bool SpeedRunCore::configure_forward(const Dictionary &parameters, int64_t level
         if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(float(double(value))) || double(value) < 0) return false;
         *fields[i] = double(value);
     }
+    parsed.fire.remaining=interval;
     parsed.interval = interval; parsed.damage = damage; parsed.pierce = int64_t(pierce);
     parsed.character_scale = character_scale; parsed.ready = true;
     runtime.state.forward = parsed; runtime.state.forward_parameters=parameters.duplicate(true);
@@ -36,11 +38,7 @@ bool SpeedRunCore::configure_forward(const Dictionary &parameters, int64_t level
 
 void SpeedRunCore::step_forward(double world_dt) {
     if (!runtime.state.forward.ready) return;
-    runtime.state.forward.recoil = std::max(0.0, runtime.state.forward.recoil - world_dt);
-    if (runtime.state.draw.drawing || runtime.state.draw.tracing) return;
-    runtime.state.forward.elapsed += world_dt;
-    if (runtime.state.forward.elapsed < runtime.state.forward.interval) return;
-    runtime.state.forward.elapsed = std::fmod(runtime.state.forward.elapsed, runtime.state.forward.interval);
+    if (!speed::ForwardBehavior::advance(runtime.state.forward,world_dt,runtime.state.draw.drawing || runtime.state.draw.tracing)) return;
     // 弾数が整数でも、元の共通弾数処理は乱数を一回進める。
     runtime.state.control.rng.randf();
     const double angle = runtime.state.ship.heading.angle();
@@ -57,11 +55,11 @@ void SpeedRunCore::step_forward(double world_dt) {
 }
 
 Dictionary SpeedRunCore::forward_snapshot() const {
-    Dictionary out; out["elapsed"] = runtime.state.forward.elapsed; out["recoil"] = runtime.state.forward.recoil; return out;
+    Dictionary out; out["elapsed"] = runtime.state.forward.interval-runtime.state.forward.fire.remaining; out["recoil"] = runtime.state.forward.recoil; return out;
 }
 
 bool SpeedRunCore::set_forward_level(int64_t level) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.forward.ready || level<1) return false;
     const Array intervals=runtime.state.forward_parameters["interval_by_level"], damages=runtime.state.forward_parameters["damage_by_level"], pierces=runtime.state.forward_parameters["pierce_by_level"];
-    runtime.state.forward.interval=intervals[std::min(level-1,intervals.size()-1)]; runtime.state.forward.damage=damages[std::min(level-1,damages.size()-1)]; runtime.state.forward.pierce=int64_t(pierces[std::min(level-1,pierces.size()-1)]); return true;
+    speed::ForwardBehavior::set_interval(runtime.state.forward,intervals[std::min(level-1,intervals.size()-1)]); runtime.state.forward.damage=damages[std::min(level-1,damages.size()-1)]; runtime.state.forward.pierce=int64_t(pierces[std::min(level-1,pierces.size()-1)]); return true;
 }

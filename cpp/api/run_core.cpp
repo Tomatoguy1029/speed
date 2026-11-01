@@ -168,9 +168,10 @@ void SpeedRunCore::advance_enemies(double delta) {
       for (size_t row : rows) {
         auto &enemy = runtime.state.enemies[row];
         if (enemy.dead || enemy.held) continue;
-        if (enemy.stone > 0) { enemy.stone -= delta; enemy.vel = Vector2(); continue; }
-        if (enemy.hit_cd > 0) enemy.hit_cd -= delta;
-        if (enemy.flash > 0) enemy.flash -= delta;
+        if (enemy.stone > 0) { enemy.stone=speed::remaining_time(enemy.stone,delta); enemy.vel = Vector2(); continue; }
+        if (enemy.hit_cd > 0) enemy.hit_cd=speed::remaining_time(enemy.hit_cd,delta);
+        if (enemy.guard > 0) enemy.guard=speed::remaining_time(enemy.guard,delta);
+        if (enemy.flash > 0) enemy.flash=speed::remaining_time(enemy.flash,delta);
         enemy.age += delta;
         const auto &def = runtime.content->definitions[enemy.definition];
         if (def.kind == speed::EnemyDefinition::Kind::Shield && enemy.slash_hold) { enemy.vel = Vector2(); continue; }
@@ -181,7 +182,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
             if (def.kind == speed::EnemyDefinition::Kind::Shield) {
                 const double bdt = far ? delta * 3.0 : delta;
-                enemy.fire_t = std::max(0.0, enemy.fire_t - bdt);
+                enemy.fire_t = speed::remaining_time(enemy.fire_t,bdt);
                 const Vector2 toward = runtime.state.enemy_aim - enemy.pos;
                 double distance = toward.length();
                 if (distance < 0.001) distance = 1;

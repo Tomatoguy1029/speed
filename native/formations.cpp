@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/timing.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -12,12 +13,7 @@ bool point(const Variant &v, Vector2 &out) {
     out = v; return out.is_finite();
 }
 template<class T> int64_t pick(const std::vector<T> &items, speed::RunRandom &rng) {
-    double total = 0;
-    for (const auto &item : items) total += item.weight;
-    if (items.empty() || total <= 0) return -1;
-    double roll = rng.randf() * total;
-    for (size_t k = 0; k < items.size(); ++k) { roll -= items[k].weight; if (roll < 0) return k; }
-    return items.size() - 1;
+    return speed::weighted_choice(items,rng,[](const auto &item){return item.weight;});
 }
 }
 

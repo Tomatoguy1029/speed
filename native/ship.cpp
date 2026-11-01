@@ -93,8 +93,8 @@ bool SpeedRunCore::step_ship(double real_dt, double world_dt, const Dictionary &
 
 bool SpeedRunCore::step_ship_input(double real_dt, double world_dt, const speed::InputFrame &input) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !std::isfinite(real_dt) || !std::isfinite(world_dt) || real_dt < 0 || world_dt < 0) return false;
-    if (runtime.state.ship.hurt > 0) runtime.state.ship.hurt -= real_dt;
-    if (runtime.state.ship.invuln > 0) runtime.state.ship.invuln -= world_dt;
+    if (runtime.state.ship.hurt > 0) runtime.state.ship.hurt=speed::remaining_time(runtime.state.ship.hurt,real_dt);
+    if (runtime.state.ship.invuln > 0) runtime.state.ship.invuln=speed::remaining_time(runtime.state.ship.invuln,world_dt);
     runtime.state.ship.shield_flash = std::max(0.0, runtime.state.ship.shield_flash - world_dt);
     if (runtime.state.ship.shield_t > 0) {
         runtime.state.ship.shield_t = std::max(0.0, runtime.state.ship.shield_t - world_dt);

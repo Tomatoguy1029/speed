@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/motion_math.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -6,10 +7,10 @@ using namespace godot;
 void SpeedRunCore::update_pushed(Enemy &enemy, double dt) {
     if (enemy.shove_time > 0) {
         enemy.shove_from = enemy.pos; enemy.shoved = true;
-        enemy.shove_time -= dt; enemy.vel = enemy.shove_vel;
-        enemy.shove_vel *= std::exp(-dt * 0.8);
+        enemy.shove_time = speed::remaining_time(enemy.shove_time,dt); enemy.vel = enemy.shove_vel;
+        enemy.shove_vel = speed::exponential_deceleration(enemy.shove_vel,0.8,dt);
     } else {
-        enemy.knock_t -= dt; enemy.vel *= std::exp(-dt * 2.0);
+        enemy.knock_t = speed::remaining_time(enemy.knock_t,dt); enemy.vel = speed::exponential_deceleration(enemy.vel,2.0,dt);
     }
     enemy.pos += enemy.vel * dt;
 }

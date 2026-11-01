@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/behaviors/weapons/forward.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -83,7 +84,7 @@ bool SpeedRunCore::grant_equipment(StringName kind, StringName id, int64_t level
     if (weapon && id==StringName("W01")) {
         const Dictionary params=p.data["forward"]; const int64_t index=int64_t(owned[id])-1;
         const Array intervals=params["interval_by_level"], damages=params["damage_by_level"], pierces=params["pierce_by_level"];
-        runtime.state.forward.interval=intervals[std::min(index,intervals.size()-1)]; runtime.state.forward.damage=damages[std::min(index,damages.size()-1)]; runtime.state.forward.pierce=int64_t(pierces[std::min(index,pierces.size()-1)]);
+        speed::ForwardBehavior::set_interval(runtime.state.forward,intervals[std::min(index,intervals.size()-1)]); runtime.state.forward.damage=damages[std::min(index,damages.size()-1)]; runtime.state.forward.pierce=int64_t(pierces[std::min(index,pierces.size()-1)]);
         runtime.state.forward.life=params["life"]; runtime.state.forward.spread=params["spread_step"]; runtime.state.forward.knock=params["knock"]; runtime.state.forward.character_scale=p.data["character_scale"]; runtime.state.forward.ready=true;
     }
     refresh_progression_stats(); return true;

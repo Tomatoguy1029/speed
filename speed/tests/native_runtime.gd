@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--timer-only" in OS.get_cmdline_user_args():
+		check(check_run_timers(), "タイマーと境界の確認を最後まで完了する")
+		print("[run_timer] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--combat-only" in OS.get_cmdline_user_args():
 		check(check_run_combat(), "共通戦闘の固定場面を最後まで確認する")
 		print("[run_combat] failed=%d" % failed)
@@ -499,4 +504,66 @@ func check_run_combat() -> bool:
 	trace = ship_run.read_frame().value.events
 	check(trace.filter(func(e): return e.get("type")==&"combat_player_damage").size()==3, "受理と拒否の全試行を記録する")
 	ship_run.dispose()
+	return true
+
+func timing_fixture(formations := [], forward := {}):
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.draw_time_scale = 1.0
+	var bytes: PackedByteArray = builder.compile_chase(definition,config,schema.sha256("タイマーの固定入力".to_utf8_buffer()))
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	check(bridge.configure(bytes,{"api_version":1,"run_id":61,"mode":1,"stage_id":"timing","profile":{},"settings":{}}).ok, "時間の固定条件を設定する")
+	if not formations.is_empty(): check(bridge._core.configure_formations(formations,2000.0), "重みの境界を持つ編成を準備する")
+	if not forward.is_empty(): check(bridge._core.configure_forward(forward,1,1.0), "射撃の端数が出る周期を設定する")
+	check(bridge.start(42).ok, "時間の固定場面を開始する")
+	return bridge
+
+func check_run_timers() -> bool:
+	var forward := {"interval_by_level":[0.01,0.02],"damage_by_level":[0.0,0.0],"pierce_by_level":[0,0],"life":1.0,"spread_step":0.0,"knock":0.0}
+	var firing = timing_fixture([],forward)
+	clock_step(firing)
+	check(firing._core.projectiles_snapshot().is_empty(), "射撃間隔の直前は撃たない")
+	clock_step(firing)
+	check(firing._core.projectiles_snapshot().size()==1 and absf(firing._core.forward_snapshot().elapsed-1.0/150.0)<1e-9, "間隔を跨いだ負の余りを次へ繰り越す")
+	check(firing._core.set_forward_level(2), "発射待ちを保って間隔を変える")
+	clock_step(firing)
+	check(firing._core.projectiles_snapshot().size()==1, "間隔変更で発射待ちを戻さない")
+	clock_step(firing)
+	check(firing._core.projectiles_snapshot().size()==2, "変更した周期で次の一発を撃つ")
+	var busy := Intent.new()
+	busy.press = true
+	busy.pen = firing.read_frame().value.ui.ship.ship_pos
+	clock_step(firing,busy)
+	var elapsed: float = firing._core.forward_snapshot().elapsed
+	busy.press = false
+	for i in range(16): clock_step(firing,busy)
+	check(firing._core.forward_snapshot().recoil==0.0 and firing._core.forward_snapshot().elapsed==elapsed, "発射休止中も反動の残り時間を0で止める")
+	firing.dispose()
+	forward.interval_by_level = [0.001]
+	var short_interval = timing_fixture([],forward)
+	clock_step(short_interval)
+	check(short_interval._core.projectiles_snapshot().size()==1 and absf(short_interval._core.forward_snapshot().elapsed-fmod(1.0/120.0,0.001))<1e-9, "W01は複数周期を跨いでも一度だけ撃ち、端数を残す")
+	short_interval.dispose()
+	var deadline = timing_fixture()
+	var enemy: int = combat_enemy(deadline)
+	check(deadline._core.request_attack("期限",PackedStringArray(["zone"]),enemy,0.1,0.0,1.0), "期限付きの攻撃を予約する")
+	check(deadline._core.advance_attack_budget(0.1-1e-12) and deadline._core.owns_attack("期限",enemy), "期限の手前では所有を保つ")
+	check(deadline._core.advance_attack_budget(0.1) and not deadline._core.owns_attack("期限",enemy), "期限ちょうどで攻撃の所有を外す")
+	deadline.dispose()
+	# seed42の最初のPCG32出力3270867926。境界そのものは次の重みへ進む。
+	var roll := 3270867926.0/4294967296.0
+	for delta in [0.0,-1.0/4294967296.0,1.0/4294967296.0]:
+		var marker := {"type":"drifter","offset":Vector2.ZERO,"rotation":0.0}
+		var formations := [{"version":2,"entries":[{"weight":roll+delta,"pos":Vector2(-100,0)},{"weight":1.0-roll-delta,"pos":Vector2(100,0)}],
+			"layouts":[{"weight":1.0,"value":-1.0,"types":["drifter"],"placements":[[marker],[marker]]}]}]
+		var weighted = timing_fixture(formations)
+		var ship: Vector2 = weighted.read_frame().value.ui.ship.ship_pos
+		check(weighted._core.set_motion_context(ship,Vector2.ZERO,Vector2(1000,1000)), "重み境界の配置領域を設定する")
+		var ids: PackedInt64Array = weighted._core.spawn_formation(0,0,-1,PackedStringArray(),-1.0,null,null)
+		check(ids.size()==1, "重みで配置を一つ選ぶ")
+		var expected: float = -100.0 if delta>0 else 100.0
+		check(absf(float(weighted._core.enemies_snapshot()[0].pos[0])-ship.x-expected)<1e-5, "抽選の重みを引いた値が0のときは次へ進む")
+		weighted.dispose()
 	return true
