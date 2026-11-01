@@ -39,8 +39,7 @@ static func build(stage: RuntimeStage, output := "res://.content") -> StageResou
 	var result := StageResources.new()
 	var paths := {}
 	_add(paths, "res://assets/effects/landmark/elite_contacts.tres")
-	_add(paths, "res://data/visuals/elite_mark.tres")
-	_add(paths, "res://shaders/elite_mark.gdshader")
+	_add(paths, "res://data/visuals/elite_runtime.tres")
 	var index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	if index == null: return null
 	result.look_names = index.look_names

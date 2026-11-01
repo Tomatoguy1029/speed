@@ -692,7 +692,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 目印の調整値は `landmark_mark.tres` を編集元に持つ。制作時の `tools/art/bake_landmark_aura.py` は共通の `build_aura.gdshader` から38項目を定数化した専用shaderとノイズ参照のmaterialを保存し、入力と出力のハッシュを記録する。HDR用の線形色とCompatibility用のsRGB色も固定値として持ち、開始時に描画方式を選ぶ。実行用materialの可変値は時刻・ノイズ参照・描画方式だけとし、shaderとノイズはScopeの参照を共有する。編集画面は共通shaderへ未保存の調整値を適用する。更新手順は[ビジュアル編集ツール](dev/tools/visual-editor.md)に定義する。機体オーラは共通shaderの機体用の寸法・原点・色を使う。
 
-エリートの接点・近隣の接点組・枝分かれ経路は `bake_landmark_masks.py` と `elite_contacts.py` が共有距離場と可動部位の区分から制作時に保存する。`elite_contacts.tres` は画像・import設定・生成コードの入力ハッシュとマスクへの参照を持つ。StageResourcesが接点・shader・`elite_mark.tres` を準備し、SessionのScopeがランの寿命で共有する。`elite_crackle.gd` は画面内のエリートごとに独立した発生時刻と最大4件の短いイベントだけを保持し、保存済みの経路を選ぶ。退出した個体の状態を回収し、時刻の巻き戻しで初期化する。黒い縁と赤い芯はラン内で共有する2つのMultiMeshへ送り、最大8192区間のバッファを再利用する。shaderは元画像の画素格子へ区間を量子化する。位置・回転・倍率と波動変形は本体と共有し、噛みつく雑魚の顎は同じ支点と姿勢、ポンプは同じ前後の変形へ接点を合わせる。ビジュアル編集は同じ描画へ未保存の設定を渡す。
+エリートの接点・近隣の接点組・枝分かれ経路は `bake_landmark_masks.py` と `elite_contacts.py` が共有距離場と可動部位の区分から制作時に保存する。`elite_contacts.tres` は画像・import設定・生成コードの入力ハッシュとマスクへの参照を持つ。`bake_elite_crackle.py` は `elite_mark.tres` と設定の既定値から色・濃さを定数化した `elite_crackle_runtime.gdshader` と、発生間隔・本数を固定した `elite_runtime.tres` を保存する。入力と出力のハッシュを共通生成で照合する。StageResourcesが接点と生成済み実行用設定を準備し、SessionのScopeがランの寿命で共有する。`elite_crackle.gd` は画面内のエリートごとに独立した発生時刻と最大4件の短いイベントだけを保持し、保存済みの経路を選ぶ。退出した個体の状態を回収し、時刻の巻き戻しで初期化する。黒い縁と赤い芯はラン内で共有する2つのMultiMeshへ送り、最大8192区間のバッファを再利用する。shaderは元画像の画素格子へ区間を量子化する。位置・回転・倍率と波動変形は本体と共有し、噛みつく雑魚の顎は同じ支点と姿勢、ポンプは同じ前後の変形へ接点を合わせる。本番shaderの可変値は描画方式と縁・芯の描画パスだけとし、区間の位置・濃さ・個体ごとの時刻はインスタンスから渡す。ビジュアル編集だけが同じ描画へ元の可変shaderと未保存の設定を渡す。
 
 敵の表示半径は、そのランの定義と生成済み外観の数値を種類ごとに1描画パスだけ共有する。共有値は衝突倍率・画像寸法・基準半径などの数値だけとし、個体の半径をその場で反映する。パス終了時に破棄し、次の描画でライブ編集後の値を読む。Resourceの所有は既存のSessionとScopeに保つ。
 

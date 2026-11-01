@@ -8,6 +8,8 @@ static func build(output: String) -> Error:
 	if burst_error != OK: return burst_error
 	var mask_error := _validate_landmark_masks()
 	if mask_error != OK: return mask_error
+	var elite_error := _validate_elite_profile()
+	if elite_error != OK: return elite_error
 	var biter_error := _validate_biter_parts()
 	if biter_error != OK: return biter_error
 	TRANSFORM._layouts.clear()
@@ -56,6 +58,17 @@ static func _validate_burst_noise() -> Error:
 	if settings.get_value("remap", "importer", "") != "3d_texture": return ERR_INVALID_DATA
 	for field in expected:
 		if settings.get_value("params", field) != expected[field]: return ERR_INVALID_DATA
+	return OK
+
+## 保存済みエリート設定と可変shaderから作った固定値を照合する。
+static func _validate_elite_profile() -> Error:
+	var baked := ResourceLoader.load("res://data/visuals/elite_runtime.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if baked == null or baked.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for group in ["inputs", "outputs"]:
+		for path: String in baked.get_meta(group, {}):
+			if FileAccess.get_sha256(path) != baked.get_meta(group)[path]:
+				push_error("エリート表示をtools/art/bake_elite_crackle.pyでベイクしてください: " + path)
+				return ERR_INVALID_DATA
 	return OK
 
 ## 制作工程のCPUベイカーが保存した固定素材を、正規ビルドでも検査する。

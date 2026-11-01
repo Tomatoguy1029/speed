@@ -5,6 +5,7 @@ signal reward_context_ready
 signal reward_context_error(message: String)
 
 const AURA := preload("res://gyms/game_context_aura.gd")
+const ELITE_AUTHORING_SHADER := preload("res://shaders/elite_mark.gdshader")
 const HUD := preload("res://gyms/game_context_hud.gd")
 const GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
 const LIVE_VISUALS := preload("res://tools/content/visual_transforms.gd")
@@ -250,7 +251,7 @@ func set_elite_settings(settings: EnemyMarkSettings) -> void:
 	var changed := _mode != "elite"
 	_elite_settings = settings
 	_mode = "elite"
-	if is_instance_valid(_render): _render._elite_crackle.set_settings(settings)
+	if is_instance_valid(_render): _render._elite_crackle.set_settings(settings, ELITE_AUTHORING_SHADER)
 	if is_node_ready():
 		if changed:
 			_refresh_enemy_choices()
@@ -362,7 +363,7 @@ func _build_context() -> void:
 		fire.manual = true
 	if _mode == "landmark":
 		_configure_landmark_preview()
-	if _mode == "elite": _render._elite_crackle.set_settings(_elite_settings)
+	if _mode == "elite": _render._elite_crackle.set_settings(_elite_settings, ELITE_AUTHORING_SHADER)
 	var layer := CanvasLayer.new()
 	layer.name = "Hud"
 	layer.layer = maxi(10, _render._look_names.size() + 5)

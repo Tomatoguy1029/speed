@@ -16,6 +16,7 @@ static func signature() -> String:
 	files.append("res://tools/art/bake_burst_noise.py")
 	files.append("res://tools/art/bake_landmark_masks.py")
 	files.append("res://tools/art/elite_contacts.py")
+	files.append("res://tools/art/bake_elite_crackle.py")
 	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
 		if not path in files and FileAccess.file_exists(path): files.append(path)
 	files.sort()

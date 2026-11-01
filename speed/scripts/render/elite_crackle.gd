@@ -2,14 +2,18 @@
 extends Node2D
 
 const ASSETS := "res://assets/effects/landmark/elite_contacts.tres"
-const SETTINGS := "res://data/visuals/elite_mark.tres"
-const SHADER := "res://shaders/elite_mark.gdshader"
+const RUNTIME := "res://data/visuals/elite_runtime.tres"
 const MAX_SEGMENTS := 8192
 const STRIDE := 16 # transform 8, normalized appearance 4, source segment 4
 var _rm: RunPresentation
 var _assets: Resource
 var _entries: Dictionary
-var _settings: EnemyMarkSettings
+var _runtime: Resource
+var _interval_min := 0.0
+var _interval_random := 0.0
+var _interval_max := 0.0
+var _arc_count := 0
+var _spark_count := 0
 var _states: Dictionary = {}
 var _stale: Array[int] = []
 var _batches: Array[MultiMeshInstance2D] = []
@@ -22,11 +26,13 @@ var _clock := -INF
 func setup(render: RunPresentation) -> void:
 	_rm = render
 	var scope := render.run.ctx.resources
-	for path in [ASSETS, SETTINGS, SHADER]:
+	for path in [ASSETS, RUNTIME]:
 		if not scope.resources.has(path) and render.state.lab_mode: scope.provide(path, load(path))
 		assert(scope.resources.has(path), "エリート描画の事前準備が必要: " + path)
 	_assets = scope.resources.get(ASSETS)
-	if _assets == null: return
+	_runtime = scope.resources.get(RUNTIME)
+	if _assets == null or _runtime == null: return
+	_timing(_runtime.get_meta("values"))
 	_entries = _assets.get_meta("entries", {})
 	var mesh := ArrayMesh.new()
 	var arrays := []
@@ -45,18 +51,32 @@ func setup(render: RunPresentation) -> void:
 		mm.custom_aabb = AABB(Vector3(-20000,-20000,-1),Vector3(40000,40000,2))
 		batch.multimesh = mm
 		var material := ShaderMaterial.new()
-		material.shader = scope.resources.get(SHADER) as Shader
+		material.shader = _runtime.get_meta("shader") as Shader
 		material.set_shader_parameter("shadow_pass", shadow)
+		material.set_shader_parameter("linear_colors", RenderingServer.get_current_rendering_method() != "gl_compatibility")
 		batch.material = material
 		add_child(batch)
 		_batches.append(batch)
-	set_settings(scope.resources.get(SETTINGS) as EnemyMarkSettings)
 
-func set_settings(value: EnemyMarkSettings) -> void:
-	_settings = value
-	if _settings == null: return
-	for batch in _batches: _settings.apply_to(batch.material as ShaderMaterial)
+## 編集画面だけが元の可変shaderと未保存値を渡す。
+func set_settings(value: Resource, shader: Shader) -> void:
+	if value == null or shader == null: return
+	var values := {}
+	for key in ["interval_min", "interval_random", "interval_max", "arc_count", "spark_count"]: values[key] = value.get(key)
+	_timing(values)
+	for n in _batches.size():
+		var material := _batches[n].material as ShaderMaterial
+		material.shader = shader
+		material.set_shader_parameter("shadow_pass", n == 0)
+		value.call("apply_to", material)
 	_states.clear()
+
+func _timing(values: Dictionary) -> void:
+	_interval_min = float(values.interval_min)
+	_interval_random = float(values.interval_random)
+	_interval_max = float(values.interval_max)
+	_arc_count = int(values.arc_count)
+	_spark_count = int(values.spark_count)
 
 func begin() -> void:
 	_count = 0
@@ -65,7 +85,7 @@ func begin() -> void:
 	_clock = _rm.state.world_time
 
 func add_enemy(t: EnemyTable, row: int, deformation: Dictionary) -> void:
-	if _settings == null: return
+	if _runtime == null: return
 	if t.def[row].behavior == &"triangle":
 		for k in range(0,t.parts[row].size(),2):
 			var child: int = t.parts[row][k]
@@ -96,8 +116,8 @@ func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
 		if _clock-events[n].born >= 0.3: events.remove_at(n)
 	if _clock >= float(state.next):
 		if events.size() < 4: events.append(_event(state.rng,patterns,entry.origin))
-		var wait := _settings.interval_min-log(maxf(0.001,1.0-state.rng.randf()))*_settings.interval_random
-		state.next = _clock+minf(maxf(_settings.interval_min,_settings.interval_max),wait)
+		var wait := _interval_min-log(maxf(0.001,1.0-state.rng.randf()))*_interval_random
+		state.next = _clock+minf(maxf(_interval_min,_interval_max),wait)
 	var visual := _rm._visual_of(t,row)
 	var scale_px := _rm.enemy_sprite_radius(t.type[row],t.r[row])/float(entry.source_radius)
 	if entry.pump: scale_px = visual._source_scale(t,row)
@@ -140,12 +160,12 @@ func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
 
 func _event(rng: RandomNumberGenerator, patterns: Array, origin: Vector2) -> Dictionary:
 	var amount := rng.randf()
-	var count := clampi(_settings.arc_count+(-1 if amount<0.15 else 1 if amount>0.85 else 0),1,4)
+	var count := clampi(_arc_count+(-1 if amount<0.15 else 1 if amount>0.85 else 0),1,4)
 	var paths := PackedInt32Array()
 	for _n in count: paths.append(rng.randi_range(0,patterns.size()-1))
 	var power := rng.randf_range(0.68,1.0)
 	var sparks := PackedFloat32Array()
-	var spark_count := mini(_settings.spark_count,0 if rng.randf()<0.32 else 1 if rng.randf()<0.73 else rng.randi_range(2,3))
+	var spark_count := mini(_spark_count,0 if rng.randf()<0.32 else 1 if rng.randf()<0.73 else rng.randi_range(2,3))
 	var anchor: Dictionary = patterns[paths[0]]
 	for _n in spark_count:
 		var endpoint := rng.randf()
