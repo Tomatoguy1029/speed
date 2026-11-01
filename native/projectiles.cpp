@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/field.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/systems/attack_system.h"
 #include <godot_cpp/templates/sort_array.hpp>
@@ -64,14 +65,16 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         auto &shot = runtime.state.friends[i];
         if (!shot.alive) continue;
         const auto processing_handle=shot.attack;
-        const Vector2 from = shot.pos, vel = shot.vel, to = from + vel * world_dt;
-        Vector2 position = to;
+        const Vector2 from = shot.pos, vel = shot.vel, destination = from + vel * world_dt;
+        auto body_hit=speed::FieldSystem::first_body_hit(runtime,from,destination,shot.radius);
+        const Vector2 to=body_hit?body_hit->point:destination;
+        Vector2 position = destination;
         double life = double(shot.life) - world_dt;
         auto end_reason=speed::AttackEndReason::Lifetime;
         shot.age = double(shot.age) + world_dt;
         shot.angle = double(shot.angle) + double(shot.spin) * world_dt;
         if (shot.kind == 1 && shot.visual != StringName("weapon/knockback")) {
-            shot.trail.append(to);
+            shot.trail.append(destination);
             if (shot.trail.size() > runtime.state.projectile_config.trail_points) shot.trail.remove_at(0);
         }
         const double padding = double(shot.radius) + std::max(runtime.state.combat_config.max_enemy_radius, runtime.state.grid.max_radius);
@@ -108,7 +111,7 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
                     Dictionary reflected_event; reflected_event["pos"] = impact; reflected_event["normal"] = normal;
                     emit_event("shield_reflect", reflected_event);
                 }
-                position = impact;life = 0;end_reason=speed::AttackEndReason::Hit;break;
+                position = impact;life = 0;body_hit.reset();end_reason=speed::AttackEndReason::Hit;break;
             }
             shot.hit_ids.insert(enemy.id);
             damage_enemy(hit.row, shot.damage, shot.cause, false, speed > 0 ? vel / speed : Vector2(), shot.knock, &impact);
@@ -121,6 +124,10 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
             if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else {life=0;end_reason=speed::AttackEndReason::Hit;} }
         }
         if (!speed::AttackSystem::get(runtime.state,processing_handle)) continue;
+        if (body_hit) {
+            position=body_hit->point;life=0;end_reason=speed::AttackEndReason::Hit;
+            Dictionary event;event["pos"]=position;event["radius"]=22.0;event["color"]=Color::html("ffd19a");event["life"]=0.18;emit_event("ring",event);
+        }
         shot.pos = position; shot.life = life;
         if (life <= 0) {
             if (shot.kind == 1) {

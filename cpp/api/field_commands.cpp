@@ -12,10 +12,19 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
     if (kind=="dev_field_query") {
         if (p.get("action",Variant()).get_type()!=Variant::STRING) return reply(false);
         const String action=p["action"];
+        if (action=="snapshot" && p.size()==1) {
+            Array bodies;
+            for (uint32_t i=0;i<runtime.state.field.bodies.size();++i) {
+                const auto &body=runtime.state.field.bodies[i];Dictionary item;
+                item["id"]=i+1;item["position"]=body.position;item["radius"]=body.radius;item["moon"]=body.moon;
+                item["orbit"]=body.orbit;item["a0"]=body.a0;item["direction"]=body.direction;bodies.push_back(item);
+            }
+            Dictionary value;value["bodies"]=bodies;value["world_time"]=runtime.state.world_time;value["body_speed_max"]=runtime.state.field.body_speed_max;return reply(true,value);
+        }
         if (action=="hit" && p.size()==4 && point(p,"from") && point(p,"to") && radius(p)) {
             const auto hit=speed::FieldSystem::first_body_hit(runtime,p["from"],p["to"],p["radius"]);
             if (!hit) return reply(true);
-            const auto &body=runtime.state.field.bodies[hit->body];Dictionary value;value["id"]=runtime.content->field_bodies[body.definition].id;value["t"]=hit->t;value["point"]=hit->point;return reply(true,value);
+            Dictionary value;value["id"]=hit->body+1;value["t"]=hit->t;value["point"]=hit->point;return reply(true,value);
         }
         if (action=="accel" && p.size()==2 && point(p,"position")) return reply(true,speed::FieldSystem::boundary_accel(runtime,p["position"]));
         if (p.size()!=3 || !point(p,"position") || !radius(p)) return reply(false);

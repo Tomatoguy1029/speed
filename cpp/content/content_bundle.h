@@ -22,6 +22,7 @@ struct ContentBundle {
     ProgressionDefinition progression;
     LifecycleDefinition lifecycle;
     std::vector<FieldBodyDefinition> field_bodies;
+    std::vector<MoonDefinition> moon_definitions;
     std::vector<LoadoutDefinition> equipment;
     std::vector<LoadoutAsset> equipment_assets;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);

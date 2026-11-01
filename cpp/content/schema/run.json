@@ -965,10 +965,10 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 9
+          "max": 10
         }
       ],
-      "version": 6
+      "version": 7
     },
     {
       "name": "ForwardDefinition",
@@ -1278,6 +1278,10 @@
       {
         "name": "Planet",
         "value": "planet"
+      },
+      {
+        "name": "Moon",
+        "value": "moon"
       }
     ],
     "EventType": [
@@ -1468,6 +1472,10 @@
       {
         "name": "Crash",
         "value": "crash"
+      },
+      {
+        "name": "Ring",
+        "value": "ring"
       }
     ],
     "ResultKind": [
@@ -1715,6 +1723,12 @@
     "crash": [
       "pos",
       "power"
+    ],
+    "ring": [
+      "pos",
+      "radius",
+      "color",
+      "life"
     ]
   },
   "includes": [

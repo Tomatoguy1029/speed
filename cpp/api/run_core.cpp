@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../systems/field.h"
 #include "../output/event_builder.h"
 #include "../../native/geometry.h"
 #include "../systems/enemy_system.h"
@@ -181,7 +182,8 @@ void SpeedRunCore::advance_enemies(double delta) {
         enemy.age += delta;
         const auto &def = runtime.content->definitions[enemy.definition];
         if (enemy.slash_hold) { enemy.vel = Vector2(); continue; }
-        if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta); continue; }
+        const Vector2 from=enemy.pos;
+        if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta);speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
@@ -202,6 +204,7 @@ void SpeedRunCore::advance_enemies(double delta) {
             }
         }
         enemy.pos += enemy.vel * delta;
+        if (!far || (enemy.id+runtime.state.ticks)%3==0) speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);
       }
     }
 }

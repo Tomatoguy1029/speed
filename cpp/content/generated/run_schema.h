@@ -461,7 +461,7 @@ inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 9) return false;
+    if (out.role > 10) return false;
     return true;
 }
 struct ForwardDefinition {
@@ -699,6 +699,36 @@ inline bool read(BinaryReader &input, FieldBodyDefinition &out) {
     if (out.visual < 1) return false;
     return true;
 }
+struct MoonDefinition {
+    uint32_t id{};
+    uint32_t count{};
+    double orbit_min{};
+    double orbit_max{};
+    double angle_jitter{};
+    double radius_min{};
+    double radius_max{};
+    double angular_speed{};
+    uint32_t visual{};
+};
+inline bool read(BinaryReader &input, MoonDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (!input.read_f64(out.orbit_min)) return false;
+    if (out.orbit_min < 0) return false;
+    if (!input.read_f64(out.orbit_max)) return false;
+    if (out.orbit_max < 0) return false;
+    if (!input.read_f64(out.angle_jitter)) return false;
+    if (out.angle_jitter < 0) return false;
+    if (!input.read_f64(out.radius_min)) return false;
+    if (out.radius_min < 0) return false;
+    if (!input.read_f64(out.radius_max)) return false;
+    if (out.radius_max < 0) return false;
+    if (!input.read_f64(out.angular_speed)) return false;
+    if (!input.read_u32(out.visual)) return false;
+    if (out.visual < 1) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -721,6 +751,7 @@ struct ContentRecords {
     std::vector<LoadoutAsset> LoadoutAsset_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
+    std::vector<MoonDefinition> MoonDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -797,7 +828,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 6) return false;
+        if (version != 7) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -856,6 +887,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { FieldBodyDefinition row; if (!read(input,row)) return false; out.FieldBodyDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 22: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { MoonDefinition row; if (!read(input,row)) return false; out.MoonDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -902,6 +939,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HoundDefinition_rows) if (!HoundDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MoonDefinition_ids;
+    for (const auto &row:data.MoonDefinition_rows) if (!MoonDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -918,6 +957,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
+    for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -1038,5 +1078,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=21;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=22;
 }

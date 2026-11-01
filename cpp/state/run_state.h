@@ -50,6 +50,8 @@ struct RunState {
         double hit_cd = 0, flash = 0;
         double stone = 0, knock_t = 0, shove_time = 0;
         Vector2 shove_vel, shove_from;
+        double body_gap=-1,body_gap_time=0;
+        Vector2 body_gap_pos;
         bool held = false, slash_hold = false, shoved = false;
         int64_t group_id = 0;
         bool pursuit_ready = false;

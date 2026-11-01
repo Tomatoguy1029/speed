@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/field.h"
 #include "../cpp/systems/attack_system.h"
 #include "../cpp/systems/attack_budget.h"
 #include "../cpp/systems/enemy_system.h"
@@ -30,7 +31,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     if (far && (enemy.id + runtime.state.ticks) % 3 != 0) { enemy.pos += enemy.vel * dt; return; }
     const double bdt = far ? dt * 3.0 : dt;
     const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
-    if (def.kind==speed::EnemyDefinition::Kind::Hound && speed::HoundBehavior::ordered_move(runtime,uint32_t(row),bdt,policy)) {enemy.pos+=enemy.vel*dt;return;}
+    if (def.kind==speed::EnemyDefinition::Kind::Hound && speed::HoundBehavior::ordered_move(runtime,uint32_t(row),bdt,policy)) {enemy.pos+=enemy.vel*dt;speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,dt);return;}
     if (enemy.mode == EnemyMode::Windup) {
         enemy.vel *= std::max(0.0, 1.0 - 8.0 * bdt);
         speed::PursuitBehavior::turn(enemy,(runtime.state.ship_pos-from).angle(),def.turn*2.0,bdt,policy);
@@ -64,4 +65,5 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         }
     }
     enemy.pos += enemy.vel * dt;
+    speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,dt);
 }

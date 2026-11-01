@@ -1,5 +1,6 @@
 ## RenderFrameの値だけを描画へ渡す。敵表や武器の実体は参照しない。
 extends Node2D
+const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
 var visuals: Dictionary = {}
 var batches: Dictionary = {}
 var parts: Dictionary = {}
@@ -15,6 +16,8 @@ var _epoch := 0
 var _jet_time := 0.0
 var pipeline: RenderPipeline
 var _particles: Array[Dictionary] = []
+var _rings: Array[Dictionary] = []
+var _zoom := 1.0
 var _particle_canvas: Node2D
 var _dim: Node2D
 var _dim_strength := 0.0
@@ -35,6 +38,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_particle_canvas = Node2D.new()
 	_layer(14).add_child(_particle_canvas)
 	_particle_canvas.draw.connect(func():
+		for ring: Dictionary in _rings:
+			var k: float = ring.life/ring.max
+			var color: Color = EFFECT_SETTINGS.tinted("",ring.color)
+			color.a *= k
+			_particle_canvas.draw_arc(ring.pos,ring.radius*(1.0+(1.0-k)*0.15),0.0,TAU,48,color,3.0*EFFECT_SETTINGS.number("","ring_width_scale",1.0)/maxf(_zoom,0.01))
 		for p: Dictionary in _particles:
 			var color: Color = p.color
 			color.a = clampf(p.life/p.max,0.0,1.0)
@@ -174,6 +182,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_queued_events.clear()
 		_flashes = ShotFlashes.new()
 		_particles.clear()
+		_rings.clear()
 	for event: Dictionary in frame.events:
 		var payload: Dictionary = event.payload.duplicate(true)
 		payload["type"] = event.type
@@ -181,7 +190,12 @@ func receive_frame(frame: Dictionary) -> bool:
 	return true
 
 func update_effects(frame: Dictionary, dt: float) -> void:
+	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
+		if event.type==&"ring":
+			if _rings.size()>80: _rings.pop_front()
+			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
+			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":duration,"max":duration})
 		if event.type==&"ship_explode": _death_burst(event.pos)
 		if event.type==&"weapon_fire" and event.get("id")==&"W01": _flashes.fire(event.angle)
 		if event.type==&"shot_hit" and event.get("visual_key")=="weapon/forward": _flashes.hit(event.pos,event.dir,2)
@@ -196,6 +210,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		p.pos += p.vel*effect_dt
 		p.vel *= 1.0-2.5*effect_dt
 		p.life -= effect_dt
+	for ring: Dictionary in _rings: ring.life -= effect_dt
+	_rings = _rings.filter(func(ring: Dictionary): return ring.life>0.0)
 	_particles = _particles.filter(func(p: Dictionary): return p.life>0.0)
 	_particle_canvas.queue_redraw()
 	var active: bool = ui.input_enabled

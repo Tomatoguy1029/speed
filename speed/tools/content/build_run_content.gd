@@ -94,6 +94,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":9})
 		visuals.append({"id":key,"role":9,"path":"res://assets/pixel/planet.png"})
 		data.FieldBodyDefinition = [{"id":1,"kind":0,"x":0.0,"y":0.0,"radius":config.planet_radius,"visual":key}]
+	if config.moon_count>0:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":10})
+		visuals.append({"id":key,"role":10,"path":"res://assets/pixel/moon.png"})
+		data.MoonDefinition = [{"id":1,"count":config.moon_count,"orbit_min":1500.0,"orbit_max":config.field_radius-600.0,
+			"angle_jitter":0.3,"radius_min":110.0,"radius_max":180.0,"angular_speed":config.moon_orbit_speed,"visual":key}]
 	for i in weapon.level_steps.size():
 		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
@@ -152,7 +158,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.LifecycleDefinition = resolved.LifecycleDefinition
 			equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
 			data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
-			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role==9)
+			data.MoonDefinition = resolved.MoonDefinition.duplicate(true)
+			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [9,10])
 		var visual: Dictionary = package.visuals[5].duplicate()
 		visual.id = i+6
 		data.ResourceKey.append({"id":visual.id,"role":visual.role})
@@ -182,7 +189,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		row.id = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":row.id,"role":row.role})
 		visuals.append(row)
-		data.FieldBodyDefinition[0].visual = row.id
+		if row.role==9: data.FieldBodyDefinition[0].visual = row.id
+		else: data.MoonDefinition[0].visual = row.id
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	for visual: Dictionary in visuals:

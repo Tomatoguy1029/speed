@@ -34,6 +34,56 @@
           "ref": "ResourceKey"
         }
       ]
+    },
+    {
+      "name": "MoonDefinition",
+      "section": 22,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32"
+        },
+        {
+          "name": "orbit_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "orbit_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle_jitter",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angular_speed",
+          "type": "f64"
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        }
+      ]
     }
   ],
   "enums": {}
