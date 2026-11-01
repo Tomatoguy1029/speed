@@ -8,7 +8,7 @@ var _masks: Dictionary
 var _sprites: Array[Sprite2D] = []
 var _material: ShaderMaterial
 var _clock := -INF
-var _pump_full := PackedFloat64Array([0.0, 0.0, 0.0])
+var _pump_full := PackedFloat64Array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 var _count := 0
 
 func setup(render: RunPresentation) -> void:
@@ -23,11 +23,11 @@ func setup(render: RunPresentation) -> void:
 	var template := scope.resources.get(MATERIAL_PATH) as ShaderMaterial
 	if _assets == null or template == null: return
 	_masks = _assets.get_meta("masks", {})
-	# ランごとの時刻だけを独立させ、3つの可視部では同じmaterialを共有する。
+	# ランごとの時刻だけを独立させ、すべての可視部で同じmaterialを共有する。
 	_material = template.duplicate() as ShaderMaterial
 	_material.set_shader_parameter("linear_colors", RenderingServer.get_current_rendering_method() != "gl_compatibility")
-	# 目印は同時に1体。見えない三角の中心だけは3つの可視部へ表示する。
-	for slot in 3:
+	# 目印は同時に2体。三角2体でも、それぞれ3つの可視部へ表示する。
+	for slot in 6:
 		var sprite := Sprite2D.new()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		sprite.material = _material

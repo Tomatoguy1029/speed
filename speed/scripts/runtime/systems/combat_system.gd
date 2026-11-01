@@ -369,6 +369,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 	state.kills += 1
 	if t.landmark[i] != 0:
 		# 目印の星を取り戻した
+		if ctx.heroes != null: ctx.heroes.landmark_recovered(i)
 		state.landmarks.append(t.pos[i])
 		state.emit(&"landmark", {"pos": t.pos[i]})
 	var cause: StringName = opts.get("cause", &"")

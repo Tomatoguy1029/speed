@@ -735,7 +735,6 @@ func _test_landmarks() -> void:
 	var h := run.heroes
 	var s := run.state
 	var t := run.enemies.table
-	run.cfg.landmark_chance = 1.0
 	_check(not h.revealed() and s.landmarks.is_empty(), "タスク19：英雄の場所は最初は隠れている")
 	var places := [Vector2(-2000, -2000), Vector2(-4000, -2000)]
 	for k in 2:
@@ -743,7 +742,7 @@ func _test_landmarks() -> void:
 		s.view_center = places[k]
 		var enemy := _enemy(&"beamer", s.ship_pos + Vector2(60, 0))
 		run.combat.rebuild_grid()
-		h._landmark_t = 0.0
+		h._landmark_times[k] = s.time
 		h.tick(0.01, 0.01)
 		_check(t.landmark[enemy] == 1, "タスク19：%dつ目の目印の星を強めの敵に持たせる" % (k + 1))
 		run.combat.damage_enemy(enemy, 1e6, {"cause": &"shot", "no_crit": true})
