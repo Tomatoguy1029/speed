@@ -47,10 +47,10 @@ bool SpeedRunCore::configure_progression(const Dictionary &data) {
     const bool forward_valid=configure_forward(data["forward"],1,data["character_scale"]); runtime.state.forward=previous;
     if (!forward_valid) return false;
     Progression parsed; parsed.data=data.duplicate(true); parsed.rerolls=data["rerolls"]; parsed.ready=true;
-    runtime.state.progression=parsed; refresh_progression_stats(); return true;
+    runtime.state.legacy_progression=parsed; refresh_progression_stats(); return true;
 }
 void SpeedRunCore::refresh_progression_stats() {
-    auto &p=runtime.state.progression; const Dictionary c=p.data["config"], profile=p.data["profile"], mult=profile["mult"], add=profile["add"], reduce=profile["reduce"], bonuses=p.data["bonuses"];
+    auto &p=runtime.state.legacy_progression; const Dictionary c=p.data["config"], profile=p.data["profile"], mult=profile["mult"], add=profile["add"], reduce=profile["reduce"], bonuses=p.data["bonuses"];
     auto bonus=[&](const char *id) { const Array values=bonuses.get(id,Array()); const int64_t n=p.traits.get(id,0); return values.is_empty()?0.0:double(values[std::min(n,values.size()-1)]); };
     const double old_max=number(p.stats,"max_hp"); Dictionary s;
     s["max_speed"]=number(c,"base_max_speed")*number(mult,"max_speed",1)*(1+bonus("T10"));
@@ -72,8 +72,8 @@ void SpeedRunCore::apply_stat_values(const Dictionary &s) {
     runtime.state.pickup_config.xp_mult=s["xp_mult"]; runtime.state.pickup_config.xp_radius=s["xp_pickup_radius"]; runtime.state.pickup_config.coin_radius=s["pickup_radius"]; runtime.state.pickup_config.speed_mult=s["pickup_speed_mult"];
 }
 bool SpeedRunCore::grant_equipment(StringName kind, StringName id, int64_t levels) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.progression.ready || levels<1 || (kind!=StringName("weapon") && kind!=StringName("trait"))) return false;
-    auto &p=runtime.state.progression; const bool weapon=kind==StringName("weapon"); const Array definitions=p.data[weapon?"weapons":"traits"];
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.legacy_progression.ready || levels<1 || (kind!=StringName("weapon") && kind!=StringName("trait"))) return false;
+    auto &p=runtime.state.legacy_progression; const bool weapon=kind==StringName("weapon"); const Array definitions=p.data[weapon?"weapons":"traits"];
     bool found=false; for (int i=0;i<definitions.size();++i) if (StringName(Dictionary(definitions[i])["id"])==id) found=true;
     if (!found) return false;
     Dictionary owned=weapon?p.weapons:p.traits; const Dictionary c=p.data["config"];
@@ -90,8 +90,8 @@ bool SpeedRunCore::grant_equipment(StringName kind, StringName id, int64_t level
     refresh_progression_stats(); return true;
 }
 bool SpeedRunCore::add_xp(double amount) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.progression.ready || !std::isfinite(amount) || amount<0) return false;
-    auto &p=runtime.state.progression; const Dictionary c=p.data["config"];
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.legacy_progression.ready || !std::isfinite(amount) || amount<0) return false;
+    auto &p=runtime.state.legacy_progression; const Dictionary c=p.data["config"];
     amount*=number(p.stats,"xp_gain_mult",1); if (!std::isfinite(p.xp+amount) || !std::isfinite(p.gained+amount)) return false;
     p.xp+=amount; p.gained+=amount;
     auto needed=[&]() { const double l=p.level; return number(c,"xp_base")+number(c,"xp_growth")*l+number(c,"xp_curve")*l*l; };
@@ -104,7 +104,7 @@ bool SpeedRunCore::add_xp(double amount) {
     return true;
 }
 Array SpeedRunCore::roll_cards(bool initial) {
-    auto &p=runtime.state.progression; const Dictionary c=p.data["config"]; Array pool,out;
+    auto &p=runtime.state.legacy_progression; const Dictionary c=p.data["config"]; Array pool,out;
     for (const char *kind:{"weapon","trait"}) {
         if (initial && String(kind)=="trait") break;
         const bool weapon=String(kind)=="weapon"; const Array definitions=p.data[weapon?"weapons":"traits"]; const Dictionary owned=weapon?p.weapons:p.traits;
@@ -130,7 +130,7 @@ Array SpeedRunCore::roll_cards(bool initial) {
     return out;
 }
 void SpeedRunCore::publish_cards() {
-    auto &p=runtime.state.progression; ++p.revision; p.pending_choice=-1; p.resource_status.clear(); p.resource_requests.clear();
+    auto &p=runtime.state.legacy_progression; ++p.revision; p.pending_choice=-1; p.resource_status.clear(); p.resource_requests.clear();
     for (int i=0;i<p.cards.size();++i) {
         const Dictionary c=p.cards[i]; const StringName id=c["id"];
         if (p.resource_status.has(id)) continue;
@@ -139,17 +139,17 @@ void SpeedRunCore::publish_cards() {
     runtime.state.phase=Phase::LevelUp; runtime.state.hitstop=0;
 }
 bool SpeedRunCore::open_cards(bool initial) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.progression.ready || runtime.state.draw.drawing || runtime.state.draw.tracing || !runtime.state.progression.cards.is_empty() || (runtime.state.phase!=Phase::Play && runtime.state.phase!=Phase::LevelUp)) return false;
-    auto &p=runtime.state.progression; if (!initial && p.pending_levels<=0) return false;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.legacy_progression.ready || runtime.state.draw.drawing || runtime.state.draw.tracing || !runtime.state.legacy_progression.cards.is_empty() || (runtime.state.phase!=Phase::Play && runtime.state.phase!=Phase::LevelUp)) return false;
+    auto &p=runtime.state.legacy_progression; if (!initial && p.pending_levels<=0) return false;
     p.cards=roll_cards(initial); if (p.cards.is_empty()) { p.pending_levels=0; return false; }
     p.start_pick=initial; publish_cards(); return true;
 }
 bool SpeedRunCore::reroll_cards() {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.progression.ready || runtime.state.progression.cards.is_empty() || runtime.state.progression.rerolls<=0) return false;
-    runtime.state.progression.cards=roll_cards(runtime.state.progression.start_pick); --runtime.state.progression.rerolls; emit_event("reroll"); publish_cards(); return true;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.legacy_progression.ready || runtime.state.legacy_progression.cards.is_empty() || runtime.state.legacy_progression.rerolls<=0) return false;
+    runtime.state.legacy_progression.cards=roll_cards(runtime.state.legacy_progression.start_pick); --runtime.state.legacy_progression.rerolls; emit_event("reroll"); publish_cards(); return true;
 }
 void SpeedRunCore::level_bonus() {
-    auto &p=runtime.state.progression; const Dictionary c=p.data["config"]; int count=0;
+    auto &p=runtime.state.legacy_progression; const Dictionary c=p.data["config"]; int count=0;
     for (const char *chance:{"levelup_bonus_chance","levelup_bonus_more","levelup_bonus_last"}) {
         if (runtime.state.control.rng.randf()>=number(c,chance)) return;
         Array choices;
@@ -163,7 +163,7 @@ void SpeedRunCore::level_bonus() {
     }
 }
 bool SpeedRunCore::apply_card(int64_t index) {
-    auto &p=runtime.state.progression; const Dictionary c=p.cards[index]; const bool initial=p.start_pick;
+    auto &p=runtime.state.legacy_progression; const Dictionary c=p.cards[index]; const bool initial=p.start_pick;
     if (!grant_equipment(c["kind"],c["id"],1)) return false;
     p.start_pick=false;
     if (!initial) { Dictionary event; event["card"]=c.duplicate(true); emit_event("upgrade",event); level_bonus(); p.pending_levels=std::max(int64_t(0),p.pending_levels-1); }
@@ -172,24 +172,24 @@ bool SpeedRunCore::apply_card(int64_t index) {
     return true;
 }
 bool SpeedRunCore::choose_card(int64_t index, int64_t revision) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.progression.ready || runtime.state.phase!=Phase::LevelUp || revision!=runtime.state.progression.revision || index<0 || index>=runtime.state.progression.cards.size()) return false;
-    auto &p=runtime.state.progression; const StringName id=Dictionary(p.cards[index])["id"]; const int status=p.resource_status[id];
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.legacy_progression.ready || runtime.state.phase!=Phase::LevelUp || revision!=runtime.state.legacy_progression.revision || index<0 || index>=runtime.state.legacy_progression.cards.size()) return false;
+    auto &p=runtime.state.legacy_progression; const StringName id=Dictionary(p.cards[index])["id"]; const int status=p.resource_status[id];
     if (status<0) { p.pending_choice=-1; return false; }
     if (status==0) { p.pending_choice=index; return true; }
     return apply_card(index);
 }
 bool SpeedRunCore::resources_ready(int64_t revision, StringName id, int64_t status) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.progression.ready || revision!=runtime.state.progression.revision || !runtime.state.progression.resource_status.has(id) || (status!=1 && status!=-1 && status!=-2)) return false;
-    auto &p=runtime.state.progression; if (p.resource_status[id]!=0) return false; p.resource_status[id]=status;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.legacy_progression.ready || revision!=runtime.state.legacy_progression.revision || !runtime.state.legacy_progression.resource_status.has(id) || (status!=1 && status!=-1 && status!=-2)) return false;
+    auto &p=runtime.state.legacy_progression; if (p.resource_status[id]!=0) return false; p.resource_status[id]=status;
     if (p.pending_choice>=0 && StringName(Dictionary(p.cards[p.pending_choice])["id"])==id) {
         const int64_t index=p.pending_choice; p.pending_choice=-1;
         if (status==1) return apply_card(index);
     }
     return true;
 }
-Array SpeedRunCore::drain_resource_requests() { Array out=runtime.state.progression.resource_requests; runtime.state.progression.resource_requests=Array(); return out; }
+Array SpeedRunCore::drain_resource_requests() { Array out=runtime.state.legacy_progression.resource_requests; runtime.state.legacy_progression.resource_requests=Array(); return out; }
 Dictionary SpeedRunCore::progression_snapshot() const {
-    const auto &p=runtime.state.progression; Dictionary out;
+    const auto &p=runtime.state.legacy_progression; Dictionary out;
     out["level"]=p.level; out["xp"]=p.xp; out["xp_gained"]=p.gained; out["pending_levels"]=p.pending_levels; out["rerolls_left"]=p.rerolls;
     out["start_pick"]=p.start_pick; out["weapons"]=p.weapons.duplicate(true); out["traits"]=p.traits.duplicate(true); out["stats"]=p.stats.duplicate(true); out["cards"]=p.cards.duplicate(true);
     out["revision"]=p.revision; out["pending_choice"]=p.pending_choice; out["ship_hp"]=runtime.state.ship.hp; return out;
@@ -197,11 +197,11 @@ Dictionary SpeedRunCore::progression_snapshot() const {
 
 int64_t SpeedRunCore::random_state() const { return (runtime.state.started && !runtime.state.closed)?int64_t(runtime.state.control.rng.get_state()):0; }
 bool SpeedRunCore::apply_external_progression(const Dictionary &stats, double hp, bool waiting, int64_t random_state) {
-    if (!runtime.state.started || runtime.state.closed || runtime.state.progression.ready || !runtime.state.ship_ready || (runtime.state.phase!=Phase::Play && runtime.state.phase!=Phase::LevelUp) || !std::isfinite(hp) || hp<0) return false;
+    if (!runtime.state.started || runtime.state.closed || runtime.state.legacy_progression.ready || !runtime.state.ship_ready || (runtime.state.phase!=Phase::Play && runtime.state.phase!=Phase::LevelUp) || !std::isfinite(hp) || hp<0) return false;
     for (const char *key:{"max_hp","max_speed","acceleration","turn_rate","glide_duration_mult","invulnerability","capacity","charge_time","length_mult","attack_mult","crit_chance","crit_mult","xp_mult","xp_pickup_radius","pickup_radius","pickup_speed_mult"})
         if (!numeric(stats.get(key,Variant())) || double(stats[key])<0) return false;
     if (double(stats["max_hp"])<=0 || double(stats["capacity"])<=0 || double(stats["charge_time"])<=0 || hp>double(stats["max_hp"])) return false;
     apply_stat_values(stats); runtime.state.ship.hp=hp; runtime.state.phase=waiting?Phase::LevelUp:Phase::Play; runtime.state.control.rng.set_state(uint64_t(random_state)); return true;
 }
 
-int64_t SpeedRunCore::progression_revision() const { return runtime.state.progression.revision; }
+int64_t SpeedRunCore::progression_revision() const { return runtime.state.legacy_progression.revision; }

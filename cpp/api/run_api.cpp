@@ -5,6 +5,7 @@
 #include "../systems/population_system.h"
 #include "../systems/attack_budget.h"
 #include "../systems/enemy_system.h"
+#include "../systems/progression.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <climits>
@@ -74,6 +75,8 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.ship_ready=state.draw_ready=true;
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
     if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
+    speed::ProgressionSystem::initialize(runtime,options.has("equipment"));
+    if (options.has("equipment")) speed::ProgressionSystem::open(*this,true);
     ++state.control.revision;return success(progress(runtime));
 }
 Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,const Dictionary &viewport) {
@@ -121,6 +124,18 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=success();
     } else if (kind=="set_settings" && payload.size()==1 && is(payload,"hitstop",Variant::BOOL)) {
         runtime.state.hitstop_enabled=payload["hitstop"];if (!runtime.state.hitstop_enabled) runtime.state.hitstop=0;response=success();
+    } else if (kind=="choose_card" && payload.size()==2 && is(payload,"offer_id",Variant::INT) && is(payload,"candidate_id",Variant::INT)) {
+        response=speed::ProgressionSystem::choose(runtime,payload["offer_id"],payload["candidate_id"])?success():failure(5,"offer_id/candidate_id","現在の候補と一致しません");
+    } else if (kind=="reroll" && payload.size()==1 && is(payload,"offer_id",Variant::INT)) {
+        response=speed::ProgressionSystem::reroll(*this,payload["offer_id"])?success():failure(4,"offer_id","引き直せません");
+    } else if (kind=="cancel_choice" && payload.size()==1 && is(payload,"offer_id",Variant::INT)) {
+        response=speed::ProgressionSystem::cancel(runtime,payload["offer_id"])?success():failure(5,"offer_id","選択中の候補と一致しません");
+    } else if (kind=="resources_complete" && payload.size()==2 && is(payload,"request_id",Variant::INT) && is(payload,"status",Variant::INT) && (int64_t(payload["status"])==1 || int64_t(payload["status"])==-1 || int64_t(payload["status"])==-2)) {
+        response=speed::ProgressionSystem::complete(runtime,payload["request_id"],payload["status"])?success():failure(5,"request_id/status","未処理の資源要求と一致しません");
+    } else if (kind=="retry_resources" && payload.size()==1 && is(payload,"request_id",Variant::INT)) {
+        response=speed::ProgressionSystem::retry(runtime,payload["request_id"])?success():failure(5,"request_id","再試行できる失敗要求がありません");
+    } else if (kind=="dev_add_xp" && runtime.api_development && payload.size()==1 && (is(payload,"amount",Variant::FLOAT) || is(payload,"amount",Variant::INT))) {
+        response=speed::ProgressionSystem::add_experience(*this,payload["amount"])?success():failure(1,"amount","最終取得XPが不正です");
     } else if (kind=="dev_spawn" && runtime.api_development && payload.size()==2 && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite()) {
         auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],Dictionary());
         if (entity>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
@@ -163,8 +178,8 @@ Dictionary SpeedRunCore::frame_run() {
     ui["ship_vel"]=runtime.state.ship.vel;ui["tracing"]=runtime.state.draw.tracing;ui["ship_boost_t"]=runtime.state.ship.boost_t;ui["glide"]=runtime.state.ship.glide;
     ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
-    ui["character_scale"]=runtime.content->config.character_scale;value["ui"]=speed::FrameBuilder::ui_delta(runtime,ui);
-    value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=Array();value["result"]=Variant();return success(value);
+    ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);value["ui"]=speed::FrameBuilder::ui_delta(runtime,ui);
+    value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=speed::ProgressionSystem::requests(runtime);value["result"]=Variant();return success(value);
 }
 Dictionary SpeedRunCore::ack_frame_run(int64_t epoch,int64_t sequence) {
     if (runtime.busy) return failure(7,"ack_frame","更新中は受領できません");
@@ -180,5 +195,6 @@ Dictionary SpeedRunCore::metrics_run() const {
 Dictionary SpeedRunCore::dispose_run() {
     if (runtime.busy) return failure(7,"dispose","更新中は再入できません");Guard guard(runtime.busy);
     if (!runtime.state.closed) {close();if (runtime.epoch<INT64_MAX) ++runtime.epoch;}
+    runtime.resource_workspace.requests.clear();runtime.state.loadout={};
     runtime.last_command_response.clear();return success();
 }

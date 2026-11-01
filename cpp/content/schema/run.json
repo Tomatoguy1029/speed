@@ -869,9 +869,17 @@
           "name": "maximum_level",
           "type": "u32",
           "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "comet_only",
+          "type": "bool"
         }
       ],
-      "version": 2
+      "version": 3
     },
     {
       "name": "HeroDefinition",
@@ -957,14 +965,14 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 6
+          "max": 7
         },
         {
           "name": "path",
           "type": "string"
         }
       ],
-      "version": 3
+      "version": 4
     },
     {
       "name": "ForwardDefinition",
@@ -1384,6 +1392,18 @@
       {
         "name": "WeaponFire",
         "value": "weapon_fire"
+      },
+      {
+        "name": "Offer",
+        "value": "offer"
+      },
+      {
+        "name": "Choice",
+        "value": "choice"
+      },
+      {
+        "name": "Loadout",
+        "value": "loadout"
       }
     ]
   },
@@ -1591,10 +1611,28 @@
       "pos",
       "angle",
       "visual_key"
+    ],
+    "offer": [
+      "offer_id",
+      "initial",
+      "count"
+    ],
+    "choice": [
+      "offer_id",
+      "candidate_id",
+      "kind",
+      "id",
+      "level"
+    ],
+    "loadout": [
+      "kind",
+      "id",
+      "level"
     ]
   },
   "includes": [
     "attacks.json",
-    "population.json"
+    "population.json",
+    "progression.json"
   ]
 }

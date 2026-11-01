@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/runtime/checkpoint.h"
+#include "../cpp/systems/progression.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -59,6 +60,8 @@ bool SpeedRunCore::restore_checkpoint(int64_t id) {
     candidate->runtime.api_run_id=runtime.api_run_id;
     candidate->runtime.api_development=runtime.api_development;
     candidate->runtime.frame_workspace.metrics=runtime.frame_workspace.metrics;
+    candidate->runtime.resource_workspace.next_id=runtime.resource_workspace.next_id;
+    if (candidate->runtime.state.loadout.ready) speed::ProgressionSystem::rebuild_requests(candidate->runtime);
     candidate->runtime.full_output_dirty=true;
     candidate->runtime.pending_resource_rebuild=true;
     runtime=std::move(candidate->runtime);

@@ -16,13 +16,14 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
-namespace speed { class RunRunner; }
+namespace speed { class RunRunner; class ProgressionSystem; }
 namespace godot {
 // 可変状態は各ランが所有する。終了した実体は再利用しない。
 class SpeedRunCore : public RefCounted {
     GDCLASS(SpeedRunCore, RefCounted)
     speed::RunRuntime runtime;
     friend class speed::RunRunner;
+    friend class speed::ProgressionSystem;
     Dictionary development_attack_command(const String &kind,const Dictionary &payload);
     Dictionary development_contact_command(const Dictionary &payload);
     Dictionary development_combat_command(const String &kind,const Dictionary &payload);

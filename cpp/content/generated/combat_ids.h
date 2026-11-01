@@ -91,7 +91,7 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="cannon") {out=VisualRole::Cannon;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -136,6 +136,9 @@ inline const char *symbol_name(EventType value) {
     case EventType::Upgrade: return "upgrade";
     case EventType::Wave: return "wave";
     case EventType::WeaponFire: return "weapon_fire";
+    case EventType::Offer: return "offer";
+    case EventType::Choice: return "choice";
+    case EventType::Loadout: return "loadout";
     default: return "";
     }
 }
@@ -182,6 +185,9 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="upgrade") {out=EventType::Upgrade;return true;}
     if (value=="wave") {out=EventType::Wave;return true;}
     if (value=="weapon_fire") {out=EventType::WeaponFire;return true;}
+    if (value=="offer") {out=EventType::Offer;return true;}
+    if (value=="choice") {out=EventType::Choice;return true;}
+    if (value=="loadout") {out=EventType::Loadout;return true;}
     return false;
 }
 enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,Count};
@@ -230,6 +236,27 @@ inline bool parse_symbol(std::string_view value, AttackCategory &out) {
     if (value=="residue") {out=AttackCategory::Residue;return true;}
     return false;
 }
+enum class CardKind : uint32_t {Weapon=0,Trait=1,PostMax=2,Heal=3,Swap=4,Keep=5,Count};
+inline const char *symbol_name(CardKind value) {
+    switch(value) {
+    case CardKind::Weapon: return "weapon";
+    case CardKind::Trait: return "trait";
+    case CardKind::PostMax: return "post_max";
+    case CardKind::Heal: return "heal";
+    case CardKind::Swap: return "swap";
+    case CardKind::Keep: return "keep";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, CardKind &out) {
+    if (value=="weapon") {out=CardKind::Weapon;return true;}
+    if (value=="trait") {out=CardKind::Trait;return true;}
+    if (value=="post_max") {out=CardKind::PostMax;return true;}
+    if (value=="heal") {out=CardKind::Heal;return true;}
+    if (value=="swap") {out=CardKind::Swap;return true;}
+    if (value=="keep") {out=CardKind::Keep;return true;}
+    return false;
+}
 inline bool event_field_allowed(EventType type, std::string_view field) {
     switch(type) {
     case EventType::AttackStart: return field=="owner" || field=="row" || field=="id" || field=="categories" || field=="token";
@@ -274,6 +301,9 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::Upgrade: return field=="card";
     case EventType::Wave: return false;
     case EventType::WeaponFire: return field=="id" || field=="pos" || field=="angle" || field=="visual_key";
+    case EventType::Offer: return field=="offer_id" || field=="initial" || field=="count";
+    case EventType::Choice: return field=="offer_id" || field=="candidate_id" || field=="kind" || field=="id" || field=="level";
+    case EventType::Loadout: return field=="kind" || field=="id" || field=="level";
     default: return false;
     }
 }

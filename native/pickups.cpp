@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/progression.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -55,8 +56,9 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
 }
 
 void SpeedRunCore::collect_pickup(StringName kind, double value) {
-    // B案は成長側へまとめて渡す。各回収の順序を保ち、カード待ちの判断は成長の所有者が行う。
-    if (runtime.state.progression.ready && kind == StringName("gem")) add_xp(value);
+    // 共通回収は倍率を一度適用して最終XPを渡す。旧比較入口は撤去まで分ける。
+    if (runtime.state.loadout.ready && kind == StringName("gem")) speed::ProgressionSystem::add_experience(*this,value*runtime.state.pickup_config.xp_mult*runtime.state.loadout.xp_gain_mult);
+    else if (runtime.state.legacy_progression.ready && kind == StringName("gem")) add_xp(value);
     else { Dictionary item; item["kind"] = kind; item["value"] = value; runtime.state.collections.append(item); }
     Dictionary event; event["kind"] = kind; emit_event("pickup", event);
 }

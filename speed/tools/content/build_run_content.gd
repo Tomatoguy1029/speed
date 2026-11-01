@@ -69,7 +69,18 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 		{"id":6,"role":6 if look!=null else 0,"path":sprite}]
 	var weapon := load("res://data/weapons/W01_forward.tres") as WeaponDef
 	if weapon==null: return {}
-	data.LoadoutDefinition = [{"id":1,"kind":0,"maximum_level":weapon.level_steps.size()}]
+	data.LoadoutDefinition = [{"id":1,"kind":0,"maximum_level":weapon.level_steps.size(),"external_id":String(weapon.id),"comet_only":weapon.comet_only}]
+	data.ProgressionDefinition = [{"id":1}]
+	for field in Schema.SCHEMA.records:
+		if field.name == "ProgressionDefinition":
+			for item in field.fields:
+				if item.name != "id": data.ProgressionDefinition[0][item.name] = config.get(item.name)
+	var entry: ContentEntry = ContentManager.catalog.find(&"weapons",weapon.id)
+	if entry==null: return {}
+	for path in entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7,"path":path})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":1,"asset":key})
 	for i in weapon.level_steps.size():
 		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
@@ -85,6 +96,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
+	var equipment_resources: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	for i in stage.resources.enemy_ids.size():
 		var id: String = stage.resources.enemy_ids[i]
@@ -113,7 +125,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)
 			data.LoadoutDefinition = resolved.LoadoutDefinition
 			data.ForwardDefinition = resolved.ForwardDefinition
-		var visual: Dictionary = resolved.ResourceKey.back().duplicate()
+			data.ProgressionDefinition = resolved.ProgressionDefinition
+			equipment_resources = resolved.ResourceKey.filter(func(key: Dictionary): return key.role==7)
+		var visual: Dictionary = resolved.ResourceKey[5].duplicate()
 		visual.id = i+6
 		data.ResourceKey.append(visual)
 		if visual.role==6:
@@ -125,10 +139,15 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			appearance_metadata[visual.id] = {"settings":settings,"paint":look.colors_key(definition.armor_colors),"biting":definition.behavior==&"biter",
 				"biter_parts":"res://data/visuals/biter_parts.tres" if id=="biter" and look.source_path=="res://data/visuals/looks/biter.tres" else ""}
 	if data.RunConfig.is_empty(): return ERR_INVALID_DATA
+	for resource: Dictionary in equipment_resources:
+		var row := resource.duplicate()
+		row.id = data.ResourceKey.size()+1
+		data.ResourceKey.append(row)
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":1,"asset":row.id})
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	for visual: Dictionary in data.ResourceKey:
-		if not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
+		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():
 		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
 	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]:

@@ -211,7 +211,7 @@ void SpeedRunCore::close() {
     runtime.state.control.rng = {};
     runtime.combat_hooks=speed::CombatHooks();runtime.render_workspace={};
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
-    runtime.state.progression = Progression();
+    runtime.state.legacy_progression = Progression();
     runtime.state.hound_packs.clear();
     runtime.state.enemies.clear(); runtime.state.enemy_handles = {};
     runtime.state.enemies.shrink_to_fit();
@@ -647,7 +647,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
         step_pickups(accumulated);
 
     }
-    if (runtime.state.progression.ready) open_cards(false);
+    if (runtime.state.legacy_progression.ready) open_cards(false);
     return true;
 }
 

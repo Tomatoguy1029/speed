@@ -93,7 +93,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     if (state.ship.invuln>0 && std::fmod(state.time*20.0,2.0)<1.0) visual_state|=2;
     for (const auto visual:{config.cannon_visual,config.ship_visual}) {
         Dictionary pose;pose["participant_id"]=0;pose["part_key"]=visual;pose["transform"]=transform;
-        pose["visible"]=state.phase!=godot::RunState::Phase::Ended;pose["visual_state"]=visual_state;poses.push_back(pose);
+        pose["visible"]=state.phase!=godot::RunState::Phase::Ended && (visual!=config.cannon_visual || state.forward.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
     out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;return out;

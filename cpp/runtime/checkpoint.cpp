@@ -23,12 +23,12 @@ godot::RunState clone_state(const godot::RunState &source) {
     auto state=source;
     state.events=source.events.duplicate(true);
     state.collections=source.collections.duplicate(true);
-    state.progression.data=source.progression.data.duplicate(true);
-    state.progression.stats=source.progression.stats.duplicate(true);
-    state.progression.weapons=source.progression.weapons.duplicate(true);
-    state.progression.traits=source.progression.traits.duplicate(true);
-    state.progression.cards=source.progression.cards.duplicate(true);
-    state.progression.resource_requests=source.progression.resource_requests.duplicate(true);
+    state.legacy_progression.data=source.legacy_progression.data.duplicate(true);
+    state.legacy_progression.stats=source.legacy_progression.stats.duplicate(true);
+    state.legacy_progression.weapons=source.legacy_progression.weapons.duplicate(true);
+    state.legacy_progression.traits=source.legacy_progression.traits.duplicate(true);
+    state.legacy_progression.cards=source.legacy_progression.cards.duplicate(true);
+    state.legacy_progression.resource_requests=source.legacy_progression.resource_requests.duplicate(true);
     state.forward_parameters=source.forward_parameters.duplicate(true);
     return state;
 }
@@ -73,7 +73,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
 }
 int64_t CheckpointStore::hold(const RunRuntime &runtime) {
     if (runtime.state.attacks.hostile_updating || runtime.state.attacks.hostile_clear_pending || !runtime.content || next_checkpoint_id==INT64_MAX) return 0;
-    const auto &progression=runtime.state.progression;
+    const auto &progression=runtime.state.legacy_progression;
     if (!value_only(progression.data) || !value_only(progression.stats) || !value_only(progression.weapons) ||
         !value_only(progression.traits) || !value_only(progression.cards) || !value_only(runtime.state.forward_parameters)) return 0;
     auto checkpoint=std::make_shared<RunCheckpoint>();
@@ -83,7 +83,7 @@ int64_t CheckpointStore::hold(const RunRuntime &runtime) {
     if (!rebuild_state_indexes(checkpoint->state,*checkpoint->content)) return 0;
     // 配信済みの音・結果や、外部の要求を再発行しない。
     checkpoint->state.events.clear();checkpoint->state.combat_events.clear();checkpoint->state.collections.clear();
-    checkpoint->state.progression.resource_requests.clear();
+    checkpoint->state.legacy_progression.resource_requests.clear();
     const int64_t id=next_checkpoint_id++;
     checkpoints.emplace(id,std::move(checkpoint));return id;
 }

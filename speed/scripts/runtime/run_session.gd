@@ -15,6 +15,7 @@ var view: Node
 ## 固定更新を自分で進めるか。実験場は自分の時計で sim を進める
 var auto_step := true
 var bridge: RefCounted
+var cpp_choices: RefCounted
 var cpp_input_source: Callable
 ## 開発用の録画条件。途中録画でもラン初期化時の実効値を保持する。
 var recording_initial: Dictionary = {}
@@ -122,7 +123,9 @@ func _physics_process(delta: float) -> void:
 		sim.physics_step(delta)
 
 func _process(delta: float) -> void:
-	if bridge != null: return
+	if bridge != null:
+		if cpp_choices!=null: cpp_choices.poll()
+		return
 	if sim.state == null:
 		if resources == null or _pending_options.is_empty(): return
 		_progress.value = resources.progress() * 100.0
@@ -153,6 +156,8 @@ func _notification(what: int) -> void:
 		# 記録の終了と役者の退出は、シミュレーションの参照が使える間に済ませる。
 		if is_inside_tree():
 			get_parent().remove_child(self)
+		if cpp_choices!=null: cpp_choices.close()
+		cpp_choices = null
 		if resources != null: resources.cancel()
 		_pending_options.clear()
 		if bridge != null: bridge.dispose()
@@ -178,15 +183,20 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	if not configured.ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA
-	if not next_bridge.start(seed_value).ok:
+	if not next_bridge.start(seed_value,options.get("cpp_start",{})).ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA
 	bridge = next_bridge
 	cpp_core = bridge._core
 	cpp_resources = prepared.resources
+	cpp_choices = preload("res://scripts/runtime/run_choice_resources.gd").new()
+	cpp_choices.attach(bridge,cpp_resources,self)
 	if with_view:
 		resources = ContentManager.prepare_resources(cpp_resources.paths,false)
 		if resources.failed or not resources.is_ready():
+			cpp_choices.close()
+			cpp_choices = null
+			resources.cancel()
 			bridge.dispose()
 			bridge = null
 			cpp_core = null

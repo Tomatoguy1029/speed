@@ -4,6 +4,7 @@
 #include <memory>
 #include "../output/render_builder.h"
 #include "../output/frame_builder.h"
+#include "../output/resource_requests.h"
 #include "../systems/combat_hooks.h"
 
 namespace speed {
@@ -18,6 +19,7 @@ public:
     RunWorkspace workspace;
     mutable RenderWorkspace render_workspace;
     FrameWorkspace frame_workspace;
+    ResourceWorkspace resource_workspace;
     CombatHooks combat_hooks;
     int64_t epoch=1;
     int64_t api_run_id=0, last_command_id=0;

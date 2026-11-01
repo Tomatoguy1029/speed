@@ -54,19 +54,24 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->bites=records.BiteDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->budget_phases=records.BudgetPhase_rows;
+    if (records.ProgressionDefinition_rows.size()!=1 || records.ProgressionDefinition_rows.front().xp_base<=0) return {};
+    bundle->progression=records.ProgressionDefinition_rows.front();
+    bundle->equipment=records.LoadoutDefinition_rows;
+    bundle->equipment_assets=records.LoadoutAsset_rows;
     for (size_t i=1;i<bundle->budget_phases.size();++i) if (bundle->budget_phases[i].start<bundle->budget_phases[i-1].start) return {};
     for (const auto &bite:bundle->bites) {
         const auto &first=bundle->bites.front();
         if (bite.duration!=first.duration || bite.scene!=first.scene || bite.hit!=first.hit || bite.fade!=first.fade) return {};
     }
     if (records.LoadoutDefinition_rows.size()!=1 || records.LoadoutDefinition_rows[0].id!=1 ||
-        records.LoadoutDefinition_rows[0].kind!=0 || bundle->forward_levels.size()!=records.LoadoutDefinition_rows[0].maximum_level) return {};
+        records.LoadoutDefinition_rows[0].kind!=0 || records.LoadoutDefinition_rows[0].external_id!="W01" ||
+        records.LoadoutDefinition_rows[0].comet_only || bundle->forward_levels.size()!=records.LoadoutDefinition_rows[0].maximum_level) return {};
     for (size_t i=0;i<bundle->forward_levels.size();++i) {
         const auto &level=bundle->forward_levels[i];
         if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
     }
     for (const auto &visual:bundle->visuals) {
-        if (visual.role>6 || (visual.path.empty() && visual.role!=2 && visual.role!=4)) return {};
+        if (visual.role>7 || (visual.path.empty() && visual.role!=2 && visual.role!=4)) return {};
     }
     std::unordered_set<std::string> names;
     for (const auto &row:records.EnemyRecord_rows) {

@@ -391,6 +391,8 @@ struct LoadoutDefinition {
     uint32_t id{};
     uint32_t kind{};
     uint32_t maximum_level{};
+    std::string external_id{};
+    bool comet_only{};
 };
 inline bool read(BinaryReader &input, LoadoutDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -399,6 +401,8 @@ inline bool read(BinaryReader &input, LoadoutDefinition &out) {
     if (out.kind > 0) return false;
     if (!input.read_u32(out.maximum_level)) return false;
     if (out.maximum_level < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_bool(out.comet_only)) return false;
     return true;
 }
 struct HeroDefinition {
@@ -458,7 +462,7 @@ inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 6) return false;
+    if (out.role > 7) return false;
     if (!input.read_string(out.path)) return false;
     return true;
 }
@@ -562,6 +566,64 @@ inline bool read(BinaryReader &input, BudgetPhase &out) {
     if (out.budget < 0) return false;
     return true;
 }
+struct ProgressionDefinition {
+    uint32_t id{};
+    double xp_base{};
+    double xp_growth{};
+    double xp_curve{};
+    double level_heal{};
+    double owned_card_bias{};
+    double levelup_bonus_chance{};
+    double levelup_bonus_more{};
+    double levelup_bonus_last{};
+    uint32_t weapon_slots{};
+    uint32_t trait_slots{};
+    uint32_t reroll_count{};
+    uint32_t start_weapon_choices{};
+};
+inline bool read(BinaryReader &input, ProgressionDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.xp_base)) return false;
+    if (out.xp_base < 0) return false;
+    if (!input.read_f64(out.xp_growth)) return false;
+    if (out.xp_growth < 0) return false;
+    if (!input.read_f64(out.xp_curve)) return false;
+    if (out.xp_curve < 0) return false;
+    if (!input.read_f64(out.level_heal)) return false;
+    if (out.level_heal < 0) return false;
+    if (!input.read_f64(out.owned_card_bias)) return false;
+    if (out.owned_card_bias < 0) return false;
+    if (!input.read_f64(out.levelup_bonus_chance)) return false;
+    if (out.levelup_bonus_chance < 0) return false;
+    if (!input.read_f64(out.levelup_bonus_more)) return false;
+    if (out.levelup_bonus_more < 0) return false;
+    if (!input.read_f64(out.levelup_bonus_last)) return false;
+    if (out.levelup_bonus_last < 0) return false;
+    if (!input.read_u32(out.weapon_slots)) return false;
+    if (out.weapon_slots < 0) return false;
+    if (!input.read_u32(out.trait_slots)) return false;
+    if (out.trait_slots < 0) return false;
+    if (!input.read_u32(out.reroll_count)) return false;
+    if (out.reroll_count < 0) return false;
+    if (!input.read_u32(out.start_weapon_choices)) return false;
+    if (out.start_weapon_choices < 0) return false;
+    return true;
+}
+struct LoadoutAsset {
+    uint32_t id{};
+    uint32_t equipment{};
+    uint32_t asset{};
+};
+inline bool read(BinaryReader &input, LoadoutAsset &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_u32(out.asset)) return false;
+    if (out.asset < 1) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -579,6 +641,8 @@ struct ContentRecords {
     std::vector<BiteDefinition> BiteDefinition_rows;
     std::vector<ContactDefinition> ContactDefinition_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
+    std::vector<ProgressionDefinition> ProgressionDefinition_rows;
+    std::vector<LoadoutAsset> LoadoutAsset_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -607,8 +671,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 5: {
-        if (version != 2) return false;
-        if (count > input.remaining()/12) return false;
+        if (version != 3) return false;
+        if (count > input.remaining()/17) return false;
         for (uint32_t i=0; i<count; ++i) { LoadoutDefinition row; if (!read(input,row)) return false; out.LoadoutDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -655,7 +719,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 3) return false;
+        if (version != 4) return false;
         if (count > input.remaining()/12) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -682,6 +746,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/20) return false;
         for (uint32_t i=0; i<count; ++i) { BudgetPhase row; if (!read(input,row)) return false; out.BudgetPhase_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 17: {
+        if (version != 1) return false;
+        if (count > input.remaining()/84) return false;
+        for (uint32_t i=0; i<count; ++i) { ProgressionDefinition row; if (!read(input,row)) return false; out.ProgressionDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 18: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { LoadoutAsset row; if (!read(input,row)) return false; out.LoadoutAsset_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -720,6 +796,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ContactDefinition_rows) if (!ContactDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ProgressionDefinition_ids;
+    for (const auto &row:data.ProgressionDefinition_rows) if (!ProgressionDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> LoadoutAsset_ids;
+    for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutAsset_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -731,6 +811,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.EnemyRecord_rows) if (!ResourceKey_ids.count(row.visual_id)) return false;
     for (const auto &row:data.ForwardDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BiteDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -851,5 +933,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=16;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=18;
 }

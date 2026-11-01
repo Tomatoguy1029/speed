@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--choice-only" in OS.get_cmdline_user_args():
+		check(check_run_choices(),"カード選択と資源保持を最後まで確認する")
+		print("[run_choices] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--geometry-only" in OS.get_cmdline_user_args() or "--geometry-sweep-only" in OS.get_cmdline_user_args():
 		check(check_contact_geometry("--geometry-sweep-only" in OS.get_cmdline_user_args()),"攻撃の形と共通被弾を最後まで確認する")
 		print("[run_geometry] failed=%d" % failed)
@@ -942,3 +947,132 @@ func check_contact_sweep(bridge) -> void:
 		var response: Dictionary = bridge.command("dev_contact",{"handle":entry[0],"center":from.lerp(to,0.25),"radius":0.0001})
 		check(response.ok and response.value.touching==entry[1],"前の判定位置から機体を掃引し、点判定の攻撃は通過を拾わない")
 		bridge.command("dev_end_attack",{"handle":entry[0]})
+
+func choice_fixture(initial := false) -> Dictionary:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.xp_base = 10.0
+	config.xp_growth = 0.0
+	config.xp_curve = 0.0
+	config.levelup_bonus_chance = 0.0
+	config.reroll_count = 3
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"]
+	var records: Dictionary = builder.chase_records(definition,config)
+	var bytes: PackedByteArray = schema.write_content(records,schema.sha256("カードと準備の固定入力".to_utf8_buffer()))
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	if not bridge.configure(bytes,{"api_version":1,"run_id":58,"mode":1,"stage_id":"choice","profile":{},"settings":{}}).ok: return {}
+	if not bridge.start(41,{"equipment":[]} if initial else {}).ok: return {}
+	var assets = load("res://tools/content/run_resources.gd").new()
+	for row: Dictionary in records.ResourceKey: assets.keys[row.id] = row.path
+	return {"bridge":bridge,"resources":assets}
+
+func check_run_choices() -> bool:
+	var fixture := choice_fixture()
+	if fixture.is_empty(): return false
+	var bridge = fixture.bridge
+	check(bridge.command("dev_add_xp",{"amount":10.0}).ok,"最終取得XPをC++の成長へ渡す")
+	clock_step(bridge)
+	var ui: Dictionary = bridge.read_frame().value.ui
+	check(ui.level==1 and ui.xp==0 and ui.cards.candidates.size()==1 and ui.weapon_levels[0].level==1,"経験値からカードを開き、選択前は装備を変えない")
+	var offer: int = ui.cards.offer_id
+	var candidate: int = ui.cards.candidates[0].candidate_id
+	var request: int = ui.cards.candidates[0].request_id
+	check(bridge.command("choose_card",{"offer_id":offer,"candidate_id":candidate}).ok,"準備中の選択は保持する")
+	clock_step(bridge)
+	check(bridge.read_frame().value.ui.weapon_levels[0].level==1,"準備中は確定しない")
+	check(bridge.command("resources_complete",{"request_id":request,"status":-1}).ok,"準備の失敗を記録する")
+	ui = bridge.read_frame().value.ui
+	check(ui.cards.selected_id==candidate and ui.cards.error_code==-1,"失敗時も同じ候補と選択を保持する")
+	check(bridge.command("retry_resources",{"request_id":request}).ok,"同じ候補で準備を再試行する")
+	ui = bridge.read_frame().value.ui
+	var retry: int = ui.cards.candidates[0].request_id
+	check(retry>request and ui.cards.offer_id==offer and ui.cards.selected_id==candidate,"再試行は新要求番号だけを発行する")
+	check(not bridge.command("resources_complete",{"request_id":request,"status":1}).ok,"失敗した旧要求への遅い成功を拒否する")
+	check(bridge.command("pause",{"paused":true}).ok,"準備中のカード画面を停止する")
+	check(bridge.command("resources_complete",{"request_id":retry,"status":1}).ok,"停止中も成功の到着を記録する")
+	clock_step(bridge)
+	check(bridge.read_frame().value.ui.weapon_levels[0].level==1,"停止中の成功で装備を確定しない")
+	bridge.command("pause",{"paused":false})
+	bridge.command("set_ui_overlay",{"active":true})
+	clock_step(bridge)
+	check(bridge.read_frame().value.ui.weapon_levels[0].level==1,"UI停止中も確定しない")
+	bridge.command("set_ui_overlay",{"active":false})
+	bridge.command("set_ui_reward",{"active":true})
+	clock_step(bridge)
+	check(bridge.read_frame().value.ui.weapon_levels[0].level==1,"報酬演出中も確定しない")
+	bridge.command("set_ui_reward",{"active":false})
+	clock_step(bridge)
+	ui = bridge.read_frame().value.ui
+	check(ui.weapon_levels[0].level==2 and ui.cards.offer_id==0 and ui.phase==RunState.Phase.PLAY,"停止条件を通過したLEVELUPで一度だけ確定し戦闘へ戻る")
+	check(not bridge.command("choose_card",{"offer_id":offer,"candidate_id":candidate}).ok and not bridge.command("resources_complete",{"request_id":retry,"status":1}).ok,"確定後の重複選択と通知で二重取得しない")
+	bridge.command("dev_add_xp",{"amount":10.0})
+	clock_step(bridge)
+	ui = bridge.read_frame().value.ui
+	offer = ui.cards.offer_id
+	request = ui.cards.candidates[0].request_id
+	bridge.command("choose_card",{"offer_id":offer,"candidate_id":candidate})
+	check(bridge.command("cancel_choice",{"offer_id":offer}).ok,"未確定の選択を取り消す")
+	check(bridge.read_frame().value.ui.cards.selected_id==0 and bridge.read_frame().value.ui.cards.offer_id==offer,"取消は装備や候補を消さない")
+	check(bridge.command("reroll",{"offer_id":offer}).ok,"カードを引き直す")
+	check(bridge.read_frame().value.ui.cards.offer_id>offer and not bridge.command("resources_complete",{"request_id":request,"status":1}).ok,"引き直し前の要求を無効にする")
+	var saved: Dictionary = bridge.checkpoint()
+	request = bridge.read_frame().value.ui.cards.candidates[0].request_id
+	check(saved.ok and bridge.restore(saved.value).ok,"選択画面の保持点へ復帰する")
+	check(bridge.read_frame().value.ui.cards.candidates[0].request_id>request,"復帰では到着状態を戻さず資源を新しく要求する")
+	bridge._core.release_checkpoint(saved.value)
+	bridge.dispose()
+	check(not bridge.command("resources_complete",{"request_id":request,"status":1}).ok,"退出後に到着した通知を拒否する")
+	return check_choice_scopes()
+
+func check_choice_scopes() -> bool:
+	var fixture := choice_fixture(true)
+	if fixture.is_empty(): return false
+	var bridge = fixture.bridge
+	var owner = load("res://scripts/runtime/run_choice_resources.gd").new()
+	var prepared: Array[ContentResourceScope] = []
+	owner.prepare = func(_paths: PackedStringArray):
+		var scope := ContentResourceScope.new()
+		scope.pending.append("準備待ち")
+		prepared.append(scope)
+		return scope
+	owner.attach(bridge,fixture.resources,self)
+	check(bridge.collect_frame().ok,"通常の資源購読口へカードを届ける")
+	owner.poll()
+	check(owner.candidates.size()==1 and owner.equipped.is_empty(),"候補資源と確定装備の資源を区別する")
+	var first: ContentResourceScope = prepared[0]
+	var ui: Dictionary = bridge.read_frame().value.ui
+	bridge.command("reroll",{"offer_id":ui.cards.offer_id})
+	owner.poll()
+	check(first.cancelled and owner.candidates.size()==1,"引き直しで古い候補Scopeだけ解放する")
+	var selected: ContentResourceScope = prepared.back()
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.card_input_delay = 0.0
+	add_child(hud)
+	hud.apply_snapshot(bridge.read_frame().value.ui)
+	check(hud._cards_box.visible and hud._cards_row.get_child_count()==1,"C++の候補を通常カード部品で表示する")
+	hud._card_command(&"choose_card",{"index":0})
+	ui = bridge.read_frame().value.ui
+	check(ui.cards.selected_id!=0 and ui.weapon_levels.is_empty(),"HUDの選択は準備中のままC++へ届く")
+	selected.provide("準備待ち",Resource.new())
+	owner.poll()
+	clock_step(bridge)
+	owner.poll()
+	check(owner.candidates.is_empty() and owner.equipped.get("weapon:W01")==selected and not selected.cancelled,"確定した装備のScopeだけをランへ移す")
+	bridge.command("dev_add_xp",{"amount":10.0})
+	clock_step(bridge)
+	owner.poll()
+	check(owner.candidates.size()==1 and owner.equipped["weapon:W01"]==selected,"取得済み装備の資源を候補へ貸して保持する")
+	ui = bridge.read_frame().value.ui
+	bridge.command("reroll",{"offer_id":ui.cards.offer_id})
+	owner.poll()
+	check(not selected.cancelled and owner.equipped["weapon:W01"]==selected,"貸したScopeは引き直しても解放しない")
+	owner.close()
+	check(selected.cancelled and owner.candidates.is_empty() and owner.equipped.is_empty(),"退出時に候補と装備を解放する")
+	var late: ContentResourceScope = first
+	late.provide("遅い到着",Resource.new())
+	check(late.resources.is_empty(),"取消後のScopeは遅い資源を保持しない")
+	hud.free()
+	bridge.dispose()
+	return true

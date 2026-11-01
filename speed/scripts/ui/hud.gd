@@ -62,6 +62,8 @@ var _card_blocked_pointer_pos := Vector2.ZERO
 ## 表示切替前からの押下と、離すまで破棄する押下（マウス・タッチ・選択キー）。
 var _card_held: Dictionary = {}
 var _card_discard: Dictionary = {}
+var _cpp_retry: Button
+var _cpp_cancel: Button
 
 ## 通常 ULT のカットインと独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
 @export_group("伝説獲得の仮演出")
@@ -313,6 +315,9 @@ func _on_events(events: Array[Dictionary]) -> void:
 
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:
+	if bridge!=null:
+		_input_cpp(event)
+		return
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus != null and focus.is_in_group("stage_enemy_tuning_input"): return
 	if run == null or run.state == null or run.state.lab_mode:
@@ -374,7 +379,7 @@ func _card_input_id(event: InputEvent) -> String:
 	elif event is InputEventAction:
 		id = "action:%s" % event.action
 	if id != "":
-		if _rewards.is_active() or _card_held.has(id) or _card_discard.has(id):
+		if (_rewards!=null and _rewards.is_active()) or _card_held.has(id) or _card_discard.has(id):
 			return id
 		for action in [&"card_1", &"card_2", &"card_3", &"reroll", &"ui_accept", &"hero", &"draw_alt", &"pause"]:
 			if event.is_action(action):
@@ -382,6 +387,17 @@ func _card_input_id(event: InputEvent) -> String:
 	return ""
 
 func _card_command(command: StringName, args := {}) -> void:
+	if bridge!=null:
+		if _cpp_ui.is_empty() or int(_cpp_ui.phase)!=RunState.Phase.LEVELUP or Time.get_ticks_usec()<_cards_accept_at: return
+		var cards: Dictionary = _cpp_ui.get("cards",{})
+		var payload := {"offer_id":cards.get("offer_id",0)}
+		if command==&"choose_card":
+			var index := int(args.get("index",-1))
+			if index<0 or index>=cards.get("candidates",[]).size(): return
+			payload.candidate_id = cards.candidates[index].candidate_id
+		_card_discard.merge(_card_held)
+		bridge.command(String(command),payload)
+		return
 	if _menu_overlay != null or _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
 		return
 	_card_discard.merge(_card_held)
@@ -1133,7 +1149,19 @@ func _exit_tree() -> void:
 
 ## C++の値のスナップショットだけを保持する。表示時計と乱数はHUDが所有する。
 func apply_snapshot(ui: Dictionary) -> void:
+	var previous: Dictionary = _cpp_ui.get("cards",{})
+	var rerolls := int(_cpp_ui.get("rerolls_left",0))
+	var phase := int(_cpp_ui.get("phase",-1))
 	_cpp_ui = ui
+	if _cards_box==null: return
+	var cards: Dictionary = ui.get("cards",{})
+	if previous!=cards or rerolls!=int(ui.get("rerolls_left",0)):
+		if previous.get("offer_id",0)!=cards.get("offer_id",0):
+			_cards_accept_at = Time.get_ticks_usec()+roundi(card_input_delay*1_000_000.0)
+			_card_discard.merge(_card_held)
+		_show_cpp_cards()
+	elif phase!=int(ui.phase): _cpp_card_visibility()
+
 
 func _ready_cpp() -> void:
 	_font = ThemeDB.fallback_font
@@ -1143,6 +1171,21 @@ func _ready_cpp() -> void:
 	add_child(_speed_indicator)
 	_health_fill = _make_bar_fill(HEALTH)
 	_experience_fill = _make_bar_fill(EXPERIENCE)
+	_build_cards()
+	_cpp_retry = Button.new()
+	_cpp_retry.text = "もう一度準備する"
+	_cpp_retry.position = Vector2(160,320)
+	_cpp_retry.size = Vector2(150,26)
+	_cpp_retry.pressed.connect(func():
+		if int(_cpp_ui.phase)==RunState.Phase.LEVELUP:
+			bridge.command("retry_resources",{"request_id":_cpp_ui.cards.request_id}))
+	_cards_box.add_child(_cpp_retry)
+	_cpp_cancel = Button.new()
+	_cpp_cancel.text = "選び直す"
+	_cpp_cancel.position = Vector2(330,320)
+	_cpp_cancel.size = Vector2(150,26)
+	_cpp_cancel.pressed.connect(func(): _card_command(&"cancel_choice"))
+	_cards_box.add_child(_cpp_cancel)
 	resized.connect(_layout_cpp_art)
 	_layout_cpp_art()
 
@@ -1150,6 +1193,8 @@ func _layout_cpp_art() -> void:
 	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
 	_speed_indicator.position = (size-(SPEED_INDICATOR.METER.get_size()+Vector2.ONE*8.0)*factor).round()
 	_speed_indicator.scale = Vector2.ONE*factor
+	_cards_box.position = ((size-ART_SIZE*factor)*0.5).round()
+	_cards_box.scale = Vector2.ONE*factor
 
 func _draw_cpp() -> void:
 	if _cpp_ui.is_empty() or not show_status: return
@@ -1162,3 +1207,61 @@ func _draw_cpp() -> void:
 	var seconds := int(_cpp_ui.run_time)
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	draw_set_transform(Vector2.ZERO)
+
+func _cpp_card_visibility() -> void:
+	_cards_box.visible = not _cpp_ui.is_empty() and int(_cpp_ui.phase)==RunState.Phase.LEVELUP and int(_cpp_ui.get("cards",{}).get("offer_id",0))!=0
+	_cards_dim.visible = _cards_box.visible
+
+func _show_cpp_cards() -> void:
+	var state: Dictionary = _cpp_ui.get("cards",{})
+	var cards: Array = state.get("candidates",[])
+	for child in _cards_row.get_children():
+		_cards_row.remove_child(child)
+		child.queue_free()
+	_swap_box.hide()
+	var width := minf(144.0,(464.0-16.0*(cards.size()-1))/maxi(1,cards.size()))
+	var left := 89.0+(464.0-(cards.size()*width+maxi(0,cards.size()-1)*16.0))*0.5
+	for i in cards.size():
+		var card: Dictionary = cards[i]
+		var entry: ContentEntry = ContentManager.catalog.find(&"traits" if card.kind=="trait" else &"weapons",StringName(card.id))
+		var button := CARD_VIEW.create(card_info(card),i,width,10,entry)
+		button.position = Vector2(left+i*(width+16),83)
+		button.pressed.connect(func(): _card_command(&"choose_card",{"index":i}))
+		_cards_row.add_child(button)
+	_cards_title.text = "準備に失敗しました。もう一度準備するか、選び直してください。" if int(state.get("error_code",0))<0 else "準備しています…" if state.get("preparing",false) else tr("hud.start_title") if state.get("initial",false) else tr("hud.levelup_title")
+	var remaining := int(_cpp_ui.get("rerolls_left",0))
+	_reroll_button.text = tr("hud.reroll").format({n=remaining,key=OS.get_keycode_string(InputActions.key_of(&"reroll"))})
+	_reroll_button.disabled = remaining<=0
+	_cpp_retry.visible = int(state.get("error_code",0))==-1
+	_cpp_cancel.visible = int(state.get("selected_id",0))!=0
+	_cpp_card_visibility()
+
+func _input_cpp(event: InputEvent) -> void:
+	if _cpp_ui.is_empty(): return
+	if event.is_action_pressed(&"pause") and not event.is_echo():
+		bridge.command("pause",{"paused":int(_cpp_ui.phase)!=RunState.Phase.PAUSED})
+		_card_discard.merge(_card_held)
+		get_viewport().set_input_as_handled()
+		return
+	var id := _card_input_id(event)
+	if id=="": return
+	var choosing := int(_cpp_ui.phase)==RunState.Phase.LEVELUP
+	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec()<_cards_accept_at)
+	if not event is InputEventScreenDrag:
+		if event.is_pressed():
+			_card_held[id] = true
+			if blocked: _card_discard[id] = true
+		else:
+			_card_held.erase(id)
+			_card_discard.erase(id)
+	if blocked:
+		get_viewport().set_input_as_handled()
+		return
+	if not choosing or event.is_echo(): return
+	for i in 3:
+		if event.is_action_pressed(StringName("card_%d" % (i+1))):
+			_card_command(&"choose_card",{"index":i})
+			get_viewport().set_input_as_handled()
+	if event.is_action_pressed(&"reroll"):
+		_card_command(&"reroll")
+		get_viewport().set_input_as_handled()

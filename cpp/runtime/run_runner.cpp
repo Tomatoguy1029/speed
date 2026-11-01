@@ -1,5 +1,6 @@
 #include "run_runner.h"
 #include "../systems/attack_system.h"
+#include "../systems/progression.h"
 #include "../api/run_core.h"
 #include <algorithm>
 #include <cmath>
@@ -24,6 +25,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     using Phase=godot::RunState::Phase;
     // UIの入口判定を通過するまで、入力も時計も消費しない。
     if (control.ui_overlay || (control.ui_reward && state.phase!=Phase::Finishing)) return true;
+    if (state.phase==Phase::LevelUp) {ProgressionSystem::poll(core);return true;}
     if (state.phase==Phase::Dying) {core.step_death(dt);return true;}
     if (state.phase!=Phase::Play) return true;
     if (state.controls_locked || state.encounter_protected) state.hitstop=0;
@@ -78,7 +80,10 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     }
     state.ship_pos=state.ship.pos;
     camera(core,dt,size);
-    if (!core.check_run_end() && state.progression.ready) core.open_cards(false);
+    if (!core.check_run_end()) {
+        if (state.loadout.ready) ProgressionSystem::open(core);
+        else if (state.legacy_progression.ready) core.open_cards(false);
+    }
     return true;
 }
 void RunRunner::leave_bonus(godot::SpeedRunCore &core) {

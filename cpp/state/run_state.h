@@ -4,6 +4,7 @@
 #include "combat_types.h"
 #include "attack_state.h"
 #include "world_state.h"
+#include "loadout_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -125,7 +126,8 @@ struct RunState {
         HashMap<StringName, int> resource_status;
         int64_t level = 0, pending_levels = 0, rerolls = 0, revision = 0, pending_choice = -1;
         double xp = 0, gained = 0;
-    } progression;
+    } legacy_progression;
+    speed::LoadoutState loadout;
     bool draw_ready = false;
     bool ship_ready = false;
     struct CombatConfig {
