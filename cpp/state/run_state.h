@@ -190,13 +190,8 @@ struct RunState {
     } bite_zone_config;
     std::deque<Hostile> hostiles;
     std::vector<size_t> free_hostiles;
-    struct ForwardWeapon {
-        bool ready = false;
-        speed::IntervalTimer fire;
-        double recoil = 0;
-        double interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
-        int64_t pierce = 0;
-    } forward;
+    using ForwardWeapon=speed::ForwardWeaponState;
+    ForwardWeapon forward;
     Dictionary forward_parameters;
     bool motion_ready = false;
     bool started = false;

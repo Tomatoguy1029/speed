@@ -77,17 +77,33 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (const auto &moon:bundle->moon_definitions) if (moon.orbit_max<moon.orbit_min || moon.radius_min<=0 || moon.radius_max<moon.radius_min) return {};
     bundle->equipment=records.LoadoutDefinition_rows;
     bundle->equipment_assets=records.LoadoutAsset_rows;
+    bundle->numeric_traits=records.NumericTraitLevel_rows;
     for (size_t i=1;i<bundle->budget_phases.size();++i) if (bundle->budget_phases[i].start<bundle->budget_phases[i-1].start) return {};
     for (const auto &bite:bundle->bites) {
         const auto &first=bundle->bites.front();
         if (bite.duration!=first.duration || bite.visual_key!=first.visual_key || bite.hit!=first.hit || bite.fade!=first.fade) return {};
     }
-    if (records.LoadoutDefinition_rows.size()!=1 || records.LoadoutDefinition_rows[0].id!=1 ||
+    if (records.LoadoutDefinition_rows.empty() || records.LoadoutDefinition_rows[0].id!=1 ||
         records.LoadoutDefinition_rows[0].kind!=0 || records.LoadoutDefinition_rows[0].external_id!="W01" ||
         records.LoadoutDefinition_rows[0].comet_only || bundle->forward_levels.size()!=records.LoadoutDefinition_rows[0].maximum_level) return {};
     for (size_t i=0;i<bundle->forward_levels.size();++i) {
         const auto &level=bundle->forward_levels[i];
         if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
+    }
+    std::unordered_set<std::string> equipment_names;
+    for (size_t index=0;index<bundle->equipment.size();++index) {
+        const auto &d=bundle->equipment[index];
+        if (d.id!=index+1 || !equipment_names.insert(d.external_id).second) return {};
+        if (d.id==1) continue;
+        if (d.kind!=1 || (d.external_id!="T34" && d.external_id!="T35" && d.external_id!="T36")) return {};
+        if (d.maximum_level>bundle->numeric_traits.size()) return {};
+        for (uint32_t level=1;level<=d.maximum_level;++level) {
+            if (std::count_if(bundle->numeric_traits.begin(),bundle->numeric_traits.end(),[&](const auto &v){return v.equipment==d.id && v.level==level;})!=1) return {};
+        }
+    }
+    for (const auto &v:bundle->numeric_traits) {
+        const auto &d=bundle->equipment[v.equipment-1];
+        if (d.kind!=1 || v.level>d.maximum_level) return {};
     }
     for (const auto &visual:bundle->visuals) {
         if (visual.role>13) return {};

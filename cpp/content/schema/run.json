@@ -869,7 +869,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 0
+          "max": 1
         },
         {
           "name": "maximum_level",
@@ -885,7 +885,7 @@
           "type": "bool"
         }
       ],
-      "version": 3
+      "version": 4
     },
     {
       "name": "HeroDefinition",
@@ -1802,6 +1802,7 @@
     "population.json",
     "progression.json",
     "enemies.json",
-    "field.json"
+    "field.json",
+    "loadout.json"
   ]
 }

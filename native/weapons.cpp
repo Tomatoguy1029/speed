@@ -32,28 +32,14 @@ bool SpeedRunCore::configure_forward(const Dictionary &parameters, int64_t level
         *fields[i] = double(value);
     }
     parsed.fire.remaining=interval;
-    parsed.interval = interval; parsed.damage = damage; parsed.pierce = int64_t(pierce);
+    parsed.base_interval = parsed.interval = interval; parsed.damage = damage; parsed.pierce = int64_t(pierce);
     parsed.character_scale = character_scale; parsed.ready = true;
     runtime.state.forward = parsed; runtime.state.forward_parameters=parameters.duplicate(true);
     return true;
 }
 
 void SpeedRunCore::step_forward(double world_dt) {
-    if (!runtime.state.forward.ready) return;
-    if (!speed::ForwardBehavior::advance(runtime.state.forward,world_dt,runtime.state.draw.drawing || runtime.state.draw.tracing)) return;
-    // 弾数が整数でも、元の共通弾数処理は乱数を一回進める。
-    runtime.state.control.rng.randf();
-    const double angle = runtime.state.ship.heading.angle();
-    const Vector2 origin = runtime.state.ship.pos + runtime.state.ship.heading * 16.0 * 1.82 * runtime.state.forward.character_scale;
-    Friendly shot;
-    shot.pos = origin; shot.vel = Vector2::from_angle(angle) * 1300.0;
-    shot.damage = runtime.state.combat_config.base_attack * runtime.state.combat_config.attack_mult * runtime.state.combat_config.atk_scale * runtime.state.forward.damage;
-    shot.life = runtime.state.forward.life; shot.pierce_left = runtime.state.forward.pierce; shot.knock = runtime.state.forward.knock;
-    shot.color = Color::html("ffe46b"); shot.weapon_id = "W01"; shot.visual = "weapon/forward";
-    if (!speed::AttackSystem::get(runtime.state,speed::FriendShotSystem::emit(runtime,std::move(shot)))) return;
-    runtime.state.forward.recoil = 0.12;
-    Dictionary event; event["id"] = StringName("W01"); event["pos"] = origin; event["angle"] = angle; event["visual_key"] = "weapon/forward";
-    emit_event("weapon_fire", event);
+    speed::ForwardBehavior::step(runtime,world_dt);
 }
 
 Dictionary SpeedRunCore::forward_snapshot() const {

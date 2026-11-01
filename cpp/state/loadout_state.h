@@ -1,11 +1,26 @@
 #pragma once
 #include "../content/generated/combat_ids.h"
+#include "../systems/timing.h"
 #include <cstdint>
 #include <vector>
 namespace speed {
+struct ForwardWeaponState {
+    bool ready = false;
+    IntervalTimer fire;
+    double recoil = 0;
+    double base_interval = 0, interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
+    int64_t pierce = 0;
+};
 struct EquipmentLevel {uint32_t definition=0,level=0;};
 struct CardCandidate {int64_t id=0;CardKind kind=CardKind::Weapon;uint32_t definition=0,level=0;};
+// 数値特性は取得の境界で畳み、武器の更新中には定義を探索しない。
+struct EquipmentEffects {
+    double area=1,shot_amount=1,full_gauge_rate=0;
+    double burst_power=1,damage_multiplier=1;
+};
 struct LoadoutState {
+    EquipmentEffects effects;
+
     bool ready=false,initial_offer=false;
     int64_t level=0,pending_levels=0,rerolls=0,next_offer_id=1,offer_id=0,selected_id=0;
     double xp=0,xp_gained=0,xp_gain_mult=1;

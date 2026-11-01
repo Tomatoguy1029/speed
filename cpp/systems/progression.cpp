@@ -1,4 +1,5 @@
 #include "progression.h"
+#include "equipment.h"
 #include "../api/run_core.h"
 #include "../behaviors/weapons/forward.h"
 #include <algorithm>
@@ -64,19 +65,9 @@ void publish(RunRuntime &run,std::vector<CardCandidate> cards,bool initial) {
 }
 bool grant(RunRuntime &run,const CardCandidate &card) {
     const auto *d=definition(run,card.definition);if (!d || card.level>d->maximum_level) return false;
-    auto &owned=d->kind==0?run.state.loadout.weapons:run.state.loadout.traits;
-    auto current=std::find_if(owned.begin(),owned.end(),[&](const auto &v){return v.definition==card.definition;});
-    if (level_of(owned,card.definition)+1!=card.level) return false;
-    // 各種類の登録タスクで、この同じ確定境界へ動作を追加する。
-    if (d->external_id!="W01" || d->kind!=0) return false;
-    const auto &level=run.content->forward_levels[card.level-1];auto &forward=run.state.forward;
-    if (forward.ready) ForwardBehavior::set_interval(forward,level.interval);
-    else {forward.interval=level.interval;forward.fire.remaining=level.interval;}
-    forward.damage=level.damage;forward.pierce=level.pierce;forward.life=level.life;forward.spread=level.spread;forward.knock=level.knock;
-    forward.character_scale=run.content->config.character_scale;forward.ready=true;
-    if (current==owned.end()) owned.push_back({card.definition,card.level});else current->level=card.level;
-    if (std::find(run.state.lifecycle.obtained.begin(),run.state.lifecycle.obtained.end(),card.definition)==run.state.lifecycle.obtained.end()) run.state.lifecycle.obtained.push_back(card.definition);
-    return true;
+    const auto &owned=d->kind==0?run.state.loadout.weapons:run.state.loadout.traits;
+    return level_of(owned,card.definition)+1==card.level && EquipmentSystem::grant(run,card.definition);
+
 }
 Dictionary card_value(const RunRuntime &run,const CardCandidate &card) {
     Dictionary value;value["candidate_id"]=card.id;value["kind"]=symbol_name(card.kind);

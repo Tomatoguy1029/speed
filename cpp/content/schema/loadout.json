@@ -1,0 +1,42 @@
+{
+  "records": [
+    {
+      "name": "NumericTraitLevel",
+      "section": 30,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "area_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "full_gauge_rate",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

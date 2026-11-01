@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w01" in OS.get_cmdline_user_args() or "--cpp-w01-detail" in OS.get_cmdline_user_args():
+		await check_cpp_w01()
+		print("[cpp_w01] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--gpu": gpu = true
 		if arg == "--combinations-only": only = PackedStringArray(["__combinations__"])
@@ -176,3 +181,208 @@ func _ready() -> void:
 		print("[equipment_effects] ソニックの白い連続面の最大辺=%dpx" % sonic_white_square)
 	print("[equipment_effects] cases=%d failures=%d errors=%d" % [cases,failures,capture.count()])
 	get_tree().quit(1 if failures or capture.count()>0 else 0)
+
+func check_cpp_w01() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.world_tick_div = 1
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 88
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_w01"
+	var builder = load("res://tools/content/build_run_content.gd")
+	check(builder.build(stage,config,output,"W01全Lvと特性・解除".sha256_text())==OK,"W01の全Lvの値を生成する")
+	var path := output.path_join("stage_88.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":631},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"W01の通常の状態・表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	if "--cpp-w01-detail" in OS.get_cmdline_user_args():
+		await check_cpp_w01_detail(session,idle,viewport)
+		session.free()
+		return
+	var initial: Dictionary = bridge.checkpoint()
+	var lab = SESSION.new()
+	add_child(lab)
+	await lab.reset({"seed":631,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
+	var run: RunSimulation = lab.run
+	run.field.bodies.clear()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W01")
+	for level in range(1,definition.level_steps.size()+1):
+		check(bridge.restore(initial.value).ok,"Lv別の確認の初期状態へ戻す")
+		bridge.collect_frame()
+		await lab.reset({"seed":631,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
+		run = lab.run
+		run.field.bodies.clear()
+		run.loadout.reset_loadout()
+		check(run.loadout.grant(&"weapon",&"W01",level),"現行W01を全Lvで装備する")
+		# 通常選択と同じ取得処理を通す。途中の解除で過去のタイマーを残さない。
+		check(bridge.command("dev_remove_weapon",{"id":"W01"}).ok,"W01を途中で解除する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W01","levels":level}).ok,"型付きの定義からW01を各Lvで取得する")
+		for id in ["T34","T35","T36"]:
+			var stacks := 5 if id=="T35" else 2
+			check(run.loadout.grant(&"trait",StringName(id),stacks),"現行の範囲・弾数・連射特性を取得する")
+			check(bridge.command("dev_grant_equipment",{"kind":"trait","id":id,"levels":stacks}).ok,"同じ特性の生成値をC++の実効能力へ畳む")
+		var weapon = run.loadout.weapon_behaviors[&"W01"]
+		var source_projectiles: ProjectileSystem = run.projectiles
+		for row in source_projectiles.friend_alive.size():
+			if source_projectiles.friend_alive[row]: source_projectiles.release_friend(row)
+		run.state.rng.state = int(core.inspect().rng_state)
+		var fires := 0
+		for tick in 110:
+			if tick in [20,30]: bridge.command("pause",{"paused":tick==20})
+			if tick in [50,56]: core.set_run_guards({"controls_locked":tick==50})
+			var random_before: String = core.inspect().rng_state
+			var before: float = core.inspect().world_time
+			var input: Dictionary = idle.duplicate()
+			if tick==65:
+				input.touch = true
+				input.press = true
+				input.pen = core.ship_snapshot().ship_pos
+			if tick==75:
+				input.pen_release = true
+			check(bridge.step(1.0/120.0,input,viewport).ok,"全Lvで通常の固定更新を進める")
+			var dt: float = core.inspect().world_time-before
+			var ship: Dictionary = core.ship_snapshot()
+			var draw: Dictionary = core.draw_snapshot()
+			run.state.ship_pos = ship.ship_pos
+			run.state.ship_heading = ship.ship_heading
+			run.state.gauge = draw.gauge
+			run.state.events.clear()
+			if dt>0.0 and not (tick>=50 and tick<56):
+				weapon.tick(dt,draw.drawing or draw.tracing)
+			if dt>0.0: source_projectiles.tick(dt,dt)
+			var actual: Array = core.projectiles_snapshot()
+			var expected := []
+			for row in source_projectiles.friend_alive.size():
+				if source_projectiles.friend_alive[row]: expected.append(row)
+			check(actual.size()==expected.size(),"全Lvで弾数・寿命・解除の挙動が一致する Lv%d tick%d" % [level,tick])
+			if actual.size()!=expected.size(): break
+			for n in actual.size():
+				var row: int = expected[n]
+				check(actual[n].pos.distance_to(source_projectiles.friend_pos[row])<0.02 and actual[n].vel.distance_to(source_projectiles.friend_vel[row])<0.02,"砲口・扇状の角度・移動が一致する")
+				check(is_equal_approx(actual[n].radius,source_projectiles.friend_r[row]) and is_equal_approx(actual[n].damage,source_projectiles.friend_dmg[row]) and is_equal_approx(actual[n].life,source_projectiles.friend_life[row]) and actual[n].pierce_left==source_projectiles.friend_pierce_left[row],"範囲・攻撃力・寿命・貫通数が実効値と一致する")
+			check(is_equal_approx(weapon._t,core.forward_snapshot().elapsed) and is_equal_approx(weapon.recoil,core.forward_snapshot().recoil),"射撃間隔と反動を停止・操作ロック・描線に合わせる")
+			var fired := run.state.events.any(func(event): return event.type==&"weapon_fire")
+			check((random_before!=core.inspect().rng_state)==fired,"整数の弾数でも発射時に抽選し、停止中は抽選しない Lv%d tick%d" % [level,tick])
+			for event: Dictionary in run.state.events:
+				if event.type==&"weapon_fire": fires+=1
+			if failures: break
+		check(fires>0,"全Lvで実際に発射する")
+		if failures: break
+	# 発射済みの弾・残り時間・反動を同じ保持点から再現する。
+	var mid: Dictionary = bridge.checkpoint()
+	var shots: Array = core.projectiles_snapshot()
+	var timing: Dictionary = core.forward_snapshot()
+	check(bridge.command("dev_remove_weapon",{"id":"W01"}).ok,"装備を外して発射を終了する")
+	check(core.projectiles_snapshot()==shots,"W01を外しても発射済みの弾は自然寿命まで残す")
+	bridge.collect_frame()
+	session.cpp_choices.poll()
+	check(not session.cpp_choices.equipped.has("weapon:W01"),"解除した装備の資源保持を解く")
+	var render: Dictionary = bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
+	check(not render.poses[0].visible,"解除した砲身を表示しない")
+	check(bridge.restore(mid.value).ok,"途中の射撃状態を復帰する")
+	bridge.collect_frame()
+	check(core.projectiles_snapshot()==shots and core.forward_snapshot()==timing,"残った弾とタイマー・反動を一緒に復帰する")
+	check(bridge.read_render(Rect2(-3000,-3000,6000,6000)).value.poses[0].visible,"復帰したW01の砲身を表示する")
+	bridge.release_checkpoint(mid.value)
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	# 通常のカード選択でW01を昇格し、資源がそろってからだけ確定する。
+	check(bridge.command("dev_add_xp",{"amount":config.xp_base}).ok,"次の通常選択に必要な経験値を取得する")
+	bridge.step(1.0/120.0,idle,viewport)
+	var cards: Dictionary = bridge.read_frame().value.ui.cards
+	var selected := {}
+	for card: Dictionary in cards.candidates:
+		if card.id=="W01": selected=card
+	check(not selected.is_empty(),"通常の成長候補にW01の次のLvを出す")
+	if not selected.is_empty():
+		bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":selected.candidate_id})
+		for frame in 120:
+			session.cpp_choices.poll()
+			bridge.step(1.0/120.0,idle,viewport)
+			if bridge.read_frame().value.ui.phase==0: break
+			await get_tree().process_frame
+		session.cpp_choices.poll()
+		var levels: Array = bridge.read_frame().value.ui.weapon_levels
+		check(levels.any(func(item): return item.id=="W01" and item.level>=2),"通常の選択を一度だけ確定しW01のLvを上げる")
+		check(session.cpp_choices.equipped.has("weapon:W01"),"選択資源を装備の寿命へ移す")
+	bridge.release_checkpoint(initial.value)
+	lab.free()
+	session.free()
+
+func check_cpp_w01_detail(session: RunSession,idle: Dictionary,viewport: Dictionary) -> void:
+	var bridge = session.bridge
+	var core = bridge._core
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W01")
+	check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T35","levels":2}).ok,"端数を含む弾数特性を取得する")
+	var volleys: Array = []
+	bridge.subscribe("w01_detail",func(frame: Dictionary):
+		for event: Dictionary in frame.events:
+			if event.type==&"weapon_fire": volleys.append(event.payload)
+		return true)
+	for tick in 65:
+		var count := volleys.size()
+		bridge.step(1.0/120.0,idle,viewport)
+		if volleys.size()==count: continue
+		var fresh: Array = core.projectiles_snapshot().filter(func(shot): return shot.age<0.009)
+		check(fresh.size() in [1,2],"端数の弾数は切り捨てか切り上げの1発群になる")
+		for shot: Dictionary in fresh:
+			var spread: float = absf(angle_difference(shot.vel.angle(),float(volleys[-1].angle)))
+			check(is_equal_approx(spread,0.0 if fresh.size()==1 else float(definition.params.spread_step)*0.5),"追加弾を左右対称に広げる")
+	check(not volleys.is_empty(),"端数の弾数で実際に発射する")
+	var elapsed: float = core.forward_snapshot().elapsed
+	var recoil: float = core.forward_snapshot().recoil
+	check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W01","levels":1}).ok,"射撃の途中でW01を昇格する")
+	check(is_equal_approx(elapsed,core.forward_snapshot().elapsed) and recoil==core.forward_snapshot().recoil,"Lv変更で射撃の経過時間と反動を初期化しない")
+	var saved: Dictionary = bridge.checkpoint()
+	for tick in 35: bridge.step(1.0/120.0,idle,viewport)
+	var expected: Array = core.projectiles_snapshot()
+	var expected_timing: Dictionary = core.forward_snapshot()
+	var expected_random: String = core.inspect().rng_state
+	check(bridge.restore(saved.value).ok,"端数抽選の途中へ復帰する")
+	bridge.collect_frame()
+	for tick in 35: bridge.step(1.0/120.0,idle,viewport)
+	check(expected==core.projectiles_snapshot() and expected_timing==core.forward_snapshot() and expected_random==core.inspect().rng_state,"復帰後も弾数・位置・タイマー・乱数消費位置を再現する")
+	bridge.release_checkpoint(saved.value)
+	var shots: Array = core.projectiles_snapshot()
+	check(not shots.is_empty(),"命中確認に実際に発射したW01の弾を使う")
+	if shots.is_empty(): return
+	var shot: Dictionary = shots[-1]
+	var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":shot.pos+shot.vel*0.04})
+	check(created.ok,"発射済みのW01の弾の前へ敵を置く")
+	var before: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==created.value)[0].hp
+	core.step_projectiles(0.05)
+	var enemies: Array = core.enemies_snapshot().filter(func(enemy): return enemy.id==created.value)
+	check(enemies.is_empty() or enemies[0].hp<before,"W01のLv別威力を通常の命中経路へ渡す")
+	bridge.command("set_ui_overlay",{"active":false})
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.01)
+	check(not presentation.frame_view._flashes.hits.is_empty(),"実際の命中通知を共通の十字・輪・火花の表示へ渡す")
+	var shown := false
+	for visual: Dictionary in session.cpp_resources.visuals:
+		if visual.role==2:
+			var batch: InstanceBatch = presentation.frame_view.batches.get(visual.id)
+			shown = batch!=null and batch.multimesh.visible_instance_count>0
+	check(shown,"発射したW01の光弾を通常の描画へ渡す")
+	var muzzle: float = presentation.frame_view._flashes.muzzle_time
+	var frame: Dictionary = bridge.read_frame().value
+	presentation.frame_view.update_effects(frame,0.1)
+	check(muzzle==presentation.frame_view._flashes.muzzle_time,"世界時計が止まっている表示では砲口の光も進めない")
+	bridge.unsubscribe("w01_detail")
+	await get_tree().process_frame

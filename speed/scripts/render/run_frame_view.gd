@@ -15,6 +15,7 @@ var _beamer := PackedFloat32Array()
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
+var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
 var _epoch := 0
 var _jet_time := 0.0
@@ -256,6 +257,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_epoch = frame.epoch
 		_queued_events.clear()
 		_flashes = ShotFlashes.new()
+		_forward_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_meteor_shards.clear()
@@ -267,6 +269,10 @@ func receive_frame(frame: Dictionary) -> bool:
 	return true
 
 func update_effects(frame: Dictionary, dt: float) -> void:
+	var equipped_forward: bool = frame.ui.get("weapon_levels",[]).any(func(item): return item.id=="W01")
+	if not equipped_forward:
+		_flashes = ShotFlashes.new()
+		_forward_world_time = -1.0
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
 		if event.type==&"shield_stolen":
@@ -288,8 +294,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":duration,"max":duration})
 		if event.type==&"ship_explode": _death_burst(event.pos)
-		if event.type==&"weapon_fire" and event.get("id")==&"W01": _flashes.fire(event.angle)
-		if event.type==&"shot_hit" and event.get("visual_key")=="weapon/forward": _flashes.hit(event.pos,event.dir,2)
+		if equipped_forward: preload("res://scripts/render/equipment/forward.gd").frame_event(_flashes,event)
 	_queued_events.clear()
 	var ui: Dictionary = frame.ui
 	_dim_strength = float(ui.get("death_dim",0.0))
@@ -329,9 +334,10 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_particles = _particles.filter(func(p: Dictionary): return p.life>0.0)
 	_particle_canvas.queue_redraw()
 	var active: bool = ui.input_enabled
-	var world_dt: float = dt*ui.world_scale if active else 0.0
+	var world_dt: float = 0.0 if _forward_world_time<0.0 else maxf(0.0,ui.world_time-_forward_world_time)
+	_forward_world_time = ui.world_time if equipped_forward else -1.0
 	_effects.begin()
-	_flashes.draw(_effects,world_dt,ui.ship.ship_pos+ui.ship.ship_heading*16.0*_pixel)
+	preload("res://scripts/render/equipment/forward.gd").frame_draw(_flashes,_effects,world_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_forward)
 	_effects.end()
 	if active and not ui.draw.drawing and ui.hitstop<=0.0:
 		_jet_time += dt*clampf(ui.ship_vel.length()/ui.base_max_speed,0.0,3.0)

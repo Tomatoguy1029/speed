@@ -7,6 +7,7 @@
 #include "../systems/attack_budget.h"
 #include "../systems/enemy_system.h"
 #include "../systems/progression.h"
+#include "../systems/equipment.h"
 #include "../systems/field.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
@@ -49,7 +50,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     candidate->runtime.api_run_id=options["run_id"];candidate->runtime.api_development=int64_t(options["mode"])==1;
     candidate->runtime.state.control.stage_id=String(options["stage_id"]);candidate->runtime.api_configured=true;
     const auto &forward=candidate->runtime.content->forward_levels.front();
-    state.forward.interval=forward.interval;state.forward.fire.remaining=forward.interval;state.forward.damage=forward.damage;
+    state.forward.base_interval=state.forward.interval=forward.interval;state.forward.fire.remaining=forward.interval;state.forward.damage=forward.damage;
     state.forward.life=forward.life;state.forward.spread=forward.spread;state.forward.knock=forward.knock;state.forward.pierce=forward.pierce;
     state.forward.character_scale=candidate->runtime.content->config.character_scale;state.forward.ready=true;
     state.hitstop_enabled=settings.get("hitstop",true);
@@ -142,6 +143,15 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=speed::ProgressionSystem::complete(runtime,payload["request_id"],payload["status"])?success():failure(5,"request_id/status","未処理の資源要求と一致しません");
     } else if (kind=="retry_resources" && payload.size()==1 && is(payload,"request_id",Variant::INT)) {
         response=speed::ProgressionSystem::retry(runtime,payload["request_id"])?success():failure(5,"request_id","再試行できる失敗要求がありません");
+    } else if ((kind=="dev_grant_equipment" || kind=="dev_remove_weapon") && runtime.api_development && is(payload,"id",Variant::STRING)) {
+        const String external=payload["id"];bool changed=false;
+        for (const auto &d:runtime.content->equipment) if (external==String::utf8(d.external_id.c_str())) {
+            if (kind=="dev_remove_weapon" && payload.size()==1) changed=speed::EquipmentSystem::remove_weapon(runtime,d.id);
+            else if (kind=="dev_grant_equipment" && payload.size()==3 && is(payload,"kind",Variant::STRING) && is(payload,"levels",Variant::INT) &&
+                String(payload["kind"])==(d.kind==0?"weapon":"trait") && int64_t(payload["levels"])>0 && int64_t(payload["levels"])<=UINT32_MAX)
+                changed=speed::EquipmentSystem::grant(runtime,d.id,uint32_t(int64_t(payload["levels"])));
+        }
+        response=changed?success():failure(5,"equipment","装備を変更できません");
     } else if (kind=="dev_add_xp" && runtime.api_development && payload.size()==1 && (is(payload,"amount",Variant::FLOAT) || is(payload,"amount",Variant::INT))) {
         response=speed::ProgressionSystem::add_experience(*this,payload["amount"])?success():failure(1,"amount","最終取得XPが不正です");
     } else if (kind=="abort" && payload.size()==1 && is(payload,"reason",Variant::INT)) {

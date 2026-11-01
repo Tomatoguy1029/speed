@@ -31,6 +31,7 @@ struct ContentBundle {
     std::vector<RockFieldDefinition> rock_fields;
     std::vector<LoadoutDefinition> equipment;
     std::vector<LoadoutAsset> equipment_assets;
+    std::vector<NumericTraitLevel> numeric_traits;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);
 };
 }
