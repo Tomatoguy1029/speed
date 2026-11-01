@@ -1,5 +1,5 @@
-## W21 質量牽引砲：なぞり中に機体の近くで倒れた敵の船体を、大型の敵も丸ごと牽引する。
-## なぞり終えると、塊を hold 秒その場に止めて見せ、そのときの進む向きへ1つずつ撃ち出し、弾が尽きるまで撃ち続ける
+## W21 アンカーキャノン：なぞり中に機体の近くで倒れた敵の船体を、大型の敵も丸ごと牽引する。
+## なぞり終えると、塊を hold 秒その場に止めて見せ、各発射時点の機体の向きへ1つずつ撃ち出し、弾が尽きるまで撃ち続ける
 ## （彗星限定。一覧 docs/game/catalog/weapons.md）。撃つ速さに機体の勢いは足さない。
 ## 隕石とボスは牽引しない。
 extends WeaponBehavior
@@ -8,7 +8,6 @@ extends WeaponBehavior
 var cargo: Array[Dictionary] = []
 const GOLDEN_ANGLE := 2.39996323
 var _fire_t := 0.0
-var _launch_dir := Vector2.RIGHT
 
 ## なぞり中に回収範囲へ船体が入っていれば、倒した手段を問わず牽引する。牽引したら true（破片は出さない）。
 func capture(i: int) -> bool:
@@ -29,8 +28,6 @@ func on_end() -> void:
 	for c in cargo:
 		c.ready = true
 	_fire_t = float(p("hold"))
-	var v := state.ship_vel
-	_launch_dir = v.normalized() if v.length() > 1.0 else state.ship_heading
 
 func tick(dt: float, _busy: bool) -> void:
 	if cargo.is_empty():
@@ -58,9 +55,10 @@ func tick(dt: float, _busy: bool) -> void:
 	while _fire_t <= 0.0 and not cargo.is_empty() and cargo[0].ready:
 		var c: Dictionary = cargo.pop_front()
 		var dmg := atk() * float(p("damage")) * dmg_k() * maxf(1.0, float(c.r) / float(p("size_ref")))
-		ctx.projectiles.fire_hull(c.pos, _launch_dir * float(p("shot_speed")) * post_factor(&"projectile_speed"), area(c.r), dmg, p("life"), p("knock"),
-			c.type, _launch_dir.angle(), c.source_id)
-		state.emit(&"anchor_fire", {"pos": c.pos, "dir": _launch_dir, "radius": c.r})
+		var launch_dir := state.ship_heading
+		ctx.projectiles.fire_hull(c.pos, launch_dir * float(p("shot_speed")) * post_factor(&"projectile_speed"), area(c.r), dmg, p("life"), p("knock"),
+			c.type, launch_dir.angle(), c.source_id)
+		state.emit(&"anchor_fire", {"pos": c.pos, "dir": launch_dir, "radius": c.r})
 		_fire_t += shot_interval
 	if cargo.is_empty() or not cargo[0].ready:
 		_fire_t = 0.0
