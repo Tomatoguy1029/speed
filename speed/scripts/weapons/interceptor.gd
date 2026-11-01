@@ -50,6 +50,10 @@ func tick(dt: float, busy: bool) -> void:
 		else: target = _nearest(d.pos, range_r)
 		if target >= 0:
 			var t := ctx.enemies.table
+			d.target = target
+			d.target_id = t.id[target]
+			# 連射途中の標的変更でも、実際に撃つ相手へ砲口を揃える。
+			d.angle = (t.pos[target] - d.pos).angle()
 			_target_after[t.id[target]] = _clock + float(p("target_interval"))
 			d.kick = 1.5 * 1.82 * cfg.character_scale
 			d.flash = 0.06
