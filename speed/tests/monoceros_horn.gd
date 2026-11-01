@@ -13,10 +13,9 @@ func aligned(actor: MonocerosBoss) -> bool:
 	return absf(tip.dot((tip - root).normalized()) - actor.horn_length()) < 0.01
 
 func _ready() -> void:
-	GameManager.run_stage = 1
-	var session := RunManager.create_run()
-	add_child(session)
-	if session.sim.state == null: await session.started
+	var session := RunManager.create_session(self, {
+		"lab": true, "stage": ContentManager.runtime_stage(1), "stage_index": 1, "seed": 42,
+	}, true)
 	session.auto_step = false
 	session.sim.bosses.spawn(load("res://data/bosses/monoceros.tres"), Vector2.ZERO)
 	var actor := session.sim.bosses.actor as MonocerosBoss
