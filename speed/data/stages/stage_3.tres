@@ -29,7 +29,7 @@ track = 0
 types = Array[StringName]([&"lynx"])
 formations = Array[PackedScene]([ExtResource("3_gibww")])
 time = 95.0
-length = 35.0
+length = 29.0
 groups = 4
 interval = 2.0
 
@@ -40,7 +40,7 @@ track = 2
 types = Array[StringName]([&"marlin"])
 formations = Array[PackedScene]([ExtResource("4_p4nfj")])
 time = 230.0
-length = 70.0
+length = 64.0
 interval = 5.0
 
 [sub_resource type="Resource" id="Resource_yo0rm"]
@@ -60,7 +60,7 @@ track = 0
 types = Array[StringName]([&"lynx"])
 formations = Array[PackedScene]([ExtResource("3_gibww")])
 time = 230.0
-length = 70.0
+length = 65.0
 interval = 3.0
 
 [sub_resource type="Resource" id="Resource_l47yt"]
@@ -80,7 +80,7 @@ track = 0
 types = Array[StringName]([&"lynx"])
 formations = Array[PackedScene]([ExtResource("3_gibww")])
 time = 320.0
-length = 105.0
+length = 100.0
 interval = 3.0
 
 [sub_resource type="Resource" id="Resource_iwkbi"]
@@ -90,7 +90,7 @@ track = 2
 types = Array[StringName]([&"marlin"])
 formations = Array[PackedScene]([ExtResource("4_p4nfj")])
 time = 320.0
-length = 105.0
+length = 100.0
 
 [sub_resource type="Resource" id="Resource_7wela"]
 script = ExtResource("2_mgob6")
@@ -100,42 +100,6 @@ types = Array[StringName]([&"corona"])
 formations = Array[PackedScene]([ExtResource("5_d6uyw")])
 time = 320.0
 length = 105.0
-
-[sub_resource type="Resource" id="Resource_fori7"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 4
-types = Array[StringName]([&"phoenix"])
-formations = Array[PackedScene]([ExtResource("6_fori7")])
-time = 455.0
-length = 445.0
-
-[sub_resource type="Resource" id="Resource_5d1dk"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 3
-types = Array[StringName]([&"corona"])
-formations = Array[PackedScene]([ExtResource("5_d6uyw")])
-time = 455.0
-length = 445.0
-
-[sub_resource type="Resource" id="Resource_luhxi"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 2
-types = Array[StringName]([&"marlin"])
-formations = Array[PackedScene]([ExtResource("4_p4nfj")])
-time = 455.0
-length = 445.0
-
-[sub_resource type="Resource" id="Resource_kpaf0"]
-script = ExtResource("2_mgob6")
-label = "やまねこさん"
-track = 0
-types = Array[StringName]([&"lynx"])
-formations = Array[PackedScene]([ExtResource("3_gibww")])
-time = 455.0
-length = 445.0
 
 [sub_resource type="Resource" id="Resource_nf088"]
 script = ExtResource("2_mgob6")
@@ -155,7 +119,7 @@ track = 1
 types = Array[StringName]([&"auriga"])
 formations = Array[PackedScene]([ExtResource("7_2vgpk")])
 time = 178.0
-length = 32.0
+length = 26.0
 groups = 3
 interval = 5.0
 
@@ -166,7 +130,7 @@ track = 1
 types = Array[StringName]([&"auriga"])
 formations = Array[PackedScene]([ExtResource("7_2vgpk")])
 time = 231.0
-length = 69.0
+length = 63.0
 interval = 5.0
 
 [sub_resource type="Resource" id="Resource_7rw0m"]
@@ -176,17 +140,7 @@ track = 1
 types = Array[StringName]([&"auriga"])
 formations = Array[PackedScene]([ExtResource("7_2vgpk")])
 time = 320.0
-length = 105.0
-interval = 5.0
-
-[sub_resource type="Resource" id="Resource_ariil"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 1
-types = Array[StringName]([&"auriga"])
-formations = Array[PackedScene]([ExtResource("7_2vgpk")])
-time = 455.0
-length = 445.0
+length = 100.0
 interval = 5.0
 
 [sub_resource type="Resource" id="Resource_x5ksi"]
@@ -196,7 +150,7 @@ track = 0
 types = Array[StringName]([&"lynx"])
 formations = Array[PackedScene]([ExtResource("3_gibww")])
 time = 158.0
-length = 52.0
+length = 46.0
 groups = 2
 interval = 3.0
 
@@ -275,6 +229,7 @@ start = 210.0
 pop_from = 70.0
 pop_to = 110.0
 rate = 10.0
+attack_budget = 1
 mix = {
 "armored": 3.0,
 "battleship": 0.3,
@@ -314,6 +269,7 @@ start = 300.0
 pop_from = 90.0
 pop_to = 120.0
 rate = 12.0
+attack_budget = 1
 mix = {
 "armored": 3.0,
 "battleship": 0.6,
@@ -353,6 +309,7 @@ start = 425.0
 pop_from = 90.0
 pop_to = 120.0
 rate = 12.0
+attack_budget = 2
 mix = {
 "armored": 3.0,
 "battleship": 0.6,
@@ -385,10 +342,29 @@ mix = {
 id = &"phase_1030509691842008278"
 display_name = "ボス戦中"
 
+[sub_resource type="Resource" id="Resource_uagtc"]
+script = ExtResource("9_mgob6")
+start = 660.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_2803564725393740302"
+display_name = "ボス後"
+
 [sub_resource type="Resource" id="Resource_2vgpk"]
 script = ExtResource("10_gibww")
 type = &"bomber"
-points = PackedVector2Array(0, 0, 62, 35, 73, 12, 130, 12, 133, 14, 140, 16, 144, 23, 210, 21, 212, 14, 230, 13, 233, 25)
+points = PackedVector2Array(0, 0, 56, 14, 73, 12, 130, 12, 133, 14, 140, 16, 144, 23, 210, 21, 212, 14, 230, 13, 233, 25, 299.9, 25, 300, 8, 308, 15, 317, 18, 321, 8, 328, 20, 345, 14, 371, 24, 394, 14, 415, 26, 424, 9, 431, 14, 439, 16, 448, 16, 452, 0, 655, 0, 663, 27)
 
 [sub_resource type="Resource" id="Resource_mgob6"]
 script = ExtResource("10_gibww")
@@ -404,7 +380,7 @@ points = PackedVector2Array(0, 0, 37, 37, 59, 35, 66, 16, 78, 33, 91, 22, 108, 3
 script = ExtResource("1")
 index = 3
 scene_path = "res://scenes/stages/stage_3.tscn"
-phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u")]
+phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u"), SubResource("Resource_uagtc")]
 enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
 enemy_attack_values = {
 "bomber": 0.0,
@@ -413,13 +389,14 @@ enemy_attack_values = {
 "splitter": 0.0
 }
 zako_curves = Array[ExtResource("10_gibww")]([SubResource("Resource_2vgpk"), SubResource("Resource_mgob6"), SubResource("Resource_uudoi")])
-clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela"), SubResource("Resource_fori7"), SubResource("Resource_5d1dk"), SubResource("Resource_luhxi"), SubResource("Resource_kpaf0"), SubResource("Resource_nf088"), SubResource("Resource_4tdib"), SubResource("Resource_d5nqe"), SubResource("Resource_7rw0m"), SubResource("Resource_ariil"), SubResource("Resource_x5ksi")])
+clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela"), SubResource("Resource_nf088"), SubResource("Resource_4tdib"), SubResource("Resource_d5nqe"), SubResource("Resource_7rw0m"), SubResource("Resource_x5ksi")])
 track_names = PackedStringArray("やまねこ座", "ぎょしゃ座", "かじき座", "みなみのかんむり座", "ほうおう座")
-boss_time = 455.0
+boss_time = 459.0
 surge_phases = {
 "escape": false,
 "phase_1030509691842008278": false,
 "phase_2525774894323272944": false,
+"phase_2803564725393740302": true,
 "phase_5747225833786728851": false,
 "phase_6369425975374370843": false
 }
