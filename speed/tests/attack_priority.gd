@@ -147,10 +147,10 @@ func _ready() -> void:
 		and crow_director.waiting.is_empty(), "Crow flies at zero attack budget without requesting a slot")
 	var pickups: PickupSystem = lab.run.pickups
 	var foot := em.table.pos[crow] - Vector2.from_angle(em.table.facing[crow]) * em.table.r[crow] * 0.62
-	var gem: int = pickups.drop_gem(foot, 7.0)
+	var gem: int = pickups.drop_crystal(foot, PickupSystem.GemKind.MID)
 	pickups.gem_pos[gem] = foot
 	em.gather_pickups(pickups, 0.1)
-	check(em.table.carry[crow] >= 7.0 and pickups.gem_alive[gem] == 0,
+	check(em.table.carry[crow] >= lab.run.cfg.xp_crystal_values[PickupSystem.GemKind.MID] and pickups.gem_alive[gem] == 0,
 		"Crow collects experience with zero attack budget")
 	crow_director.settings.budget = 1.0
 	var blocker := em.spawn(em.def_of(&"telescope"), Vector2(400, 0))

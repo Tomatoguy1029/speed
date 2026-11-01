@@ -1,13 +1,23 @@
-## 光の槍の即時の貫通判定と、命中地点からの分裂。飛ぶ見た目は共通の発射イベントで再生する。
+## 光の槍の生成時の複製と即時の貫通判定。飛ぶ見た目は共通の発射イベントで再生する。
 extends RunSystem
 var items: Array[Dictionary] = []
 func fire(from: Vector2, direction: Vector2, length: float, width: float, damage: float, knock: float) -> void:
 	var queue: Array[Dictionary] = [{"from": from, "velocity": direction * length / 0.18, "length": length, "width": width,
-		"damage": damage, "knock": knock, "generation": 0, "hit": {}}]
-	while not queue.is_empty() and state.phase == RunState.Phase.PLAY:
-		var lance: Dictionary = queue.pop_front()
+		"damage": damage, "knock": knock, "hit": {}, "duplicate": false}]
+	var next := 0
+	while next < queue.size() and state.phase == RunState.Phase.PLAY:
+		var lance: Dictionary = queue[next]
+		next += 1
 		lance.life = 0.5
 		items.append(lance)
+		if not lance.duplicate:
+			var vectors := ctx.loadout.split_vectors(lance.velocity)
+			if ctx.projectiles.flying_count() + queue.size() - next + vectors.size() <= 220:
+				for velocity in vectors:
+					queue.append({"from": lance.from, "velocity": velocity, "length": lance.length, "width": lance.width,
+						"damage": lance.damage * ctx.loadout.split_damage(), "knock": lance.knock,
+						"hit": {}, "duplicate": true})
+				if not vectors.is_empty(): state.emit(&"duplicate", {"pos": lance.from, "directions": vectors})
 		var to: Vector2 = lance.from + lance.velocity.normalized() * lance.length
 		state.emit(&"critical_lance", {"from": lance.from, "to": to, "width": lance.width})
 		var rows := PackedInt32Array()
@@ -24,17 +34,15 @@ func fire(from: Vector2, direction: Vector2, length: float, width: float, damage
 			var i: int = hit[1]
 			if t.dead[i] != 0: continue
 			lance.hit[t.id[i]] = true
-			var impact: Vector2 = lance.from.lerp(to, hit[0])
 			ctx.combat.damage_enemy(i, lance.damage, {"cause": &"critBeam", "no_crit": true, "dir": lance.velocity.normalized(), "knock": lance.knock})
-			var vectors := ctx.loadout.split_vectors(lance.velocity, lance.generation)
-			if ctx.projectiles.flying_count() + queue.size() + vectors.size() > 220: continue
-			for velocity in vectors:
-				queue.append({"from": impact, "velocity": velocity, "length": lance.length * (1.0 - hit[0]), "width": lance.width,
-					"damage": lance.damage * ctx.loadout.split_damage(), "knock": lance.knock, "generation": lance.generation + 1, "hit": lance.hit.duplicate()})
-			if not vectors.is_empty(): state.emit(&"duplicate", {"pos": impact, "directions": vectors})
 func tick(_real_dt: float, world_dt: float) -> void:
-	for lance in items: lance.life -= world_dt
-	items = items.filter(func(l): return l.life > 0.0)
+	var kept := 0
+	for lance in items:
+		lance.life -= world_dt
+		if lance.life > 0.0:
+			items[kept] = lance
+			kept += 1
+	items.resize(kept)
 
 ## 槍は発射時の世界座標で進む。機体の移動通知で位置を変えない。
 func on_trail(_p0: Vector2, _p1: Vector2) -> void:

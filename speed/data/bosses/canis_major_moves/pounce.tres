@@ -21,3 +21,6 @@ recover = 1.4
 warn = 0.7
 warn_p2 = 0.5
 visual = ExtResource("visual")
+lead_extra = 0.2
+chain = 3
+chain_warn = 0.45

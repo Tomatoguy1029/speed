@@ -1,6 +1,7 @@
 ## 実験条件・攻撃・出現・配置規則・保存の編集ドック。
 extends TabContainer
 const ARMOR_VIEW := preload("res://gyms/enemy_lab/lab_armor_paint.gd")
+const BOSS_PARTS := preload("res://gyms/enemy_lab/lab_boss_parts.gd")
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 const LIGHTING := preload("res://data/visuals/enemy_lighting.tres")
 var lab
@@ -31,11 +32,13 @@ var _appearance_scale: SpinBox
 var _collision_scale: SpinBox
 var _collision_radius: Label
 var _appearance_save: Button
+var _appearance_pending: Label
 var _appearance_reset: Button
 var _appearance_hashes: Dictionary = {}
 var _armor_view: ARMOR_VIEW
 var _armor_color: ColorPickerButton
 var _armor_part: OptionButton
+var _committing_appearance := false
 
 func _ready() -> void:
 	custom_minimum_size.x = 368
@@ -48,11 +51,14 @@ func _ready() -> void:
 	_appearance(_page(tr("lab.appearance.title")))
 
 func _appearance(page: Node) -> void:
-	_appearance_hashes = ContentManager.source_hashes.duplicate()
+	refresh_appearance_baselines()
 	_text(page, tr("lab.appearance.help"))
+	_button(page, tr("lab.boss_parts.open"), _open_boss_parts)
 	_button(page, tr("lab.appearance.bomber"), _inspect_bomber)
 	_button(page, tr("lab.appearance.focus"), _focus_appearance)
 	_appearance_label = _text(page, "")
+	_appearance_pending = _text(page, "")
+	_button(page, tr("lab.appearance.save_all"), _save_all_appearance)
 	_appearance_scale = _number(page, tr("lab.appearance.scale"), 1, 0.1, 5, 0.05, _set_visual.bind("scale"))
 	_collision_scale = _number(page, tr("lab.appearance.collision_scale"), 1, 0.1, 5, 0.05, _set_visual.bind("collision_scale"))
 	_collision_radius = _text(page, "")
@@ -76,6 +82,7 @@ func _appearance(page: Node) -> void:
 	_armor_color.edit_alpha = false
 	_armor_color.custom_minimum_size = Vector2(100, 32)
 	paint_row.add_child(_armor_color)
+	UI.edit_shortcuts(_armor_color.get_popup(), lab)
 	_armor_view = ARMOR_VIEW.new()
 	_armor_view.piece_pressed.connect(_paint_armor_piece)
 	paint_box.add_child(_armor_view)
@@ -86,13 +93,42 @@ func _appearance(page: Node) -> void:
 		_lighting_fields[key] = _number(page, tr("lab.appearance." + key), LIGHTING.get(key), entry[1], entry[2], entry[3], _set_visual.bind(key))
 	_text(page, tr("lab.appearance.type_help"))
 
+## 明示的な本番データ再読込の成功後だけ、新しい保存元を競合検出の基準にする。
+func refresh_appearance_baselines() -> void:
+	_appearance_hashes = ContentManager.source_hashes.duplicate()
+
+func _open_boss_parts() -> void:
+	if not is_instance_valid(lab.session.run): return
+	commit_appearance_fields()
+	var existing := get_node_or_null("BossPartsEditor") as Window
+	if existing != null:
+		existing.grab_focus()
+		return
+	lab.session.playing = false
+	var owner: BossActor
+	for actor in lab.session.run.bosses.actors:
+		if actor.has_body() and actor.def.id == &"monoceros":
+			owner = actor
+			break
+	if owner == null:
+		var point: Vector2 = lab.session.run.state.ship_pos + Vector2(260, 0)
+		lab.session.perform("boss", {"type": "monoceros", "pos": [point.x, point.y]})
+	else:
+		lab.session.selected = owner.body
+	_focus_appearance()
+	var editor := BOSS_PARTS.new()
+	editor.name = "BossPartsEditor"
+	add_child(editor)
+	editor.open_editor(lab)
+
+
 func _paint_armor_piece(region: int, restore: bool) -> void:
 	if _appearance_type == &"" or _armor_view.source == null:
 		return
 	var def: EnemyDef = lab.session.run.enemies.def_of(_appearance_type)
 	var colors := def.armor_colors.duplicate(true)
 	var source: String = _armor_view.data.key
-	var palette: Dictionary = colors.get(source, {}).duplicate()
+	var palette: Dictionary = ARMOR_VIEW.PAINT.region_colors(_armor_view.data, colors)
 	if restore:
 		palette.erase(str(region))
 	else:
@@ -124,6 +160,8 @@ func _render() -> RunPresentation:
 	return scene.view.get_node("RunPresentation") as RunPresentation
 
 func _sync_appearance() -> void:
+	if _committing_appearance: return
+	_appearance_pending.text = tr("lab.appearance.pending_count").format({"count": _pending_appearances().size()})
 	var row: int = lab.session.selected
 	var table: EnemyTable = lab.session.run.enemies.table
 	var supported := row >= 0 and table.is_boss[row] == 0 and table.meteor_index[row] < 0 and table.type[row] not in [&"iron", &"saw"]
@@ -152,7 +190,7 @@ func _sync_appearance() -> void:
 		_armor_part.select(0)
 	if look != null and look.split_other != null and _armor_part.selected == 1:
 		look = look.split_other
-	_armor_view.show_armor(look.armor if look != null else null, def.armor_colors)
+	_armor_view.show_armor(look.armor if look != null else null, look.paint_palettes(def.armor_colors) if look != null else def.armor_colors)
 	_armor_color.disabled = look == null
 	var pending: bool = def.visual_settings != original.visual_settings or def.armor_colors != original.armor_colors
 	_appearance_label.text = tr("lab.appearance.target").format({"name": def.display_name, "id": type, "state": tr("lab.appearance.unsaved") if pending else tr("lab.appearance.saved_state")})
@@ -186,38 +224,92 @@ func _restore_appearance() -> void:
 func _save_appearance() -> void:
 	if _appearance_type == &"":
 		return
-	_appearance_scale.apply()
-	_collision_scale.apply()
-	for field: SpinBox in _lighting_fields.values():
-		if field.editable:
-			field.apply()
-	var type := _appearance_type
-	var original: EnemyDef = ContentManager.enemies[type]
-	var path := original.resource_path
-	if FileAccess.get_sha256(path) != String(_appearance_hashes.get(path, "")):
-		lab._messages.text = tr("lab.appearance.file_changed")
-		return
-	var saved := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as EnemyDef
-	if saved == null:
-		lab._messages.text = tr("lab.appearance.save_failed")
-		return
-	var def: EnemyDef = lab.session.run.enemies.def_of(type)
-	saved.visual_settings = def.visual_settings.duplicate(true)
-	saved.armor_colors = def.armor_colors.duplicate(true)
-	var error := ResourceSaver.save(saved, path)
-	if error != OK:
-		lab._messages.text = tr("lab.appearance.save_failed") + " " + error_string(error)
-		return
-	original.visual_settings = saved.visual_settings.duplicate(true)
-	original.armor_colors = saved.armor_colors.duplicate(true)
-	_appearance_hashes[path] = FileAccess.get_sha256(path)
-	ContentManager.source_hashes[path] = _appearance_hashes[path]
-	lab._messages.text = tr("lab.appearance.saved_type").format({"name": def.display_name})
+	commit_appearance_fields()
+	lab._messages.text = save_appearance_targets([{"type": _appearance_type, "boss": false}])
+
+## 選択を替える前に、入力中の数値を元の種類へ確定する。
+func commit_appearance_fields() -> void:
+	if _committing_appearance or not is_instance_valid(lab.session.run): return
+	_committing_appearance = true
+	if _appearance_angle.editable: _appearance_angle.apply()
+	if _appearance_type != &"":
+		for field: SpinBox in [_appearance_scale, _collision_scale] + _lighting_fields.values():
+			if field.editable: field.apply()
+	_committing_appearance = false
+
+func _save_all_appearance() -> void:
+	commit_appearance_fields()
+	var editor := get_node_or_null("BossPartsEditor")
+	if editor != null: editor.commit_fields()
+	lab._messages.text = save_appearance_targets(_pending_appearances())
+
+func _appearance_values(definition: Resource, boss: bool) -> Dictionary:
+	if boss: return {"part_appearance": definition.part_appearance}
+	return {"visual_settings": definition.visual_settings, "armor_colors": definition.armor_colors}
+
+func _appearance_dirty(target: Dictionary) -> bool:
+	if not is_instance_valid(lab.session.run): return false
+	var originals: Dictionary = ContentManager.bosses if target.boss else ContentManager.enemies
+	var definitions: Dictionary = lab.session.run.bosses.definitions if target.boss else lab.session.run.enemies.definitions
+	if not originals.has(target.type) or not definitions.has(target.type): return false
+	return _appearance_values(definitions[target.type], target.boss) != _appearance_values(originals[target.type], target.boss)
+
+func _pending_appearances() -> Array[Dictionary]:
+	var pending: Array[Dictionary] = []
+	if not is_instance_valid(lab.session.run): return pending
+	for boss in [false, true]:
+		var definitions: Dictionary = lab.session.run.bosses.definitions if boss else lab.session.run.enemies.definitions
+		var types: Array = definitions.keys()
+		types.sort()
+		for type in types:
+			var target := {"type": type, "boss": boss}
+			if _appearance_dirty(target): pending.append(target)
+	return pending
+
+## 個別保存・一括保存・パーツ編集で、保存基準と失敗時の扱いを共用する。
+func save_appearance_targets(targets: Array) -> String:
+	var count := 0
+	var failures := PackedStringArray()
+	for target: Dictionary in targets:
+		if not _appearance_dirty(target): continue
+		var error := _save_appearance_target(target)
+		if error.is_empty(): count += 1
+		else:
+			var originals: Dictionary = ContentManager.bosses if target.boss else ContentManager.enemies
+			failures.append("%s: %s" % [originals[target.type].display_name, error])
 	_sync_appearance()
+	var editor := get_node_or_null("BossPartsEditor")
+	if editor != null and count > 0: editor.refresh_saved_state()
+	if not failures.is_empty():
+		return tr("lab.appearance.save_partial").format({"saved": count, "failed": " / ".join(failures)})
+	return tr("lab.appearance.saved_all").format({"count": count}) if count > 0 else tr("lab.appearance.no_changes")
+
+func _save_appearance_target(target: Dictionary) -> String:
+	var original: Resource = ContentManager.bosses[target.type] if target.boss else ContentManager.enemies[target.type]
+	var definition: Resource = lab.session.run.bosses.definitions[target.type] if target.boss else lab.session.run.enemies.definitions[target.type]
+	var path := original.resource_path
+	var expected := String(_appearance_hashes.get(path, ""))
+	if expected.is_empty() or FileAccess.get_sha256(path) != expected:
+		return tr("lab.appearance.file_changed")
+	var saved := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
+	if saved == null or saved.get_script() != original.get_script(): return tr("lab.appearance.save_failed")
+	var values := _appearance_values(definition, target.boss)
+	for key in values: saved.set(key, values[key].duplicate(true))
+	if FileAccess.get_sha256(path) != expected: return tr("lab.appearance.file_changed")
+	var error := ResourceSaver.save(saved, path)
+	if error != OK: return tr("lab.appearance.save_failed") + " " + error_string(error)
+	var saved_hash := FileAccess.get_sha256(path)
+	if saved_hash.is_empty(): return tr("lab.appearance.save_failed")
+	# 成功した対象だけを保存済みとする。失敗した種類の編集値はランに保持する。
+	for key in values: original.set(key, values[key].duplicate(true))
+	_appearance_hashes[path] = saved_hash
+	ContentManager.source_hashes[path] = saved_hash
+	return ""
 
 func _inspect_bomber() -> void:
 	if not is_instance_valid(lab.session.run):
 		return
+	commit_appearance_fields()
 	lab.session.playing = false
 	var point: Vector2 = lab.session.run.state.ship_pos + Vector2(200, 0)
 	lab.session.perform("spawn", {"type": "bomber", "pos": [point.x, point.y], "count": 1})

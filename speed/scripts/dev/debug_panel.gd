@@ -255,6 +255,7 @@ func _on_slider(value: float, key: String) -> void:
 		cfg.set(key, int(value))
 	else:
 		cfg.set(key, value)
+	run.loadout.refresh_sonic_wave_speed()
 	_sliders[key][1].text = "%s %s" % [_sliders[key][2], str(snappedf(value, 0.01))]
 
 func _refresh_sliders() -> void:
@@ -269,4 +270,5 @@ func _reset_defaults() -> void:
 	for prop in base.get_property_list():
 		if prop.usage & PROPERTY_USAGE_SCRIPT_VARIABLE:
 			ContentManager.cfg.set(prop.name, base.get(prop.name))
+	run.loadout.refresh_sonic_wave_speed()
 	_refresh_sliders()

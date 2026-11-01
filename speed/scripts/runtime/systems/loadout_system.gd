@@ -111,7 +111,8 @@ func refresh_stats() -> void:
 	s.capacity = 1.0 + _trait_bonus(&"T08")
 	s.charge_time = cfg.dash_charge_time * float(ctx.profile.reduce.get(&"charge_time", 1.0)) / (1.0 + _trait_bonus(&"T07"))
 	var crit_def := ContentManager.definition(&"traits", &"T09") as TraitDef
-	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + (crit_def.stack_bonus(_n(&"T09")) if crit_def != null else 0.0))
+	var crit_max := float(crit_def.params.get("max", 1.0)) if crit_def != null else 1.0
+	s.crit_chance = minf(crit_max, cfg.base_crit_chance + (crit_def.stack_bonus(_n(&"T09")) if crit_def != null else 0.0))
 	s.crit_mult = cfg.crit_mult
 	s.pickup_radius = cfg.pickup_radius * float(ctx.profile.mult.get(&"pickup", 1.0)) * (1.0 + _trait_bonus(&"T12"))
 	s.length_mult = float(ctx.profile.mult.get(&"length", 1.0)) * (1.0 + _trait_bonus(&"T14"))
@@ -153,14 +154,12 @@ func normal_progression_complete() -> bool:
 func _n(id: StringName) -> int:
 	return state.traits.get(id, 0)
 
-## 能力値を変える特性の値（.tres の params）。
-func _trait_param(id: StringName, key: String, default := 0.0) -> float:
-	var def := ContentManager.definition(&"traits", id) as TraitDef
-	return float(def.params.get(key, default)) if def != null else default
-
 func _trait_bonus(id: StringName) -> float:
+	var stacks := _n(id)
+	# 未取得なら stack_bonus() も 0。定義と依存資源の取得を省く。
+	if stacks <= 0: return 0.0
 	var def := ContentManager.definition(&"traits", id) as TraitDef
-	return def.stack_bonus(_n(id)) if def != null else 0.0
+	return def.stack_bonus(stacks) if def != null else 0.0
 
 # ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 
@@ -168,8 +167,19 @@ func xp_needed() -> float:
 	var L := float(state.level)
 	return cfg.xp_base + cfg.xp_growth * L + cfg.xp_curve * L * L
 
+## 回収開始時の機体倍率とラン内倍率。ビーコンはこの値を一度確定して全量へ使う。
+func crystal_multiplier() -> float:
+	return state.stats.xp_mult * state.stats.xp_gain_mult
+
+## 保持していた基準XPを回収するときだけ倍率を適用し、実取得XPを返す。
+func add_crystal_xp(base_xp: float, multiplier: float = -1.0) -> float:
+	var applied := crystal_multiplier() if multiplier < 0.0 else multiplier
+	var acquired := base_xp * applied
+	add_xp(acquired)
+	return acquired
+
+## 最終取得XPを直接加える。開発用レベル操作もこの入口を使う。
 func add_xp(v: float) -> void:
-	v *= state.stats.xp_gain_mult
 	state.xp += v
 	state.xp_gained += v
 	var need := xp_needed()
@@ -409,6 +419,7 @@ func grant(kind: StringName, id: StringName, levels := 1, source := &"direct") -
 		state.modules_obtained.append(id)
 	_claim_resources(category, id)
 	_sync_behavior(weapon, id, def, owned[id])
+	if id == &"T34": refresh_sonic_wave_speed()
 	refresh_stats()
 	_record_change(kind, id, lv, int(owned[id]), source)
 	equipment_changed.emit()
@@ -433,8 +444,13 @@ func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> voi
 		table[id] = b
 	if weapon:
 		table[id].level = lv
+		if id == &"W08": refresh_sonic_wave_speed()
 	else:
 		table[id].n = lv
+
+func refresh_sonic_wave_speed() -> void:
+	var sonic = weapon_behaviors.get(&"W08")
+	if sonic != null and sonic.has_method(&"refresh_wave_speed"): sonic.refresh_wave_speed()
 
 ## 武器を外す（彗星限定の武器と入れ替えるとき）。
 func remove_weapon(id: StringName, source := &"direct") -> void:
@@ -573,20 +589,24 @@ func shot_count(base: int) -> int:
 	return count + (1 if state.rng.randf() < amount - count else 0)
 
 func shooting_rate() -> float:
-	if _n(&"T36") == 0 or state.gauge < 1.0: return 1.0
-	return 1.0 + (_trait_param(&"T36", "rate_base") + _trait_param(&"T36", "rate_per") * _n(&"T36")) * state.gauge
+	var stacks := _n(&"T36")
+	if stacks == 0 or state.gauge < 1.0: return 1.0
+	var def := ContentManager.definition(&"traits", &"T36") as TraitDef
+	var rate_base := float(def.params.get("rate_base", 0.0)) if def != null else 0.0
+	var rate_per := float(def.params.get("rate_per", 0.0)) if def != null else 0.0
+	return 1.0 + (rate_base + rate_per * stacks) * state.gauge
 
 func damage_multiplier() -> float:
 	var rampage = trait_behaviors.get(&"T33")
 	return rampage.multiplier() if rampage != null else 1.0
 
-## 弾・星屑・槍は同じ確率と同時数の上限を共有する。
-func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
+## 元の弾・星屑・槍の生成時に1回抽選する。同じ確率と同時数の上限を共有する。
+func split_vectors(velocity: Vector2) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	var n := _n(&"T37")
 	if n == 0: return out
 	var d: TraitDef = trait_behaviors[&"T37"].def if trait_behaviors.has(&"T37") else ContentManager.definition(&"traits", &"T37") as TraitDef
-	if generation >= int(d.params.generations) or projectiles.flying_count() + 2 > int(d.params.max): return out
+	if projectiles.flying_count() + 2 > int(d.params.max): return out
 	if state.rng.randf() >= float(d.params.chance_by_level[n - 1]): return out
 	for side in [-1.0, 1.0]:
 		var angle: float = deg_to_rad(state.rng.randf_range(float(d.params.angle_min), float(d.params.angle_max))) * side
@@ -594,8 +614,10 @@ func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
 	return out
 
 func split_damage() -> float:
+	var stacks := _n(&"T37")
+	if stacks <= 0: return 1.0
 	var d: TraitDef = trait_behaviors[&"T37"].def if trait_behaviors.has(&"T37") else ContentManager.definition(&"traits", &"T37") as TraitDef
-	return float(d.params.damage_by_level[_n(&"T37") - 1]) if _n(&"T37") > 0 else 1.0
+	return float(d.params.damage_by_level[stacks - 1])
 
 func prepare_ram(extra_distance: float) -> float:
 	var distance := boost_distance + extra_distance

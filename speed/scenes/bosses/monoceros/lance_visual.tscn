@@ -1,6 +1,6 @@
 [gd_scene load_steps=6 format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/monoceros/technique_visual.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/monoceros/lance_visual.gd" id="1"]
 
 [sub_resource type="Animation" id="windup"]
 resource_name = "windup"
@@ -21,7 +21,7 @@ _data = {
 "recover": SubResource("recover")
 }
 
-[node name="TailSweepVisual" type="Node2D"]
+[node name="LanceVisual" type="Node2D"]
 script = ExtResource("1")
 technique_id = &"lance"
 

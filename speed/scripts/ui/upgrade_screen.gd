@@ -50,6 +50,7 @@ func _ready() -> void:
 	_layout_art()
 	_refresh_details()
 	super()
+	AudioManager.play(&"menu_open")
 	if get_meta("fade_from_menu", false):
 		_fade_in()
 
@@ -125,6 +126,47 @@ func _build_art() -> void:
 	buy_frame.z_index = 2
 	_canvas.add_child(buy_frame)
 	_buy_button.z_index = 3
+	if OS.is_debug_build(): _build_debug_controls()
+
+func _build_debug_controls() -> void:
+	var reset := Button.new()
+	reset.name = "DebugResetUpgrades"
+	reset.text = tr("upgrade.debug.reset")
+	reset.tooltip_text = tr("upgrade.debug.reset_help")
+	reset.position = Vector2(430, 312)
+	reset.size = Vector2(90, 24)
+	reset.add_theme_font_size_override("font_size", 10)
+	reset.pressed.connect(func():
+		SaveManager.dev_meta_override.clear()
+		SaveManager.reset_upgrades()
+		_refresh_highlights()
+		_refresh_details())
+	_canvas.add_child(reset)
+	var infinite := Button.new()
+	infinite.name = "DebugInfiniteParts"
+	infinite.text = tr("upgrade.debug.infinite")
+	infinite.tooltip_text = tr("upgrade.debug.infinite_help")
+	infinite.toggle_mode = true
+	infinite.button_pressed = SaveManager.dev_infinite_parts
+	infinite.position = Vector2(524, 312)
+	infinite.size = Vector2(86, 24)
+	infinite.add_theme_font_size_override("font_size", 10)
+	infinite.toggled.connect(func(enabled: bool):
+		SaveManager.dev_infinite_parts = enabled
+		_refresh_details())
+	_canvas.add_child(infinite)
+	for button: Button in [reset, infinite]:
+		button.z_index = 10
+		for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+			var style := StyleBoxFlat.new()
+			style.bg_color = Color("#173c46") if state in ["pressed", "hover_pressed"] else Color("#08161c")
+			style.border_color = CYAN
+			style.set_border_width_all(1)
+			style.content_margin_left = 3
+			style.content_margin_right = 3
+			style.content_margin_top = 2
+			style.content_margin_bottom = 2
+			button.add_theme_stylebox_override(state, style)
 
 func _fade_in() -> void:
 	_group_content()
@@ -309,7 +351,7 @@ func _select(id: StringName) -> void:
 	_refresh_details()
 
 func _refresh_details() -> void:
-	_coins.text = tr("common.parts").format({n = SaveManager.coins()})
+	_coins.text = tr("common.parts").format({n = "∞" if OS.is_debug_build() and SaveManager.dev_infinite_parts else str(SaveManager.coins())})
 	var def := ContentManager.catalog.find(&"meta_upgrades", _selected)
 	_buy_button.disabled = true
 	if def == null:
@@ -324,14 +366,14 @@ func _refresh_details() -> void:
 	_information.text = tr("upgrade.details").format({desc = def.get_description(), lv = level, max = def.costs.size()})
 	_price.text = tr("upgrade.max") if maxed else tr("upgrade.price").format({n = def.costs[level]})
 	_buy_button.text = tr("upgrade.max") if maxed else tr("upgrade.action")
-	_buy_button.disabled = maxed or SaveManager.coins() < def.costs[level]
+	_buy_button.disabled = maxed or not SaveManager.can_afford_upgrade(def.costs[level])
 
 func _buy() -> void:
 	if _leaving:
 		return
 	var def := ContentManager.catalog.find(&"meta_upgrades", _selected)
 	if def != null and SaveManager.buy_upgrade(def):
-		AudioManager.play(&"levelup")
+		AudioManager.play(&"upgrade_apply", linear_to_db(0.5))
 		_play_upgrade_effect(def.id)
 	_refresh_details()
 

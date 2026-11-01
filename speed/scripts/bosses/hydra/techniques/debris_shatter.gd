@@ -84,7 +84,7 @@ class Runner extends "res://scripts/bosses/hydra/technique_runner.gd":
 		var beam=a.participants[1]
 		if not state.has("deployed"):
 			state.deployed=true
-			state.aim=(a.run_state.ship_pos-beam.strike_pos).angle()
+			state.aim=(a.neck_tracking_target(beam,a.run_state.ship_pos)-beam.strike_pos).angle()
 			for j in int(p.rubble_count):
 				var offset: float=(float(j)/maxf(1.0,float(p.rubble_count)-1.0)-0.5)*1.4
 				var at: Vector2=beam.strike_pos+Vector2.from_angle(float(state.aim)+offset)*420.0

@@ -72,7 +72,7 @@ func tick(dt: float) -> bool:
 		&"return":
 			var progress := smoothstep(0.0,1.2,time)
 			a.table.pos[a.body]=_return_from.lerp(home,progress)
-			a.table.facing[a.body]=lerp_angle(_return_angle,(a.run_state.ship_pos-home).angle(),progress)
+			a.table.facing[a.body]=a.tracking_angle(lerp_angle(_return_angle,(a.run_state.ship_pos-home).angle(),progress))
 			a.apply_depth(lerpf(_return_depth,1.0,progress),lerpf(_return_alpha,1.0,progress))
 			if time>=1.2:
 				a.reset_pose()

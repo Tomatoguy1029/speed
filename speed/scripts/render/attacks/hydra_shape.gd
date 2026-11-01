@@ -1,5 +1,6 @@
 ## 首が放つ攻撃の見た目。点列と時間は技から受け取り、判定を書き換えない。
 extends AttackVisual
+@export_range(0.5, 4.0, 0.05) var pixel_scale := 1.0
 @export var energy_shader: Shader = preload("res://shaders/hydra_energy.gdshader")
 @export var area_shader: Shader = preload("res://shaders/hydra_area.gdshader")
 @export var tornado_scene: PackedScene = preload("res://scenes/bosses/hydra_tornado.tscn")
@@ -9,6 +10,7 @@ func configure(_actor: Node, kind: StringName, points: PackedVector2Array, white
 	var area := kind == &"lightning" and points[0].distance_to(points[-1]) < 1.0
 	if kind in [&"tornado", &"tornado_charge"]:
 		line = tornado_scene.instantiate()
+		line.set_meta("shape_owner", visual_profile_key)
 	elif area:
 		line = Sprite2D.new()
 		line.texture = white
@@ -23,9 +25,16 @@ func configure(_actor: Node, kind: StringName, points: PackedVector2Array, white
 	if kind not in [&"tornado", &"tornado_charge"]:
 		line.material = ShaderMaterial.new()
 		line.material.shader = area_shader if area else energy_shader
+		ShaderTuning.apply(line.material, visual_profile_key, scene_file_path, "shape")
+		line.set_meta("shader_tuning_profile", visual_profile_key)
+		line.set_meta("shader_tuning_fallback", scene_file_path)
+		line.set_meta("shader_tuning_component", "shape")
 	add_child(line)
 	if line.has_method("set_pixel_size"):
-		line.set_pixel_size(3.0 * EFFECT_SETTINGS.number(scene_file_path, "pixel_scale", 1.0))
+		line.set_pixel_size(3.0 * pixel_scale)
+
+func refresh_visual_settings() -> void:
+	if is_instance_valid(line) and line.has_method("set_pixel_size"): line.set_pixel_size(3.0 * pixel_scale)
 func update_effect(effect: Dictionary, clock: float) -> void:
 	if line.has_method("update_effect"):
 		line.update_effect(effect, clock)
@@ -39,7 +48,7 @@ func update_effect(effect: Dictionary, clock: float) -> void:
 	var color: Color = {&"tornado":Color(0.3,0.85,0.72), &"rubble":Color(0.55,0.44,0.3), &"wind":Color(0.25,0.9,0.75), &"wind_blade":Color(0.3,1,0.8), &"lightning":Color(0.4,0.75,1), &"bite":Color(1,0.45,0.18)}.get(effect.kind, Color(1,0.25,0.4))
 	line.material.set_shader_parameter("style", {&"wind":1,&"wind_blade":1,&"lightning":2,&"rubble":3,&"tornado":4,&"bolt":5}.get(effect.kind,0))
 	line.material.set_shader_parameter("tint", color)
-	line.material.set_shader_parameter("cell_size", 4.0 * EFFECT_SETTINGS.number(scene_file_path, "pixel_scale", 1.0))
+	line.material.set_shader_parameter("cell_size", 4.0 * pixel_scale)
 	line.material.set_shader_parameter("clock", clock)
 	line.material.set_shader_parameter("warning", effect.age < effect.delay)
 	var length := 0.0

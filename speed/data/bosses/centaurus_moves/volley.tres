@@ -4,6 +4,8 @@
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/volley_visual.tscn" id="visual"]
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/centaurus_volley.tscn" id="effect_owner"]
+
 [resource]
 script = ExtResource("1")
 technique = &"volley"
@@ -19,3 +21,5 @@ speed = 900.0
 travel = 1400.0
 warn = 0.6
 visual = ExtResource("visual")
+
+shot_visual = ExtResource("effect_owner")

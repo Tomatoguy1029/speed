@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="ComboTransitionSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/combo_transition_settings.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+kind = 2
+anticipation_seconds = 0.26
+opening_seconds = 0.90
+badge_delay = 0.38
+focus = Vector2(0.49, 0.45)
+rim_width = 1.5
+transition_color = Color(1, 0.827451, 0.298039, 1)
+highlight_color = Color(1, 0.94902, 0.65098, 1)
+ink_color = Color(0.062745, 0.070588, 0.109804, 1)
+badge_face = Color(0.937255, 0.749020, 0.313725, 1)
+badge_edge = Color(1.000000, 0.945098, 0.772549, 1)
+badge_under = Color(0.803922, 0.545098, 0.192157, 1)
+badge_outline = Color(0.156863, 0.074510, 0.125490, 1)
+badge_shadow = Color(0.156863, 0.074510, 0.125490, 1)
+badge_tag = Color(0.650980, 0.294118, 0.168627, 1)
+badge_tag_edge = Color(1.000000, 0.541176, 0.219608, 1)
+badge_tag_text = Color(1.000000, 0.945098, 0.772549, 1)
+badge_lines_color = Color(1.000000, 0.541176, 0.219608, 1)

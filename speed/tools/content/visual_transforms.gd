@@ -1,4 +1,4 @@
-## 透過で区切られた装甲片を上下左右の4近傍で分け、種類ごとの塗装を作る。
+## 透過の4近傍または明示した領域表で装甲片を分け、種類ごとの塗装を作る。
 @tool
 extends RefCounted
 
@@ -50,16 +50,65 @@ static func layout(texture: Texture2D) -> Dictionary:
 	var digest := HashingContext.new()
 	digest.start(HashingContext.HASH_SHA256)
 	digest.update(opaque)
-	var key := "%s|%dx%d|%s" % [texture.resource_path, width, height, digest.finish().hex_encode()]
+	var alpha_hash := digest.finish().hex_encode()
+	var key := "%s|%dx%d|%s" % [texture.resource_path, width, height, alpha_hash]
 	var result := {"image": image, "width": width, "height": height, "labels": labels,
-		"regions": regions, "shades": shades, "key": key}
+		"regions": regions, "shades": shades, "key": key, "parents": {}}
+	var partition_path := texture.resource_path.get_basename() + ".regions.json"
+	if FileAccess.file_exists(partition_path):
+		_partition(result, partition_path, alpha_hash)
 	_layouts[id] = result
+	return result
+
+## 領域表は画素を描き替えず、クリック・塗装の単位だけを指定する。
+## 濃淡は元の連結領域の値を保ち、旧領域の一括塗装を同じ見た目で引き継ぐ。
+static func _partition(data: Dictionary, path: String, alpha_hash: String) -> void:
+	var partition: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	assert(partition is Dictionary and partition.get("alpha_sha256", "") == alpha_hash, "装甲領域表のマスクが一致しない: " + path)
+	var rows: Array = partition.get("rows", [])
+	assert(rows.size() == data.height, "装甲領域表の高さが一致しない: " + path)
+	var labels := PackedInt32Array()
+	labels.resize(data.labels.size())
+	labels.fill(-1)
+	var regions := {}
+	var parents := {}
+	for y in rows.size():
+		var row: String = rows[y]
+		assert(row.length() == data.width, "装甲領域表の幅が一致しない: " + path)
+		for x in row.length():
+			var pixel := y * int(data.width) + x
+			var parent: int = data.labels[pixel]
+			assert((row[x] == ".") == (parent < 0), "装甲領域表の透過が一致しない: " + path)
+			if parent < 0: continue
+			# 元の画素番号と重ならないIDにし、旧塗装と個別塗装を区別する。
+			var region: int = data.labels.size() + row.unicode_at(x)
+			assert(not parents.has(region) or parents[region] == parent, "装甲領域表が異なる元領域を結合している: " + path)
+			if not regions.has(region): regions[region] = PackedInt32Array()
+			var pixels: PackedInt32Array = regions[region]
+			pixels.append(pixel)
+			regions[region] = pixels
+			parents[region] = parent
+			labels[pixel] = region
+	data.labels = labels
+	data.regions = regions
+	data.parents = parents
+
+## 旧領域の塗装を個別領域へ展開する。以降の編集・解除は選択パーツだけへ作用する。
+static func region_colors(data: Dictionary, palettes: Dictionary) -> Dictionary:
+	var colors: Dictionary = palettes.get(data.key, {})
+	if data.parents.is_empty(): return colors.duplicate()
+	var result := {}
+	for region in data.regions:
+		var key := str(region)
+		var parent := str(data.parents[region])
+		if colors.has(key): result[key] = colors[key]
+		elif colors.has(parent): result[key] = colors[parent]
 	return result
 
 static func painted_image(texture: Texture2D, palettes: Dictionary) -> Image:
 	var data := layout(texture)
 	var image: Image = data.image.duplicate()
-	var colors: Dictionary = palettes.get(data.key, {})
+	var colors := region_colors(data, palettes)
 	for region in colors:
 		var pixels: PackedInt32Array = data.regions.get(int(region), PackedInt32Array())
 		var color := Color.html(colors[region])
@@ -91,6 +140,12 @@ static func prepare_look(source: EnemyLook, palettes: Array[Dictionary]) -> Enem
 	result.previews = {}
 	var data := layout(source.armor)
 	result.armor_key = data.key
+	if not source.armor_color_source_key.is_empty():
+		var color_source := load(source.armor_color_source_key.get_slice("|", 0)) as Texture2D
+		var color_data := layout(color_source)
+		assert(color_data.key == source.armor_color_source_key, "塗装の継承元が一致しない: " + source.resource_path)
+		for region in source.armor_color_regions:
+			assert(data.regions.has(int(region)) and color_data.regions.has(int(source.armor_color_regions[region])), "塗装の対応領域が存在しない: " + source.resource_path)
 	if source.decorations != null:
 		var image := source.base.get_image().duplicate()
 		image.blend_rect(source.decorations.get_image(), Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
@@ -100,7 +155,7 @@ static func prepare_look(source: EnemyLook, palettes: Array[Dictionary]) -> Enem
 	for palette in palettes:
 		var armor_id := result.colors_key(palette)
 		if not result.painted_armors.has(armor_id):
-			result.painted_armors[armor_id] = source.armor if armor_id.is_empty() else ImageTexture.create_from_image(painted_image(source.armor, palette))
+			result.painted_armors[armor_id] = source.armor if armor_id.is_empty() else ImageTexture.create_from_image(painted_image(source.armor, result.paint_palettes(palette)))
 		var preview_id := result.preview_key(palette)
 		if result.previews.has(preview_id): continue
 		var image := result.base.get_image().duplicate()

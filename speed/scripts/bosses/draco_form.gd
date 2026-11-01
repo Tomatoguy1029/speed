@@ -197,7 +197,10 @@ static func draw_head(canvas: CanvasItem, scale: float, mouth_open := 0.0, light
 
 static func star(canvas: CanvasItem, at: Vector2, size: float, color: Color) -> void:
 	if size<=0.01 or color.a<=0.001: return
-	canvas.draw_colored_polygon(PackedVector2Array([at+Vector2(-size,0),at+Vector2(-size*0.18,-size*0.18),at+Vector2(0,-size),at+Vector2(size*0.18,-size*0.18),at+Vector2(size,0),at+Vector2(size*0.18,size*0.18),at+Vector2(0,size),at+Vector2(-size*0.18,size*0.18)]),color)
+	# Explicit sectors avoid triangulating a tiny concave outline at distant coordinates.
+	var points := PackedVector2Array([at,at+Vector2(-size,0),at+Vector2(-size*0.18,-size*0.18),at+Vector2(0,-size),at+Vector2(size*0.18,-size*0.18),at+Vector2(size,0),at+Vector2(size*0.18,size*0.18),at+Vector2(0,size),at+Vector2(-size*0.18,size*0.18)])
+	var indices := PackedInt32Array([0,1,2,0,2,3,0,3,4,0,4,5,0,5,6,0,6,7,0,7,8,0,8,1])
+	RenderingServer.canvas_item_add_triangle_array(canvas.get_canvas_item(),indices,points,PackedColorArray([color]))
 	canvas.draw_rect(Rect2((at-Vector2.ONE*size*0.12).snapped(Vector2(2,2)),Vector2.ONE*maxf(2,size*0.24)),Color.WHITE)
 
 static func faded(color: Color, alpha: float) -> Color:

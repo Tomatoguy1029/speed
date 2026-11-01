@@ -33,6 +33,7 @@ func _ruler(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = float(p.telegraph)
+				state.emit(&"enemy_laser_charge", {"id": t.id[i], "row": i})
 		EnemyTable.Mode.WINDUP:
 			_hold(i, dt)
 			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
@@ -42,6 +43,7 @@ func _ruler(i: int, dt: float) -> void:
 				projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.RAY
 				projectiles.hazard_block[h] = 1
 				projectiles.attach_hazard(h, i)
+				state.emit(&"enemy_laser_fire", {"id": t.id[i]})
 				t.links[i] = PackedInt32Array([h])
 				t.charge[i] = 0.0
 				t.mode[i] = EnemyTable.Mode.RECOVER
@@ -74,6 +76,7 @@ func _split_ruler(i: int) -> void:
 	var d := Vector2(signf(rel.x), 0.0) if absf(rel.x) > absf(rel.y) else Vector2(0.0, signf(rel.y))
 	if d == Vector2.ZERO:
 		d = Vector2.DOWN
+	if m.motion.turn_locked(i): d = Vector2.from_angle(t.facing[i])
 	var halves := [i, spawn(t.def[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i], "attack_priority": t.attack_priority[i]})]
 	for k in 2:
 		var j: int = halves[k]

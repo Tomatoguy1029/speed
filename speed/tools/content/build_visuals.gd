@@ -4,6 +4,16 @@ extends RefCounted
 const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 
 static func build(output: String) -> Error:
+	var profiles_error: Error = preload("res://tools/content/build_effect_profiles.gd").validate()
+	if profiles_error != OK: return profiles_error
+	var burst_error := _validate_burst_noise()
+	if burst_error != OK: return burst_error
+	var mask_error := _validate_landmark_masks()
+	if mask_error != OK: return mask_error
+	var elite_error := _validate_elite_profile()
+	if elite_error != OK: return elite_error
+	var biter_error := _validate_biter_parts()
+	if biter_error != OK: return biter_error
 	TRANSFORM._layouts.clear()
 	var palettes: Array[Dictionary] = [{}]
 	for file in DirAccess.get_files_at("res://data/enemies"):
@@ -31,6 +41,98 @@ static func build(output: String) -> Error:
 	var error := ResourceSaver.save(index, output.path_join("visual_index.tres"))
 	TRANSFORM._layouts.clear()
 	return _build_meteor_pieces(output) if error == OK else error
+
+## 制作済みノイズの格子点・版と、Texture3Dの取り込み条件を照合する。
+static func _validate_burst_noise() -> Error:
+	var baked := ResourceLoader.load("res://assets/effects/build/burst_noise.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if baked == null or baked.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for group in ["inputs", "outputs"]:
+		for path: String in baked.get_meta(group, {}):
+			if FileAccess.get_sha256(path) != baked.get_meta(group)[path]:
+				push_error("爆発ノイズをtools/art/bake_burst_noise.pyでベイクしてください: " + path)
+				return ERR_INVALID_DATA
+	var texture := baked.get_meta("texture") as Texture3D
+	if texture == null or Vector3i(texture.get_width(), texture.get_height(), texture.get_depth()) != Vector3i(64, 64, 64) or texture.has_mipmaps(): return ERR_INVALID_DATA
+	var settings := ConfigFile.new()
+	var error := settings.load("res://assets/effects/build/burst_noise_volume.png.import")
+	if error != OK: return error
+	var expected := {"compress/mode": 0, "compress/channel_pack": 1, "mipmaps/generate": false, "slices/horizontal": 8, "slices/vertical": 8}
+	if settings.get_value("remap", "importer", "") != "3d_texture": return ERR_INVALID_DATA
+	for field in expected:
+		if settings.get_value("params", field) != expected[field]: return ERR_INVALID_DATA
+	return OK
+
+## 保存済みエリート設定と可変shaderから作った固定値を照合する。
+static func _validate_elite_profile() -> Error:
+	var baked := ResourceLoader.load("res://data/visuals/elite_runtime.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if baked == null or baked.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for group in ["inputs", "outputs"]:
+		for path: String in baked.get_meta(group, {}):
+			if FileAccess.get_sha256(path) != baked.get_meta(group)[path]:
+				push_error("エリート表示をtools/art/bake_elite_crackle.pyでベイクしてください: " + path)
+				return ERR_INVALID_DATA
+	return OK
+
+## 制作工程のCPUベイカーが保存した固定素材を、正規ビルドでも検査する。
+## サイズ・塗装の値は実行時の本体と共有し、透過形状の入力だけを固定する。
+static func _validate_landmark_masks() -> Error:
+	var masks := ResourceLoader.load("res://assets/effects/landmark/masks.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as Resource
+	if masks == null or masks.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for path: String in masks.get_meta("inputs", {}):
+		if FileAccess.get_sha256(path) != masks.get_meta("inputs")[path]:
+			push_error("目印マスクの入力が変わりました。tools/art/bake_landmark_masks.pyでベイク: " + path)
+			return ERR_INVALID_DATA
+	var candidates: Array = masks.get_meta("candidates", [])
+	var excluded: Array = masks.get_meta("excluded_candidates", [])
+	for entry: Dictionary in masks.get_meta("masks", {}).values():
+		if entry.texture == null or FileAccess.get_sha256(entry.file) != entry.mask_sha256:
+			push_error("目印マスクの生成物が欠落・不一致: " + str(entry.file))
+			return ERR_INVALID_DATA
+	var current: Array[String] = []
+	for file in DirAccess.get_files_at("res://data/enemies"):
+		if not file.ends_with(".tres"): continue
+		var definition := load("res://data/enemies/" + file) as EnemyDef
+		if definition.rank >= 2 and definition.rank <= 5 and file.get_basename() not in excluded: current.append(file.get_basename())
+		var expected: String = masks.get_meta("fallback_shapes", {}).get(file.get_basename(), "")
+		if not expected.is_empty() and String(definition.shape) != expected: return ERR_INVALID_DATA
+	current.sort()
+	if current != candidates:
+		push_error("目印候補が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
+		return ERR_INVALID_DATA
+	var aliases := {}
+	var elites := {}
+	for file in DirAccess.get_files_at("res://data/stages"):
+		if not file.begins_with("stage_") or not file.ends_with(".tres"): continue
+		var stage := load("res://data/stages/" + file) as StageDef
+		for curve: SpawnCurve in stage.zako_curves:
+			var definition := load("res://data/enemies/%s.tres" % curve.type) as EnemyDef
+			if definition != null and definition.max_alive == 0 and String(curve.type) not in excluded: elites[String(curve.type)] = true
+		for id: String in stage.enemy_looks:
+			if id in candidates or id in masks.get_meta("elite_candidates", []): aliases[id + ":" + file.get_basename()] = stage.enemy_looks[id]
+	var elite_ids := elites.keys()
+	elite_ids.sort()
+	if elite_ids != masks.get_meta("elite_candidates", []):
+		push_error("エリート対象が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
+		return ERR_INVALID_DATA
+	if aliases != masks.get_meta("stage_aliases", {}):
+		push_error("目印候補の外観が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
+		return ERR_INVALID_DATA
+	var contacts := ResourceLoader.load("res://assets/effects/landmark/elite_contacts.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if contacts == null or contacts.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	if contacts.get_meta("mask_manifest_sha256", "") != FileAccess.get_sha256("res://assets/effects/landmark/masks.tres"): return ERR_INVALID_DATA
+	for path: String in contacts.get_meta("inputs", {}):
+		if FileAccess.get_sha256(path) != contacts.get_meta("inputs")[path]: return ERR_INVALID_DATA
+	return OK
+
+static func _validate_biter_parts() -> Error:
+	var parts := ResourceLoader.load("res://data/visuals/biter_parts.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as Resource
+	if parts == null or parts.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for group in ["inputs", "outputs"]:
+		for path: String in parts.get_meta(group, {}):
+			if FileAccess.get_sha256(path) != parts.get_meta(group)[path]:
+				push_error("噛みつく雑魚の分割素材をtools/art/bake_biter_parts.pyで更新してください: " + path)
+				return ERR_INVALID_DATA
+	return OK
 
 ## 隣の破片が切り出し矩形へ入り込む部分を、制作時に除く。
 static func _build_meteor_pieces(output: String) -> Error:

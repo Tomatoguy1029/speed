@@ -26,3 +26,4 @@ func _bomber(i: int, dt: float) -> void:
 	t.charge[i] = clampf(phase, 0.0, 1.0)
 	if t.timer[i] <= 0.0:
 		_self_destruct(i)
+		state.emit(&"bomber_explode", {"pos": t.pos[i]})

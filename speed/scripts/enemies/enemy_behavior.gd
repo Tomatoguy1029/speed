@@ -209,7 +209,8 @@ func _self_destruct(i: int) -> void:
 
 func fire_volley(i: int) -> void:
 	var p: Dictionary = table.def[i].params
-	var base := (state.enemy_aim - table.pos[i]).angle()
+	# 追跡中の旋回に合わせ、予告の砲口と同じ正面へ撃つ。
+	var base := table.facing[i]
 	var n: int = p.volley
 	var spread: float = p.spread
 	for k in n:

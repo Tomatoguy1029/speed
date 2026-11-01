@@ -73,6 +73,7 @@ const NECK_CHAIN := preload("res://scripts/bosses/hydra_neck.gd")
 class Neck:
 	## 首の種類（bite・vortex・debris・beam・thunder）
 	var kind: StringName
+	var combat_trace := preload("res://scripts/bosses/combat_trace.gd").new()
 	## 本体から見た付け根の向きと、今の首の向き・長さ
 	var base_angle := 0.0
 	var angle := 0.0
@@ -209,8 +210,8 @@ func _on_bound() -> void:
 	draws_self = true
 	table.gate[body] = EnemyTable.Gate.NONE
 	table.armor[body] = 0.0
-	# 本体と首は、敵（頭）の下、地形の上に描く（RunPresentation の描画の層の enemies の下）
-	z_index = 5
+	# 本体と首も通常敵の帯へ揃え、結晶より前に描く。
+	z_index = BODY_Z_INDEX
 	arena = preload("res://scripts/bosses/hydra_arena.gd").new()
 	add_child(arena)
 	arena.bind(self)
@@ -244,6 +245,16 @@ func _process(delta: float) -> void:
 	# 制限時間の一撃が当たったら、敗北の停止の間に光を消し、爆発と GAME OVER を見せる。
 	if final_strike_t >= 0.0 and run_state.phase != RunState.Phase.PLAY:
 		attack_field.modulate.a = move_toward(attack_field.modulate.a, 0.0, delta / maxf(0.01, ctx.cfg.death_freeze_time))
+
+func finish_combat_observations(step: String, reason: String) -> void:
+	super(step, reason)
+	for n in necks: n.combat_trace.finish(step, reason)
+
+## 通常攻撃は首ごと、大技は本体の行動として記録する。
+func combat_trace_for(row: int):
+	for n in necks:
+		if n.row == row and _normal_moves.has(n.mode): return n.combat_trace
+	return combat_trace
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0:
@@ -344,14 +355,14 @@ func _move(dt: float) -> void:
 		var middle:=Vector2.ZERO
 		for n in participants:middle+=Vector2.from_angle(n.base_angle)
 		var wanted: float=d.angle()-middle.angle()
-		t.facing[i] = rotate_toward(t.facing[i],wanted,def.turn*dt)
+		t.facing[i] = tracking_angle(rotate_toward(t.facing[i],wanted,def.turn*dt))
 	var swimming := (dist > float(p.engage) or not run_state.view_rect().grow(-table.r[i]).has_point(t.pos[i])) and not busy and recovery_t <= 0.0
-	var want := d / dist * def.speed if swimming else Vector2.ZERO
+	var want := ctx.enemies.motion.steering_velocity(i, d / dist * def.speed) if swimming else Vector2.ZERO
 	t.vel[i] += (want - t.vel[i]) * minf(1.0, def.accel * dt)
 	if busy or recovery_t > 0.0:
 		t.vel[i] = Vector2.ZERO
 	# 構えている間は胴体の向きを保ち、狙いは首先で表す。
-	if swimming:
+	if swimming and not tracking_locked():
 		t.facing[i] += clampf(Geom.angle_diff(d.angle(), t.facing[i]), -def.turn * dt, def.turn * dt)
 	var from := t.pos[i]
 	t.pos[i] += t.vel[i] * dt
@@ -372,6 +383,7 @@ func _set_count(n: int) -> void:
 			neck = necks[k]
 		else:
 			neck = Neck.new()
+			neck.combat_trace.bind(self)
 			neck.kind = kinds[k]
 			neck.cd = float(def.params.attack_cd) * (0.5 + 0.5 * run_state.rng.randf())
 			necks.append(neck)
@@ -575,6 +587,9 @@ func start_normal(index: int, attack: StringName, internal_step := false) -> boo
 		var cats: Array={&"bite":["dash"],&"vortex":["wave"],&"debris":["aimed"],&"beam":["beam"],&"thunder":["zone"]}[n.kind]
 		var cost: float=_normal_cost(attack)*maxf(0.0,table.attack_value[n.row])
 		if not director.request("neck:"+str(n.row_id),cats,n.row,n.row_id,4.0,table.attack_priority[n.row],cost):return false
+	n.combat_trace = preload("res://scripts/bosses/combat_trace.gd").new()
+	n.combat_trace.bind(self, attack)
+	n.combat_trace.begin(attack, combat_origin)
 	n.mode = attack
 	n.t = 0.0
 	n.locked = false
@@ -583,12 +598,13 @@ func start_normal(index: int, attack: StringName, internal_step := false) -> boo
 	n.motion.erase("normal_phase")
 	n.motion.erase("lunge_done")
 	n.motion.erase("extension")
-	n.target = run_state.ship_pos
-	if attack==&"thunder_drop":n.target+=run_state.ship_vel*float(move_params(attack).thunder_lead)
+	n.target = neck_tracking_target(n, run_state.ship_pos)
+	if attack==&"thunder_drop":n.target=neck_tracking_target(n, n.target+run_state.ship_vel*float(move_params(attack).thunder_lead))
 	_cue(&"warning_started",attack,index)
 	return true
 
 func finish_normal(n: Neck) -> void:
+	n.combat_trace.finish()
 	var cooldown := float(move_params(n.mode).attack_cd)
 	var at := _head_pos(n)
 	_release_attack(n)
@@ -618,7 +634,7 @@ func position_head(index: int, dt: float) -> void:
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
 
 func aim_neck(n: Neck, desired: float, dt: float) -> void:
-	if dt<=0.0:return
+	if dt<=0.0 or tracking_locked():return
 	if separated and n != immortal_neck:
 		n.look_angle = rotate_toward(n.look_angle, desired, float(def.params.squad.look_player_turn) * dt)
 		return
@@ -640,12 +656,13 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 	match neck.mode:
 		&"tech_aim":
 			var direction: float=(neck.target-_neck_base(neck)).angle()
-			neck.angle=lerp_angle(neck.angle,direction,minf(1.0,dt*6.0))
+			if not tracking_locked(): neck.angle=lerp_angle(neck.angle,direction,minf(1.0,dt*6.0))
 			neck.length=move_toward(neck.length,float(def.params.neck_rest)*0.35,float(def.params.neck_rest)*dt*2.0)
 			neck.glow=minf(1.0,neck.glow+dt*1.5)
 		&"tech_lunge":_north_step(neck,minf(1.0,neck.t/_north_duration),dt)
 
 func _end(neck: Neck, interrupted := false) -> void:
+	neck.combat_trace.finish("interrupted" if interrupted else "completed", "neck_stopped" if interrupted else "")
 	# 伸びた頭をその場に残し、攻めどきが終わってから通常の長さへ戻す。
 	if tech_kind(tech) == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		var offset := neck.strike_pos - _neck_base(neck)
@@ -710,6 +727,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[tech_kind(attack)])
 		combo_wait=float(def.params.combo_cooldown)
 	if not chosen.is_empty(): participants.assign(chosen)
+	combat_trace.begin(attack, combat_origin)
 	tech = attack
 	special = _moves[attack].make_runner()
 	special.a = self
@@ -727,7 +745,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 
 ## 予告の間に自機を追うか。技の設定が無い動作は追う。
 func tracks_during_warn(id: StringName) -> bool:
-	return not _moves.has(id) or _moves[id].track_during_warn
+	return not tracking_locked() and (not _moves.has(id) or _moves[id].track_during_warn)
 
 func attack_playing() -> bool:
 	return busy
@@ -784,7 +802,7 @@ func _final_strike_tick(dt: float) -> void:
 		table.guard[n.row] = 1.0
 		if separated:
 			n.velocity = Vector2.ZERO
-			n.angle = lerp_angle(n.angle, (ship - n.free_pos).angle(), minf(1.0, dt * 6.0))
+			if not tracking_locked(): n.angle = lerp_angle(n.angle, (ship - n.free_pos).angle(), minf(1.0, dt * 6.0))
 		else:
 			aim_neck(n, (ship - _neck_base(n)).angle(), dt)
 			n.length = move_toward(n.length, float(def.params.neck_rest), float(def.params.neck_rest) * dt)
@@ -793,7 +811,8 @@ func _final_strike_tick(dt: float) -> void:
 		table.facing[n.row] = n.angle
 		_follow_neck(n, dt)
 		var head: Vector2 = table.pos[n.row]
-		var points := PackedVector2Array([head, head + (ship - head).normalized() * reach])
+		var direction := Vector2.from_angle(n.angle) if tracking_locked() else (ship - head).normalized()
+		var points := PackedVector2Array([head, head + direction * reach])
 		if not _final_beams.has(n.row_id):
 			_final_beams[n.row_id] = attack_field.add_shape(points, width, maxf(0.0, _final_charge - float(def.params.final_widen_time) - final_strike_t),
 				_final_charge + 10.0, 0.0, &"beam", n.row, Vector2.ZERO, true)
@@ -861,6 +880,7 @@ func tech_end() -> void:
 	recovery_t = float(move_params(tech).tech_recovery)
 	_cue(&"finished" if last_tech_result == &"finished" else &"interrupted")
 	_cue(&"recovery_started", tech, -1, {"duration": recovery_t})
+	combat_trace.finish("completed" if last_tech_result == &"finished" else "interrupted")
 	for neck in necks:
 		if String(neck.mode).begins_with("tech_") or String(neck.mode).begins_with("special_"):
 			_release_attack(neck)
@@ -974,6 +994,12 @@ func presentation_state() -> Dictionary:
 
 func _cue(cue: StringName, attack: StringName = &"", index := -1, details := {}) -> void:
 	if ctx == null or not has_body(): return
+	var trace = necks[index].combat_trace if index >= 0 and index < necks.size() and _normal_moves.has(necks[index].mode) else combat_trace
+	match cue:
+		&"warning_started": trace.stage("telegraph")
+		&"target_locked": trace.stage("lock")
+		&"attack_started": trace.execute()
+		&"recovery_started": trace.stage("recovery")
 	var anchor := presentation_anchor(index)
 	var head_id := necks[index].row_id if index >= 0 and index < necks.size() else (immortal_id if index == -2 else table.id[body])
 	presentation_event.emit({"cue": cue, "technique": attack if attack != &"" else tech,
@@ -994,16 +1020,22 @@ func draw_on(c: CanvasItem) -> void:
 		return
 	var t := table
 	var r := t.r[body]
-	if neck_texture==null:
+	if has_node("NeckArtwork"):
+		for neck in necks:
+			if neck.row >= 0 and neck.glow > 0.0 and not neck.segs.is_empty():
+				c.draw_circle(neck.segs[-1] - table.pos[body], r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * neck.glow))
+	elif neck_texture==null:
 		_draw_neck_mesh(c,r)
 	else:
 		for neck in necks:
 			if neck.row >= 0 or neck.length > 0.0:
 				_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
 	if separated:
-		if immortal_neck!=null:
+		if immortal_neck!=null and not has_node("NeckArtwork"):
 			if neck_texture!=null:_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
 			_draw_compass(c,52.0)
+		return
+	if has_node("BodyArtwork"):
 		return
 	if body_texture!=null:
 		c.draw_texture_rect(body_texture,Rect2(Vector2.ONE*-r,Vector2.ONE*r*2.0),false)
@@ -1015,6 +1047,7 @@ func draw_on(c: CanvasItem) -> void:
 		_draw_compass(c, r * 0.75)
 
 func draw_head_on(c: CanvasItem, row: int, at: Vector2) -> bool:
+	if has_node("HeadArtwork"): return true
 	var kind: StringName = &""
 	for neck in necks:
 		if neck.row == row and _alive(neck):
@@ -1164,7 +1197,7 @@ func begin_separation()->void:
 	immortal_neck=Neck.new()
 	immortal_neck.kind=&"immortal"
 	immortal_neck.free_pos=table.pos[body]
-	immortal_neck.angle=(table.pos[body]-run_state.ship_pos).angle()
+	immortal_neck.angle=tracking_angle((table.pos[body]-run_state.ship_pos).angle())
 	immortal_neck.look_angle=immortal_neck.angle
 	immortal_row=ctx.enemies.spawn_part(body,ctx.enemies.def_of(&"hydra_immortal"),immortal_neck.free_pos)
 	immortal_id=table.id[immortal_row]
@@ -1200,7 +1233,7 @@ func tick_bearer(dt: float)->void:
 		n.t=0.0
 		n.locked=false
 		n.step=0
-		n.target=run_state.ship_pos
+		n.target=neck_tracking_target(n, run_state.ship_pos)
 		_cue(&"warning_started",&"bite_thrust",-2)
 	elif not alone and not busy:
 		n.cd=maxf(0.0,n.cd-dt)
@@ -1217,7 +1250,7 @@ func tick_bearer(dt: float)->void:
 			n.free_pos=n.free_pos.lerp(target,1.0-exp(-4.0*dt))
 			n.velocity=Vector2.ZERO
 		else:steer_snake(n,target,dt,float(def.params.bearer_speed)/float(def.params.snake_speed),grid_hold)
-	if not alone and not busy: SNAKE.update_look(n, run_state.ship_pos, dt, _time, run_state.rng, def.params.squad, &"bearer", false)
+	if not alone and not busy: SNAKE.update_look(n, run_state.ship_pos, dt, _time, run_state.rng, def.params.squad, &"bearer", false, tracking_locked())
 	var at:=_head_pos(n)
 	table.pos[immortal_row]=at
 	table.facing[immortal_row]=n.angle if alone or busy else n.look_angle
@@ -1251,7 +1284,7 @@ func grid_plan()->Dictionary:
 func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formation:=false) -> void:
 	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
 	n.free_pos = from
-	SNAKE.steer(n, snake_destination(n, target, formation), dt, def.params, speed_scale)
+	SNAKE.steer(n, snake_destination(n, target, formation), dt, def.params, speed_scale, tracking_locked())
 	_finish_snake_step(n, from)
 
 func snake_destination(n: Neck, target: Vector2, formation: bool) -> Vector2:
@@ -1273,14 +1306,14 @@ func snake_destination(n: Neck, target: Vector2, formation: bool) -> Vector2:
 func swim_snake(n: Neck, force: Vector2, speed: float, turn: float, dt: float) -> void:
 	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
 	n.free_pos = from
-	SNAKE.apply_force(n, force, speed, turn, dt, def.params.squad)
+	SNAKE.apply_force(n, force, speed, turn, dt, def.params.squad, tracking_locked())
 	_finish_snake_step(n, from)
 
 func swim_bearer(n: Neck, target: Vector2, speed: float, turn: float, dt: float) -> void:
 	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
 	n.free_pos = from
 	var offset := snake_destination(n, target, true) - from
-	if offset.length() > 4.0: n.angle = rotate_toward(n.angle, offset.angle(), turn * clampf(offset.length() / 90.0, 0.2, 1.0) * dt)
+	if offset.length() > 4.0 and not tracking_locked(): n.angle = rotate_toward(n.angle, offset.angle(), turn * clampf(offset.length() / 90.0, 0.2, 1.0) * dt)
 	var amount := speed * minf(1.0, offset.length() / 130.0) * (0.3 + 0.7 * maxf(0.0, cos(angle_difference(n.angle, offset.angle()))))
 	n.velocity = n.velocity.lerp(Vector2.from_angle(n.angle) * amount, 1.0 - exp(-2.5 * dt))
 	n.free_pos += n.velocity * dt
@@ -1302,6 +1335,7 @@ func _finish_snake_step(n: Neck, from: Vector2) -> void:
 func move_reach(id: StringName) -> Dictionary:
 	return _moves[id].range_info(move_params(id)) if _moves.has(id) else {"origin": "head", "max": INF}
 func tick_normal(neck, dt: float) -> void:
+	if tracking_locked() and not neck.locked: neck.target = neck_tracking_target(neck, neck.target)
 	if separated and neck != immortal_neck:
 		NORMAL_SWIM.tick(self, neck, dt)
 		return
@@ -1322,3 +1356,8 @@ func tech_kind(id: StringName) -> StringName:
 
 func head_angle(n: Neck) -> float:
 	return n.look_angle if separated and (n.mode == &"idle" or _normal_moves.has(n.mode)) else n.angle
+
+func neck_tracking_target(n: Neck, target: Vector2) -> Vector2:
+	if not tracking_locked(): return target
+	var origin := _head_pos(n)
+	return origin + Vector2.from_angle(head_angle(n)) * maxf(1.0, origin.distance_to(target))

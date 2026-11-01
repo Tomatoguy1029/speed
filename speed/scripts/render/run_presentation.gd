@@ -5,9 +5,10 @@
 class_name RunPresentation
 extends Node
 
-const XP_COLOR := Color("#b8a0ff")
+const MAGNET_COLOR := Color("#b8a0ff")
 const COIN_COLOR := Color("#ffd24a")
-const XP_OUTLINE := Color("#39265e")
+const CRYSTAL_COLORS := [Color("#08deff"), Color("#945cff"), Color("#ffb609")]
+const CRYSTAL_FACETS_PATH := "res://assets/pixel/xp_crystal_facets.tres"
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
@@ -88,30 +89,30 @@ var _enemy_textures: Dictionary = {}
 var bolts: Array = []
 var _bolt_seed := 0
 var shield_transfers: Array = []
+var shield_source_type: StringName = &"shield"
 var _attack_visuals: Dictionary = {}
-var _build_world_time := 0.0
-var _bipolar_flash := 0.0
-var build_effects: BuildEffects
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
 var flash := 0.0
-var _stars: PackedVector3Array
 var _star_batch: InstanceBatch
-var _star_material: ShaderMaterial
 var _hostile_batch: InstanceBatch
 var _coin_batch: InstanceBatch
 var _ship_visual: RefCounted
+var _critical_hits: RefCounted
+var _armor_blocks: RefCounted
 var _meteor_visual: RefCounted
 var _body_visual: RefCounted
-var _glide_wake: Node2D
 var _equipment_visuals: Dictionary = {}
 ## 1回の敵描画で共有する数値だけ。Resource参照を持たず、パスの前後で破棄する。
 var _enemy_sprite_metrics: Dictionary = {}
+var _enemy_wave_deformations: Dictionary = {}
 var _drawing_enemies := false
 var _hero_aura: MeshInstance2D
 var _hero_aura_material: ShaderMaterial
 var _field_boundary: DrawLayer
+var _landmark_aura: Node2D
+var _elite_crackle: Node2D
 ## 開発版の計測の記録先：表示側の処理時間と、敵の描画1回あたりの行の数
 var perf := PerfLog.new()
 var perf_rows := PerfLog.new()
@@ -122,6 +123,8 @@ func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	_ship_visual = load("res://scripts/render/ship_visual.gd").new()
 	_ship_visual.setup(self)
+	_critical_hits = load("res://scripts/render/critical_hit.gd").new()
+	_armor_blocks = load("res://scripts/render/armor_block.gd").new()
 	_body_visual = load("res://scripts/render/body_visual.gd").new()
 	_read_settings()
 	SaveManager.settings_changed.connect(_read_settings)
@@ -160,22 +163,19 @@ func _ready() -> void:
 	_path_band_group.add_child(_path_band)
 	_build_batches()
 	_build_directional_lights(world)
+	_landmark_aura = load("res://scripts/render/landmark_aura.gd").new()
+	_landmark_aura.z_index = -2
+	_layers.enemies.add_child(_landmark_aura)
+	_landmark_aura.setup(self)
+	_elite_crackle = load("res://scripts/render/elite_crackle.gd").new()
+	_lit_enemy_marks.add_child(_elite_crackle)
+	_elite_crackle.setup(self)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _look_names.size() + 2)
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
-	_glide_wake = load("res://scenes/fx/glide_wake.tscn").instantiate()
-	_layers.exhaust.add_child(_glide_wake)
 	run.loadout.equipment_changed.connect(_sync_equipment_visuals)
 	_sync_equipment_visuals()
-	build_effects = BuildEffects.new()
-	build_effects.pixel = 1.82 * cfg.character_scale
-	build_effects.texture_provider = _enemy_texture
-	_layers.fx.add_child(build_effects)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	for i in 400:
-		_stars.append(Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(0.2, 1.0)))
 	_build_star_batch()
 	_build_stage_background()
 	run.frame_events.connect(_on_events)
@@ -189,6 +189,7 @@ func _build_directional_lights(world: Node2D) -> void:
 	marks.follow_viewport_enabled = true
 	world.add_child(marks)
 	_lit_enemy_marks = DrawLayer.new()
+	_lit_enemy_marks.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_lit_enemy_marks.draw_fn = _timed(&"draw_lit_enemy_marks", _draw_lit_enemy_marks)
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
@@ -255,7 +256,13 @@ func _build_batches() -> void:
 	_armor_material = ShaderMaterial.new()
 	_armor_material.shader = preload("res://shaders/pixel_armor.gdshader")
 	var gem := InstanceBatch.new()
-	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
+	# 固定の形・面はランのScopeで保持し、描画中に画像を生成しない。
+	var facets := run.ctx.resources.resources.get(CRYSTAL_FACETS_PATH) as Texture2D
+	if facets == null and state.lab_mode:
+		facets = load(CRYSTAL_FACETS_PATH) as Texture2D
+		run.ctx.resources.provide(CRYSTAL_FACETS_PATH, facets)
+	assert(facets != null, "経験値の結晶の固定面マスクが必要")
+	gem.setup_texture(facets)
 	var gem_mat := ShaderMaterial.new()
 	gem_mat.shader = load("res://shaders/xp_crystal.gdshader")
 	gem.material = gem_mat
@@ -399,11 +406,12 @@ func _present(delta: float) -> void:
 	_update_fx(dt)
 	perf.since(&"process.fx", t0)
 	_ship_visual.update(dt)
-	_glide_wake.visible = not state.weapons.has(&"W08") and not (state.weapons.has(&"W26") and state.tracing)
-	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
 		var visual: WeaponVisual = _equipment_visuals[key]
+		t0 = Time.get_ticks_usec() if perf.active else 0
 		visual.tick(dt)
+		if perf.active:
+			perf.since(StringName("process.equipment." + String(visual.behavior.def.id)), t0)
 		if visual.finished():
 			visual.dispose()
 			_equipment_visuals.erase(key)
@@ -452,14 +460,12 @@ func _handle_events(events: Array[Dictionary]) -> void:
 			v.on_event(ev)
 		for visual in _equipment_visuals.values():
 			visual.on_event(ev)
-		if ev.type==&"beam" and ev.get("visual_key","")=="weapon/bipolar":
-			_bipolar_flash=0.1
-			shake=maxf(shake,6.0)
-		if build_effects.event(ev): continue
+		if _claimed(ev): continue
 		match ev.type:
 			&"ring":
 				_ring(ev.pos, ev.radius, ev.color, ev.life, String(ev.get("visual_key", "")))
 			&"explode":
+				if ev.get("cause", &"") == &"pump_burst": continue
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 				if ev.radius >= 150.0:
 					pipeline.add_wave(ev.pos, ev.radius, 0.4)
@@ -476,16 +482,18 @@ func _handle_events(events: Array[Dictionary]) -> void:
 				elif ev.cause == &"ram":
 					shake = maxf(shake, 5.0)
 			&"block_impact":
-				_sparks(ev.pos, ev.normal, cfg.block_spark_count, Color("#ffd28a"))
-				impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": ev.normal, "life": cfg.block_impact_life, "max": cfg.block_impact_life, "color": Color("#ffe9a8")})
-			&"weak_impact":
-				var d: Vector2 = (ev.pos - ev.enemy_pos).normalized()
-				_sparks(ev.pos, d, cfg.weak_flame_count, Color("#ff6a2a"))
-				impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": d, "life": cfg.weak_impact_life, "max": cfg.weak_impact_life, "color": Color("#ff5a2a")})
+				if ev.get("armor_bounce", false):
+					_armor_blocks.add(ev.pos, ev.normal)
+				else:
+					_sparks(ev.pos, ev.normal, cfg.block_spark_count, Color("#ffd28a"))
+					impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": ev.normal, "life": cfg.block_impact_life, "max": cfg.block_impact_life, "color": Color("#ffe9a8")})
+			&"critical_hit":
+				_critical_hits.add(ev.pos, ev.enemy_pos + Vector2(0, -ev.r - _px(10.0)), ev.dir)
 			&"shield_reflect":
 				_sparks(ev.pos, ev.normal, 8, Color("#ffa4ef"))
 				_ring(ev.pos, 22.0, Color("#ff9de9"), 0.18)
 			&"shield_stolen":
+				shield_source_type = StringName(ev.get("enemy_type", &"shield"))
 				shield_transfers.append({"pos": ev.pos, "facing": ev.facing, "r": ev.r, "arc": ev.arc,
 					"life": 0.3, "max": 0.3})
 				_ring(ev.pos, ev.r * 1.7, Color("#65e8ff"), 0.3)
@@ -575,6 +583,7 @@ func _handle_events(events: Array[Dictionary]) -> void:
 
 ## 予告と実際の撃破・結晶演出で同じ値を使う。他の演出は下限に含めない。
 func _common_burst_count(event: Dictionary) -> int:
+	if event.type == &"kill" and event.get("enemy_type", &"") == &"pump": return 0
 	match event.type:
 		&"kill": return 6+roundi(float(event.r)/3.0)
 		&"gem_burst": return 14
@@ -621,12 +630,8 @@ func _shatter_meteor(ev: Dictionary) -> void:
 	_meteors().shatter(ev)
 
 func _update_fx(dt: float) -> void:
-	var world_dt := maxf(0.0, state.world_time - _build_world_time)
-	_build_world_time = state.world_time
-	_bipolar_flash=maxf(0.0,_bipolar_flash-world_dt)
-	build_effects.step(world_dt, state.ship_pos)
-	build_effects.sample(run.ctx, world_dt)
-	build_effects.projectiles(run.projectiles)
+	_critical_hits.update(dt)
+	_armor_blocks.update(dt)
 	for shard in meteor_shards:
 		shard.pos += shard.vel * dt
 		shard.angle += shard.spin * dt
@@ -695,19 +700,7 @@ func view_rect() -> Rect2:
 
 ## 星の円メッシュと乱数データは開始時に作り、GPUで位置・視差だけ更新する。
 func _build_star_batch() -> void:
-	_star_batch = InstanceBatch.new()
-	_star_batch.setup_polygon(InstanceBatch.circle_points(16))
-	var mm := _star_batch.multimesh
-	mm.use_custom_data = true
-	mm.instance_count = _stars.size()
-	for i in _stars.size():
-		var star := _stars[i]
-		mm.set_instance_transform_2d(i, Transform2D.IDENTITY)
-		mm.set_instance_custom_data(i, Color(star.x, star.y, star.z, 0.0))
-		mm.set_instance_color(i, Color(0.7, 0.8, 1.0, 0.25 + 0.5 * star.z))
-	_star_material = ShaderMaterial.new()
-	_star_material.shader = preload("res://shaders/background_stars.gdshader")
-	_star_batch.material = _star_material
+	_star_batch = preload("res://scripts/render/background_star_field.gd").create()
 	_layers.background.add_child(_star_batch)
 
 ## 透明な余白を除く画像の中心を、開始地点からの距離に合わせる。
@@ -762,7 +755,7 @@ func _build_stage_background() -> void:
 
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
-	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else Color(0.02, 0.03, 0.07))
+	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else state.stage.background_color)
 	_star_batch.visible = show_background
 	for i in _background_sprites.size():
 		var sprite := _background_sprites[i]
@@ -774,9 +767,7 @@ func _draw_background(c: CanvasItem) -> void:
 		fire.position = _background_origin + _fire_placements[i].position_at(cam_center - _background_origin) + _fire_placements[i].fire_offset
 	for fire in _static_fires:
 		fire.visible = show_background
-	_star_material.set_shader_parameter("view_center", cam_center)
-	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
-	_star_material.set_shader_parameter("camera_zoom", cam_zoom)
+	preload("res://scripts/render/background_star_field.gd").update_view(_star_batch, cam_center, view_rect().size / 2.0, cam_zoom)
 
 func _draw_field_boundary(c: CanvasItem) -> void:
 	if run.field.battle_arenas.is_empty():
@@ -900,19 +891,18 @@ func _draw_hero(c: CanvasItem) -> void:
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
 	var view := view_rect().grow(60.0)
-	# 経験値の結晶：画面上で最低 8px の高さ（仕様書 17）
+	# 旧1XPの基準寸法を全色で使う。長辺2のテクスチャを旧メッシュの2.8へ合わせる。
 	var gs := maxf(5.0, _px(4.0))
 	var gems: InstanceBatch = _batches[&"gem"]
 	gems.begin()
 	var gem_alive := p.gem_alive
 	var gem_pos := p.gem_pos
-	var gem_value := p.gem_value
+	var gem_kind := p.gem_kind
 	for i in gem_alive.size():
 		var pos := gem_pos[i]
 		if gem_alive[i] != 0 and view.has_point(pos):
-			# 経験値の多い結晶ほど大きい（経験値1で等倍、最大3倍）
-			var v := gem_value[i]
-			gems.add_upright(pos, gs * (1.0 if v <= 1.0 else minf(pow(v, 0.2), 3.0)), XP_COLOR)
+			# 集約黄の保持XPが増えても形・寸法・色を変えない。
+			gems.add_upright(pos, gs * 1.4, CRYSTAL_COLORS[gem_kind[i]])
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
@@ -936,11 +926,13 @@ func _draw_pickups(c: CanvasItem) -> void:
 					cap.pos + Vector2(0, 22), cap.pos + Vector2(-18, 0)]), Color("#efcb70"))
 				c.draw_circle(cap.pos, 7.0, Color("#fff1bf"))
 			Pickup.Kind.MAGNET:
-				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, XP_COLOR, 6.0)
+				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, MAGNET_COLOR, 6.0)
 				c.draw_rect(Rect2(cap.pos + Vector2(-17, 0), Vector2(6, 10)), Color.WHITE)
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	_landmark_aura.begin()
+	_elite_crackle.begin()
 	var wave_deformations := {}
 	var quake = run.loadout.weapon_behaviors.get(&"W04")
 	if quake != null:
@@ -953,6 +945,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	var t0 := Time.get_ticks_usec()
 	_enemy_sprite_metrics.clear()
 	_drawing_enemies = true
+	_enemy_wave_deformations = wave_deformations
 	_sync_visuals()
 	var query_padding := run.combat.enemy_query_padding
 	var view := view_rect().grow(query_padding)
@@ -999,10 +992,14 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
+		if landmark[i] != 0:
+			_landmark_aura.add_enemy(t, i, wave_deformations.get(t.id[i], {}))
 		# g成分は自爆予告の赤い装甲。被弾の白いフラッシュとは分ける。
 		if t.def[i] != null and t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
 			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
-		if visual != null and visual.draw_body(c, t, i, p):
+		var custom_body := visual != null and visual.draw_body(c, t, i, p)
+		if elite[i] != 0: _elite_crackle.add_enemy(t,i,wave_deformations.get(t.id[i],{}))
+		if custom_body:
 			self_drawn += 1
 			continue
 		batched += 1
@@ -1025,6 +1022,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 			marked += 1
 			_draw_enemy_marks(c, t, i)
 	perf.since(&"draw_enemies.rows", t0)
+	_elite_crackle.end()
 	t0 = Time.get_ticks_usec()
 	for key in _batches:
 		if key != &"gem":
@@ -1039,6 +1037,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	perf.since(&"draw_enemies.visual_layers", t0)
 	_drawing_enemies = false
 	_enemy_sprite_metrics.clear()
+	_enemy_wave_deformations.clear()
 	if perf_rows.active:
 		perf_rows.add(&"rows", alive.size())
 		perf_rows.add(&"live", live)
@@ -1052,6 +1051,7 @@ func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	for i in t.alive.size():
 		if t.alive[i] != 0 and t.dead[i] == 0 and _armor_batches.has(t.type[i]) and view.has_point(t.pos[i]):
 			_draw_enemy_marks(c, t, i)
+	_critical_hits.draw(c, cam_zoom)
 
 ## 彗星：光る核と、進む向きの反対へ伸びる尾。レアな彗星は金色で、周りを光の粒が回る（デザインとアートスタイル）。
 ## 専用の絵ができるまでの仮の描き方。
@@ -1183,25 +1183,15 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false, tint)
 	c.draw_set_transform(Vector2.ZERO)
 
-## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。種類ごとの飾りは見た目の処理が描く。
+## 背面の弱点・予告・HPバーと種類固有の飾り。エリートは共有バッチへ描く。
 func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
 	var v := _visual_of(t, i)
-	if t.elite[i] != 0:
-		c.draw_arc(p, r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
 	var weak := t.weak_arc[i]
 	if weak > 0.0 and t.type[i] not in EnemyDef.NATIVE_SPRITES and (v == null or v.draws_weak_arc):
 		var f := t.facing[i]
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
-	if t.landmark[i] != 0:
-		# 目印の星：金色とも白ともつかない特別な光
-		var tw := 0.75 + 0.25 * sin(state.world_time * 5.0 + float(t.id[i]))
-		c.draw_circle(p, r * 2.2 * tw, Color(1.0, 0.95, 0.8, 0.16))
-		c.draw_circle(p, r * 0.5, Color(1.0, 0.97, 0.88, 0.95))
-		for k in 4:
-			var u := Vector2.from_angle(k * PI / 2.0 + state.world_time) * r * 1.8 * tw
-			c.draw_line(p - u, p + u, Color(1.0, 0.95, 0.75, 0.6), _px(2.0))
 	if t.stone[i] > 0.0:
 		# 石になっている
 		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))
@@ -1226,11 +1216,13 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	var pr := run.projectiles
 	var friend_alive := pr.friend_alive
 	var friend_pos := pr.friend_pos
+	for visual: AttackVisual in _friendly_visuals.values(): visual.begin_batch()
 	for i in friend_alive.size():
 		var pos := friend_pos[i]
 		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
 		_friendly_visual(pr, i).draw_friend(c, pr, i, pos)
+	for visual: AttackVisual in _friendly_visuals.values(): visual.end_batch()
 	for visual: AttackVisual in _attack_visuals.values(): visual.begin_batch()
 	_hostile_batch.begin()
 	for i in pr.hostile_alive.size():
@@ -1372,6 +1364,7 @@ func _draw_round_arc(c: CanvasItem, center: Vector2, radius: float, start: float
 
 func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)
+	_armor_blocks.draw(c)
 	for bm in beams:
 		var k: float = bm.life / bm.max
 		var key := String(bm.get("visual_key", ""))
@@ -1442,7 +1435,6 @@ func _draw_top(c: CanvasItem) -> void:
 		var height := rect.size.y*0.1*state.cinematic_bars
 		c.draw_rect(Rect2(rect.position,Vector2(rect.size.x,height)),Color.BLACK)
 		c.draw_rect(Rect2(Vector2(rect.position.x,rect.end.y-height),Vector2(rect.size.x,height)),Color.BLACK)
-	if _bipolar_flash>0.0:c.draw_rect(view_rect().grow(400.0),Color(1,1,1,0.45*_bipolar_flash/0.1))
 	if flash > 0.0:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
 
@@ -1479,6 +1471,12 @@ func _sync_equipment_visuals() -> void:
 			_equipment_visuals[key] = visual
 	for key in _equipment_visuals:
 		_equipment_visuals[key].active = current.has(key)
+
+## 装備の表示が自分で描く出来事は、既定の処理（死亡の破片・輪・ビーム）を行わない。
+func _claimed(ev: Dictionary) -> bool:
+	for visual in _equipment_visuals.values():
+		if visual.active and visual.claims(ev): return true
+	return false
 
 func _blue_exhaust() -> bool:
 	for visual in _equipment_visuals.values():

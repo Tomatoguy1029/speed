@@ -52,12 +52,33 @@ func make_runner() -> RefCounted:
 	return Runner.new()
 
 class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
-	pass
+	var warned: Dictionary = {}
+
+	func _begin_windup(host: CanisMajorBoss, r: Dictionary, length: float) -> void:
+		super(host, r, length)
+		var hounds = host._hounds()
+		if hounds == null: return
+		for i in host.led:
+			if not host._alive_hound(i) or host.ring.has(i): continue
+			warned[i] = host.table.id[i]
+			hounds.mark(i, host.run_state.world_time + float(r.warn))
+
+	func _clear_warning(host: CanisMajorBoss) -> void:
+		var hounds = host._hounds()
+		if hounds != null:
+			for i: int in warned:
+				if host.table.id[i] == warned[i]: hounds.warning_until.erase(i)
+		warned.clear()
+
+	func cancel(host: CanisMajorBoss) -> void:
+		_clear_warning(host)
+		super(host)
 
 	func kind() -> StringName:
 		return &"command"
 
 	func execute(host: CanisMajorBoss) -> void:
+		_clear_warning(host)
 		var r := host.rule()
 		var hounds = host._hounds()
 		host._cue(&"command")

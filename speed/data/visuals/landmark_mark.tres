@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="EnemyMarkSettings" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyMarkSettings" format=3]
 
 [ext_resource type="Script" path="res://scripts/data_types/enemy_mark_settings.gd" id="1"]
 
@@ -8,7 +8,21 @@ pixel_grid = 72
 inner_radius = 0.31
 outer_radius = 0.48
 noise_scale = 11.0
-motion_speed = 1.25
-intensity = 0.9
-color = Color(0.82, 0.68, 0.38, 1)
-highlight = Color(1, 0.96, 0.8, 1)
+motion_speed = 0.3
+intensity = 1.0
+color = Color(0.70980394, 0.27058825, 0.101960786, 1)
+highlight = Color(1, 0.85490197, 0.43529412, 1)
+aura_width = 1.25
+aura_variation = 6.5
+pixel_size = 2.5
+edge_falloff = 3.1
+flow_coherence = 0.7
+flow_spread = 2.0
+flow_field_scale = 0.2
+flow_field_speed = 0.05
+noise_span = 70.0
+edge_opacity = 0.91
+core_opacity = 0.47
+pulse_amount = 0.08
+pulse_seconds = 2.0
+opacity_step = 5.0

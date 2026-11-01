@@ -83,6 +83,8 @@ func _telescope(i: int, dt: float) -> void:
 		return
 	# 照準が見え始める前に、射程・遮蔽物と予算を確認する。
 	if not _lab_admit(i, dt):
+		if t.mode[i] == EnemyTable.Mode.WINDUP:
+			state.emit(&"enemy_laser_cancel", {"id": t.id[i]})
 		t.mode[i] = EnemyTable.Mode.MOVE
 		t.charge[i] = 0.0
 		_tele_rays.erase(t.id[i])
@@ -99,6 +101,7 @@ func _telescope(i: int, dt: float) -> void:
 				float(p.bullet_dmg), Color(1.0, 0.3, 0.25))
 			if beam >= 0:
 				projectiles.hazard_style[beam] = ProjectileSystem.HazardStyle.TELESCOPE
+				state.emit(&"enemy_laser_fire", {"id": t.id[i]})
 			state.emit(&"telescope_fire", {"pos": lens, "angle": t.facing[i], "length": reach, "width": float(p.laser_width)})
 			t.charge[i] = 0.0
 			t.mode[i] = EnemyTable.Mode.RECOVER
@@ -110,9 +113,12 @@ func _telescope(i: int, dt: float) -> void:
 		t.mode[i] = EnemyTable.Mode.WINDUP
 		t.timer[i] = float(p.laser_charge)
 		state.emit(&"telescope_charge", {"pos": telescope_lens(i)})
+		state.emit(&"enemy_laser_charge", {"id": t.id[i], "row": i})
 
 ## 照準と未発射の予約を解除する。既に飛んでいる攻撃はdirector側が保持する。
 func _cancel_telescope(i: int) -> void:
+	if table.mode[i] == EnemyTable.Mode.WINDUP:
+		state.emit(&"enemy_laser_cancel", {"id": table.id[i]})
 	if projectiles.director != null:
 		projectiles.director.cancel_attack(_lab_owner(i), table.id[i])
 	table.mode[i] = EnemyTable.Mode.MOVE

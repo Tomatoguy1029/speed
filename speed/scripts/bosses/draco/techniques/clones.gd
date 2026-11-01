@@ -74,8 +74,11 @@ class Runner extends BossTechnique.Runner:
 			for move in MOVES:
 				if move.technique == id: return HYDRA.params.merged(move.values(),true)
 			return HYDRA.params
-		func tracks_during_warn(_id: StringName) -> bool: return true
+		func tracks_during_warn(_id: StringName) -> bool: return not actor.tracking_locked()
 		func tick_normal(n: Dictionary, dt: float) -> void:
+			if actor.tracking_locked() and not n.locked:
+				var origin: Vector2 = _head_pos(n)
+				n.target = origin + Vector2.from_angle(float(n.angle)) * maxf(1.0, origin.distance_to(n.target))
 			tech = n.mode
 			if not runners.has(n.mode):
 				for move in MOVES:
@@ -83,7 +86,8 @@ class Runner extends BossTechnique.Runner:
 			runners[n.mode].tick_neck(self, n, dt)
 		func _head_pos(n: Dictionary) -> Vector2: return n.strike_pos if n.locked else table.pos[n.row]
 		func _neck_base(n: Dictionary) -> Vector2: return table.pos[n.row]
-		func aim_neck(n: Dictionary, angle: float, _dt: float) -> void: n.angle=angle
+		func aim_neck(n: Dictionary, angle: float, _dt: float) -> void:
+			if not actor.tracking_locked(): n.angle=angle
 		func _cue(_cue: StringName,_attack: StringName,_index: int) -> void: pass
 		func head_index(_n: Dictionary) -> int: return 0
 		func finish_normal(n: Dictionary) -> void: n.done=true

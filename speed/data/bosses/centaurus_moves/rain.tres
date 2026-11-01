@@ -4,12 +4,16 @@
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/rain_visual.tscn" id="visual"]
 
+[ext_resource type="PackedScene" path="res://scenes/attacks/owned/centaurus_rain.tscn" id="effect_owner"]
+
 [resource]
 script = ExtResource("1")
 technique = &"rain"
 display_name = "矢の雨"
-arrow_gap = 22.0
-arrows_per_step = 2
+arrow_gap = 44.0
+arrow_gap_p2 = 22.0
+arrows_per_step = 1
+arrows_per_step_p2 = 2
 cd = 9.0
 circle_radius = 100.0
 damage = 14.0
@@ -18,7 +22,7 @@ drop_height = 70.0
 fade = 0.3
 fall = 0.3
 forward = 650.0
-linger = 0.4
+linger = 0.6
 recover = 0.8
 trace_bend = 1.2
 trace_gap = 0.35
@@ -28,3 +32,5 @@ traces = 4
 traces_p2 = 6
 warn = 0.8
 visual = ExtResource("visual")
+
+shot_visual = ExtResource("effect_owner")

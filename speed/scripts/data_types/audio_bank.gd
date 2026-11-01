@@ -1,4 +1,6 @@
-## 制作工程で合成した共有の効果音。
+## 制作工程でまとめた効果音とBGM。
 class_name AudioBank
 extends Resource
 @export var sounds: Dictionary = {}
+
+@export var music: Dictionary = {}

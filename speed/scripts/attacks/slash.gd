@@ -17,7 +17,7 @@ const SLASH_SAMPLES := 16
 func contact(ps: ProjectileSystem, i: int, _from: Vector2, to: Vector2, _body_hit, ship_pos: Vector2, R: float, _step: float) -> Variant:
 	if not slash_touches(to, ps.hostile_vel[i].angle(), ps.hostile_r[i], ps.hostile_turn[i], ship_pos, R):
 		return null
-	ps.ship.damage(ps.hostile_dmg[i], 0.0, ProjectileSystem.HOSTILE_CAUSE[ps.hostile_kind[i]])
+	ps._combat_damage(ps._combat_hostiles, i, ps.hostile_dmg[i], 0.0, ProjectileSystem.HOSTILE_CAUSE[ps.hostile_kind[i]], &"")
 	return to
 
 ## 斬撃の k 本目（0〜2）の爪痕の点（斬撃の向きの座標。x が伸びる側、y が本体の方。横の大きさ 1）。k が大きいほど外側（機体側）。

@@ -21,6 +21,7 @@ var fields := VBoxContainer.new()
 var _status: Label
 var _expanded := {"scene": false, "particle": false, "layers": false, "shape": false}
 var _grids: Array[GridContainer] = []
+var _generation := 0
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -47,6 +48,7 @@ func _reload() -> void:
 func refresh() -> void:
 	if not is_instance_valid(preview) or preview.settings == null:
 		return
+	_generation += 1
 	for child in fields.get_children():
 		fields.remove_child(child)
 		child.queue_free()
@@ -247,8 +249,14 @@ func _property_grid(parent: Control, keys: Array, properties: Dictionary) -> voi
 			var picker := ColorPickerButton.new()
 			picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			picker.color = current
-			picker.color_changed.connect(func(v): preview.change_setting(key, v))
+			var generation := _generation
+			picker.color_changed.connect(func(v):
+				if generation == _generation: preview.change_setting(key, v))
 			color_row.add_child(picker)
+			var popup := picker.get_popup()
+			popup.window_input.connect(func(event: InputEvent): preview.history_input(event, popup))
+			popup.about_to_popup.connect(func(): preview.history_popup_opened(popup))
+			picker.popup_closed.connect(preview.end_history_gesture)
 		elif current is Vector2 or current is Vector3:
 			for axis in (2 if current is Vector2 else 3):
 				var component: String = (["幅", "高"] if current is Vector2 else ["外", "内", "芯"])[axis]
@@ -322,5 +330,9 @@ func _number(parent: Control, label: String, tip: String, value: float, hint: St
 	input.max_value = float(bounds[1]) if bounds.size() > 1 else 1024.0
 	input.step = float(bounds[2]) if bounds.size() > 2 else 0.05
 	input.value = value
-	input.value_changed.connect(action)
+	var generation := _generation
+	input.value_changed.connect(func(value: float):
+		if generation == _generation: action.call(value))
 	row.add_child(input)
+	input.get_line_edit().focus_entered.connect(preview.history_field_focused)
+	input.get_line_edit().text_submitted.connect(func(_text: String): preview.end_history_merge())

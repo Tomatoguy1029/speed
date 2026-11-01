@@ -7,12 +7,15 @@ script = ExtResource("1_cmflw")
 partial_rest = 0.8
 empty_rest = 2.0
 sections = [{
-"cap": 3.0,
-"name": "追跡",
-"next": 0,
-"request": "any",
-"weights": {
-"major": 20.0,
-"single": 80.0
-}
+"name": "牽制", "request": "normal", "allowed_groups": ["choose_harass"], "cap": 2.0,
+"action_count": 1, "no_candidate_timeout": 1.0, "next": 1, "weights": {"single": 100.0}
+}, {
+"name": "圧力", "request": "normal", "allowed_groups": ["choose_pressure"], "cap": 3.0,
+"section_budget": 4.0, "action_count": 2, "action_interval": 0.3, "no_candidate_timeout": 1.0,
+"next": 2, "weights": {"single": 50.0, "combo": 50.0}
+}, {
+"name": "大技", "request": "major", "cap": 3.0, "action_count": 1,
+"no_candidate_timeout": 0.6, "next": 3, "fallback": 3, "weights": {"major": 100.0}
+}, {
+"name": "息を整える", "request": "rest", "next": 0, "weights": {}
 }]

@@ -40,7 +40,7 @@ func _soldier(i: int, dt: float) -> void:
 		if t.pos[i].distance_to(goal) < 8.0:
 			t.pos[i] = goal
 			t.vel[i] = Vector2.ZERO
-			t.facing[i] = slot[1]
+			t.facing[i] = m.motion.tracking_angle(i, slot[1])
 			t.mode[i] = EnemyTable.Mode.MOVE
 		return
 	t.vel[i] = Vector2.ZERO

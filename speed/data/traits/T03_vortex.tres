@@ -8,7 +8,7 @@ params = {
 "damage_base": 0.75,
 "damage_per": 0.25,
 "radius_by_level": [215.0, 230.0, 250.0, 265.0, 285.0],
-"kills_by_level": [40.0, 35.0, 30.0, 27.0, 25.0],
+"kills_by_level": [65.0, 55.0, 45.0, 38.0, 32.0],
 "charge": 0.15,
 "hold": 0.22,
 "collapse": 0.15

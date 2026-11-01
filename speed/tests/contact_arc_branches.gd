@@ -17,6 +17,7 @@ func verify() -> void:
 	context.enemies = em
 	context.combat = combat
 	context.loadout = build
+	context.projectiles = ProjectileSystem.new()
 	em.setup(context)
 	combat.setup(context)
 	build.ctx = context
@@ -39,11 +40,11 @@ func verify() -> void:
 	combat.rebuild_grid()
 	var arc = load("res://scripts/weapons/contactArc.gd").new()
 	arc.setup(context, load("res://data/weapons/W17_contactArc.tres"))
-	assert(is_equal_approx(float(arc.p("cooldown")), 0.15), "W17 global cooldown changed")
+	assert(is_equal_approx(float(arc.p("cooldown")), 1.0), "W17 cooldown must be one world second")
 	var visual_segments := PackedVector2Array()
 	for lv in range(1, 6):
 		arc.level = lv
-		s.world_time += 0.15
+		s.world_time += 1.0
 		s.events.clear()
 		arc.on_any_contact(target)
 		var ids := {}
@@ -82,7 +83,7 @@ func verify() -> void:
 	for k in 12: em.spawn(definition, Vector2(40.0 + k * 15.0, 0))
 	combat.rebuild_grid()
 	s.events.clear()
-	s.world_time += 0.15
+	s.world_time += 1.0
 	arc.on_any_contact(target)
 	var one_side_hits := 0
 	for e in s.events:
@@ -96,13 +97,26 @@ func verify() -> void:
 	target = em.spawn(definition, Vector2.ZERO)
 	combat.rebuild_grid()
 	s.events.clear()
-	s.world_time += 0.15
+	s.world_time += 1.0
 	arc.on_any_contact(target)
 	assert(s.events.back().segments.size() == 2)
 	print("W17 isolated target: OK")
+	# 別の敵への接触やレベルアップでも、全体の1秒待ちは飛ばせない。
+	s.events.clear()
+	arc.level = 4
+	var other := em.spawn(definition, Vector2(20, 0))
+	combat.rebuild_grid()
+	arc.on_any_contact(other)
+	assert(s.events.is_empty(), "Level change or another target bypassed cooldown")
+	s.world_time += 0.999
+	arc.on_any_contact(other)
+	assert(s.events.is_empty(), "Arc fired before one second")
+	s.world_time += 0.001
+	arc.on_any_contact(other)
+	assert(s.events.any(func(e): return e.type == &"bolt"), "Arc did not resume at one second")
 	if "--visual" in OS.get_cmdline_user_args():
 		await show_visual(build, s, cfg, visual_segments)
-	for system in [em, combat, build]:
+	for system in [em, combat, build, context.projectiles]:
 		system.dispose()
 	get_tree().quit()
 

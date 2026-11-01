@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Texture3D" path="res://assets/effects/build/burst_noise_volume.png" id="1_noise"]
+
+[resource]
+metadata/bake_version = 1
+metadata/texture = ExtResource("1_noise")
+metadata/inputs = {"res://assets/effects/build/value_noise.png": "b9b9db601abb1b626f77f593ef2693943c4fbb0976e30cc7e25cbe119c9f4ad0", "res://tools/art/bake_burst_noise.py": "3325a91062ca3c31aa5f95f729af1fb537ae692d5954ece2e32490cfb33f717c"}
+metadata/outputs = {"res://assets/effects/build/burst_noise_volume.png": "b6681f28333a669ecb9965ef199dfa16c72a55d1a8aa7505177184e3a02efbdf"}
+metadata/slices = Vector3i(64, 64, 64)

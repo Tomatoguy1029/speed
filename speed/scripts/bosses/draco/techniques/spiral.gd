@@ -306,6 +306,7 @@ class Runner extends BossTechnique.Runner:
 		a.body_override = points
 
 	func _follow_center(a: BossActor, dt: float) -> Vector2:
+		if a.tracking_locked(): return Vector2.ZERO
 		var shift: Vector2 = (a.run_state.ship_pos - center) * (1.0 - exp(-1.4 * dt))
 		shift = shift.limit_length(350.0 * dt)
 		center += shift

@@ -13,6 +13,8 @@ const EDITOR_ORDER := 5
 ## ステージの番号。
 ## 単位：番号
 @export var index: int
+## 星と背景素材の背後に描く、ステージ全体の地色。
+@export var background_color: Color = Color(0.02, 0.03, 0.07)
 ## 開始地点を基準に置く背景。配列の後ろほど手前に重ねる。
 @export var backgrounds: Array[BackgroundPlacement] = []
 ## 開始地点を基準とする固定位置の共通炎。名前 → {preset, offset, scale}。

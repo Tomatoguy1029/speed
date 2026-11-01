@@ -38,6 +38,8 @@ static func _attack(paths: Dictionary, kind: String) -> void:
 static func build(stage: RuntimeStage, output := "res://.content") -> StageResources:
 	var result := StageResources.new()
 	var paths := {}
+	_add(paths, "res://assets/effects/landmark/elite_contacts.tres")
+	_add(paths, "res://data/visuals/elite_runtime.tres")
 	var index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	if index == null: return null
 	result.look_names = index.look_names
@@ -112,6 +114,10 @@ static func build(stage: RuntimeStage, output := "res://.content") -> StageResou
 		var definition := load(boss.path) as BossDef
 		_add(paths, definition.scene_path)
 	for common in ["res://.content/hero_aura.res", "res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/render_pipeline.gd", "res://scripts/render/gpu_sparks.gd", "res://scripts/render/ship_visual.gd", "res://scripts/render/body_visual.gd", "res://scripts/render/meteor_visual.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
+	# 武器・特性の演出は途中で手に入るので、使う shader をすべて事前に準備する
+	for folder in ["res://scripts/render/equipment", "res://scripts/render/friendly", "res://scripts/render/fx"]:
+		for file in DirAccess.get_files_at(folder):
+			if file.ends_with(".gd"): _script(paths, folder.path_join(file))
 	result.paths = PackedStringArray(paths.keys())
 	result.paths.sort()
 	for path in result.paths:

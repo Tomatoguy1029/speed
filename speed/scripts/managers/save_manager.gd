@@ -18,6 +18,8 @@ var data: Dictionary = {}
 var settings: Dictionary = {}
 ## 開発版だけ：ランで使う強化の段の上書き（ID → 段）。調整パネルで決め、セーブには書かない。
 var dev_meta_override: Dictionary = {}
+## 強化画面の試聴用。起動中だけ有効で、設定やセーブへ保存しない。
+var dev_infinite_parts := false
 ## 起動してからウィンドウの大きさを画面に合わせたか
 var _window_sized := false
 
@@ -71,15 +73,19 @@ func run_meta_level(id: StringName) -> int:
 		return int(dev_meta_override[String(id)])
 	return meta_level(id)
 
+func can_afford_upgrade(cost: int) -> bool:
+	return (OS.is_debug_build() and dev_infinite_parts) or coins() >= cost
+
 ## 強化を1段階買う。部品が足りないか最大なら false。
 func buy_upgrade(def: Resource) -> bool:
 	var lv := meta_level(def.id)
 	if lv >= def.costs.size():
 		return false
 	var cost: int = def.costs[lv]
-	if coins() < cost:
+	if not can_afford_upgrade(cost):
 		return false
-	data.coins = coins() - cost
+	if not (OS.is_debug_build() and dev_infinite_parts):
+		data.coins = coins() - cost
 	data.meta[String(def.id)] = lv + 1
 	save()
 	return true
@@ -185,6 +191,7 @@ func default_settings() -> Dictionary:
 	return {
 		"master_volume": 0.8,
 		"sfx_volume": 0.8,
+		"music_volume": 0.5,
 		"engine_volume": 0.6,
 		"muted": true,
 		"window_mode": "windowed",

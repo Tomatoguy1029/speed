@@ -33,6 +33,9 @@ var _final_picker := OptionButton.new()
 var _boss := ""
 var _technique := ""
 var _equipment_key := ""
+var _enemy_key := ""
+var _enemy_row := -1
+var _enemy_id := -1
 var _final_preview := false
 var _final_boss := "canis_major"
 var _serial := 0
@@ -40,6 +43,11 @@ var _visual_time := 0.0
 var _preview_origin := Vector2.ZERO
 var _preview_heading := Vector2.RIGHT
 var _loop_seconds := 0.0
+var _boss_frame := Rect2()
+var _boss_frame_ready := false
+var _preview_target := Vector2.ZERO
+## 装備の試遊で映す世界の横幅（演出の試作の画面は横300ドット＝約710）
+const EQUIPMENT_VIEW_WIDTH := 1000.0
 var _dragging_origin := false
 
 func _ready() -> void:
@@ -185,6 +193,7 @@ func set_effect(path: String, resume: Variant = null) -> void:
 	_serial += 1
 	var serial := _serial
 	_loop_seconds = 0.0
+	_boss_frame_ready = false
 	if manual != null: manual.finish()
 	manual = null
 	actor = null
@@ -194,6 +203,7 @@ func set_effect(path: String, resume: Variant = null) -> void:
 		_weapon_key = ""
 		_trait_key = ""
 	_equipment_key = ""
+	_enemy_key = ""
 	_loadout_row.visible = path.begins_with("weapon/") or path.begins_with("trait/")
 	_refresh_equipment_labels()
 	_final_preview = path == "boss/final_strike"
@@ -205,19 +215,37 @@ func set_effect(path: String, resume: Variant = null) -> void:
 		_equipment_key = path
 		await _setup_equipment(path, serial, keep_playing)
 		return
+	if path.begins_with("enemy/"):
+		_enemy_key = path
+		await _setup_enemy(serial, keep_playing)
+		return
 	if _final_preview:
 		_boss = _final_boss
 		_technique = "final_strike"
+	elif path.begins_with("boss/move/"):
+		var parts := path.split("/")
+		if parts.size() != 4: return
+		_boss = parts[2]
+		_technique = parts[3]
 	else:
-		var relative := path.trim_prefix(ROOT).trim_suffix("_visual.tscn")
-		var parts := relative.split("/")
+		# 本体表示の入口だけは既存scene参照を受け、登録された技IDへ解決する。
+		var parts := path.trim_prefix(ROOT).split("/")
 		if not path.begins_with(ROOT) or parts.size() != 2:
 			_boss = ""
 			_technique = ""
 			_status.text = "ボス技の描画を選ぶと実戦プレビューを表示します"
 			return
 		_boss = parts[0]
-		_technique = parts[1]
+		_technique = ""
+		var rules: Resource = load("res://data/bosses/ai/%s_action_rules.tres" % _boss)
+		if rules != null:
+			for move: Resource in rules.get("techniques"):
+				if move != null and move.visual != null and move.visual.resource_path == path:
+					_technique = String(move.technique)
+					break
+		if _technique.is_empty():
+			_status.text = "この表示に対応する登録技がありません: " + path
+			return
 	if not ContentManager.bosses.has(StringName(_boss)):
 		_status.text = "登録されていないボス: " + _boss
 		return
@@ -249,6 +277,7 @@ func set_effect(path: String, resume: Variant = null) -> void:
 		_status.text = "ボスを配置できません: " + _boss
 		return
 	actor.configure_flow(program)
+	_preview_target = session.run.state.ship_pos
 	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud") if session.scene.view != null else null
 	if hud != null: hud.visible = false
 	if _boss != "hydra" and not _final_preview:
@@ -312,6 +341,28 @@ func _setup_equipment(_key: String, serial: int, keep_playing: bool) -> void:
 	if play_key in ["weapon/knockback","trait/duplicator"]: _status.text += "（試遊では確率の演出を必ず発動）"
 	refresh_effects()
 
+func _setup_enemy(serial: int, keep_playing: bool) -> void:
+	var type := _enemy_key.get_slice("/", 1)
+	_boss = ""
+	_technique = ""
+	_status.text = "敵の技を準備中: " + type
+	await session.reset({"empty": true, "stage": 1, "ship_pos": [400, 0], "invincible": true, "director": {"enabled": false}})
+	if serial != _serial: return
+	_pause_render_process()
+	session.perform("spawn", {"type": type, "pos": [0, 0], "count": 1})
+	_enemy_row = session.selected
+	if _enemy_row < 0:
+		_status.text = "敵を配置できません: " + type
+		return
+	_enemy_id = session.run.enemies.table.id[_enemy_row]
+	_preview_target = session.run.state.ship_pos
+	_boss_frame_ready = false
+	session.playing = keep_playing
+	_set_scene_processing(keep_playing)
+	_sync_play_button()
+	_status.text = "敵の行動と専用の描画を試遊: " + type
+	refresh_effects()
+
 func _show_effect_canvas() -> void:
 	if not is_instance_valid(session.scene) or session.scene.view == null: return
 	var render := _render()
@@ -364,6 +415,9 @@ func _change_loadout() -> void:
 	if not _equipment_key.is_empty(): set_effect(_equipment_key)
 
 func _replay() -> void:
+	if not _enemy_key.is_empty():
+		set_effect(_enemy_key, false)
+		return
 	if not _equipment_key.is_empty():
 		set_effect(_equipment_key, false)
 		return
@@ -376,6 +430,9 @@ func _execute_selected(keep_playing: bool) -> void:
 	if not is_instance_valid(actor): return
 	var started: bool = _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
 	if started:
+		# 構図の基準だけを記録する。吸引・吐出による標的の移動は本番処理へ任せる。
+		_preview_target = session.run.state.ship_pos
+		_boss_frame_ready = false
 		session.playing = keep_playing
 		_set_scene_processing(keep_playing)
 		_sync_play_button()
@@ -387,14 +444,16 @@ func _execute_selected(keep_playing: bool) -> void:
 
 func refresh_effects() -> void:
 	if is_instance_valid(actor):
+		if "sirius_effects" in actor and is_instance_valid(actor.sirius_effects):
+			actor.sirius_effects._sync_fire_displays()
 		var presentation: CanvasItem = actor.get("_presentation") as CanvasItem
 		if presentation != null:
-			EFFECT_SETTINGS.apply_key(presentation, "boss/body/" + _boss)
+			EFFECT_SETTINGS.apply_body(presentation, _boss, _technique)
 			presentation.queue_redraw()
 	var render := _render()
 	if render == null: return
 	_refresh_scene_visuals(session.scene.view)
-	render.build_effects.refresh_preview()
+	_update_preview_camera(render)
 	render._present(0.0)
 	_hide_preview_hud()
 	if not _equipment_key.is_empty(): _show_effect_canvas()
@@ -406,10 +465,13 @@ func _hide_preview_hud() -> void:
 	if hud != null: hud.visible = false
 
 func _refresh_scene_visuals(node: Node) -> void:
+	if node is CanvasItem and node.has_meta("shader_tuning_profile"):
+		ShaderTuning.apply((node as CanvasItem).material as ShaderMaterial, node.get_meta("shader_tuning_profile"), node.get_meta("shader_tuning_fallback", ""), node.get_meta("shader_tuning_component", ""))
 	if node is AttackVisual:
 		(node as AttackVisual)._apply_effect_settings()
 	elif node is CanvasItem:
 		EFFECT_SETTINGS.apply_to(node as CanvasItem)
+	if node.has_method("refresh_visual_settings"): node.refresh_visual_settings()
 	if node is CanvasItem: (node as CanvasItem).queue_redraw()
 	for child in node.get_children(): _refresh_scene_visuals(child)
 
@@ -421,7 +483,6 @@ func _pause_render_process() -> void:
 	var render := _render()
 	if render != null:
 		render.set_process(false)
-		render.build_effects.preview_editable = true
 
 func _set_scene_processing(playing: bool) -> void:
 	if is_instance_valid(session.scene):
@@ -451,22 +512,78 @@ func _process(_delta: float) -> void:
 		session.run._begin_death()
 	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
 	if render == null: return
+	_update_preview_camera(render)
 	if session.playing:
 		_visual_time += _delta * session.speed
 		render._present(_delta * session.speed)
 		_hide_preview_hud()
-		if not _equipment_key.is_empty():
-			_show_effect_canvas()
+		if not _equipment_key.is_empty() or not _enemy_key.is_empty():
+			if not _equipment_key.is_empty(): _show_effect_canvas()
 			_loop_seconds += _delta * session.speed
 			if _loop_seconds >= 10.0:
-				set_effect(_equipment_key, true)
+				set_effect(_enemy_key if not _enemy_key.is_empty() else _equipment_key, true)
 				return
 	_sync_preview_shader_time(session.scene.view)
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
-	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
-	var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
-	render.view_override = {"center": session.run.state.view_center,
-		"zoom": zoom * fit, "shake": _equipment_key.is_empty()}
+
+## ボスと技の範囲を映す、このプレビューだけのカメラ。標的や本編のカメラ状態を追わない。
+func _update_preview_camera(render: RunPresentation) -> void:
+	if not _equipment_key.is_empty():
+		var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
+		render.view_override = {"center": session.run.state.ship_pos, "zoom": 1280.0 / EQUIPMENT_VIEW_WIDTH * fit, "shake": false}
+		return
+	var origin := Vector2.ZERO
+	var body_radius := 180.0
+	if not _enemy_key.is_empty():
+		if session.run.enemies.is_same(_enemy_row, _enemy_id):
+			origin = session.run.enemies.table.pos[_enemy_row]
+			body_radius = maxf(body_radius, float(session.run.enemies.table.r[_enemy_row]))
+	else:
+		if not is_instance_valid(actor) or not actor.has_body(): return
+		origin = actor.table.pos[actor.body]
+		body_radius = maxf(body_radius, float(actor.table.r[actor.body]))
+	if not _boss_frame_ready:
+		var width := 2800.0 if _boss == "hydra" else 1800.0
+		var size := Vector2(width, width * 9.0 / 16.0)
+		_boss_frame = Rect2((origin + _preview_target) * 0.5 - size * 0.5, size)
+		_boss_frame_ready = true
+	_boss_frame = _boss_frame.merge(Rect2(origin, Vector2.ZERO).grow(body_radius + 100.0))
+	if is_instance_valid(actor) and "attack_points" in actor:
+		for point: Vector2 in actor.attack_points:
+			_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(100.0))
+	if is_instance_valid(actor):
+		if "attack_field" in actor: _fit_attack_field(actor.attack_field)
+		if "retained_fields" in actor:
+			for host: Node in actor.retained_fields:
+				if is_instance_valid(host) and "attack_field" in host: _fit_attack_field(host.attack_field)
+		if "technique_visuals" in actor:
+			for visual: Node2D in actor.technique_visuals.nodes.values():
+				if not is_instance_valid(visual) or not "effects" in visual: continue
+				for effect: Dictionary in visual.effects:
+					if effect.has("pos"):
+						_boss_frame = _boss_frame.merge(Rect2(effect.pos, Vector2.ZERO).grow(maxf(100.0, float(effect.get("radius", 0.0)))))
+					for point: Vector2 in effect.get("line", PackedVector2Array()):
+						_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(100.0))
+	var pr: ProjectileSystem = session.run.projectiles
+	for row in pr.hazard_alive.size():
+		if pr.hazard_alive[row] == 0: continue
+		var start: Vector2 = pr.hazard_pos[row]
+		var end := start
+		var margin := maxf(80.0, float(pr.hazard_len[row]))
+		if pr.hazard_kind[row] in [ProjectileSystem.HazardKind.BEAM, ProjectileSystem.HazardKind.WALL]:
+			end += Vector2.from_angle(pr.hazard_angle[row]) * pr.hazard_len[row]
+			margin = maxf(80.0, pr.flood_half(row, pr.hazard_len[row]))
+		_boss_frame = _boss_frame.merge(Rect2(start, Vector2.ZERO).expand(end).grow(margin))
+	# 一回の試行中は範囲を広げるだけにし、攻撃が消える瞬間の急なズームを避ける。
+	var zoom := minf(_frame.size.x / _boss_frame.size.x, _frame.size.y / _boss_frame.size.y)
+	render.view_override = {"center": _boss_frame.get_center(), "zoom": maxf(zoom, 0.001), "shake": false}
+
+func _fit_attack_field(field: Node) -> void:
+	if not is_instance_valid(field) or not "effects" in field: return
+	for effect: Dictionary in field.effects:
+		var margin := maxf(100.0, float(effect.get("width", 0.0)))
+		for point: Vector2 in effect.get("points", PackedVector2Array()):
+			_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(margin))
 
 func _step() -> void:
 	if not is_instance_valid(actor) and (session == null or not is_instance_valid(session.run)): return
@@ -499,7 +616,6 @@ func _execute_hydra() -> bool:
 			neck.length = float(actor.def.params.neck_rest)
 			origin = actor._head_pos(neck) if int(gate.get("distance_origin", 0)) == 1 else actor._neck_base(neck)
 	var point := origin + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance
-	session.pinned = point
 	session.run.state.ship_pos = point
 	session.run.state.enemy_aim = point
 	session.run.state.view_center = point

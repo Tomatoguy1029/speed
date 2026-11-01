@@ -18,7 +18,7 @@ func prepare()->void:
 		n.locked=false
 		n.step=0
 		n.emission.clear()
-		n.target=a.run_state.ship_pos
+		n.target=a.neck_tracking_target(n, a.run_state.ship_pos)
 	if a.tech_kind(a.tech)==&"curve":call("curve", 0.0)
 	if a.tech_kind(a.tech) in [&"swarm",&"grid"]:
 		positioning=true
@@ -60,7 +60,7 @@ func position(dt: float)->bool:
 		positioning=false
 		for n in a.participants:
 			n.strike_from=n.strike_pos
-			var direction: Vector2=(a.run_state.ship_pos-n.strike_pos).normalized()
+			var direction: Vector2=(a.neck_tracking_target(n,a.run_state.ship_pos)-n.strike_pos).normalized()
 			n.target=n.strike_pos+direction*float(a.move_params(a.tech).swarm_reach)
 			var hit: Dictionary=a.ctx.field.arena_hit(n.strike_pos,n.target,a.table.r[n.row])
 			if not hit.is_empty():n.target=hit.pos

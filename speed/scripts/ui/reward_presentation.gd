@@ -48,6 +48,28 @@ var _ult_block: PanelContainer
 var _ult_name: Label
 var _ult_desc: Label
 var _ult_key: Label
+## 制作画面が明示注入する表示だけの再生面。配布用の設定や抽選経路を参照しない。
+var _authoring_surface: Control
+
+func attach_authoring_surface(surface: Control) -> bool:
+	if not OS.has_feature("editor"): return false
+	if not _queue.is_empty() or not _current.is_empty() or _authoring_surface != null: return false
+	_authoring_surface = surface
+	for child in get_children():
+		if child is CanvasItem: child.hide()
+	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(surface)
+	surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	show()
+	return true
+
+func detach_authoring_surface() -> Control:
+	var surface := _authoring_surface
+	_authoring_surface = null
+	if surface != null: remove_child(surface)
+	hide()
+	return surface
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -320,6 +342,7 @@ func _begin_ult() -> void:
 	AudioManager.play(&"levelup", -4.0, 0.65)
 
 func _process(delta: float) -> void:
+	if _authoring_surface != null: return
 	if not is_active():
 		return
 	_elapsed += delta

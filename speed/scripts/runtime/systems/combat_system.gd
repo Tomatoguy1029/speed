@@ -148,8 +148,6 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			var target := damage_target(i)
 			var hp_before := t.hp[target]
 			damage_enemy(i, dmg, {"crit": crit, "cause": &"ram", "dir": dir, "impact": hit_pos})
-			if crit:
-				state.emit(&"weak_impact", {"pos": hit_pos, "enemy_pos": t.pos[i], "r": t.r[i]})
 			t.hit_cd[damage_target(i)] = cfg.contact_cooldown
 			if run != null:
 				var id := t.id[damage_target(i)]
@@ -168,7 +166,9 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		state.glide = false
 		var n := hit_pos - t.pos[i]
 		n = n.normalized() if n.length_squared() > 0.0 else -dir
-		state.emit(&"block_impact", {"pos": hit_pos, "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
+		# pos は機体の中心ではなく、敵の接触面。石化・壁等と共用するイベントは演出だけ区別する。
+		state.emit(&"block_impact", {"pos": t.pos[i] + n * t.r[i], "normal": n,
+			"enemy_pos": t.pos[i], "r": t.r[i], "armor_bounce": true})
 		# 押し出すのは機体の本体の大きさまで（なぞり中の太い当たり判定の分は押し出さない）
 		state.ship_pos = t.pos[i] + n * (t.r[i] + cfg.ship_radius + 1.0)
 		var vn := state.ship_vel.dot(n)
@@ -188,12 +188,15 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 	return false
 
 ## 機体の移動区間が、じょうぎ座の壁ビームか固定の戦闘外周に触れたら、手前で止めて弾く。
+## 移動の前から壁の帯に重なっていたら、近い側の外へ押し出して同じように弾く（中に閉じ込めない）。
 ## 弾いたら true。弾かれるのは失敗で、被弾はしない。
 func wall_bounce(from: Vector2) -> bool:
-	var hit := projectiles.block_hit(from, state.ship_pos, cfg.ship_radius)
-	var arena := field.arena_hit(from, state.ship_pos, cfg.ship_radius)
-	if not arena.is_empty() and (hit.is_empty() or from.distance_squared_to(arena.pos)<from.distance_squared_to(hit.pos)):
-		hit = arena
+	var hit := projectiles.block_overlap(from, cfg.ship_radius, state.ship_vel)
+	if hit.is_empty():
+		hit = projectiles.block_hit(from, state.ship_pos, cfg.ship_radius)
+		var arena := field.arena_hit(from, state.ship_pos, cfg.ship_radius)
+		if not arena.is_empty() and (hit.is_empty() or from.distance_squared_to(arena.pos)<from.distance_squared_to(hit.pos)):
+			hit = arena
 	if hit.is_empty():
 		return false
 	var n: Vector2 = hit.normal
@@ -296,7 +299,8 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	t.flash[i] = 0.12
 	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause, "id": t.id[i]})
 	if crit:
-		state.emit(&"text", {"pos": t.pos[i] + Vector2(0, -t.r[i] - 10.0), "text": "CRIT", "color": Color("#ffe46b"), "size": 16})
+		state.emit(&"critical_hit", {"pos": opts.get("impact", t.pos[i]), "enemy_pos": t.pos[i],
+			"r": t.r[i], "dir": opts.get("dir", state.ship_heading)})
 	if t.hp[i] <= 0.0:
 		kill_enemy(i, opts.merged({"crit": crit, "one_shot": dmg >= t.max_hp[i] * 0.8}))
 	elif opts.has("dir"):
@@ -367,6 +371,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 	state.kills += 1
 	if t.landmark[i] != 0:
 		# 目印の星を取り戻した
+		if ctx.heroes != null: ctx.heroes.landmark_recovered(i)
 		state.landmarks.append(t.pos[i])
 		state.emit(&"landmark", {"pos": t.pos[i]})
 	var cause: StringName = opts.get("cause", &"")
@@ -381,17 +386,19 @@ func kill_enemy(i: int, opts := {}) -> void:
 		"t": state.time, "world_t": state.world_time,
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
-	# 質量牽引砲（W21）が船体を牽引したら、吹き飛ばし衝角（W03）の破片も死体も出さない
-	# 残像の追撃は直撃だけで完結させ、牽引・攻撃破片・撃破発動の武器/特性を複製しない。
-	if cause == &"afterimage":
+	# 分身の追撃と牽引は船体を使い、星砕きと重複させない。
+	# hull_scatteredはエンドホールも一時的に書くため、ここでの使用だけを保持する。
+	var afterimage := cause == &"afterimage"
+	var hull_used := afterimage or build.capture_hull(i)
+	if hull_used:
 		t.hull_scattered[i] = 1
-	elif build.capture_hull(i):
-		t.hull_scattered[i] = 1
-	var shatter = build.weapon_behaviors.get(&"W03")
-	if shatter != null: shatter.on_defeated(i, opts)
+	else:
+		var shatter = build.weapon_behaviors.get(&"W03")
+		if shatter != null: shatter.on_defeated(i, opts)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
-	build.on_kill(cause, t.pos[i])
+	if not afterimage:
+		build.on_kill(cause, t.pos[i])
 
 ## 中心 center・半径 radius の敵に、装甲を無視したダメージを与える。
 func explode(center: Vector2, radius: float, dmg: float, opts := {}) -> void:

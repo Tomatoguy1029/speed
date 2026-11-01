@@ -87,12 +87,14 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 
 func _step(dt: float, accel: Vector2) -> void:
 	if state.glide:
-		# 勢い：glide_hold の間は速さを保ち、そのあと glide_fade かけて巡航の速さまで落として終える（仕様書 6.6）
+		# 実走距離に応じて保持・減速時間を伸縮し、慣性航行の時間倍率を掛ける（仕様書 6.6）。
 		state.glide_t += dt
 		var cruise := state.stats.max_speed * cfg.steer_cruise
 		var sp := state.glide_speed
-		var hold := cfg.glide_hold * state.stats.glide_duration_mult
-		var fade := cfg.glide_fade * state.stats.glide_duration_mult
+		var distance_ratio := clampf(state.trace_total / maxf(cfg.draw_length, 1.0), 0.0, 1.0)
+		var duration_mult := distance_ratio * state.stats.glide_duration_mult
+		var hold := cfg.glide_hold * duration_mult
+		var fade := cfg.glide_fade * duration_mult
 		if state.glide_t > hold:
 			var k := (state.glide_t - hold) / maxf(0.001, fade)
 			if k >= 1.0:
@@ -177,7 +179,7 @@ func steal_shield(i: int) -> void:
 	state.ship_shield_max = duration
 	state.ship_shield_flash = 0.2
 	state.emit(&"shield_stolen", {"pos": t.pos[i], "facing": t.facing[i], "r": t.r[i],
-		"arc": float(t.def[i].params.front_arc)})
+		"arc": float(t.def[i].params.front_arc), "enemy_type": t.type[i]})
 
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 ## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。
@@ -195,6 +197,14 @@ func damage(amount: float, slow: float, cause: StringName, source := &"", observ
 	if state.ship_invuln > 0.0 or invincible:
 		_record_damage(amount, cause, source, "invulnerability" if state.ship_invuln > 0.0 else "debug_invincible", state.ship_hp, observation)
 		return false
+	# 時間切れの強制一撃とデバッグ操作は通常の攻撃ではない。
+	if amount > 0.0 and cause != &"final_strike" and cause != &"debug":
+		var barrier = build.weapon_behaviors.get(&"W05")
+		if barrier != null:
+			var hit: Vector2 = state.ship_pos + state.ship_heading * float(barrier.shell_radius())
+			if barrier.block_damage(amount, hit):
+				_barrier_blocked(amount, cause, source, observation)
+				return false
 	var hp_before := state.ship_hp
 	state.ship_hp -= amount
 	if slow > 0.0:
@@ -210,6 +220,24 @@ func damage(amount: float, slow: float, cause: StringName, source := &"", observ
 	if state.ship_hp > 0.0:
 		build.on_hurt()
 	return true
+
+## 敵弾は機体へ届く前に殻と衝突する。共通の被弾制限と記録を通して二重防御を防ぐ。
+func block_projectile(from: Vector2, to: Vector2, radius: float, amount: float, cause: StringName, source := &"", observation: Dictionary = {}) -> Variant:
+	if amount <= 0.0 or state.phase != RunState.Phase.PLAY or state.boss_dead or state.controls_locked or state.encounter_protected:
+		return null
+	if state.ship_shield_t > 0.0 or state.ship_invuln > 0.0 or invincible:
+		return null
+	var barrier = build.weapon_behaviors.get(&"W05")
+	if barrier == null: return null
+	var blocked: Variant = barrier.block_segment(from, to, radius, amount)
+	if blocked != null:
+		_barrier_blocked(amount, cause, source, observation)
+	return blocked
+
+func _barrier_blocked(amount: float, cause: StringName, source: StringName, observation: Dictionary) -> void:
+	# 継続判定は被弾後と同じ間隔で再び受け付ける。
+	state.ship_invuln = state.stats.invulnerability
+	_record_damage(amount, cause, source, "barrier", state.ship_hp, observation)
 
 func _record_damage(amount: float, cause: StringName, source: StringName, reason: String, before: float, observation: Dictionary) -> void:
 	if recording_hurt_attempt.has_connections():

@@ -67,7 +67,7 @@ func tick(dt: float) -> void:
 		var n = item.neck
 		var near: bool = n.free_pos.distance_to(a.run_state.ship_pos) < minf(float(p.attack_ranges[n.kind]), 300.0) + 100.0 + float(p.look_near_extra)
 		if a._normal_moves.has(n.mode) and a.NORMAL_SWIM.phase(a, n) != &"hold": continue
-		a.SNAKE.update_look(n, a.run_state.ship_pos, dt, a._time, a.run_state.rng, p, profile(n), near or profile(n) == &"block")
+		a.SNAKE.update_look(n, a.run_state.ship_pos, dt, a._time, a.run_state.rng, p, profile(n), near or profile(n) == &"block", a.tracking_locked())
 
 func replan() -> void:
 	var p: Dictionary = a.def.params.squad

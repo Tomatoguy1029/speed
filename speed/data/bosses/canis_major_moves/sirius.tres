@@ -1,21 +1,28 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
 [ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/sirius.gd" id="1"]
-
 [ext_resource type="PackedScene" path="res://scenes/bosses/canis_major/sirius_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
 technique = &"sirius"
-display_name = "シリウス"
-beam_length = 1400.0
-beam_time = 0.5
-beam_time_p2 = 0.8
-beam_width = 50.0
-beam_width_p2 = 80.0
-cd = 6.0
-damage = 26.0
+display_name = "焼き焦がす光"
+category = &"single"
+track_during_warn = true
+shots = 3
+shot_gap = 0.25
+warn = 0.7
 lock = 0.3
+lead = 0.3
+aim_turn = 3.0
+beam_length = 1300.0
+beam_width = 40.0
+beam_time = 0.35
+trail_delay = 0.35
+trail_time = 3.2
+trail_width = 18.0
+trail_damage = 10.0
+damage = 20.0
 recover = 1.0
-warn = 1.0
+cd = 12.0
 visual = ExtResource("visual")

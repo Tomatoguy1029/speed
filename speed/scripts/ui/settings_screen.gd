@@ -1,7 +1,7 @@
 ## 設定（仕様書 3）。音量・演出・画面モード・言語・キー設定。変えるとすぐ反映し、設定のファイルに保存する。
 extends UiScreen
 
-const VOLUMES := ["master_volume", "sfx_volume", "engine_volume"]
+const VOLUMES := ["master_volume", "sfx_volume", "music_volume", "engine_volume"]
 const WINDOW_MODES := ["windowed", "fullscreen", "exclusive"]
 
 ## キーの割り当てを待っているアクション（なければ空）

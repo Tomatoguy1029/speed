@@ -112,6 +112,7 @@ func select(id: StringName) -> bool:
 		ctx.ship.heal(ctx.state.stats.max_hp * float(data.increments.heal))
 	else:
 		stacks[id] = int(stacks.get(id, 0)) + 1
+		if id == &"area": ctx.loadout.refresh_sonic_wave_speed()
 	return true
 
 func card_info(id: StringName) -> Dictionary:

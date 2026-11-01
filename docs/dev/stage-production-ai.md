@@ -41,7 +41,7 @@
 | 通常敵の同時攻撃 | ステージの `phases[].attack_budget`・`enemy_attack_values`、クリップの `attack_priority`・`formation_values` | [攻撃の管理](../spec.md#117-敵の攻撃の形)、`scripts/encounters/attack_director.gd` |
 | ステージ内の敵数値 | 対象ステージの `enemy_tuning` | `scripts/data_types/stage_enemy_tuning.gd` の許可項目と `scripts/runtime/systems/enemy_system.gd`、[敵一覧](../game/catalog/enemies.md)を照合する。共通定義を保ってラン専用の値へ解決する |
 | 敵の共通基準と行動（基礎担当の依頼範囲） | `data/enemies/<type ID>.tres`、種類別の `scripts/enemies/` | `scripts/data_types/enemy_def.gd`、`scripts/runtime/systems/enemy_system.gd`、[敵一覧](../game/catalog/enemies.md) |
-| 成長とドロップ | ステージ固有の時間帯の `xp_bonus` 等。共通の `data/config.tres`・敵の報酬値は基礎担当の依頼範囲 | [成長](../spec.md#9-成長)・[ドロップ](../spec.md#10-ドロップと回収)、`scripts/runtime/systems/loadout_system.gd`・`pickup_system.gd` |
+| 成長とドロップ | [結晶と成長の共通規則](../spec.md#10-ドロップと回収)。`data/config.tres`・敵の報酬上書きは基礎担当の依頼範囲 | [成長](../spec.md#9-成長)・[ドロップ](../spec.md#10-ドロップと回収)、`scripts/runtime/systems/loadout_system.gd`・`pickup_system.gd` |
 | ボス | 対象の `data/bosses/`・`scenes/bosses/`・`scripts/bosses/` | ボスの個別仕様と[AI・技・演出の分担](../architecture.md#61-敵とボスの-ai) |
 | 敵の絵・攻撃の描画 | `assets/pixel/`、`scripts/render/run_presentation.gd`、対象の描画処理 | [アートスタイル](../game/art-style.md)・[素材の入口](../../speed/assets/pixel/README.md)。ヒュドラは[個別素材と演出](../game/bosses/hydra.md#8-素材と演出) |
 
@@ -567,13 +567,13 @@ Hydraは基準姿勢の首配置・生存本数・一部の参加条件と、通
 
 ### 録画操作と開始条件の補足
 
-F9の待機はラン開始前にONにし、通常のステージ選択から開始する。録画はクリア・死亡・退出時に閉じ、F9でも手動停止できる。停止・再開は別ファイルとして扱う。ラン終了後も待機は続く。
+Ctrl+F9の待機はラン開始前にONにし、通常のステージ選択から開始する。録画はクリア・死亡・退出時に閉じ、Ctrl+F9でも手動停止できる。停止・再開は別ファイルとして扱う。ラン終了後も待機は続く。
 
-プレイ中のF9開始は成長を引き継ぐ途中録画、タイムライン途中再生はその時刻から初期の成長状態で始める区間検証。タイムラインは時刻0からでも通常開始と区別する。途中時刻のXP0を通常成長の集計へ混ぜない。
+プレイ中のCtrl+F9開始は成長を引き継ぐ途中録画、タイムライン途中再生はその時刻から初期の成長状態で始める区間検証。タイムラインは時刻0からでも通常開始と区別する。途中時刻のXP0を通常成長の集計へ混ぜない。
 
 録画中のF4は適用と保存を別の通知として読む。変更した時刻・項目・感想を確認し、設定区間を分ける。候補を探すライブ試行後は保存済みの値で先頭から再録画し、固定条件の比較につなぐ。通知形式は[設計書の開始条件と分析](../architecture.md#開始条件と分析の読み方)を参照する。
 
-保存先は端末の書類フォルダ内 `SPEED/recordings/`、取得できない場合はGodotの `user://recordings/`。録画・待機が有効な間はF10で開ける。F9で無効にするとF10も無効になる。F10や利用者の手動探索を録画分析の必須手順にしない。
+保存先は端末の書類フォルダ内 `SPEED/recordings/`、取得できない場合はGodotの `user://recordings/`。録画・待機が有効な間はCtrl+F10で開ける。Ctrl+F9で無効にするとCtrl+F10も無効になる。Ctrl+F10や利用者の手動探索を録画分析の必須手順にしない。
 
 ### 1. 目的と調整基準を揃える
 
@@ -583,7 +583,7 @@ F9の待機はラン開始前にONにし、通常のステージ選択から開�
 
 ### 2. 保存先を解決し、対象録画を選ぶ
 
-- 指定されたファイル・ディレクトリを優先する。未指定なら `speed/scripts/dev/play_recorder.gd` の `folder()` と各端末の書類フォルダ/Godotユーザーデータ設定から保存先を解決し、AIがJSONLを直接読む。F10でフォルダを開く操作や利用者によるファイル探索を標準手順にしない。
+- 指定されたファイル・ディレクトリを優先する。未指定なら `speed/scripts/dev/play_recorder.gd` の `folder()` と各端末の書類フォルダ/Godotユーザーデータ設定から保存先を解決し、AIがJSONLを直接読む。Ctrl+F10でフォルダを開く操作や利用者によるファイル探索を標準手順にしない。
 - ヘッダー・末尾・型別件数から候補を確認し、対象ステージ・記録日時・開始条件・終了状態と依頼の試遊範囲を照合する。更新日時が最新のファイルを無確認で対象ランにしない。候補が曖昧なら、確認できた候補の違いと必要な日時/ステージ等だけを聞く。
 - アクセスできない場合は対象の保存先と理由を示し、必要なパス指定や読める環境への受け渡しだけを依頼する。個人の絶対パスを共有文書へ保存しない。
 - 通常開始・タイムライン検証・途中録画/前半欠落・出自不明を、スキルの適格性判定で分ける。通常成長へ途中時刻のXP0開始を混ぜず、採用したファイル/秒範囲と除外理由を残す。schema番号だけでなく測定版と実在項目を確認し、欠けたイベントを創作しない。

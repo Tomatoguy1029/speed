@@ -76,6 +76,9 @@ var _last_history_key := ""
 var _last_history_msec := 0
 var _drag_before: Dictionary = {}
 var _restoring_history := false
+var _history_gesture := false
+var _history_popup: PopupPanel
+var _last_history_input := 0
 
 func _snapshot() -> Dictionary:
 	var values := {}
@@ -117,15 +120,15 @@ func _restore_snapshot(snapshot: Dictionary) -> void:
 	_view_dirty = true
 	dirty = true
 	_set_status("未保存の調整値 / 保存先: " + _loaded_path)
-	_restoring_history = false
 	if is_instance_valid(_panel): _panel.refresh()
+	_restoring_history = false
 
 func _record_change(key: String, before: Dictionary, merge := false) -> void:
 	if _restoring_history or before.is_empty(): return
 	var after := _snapshot()
 	if before == after: return
 	var now := Time.get_ticks_msec()
-	if not merge or key != _last_history_key or now - _last_history_msec > 500:
+	if not merge or key != _last_history_key or (not _history_gesture and now - _last_history_msec > 500):
 		_history_serial += 1
 	_last_history_key = key
 	_last_history_msec = now
@@ -153,16 +156,64 @@ func change_setting_component(key: String, axis: int, value: float) -> void:
 	var vector: Variant = settings.get(key)
 	vector[axis] = value
 	settings.set(key, vector)
-	_record_change(key, before, true)
+	_record_change("%s/%d" % [key, axis], before, true)
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	if Engine.is_editor_hint() or not is_visible_in_tree() or not event is InputEventKey: return
+func end_history_merge() -> void:
+	_last_history_key = ""
+	_last_history_msec = 0
+
+func end_history_gesture() -> void:
+	_history_gesture = false
+	end_history_merge()
+
+func history_field_focused() -> void:
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		end_history_merge()
+
+func history_popup_opened(popup: PopupPanel) -> void:
+	_history_popup = popup
+	end_history_gesture()
+
+func _input(event: InputEvent) -> void:
+	history_input(event, get_viewport())
+
+func history_input(event: InputEvent, scope: Viewport) -> void:
+	if Engine.is_editor_hint() or not is_visible_in_tree(): return
+	if is_instance_valid(_history_popup) and _history_popup.visible: scope = _history_popup
+	if event.get_instance_id() == _last_history_input: return
+	_last_history_input = event.get_instance_id()
+	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		if event.pressed:
+			end_history_merge()
+			_history_gesture = true
+		else: call_deferred("end_history_gesture")
+		return
+	if not event is InputEventKey: return
+	var focus := scope.gui_get_focus_owner()
+	var spin: SpinBox
+	var node: Node = focus
+	while node != null:
+		if node is SpinBox:
+			spin = node as SpinBox
+			break
+		node = node.get_parent()
+	if event.keycode in [KEY_UP, KEY_DOWN] and spin != null:
+		if event.pressed and not event.echo:
+			end_history_merge()
+			_history_gesture = true
+		elif not event.pressed: call_deferred("end_history_gesture")
 	if not event.pressed or event.echo or event.keycode != KEY_Z or not event.is_command_or_control_pressed(): return
-	var focus := get_viewport().gui_get_focus_owner()
-	if focus is LineEdit or focus is TextEdit or focus is SpinBox: return
+	if (focus is LineEdit or focus is TextEdit) and spin == null and scope != _history_popup: return
+	scope.set_input_as_handled()
+	if spin != null: spin.apply()
+	end_history_gesture()
 	if event.shift_pressed: _history.redo()
 	else: _history.undo()
-	get_viewport().set_input_as_handled()
+
+func _reset_edit_history() -> void:
+	_history_generation += 1
+	_history.clear_history()
+	end_history_gesture()
 
 func open_editor() -> void:
 	EditorInterface.play_custom_scene("res://gyms/visual_editor.tscn")
@@ -329,7 +380,7 @@ func select_context(path: String, target: int) -> void:
 		_set_status("背景を読み込めません: " + path)
 		return
 	if path != context_stage_path or target != context_target:
-		_history_generation += 1
+		_reset_edit_history()
 	var old_center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
 	var references: Array[Dictionary] = []
 	for sprite in reference_sprites:
@@ -741,7 +792,7 @@ func reload_preset() -> void:
 	if loaded == null:
 		_set_status("ピクセル炎の設定Resourceを読み込めません。")
 		return
-	_history_generation += 1
+	_reset_edit_history()
 	_loaded_path = path
 	_source_hash = FileAccess.get_md5(path)
 	settings = loaded
@@ -767,7 +818,7 @@ func save_copy() -> void:
 		_set_status("複製先には data/visuals 内の新しい .tres パスを指定してください。既存ファイルは保護します。")
 		return
 	if _write_preset(path):
-		_history_generation += 1
+		_reset_edit_history()
 		preset_path = path
 		notify_property_list_changed()
 		if is_instance_valid(_panel):
@@ -777,6 +828,7 @@ func _valid_path(path: String) -> bool:
 	return path.begins_with("res://data/visuals/") and path.ends_with(".tres")
 
 func _write_preset(path: String) -> bool:
+	end_history_gesture()
 	if settings == null:
 		return false
 	# 書き出すコピーだけにパスを付け、共有キャッシュと調整中Resourceを分離する。
@@ -803,6 +855,7 @@ func reload_current() -> void:
 	reload_preset()
 
 func set_active(active: bool) -> void:
+	if not active: end_history_gesture()
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
 	stage.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED
 	if active:

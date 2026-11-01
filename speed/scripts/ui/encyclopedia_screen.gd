@@ -64,6 +64,7 @@ func _ready() -> void:
 		var ids: Array = ORDER.get(section[1],table.keys())
 		var grid := _grid(page)
 		var comet := false
+		var number := 0
 		var first: Button
 		for id in ids:
 			var def: Resource = table.get(StringName(id))
@@ -80,9 +81,10 @@ func _ready() -> void:
 				page.add_child(label)
 				grid = _grid(page)
 			total += 1
+			number += 1
 			var has := SaveManager.is_module_known(def.id)
 			known += 1 if has else 0
-			var entry := _entry(def,has,total,rare)
+			var entry := _entry(def,has,number,rare)
 			grid.add_child(entry)
 			if first==null: first=entry
 		_first.append(first)
@@ -197,4 +199,4 @@ func _show(def: Resource, has: bool, number: int, rare: bool, button: Button) ->
 	_detail_scroll.scroll_vertical=0
 	_detail_panel.add_theme_stylebox_override("panel",_style(rare,true))
 	_caption.text="No.%02d  %s%s" % [number,tr(SECTIONS[_tab][0]),("  "+tr("codex.comet_relics")) if rare else ""]
-	_detail.text=(def.get_display_name()+"\n\n"+def.get_description()) if has else tr("codex.unknown_name")+"\n\n"+tr("codex.unknown_detail")
+	_detail.text=(def.get_display_name()+"\n\n"+def.get_codex_description()) if has else tr("codex.unknown_name")+"\n\n"+tr("codex.unknown_detail")

@@ -6,27 +6,131 @@ uniform float strength=0.0;
 uniform float pop=0.0;
 uniform float pixel_scale=1.0;
 uniform vec4 tint : source_color=vec4(1.0);
+// 機体の既定値を維持し、敵は元画像の座標系と余白を渡す。
+uniform vec2 mask_size=vec2(83,122);
+uniform float distance_scale=0.55;
+uniform float rise_origin=30.8;
+uniform bool landmark_mode=false;
+uniform float aura_width=5.0;
+uniform float aura_variation=6.25;
+uniform float aura_intensity=0.9;
+uniform vec4 aura_core : source_color=vec4(1.0,0.855,0.467,1.0);
+uniform vec4 aura_outer : source_color=vec4(0.710,0.439,0.102,1.0);
+uniform bool pump_mask=false;
+uniform float pump_full=0.0;
+uniform float mask_padding=32.0;
+group_uniforms landmark;
+uniform float lm_edge_falloff=1.0;
+uniform float lm_core_width=3.0;
+uniform float lm_flow_angle=-90.0;
+uniform float lm_flow_coherence=1.0;
+uniform float lm_flow_spread=90.0;
+uniform float lm_flow_field_scale=1.0;
+uniform float lm_flow_field_speed=0.15;
+uniform float lm_noise_span=64.0;
+uniform float lm_noise_frequency_1=1.2;
+uniform float lm_noise_frequency_2=0.96;
+uniform float lm_noise_speed_1=28.0;
+uniform float lm_noise_speed_2=16.0;
+uniform float lm_noise_weight_1=1.0;
+uniform float lm_noise_weight_2=1.0;
+uniform float lm_noise_offset_x=23.0;
+uniform float lm_noise_offset_y=41.0;
+uniform float lm_noise_bias=0.5;
+uniform float lm_noise_contrast=1.0;
+uniform float lm_breakup_span=37.0;
+uniform float lm_breakup_speed=9.0;
+uniform float lm_breakup_strength=0.35;
+uniform float lm_breakup_offset_x=17.0;
+uniform float lm_breakup_offset_y=0.0;
+uniform float lm_core_noise_threshold=0.4;
+uniform float lm_core_noise_gain=1.6;
+uniform float lm_edge_opacity=0.8627451;
+uniform float lm_core_opacity=0.43137255;
+uniform float lm_max_opacity=0.89411765;
+uniform float lm_pulse_amount=0.07;
+uniform float lm_pulse_seconds=4.0;
+uniform float lm_opacity_step=12.0;
+group_uniforms;
+#include "res://shaders/pump_outline.gdshaderinc"
+// tuning の値は戦闘エフェクトツールで上書きする（ShaderTuning）。強さで銀→青→金に変わり、各段は縁・中・外の3色
+group_uniforms tuning;
+uniform vec4 silver_rim : source_color=vec4(0.949,0.965,1.0,1.0);
+uniform vec4 silver_mid : source_color=vec4(0.725,0.776,0.902,1.0);
+uniform vec4 silver_outer : source_color=vec4(0.435,0.498,0.682,1.0);
+uniform vec4 blue_rim : source_color=vec4(0.902,0.973,1.0,1.0);
+uniform vec4 blue_mid : source_color=vec4(0.498,0.816,1.0,1.0);
+uniform vec4 blue_outer : source_color=vec4(0.184,0.435,0.753,1.0);
+uniform vec4 gold_rim : source_color=vec4(1.0,0.965,0.816,1.0);
+uniform vec4 gold_mid : source_color=vec4(1.0,0.824,0.290,1.0);
+uniform vec4 gold_outer : source_color=vec4(0.690,0.478,0.078,1.0);
+uniform float flicker_speed : hint_range(0.0, 3.0, 0.05)=1.0;
+uniform float rise : hint_range(0.0, 2.0, 0.05)=0.6;
+group_uniforms;
 vec3 palette(float stage, int band){
- vec3 a[3]=vec3[](vec3(242,246,255),vec3(185,198,230),vec3(111,127,174));
- vec3 b[3]=vec3[](vec3(230,248,255),vec3(127,208,255),vec3(47,111,192));
- vec3 c[3]=vec3[](vec3(255,246,208),vec3(255,210,74),vec3(176,122,20));
- return (stage<1.0?mix(a[band],b[band],stage):mix(b[band],c[band],min(1.0,stage-1.0)))/255.0;
+ vec3 a[3]=vec3[](silver_rim.rgb,silver_mid.rgb,silver_outer.rgb);
+ vec3 b[3]=vec3[](blue_rim.rgb,blue_mid.rgb,blue_outer.rgb);
+ vec3 c[3]=vec3[](gold_rim.rgb,gold_mid.rgb,gold_outer.rgb);
+ return stage<1.0?mix(a[band],b[band],stage):mix(b[band],c[band],min(1.0,stage-1.0));
+}
+vec2 landmark_flow(vec2 p, float layer){
+ float angle=radians(lm_flow_angle);
+ vec2 aligned=vec2(cos(angle),sin(angle));
+ if(lm_flow_coherence>=1.0) return aligned;
+ vec2 offset=vec2(lm_noise_offset_x,lm_noise_offset_y)*layer;
+ float field=texture(noise_tex,(p*lm_flow_field_scale+offset)/64.0+vec2(clock*flicker_speed*lm_flow_field_speed)).r;
+ float scattered_angle=angle+(field*2.0-1.0)*radians(lm_flow_spread);
+ vec2 scattered=vec2(cos(scattered_angle),sin(scattered_angle));
+ return normalize(mix(scattered,aligned,lm_flow_coherence));
+}
+float landmark_noise(vec2 p){
+ float t=clock*flicker_speed;
+ float a=texture(noise_tex,(p*lm_noise_frequency_1-landmark_flow(p,0.0)*t*lm_noise_speed_1)/lm_noise_span).r;
+ float b=texture(noise_tex,(p*lm_noise_frequency_2+vec2(lm_noise_offset_x,lm_noise_offset_y)-landmark_flow(p,1.0)*t*lm_noise_speed_2)/lm_noise_span).r;
+ return clamp((a*lm_noise_weight_1+b*lm_noise_weight_2-lm_noise_bias)*lm_noise_contrast,0.0,1.0);
 }
 void fragment(){
- vec2 p=(floor(UV*vec2(83,122)*0.55/pixel_scale)+0.5)*pixel_scale;
- vec2 uv=p/(vec2(83,122)*0.55);
+ vec2 p=(floor(UV*mask_size*distance_scale/pixel_scale)+0.5)*pixel_scale;
+ vec2 uv=p/(mask_size*distance_scale);
  float raw=texture(TEXTURE,uv).r*255.0;
- float distance=raw/8.0*0.55;
+ float distance=raw/8.0*distance_scale;
+ if(landmark_mode && pump_mask && pump_full>0.001){
+  vec2 at=floor(p-vec2(mask_padding));
+  vec2 radii=pump_radii(at,pump_full);
+  vec2 source=pump_source(at,radii);
+  vec2 warped=(source+vec2(mask_padding)+0.5)/mask_size;
+  float front_distance=texture(TEXTURE,uv).g*255.0/8.0;
+  float rear_distance=texture(TEXTURE,warped).b*255.0/8.0*radii.y/radii.x;
+  rear_distance=max(rear_distance,length(at-vec2(12.0,27.0))-radii.y);
+  distance=min(front_distance,rear_distance);
+  raw=distance*8.0;
+ }
  float base=0.5+3.3*strength*strength+0.7*pop;
- float n=clamp(texture(noise_tex,(p*1.2+vec2(0,clock*28.0))/64.0).r+texture(noise_tex,(p*0.96+vec2(23,clock*16.0+41.0))/64.0).r-0.5,0.0,1.0);
- float up=max(0.0,30.0*0.55+26.0*0.55-p.y)/50.0;
- float e=base*(0.75+0.55*n)+up*base*0.6*n;
+ float n=landmark_mode?landmark_noise(p):clamp(texture(noise_tex,(p*1.2+vec2(0,clock*flicker_speed*28.0))/64.0).r+texture(noise_tex,(p*0.96+vec2(23,clock*flicker_speed*16.0+41.0))/64.0).r-0.5,0.0,1.0);
+ float up=max(0.0,rise_origin-p.y)/50.0;
+ float e=base*(0.75+0.55*n)+up*base*rise*n;
  float inner=e-distance;
  vec4 col=vec4(0.0);
+ if(landmark_mode){
+  // 輪郭から外へ薄くなる濃金の揺らぎ。機体の段階色とは独立する。
+  float width=aura_width+aura_variation*n;
+  if(raw>0.0 && distance<width){
+   float edge=distance/max(width,0.001);
+   float breakup=texture(noise_tex,(p+vec2(lm_breakup_offset_x,lm_breakup_offset_y)-landmark_flow(p,2.0)*clock*flicker_speed*lm_breakup_speed)/lm_breakup_span).r;
+   float broken=(1.0-lm_breakup_strength)+lm_breakup_strength*breakup;
+   float core=max(0.0,1.0-distance/lm_core_width)*max(0.0,(n-lm_core_noise_threshold)*lm_core_noise_gain);
+   float alpha=(lm_edge_opacity*pow(1.0-edge,lm_edge_falloff)*broken+lm_core_opacity*core)*255.0*aura_intensity;
+   alpha*=1.0-lm_pulse_amount+lm_pulse_amount*sin(clock*TAU/lm_pulse_seconds);
+   alpha=min(lm_max_opacity*255.0,floor(alpha/lm_opacity_step+0.5)*lm_opacity_step)/255.0;
+   col=mix(aura_core,aura_outer,edge);
+   col.a*=alpha;
+  }
+ }else{
  if(raw>0.0&&distance<14.0&&distance<=e&&base>=1.0){
   if(inner<1.0) col=vec4(pop>0.5?vec3(1.0):palette(strength*2.0,0),1.0);
   else if(inner<2.0) col=vec4(palette(strength*2.0,1),1.0);
   else if(mod(p.x+p.y,2.0)<1.0) col=vec4(palette(strength*2.0,2),1.0);
+ }
  }
  COLOR=col*tint;
 }

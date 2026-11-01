@@ -1,0 +1,363 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/centaurus_parts.gd" id="1_ohaap"]
+[ext_resource type="Texture2D" path="res://assets/pixel/centaurus/base.png" id="2_rmrdc"]
+[ext_resource type="Texture2D" path="res://assets/pixel/centaurus/armor.png" id="3_1j3vs"]
+[ext_resource type="Texture2D" path="res://assets/pixel/centaurus/bow.png" id="4_i4tkx"]
+
+
+[ext_resource type="Shader" path="res://shaders/boss_part.gdshader" id="centaurus_normal_shader"]
+[ext_resource type="Texture2D" path="res://assets/pixel/centaurus/armor_normal.png" id="centaurus_normal_armor"]
+[ext_resource type="Texture2D" path="res://assets/pixel/centaurus/bow_normal.png" id="centaurus_normal_bow"]
+
+[sub_resource type="ShaderMaterial" id="centaurus_normal_material"]
+shader = ExtResource("centaurus_normal_shader")
+shader_parameter/use_normal = true
+
+[sub_resource type="CanvasTexture" id="centaurus_canvas_armor"]
+diffuse_texture = ExtResource("3_1j3vs")
+normal_texture = ExtResource("centaurus_normal_armor")
+texture_filter = 1
+
+[sub_resource type="CanvasTexture" id="centaurus_canvas_bow"]
+diffuse_texture = ExtResource("4_i4tkx")
+normal_texture = ExtResource("centaurus_normal_bow")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="plume_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(179, 6, 86, 90)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="plume_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(179, 6, 86, 90)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="side_armor_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(182, 126, 23, 52)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="side_armor_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(182, 126, 23, 52)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="body_upper_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(107, 85, 45, 64)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="body_upper_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(107, 85, 45, 64)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="body_middle_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(107, 177, 45, 30)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="body_middle_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(107, 177, 45, 30)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="body_lower_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(115, 231, 27, 43)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="body_lower_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(115, 231, 27, 43)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="arm_upper_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(240, 124, 22, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="arm_upper_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(240, 124, 22, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="arm_forearm_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(246, 162, 15, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="arm_forearm_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(246, 162, 15, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="hand_base"]
+atlas = ExtResource("2_rmrdc")
+region = Rect2(241, 205, 18, 22)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="hand_armor"]
+atlas = SubResource("centaurus_canvas_armor")
+region = Rect2(241, 205, 18, 22)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="bow_vertical_bow"]
+atlas = SubResource("centaurus_canvas_bow")
+region = Rect2(484, 226, 10, 68)
+filter_clip = true
+
+[node name="CentaurusParts" type="Node2D" unique_id=464581155]
+texture_filter = 1
+script = ExtResource("1_ohaap")
+
+[node name="Plume" type="Node2D" parent="." unique_id=1797218952]
+position = Vector2(-46, -135)
+metadata/part_label = "Plume"
+
+[node name="Base" type="Sprite2D" parent="Plume" unique_id=1922208220]
+z_index = -1
+texture = SubResource("plume_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="Plume" unique_id=77744940]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("plume_armor")
+centered = false
+
+[node name="RearRightLeg" type="Node2D" parent="." unique_id=813349833]
+position = Vector2(16, -53)
+metadata/part_label = "後右脚"
+
+[node name="Base" type="Sprite2D" parent="RearRightLeg" unique_id=1532600266]
+z_index = -1
+position = Vector2(-4, 0)
+texture = SubResource("side_armor_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="RearRightLeg" unique_id=1071912964]
+material = SubResource("centaurus_normal_material")
+position = Vector2(-4, 0)
+texture = SubResource("side_armor_armor")
+centered = false
+
+[node name="RearLeftLeg" type="Node2D" parent="." unique_id=1348215993]
+position = Vector2(-35, -54)
+metadata/part_label = "後左脚"
+
+[node name="Base" type="Sprite2D" parent="RearLeftLeg" unique_id=1481959502]
+z_index = -1
+texture = SubResource("side_armor_base")
+centered = false
+flip_h = true
+
+[node name="Armor" type="Sprite2D" parent="RearLeftLeg" unique_id=1772569863]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("side_armor_armor")
+centered = false
+flip_h = true
+
+[node name="FrontLeftLeg" type="Node2D" parent="." unique_id=1676279492]
+position = Vector2(-40, 1)
+metadata/part_label = "前左脚"
+
+[node name="Base" type="Sprite2D" parent="FrontLeftLeg" unique_id=681016511]
+z_index = -1
+texture = SubResource("side_armor_base")
+centered = false
+flip_h = true
+
+[node name="Armor" type="Sprite2D" parent="FrontLeftLeg" unique_id=665249106]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("side_armor_armor")
+centered = false
+flip_h = true
+
+[node name="FrontRightLeg" type="Node2D" parent="." unique_id=383267764]
+position = Vector2(20, 0)
+metadata/part_label = "前右脚"
+
+[node name="Base" type="Sprite2D" parent="FrontRightLeg" unique_id=189094445]
+z_index = -1
+position = Vector2(-4, 0)
+texture = SubResource("side_armor_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="FrontRightLeg" unique_id=102592036]
+material = SubResource("centaurus_normal_material")
+position = Vector2(-4, 0)
+texture = SubResource("side_armor_armor")
+centered = false
+
+[node name="UpperBody" type="Node2D" parent="." unique_id=1429625580]
+position = Vector2(-23, -54)
+metadata/part_label = "UpperBody"
+
+[node name="Base" type="Sprite2D" parent="UpperBody" unique_id=1476269502]
+z_index = -1
+texture = SubResource("body_upper_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="UpperBody" unique_id=1207705574]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("body_upper_armor")
+centered = false
+
+[node name="MiddleBody" type="Node2D" parent="." unique_id=2062498354]
+position = Vector2(-23, 5)
+metadata/part_label = "MiddleBody"
+
+[node name="Base" type="Sprite2D" parent="MiddleBody" unique_id=354301542]
+z_index = -1
+texture = SubResource("body_middle_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="MiddleBody" unique_id=1291699096]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("body_middle_armor")
+centered = false
+
+[node name="LowerBody" type="Node2D" parent="." unique_id=1325748710]
+position = Vector2(-11, 20)
+rotation = 0.15707964
+metadata/part_label = "LowerBody"
+
+[node name="Base" type="Sprite2D" parent="LowerBody" unique_id=336806544]
+z_index = -1
+texture = SubResource("body_lower_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="LowerBody" unique_id=568365571]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("body_lower_armor")
+centered = false
+
+[node name="RightArm" type="Node2D" parent="." unique_id=282247031]
+position = Vector2(25.16726, 33.170837)
+rotation = 0.31460193
+metadata/part_label = "右腕"
+
+[node name="Upper" type="Node2D" parent="RightArm" unique_id=1011940374]
+position = Vector2(-9, 0)
+metadata/part_label = "Upper"
+
+[node name="Base" type="Sprite2D" parent="RightArm/Upper" unique_id=1642586225]
+z_index = -1
+position = Vector2(-4, -1)
+texture = SubResource("arm_upper_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="RightArm/Upper" unique_id=404963312]
+material = SubResource("centaurus_normal_material")
+position = Vector2(-4, -1)
+texture = SubResource("arm_upper_armor")
+centered = false
+
+[node name="Elbow" type="Node2D" parent="RightArm" unique_id=1103824520]
+position = Vector2(-3.0525608, 21.190247)
+rotation = -0.035791766
+metadata/part_label = "右肘"
+
+[node name="Forearm" type="Node2D" parent="RightArm/Elbow" unique_id=1324207270]
+position = Vector2(-7, 0)
+metadata/part_label = "Forearm"
+
+[node name="Base" type="Sprite2D" parent="RightArm/Elbow/Forearm" unique_id=1033504787]
+z_index = -1
+texture = SubResource("arm_forearm_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="RightArm/Elbow/Forearm" unique_id=1364398487]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("arm_forearm_armor")
+centered = false
+
+[node name="Hand" type="Node2D" parent="RightArm/Elbow" unique_id=1843990649]
+position = Vector2(-4.019331, 23.75925)
+rotation = 0.6829892
+scale = Vector2(0.9999999, 0.9999999)
+metadata/part_label = "Hand"
+
+[node name="Base" type="Sprite2D" parent="RightArm/Elbow/Hand" unique_id=1573845454]
+z_index = -1
+texture = SubResource("hand_base")
+centered = false
+flip_h = true
+
+[node name="Armor" type="Sprite2D" parent="RightArm/Elbow/Hand" unique_id=1662335154]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("hand_armor")
+centered = false
+flip_h = true
+
+[node name="LeftArm" type="Node2D" parent="." unique_id=593702542]
+position = Vector2(-20.594498, 29.747355)
+rotation = 0.8693707
+metadata/part_label = "左腕"
+
+[node name="Upper" type="Node2D" parent="LeftArm" unique_id=1386487794]
+position = Vector2(-8.999999, 0)
+metadata/part_label = "Upper"
+
+[node name="Base" type="Sprite2D" parent="LeftArm/Upper" unique_id=1154624145]
+z_index = -1
+position = Vector2(0, -1)
+texture = SubResource("arm_upper_base")
+centered = false
+flip_h = true
+
+[node name="Armor" type="Sprite2D" parent="LeftArm/Upper" unique_id=38428978]
+material = SubResource("centaurus_normal_material")
+position = Vector2(0, -1)
+texture = SubResource("arm_upper_armor")
+centered = false
+flip_h = true
+
+[node name="Elbow" type="Node2D" parent="LeftArm" unique_id=1543425415]
+position = Vector2(-3.9738722, 28.409946)
+rotation = -1.8972466
+metadata/part_label = "左肘"
+
+[node name="Forearm" type="Node2D" parent="LeftArm/Elbow" unique_id=551881052]
+position = Vector2(-7, 0)
+scale = Vector2(0.99999994, 0.99999994)
+metadata/part_label = "Forearm"
+
+[node name="Base" type="Sprite2D" parent="LeftArm/Elbow/Forearm" unique_id=1176262646]
+z_index = -1
+texture = SubResource("arm_forearm_base")
+centered = false
+flip_h = true
+
+[node name="Armor" type="Sprite2D" parent="LeftArm/Elbow/Forearm" unique_id=274450429]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("arm_forearm_armor")
+centered = false
+flip_h = true
+
+[node name="Hand" type="Node2D" parent="LeftArm/Elbow" unique_id=1572129292]
+position = Vector2(-11.456017, 27.330667)
+rotation = -0.24665698
+scale = Vector2(0.9999999, 0.9999999)
+metadata/part_label = "Hand"
+
+[node name="Base" type="Sprite2D" parent="LeftArm/Elbow/Hand" unique_id=114831152]
+z_index = -1
+texture = SubResource("hand_base")
+centered = false
+
+[node name="Armor" type="Sprite2D" parent="LeftArm/Elbow/Hand" unique_id=28741339]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("hand_armor")
+centered = false
+
+[node name="Bow" type="Node2D" parent="." unique_id=782591158]
+position = Vector2(-7, 60)
+metadata/part_label = "Bow"
+
+[node name="Bow" type="Sprite2D" parent="Bow" unique_id=1440736840]
+material = SubResource("centaurus_normal_material")
+texture = SubResource("bow_vertical_bow")
+centered = false

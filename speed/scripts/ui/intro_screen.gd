@@ -75,6 +75,7 @@ func _on_beat_changed(next: int) -> void:
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for event in events:
+		if event.type == &"trace_end": AudioManager.end_dash()
 		if event.type == &"launch":
 			AudioManager.play(&"dash", -6.0)
 		if event.type == &"kill":
@@ -110,6 +111,7 @@ func _resume() -> void:
 	run.input.process_mode = Node.PROCESS_MODE_INHERIT if beat in [Beat.FLIGHT,Beat.PRACTICE] else Node.PROCESS_MODE_DISABLED
 
 func _exit_tree() -> void:
+	AudioManager.end_dash()
 	sequence.dispose()
 	# RenderPipeline が導入の間だけ設定した HDR を次のメニューへ残さない。
 	get_viewport().use_hdr_2d = false

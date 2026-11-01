@@ -6,8 +6,21 @@
 script = ExtResource("1")
 visual_settings = {
 "ambient": 0.0,
-"key_energy": 1.7,
-"scale": 1.3
+"collision_scale": 1.1,
+"key_angle": 90.0,
+"key_energy": 1.6,
+"scale": 1.4
+}
+armor_colors = {
+"res://assets/pixel/dolphin/dolphin_armor.png|64x64|ecbdeb597e263ea17242a6c5c7eaa7c35992ff07502b4efae2b22b3bd8dc002b": {
+"1114": "b68e2c",
+"1126": "b68e2c",
+"2071": "2f425e",
+"2087": "2f425e",
+"3167": "2f425e",
+"32": "8a6a2f",
+"476": "b68e2c"
+}
 }
 rank = 5
 radius = 26.0

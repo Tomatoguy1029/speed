@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/blaze.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"blaze"
+display_name = "燃える猟犬"
+category = &"single"
+track_during_warn = true
+warn = 0.5
+count = 3
+min_hounds = 3
+ignite_at = 0.5
+ignite_step = 0.15
+run_speed = 430.0
+stop_dist = 90.0
+max_run = 4.5
+blink = 0.6
+explode_radius = 100.0
+damage = 20.0
+recover = 0.5
+cd = 12.0

@@ -1,7 +1,6 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
 [ext_resource type="Script" path="res://scripts/bosses/monoceros/techniques/lance.gd" id="1"]
-
 [ext_resource type="PackedScene" path="res://scenes/bosses/monoceros/lance_visual.tscn" id="visual"]
 
 [resource]
@@ -9,11 +8,21 @@ script = ExtResource("1")
 technique = &"lance"
 category = &"major"
 display_name = "光の槍"
-active = 0.38
-cd = 10.0
-damage = 30.0
-distance = 340.0
-reach = 650.0
-recover = 2.2
-warn = 1.35
+track_during_warn = false
 visual = ExtResource("visual")
+warn = 1.4
+lock_time = 0.25
+aim_turn = 2.199114857512855
+back_speed = 40.0
+head_length = 60.0
+width = 48.0
+distance = 1250.0
+speed = 3400.0
+boom_interval = 0.045
+boom_ahead = 300.0
+stop_time = 0.35
+stop_decay = 9.0
+shatter_time = 0.2
+damage = 30.0
+recover = 2.0
+cd = 10.0

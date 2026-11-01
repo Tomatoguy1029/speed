@@ -16,6 +16,7 @@ func step(i: int, dt: float) -> void:
 		EnemyTable.Mode.MOVE:
 			if t.timer[i] <= 0.0:
 				var away := (t.pos[i] - state.enemy_aim).normalized()
+				if m.motion.turn_locked(i): away = -Vector2.from_angle(t.facing[i])
 				if away == Vector2.ZERO:
 					away = Vector2.from_angle(t.facing[i])
 				t.anchor[i] = t.pos[i] + away * float(p.retreat_distance)
@@ -23,10 +24,10 @@ func step(i: int, dt: float) -> void:
 			_advance_to(i, t.anchor[i], dt)
 			if t.timer[i] <= 0.0:
 				# ここから着地まで同じ位置を見せる。先読み・追尾は行わない。
-				t.anchor[i] = state.enemy_aim
+				t.anchor[i] = m.motion.tracking_target(i, state.enemy_aim)
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = maxf(0.01, float(p.telegraph))
-				t.facing[i] = (t.anchor[i] - t.pos[i]).angle()
+				t.facing[i] = m.motion.tracking_angle(i, (t.anchor[i] - t.pos[i]).angle())
 		EnemyTable.Mode.WINDUP:
 			t.timer[i] = maxf(0.0, t.timer[i] - dt)
 			t.charge[i] = 1.0 - t.timer[i] / maxf(0.01, float(p.telegraph))
@@ -52,7 +53,7 @@ func step(i: int, dt: float) -> void:
 func _advance_to(i: int, target: Vector2, dt: float) -> void:
 	var t := table
 	var delta := target - t.pos[i]
-	if not delta.is_zero_approx():
+	if not delta.is_zero_approx() and not m.motion.turn_locked(i):
 		t.facing[i] = delta.angle()
 	t.pos[i] = t.pos[i].lerp(target, clampf(dt / maxf(0.001, t.timer[i]), 0.0, 1.0))
 	t.timer[i] = maxf(0.0, t.timer[i] - dt)

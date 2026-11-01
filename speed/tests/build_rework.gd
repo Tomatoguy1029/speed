@@ -14,6 +14,7 @@ func _ready() -> void:
 	_test_discovery()
 	_test_shooting()
 	_test_one_shot()
+	_test_hull_kill_exclusion()
 	_test_barrier()
 	_test_distance()
 	_test_endpoint()
@@ -43,27 +44,21 @@ func _test_duplication() -> void:
 	var behavior = run.loadout.trait_behaviors[&"T37"]
 	behavior.def = behavior.def.duplicate(true)
 	behavior.def.params.chance_by_level = [0.0,0.0,0.0,0.0,0.0]
-	_check(run.loadout.split_vectors(Vector2.RIGHT,0).is_empty(),"分裂は装備した定義を使い、局所的な試遊の設定も反映する")
+	_check(run.loadout.split_vectors(Vector2.RIGHT).is_empty(),"複製は装備した定義を使い、局所的な試遊の設定も反映する")
 	behavior.def.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
 	var ps := run.projectiles
-	ps.fire_shot(Vector2.ZERO, 0.0, 10.0)
-	var original := 0
-	var source_hit := {123: true}
-	ps.friend_hit[original] = source_hit
 	var before := ps.friend_count()
-	for attempt in 100:
-		if ps.duplicate_friend(original, Vector2.ONE): break
-	_check(ps.friend_count() == before + 2, "分裂で2発増える")
+	ps.fire_hull(Vector2.ZERO, Vector2.RIGHT, 1.0, 10.0, 1.0, 0.0, &"drifter", 0.0, 123)
+	_check(ps.friend_count() == before + 3, "生成時に元1個と複製2個を加え、複製からの再抽選を止める")
 	for i in range(1, 3):
-		_check(ps.friend_generation[i] == 1 and is_equal_approx(ps.friend_dmg[i], 8.0), "Lv5の子は8割・次の世代")
-		_check(ps.friend_hit[i].has(123), "同じ敵へ分裂直後に再命中しない")
+		_check(is_equal_approx(ps.friend_dmg[i], 8.0), "Lv5の複製は8割の威力")
+		_check(ps.friend_hit[i].has(123), "複製も発射元の敵を命中対象から除く")
 	ps.friend_hit[1][456] = true
 	_check(not ps.friend_hit[2].has(456), "左右の命中履歴を独立させる")
-	ps.friend_generation[1] = 6
-	_check(not ps.duplicate_friend(1, Vector2.ONE), "6世代で止まる")
 	while ps.friend_count() < 219:
 		ps.fire_shot(Vector2.ZERO, 0.0, 1.0)
-	_check(not ps.duplicate_friend(0, Vector2.ZERO), "220を超える分裂を止める")
+	ps.fire_shot(Vector2.ZERO, 0.0, 1.0)
+	_check(ps.friend_count() == 220, "元の弾の生成後に220を超える複製を止める")
 	ps.friend_slots.clear()
 	run.loadout.reset_loadout()
 
@@ -98,7 +93,7 @@ func _test_one_shot() -> void:
 		t.hp[i] = 8.0
 		var before := run.projectiles.friend_count()
 		run.combat.damage_enemy(i, 8.0, {"cause": cause})
-		_check(run.projectiles.friend_count() == before + 2, "全攻撃から8割の一撃で小さい敵も砕く")
+		_check(run.projectiles.friend_count() == before + (0 if cause == &"afterimage" else 2), "分身以外の8割の一撃で小さい敵も砕く")
 	var weak := _enemy(&"drifter", Vector2(200, 100))
 	t.max_hp[weak] = 10.0
 	t.hp[weak] = 7.99
@@ -235,5 +230,36 @@ func _test_hole_capture() -> void:
 	hole.on_end()
 	hole.tick(0.2, false)
 	_check(run.enemies.table.dead[victim] == 0 and run.enemies.table.hull_scattered[victim] == 0, "無敵の敵はエンドホールへ吸い込んだ扱いにしない")
+	_clear()
+	run.loadout.reset_loadout()
+
+func _test_hull_kill_exclusion() -> void:
+	_clear()
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"weapon", &"W03", 5)
+	run.loadout.grant(&"weapon", &"W21", 1)
+	run.loadout.grant(&"trait", &"T33", 1)
+	var shatter = run.loadout.weapon_behaviors[&"W03"]
+	shatter.def = shatter.def.duplicate(true)
+	shatter.def.params.chance_by_level = [1.0, 1.0, 1.0, 1.0, 1.0]
+	var tow = run.loadout.weapon_behaviors[&"W21"]
+	var rampage = run.loadout.trait_behaviors[&"T33"]
+	var t := run.enemies.table
+	run.state.tracing = true
+	for cause in [&"shot", &"afterimage"]:
+		var i := _enemy(&"drifter", run.state.ship_pos + Vector2(30, 0))
+		var kills := run.state.kills
+		var count: int = tow.cargo.size()
+		var triggered: int = rampage.kills
+		run.combat.kill_enemy(i, {"cause": cause, "one_shot": true})
+		_check(run.projectiles.debris_count() == 0, "船体を使った撃破では星砕きが発動しない")
+		_check(tow.cargo.size() == count + (0 if cause == &"afterimage" else 1), "分身の撃破では船体を牽引しない")
+		_check(rampage.kills == triggered + (0 if cause == &"afterimage" else 1), "牽引は撃破特性を保ち、分身の撃破は発動を抑える")
+		_check(run.state.kills == kills + 1 and t.dead[i] != 0, "どちらの撃破も撃破数へ加算する")
+	run.state.tracing = false
+	var i := _enemy(&"drifter", run.state.ship_pos)
+	t.hull_scattered[i] = 1
+	run.combat.kill_enemy(i, {"cause": &"vortex", "one_shot": true})
+	_check(run.projectiles.debris_count() == 2, "一時的なhull_scatteredだけでは星砕きを抑えない")
 	_clear()
 	run.loadout.reset_loadout()

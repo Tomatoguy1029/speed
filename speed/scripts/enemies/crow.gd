@@ -46,12 +46,7 @@ func gather_pickups(pk: PickupSystem, dt: float) -> void:
 			var d := feet - pk.gem_pos[i]
 			var dist := d.length()
 			if dist <= step + 4.0:
-				t.carry[j] += pk.gem_value[i]
-				t.buds[j] += 1
-				if pk.records_xp():
-					pk.record_xp({"type": "xp_transfer", "id": pk.gem_seq[i], "xp": pk.gem_value[i],
-						"method": "crow", "enemy_id": t.id[j]})
-				pk.gem_slots.release(i)
+				pk.carry_crystal(j, i)
 			else:
 				pk.gem_pos[i] += d / dist * step
 
@@ -89,4 +84,12 @@ func _crow(i: int, dt: float) -> void:
 	t.vel[i] = Vector2.from_angle(t.facing[i]) * t.speed[i]
 	var margin := float(p.exit_margin)
 	if (absf(rel.x) > _vh.x + margin or absf(rel.y) > _vh.y + margin) and rel.dot(t.vel[i]) > 0.0:
+		m.ctx.pickups.lose_carried(i, &"retreat")
 		mark_dead(i)
+
+## 実撃破の再ドロップは、この解放通知より先に確定している。
+func on_release(i: int) -> void:
+	m.ctx.pickups.lose_carried(i, &"released")
+
+func clear() -> void:
+	if m.ctx.pickups != null: m.ctx.pickups.lose_all_carried(&"cleared")

@@ -1,9 +1,27 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://inwplod2bxq0"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"collision_scale": 1.05,
+"fill_energy": 0.5,
+"height": 0.4,
+"key_energy": 1.6,
+"scale": 1.7000000000000002
+}
+armor_colors = {
+"res://assets/pixel/marlin/swordfish_armor.png|64x64|0dc56d0da46c66c9c4eec227ca771757b6b459128d245adc624a5e8129e5a6bd": {
+"1055": "4b658f",
+"1692": "4b658f",
+"1698": "4b658f",
+"2265": "4b658f",
+"2275": "4b658f",
+"2845": "2f425e",
+"351": "ffe23f"
+}
+}
 rank = 5
 radius = 26.0
 hp = 70.0
@@ -21,7 +39,7 @@ params = {
 "dash_time": 0.9,
 "fire_interval": 4.0,
 "keep": 520.0,
-"recover": 0.8,
+"recover": 1.3,
 "telegraph": 0.8
 }
 id = &"marlin"

@@ -1,9 +1,52 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://bqd5m3e7p260d"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"collision_scale": 1.1,
+"height": 0.2,
+"key_energy": 1.6,
+"scale": 1.6
+}
+armor_colors = {
+"res://assets/pixel/auriga/armor.png|63x80|00e2d21926c111b6853e9e048930ca965bb3f4f32e7b945962d0efa8e7d36d7e": {
+"104": "4b658f",
+"1203": "b68e2c",
+"1249": "b68e2c",
+"1517": "b68e2c",
+"1521": "8a6a2f",
+"1563": "8a6a2f",
+"1568": "b68e2c",
+"1674": "4b658f",
+"2146": "b68e2c",
+"2198": "b68e2c",
+"2340": "2f425e",
+"2377": "2f425e",
+"2475": "4b658f",
+"2781": "b68e2c",
+"2796": "4b658f",
+"2810": "4b658f",
+"2823": "b68e2c",
+"3042": "2f425e",
+"3067": "2f425e",
+"3154": "b68e2c",
+"3208": "b68e2c",
+"3489": "2f425e",
+"3600": "8a6a2f",
+"3641": "8a6a2f",
+"3972": "b68e2c",
+"3988": "2f425e",
+"4026": "b68e2c",
+"4357": "b68e2c",
+"4398": "b68e2c",
+"467": "4b658f",
+"776": "4b658f",
+"796": "4b658f",
+"85": "4b658f"
+}
+}
 rank = 5
 radius = 30.0
 hp = 110.0

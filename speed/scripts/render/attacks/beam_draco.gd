@@ -1,9 +1,15 @@
 ## りゅう座の吐き出しの光線。口元の光の溜めと、口から伸びる光線を専用の層とshaderで描く。
 ## 光線の長さは判定と同じ hazard_len を使うので、伸びていく見た目と当たりが一致する。
 extends AttackVisual
+const PROFILE := "boss/move/draco/inhale"
+
+func _apply_effect_settings() -> void:
+	super()
+	EFFECT_SETTINGS.apply_key(self, PROFILE, scene_file_path)
+	effect_tint = EFFECT_SETTINGS.resolved_values(PROFILE, scene_file_path).get("effect_tint", Color.WHITE)
 
 ## 光線が消えるときに薄れる時間
-const FADE := 0.15
+@export_range(0.02, 0.5, 0.01) var fade_seconds := 0.15
 var _layer: DrawLayer
 
 func setup(render: RunPresentation) -> void:
@@ -16,7 +22,10 @@ func setup(render: RunPresentation) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/draco_beam.gdshader")
 	mat.set_shader_parameter("noise_tex", load("res://assets/fx/water_noise.png"))
+	ShaderTuning.apply(mat, PROFILE, scene_file_path)
 	_layer.material = mat
+	_layer.set_meta("shader_tuning_profile", PROFILE)
+	_layer.set_meta("shader_tuning_fallback", scene_file_path)
 	rm.get_node(rm.world_path).add_child(_layer)
 	if not rm.pipeline.rich:
 		_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
@@ -34,7 +43,7 @@ func _draw_beams(c: CanvasItem) -> void:
 	# HDR の描画では頂点の色が線形に直されて届くので、shaderで元の値に戻す
 	mat.set_shader_parameter("linear_colors", _layer.get_viewport().use_hdr_2d)
 	mat.set_shader_parameter("clock", rm.state.world_time)
-	mat.set_shader_parameter("pixel", _px(2.0) * EFFECT_SETTINGS.number(scene_file_path, "pixel_scale", 1.0))
+	mat.set_shader_parameter("pixel", _px(2.0) * float(EFFECT_SETTINGS.resolved_values(PROFILE, scene_file_path).get("pixel_scale", 1.0)))
 	for i in pr.hazard_alive.size():
 		if pr.hazard_visual[i] != &"" and String(pr.hazard_visual[i]) != scene_file_path: continue
 		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.DRACO:
@@ -54,7 +63,7 @@ func _draw_beams(c: CanvasItem) -> void:
 			_orb(c, at, half, clampf(t / maxf(delay, 0.001), 0.0, 1.0), seed)
 			continue
 		var remaining := delay + pr.hazard_active[i] - t
-		var strength := clampf(remaining / FADE, 0.0, 1.0)
+		var strength := clampf(remaining / maxf(fade_seconds, 0.001), 0.0, 1.0)
 		var length := pr.hazard_len[i]
 		mat.set_shader_parameter("beam_len", length)
 		if length > 1.0: _strip(c, at, angle, length, half, strength, seed)

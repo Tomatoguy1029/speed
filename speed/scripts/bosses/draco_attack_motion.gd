@@ -59,6 +59,6 @@ static func fit_spine(desired: PackedVector2Array, reference: PackedVector2Array
 
 static func predict(a: BossActor, seconds: float, cap: float) -> Vector2:
 	if a.run_state.tracing:
-		return a.run_state.enemy_aim
+		return a.tracking_target(a.run_state.enemy_aim)
 	var travel: Vector2=a.run_state.ship_vel*maxf(0.0,seconds)
-	return a.run_state.ship_pos+travel.limit_length(cap)
+	return a.tracking_target(a.run_state.ship_pos+travel.limit_length(cap))

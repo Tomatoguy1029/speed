@@ -1,0 +1,157 @@
+## ドット単位の爆発（自爆する雑魚・機雷）。煙・火球と輪・燃えかす・火の粉を順に描き、寿命が来たら消す。
+## 位置は世界座標、半径はドット数。四角の大きさと寿命は、置いたときの調整値で粒と輪の届く範囲から決める。
+class_name BlastBursts
+extends Node2D
+
+const SHADER := preload("res://shaders/blast_burst.gdshader")
+const NOISE := preload("res://assets/effects/build/burst_noise.tres")
+const RUNTIME := preload("res://scripts/render/fx/burst_runtime.gd")
+## add前に指定する、使用元が所有するshader。火球・煙・粒の共通の描画契約を持つ。
+var shader: Shader = SHADER
+var px := 2.366
+## 戦闘エフェクトツールの装備・攻撃キー（ShaderTuning）
+var key := ""
+## 単体シーンは保存値を編集する。通常ゲームは対象3種だけ制作済みの値を使う。
+var live_edit := false
+## 単独プレビューの形を調整する間、粒の並びを保つ。負数で爆発ごとに選ぶ。
+var seed_override := -1.0
+var _items: Array[Dictionary] = []
+## shader の上限と同じ粒数。各粒の四角は共有し、頂点で現在の軌道へ置く。
+const PARTICLE_COUNTS := {1: 24, 2: 96, 3: 64}
+static var _particle_meshes: Dictionary = {}
+
+func setup(cell: float) -> void:
+	px = cell
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+## delay 秒たってから爆発する。
+func add(pos: Vector2, radius: float, delay := 0.0) -> void:
+	var fixed := RUNTIME.profile(key, live_edit)
+	if not fixed.is_empty():
+		_add_fixed(pos, radius, delay, fixed)
+		return
+	var node := Node2D.new()
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	ShaderTuning.apply(mat, key)
+	var center := (pos / px).round()
+	var half := ceilf(radius * _reach(mat, radius)) + 3.0
+	node.position = center * px
+	node.scale = Vector2.ONE * half * px
+	mat.set_shader_parameter("value_noise", NOISE.get_meta("texture"))
+	mat.set_shader_parameter("half_cells", half)
+	mat.set_shader_parameter("radius", radius)
+	mat.set_shader_parameter("origin", center)
+	mat.set_shader_parameter("seed", seed_override if seed_override >= 0.0 else randf() * 9.0)
+	var materials: Array[ShaderMaterial] = []
+	# 子の順番とmesh内の粒番号順で、元のshaderの重なり順を保つ。
+	for mode: int in [1, 0, 2, 3]:
+		var surface := MeshInstance2D.new()
+		surface.mesh = FireBursts._mesh() if mode == 0 else _particle_mesh(mode)
+		var part: ShaderMaterial = mat if mode == 0 else mat.duplicate() as ShaderMaterial
+		part.set_shader_parameter("pass_mode", mode)
+		surface.material = part
+		node.add_child(surface)
+		materials.append(part)
+	add_child(node)
+	node.visible = delay <= 0.0
+	_items.append({"node": node, "materials": materials, "age": -delay, "life": _life(mat), "radius": radius,
+		"baked": false,
+		"tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
+	if _items.size() > 96: _items.pop_front().node.queue_free()
+
+## 固定passの素材を複製し、発生位置・半径・種だけを設定する。
+func _add_fixed(pos: Vector2, radius: float, delay: float, fixed: Dictionary) -> void:
+	var node := Node2D.new()
+	var center := (pos / px).round()
+	var half := ceilf(radius * RUNTIME.reach(fixed, radius)) + 3.0
+	var seed := seed_override if seed_override >= 0.0 else randf() * 9.0
+	node.position = center * px
+	node.scale = Vector2.ONE * half * px
+	var dynamic := {"half_cells": half, "radius": radius, "origin": center, "seed": seed}
+	var materials: Array[ShaderMaterial] = []
+	for spec: Dictionary in fixed.passes:
+		var surface := MeshInstance2D.new()
+		var mode := int(spec.mode)
+		surface.mesh = FireBursts._mesh() if mode == 0 else _particle_mesh(mode, int(spec.count))
+		var mat := RUNTIME.material(spec)
+		for name: String in dynamic:
+			if name in spec.parameters: mat.set_shader_parameter(name, dynamic[name])
+		surface.material = mat
+		node.add_child(surface)
+		materials.append(mat)
+	add_child(node)
+	node.visible = delay <= 0.0
+	_items.append({"node": node, "materials": materials, "age": -delay, "life": float(fixed.life),
+		"baked": true, "time_scale": float(fixed.time_scale)})
+	if _items.size() > 96: _items.pop_front().node.queue_free()
+
+## dt は世界の秒。
+func step(dt: float) -> void:
+	var revision: int = ShaderTuning.SETTINGS.preview_revision
+	var fixed := RUNTIME.profile(key, live_edit)
+	var time_scale := float(fixed.time_scale) if not fixed.is_empty() else ShaderTuning.burst_time_scale(key)
+	for item in _items:
+		item.age += dt
+		var retune: bool = not item.baked and (item.tuning_revision != revision or item.tuning_key != key)
+		if retune:
+			for mat: ShaderMaterial in item.materials: ShaderTuning.apply(mat, key)
+			var first: ShaderMaterial = item.materials[0]
+			item.life = _life(first)
+			var half := ceilf(float(item.radius) * _reach(first, item.radius)) + 3.0
+			item.node.scale = Vector2.ONE * half * px
+			for mat: ShaderMaterial in item.materials: mat.set_shader_parameter("half_cells", half)
+		var age: float = item.age / (item.time_scale if item.baked else time_scale)
+		item.node.visible = age >= 0.0 and age < item.life
+		if age >= item.life and not ShaderTuning.previewing():
+			item.node.queue_free()
+			continue
+		for mat: ShaderMaterial in item.materials:
+			mat.set_shader_parameter("age", maxf(0.0, age))
+		if not item.baked:
+			item.tuning_revision = revision
+			item.tuning_key = key
+	if not ShaderTuning.previewing(): _items = _items.filter(func(item): return item.age / (item.time_scale if item.baked else time_scale) < item.life)
+
+## 上限分の四角を1枚のmeshにまとめる。UV.xへ粒番号を埋め、順序と頂点数を固定する。
+static func _particle_mesh(mode: int, count := -1) -> ArrayMesh:
+	if count < 0: count = int(PARTICLE_COUNTS[mode])
+	var cache_key := Vector2i(mode, count)
+	if _particle_meshes.has(cache_key): return _particle_meshes[cache_key]
+	var vertices := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for i in count:
+		vertices.append_array(PackedVector2Array([Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]))
+		var u := float(i * 2)
+		uvs.append_array(PackedVector2Array([Vector2(u, 0), Vector2(u + 1, 0), Vector2(u + 1, 1), Vector2(u, 1)]))
+		var v := i * 4
+		indices.append_array(PackedInt32Array([v, v + 1, v + 2, v, v + 2, v + 3]))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_particle_meshes[cache_key] = mesh
+	return mesh
+
+## 半径に対する、火の粉・衝撃波の輪・煙の届く範囲（shader の reach と同じ）。
+static func _reach(mat: ShaderMaterial, radius: float) -> float:
+	var spark_seconds: float = _value(mat, "spark_seconds")
+	var sparks := 0.16 + 6.6 * _value(mat, "spark_speed") * (1.0 - exp(-0.6 * (spark_seconds + 0.06))) / 0.6 + 17.0 / maxf(radius, 1.0)
+	var ring: float = 0.21 + _value(mat, "ring_size") + 3.0 / maxf(radius, 1.0)
+	var cinders := 1.05 + 22.0 / 38.0 * _value(mat, "cinder_speed") * _value(mat, "cinder_seconds") + 2.0 / maxf(radius, 1.0)
+	var smoke := 0.8 + 15.0 / 38.0 * 1.3 + (sqrt(12.0 * 12.0 + 16.0 * 16.0) / 38.0) * _value(mat, "smoke_seconds")
+	return maxf(maxf(1.7, cinders), maxf(smoke, maxf(sparks, ring)))
+
+## 最後の煙・燃えかす・火の粉が消えるまでの秒。
+static func _life(mat: ShaderMaterial) -> float:
+	var fire: float = _value(mat, "fire_seconds")
+	return maxf(maxf(fire, _value(mat, "ring_seconds")), maxf(0.3 + _value(mat, "smoke_seconds"),
+		maxf(0.67 * fire + _value(mat, "cinder_seconds"), 0.06 + _value(mat, "spark_seconds"))))
+
+static func _value(mat: ShaderMaterial, uniform: String) -> float:
+	var value: Variant = mat.get_shader_parameter(uniform)
+	return float(value) if value != null else float(ShaderTuning.default_value(mat.shader, uniform))

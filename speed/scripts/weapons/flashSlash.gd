@@ -1,6 +1,8 @@
 ## W28 閃光斬：印の対象は行番号とIDで保持し、再利用された別の敵を斬らない。
 extends WeaponBehavior
 var marks: Array[Dictionary] = []
+## 残っている印をブーストID・敵IDで引く。印の寿命と一緒に解放する。
+var _marked_ids: Dictionary = {}
 var elapsed := -1.0
 var _distance := 0.0
 func on_launch(_full: bool) -> void:
@@ -10,12 +12,16 @@ func on_ram_hit(i: int, hit: Vector2, _dir: Vector2, damage: float) -> void:
 	i = ctx.combat.damage_target(i)
 	var t := ctx.enemies.table
 	if not state.tracing or t.dead[i] != 0: return
-	for mark in marks:
-		if mark.id == t.id[i] and mark.dash == state.dash_id: return
+	if not _marked_ids.has(state.dash_id):
+		_marked_ids[state.dash_id] = {}
+	var ids: Dictionary = _marked_ids[state.dash_id]
+	if ids.has(t.id[i]): return
+	ids[t.id[i]] = true
 	var angle := state.rng.randf() * TAU
+	var cuts := int(at_level("cuts_by_level"))
 	marks.append({"row": i, "id": t.id[i], "dash": state.dash_id, "distance": ctx.loadout.boost_distance,
-		"damage": (damage if damage > 0.0 else atk()) * at_level("mult_by_level"), "left": int(at_level("cuts_by_level")),
-		"total": int(at_level("cuts_by_level")), "time": -1.0, "angle": angle})
+		"damage": (damage if damage > 0.0 else atk()) * at_level("mult_by_level"), "left": cuts,
+		"total": cuts, "time": -1.0, "angle": angle})
 	if t.is_boss[i] == 0: t.slash_hold[i] = 1
 	t.flash[i] = 0.07
 	state.emit(&"slash_mark", {"pos": t.pos[i], "angle": angle, "radius": t.r[i], "id": t.id[i], "row": i})
@@ -40,8 +46,18 @@ func tick(dt: float, _busy: bool) -> void:
 			ctx.combat.damage_enemy(i, mark.damage / mark.total, {"cause": &"flashSlash", "no_crit": true, "knock": 0.0})
 			state.emit(&"flash_slash", {"pos": t.pos[i], "angle": mark.angle + (mark.total - mark.left - 1) * 0.55, "length": 150.0, "width": 3.2, "id": mark.id})
 		if mark.left == 0: t.slash_hold[i] = 0
-	marks = marks.filter(func(m): return m.left > 0)
+	var kept := 0
+	for mark in marks:
+		if mark.left > 0:
+			marks[kept] = mark
+			kept += 1
+		else:
+			var ids: Dictionary = _marked_ids[mark.dash]
+			ids.erase(mark.id)
+			if ids.is_empty(): _marked_ids.erase(mark.dash)
+	marks.resize(kept)
 func dispose() -> void:
 	for m in marks:
 		if ctx.enemies.is_same(m.row, m.id): ctx.enemies.table.slash_hold[m.row] = 0
 	marks.clear()
+	_marked_ids.clear()

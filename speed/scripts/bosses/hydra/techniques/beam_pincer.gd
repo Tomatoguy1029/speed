@@ -72,7 +72,7 @@ class Runner extends "res://scripts/bosses/hydra/technique_runner.gd":
 		var p: Dictionary=a.move_params(a.tech)
 		if not state.has("aims"):
 			state.aims=[]
-			for n in a.participants:state.aims.append((a.run_state.ship_pos-n.strike_pos).angle())
+			for n in a.participants:state.aims.append((a.neck_tracking_target(n,a.run_state.ship_pos)-n.strike_pos).angle())
 		for j in a.participants.size():
 			var n=a.participants[j]
 			var side:=1.0 if j==0 else -1.0

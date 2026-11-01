@@ -78,6 +78,7 @@ func _test_upgrade_screen() -> void:
 		await get_tree().create_timer(1.0).timeout
 		var screen: Control = app._current
 		check(screen.get_script().resource_path == "res://scripts/ui/upgrade_screen.gd", "機体強化画面へ遷移する")
+		check(AudioManager._music_track == &"menu" and AudioManager._music_player.playing, "機体強化画面でメニューBGMを流す")
 		screen.find_child("Part_speed", true, false).pressed.emit()
 		check(screen._information.text.contains("2 / 5"), "購入画面はデバッグの4段でなく保存された2段を表示する")
 		check(screen._price.text.contains("90"), "保存された次の段の費用を表示する")
@@ -87,11 +88,45 @@ func _test_upgrade_screen() -> void:
 			check(SaveManager.writes == 1 and screen._information.text.contains("3 / 5"), "購入後の保存と表示を揃える")
 			check(SaveManager.run_meta_level(&"speed") == 4, "購入してもランのデバッグ上書きを保つ")
 			await _shot()
+			_test_debug_upgrade_controls(screen)
 		GameManager.back()
 		await get_tree().create_timer(1.0).timeout
 		check(GameManager.screen == GameManager.Screen.MAIN_MENU, "機体強化画面から戻る")
+	app._sync_screen_music(GameManager.Screen.STAGE_SELECT)
+	check(not AudioManager._music_player.playing, "ステージセレクトではメニューBGMを止める")
+	app._sync_screen_music(GameManager.Screen.MAIN_MENU)
+	await get_tree().process_frame
 	app.queue_free()
 	await get_tree().process_frame
+	check(AudioManager._music_track == &"", "メニューのルートを破棄したら所有する曲を停止する")
+
+func _test_debug_upgrade_controls(screen: Control) -> void:
+	var saved: Dictionary = SaveManager.data.duplicate(true)
+	var reset := screen.find_child("DebugResetUpgrades", true, false) as Button
+	var infinite := screen.find_child("DebugInfiniteParts", true, false) as Button
+	check(reset != null and infinite != null, "デバッグ用の2ボタンを表示する")
+	if reset == null or infinite == null: return
+	SaveManager.data.coins = 0
+	infinite.button_pressed = true
+	screen._select(&"atk")
+	check(not screen._buy_button.disabled and screen._coins.text.contains("∞"), "部品無限中は部品0でも購入できる")
+	var level := SaveManager.meta_level(&"atk")
+	screen._buy()
+	check(SaveManager.meta_level(&"atk") == level + 1 and SaveManager.coins() == 0, "無限中は部品を消費しない")
+	var voice: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
+	check(is_equal_approx(db_to_linear(voice.volume_db), 0.5), "機体強化の確定音を半分にする")
+	var maximum: int = ContentManager.catalog.find(&"meta_upgrades", &"atk").costs.size()
+	for i in maximum: screen._buy()
+	check(SaveManager.meta_level(&"atk") == maximum, "無限中も最大段階を超えない")
+	reset.pressed.emit()
+	check(SaveManager.data.meta.is_empty() and SaveManager.dev_meta_override.is_empty(), "全強化と段階上書きをリセットする")
+	for key in ["intro_seen", "cleared_stage", "legendary", "encyclopedia", "best"]:
+		check(SaveManager.data[key] == saved[key], "強化以外の進行は保持: " + key)
+	infinite.button_pressed = false
+	SaveManager.data.coins = 0
+	screen._refresh_details()
+	check(screen._buy_button.disabled, "部品無限OFFでは通常の購入制限に戻る")
+	check(not SaveManager.data.has("dev_infinite_parts"), "無限設定をセーブへ書かない")
 
 func _button(controls: Control, text: String) -> Button:
 	for button: Button in controls.find_children("*", "Button", true, false):

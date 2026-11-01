@@ -8,14 +8,17 @@ partial_rest = 0.8
 empty_rest = 2.0
 layout = {
 "section_0": Vector2(40, 20),
+"section_1": Vector2(450, 20),
+"section_2": Vector2(860, 20),
+"section_3": Vector2(1270, 20),
 "shared_rest": Vector2(427, 28)
 }
 sections = [{
-"cap": 3.0,
-"name": "牽制",
-"next": 0,
-"request": "any",
-"weights": {
-"single": 100.0
-}
+"name": "牽制", "request": "normal", "allowed_groups": ["choose_normal"], "cap": 1.0, "action_count": 1, "no_candidate_timeout": 1.0, "next": 1, "weights": {"single": 100.0}
+}, {
+"name": "圧力", "request": "normal", "allowed_groups": ["choose_normal", "choose_combo"], "cap": 3.0, "section_budget": 4.0, "action_count": 2, "action_interval": 0.25, "no_candidate_timeout": 1.0, "next": 2, "weights": {"single": 35.0, "combo": 65.0}
+}, {
+"name": "大技", "request": "major", "cap": 3.0, "action_count": 1, "no_candidate_timeout": 0.6, "next": 3, "fallback": 3, "weights": {"major": 100.0}
+}, {
+"name": "反撃の間", "request": "rest", "next": 0, "weights": {}
 }]

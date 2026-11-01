@@ -1,5 +1,10 @@
 [gd_scene format=3]
 [ext_resource type="Script" path="res://scripts/bosses/canis_major_presentation.gd" id="visual"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/canis_major_parts.tscn" id="parts"]
 [node name="CanisMajorPresentation" type="Node2D"]
 texture_filter = 1
 script = ExtResource("visual")
+
+[node name="Parts" parent="." instance=ExtResource("parts")]
+show_behind_parent = true
+rotation = -1.5707963

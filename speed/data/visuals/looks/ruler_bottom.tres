@@ -10,3 +10,19 @@ script = ExtResource("1")
 base = ExtResource("2")
 armor = ExtResource("3")
 normal = ExtResource("4")
+armor_color_source_key = "res://assets/pixel/ruler/ruler_top_armor.png|58x46|fbe6bc9ef9f1395bccaa5bca0a8f666f73ff62e18cc44f000208b3d7ce05fc57"
+armor_color_regions = {
+"1289": "185",
+"1371": "153",
+"1473": "367",
+"1616": "398",
+"1685": "467",
+"1738": "520",
+"1900": "682",
+"1973": "755",
+"2132": "914",
+"2164": "946",
+"2213": "995",
+"2240": "1022",
+"2402": "1184"
+}

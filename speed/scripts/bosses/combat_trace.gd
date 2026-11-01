@@ -6,16 +6,19 @@ var generation := -1
 var action_id := 0
 var decision_id := 0
 var action := ""
+var action_hint := ""
 var origin := "external_forced"
 var checks := 0
 var contacts := 0
 var applied := 0.0
 var pass_index := 0
+var executed := false
 var observed_start := false
 var ended := true
 
-func bind(actor: BossActor) -> void:
+func bind(actor: BossActor, hint: StringName = &"") -> void:
 	owner = weakref(actor)
+	action_hint = String(hint)
 
 func enabled(detail := 1) -> bool:
 	var a = owner.get_ref() if owner != null else null
@@ -32,10 +35,14 @@ func _sync() -> void:
 	contacts = 0
 	applied = 0.0
 	pass_index = 0
+	executed = false
 	observed_start = false
 	ended = false
 	origin = "unobserved"
-	action = String(a.get("technique")) if "technique" in a else ""
+	if not action_hint.is_empty(): action = action_hint
+	elif "technique" in a: action = String(a.get("technique"))
+	elif "tech" in a: action = String(a.get("tech"))
+	else: action = ""
 
 func context() -> Dictionary:
 	_sync()
@@ -75,6 +82,7 @@ func begin(id: StringName, source: String) -> void:
 	contacts = 0
 	applied = 0.0
 	pass_index = 0
+	executed = false
 	observed_start = true
 	ended = false
 	event("boss_action", {"step": "selected"})
@@ -84,6 +92,14 @@ func stage(step: String, extra := {}) -> void:
 	_sync()
 	if step == "telegraph": pass_index += 1
 	event("boss_action", extra.merged({"step": step}))
+
+## 同じ行動が細かい判定を連続生成しても、最初の実行だけを記録する。
+func execute() -> void:
+	if not enabled(): return
+	_sync()
+	if executed: return
+	executed = true
+	stage("execute")
 
 func evaluate() -> void:
 	if not enabled(): return

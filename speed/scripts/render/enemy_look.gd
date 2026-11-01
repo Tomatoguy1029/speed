@@ -16,6 +16,9 @@ extends Resource
 @export var normal: Texture2D
 ## 分離するもう片側の外観。分離前の一覧・船体では同じ位置に重ねる。
 @export var split_other: EnemyLook
+## 対になる装甲の塗装キーと、こちらの領域ID → 相手の領域ID。個別指定した色を優先する。
+@export var armor_color_source_key := ""
+@export var armor_color_regions: Dictionary = {}
 ## 絵の正面の向き（ラジアン。敵の向きに足す）
 @export var angle := 0.0
 ## 敵が回っても絵を回さない（冠など）
@@ -30,8 +33,23 @@ extends Resource
 @export_storage var painted_armors: Dictionary = {}
 @export_storage var previews: Dictionary = {}
 
+func armor_palette(palettes: Dictionary) -> Dictionary:
+	if armor_color_regions.is_empty(): return palettes.get(armor_key, {})
+	var colors: Dictionary = palettes.get(armor_key, {}).duplicate()
+	var source: Dictionary = palettes.get(armor_color_source_key, {})
+	for region in armor_color_regions:
+		var other := str(armor_color_regions[region])
+		if not colors.has(region) and source.has(other): colors[region] = source[other]
+	return colors
+
+func paint_palettes(palettes: Dictionary) -> Dictionary:
+	if armor_color_regions.is_empty(): return palettes
+	var result := palettes.duplicate()
+	result[armor_key] = armor_palette(palettes)
+	return result
+
 func colors_key(palettes: Dictionary) -> String:
-	var colors: Dictionary = palettes.get(armor_key, {})
+	var colors := armor_palette(palettes)
 	var ids := colors.keys()
 	ids.sort()
 	var parts := PackedStringArray()

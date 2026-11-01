@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/monoceros/techniques/horn_wave.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros/horn_wave_visual.tscn" id="visual"]
+
+[resource]
+script = ExtResource("1")
+technique = &"horn_wave"
+category = &"single"
+display_name = "角の衝撃波"
+track_during_warn = true
+visual = ExtResource("visual")
+windup = 0.7
+windup_turn = 2.007128639793479
+pull = 1.3962634015954636
+swing_time = 0.36
+swing_turn = 1.5009831567151235
+release_offset = 0.4363323129985824
+recharge = 0.45
+return_time = 0.4
+wave_speed = 600.0
+wave_start = 120.0
+wave_max = 1000.0
+wave_half_angle = 0.6108652381980153
+wave_width = 20.0
+damage = 15.0
+recover = 0.9
+cd = 6.0

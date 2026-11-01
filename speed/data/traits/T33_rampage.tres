@@ -5,10 +5,10 @@
 [resource]
 script = ExtResource("1")
 params = {
-"kills": 150,
-"bonus_base": 0.2,
-"bonus_per": 0.1,
-"half_life": 1.4
+"kills": 12,
+"bonus_base": 0.36,
+"bonus_per": 0.18,
+"half_life": 2.8
 }
 id = &"T33"
 code_id = &"rampage"

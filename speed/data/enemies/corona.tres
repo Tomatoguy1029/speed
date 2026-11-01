@@ -6,10 +6,25 @@
 script = ExtResource("1")
 visual_settings = {
 "ambient": 0.0,
-"fill_energy": 0.4,
+"collision_scale": 0.7,
+"fill_energy": 0.6,
+"height": 0.25,
 "key_angle": -45.0,
-"key_energy": 2.0,
-"scale": 1.4
+"key_energy": 1.5,
+"normal_strength": 2.0,
+"scale": 1.65
+}
+armor_colors = {
+"res://assets/pixel/corona/crown_armor.png|55x55|ea76449000a437bdf5799489804d5602589b4311b8ac1ed8704f1000601d9703": {
+"3090": "4d6792",
+"3091": "4d6792",
+"3092": "4d6792",
+"3093": "304460",
+"3094": "4d6792",
+"3095": "4d6792",
+"3096": "4d6792",
+"3140": "d8aa2e"
+}
 }
 rank = 6
 radius = 44.0

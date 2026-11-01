@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ComboTransitionSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/combo_transition_settings.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+kind = 0
+selection_seconds = 0.60
+anticipation_seconds = 0.70
+cover_seconds = 0.10
+opening_seconds = 0.40
+background_dim = 0.54
+card_start_scale = 0.30
+card_overshoot = 1.05
+card_zoom_seconds = 0.30
+card_settle_seconds = 0.10
+flash_strength = 0.72
+flash_seconds = 0.10
+hold_seconds = 1.50
+focus = Vector2(0.5, 0.5)

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PixelFireSettings" format=3]
+[ext_resource type="Script" path="res://scripts/render/fx/pixel_fire_settings.gd" id="1"]
+[resource]
+script = ExtResource("1")
+field_size = Vector2(128, 896)
+birth_rate = 24.0
+particle_size = 22.0
+rise_speed = 90.0
+lifetime = 1.1
+capacity = 384
+source_size = Vector2(32, 8)
+merge_threshold = 0.28
+pixel_size = 3.0
+density_pixel_size = 2.0
+update_fps = 24.0
+sway = 16.0
+deformation = 4.0
+outer_color = Color(0.16, 0.39, 0.86, 1)
+inner_color = Color(0.61, 0.88, 1, 1)
+core_color = Color(0.95, 0.99, 1, 1)
+glow_strength = 0.22
+glow_radius = 8.0

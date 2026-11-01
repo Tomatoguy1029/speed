@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/stream.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"stream"
+display_name = "順番の号令"
+category = &"single"
+track_during_warn = true
+warn = 0.6
+interval = 0.2
+each_warn = 0.3
+lunge_speed = 1260.0
+lunge_speed_p2 = 1500.0
+lunge_time = 0.55
+min_hounds = 5
+damage = 12.0
+recover = 0.6
+cd = 7.0
+cd_p2 = 5.0

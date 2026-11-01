@@ -38,20 +38,23 @@ func _ready() -> void:
 			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= actor._reach(actor.technique)
 			break
 	check(approached, "攻撃可能な距離へ戻ってから予告を始める")
-	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance", &"combo"]:
+	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance", &"horn_wave"]:
 		fresh()
 		actor._cooldown = 0.0
-		actor.phase = 2 if tech in [&"lance", &"combo"] else 1
-		sim.state.enemy_aim = Vector2(-180, 0) if tech == &"kick" else Vector2(180, 0) if tech == &"sweep" else Vector2(600, 0)
+		actor.phase = 2 if tech == &"lance" else 1
+		actor._apply_phase()
+		sim.state.enemy_aim = Vector2(-180, 0) if tech == &"kick" else Vector2(400, 0) if tech == &"sweep" else Vector2(600, 0)
 		sim.state.ship_pos = sim.state.enemy_aim
 		var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
 		check(candidates.any(func(c): return c.id == String(tech)), "仕様の距離・形態で候補へ入る: " + tech)
 		var flow := actor.flow_runner.flow.duplicate(true)
 		for section in flow.sections: section["allowed_techniques"] = [String(tech)]
+		# 指定された区間0で衝撃波を単独確認するため、この複製だけ消費上限を技の消費へ合わせる。
+		if tech == &"horn_wave": flow.sections[0]["cap"] = float(actor.action_rules.costs.horn_wave)
 		actor.flow_runner.configure(flow)
-		actor.flow_runner.index = 2 if tech == &"lance" else 1 if tech in [&"return_charge", &"combo"] else 0
+		actor.flow_runner.index = 2 if tech == &"lance" else 1 if tech == &"return_charge" else 0
 		step(DT)
-		check(actor.mode == &"windup" and actor.technique == (&"charge" if tech == &"combo" else tech), "共通フローから技を開始できる: " + tech)
+		check(actor.mode == &"windup" and actor.technique == tech, "共通フローから技を開始できる: " + tech)
 	fresh()
 	actor.start_attack(&"charge")
 	sim.state.enemy_aim = Vector2(600, 220)
@@ -70,9 +73,10 @@ func _ready() -> void:
 	check(absf((actor.table.pos[actor.body] - launch).normalized().cross(Vector2.from_angle(locked_angle))) < 0.001, "発進後は直線で曲がらない")
 	step(2.2)
 	check(actor.mode == &"idle", "通常突進の後に回復する")
-	for tech in [&"charge", &"return_charge", &"lance"]:
+	for tech in [&"charge", &"return_charge"]:
 		fresh()
 		actor.phase = 2
+		actor._apply_phase()
 		sim.state.enemy_aim = Vector2(-600, 0)
 		sim.state.ship_pos = sim.state.enemy_aim
 		actor.start_attack(tech)
@@ -84,20 +88,21 @@ func _ready() -> void:
 	fresh()
 	actor.start_attack(&"return_charge")
 	var launches := 0
+	events.clear()
+	actor.presentation_event.connect(func(e): events.append(e.cue))
 	var locked_count := 0
 	var sign_y := 1.0
 	for frame in 1600:
-		if actor.mode == &"turnaround":
+		if actor._runner.get("stage") == &"brake":
 			sim.state.enemy_aim = actor.table.pos[actor.body] + Vector2(-500, sign_y * 160)
 			sim.state.ship_pos = sim.state.enemy_aim
 			sign_y = -sign_y
-		var before := actor.mode
 		var was_locked := actor.locked
 		step(DT)
-		if before == &"windup" and actor.mode == &"active": launches += 1
+		launches = events.count(&"attack_started")
 		if not was_locked and actor.locked: locked_count += 1
 		if actor.mode == &"recovery": break
-	check(launches == int(actor.def.params.return_passes) and locked_count == launches, "往復は毎回予告と固定を挟んで発進する")
+	check(launches == int(actor.rule().get("passes", 0)) and locked_count == launches, "往復は毎回予告と固定を挟んで発進する")
 	check(actor.recovery >= float(actor.rule().recover) - DT, "往復の最後に全体の隙を確保する")
 
 	fresh()
@@ -136,10 +141,11 @@ func _ready() -> void:
 		check(actor.phase == 2, "抜いた後に予約した形態へ進む")
 		check(sim.field.bodies.size() == 1 and planet.r == 80.0 and planet.pos == Vector2(1020,0), "惑星を生成・破壊・移動しない")
 
-	for tech in [&"charge", &"sweep", &"kick", &"lance"]:
+	for tech in [&"charge", &"kick", &"lance"]:
 		fresh()
 		actor.phase = 2
-		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(160,0) if tech == &"sweep" else Vector2(600,0)
+		actor._apply_phase()
+		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech == &"sweep" else Vector2(600,0)
 		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
 		var hp := sim.state.ship_hp
@@ -159,6 +165,27 @@ func _ready() -> void:
 		check(sim.state.ship_hp == hurt_hp, "一振りで重複被弾を出さない: " + tech)
 
 	fresh()
+	sim.state.ship_pos = Vector2(400, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	actor.start_attack(&"sweep")
+	var sweep_hp := sim.state.ship_hp
+	var sweep_points := actor.horn_points()
+	sim.state.ship_pos = sweep_points[0].lerp(sweep_points[1], 0.75)
+	actor.previous_ship = sim.state.ship_pos
+	for frame in 600:
+		if actor._runner.get("stage") == &"swing": break
+		step(DT)
+	check(sim.state.ship_hp == sweep_hp, "踏み込み薙ぎは振り抜く前に角へ触れても無害")
+	sweep_points = actor.horn_points()
+	sim.state.ship_pos = sweep_points[0].lerp(sweep_points[1], 0.65)
+	actor.previous_ship = sim.state.ship_pos
+	step(DT)
+	check(sim.state.ship_hp < sweep_hp, "踏み込み薙ぎは振り抜く角の形状で被弾する")
+	var sweep_hurt_hp := sim.state.ship_hp
+	step(0.1)
+	check(sim.state.ship_hp == sweep_hurt_hp, "踏み込み薙ぎは一振りで重複被弾を出さない")
+
+	fresh()
 	actor._cooldown = 0.0
 	check(actor.can_select(&"kick",1,0,260,true)==false, "正面の自機に後ろ蹴りを選ばない")
 	sim.state.enemy_aim = Vector2(-180, 0)
@@ -167,22 +194,6 @@ func _ready() -> void:
 	actor.start_attack(&"kick")
 	step(2.5)
 	check(not actor.can_select(&"kick",1,0,260,true), "蹴りのCDで背面攻略の機会を確保する")
-
-	fresh()
-	actor.phase = 2
-	actor.start_attack(&"combo")
-	step(2.5)
-	check(actor.technique == &"charge" and actor.mode == &"recovery" and not actor.combo_pending, "突進後に届かない薙ぎを強制せず隙を作る")
-	fresh()
-	actor.phase = 2
-	actor.start_attack(&"combo")
-	step(2.0)
-	sim.state.ship_pos = actor.table.pos[actor.body] + Vector2(160,0)
-	sim.state.enemy_aim = sim.state.ship_pos
-	step(0.5)
-	check(actor.technique == &"sweep" and actor.mode == &"windup", "仮連携は突進後に薙ぎが届く時だけ予告を始める")
-	step(1.5)
-	check(actor.mode == &"recovery" and not actor.combo_pending, "連携の最後に隙を作る")
 
 	fresh()
 	actor.start_attack(&"charge")
@@ -217,23 +228,32 @@ func _ready() -> void:
 
 	fresh()
 	actor.phase = 2
+	actor._apply_phase()
+	var lance_trace := {"launch": Vector2.ZERO, "stopped": false, "distance": 0.0, "shatters": 0}
+	actor.presentation_event.connect(func(e):
+		if e.cue == &"attack_started": lance_trace.launch = actor.table.pos[actor.body]
+		if e.cue == &"lance_shatter": lance_trace.shatters += 1)
 	actor.start_attack(&"lance")
-	step(0.6)
-	sim.state.ship_pos = Vector2(2200,0)
-	sim.state.enemy_aim = sim.state.ship_pos
-	step(0.8)
-	check(actor.mode == &"recovery" and float(actor._presentation.get("lance_afterglow")) <= 0.0, "発進を見送った槍は突いた残光を出さない")
-	fresh()
-	actor.phase = 2
-	actor.start_attack(&"lance")
-	while actor.mode in [&"windup", &"active"]: step(DT)
-	check(actor._presentation.get("lance_afterglow") != null, "光の槍は突き終わりに全体を残す")
-	if actor._presentation.get("lance_afterglow") != null:
-		check(float(actor._presentation.get("lance_afterglow")) > 0.0, "突き終わりの残光を開始する")
-		var hp_after := sim.state.ship_hp
-		step(0.7)
-		check(float(actor._presentation.get("lance_afterglow")) <= 0.0, "飛散後の粒子はフェードして消える")
-		check(sim.state.ship_hp == hp_after, "槍の残光に攻撃判定を残さない")
+	var after_shatter := false
+	var shatter_hp := sim.state.ship_hp
+	for frame in 1200:
+		step(DT)
+		if actor._runner.get("stage") == &"stop" and not lance_trace.stopped:
+			lance_trace.stopped = true
+			lance_trace.distance = actor.table.pos[actor.body].distance_to(lance_trace.launch)
+		if lance_trace.shatters > 0 and not after_shatter:
+			after_shatter = true
+			var points := actor.horn_points()
+			sim.state.ship_pos = points[0].lerp(points[1], 0.65)
+			actor.previous_ship = sim.state.ship_pos
+			shatter_hp = sim.state.ship_hp
+			sim.state.ship_invuln = 0.0
+		if actor.mode == &"recovery": break
+	check(lance_trace.stopped and absf(float(lance_trace.distance) - float(actor.rule().distance)) < 0.1, "光の槍は指定の距離を進んで停止する")
+	check(lance_trace.shatters == 1 and actor.mode == &"recovery", "光の槍は1回だけ砕けて隙に入る")
+	sim.state.ship_invuln = 0.0
+	step(0.7)
+	check(after_shatter and sim.state.ship_hp == shatter_hp, "砕けた光の槍の角に攻撃判定を残さない")
 
 	fresh()
 	# 通常ランの共通撃破通知を使い、伝説モジュールへ進む接続点まで確認する。
@@ -246,12 +266,83 @@ func _ready() -> void:
 	check(actor.phase == 1 and not actor.phase_pending and actor.mode == &"idle", "再生成で攻撃・形態・角刺さりをリセットする")
 	actor._cooldown = 0.0
 	var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
-	check(not candidates.is_empty() and candidates.all(func(c): return c.id not in ["lance", "combo"]), "第1形態の候補に第2形態専用技を混ぜない")
+	check(not candidates.is_empty() and candidates.all(func(c): return c.id not in ["lance", "sword_flash", "horn_dance"]), "第1形態の候補に第2形態専用技を混ぜない")
 	step(0.1)
 	check(actor.flow_runner.active and actor.flow_runner.stamina < actor.flow_runner.flow.maximum_stamina, "共通フローの抽選で技を開始しスタミナを消費する")
 	actor.begin_final_strike(1.0)
 	step(0.1)
 	check(actor.final_strike_t >= 0.0 and actor.mode == &"final", "制限時間の共通演出に対応する")
+	fresh()
+	sim.state.ship_pos = Vector2(2000, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	actor.start_attack(&"horn_wave")
+	for frame in 600:
+		step(DT)
+		if actor.mode == &"recovery" and not actor.horn_waves.is_empty(): break
+	check(actor.mode == &"recovery" and not actor.horn_waves.is_empty(), "角の衝撃波は技が終わったあとも残る")
+	if not actor.horn_waves.is_empty():
+		var wave: Dictionary = actor.horn_waves.back()
+		var radius := float(wave.radius)
+		step(DT)
+		check(float(wave.radius) > radius, "技が終わったあとも衝撃波が広がる")
+		sim.state.ship_pos = Vector2(wave.center) + Vector2.from_angle(float(wave.angle)) * (float(wave.radius) + float(wave.speed) * DT)
+		actor.previous_ship = sim.state.ship_pos
+		sim.state.ship_invuln = 0.0
+		var wave_hp := sim.state.ship_hp
+		step(DT)
+		check(sim.state.ship_hp < wave_hp and wave.hit, "角の衝撃波の帯に入ると被弾する")
+		var wave_hurt_hp := sim.state.ship_hp
+		for frame in 10:
+			sim.state.ship_invuln = 0.0
+			sim.state.ship_pos = Vector2(wave.center) + Vector2.from_angle(float(wave.angle)) * (float(wave.radius) + float(wave.speed) * DT)
+			step(DT)
+		check(sim.state.ship_hp == wave_hurt_hp, "同じ衝撃波の帯では重複被弾しない")
+		step(2.0)
+		check(actor.horn_waves.is_empty(), "角の衝撃波は上限の半径で消える")
+
+	fresh()
+	actor.phase = 2
+	actor._apply_phase()
+	sim.state.ship_pos = Vector2(400, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	var slash_trace := {"releases": 0, "hits": {}}
+	actor.presentation_event.connect(func(e):
+		if e.cue == &"slash_release": slash_trace.releases += 1)
+	var record_slash := func(_e):
+		var cut := int(slash_trace.releases)
+		slash_trace.hits[cut] = int(slash_trace.hits.get(cut, 0)) + 1
+	sim.ship.hurt_recorded.connect(record_slash)
+	actor.start_attack(&"sword_flash")
+	for frame in 1200:
+		sim.state.ship_invuln = 0.0
+		step(DT)
+		if actor.mode == &"recovery": break
+	sim.ship.hurt_recorded.disconnect(record_slash)
+	check(slash_trace.releases == int(actor.rule().get("cuts", 0)) and slash_trace.releases > 0, "光の剣は指定した回数の斬撃を放つ")
+	check(slash_trace.hits.size() == slash_trace.releases and slash_trace.hits.values().all(func(n): return int(n) == 1), "光の剣は静止自機へ各斬撃で1回だけ当たる")
+	check(actor.mode == &"recovery", "光の剣は連撃を終えて隙に入る")
+
+	fresh()
+	actor.phase = 2
+	actor._apply_phase()
+	sim.state.ship_pos = Vector2(600, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	var dance_trace := {"launches": 0, "ended": false, "left": true}
+	actor.presentation_event.connect(func(e):
+		if e.cue == &"attack_started": dance_trace.launches += 1
+		if e.cue == &"dance_end": dance_trace.ended = true)
+	actor.start_attack(&"horn_dance")
+	for frame in 2400:
+		var was_circle: bool = actor._runner != null and actor._runner.get("stage") == &"circle"
+		var facing := actor.table.facing[actor.body]
+		step(DT)
+		if was_circle and actor._runner.get("stage") == &"circle":
+			dance_trace.left = bool(dance_trace.left) and actor.table.facing[actor.body] < facing
+		if actor.mode == &"recovery": break
+	check(dance_trace.launches == int(actor.rule().get("passes", 0)) and dance_trace.launches > 0, "光角の乱舞は指定した回数突進する")
+	check(dance_trace.left, "光角の乱舞は旋回中に左へ回り続ける")
+	check(dance_trace.ended and actor.mode == &"recovery", "光角の乱舞は角を掲げて隙に入る")
+
 	session.free()
 	await get_tree().process_frame
 	print("[monoceros] failures=",failed)
@@ -304,11 +395,12 @@ func capture() -> void:
 	label.position = Vector2(24,130)
 	label.add_theme_font_size_override("font_size",24)
 	layer.add_child(label)
-	var stage_names := [&"charge",&"sweep",&"kick",&"return_charge",&"lance"]
+	var stage_names := [&"charge",&"sweep",&"kick",&"return_charge",&"lance",&"horn_wave",&"sword_flash",&"horn_dance"]
 	for tech in stage_names:
 		fresh()
-		actor.phase = 2 if tech==&"lance" else 1
-		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(160,0) if tech == &"sweep" else Vector2(600,0)
+		actor.phase = 2 if tech in [&"lance", &"sword_flash", &"horn_dance"] else 1
+		actor._apply_phase()
+		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech in [&"sweep", &"sword_flash"] else Vector2(600,0)
 		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
 		for frame in 170:

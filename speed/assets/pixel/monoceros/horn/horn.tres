@@ -1,0 +1,9 @@
+[gd_resource type="CanvasTexture" load_steps=3 format=3]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/horn/horn.png" id="1"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/horn/horn_normal.png" id="2"]
+[resource]
+diffuse_texture = ExtResource("1")
+normal_texture = ExtResource("2")
+texture_filter = 1
+metadata/core_lengths = PackedFloat32Array(64, 64, 64, 66, 69, 74, 78, 80, 80, 79, 80, 80, 80, 80, 80)
+metadata/durations = PackedFloat32Array(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)

@@ -30,7 +30,7 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 	await worker.seek(source_tick)
 	if cancelled:
 		return await _finish({"status": "cancelled"})
-	for n in clampi(start_offset, 0, 3600):
+	for n in clampi(start_offset, 0, roundi(60.0 / worker.DT)):
 		worker.step()
 	var run: RunSimulation = worker.run
 	if run.state.tracing or run.state.phase != RunState.Phase.PLAY:
@@ -50,7 +50,7 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 	it.has_cursor = true
 	it.cursor = path[0]
 	run.draw._start(it)
-	var frames: int = clampi(ceili(maxf(draw_seconds, run.cfg.draw_confirm_delay) / worker.DT), 1, 1800)
+	var frames: int = clampi(ceili(maxf(draw_seconds, run.cfg.draw_confirm_delay) / worker.DT), 1, roundi(30.0 / worker.DT))
 	for n in frames:
 		if cancelled:
 			return await _finish({"status": "cancelled"})
@@ -73,7 +73,7 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 		run.draw._commit(it)
 	var trajectory := []
 	var completed := false
-	for n in 3600:
+	for n in roundi(60.0 / worker.DT):
 		if cancelled:
 			return await _finish({"status": "cancelled"})
 		trajectory.append([run.state.ship_pos.x, run.state.ship_pos.y])
@@ -82,7 +82,7 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 			break
 		worker.step()
 		if n % 120 == 0:
-			progress.emit(0.65 + 0.3 * float(n) / 3600)
+			progress.emit(0.65 + 0.3 * float(n) / (60.0 / worker.DT))
 			await get_tree().process_frame
 	var damage_total := 0.0
 	var kills := 0

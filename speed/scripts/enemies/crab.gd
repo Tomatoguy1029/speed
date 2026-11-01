@@ -47,6 +47,7 @@ func step(i: int, dt: float) -> void:
 
 ## 進む向きから turn_angle 度以上自機がずれたら、その場で横腹を自機へ向け直す。回る量が少ない側を選ぶ。
 func _steer(i: int) -> void:
+	if m.motion.turn_locked(i): return
 	var t := table
 	var to := state.ship_pos - t.pos[i]
 	if to.length_squared() < 1.0:

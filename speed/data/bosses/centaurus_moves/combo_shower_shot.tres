@@ -1,0 +1,12 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/combo_shower_shot.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"combo_shower_shot"
+display_name = "降り注ぐ矢から強弓"
+category = &"combo"
+track_during_warn = false
+gap = 0.2
+cd = 10.0

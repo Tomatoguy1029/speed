@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/hunt_pounce.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"hunt_pounce"
+display_name = "追い立てと飛びかかり"
+category = &"combo"
+track_during_warn = true
+gap = 0.1
+cd = 9.0

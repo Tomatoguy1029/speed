@@ -8,6 +8,24 @@ extends Resource
 ## データ編集の画面での並び順
 const EDITOR_ORDER := 6
 
+## 表示パーツの塗装色と元の配置からの位置補正。戦闘判定とは独立する。
+@export var part_appearance: Dictionary = {}
+
+static func valid_part_appearance(value) -> bool:
+	if not value is Dictionary or value.size() > 128: return false
+	for key in value:
+		if not key is String or key.length() > 160 or not value[key] is Dictionary: return false
+		for field in value[key]:
+			var entry = value[key][field]
+			if field == "color":
+				if not entry is String or entry.length() != 6 or not Color.html_is_valid(entry): return false
+			elif field == "offset":
+				if not entry is Array or entry.size() != 2: return false
+				for number in entry:
+					if typeof(number) not in [TYPE_FLOAT, TYPE_INT] or not is_finite(float(number)) or absf(float(number)) > 256: return false
+			else: return false
+	return true
+
 ## 攻撃の値（params）の名前・説明・単位
 const PARAMS_DOCS := {
 	"squad": ["分離後の群れ", "うみへび座：戦術・陣形・移動・視線・不死の蛇の距離の調整値。", "—"],
@@ -89,10 +107,8 @@ const PARAMS_DOCS := {
 ## 機体の方を向く速さ。
 ## 単位：ラジアン/秒
 @export var turn: float
-## 経験値
-## 倒したときに落とす経験値。
-## 単位：経験値
-@export var xp: float
+## 旧ボス資源の経験値の読み取り互換。ボス本体は専用の決着処理を使う。
+@export_storage var xp: float
 ## 背面の弱点の広さ
 ## 背面のこの角度（片側）に当てると必ずクリティカルになる。0 なら弱点なし。
 ## 単位：ラジアン

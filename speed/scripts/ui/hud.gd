@@ -8,25 +8,32 @@ extends Control
 const RING_PULSE_TIME := 0.35
 ## リングが1周溜まりきったときに白く光る時間（実秒）
 const RING_FLASH_TIME := 0.3
-## 内側のリングの半径と、外側のリングまでの間隔
-const RING_RADIUS := 14.0
+## 制作済みの色・円帯・目盛りと、3周目以降の間隔
+const BOOST_STYLE := preload("res://data/visuals/boost_gauge_runtime.tres")
 const RING_GAP := 7.0
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（素材のpx）
-const LOADOUT_WEAPON := 21.0
-const LOADOUT_TRAIT := 13.0
+const LOADOUT_SLOT := 16.0
+const LOADOUT_STEP := 18.0
+const LOADOUT_WEAPON := Vector2(9, 320)
+const LOADOUT_TRAIT := Vector2(9, 338)
+const LOADOUT_HERO := Vector2(81, 320)
+const LOADOUT_REGION := Rect2(9, 320, 107, 35)
 ## ミニマップの半径（素材のpx）
 const MINIMAP_R := 43.0
 const MINIMAP_CENTER := Vector2(584, 55)
 const ART_SIZE := Vector2(640, 360)
 const CYAN := Color("#5bc8db")
 const ART := "res://assets/ui/combat/"
-const FRAME := preload(ART + "combat_ui_main.png")
 const RADAR := preload(ART + "combat_ui_radar.png")
 const HEALTH := preload(ART + "combat_ui_health_bar.png")
+const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
 const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
-const SLOTS := preload(ART + "combat_ui_upgrades_boxes.png")
+const SLOTS := preload(ART + "combat_ui_components.png")
+const COMET_SLOT_FRAME := preload(ART + "comet_slot_frame.gdshader")
 const CARDS := preload(ART + "combat_ui_boxes.png")
+const CARD_VIEW := preload("res://scripts/ui/reward_card_view.gd")
+const SPEED_INDICATOR := preload("res://scripts/ui/speed_indicator.gd")
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := preload("res://scripts/ui/module_icons.gd").IDS
 
@@ -66,19 +73,20 @@ var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var _laser_audio: Node
 var _font: Font
 var _cards_box: Control
+var _cards_dim: ColorRect
 var _reroll_button: Button
 var _cards_title: Label
 var _cards_row: Control
-var _swap_box: VBoxContainer
-var _swap_scroll: ScrollContainer
+var _swap_box: Control
 var _swap_grid: GridContainer
+var _swap_new_card: Button
 var _swap_new_name: Label
 var _swap_new_desc: Label
 var _swap_keep: Button
 var _swap_keep_index := -1
-var _frame: TextureRect
 var _loadout_icons: Control
 var _loadout_key := ""
 var _health_fill: AtlasTexture
@@ -101,22 +109,19 @@ var _ring_amount := 1.0
 var _pause_after_reward := false
 var _menu_overlay: Control
 var _overlay_focus: WeakRef
+var _speed_indicator: SPEED_INDICATOR
 
 func _ready() -> void:
+	_speed_indicator = SPEED_INDICATOR.new()
+	add_child(_speed_indicator)
+	_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
+	add_child(_laser_audio)
 	_font = ThemeDB.fallback_font
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_health_fill = _make_bar_fill(HEALTH)
 	_experience_fill = _make_bar_fill(EXPERIENCE)
-	_frame = TextureRect.new()
-	_frame.texture = FRAME
-	_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var frame_material := ShaderMaterial.new()
-	frame_material.shader = preload(ART + "main_frame.gdshader")
-	_frame.material = frame_material
-	add_child(_frame)
 	_loadout_icons = Control.new()
 	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
@@ -129,7 +134,7 @@ func _ready() -> void:
 	_rewards.add_module_icon = _add_icon
 	add_child(_rewards)
 	_rewards.active_changed.connect(_on_reward_active)
-	resized.connect(_layout_cards)
+	resized.connect(_layout_art)
 	_build_pause()
 	_draw_button = Button.new()
 	_draw_button.text = "hud.draw"
@@ -159,6 +164,8 @@ func _ready() -> void:
 	run.phase_changed.connect(_on_phase)
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
+	if not run.state.lab_mode:
+		AudioManager.play_music(&"boss" if run.state.boss_spawned else &"battle", 0.6, self)
 
 func _on_reward_active(active: bool) -> void:
 	run.ui_reward_active = active
@@ -234,6 +241,7 @@ func _sync_menu_visibility() -> void:
 	var covered := _menu_overlay != null
 	var paused := run.state.phase == RunState.Phase.PAUSED
 	_cards_box.visible = not covered and not paused and not _rewards.is_active() and run.state.phase == RunState.Phase.LEVELUP
+	_cards_dim.visible = _cards_box.visible and _swap_box.visible
 	_pause_box.visible = not covered and paused and _settings == null
 	_rewards.visible = not covered and not paused and _rewards.is_active()
 	_rewards.set_process(not covered and not paused)
@@ -242,6 +250,8 @@ func _sync_menu_visibility() -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"enemy_laser_charge", &"enemy_laser_cancel", &"enemy_laser_fire":
+				_laser_audio.handle(ev)
 			&"full_burst_ready":
 				_ring_flash_t = 0.1
 				_ring_flash_max = 0.1
@@ -255,26 +265,36 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"hero_discovered":
 				_hero_notice_t = 1.8
 			&"boss_spawn":
+				if not run.state.lab_mode: AudioManager.play_music(&"boss", 1.0, self)
 				_warning_t = 3.0
 			&"clear_banner":
+				AudioManager.end_dash()
 				_banner = tr("hud.clear")
 				_banner_color = Color("#ffe46b")
 				_banner_t = 99.0
 			&"game_over":
+				AudioManager.end_dash()
+				if not run.state.lab_mode:
+					AudioManager.play_music(&"game_over", 1.0, AudioManager)
 				_banner = tr("hud.game_over")
 				_banner_color = Color("#ff6b5a")
 				_banner_t = 99.0
 			&"levelup":
-				AudioManager.play(&"levelup", -6.0)
+				AudioManager.play(&"levelup_notice", -6.0)
 			&"kill":
 				if not ev.get("silent", false):
 					AudioManager.play(&"kill", -10.0, randf_range(0.9, 1.2))
 			&"hurt":
 				AudioManager.play(&"hurt", -4.0)
+			&"weapon_fire":
+				if ev.id in [&"W01", &"W23"]:
+					AudioManager.play(&"blaster", -12.0)
 			&"launch":
 				AudioManager.play(&"dash", -6.0)
-			&"bounce", &"block_impact":
-				AudioManager.play(&"block", -8.0)
+			&"trace_end":
+				AudioManager.end_dash()
+			&"block_impact":
+				AudioManager.play(&"bounce", -8.0)
 			&"shield_reflect":
 				AudioManager.play(&"block", -10.0, 1.8)
 			&"shield_stolen":
@@ -283,6 +303,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"block", -10.0, 1.3)
 			&"boss_explode":
 				AudioManager.play(&"boom")
+			&"bomber_explode":
+				AudioManager.play(&"bomber_explode", -12.0)
 
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:
@@ -393,6 +415,12 @@ func _notification(what: int) -> void:
 			run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_update_speed_indicator(delta)
+	_laser_audio.sync(run)
+	var slow := run.state.phase == RunState.Phase.PLAY and run.draw.world_scale() < 0.999
+	if run.state.phase == RunState.Phase.FINISHING:
+		slow = run.sequence_t < run.cfg.boss_finish_slow_time
+	AudioManager.set_slow_motion(slow and _menu_overlay == null and not _rewards.is_active())
 	_update_finish_presentation()
 	_update_cinematic_visibility()
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
@@ -416,8 +444,9 @@ func _can_show_draw_button(touchscreen: bool) -> bool:
 func _sync_combat_art_visibility() -> void:
 	var state := run.state
 	var cinematic := state != null and state.cinematic_bars > 0.0
-	_frame.visible = show_status and state != null and state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING] and not cinematic
-	_loadout_icons.visible = _frame.visible or (cinematic and not state.final_modules.is_empty())
+	var combat_visible := show_status and state != null and state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING] and not cinematic
+	_loadout_icons.visible = combat_visible or (cinematic and not state.final_modules.is_empty())
+	_speed_indicator.visible = combat_visible
 
 func _update_finish_presentation() -> void:
 	if run.state.phase != RunState.Phase.FINISHING:
@@ -439,16 +468,13 @@ func _update_finish_presentation() -> void:
 func _layout_art() -> void:
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
 	var origin := (size - ART_SIZE * factor) * 0.5
-	for item in [_frame, _loadout_icons]:
-		item.position = origin
-		item.scale = Vector2.ONE * factor
-	if _swap_box.visible:
-		_layout_cards()
-	else:
-		_cards_box.position = origin
-		_cards_box.scale = Vector2.ONE * factor
-		_cards_box.size = ART_SIZE
-	_frame.size = ART_SIZE
+	_speed_indicator.position = (size - (SPEED_INDICATOR.METER.get_size() + Vector2.ONE * 8.0) * factor).round()
+	_speed_indicator.scale = Vector2.ONE * factor
+	_loadout_icons.position = origin
+	_loadout_icons.scale = Vector2.ONE * factor
+	_cards_box.position = origin
+	_cards_box.scale = Vector2.ONE * factor
+	_cards_box.size = ART_SIZE
 	_sync_combat_art_visibility()
 
 func _make_bar_fill(frame: Texture2D) -> AtlasTexture:
@@ -479,18 +505,7 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 	draw_texture(frame, Vector2.ZERO)
 
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
-	if definition == null or definition is HeroDef:
-		return
-	var texture: Texture2D = preload("res://scripts/ui/module_icons.gd").texture_for(definition)
-	if texture == null: return
-	var icon := TextureRect.new()
-	icon.texture = texture
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.position = area.position
-	icon.size = area.size
-	parent.add_child(icon)
+	CARD_VIEW.add_icon(parent, definition, area)
 
 func _refresh_loadout_icons() -> void:
 	if run.state == null:
@@ -511,20 +526,45 @@ func _refresh_loadout_icons() -> void:
 			continue
 		var index := 0
 		for id in owned:
-			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
-			_add_icon(_loadout_icons, ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id), area)
+			var at := (LOADOUT_WEAPON if row == 0 else LOADOUT_TRAIT) + Vector2(index * LOADOUT_STEP, 0)
+			var area := Rect2(at + Vector2(2, 2), Vector2(12, 10))
+			var definition: Resource = ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id)
+			if row == 0 and definition != null and definition.comet_only:
+				_add_comet_slot_frame(Rect2(at, Vector2(LOADOUT_SLOT, 17)))
+			_add_icon(_loadout_icons, definition, area)
 			index += 1
 		row += 1
 	for j in run.state.final_modules.size():
 		var preview=preload("res://scripts/ui/legendary_module_icon.gd").new()
-		preview.position=Vector2(9+j*23,317)
-		preview.size=Vector2(17,17)
+		preview.position=LOADOUT_WEAPON+Vector2(j*LOADOUT_STEP+2,2)
+		preview.size=Vector2(12,10)
 		preview.module_id=run.state.final_modules[j]
 		_loadout_icons.add_child(preview)
+
+func _add_comet_slot_frame(area: Rect2) -> void:
+	var texture := AtlasTexture.new()
+	texture.atlas = SLOTS
+	texture.region = area
+	var material := ShaderMaterial.new()
+	material.shader = COMET_SLOT_FRAME
+	material.set_shader_parameter("frame_color", COMET_ONLY_COLOR)
+	var frame := TextureRect.new()
+	frame.texture = texture
+	frame.material = material
+	frame.position = area.position
+	frame.size = area.size
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loadout_icons.add_child(frame)
 
 # ── 3択 ──────────────────────────────────────────────────────────
 
 func _build_cards() -> void:
+	_cards_dim = ColorRect.new()
+	_cards_dim.color = Color(0, 0, 0, 0.28)
+	_cards_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cards_dim.hide()
+	add_child(_cards_dim)
+	_cards_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_cards_box = Control.new()
 	_cards_box.size = ART_SIZE
 	_cards_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -550,66 +590,30 @@ func _build_cards() -> void:
 	_build_swap_cards()
 
 func _card_art(button: Button, region: Rect2) -> void:
-	var texture := AtlasTexture.new()
-	texture.atlas = CARDS
-	texture.region = region
-	var style := StyleBoxTexture.new()
-	style.texture = texture
-	button.add_theme_stylebox_override("normal", style)
-	for state in ["hover", "pressed", "focus", "disabled"]:
-		var variant := style.duplicate() as StyleBoxTexture
-		variant.modulate_color = Color(0.5, 0.5, 0.5) if state == "disabled" else Color(1.3, 1.3, 1.3)
-		button.add_theme_stylebox_override(state, variant)
-	button.add_theme_color_override("font_color", CYAN)
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	CARD_VIEW.apply_art(button, region)
 
 func _build_swap_cards() -> void:
-	_swap_box = VBoxContainer.new()
+	_swap_box = Control.new()
+	_swap_box.size = ART_SIZE
+	_swap_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_swap_box.hide()
 	_cards_box.add_child(_swap_box)
-	var heading := Label.new()
-	heading.text = "card.new_weapon"
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_swap_box.add_child(heading)
-	_swap_scroll = ScrollContainer.new()
-	_swap_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_swap_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_swap_scroll.follow_focus = true
-	_swap_scroll.hide()
-	_swap_box.add_child(_swap_scroll)
-	var content := VBoxContainer.new()
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 16)
-	_swap_scroll.add_child(content)
-	# 新武器は情報だけを表示し、交換候補と同じボタンにはしない。
-	var info := PanelContainer.new()
-	info.mouse_filter = Control.MOUSE_FILTER_PASS
-	var style := _card_style(COMET_ONLY_COLOR)
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
-	info.add_theme_stylebox_override("panel", style)
-	content.add_child(info)
-	var labels := VBoxContainer.new()
-	info.add_child(labels)
-	_swap_new_name = Label.new()
-	_swap_new_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	labels.add_child(_swap_new_name)
-	_swap_new_desc = Label.new()
-	_swap_new_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	labels.add_child(_swap_new_desc)
-	var title := Label.new()
-	title.text = "hud.swap_title"
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(title)
+	var arrow := Line2D.new()
+	arrow.points = PackedVector2Array([Vector2(320, 225), Vector2(320, 235), Vector2(316, 231), Vector2(320, 235), Vector2(324, 231)])
+	arrow.width = 1.0
+	arrow.default_color = COMET_ONLY_COLOR
+	_swap_box.add_child(arrow)
 	_swap_grid = GridContainer.new()
+	_swap_grid.position = Vector2(136, 240)
+	_swap_grid.size = Vector2(368, 80)
+	_swap_grid.columns = 4
 	_swap_grid.add_theme_constant_override("h_separation", 16)
-	_swap_grid.add_theme_constant_override("v_separation", 16)
-	content.add_child(_swap_grid)
+	_swap_box.add_child(_swap_grid)
 	_swap_keep = Button.new()
-	_swap_keep.custom_minimum_size.y = 64
-	_swap_keep.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_swap_keep.position = Vector2(264, 327)
+	_swap_keep.size = Vector2(112, 29)
+	_swap_keep.add_theme_font_size_override("font_size", 9)
+	_card_art(_swap_keep, Rect2(265, 288, 112, 29))
 	_swap_keep.pressed.connect(func(): _card_command(&"choose_card", {"index": _swap_keep_index}))
 	_swap_keep.hide()
 	_swap_box.add_child(_swap_keep)
@@ -629,113 +633,76 @@ func _show_cards() -> void:
 	_cards_title.visible = swap == &""
 	_cards_row.visible = swap == &""
 	_swap_box.visible = swap != &""
-	_swap_scroll.visible = swap != &""
 	_swap_keep.visible = swap != &""
+	_swap_keep_index = -1
 	if swap != &"":
 		var got: ContentEntry = ContentManager.catalog.find(&"weapons", swap)
-		_swap_new_name.text = got.get_display_name()
-		_swap_new_desc.text = got.get_description()
+		if _swap_new_card != null:
+			_swap_box.remove_child(_swap_new_card)
+			_swap_new_card.queue_free()
+		# 通常カードと同じ生成経路を使い、新武器の情報表示だけを行う。
+		_swap_new_card = CARD_VIEW.create({"tag": tr("card.new_weapon"), "name": got.get_display_name(), "desc": got.get_description()}, -1, 144, 10, got)
+		_swap_new_card.position = Vector2(248, 28)
+		_swap_new_card.focus_mode = Control.FOCUS_NONE
+		_swap_new_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		CARD_VIEW.set_palette(_swap_new_card, COMET_ONLY_COLOR, Color("#371b23"))
+		_swap_box.add_child(_swap_new_card)
+		_swap_new_name = _swap_new_card.get_node("Name")
+		_swap_new_desc = _swap_new_card.get_node("Description")
 		for i in cards.size():
 			if cards[i].kind == &"keep":
 				_swap_keep_index = i
 				var info := card_info(cards[i], run.cfg.trait_max_stacks)
-				_swap_keep.text = "%s\n%s" % [info.tag, info.desc]
+				_swap_keep.text = info.name
 			else:
-				var b := _card_button(cards[i], i, Vector2(0, 220))
-				b.mouse_filter = Control.MOUSE_FILTER_PASS
+				var definition: Resource = ContentManager.catalog.find(&"weapons", cards[i].id)
+				var b := CARD_VIEW.create_weapon_slot(definition)
+				var info := card_info(cards[i], run.cfg.trait_max_stacks)
+				b.tooltip_text = "%s\n%s" % [info.name, info.desc]
+				b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
 				_swap_grid.add_child(b)
+		_link_swap_focus()
 	else:
 		_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
 		var width := minf(144.0, (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size()))
 		var left := 89.0 + (464.0 - (cards.size() * width + maxi(0, cards.size() - 1) * 16.0)) / 2.0
 		for i in cards.size():
 			var info := card_info(cards[i], run.cfg.trait_max_stacks)
-			var b := Button.new()
-			b.position = Vector2(left + i * (width + 16), 83)
-			b.size = Vector2(width, 193)
-			b.tooltip_text = "%s: %s" % [info.name, info.get("tooltip_desc", info.desc)]
-			if cards[i].kind == &"post_max":
-				var style := _card_style(info.color)
-				style.bg_color = Color("#233c49")
-				style.set_corner_radius_all(0)
-				style.set_border_width_all(2)
-				b.add_theme_stylebox_override("normal", style)
-				var focus_style := style.duplicate() as StyleBoxFlat
-				focus_style.border_color = Color("#c0ffff")
-				for visual_state in ["focus", "hover", "pressed"]:
-					b.add_theme_stylebox_override(visual_state, focus_style)
-			else:
-				_card_art(b, Rect2(89, 83, 145, 193))
-			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
-			_cards_row.add_child(b)
-			var font_size := 10 if cards.size() <= 3 else 8
-			for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
-				[Vector2(7, 34), Vector2(width - 14, 28), info.name],
-				[Vector2(7, 65), Vector2(width - 14, 122 if cards[i].kind == &"post_max" else 57), info.desc]]:
-				var label := Label.new()
-				label.position = entry[0]
-				label.size = entry[1]
-				label.text = entry[2]
-				label.add_theme_font_size_override("font_size", (17 if entry[0].y == 65 else 13) if cards[i].kind == &"post_max" else font_size)
-				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-				label.clip_text = true
-				label.max_lines_visible = (2 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
-				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				b.add_child(label)
 			var card: Dictionary = cards[i]
 			var definition: Resource = ContentManager.catalog.find(&"traits" if card.kind == &"trait" else &"weapons", card.id)
-			_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
+			var b := CARD_VIEW.create(info, i, width, 10 if cards.size() <= 3 else 8, definition, card.kind == &"post_max")
+			b.position = Vector2(left + i * (width + 16), 83)
+			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
+			_cards_row.add_child(b)
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
 	_reroll_button.disabled = left <= 0
 	_reroll_button.visible = swap == &""
 	_layout_art()
-	_layout_cards()
+	_sync_menu_visibility()
 	var row: Control = _swap_grid if swap != &"" else _cards_row
 	if row.get_child_count() > 0:
 		_focus_card.call_deferred(weakref(row.get_child(0)))
-	_swap_scroll.set_deferred("scroll_vertical", 0)
 
 func _focus_card(reference: WeakRef) -> void:
 	var button: Control = reference.get_ref()
 	if button != null and button.is_visible_in_tree():
 		button.grab_focus()
 
-func _layout_cards() -> void:
-	if _swap_box == null or not _swap_box.visible:
-		return
-	var width := maxf(1.0, minf(1100.0, size.x - 32.0))
-	_swap_grid.columns = clampi(int((width + 16.0) / 236.0), 1, maxi(1, _swap_grid.get_child_count()))
-	_cards_box.scale = Vector2.ONE
-	_cards_box.size = Vector2(width, maxf(1.0, minf(600.0, size.y - 32.0)))
-	_cards_box.position = (size - _cards_box.size) / 2.0
-	_swap_box.size = _cards_box.size
-
-func _card_button(card: Dictionary, index: int, minimum_size: Vector2) -> Button:
-	var info := card_info(card, run.cfg.trait_max_stacks)
-	var b := Button.new()
-	b.custom_minimum_size = minimum_size
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.text = "%d. %s\n%s\n\n%s" % [index + 1, info.tag, info.name, info.desc]
-	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var style := _card_style(info.color)
-	b.add_theme_stylebox_override("normal", style)
-	var hover := style.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.12, 0.15, 0.24, 0.95)
-	b.add_theme_stylebox_override("hover", hover)
-	b.add_theme_stylebox_override("focus", hover)
-	b.pressed.connect(func(): _card_command(&"choose_card", {"index": index}))
-	return b
-
-func _card_style(col: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.06, 0.08, 0.14, 0.95)
-	style.border_color = col
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(6)
-	return style
+func _link_swap_focus() -> void:
+	var buttons: Array[Control] = []
+	for button: Control in _swap_grid.get_children():
+		buttons.append(button)
+	buttons.append(_swap_keep)
+	for i in buttons.size():
+		var button := buttons[i]
+		button.focus_next = button.get_path_to(buttons[(i + 1) % buttons.size()])
+		button.focus_previous = button.get_path_to(buttons[posmod(i - 1, buttons.size())])
+		if button != _swap_keep:
+			button.focus_neighbor_left = button.get_path_to(buttons[posmod(i - 1, buttons.size() - 1)])
+			button.focus_neighbor_right = button.get_path_to(buttons[(i + 1) % (buttons.size() - 1)])
+			button.focus_neighbor_bottom = button.get_path_to(_swap_keep)
+	_swap_keep.focus_neighbor_top = _swap_keep.get_path_to(buttons[0])
 
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary, trait_max_stacks := -1) -> Dictionary:
@@ -743,8 +710,8 @@ static func card_info(c: Dictionary, trait_max_stacks := -1) -> Dictionary:
 	if c.kind == &"swap" or c.kind == &"keep":
 		if c.kind == &"keep":
 			var new_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.new)
-			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
-				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
+			return {"tag": "", "name": TranslationServer.translate("card.discard_weapon").format({name = new_def.get_display_name()}),
+				"desc": "", "color": Color("#6b7690")}
 		var old_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.id)
 		var old_name := old_def.get_display_name() if old_def.comet_only else "%s Lv%d" % [old_def.get_display_name(), c.level]
 		return {"tag": TranslationServer.translate("card.swap_tag"), "name": old_name,
@@ -848,7 +815,7 @@ func _draw() -> void:
 	if show_status:
 		# 素材の体力枠の内側に、現在のHPの割合を描く。
 		var hp := clampf(s.ship_hp / maxf(1.0, s.stats.max_hp), 0.0, 1.0)
-		var health_color := Color("#ff526e") if hp < 0.3 else CYAN
+		var health_color := Color("#ff526e") if hp <= 0.1 else Color("#ffe46b") if hp < 0.5 else Color("#67e8b1")
 		_draw_bar(HEALTH, _health_fill, hp, health_color)
 		draw_string(_font, Vector2(7, 40), "%d/%d" % [ceili(maxf(0.0, s.ship_hp)), roundi(s.stats.max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CYAN)
 		draw_string(_font, Vector2(7, 52), "ATK %.1f  %s  Lv %d  %s" % [run.combat.attack_power(), tr("hud.kills").format({n = s.kills}), s.level, tr("common.parts").format({n = s.coins})], HORIZONTAL_ALIGNMENT_LEFT, 260, 8, CYAN)
@@ -870,12 +837,21 @@ func _draw() -> void:
 		for p in run.field.rare_comet_positions():
 			_draw_edge_arrow(p, Color("#ffd24a"))
 		_draw_gauge_ring()
-	if _cards_box.visible and _swap_box.visible:
-		draw_rect(_cards_box.get_rect(), Color(0.06, 0.08, 0.14, 0.95))
 
 var _dense := PackedVector2Array()
 var _minimap_at := Vector2.ZERO
 var _minimap_r := 0.0
+
+func _speed_indicator_mode() -> int:
+	var s := run.state
+	if s.tracing or s.ship_boost_t > 0.0: return 2
+	if s.glide or s.ship_vel.length() > s.stats.max_speed * run.cfg.steer_cruise + 1.0: return 1
+	return 0
+
+func _update_speed_indicator(delta: float) -> void:
+	if run.state.phase != RunState.Phase.PLAY or run.ui_overlay_active or run.ui_reward_active:
+		return
+	_speed_indicator.advance(_speed_indicator_mode(), delta)
 
 ## ミニマップ（右上）。自機を中心に、世界の方角と縮尺を保って出す（仕様書 17）。
 ## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
@@ -1001,16 +977,16 @@ func _dense_cells() -> PackedVector2Array:
 ## 下の目盛りは強化の段階（仕様書 8）。
 ## 枠の中は能力IDに対応する専用アイコンを表示する。
 func _draw_loadout() -> void:
-	draw_texture(SLOTS, Vector2.ZERO)
-	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
-	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
-	_draw_hero_slot(Vector2(99, 315))
+	draw_texture_rect_region(SLOTS, LOADOUT_REGION, LOADOUT_REGION)
+	_draw_slot_row(LOADOUT_WEAPON, true, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
+	_draw_slot_row(LOADOUT_TRAIT, false, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
+	_draw_hero_slot(LOADOUT_HERO)
 
 func _draw_hero_slot(at: Vector2) -> void:
 	var s := run.state
 	if s.hero_power == &"":
 		return
-	var rect := Rect2(at + Vector2(3, 3), Vector2(32, 31))
+	var rect := Rect2(at + Vector2(3, 3), Vector2(29, 29))
 	var definition: HeroDef = ContentManager.heroes.get(s.hero_power)
 	var gold := Color("#ffe8a0")
 	if definition != null and not definition.stars.is_empty():
@@ -1030,23 +1006,20 @@ func _draw_hero_slot(at: Vector2) -> void:
 	if s.hero_cd > 0.0 and definition != null and definition.cooldown > 0.0:
 		var k := clampf(s.hero_cd / definition.cooldown, 0, 1)
 		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1 - k)), Vector2(rect.size.x, rect.size.y * k)), Color(0, 0, 0, 0.65))
-	draw_string(_font, at + Vector2(26, 32), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
+	draw_string(_font, at + Vector2(24, 31), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
 	if s.hero_active_t > 0.0:
 		draw_string(_font, at + Vector2(35, 15), "%ds" % ceili(s.hero_active_t), HORIZONTAL_ALIGNMENT_LEFT, 32, 9, gold)
 
-func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
+func _draw_slot_row(origin: Vector2, weapon: bool, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()
 	for k in mini(slots, ids.size()):
-		var weapon := size_px == LOADOUT_WEAPON
-		var step := 23.0 if weapon else 15.0
-		var rect := Rect2((7.0 if weapon else 9.0) + k * step, y, size_px, size_px)
+		var rect := Rect2(origin + Vector2(k * LOADOUT_STEP, 0), Vector2(LOADOUT_SLOT, 17))
 		var lv: int = owned[ids[k]]
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
 		var definition = defs[ids[k]]
 		if weapon and definition.comet_only:
-			draw_rect(rect.grow(1), COMET_ONLY_COLOR, false, 1)
 			continue
-		var pip_w := (size_px - 4.0) / max_level
+		var pip_w := (LOADOUT_SLOT - 4.0) / max_level
 		for j in max_level:
 			draw_rect(Rect2(rect.position.x + 2 + j * pip_w, rect.end.y - 3, maxf(1, pip_w - 1), 1), col if j < lv else Color(1, 1, 1, 0.15))
 
@@ -1093,13 +1066,12 @@ func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 
 ## カーソル付近のリング：描画前は溜まっている量、描画中は残りの長さ（仕様書 6.2）。
 ## 内側の1周が容量1、大容量チャージで増えた容量は外側の弧。内側から順に埋まる。
-## 描けるまでは同じ色を暗くし、描ける量に目盛りを置く。描けるようになった瞬間に広がる輪、1周溜まりきった瞬間に白い光を出す。
+## 描けるまでは専用の不足色を使い、描ける量に目盛りを置く。描けるようになった瞬間に広がる輪、1周溜まりきった瞬間に白い光を出す。
 func _draw_gauge_ring() -> void:
 	var s := run.state
 	var c := get_viewport().get_mouse_position() + Vector2(26, 26)
 	var min_charge := run.cfg.draw_min_charge
 	var capacity := s.stats.capacity
-	var laps := ceili(capacity - 1e-6)
 	var amount := s.gauge_amount()
 	var usable := amount >= min_charge
 	var charging := not s.drawing and not s.tracing
@@ -1110,30 +1082,11 @@ func _draw_gauge_ring() -> void:
 		_ring_flash_t = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
 		_ring_flash_max = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
 	_ring_amount = amount
-	var col := Color("#5dffa0")
-	if not usable:
-		col.a = 0.4
 	if s.drawing:
 		amount = s.draw_gauge * (1.0 - s.draw_length / maxf(1.0, s.draw_limit))
-		col = Color("#c8f7ff")
-	var width := 4.0
-	if _ring_flash_t > 0.0:
-		var k := _ring_flash_t / _ring_flash_max
-		col = col.lerp(Color.WHITE, k)
-		width += 2.0 * k
-	for lap in laps:
-		var r := RING_RADIUS + RING_GAP * lap
-		var lap_cap := minf(1.0, capacity - lap)
-		var fill := clampf(amount - lap, 0.0, lap_cap)
-		draw_arc(c, r, -PI / 2.0, -PI / 2.0 + TAU * lap_cap, 32, Color(1, 1, 1, 0.15), 4.0)
-		if fill > 0.0:
-			draw_arc(c, r, -PI / 2.0, -PI / 2.0 + TAU * fill, 32, col, width)
-	if not s.drawing:
-		var tick := Vector2.from_angle(-PI / 2.0 + TAU * min_charge)
-		draw_line(c + tick * (RING_RADIUS - 4.0), c + tick * (RING_RADIUS + 5.0), Color(1, 1, 1, 0.9 if usable else 0.5), 2.0)
-	if _ring_pulse_t > 0.0:
-		var k := 1.0 - _ring_pulse_t / RING_PULSE_TIME
-		draw_arc(c, RING_RADIUS + RING_GAP * (laps - 1) + 12.0 * k, 0, TAU, 32, Color(0.36, 1.0, 0.63, 1.0 - k), 3.0)
+	var flash := _ring_flash_t / _ring_flash_max if _ring_flash_t > 0.0 else 0.0
+	var pulse := 1.0 - _ring_pulse_t / RING_PULSE_TIME if _ring_pulse_t > 0.0 else -1.0
+	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, s.drawing, usable, flash, pulse, BOOST_STYLE, RING_GAP)
 
 ## 内側・外側のどれかのリングが、before から after の間に溜まりきったか
 func _lap_filled(before: float, after: float, capacity: float) -> bool:
@@ -1147,3 +1100,9 @@ func _draw_banner() -> void:
 	if _banner == "":
 		return
 	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)
+
+func _exit_tree() -> void:
+	AudioManager.set_slow_motion(false)
+	if run != null and run.state != null and not run.state.lab_mode:
+		AudioManager.stop_music(self)
+	AudioManager.end_dash()

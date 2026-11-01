@@ -18,6 +18,7 @@ func _ready() -> void:
 	var script := load("res://gyms/enemy_lab/lab_session.gd")
 	var lab = script.new()
 	add_child(lab)
+	check(is_equal_approx(lab.DT, 1.0 / Engine.physics_ticks_per_second), "実験場は本番と同じ物理更新の刻み")
 	var data_before := JSON.stringify(SaveManager.data)
 	var config_before := ContentManager.cfg.enemy_hp_mult
 	await lab.reset({"seed": 932, "empty": true, "stage": 4})
@@ -28,6 +29,11 @@ func _ready() -> void:
 	check(lab.run.enemies.count() == 3, "好きな敵を複数出せる")
 	for n in 120:
 		lab.step()
+	check(is_equal_approx(lab.run.state.time, 1.0), "120回の更新で1秒進む")
+	var track = load("res://gyms/enemy_lab/lab_timeline.gd").new()
+	track.session = lab
+	check(is_equal_approx(track.visible_span() * lab.DT, 10.0), "タイムラインの表示幅は10秒を保つ")
+	track.free()
 	var digest: String = lab.digest()
 	check(not digest.is_empty(), "比較用の戦闘状態を取得できる")
 	await lab.seek(0)

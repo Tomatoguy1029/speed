@@ -15,3 +15,4 @@ distance = 1250.0
 recover = 1.5
 warn = 1.05
 visual = ExtResource("visual")
+active_p2 = 0.71

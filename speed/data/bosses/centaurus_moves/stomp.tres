@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/stomp.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/stomp_visual.tscn" id="visual"]
+
+[resource]
+script = ExtResource("1")
+technique = &"stomp"
+display_name = "前脚の踏みつけ"
+category = &"single"
+track_during_warn = false
+warn = 0.6
+active = 0.15
+range_radius = 260.0
+half_angle = 50.0
+damage = 20.0
+recover = 1.0
+cd = 4.0
+visual = ExtResource("visual")
