@@ -2,8 +2,8 @@ extends WeaponVisual
 ## エンドホール：ブーストのあと、飛び続ける機体を中心に紫と白の粒が集まり（溜め）、真っ黒の暗黒が生まれて
 ## 重力レンズで周りの光を曲げる（機体のすぐ下で画面を読む hole_lens）。引き込みの瞬間は周りが暗い紫に沈み、
 ## 敵は紫の尾を引いて中心へ引きずられながら、その敵の色の細かい粒に砕けていく。暗黒は一気に縮んで消え、そのあいだ
-## 中心へ白い点が潰れ、輪が1本縮む。消えきると白い点が一瞬震えて十字にはじけ、同時に機体の周りへ緑のやわらかい光が
-## 広がり、緑の粒が舞い上がる。
+## 中心へ白い点が潰れ、輪が1本縮む。消えきると白い点が一瞬震えて十字にはじけ、同時に機体の周りへブーストゲージ色の
+## やわらかい光が広がり、同じ色の粒が舞い上がる。
 
 const CHARGE := 0.15
 const PULL := 0.07
@@ -14,6 +14,7 @@ const CRUSH := 0.08
 const POP := 0.3
 const MID := Color("#a080f0")
 const PALE := Color("#d8c8ff")
+const BOOST_STYLE := preload("res://data/visuals/boost_gauge_runtime.tres")
 var holes: Array[Dictionary] = []
 var captures: Array[Dictionary] = []
 var heals: Array[Dictionary] = []
@@ -217,16 +218,17 @@ func _pop(p: PixelPainter, age: float, center: Vector2) -> void:
 			for e in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]: p.dot(center + e * p.px, Color.WHITE)
 		p.dot(center, Color.WHITE)
 
-## 回復：機体を中心に緑のやわらかい光が広がり（外の光と、白っぽい内の光）、緑の丸い粒が舞い上がる。
+## 回復：ブーストゲージの通常色で光と粒を描き、内側の光は白に近づける。
 func _heal(p: PixelPainter, g: Dictionary, center: Vector2) -> void:
 	var h: float = g.age / 0.7
-	_glow(g.outer, center, (12.0 + 40.0 * h) * p.px, Color(110.0 / 255.0, 1.0, 170.0 / 255.0, 0.55 * (1.0 - h)))
-	_glow(g.inner, center, (8.0 + 14.0 * h) * p.px, Color(220.0 / 255.0, 1.0, 230.0 / 255.0, 0.5 * (1.0 - h) * (1.0 - h)))
+	var color := BOOST_STYLE.normal_color
+	_glow(g.outer, center, (12.0 + 40.0 * h) * p.px, Color(color, 0.55 * (1.0 - h)))
+	_glow(g.inner, center, (8.0 + 14.0 * h) * p.px, Color(color.lightened(0.8), 0.5 * (1.0 - h) * (1.0 - h)))
 	for dot in g.dots:
 		var k := clampf((h - dot.dl) / (1.0 - dot.dl), 0.0, 1.0)
 		if k <= 0.0 or k >= 1.0: continue
 		var pos: Vector2 = center + Vector2(cos(dot.a) * dot.v * k, sin(dot.a) * dot.v * k * 0.6 - dot.up * k) * p.px
-		p.disk(pos, dot.s, Color(Color("#8fffbe"), 1.0 - k))
+		p.disk(pos, dot.s, Color(color, 1.0 - k))
 
 func _glow(rect: ColorRect, center: Vector2, radius: float, color: Color) -> void:
 	rect.position = center - Vector2.ONE * radius
