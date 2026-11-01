@@ -139,7 +139,7 @@
 
 ## ポンプ座の吸引と解放
 
-- 口と前部は原画の位置・寸法を保ち、吸収在庫に応じて後部の貯蔵部だけを丸く膨らませる。元のBase・保存済み塗装・Normalを `shaders/pump_reservoir.gdshader` で参照し、内部へ実雑魚の画像を重ねる。白い短い不均一な吸引風は口へ収束し、吸い込まれる敵は口から内部後部へ進む。
+- 口と前部は原画の位置・寸法を保ち、吸収在庫に応じて後部の貯蔵部だけを丸く膨らませる。元のBase・保存済み塗装・Normalを `shaders/pump_reservoir.gdshader` で参照し、内部へ実雑魚の画像を重ねる。法線は素材座標で読み、個体のMeshInstance2Dの回転をGodotの照明処理で適用する。白い短い不均一な吸引風は口へ収束し、吸い込まれる敵は口から内部後部へ進む。
 - 蓄積は `pump.tres` の `store_max`・`swallow_interval` と吸引対象に従う。満杯後は `telegraph` の間停止し、向きを固定して一気に射出する。短い反動と後部の収縮を伴う。弾速は `shell_speed`、射程・当たり判定・破裂は `shell_range`・`shell_r`・`burst_radius` に従う。
 - 圧縮弾はpixelfxのLaser boltを基に、丸い先端の白い芯・後方へ細くなる緑の色帯・帯を走るパルス・らせんの光点・分離して揺れる短い尾で描く。`shaders/pump_shell_runtime.gdshader` が保存済みの外観値を定数に持ち、再利用するメッシュへ描く。編集時は `shaders/pump_shell.gdshader` を使い、実雑魚の元絵は芯の中へ任意表示する。着弾は `scenes/attacks/zone_pump.tscn` から、自爆・機雷と同じ爆発処理を `shaders/blast_burst.gdshader` とポンプ専用の緑色設定で描く。弾と着弾の表示値は[ビジュアル編集](../../dev/tools/visual-editor.md)で個別に調整する。
 - 本体を倒すと、`release_base` 個の実装甲片と、`release_per`・吸収在庫に応じた実雑魚の破片を同時に放射状へ飛ばす。各片は一定の速度で外向きに進み、青緑の長い燃焼尾を速度の逆へ引く。幅・輝度だけを局所的に揺らし、描画は `shaders/pump_debris.gdshader` を使う。速度・個数・攻撃判定は本体の解放設定に従い、共通の装飾粒や破裂円は重ねず、飛ぶ片の数を表示する。

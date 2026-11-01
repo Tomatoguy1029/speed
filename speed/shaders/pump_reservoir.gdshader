@@ -12,14 +12,10 @@ uniform float brightness = 1.0;
 uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
 varying vec2 local_pixel;
-varying vec2 basis_x;
-varying vec2 basis_y;
 varying vec4 albedo;
 #include "res://shaders/pump_outline.gdshaderinc"
 void vertex() {
 	local_pixel = VERTEX + vec2(12.0, 27.0);
-	basis_x = normalize(MODEL_MATRIX[0].xy);
-	basis_y = normalize(MODEL_MATRIX[1].xy);
 }
 void fragment() {
 	vec2 p = floor(local_pixel);
@@ -54,7 +50,8 @@ void fragment() {
 	vec3 n = texture(normal_tex, sample_uv).rgb * 2.0 - 1.0;
 	n.y *= -1.0;
 	n = normalize(vec3(n.xy * normal_strength, max(n.z, 0.001)));
-	NORMAL = vec3(mat2(basis_x, basis_y) * n.xy, n.z);
+	// 個体ごとのMeshInstance2Dの回転は、fragment後にGodotが法線へ適用する。
+	NORMAL = n;
 }
 void light() {
 	LIGHT = vec4(albedo.rgb * albedo.a * brightness * LIGHT_COLOR.rgb * LIGHT_ENERGY * max(dot(NORMAL, LIGHT_DIRECTION), 0.0), LIGHT_COLOR.a);
