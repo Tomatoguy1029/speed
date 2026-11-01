@@ -6,7 +6,29 @@
 script = ExtResource("1")
 visual_settings = {
 "ambient": 0.1,
-"key_energy": 2.0
+"collision_scale": 0.9,
+"fill_angle": 135.0,
+"height": 0.4,
+"key_angle": -45.0,
+"key_energy": 1.6,
+"scale": 1.05
+}
+armor_colors = {
+"res://assets/pixel/reticle/reticle_armor.png|28x28|675f5b0181992f9c0e1b1088f37423de07871964a542d8fa555a4facf3c3eef0": {
+"849": "304460",
+"850": "304460",
+"851": "304460",
+"852": "304460",
+"853": "304460",
+"854": "304460",
+"855": "304460",
+"856": "304460",
+"857": "304460",
+"858": "304460",
+"859": "304460",
+"860": "304460",
+"899": "d8aa2e"
+}
 }
 rank = 4
 radius = 22.0

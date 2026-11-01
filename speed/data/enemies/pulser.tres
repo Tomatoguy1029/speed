@@ -6,11 +6,12 @@
 script = ExtResource("1")
 visual_settings = {
 "ambient": 0.0,
+"collision_scale": 1.2000000000000002,
 "fill_angle": 180.0,
 "fill_energy": 0.8,
 "height": 0.5,
 "key_energy": 1.3,
-"normal_strength": 1.4,
+"normal_strength": 0.8,
 "scale": 1.1
 }
 armor_colors = {

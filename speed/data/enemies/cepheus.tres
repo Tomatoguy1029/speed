@@ -1,9 +1,58 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://d2eiulmloa5u7"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"collision_scale": 1.15,
+"scale": 1.2000000000000002
+}
+armor_colors = {
+"res://assets/pixel/cepheus/kepheus_armor.png|101x87|48210deae53b76f3cac9c0d928f3ffc9097b2c07ef3e34deab66e2e0ed6096ac": {
+"1025": "4b658f",
+"109": "4b658f",
+"1093": "4b658f",
+"1418": "d4a72c",
+"1509": "d4a72c",
+"191": "4b658f",
+"1956": "2f425e",
+"1979": "2f425e",
+"2146": "4b658f",
+"217": "2f425e",
+"2195": "4b658f",
+"2238": "d4a72c",
+"2272": "d4a72c",
+"2304": "d4a72c",
+"283": "2f425e",
+"2972": "4b658f",
+"2983": "4b658f",
+"3265": "2f425e",
+"3298": "2f425e",
+"3777": "4b658f",
+"3796": "4b658f",
+"3939": "4b658f",
+"4038": "4b658f",
+"4048": "4b658f",
+"4130": "4b658f",
+"4380": "2f425e",
+"4405": "2f425e",
+"4774": "2f425e",
+"4792": "d4a72c",
+"4800": "d4a72c",
+"4816": "2f425e",
+"4998": "4b658f",
+"5802": "4b658f",
+"5811": "4b658f",
+"628": "2f425e",
+"683": "2f425e",
+"6912": "2f425e",
+"6924": "2f425e",
+"7523": "d4a72c",
+"810": "4b658f",
+"905": "4b658f"
+}
+}
 rank = 7
 radius = 50.0
 hp = 1100.0

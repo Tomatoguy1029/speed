@@ -1,9 +1,47 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://7sfskgy0ilat"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"ambient": 0.0,
+"collision_scale": 1.05,
+"key_energy": 1.5,
+"normal_strength": 2.0,
+"scale": 1.3
+}
+armor_colors = {
+"res://assets/pixel/phoenix/phoenix_armor.png|137x94|8197a3194d50eace0dff8b377c52ee4fbbfd182d57e774b9377f778e39355949": {
+"1711": "d4a72c",
+"205": "4b658f",
+"2788": "d4a72c",
+"2797": "d4a72c",
+"2817": "d4a72c",
+"2824": "d4a72c",
+"3459": "d4a72c",
+"3468": "b68e2c",
+"3513": "b68e2c",
+"3523": "d4a72c",
+"4023": "2f425e",
+"4056": "2f425e",
+"4578": "2f425e",
+"4600": "2f425e",
+"4685": "2f425e",
+"4761": "2f425e",
+"4970": "2f425e",
+"4993": "8a6a2f",
+"5007": "8a6a2f",
+"5027": "2f425e",
+"5087": "d4a72c",
+"5184": "d4a72c",
+"6641": "b68e2c",
+"6647": "b68e2c",
+"8011": "4b658f",
+"8017": "4b658f",
+"8425": "2f425e"
+}
+}
 rank = 7
 radius = 56.0
 hp = 900.0

@@ -5,10 +5,35 @@
 [resource]
 script = ExtResource("1")
 visual_settings = {
-"ambient": 0.0,
-"key_energy": 1.5,
-"normal_strength": 2.0,
-"scale": 2.0
+"ambient": 0.08,
+"collision_scale": 0.44999999999999996,
+"fill_angle": 135.0,
+"key_energy": 1.1,
+"normal_strength": 1.0,
+"scale": 2.5
+}
+armor_colors = {
+"res://assets/pixel/aquila/eagle_armor.png|63x63|b439e0c38d8370394d06e819de5c8b47ab02c5b63fb5358b191c0a7be8396db6": {
+"1145": "4b658f",
+"1185": "4b658f",
+"1341": "4b658f",
+"1366": "4b658f",
+"1848": "2f425e",
+"1870": "2f425e",
+"2040": "2f425e",
+"2056": "2f425e",
+"2157": "d4a72c",
+"2191": "d4a72c",
+"2237": "d8aa2e",
+"2610": "4b658f",
+"2934": "4b658f",
+"2993": "b68e2c",
+"32": "b68e2c",
+"714": "4b658f",
+"736": "4b658f",
+"844": "4b658f",
+"857": "4b658f"
+}
 }
 rank = 10
 radius = 64.0

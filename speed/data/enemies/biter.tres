@@ -7,6 +7,7 @@ script = ExtResource("1")
 visual_settings = {
 "height": 0.29,
 "key_energy": 1.0,
+"normal_strength": 0.6,
 "scale": 1.4
 }
 armor_colors = {

@@ -1,9 +1,29 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://ci0qobf11l5rk"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"key_energy": 1.6,
+"scale": 1.2000000000000002
+}
+armor_colors = {
+"res://assets/pixel/crow/armor.png|33x29|53e6e2545ed9505ebd120080b75b3ead68b0b3e27171f817a3ffd02154e074b1": {
+"276": "8a6a2f",
+"283": "8a6a2f",
+"371": "b68e2c",
+"386": "b68e2c",
+"49": "d4a72c",
+"540": "2f425e",
+"546": "2f425e",
+"563": "4b658f",
+"570": "4b658f",
+"582": "4b658f",
+"590": "4b658f",
+"709": "2f425e"
+}
+}
 rank = 4
 radius = 16.0
 hp = 8.0
