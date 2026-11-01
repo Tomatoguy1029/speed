@@ -149,6 +149,7 @@ public:
     bool step_projectiles(double world_dt);
     Array projectiles_snapshot() const;
     PackedFloat32Array friendly_buffer(StringName visual, double pixel, double scale, double clock) const;
+    bool configure_content(const PackedByteArray &bytes);
     bool configure(const Dictionary &data);
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
     bool step_ship(double real_dt, double world_dt, const Dictionary &input);

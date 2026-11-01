@@ -22,6 +22,7 @@ def main():
         parser.error('Windowsの対象はx86_64です')
     if not args.sdk.is_dir():
         parser.error('SDKがありません。dependencies.jsonの公式URLと完全コミットを使って取得してください')
+    subprocess.run([sys.executable, str(root / 'tools/build/generate_run_schema.py'), '--check'], check=True)
     command = [args.scons, '-C', str(root / 'cpp'), '-j', str(args.jobs),
                'godot_cpp_dir=' + str(args.sdk.resolve()), 'platform=' + args.platform,
                'arch=' + args.arch, 'target=template_release', 'precision=' + lock['precision']]

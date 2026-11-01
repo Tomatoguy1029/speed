@@ -9,6 +9,7 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_content", "bytes"), &SpeedRunCore::configure_content);
     ClassDB::bind_method(D_METHOD("configure_bite_zone", "data"), &SpeedRunCore::configure_bite_zone);
     ClassDB::bind_method(D_METHOD("fire_bite_zone", "at", "radius", "delay", "damage", "color", "token"), &SpeedRunCore::fire_bite_zone, DEFVAL(0));
     ClassDB::bind_method(D_METHOD("step_hazards", "dt"), &SpeedRunCore::step_hazards);
@@ -655,4 +656,15 @@ PackedInt64Array SpeedRunCore::enemy_handle(int64_t id) const {
 bool SpeedRunCore::valid_enemy_handle(PackedInt64Array value) const {
     if (runtime.state.closed || value.size() != 2 || value[0] < 0 || value[0] >= UINT32_MAX || value[1] <= 0 || value[1] > UINT32_MAX) return false;
     return runtime.state.enemy_handles.contains({uint32_t(value[0]), uint32_t(value[1])});
+}
+
+bool SpeedRunCore::configure_content(const PackedByteArray &bytes) {
+    if (runtime.state.started || runtime.state.closed) return false;
+    auto content=speed::ContentBundle::read(bytes);
+    if (!content) return false;
+    runtime.state.enemy_aim_lag=content->aim_lag;
+    runtime.state.enemy_aim_speed=content->aim_speed;
+    runtime.state.aim_ready=true;
+    runtime.content=std::move(content);
+    return true;
 }

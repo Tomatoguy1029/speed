@@ -10,7 +10,8 @@
   "enabled_classes": [
     "RefCounted",
     "RandomNumberGenerator",
-    "OS"
+    "OS",
+    "HashingContext"
   ],
   "engine": "4.7.2",
   "export_templates": "4.7.2.stable"

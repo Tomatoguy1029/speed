@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--schema-only" in OS.get_cmdline_user_args():
+		check(check_schema(), "スキーマ確認が最後まで完了する")
+		print("[run_schema] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	var comparison = load("res://tools/compare_runtime.gd").new()
 	var first = comparison.create_native()
 	if first == null:
@@ -89,3 +94,55 @@ func configured_forward(comparison, data: Dictionary) -> bool:
 	var accepted: bool = core.configure_forward(data.forward, 5, data.config.character_scale)
 	core.close()
 	return accepted
+
+func check_schema() -> bool:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var comparison = load("res://tools/compare_runtime.gd").new()
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var data: Dictionary = builder.chase_records(definition, ContentManager.base)
+	var signature: PackedByteArray = schema.sha256("追跡敵の固定入力".to_utf8_buffer())
+	var bytes: PackedByteArray = schema.write_content(data, signature)
+	var core = comparison.create_native()
+	check(not bytes.is_empty() and core.configure_content(bytes), "共通スキーマの生成物をC++が読める")
+	var bad: Dictionary = data.duplicate(true)
+	bad.ChaseDefinition[0].extra = 1
+	check(schema.write_content(bad, signature).is_empty(), "未登録フィールドを生成時に拒否する")
+	bad = data.duplicate(true)
+	bad.ChaseDefinition[0].hp = NAN
+	check(schema.write_content(bad, signature).is_empty(), "非有限値を生成時に拒否する")
+	bad = data.duplicate(true)
+	bad.DefinitionIndex[0].enemy = 99
+	check(schema.write_content(bad, signature).is_empty(), "存在しない参照を生成時に拒否する")
+	var damaged := bytes.duplicate()
+	damaged.encode_u32(8, 2)
+	check(not core.configure_content(damaged), "形式の版不一致を開始前に拒否する")
+	damaged = bytes.duplicate()
+	damaged.encode_u64(96, bytes.size()+1)
+	check(not core.configure_content(damaged), "セクションの範囲外offsetを拒否する")
+	damaged = bytes.duplicate()
+	damaged.encode_u64(104, 9223372036854775807)
+	check(not core.configure_content(damaged), "長さの範囲超過を拒否する")
+	damaged = bytes.duplicate()
+	damaged[damaged.size()-1] ^= 1
+	check(not core.configure_content(damaged), "内容署名の不一致を拒否する")
+	var enemy_offset: int = bytes.decode_u64(88+3*32+8)
+	damaged = bytes.duplicate()
+	damaged.encode_u64(enemy_offset+4, 9221120237041090560)
+	check(not core.configure_content(resign_content(damaged, schema)), "署名が正しくても非有限の読込を拒否する")
+	var index_offset: int = bytes.decode_u64(88+2*32+8)
+	damaged = bytes.duplicate()
+	damaged.encode_u32(index_offset+4, 99)
+	check(not core.configure_content(resign_content(damaged, schema)), "署名が正しくても参照不正を拒否する")
+	check(core.start(932) and core.set_motion_context(Vector2(100,0),Vector2.ZERO,Vector2(1000,1000)), "検査失敗後も直前の有効な定義を保つ")
+	var id: int = core.spawn_enemy(definition.id,Vector2.ZERO,{})
+	check(id>0 and core.step(0.1), "Resourceから生成した追跡敵を更新できる")
+	var row: Dictionary = core.enemies_snapshot()[0]
+	check(row.pos[0]>0 and row.hp==data.ChaseDefinition[0].hp, "移植したHPと移動速度が実行へ反映する")
+	core.close()
+	return true
+
+func resign_content(bytes: PackedByteArray, schema) -> PackedByteArray:
+	var signature: PackedByteArray = schema.sha256(bytes.slice(88+32*bytes.decode_u32(16)))
+	for i in range(32): bytes[56+i] = signature[i]
+	return bytes
