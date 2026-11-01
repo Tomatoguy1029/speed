@@ -19,6 +19,14 @@ profiles = {
 "unavailable_color": Color(0.8627451, 0.039215688, 0.023529412, 1),
 "unavailable_tick_color": Color(1, 1, 1, 1)
 },
+"res://scenes/attacks/shell.tscn": {
+"shader/pump_shell/bolt_length": 60.0,
+"shader/pump_shell/bolt_scale": 3.000000037253,
+"shader/pump_shell/bolt_width": 1.80000001937156,
+"shader/pump_shell/contents_opacity": 0.30000000447036,
+"shader/pump_shell/glint_scale": 2.0,
+"shader/pump_shell/glow_strength": 1.5000000223518
+},
 "res://scenes/attacks/zone_pump.tscn": {
 "effect_scale": 0.8333333333333333,
 "glow_energy": 1.0,

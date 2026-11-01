@@ -1,6 +1,7 @@
 ## pixelfxのLaser boltに沿った、白い芯・緑の色帯・流れる光点。ノードは同時表示数の範囲で再利用する。
 extends AttackVisual
 const SHADER := preload("res://shaders/pump_shell.gdshader")
+const RUNTIME_SHADER := preload("res://shaders/pump_shell_runtime.gdshader")
 const TUNED_SHADERS := [SHADER]
 const KEY := "res://scenes/attacks/shell.tscn"
 const CONTENTS := [preload("res://assets/pixel/drifter.png"), preload("res://assets/pixel/swarm.png"), preload("res://assets/pixel/splitling.png")]
@@ -38,7 +39,9 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 		var created := MeshInstance2D.new()
 		created.mesh = _mesh
 		var created_material := ShaderMaterial.new()
-		created_material.shader = SHADER
+		created_material.shader = RUNTIME_SHADER if rm != null else SHADER
+		if rm != null:
+			created_material.set_shader_parameter("linear_colors", RenderingServer.get_current_rendering_method() != "gl_compatibility")
 		for k in 3: created_material.set_shader_parameter("enemy%d" % k, CONTENTS[k])
 		created.material = created_material
 		created.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
@@ -55,7 +58,7 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 	node.show()
 	var material := node.material as ShaderMaterial
 	material.set_shader_parameter("clock", clock)
-	ShaderTuning.apply(material, KEY)
+	if rm == null: ShaderTuning.apply(material, KEY)
 
 ## 単独プレビューも同じ光弾・描画パラメータを使う。飛行を画面内へ縮尺表示する。
 func _process(dt: float) -> void:
