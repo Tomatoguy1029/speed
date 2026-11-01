@@ -157,6 +157,7 @@ public:
     Dictionary step_run(const Variant &dt,const Dictionary &input,const Dictionary &viewport);
     Dictionary command_run(const Dictionary &envelope);
     Dictionary frame_run() const;
+    Dictionary render_run(const Rect2 &view,const Variant &alpha) const;
     Dictionary dispose_run();
     bool configure_content(const PackedByteArray &bytes);
     bool configure(const Dictionary &data);

@@ -529,9 +529,72 @@
           "type": "bool",
           "value": true,
           "runtime": "pickup_config.fixed_rewards"
+        },
+        {
+          "name": "character_scale",
+          "type": "f64",
+          "min": 0,
+          "config": "character_scale"
+        },
+        {
+          "name": "projectiles_ready",
+          "type": "bool",
+          "value": true,
+          "runtime": "projectile_config.ready"
+        },
+        {
+          "name": "debris_life",
+          "type": "f64",
+          "min": 0,
+          "config": "hull_debris_life",
+          "runtime": "projectile_config.debris_life"
+        },
+        {
+          "name": "debris_knock",
+          "type": "f64",
+          "min": 0,
+          "config": "hull_debris_knock",
+          "runtime": "projectile_config.debris_knock"
+        },
+        {
+          "name": "trail_points",
+          "type": "i64",
+          "min": 0,
+          "config": "corpse_trail_points",
+          "runtime": "projectile_config.trail_points"
+        },
+        {
+          "name": "ship_visual",
+          "type": "u32",
+          "value": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "shot_visual",
+          "type": "u32",
+          "value": 2,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "crystal_visual",
+          "type": "u32",
+          "value": 3,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "coin_visual",
+          "type": "u32",
+          "value": 4,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "cannon_visual",
+          "type": "u32",
+          "value": 5,
+          "ref": "ResourceKey"
         }
       ],
-      "version": 5
+      "version": 6
     },
     {
       "name": "StringEntry",
@@ -756,21 +819,48 @@
           "name": "gold_eligible",
           "type": "bool",
           "native": "gold_eligible"
+        },
+        {
+          "name": "visual_id",
+          "type": "u32",
+          "ref": "ResourceKey",
+          "native": "visual_id"
+        },
+        {
+          "name": "sprite_scale",
+          "type": "f64",
+          "min": 0,
+          "native": "sprite_scale"
+        },
+        {
+          "name": "sprite_angle",
+          "type": "f64",
+          "native": "sprite_angle"
         }
       ],
-      "version": 2
+      "version": 3
     },
     {
       "name": "LoadoutDefinition",
       "section": 5,
-      "enabled": false,
       "fields": [
         {
           "name": "id",
           "type": "u32",
           "min": 1
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 0
+        },
+        {
+          "name": "maximum_level",
+          "type": "u32",
+          "min": 1
         }
-      ]
+      ],
+      "version": 2
     },
     {
       "name": "HeroDefinition",
@@ -847,12 +937,71 @@
     {
       "name": "ResourceKey",
       "section": 12,
-      "enabled": false,
       "fields": [
         {
           "name": "id",
           "type": "u32",
           "min": 1
+        },
+        {
+          "name": "role",
+          "type": "u32",
+          "max": 5
+        },
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "ForwardDefinition",
+      "section": 13,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pierce",
+          "type": "u32"
         }
       ]
     }
@@ -970,6 +1119,36 @@
       {
         "name": "Reflected",
         "value": "reflected"
+      },
+      {
+        "name": "HullDebris",
+        "value": "hullDebris"
+      }
+    ],
+    "VisualRole": [
+      {
+        "name": "EnemySprite",
+        "value": "enemy_sprite"
+      },
+      {
+        "name": "Ship",
+        "value": "ship"
+      },
+      {
+        "name": "ForwardShot",
+        "value": "forward_shot"
+      },
+      {
+        "name": "Crystal",
+        "value": "crystal"
+      },
+      {
+        "name": "Coin",
+        "value": "coin"
+      },
+      {
+        "name": "Cannon",
+        "value": "cannon"
       }
     ]
   }

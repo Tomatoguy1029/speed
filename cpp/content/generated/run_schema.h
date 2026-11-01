@@ -83,6 +83,16 @@ struct RunConfig {
     double pickup_speed_mult{};
     double pickup_xp_radius{};
     bool fixed_rewards{};
+    double character_scale{};
+    bool projectiles_ready{};
+    double debris_life{};
+    double debris_knock{};
+    int64_t trail_points{};
+    uint32_t ship_visual{};
+    uint32_t shot_visual{};
+    uint32_t crystal_visual{};
+    uint32_t coin_visual{};
+    uint32_t cannon_visual{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -235,6 +245,20 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_f64(out.pickup_xp_radius)) return false;
     if (out.pickup_xp_radius < 0) return false;
     if (!input.read_bool(out.fixed_rewards)) return false;
+    if (!input.read_f64(out.character_scale)) return false;
+    if (out.character_scale < 0) return false;
+    if (!input.read_bool(out.projectiles_ready)) return false;
+    if (!input.read_f64(out.debris_life)) return false;
+    if (out.debris_life < 0) return false;
+    if (!input.read_f64(out.debris_knock)) return false;
+    if (out.debris_knock < 0) return false;
+    if (!input.read_i64(out.trail_points)) return false;
+    if (out.trail_points < 0) return false;
+    if (!input.read_u32(out.ship_visual)) return false;
+    if (!input.read_u32(out.shot_visual)) return false;
+    if (!input.read_u32(out.crystal_visual)) return false;
+    if (!input.read_u32(out.coin_visual)) return false;
+    if (!input.read_u32(out.cannon_visual)) return false;
     return true;
 }
 struct StringEntry {
@@ -292,6 +316,9 @@ struct ChaseDefinition {
     uint32_t reward_mid{};
     uint32_t reward_high{};
     bool gold_eligible{};
+    uint32_t visual_id{};
+    double sprite_scale{};
+    double sprite_angle{};
 };
 inline bool read(BinaryReader &input, ChaseDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -348,14 +375,24 @@ inline bool read(BinaryReader &input, ChaseDefinition &out) {
     if (!input.read_u32(out.reward_mid)) return false;
     if (!input.read_u32(out.reward_high)) return false;
     if (!input.read_bool(out.gold_eligible)) return false;
+    if (!input.read_u32(out.visual_id)) return false;
+    if (!input.read_f64(out.sprite_scale)) return false;
+    if (out.sprite_scale < 0) return false;
+    if (!input.read_f64(out.sprite_angle)) return false;
     return true;
 }
 struct LoadoutDefinition {
     uint32_t id{};
+    uint32_t kind{};
+    uint32_t maximum_level{};
 };
 inline bool read(BinaryReader &input, LoadoutDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 0) return false;
+    if (!input.read_u32(out.maximum_level)) return false;
+    if (out.maximum_level < 1) return false;
     return true;
 }
 struct HeroDefinition {
@@ -408,10 +445,45 @@ inline bool read(BinaryReader &input, TechniqueDefinition &out) {
 }
 struct ResourceKey {
     uint32_t id{};
+    uint32_t role{};
+    std::string path{};
 };
 inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
+    if (!input.read_u32(out.role)) return false;
+    if (out.role > 5) return false;
+    if (!input.read_string(out.path)) return false;
+    return true;
+}
+struct ForwardDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    double interval{};
+    double damage{};
+    double life{};
+    double spread{};
+    double knock{};
+    uint32_t pierce{};
+};
+inline bool read(BinaryReader &input, ForwardDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.spread)) return false;
+    if (out.spread < 0) return false;
+    if (!input.read_f64(out.knock)) return false;
+    if (out.knock < 0) return false;
+    if (!input.read_u32(out.pierce)) return false;
     return true;
 }
 struct ContentRecords {
@@ -427,12 +499,13 @@ struct ContentRecords {
     std::vector<BossFlowDefinition> BossFlowDefinition_rows;
     std::vector<TechniqueDefinition> TechniqueDefinition_rows;
     std::vector<ResourceKey> ResourceKey_rows;
+    std::vector<ForwardDefinition> ForwardDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 5) return false;
-        if (count > input.remaining()/587) return false;
+        if (version != 6) return false;
+        if (count > input.remaining()/640) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -449,15 +522,14 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 2) return false;
-        if (count > input.remaining()/204) return false;
+        if (version != 3) return false;
+        if (count > input.remaining()/224) return false;
         for (uint32_t i=0; i<count; ++i) { ChaseDefinition row; if (!read(input,row)) return false; out.ChaseDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 5: {
-        if (version != 1) return false;
-        if (count) return false;
-        if (count > input.remaining()/4) return false;
+        if (version != 2) return false;
+        if (count > input.remaining()/12) return false;
         for (uint32_t i=0; i<count; ++i) { LoadoutDefinition row; if (!read(input,row)) return false; out.LoadoutDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -504,10 +576,15 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 1) return false;
-        if (count) return false;
-        if (count > input.remaining()/4) return false;
+        if (version != 2) return false;
+        if (count > input.remaining()/12) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 13: {
+        if (version != 1) return false;
+        if (count > input.remaining()/56) return false;
+        for (uint32_t i=0; i<count; ++i) { ForwardDefinition row; if (!read(input,row)) return false; out.ForwardDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -538,9 +615,18 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.TechniqueDefinition_rows) if (!TechniqueDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ResourceKey_ids;
     for (const auto &row:data.ResourceKey_rows) if (!ResourceKey_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ForwardDefinition_ids;
+    for (const auto &row:data.ForwardDefinition_rows) if (!ForwardDefinition_ids.insert(row.id).second) return false;
+    for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
+    for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
+    for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
+    for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.coin_visual)) return false;
+    for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.cannon_visual)) return false;
     for (const auto &row:data.DefinitionIndex_rows) if (!StringEntry_ids.count(row.id)) return false;
     for (const auto &row:data.DefinitionIndex_rows) if (!ChaseDefinition_ids.count(row.enemy)) return false;
     for (const auto &row:data.ChaseDefinition_rows) if (!StringEntry_ids.count(row.id)) return false;
+    for (const auto &row:data.ChaseDefinition_rows) if (!ResourceKey_ids.count(row.visual_id)) return false;
+    for (const auto &row:data.ForwardDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -615,6 +701,10 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.pickup_config.speed_mult=config.pickup_speed_mult;
     state.pickup_config.xp_radius=config.pickup_xp_radius;
     state.pickup_config.fixed_rewards=config.fixed_rewards;
+    state.projectile_config.ready=config.projectiles_ready;
+    state.projectile_config.debris_life=config.debris_life;
+    state.projectile_config.debris_knock=config.debris_knock;
+    state.projectile_config.trail_points=config.trail_points;
 }
 inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringName &id) {
     EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;
@@ -650,7 +740,10 @@ inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringN
     out.xp_rewards[1]=row.reward_mid;
     out.xp_rewards[2]=row.reward_high;
     out.gold_eligible=row.gold_eligible;
+    out.visual_id=row.visual_id;
+    out.sprite_scale=row.sprite_scale;
+    out.sprite_angle=row.sprite_angle;
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=12;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=13;
 }

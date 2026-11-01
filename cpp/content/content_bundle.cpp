@@ -49,6 +49,17 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->config=records.RunConfig_rows[0];
     bundle->aim_lag=records.RunConfig_rows[0].aim_lag;bundle->aim_speed=records.RunConfig_rows[0].aim_speed;
     bundle->crystal_values={records.RunConfig_rows[0].crystal_low,records.RunConfig_rows[0].crystal_mid,records.RunConfig_rows[0].crystal_high};
+    bundle->visuals=records.ResourceKey_rows;
+    bundle->forward_levels=records.ForwardDefinition_rows;
+    if (records.LoadoutDefinition_rows.size()!=1 || records.LoadoutDefinition_rows[0].id!=1 ||
+        records.LoadoutDefinition_rows[0].kind!=0 || bundle->forward_levels.size()!=records.LoadoutDefinition_rows[0].maximum_level) return {};
+    for (size_t i=0;i<bundle->forward_levels.size();++i) {
+        const auto &level=bundle->forward_levels[i];
+        if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
+    }
+    for (const auto &visual:bundle->visuals) {
+        if (visual.role>5 || (visual.path.empty() && visual.role!=2 && visual.role!=4)) return {};
+    }
     std::unordered_set<std::string> names;
     for (const auto &row:records.ChaseDefinition_rows) {
         auto string=std::find_if(records.StringEntry_rows.begin(),records.StringEntry_rows.end(),[&](const auto &s){return s.id==row.id;});

@@ -3,3 +3,4 @@ extends Resource
 @export var input_sha256 := ""
 @export var paths := PackedStringArray()
 @export var keys: Dictionary = {}
+@export var visuals: Array[Dictionary] = []

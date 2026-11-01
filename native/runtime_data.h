@@ -9,6 +9,7 @@ namespace speed {
 // 編集元から生成した固定値。ランの可変状態とは別に保持する。
 struct EnemyDefinition {
     godot::StringName id;
+    uint32_t visual_id=0;double sprite_scale=1,sprite_angle=0;
     enum class Kind { Chase, Shield, Biter, Hound } kind = Kind::Chase;
     struct Bite { double reach = 0, telegraph = 0, rest = 0, radius = 0, damage = 0; } bite;
     struct Pack { int64_t count = 1; double gap = 0, reach = 1, alignment = 0, cohesion = 0, separation = 0; } pack;

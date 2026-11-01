@@ -23,7 +23,7 @@ func _on_session_created(session: RunSession) -> void:
 	session.started.connect(_decorate.bind(weakref(session)), CONNECT_ONE_SHOT)
 func _decorate(reference: WeakRef) -> void:
 	var session := reference.get_ref() as RunSession
-	if session == null or session.view == null or session.sim.state.lab_mode: return
+	if session == null or session.view == null or session.sim.state == null or session.sim.state.lab_mode: return
 	var panel := DEBUG_PANEL.new()
 	panel.name = "DebugPanel"
 	panel.run = session.sim

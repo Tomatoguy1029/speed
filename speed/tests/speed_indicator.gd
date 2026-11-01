@@ -13,6 +13,27 @@ func advance(indicator: INDICATOR, mode: int, seconds: float) -> void:
 		indicator.advance(mode, 1.0 / 60.0)
 
 func _ready() -> void:
+	var cpp_hud = preload("res://scripts/ui/hud.gd").new()
+	cpp_hud.bridge = RefCounted.new()
+	cpp_hud._ready_cpp()
+	var snapshot := {"phase":0,"input_enabled":true,"tracing":false,"ship_boost_t":0.0,"glide":false,"ship_vel":Vector2(30,0),"max_speed":100.0,"steer_cruise":0.3}
+	cpp_hud.apply_snapshot(snapshot)
+	check(cpp_hud._speed_indicator_mode()==INDICATOR.NORMAL,"C++の巡航速度を読み取り専用で表示する")
+	snapshot.ship_vel = Vector2(60,0)
+	check(cpp_hud._speed_indicator_mode()==INDICATOR.FAST,"C++の巡航超過を表示する")
+	snapshot.glide = true
+	snapshot.tracing = true
+	check(cpp_hud._speed_indicator_mode()==INDICATOR.BOOST,"C++でも突進を勢いより優先する")
+	cpp_hud._update_speed_indicator(0.1)
+	var paused: float = cpp_hud._speed_indicator.value
+	snapshot.input_enabled = false
+	cpp_hud._update_speed_indicator(1.0)
+	check(cpp_hud._speed_indicator.value==paused,"C++のUI停止中も針と表示時計を止める")
+	for extent in [Vector2(640,480),Vector2(1280,720)]:
+		cpp_hud.size = extent
+		cpp_hud._layout_cpp_art()
+		check(cpp_hud._speed_indicator.position.x<extent.x and cpp_hud._speed_indicator.position.y<extent.y,"C++の速度計もサイズ変更後の右下へ配置する")
+	cpp_hud.free()
 	var hud = preload("res://scripts/ui/hud.gd").new()
 	hud.run = RunSimulation.new()
 	hud.run.state = RunState.new()

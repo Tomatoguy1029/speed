@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../runtime/run_runner.h"
 #include "../output/event_builder.h"
+#include "../output/render_builder.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <climits>
@@ -41,6 +42,10 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || d.charge_time<=0 || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1 || state.frame_grid_cell<=0) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
     candidate->runtime.api_run_id=options["run_id"];candidate->runtime.api_development=int64_t(options["mode"])==1;
     candidate->runtime.state.control.stage_id=String(options["stage_id"]);candidate->runtime.api_configured=true;
+    const auto &forward=candidate->runtime.content->forward_levels.front();
+    state.forward.interval=forward.interval;state.forward.fire.remaining=forward.interval;state.forward.damage=forward.damage;
+    state.forward.life=forward.life;state.forward.spread=forward.spread;state.forward.knock=forward.knock;state.forward.pierce=forward.pierce;
+    state.forward.character_scale=candidate->runtime.content->config.character_scale;state.forward.ready=true;
     state.hitstop_enabled=settings.get("hitstop",true);
     runtime=std::move(candidate->runtime);
     PackedByteArray digest;digest.resize(32);std::copy(runtime.content->payload_sha256.begin(),runtime.content->payload_sha256.end(),digest.ptrw());
@@ -73,6 +78,7 @@ Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,co
     const Vector2 size=viewport["logical_size"];
     if (!size.is_finite() || size.x<=0 || size.y<=0) return failure(1,"logical_size","論理サイズは有限の正数にしてください");
     if (runtime.state.control.tick==INT64_MAX || runtime.state.control.revision==INT64_MAX) return failure(9,"tick","更新番号が上限です");
+    speed::RenderBuilder::capture_previous(runtime);
     if (!speed::RunRunner::step_play(*this,1.0/120.0,input,size)) return failure(8,"step","更新の整合を確認してください");
     speed::EventBuilder::flush_combat(runtime);
     ++runtime.state.control.tick;++runtime.state.control.revision;return success(progress(runtime));
@@ -115,12 +121,24 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     if (bool(response["ok"])) ++runtime.state.control.revision;
     runtime.last_command_id=id;runtime.last_command_response=response.duplicate(true);return response;
 }
+Dictionary SpeedRunCore::render_run(const Rect2 &view,const Variant &alpha) const {
+    if (runtime.busy) return failure(7,"read_render","更新中は再入できません");
+    if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_render","開始していないランです");
+    if (alpha.get_type()!=Variant::FLOAT || !std::isfinite(double(alpha)) || double(alpha)<0 || double(alpha)>1 ||
+        !view.position.is_finite() || !view.size.is_finite() || view.size.x<0 || view.size.y<0) return failure(1,"view/alpha","表示範囲か補間係数が不正です");
+    return success(speed::RenderBuilder::read(runtime,view,double(alpha)));
+}
 Dictionary SpeedRunCore::frame_run() const {
     if (runtime.busy) return failure(7,"read_frame","更新中は再入できません");
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_frame","開始していないランです");
     const auto &control=runtime.state.control;Dictionary camera;camera["center"]=control.camera_center;camera["zoom"]=control.camera_zoom;camera["half"]=runtime.state.view_half;
     Dictionary value=progress(runtime);value["run_id"]=runtime.api_run_id;value["camera"]=camera;
-    Dictionary ui;ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();value["ui"]=ui;
+    Dictionary ui;ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["max_hp"]=runtime.state.ship_config.max_hp;
+    ui["max_speed"]=runtime.state.ship_config.max_speed;ui["steer_cruise"]=runtime.state.ship_config.steer_cruise;
+    ui["ship_vel"]=runtime.state.ship.vel;ui["tracing"]=runtime.state.draw.tracing;ui["ship_boost_t"]=runtime.state.ship.boost_t;ui["glide"]=runtime.state.ship.glide;
+    ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
+    ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
+    ui["character_scale"]=runtime.content->config.character_scale;value["ui"]=ui;
     value["events"]=runtime.state.events.duplicate(true);value["resource_requests"]=Array();value["result"]=Variant();return success(value);
 }
 Dictionary SpeedRunCore::dispose_run() {

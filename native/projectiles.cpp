@@ -6,6 +6,8 @@
 using namespace godot;
 
 size_t SpeedRunCore::add_friend(Friendly shot) {
+    if (runtime.state.next_attack_id==INT64_MAX) return SIZE_MAX;
+    shot.id=runtime.state.next_attack_id++;
     ++runtime.state.live_friends;
     if (shot.kind == 1) ++runtime.state.live_debris;
     size_t row;
@@ -49,8 +51,7 @@ bool SpeedRunCore::fire_shot(Vector2 from, double angle, double damage, const Di
     if (shot.cause != StringName("shot")) return false;
     shot.weapon_id = options.get("weapon_id", StringName());
     shot.visual = options.get("visual_key", StringName());
-    add_friend(std::move(shot));
-    return true;
+    return add_friend(std::move(shot))!=SIZE_MAX;
 }
 
 static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double radius) {

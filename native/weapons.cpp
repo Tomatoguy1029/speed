@@ -48,7 +48,7 @@ void SpeedRunCore::step_forward(double world_dt) {
     shot.damage = runtime.state.combat_config.base_attack * runtime.state.combat_config.attack_mult * runtime.state.combat_config.atk_scale * runtime.state.forward.damage;
     shot.life = runtime.state.forward.life; shot.pierce_left = runtime.state.forward.pierce; shot.knock = runtime.state.forward.knock;
     shot.color = Color::html("ffe46b"); shot.weapon_id = "W01"; shot.visual = "weapon/forward";
-    add_friend(std::move(shot));
+    if (add_friend(std::move(shot))==SIZE_MAX) return;
     runtime.state.forward.recoil = 0.12;
     Dictionary event; event["id"] = StringName("W01"); event["pos"] = origin; event["angle"] = angle; event["visual_key"] = "weapon/forward";
     emit_event("weapon_fire", event);
@@ -60,6 +60,13 @@ Dictionary SpeedRunCore::forward_snapshot() const {
 
 bool SpeedRunCore::set_forward_level(int64_t level) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.forward.ready || level<1) return false;
+    if (runtime.state.forward_parameters.is_empty()) {
+        if (runtime.content->forward_levels.empty()) return false;
+        const auto &next=runtime.content->forward_levels[std::min(size_t(level-1),runtime.content->forward_levels.size()-1)];
+        speed::ForwardBehavior::set_interval(runtime.state.forward,next.interval);runtime.state.forward.damage=next.damage;
+        runtime.state.forward.pierce=next.pierce;runtime.state.forward.life=next.life;runtime.state.forward.spread=next.spread;
+        runtime.state.forward.knock=next.knock;return true;
+    }
     const Array intervals=runtime.state.forward_parameters["interval_by_level"], damages=runtime.state.forward_parameters["damage_by_level"], pierces=runtime.state.forward_parameters["pierce_by_level"];
     speed::ForwardBehavior::set_interval(runtime.state.forward,intervals[std::min(level-1,intervals.size()-1)]); runtime.state.forward.damage=damages[std::min(level-1,damages.size()-1)]; runtime.state.forward.pierce=int64_t(pierces[std::min(level-1,pierces.size()-1)]); return true;
 }

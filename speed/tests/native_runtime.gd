@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--render-only" in OS.get_cmdline_user_args() or "--render-enemies-only" in OS.get_cmdline_user_args():
+		check(await check_run_render("--render-enemies-only" in OS.get_cmdline_user_args()), "描画付きの代表経路を最後まで確認する")
+		print("[run_render] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--timer-only" in OS.get_cmdline_user_args():
 		check(check_run_timers(), "タイマーと境界の確認を最後まで完了する")
 		print("[run_timer] failed=%d" % failed)
@@ -566,4 +571,95 @@ func check_run_timers() -> bool:
 		var expected: float = -100.0 if delta>0 else 100.0
 		check(absf(float(weighted._core.enemies_snapshot()[0].pos[0])-ship.x-expected)<1e-5, "抽選の重みを引いた値が0のときは次へ進む")
 		weighted.dispose()
+	return true
+
+func render_batch(frame: Dictionary, id: int) -> Dictionary:
+	for batch: Dictionary in frame.batches:
+		if batch.visual_id==id: return batch
+	return {}
+
+func check_run_render(enemies_only := false) -> bool:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.world_tick_div = 1
+	config.kill_hitstop = 0.0
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.stage_hp = 1.0
+	definition.armor = 0.0
+	definition.speed = 30.0
+	definition.xp_reward_counts = PackedInt32Array([1,0,0])
+	var stage := RuntimeStage.new()
+	stage.index = 80
+	stage.enemy_tuning = {"drifter":{"hp":1.0}}
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_render"
+	if builder.build(stage,config,output,"表示経路の固定入力".sha256_text(),{&"drifter":definition})!=OK: return false
+	var path := output.path_join("stage_80.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":42},true)
+	session.auto_step = false
+	if session.bridge==null or session.view==null: return false
+	var bridge = session.bridge
+	clock_step(bridge)
+	await get_tree().process_frame
+	if DisplayServer.get_name()!="headless": await RenderingServer.frame_post_draw
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	if enemies_only:
+		var ship_position: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
+		bridge.command("dev_spawn",{"definition_id":"drifter","position":ship_position+Vector2(100,0)})
+		await get_tree().process_frame
+		if DisplayServer.get_name()!="headless": await RenderingServer.frame_post_draw
+		check(presentation.frame_view.batches.has(6) and presentation.frame_view.batches[6].multimesh.visible_instance_count==1,"追跡敵の画像を通常画面のMultiMeshへ投入する")
+		if DisplayServer.get_name()!="headless": get_viewport().get_texture().get_image().save_png("/tmp/speed-cpp-r04-enemies.png")
+		session.free()
+		return true
+	check(presentation.frame_view!=null and presentation.frame_view.parts.size()==2,"通常画面が機体とW01の砲身を表示する")
+	var camera: Dictionary = bridge.read_frame().value.camera
+	var viewport := Rect2(camera.center-Vector2(250,180),Vector2(500,360))
+	var position: Vector2 = camera.center+Vector2(100,0)
+	var entity: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":position}).value
+	var initial: Dictionary = bridge.read_render(viewport,1.0).value
+	check(render_batch(initial,6).ids.has(entity),"生成直後の敵を表示する")
+	clock_step(bridge)
+	var before: Dictionary = bridge._core.inspect()
+	var old: Dictionary = bridge.read_render(viewport,0.0).value
+	var half: Dictionary = bridge.read_render(viewport,0.5).value
+	var current: Dictionary = bridge.read_render(viewport,1.0).value
+	var t0: PackedFloat32Array = render_batch(old,6).transforms
+	var t1: PackedFloat32Array = render_batch(current,6).transforms
+	var th: PackedFloat32Array = render_batch(half,6).transforms
+	check(absf(t0[4]-position.x)<0.001 and absf(th[4]-(t0[4]+t1[4])*0.5)<0.001,"表示だけで前回と今回の座標を補間する")
+	check(before==bridge._core.inspect() and render_batch(old,6).transforms==t0,"表示の読取は戦闘状態と保持中の配列を変更しない")
+	for batch: Dictionary in current.batches:
+		check(batch.ids.size()*6==batch.transforms.size() and batch.colors.size()==batch.ids.size() and batch.flags.size()==batch.ids.size(),"表示のPacked配列の長さが一致する")
+	var radius: float = bridge._core.enemies_snapshot()[0].radius
+	var edge: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(viewport.end.x+radius*0.5,viewport.get_center().y)}).value
+	var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(viewport.end.x+radius*4.0,viewport.get_center().y)}).value
+	var visible: Dictionary = bridge.read_render(viewport,1.0).value
+	check(render_batch(visible,6).ids.has(edge) and not render_batch(visible,6).ids.has(outside),"画面端に重なる敵を残し、離れた敵だけを表示から外す")
+	var bad := visible.duplicate(true)
+	bad.batches[0].transforms = PackedFloat32Array([0.0])
+	check(not presentation.frame_view.apply_frame(bad),"長さの壊れた表示データを投入しない")
+	for id in [entity,edge,outside]: bridge.command("dev_remove",{"entity_id":id})
+	for i in range(49): clock_step(bridge)
+	var shots: Array = bridge._core.projectiles_snapshot()
+	check(not shots.is_empty(),"生成したW01の定義から発射する")
+	if shots.is_empty(): return false
+	var shot: Dictionary = shots.back()
+	var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":shot.pos+shot.vel.normalized()*8.0}).value
+	clock_step(bridge)
+	var events: Array = bridge.read_frame().value.events
+	check(events.any(func(e): return e.type==&"shot_hit") and events.any(func(e): return e.type==&"kill" and e.get("id")==target),"W01の命中から共通撃破へ進む")
+	presentation._present_cpp(0.0)
+	await get_tree().process_frame
+	if DisplayServer.get_name()!="headless":
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("/tmp/speed-cpp-r04-scene.png")
+	check(presentation.frame_view.batches.has(3),"撃破後の結晶を通常画面へ渡す")
+	print("[run_render] build_us=%d submit_us=%d" % [presentation.frame_view.build_us,presentation.frame_view.submit_us])
+	var world: WeakRef = weakref(session.view.get_node("World"))
+	session.free()
+	await get_tree().process_frame
+	check(world.get_ref()==null and not bridge.read_render(viewport,1.0).ok,"解放したランの表示と資源を残さない")
 	return true

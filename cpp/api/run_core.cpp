@@ -15,6 +15,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("step_run", "dt", "input", "viewport"), &SpeedRunCore::step_run);
     ClassDB::bind_method(D_METHOD("command_run", "envelope"), &SpeedRunCore::command_run);
     ClassDB::bind_method(D_METHOD("frame_run"), &SpeedRunCore::frame_run);
+    ClassDB::bind_method(D_METHOD("render_run","view","alpha"), &SpeedRunCore::render_run);
     ClassDB::bind_method(D_METHOD("dispose_run"), &SpeedRunCore::dispose_run);
 
     ClassDB::bind_method(D_METHOD("hold_checkpoint"), &SpeedRunCore::hold_checkpoint);
@@ -202,7 +203,7 @@ void SpeedRunCore::advance_enemies(double delta) {
 void SpeedRunCore::close() {
     runtime.state.closed = true;
     runtime.state.control.rng = {};
-    runtime.combat_hooks=speed::CombatHooks();
+    runtime.combat_hooks=speed::CombatHooks();runtime.render_workspace={};
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
     runtime.state.progression = Progression();
     runtime.state.hound_packs.clear();
@@ -218,7 +219,7 @@ void SpeedRunCore::close() {
     runtime.state.attack_budget = AttackBudget();
     runtime.state.draw = Draw();
     runtime.state.grid = EnemyGrid();
-    runtime.state.events.clear();runtime.state.combat_events.clear();
+    runtime.state.events.clear();runtime.state.combat_events.clear();runtime.state.previous_poses={};
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.bite_zones.clear(); runtime.state.free_bite_zones.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;

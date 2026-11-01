@@ -24,6 +24,9 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 	if reward.is_empty() or config.xp_crystal_values.size()!=3: return {}
 	for i in range(3): row[["reward_low","reward_mid","reward_high"][i]] = int(reward.counts[i])
 	row.gold_eligible = reward.gold_eligible
+	row.visual_id = 6
+	row.sprite_scale = 1.0/definition.visual_value("collision_scale",1.0)
+	row.sprite_angle = PI/2.0 if definition.id in EnemyDef.NATIVE_SPRITES else -PI/2.0
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	data.RunConfig = [{"id":1,"aim_lag":resolved.motion.aim_lag,"aim_speed":resolved.motion.aim_speed,"crystal_low":config.xp_crystal_values[0],"crystal_mid":config.xp_crystal_values[1],"crystal_high":config.xp_crystal_values[2]}]
@@ -35,6 +38,20 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.ChaseDefinition = [row]
+	var sprite := stage.enemy_sprite_path(definition.id) if stage!=null else "res://assets/pixel/%s.png" % definition.id
+	if not ResourceLoader.exists(sprite): return {}
+	data.ResourceKey = [{"id":1,"role":1,"path":"res://assets/pixel/airship.png"},
+		{"id":2,"role":2,"path":""},{"id":3,"role":3,"path":"res://assets/pixel/xp_crystal_facets.tres"},
+		{"id":4,"role":4,"path":""},{"id":5,"role":5,"path":"res://assets/pixel/airship_canon.png"},
+		{"id":6,"role":0,"path":sprite}]
+	var weapon := load("res://data/weapons/W01_forward.tres") as WeaponDef
+	if weapon==null: return {}
+	data.LoadoutDefinition = [{"id":1,"kind":0,"maximum_level":weapon.level_steps.size()}]
+	for i in weapon.level_steps.size():
+		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,
+			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
+			"life":float(weapon.params.life),"spread":float(weapon.params.spread_step),"knock":float(weapon.params.knock),
+			"pierce":int(weapon.params.pierce_by_level[i])})
 	return data
 
 static func compile_chase(definition: EnemyDef, config: GameConfig, input_sha256: PackedByteArray) -> PackedByteArray:
@@ -58,13 +75,25 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if resolved.is_empty(): return ERR_UNAVAILABLE
 		var row: Dictionary = resolved.ChaseDefinition[0]
 		row.id = i+1
+		row.visual_id = i+6
 		data.ChaseDefinition.append(row)
 		data.StringEntry.append({"id":i+1,"value":id})
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.RunConfig = resolved.RunConfig
+		if data.ResourceKey.is_empty():
+			data.ResourceKey = resolved.ResourceKey.slice(0,5)
+			data.LoadoutDefinition = resolved.LoadoutDefinition
+			data.ForwardDefinition = resolved.ForwardDefinition
+		var visual: Dictionary = resolved.ResourceKey.back().duplicate()
+		visual.id = i+6
+		data.ResourceKey.append(visual)
 	if data.RunConfig.is_empty(): return ERR_INVALID_DATA
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
+	for visual: Dictionary in data.ResourceKey:
+		if not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
+	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]:
+		if not paths.has(asset): paths.append(asset)
 	paths.sort()
 	var resolved_input := source_sha256.to_utf8_buffer()
 	resolved_input.append_array(Schema.write_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])))
@@ -88,9 +117,10 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	if FileAccess.get_file_as_bytes(binary_path)!=bytes: return ERR_FILE_CORRUPT
 	var resources = preload("res://tools/content/run_resources.gd").new()
 	resources.input_sha256 = input_sha256
-	resources.paths = stage.resources.paths.duplicate()
-	resources.paths.sort()
-	for i in resources.paths.size(): resources.keys[i+1] = resources.paths[i]
+	resources.paths = paths
+	resources.visuals.assign(data.ResourceKey)
+	for visual: Dictionary in data.ResourceKey:
+		if not visual.path.is_empty(): resources.keys[visual.id] = visual.path
 	if not FileAccess.file_exists(resources_path):
 		error = ResourceSaver.save(resources,resources_path)
 		if error!=OK: return error

@@ -2,6 +2,7 @@
 #include "../../native/runtime_data.h"
 #include "entity_store.h"
 #include "combat_types.h"
+#include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include "run_control_state.h"
@@ -22,6 +23,7 @@ namespace godot {
 // ランの値状態。保持・複製は全フィールドをまとめてコピーする。
 struct RunState {
     speed::RunControlState control;
+    speed::PreviousPoseState previous_poses;
     enum class EnemyMode { Move, Windup, Dash, Recover };
     struct Enemy {
         int64_t id = 0;
@@ -180,7 +182,7 @@ struct RunState {
     bool pickups_ready = false;
     struct Friendly {
         bool alive = true, pierce = false, no_crit = false;
-        int64_t kind = 0, generation = 0, pierce_left = 0;
+        int64_t kind = 0, generation = 0, pierce_left = 0, id = 0;
         Vector2 pos, vel;
         float radius = 5, life = 0.9f, age = 0, knock = 250, angle = 0, spin = 0;
         double damage = 0;
@@ -191,6 +193,7 @@ struct RunState {
     };
     // 命中中に後ろへ追加しても、処理中の弾への参照を保つ。
     std::deque<Friendly> friends;
+    int64_t next_attack_id=1;
     std::vector<size_t> free_friends;
     size_t live_friends = 0, live_debris = 0;
     struct ProjectileConfig {

@@ -57,7 +57,7 @@ func start_loading(options: Dictionary) -> void:
 ## options.hud が false なら通常 HUD を省き、利用側が専用 UI を接続する。
 func start(options: Dictionary, with_view: bool) -> void:
 	if options.get("runtime", "") == "cpp":
-		var error := start_cpp_content(options.get("cpp_index",""),options.get("cpp_signature",""),options.get("seed",0))
+		var error := start_cpp_content(options.get("cpp_index",""),options.get("cpp_signature",""),options.get("seed",0),with_view,options)
 		if error != OK: push_error("C++ランの開始に失敗: %s" % error_string(error))
 		return
 	options = options.duplicate()
@@ -167,7 +167,7 @@ func _notification(what: int) -> void:
 ## 開発用。開始までに生成・解析を呼ばず、保存済みの同じ版を使う。
 var cpp_core: RefCounted
 var cpp_resources: Resource
-func start_cpp_content(index_path: String, input_sha256: String, seed_value: int) -> Error:
+func start_cpp_content(index_path: String, input_sha256: String, seed_value: int, with_view := false, options := {}) -> Error:
 	if cpp_core != null or sim.state != null: return ERR_ALREADY_IN_USE
 	var prepared := preload("res://scripts/runtime/run_content_loader.gd").read_bundle(index_path,input_sha256)
 	if prepared.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
@@ -184,8 +184,25 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	bridge = next_bridge
 	cpp_core = bridge._core
 	cpp_resources = prepared.resources
-	var router = preload("res://scripts/input/input_router.gd").new()
-	add_child(router)
-	cpp_input_source = router.poll
+	if with_view:
+		resources = ContentManager.prepare_resources(cpp_resources.paths,false)
+		if resources.failed or not resources.is_ready():
+			bridge.dispose()
+			bridge = null
+			cpp_core = null
+			return ERR_CANT_OPEN
+		view = load(VIEW_PATH).instantiate()
+		var presentation: RunPresentation = view.get_node("RunPresentation")
+		presentation.bridge = bridge
+		presentation.cpp_resources = cpp_resources
+		presentation.cpp_scope = resources
+		if options.get("hud",true): view.get_node("Hud/HudRoot").bridge = bridge
+		else: view.get_node("Hud").free()
+		cpp_input_source = view.get_node("World/InputRouter").poll
+		add_child(view)
+	else:
+		var router = preload("res://scripts/input/input_router.gd").new()
+		add_child(router)
+		cpp_input_source = router.poll
 	started.emit()
 	return OK

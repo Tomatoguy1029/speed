@@ -84,6 +84,10 @@ func send_envelope(envelope: Dictionary) -> Dictionary:
 		_next_command = maxi(_next_command,int(envelope.command_id)+1)
 	return result
 
+func read_render(view: Rect2, alpha := 1.0) -> Dictionary:
+	if _busy: return _error(7,"read_render","更新中は再入できません")
+	return _core.render_run(view,alpha) if _core!=null else _error(4,"read_render","破棄済みです")
+
 func read_frame() -> Dictionary:
 	if _busy: return _error(7,"read_frame","更新中は再入できません")
 	return _core.frame_run() if _core != null else _error(4,"read_frame","破棄済みです")

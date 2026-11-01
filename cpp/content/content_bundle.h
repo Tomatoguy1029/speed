@@ -13,6 +13,8 @@ struct ContentBundle {
     std::array<double,3> crystal_values{};
     double aim_lag=0, aim_speed=0;
     std::vector<EnemyDefinition> definitions;
+    std::vector<ResourceKey> visuals;
+    std::vector<ForwardDefinition> forward_levels;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);
 };
 }

@@ -25,6 +25,10 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export_range(0.1, 3.0) var finish_wave_seconds := 0.8
 
 ## RunSession が木に入れる前に入れる
+var bridge: RefCounted
+var cpp_resources: Resource
+var cpp_scope: ContentResourceScope
+var frame_view: Node2D
 var run: RunSimulation
 var state: RunState
 var cfg: GameConfig
@@ -118,6 +122,9 @@ var perf := PerfLog.new()
 var perf_rows := PerfLog.new()
 
 func _ready() -> void:
+	if bridge!=null:
+		_ready_cpp()
+		return
 	state = run.state
 	cfg = run.cfg
 	_font = ThemeDB.fallback_font
@@ -378,6 +385,9 @@ func _timed(key: StringName, f: Callable) -> Callable:
 		perf.since(key, t0)
 
 func _process(delta: float) -> void:
+	if bridge!=null:
+		_present_cpp(delta)
+		return
 	if not perf.active:
 		_present(delta)
 		return
@@ -1569,3 +1579,38 @@ func _sync_picaro() -> void:
 		if not used.has(id):
 			_picaro_sprites[id].queue_free()
 			_picaro_sprites.erase(id)
+
+func _ready_cpp() -> void:
+	_camera = get_node(camera_path) as Camera2D
+	var snapshot: Dictionary = bridge.read_frame()
+	if not snapshot.ok: return
+	frame_view = load("res://scripts/render/run_frame_view.gd").new()
+	get_node(world_path).add_child(frame_view)
+	frame_view.setup(cpp_scope,cpp_resources.visuals,float(snapshot.value.ui.character_scale))
+	pipeline = RenderPipeline.new()
+	add_child(pipeline)
+	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],2)
+
+func _present_cpp(delta: float) -> void:
+	if frame_view==null: return
+	var snapshot: Dictionary = bridge.read_frame()
+	if not snapshot.ok:
+		frame_view.hide()
+		return
+	var frame: Dictionary = snapshot.value
+	cam_center = frame.camera.center
+	cam_zoom = frame.camera.zoom
+	_camera.position = cam_center
+	_camera.zoom = Vector2.ONE*cam_zoom
+	var half := get_viewport().get_visible_rect().size/(2.0*cam_zoom)
+	var began := Time.get_ticks_usec()
+	var render: Dictionary = bridge.read_render(Rect2(cam_center-half,half*2.0),1.0)
+	frame_view.build_us = Time.get_ticks_usec()-began
+	if not render.ok or not frame_view.apply_frame(render.value):
+		frame_view.hide()
+		return
+	frame_view.show()
+	frame_view.update_effects(frame,delta)
+	var hud := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")
+	if hud!=null: hud.apply_snapshot(frame.ui)
+	pipeline.step(delta if frame.ui.input_enabled else 0.0,cam_center,cam_zoom)

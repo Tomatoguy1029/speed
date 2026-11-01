@@ -153,3 +153,24 @@ func deform_last(radial: Vector2, amount: float) -> void:
 		var stretched := n*basis.dot(n)*(1.0-0.5*amount)+side*basis.dot(side)*(1.0+0.6*amount)
 		_buf[i+column]=stretched.x
 		_buf[i+4+column]=stretched.y
+
+## RenderFrameの2D変換6要素と色を、既存のMultiMeshバッファへまとめて投入する。
+func apply_frame(transforms: PackedFloat32Array, colors: PackedColorArray) -> void:
+	_count = colors.size()
+	var need := _count*STRIDE
+	if _buf.size()<need: _buf.resize(maxi(need,_buf.size()*2))
+	for i in _count:
+		var source := i*6
+		var target := i*STRIDE
+		_buf[target] = transforms[source]
+		_buf[target+1] = transforms[source+2]
+		_buf[target+2] = 0.0
+		_buf[target+3] = transforms[source+4]
+		_buf[target+4] = transforms[source+1]
+		_buf[target+5] = transforms[source+3]
+		_buf[target+6] = 0.0
+		_buf[target+7] = transforms[source+5]
+		_buf[target+8] = colors[i].r
+		_buf[target+9] = colors[i].g
+		_buf[target+10] = colors[i].b
+		_buf[target+11] = colors[i].a

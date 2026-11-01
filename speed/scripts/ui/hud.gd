@@ -72,6 +72,8 @@ var _finish_skip: Button
 var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
+var bridge: RefCounted
+var _cpp_ui: Dictionary = {}
 var run: RunSimulation
 var _laser_audio: Node
 var _font: Font
@@ -112,6 +114,9 @@ var _overlay_focus: WeakRef
 var _speed_indicator: SPEED_INDICATOR
 
 func _ready() -> void:
+	if bridge!=null:
+		_ready_cpp()
+		return
 	_speed_indicator = SPEED_INDICATOR.new()
 	add_child(_speed_indicator)
 	_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
@@ -383,6 +388,11 @@ func _card_command(command: StringName, args := {}) -> void:
 	run.command(command, args)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if bridge!=null:
+		if event.is_action_pressed(&"pause") and not event.is_echo() and not _cpp_ui.is_empty():
+			bridge.command("pause",{"paused":int(_cpp_ui.phase)!=2})
+			get_viewport().set_input_as_handled()
+		return
 	# 実験場では HUD は表示だけ。操作は実験場が扱う。
 	if run.state.lab_mode:
 		return
@@ -415,6 +425,10 @@ func _notification(what: int) -> void:
 			run.command(&"pause")
 
 func _process(delta: float) -> void:
+	if bridge!=null:
+		_update_speed_indicator(delta)
+		queue_redraw()
+		return
 	_update_speed_indicator(delta)
 	_laser_audio.sync(run)
 	var slow := run.state.phase == RunState.Phase.PLAY and run.draw.world_scale() < 0.999
@@ -795,6 +809,9 @@ func _open_settings(from: Button) -> void:
 # ── 描画（HUD） ─────────────────────────────────────────────────
 
 func _draw() -> void:
+	if bridge!=null:
+		_draw_cpp()
+		return
 	var s := run.state
 	if s == null:
 		return
@@ -843,12 +860,19 @@ var _minimap_at := Vector2.ZERO
 var _minimap_r := 0.0
 
 func _speed_indicator_mode() -> int:
+	if bridge!=null:
+		if _cpp_ui.get("tracing",false) or float(_cpp_ui.get("ship_boost_t",0.0))>0.0: return SPEED_INDICATOR.BOOST
+		if _cpp_ui.get("glide",false) or Vector2(_cpp_ui.get("ship_vel",Vector2.ZERO)).length()>float(_cpp_ui.get("max_speed",0.0))*float(_cpp_ui.get("steer_cruise",0.0))+1.0: return SPEED_INDICATOR.FAST
+		return SPEED_INDICATOR.NORMAL
 	var s := run.state
 	if s.tracing or s.ship_boost_t > 0.0: return 2
 	if s.glide or s.ship_vel.length() > s.stats.max_speed * run.cfg.steer_cruise + 1.0: return 1
 	return 0
 
 func _update_speed_indicator(delta: float) -> void:
+	if bridge!=null:
+		if _cpp_ui.get("phase",-1)==0 and _cpp_ui.get("input_enabled",false): _speed_indicator.advance(_speed_indicator_mode(),delta)
+		return
 	if run.state.phase != RunState.Phase.PLAY or run.ui_overlay_active or run.ui_reward_active:
 		return
 	_speed_indicator.advance(_speed_indicator_mode(), delta)
@@ -1106,3 +1130,35 @@ func _exit_tree() -> void:
 	if run != null and run.state != null and not run.state.lab_mode:
 		AudioManager.stop_music(self)
 	AudioManager.end_dash()
+
+## C++の値のスナップショットだけを保持する。表示時計と乱数はHUDが所有する。
+func apply_snapshot(ui: Dictionary) -> void:
+	_cpp_ui = ui
+
+func _ready_cpp() -> void:
+	_font = ThemeDB.fallback_font
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_speed_indicator = SPEED_INDICATOR.new()
+	add_child(_speed_indicator)
+	_health_fill = _make_bar_fill(HEALTH)
+	_experience_fill = _make_bar_fill(EXPERIENCE)
+	resized.connect(_layout_cpp_art)
+	_layout_cpp_art()
+
+func _layout_cpp_art() -> void:
+	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
+	_speed_indicator.position = (size-(SPEED_INDICATOR.METER.get_size()+Vector2.ONE*8.0)*factor).round()
+	_speed_indicator.scale = Vector2.ONE*factor
+
+func _draw_cpp() -> void:
+	if _cpp_ui.is_empty() or not show_status: return
+	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
+	draw_set_transform((size-ART_SIZE*factor)*0.5,0.0,Vector2.ONE*factor)
+	var hp := clampf(float(_cpp_ui.hp)/maxf(1.0,float(_cpp_ui.max_hp)),0.0,1.0)
+	_draw_bar(HEALTH,_health_fill,hp,Color("#ff526e") if hp<=0.1 else Color("#ffe46b") if hp<0.5 else Color("#67e8b1"))
+	draw_string(_font,Vector2(7,40),"%d/%d" % [ceili(maxf(0.0,float(_cpp_ui.hp))),roundi(float(_cpp_ui.max_hp))],HORIZONTAL_ALIGNMENT_LEFT,-1,14,CYAN)
+	_draw_bar(EXPERIENCE,_experience_fill,float(_cpp_ui.get("xp",0.0))/maxf(1.0,float(_cpp_ui.get("next_xp",1.0))),Color("#b8a0ff"))
+	var seconds := int(_cpp_ui.run_time)
+	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
+	draw_set_transform(Vector2.ZERO)
