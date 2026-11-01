@@ -4,11 +4,11 @@ const Schema = preload("res://tools/content/generated/run_schema.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -56,6 +56,10 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			"duration":ProjectileSystem.ZONE_FLASH,"visual_key":7,
 			"hit":visual.get_node_or_null("Hit")!=null,"fade":visual.get_node_or_null("Fade")!=null}]
 		visual.free()
+	if definition.behavior==&"gunner":
+		var gunner: Dictionary = source.gunner.duplicate()
+		gunner.id = 1
+		data.GunnerDefinition = [gunner]
 	if definition.behavior==&"hound":
 		var pack: Dictionary = source.pack.duplicate()
 		pack.id = 1
@@ -168,6 +172,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
+		for gunner: Dictionary in resolved.GunnerDefinition:
+			gunner.id = row.id
+			data.GunnerDefinition.append(gunner)
 		for hound: Dictionary in resolved.HoundDefinition:
 			hound.id = row.id
 			data.HoundDefinition.append(hound)

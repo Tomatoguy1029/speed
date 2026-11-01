@@ -17,6 +17,7 @@ struct ContentBundle {
     std::vector<ForwardDefinition> forward_levels;
     std::vector<BiteDefinition> bites;
     std::vector<HoundDefinition> hounds;
+    std::vector<GunnerDefinition> gunners;
     std::vector<ContactDefinition> contacts;
     std::vector<HostileDefinition> hostile_definitions;
     std::vector<BeamDefinition> beams;

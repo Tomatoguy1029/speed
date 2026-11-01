@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../behaviors/enemies/gunner.h"
 #include "../systems/field.h"
 #include "../output/event_builder.h"
 #include "../../native/geometry.h"
@@ -188,7 +189,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind == speed::EnemyDefinition::Kind::Shield) {
+            if (def.kind==speed::EnemyDefinition::Kind::Gunner) {
+                speed::GunnerBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind == speed::EnemyDefinition::Kind::Shield) {
                 const double bdt = far ? delta * 3.0 : delta;
                 enemy.fire_t = speed::remaining_time(enemy.fire_t,bdt);
                 const Vector2 toward = runtime.state.enemy_aim - enemy.pos;

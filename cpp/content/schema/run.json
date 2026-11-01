@@ -592,6 +592,12 @@
           "type": "u32",
           "value": 5,
           "ref": "ResourceKey"
+        },
+        {
+          "name": "enemy_face_move",
+          "type": "f64",
+          "min": 0,
+          "config": "enemy_face_move"
         }
       ],
       "version": 6
@@ -840,7 +846,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 6
+          "max": 7
         },
         {
           "name": "turn",
@@ -849,7 +855,7 @@
           "native": "turn"
         }
       ],
-      "version": 6
+      "version": 7
     },
     {
       "name": "LoadoutDefinition",

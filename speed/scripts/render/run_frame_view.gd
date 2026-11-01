@@ -10,6 +10,8 @@ var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
 var _scope: ContentResourceScope
 var _pixel := 1.82
+var _gunner := PackedFloat32Array()
+var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
 var _queued_events: Array[Dictionary] = []
@@ -34,6 +36,9 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_scope = scope
 	_pixel = 1.82*character_scale
 	for entry in entries: visuals[int(entry.id)] = entry
+	_gunner_marks = DrawLayer.new()
+	_gunner_marks.draw_fn = func(canvas: CanvasItem): preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
+	_layer(9).add_child(_gunner_marks)
 	_effects = PixelPainter.new()
 	_effects.setup_painter(_pixel)
 	_layer(14).add_child(_effects)
@@ -109,6 +114,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.get("biter") is Dictionary: return false
 			for key in ["modes","charges","timers","rests"]:
 				if not row.biter.has(key) or row.biter[key].size()!=count: return false
+		if row.has("gunner"):
+			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
+			for value: float in row.gunner:
+				if not is_finite(value): return false
 		if row.has("glows"):
 			if not row.glows is PackedFloat32Array or row.glows.size()%3!=0: return false
 			for value: float in row.glows:
@@ -132,6 +141,10 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in enemy_frames.values(): display.begin()
 	for node: Sprite2D in parts.values(): node.hide()
 	for line in _lines: line.hide()
+	_gunner.clear()
+	for row: Dictionary in frame.batches:
+		if row.has("gunner"): _gunner.append_array(row.gunner)
+	_gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	for row: Dictionary in rows:

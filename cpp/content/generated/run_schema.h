@@ -93,6 +93,7 @@ struct RunConfig {
     uint32_t crystal_visual{};
     uint32_t coin_visual{};
     uint32_t cannon_visual{};
+    double enemy_face_move{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -259,6 +260,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.crystal_visual)) return false;
     if (!input.read_u32(out.coin_visual)) return false;
     if (!input.read_u32(out.cannon_visual)) return false;
+    if (!input.read_f64(out.enemy_face_move)) return false;
+    if (out.enemy_face_move < 0) return false;
     return true;
 }
 struct StringEntry {
@@ -382,7 +385,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 6) return false;
+    if (out.kind > 7) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     return true;
@@ -767,6 +770,35 @@ inline bool read(BinaryReader &input, ShieldDefinition &out) {
     if (out.reflected < 1) return false;
     return true;
 }
+struct GunnerDefinition {
+    uint32_t id{};
+    double accel{};
+    double keep{};
+    double telegraph{};
+    double bullet_speed{};
+    double bullet_damage{};
+    double slow{};
+    double admission_duration{};
+};
+inline bool read(BinaryReader &input, GunnerDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.telegraph)) return false;
+    if (out.telegraph < 0) return false;
+    if (!input.read_f64(out.bullet_speed)) return false;
+    if (out.bullet_speed < 0) return false;
+    if (!input.read_f64(out.bullet_damage)) return false;
+    if (out.bullet_damage < 0) return false;
+    if (!input.read_f64(out.slow)) return false;
+    if (out.slow < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -911,6 +943,7 @@ struct ContentRecords {
     std::vector<LoadoutAsset> LoadoutAsset_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
     std::vector<ShieldDefinition> ShieldDefinition_rows;
+    std::vector<GunnerDefinition> GunnerDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -919,7 +952,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     switch(kind) {
     case 1: {
         if (version != 6) return false;
-        if (count > input.remaining()/640) return false;
+        if (count > input.remaining()/648) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -936,7 +969,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 6) return false;
+        if (version != 7) return false;
         if (count > input.remaining()/236) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -1067,6 +1100,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { ShieldDefinition row; if (!read(input,row)) return false; out.ShieldDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 28: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { GunnerDefinition row; if (!read(input,row)) return false; out.GunnerDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -1137,6 +1176,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HoundDefinition_rows) if (!HoundDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ShieldDefinition_ids;
     for (const auto &row:data.ShieldDefinition_rows) if (!ShieldDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> GunnerDefinition_ids;
+    for (const auto &row:data.GunnerDefinition_rows) if (!GunnerDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -1165,6 +1206,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ShieldDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ShieldDefinition_rows) if (!HostileDefinition_ids.count(row.reflected)) return false;
+    for (const auto &row:data.GunnerDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -1296,5 +1338,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=27;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=28;
 }

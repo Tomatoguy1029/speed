@@ -54,6 +54,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->forward_levels=records.ForwardDefinition_rows;
     bundle->bites=records.BiteDefinition_rows;
     bundle->hounds=records.HoundDefinition_rows;
+    bundle->gunners=records.GunnerDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
     bundle->beams=records.BeamDefinition_rows;
@@ -96,7 +97,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -116,6 +117,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             if (hound==bundle->hounds.end()) return {};
             definition.pack={hound->count,hound->gap,hound->reach,hound->alignment,hound->cohesion,hound->separation};definition.accel=hound->accel;
         } else if (hound!=bundle->hounds.end()) return {};
+        const auto gunner=std::find_if(bundle->gunners.begin(),bundle->gunners.end(),[&](const auto &g){return g.id==row.id;});
+        if (row.kind==7) {
+            if (gunner==bundle->gunners.end() || gunner->telegraph<=0 || row.fire_interval<=0) return {};
+            for (double value:{gunner->accel,gunner->keep,gunner->telegraph,gunner->bullet_speed,gunner->bullet_damage,gunner->slow,gunner->admission_duration}) if (!std::isfinite(float(value))) return {};
+            definition.gunner_definition=uint32_t(gunner-bundle->gunners.begin()+1);definition.accel=gunner->accel;
+        } else if (gunner!=bundle->gunners.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;
