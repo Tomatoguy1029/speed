@@ -252,7 +252,8 @@ Main (Node)
   - 列を伸ばしたとき、全部の列の長さがそろっているか。
   - ラン開始時、追加の関数が使い回す行の全部の列を書き直すか。書き忘れた列があれば、その名前を出して止まる。
 - 敵は敵の表（6.2）の1行。隕石とボスの当たり判定も同じ表に入る。撃破した敵は撃破済みの印を付け、その回の終わりに行を空きへ戻す。何フレームもまたいで敵を覚えるときは、行番号と id の組で覚え、`EnemySystem.is_same` で確かめる。行動する雑魚は行動の種類ごとの行番号の一覧に入り、更新は種類ごとにその一覧を回す。追跡の更新は関数を呼ばずにループの中で計算する。追跡と噛みつきの更新は、天体までの余裕を持つ列もループの先頭で読み、移動後の同じ距離条件で衝突を確かめる。攻撃枠の取得は強敵以上に対して行う。種類ごとの更新は、その種類の行があるときに進める。画面から遠い敵は、判断（向きを変える・攻撃の時間を進めるなど）を3回に1回だけ、まとめた時間で行い、間の回は今の速度で進むだけにする。さらに速さが要るときは、ここを GDExtension に移す。
-- 経験値の結晶の上限で「いちばん古い結晶」を選ぶため、結晶ごとに落ちた順の通し番号を持ち、落ちた順の待ち行列から取り出す。拾われた結晶は取り出すときに読み飛ばす。
+- 経験値は `PickupSystem` の `gem_` 列に持つ。`gem_kind` は0・1・2の種類、`gem_value` は倍率適用前の保持基準XP、`gem_seq` は行の再利用から独立した安定IDを表す。地面の個数を `config.gem_max` 内に保ちながら、超過分を指定黄色へ加える。指定先の行とIDを照合し、指定がないときだけ最古の黄色、次いで最古の結晶を選ぶ。[取得・集約の規則](spec.md#102-取得と集約)に従い、変色時も元の保持量を引き継ぐ。
+- 運搬中の結晶は `PickupSystem` が敵の安定IDごとに `{row, crystals}` で保持する。結晶ごとに `id`・`kind`・`base_xp`・`origin` を持ち、指定解除・再ドロップ・持ち去りを同じ個体へ結び付ける。敵表の `carry`・`buds` は既存の運搬表示用合計として扱い、再ドロップの基準量は結晶ごとの保持値から読む。
 - 当たり判定の格子（`SpatialGrid`）は `PackedInt32Array` の先頭・次の表で持ち、探索の結果は敵の表の行番号。
 - 出現調査は世界側の更新ごと。全体数・四辺の偏り・遠方の再配置は毎回調べ、種類別数は出現上限を使う戦艦とタイタンだけ集計する。四辺の分類では個体ごとの正規化除算を交差乗算に置き換える。
 - 描画は `MultiMesh` にまとめて描く（`scripts/render/instance_batch.gd`）。Compatibility では `custom_aabb` の設定が要る。
@@ -404,7 +405,7 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `hp` | 全部 | HP |
 | `max_hp` | 全部 | 最大 HP |
 | `armor` | 全部 | 装甲 |
-| `xp` | 全部 | 経験値 |
+| `xp` | 全部 | 互換用。通常生成は0。報酬は解決済みの種類別個数を使う |
 | `gate` | 特殊な倒し方を持つ敵 | 倒し方の種類（`EnemyTable.Gate`） |
 | `weak_arc` | `armored`・`battleship`・ボス | 背面の弱点の半角 |
 | `color` | 全部 | 色（撃破の演出・破片） |
@@ -425,7 +426,7 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `charge` | `biter`・`defender`・`hound`・`gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`crab`・`phoenix`・`aquarius`・`cepheus`・ボス | 攻撃の予告の溜め（0〜1） |
 | `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次のしぶき、ポンプ座は次の吸い込み |
 | `buds` | `splitter`・`pump`・`crow`・`crab` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数、かに座は進む向き（体の右が1、左が-1） |
-| `carry` | `crow` | からす座が運ぶ経験値の量 |
+| `carry` | `crow` | 運搬表示用の保持基準XP合計。結晶ごとの実額はPickupSystemが保持 |
 | `target` | `reticle`・`soldier` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号 |
 | `target_id` | `reticle`・`soldier` | 狙っている岩の id。ケフェウス座の兵は仕える王の id |
 | `anchor` | `cepheus`・`phoenix` | ケフェウス座の隊列の基準位置。ほうおう座の離脱先・着地点 |
@@ -475,7 +476,7 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 |---|---|---|
 | `WeaponDef` | 固定の内部ID（`W01`）、処理ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](game/catalog/weapons.md) |
 | `TraitDef` | 固定の内部ID（`T03`）、処理ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](game/catalog/traits.md) |
-| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値、攻撃の重さ | [enemies.md](game/catalog/enemies.md) |
+| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、報酬個数の上書き `xp_reward_counts`、倒し方、行動の種類と値、攻撃の重さ | [enemies.md](game/catalog/enemies.md) |
 | `PhaseDef` | 開始の時刻、敵の数、敵レベル、補充の速さ、出現の重み、攻撃の予算、特別なルール | 仕様書 4.2 |
 | `MetaUpgradeDef` | 強化の名前、効果、段階ごとの費用 | 仕様書 14 |
 | `StageDef` | 星系、フィールドの配置、仕掛けの領域、時間帯の表、ステージの敵、雑魚の目標の数の曲線、出現のクリップ、出現タイムラインのトラックの名前、敵の見た目、中ボス、伝説のモジュール | 仕様書 2〜22 |
@@ -694,6 +695,8 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 エリートの接点・近隣の接点組・枝分かれ経路は `bake_landmark_masks.py` と `elite_contacts.py` が共有距離場と可動部位の区分から制作時に保存する。`elite_contacts.tres` は画像・import設定・生成コードの入力ハッシュとマスクへの参照を持つ。`bake_elite_crackle.py` は `elite_mark.tres` と設定の既定値から色・濃さを定数化した `elite_crackle_runtime.gdshader` と、発生間隔・本数を固定した `elite_runtime.tres` を保存する。入力と出力のハッシュを共通生成で照合する。StageResourcesが接点と生成済み実行用設定を準備し、SessionのScopeがランの寿命で共有する。`elite_crackle.gd` は画面内のエリートごとに独立した発生時刻と最大4件の短いイベントだけを保持し、保存済みの経路を選ぶ。退出した個体の状態を回収し、時刻の巻き戻しで初期化する。黒い縁と赤い芯はラン内で共有する2つのMultiMeshへ送り、最大8192区間のバッファを再利用する。shaderは元画像の画素格子へ区間を量子化する。位置・回転・倍率と波動変形は本体と共有し、噛みつく雑魚の顎は同じ支点と姿勢、ポンプは同じ前後の変形へ接点を合わせる。本番shaderの可変値は描画方式と縁・芯の描画パスだけとし、区間の位置・濃さ・個体ごとの時刻はインスタンスから渡す。ビジュアル編集だけが同じ描画へ元の可変shaderと未保存の設定を渡す。
 
+経験値は、固定の面マスク `assets/pixel/xp_crystal_facets.tres` をScopeから取得し、3色共通の単一MultiMeshで描く。面マスクはImageを内包するImageTextureとし、実行時は `gem_kind` から指定色を渡す。共通寸法は通常の基準結晶の高さを維持し、表示倍率に応じた下限を共用する。`pickups` のz=6、通常敵の図形と `BossActor`・ヒュドラ・りゅう座の分身の基準z=7を使い、結晶を敵の背後へ置く。法線付きの通常敵も既存の上位CanvasLayerへ描く。
+
 敵の表示半径は、そのランの定義と生成済み外観の数値を種類ごとに1描画パスだけ共有する。共有値は衝突倍率・画像寸法・基準半径などの数値だけとし、個体の半径をその場で反映する。パス終了時に破棄し、次の描画でライブ編集後の値を読む。Resourceの所有は既存のSessionとScopeに保つ。
 
 噛みつく雑魚の本体・左右の顎は、制作時の `tools/art/bake_biter_parts.py` が保存済みの領域マスクでBase・Armor・Normalを分割する。共通キャンバスと回転支点・入力と出力のハッシュは `data/visuals/biter_parts.tres` に持ち、共通生成で整合を確認する。StageResourcesの依存収集が分割素材・shaderを登録し、SessionのScopeが保持する。表示は種類内で部位ごとのMultiMeshとmaterialを共用し、確定塗装のRGBへ部位のアルファを重ね、顎の回転と同じ基底で法線を回す。構え・回復の時計から姿勢を求め、噛み閉鎖時の火花は活動中の個体だけを共通の四角形バッチへ追加する。専用shaderが6本の筋と伸縮・濃淡を描く。`biter` の攻撃は表示だけを専用シーンへ渡し、共通の範囲判定を維持する。蛇の外観は同じ火花と元の船体を使う。
@@ -782,8 +785,8 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 - 待機中に始めたランは初期化直後から、プレイ中に有効にしたランはその時点から、終わる（クリア・やられた・やめた）か F9 で停止するまで1つのファイルに書く。待機は F9 で切るまで続き、次のランと停止後の再開は別のファイルになる。記録対象は本番のランとし、実験場は専用の記録を使う。
 - 置き場所は書類フォルダの `SPEED/recordings/stage<番号>_<日時>.jsonl`（Mac は `~/Documents/SPEED/recordings/`。書類フォルダが分からなければ `user://recordings/`）。同名ファイルがあれば連番を足して保存する。ほかの開発者もこのファイルを送って共有する。1行に1つの記録（JSON）。書いたそばからファイルへ出し、メモリにためない。
 - 記録の種類（`type`）：
-  - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`、追加計測は `measurement_version=3`）、Godot の版、報酬・メニューでの停止を性能集計から除く識別子（`perf_excludes_ui_pause=true`）、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_config`。大きい結晶のドロップ率・段ごとの経験値と重み、必要経験値の式）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
-  - `sample`：3秒（ランの時計）ごとのラン秒・世界秒とまとめ。拾った・落ちた・フィールドに残る経験値、レベル、HP、敵の数（星ごと・画面の中）、種類ごとの撃破数、倒した原因ごとの撃破数（`kills_by`）、与えたダメージの原因ごとの合計（`dealt`。倒しきった余りも含む）、攻撃の種類ごとの被弾（撃った敵が分かる攻撃は「攻撃/敵の種類」）、攻撃の予算の使用量の最大。`measurement_version=3` では命中を武器ID・敵種・敵級・エリート・原因で集約した `effective_damage` に解決後の量・実際のHP減少・超過分・形態境界などで捨てた量と命中回数、`enemy_life` に敵種・敵級・エリート別の出現時最大HPの合計と件数、出現・撃破・退場・生存終了数、観測できた出現から死亡・初被弾から死亡までの世界秒の合計と件数、`enemy_contacts` に機体への幾何接触の原因・判定結果別件数とバリアが受け止めた敵弾数を置く。未観測の出現と退場を撃破時間へ含めない。`enemy_contacts` は攻撃の発動数ではない。
+  - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`、追加計測は `measurement_version=3`）、Godot の版、報酬・メニューでの停止を性能集計から除く識別子（`perf_excludes_ui_pause=true`）、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_reward_version=2`、`xp_config`。色別基準XP、星数別既定個数、解決済みの敵別報酬、黄色確率、上限方式、必要経験値の係数と取得倍率）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
+  - `sample`：3秒（ランの時計）ごとのラン秒・世界秒とまとめ。取得した実XP・供給した基準XP・フィールドに残る基準XP、レベル、HP、敵の数（星ごと・画面の中）、種類ごとの撃破数、倒した原因ごとの撃破数（`kills_by`）、与えたダメージの原因ごとの合計（`dealt`。倒しきった余りも含む）、攻撃の種類ごとの被弾（撃った敵が分かる攻撃は「攻撃/敵の種類」）、攻撃の予算の使用量の最大。`measurement_version=3` では命中を武器ID・敵種・敵級・エリート・原因で集約した `effective_damage` に解決後の量・実際のHP減少・超過分・形態境界などで捨てた量と命中回数、`enemy_life` に敵種・敵級・エリート別の出現時最大HPの合計と件数、出現・撃破・退場・生存終了数、観測できた出現から死亡・初被弾から死亡までの世界秒の合計と件数、`enemy_contacts` に機体への幾何接触の原因・判定結果別件数とバリアが受け止めた敵弾数を置く。未観測の出現と退場を撃破時間へ含めない。`enemy_contacts` は攻撃の発動数ではない。
   - `performance`：PLAY 中の実時間3秒ごとの描画フレーム間隔。`real_t` は書き込み時の記録開始からの実秒、`window_start_real`・`window_end_real` は計測区間の実秒、`duration_real` は観測した間隔の合計とする。`t`・`world_t` でラン秒・世界秒に対応づけ、ボーナス中も実時間で書く。平均FPS、平均・最大フレーム時間、33ms・50ms超の回数、ヒットストップを観測したフレーム数と割合（`hitstop_frame_ratio`）、描線中・駆け抜け中のフレーム数を保持する。ポーズ・カード選択・報酬表示・メニュー表示・ボーナス切替で窓を分け、遊んでいる最中のボーナス切替フレームの待ちは残す。割合はフレーム観測値であり、停止時間の厳密な割合とは区別する。`objects_at_write` に書き込み時点の敵・味方弾・敵弾・攻撃範囲・経験値粒・部品の使用数と確保行数、カプセル数、冠の保持数を置く。`bonus` は計測区間、`bonus_at_write` は書き込み時点の状態を表す。`profile` に計測区間の処理時間を置く。`sim`・`view` は世界側・表示側の `PerfLog` の項目 → [合計ms, 回数, 1回の最大ms]、`enemy_rows` は敵の描画1回あたりの行の数の平均、`recorder` は区間中に記録が書いた行数と書く時間の合計（`lines`・`write_ms`）。`profile` は `measurement_version=2` の記録から持つ。毎フレームは定数個のカウンタだけを更新し、フレーム別の行は保存しない。
   - `bonus`・`run_phase`：ボーナスの出入りと、ポーズ・カード選択を含むラン状態の切り替わり。全ての行に `real_t` を追加し、既存のXP・戦闘の `t` と結び付ける。
   - `band`：時間帯の切り替わり（名前）
@@ -791,15 +794,26 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
   - `loadout`：武器・特性が実際に変わったラン秒・世界秒、種類・管理ID・変更前後の段（`previous`・`current`）、取得経路（`source`）。初期武器選択は `initial_choice`、通常カードは `card`、おまけは `level_bonus`、彗星の空き枠取得は `comet`、交換の取り外しと取得は `comet_swap`、直接付与・取り外しは `direct`、全解除は `reset`。段0は取り外しを表す。取得時に実際に参照した定義のハッシュ（`definition_sha256`）も持つ。装備の復元は開始装備とこの差分を使い、`pick` の回数やおまけ数を重ねて加算しない。
   - `enemy_tuning_changed`・`enemy_tuning_saved`：ライブ適用とステージ保存の通知。`values` に通知時点の上書き辞書全体を保持し、空の辞書は全解除を表す。ライブ適用は既存個体と以後の出現へ反映する変更、保存は対象ファイルへの書き込みとして区別する。`t`・`world_t` は通知処理時点、`event_t`・`event_world_t` は発行元が添えた実際の適用・保存時点を表す。発行元に時刻がない場合は後者を `null` として保持する。保存通知は `path` も持つ。
   - `hurt`：HPが減った被弾ごとの発生ラン秒・世界秒、1発のダメージ（`amount`。致死時の超過分を含む）、原因・発生元・被弾直後のHP（`hp_after`）。無敵・盾で拒否した攻撃は実被弾の件数から区別する。`sample.damage` は同じ被弾の区間集計として読む。
-  - `xp_drop`：結晶の通し番号（`id`）、生成ラン秒・世界秒、結晶の総XP（`xp`）、今回加えたXP（`added_xp`）、出所（`source`：`enemy`・`big_crystal`・`crow_carry`・`direct`）、敵種・敵個体ID・大結晶の段。上限による合流は親結晶のIDを `merged_from` に置く（通常は -1）。合流前のXPを新規供給量へ重ねない。からす座が運んだXPの再ドロップも `crow_carry` として区別する。
-  - `xp_collect`：機体が取得したラン秒・世界秒・XP・方法。通常回収（`method=ship`）は結晶の `id`、ビーコン（`method=beacon`）は `[id, XP]` の配列 `gems` と合計XPを1行で保存する。
-  - `xp_transfer`：からす座が結晶を持ち去ったラン秒・世界秒、結晶ID・XP・運搬する敵の個体ID。機体の取得XPと分け、同じ敵IDの `crow_carry` へつなぐ。
-  - `xp_existing`：途中録画の開始時に地面にある結晶の `[id, XP]` と、運搬中の `[敵個体ID, XP]` を一度だけ保存する。`origin=unobserved` として、生成前半の欠測を保つ。
+  - 経験値の出来事は `xp_reward_version=2` で識別し、結晶の安定ID、種類 `low/mid/high`、保持基準XP、ラン秒・世界秒を持つ。新規供給には元の敵種・敵個体IDと発生時刻を保持し、運搬と再ドロップは同じ供給の移動として追う。指定黄色への加算は、指定先ID・加算前後の保持基準XP・元の供給と指定変更を識別する。
+  - `xp_collect`：通常回収とビーコンを区別し、結晶ID・種類・保持基準XPの内訳、基準合計、取得時の倍率と実取得合計を保存する。ビーコンは一括回収の開始時に使った倍率を持つ。
+  - `xp_transfer`：結晶ID、種類・保持基準XPと運搬する敵の安定IDを結ぶ。再ドロップと持ち去りを区別し、集約先の運搬・回収による指定解除を記録する。
+  - `xp_existing`：途中録画の開始時に `PickupSystem.xp_snapshot()` の `ground`・`carried`・`cap` を保存する。`origin=unobserved` とし、観測前の生成時刻・出所は欠測として保つ。
   - `strong`：強敵と大物（星3以上）が倒れた（ランの終わりにまだいた）ときの、出た時刻・生きていた時間・受けた体当たりの回数・武器のダメージの合計と原因ごとの内訳（`by_cause`）・とどめの原因（`killed_by`）
   - `clip_group`・`clip_group_end`：出現のクリップの群れが出た・全滅した
-  - `big_crystal`：大きい結晶が落ちた時刻、落ちたときのレベル、段（`tier`。1〜3が小・中・大）、経験値、落とした敵の種類
-  - `end`：終わり方、レベル、撃破数、武器と特性、やられたときは最後に受けた攻撃、段ごとの大きい結晶の数と経験値の合計（`big_crystals`）
+  - `end`：終わり方、レベル、撃破数、武器と特性、やられたときは最後に受けた攻撃、ラン全体の `xp_cumulative`、録画区間の `xp_observed`、装備の完成度 `equipment_progress`
 - ゲーム側は、記録のために出来事（`strong_spawn`・`clip_group`・`clip_group_end`、撃破と命中の個体の `id`、被弾の `source`）と、経験値の合計（`RunState.xp_gained`・`xp_dropped`）を出す。
+
+#### 経験値の区間集計
+
+`PickupSystem.xp_summary()` は、種類別の `supplied`・`collected`・`lost` に個数 `count` と基準量 `base_xp` を持ち、`collected` は実取得量 `actual_xp` も持つ。`gold_rolls` は適格な実撃破の抽選数 `eligible` と当選数 `won`、`collected_actual_xp` は実取得の合計を表す。`ground`・`carried` は現在の残存、`cap` は `mode=oldest_high_absorber`・`limit`・`absorber_id` を持つ。
+
+供給の種類は元の新規報酬、地面・運搬中・回収の種類は現在の結晶種を表す。変色と吸収で色別個数が変わるため、収支は変色・吸収の前後明細と基準XP総額で照合する。
+
+録画の `start.xp_cumulative_at_start` は開始時点の累計、`sample.xp` は `scope=recording_interval` の区間差、`end.xp_cumulative` はラン全体、`end.xp_observed` は `scope=recording_total` の録画区間全体を表す。供給・回収・持ち去り・抽選は区間差を取り、地面・運搬中・上限指定は各時点の現在値を保存する。録画前からの残存と録画区間中の供給を区別する。
+
+`sample.xp_picked_actual`・`xp_dropped_base`・`xp_field_base` で実取得と基準量を明示する。互換用の `xp_picked`・`xp_dropped`・`xp_field` は同じ出来事の参照値で、明示項目と重ねて集計しない。旧録画の `big_crystal`・`big_crystals` と数値の `tier` は、その版の意味で読む。
+
+`equipment_progress` は武器と特性の取得段数 `weapon_levels`・`trait_levels`、上限段数 `max_levels`、完成度 `completion` を保存する。選択回数と装備の実取得段数は、`offer`・`choice`・`loadout` と照合して分ける。成長換算では[共通仕様の確認範囲](spec.md#91-経験値とレベル)を示す。
 
 #### ボス戦闘の診断
 
@@ -876,6 +890,8 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 | 対象 | 現在の実装 | 維持する契約 |
 |---|---|---|
+| 経験値の結晶の面 | 固定の `xp_crystal_facets.tres` とshaderをStageResourcesの依存へ登録し、通常ランはSessionのScopeから取得する | 表示開始時に共通バッチへ面マスクを設定し、表示中は位置・種類の色だけを渡す。実験場は同じ固定素材を明示的にScopeへ提供する |
+| 経験値の固定報酬 | `EnemySystem` が敵定義を準備するときに星数と `xp_reward_counts` から確定個数と黄色抽選対象を解決し、`reward_of(definition)` で取得する | 撃破時は解決済みの個数と必要な抽選だけを使う。ライブ編集後は定義の変更を照合して解決し直す。取得倍率は回収入口で一度だけ適用する |
 | 背景の透明余白 | `prepare_background.gd` が使用範囲を生成し、RuntimeStageは範囲と画像パスを持つ。表示はSessionのScopeから画像を取得する | 背景エディターは同じ変換を明示的に呼ぶ。原点・寸法・重なり・透明部分・明るさを維持する |
 | 固定の敵外観 | `build_visuals.gd` が `.content/look_<外観名>.res` へ本体・塗装・合成画像を保存し、ステージの依存一覧へ登録する。表示はScope内のEnemyLookを使う | 戦闘・サムネイル・牽引船体で同じ結果を使い、分離する外観との対応も維持する。対になる装甲の塗装キーと領域対応はEnemyLookに持ち、生成とライブ編集は同じ解決済みの色を使う。画像を生成するときに対応元のマスクと領域の存在を確認する |
 | 装甲の領域と塗装 | `visual_transforms.gd` が透過の連結領域と任意の `<装甲画像名>.regions.json` から塗装領域を求め、濃淡を保って確定塗装を生成する。領域データは `.content/dev/armor_<外観名>.res` へ保存する | 部位キーと保存済み塗装の対応・濃淡・アルファを維持する。明示した分割領域は元の領域の塗装を継承する。実験場は `live_visuals` で同じ変換を明示的に接続し、塗装変更を表示へ反映する。解析用スクリプトと領域データは配布から除外する |
@@ -938,7 +954,7 @@ demo のどのファイルが、仕様書のどこにあたり、本番のどこ
 | 項目 | 管理方法と参照先 |
 |---|---|
 | 敵 | `SpawnSystem` が通常補充・波状出現の数とクリップの制限を管理する。`EnemySystem.spawn()`・`spawn_part()` は行を生成し、`spawn_later()` は行動が確定した生成を更新末尾に実行する。各行動が固有数・間隔を制限し、`RowSlots` が空き行を再利用・拡張する。予約は確定時の定義・位置・指定をラン内で保持し、実行後または全消去時に解放する。[生成の共通規則](spec.md#113-出現と補充) |
-| 経験値の結晶 | 個数が `config.gem_max` を超えた状態で追加すると、最古の結晶を新しい結晶へまとめる。[仕様書10章](spec.md#10-ドロップと回収) |
+| 経験値の結晶 | 地面の全色合計を `config.gem_max` 内に保つ。空き枠ぶんを生成し、余剰基準XPを指定黄色へ加える。[取得と集約](spec.md#102-取得と集約) |
 | 機雷 | [W07_mines.tres](../speed/data/weapons/W07_mines.tres) の `params.max` まで追加する |
 | 破片の光の跡 | 1つの破片につき `config.corpse_trail_points` 点まで保持し、超えた最古点を除く。[仕様書16章](spec.md#16-演出) |
 
