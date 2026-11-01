@@ -11,6 +11,7 @@ var _shape_displays: Dictionary = {}
 var _scope: ContentResourceScope
 var _pixel := 1.82
 var _gunner := PackedFloat32Array()
+var _beamer := PackedFloat32Array()
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
@@ -37,7 +38,9 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_pixel = 1.82*character_scale
 	for entry in entries: visuals[int(entry.id)] = entry
 	_gunner_marks = DrawLayer.new()
-	_gunner_marks.draw_fn = func(canvas: CanvasItem): preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
+	_gunner_marks.draw_fn = func(canvas: CanvasItem):
+		preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
+		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
 	_layer(9).add_child(_gunner_marks)
 	_effects = PixelPainter.new()
 	_effects.setup_painter(_pixel)
@@ -114,6 +117,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.get("biter") is Dictionary: return false
 			for key in ["modes","charges","timers","rests"]:
 				if not row.biter.has(key) or row.biter[key].size()!=count: return false
+		if row.has("beamer"):
+			if not row.beamer is PackedFloat32Array or row.beamer.size()%10!=0: return false
+			for value: float in row.beamer:
+				if not is_finite(value): return false
 		if row.has("gunner"):
 			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
 			for value: float in row.gunner:
@@ -142,8 +149,10 @@ func apply_frame(frame: Dictionary) -> bool:
 	for node: Sprite2D in parts.values(): node.hide()
 	for line in _lines: line.hide()
 	_gunner.clear()
+	_beamer.clear()
 	for row: Dictionary in frame.batches:
 		if row.has("gunner"): _gunner.append_array(row.gunner)
+		if row.has("beamer"): _beamer.append_array(row.beamer)
 	_gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
@@ -197,6 +206,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			var line := _lines[line_index]
 			if line.get_parent()!=parent: line.reparent(parent)
 			line.points = row.points.slice(row.offsets[i],row.offsets[i+1])
+			line.z_index = -1 if row.get("behind_parent",false) else 0
 			line.width = row.widths[i]
 			line.default_color = row.colors[i]
 			line.show()

@@ -3,12 +3,21 @@ extends "res://tests/native_attack_budget.gd"
 const SHIP := preload("res://tests/native_ship.gd")
 var beam_finished := false
 var beam_retry := false
+var beamer_finished := false
+var beamer_fixes := false
 func values(object: Object,keys: Array) -> Dictionary:
 	var out := {}
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
 	comparison = COMPARE.new()
+	if "--cpp-beamer" in OS.get_cmdline_user_args() or "--cpp-beamer-fixes" in OS.get_cmdline_user_args():
+		beamer_fixes = "--cpp-beamer-fixes" in OS.get_cmdline_user_args()
+		await check_cpp_beamer()
+		beamer_check(beamer_finished,"ビーム敵の確認が最後まで進んだ")
+		print("[cpp_beamer] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-beam" in OS.get_cmdline_user_args() or "--cpp-beam-fixes" in OS.get_cmdline_user_args():
 		beam_retry = "--cpp-beam-fixes" in OS.get_cmdline_user_args()
 		await check_cpp_beam()
@@ -275,3 +284,168 @@ func check_cpp_beam() -> void:
 	lab.free()
 	session.free()
 	beam_finished = true
+
+func beamer_check(ok: bool, label: String) -> void:
+	if beamer_fixes and label not in ["当たりの大きさに合わせる新しい外観を使う","保持点からチャージ音の所有も復元する","発生元の撃破・行再利用・吸引で付随ビームを回収する: pull","ビーム敵の確認が最後まで進んだ"]: return
+	check(ok,label)
+
+func beamer_state(run: RunSimulation, core, row: int, id: int, label: String) -> void:
+	if beamer_fixes: return
+	for enemy: Dictionary in core.enemies_snapshot():
+		if enemy.id!=id: continue
+		beamer_check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001,label+"の距離保持・照準・停止")
+	for motion: Dictionary in core.enemy_motion_snapshot():
+		if motion.id!=id: continue
+		# 負の余りを読まない残り時間は、承認済みの時計の決まりで0にそろえる。
+		beamer_check(motion.mode==run.enemies.table.mode[row] and is_equal_approx(motion.timer,maxf(0.0,run.enemies.table.timer[row])) and is_equal_approx(motion.fire_t,maxf(0.0,run.enemies.table.fire_t[row])) and is_equal_approx(motion.charge,run.enemies.table.charge[row]),label+"の予告・照射・再装填")
+	beam_states(run,core,label+"の付随ビーム")
+
+func check_cpp_beamer() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	config.base_hp = 100.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 83
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["beamer"])
+	var output := "res://.content/dev/run_beamer"
+	var builder = load("res://tools/content/build_run_content.gd")
+	var built: Error = builder.build(stage,config,output,"ビーム敵の予告と付随判定".sha256_text())
+	beamer_check(built==OK,"ビーム敵の実効値・新しい本体/装甲/法線を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_83.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":983},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	beamer_check(session.bridge!=null,"ビーム敵の通常のランと表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	var initial: Dictionary = bridge.checkpoint()
+	var notices := []
+	bridge.subscribe("beamer_check",func(frame: Dictionary):
+		for event: Dictionary in frame.events:
+			if event.type in [&"enemy_laser_charge",&"enemy_laser_fire"]: notices.append(event.type)
+		return true)
+	for kind in (["normal","pull"] if beamer_fixes else ["normal","death","reuse","pull"]):
+		bridge.restore(initial.value)
+		notices.clear()
+		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+		add_child(lab)
+		await lab.reset({"seed":983,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
+			"config":{"start_radius":900.0,"planet_radius":100.0,"base_hp":100.0}})
+		var run: RunSimulation = lab.run
+		run.state.ship_pos = target
+		run.state.enemy_aim = target
+		run.state.view_center = target
+		run.state.view_half = Vector2(640,360)
+		run.state.world_time = core.inspect().world_time
+		run.state.time = core.inspect().time
+		run.enemies._lod = core.inspect().ticks
+		run.enemies._next_id = 1
+		run.state.rng.state = int(core.inspect().rng_state)
+		var director = run.projectiles.director
+		director.formation_mode = true
+		core.set_attack_formation_mode(true)
+		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
+		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+		var definition := run.enemies.def_of(&"beamer")
+		var position := target+Vector2(480,120)
+		var row := run.enemies.spawn(definition,position)
+		var id: int = bridge.command("dev_spawn",{"definition_id":"beamer","position":position}).value
+		run.enemies.table.fire_t[row] = 0.125
+		core.set_enemy_motion(id,{"fire_t":0.125})
+		core.set_motion_context(target,target,Vector2(640,360))
+		var warning: Dictionary = {}
+		var warning_shapes := []
+		for step in 13:
+			if step==1:
+				director.configure({"enabled":true,"budget":1.0,"jitter":0.0})
+				core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+			if step==3 and kind=="death":
+				run.combat.kill_enemy(row,{"cause":&"ram"})
+				bridge.command("dev_kill",{"entity_id":id,"cause":"ram"})
+			elif step==3 and kind=="reuse":
+				run.enemies._release_row(row)
+				core.remove_enemy(id)
+				row = run.enemies.spawn(definition,position)
+				var previous_id := id
+				id = bridge.command("dev_spawn",{"definition_id":"beamer","position":position}).value
+				run.enemies.table.fire_t[row] = 4.0
+				core.set_enemy_motion(id,{"fire_t":4.0})
+				beamer_check(id!=previous_id and run.enemies.table.id[row]==id,"行を再利用した新しい敵へ古い照射を引き継がない")
+			elif step==3 and kind=="pull":
+				var puller := run.enemies.spawn(definition,target+Vector2(600,600),{"held":true})
+				run.enemies.table.held[puller] = 1
+				var puller_id: int = bridge.command("dev_spawn",{"definition_id":"beamer","position":target+Vector2(600,600)}).value
+				core.set_enemy_motion(puller_id,{"held":true})
+				run.enemies.table.pump_owner[row] = puller
+				core.set_enemy_motion(id,{"pump_owner":puller_id})
+			if step in [4,5] and kind=="normal":
+				run.enemies.table.held[row] = 1 if step==4 else 0
+				core.set_enemy_motion(id,{"held":step==4})
+			run.state.world_time += 0.125
+			run.state.time += 0.125
+			director.advance(run.state.world_time,run.enemies)
+			core.advance_attack_budget(run.state.world_time)
+			run.enemies.tick(0.125,0.125)
+			core.step(0.125)
+			run.projectiles._update_hazards(0.125)
+			core.step_hazards(0.125)
+			beamer_state(run,core,row,id,"%s/%d" % [kind,step])
+			# 個別Systemを進めた確認では、通常命令と同じ状態公開の区切りも通す。
+			var delivered: Dictionary = bridge.command("set_ui_overlay",{"active":false})
+			beamer_check(delivered.ok,"ビーム敵の通知と音の状態を公開する: %s/%d" % [kind,step])
+			if step==0: beamer_check(core.hazards_snapshot().is_empty(),"枠を待つ間は予告のビームを作らない")
+			if step==2 and kind=="normal":
+				warning = bridge.checkpoint()
+				var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
+				warning_shapes = frame.shapes
+				beamer_check(frame.shapes.size()==2 and frame.shapes[0].kind==0 and frame.shapes[0].get("behind_parent",false) and frame.shapes[1].kind==1,"予告の線を砲口の光の後ろへ出す")
+				var look: EnemyLook
+				for entry: Dictionary in session.cpp_resources.visuals:
+					if entry.role==6:
+						var candidate: EnemyLook = session.resources.resources.get(entry.path)
+						if candidate!=null and candidate.source_path=="res://data/visuals/looks/beamer.tres": look = candidate
+				beamer_check(look!=null and look.size_from_collision and look.base!=null and look.armor!=null and look.normal!=null,"当たりの大きさに合わせる新しい外観を使う")
+				var presentation: RunPresentation = session.view.get_node("RunPresentation")
+				presentation._present_cpp(0.0)
+				beamer_check(presentation.frame_view.apply_frame(frame) and presentation.frame_view._beamer.size()==10,"本体・装甲・砲口・予告線を通常の表示へ渡す")
+				beamer_check(bridge.read_frame().value.ui.laser_voices.size()==1,"チャージ音の所有者を個体IDで返す")
+				await get_tree().process_frame
+			if step==4 and kind=="normal":
+				beamer_check(bridge.read_frame().value.ui.laser_voices[0].paused,"保持中はその敵のチャージ音を止める")
+				if AudioManager.sound(&"enemy_laser_charge")!=null:
+					beamer_check(session.cpp_laser_audio._voices.has(id) and session.cpp_laser_audio._voices[id].player.stream_paused,"音の再生側も個体の保持に従って一時停止する")
+			if step==3 and kind in ["death","reuse","pull"]:
+				beamer_check(core.hazards_snapshot().is_empty() and (kind=="pull" or session.cpp_laser_audio._voices.is_empty()),"発生元の撃破・行再利用・吸引で付随ビームを回収する: "+kind)
+		if kind=="normal":
+			beamer_check(core.hazards_snapshot().is_empty() and core.enemy_motion_snapshot()[0].mode==0,"照射後に判定を回収し次の射撃待ちへ戻る")
+			beamer_check(notices.count(&"enemy_laser_charge")==1 and notices.count(&"enemy_laser_fire")==1,"予告と照射の効果音通知を1回ずつ配る")
+			var final_enemies: Array = core.enemy_motion_snapshot()
+			var final_ship: Dictionary = core.ship_snapshot()
+			bridge.restore(warning.value)
+			bridge.collect_frame()
+			beamer_check(bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value.shapes==warning_shapes,"保持点から予告線とビームの形も復元する")
+			if AudioManager.sound(&"enemy_laser_charge")!=null: beamer_check(session.cpp_laser_audio._voices.has(id),"保持点からチャージ音の所有も復元する")
+			for step in range(3,13):
+				if step in [4,5]: core.set_enemy_motion(id,{"held":step==4})
+				core.advance_attack_budget(core.inspect().world_time+0.125)
+				core.step(0.125)
+				core.step_hazards(0.125)
+			beamer_check(core.hazards_snapshot().is_empty() and core.enemy_motion_snapshot()==final_enemies and core.ship_snapshot()==final_ship,"保持点から同じ照射・被弾・終了を再現する")
+			bridge.release_checkpoint(warning.value)
+		lab.free()
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	beamer_finished = true

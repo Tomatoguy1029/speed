@@ -385,7 +385,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 7) return false;
+    if (out.kind > 8) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     return true;
@@ -799,6 +799,40 @@ inline bool read(BinaryReader &input, GunnerDefinition &out) {
     if (out.admission_duration < 0) return false;
     return true;
 }
+struct BeamerDefinition {
+    uint32_t id{};
+    double accel{};
+    double keep{};
+    double telegraph{};
+    double beam_time{};
+    double beam_length{};
+    double damage{};
+    double admission_duration{};
+    double half_width{};
+    bool cross{};
+};
+inline bool read(BinaryReader &input, BeamerDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.telegraph)) return false;
+    if (out.telegraph < 0) return false;
+    if (!input.read_f64(out.beam_time)) return false;
+    if (out.beam_time < 0) return false;
+    if (!input.read_f64(out.beam_length)) return false;
+    if (out.beam_length < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    if (!input.read_f64(out.half_width)) return false;
+    if (out.half_width < 0) return false;
+    if (!input.read_bool(out.cross)) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -944,6 +978,7 @@ struct ContentRecords {
     std::vector<HoundDefinition> HoundDefinition_rows;
     std::vector<ShieldDefinition> ShieldDefinition_rows;
     std::vector<GunnerDefinition> GunnerDefinition_rows;
+    std::vector<BeamerDefinition> BeamerDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -1106,6 +1141,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { GunnerDefinition row; if (!read(input,row)) return false; out.GunnerDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 29: {
+        if (version != 1) return false;
+        if (count > input.remaining()/69) return false;
+        for (uint32_t i=0; i<count; ++i) { BeamerDefinition row; if (!read(input,row)) return false; out.BeamerDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -1178,6 +1219,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ShieldDefinition_rows) if (!ShieldDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> GunnerDefinition_ids;
     for (const auto &row:data.GunnerDefinition_rows) if (!GunnerDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BeamerDefinition_ids;
+    for (const auto &row:data.BeamerDefinition_rows) if (!BeamerDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -1207,6 +1250,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ShieldDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ShieldDefinition_rows) if (!HostileDefinition_ids.count(row.reflected)) return false;
     for (const auto &row:data.GunnerDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.BeamerDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -1338,5 +1382,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=28;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=29;
 }

@@ -26,6 +26,7 @@ var view: Node
 var auto_step := true
 var bridge: RefCounted
 var cpp_choices: RefCounted
+var cpp_laser_audio: Node
 var cpp_input_source: Callable
 ## 開発用の録画条件。途中録画でもラン初期化時の実効値を保持する。
 var recording_initial: Dictionary = {}
@@ -199,6 +200,7 @@ func _notification(what: int) -> void:
 		if _pending_cpp_bridge!=null: _pending_cpp_bridge.dispose()
 		_pending_cpp_bridge = null
 		_pending_cpp.clear()
+		if cpp_laser_audio!=null: cpp_laser_audio.clear()
 		if resources != null: resources.cancel()
 		_pending_options.clear()
 		if bridge!=null and is_instance_valid(view):
@@ -300,6 +302,9 @@ func _poll_cpp_loading() -> void:
 		cpp_input_source = view.get_node("World/InputRouter").poll
 		add_child(view)
 		bridge.subscribe("audio",AudioManager.consume_cpp_frame)
+		cpp_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
+		add_child(cpp_laser_audio)
+		bridge.subscribe("laser_audio",cpp_laser_audio.consume_cpp_frame)
 	else:
 		var router = preload("res://scripts/input/input_router.gd").new()
 		add_child(router)

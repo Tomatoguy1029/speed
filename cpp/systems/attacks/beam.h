@@ -7,6 +7,7 @@ struct BeamParams {
     godot::Vector2 position;
     double angle=0,length=0,half_width=0,arc=0,delay=0,active=0,damage=0;
     godot::Color color=godot::Color::html("ff5a6e");
+    BeamStyle style=BeamStyle::Plain;
     EnemyHandle owner;
     BudgetToken budget;
 };

@@ -15,7 +15,7 @@ struct RenderBatchBuffer {
     std::vector<Instance> instances;
     bool biter=false;
     godot::PackedInt32Array modes;
-    godot::PackedFloat32Array charges,timers,rests,glows,gunner;
+    godot::PackedFloat32Array charges,timers,rests,glows,gunner,beamer;
     godot::PackedInt64Array ids;godot::PackedFloat32Array transforms;godot::PackedColorArray colors;godot::PackedInt32Array flags;
     void add(int64_t id,godot::Vector2 at,double angle,double radius,godot::Color color,int32_t flag=0) {instances.push_back({id,at,angle,radius,color,flag});}
     godot::Dictionary value();

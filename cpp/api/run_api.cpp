@@ -193,6 +193,17 @@ Dictionary SpeedRunCore::frame_run() {
     ui["max_speed"]=runtime.state.ship_config.max_speed;ui["steer_cruise"]=runtime.state.ship_config.steer_cruise;
     ui["ship_vel"]=runtime.state.ship.vel;ui["tracing"]=runtime.state.draw.tracing;ui["ship_boost_t"]=runtime.state.ship.boost_t;ui["glide"]=runtime.state.ship.glide;
     ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
+    Array voices;
+    const auto &state=runtime.state;
+    if (state.phase!=Phase::Finishing && state.phase!=Phase::Ended) for (size_t group=0;group<state.behavior_rows.size();++group) {
+        if (state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Beamer) continue;
+        for (auto row:state.behavior_rows[group]) {
+            const auto &enemy=state.enemies[row];if (enemy.dead || enemy.mode!=EnemyMode::Windup || enemy.timer<=runtime.content->beamers[runtime.content->definitions[enemy.definition].beamer_definition-1].beam_time) continue;
+            Dictionary voice;voice["id"]=enemy.id;voice["paused"]=state.phase!=Phase::Play || control.ui_overlay || control.ui_reward || state.hitstop>0 || enemy.stone>0 || enemy.held || enemy.shove_time>0 || enemy.knock_t>0;
+            voices.push_back(voice);
+        }
+    }
+    ui["laser_voices"]=voices;
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=control.ui_overlay || control.ui_reward || runtime.state.phase==Phase::Paused || runtime.state.phase==Phase::LevelUp || (runtime.state.phase==Phase::Dying && runtime.state.sequence_t<runtime.state.death_freeze);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;

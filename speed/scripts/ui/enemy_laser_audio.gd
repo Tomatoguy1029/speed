@@ -2,6 +2,29 @@
 extends Node
 
 var _voices: Dictionary = {}
+var _cpp_epoch := 0
+
+func consume_cpp_frame(frame: Dictionary) -> bool:
+	if frame.epoch!=_cpp_epoch:
+		clear()
+		_cpp_epoch = frame.epoch
+	for notice: Dictionary in frame.events:
+		if notice.type not in [&"enemy_laser_charge",&"enemy_laser_cancel",&"enemy_laser_fire"]: continue
+		var event: Dictionary = notice.payload.duplicate(true)
+		event["type"] = notice.type
+		handle(event)
+	var active := {}
+	for voice: Dictionary in frame.ui.get("laser_voices",[]):
+		active[voice.id] = voice
+		if not _voices.has(voice.id): handle({"id":voice.id,"row":0,"type":&"enemy_laser_charge"})
+	for id in _voices.keys():
+		if not active.has(id):
+			stop(id)
+			continue
+		var player: AudioStreamPlayer = _voices[id].player
+		player.stream_paused = active[id].paused
+		player.pitch_scale = maxf(0.01,frame.ui.world_scale)
+	return true
 
 func handle(event: Dictionary) -> void:
 	var id := int(event.id)

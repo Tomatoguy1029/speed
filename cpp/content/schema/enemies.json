@@ -146,6 +146,64 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "BeamerDefinition",
+      "section": 29,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_width",
+          "type": "f64",
+          "min": 0,
+          "source": "beam_width",
+          "multiplier": 0.5
+        },
+        {
+          "name": "cross",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "enums": {}

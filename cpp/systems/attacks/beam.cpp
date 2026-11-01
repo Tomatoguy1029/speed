@@ -4,13 +4,13 @@
 #include <cmath>
 namespace speed {
 AttackHandle BeamSystem::emit(RunRuntime &run,const BeamParams &p) {
-    if (!run.state.started || run.state.closed || !p.position.is_finite() || run.content->beams.empty() ||
+    if (!run.state.started || run.state.closed || p.style>=BeamStyle::Count || !p.position.is_finite() || run.content->beams.empty() ||
         (p.owner.generation && !run.state.enemy_handles.contains(p.owner))) return {};
     for (double value:{p.length,p.half_width,p.delay,p.active,p.damage}) if (!std::isfinite(value) || value<0) return {};
     for (double value:{p.length,p.half_width,p.delay,p.active,p.angle,p.arc}) if (!std::isfinite(float(value))) return {};
     for (float channel:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(channel)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.delay=p.delay;hazard.duration=p.active;hazard.damage=p.damage;hazard.color=p.color;
-    hazard.shape=BeamHazard{float(p.angle),float(p.length),float(p.half_width),float(p.arc),1};
+    hazard.shape=BeamHazard{float(p.angle),float(p.length),float(p.half_width),float(p.arc),1,uint32_t(p.style)};
     AttackSpec spec;spec.cause=Cause::Beam;spec.owner.live_source=p.owner;spec.owner.attached=p.owner.generation>0;spec.owner.budget=p.budget;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (p.owner.generation) spec.policies|=policy(EndPolicy::CancelWithParticipant);
@@ -36,6 +36,14 @@ void BeamSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const double zoom=std::max(0.01,run.state.control.camera_zoom);const bool charging=hazard.time<hazard.delay;
     if (!charging && !view.grow(beam->length).has_point(hazard.pos)) return;
     Dictionary shape;shape["kind"]=int32_t(charging?RenderShapeKind::Circle:RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    if (charging && beam->style==uint32_t(BeamStyle::Guide) && view.grow(beam->length).has_point(hazard.pos)) {
+        const double k=std::clamp(double(hazard.time)/std::max(0.001,double(hazard.delay)),0.0,1.0);
+        Dictionary guide=shape.duplicate();guide["kind"]=int32_t(RenderShapeKind::Polyline);guide["behind_parent"]=true;
+        PackedVector2Array path;path.push_back(hazard.pos);path.push_back(hazard.pos+Vector2::from_angle(beam->angle)*beam->length);
+        PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(2);PackedFloat32Array widths;widths.push_back(1.5/zoom);
+        auto color=hazard.color;color.a=0.2+0.5*k;PackedColorArray colors;colors.push_back(color);
+        guide["points"]=path;guide["offsets"]=offsets;guide["widths"]=widths;guide["colors"]=colors;shapes.push_back(guide);
+    }
     PackedVector2Array points;PackedInt32Array offsets;PackedFloat32Array widths;PackedColorArray colors;offsets.push_back(0);
     if (charging) {
         const double k=std::clamp(double(hazard.time)/std::max(0.001,double(hazard.delay)),0.0,1.0);

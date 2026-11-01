@@ -846,7 +846,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 7
+          "max": 8
         },
         {
           "name": "turn",
@@ -1506,6 +1506,18 @@
       {
         "name": "Shoot",
         "value": "shoot"
+      },
+      {
+        "name": "EnemyLaserCharge",
+        "value": "enemy_laser_charge"
+      },
+      {
+        "name": "EnemyLaserFire",
+        "value": "enemy_laser_fire"
+      },
+      {
+        "name": "EnemyLaserCancel",
+        "value": "enemy_laser_cancel"
       }
     ],
     "ResultKind": [
@@ -1773,6 +1785,16 @@
     "shoot": [
       "pos",
       "kind"
+    ],
+    "enemy_laser_charge": [
+      "id",
+      "row"
+    ],
+    "enemy_laser_fire": [
+      "id"
+    ],
+    "enemy_laser_cancel": [
+      "id"
     ]
   },
   "includes": [

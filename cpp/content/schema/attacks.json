@@ -197,6 +197,16 @@
         "name": "Hull",
         "value": "hull"
       }
+    ],
+    "BeamStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Guide",
+        "value": "guide"
+      }
     ]
   }
 }

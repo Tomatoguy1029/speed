@@ -5,7 +5,7 @@
 #include <variant>
 namespace speed {
 struct CircleHazard {float radius=0;};
-struct BeamHazard {float angle=0,length=0,half_width=0,arc=0;uint32_t definition=0;};
+struct BeamHazard {float angle=0,length=0,half_width=0,arc=0;uint32_t definition=0,style=0;};
 struct HazardState {
     godot::Vector2 pos;
     float time=0,delay=0,duration=0;
