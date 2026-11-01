@@ -16,7 +16,7 @@ func _ready() -> void:
 		await _capture(stage)
 		return
 	var config := ContentManager.cfg.duplicate(true) as GameConfig
-	config.drop_base = 0.0
+	config.strong_gold_chance = 0.0
 	var session := RunManager.create_session(self, {"lab": true, "stage": stage, "stage_index": 1, "seed": 42, "config": config}, false)
 	session.auto_step = false
 	sim = session.sim
@@ -104,7 +104,9 @@ func _ready() -> void:
 	var kills := sim.state.kills
 	var xp := sim.state.xp_dropped
 	var expected_xp := 0.0
-	for j in victims: expected_xp += t.xp[j] * sim.state.stats.xp_mult * (sim.spawn.current_phase().xp_bonus if sim.spawn.current_phase().xp_bonus > 0.0 else 1.0)
+	for j in victims:
+		var counts: PackedInt32Array = sim.enemies.reward_of(t.def[j]).counts
+		for kind in counts.size(): expected_xp += counts[kind] * sim.cfg.xp_crystal_values[kind]
 	sim.enemies.tick(0.1, 0.1)
 	for j in victims: check(t.dead[j] != 0, "高速突進の途中にいる敵を撃破する")
 	check(t.dead[outside] == 0, "進路の外の敵を壊さない")
