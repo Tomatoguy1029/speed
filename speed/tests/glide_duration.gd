@@ -89,6 +89,7 @@ func _ready() -> void:
 
 func _begin_glide() -> void:
 	run.state.ship_vel = Vector2.RIGHT * run.state.stats.max_speed
+	run.state.trace_total = run.cfg.draw_length
 	run.draw._pre_dash_speed = 0.0
 	run.draw._end_trace(true)
 
