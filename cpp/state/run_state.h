@@ -7,6 +7,7 @@
 #include "loadout_state.h"
 #include "group_state.h"
 #include "lifecycle_state.h"
+#include "field_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -61,6 +62,7 @@ struct RunState {
     speed::GroupState groups;
     using AttackBudget=speed::AttackBudgetState;
     speed::WorldState world;
+    speed::FieldState field;
     struct Formation {
         struct Marker { StringName type; Vector2 offset; double rotation = 0; };
         struct Entry { double weight = 0; Vector2 pos; };

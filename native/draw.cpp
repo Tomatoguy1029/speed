@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/field.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -52,7 +53,9 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
     if (length < runtime.state.draw_config.point_step) return;
     const double remain = runtime.state.draw.limit - runtime.state.draw.length;
     if (remain <= 0.5) return;
-    const double added = std::min(length, remain);
+    double added = std::min(length, remain);
+    const auto hit=speed::FieldSystem::first_body_hit(runtime,last,last+d/length*added,runtime.state.ship_config.ship_radius);
+    if (hit) {added=std::max(0.0,hit->t*added-2.0);runtime.state.draw.blocked=true;}
     if (added < 1) return;
     const Vector2 u = d / length;
     runtime.state.draw.points.append(last + u * added);
@@ -64,6 +67,7 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
     Vector2 offset = ((a + c) * 0.5 - b) * 0.5;
     offset = offset.limit_length(2.5 / std::max(camera_zoom, 0.01));
     const Vector2 corrected = b + offset;
+    if (speed::FieldSystem::first_body_hit(runtime,a,corrected,runtime.state.ship_config.ship_radius) || speed::FieldSystem::first_body_hit(runtime,corrected,c,runtime.state.ship_config.ship_radius)) return;
     const double old_length = double(a.distance_to(b)) + double(b.distance_to(c));
     const double new_length = double(a.distance_to(corrected)) + double(corrected.distance_to(c));
     runtime.state.draw.points.set(i, corrected);

@@ -965,10 +965,10 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 8
+          "max": 9
         }
       ],
-      "version": 5
+      "version": 6
     },
     {
       "name": "ForwardDefinition",
@@ -1274,6 +1274,10 @@
       {
         "name": "AttackScene",
         "value": "attack_scene"
+      },
+      {
+        "name": "Planet",
+        "value": "planet"
       }
     ],
     "EventType": [
@@ -1460,6 +1464,10 @@
       {
         "name": "RunFinished",
         "value": "run_finished"
+      },
+      {
+        "name": "Crash",
+        "value": "crash"
       }
     ],
     "ResultKind": [
@@ -1703,12 +1711,17 @@
     "run_finished": [
       "result_id",
       "kind"
+    ],
+    "crash": [
+      "pos",
+      "power"
     ]
   },
   "includes": [
     "attacks.json",
     "population.json",
     "progression.json",
-    "enemies.json"
+    "enemies.json",
+    "field.json"
   ]
 }

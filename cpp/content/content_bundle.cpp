@@ -59,6 +59,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->progression=records.ProgressionDefinition_rows.front();
     if (records.LifecycleDefinition_rows.size()!=1) return {};
     bundle->lifecycle=records.LifecycleDefinition_rows.front();
+    bundle->field_bodies=records.FieldBodyDefinition_rows;
+    for (const auto &body:bundle->field_bodies) if (body.radius<=0) return {};
     bundle->equipment=records.LoadoutDefinition_rows;
     bundle->equipment_assets=records.LoadoutAsset_rows;
     for (size_t i=1;i<bundle->budget_phases.size();++i) if (bundle->budget_phases[i].start<bundle->budget_phases[i-1].start) return {};
@@ -74,7 +76,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
     }
     for (const auto &visual:bundle->visuals) {
-        if (visual.role>8) return {};
+        if (visual.role>9) return {};
     }
     std::unordered_set<std::string> names;
     for (const auto &row:records.EnemyRecord_rows) {

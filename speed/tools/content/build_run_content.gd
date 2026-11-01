@@ -89,6 +89,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":1,"asset":key})
+	if config.planet_radius>0.0:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":9})
+		visuals.append({"id":key,"role":9,"path":"res://assets/pixel/planet.png"})
+		data.FieldBodyDefinition = [{"id":1,"kind":0,"x":0.0,"y":0.0,"radius":config.planet_radius,"visual":key}]
 	for i in weapon.level_steps.size():
 		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
@@ -109,6 +114,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var appearance_metadata := {}
 	var equipment_resources: Array = []
 	var visuals: Array[Dictionary] = []
+	var field_visuals: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	for i in stage.resources.enemy_ids.size():
 		var id: String = stage.resources.enemy_ids[i]
@@ -145,6 +151,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ProgressionDefinition = resolved.ProgressionDefinition
 			data.LifecycleDefinition = resolved.LifecycleDefinition
 			equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
+			data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
+			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role==9)
 		var visual: Dictionary = package.visuals[5].duplicate()
 		visual.id = i+6
 		data.ResourceKey.append({"id":visual.id,"role":visual.role})
@@ -169,6 +177,12 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.ResourceKey.append({"id":row.id,"role":row.role})
 		visuals.append(row)
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":1,"asset":row.id})
+	for resource: Dictionary in field_visuals:
+		var row := resource.duplicate()
+		row.id = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":row.id,"role":row.role})
+		visuals.append(row)
+		data.FieldBodyDefinition[0].visual = row.id
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	for visual: Dictionary in visuals:

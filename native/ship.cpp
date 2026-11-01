@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/field.h"
 #include "geometry.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
@@ -109,20 +110,12 @@ bool SpeedRunCore::step_ship_input(double real_dt, double world_dt, const speed:
         const Vector2 d = Vector2(input.cursor) - runtime.state.ship.pos;
         if (d.length_squared() >= c.mouse_dead_zone * c.mouse_dead_zone) steer_ship(d.angle(), world_dt);
     }
-    const double r = runtime.state.ship.pos.length();
-    const Vector2 accel = r <= c.field_radius ? Vector2() : -runtime.state.ship.pos / r * (c.boundary_push + (r - c.field_radius) * 4.0);
+    const Vector2 accel=speed::FieldSystem::boundary_accel(runtime,runtime.state.ship.pos);
     const Vector2 from = runtime.state.ship.pos;
     move_ship(world_dt, accel);
     if (runtime.state.combat_ready) collide_ship(from, c.ship_radius);
-    // 地形のない比較場面の外周。天体・固定囲いは地形の移行単位で接続する。
-    const double radius = runtime.state.ship.pos.length(), wall = c.field_radius + 500.0;
-    if (radius > wall) {
-        runtime.state.ship.glide = false;
-        const Vector2 n = runtime.state.ship.pos / radius;
-        runtime.state.ship.pos = n * wall;
-        const double vn = runtime.state.ship.vel.dot(n);
-        if (vn > 0) runtime.state.ship.vel -= n * 2.0 * vn;
-    }
+    if (runtime.state.phase!=Phase::Play) return true;
+    speed::FieldSystem::collide_ship(runtime);
     if (!runtime.state.ship.vel.is_zero_approx()) runtime.state.ship.heading = runtime.state.ship.vel.normalized();
     runtime.state.ship.peak_speed = std::max(runtime.state.ship.peak_speed, double(runtime.state.ship.vel.length()));
     runtime.state.ship_pos = runtime.state.ship.pos;

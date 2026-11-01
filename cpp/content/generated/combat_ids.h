@@ -70,7 +70,7 @@ inline bool parse_symbol(std::string_view value, Cause &out) {
     if (value=="hullDebris") {out=Cause::HullDebris;return true;}
     return false;
 }
-enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Count};
+enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Count};
 inline const char *symbol_name(VisualRole value) {
     switch(value) {
     case VisualRole::EnemySprite: return "enemy_sprite";
@@ -82,6 +82,7 @@ inline const char *symbol_name(VisualRole value) {
     case VisualRole::EnemyLook: return "enemy_look";
     case VisualRole::Equipment: return "equipment";
     case VisualRole::AttackScene: return "attack_scene";
+    case VisualRole::Planet: return "planet";
     default: return "";
     }
 }
@@ -95,9 +96,10 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="enemy_look") {out=VisualRole::EnemyLook;return true;}
     if (value=="equipment") {out=VisualRole::Equipment;return true;}
     if (value=="attack_scene") {out=VisualRole::AttackScene;return true;}
+    if (value=="planet") {out=VisualRole::Planet;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -146,6 +148,7 @@ inline const char *symbol_name(EventType value) {
     case EventType::Choice: return "choice";
     case EventType::Loadout: return "loadout";
     case EventType::RunFinished: return "run_finished";
+    case EventType::Crash: return "crash";
     default: return "";
     }
 }
@@ -196,6 +199,7 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="choice") {out=EventType::Choice;return true;}
     if (value=="loadout") {out=EventType::Loadout;return true;}
     if (value=="run_finished") {out=EventType::RunFinished;return true;}
+    if (value=="crash") {out=EventType::Crash;return true;}
     return false;
 }
 enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
@@ -328,6 +332,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::Choice: return field=="offer_id" || field=="candidate_id" || field=="kind" || field=="id" || field=="level";
     case EventType::Loadout: return field=="kind" || field=="id" || field=="level";
     case EventType::RunFinished: return field=="result_id" || field=="kind";
+    case EventType::Crash: return field=="pos" || field=="power";
     default: return false;
     }
 }

@@ -7,6 +7,7 @@
 #include "../systems/attack_budget.h"
 #include "../systems/enemy_system.h"
 #include "../systems/progression.h"
+#include "../systems/field.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <climits>
@@ -81,6 +82,7 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.frame_ready=true;
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
     if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
+    speed::FieldSystem::initialize(runtime);
     speed::ProgressionSystem::initialize(runtime,options.has("equipment"));
     if (options.has("equipment")) speed::ProgressionSystem::open(*this,true);
     ++state.control.revision;return success(progress(runtime));
@@ -162,6 +164,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat") response=development_combat_command(kind,payload);
     else if (kind=="dev_emit_attack" || kind=="dev_end_attack" || kind=="dev_attack_scope" || kind=="dev_clear_hostile" || kind=="dev_attack_update") response=development_attack_command(kind,payload);
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
+    else if (kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion") response=development_field_command(kind,payload);
     else if (kind=="dev_contact") response=development_contact_command(payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);

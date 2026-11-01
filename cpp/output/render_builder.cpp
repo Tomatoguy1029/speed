@@ -47,6 +47,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
+    for (const auto &body:state.field.bodies) {
+        const auto &definition=run.content->field_bodies[body.definition];
+        if (view.grow(definition.radius).has_point(body.position)) batch(definition.visual,2,0).add(definition.id,body.position,0,definition.radius,Color(0,0,0,1));
+    }
     for (size_t i=0;i<state.enemies.size();++i) {
         const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead) continue;
         const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id) continue;

@@ -213,7 +213,7 @@ void SpeedRunCore::close() {
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
     runtime.state.legacy_progression = Progression();
     runtime.state.loadout={};runtime.state.lifecycle={};runtime.resource_workspace.requests.clear();
-    runtime.state.groups={};
+    runtime.state.groups={};runtime.state.field={};
     runtime.state.enemies.clear(); runtime.state.enemy_handles = {};
     runtime.state.enemies.shrink_to_fit();
     runtime.state.free_rows.clear();

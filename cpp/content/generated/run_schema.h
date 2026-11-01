@@ -461,7 +461,7 @@ inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 8) return false;
+    if (out.role > 9) return false;
     return true;
 }
 struct ForwardDefinition {
@@ -678,6 +678,27 @@ inline bool read(BinaryReader &input, HoundDefinition &out) {
     if (out.accel < 0) return false;
     return true;
 }
+struct FieldBodyDefinition {
+    uint32_t id{};
+    uint32_t kind{};
+    double x{};
+    double y{};
+    double radius{};
+    uint32_t visual{};
+};
+inline bool read(BinaryReader &input, FieldBodyDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 0) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_u32(out.visual)) return false;
+    if (out.visual < 1) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -699,6 +720,7 @@ struct ContentRecords {
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
+    std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -775,7 +797,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 5) return false;
+        if (version != 6) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -828,6 +850,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { HoundDefinition row; if (!read(input,row)) return false; out.HoundDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 21: {
+        if (version != 1) return false;
+        if (count > input.remaining()/36) return false;
+        for (uint32_t i=0; i<count; ++i) { FieldBodyDefinition row; if (!read(input,row)) return false; out.FieldBodyDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -872,6 +900,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutAsset_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HoundDefinition_ids;
     for (const auto &row:data.HoundDefinition_rows) if (!HoundDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> FieldBodyDefinition_ids;
+    for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -887,6 +917,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -1007,5 +1038,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=20;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=21;
 }

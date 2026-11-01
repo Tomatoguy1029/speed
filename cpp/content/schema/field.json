@@ -1,0 +1,40 @@
+{
+  "records": [
+    {
+      "name": "FieldBodyDefinition",
+      "section": 21,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 0
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}
