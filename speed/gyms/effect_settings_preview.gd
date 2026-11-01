@@ -21,7 +21,7 @@ const ENEMY_EFFECTS := {
 	"enemy/aquila": {"title": "わし座 · 進路の雷撃", "scene": "res://scenes/attacks/zone_aquila.tscn"},
 }
 const BOOST_GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
-const TARGET_GROUPS := ["武器", "特性", "ボス本体", "ボス技", "敵の技", "HUD"]
+const TARGET_GROUPS := ["武器", "爆発", "特性", "ボス本体", "ボス技", "敵の技", "HUD"]
 const DIRECT_EFFECTS := [
 	"weapon/forward", "weapon/scatter", "weapon/knockback", "weapon/contactArc",
 	"weapon/barrier", "weapon/contactWave", "weapon/mines", "weapon/rear", "weapon/bipolar",
@@ -35,11 +35,14 @@ const DIRECT_EFFECTS := [
 const BOMBER_PREVIEW := "res://scenes/attacks/zone_bomber.tscn"
 const PUMP_SHELL := "res://scenes/attacks/shell.tscn"
 const PUMP_BLAST := "res://scenes/attacks/zone_pump.tscn"
-const STANDALONE_ATTACKS := [BOMBER_PREVIEW, PUMP_SHELL, PUMP_BLAST]
+const MINE_BLAST := "preview/mine_blast"
+const MINE_PREVIEW := preload("res://gyms/mine_blast_preview.gd")
+const STANDALONE_ATTACKS := [BOMBER_PREVIEW, PUMP_SHELL, PUMP_BLAST, MINE_BLAST]
 const ATTACK_LABELS := {
 	BOMBER_PREVIEW: ["自爆する雑魚 · 自爆の爆発", "自爆する雑魚専用のドット単位の爆発。閃光・火球・衝撃波の輪・煙・燃えかす・火の粉を調整します。"],
 	PUMP_SHELL: ["ポンプ座 · 圧縮弾", "Laser bolt風の白い芯・緑の色帯・パルス・光点・短い尾を調整します。"],
 	PUMP_BLAST: ["ポンプ座 · 着弾の爆発", "自爆・機雷と同じ爆発shaderを、ポンプ専用の色・形・時間・粒子で調整します。"],
+	MINE_BLAST: ["機雷の爆発", "機雷の爆発だけを反復再生します。武器のマインランチャーと同じ色・時間・粒子の設定を使います。"],
 }
 const VISUAL_FIELDS := [
 	"pixel_size", "warning_color", "locked_color", "attack_color", "recovery_color",
@@ -406,6 +409,73 @@ var _static_container: SubViewportContainer
 var _boss_preview
 var _game_context
 var _context_active := false
+var _edit_history := preload("res://gyms/visual_edit_history.gd").new()
+var _saved_profiles: Dictionary = {}
+var _field_inputs: Dictionary = {}
+var _field_defaults: Dictionary = {}
+var _last_history_input := 0
+var _history_popup: PopupPanel
+var _field_generation := 0
+
+func _input(event: InputEvent) -> void:
+	_history_input(event, get_viewport())
+
+func _history_input(event: InputEvent, scope: Viewport, color_popup := false) -> void:
+	if not _context_active or not is_visible_in_tree(): return
+	if is_instance_valid(_history_popup) and _history_popup.visible:
+		scope = _history_popup
+		color_popup = true
+	if event.get_instance_id() == _last_history_input: return
+	_last_history_input = event.get_instance_id()
+	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		if event.pressed: _edit_history.begin_gesture()
+		else: _edit_history.call_deferred("end_gesture")
+		return
+	if not event is InputEventKey: return
+	var focus := scope.gui_get_focus_owner()
+	var parameter_focus := color_popup or (focus != null and _fields.is_ancestor_of(focus))
+	if event.keycode in [KEY_UP, KEY_DOWN] and parameter_focus:
+		if event.pressed and not event.echo: _edit_history.begin_gesture()
+		elif not event.pressed: _edit_history.call_deferred("end_gesture")
+	if not event.pressed or event.echo or event.keycode != KEY_Z or not event.is_command_or_control_pressed(): return
+	if (focus is LineEdit or focus is TextEdit) and not parameter_focus: return
+	scope.set_input_as_handled()
+	_commit_number(focus)
+	if _edit_history.undo(event.shift_pressed):
+		_message = "やり直しました" if event.shift_pressed else "取り消しました"
+
+func _commit_number(focus: Control) -> void:
+	var node: Node = focus
+	while node != null:
+		if node is SpinBox:
+			(node as SpinBox).apply()
+			return
+		node = node.get_parent()
+
+func _field_focused() -> void:
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		_edit_history.end_gesture()
+
+func _edit_snapshot() -> Dictionary:
+	return {"target": _selected, "profiles": _working.profiles.duplicate(true)}
+
+func _restore_edit(snapshot: Dictionary) -> void:
+	_working.profiles = snapshot.profiles.duplicate(true)
+	_dirty = _working.profiles != _saved_profiles
+	if _selected != snapshot.target:
+		_select(snapshot.target)
+	else:
+		for name in _field_inputs:
+			var control: Control = _field_inputs[name]
+			if not is_instance_valid(control): continue
+			var value: Variant = _value(name, _field_defaults[name])
+			if control is SpinBox: (control as SpinBox).set_value_no_signal(value)
+			elif control is ColorPickerButton:
+				control.set_block_signals(true)
+				(control as ColorPickerButton).color = value
+				control.set_block_signals(false)
+		_apply_preview()
+		_refresh_live_effect()
 
 func _ready() -> void:
 	_collect_boss_techniques()
@@ -500,6 +570,7 @@ func _ready() -> void:
 	_show_target_group(_target_group)
 
 func _group_for(path: String) -> String:
+	if path == MINE_BLAST: return "爆発"
 	if path == BOOST_GAUGE.KEY: return "HUD"
 	if path.begins_with("weapon/"): return "武器"
 	if path.begins_with("trait/"): return "特性"
@@ -557,7 +628,7 @@ func _add_target_button(path: String, parent: HFlowContainer) -> void:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(76, 70) if definition != null else Vector2(220, 46) if _group_for(path) == "ボス技" else Vector2(94, 42)
 	if ATTACK_LABELS.has(path):
-		button.tooltip_text = name + "\n" + ATTACK_LABELS[path][1] + "\n" + path
+		button.tooltip_text = name + "\n" + ATTACK_LABELS[path][1] + ("" if path == MINE_BLAST else "\n" + path)
 	elif definition != null:
 		button.tooltip_text = name + "\n" + definition.get_description()
 	elif _technique_names.has(path):
@@ -679,11 +750,12 @@ func _effect_label(path: String) -> String:
 	return path.trim_prefix(ROOT+"/").trim_suffix("_visual.tscn")
 
 func _select(path: String) -> void:
+	_edit_history.end_gesture()
 	_selected = path
 	if path == BOOST_GAUGE.KEY:
 		_working.profiles[path] = BOOST_GAUGE.migrated_values(_working.profiles.get(path, {}))
 	_standalone_controls.visible = path in STANDALONE_ATTACKS
-	_standalone_speed.visible = path in [BOMBER_PREVIEW, PUMP_BLAST]
+	_standalone_speed.visible = path in [BOMBER_PREVIEW, PUMP_BLAST, MINE_BLAST]
 	_standalone_speed.select(2)
 	_standalone_play.set_pressed_no_signal(false)
 	_standalone_play.text = "⏸"
@@ -699,10 +771,10 @@ func _select(path: String) -> void:
 	_game_context.set_active(_context_active and path == BOOST_GAUGE.KEY)
 	_boss_preview.visible = live_effect
 	_boss_preview.set_active(live_effect)
-	if ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with("res://"):
+	if path == MINE_BLAST or ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with("res://"):
 		var scene_path: String = ENEMY_EFFECTS[path].scene if ENEMY_EFFECTS.has(path) else _move_targets[path].visual if _move_targets.has(path) else path
-		var scene := load(scene_path) as PackedScene if not scene_path.is_empty() else null
-		_sample = scene.instantiate() as Node2D if scene != null else null
+		var scene := load(scene_path) as PackedScene if path != MINE_BLAST and not scene_path.is_empty() else null
+		_sample = MINE_PREVIEW.new() if path == MINE_BLAST else scene.instantiate() as Node2D if scene != null else null
 		if not boss_effect and _sample != null:
 			var base_modulate := _sample.modulate
 			_sample.position = Vector2(240, 240)
@@ -718,7 +790,10 @@ func _select(path: String) -> void:
 	_boss_preview.set_effect(preview_path)
 
 func _build_fields() -> void:
+	_field_generation += 1
 	_boost_boundary_inputs.clear()
+	_field_inputs.clear()
+	_field_defaults.clear()
 	_field_rows = _fields
 	for child in _fields.get_children():
 		_fields.remove_child(child)
@@ -745,7 +820,7 @@ func _build_fields() -> void:
 			if not (info.usage & PROPERTY_USAGE_EDITOR): continue
 			if info.type in [TYPE_COLOR, TYPE_FLOAT, TYPE_INT]:
 				entries.append({"name": name, "value": _sample.get(name), "hint": info.hint_string})
-	BURST_FIELDS.decorate(entries, _selected)
+	BURST_FIELDS.decorate(entries, _profile_key())
 	var unique := {}
 	for entry in entries:
 		if not unique.has(entry.name): unique[entry.name] = entry
@@ -909,19 +984,30 @@ func _value(name: String, fallback: Variant) -> Variant:
 	var legacy: String = _move_targets[_selected].visual if _move_targets.has(_selected) else ENEMY_EFFECTS[_selected].scene if ENEMY_EFFECTS.has(_selected) else ""
 	if _selected == "boss/move/draco/inhale" and (name.begins_with("shader/") or name in ["pixel_scale", "fade_seconds"]):
 		legacy = "res://scenes/attacks/beam_draco.tscn"
-	return ShaderTuning.saved_value(_working.resolved_values(_selected, legacy), name, fallback)
+	return ShaderTuning.saved_value(_working.resolved_values(_profile_key(), legacy), name, fallback)
+
+func _profile_key() -> String:
+	return "weapon/mines" if _selected == MINE_BLAST else _selected
 
 func _set_value(name: String, value: Variant) -> void:
-	var values: Dictionary = _working.profiles.get(_selected, {}).duplicate()
+	if _edit_history.restoring: return
+	var before := _edit_snapshot()
+	var values: Dictionary = _working.profiles.get(_profile_key(), {}).duplicate()
 	if _selected == BOOST_GAUGE.KEY:
 		values = BOOST_GAUGE.edited_values(values, name, value)
 		for key in _boost_boundary_inputs: _boost_boundary_inputs[key].set_value_no_signal(values[key])
 	else:
 		values[name] = value
-	_working.profiles[_selected] = values
-	_dirty = true
-	_message = "未保存: " + _selected
+	_working.profiles[_profile_key()] = values
+	var after := _edit_snapshot()
+	if before == after: return
+	_edit_history.record(_profile_key() + "/" + name, before, after, _restore_edit)
+	_dirty = _working.profiles != _saved_profiles
+	_message = "未保存: " + _effect_label(_selected)
 	_apply_preview()
+	_refresh_live_effect()
+
+func _refresh_live_effect() -> void:
 	if ENEMY_EFFECTS.has(_selected) or _move_targets.has(_selected) or _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		_boss_preview.refresh_effects()
 
@@ -940,8 +1026,18 @@ func _add_color(label: String, name: String, original: Color, help := "") -> voi
 	picker.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	picker.tooltip_text = help + "\nクリックして色を変更"
 	picker.color = _value(name, original)
-	picker.color_changed.connect(func(color: Color): _set_value(name, color))
+	var generation := _field_generation
+	picker.color_changed.connect(func(color: Color):
+		if generation == _field_generation: _set_value(name, color))
 	row.add_child(picker)
+	_field_inputs[name] = picker
+	_field_defaults[name] = original
+	var popup := picker.get_popup()
+	popup.window_input.connect(_history_input.bind(popup, true))
+	popup.about_to_popup.connect(func():
+		_history_popup = popup
+		_edit_history.end_gesture())
+	picker.popup_closed.connect(_edit_history.end_gesture)
 
 func _add_number(label: String, name: String, original: float, hint: String, help := "") -> void:
 	var row := HBoxContainer.new()
@@ -962,8 +1058,14 @@ func _add_number(label: String, name: String, original: float, hint: String, hel
 	spin.max_value = float(parts[1]) if parts.size() > 1 and parts[1].is_valid_float() else limits[1]
 	spin.step = float(parts[2]) if parts.size() > 2 and parts[2].is_valid_float() else limits[2]
 	spin.value = _value(name, original)
-	spin.value_changed.connect(func(value: float): _set_value(name, value))
+	var generation := _field_generation
+	spin.value_changed.connect(func(value: float):
+		if generation == _field_generation: _set_value(name, value))
 	row.add_child(spin)
+	_field_inputs[name] = spin
+	_field_defaults[name] = original
+	spin.get_line_edit().focus_entered.connect(_field_focused)
+	spin.get_line_edit().text_submitted.connect(func(_text: String): _edit_history.end_gesture())
 	if _selected == BOOST_GAUGE.KEY and name in BOOST_GAUGE.BOUNDARY_KEYS: _boost_boundary_inputs[name] = spin
 
 func _apply_preview() -> void:
@@ -974,7 +1076,8 @@ func _apply_preview() -> void:
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
-	_working.apply_to(_sample)
+	if _selected == MINE_BLAST: _working.apply_key(_sample, _profile_key())
+	else: _working.apply_to(_sample)
 	if _selected in STANDALONE_ATTACKS: _sample.call("preview_step", 0.0)
 	_sample.queue_redraw()
 
@@ -984,6 +1087,9 @@ func editing_state() -> Dictionary:
 	return {"path": SETTINGS_PATH, "dirty_paths": paths, "busy": false, "message": _message}
 
 func save_current() -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and _fields.is_ancestor_of(focus): _commit_number(focus)
+	_edit_history.end_gesture()
 	if FileAccess.get_md5(SETTINGS_PATH) != _source_hash:
 		_message = "保存先が外部で変更されました。再読込してください。"
 		return
@@ -992,6 +1098,7 @@ func save_current() -> void:
 		_message = "保存失敗: " + error_string(error)
 		return
 	_source_hash = FileAccess.get_md5(SETTINGS_PATH)
+	_saved_profiles = _working.profiles.duplicate(true)
 	_dirty = false
 	_message = "保存しました: " + SETTINGS_PATH
 
@@ -1001,12 +1108,15 @@ func reload_current() -> void:
 		_message = "設定を読み込めません: " + SETTINGS_PATH
 		return
 	_working = loaded.duplicate(true)
+	_saved_profiles = _working.profiles.duplicate(true)
+	_edit_history.clear()
 	_source_hash = FileAccess.get_md5(SETTINGS_PATH)
 	_dirty = false
 	_message = "保存値を読み込みました"
 	if not _selected.is_empty(): _select(_selected)
 
 func set_active(active: bool) -> void:
+	if not active: _edit_history.end_gesture()
 	_context_active = active
 	if is_instance_valid(_game_context): _game_context.set_active(active and _selected == BOOST_GAUGE.KEY)
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
@@ -1018,4 +1128,5 @@ func set_active(active: bool) -> void:
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
 
 func _exit_tree() -> void:
+	_edit_history.dispose()
 	EFFECT_SETTINGS.clear_preview_profiles()

@@ -4,6 +4,7 @@ extends WeaponVisual
 
 ## 戦闘エフェクトツールで調整する shader
 const TUNED_SHADERS := [preload("res://shaders/mine_burst.gdshader")]
+const EFFECT_KEY := "weapon/mines"
 var booms: Array[Dictionary] = []
 
 func setup(render: RunPresentation, owner_behavior) -> void:
@@ -18,9 +19,8 @@ func on_event(ev: Dictionary) -> void:
 	if not claims(ev): return
 	var px := painter().px
 	# 試作は踏まれた範囲 28 ドットに半径 23 の炎
-	blasts(TUNED_SHADERS[0]).add(ev.pos, float(ev.radius) / px * 23.0 / 28.0)
-	var debris: Array[Dictionary] = []
-	for i in 14: debris.append({"dir": Vector2.from_angle(randf() * TAU), "v": 40.0 + randf() * 70.0})
+	blasts(TUNED_SHADERS[0]).add(ev.pos, blast_radius(ev.radius, px))
+	var debris := explosion_debris()
 	booms.append({"pos": ev.pos, "age": 0.0, "debris": debris})
 	if booms.size() > 96: booms.pop_front()
 
@@ -39,15 +39,29 @@ func tick(_dt: float) -> void:
 		if armed and age < 0.22: p.thick_ring(pos, 6.0, 1, Color("#cfeaff"))
 	for b in booms:
 		b.age += dt
-		var q: float = b.age / time_scale / 0.4
-		if q >= 1.0: continue
 		var energy := visual_number("glow_energy", 1.0)
-		var color: Color = (Color.WHITE if q < 0.5 else Color("#8fb8ff")) * Color(energy, energy, energy, 1.0)
-		for d in b.debris:
-			p.dot(b.pos + d.dir * d.v * q * p.px, color)
+		draw_explosion_debris(p, b.pos, b.debris, b.age, time_scale, energy)
 	if not ShaderTuning.previewing(): booms = booms.filter(func(b): return b.age / time_scale < 0.4)
 	blasts(TUNED_SHADERS[0]).step(dt)
 	p.end()
+
+## 単体プレビューも同じ半径・破片を使う。
+static func blast_radius(radius: float, cell: float) -> float:
+	return radius / cell * 23.0 / 28.0
+
+static func explosion_debris(rng: RandomNumberGenerator = null) -> Array[Dictionary]:
+	var debris: Array[Dictionary] = []
+	for i in 14:
+		var angle := (rng.randf() if rng != null else randf()) * TAU
+		var speed := 40.0 + (rng.randf() if rng != null else randf()) * 70.0
+		debris.append({"dir": Vector2.from_angle(angle), "v": speed})
+	return debris
+
+static func draw_explosion_debris(p: PixelPainter, at: Vector2, debris: Array, age: float, time_scale: float, energy: float) -> void:
+	var q := age / time_scale / 0.4
+	if q < 0.0 or q >= 1.0: return
+	var color: Color = (Color.WHITE if q < 0.5 else Color("#8fb8ff")) * Color(energy, energy, energy, 1.0)
+	for d in debris: p.dot(at + d.dir * d.v * q * p.px, color)
 
 ## 機雷の絵（試作の pmine）。紺の十字の胴、4本の突起、中心の灯り。
 func _mine(p: PixelPainter, pos: Vector2, lit: bool) -> void:
