@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/runtime/checkpoint.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -6,16 +7,8 @@ using namespace godot;
 Ref<SpeedRunCore> SpeedRunCore::checkpoint() const {
     if (!runtime.state.started || runtime.state.closed) return Ref<SpeedRunCore>();
     Ref<SpeedRunCore> out; out.instantiate();
-    // タイマー、時計の端数、格納行、空き行、命中集合、待機中の枠も含む値コピー。
-    out->runtime.state = runtime.state;
+    out->runtime.state = speed::clone_state(runtime.state);
     out->runtime.content = runtime.content;
-    out->runtime.state.rng.instantiate(); out->runtime.state.rng->set_seed(runtime.state.rng->get_seed()); out->runtime.state.rng->set_state(runtime.state.rng->get_state());
-    // Dictionary/Arrayは共有書込みなので、可変の保持値を明示的に分離する。
-    out->runtime.state.events=runtime.state.events.duplicate(true); out->runtime.state.collections=runtime.state.collections.duplicate(true);
-    out->runtime.state.progression.data=runtime.state.progression.data.duplicate(true); out->runtime.state.progression.stats=runtime.state.progression.stats.duplicate(true);
-    out->runtime.state.progression.weapons=runtime.state.progression.weapons.duplicate(true); out->runtime.state.progression.traits=runtime.state.progression.traits.duplicate(true);
-    out->runtime.state.progression.cards=runtime.state.progression.cards.duplicate(true); out->runtime.state.progression.resource_requests=runtime.state.progression.resource_requests.duplicate(true);
-    out->runtime.state.forward_parameters=runtime.state.forward_parameters.duplicate(true);
     return out;
 }
 bool SpeedRunCore::update_enemy_definition(StringName id, const Dictionary &data) {
@@ -44,4 +37,29 @@ bool SpeedRunCore::update_enemy_definition(StringName id, const Dictionary &data
     auto definitions = runtime.content->definitions;
     definitions[index] = replacement;
     runtime.replace_definitions(std::move(definitions)); return true;
+}
+
+int64_t SpeedRunCore::hold_checkpoint() const { return speed::CheckpointStore::hold(runtime); }
+bool SpeedRunCore::release_checkpoint(int64_t id) { return speed::CheckpointStore::release(id); }
+int64_t SpeedRunCore::current_epoch() const { return runtime.epoch; }
+bool SpeedRunCore::restore_checkpoint(int64_t id) {
+    if (runtime.state.closed || runtime.epoch==INT64_MAX) return false;
+    auto checkpoint=speed::CheckpointStore::find(id);
+    if (!checkpoint || checkpoint->state_schema_version!=speed::STATE_SCHEMA_VERSION || !checkpoint->content ||
+        checkpoint->payload_sha256!=checkpoint->content->payload_sha256) return false;
+    Ref<SpeedRunCore> candidate;candidate.instantiate();
+    candidate->runtime.state=speed::clone_state(checkpoint->state);
+    candidate->runtime.content=checkpoint->content;
+    candidate->runtime.state.rng.instantiate();
+    candidate->runtime.state.rng->set_seed(checkpoint->rng_seed);
+    candidate->runtime.state.rng->set_state(checkpoint->rng_state);
+    const double grid_cell=candidate->runtime.state.grid.cell;
+    candidate->runtime.state.grid={};
+    if (!speed::rebuild_state_indexes(candidate->runtime.state,*candidate->runtime.content) ||
+        !candidate->rebuild_enemy_grid(grid_cell)) return false;
+    candidate->runtime.epoch=runtime.epoch+1;
+    candidate->runtime.full_output_dirty=true;
+    candidate->runtime.pending_resource_rebuild=true;
+    runtime=std::move(candidate->runtime);
+    return true;
 }

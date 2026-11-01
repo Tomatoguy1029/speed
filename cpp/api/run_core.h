@@ -197,6 +197,10 @@ public:
     void close();
     Dictionary inspect() const;
     Ref<SpeedRunCore> checkpoint() const;
+    int64_t hold_checkpoint() const;
+    bool restore_checkpoint(int64_t id);
+    bool release_checkpoint(int64_t id);
+    int64_t current_epoch() const;
     bool update_enemy_definition(StringName id, const Dictionary &data);
 };
 }

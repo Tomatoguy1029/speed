@@ -13,6 +13,8 @@ public:
     godot::RunState state;
     std::shared_ptr<const ContentBundle> content = std::make_shared<const ContentBundle>();
     RunWorkspace workspace;
+    int64_t epoch=1;
+    bool full_output_dirty=false, pending_resource_rebuild=false;
     void replace_definitions(std::vector<EnemyDefinition> definitions) {
         auto next = std::make_shared<ContentBundle>();
         next->definitions = std::move(definitions);

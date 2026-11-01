@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--restore-only" in OS.get_cmdline_user_args():
+		check(check_runtime_restore(), "保持と復帰の確認が最後まで完了する")
+		print("[run_restore] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--schema-only" in OS.get_cmdline_user_args():
 		check(check_schema(), "スキーマ確認が最後まで完了する")
 		print("[run_schema] failed=%d" % failed)
@@ -146,3 +151,50 @@ func resign_content(bytes: PackedByteArray, schema) -> PackedByteArray:
 	var signature: PackedByteArray = schema.sha256(bytes.slice(88+32*bytes.decode_u32(16)))
 	for i in range(32): bytes[56+i] = signature[i]
 	return bytes
+
+func check_runtime_restore() -> bool:
+	var comparison = load("res://tools/compare_runtime.gd").new()
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var signature: PackedByteArray = schema.sha256("復帰前の定義".to_utf8_buffer())
+	var bytes: PackedByteArray = builder.compile_chase(definition,ContentManager.base,signature)
+	var original = comparison.create_native()
+	check(original.configure_content(bytes) and original.start(41), "生成した定義から保持対象を開始する")
+	check(original.set_motion_context(Vector2(200,0),Vector2.ZERO,Vector2(1000,1000)), "更新の入力を設定する")
+	var enemy_id: int = original.spawn_enemy(definition.id,Vector2.ZERO,{})
+	check(enemy_id>0 and original.step(0.1), "保持前に敵を移動する")
+	var expected: Array = original.enemies_snapshot()
+	var saved_handle: PackedInt64Array = original.enemy_handle(enemy_id)
+	var checkpoint_id: int = original.hold_checkpoint()
+	check(checkpoint_id>0, "保持番号を取得する")
+	original.close()
+	original = null
+	var restored = comparison.create_native()
+	var epoch: int = restored.current_epoch()
+	check(restored.restore_checkpoint(checkpoint_id), "元のラン破棄後も保持点から復帰できる")
+	check(restored.current_epoch()>epoch and restored.enemies_snapshot()==expected, "保持時の敵へ戻し外部の世代を進める")
+	check(restored.valid_enemy_handle(saved_handle), "保存した個体の世代を保つ")
+	var independent = comparison.create_native()
+	check(independent.restore_checkpoint(checkpoint_id), "同じ保持点から別のランへ復帰する")
+	check(restored.step(0.1) and independent.enemies_snapshot()==expected, "復帰したランを別々に進められる")
+	var current: Array = restored.enemies_snapshot()
+	epoch = restored.current_epoch()
+	check(not restored.restore_checkpoint(-1) and restored.enemies_snapshot()==current and restored.current_epoch()==epoch, "不正復帰で現在の状態と世代を変えない")
+	definition.speed += 20.0
+	var next_bytes: PackedByteArray = builder.compile_chase(definition,ContentManager.base,schema.sha256("変更後の定義".to_utf8_buffer()))
+	var changed = comparison.create_native()
+	check(changed.configure_content(next_bytes) and changed.start(41) and changed.restore_checkpoint(checkpoint_id), "違う定義のランを保持時の定義へ戻せる")
+	var clone_id: int = changed.spawn_enemy(definition.id,Vector2.ZERO,{})
+	check(clone_id>enemy_id and changed.step(0.1), "復帰した定義で新しい敵を動かす")
+	var rows: Array = changed.enemies_snapshot()
+	var clone: Dictionary = rows[rows.size()-1]
+	check(absf(float(clone.pos[0])-float(expected[0].pos[0]))<0.0001, "復帰後の生成は変更前の速度を使う")
+	check(changed.release_checkpoint(checkpoint_id), "保持点を解除できる")
+	current = changed.enemies_snapshot()
+	check(not changed.restore_checkpoint(checkpoint_id) and not changed.release_checkpoint(checkpoint_id) and changed.enemies_snapshot()==current, "解除した保持点を拒否する")
+	check(independent.enemies_snapshot()==expected, "保持点の解除が復帰済みランへ漏れない")
+	changed.close()
+	restored.close()
+	independent.close()
+	return true

@@ -28,6 +28,7 @@ public:
         return handle.slot < slots.size() && slots[handle.slot].id > 0 &&
                slots[handle.slot].generation == handle.generation;
     }
+    int64_t entity_id(Handle<Tag> handle) const { return contains(handle) ? slots[handle.slot].id : 0; }
     Handle<Tag> at(uint32_t slot) const {
         return slot < slots.size() && slots[slot].id > 0 ? Handle<Tag>{slot, slots[slot].generation} : Handle<Tag>{};
     }

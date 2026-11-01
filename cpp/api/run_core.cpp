@@ -9,6 +9,10 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("hold_checkpoint"), &SpeedRunCore::hold_checkpoint);
+    ClassDB::bind_method(D_METHOD("restore_checkpoint", "id"), &SpeedRunCore::restore_checkpoint);
+    ClassDB::bind_method(D_METHOD("release_checkpoint", "id"), &SpeedRunCore::release_checkpoint);
+    ClassDB::bind_method(D_METHOD("current_epoch"), &SpeedRunCore::current_epoch);
     ClassDB::bind_method(D_METHOD("configure_content", "bytes"), &SpeedRunCore::configure_content);
     ClassDB::bind_method(D_METHOD("configure_bite_zone", "data"), &SpeedRunCore::configure_bite_zone);
     ClassDB::bind_method(D_METHOD("fire_bite_zone", "at", "radius", "delay", "damage", "color", "token"), &SpeedRunCore::fire_bite_zone, DEFVAL(0));
