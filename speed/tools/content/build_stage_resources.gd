@@ -35,7 +35,7 @@ static func _attack(paths: Dictionary, kind: String) -> void:
 		_script(paths, "res://scripts/render/attacks/flood.gd")
 		_add(paths, "res://shaders/water_flood.gdshader")
 	if kind == "rings": _script(paths, "res://scripts/render/attacks/wave.gd")
-static func build(stage: RuntimeStage, output := "res://.content") -> StageResources:
+static func build(stage: RuntimeStage, output := "res://.content", config: GameConfig = null) -> StageResources:
 	var result := StageResources.new()
 	var paths := {}
 	_add(paths, "res://assets/effects/landmark/elite_contacts.tres")
@@ -69,7 +69,7 @@ static func build(stage: RuntimeStage, output := "res://.content") -> StageResou
 			for layout in formation.layouts:
 				for marker in layout.markers:
 					if clip.types.is_empty() or StringName(marker.type) in clip.types: ids[String(marker.type)] = true
-	var cfg := load("res://data/config.tres") as GameConfig
+	var cfg := config if config != null else load("res://data/config.tres") as GameConfig
 	for kind in ["meteor", "iron", "saw"]:
 		if cfg.get(kind + "_count") > 0: ids[kind] = true
 	if stage.boss_id == &"draco":

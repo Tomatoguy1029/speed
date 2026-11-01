@@ -21,6 +21,21 @@
           "name": "aim_speed",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "crystal_low",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "crystal_mid",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "crystal_high",
+          "type": "f64",
+          "min": 0
         }
       ]
     },
@@ -227,6 +242,26 @@
           "name": "fixed_sprite",
           "type": "bool",
           "native": "scaling.fixed_sprite"
+        },
+        {
+          "name": "reward_low",
+          "type": "u32",
+          "native": "xp_rewards[0]"
+        },
+        {
+          "name": "reward_mid",
+          "type": "u32",
+          "native": "xp_rewards[1]"
+        },
+        {
+          "name": "reward_high",
+          "type": "u32",
+          "native": "xp_rewards[2]"
+        },
+        {
+          "name": "gold_eligible",
+          "type": "bool",
+          "native": "gold_eligible"
         }
       ]
     },

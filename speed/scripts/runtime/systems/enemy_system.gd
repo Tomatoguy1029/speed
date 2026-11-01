@@ -503,15 +503,8 @@ func def_of(type: StringName) -> EnemyDef:
 
 ## 固定入力の報酬を、定義の解決と生成境界で準備する。ライブ編集時は入力が変わった分だけ更新する。
 func _prepare_xp_reward(definition: EnemyDef) -> void:
-	var reward := definition.resolved_xp_reward
-	if reward.is_empty() or reward.rank != definition.rank or reward.override != definition.xp_reward_counts:
-		assert(definition.xp_reward_counts.is_empty() or definition.xp_reward_counts.size() == 3, "報酬個数はlow・mid・highの3要素")
-		var counts := EnemyDef.default_xp_reward_counts(definition.rank) if definition.xp_reward_counts.is_empty() else definition.xp_reward_counts.duplicate()
-		for kind in counts.size(): counts[kind] = maxi(0, counts[kind])
-		reward = {"rank": definition.rank, "counts": counts,
-			"gold_eligible": definition.rank >= 3 and definition.rank <= 10 and counts[1] > 0,
-			"override": definition.xp_reward_counts.duplicate()}
-		definition.resolved_xp_reward = reward
+	var reward := definition.resolve_xp_reward()
+	assert(not reward.is_empty(), "報酬個数はlow・mid・highの3要素")
 	var type := String(definition.id)
 	var snapshot: Dictionary = _xp_reward_snapshot.get(type, {})
 	if snapshot.is_empty() or snapshot.rank != reward.rank or snapshot.override != reward.override:

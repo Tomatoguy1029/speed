@@ -3,6 +3,7 @@
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 #include <vector>
+#include <array>
 
 namespace speed {
 // 編集元から生成した固定値。ランの可変状態とは別に保持する。
@@ -28,6 +29,8 @@ struct EnemyDefinition {
     double speed = 0.0;
     double fire_interval = 0.0;
     double xp = 0.0, knockback = 0.0, hitstop_multiplier = 0.0;
+    std::array<uint32_t,3> xp_rewards{};
+    bool gold_eligible=false;
     godot::Color color;
 };
 struct SpawnTimeline {

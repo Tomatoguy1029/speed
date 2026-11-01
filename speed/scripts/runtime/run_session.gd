@@ -141,6 +141,25 @@ func _notification(what: int) -> void:
 			get_parent().remove_child(self)
 		if resources != null: resources.cancel()
 		_pending_options.clear()
+		if cpp_core != null: cpp_core.close()
+		cpp_core = null
+		cpp_resources = null
 		sim.dispose()
 		if is_instance_valid(RunManager):
 			RunManager.unregister(self)
+
+## 開発用。開始までに生成・解析を呼ばず、保存済みの同じ版を使う。
+var cpp_core: RefCounted
+var cpp_resources: Resource
+func start_cpp_content(index_path: String, input_sha256: String, seed_value: int) -> Error:
+	if cpp_core != null or sim.state != null: return ERR_ALREADY_IN_USE
+	var prepared := preload("res://scripts/runtime/run_content_loader.gd").read_bundle(index_path,input_sha256)
+	if prepared.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
+	var core = ClassDB.instantiate(&"SpeedRunCore")
+	if not core.configure_content(prepared.bytes) or not core.start(seed_value):
+		core.close()
+		return ERR_INVALID_DATA
+	cpp_core = core
+	cpp_resources = prepared.resources
+	started.emit()
+	return OK

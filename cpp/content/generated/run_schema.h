@@ -8,6 +8,9 @@ struct RunConfig {
     uint32_t id{};
     double aim_lag{};
     double aim_speed{};
+    double crystal_low{};
+    double crystal_mid{};
+    double crystal_high{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -16,6 +19,12 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.aim_lag < 0) return false;
     if (!input.read_f64(out.aim_speed)) return false;
     if (out.aim_speed < 0) return false;
+    if (!input.read_f64(out.crystal_low)) return false;
+    if (out.crystal_low < 0) return false;
+    if (!input.read_f64(out.crystal_mid)) return false;
+    if (out.crystal_mid < 0) return false;
+    if (!input.read_f64(out.crystal_high)) return false;
+    if (out.crystal_high < 0) return false;
     return true;
 }
 struct StringEntry {
@@ -69,6 +78,10 @@ struct ChaseDefinition {
     double scaling_visual{};
     double scaling_collision{};
     bool fixed_sprite{};
+    uint32_t reward_low{};
+    uint32_t reward_mid{};
+    uint32_t reward_high{};
+    bool gold_eligible{};
 };
 inline bool read(BinaryReader &input, ChaseDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -121,6 +134,10 @@ inline bool read(BinaryReader &input, ChaseDefinition &out) {
     if (!input.read_f64(out.scaling_collision)) return false;
     if (out.scaling_collision < 0) return false;
     if (!input.read_bool(out.fixed_sprite)) return false;
+    if (!input.read_u32(out.reward_low)) return false;
+    if (!input.read_u32(out.reward_mid)) return false;
+    if (!input.read_u32(out.reward_high)) return false;
+    if (!input.read_bool(out.gold_eligible)) return false;
     return true;
 }
 struct LoadoutDefinition {
@@ -205,7 +222,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     if (version != 1) return false;
     switch(kind) {
     case 1: {
-        if (count > input.remaining()/20) return false;
+        if (count > input.remaining()/44) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -220,7 +237,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (count > input.remaining()/191) return false;
+        if (count > input.remaining()/204) return false;
         for (uint32_t i=0; i<count; ++i) { ChaseDefinition row; if (!read(input,row)) return false; out.ChaseDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -335,6 +352,10 @@ inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringN
     out.scaling.visual=row.scaling_visual;
     out.scaling.collision=row.scaling_collision;
     out.scaling.fixed_sprite=row.fixed_sprite;
+    out.xp_rewards[0]=row.reward_low;
+    out.xp_rewards[1]=row.reward_mid;
+    out.xp_rewards[2]=row.reward_high;
+    out.gold_eligible=row.gold_eligible;
     return out;
 }
 inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=12;

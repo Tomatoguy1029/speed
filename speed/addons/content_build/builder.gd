@@ -70,3 +70,9 @@ static func build_all(force := false, output := ROOT) -> Error:
 	if stamp == null: return FileAccess.get_open_error()
 	stamp.store_string(JSON.stringify({"signature": signature(), "outputs": outputs}))
 	return OK
+
+## 開発用C++入口。通常入口の切替までは明示して呼ぶ。
+static func build_cpp_stage(source: StageDef, config: GameConfig, output := ROOT, definitions := {}) -> Error:
+	var stage := preload("res://tools/content/build_runtime_stage.gd").compile(source,output,config)
+	if stage == null: return ERR_INVALID_DATA
+	return preload("res://tools/content/build_run_content.gd").build(stage,config,output.path_join("run"),signature(),definitions)

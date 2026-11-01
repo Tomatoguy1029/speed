@@ -26,7 +26,7 @@ static func clip(source: SpawnClip) -> RuntimeClip:
 			result.prepared.append({"layouts": layouts, "entries": data.entries})
 	return result
 
-static func compile(source: StageDef, output := "res://.content") -> RuntimeStage:
+static func compile(source: StageDef, output := "res://.content", config: GameConfig = null) -> RuntimeStage:
 	var result := RuntimeStage.new()
 	for property in source.get_property_list():
 		if property.usage & PROPERTY_USAGE_STORAGE == 0: continue
@@ -45,7 +45,7 @@ static func compile(source: StageDef, output := "res://.content") -> RuntimeStag
 		copy.display_name = ""
 		result.phases.append(copy)
 	for item in source.clips: result.clips.append(clip(item))
-	result.resources = load("res://tools/content/build_stage_resources.gd").build(result, output)
+	result.resources = load("res://tools/content/build_stage_resources.gd").build(result, output, config)
 	# 実行用にも局所上書きを保持し、未知の敵・項目・不正な数値を生成時に止める。
 	for id in result.enemy_tuning:
 		var path := "res://data/enemies/%s.tres" % String(id)

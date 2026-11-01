@@ -47,6 +47,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     std::copy(bytes.ptr()+24,bytes.ptr()+56,bundle->input_sha256.begin());
     std::copy(bytes.ptr()+56,bytes.ptr()+88,bundle->payload_sha256.begin());
     bundle->aim_lag=records.RunConfig_rows[0].aim_lag;bundle->aim_speed=records.RunConfig_rows[0].aim_speed;
+    bundle->crystal_values={records.RunConfig_rows[0].crystal_low,records.RunConfig_rows[0].crystal_mid,records.RunConfig_rows[0].crystal_high};
     std::unordered_set<std::string> names;
     for (const auto &row:records.ChaseDefinition_rows) {
         auto string=std::find_if(records.StringEntry_rows.begin(),records.StringEntry_rows.end(),[&](const auto &s){return s.id==row.id;});
