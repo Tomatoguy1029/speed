@@ -17,9 +17,9 @@ var _face_move: float:
 func setup(system: EnemySystem) -> void:
 	m = system
 
-## ブースト中の自律操舵を止める。捕捉・吸引は外力側の移動を使う。
+## 線上を突進している間の自律操舵を止める。捕捉・吸引は外力側の移動を使う。
 func turn_locked(i: int) -> bool:
-	return (state.tracing or state.glide or state.ship_boost_t > 0.0) \
+	return state.tracing \
 		and table.held[i] == 0 and table.pump_owner[i] < 0
 
 ## 再照準だけを止め、攻撃で確定した旋回や軌道は呼び出し側で保つ。

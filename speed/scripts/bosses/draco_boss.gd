@@ -254,10 +254,6 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	var prior_observer := ctx.bosses.recording_actor
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	elapsed += dt
-	# なぞり中は予告の狙いを固定する。渦の中心移動は構図維持なので対象外。
-	if mode == &"windup" and run_state.tracing and tech_kind(technique) not in [&"spiral", &"charge", &"leap", &"rifts"] and _runner != null and "locked" in _runner and not _runner.locked:
-		_runner.locked = true
-		combat_trace.stage("lock", {"scope": "trace_aim"})
 	if mode == &"windup" and _runner != null and _runner.has_method("windup"): _runner.windup(self,dt)
 	# 予告の間に自機を追わない技は、画面外からの配置を終えて最初に狙った時点で固定する。渦の中心移動は構図維持なので対象外。
 	if mode == &"windup" and tech_kind(technique) != &"spiral" and _runner != null and "locked" in _runner and not _runner.locked \
