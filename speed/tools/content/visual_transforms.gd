@@ -140,6 +140,12 @@ static func prepare_look(source: EnemyLook, palettes: Array[Dictionary]) -> Enem
 	result.previews = {}
 	var data := layout(source.armor)
 	result.armor_key = data.key
+	if not source.armor_color_source_key.is_empty():
+		var color_source := load(source.armor_color_source_key.get_slice("|", 0)) as Texture2D
+		var color_data := layout(color_source)
+		assert(color_data.key == source.armor_color_source_key, "塗装の継承元が一致しない: " + source.resource_path)
+		for region in source.armor_color_regions:
+			assert(data.regions.has(int(region)) and color_data.regions.has(int(source.armor_color_regions[region])), "塗装の対応領域が存在しない: " + source.resource_path)
 	if source.decorations != null:
 		var image := source.base.get_image().duplicate()
 		image.blend_rect(source.decorations.get_image(), Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
@@ -149,7 +155,7 @@ static func prepare_look(source: EnemyLook, palettes: Array[Dictionary]) -> Enem
 	for palette in palettes:
 		var armor_id := result.colors_key(palette)
 		if not result.painted_armors.has(armor_id):
-			result.painted_armors[armor_id] = source.armor if armor_id.is_empty() else ImageTexture.create_from_image(painted_image(source.armor, palette))
+			result.painted_armors[armor_id] = source.armor if armor_id.is_empty() else ImageTexture.create_from_image(painted_image(source.armor, result.paint_palettes(palette)))
 		var preview_id := result.preview_key(palette)
 		if result.previews.has(preview_id): continue
 		var image := result.base.get_image().duplicate()

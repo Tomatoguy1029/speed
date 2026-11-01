@@ -114,7 +114,7 @@ metadata/inputs = {"res://assets/pixel/auriga/armor.png": "e65957d950fb25e7e58d9
 "res://data/visuals/looks/pump.tres": "6d6c2c20a4c2a2d56e5adceb127812dcd9b21cfbe1044be2a755c2a7065ca3fb",
 "res://data/visuals/looks/reticle.tres": "16b0c4689413d032e63dd7e768051a3139c624c73ad743c31e57b49cae9a2be6",
 "res://data/visuals/looks/ruler.tres": "ae5c8f46de281017a0a95fe1486e3b01bd07ba254a342360feac95653b3076b0",
-"res://data/visuals/looks/ruler_bottom.tres": "e0adce2dad860576f722b7fcf27c6d200d4e89d3522ee91220af72db38d9ebdc",
+"res://data/visuals/looks/ruler_bottom.tres": "c5174a7150e5ef99f9ecc032083696736a134cbc1a10608601f10fefc5caf1cf",
 "res://data/visuals/looks/shield.tres": "433dd170c4bc8ccf046c10f62b61adf6f3aed86aa5f7d124565b606d88269def",
 "res://data/visuals/looks/snake.tres": "cc2ac10d4973e47e242ff3ea438b980317b197008548bfe6c752b2f2cad54f05",
 "res://data/visuals/looks/splitter.tres": "a2ea34dd9127aa6365f9ed7c639fed09156a3c8ab2f791200357fb33b7ed9ba6",
@@ -123,7 +123,7 @@ metadata/inputs = {"res://assets/pixel/auriga/armor.png": "e65957d950fb25e7e58d9
 "res://shaders/pump_outline.gdshaderinc": "92af1c88b47b77d4aaf1de15c31ff283bbb72e94d32be60e26a3f7fc3d9df174",
 "res://tools/art/bake_landmark_masks.py": "0599afcf725bf4a4cbdc01ca4c444428a392f4f06cd2b1ab7c7ffc804d44b25a",
 "res://tools/art/elite_contacts.py": "ba9770537d012ba01ebc833df9691f8c4804b353ef5a9b1d541891563aade3c0"}
-metadata/mask_manifest_sha256 = "78d661580d95c86d838cb3fdf14bc477542e284bd664e76cd5cfed1e08786da5"
+metadata/mask_manifest_sha256 = "0049da892f3469ad40d91470818a2fb675306bc87a5f5a25b807d2ee6a7de638"
 metadata/pump_outline = [8.975, 9.1, 8.225, 8.35, 8.6, 7.85, 8.225, 8.725, 8.1, 8.725, 8.1, 8.725, 8.225, 7.85, 8.6, 8.35, 8.225, 9.1, 9.1, 9.1, 9.225, 9.225, 8.6, 8.975, 8.6, 8.725, 9.35, 8.725, 9.35, 9.1, 9.35, 8.975, 9.6, 9.35, 9.225, 10.1, 10.1, 10.1, 10.225, 9.35, 9.6, 9.975, 9.35, 9.975, 10.6, 11.6, 11.975, 11.1, 10.475, 9.975, 9.6, 9.35, 9.225, 9.1, 9.1, 9.1, 9.225, 9.35, 9.6, 9.975, 10.475, 11.1, 11.225, 10.1, 9.35, 8.725, 8.6, 8.975, 8.6, 9.225, 9.225, 9.1]
 metadata/entries = {"res://data/visuals/looks/auriga.tres": {"biter": false,
 "origin": Vector2(31.5, 40.0),

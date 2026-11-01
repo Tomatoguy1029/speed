@@ -117,7 +117,7 @@
 
 - `biter` の専用外観は `assets/pixel/biter/parts/` の事前分割素材を使う。塗装は分割前の確定画像を共有し、部位ごとのアルファと法線を重ねる。素材の更新は `python3 speed/tools/art/bake_biter_parts.py`。顎の表現は[敵のアート](../art-style.md#42-敵)に従う。
 
-- `ruler`（じょうぎ座）は `assets/pixel/ruler/` の上下の専用画像を重ねて出現し、分離後は各個体が片側の画像を使う。装甲の塗装は上下を選んで編集する。
+- `ruler`（じょうぎ座）は `assets/pixel/ruler/` の上下の専用画像を重ねて出現し、分離後は各個体が片側の画像を使う。装甲の塗装は上下を選んで編集する。下側の未指定の装甲片は上側の対応する装甲片の色を使い、下側に指定した色を優先する。上下の対応は `data/visuals/looks/ruler_bottom.tres` に持つ。
 
 - `lynx`（やまねこ座）は `assets/pixel/lynx/` の専用画像を使う。重ね方は[敵のアート](../art-style.md#42-敵)に従う。
 

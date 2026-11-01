@@ -190,7 +190,7 @@ func _sync_appearance() -> void:
 		_armor_part.select(0)
 	if look != null and look.split_other != null and _armor_part.selected == 1:
 		look = look.split_other
-	_armor_view.show_armor(look.armor if look != null else null, def.armor_colors)
+	_armor_view.show_armor(look.armor if look != null else null, look.paint_palettes(def.armor_colors) if look != null else def.armor_colors)
 	_armor_color.disabled = look == null
 	var pending: bool = def.visual_settings != original.visual_settings or def.armor_colors != original.armor_colors
 	_appearance_label.text = tr("lab.appearance.target").format({"name": def.display_name, "id": type, "state": tr("lab.appearance.unsaved") if pending else tr("lab.appearance.saved_state")})
