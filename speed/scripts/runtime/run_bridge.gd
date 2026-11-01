@@ -59,6 +59,8 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 		_busy = false
 		return _error(1,"input","入力元がありません")
 	var frame: Dictionary = _core.frame_run()
+	var router := source.get_object() as InputRouter
+	if router!=null and frame.ok: router.drawing = frame.value.ui.draw.drawing
 	var intent = source.call() if frame.ok and frame.value.ui.input_enabled else Intent.new()
 	if not intent is Intent:
 		_busy = false

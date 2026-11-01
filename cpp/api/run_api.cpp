@@ -39,7 +39,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     if (!candidate->configure_content(bytes)) return failure(1,"bundle","生成物の版・参照・署名を確認してください");
     speed::apply_config(candidate->runtime.content->config,candidate->runtime.state);
     auto &state=candidate->runtime.state;const auto &s=state.ship_config;const auto &d=state.draw_config;const auto &c=state.control;
-    if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || d.charge_time<=0 || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1 || state.frame_grid_cell<=0) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
+    if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || d.charge_time<=0 || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1 || state.frame_grid_cell<=0 || candidate->runtime.content->config.character_scale<=0) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
     candidate->runtime.api_run_id=options["run_id"];candidate->runtime.api_development=int64_t(options["mode"])==1;
     candidate->runtime.state.control.stage_id=String(options["stage_id"]);candidate->runtime.api_configured=true;
     const auto &forward=candidate->runtime.content->forward_levels.front();
