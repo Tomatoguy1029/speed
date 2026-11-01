@@ -5,6 +5,9 @@
 class_name BossActor
 extends Node2D
 
+## 通常敵の本体と同じ帯。結晶（z=6）より前に全ボス本体を置く。
+const BODY_Z_INDEX := 7
+
 var combat_trace := preload("res://scripts/bosses/combat_trace.gd").new()
 ## Adapter scopes natural AI; direct/debug callers keep the explicit external origin.
 var combat_origin := "external_forced"
@@ -41,6 +44,8 @@ func bind(context: RunContext, row: int, d: BossDef) -> void:
 	def = d
 	position = table.pos[row]
 	combat_trace.bind(self)
+	# 子の面の絶対zを解決する初期化より先に基準を確定する。
+	z_index = maxi(z_index, BODY_Z_INDEX)
 	_on_bound()
 
 ## 録画停止・役者の解放では、並行する行動も含めて観測を閉じる。

@@ -27,12 +27,13 @@ func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self, "boss/body/centaurus")
 func bind_centaurus(owner_actor: CentaurusBoss) -> void:
 	actor = owner_actor
+	# parts._ready()でBaseの絶対zを求める前に、本体の描画帯を確定する。
+	z_index = 1
 	_parts = PARTS.instantiate()
 	_parts.rotation = -PI * 0.5
 	add_child(_parts)
 	actor.presentation_event.connect(_event)
 	actor.presentation_advanced.connect(_advance)
-	z_index = 1
 
 func _event(event: Dictionary) -> void:
 	if event.cue in [&"released", &"fan_released", &"sail_shot"]: _parts.release_bow(float(actor.rule().get("interval", 0.4)))

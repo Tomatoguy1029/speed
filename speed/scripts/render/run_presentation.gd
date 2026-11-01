@@ -5,9 +5,10 @@
 class_name RunPresentation
 extends Node
 
-const XP_COLOR := Color("#b8a0ff")
+const MAGNET_COLOR := Color("#b8a0ff")
 const COIN_COLOR := Color("#ffd24a")
-const XP_OUTLINE := Color("#39265e")
+const CRYSTAL_COLORS := [Color("#08deff"), Color("#945cff"), Color("#ffb609")]
+const CRYSTAL_FACETS_PATH := "res://assets/pixel/xp_crystal_facets.tres"
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
@@ -255,7 +256,13 @@ func _build_batches() -> void:
 	_armor_material = ShaderMaterial.new()
 	_armor_material.shader = preload("res://shaders/pixel_armor.gdshader")
 	var gem := InstanceBatch.new()
-	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
+	# 固定の形・面はランのScopeで保持し、描画中に画像を生成しない。
+	var facets := run.ctx.resources.resources.get(CRYSTAL_FACETS_PATH) as Texture2D
+	if facets == null and state.lab_mode:
+		facets = load(CRYSTAL_FACETS_PATH) as Texture2D
+		run.ctx.resources.provide(CRYSTAL_FACETS_PATH, facets)
+	assert(facets != null, "経験値の結晶の固定面マスクが必要")
+	gem.setup_texture(facets)
 	var gem_mat := ShaderMaterial.new()
 	gem_mat.shader = load("res://shaders/xp_crystal.gdshader")
 	gem.material = gem_mat
@@ -884,19 +891,18 @@ func _draw_hero(c: CanvasItem) -> void:
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
 	var view := view_rect().grow(60.0)
-	# 経験値の結晶：画面上で最低 8px の高さ（仕様書 17）
+	# 旧1XPの基準寸法を全色で使う。長辺2のテクスチャを旧メッシュの2.8へ合わせる。
 	var gs := maxf(5.0, _px(4.0))
 	var gems: InstanceBatch = _batches[&"gem"]
 	gems.begin()
 	var gem_alive := p.gem_alive
 	var gem_pos := p.gem_pos
-	var gem_value := p.gem_value
+	var gem_kind := p.gem_kind
 	for i in gem_alive.size():
 		var pos := gem_pos[i]
 		if gem_alive[i] != 0 and view.has_point(pos):
-			# 経験値の多い結晶ほど大きい（経験値1で等倍、最大3倍）
-			var v := gem_value[i]
-			gems.add_upright(pos, gs * (1.0 if v <= 1.0 else minf(pow(v, 0.2), 3.0)), XP_COLOR)
+			# 集約黄の保持XPが増えても形・寸法・色を変えない。
+			gems.add_upright(pos, gs * 1.4, CRYSTAL_COLORS[gem_kind[i]])
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
@@ -920,7 +926,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 					cap.pos + Vector2(0, 22), cap.pos + Vector2(-18, 0)]), Color("#efcb70"))
 				c.draw_circle(cap.pos, 7.0, Color("#fff1bf"))
 			Pickup.Kind.MAGNET:
-				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, XP_COLOR, 6.0)
+				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, MAGNET_COLOR, 6.0)
 				c.draw_rect(Rect2(cap.pos + Vector2(-17, 0), Vector2(6, 10)), Color.WHITE)
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 

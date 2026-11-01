@@ -364,7 +364,7 @@ func field_items() -> Array:
 			FIELD_ITEM.make(&"field_comet", tr("lab.field.comet"), &"comet", 45.0, Color("#9fd6ff")),
 			FIELD_ITEM.make(&"field_gravity", tr("lab.field.gravity"), &"gravity", 0.0, Color("#a98cff")),
 			FIELD_ITEM.make(&"field_warp", tr("lab.field.warp"), &"warp", 0.0, Color("#d6a8ff")),
-			FIELD_ITEM.make(&"field_gem", tr("lab.field.gem"), &"gem", 140.0, RunPresentation.XP_COLOR),
+			FIELD_ITEM.make(&"field_gem", tr("lab.field.gem"), &"gem", 140.0, RunPresentation.CRYSTAL_COLORS[PickupSystem.GemKind.LOW]),
 		]
 	return _field_items
 

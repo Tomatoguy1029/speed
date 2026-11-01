@@ -7,6 +7,7 @@ func _ready() -> void:
 	_parts = preload("res://scripts/bosses/draco_parts.gd").new()
 	add_child(_parts)
 	top_level = true
+	z_index = BossActor.BODY_Z_INDEX
 	material = ShaderMaterial.new()
 	material.shader = preload("res://shaders/picaro.gdshader")
 func _process(_dt: float) -> void:
