@@ -86,9 +86,13 @@ void SpeedRunCore::move_ship(double dt, Vector2 accel) {
 }
 
 bool SpeedRunCore::step_ship(double real_dt, double world_dt, const Dictionary &input) {
+    speed::InputFrame frame;
+    if (!speed::decode_input(input,frame,false)) return false;
+    return step_ship_input(real_dt,world_dt,frame);
+}
+
+bool SpeedRunCore::step_ship_input(double real_dt, double world_dt, const speed::InputFrame &input) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !std::isfinite(real_dt) || !std::isfinite(world_dt) || real_dt < 0 || world_dt < 0) return false;
-    for (const char *key : {"touch", "has_cursor", "stick_active"}) if (input.has(key) && input[key].get_type() != Variant::BOOL) return false;
-    for (const char *key : {"cursor", "stick"}) if (input.has(key) && (input[key].get_type() != Variant::VECTOR2 || !Vector2(input[key]).is_finite())) return false;
     if (runtime.state.ship.hurt > 0) runtime.state.ship.hurt -= real_dt;
     if (runtime.state.ship.invuln > 0) runtime.state.ship.invuln -= world_dt;
     runtime.state.ship.shield_flash = std::max(0.0, runtime.state.ship.shield_flash - world_dt);
@@ -98,11 +102,11 @@ bool SpeedRunCore::step_ship(double real_dt, double world_dt, const Dictionary &
     }
     if (runtime.state.draw.drawing || runtime.state.draw.tracing || world_dt <= 0) return true;
     const auto &c = runtime.state.ship_config;
-    if (bool(input.get("touch", false))) {
-        const Vector2 stick = input.get("stick", Vector2());
-        if (bool(input.get("stick_active", false)) && stick.length() >= c.stick_dead_zone) steer_ship(stick.angle(), world_dt);
-    } else if (bool(input.get("has_cursor", false))) {
-        const Vector2 d = Vector2(input.get("cursor", Vector2())) - runtime.state.ship.pos;
+    if (bool(input.touch)) {
+        const Vector2 stick = input.stick;
+        if (bool(input.stick_active) && stick.length() >= c.stick_dead_zone) steer_ship(stick.angle(), world_dt);
+    } else if (bool(input.has_cursor)) {
+        const Vector2 d = Vector2(input.cursor) - runtime.state.ship.pos;
         if (d.length_squared() >= c.mouse_dead_zone * c.mouse_dead_zone) steer_ship(d.angle(), world_dt);
     }
     const double r = runtime.state.ship.pos.length();

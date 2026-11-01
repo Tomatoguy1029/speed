@@ -14,15 +14,15 @@ def generate():
     records=schema['records']; names={r['name'] for r in records}
     assert len(names)==len(records) and len({r['section'] for r in records})==len(records)
     for record in records:
-        assert set(record)<= {'name','section','fields','enabled'}
+        assert set(record)<= {'name','section','fields','enabled','version'}
         keys=set()
         for field in record['fields']:
-            assert set(field)<= {'name','type','min','max','source','ref','native'}
+            assert set(field)<= {'name','type','min','max','source','ref','native','runtime','config','value'}
             assert field['name'].isidentifier() and field['type'] in TYPES
             assert field.get('ref',record['name']) in names
             assert field.get('source',field['name']) not in keys
             keys.add(field.get('source',field['name']))
-    cpp=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include "../binary_reader.h"','#include <vector>','#include <unordered_set>','namespace speed {']
+    cpp=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include "../binary_reader.h"','#include <vector>','#include <unordered_set>','#include "../../state/run_state.h"','namespace speed {']
     for rec in records:
         cpp += [f'struct {rec["name"]} {{']+[f'    {TYPES[f["type"]]} {f["name"]}{{}};' for f in rec['fields']]+['};']
         cpp += [f'inline bool read(BinaryReader &input, {rec["name"]} &out) {{']
@@ -32,10 +32,10 @@ def generate():
                 if constraint in f:cpp += [f'    if (out.{f["name"]} {op} {f[constraint]}) return false;']
         cpp += ['    return true;','}']
     cpp+=['struct ContentRecords {']+[f'    std::vector<{r["name"]}> {r["name"]}_rows;' for r in records]+['};']
-    cpp+=['inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {','    if (version != 1) return false;','    switch(kind) {']
+    cpp+=['inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {','    switch(kind) {']
     for rec in records:
         n=rec['name'];minimum=sum(WIDTH[f['type']] for f in rec['fields'])
-        cpp += [f'    case {rec["section"]}: {{']
+        cpp += [f'    case {rec["section"]}: {{',f'        if (version != {rec.get("version",1)}) return false;']
         if not rec.get('enabled',True):cpp+=['        if (count) return false;']
         cpp += [f'        if (count > input.remaining()/{minimum}) return false;',f'        for (uint32_t i=0; i<count; ++i) {{ {n} row; if (!read(input,row)) return false; out.{n}_rows.push_back(std::move(row)); }}','        return input.remaining()==0;','    }']
     cpp+=['    default: return false;','    }','}']
@@ -46,6 +46,10 @@ def generate():
         for f in rec['fields']:
             if 'ref' in f:cpp += [f'    for (const auto &row:data.{rec["name"]}_rows) if (!{f["ref"]}_ids.count(row.{f["name"]})) return false;']
     cpp+=['    return true;','}']
+    cpp+=['inline void apply_config(const RunConfig &config, godot::RunState &state) {']
+    for f in records[0]['fields']:
+        if 'runtime' in f:cpp += [f'    state.{f["runtime"]}=config.{f["name"]};']
+    cpp+=['}']
     cpp+=['inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringName &id) {','    EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;']
     for f in next(r for r in records if r['name']=='ChaseDefinition')['fields']:
         if 'native' in f:cpp += [f'    out.{f["native"]}=row.{f["name"]};']
@@ -78,7 +82,7 @@ static func write_content(data: Dictionary, input_sha256: PackedByteArray) -> Pa
 		for row in data[record.name]:
 			for field in record.fields:
 				_put(payload,field.type,row[field.get("source",field.name)])
-		sections.append([record.section,start,payload.get_position()-start,data[record.name].size()])
+		sections.append([record.section,start,payload.get_position()-start,data[record.name].size(),record.get("version",1)])
 	var output := StreamPeerBuffer.new()
 	output.big_endian = false
 	output.put_data("SPDRUN01".to_ascii_buffer())
@@ -91,7 +95,7 @@ static func write_content(data: Dictionary, input_sha256: PackedByteArray) -> Pa
 	var begin := 88+32*sections.size()
 	for section in sections:
 		output.put_u32(section[0])
-		output.put_u32(1)
+		output.put_u32(section[4])
 		output.put_u64(begin+section[1])
 		output.put_u64(section[2])
 		output.put_u32(section[3])

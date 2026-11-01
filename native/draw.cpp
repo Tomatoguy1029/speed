@@ -109,12 +109,16 @@ void SpeedRunCore::commit_draw() {
 }
 
 bool SpeedRunCore::handle_draw(const Dictionary &input, int64_t clock_msec, double camera_zoom) {
+    speed::InputFrame frame;
+    if (!speed::decode_input(input,frame,false)) return false;
+    return handle_draw_input(frame,clock_msec,camera_zoom);
+}
+
+bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clock_msec, double camera_zoom) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.draw_ready || clock_msec < 0 || !std::isfinite(camera_zoom) || camera_zoom <= 0) return false;
-    for (const char *key : {"touch", "press", "alt_press", "has_cursor", "pen_release"}) if (input.has(key) && input[key].get_type() != Variant::BOOL) return false;
-    if (input.has("pen") && (input["pen"].get_type() != Variant::VECTOR2 || !Vector2(input["pen"]).is_finite())) return false;
-    const bool press = input.get("press", false), alt = input.get("alt_press", false);
-    const bool touch = input.get("touch", false), release = input.get("pen_release", false);
-    const Vector2 pen = input.get("pen", Vector2());
+    const bool press = input.press, alt = input.alt_press;
+    const bool touch = input.touch, release = input.pen_release;
+    const Vector2 pen = input.pen;
     if (!runtime.state.draw.drawing && !runtime.state.draw.tracing) {
         if ((press || alt) && runtime.state.draw_config.capacity * runtime.state.draw.gauge >= runtime.state.draw_config.min_charge) begin_draw(press, pen, clock_msec);
         return true;
@@ -125,7 +129,7 @@ bool SpeedRunCore::handle_draw(const Dictionary &input, int64_t clock_msec, doub
         else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); }
         return true;
     }
-    if (bool(input.get("has_cursor", false))) extend_draw(pen, camera_zoom);
+    if (bool(input.has_cursor)) extend_draw(pen, camera_zoom);
     if (touch && (release || alt)) commit_draw();
     else if (runtime.state.draw.length >= runtime.state.draw.limit - 0.5 || runtime.state.draw.blocked) commit_draw();
     else if (press && clock_msec - runtime.state.draw.first_msec >= runtime.state.draw_config.confirm_delay * 1000.0 && runtime.state.draw.points.size() >= 2) commit_draw();

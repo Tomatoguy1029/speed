@@ -27,6 +27,9 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	data.RunConfig = [{"id":1,"aim_lag":resolved.motion.aim_lag,"aim_speed":resolved.motion.aim_speed,"crystal_low":config.xp_crystal_values[0],"crystal_mid":config.xp_crystal_values[1],"crystal_high":config.xp_crystal_values[2]}]
+	for field in Schema.SCHEMA.records[0].fields:
+		if field.has("config"): data.RunConfig[0][field.name] = config.get(field.config)
+		elif field.has("value"): data.RunConfig[0][field.name] = field.value
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.ChaseDefinition = [row]
@@ -92,7 +95,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	else:
 		var saved = ResourceLoader.load(resources_path,"",ResourceLoader.CACHE_MODE_IGNORE)
 		if saved == null or saved.input_sha256!=input_sha256 or saved.paths!=resources.paths: return ERR_FILE_CORRUPT
-	var index := {"format":1,"source_sha256":source_sha256,"input_sha256":input_sha256,"payload_sha256":bytes.slice(56,88).hex_encode(),"binary":binary_path,"resources":resources_path,"resources_sha256":FileAccess.get_sha256(resources_path)}
+	var index := {"format":1,"stage_id":str(stage.index),"source_sha256":source_sha256,"input_sha256":input_sha256,"payload_sha256":bytes.slice(56,88).hex_encode(),"binary":binary_path,"resources":resources_path,"resources_sha256":FileAccess.get_sha256(resources_path)}
 	var pending_path := output.path_join("stage_%d.pending.json" % stage.index)
 	var final_path := output.path_join("stage_%d.json" % stage.index)
 	var file := FileAccess.open(pending_path,FileAccess.WRITE)

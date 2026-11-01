@@ -14,6 +14,9 @@ public:
     std::shared_ptr<const ContentBundle> content = std::make_shared<const ContentBundle>();
     RunWorkspace workspace;
     int64_t epoch=1;
+    int64_t api_run_id=0, last_command_id=0;
+    bool api_configured=false, api_development=false, busy=false;
+    godot::Dictionary last_command_response;
     bool full_output_dirty=false, pending_resource_rebuild=false;
     void replace_definitions(std::vector<EnemyDefinition> definitions) {
         auto next = std::make_shared<ContentBundle>();

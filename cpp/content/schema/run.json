@@ -36,8 +36,303 @@
           "name": "crystal_high",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "ship_config_start_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.start_radius",
+          "config": "start_radius"
+        },
+        {
+          "name": "ship_config_base_max_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.base_max_speed",
+          "config": "base_max_speed"
+        },
+        {
+          "name": "ship_config_stick_dead_zone",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.stick_dead_zone",
+          "config": "stick_dead_zone"
+        },
+        {
+          "name": "ship_config_mouse_dead_zone",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.mouse_dead_zone",
+          "config": "mouse_dead_zone"
+        },
+        {
+          "name": "ship_config_steer_cruise",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.steer_cruise",
+          "config": "steer_cruise"
+        },
+        {
+          "name": "ship_config_glide_hold",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.glide_hold",
+          "config": "glide_hold"
+        },
+        {
+          "name": "ship_config_glide_fade",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.glide_fade",
+          "config": "glide_fade"
+        },
+        {
+          "name": "ship_config_cruise_floor",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.cruise_floor",
+          "config": "cruise_floor"
+        },
+        {
+          "name": "ship_config_energy_cut",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.energy_cut",
+          "config": "energy_cut"
+        },
+        {
+          "name": "ship_config_cruise_drag",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.cruise_drag",
+          "config": "cruise_drag"
+        },
+        {
+          "name": "ship_config_overcap_decay",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.overcap_decay",
+          "config": "overcap_decay"
+        },
+        {
+          "name": "ship_config_field_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.field_radius",
+          "config": "field_radius"
+        },
+        {
+          "name": "ship_config_boundary_push",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.boundary_push",
+          "config": "boundary_push"
+        },
+        {
+          "name": "ship_config_ship_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.ship_radius",
+          "config": "ship_radius"
+        },
+        {
+          "name": "ship_config_crash_restitution",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.crash_restitution",
+          "config": "crash_restitution"
+        },
+        {
+          "name": "ship_config_ship_hurt_time",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.ship_hurt_time",
+          "config": "ship_hurt_time"
+        },
+        {
+          "name": "ship_config_max_hp",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.max_hp",
+          "config": "base_hp"
+        },
+        {
+          "name": "ship_config_max_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.max_speed",
+          "config": "base_max_speed"
+        },
+        {
+          "name": "ship_config_turn_rate",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.turn_rate",
+          "config": "steer_rate"
+        },
+        {
+          "name": "ship_config_acceleration",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.acceleration",
+          "config": "steer_accel"
+        },
+        {
+          "name": "ship_config_glide_duration_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.glide_duration_mult",
+          "value": 1.0
+        },
+        {
+          "name": "ship_config_invulnerability",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.invulnerability",
+          "config": "invuln_time"
+        },
+        {
+          "name": "draw_config_min_charge",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.min_charge",
+          "config": "draw_min_charge"
+        },
+        {
+          "name": "draw_config_length",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.length",
+          "config": "draw_length"
+        },
+        {
+          "name": "draw_config_point_step",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.point_step",
+          "config": "draw_step"
+        },
+        {
+          "name": "draw_config_confirm_delay",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.confirm_delay",
+          "config": "draw_confirm_delay"
+        },
+        {
+          "name": "draw_config_run_time",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.run_time",
+          "config": "draw_run_time"
+        },
+        {
+          "name": "draw_config_time_scale",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.time_scale",
+          "config": "draw_time_scale"
+        },
+        {
+          "name": "draw_config_slow_ref",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.slow_ref",
+          "config": "draw_run_slow_ref"
+        },
+        {
+          "name": "draw_config_scale_min",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.scale_min",
+          "config": "draw_run_scale_min"
+        },
+        {
+          "name": "draw_config_boost_duration",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.boost_duration",
+          "config": "boost_duration"
+        },
+        {
+          "name": "draw_config_carry",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.carry",
+          "config": "carry"
+        },
+        {
+          "name": "draw_config_launch_ratio",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.launch_ratio",
+          "config": "launch_ratio"
+        },
+        {
+          "name": "draw_config_glide_ratio",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.glide_ratio",
+          "config": "glide_speed_ratio"
+        },
+        {
+          "name": "draw_config_capacity",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.capacity",
+          "value": 1.0
+        },
+        {
+          "name": "draw_config_charge_time",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.charge_time",
+          "config": "dash_charge_time"
+        },
+        {
+          "name": "draw_config_length_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.length_mult",
+          "value": 1.0
+        },
+        {
+          "name": "camera_base_view",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.base_view",
+          "config": "base_view"
+        },
+        {
+          "name": "camera_zoom_ref_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.zoom_ref_speed",
+          "config": "zoom_ref_speed"
+        },
+        {
+          "name": "camera_zoom_exp",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.zoom_exp",
+          "config": "zoom_exp"
+        },
+        {
+          "name": "camera_zoom_min",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.zoom_min",
+          "config": "zoom_min"
+        },
+        {
+          "name": "camera_look_ahead",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.look_ahead",
+          "config": "look_ahead"
         }
-      ]
+      ],
+      "version": 3
     },
     {
       "name": "StringEntry",
@@ -263,7 +558,8 @@
           "type": "bool",
           "native": "gold_eligible"
         }
-      ]
+      ],
+      "version": 2
     },
     {
       "name": "LoadoutDefinition",

@@ -9,6 +9,7 @@ namespace speed {
 // ランと保持したランで共有する読み取り専用の定義。
 struct ContentBundle {
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};
+    RunConfig config;
     std::array<double,3> crystal_values{};
     double aim_lag=0, aim_speed=0;
     std::vector<EnemyDefinition> definitions;

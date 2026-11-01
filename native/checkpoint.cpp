@@ -55,6 +55,9 @@ bool SpeedRunCore::restore_checkpoint(int64_t id) {
     if (!speed::rebuild_state_indexes(candidate->runtime.state,*candidate->runtime.content) ||
         !candidate->rebuild_enemy_grid(grid_cell)) return false;
     candidate->runtime.epoch=runtime.epoch+1;
+    candidate->runtime.api_configured=runtime.api_configured;
+    candidate->runtime.api_run_id=runtime.api_run_id;
+    candidate->runtime.api_development=runtime.api_development;
     candidate->runtime.full_output_dirty=true;
     candidate->runtime.pending_resource_rebuild=true;
     runtime=std::move(candidate->runtime);

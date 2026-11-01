@@ -9,6 +9,13 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_run", "bytes", "options"), &SpeedRunCore::configure_run);
+    ClassDB::bind_method(D_METHOD("start_run", "seed", "options"), &SpeedRunCore::start_run);
+    ClassDB::bind_method(D_METHOD("step_run", "dt", "input", "viewport"), &SpeedRunCore::step_run);
+    ClassDB::bind_method(D_METHOD("command_run", "envelope"), &SpeedRunCore::command_run);
+    ClassDB::bind_method(D_METHOD("frame_run"), &SpeedRunCore::frame_run);
+    ClassDB::bind_method(D_METHOD("dispose_run"), &SpeedRunCore::dispose_run);
+
     ClassDB::bind_method(D_METHOD("hold_checkpoint"), &SpeedRunCore::hold_checkpoint);
     ClassDB::bind_method(D_METHOD("restore_checkpoint", "id"), &SpeedRunCore::restore_checkpoint);
     ClassDB::bind_method(D_METHOD("release_checkpoint", "id"), &SpeedRunCore::release_checkpoint);

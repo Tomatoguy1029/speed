@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--bridge-only" in OS.get_cmdline_user_args():
+		check(check_run_bridge(), "入力接続の確認が最後まで完了する")
+		print("[run_bridge] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--random-only" in OS.get_cmdline_user_args():
 		check(check_run_random(), "戦闘乱数の確認が最後まで完了する")
 		print("[run_random] failed=%d" % failed)
@@ -231,4 +236,66 @@ func check_run_random() -> bool:
 	check(first.release_checkpoint(saved), "確認に使った保持点を解除する")
 	first.close()
 	second.close()
+	return true
+
+func check_run_bridge() -> bool:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var stage := RuntimeStage.new()
+	stage.index = 79
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_bridge"
+	var signature := "入力接続の固定入力".sha256_text()
+	if builder.build(stage,ContentManager.base,output,signature)!=OK: return false
+	var path := output.path_join("stage_79.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var options := {"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":42}
+	var session: RunSession = RunManager.create_session(self,options,false)
+	session.auto_step = false
+	if session.bridge == null: return false
+	var bridge = session.bridge
+	check(bridge.read_frame().ok, "通常SessionがC++の窓口を所有する")
+	var initial: Dictionary = bridge.read_frame().value
+	var input := Intent.new()
+	input.has_cursor = true
+	input.cursor = Vector2(2000,0)
+	for tick in range(30):
+		check(bridge.step(1.0/120.0,bridge.pack_intent(input),{"logical_size":Vector2(640,480)}).ok, "固定更新で移動入力を届ける")
+	var moved: Dictionary = bridge.read_frame().value
+	check(moved.tick==30 and moved.ui.ship.ship_pos!=initial.ui.ship.ship_pos, "120Hzの更新を一度ずつ実行する")
+	var pen: Vector2 = moved.ui.ship.ship_pos
+	input.press = true
+	input.pen = pen
+	input.touch = true
+	check(bridge.step(1.0/120.0,bridge.pack_intent(input),{"logical_size":Vector2(640,480)}).ok and bridge.read_frame().value.ui.draw.drawing, "押下で描線を始める")
+	input.press = false
+	input.pen_release = true
+	input.pen = pen+Vector2(100,0)
+	check(bridge.step(1.0/120.0,bridge.pack_intent(input),{"logical_size":Vector2(640,480)}).ok, "ペンの移動と解放を届ける")
+	check(not bridge.read_frame().value.ui.draw.drawing, "タッチの解放で描線を確定する")
+	var envelope := {"run_id":session.id,"epoch":bridge._epoch,"command_id":1,"kind":"pause","payload":{"paused":true}}
+	var first: Dictionary = bridge.send_envelope(envelope)
+	var revision: int = bridge.read_frame().value.state_revision
+	check(first.ok and bridge.send_envelope(envelope)==first and bridge.read_frame().value.state_revision==revision, "同じ命令番号は同じ返答で二重適用しない")
+	var invalid := envelope.duplicate(true)
+	invalid.epoch -= 1
+	check(bridge.send_envelope(invalid).code==3, "古い世代の命令を拒否する")
+	var prior: Dictionary = bridge.read_frame().value
+	check(bridge.step(1.0/60.0,bridge.pack_intent(input),{"logical_size":Vector2(640,480)}).code==1 and bridge.read_frame().value==prior, "不正dtを変更前に拒否する")
+	var malformed: Dictionary = bridge.pack_intent(input)
+	malformed.hero_press = 1
+	check(bridge.step(1.0/120.0,malformed,{"logical_size":Vector2(640,480)}).code==1, "入力の全フィールドを型で検査する")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(input),{"logical_size":Vector2(640,480),"zoom":1.0}).code==1, "カメラ倍率を外部から渡さない")
+	var reentry := []
+	var provider := func() -> Intent:
+		reentry.append(bridge.command("pause",{"paused":false}).code)
+		return Intent.new()
+	check(bridge.poll_and_step(1.0/120.0,provider,Vector2(640,480)).ok and reentry==[7], "入力取得中の再入を拒否する")
+	check(bridge.dispose().ok and bridge.dispose().ok and not bridge.read_frame().ok, "破棄は繰り返し安全で旧窓口は使えない")
+	var previous_id := session.id
+	session.free()
+	var next: RunSession = RunManager.create_session(self,options,false)
+	next.auto_step = false
+	check(next.id>previous_id and next.bridge!=null and next.bridge.read_frame().value.tick==0, "再出撃は別のランIDと状態を使う")
+	next.free()
 	return true

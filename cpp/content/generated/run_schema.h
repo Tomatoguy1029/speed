@@ -3,6 +3,7 @@
 #include "../binary_reader.h"
 #include <vector>
 #include <unordered_set>
+#include "../../state/run_state.h"
 namespace speed {
 struct RunConfig {
     uint32_t id{};
@@ -11,6 +12,48 @@ struct RunConfig {
     double crystal_low{};
     double crystal_mid{};
     double crystal_high{};
+    double ship_config_start_radius{};
+    double ship_config_base_max_speed{};
+    double ship_config_stick_dead_zone{};
+    double ship_config_mouse_dead_zone{};
+    double ship_config_steer_cruise{};
+    double ship_config_glide_hold{};
+    double ship_config_glide_fade{};
+    double ship_config_cruise_floor{};
+    double ship_config_energy_cut{};
+    double ship_config_cruise_drag{};
+    double ship_config_overcap_decay{};
+    double ship_config_field_radius{};
+    double ship_config_boundary_push{};
+    double ship_config_ship_radius{};
+    double ship_config_crash_restitution{};
+    double ship_config_ship_hurt_time{};
+    double ship_config_max_hp{};
+    double ship_config_max_speed{};
+    double ship_config_turn_rate{};
+    double ship_config_acceleration{};
+    double ship_config_glide_duration_mult{};
+    double ship_config_invulnerability{};
+    double draw_config_min_charge{};
+    double draw_config_length{};
+    double draw_config_point_step{};
+    double draw_config_confirm_delay{};
+    double draw_config_run_time{};
+    double draw_config_time_scale{};
+    double draw_config_slow_ref{};
+    double draw_config_scale_min{};
+    double draw_config_boost_duration{};
+    double draw_config_carry{};
+    double draw_config_launch_ratio{};
+    double draw_config_glide_ratio{};
+    double draw_config_capacity{};
+    double draw_config_charge_time{};
+    double draw_config_length_mult{};
+    double camera_base_view{};
+    double camera_zoom_ref_speed{};
+    double camera_zoom_exp{};
+    double camera_zoom_min{};
+    double camera_look_ahead{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -25,6 +68,90 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.crystal_mid < 0) return false;
     if (!input.read_f64(out.crystal_high)) return false;
     if (out.crystal_high < 0) return false;
+    if (!input.read_f64(out.ship_config_start_radius)) return false;
+    if (out.ship_config_start_radius < 0) return false;
+    if (!input.read_f64(out.ship_config_base_max_speed)) return false;
+    if (out.ship_config_base_max_speed < 0) return false;
+    if (!input.read_f64(out.ship_config_stick_dead_zone)) return false;
+    if (out.ship_config_stick_dead_zone < 0) return false;
+    if (!input.read_f64(out.ship_config_mouse_dead_zone)) return false;
+    if (out.ship_config_mouse_dead_zone < 0) return false;
+    if (!input.read_f64(out.ship_config_steer_cruise)) return false;
+    if (out.ship_config_steer_cruise < 0) return false;
+    if (!input.read_f64(out.ship_config_glide_hold)) return false;
+    if (out.ship_config_glide_hold < 0) return false;
+    if (!input.read_f64(out.ship_config_glide_fade)) return false;
+    if (out.ship_config_glide_fade < 0) return false;
+    if (!input.read_f64(out.ship_config_cruise_floor)) return false;
+    if (out.ship_config_cruise_floor < 0) return false;
+    if (!input.read_f64(out.ship_config_energy_cut)) return false;
+    if (out.ship_config_energy_cut < 0) return false;
+    if (!input.read_f64(out.ship_config_cruise_drag)) return false;
+    if (out.ship_config_cruise_drag < 0) return false;
+    if (!input.read_f64(out.ship_config_overcap_decay)) return false;
+    if (out.ship_config_overcap_decay < 0) return false;
+    if (!input.read_f64(out.ship_config_field_radius)) return false;
+    if (out.ship_config_field_radius < 0) return false;
+    if (!input.read_f64(out.ship_config_boundary_push)) return false;
+    if (out.ship_config_boundary_push < 0) return false;
+    if (!input.read_f64(out.ship_config_ship_radius)) return false;
+    if (out.ship_config_ship_radius < 0) return false;
+    if (!input.read_f64(out.ship_config_crash_restitution)) return false;
+    if (out.ship_config_crash_restitution < 0) return false;
+    if (!input.read_f64(out.ship_config_ship_hurt_time)) return false;
+    if (out.ship_config_ship_hurt_time < 0) return false;
+    if (!input.read_f64(out.ship_config_max_hp)) return false;
+    if (out.ship_config_max_hp < 0) return false;
+    if (!input.read_f64(out.ship_config_max_speed)) return false;
+    if (out.ship_config_max_speed < 0) return false;
+    if (!input.read_f64(out.ship_config_turn_rate)) return false;
+    if (out.ship_config_turn_rate < 0) return false;
+    if (!input.read_f64(out.ship_config_acceleration)) return false;
+    if (out.ship_config_acceleration < 0) return false;
+    if (!input.read_f64(out.ship_config_glide_duration_mult)) return false;
+    if (out.ship_config_glide_duration_mult < 0) return false;
+    if (!input.read_f64(out.ship_config_invulnerability)) return false;
+    if (out.ship_config_invulnerability < 0) return false;
+    if (!input.read_f64(out.draw_config_min_charge)) return false;
+    if (out.draw_config_min_charge < 0) return false;
+    if (!input.read_f64(out.draw_config_length)) return false;
+    if (out.draw_config_length < 0) return false;
+    if (!input.read_f64(out.draw_config_point_step)) return false;
+    if (out.draw_config_point_step < 0) return false;
+    if (!input.read_f64(out.draw_config_confirm_delay)) return false;
+    if (out.draw_config_confirm_delay < 0) return false;
+    if (!input.read_f64(out.draw_config_run_time)) return false;
+    if (out.draw_config_run_time < 0) return false;
+    if (!input.read_f64(out.draw_config_time_scale)) return false;
+    if (out.draw_config_time_scale < 0) return false;
+    if (!input.read_f64(out.draw_config_slow_ref)) return false;
+    if (out.draw_config_slow_ref < 0) return false;
+    if (!input.read_f64(out.draw_config_scale_min)) return false;
+    if (out.draw_config_scale_min < 0) return false;
+    if (!input.read_f64(out.draw_config_boost_duration)) return false;
+    if (out.draw_config_boost_duration < 0) return false;
+    if (!input.read_f64(out.draw_config_carry)) return false;
+    if (out.draw_config_carry < 0) return false;
+    if (!input.read_f64(out.draw_config_launch_ratio)) return false;
+    if (out.draw_config_launch_ratio < 0) return false;
+    if (!input.read_f64(out.draw_config_glide_ratio)) return false;
+    if (out.draw_config_glide_ratio < 0) return false;
+    if (!input.read_f64(out.draw_config_capacity)) return false;
+    if (out.draw_config_capacity < 0) return false;
+    if (!input.read_f64(out.draw_config_charge_time)) return false;
+    if (out.draw_config_charge_time < 0) return false;
+    if (!input.read_f64(out.draw_config_length_mult)) return false;
+    if (out.draw_config_length_mult < 0) return false;
+    if (!input.read_f64(out.camera_base_view)) return false;
+    if (out.camera_base_view < 0) return false;
+    if (!input.read_f64(out.camera_zoom_ref_speed)) return false;
+    if (out.camera_zoom_ref_speed < 0) return false;
+    if (!input.read_f64(out.camera_zoom_exp)) return false;
+    if (out.camera_zoom_exp < 0) return false;
+    if (!input.read_f64(out.camera_zoom_min)) return false;
+    if (out.camera_zoom_min < 0) return false;
+    if (!input.read_f64(out.camera_look_ahead)) return false;
+    if (out.camera_look_ahead < 0) return false;
     return true;
 }
 struct StringEntry {
@@ -219,71 +346,82 @@ struct ContentRecords {
     std::vector<ResourceKey> ResourceKey_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
-    if (version != 1) return false;
     switch(kind) {
     case 1: {
-        if (count > input.remaining()/44) return false;
+        if (version != 3) return false;
+        if (count > input.remaining()/380) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 2: {
+        if (version != 1) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { StringEntry row; if (!read(input,row)) return false; out.StringEntry_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 3: {
+        if (version != 1) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { DefinitionIndex row; if (!read(input,row)) return false; out.DefinitionIndex_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 4: {
+        if (version != 2) return false;
         if (count > input.remaining()/204) return false;
         for (uint32_t i=0; i<count; ++i) { ChaseDefinition row; if (!read(input,row)) return false; out.ChaseDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 5: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { LoadoutDefinition row; if (!read(input,row)) return false; out.LoadoutDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 6: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { HeroDefinition row; if (!read(input,row)) return false; out.HeroDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 7: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { FieldDefinition row; if (!read(input,row)) return false; out.FieldDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 8: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { PopulationDefinition row; if (!read(input,row)) return false; out.PopulationDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 9: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { FormationDefinition row; if (!read(input,row)) return false; out.FormationDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 10: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { BossFlowDefinition row; if (!read(input,row)) return false; out.BossFlowDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 11: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { TechniqueDefinition row; if (!read(input,row)) return false; out.TechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 12: {
+        if (version != 1) return false;
         if (count) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
@@ -321,6 +459,50 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DefinitionIndex_rows) if (!ChaseDefinition_ids.count(row.enemy)) return false;
     for (const auto &row:data.ChaseDefinition_rows) if (!StringEntry_ids.count(row.id)) return false;
     return true;
+}
+inline void apply_config(const RunConfig &config, godot::RunState &state) {
+    state.ship_config.start_radius=config.ship_config_start_radius;
+    state.ship_config.base_max_speed=config.ship_config_base_max_speed;
+    state.ship_config.stick_dead_zone=config.ship_config_stick_dead_zone;
+    state.ship_config.mouse_dead_zone=config.ship_config_mouse_dead_zone;
+    state.ship_config.steer_cruise=config.ship_config_steer_cruise;
+    state.ship_config.glide_hold=config.ship_config_glide_hold;
+    state.ship_config.glide_fade=config.ship_config_glide_fade;
+    state.ship_config.cruise_floor=config.ship_config_cruise_floor;
+    state.ship_config.energy_cut=config.ship_config_energy_cut;
+    state.ship_config.cruise_drag=config.ship_config_cruise_drag;
+    state.ship_config.overcap_decay=config.ship_config_overcap_decay;
+    state.ship_config.field_radius=config.ship_config_field_radius;
+    state.ship_config.boundary_push=config.ship_config_boundary_push;
+    state.ship_config.ship_radius=config.ship_config_ship_radius;
+    state.ship_config.crash_restitution=config.ship_config_crash_restitution;
+    state.ship_config.ship_hurt_time=config.ship_config_ship_hurt_time;
+    state.ship_config.max_hp=config.ship_config_max_hp;
+    state.ship_config.max_speed=config.ship_config_max_speed;
+    state.ship_config.turn_rate=config.ship_config_turn_rate;
+    state.ship_config.acceleration=config.ship_config_acceleration;
+    state.ship_config.glide_duration_mult=config.ship_config_glide_duration_mult;
+    state.ship_config.invulnerability=config.ship_config_invulnerability;
+    state.draw_config.min_charge=config.draw_config_min_charge;
+    state.draw_config.length=config.draw_config_length;
+    state.draw_config.point_step=config.draw_config_point_step;
+    state.draw_config.confirm_delay=config.draw_config_confirm_delay;
+    state.draw_config.run_time=config.draw_config_run_time;
+    state.draw_config.time_scale=config.draw_config_time_scale;
+    state.draw_config.slow_ref=config.draw_config_slow_ref;
+    state.draw_config.scale_min=config.draw_config_scale_min;
+    state.draw_config.boost_duration=config.draw_config_boost_duration;
+    state.draw_config.carry=config.draw_config_carry;
+    state.draw_config.launch_ratio=config.draw_config_launch_ratio;
+    state.draw_config.glide_ratio=config.draw_config_glide_ratio;
+    state.draw_config.capacity=config.draw_config_capacity;
+    state.draw_config.charge_time=config.draw_config_charge_time;
+    state.draw_config.length_mult=config.draw_config_length_mult;
+    state.control.base_view=config.camera_base_view;
+    state.control.zoom_ref_speed=config.camera_zoom_ref_speed;
+    state.control.zoom_exp=config.camera_zoom_exp;
+    state.control.zoom_min=config.camera_zoom_min;
+    state.control.look_ahead=config.camera_look_ahead;
 }
 inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringName &id) {
     EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;

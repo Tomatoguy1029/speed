@@ -49,7 +49,8 @@ func session(id: int) -> RunSession:
 func command(id: int, name: StringName, args := {}) -> void:
 	var s: RunSession = _sessions.get(id)
 	if s != null:
-		s.sim.command(name, args)
+		if s.bridge != null: s.bridge.command(String(name),args)
+		else: s.sim.command(name, args)
 
 ## RunSession が木から出るときに呼ぶ。
 func unregister(s: RunSession) -> void:
@@ -65,3 +66,9 @@ func _register(s: RunSession, options: Dictionary) -> RunSession:
 	_sessions[s.id] = s
 	session_created.emit(s)
 	return s
+
+## 手動で作ったSessionも同じ単調なランIDへ登録する。
+func ensure_registered(s: RunSession) -> bool:
+	if s.id>0: return _sessions.get(s.id)==s
+	if _next_id<=0 or _next_id==9223372036854775807: return false
+	return _register(s,{})!=null

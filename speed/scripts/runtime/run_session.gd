@@ -14,6 +14,8 @@ var sim := RunSimulation.new()
 var view: Node
 ## 固定更新を自分で進めるか。実験場は自分の時計で sim を進める
 var auto_step := true
+var bridge: RefCounted
+var cpp_input_source: Callable
 ## 開発用の録画条件。途中録画でもラン初期化時の実効値を保持する。
 var recording_initial: Dictionary = {}
 
@@ -54,6 +56,10 @@ func start_loading(options: Dictionary) -> void:
 ## 木に入ったあとに呼ぶ。表示を作る場合は、シミュレーションを組み立ててから表示を木に入れる。
 ## options.hud が false なら通常 HUD を省き、利用側が専用 UI を接続する。
 func start(options: Dictionary, with_view: bool) -> void:
+	if options.get("runtime", "") == "cpp":
+		var error := start_cpp_content(options.get("cpp_index",""),options.get("cpp_signature",""),options.get("seed",0))
+		if error != OK: push_error("C++ランの開始に失敗: %s" % error_string(error))
+		return
 	options = options.duplicate()
 	if not options.has("stage"):
 		options.stage = ContentManager.runtime_stage(int(options.get("stage_index", 1)))
@@ -105,10 +111,18 @@ func start(options: Dictionary, with_view: bool) -> void:
 	loading_timings["started_callbacks_ms"] = (Time.get_ticks_usec() - before) / 1000.0
 
 func _physics_process(delta: float) -> void:
+	if bridge != null:
+		if auto_step and cpp_input_source.is_valid():
+			var response: Dictionary = bridge.poll_and_step(delta,cpp_input_source,get_viewport().get_visible_rect().size)
+			if not response.ok:
+				auto_step = false
+				push_error("C++ランの更新に失敗: %s (%s)" % [response.message,response.field])
+		return
 	if auto_step and sim.state != null:
 		sim.physics_step(delta)
 
 func _process(delta: float) -> void:
+	if bridge != null: return
 	if sim.state == null:
 		if resources == null or _pending_options.is_empty(): return
 		_progress.value = resources.progress() * 100.0
@@ -141,7 +155,9 @@ func _notification(what: int) -> void:
 			get_parent().remove_child(self)
 		if resources != null: resources.cancel()
 		_pending_options.clear()
-		if cpp_core != null: cpp_core.close()
+		if bridge != null: bridge.dispose()
+		elif cpp_core != null: cpp_core.close()
+		bridge = null
 		cpp_core = null
 		cpp_resources = null
 		sim.dispose()
@@ -155,11 +171,21 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	if cpp_core != null or sim.state != null: return ERR_ALREADY_IN_USE
 	var prepared := preload("res://scripts/runtime/run_content_loader.gd").read_bundle(index_path,input_sha256)
 	if prepared.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
-	var core = ClassDB.instantiate(&"SpeedRunCore")
-	if not core.configure_content(prepared.bytes) or not core.start(seed_value):
-		core.close()
+	if not RunManager.ensure_registered(self): return ERR_OUT_OF_MEMORY
+	var next_bridge = preload("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":1,
+		"stage_id":prepared.index.get("stage_id",""),"profile":{},"settings":{}})
+	if not configured.ok:
+		next_bridge.dispose()
 		return ERR_INVALID_DATA
-	cpp_core = core
+	if not next_bridge.start(seed_value).ok:
+		next_bridge.dispose()
+		return ERR_INVALID_DATA
+	bridge = next_bridge
+	cpp_core = bridge._core
 	cpp_resources = prepared.resources
+	var router = preload("res://scripts/input/input_router.gd").new()
+	add_child(router)
+	cpp_input_source = router.poll
 	started.emit()
 	return OK

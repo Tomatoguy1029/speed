@@ -16,11 +16,15 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
+namespace speed { class RunRunner; }
 namespace godot {
 // 可変状態は各ランが所有する。終了した実体は再利用しない。
 class SpeedRunCore : public RefCounted {
     GDCLASS(SpeedRunCore, RefCounted)
     speed::RunRuntime runtime;
+    friend class speed::RunRunner;
+    bool step_ship_input(double real_dt,double world_dt,const speed::InputFrame &input);
+    bool handle_draw_input(const speed::InputFrame &input,int64_t clock_msec,double camera_zoom);
     using EnemyMode = RunState::EnemyMode;
     using Enemy = RunState::Enemy;
     using AttackBudget = RunState::AttackBudget;
@@ -149,6 +153,12 @@ public:
     bool step_projectiles(double world_dt);
     Array projectiles_snapshot() const;
     PackedFloat32Array friendly_buffer(StringName visual, double pixel, double scale, double clock) const;
+    Dictionary configure_run(const PackedByteArray &bytes,const Dictionary &options);
+    Dictionary start_run(const Variant &seed,const Dictionary &options);
+    Dictionary step_run(const Variant &dt,const Dictionary &input,const Dictionary &viewport);
+    Dictionary command_run(const Dictionary &envelope);
+    Dictionary frame_run() const;
+    Dictionary dispose_run();
     bool configure_content(const PackedByteArray &bytes);
     bool configure(const Dictionary &data);
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
