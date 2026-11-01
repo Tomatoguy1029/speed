@@ -26,10 +26,22 @@ func _ready() -> void:
 func burst_shader() -> Shader:
 	return TUNED_SHADERS[0]
 
+func _burst_key() -> String:
+	return KEY
+
+func _apply_effect_settings() -> void:
+	var fixed := BurstRuntime.profile(_burst_key(), rm == null)
+	if fixed.is_empty():
+		super._apply_effect_settings()
+	else:
+		pixel_scale = fixed.pixel_scale
+		effect_scale = fixed.effect_scale
+
 func _create_blasts() -> void:
 	_blasts = BLAST_BURSTS.new()
 	_blasts.shader = burst_shader()
 	_blasts.key = KEY
+	_blasts.live_edit = rm == null
 	if rm == null:
 		if _preview_seed < 0.0: _preview_seed = randf() * 9.0
 		_blasts.seed_override = _preview_seed

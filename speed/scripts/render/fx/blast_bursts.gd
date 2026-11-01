@@ -10,6 +10,7 @@ var shader: Shader = SHADER
 var px := 2.366
 ## 戦闘エフェクトツールの装備・攻撃キー（ShaderTuning）
 var key := ""
+var live_edit := false
 ## 単独プレビューの形を調整する間、粒の並びを保つ。負数で爆発ごとに選ぶ。
 var seed_override := -1.0
 var _items: Array[Dictionary] = []
@@ -24,14 +25,17 @@ func setup(cell: float) -> void:
 ## delay 秒たってから爆発する。
 func add(pos: Vector2, radius: float, delay := 0.0) -> void:
 	var node := Node2D.new()
-	var mat := ShaderMaterial.new()
-	mat.shader = shader
-	ShaderTuning.apply(mat, key)
+	var fixed := BurstRuntime.profile(key, live_edit)
+	var baked := not fixed.is_empty()
+	var mat := BurstRuntime.material(fixed) if baked else ShaderMaterial.new()
+	if not baked:
+		mat.shader = shader
+		ShaderTuning.apply(mat, key)
 	var center := (pos / px).round()
-	var half := ceilf(radius * _reach(mat, radius)) + 3.0
+	var half := ceilf(radius * (BurstRuntime.reach(fixed, radius) if baked else _reach(mat, radius))) + 3.0
 	node.position = center * px
 	node.scale = Vector2.ONE * half * px
-	mat.set_shader_parameter("value_noise", NOISE.get_meta("texture"))
+	if not baked: mat.set_shader_parameter("value_noise", NOISE.get_meta("texture"))
 	mat.set_shader_parameter("half_cells", half)
 	mat.set_shader_parameter("radius", radius)
 	mat.set_shader_parameter("origin", center)
@@ -41,24 +45,30 @@ func add(pos: Vector2, radius: float, delay := 0.0) -> void:
 	for mode: int in [1, 0, 2, 3]:
 		var surface := MeshInstance2D.new()
 		surface.mesh = FireBursts._mesh() if mode == 0 else _particle_mesh(mode)
-		var part: ShaderMaterial = mat if mode == 0 else mat.duplicate() as ShaderMaterial
-		part.set_shader_parameter("pass_mode", mode)
+		var part: ShaderMaterial = mat if mode == 0 else BurstRuntime.material(fixed, mode) if baked else mat.duplicate() as ShaderMaterial
+		if baked and mode != 0:
+			part.set_shader_parameter("half_cells", half)
+			part.set_shader_parameter("radius", radius)
+			part.set_shader_parameter("origin", center)
+			part.set_shader_parameter("seed", mat.get_shader_parameter("seed"))
+		elif not baked: part.set_shader_parameter("pass_mode", mode)
 		surface.material = part
 		node.add_child(surface)
 		materials.append(part)
 	add_child(node)
 	node.visible = delay <= 0.0
-	_items.append({"node": node, "materials": materials, "age": -delay, "life": _life(mat), "radius": radius,
+	_items.append({"node": node, "materials": materials, "age": -delay, "life": float(fixed.life) if baked else _life(mat), "radius": radius,
+		"baked": baked, "time_scale": float(fixed.time_scale) if baked else 1.0,
 		"tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
 	if _items.size() > 96: _items.pop_front().node.queue_free()
 
 ## dt は世界の秒。
 func step(dt: float) -> void:
 	var revision: int = ShaderTuning.SETTINGS.preview_revision
-	var time_scale := ShaderTuning.burst_time_scale(key)
+	var live_time_scale := ShaderTuning.burst_time_scale(key) if live_edit else BurstRuntime.time_scale(key)
 	for item in _items:
 		item.age += dt
-		var retune: bool = item.tuning_revision != revision or item.tuning_key != key
+		var retune: bool = not item.baked and (item.tuning_revision != revision or item.tuning_key != key)
 		if retune:
 			for mat: ShaderMaterial in item.materials: ShaderTuning.apply(mat, key)
 			var first: ShaderMaterial = item.materials[0]
@@ -66,6 +76,7 @@ func step(dt: float) -> void:
 			var half := ceilf(float(item.radius) * _reach(first, item.radius)) + 3.0
 			item.node.scale = Vector2.ONE * half * px
 			for mat: ShaderMaterial in item.materials: mat.set_shader_parameter("half_cells", half)
+		var time_scale: float = item.time_scale if item.baked else live_time_scale
 		var age: float = item.age / time_scale
 		item.node.visible = age >= 0.0 and age < item.life
 		if age >= item.life and not ShaderTuning.previewing():
@@ -75,7 +86,7 @@ func step(dt: float) -> void:
 			mat.set_shader_parameter("age", maxf(0.0, age))
 		item.tuning_revision = revision
 		item.tuning_key = key
-	if not ShaderTuning.previewing(): _items = _items.filter(func(item): return item.age / time_scale < item.life)
+	if not ShaderTuning.previewing(): _items = _items.filter(func(item): return item.age / (item.time_scale if item.baked else live_time_scale) < item.life)
 
 ## 上限分の四角を1枚のmeshにまとめる。UV.xへ粒番号を埋め、順序と頂点数を固定する。
 static func _particle_mesh(mode: int) -> ArrayMesh:

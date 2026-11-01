@@ -6,6 +6,8 @@ const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 static func build(output: String) -> Error:
 	var burst_error := _validate_burst_noise()
 	if burst_error != OK: return burst_error
+	var profile_error := _validate_burst_profiles()
+	if profile_error != OK: return profile_error
 	var mask_error := _validate_landmark_masks()
 	if mask_error != OK: return mask_error
 	var biter_error := _validate_biter_parts()
@@ -56,6 +58,28 @@ static func _validate_burst_noise() -> Error:
 	if settings.get_value("remap", "importer", "") != "3d_texture": return ERR_INVALID_DATA
 	for field in expected:
 		if settings.get_value("params", field) != expected[field]: return ERR_INVALID_DATA
+	return OK
+
+## 保存値と可変shaderから用途別に制作した固定値の入力・出力を照合する。
+static func _validate_burst_profiles() -> Error:
+	var baked := ResourceLoader.load("res://data/visuals/burst_runtime.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if baked == null or baked.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	for group in ["inputs", "outputs"]:
+		for path: String in baked.get_meta(group, {}):
+			if FileAccess.get_sha256(path) != baked.get_meta(group)[path]:
+				push_error("爆発表示をtools/art/bake_burst_profiles.pyでベイクしてください: " + path)
+				return ERR_INVALID_DATA
+	var source := FileAccess.get_file_as_string("res://data/visuals/effect_settings.tres")
+	for key: String in baked.get_meta("saved_profiles", {}):
+		var start := source.find('"' + key + '": {\n')
+		var actual := ""
+		if start >= 0:
+			var end := source.find("\n}", start)
+			if end < 0: return ERR_INVALID_DATA
+			actual = source.substr(start, end + 2 - start).sha256_text()
+		if actual != baked.get_meta("saved_profiles")[key]:
+			push_error("保存済みの爆発表示をtools/art/bake_burst_profiles.pyでベイクしてください: " + key)
+			return ERR_INVALID_DATA
 	return OK
 
 ## 制作工程のCPUベイカーが保存した固定素材を、正規ビルドでも検査する。

@@ -25,41 +25,49 @@ func add(pos: Vector2, radius: float, life: float, colors: Array = EMBER, delay 
 	var half := ceilf(radius * 1.25) + 3.0
 	node.position = center * px
 	node.scale = Vector2.ONE * half * px
-	var mat := ShaderMaterial.new()
-	mat.shader = SHADER
-	mat.set_shader_parameter("value_noise", VALUE_NOISE)
+	var fixed := BurstRuntime.profile(key)
+	var baked := not fixed.is_empty()
+	var mat := BurstRuntime.material(fixed) if baked else ShaderMaterial.new()
+	if not baked:
+		mat.shader = SHADER
+		mat.set_shader_parameter("value_noise", VALUE_NOISE)
 	mat.set_shader_parameter("half_cells", half)
 	mat.set_shader_parameter("radius", radius)
 	mat.set_shader_parameter("origin", center)
 	mat.set_shader_parameter("seed", randf() * 9.0)
-	for i in 4: mat.set_shader_parameter("c%d" % i, colors[i])
-	ShaderTuning.apply(mat, key)
+	if not baked:
+		for i in 4: mat.set_shader_parameter("c%d" % i, colors[i])
+		ShaderTuning.apply(mat, key)
 	node.material = mat
 	add_child(node)
 	node.visible = delay <= 0.0
-	_items.append({"node": node, "age": -delay, "life": life, "tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
+	_items.append({"node": node, "age": -delay, "life": float(fixed.fire_seconds) if baked else life,
+		"baked": baked, "time_scale": float(fixed.time_scale) if baked else 1.0,
+		"tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
 	if _items.size() > 96: _items.pop_front().node.queue_free()
 
 ## dt は世界の秒。
 func step(dt: float) -> void:
-	var time_scale := ShaderTuning.burst_time_scale(key)
+	var live_time_scale := BurstRuntime.time_scale(key)
 	var revision: int = ShaderTuning.SETTINGS.preview_revision
 	for item in _items:
 		item.age += dt
+		var time_scale: float = item.time_scale if item.baked else live_time_scale
 		var age: float = item.age / time_scale
-		var life := maxf(0.01, ShaderTuning.burst_number(key, "burst_fire_seconds", item.life))
+		var life := float(item.life) if item.baked else maxf(0.01, ShaderTuning.burst_number(key, "burst_fire_seconds", item.life))
+		item.visible_life = life
 		item.node.visible = age >= 0.0 and age < life
 		if age >= life and not ShaderTuning.previewing():
 			item.node.queue_free()
 			continue
 		var mat := item.node.material as ShaderMaterial
 		mat.set_shader_parameter("life", maxf(0.0, age) / life)
-		if item.tuning_revision != revision or item.tuning_key != key:
+		if not item.baked and (item.tuning_revision != revision or item.tuning_key != key):
 			ShaderTuning.apply(mat, key)
 			item.tuning_revision = revision
 			item.tuning_key = key
 	if not ShaderTuning.previewing():
-		_items = _items.filter(func(item): return item.age / time_scale < maxf(0.01, ShaderTuning.burst_number(key, "burst_fire_seconds", item.life)))
+		_items = _items.filter(func(item): return item.age / (item.time_scale if item.baked else live_time_scale) < item.visible_life)
 
 static func _mesh() -> ArrayMesh:
 	if _quad != null: return _quad
