@@ -204,6 +204,7 @@ struct RunState {
     std::deque<BiteZone> bite_zones;
     std::vector<size_t> free_bite_zones;
     struct BiteZoneConfig {
+        uint32_t visual_key=0;
         bool ready = false, hit = false, fade = false;
         float duration = 0;
         String scene;

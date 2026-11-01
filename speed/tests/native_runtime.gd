@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--assets-only" in OS.get_cmdline_user_args() or "--assets-loading-only" in OS.get_cmdline_user_args():
+		check(await check_run_assets("--assets-loading-only" in OS.get_cmdline_user_args()),"表示資源の生成・準備・取消と保持を最後まで確認する")
+		print("[run_assets] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--lifecycle-only" in OS.get_cmdline_user_args() or "--lifecycle-display-only" in OS.get_cmdline_user_args():
 		check(await check_run_lifecycle("--lifecycle-display-only" in OS.get_cmdline_user_args()),"終了結果と保存を最後まで確認する")
 		print("[run_lifecycle] failed=%d" % failed)
@@ -974,7 +979,10 @@ func choice_fixture(initial := false) -> Dictionary:
 	if not bridge.configure(bytes,{"api_version":1,"run_id":58,"mode":1,"stage_id":"choice","profile":{},"settings":{}}).ok: return {}
 	if not bridge.start(41,{"equipment":[]} if initial else {}).ok: return {}
 	var assets = load("res://tools/content/run_resources.gd").new()
-	for row: Dictionary in records.ResourceKey: assets.keys[row.id] = row.path
+	for row: Dictionary in builder.chase_package(definition,config).visuals:
+		if not row.path.is_empty():
+			assets.keys[row.id] = row.path
+			assets.order.append(row.path)
 	return {"bridge":bridge,"resources":assets}
 
 func check_run_choices() -> bool:
@@ -1299,4 +1307,95 @@ func check_death_display(options: Dictionary, config: GameConfig) -> bool:
 	check(hud._banner==tr("hud.game_over"),"game_over通知をHUDへ表示する")
 	await get_tree().process_frame
 	session.free()
+	return true
+
+func check_run_assets(loading_only := false) -> bool:
+	var stage := RuntimeStage.new()
+	stage.index = 82
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var builder = load("res://tools/content/build_run_content.gd")
+	var output := "res://.content/dev/run_assets"
+	if builder.build(stage,ContentManager.base,output,"表示資源の固定入力".sha256_text())!=OK: return false
+	var index_path := output.path_join("stage_82.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+	var loader = load("res://scripts/runtime/run_content_loader.gd")
+	var bundle: Dictionary = loader.read_bundle(index_path,index.input_sha256)
+	if bundle.is_empty(): return false
+	var assets: Resource = bundle.resources
+	if not loading_only:
+		check(not bundle.bytes.hex_encode().contains("7265733a2f2f"),"C++のバイナリは資源パスを持たずキーだけを持つ")
+		for path in ["res://assets/pixel/xp_crystal_facets.tres","res://assets/pixel/beamer/base.png","res://assets/pixel/beamer/armor.png",
+			"res://assets/pixel/beamer/normal.png","res://assets/pixel/saw.png","res://assets/pixel/monoceros/horn/horn.tres",
+			"res://assets/ui/combat/speed_indicator_meter.png"]:
+			check(assets.dependencies.has(path),"必要な表示依存を生成時に追跡する: "+path)
+		for key in ["weapon:W07","weapon:W29","trait:T03"]:
+			check(assets.equipment.has(key) and not assets.equipment[key].is_empty(),"最新catalogの資源キーを持つ: "+key)
+	else:
+		check(assets.dependencies.has("res://assets/ui/combat/speed_indicator_meter.png"),"速度計のpreload画像を生成時に追跡する")
+	var scene_position: int = assets.paths.find(RunSession.VIEW_PATH)
+	var texture_position: int = assets.paths.find("res://assets/ui/combat/speed_indicator_meter.png")
+	check(texture_position>=0 and texture_position<scene_position,"静的preloadの画像を画面Sceneより前に準備する")
+	if not loading_only:
+		check(loader.read_bundle(index_path,"0".repeat(64)).is_empty(),"古い入力署名の出撃を拒否する")
+		var missing := "res://assets/pixel/beamer/normal.png"
+		var bytes := FileAccess.get_file_as_bytes(missing)
+		var temporary := ProjectSettings.globalize_path(missing)+".asset_check_hidden"
+		check(DirAccess.rename_absolute(ProjectSettings.globalize_path(missing),temporary)==OK,"独立コピーだけで欠落条件を作る")
+		check(loader.read_bundle(index_path,index.input_sha256).is_empty(),"生成後に欠けた画像を拒否し起動中に合成しない")
+		DirAccess.rename_absolute(temporary,ProjectSettings.globalize_path(missing))
+		check(FileAccess.get_file_as_bytes(missing)==bytes,"確認に使った元画像を戻す")
+		var shader := "res://shaders/pixel_sprite.gdshader"
+		var original := FileAccess.get_file_as_bytes(shader)
+		var file := FileAccess.open(shader,FileAccess.WRITE)
+		file.store_buffer(original)
+		file.store_string("\n")
+		file.close()
+		check(loader.read_bundle(index_path,index.input_sha256).is_empty(),"shaderの古い依存署名を拒否する")
+		file = FileAccess.open(shader,FileAccess.WRITE)
+		file.store_buffer(original)
+		file.close()
+	var held := ContentResourceScope.new()
+	held.pending.append("表示の準備待ち")
+	var session := RunSession.new()
+	session.cpp_prepare = func(_paths: PackedStringArray): return held
+	add_child(session)
+	check(session.start_cpp_content(index_path,index.input_sha256,42,true)==OK,"読込中のSessionを作る")
+	var waiting: RefCounted = session._pending_cpp_bridge
+	check(session.bridge==null and session.view==null and session._sim==null and not waiting.read_frame().ok,"資源準備前にはゲーム・表示・旧シミュレーションを開始しない")
+	var old_id := session.id
+	session.free()
+	held.provide("表示の準備待ち",Resource.new())
+	check(held.cancelled and held.resources.is_empty() and not waiting.read_frame().ok and RunManager.session(old_id)==null,"読込中取消と遅い到着を無効にする")
+	if not loading_only:
+		var lighting := "res://data/visuals/enemy_lighting.tres"
+		var raw := FileAccess.get_file_as_bytes(lighting)
+		var stamp := FileAccess.get_sha256(lighting)
+		var first := ContentManager.prepare_resources(PackedStringArray([lighting]),false,{lighting:stamp})
+		var second := ContentManager.prepare_resources(PackedStringArray([lighting]),false,{lighting:stamp})
+		check(first.is_ready() and first.resources[lighting]==second.resources[lighting],"同じ版の再出撃は資源を共有する")
+		var old_light: Resource = first.resources[lighting]
+		var old_energy: float = old_light.key_energy
+		var changed: Resource = old_light.duplicate(true)
+		changed.key_energy = old_energy+0.25
+		check(ResourceSaver.save(changed,lighting)==OK,"独立コピーだけで次の表示版を作る")
+		var third := ContentManager.prepare_resources(PackedStringArray([lighting]),false,{lighting:FileAccess.get_sha256(lighting)})
+		check(third.resources[lighting]!=old_light and third.resources[lighting].key_energy==old_energy+0.25 and old_light.key_energy==old_energy,"新しい版を取得しても旧Scopeの資源を書き換えない")
+		third.cancel()
+		check(not first.cancelled and first.resources[lighting]==old_light,"新しいScopeの取消は古い利用者を壊さない")
+		var file := FileAccess.open(lighting,FileAccess.WRITE)
+		file.store_buffer(raw)
+		file.close()
+		first.cancel()
+		second.cancel()
+	var live := RunSession.new()
+	add_child(live)
+	live.auto_step = false
+	check(live.start_cpp_content(index_path,index.input_sha256,43,true)==OK,"準備済みの一覧から通常表示を開始する")
+	for frame in 240:
+		if live.bridge!=null or live.cpp_error!=OK: break
+		await get_tree().process_frame
+	check(live.bridge!=null and live.view!=null and live._sim==null,"資源とGPU準備の後でC++と表示だけを公開する")
+	if live.bridge!=null: check(live.bridge.read_frame().value.tick==0,"準備中に戦闘の時間を消費しない")
+	live.free()
 	return true

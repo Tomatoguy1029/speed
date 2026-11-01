@@ -16,6 +16,9 @@ func _ready() -> void:
 	recorder.name = "PlayRecorder"
 	add_child(recorder)
 func _on_session_created(session: RunSession) -> void:
+	if session.runtime_kind=="cpp":
+		session.add_to_group("recordable_runs")
+		return
 	var commands := COMMANDS.new()
 	commands.setup(session.sim)
 	session.sim.command_extension = func(name: StringName, args: Dictionary) -> bool: return commands.handle(name, args)

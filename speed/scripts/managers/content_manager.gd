@@ -156,21 +156,18 @@ func _table(category: StringName) -> Dictionary:
 		_tables[category] = table
 	return _tables[category]
 
-## 開発中は実験場の保存で生成物が古くなるため、ステージ開始ごとに確認する。
+## 起動では生成しない。Editorの実行前処理・CLI・exportが用意した生成物を読む。
 func _ensure_runtime_content() -> bool:
-	if not OS.has_feature("editor"):
-		return true
-	var builder = load("res://addons/content_build/builder.gd")
-	if builder.is_current():
-		return true
-	var error: Error = builder.build_all()
-	if error != OK:
-		push_error("実行用データの自動生成に失敗: %s" % error_string(error))
+	var path := "res://.content/stamp.json"
+	if not FileAccess.file_exists(path):
+		push_error("実行用データがありません。共通の生成操作を先に行ってください。")
 		return false
-	if catalog != null:
-		catalog = ResourceLoader.load("res://data/content_catalog.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as ContentCatalog
-		visual_index = ResourceLoader.load("res://.content/visual_index.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
-		release_runtime_definitions()
+	var stamp = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not stamp is Dictionary or not stamp.get("outputs") is Array or stamp.outputs.is_empty(): return false
+	for output in stamp.outputs:
+		if not output is String or not ResourceLoader.exists(output) and not FileAccess.file_exists(output):
+			push_error("実行用データが不足しています。共通の生成操作を先に行ってください。")
+			return false
 	return true
 
 func runtime_stage(index: int) -> RuntimeStage:
@@ -182,17 +179,20 @@ func runtime_stage(index: int) -> RuntimeStage:
 	return ResourceLoader.load("res://.content/stage_%d.tres" % index, "", mode) as RuntimeStage
 
 ## 読込タスクは結果の資源と終了まで所有し、取り消した要求も回収する。
-# Godot 4.6.3 の load_threaded_* は、依存読込との競合で内部トークンが残る。
-# load() と結果をこのタスクが所有し、終了を待ってから主スレッドへ渡す。
+# 読込と結果をタスクが所有し、終了を待ってから主スレッドへ渡す。
 class ResourceJob:
 	extends RefCounted
 	var task_id: int
+	var path := ""
+	var signature := ""
 	var resource: Resource
 	var waiters: Array[WeakRef] = []
-	func start(path: String) -> void:
-		task_id = WorkerThreadPool.add_task(_load.bind(path), false, "Load " + path)
-	func _load(path: String) -> void:
-		resource = ResourceLoader.load(path)
+	func start(source: String, version: String = "") -> void:
+		path = source
+		signature = version
+		task_id = WorkerThreadPool.add_task(_load, false, "Load " + path)
+	func _load() -> void:
+		resource = ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE if not signature.is_empty() else ResourceLoader.CACHE_MODE_REUSE)
 	func finish() -> void:
 		# 終了時はフレームが進まないので、描画資源の作成要求も主スレッドで処理する。
 		while not WorkerThreadPool.is_task_completed(task_id):
@@ -201,26 +201,65 @@ class ResourceJob:
 		WorkerThreadPool.wait_for_task_completion(task_id)
 
 var _resource_jobs: Dictionary = {}
-func prepare_resources(paths: PackedStringArray, threaded := true) -> ContentResourceScope:
+## 画像・音・shaderを先に揃えてから、preloadを持つScript/Sceneを主スレッドで読む。
+var _composite_scopes: Array[WeakRef] = []
+var _prepared_resources: Dictionary = {}
+func prepare_resources(paths: PackedStringArray, threaded := true, signatures := {}) -> ContentResourceScope:
 	var scope := ContentResourceScope.new()
+	scope.signatures = signatures
 	if paths.is_empty(): scope.warmup_complete = true
 	for path in paths:
 		if scope.resources.has(path) or path in scope.pending: continue
-		# スクリプト・シーン・複合資源の依存解決は主スレッドに集約する。
-		# 独立した画像・音源・シェーダーの読込だけを非同期にする。
-		if not threaded or path.get_extension() not in ["png", "svg", "jpg", "jpeg", "webp",
-			"wav", "ogg", "mp3", "gdshader", "glsl"]:
-			scope.provide(path, load(path))
-		elif ResourceLoader.has_cached(path):
-			scope.provide(path, ResourceLoader.get_cached_ref(path))
+		if path.get_extension() not in ["png","svg","jpg","jpeg","webp","wav","ogg","mp3","gdshader","glsl"]:
+			scope.composites.append(path)
+			scope.pending.append(path)
+		elif not threaded:
+			scope.provide(path,_load_prepared(path,str(signatures.get(path,""))))
+		elif _cached_prepared(path,str(signatures.get(path,"")))!=null:
+			scope.provide(path,_cached_prepared(path,str(signatures.get(path,""))))
+		elif signatures.get(path,"")=="" and ResourceLoader.has_cached(path):
+			scope.provide(path,ResourceLoader.get_cached_ref(path))
 		else:
 			scope.pending.append(path)
-			if not _resource_jobs.has(path):
+			var version := str(signatures.get(path,""))
+			var key := path+":"+version
+			if not _resource_jobs.has(key):
 				var job := ResourceJob.new()
-				_resource_jobs[path] = job
-				job.start(path)
-			_resource_jobs[path].waiters.append(weakref(scope))
+				_resource_jobs[key] = job
+				job.start(path,version)
+			_resource_jobs[key].waiters.append(weakref(scope))
+	if not _finish_composites(scope): _composite_scopes.append(weakref(scope))
 	return scope
+
+func _finish_composites(scope: ContentResourceScope) -> bool:
+	if scope.cancelled: return true
+	for path in scope.pending:
+		if not path in scope.composites: return false
+	# 同時に別の版を準備しても、このScopeの依存を親のpreloadへ渡す。
+	for path in scope.resources:
+		if not str(scope.signatures.get(path,"")).is_empty(): scope.resources[path].take_over_path(path)
+	var composite_paths := scope.composites.duplicate()
+	scope.composites.clear()
+	for path in composite_paths:
+		scope.provide(path,null if scope.failed else _load_prepared(path,str(scope.signatures.get(path,""))))
+	return true
+
+func _cached_prepared(path: String, signature: String) -> Resource:
+	var entry: WeakRef = _prepared_resources.get(path+":"+signature)
+	return entry.get_ref() as Resource if entry!=null else null
+
+func _remember_prepared(path: String, signature: String, resource: Resource) -> void:
+	if resource==null or signature.is_empty(): return
+	resource.take_over_path(path)
+	_prepared_resources[path+":"+signature] = weakref(resource)
+
+func _load_prepared(path: String, signature: String) -> Resource:
+	var cached := _cached_prepared(path,signature)
+	if cached!=null: return cached
+	var resource := ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE if not signature.is_empty() else ResourceLoader.CACHE_MODE_REUSE)
+	_remember_prepared(path,signature,resource)
+	return resource
+
 func pending_resources() -> int:
 	return _resource_jobs.size()
 func _process(_delta: float) -> void:
@@ -228,10 +267,14 @@ func _process(_delta: float) -> void:
 		var job: ResourceJob = _resource_jobs[path]
 		if not WorkerThreadPool.is_task_completed(job.task_id): continue
 		job.finish()
+		_remember_prepared(job.path,job.signature,job.resource)
 		for reference: WeakRef in job.waiters:
 			var scope := reference.get_ref() as ContentResourceScope
-			if scope != null: scope.provide(path, job.resource)
+			if scope != null: scope.provide(job.path, job.resource)
 		_resource_jobs.erase(path)
+	for reference: WeakRef in _composite_scopes.duplicate():
+		var scope := reference.get_ref() as ContentResourceScope
+		if scope==null or _finish_composites(scope): _composite_scopes.erase(reference)
 
 func _exit_tree() -> void:
 	for job: ResourceJob in _resource_jobs.values(): job.finish()

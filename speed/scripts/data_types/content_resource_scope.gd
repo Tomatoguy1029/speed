@@ -3,6 +3,8 @@ class_name ContentResourceScope
 extends RefCounted
 var resources: Dictionary = {}
 var pending := PackedStringArray()
+var composites := PackedStringArray()
+var signatures: Dictionary = {}
 var cancelled := false
 var failed := false
 var warming := false
@@ -20,5 +22,6 @@ func cancel() -> void:
 	resources.clear()
 	warm_materials.clear()
 	pending.clear()
+	composites.clear()
 func progress() -> float:
 	return float(resources.size()) / maxf(1.0, resources.size() + pending.size())

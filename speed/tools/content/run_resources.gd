@@ -4,3 +4,8 @@ extends Resource
 @export var paths := PackedStringArray()
 @export var keys: Dictionary = {}
 @export var visuals: Array[Dictionary] = []
+
+@export var dependencies: Dictionary = {}
+@export var equipment: Dictionary = {}
+@export var order := PackedStringArray()
+@export var signatures: Dictionary = {}

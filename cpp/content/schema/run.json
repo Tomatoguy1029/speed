@@ -965,14 +965,10 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 7
-        },
-        {
-          "name": "path",
-          "type": "string"
+          "max": 8
         }
       ],
-      "version": 4
+      "version": 5
     },
     {
       "name": "ForwardDefinition",
@@ -1065,8 +1061,10 @@
           "min": 0
         },
         {
-          "name": "scene",
-          "type": "string"
+          "name": "visual_key",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
         },
         {
           "name": "hit",
@@ -1076,7 +1074,8 @@
           "name": "fade",
           "type": "bool"
         }
-      ]
+      ],
+      "version": 2
     },
     {
       "name": "LifecycleDefinition",
@@ -1263,6 +1262,18 @@
       {
         "name": "Cannon",
         "value": "cannon"
+      },
+      {
+        "name": "EnemyLook",
+        "value": "enemy_look"
+      },
+      {
+        "name": "Equipment",
+        "value": "equipment"
+      },
+      {
+        "name": "AttackScene",
+        "value": "attack_scene"
       }
     ],
     "EventType": [
@@ -1487,7 +1498,8 @@
     "attack_visual_end": [
       "scene",
       "phase",
-      "pos"
+      "pos",
+      "visual_key"
     ],
     "bonus": [
       "enter",

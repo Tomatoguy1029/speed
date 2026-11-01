@@ -456,14 +456,12 @@ inline bool read(BinaryReader &input, TechniqueDefinition &out) {
 struct ResourceKey {
     uint32_t id{};
     uint32_t role{};
-    std::string path{};
 };
 inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 7) return false;
-    if (!input.read_string(out.path)) return false;
+    if (out.role > 8) return false;
     return true;
 }
 struct ForwardDefinition {
@@ -504,7 +502,7 @@ struct BiteDefinition {
     double radius{};
     double damage{};
     double duration{};
-    std::string scene{};
+    uint32_t visual_key{};
     bool hit{};
     bool fade{};
 };
@@ -523,7 +521,8 @@ inline bool read(BinaryReader &input, BiteDefinition &out) {
     if (out.damage < 0) return false;
     if (!input.read_f64(out.duration)) return false;
     if (out.duration < 0) return false;
-    if (!input.read_string(out.scene)) return false;
+    if (!input.read_u32(out.visual_key)) return false;
+    if (out.visual_key < 1) return false;
     if (!input.read_bool(out.hit)) return false;
     if (!input.read_bool(out.fade)) return false;
     return true;
@@ -776,8 +775,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 4) return false;
-        if (count > input.remaining()/12) return false;
+        if (version != 5) return false;
+        if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -788,7 +787,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 14: {
-        if (version != 1) return false;
+        if (version != 2) return false;
         if (count > input.remaining()/58) return false;
         for (uint32_t i=0; i<count; ++i) { BiteDefinition row; if (!read(input,row)) return false; out.BiteDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -884,6 +883,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.EnemyRecord_rows) if (!ResourceKey_ids.count(row.visual_id)) return false;
     for (const auto &row:data.ForwardDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BiteDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.BiteDefinition_rows) if (!ResourceKey_ids.count(row.visual_key)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;

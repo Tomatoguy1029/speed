@@ -9,7 +9,17 @@ const VIEW_PATH := "res://scenes/run/run.tscn"
 
 ## RunManager が振る番号。破棄したあとの命令を見分ける
 var id := 0
-var sim := RunSimulation.new()
+var runtime_kind := "gdscript"
+var _sim: RefCounted
+var sim: RefCounted:
+	get:
+		_ensure_sim()
+		return _sim
+var _pending_cpp: Dictionary = {}
+var _pending_cpp_bridge: RefCounted
+var cpp_error: Error = OK
+var cpp_prepare: Callable
+signal loading_failed(error: Error)
 ## 表示（表示のない試行では null）
 var view: Node
 ## 固定更新を自分で進めるか。実験場は自分の時計で sim を進める
@@ -37,10 +47,21 @@ var _progress: ProgressBar
 
 ## 通常の出撃は資源を別スレッドで準備し、準備が終わるまで戦闘の時計を始めない。
 func start_loading(options: Dictionary) -> void:
+	if options.get("runtime","")=="cpp":
+		start(options,true)
+		return
+	prepare_legacy(options)
 	var stage: RuntimeStage = options.get("stage")
 	if stage == null: return
 	_load_started_us = Time.get_ticks_usec()
 	_pending_options = options
+	_show_loading()
+	# 描画を持たないDummy rendererはテクスチャ生成を主スレッドで行う。
+	resources = ContentManager.prepare_resources(stage.resources.paths, DisplayServer.get_name() != "headless")
+	loading_timings["resource_request_ms"] = (Time.get_ticks_usec() - _load_started_us) / 1000.0
+
+func _show_loading() -> void:
+	if _loading!=null: return
 	_loading = CanvasLayer.new()
 	add_child(_loading)
 	var center := CenterContainer.new()
@@ -55,17 +76,19 @@ func start_loading(options: Dictionary) -> void:
 	back.text = tr("common.back")
 	back.pressed.connect(GameManager.abort_run)
 	column.add_child(back)
-	# 描画を持たないDummy rendererはテクスチャ生成を主スレッドで行う。
-	resources = ContentManager.prepare_resources(stage.resources.paths, DisplayServer.get_name() != "headless")
-	loading_timings["resource_request_ms"] = (Time.get_ticks_usec() - _load_started_us) / 1000.0
 
 ## 木に入ったあとに呼ぶ。表示を作る場合は、シミュレーションを組み立ててから表示を木に入れる。
 ## options.hud が false なら通常 HUD を省き、利用側が専用 UI を接続する。
 func start(options: Dictionary, with_view: bool) -> void:
 	if options.get("runtime", "") == "cpp":
 		var error := start_cpp_content(options.get("cpp_index",""),options.get("cpp_signature",""),options.get("seed",0),with_view,options)
-		if error != OK: push_error("C++ランの開始に失敗: %s" % error_string(error))
+		if error != OK:
+			if cpp_error!=error:
+				cpp_error = error
+				loading_failed.emit(error)
+			push_error("C++ランの開始に失敗: %s" % error_string(error))
 		return
+	prepare_legacy(options)
 	options = options.duplicate()
 	if not options.has("stage"):
 		options.stage = ContentManager.runtime_stage(int(options.get("stage_index", 1)))
@@ -124,15 +147,19 @@ func _physics_process(delta: float) -> void:
 				auto_step = false
 				push_error("C++ランの更新に失敗: %s (%s)" % [response.message,response.field])
 		return
-	if auto_step and sim.state != null:
+	if auto_step and _sim!=null and _sim.state != null:
 		sim.physics_step(delta)
 
 func _process(delta: float) -> void:
+	if not _pending_cpp.is_empty():
+		_poll_cpp_loading()
+		return
 	if bridge != null:
 		if not _cpp_accepting: return
 		if cpp_choices!=null: cpp_choices.poll()
 		flush_cpp_result()
 		return
+	if _sim==null: return
 	if sim.state == null:
 		if resources == null or _pending_options.is_empty(): return
 		_progress.value = resources.progress() * 100.0
@@ -169,6 +196,9 @@ func _notification(what: int) -> void:
 			get_parent().remove_child(self)
 		if cpp_choices!=null: cpp_choices.close()
 		cpp_choices = null
+		if _pending_cpp_bridge!=null: _pending_cpp_bridge.dispose()
+		_pending_cpp_bridge = null
+		_pending_cpp.clear()
 		if resources != null: resources.cancel()
 		_pending_options.clear()
 		if bridge!=null and is_instance_valid(view):
@@ -179,7 +209,7 @@ func _notification(what: int) -> void:
 		bridge = null
 		cpp_core = null
 		cpp_resources = null
-		sim.dispose()
+		if _sim!=null: _sim.dispose()
 		if is_instance_valid(RunManager):
 			RunManager.unregister(self)
 
@@ -187,7 +217,10 @@ func _notification(what: int) -> void:
 var cpp_core: RefCounted
 var cpp_resources: Resource
 func start_cpp_content(index_path: String, input_sha256: String, seed_value: int, with_view := false, options := {}) -> Error:
-	if cpp_core != null or sim.state != null: return ERR_ALREADY_IN_USE
+	if cpp_core != null or not _pending_cpp.is_empty() or (_sim!=null and _sim.state != null): return ERR_ALREADY_IN_USE
+	runtime_kind = "cpp"
+	cpp_error = OK
+	_warm_started_us = 0
 	var prepared := preload("res://scripts/runtime/run_content_loader.gd").read_bundle(index_path,input_sha256)
 	if prepared.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
 	if not RunManager.ensure_registered(self): return ERR_OUT_OF_MEMORY
@@ -197,30 +230,68 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	if not configured.ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA
+	# 資源の読込中は、開始していないC++をSession内だけで保持する。
+	cpp_resources = prepared.resources
+	_pending_cpp_bridge = next_bridge
+	_pending_cpp = {"seed":seed_value,"options":options.duplicate(true),"with_view":with_view}
+	_load_started_us = Time.get_ticks_usec()
+	if with_view:
+		_show_loading()
+		resources = cpp_prepare.call(cpp_resources.paths) if cpp_prepare.is_valid() else ContentManager.prepare_resources(cpp_resources.paths,DisplayServer.get_name()!="headless",cpp_resources.signatures)
+	else:
+		resources = ContentResourceScope.new()
+		resources.warmup_complete = true
+	_poll_cpp_loading()
+	return cpp_error
+
+func _poll_cpp_loading() -> void:
+	if _pending_cpp.is_empty() or not _cpp_accepting: return
+	if is_instance_valid(_progress): _progress.value = resources.progress()*100.0
+	if resources.failed or resources.cancelled:
+		cpp_error = ERR_CANT_OPEN
+		_pending_cpp_bridge.dispose()
+		_pending_cpp_bridge = null
+		_pending_cpp.clear()
+		resources.cancel()
+		if _loading!=null:
+			_loading.queue_free()
+			_loading = null
+		loading_failed.emit(cpp_error)
+		return
+	if not resources.is_ready(): return
+	if _warm_started_us==0:
+		_warm_started_us = Time.get_ticks_usec()
+		loading_timings["resource_wait_ms"] = (_warm_started_us-_load_started_us)/1000.0
+	if not resources.warmup_complete:
+		load("res://scripts/render/run_presentation.gd").warm_resources(self,resources)
+		return
+	loading_timings["shader_warmup_ms"] = (Time.get_ticks_usec()-_warm_started_us)/1000.0
+	var pending := _pending_cpp
+	var next_bridge: RefCounted = _pending_cpp_bridge
+	_pending_cpp = {}
+	_pending_cpp_bridge = null
+	var options: Dictionary = pending.options
+	var with_view: bool = pending.with_view
 	var start_options: Dictionary = options.get("cpp_start",{}).duplicate(true)
 	start_options.endless = options.get("endless",false)
-	if not next_bridge.start(seed_value,start_options).ok:
+	if not next_bridge.start(pending.seed,start_options).ok:
+		cpp_error = ERR_INVALID_DATA
 		next_bridge.dispose()
-		return ERR_INVALID_DATA
+		resources.cancel()
+		loading_failed.emit(cpp_error)
+		return
+	if _loading!=null:
+		_loading.queue_free()
+		_loading = null
 	bridge = next_bridge
 	bridge.subscribe("result",_consume_cpp_result)
 	if RunManager.current_id==id or options.get("manage_result",false): cpp_finished.connect(GameManager.finish_cpp_run)
 	cpp_core = bridge._core
-	cpp_resources = prepared.resources
 	cpp_choices = preload("res://scripts/runtime/run_choice_resources.gd").new()
 	cpp_choices.attach(bridge,cpp_resources,self)
 	if with_view:
-		resources = ContentManager.prepare_resources(cpp_resources.paths,false)
-		if resources.failed or not resources.is_ready():
-			cpp_choices.close()
-			cpp_choices = null
-			resources.cancel()
-			bridge.dispose()
-			bridge = null
-			cpp_core = null
-			return ERR_CANT_OPEN
-		view = load(VIEW_PATH).instantiate()
-		var presentation: RunPresentation = view.get_node("RunPresentation")
+		view = (resources.resources[VIEW_PATH] as PackedScene).instantiate()
+		var presentation: Node = view.get_node("RunPresentation")
 		presentation.bridge = bridge
 		presentation.cpp_resources = cpp_resources
 		presentation.cpp_scope = resources
@@ -238,7 +309,6 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	started.emit()
 	var delivered: Dictionary = bridge.collect_frame()
 	if not delivered.ok: push_warning(delivered.message)
-	return OK
 
 func _consume_cpp_result(frame: Dictionary) -> bool:
 	_cpp_pending_result = frame.result if frame.result is Dictionary else {}
@@ -251,3 +321,11 @@ func flush_cpp_result() -> void:
 	if result_id==_cpp_published_result: return
 	_cpp_published_result = result_id
 	cpp_finished.emit(_cpp_pending_result.duplicate(true))
+
+## 旧入口だけが旧シミュレーションを作る。通常入口の切替後に撤去する。
+func _ensure_sim() -> void:
+	if _sim==null: _sim = load("res://scripts/runtime/run_simulation.gd").new()
+
+func prepare_legacy(options: Dictionary) -> void:
+	_ensure_sim()
+	_sim.options = options

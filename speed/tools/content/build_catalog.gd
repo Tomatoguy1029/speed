@@ -35,6 +35,8 @@ static func build(output := "res://data/content_catalog.tres") -> Error:
 				dependencies._script(paths, "res://scripts/render/equipment/%s.gd" % entry.code_id)
 				entry.resources = PackedStringArray(paths.keys())
 				entry.resources.sort()
+				for resource_path in entry.resources:
+					hashes.append(resource_path+":"+FileAccess.get_sha256(resource_path))
 			catalog.entries.append(entry)
 	catalog.source_signature = "\n".join(hashes).sha256_text()
 	if FileAccess.file_exists(output):

@@ -80,7 +80,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             d["t"]=e.time;d["world_t"]=e.world_time;append(run,"attack_retired",d);
             if (e.attack_pool==AttackPool::Hazard && run.state.bite_zone_config.fade &&
                 (e.attack_end_reason==AttackEndReason::Lifetime || e.attack_end_reason==AttackEndReason::ParticipantEnd || e.attack_end_reason==AttackEndReason::TechniqueCancel || e.attack_end_reason==AttackEndReason::TechniqueEnd)) {
-                godot::Dictionary visual;visual["scene"]=run.state.bite_zone_config.scene;visual["phase"]="Fade";visual["pos"]=e.pos;append(run,"attack_visual_end",visual);
+                godot::Dictionary visual;if (run.state.bite_zone_config.visual_key) visual["visual_key"]=run.state.bite_zone_config.visual_key;else visual["scene"]=run.state.bite_zone_config.scene;visual["phase"]="Fade";visual["pos"]=e.pos;append(run,"attack_visual_end",visual);
             }break;
         }
         case CombatEventKind::EnemyDamage:

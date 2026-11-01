@@ -60,7 +60,8 @@ func unregister(s: RunSession) -> void:
 		current_id = -1
 
 func _register(s: RunSession, options: Dictionary) -> RunSession:
-	s.sim.options = options
+	s.runtime_kind = options.get("runtime","gdscript")
+	if options.get("runtime","")!="cpp": s.prepare_legacy(options)
 	s.id = _next_id
 	_next_id += 1
 	_sessions[s.id] = s
@@ -71,4 +72,4 @@ func _register(s: RunSession, options: Dictionary) -> RunSession:
 func ensure_registered(s: RunSession) -> bool:
 	if s.id>0: return _sessions.get(s.id)==s
 	if _next_id<=0 or _next_id==9223372036854775807: return false
-	return _register(s,{})!=null
+	return _register(s,{"runtime":"cpp"})!=null

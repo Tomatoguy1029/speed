@@ -32,7 +32,7 @@ int64_t SpeedRunCore::fire_bite_zone(Vector2 at, double radius, double delay, do
 
 void SpeedRunCore::end_bite_visual(bool hit, Vector2 at) {
     if (!(hit ? runtime.state.bite_zone_config.hit : runtime.state.bite_zone_config.fade)) return;
-    Dictionary event; event["scene"] = runtime.state.bite_zone_config.scene; event["phase"] = hit ? "Hit" : "Fade"; event["pos"] = at;
+    Dictionary event; if (runtime.state.bite_zone_config.visual_key) event["visual_key"]=runtime.state.bite_zone_config.visual_key;else event["scene"] = runtime.state.bite_zone_config.scene; event["phase"] = hit ? "Hit" : "Fade"; event["pos"] = at;
     emit_event("attack_visual_end", event);
 }
 

@@ -150,6 +150,7 @@ func _set_armed(on: bool) -> void:
 				_begin(run,true)
 				if _cpp_session_id>0: break
 				continue
+			if run.runtime_kind=="cpp": continue
 			if run.sim.state == null:
 				_on_node_added(run)
 				continue
@@ -175,7 +176,7 @@ func _begin(session: RunSession, during_run := false) -> void:
 	if session.bridge!=null:
 		_begin_cpp(session,during_run)
 		return
-	var run := session.sim
+	var run: RunSimulation = session.sim
 	if not armed or run == _run or session.is_queued_for_deletion() or run.state == null or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
 		return
 	_end("quit")

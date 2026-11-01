@@ -694,7 +694,7 @@ bool SpeedRunCore::configure_content(const PackedByteArray &bytes) {
     if (!content->bites.empty()) {
         const auto &bite=content->bites.front();
         auto &config=runtime.state.bite_zone_config;
-        config.ready=true;config.duration=bite.duration;config.scene=String::utf8(bite.scene.c_str());config.hit=bite.hit;config.fade=bite.fade;
+        config.ready=true;config.duration=bite.duration;config.visual_key=bite.visual_key;config.hit=bite.hit;config.fade=bite.fade;
     }
     runtime.content=std::move(content);
     return true;

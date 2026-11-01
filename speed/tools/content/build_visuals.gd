@@ -3,7 +3,7 @@
 extends RefCounted
 const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 
-static func build(output: String) -> Error:
+static func validate() -> Error:
 	var profiles_error: Error = preload("res://tools/content/build_effect_profiles.gd").validate()
 	if profiles_error != OK: return profiles_error
 	var burst_error := _validate_burst_noise()
@@ -14,6 +14,11 @@ static func build(output: String) -> Error:
 	if elite_error != OK: return elite_error
 	var biter_error := _validate_biter_parts()
 	if biter_error != OK: return biter_error
+	return OK
+
+static func build(output: String) -> Error:
+	var validation := validate()
+	if validation!=OK: return validation
 	TRANSFORM._layouts.clear()
 	var palettes: Array[Dictionary] = [{}]
 	for file in DirAccess.get_files_at("res://data/enemies"):

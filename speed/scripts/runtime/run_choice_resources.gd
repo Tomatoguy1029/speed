@@ -72,14 +72,21 @@ func poll() -> void:
 					scope = ContentResourceScope.new()
 					scope.failed = true
 				else:
-					scope = prepare.call(paths) if prepare.is_valid() else ContentManager.prepare_resources(paths,DisplayServer.get_name()!="headless")
+					var ordered := PackedStringArray()
+					for path in resources.order:
+						if path in paths: ordered.append(path)
+					if ordered.size()!=paths.size():
+						scope = ContentResourceScope.new()
+						scope.failed = true
+					else:
+						scope = prepare.call(ordered) if prepare.is_valid() else ContentManager.prepare_resources(ordered,DisplayServer.get_name()!="headless",resources.signatures)
 			candidates[request.request_id] = {"scope":scope,"key":key,"level":card.level,"borrowed":borrowed,"notified":false}
 		var row: Dictionary = candidates[request.request_id]
 		if row.notified: continue
 		var scope: ContentResourceScope = row.scope
 		if not scope.is_ready(): continue
 		if not scope.failed and not scope.cancelled and not scope.warmup_complete:
-			RunPresentation.warm_resources(parent,scope)
+			load("res://scripts/render/run_presentation.gd").warm_resources(parent,scope)
 			if not scope.warmup_complete: continue
 		var status := -2 if scope.cancelled else -1 if scope.failed else 1
 		var response: Dictionary = bridge.command("resources_complete",{"request_id":request.request_id,"status":status})

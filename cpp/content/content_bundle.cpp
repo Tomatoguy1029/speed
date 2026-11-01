@@ -64,7 +64,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (size_t i=1;i<bundle->budget_phases.size();++i) if (bundle->budget_phases[i].start<bundle->budget_phases[i-1].start) return {};
     for (const auto &bite:bundle->bites) {
         const auto &first=bundle->bites.front();
-        if (bite.duration!=first.duration || bite.scene!=first.scene || bite.hit!=first.hit || bite.fade!=first.fade) return {};
+        if (bite.duration!=first.duration || bite.visual_key!=first.visual_key || bite.hit!=first.hit || bite.fade!=first.fade) return {};
     }
     if (records.LoadoutDefinition_rows.size()!=1 || records.LoadoutDefinition_rows[0].id!=1 ||
         records.LoadoutDefinition_rows[0].kind!=0 || records.LoadoutDefinition_rows[0].external_id!="W01" ||
@@ -74,7 +74,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
     }
     for (const auto &visual:bundle->visuals) {
-        if (visual.role>7 || (visual.path.empty() && visual.role!=2 && visual.role!=4)) return {};
+        if (visual.role>8) return {};
     }
     std::unordered_set<std::string> names;
     for (const auto &row:records.EnemyRecord_rows) {
@@ -86,7 +86,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto bite=std::find_if(bundle->bites.begin(),bundle->bites.end(),[&](const auto &b){return b.id==row.id;});
         if (row.kind==2 || row.kind==3) {
-            if (bite==bundle->bites.end() || bite->warn<=0 || bite->duration<=0 || bite->scene.empty()) return {};
+            if (bite==bundle->bites.end() || bite->warn<=0 || bite->duration<=0 || !bite->visual_key) return {};
             definition.bite={bite->reach,bite->warn,bite->rest,bite->radius,bite->damage};
         } else if (bite!=bundle->bites.end()) return {};
         const auto hound=std::find_if(bundle->hounds.begin(),bundle->hounds.end(),[&](const auto &h){return h.id==row.id;});
