@@ -40,7 +40,7 @@ const MINE_PREVIEW := preload("res://gyms/mine_blast_preview.gd")
 const STANDALONE_ATTACKS := [BOMBER_PREVIEW, PUMP_SHELL, PUMP_BLAST, MINE_BLAST]
 const ATTACK_LABELS := {
 	BOMBER_PREVIEW: ["自爆する雑魚 · 自爆の爆発", "自爆する雑魚専用のドット単位の爆発。閃光・火球・衝撃波の輪・煙・燃えかす・火の粉を調整します。"],
-	PUMP_SHELL: ["ポンプ座 · 圧縮弾", "Laser bolt風の白い芯・緑の色帯・パルス・光点・短い尾を調整します。"],
+	PUMP_SHELL: ["ポンプ座 · 圧縮弾", "収納した敵の塊と、そこから出るLaser bolt風の緑の光・パルス・光点・短い尾を調整します。"],
 	PUMP_BLAST: ["ポンプ座 · 着弾の爆発", "自爆・機雷と同じ爆発shaderを、ポンプ専用の色・形・時間・粒子で調整します。"],
 	MINE_BLAST: ["機雷の爆発", "機雷の爆発だけを反復再生します。武器のマインランチャーと同じ色・時間・粒子の設定を使います。"],
 }
