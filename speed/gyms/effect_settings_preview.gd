@@ -15,6 +15,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const BOSS_PREVIEW := preload("res://gyms/boss_effect_preview.gd")
 const MODULE_ICONS := preload("res://scripts/ui/module_icons.gd")
 const COMPONENTS := preload("res://scripts/render/fx/visual_effect_components.gd")
+const BURST_FIELDS := preload("res://gyms/burst_effect_fields.gd")
 const ENEMY_EFFECTS := {
 	"enemy/phoenix": {"title": "ほうおう座 · 着地の炎", "scene": ""},
 	"enemy/aquila": {"title": "わし座 · 進路の雷撃", "scene": "res://scenes/attacks/zone_aquila.tscn"},
@@ -370,7 +371,7 @@ const SHADER_LABELS := {
 	"cloud_frequency": ["雲模様の密度", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
 	"cloud_speed": ["雲模様の流速", "表示だけを調整します。判定・攻撃時間・移動速度は維持します。"],
 }
-const GROUP_ORDER := ["色", "形・大きさ", "動き・時間", "粒子", "シェーダ", "品質・負荷"]
+const GROUP_ORDER := ["爆発・基本", "火球", "閃光", "衝撃波", "煙", "火の粉", "燃えかす", "稲妻・光粒", "色", "形・大きさ", "動き・時間", "粒子", "シェーダ", "品質・負荷"]
 
 var preview_host: Control
 var controls_host: Control
@@ -391,10 +392,13 @@ var _move_order: Dictionary = {}
 var _expanded_bosses := {}
 var _editing_label := Label.new()
 var _fields := VBoxContainer.new()
+var _field_rows: VBoxContainer
+var _expanded_field_groups: Dictionary = {}
 var _boost_boundary_inputs: Dictionary = {}
 var _sample: Node2D
 var _standalone_controls: HBoxContainer
 var _standalone_play: Button
+var _standalone_speed: OptionButton
 var _viewport: SubViewport
 var _swatch := ColorRect.new()
 var _static_container: SubViewportContainer
@@ -462,6 +466,14 @@ func _ready() -> void:
 	standalone_restart.pressed.connect(func():
 		if is_instance_valid(_sample): _sample.call("preview_restart"))
 	_standalone_controls.add_child(standalone_restart)
+	_standalone_speed = OptionButton.new()
+	for speed in [0.25, 0.5, 1.0, 2.0, 4.0]: _standalone_speed.add_item(str(speed) + "×")
+	_standalone_speed.select(2)
+	_standalone_speed.tooltip_text = "プレビューの再生速度"
+	_standalone_speed.item_selected.connect(func(index: int):
+		if is_instance_valid(_sample) and "preview_speed" in _sample:
+			_sample.set("preview_speed", [0.25, 0.5, 1.0, 2.0, 4.0][index]))
+	_standalone_controls.add_child(_standalone_speed)
 	_static_container = SubViewportContainer.new()
 	_static_container.stretch = true
 	_static_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -670,6 +682,8 @@ func _select(path: String) -> void:
 	if path == BOOST_GAUGE.KEY:
 		_working.profiles[path] = BOOST_GAUGE.migrated_values(_working.profiles.get(path, {}))
 	_standalone_controls.visible = path in STANDALONE_ATTACKS
+	_standalone_speed.visible = path in [BOMBER_PREVIEW, PUMP_BLAST]
+	_standalone_speed.select(2)
 	_standalone_play.set_pressed_no_signal(false)
 	_standalone_play.text = "⏸"
 	if _group_for(path) != _target_group: _show_target_group(_group_for(path))
@@ -704,6 +718,7 @@ func _select(path: String) -> void:
 
 func _build_fields() -> void:
 	_boost_boundary_inputs.clear()
+	_field_rows = _fields
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
@@ -729,6 +744,7 @@ func _build_fields() -> void:
 			if not (info.usage & PROPERTY_USAGE_EDITOR): continue
 			if info.type in [TYPE_COLOR, TYPE_FLOAT, TYPE_INT]:
 				entries.append({"name": name, "value": _sample.get(name), "hint": info.hint_string})
+	BURST_FIELDS.decorate(entries, _selected)
 	var unique := {}
 	for entry in entries:
 		if not unique.has(entry.name): unique[entry.name] = entry
@@ -868,6 +884,21 @@ func _field_label(name: String, fallback: String) -> String:
 
 func _add_group(title: String) -> void:
 	_fields.add_child(HSeparator.new())
+	_field_rows = _fields
+	if title in BURST_FIELDS.GROUPS:
+		var button := Button.new()
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var content := VBoxContainer.new()
+		content.visible = _expanded_field_groups.get(title, title == "爆発・基本")
+		button.text = ("▼ " if content.visible else "▶ ") + title
+		button.pressed.connect(func():
+			content.visible = not content.visible
+			_expanded_field_groups[title] = content.visible
+			button.text = ("▼ " if content.visible else "▶ ") + title)
+		_fields.add_child(button)
+		_fields.add_child(content)
+		_field_rows = content
+		return
 	var heading := Label.new()
 	heading.text = title
 	heading.add_theme_color_override("font_color", Color("#86dfff"))
@@ -896,7 +927,7 @@ func _set_value(name: String, value: Variant) -> void:
 func _add_color(label: String, name: String, original: Color, help := "") -> void:
 	var row := HBoxContainer.new()
 	row.tooltip_text = help
-	_fields.add_child(row)
+	_field_rows.add_child(row)
 	var caption := Label.new()
 	caption.text = label
 	caption.tooltip_text = help
@@ -914,7 +945,7 @@ func _add_color(label: String, name: String, original: Color, help := "") -> voi
 func _add_number(label: String, name: String, original: float, hint: String, help := "") -> void:
 	var row := HBoxContainer.new()
 	row.tooltip_text = help
-	_fields.add_child(row)
+	_field_rows.add_child(row)
 	var caption := Label.new()
 	caption.text = label
 	caption.tooltip_text = help
