@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../behaviors/enemies/gunner.h"
 #include "../behaviors/enemies/beamer.h"
+#include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
 #include "../output/event_builder.h"
 #include "../../native/geometry.h"
@@ -195,15 +196,7 @@ void SpeedRunCore::advance_enemies(double delta) {
             } else if (def.kind==speed::EnemyDefinition::Kind::Gunner) {
                 speed::GunnerBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind == speed::EnemyDefinition::Kind::Shield) {
-                const double bdt = far ? delta * 3.0 : delta;
-                enemy.fire_t = speed::remaining_time(enemy.fire_t,bdt);
-                const Vector2 toward = runtime.state.enemy_aim - enemy.pos;
-                double distance = toward.length();
-                if (distance < 0.001) distance = 1;
-                enemy.vel += (toward / distance * enemy.speed - enemy.vel) * std::min(1.0, def.accel * bdt);
-                const double difference = double((runtime.state.ship_pos - enemy.pos).angle()) - enemy.facing;
-                const double wrapped = speed::angle_difference(difference);
-                enemy.facing += std::clamp(wrapped, -def.turn * bdt, def.turn * bdt);
+                speed::ShieldBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else {
                 const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
                 enemy.vel=speed::PursuitBehavior::velocity(enemy,runtime.state.ship_pos,def.turn,far?delta*3.0:delta,policy);

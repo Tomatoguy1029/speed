@@ -9,6 +9,8 @@ var failed := 0
 var reflected_finished := false
 var reflected_fixes := false
 var reflected_lifetime := false
+var shield_finished := false
+var shield_red := false
 func check(ok: bool, label: String) -> void:
 	if reflected_lifetime and label not in ["盾の寿命の値を使い切った反射弾を一度だけ回収する","反射弾の確認本体が最後まで進んだ"]: return
 	if reflected_fixes and not ("反射弾の状態が現行と一致する" in label or label in ["反射弾を共通の機体被弾へ通す","石化した反射弾は触れると被弾せずに消える","盾の寿命の値を使い切った反射弾を一度だけ回収する","反射弾の確認本体が最後まで進んだ"]): return
@@ -16,6 +18,13 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-shield" in OS.get_cmdline_user_args() or "--cpp-shield-red" in OS.get_cmdline_user_args():
+		shield_red = "--cpp-shield-red" in OS.get_cmdline_user_args()
+		await check_cpp_shield()
+		check(shield_finished,"盾の確認が最後まで進んだ")
+		print("[cpp_shield] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-reflected" in OS.get_cmdline_user_args() or "--cpp-reflected-fixes" in OS.get_cmdline_user_args() or "--cpp-reflected-lifetime" in OS.get_cmdline_user_args():
 		reflected_fixes = "--cpp-reflected-fixes" in OS.get_cmdline_user_args()
 		reflected_lifetime = "--cpp-reflected-lifetime" in OS.get_cmdline_user_args()
@@ -348,3 +357,139 @@ func check_cpp_reflected() -> void:
 	lab.free()
 	session.free()
 	reflected_finished = true
+
+func check_cpp_shield() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	config.base_hp = 100.0
+	config.base_attack = 100.0
+	config.ram_speed_ratio = 0.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 82
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["shield"])
+	var output := "res://.content/dev/run_shield"
+	var builder = load("res://tools/content/build_run_content.gd")
+	var built: Error = builder.build(stage,config,output,"盾の防御・取得・表示".sha256_text())
+	if not shield_red: check(built==OK,"盾の実効値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_82.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":287},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if not shield_red: check(session.bridge!=null,"盾の通常のランと表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	if shield_red:
+		bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(1000,0)})
+		bridge.command("dev_spawn",{"definition_id":"shield","position":target+Vector2(25,0)})
+		core.collide_ship(target-Vector2(100,0),config.ship_radius)
+		bridge.command("set_ui_overlay",{"active":false})
+		check(core.ship_snapshot().ship_shield_t>0.0 and bridge.read_frame().value.ui.get("ship_shield_visual",0)>0,"奪った盾の外観を保持して表示へ渡す")
+		session.free()
+		shield_finished = true
+		return
+	var initial: Dictionary = bridge.checkpoint()
+	var notices := []
+	bridge.subscribe("shield_check",func(frame: Dictionary):
+		for event: Dictionary in frame.events:
+			if event.type in [&"shield_stolen",&"shield_block",&"shield_expired"]: notices.append({"type":event.type,"data":event.payload})
+		return true)
+	var comparison = COMPARE.new()
+	for mode in ["front_ram","rear_ram","front_shots","back_shots","movement"]:
+		bridge.restore(initial.value)
+		notices.clear()
+		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+		add_child(lab)
+		await lab.reset({"seed":287,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
+			"config":{"start_radius":900.0,"planet_radius":100.0,"base_hp":100.0,"base_attack":100.0,"ram_speed_ratio":0.0}})
+		var run: RunSimulation = lab.run
+		run.state.ship_pos = target
+		run.state.ship_vel = Vector2.ZERO
+		run.state.enemy_aim = target
+		run.state.view_center = target
+		run.state.view_half = Vector2(640,360)
+		run.enemies._next_id = 1
+		run.enemies._lod = core.inspect().ticks
+		run.state.rng.state = int(core.inspect().rng_state)
+		var definition := run.enemies.def_of(&"shield")
+		var position := target+Vector2(25,0) if mode=="rear_ram" else target-Vector2(25,0) if mode=="front_ram" else target+Vector2(480,200)
+		var row := run.enemies.spawn(definition,position)
+		var id: int = bridge.command("dev_spawn",{"definition_id":"shield","position":position}).value
+		run.combat.rebuild_grid()
+		core.set_motion_context(target,target,Vector2(640,360))
+		if mode.ends_with("ram"):
+			var velocity := Vector2(1000,0) if mode=="rear_ram" else Vector2(-1000,0)
+			run.state.ship_vel = velocity
+			bridge.command("dev_ship_motion",{"position":target,"velocity":velocity})
+			var from := target-velocity.normalized()*100.0
+			var bounced := run.combat.collide_ship(from,config.ship_radius,null)
+			check(core.collide_ship(from,config.ship_radius)==bounced,"盾への体当たりの前後判定: "+mode)
+		elif mode.ends_with("shots"):
+			var from := position+Vector2(200,0) if mode=="front_shots" else position-Vector2(200,0)
+			var angle := PI if mode=="front_shots" else 0.0
+			for repeat in 2:
+				var options := {"speed":1200.0,"life":1.0,"pierce_left":5,"knock":0.0,"weapon_id":&"W01"}
+				run.projectiles.fire_shot(from,angle,2.0,options)
+				core.fire_shot(from,angle,2.0,options)
+				run.projectiles._update_friendly(0.2)
+				core.step_projectiles(0.2)
+			check(core.hostiles_snapshot().size()==(1 if mode=="front_shots" else 0),"前面だけ反射し待ち時間中の反射を重ねない: "+mode)
+		else:
+			for step in 4:
+				run.enemies.tick(0.125,0.125)
+				core.step(0.125)
+			var moved: Dictionary = core.enemies_snapshot()[0]
+			check(Vector2(moved.pos[0],moved.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(moved.vel[0],moved.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(moved.facing-run.enemies.table.facing[row])<0.0001,"盾の追跡・旋回を共通の操舵へ通す")
+			var relocated := target+Vector2(500,-100)
+			check(bridge.command("dev_relocate",{"entity_id":id,"position":relocated}).ok and core.enemies_snapshot()[0].id==id,"再配置で盾の個体IDを保つ")
+			bridge.command("dev_kill",{"entity_id":id,"cause":"ram"})
+			check(core.enemies_snapshot()[0].dead==1,"再配置した盾も通常の撃破へ通る")
+			lab.free()
+			continue
+		check(is_equal_approx(core.enemies_snapshot()[0].hp,run.enemies.table.hp[row]) and core.enemies_snapshot()[0].dead==run.enemies.table.dead[row],"前後からの命中と盾の生死が一致する: "+mode)
+		check(is_equal_approx(core.ship_snapshot().ship_shield_t,run.state.ship_shield_t),"盾の取得と持続時間が一致する: "+mode)
+		bridge.command("set_ui_overlay",{"active":false})
+		if mode=="rear_ram":
+			check(notices.size()>0 and notices[0].type==&"shield_stolen" and notices[0].data.get("enemy_type")==&"shield","奪った敵の種類を表示通知へ渡す")
+			var held: Dictionary = bridge.checkpoint()
+			var presentation: RunPresentation = session.view.get_node("RunPresentation")
+			presentation._present_cpp(0.0)
+			var holder: Node = presentation.frame_view.get("_shield_holder")
+			check(holder!=null and holder.get_node_or_null("ScutumGuardLighting/ScutumGuard/Armor")!=null,"奪った盾の本体・装甲・法線を機体へ表示する")
+			await get_tree().process_frame
+			for elapsed in [0.21,0.01,float(definition.params.shield_time)]:
+				run.ship.intent.touch = true
+				run.ship.tick(elapsed,elapsed)
+				core.step_ship(elapsed,elapsed,{"touch":true})
+				run.state.view_center = run.state.ship_pos
+				core.set_motion_context(core.ship_snapshot().ship_pos,run.state.ship_pos,Vector2(640,360))
+				var values := {"kind":0,"pos":run.state.ship_pos,"vel":Vector2.ZERO,"speed":0.0,"r":7.0,"life":1.0,"dmg":7.0,"slow":0.2,"turn":0.0}
+				run.projectiles._add_hostile(values.pos,values.vel,values.speed,values.r,values.life,values.dmg,values.slow,values.turn,0)
+				core.spawn_hostile(values)
+				run.projectiles._update_hostile(0.01)
+				core.step_hostiles(0.01)
+				check(is_equal_approx(core.ship_snapshot().ship_hp,run.state.ship_hp) and is_equal_approx(core.ship_snapshot().ship_shield_t,run.state.ship_shield_t),"取得後の防御・待ち時間・失効後の被弾が一致する")
+			bridge.command("set_ui_overlay",{"active":false})
+			presentation._present_cpp(0.0)
+			check(core.ship_snapshot().ship_hp<config.base_hp and not holder.get_node("ScutumGuardLighting").visible,"失効した盾は表示を消して被弾する")
+			bridge.restore(held.value)
+			bridge.collect_frame()
+			presentation._present_cpp(0.0)
+			check(bridge.read_frame().value.ui.get("ship_shield_visual",0)>0 and holder.get_node("ScutumGuardLighting").visible,"盾を奪った保持点から外観と防御を復元する")
+			bridge.release_checkpoint(held.value)
+		lab.free()
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	shield_finished = true

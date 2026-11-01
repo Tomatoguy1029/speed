@@ -75,6 +75,7 @@ struct RunState {
     double enemy_aim_lag = 0, enemy_aim_speed = 0;
     bool aim_ready = false;
     struct Ship {
+        uint32_t shield_source_definition=0;
         Vector2 pos, vel, heading = Vector2(0, -1);
         double hp = 0, hurt = 0, invuln = 0, shield_flash = 0, shield_t = 0, shield_max = 0;
         double boost_t = 0, fade_t = 0, glide_t = 0, glide_speed = 0, peak_speed = 0;

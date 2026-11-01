@@ -22,6 +22,12 @@ var pipeline: RenderPipeline
 var _particles: Array[Dictionary] = []
 var _rings: Array[Dictionary] = []
 var _meteor_shards: Array[Dictionary] = []
+var _shield_transfers: Array[Dictionary] = []
+var _shield_holder: Node2D
+var _shield_transfer_canvas: DrawLayer
+var _shield_layer := 2
+var _ship_visible := true
+var _ship_visual_position := Vector2.INF
 var _zoom := 1.0
 var _particle_canvas: Node2D
 var _dim: Node2D
@@ -37,6 +43,20 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_scope = scope
 	_pixel = 1.82*character_scale
 	for entry in entries: visuals[int(entry.id)] = entry
+	for entry: Dictionary in entries:
+		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
+	_shield_holder = Node2D.new()
+	_layer(18).add_child(_shield_holder)
+	var transfer_layer := CanvasLayer.new()
+	transfer_layer.layer = _shield_layer-1
+	transfer_layer.follow_viewport_enabled = true
+	add_child(transfer_layer)
+	_shield_transfer_canvas = DrawLayer.new()
+	transfer_layer.add_child(_shield_transfer_canvas)
+	_shield_transfer_canvas.draw_fn = func(canvas: CanvasItem):
+		for effect: Dictionary in _shield_transfers:
+			preload("res://scripts/render/shield_visual.gd").transfer(canvas,effect,_ship_visual_position)
+
 	_gunner_marks = DrawLayer.new()
 	_gunner_marks.draw_fn = func(canvas: CanvasItem):
 		preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
@@ -220,6 +240,9 @@ func apply_frame(frame: Dictionary) -> bool:
 			_layer(17 if visuals[row.part_key].role==5 else 18).add_child(sprite)
 			parts[key] = sprite
 		var sprite: Sprite2D = parts[key]
+		if visuals[row.part_key].role==1:
+			_ship_visual_position = row.transform.origin
+			_ship_visible = row.visible
 		sprite.transform = row.transform
 		sprite.visible = row.visible
 		sprite.modulate = Color("#ff6b5a") if row.visual_state & 1 else Color.WHITE
@@ -236,6 +259,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_particles.clear()
 		_rings.clear()
 		_meteor_shards.clear()
+		_shield_transfers.clear()
 	for event: Dictionary in frame.events:
 		var payload: Dictionary = event.payload.duplicate(true)
 		payload["type"] = event.type
@@ -245,6 +269,11 @@ func receive_frame(frame: Dictionary) -> bool:
 func update_effects(frame: Dictionary, dt: float) -> void:
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
+		if event.type==&"shield_stolen":
+			_shield_transfers.append({"pos":event.pos,"facing":event.facing,"r":event.r,"arc":event.arc,"life":0.3,"max":0.3})
+			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})
+		if event.type==&"shield_block":
+			_rings.append({"pos":event.pos,"radius":float(frame.ui.ship_radius)*3.0,"color":Color("#bcefff"),"life":0.18,"max":0.18})
 		if event.type==&"kill" and event.get("enemy_type")==&"meteor":
 			var frames: SpriteFrames = _scope.resources.get("res://.content/meteor_pieces.res")
 			if frames!=null:
@@ -268,6 +297,24 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	for effect: Dictionary in _shield_transfers: effect.life -= effect_dt
+	_shield_transfers = _shield_transfers.filter(func(effect: Dictionary): return effect.life>0.0)
+	_shield_transfer_canvas.queue_redraw()
+	var shield := {"remaining":ui.ship.ship_shield_t if _ship_visible else 0.0,"position":_ship_visual_position,
+		"angle":(ui.ship.ship_heading as Vector2).angle(),"clock":ui.world_time,"ship_radius":ui.ship_radius,
+		"scale":ui.character_scale,"layer":_shield_layer}
+	var shield_key: int = ui.get("ship_shield_visual",0)
+	if shield.remaining>0.0 and visuals.has(shield_key):
+		var entry: Dictionary = visuals[shield_key]
+		var look := _scope.resources.get(entry.path) as EnemyLook
+		if look!=null:
+			shield.paint = look.painted_armors[entry.paint]
+			shield.settings = entry.settings.duplicate()
+			shield.settings.brightness = 1.0-_dim_strength
+		else: shield.remaining = 0.0
+	else: shield.remaining = 0.0
+	preload("res://scripts/render/shield_visual.gd").equipped_frame(_shield_holder,shield)
+
 	for p: Dictionary in _particles:
 		p.pos += p.vel*effect_dt
 		p.vel *= 1.0-2.5*effect_dt

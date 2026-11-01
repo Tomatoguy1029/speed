@@ -1,4 +1,5 @@
 #include "combat_hooks.h"
+#include "../behaviors/enemies/shield.h"
 #include "attack_budget.h"
 #include "../runtime/run_runtime.h"
 #include "../../native/geometry.h"
@@ -12,10 +13,7 @@ void passive_death(RunRuntime &run,const DeathContext &death) {
 bool saw_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest &) {return run.state.enemies[target.slot].stone>0;}
 bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {
     const auto &enemy=run.state.enemies[target.slot];
-    if (enemy.stone>0) return true;
-    auto toward=(request.has_impact?request.impact:enemy.pos)-enemy.pos;
-    if (toward.length_squared()<0.01) toward=-request.direction;
-    return toward.length_squared()==0 || std::abs(angle_difference(double(toward.angle())-enemy.facing))>run.content->definitions[enemy.definition].front_arc;
+    return !ShieldBehavior::blocks_front(run,target,request.has_impact?request.impact:enemy.pos,request.direction);
 }
 }
 CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);}

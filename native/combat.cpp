@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/behaviors/enemies/shield.h"
 #include "../cpp/systems/field.h"
 #include "geometry.h"
 #include "../cpp/systems/combat_resolver.h"
@@ -118,7 +119,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             return true;
         }
         if (!runtime.state.draw.tracing && enemy.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock)) continue;
-        const bool rear = std::abs(angle_difference((position - enemy.pos).angle(), enemy.facing + godot::Math::PI)) <= def.weak_arc;
+        const bool rear = def.kind==speed::EnemyDefinition::Kind::Shield?speed::ShieldBehavior::rear_open(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position):std::abs(angle_difference((position - enemy.pos).angle(), enemy.facing + godot::Math::PI)) <= def.weak_arc;
         const bool crit = (def.weak_arc > 0 && rear) || runtime.state.control.rng.randf() < c.crit_chance;
         if (enemy.stone > 0) {
             enemy.hit_cd = c.contact_cooldown;
@@ -148,16 +149,10 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (!front && attack >= enemy.armor * (crit ? c.crit_armor : 1.0)) {
             double damage = attack * (crit ? c.crit_mult : 1.0);
             if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
-                runtime.state.ship.shield_t = def.shield_time; runtime.state.ship.shield_max = def.shield_time; runtime.state.ship.shield_flash = 0.2;
-                Dictionary stolen; stolen["pos"] = enemy.pos; stolen["facing"] = enemy.facing; stolen["r"] = enemy.radius; stolen["arc"] = def.front_arc;
-                emit_event("shield_stolen", stolen);
+                speed::ShieldBehavior::steal(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));
                 damage = std::max(damage, enemy.hp);
             }
-            damage_enemy(hit.row, damage, "ram", crit, direction);
-            if (crit) {
-                Dictionary impact; impact["pos"] = position; impact["enemy_pos"] = enemy.pos; impact["r"] = enemy.radius;
-                emit_event("weak_impact", impact);
-            }
+            damage_enemy(hit.row, damage, "ram", crit, direction,160.0,&position);
             enemy.hit_cd = c.contact_cooldown;
             if (runtime.state.draw.tracing) {
                 runtime.state.draw.inside[enemy.id] = hit.row;
