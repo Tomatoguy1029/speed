@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/systems/field.h"
+#include "../cpp/systems/attacks/reflected.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/systems/attack_system.h"
 #include <godot_cpp/templates/sort_array.hpp>
@@ -93,24 +94,7 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
             if (life <= 0 || enemy.dead || shot.hit_ids.count(enemy.id)) continue;
             const Vector2 impact = from.lerp(to, hit.time);
             if (shot.kind == 0 && blocks_front(hit.row, impact, vel)) {
-                auto &target = runtime.state.enemies[hit.row];
-                if (target.fire_t <= 0) {
-                    const auto &def = runtime.content->definitions[target.definition];
-                    Vector2 normal = (impact - target.pos).normalized();
-                    if (normal.is_zero_approx()) normal = Vector2::from_angle(target.facing);
-                    const Vector2 direction = (vel - normal * 2.0 * vel.dot(normal)).normalized();
-                    Hostile reflected;
-                    reflected.kind = 2; reflected.pos = impact + normal * 2.0;
-                    reflected.vel = direction * def.reflect_speed; reflected.speed = def.reflect_speed;
-                    reflected.radius = std::clamp(double(shot.radius), 5.0, 10.0);
-                    reflected.life = def.reflect_life; reflected.damage = def.reflect_damage;
-                    speed::AttackSpec reflected_spec;reflected_spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;
-                    reflected_spec.owner.live_source=runtime.state.enemy_handles.at(uint32_t(hit.row));
-                    add_hostile(std::move(reflected),reflected_spec);
-                    target.fire_t = std::max(0.01, def.reflect_interval); target.flash = 0.1;
-                    Dictionary reflected_event; reflected_event["pos"] = impact; reflected_event["normal"] = normal;
-                    emit_event("shield_reflect", reflected_event);
-                }
+                speed::ReflectedSystem::reflect(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),impact,vel,shot.radius);
                 position = impact;life = 0;body_hit.reset();end_reason=speed::AttackEndReason::Hit;break;
             }
             shot.hit_ids.insert(enemy.id);

@@ -82,7 +82,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (const auto &shot:state.hostiles) {
         if (!shot.alive || !shot.definition || !view.grow(40.0).has_point(shot.pos)) continue;
         const auto &definition=run.content->hostile_definitions[shot.definition-1];const auto *record=AttackSystem::get(state,shot.attack);if (!record) continue;
-        batch(definition.visual,10,0).add(record->id,shot.pos,0,shot.radius,Color(1,1,1,1));
+        batch(definition.visual,10,0).add(record->id,shot.pos,shot.kind==int64_t(HostileKind::Reflected)?shot.vel.angle():0.0,shot.radius,Color(1,1,1,1));
         if (shot.stone>0) batch(definition.stone_visual,10,1).add(record->id,shot.pos,0,shot.radius*1.3,Color(0.62,0.6,0.58,0.9));
     }
     const Color crystal_colors[]={Color::html("08deff"),Color::html("945cff"),Color::html("ffb609")};

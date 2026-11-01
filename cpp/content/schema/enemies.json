@@ -46,6 +46,59 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "ShieldDefinition",
+      "section": 25,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "weak_arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "front_arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reflect_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reflect_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shield_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reflected",
+          "type": "u32",
+          "min": 1,
+          "ref": "HostileDefinition"
+        }
+      ]
     }
   ],
   "enums": {}

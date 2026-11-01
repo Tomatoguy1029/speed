@@ -965,10 +965,10 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 12
+          "max": 13
         }
       ],
-      "version": 8
+      "version": 9
     },
     {
       "name": "ForwardDefinition",
@@ -1294,6 +1294,10 @@
       {
         "name": "StoneShot",
         "value": "stone_shot"
+      },
+      {
+        "name": "ReflectedShot",
+        "value": "reflected_shot"
       }
     ],
     "EventType": [

@@ -72,7 +72,7 @@ inline bool parse_symbol(std::string_view value, Cause &out) {
     if (value=="saw") {out=Cause::Saw;return true;}
     return false;
 }
-enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,Count};
+enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,ReflectedShot=13,Count};
 inline const char *symbol_name(VisualRole value) {
     switch(value) {
     case VisualRole::EnemySprite: return "enemy_sprite";
@@ -88,6 +88,7 @@ inline const char *symbol_name(VisualRole value) {
     case VisualRole::Moon: return "moon";
     case VisualRole::HostileShot: return "hostile_shot";
     case VisualRole::StoneShot: return "stone_shot";
+    case VisualRole::ReflectedShot: return "reflected_shot";
     default: return "";
     }
 }
@@ -105,6 +106,7 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="moon") {out=VisualRole::Moon;return true;}
     if (value=="hostile_shot") {out=VisualRole::HostileShot;return true;}
     if (value=="stone_shot") {out=VisualRole::StoneShot;return true;}
+    if (value=="reflected_shot") {out=VisualRole::ReflectedShot;return true;}
     return false;
 }
 enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,Count};

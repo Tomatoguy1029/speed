@@ -461,7 +461,7 @@ inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 12) return false;
+    if (out.role > 13) return false;
     return true;
 }
 struct ForwardDefinition {
@@ -713,6 +713,38 @@ inline bool read(BinaryReader &input, HoundDefinition &out) {
     if (out.accel < 0) return false;
     return true;
 }
+struct ShieldDefinition {
+    uint32_t id{};
+    double accel{};
+    double turn{};
+    double weak_arc{};
+    double front_arc{};
+    double reflect_speed{};
+    double reflect_interval{};
+    double shield_time{};
+    uint32_t reflected{};
+};
+inline bool read(BinaryReader &input, ShieldDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.turn)) return false;
+    if (out.turn < 0) return false;
+    if (!input.read_f64(out.weak_arc)) return false;
+    if (out.weak_arc < 0) return false;
+    if (!input.read_f64(out.front_arc)) return false;
+    if (out.front_arc < 0) return false;
+    if (!input.read_f64(out.reflect_speed)) return false;
+    if (out.reflect_speed < 0) return false;
+    if (!input.read_f64(out.reflect_interval)) return false;
+    if (out.reflect_interval < 0) return false;
+    if (!input.read_f64(out.shield_time)) return false;
+    if (out.shield_time < 0) return false;
+    if (!input.read_u32(out.reflected)) return false;
+    if (out.reflected < 1) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -854,6 +886,7 @@ struct ContentRecords {
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
+    std::vector<ShieldDefinition> ShieldDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -933,7 +966,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 8) return false;
+        if (version != 9) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -990,6 +1023,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/56) return false;
         for (uint32_t i=0; i<count; ++i) { HoundDefinition row; if (!read(input,row)) return false; out.HoundDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 25: {
+        if (version != 1) return false;
+        if (count > input.remaining()/64) return false;
+        for (uint32_t i=0; i<count; ++i) { ShieldDefinition row; if (!read(input,row)) return false; out.ShieldDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 21: {
@@ -1056,6 +1095,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutAsset_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HoundDefinition_ids;
     for (const auto &row:data.HoundDefinition_rows) if (!HoundDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ShieldDefinition_ids;
+    for (const auto &row:data.ShieldDefinition_rows) if (!ShieldDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -1080,6 +1121,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.ShieldDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.ShieldDefinition_rows) if (!HostileDefinition_ids.count(row.reflected)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -1211,5 +1254,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=24;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=25;
 }

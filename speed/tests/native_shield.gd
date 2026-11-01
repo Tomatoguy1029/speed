@@ -6,11 +6,24 @@ const SHIP := preload("res://tests/native_ship.gd")
 const COMBAT := preload("res://tests/native_combat.gd")
 const HOSTILES := preload("res://tests/native_hostiles.gd")
 var failed := 0
+var reflected_finished := false
+var reflected_fixes := false
+var reflected_lifetime := false
 func check(ok: bool, label: String) -> void:
+	if reflected_lifetime and label not in ["盾の寿命の値を使い切った反射弾を一度だけ回収する","反射弾の確認本体が最後まで進んだ"]: return
+	if reflected_fixes and not ("反射弾の状態が現行と一致する" in label or label in ["反射弾を共通の機体被弾へ通す","石化した反射弾は触れると被弾せずに消える","盾の寿命の値を使い切った反射弾を一度だけ回収する","反射弾の確認本体が最後まで進んだ"]): return
 	if not ok:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-reflected" in OS.get_cmdline_user_args() or "--cpp-reflected-fixes" in OS.get_cmdline_user_args() or "--cpp-reflected-lifetime" in OS.get_cmdline_user_args():
+		reflected_fixes = "--cpp-reflected-fixes" in OS.get_cmdline_user_args()
+		reflected_lifetime = "--cpp-reflected-lifetime" in OS.get_cmdline_user_args()
+		await check_cpp_reflected()
+		check(reflected_finished,"反射弾の確認本体が最後まで進んだ")
+		print("[cpp_reflected] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	var comparison = COMPARE.new()
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
@@ -165,3 +178,173 @@ func compare_hits(comparison, mode: String, stone := false) -> void:
 	budget_helper.free()
 	core.close()
 	lab.free()
+
+func reflected_states(run: RunSimulation, core, label: String) -> void:
+	var reader = HOSTILES.new()
+	var expected: Array = reader.snapshot(run.projectiles)
+	reader.free()
+	for row: Dictionary in expected:
+		row.stone = maxf(0.0,row.stone)
+		row.wait = maxf(0.0,row.wait)
+	var comparison = COMPARE.new()
+	var difference: String = comparison.difference(comparison.plain(expected),comparison.plain(core.hostiles_snapshot()))
+	check(difference.is_empty(),label+"：反射弾の状態が現行と一致する "+difference)
+
+func reflected_shot(run: RunSimulation, core, source: int, target: Vector2, radius: float) -> void:
+	run.enemies.table.fire_t[source] = 0.0
+	run.combat.rebuild_grid()
+	var options := {"speed":1200.0,"r":radius,"life":4.0}
+	run.projectiles.fire_shot(target,PI,10.0,options)
+	check(core.fire_shot(target,PI,10.0,options),"盾の前面へ味方弾を作る")
+	run.projectiles._update_friendly(0.5)
+	check(core.step_projectiles(0.5),"味方弾の共通更新で盾の反射を通す")
+
+func check_cpp_reflected() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 87
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["shield"])
+	var output := "res://.content/dev/run_reflected"
+	var builder = load("res://tools/content/build_run_content.gd")
+	check(builder!=null and builder.can_instantiate(),"反射弾の生成入口を読み込める")
+	if builder==null or not builder.can_instantiate(): return
+	var built: Error = builder.build(stage,config,output,"盾からの反射弾の生成・飛行・終了".sha256_text())
+	check(built==OK,"盾の実効値・反射弾・表示キーを生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_87.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":287},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"盾とピンクの反射弾の資源を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target := Vector2(-900,0)
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	core.set_motion_context(target,target,Vector2(640,360))
+	var source_position := Vector2(-1200,0)
+	var source_id: int = bridge.command("dev_spawn",{"definition_id":"shield","position":source_position}).value
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed":287,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
+		"config":{"start_radius":900.0,"planet_radius":100.0}})
+	var run: RunSimulation = lab.run
+	run.state.ship_pos = target
+	run.state.ship_vel = Vector2.ZERO
+	run.state.view_center = target
+	run.state.view_half = Vector2(640,360)
+	var definition: EnemyDef = run.enemies.def_of(&"shield")
+	var source: int = run.enemies.spawn(definition,source_position)
+	var empty: Dictionary = bridge.checkpoint()
+	var pending: Dictionary = {}
+	if not reflected_lifetime:
+		for radius in [1.0,7.0,17.0]:
+			check(bridge.restore(empty.value).ok,"半径ごとの反射の場面を初期化する")
+			run.projectiles.clear_hostile()
+			reflected_shot(run,core,source,target,radius)
+			reflected_states(run,core,"盾の反射と半径の上下限")
+			var shots: Array = core.hostiles_snapshot()
+			check(shots.size()==1 and shots[0].kind==2 and is_equal_approx(shots[0].life,float(definition.params.reflect_life)),"盾の寿命の値で危険な反射弾を1つ作る")
+			var record: Dictionary = core.attack_snapshot()[0]
+			check(record.source_id==source_id and record.source_alive,"反射元の敵IDと生存参照を分けて保持する")
+			check(core.projectiles_snapshot().is_empty(),"盾に当たった味方弾を同じ更新で消す")
+		# この弾を、同じ更新順と保持点から先へ進める。
+		pending = bridge.checkpoint()
+		var saved_hp: float = core.enemies_snapshot()[0].hp
+		run.projectiles.fire_shot(target,PI,10.0,{"speed":1200.0,"r":7.0,"life":4.0})
+		core.fire_shot(target,PI,10.0,{"speed":1200.0,"r":7.0,"life":4.0})
+		run.projectiles._update_friendly(0.5)
+		core.step_projectiles(0.5)
+		check(core.hostiles_snapshot().size()==1 and core.enemies_snapshot()[0].hp==saved_hp,"反射の待機中も味方弾を止め、反射弾とダメージを重ねない")
+		run.projectiles._update_hostile(0.1)
+		core.step_hostiles(0.1)
+		reflected_states(run,core,"反射後の直進")
+		var visual := 0
+		var stone_visual := 0
+		for entry: Dictionary in session.cpp_resources.visuals:
+			if entry.role==13: visual = entry.id
+			if entry.role==12: stone_visual = entry.id
+		var frame: Dictionary = bridge.read_render(Rect2(-1800,-500,1500,1000)).value
+		var visible := false
+		for batch: Dictionary in frame.batches:
+			if batch.visual_id==visual: visible = batch.ids.size()==1 and is_equal_approx(batch.transforms[0],10.0)
+		check(visible,"反射弾の半径・位置・進む向きを専用のまとめ描きへ渡す")
+		var presentation: RunPresentation = session.view.get_node("RunPresentation")
+		presentation._present_cpp(0.0)
+		check(presentation.frame_view.batches.has(visual),"ピンクの尾・本体・明るい芯の反射弾を通常画面へ出す")
+		var shown: InstanceBatch = presentation.frame_view.batches.get(visual)
+		if shown!=null:
+			var arrays: Array = shown.multimesh.mesh.surface_get_arrays(0)
+			check(arrays[Mesh.ARRAY_COLOR].has(Color("#ff84df")) and arrays[Mesh.ARRAY_COLOR].has(Color("#f45ec5")) and arrays[Mesh.ARRAY_COLOR].has(Color("#fff0fc")),"反射弾の尾・本体・芯の色を保つ")
+		bridge.command("dev_kill",{"entity_id":source_id,"cause":"ram"})
+		check(core.hostiles_snapshot().size()==1 and not core.attack_snapshot()[0].source_alive,"盾が倒れても反射弾を寿命まで残す")
+		run.projectiles._update_hostile(0.5)
+		core.step_hostiles(0.5)
+		reflected_states(run,core,"機体への命中と終了")
+		var hit: Dictionary = core.ship_snapshot()
+		check(is_equal_approx(hit.ship_hp,run.state.ship_hp) and is_equal_approx(hit.ship_hp,config.base_hp-float(definition.params.reflect_dmg)),"反射弾を共通の機体被弾へ通す")
+		bridge.restore(pending.value)
+		core.step_hostiles(0.1)
+		core.step_hostiles(0.5)
+		check(core.hostiles_snapshot().is_empty() and core.ship_snapshot()==hit,"保持点から反射弾と同じ命中・消滅を再現する")
+		bridge.restore(pending.value)
+		run.projectiles.clear_hostile()
+		run.state.ship_hp = config.base_hp
+		run.state.ship_invuln = 0.0
+		reflected_shot(run,core,source,target,17.0)
+		# C++には保持点の弾があるため、上で新規に追加された分を残さない。
+		# 盾は保持点のクールダウン中なので、新しい反射弾は生成されない。
+		run.projectiles.stone_hostile(Rect2(-1800,-500,1500,1000),0.1)
+		bridge.command("dev_stone_hostiles",{"duration":0.1,"view":Rect2(-1800,-500,1500,1000)})
+		run.projectiles._update_hostile(0.05)
+		core.step_hostiles(0.05)
+		reflected_states(run,core,"石化した反射弾")
+		frame = bridge.read_render(Rect2(-1800,-500,1500,1000)).value
+		var stone_shown := false
+		for batch: Dictionary in frame.batches:
+			if batch.visual_id==stone_visual: stone_shown = batch.ids.size()==1
+		check(stone_shown,"石化した反射弾にも同じ灰色の表示を重ねる")
+		var at: Vector2 = run.projectiles.hostile_pos[0]
+		run.state.ship_pos = at
+		bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+		run.projectiles._update_hostile(0.02)
+		core.step_hostiles(0.02)
+		check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"石化した反射弾は触れると被弾せずに消える")
+	# 十分に広い表示範囲で、地形と機体を避け、反射弾自体の寿命で終了させる。
+	bridge.restore(empty.value)
+	run.projectiles.clear_hostile()
+	var far_source_position := Vector2(1500,1500)
+	var far_source: int = run.enemies.spawn(definition,far_source_position)
+	bridge.command("dev_spawn",{"definition_id":"shield","position":far_source_position})
+	reflected_shot(run,core,far_source,Vector2(1800,1500),7.0)
+	var outside := Vector2(-3000,3000)
+	run.state.ship_pos = outside
+	run.state.view_center = Vector2(2000,1500)
+	run.state.view_half = Vector2(10000,10000)
+	bridge.command("dev_ship_motion",{"position":outside,"velocity":Vector2.ZERO})
+	core.set_motion_context(outside,run.state.view_center,run.state.view_half)
+	run.projectiles._update_hostile(float(definition.params.reflect_life)+0.01)
+	core.step_hostiles(float(definition.params.reflect_life)+0.01)
+	if not reflected_lifetime: reflected_states(run,core,"地形・機体・画面外に依存しない寿命終了")
+	var lifetime := 0
+	# 個別Systemを直接進める確認では、通常Runnerの末尾に相当する通知の確定も行う。
+	for event: Dictionary in core.drain_events():
+		if event.type==&"attack_retired" and event.reason=="lifetime": lifetime += 1
+	check(core.hostiles_snapshot().is_empty() and lifetime==1,"盾の寿命の値を使い切った反射弾を一度だけ回収する")
+	if not pending.is_empty(): bridge.release_checkpoint(pending.value)
+	bridge.release_checkpoint(empty.value)
+	await get_tree().process_frame
+	lab.free()
+	session.free()
+	reflected_finished = true

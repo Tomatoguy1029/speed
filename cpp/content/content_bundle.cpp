@@ -86,7 +86,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
     }
     for (const auto &visual:bundle->visuals) {
-        if (visual.role>12) return {};
+        if (visual.role>13) return {};
     }
     std::unordered_set<std::string> names;
     for (const auto &row:records.EnemyRecord_rows) {
@@ -94,8 +94,16 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
+        const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
+        if (row.kind==1) {
+            if (shield==records.ShieldDefinition_rows.end() || shield->reflected>bundle->hostile_definitions.size() || shield->turn<=0) return {};
+            const auto &reflected=bundle->hostile_definitions[shield->reflected-1];if (reflected.kind!=uint32_t(HostileKind::Reflected)) return {};
+            definition.accel=shield->accel;definition.turn=shield->turn;definition.weak_arc=shield->weak_arc;definition.front_arc=shield->front_arc;
+            definition.reflect_speed=shield->reflect_speed;definition.reflect_interval=shield->reflect_interval;definition.shield_time=shield->shield_time;
+            definition.reflected_definition=shield->reflected;definition.reflect_life=reflected.life;definition.reflect_damage=reflected.damage;
+        } else if (shield!=records.ShieldDefinition_rows.end()) return {};
         const auto bite=std::find_if(bundle->bites.begin(),bundle->bites.end(),[&](const auto &b){return b.id==row.id;});
         if (row.kind==2 || row.kind==3) {
             if (bite==bundle->bites.end() || bite->warn<=0 || bite->duration<=0 || !bite->visual_key) return {};

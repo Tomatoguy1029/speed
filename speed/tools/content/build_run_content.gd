@@ -4,11 +4,11 @@ const Schema = preload("res://tools/content/generated/run_schema.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"biter",&"hound",&"meteor",&"obstacle",&"saw"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -110,6 +110,15 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	visuals.append({"id":bullet_visual+1,"role":12,"path":""})
 	data.HostileDefinition = [{"id":1,"kind":0,"radius":7.0,"life":4.0,"damage":7.0,"slow":0.0,"turn":0.0,
 		"visual":bullet_visual,"stone_visual":bullet_visual+1,"contact":1}]
+	if definition.behavior==&"shield":
+		var shield := {"id":1,"reflected":2}
+		for key in ["accel","turn","weak_arc","front_arc","reflect_speed","reflect_interval","shield_time"]: shield[key] = source.shield[key]
+		data.ShieldDefinition = [shield]
+		var reflected_visual: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":reflected_visual,"role":13})
+		visuals.append({"id":reflected_visual,"role":13,"path":""})
+		data.HostileDefinition.append({"id":2,"kind":2,"radius":5.0,"life":source.shield.reflect_life,"damage":source.shield.reflect_dmg,"slow":0.0,"turn":0.0,
+			"visual":reflected_visual,"stone_visual":bullet_visual+1,"contact":1})
 	for i in weapon.level_steps.size():
 		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
@@ -173,9 +182,19 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
 			data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
 			data.MoonDefinition = resolved.MoonDefinition.duplicate(true)
-			data.HostileDefinition = resolved.HostileDefinition.duplicate(true)
+			data.HostileDefinition = resolved.HostileDefinition.slice(0,1).duplicate(true)
 			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [9,10])
-			attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12])
+			attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12,13])
+		for attack_visual: Dictionary in package.visuals:
+			if attack_visual.role==13 and not attack_visuals.any(func(value: Dictionary): return value.role==13): attack_visuals.append(attack_visual)
+		for shield_source: Dictionary in resolved.ShieldDefinition:
+			var shield := shield_source.duplicate()
+			var reflected: Dictionary = resolved.HostileDefinition[1].duplicate()
+			reflected.id = data.HostileDefinition.size()+1
+			shield.id = row.id
+			shield.reflected = reflected.id
+			data.HostileDefinition.append(reflected)
+			data.ShieldDefinition.append(shield)
 		var visual: Dictionary = package.visuals[5].duplicate()
 		visual.id = i+6
 		data.ResourceKey.append({"id":visual.id,"role":visual.role})
@@ -212,7 +231,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		row.id = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":row.id,"role":row.role})
 		visuals.append(row)
-		data.HostileDefinition[0]["visual" if row.role==11 else "stone_visual"] = row.id
+		for attack: Dictionary in data.HostileDefinition:
+			if row.role==12: attack.stone_visual = row.id
+			elif (row.role==13 and attack.kind==2) or (row.role==11 and attack.kind!=2): attack.visual = row.id
 	var terrain := {"id":1}
 	for key in ["meteor_count","iron_count","saw_count","planet_radius","meteor_coin_chance","meteor_heal_chance","meteor_magnet_chance","saw_speed","saw_power","saw_life"]:
 		terrain[key] = config.get(key)
