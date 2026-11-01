@@ -22,9 +22,11 @@ func on_event(ev: Dictionary) -> void:
 	var debris: Array[Dictionary] = []
 	for i in 14: debris.append({"dir": Vector2.from_angle(randf() * TAU), "v": 40.0 + randf() * 70.0})
 	booms.append({"pos": ev.pos, "age": 0.0, "debris": debris})
+	if booms.size() > 96: booms.pop_front()
 
 func tick(_dt: float) -> void:
 	var dt := world_dt()
+	var time_scale := ShaderTuning.burst_time_scale(_effect_key())
 	var p := painter()
 	p.begin()
 	var t := state.world_time
@@ -37,11 +39,13 @@ func tick(_dt: float) -> void:
 		if armed and age < 0.22: p.thick_ring(pos, 6.0, 1, Color("#cfeaff"))
 	for b in booms:
 		b.age += dt
-		var q: float = b.age / 0.4
+		var q: float = b.age / time_scale / 0.4
 		if q >= 1.0: continue
+		var energy := visual_number("glow_energy", 1.0)
+		var color: Color = (Color.WHITE if q < 0.5 else Color("#8fb8ff")) * Color(energy, energy, energy, 1.0)
 		for d in b.debris:
-			p.dot(b.pos + d.dir * d.v * q * p.px, Color.WHITE if q < 0.5 else Color("#8fb8ff"))
-	booms = booms.filter(func(b): return b.age < 0.4)
+			p.dot(b.pos + d.dir * d.v * q * p.px, color)
+	if not ShaderTuning.previewing(): booms = booms.filter(func(b): return b.age / time_scale < 0.4)
 	blasts(TUNED_SHADERS[0]).step(dt)
 	p.end()
 

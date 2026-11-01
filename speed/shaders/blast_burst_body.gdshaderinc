@@ -69,12 +69,12 @@ void spark_state(float i, out vec4 state, out vec4 extra, out vec4 color) {
 	float pick = rnd(i, 46.0);
 	state = vec4(head, dir);
 	extra = vec4(len, k < 0.35 ? k / 0.35 : 1.0, 0.0, 0.0);
-	color = vec4(pick < 0.25 ? c0.rgb : pick < 0.75 ? c1.rgb : c2.rgb, 1.0);
+	color = pick < 0.25 ? c0 : pick < 0.75 ? c1 : c2;
 }
 
 void vertex() {
 	float R = max(radius, 1.0);
-	max_reach = R * 1.7;
+	max_reach = half_cells;
 	if (age < spark_seconds + 0.06) max_reach = max(max_reach, R * 0.16 + drift(R * 6.6 * spark_speed, age) + 17.0);
 	if (age < ring_seconds) max_reach = max(max_reach, R * (0.21 + ring_size) + 3.0);
 	particle_state = vec4(0.0);
@@ -144,16 +144,16 @@ void fragment() {
 		vec2 c = particle_state.xy;
 		float r = particle_state.z;
 		float k = particle_state.w;
-		if (length(p - c) <= r) col = over(col, smoke_dark.rgb, k);
-		if (length(p - c + vec2(0.2, 0.25) * r) <= r * 0.75) col = over(col, smoke_mid.rgb, k * 0.55);
-		if (length(p - c + vec2(0.35, 0.4) * r) <= r * 0.4) col = over(col, smoke_light.rgb, k * 0.35);
+		if (length(p - c) <= r) col = over(col, smoke_dark.rgb, k * smoke_dark.a);
+		if (length(p - c + vec2(0.2, 0.25) * r) <= r * 0.75) col = over(col, smoke_mid.rgb, k * 0.55 * smoke_mid.a);
+		if (length(p - c + vec2(0.35, 0.4) * r) <= r * 0.4) col = over(col, smoke_light.rgb, k * 0.35 * smoke_light.a);
 	} else if (pass_mode == 2) {
 		vec2 at = particle_state.xy;
 		float k = particle_state.z;
 		bool big = particle_state.w > 0.5;
-		vec3 c = k < 0.3 ? c0.rgb : k < 0.65 ? c1.rgb : c2.rgb;
-		if (cell == at || (big && cell == at + vec2(1.0, 0.0))) col = vec4(c, 1.0);
-		else if (big && cell == at + vec2(0.0, 1.0)) col = vec4(c2.rgb, 1.0);
+		vec4 c = k < 0.3 ? c0 : k < 0.65 ? c1 : c2;
+		if (cell == at || (big && cell == at + vec2(1.0, 0.0))) col = c;
+		else if (big && cell == at + vec2(0.0, 1.0)) col = c2;
 	} else if (pass_mode == 3) {
 		vec2 dir = particle_state.zw;
 		vec2 rel = p - particle_state.xy;
@@ -162,7 +162,7 @@ void fragment() {
 		if (along > 0.5 || along < -len || abs(rel.x * dir.y - rel.y * dir.x) > 0.55) discard;
 		vec3 c = particle_color.rgb;
 		if (along < -len * 0.4) c *= 0.55;
-		col = vec4(c, particle_extra.y);
+		col = vec4(c, particle_extra.y * particle_color.a);
 	} else {
 		// 火球：煙の上、燃えかすと火の粉の下。
 		float life = age / fire_seconds;
@@ -186,10 +186,12 @@ void fragment() {
 		if (ru < 1.0) {
 			float rr = R * (0.21 + ring_size * out_cubic(ru));
 			float w = ru < 0.4 ? 2.0 : 1.0;
-			if (abs(dist - rr) <= w && vnoise(vec3(p * 0.25 + seed, ru * 3.0 + 9.0)) >= 0.2 + ru * 0.5)
-				col = over(col, ru < 0.3 ? c0.rgb : c1.rgb, ring_alpha * (ru < 0.5 ? 1.0 : 0.58));
+			if (abs(dist - rr) <= w && vnoise(vec3(p * 0.25 + seed, ru * 3.0 + 9.0)) >= 0.2 + ru * 0.5) {
+				vec4 ring_color = ru < 0.3 ? c0 : c1;
+				col = over(col, ring_color.rgb, ring_color.a * ring_alpha * (ru < 0.5 ? 1.0 : 0.58));
+			}
 		}
 	}
 	if (col.a <= 0.0) discard;
-	COLOR = col;
+	COLOR = vec4(col.rgb * effect_energy, col.a) * effect_color;
 }

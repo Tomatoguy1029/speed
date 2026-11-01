@@ -11,6 +11,9 @@ uniform float life = 0.0;
 // 炎の中心のドット座標と種（ノイズを場所ごと・炎ごとに変える）
 uniform vec2 origin = vec2(0.0);
 uniform float seed = 0.0;
+// 表示用の全体色と明るさ。CanvasItemのmodulateとは独立して適用する。
+uniform vec4 effect_color : source_color = vec4(1.0);
+uniform float effect_energy = 1.0;
 group_uniforms tuning;
 uniform vec4 c0 : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform vec4 c1 : source_color = vec4(1.0, 0.949, 0.659, 1.0);
@@ -62,4 +65,6 @@ void fragment() {
 	} else {
 		discard;
 	}
+	COLOR *= effect_color;
+	COLOR.rgb *= effect_energy;
 }

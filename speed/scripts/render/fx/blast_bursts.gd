@@ -10,6 +10,8 @@ var shader: Shader = SHADER
 var px := 2.366
 ## 戦闘エフェクトツールの装備・攻撃キー（ShaderTuning）
 var key := ""
+## 単独プレビューの形を調整する間、粒の並びを保つ。負数で爆発ごとに選ぶ。
+var seed_override := -1.0
 var _items: Array[Dictionary] = []
 ## shader の上限と同じ粒数。各粒の四角は共有し、頂点で現在の軌道へ置く。
 const PARTICLE_COUNTS := {1: 24, 2: 96, 3: 64}
@@ -33,7 +35,7 @@ func add(pos: Vector2, radius: float, delay := 0.0) -> void:
 	mat.set_shader_parameter("half_cells", half)
 	mat.set_shader_parameter("radius", radius)
 	mat.set_shader_parameter("origin", center)
-	mat.set_shader_parameter("seed", randf() * 9.0)
+	mat.set_shader_parameter("seed", seed_override if seed_override >= 0.0 else randf() * 9.0)
 	var materials: Array[ShaderMaterial] = []
 	# 子の順番とmesh内の粒番号順で、元のshaderの重なり順を保つ。
 	for mode: int in [1, 0, 2, 3]:
@@ -46,26 +48,34 @@ func add(pos: Vector2, radius: float, delay := 0.0) -> void:
 		materials.append(part)
 	add_child(node)
 	node.visible = delay <= 0.0
-	_items.append({"node": node, "materials": materials, "age": -delay, "life": _life(mat),
+	_items.append({"node": node, "materials": materials, "age": -delay, "life": _life(mat), "radius": radius,
 		"tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
 	if _items.size() > 96: _items.pop_front().node.queue_free()
 
 ## dt は世界の秒。
 func step(dt: float) -> void:
 	var revision: int = ShaderTuning.SETTINGS.preview_revision
+	var time_scale := ShaderTuning.burst_time_scale(key)
 	for item in _items:
 		item.age += dt
-		if item.age >= item.life:
+		var retune: bool = item.tuning_revision != revision or item.tuning_key != key
+		if retune:
+			for mat: ShaderMaterial in item.materials: ShaderTuning.apply(mat, key)
+			var first: ShaderMaterial = item.materials[0]
+			item.life = _life(first)
+			var half := ceilf(float(item.radius) * _reach(first, item.radius)) + 3.0
+			item.node.scale = Vector2.ONE * half * px
+			for mat: ShaderMaterial in item.materials: mat.set_shader_parameter("half_cells", half)
+		var age: float = item.age / time_scale
+		item.node.visible = age >= 0.0 and age < item.life
+		if age >= item.life and not ShaderTuning.previewing():
 			item.node.queue_free()
 			continue
-		item.node.visible = item.age >= 0.0
-		var retune: bool = item.tuning_revision != revision or item.tuning_key != key
 		for mat: ShaderMaterial in item.materials:
-			mat.set_shader_parameter("age", maxf(0.0, item.age))
-			if retune: ShaderTuning.apply(mat, key)
+			mat.set_shader_parameter("age", maxf(0.0, age))
 		item.tuning_revision = revision
 		item.tuning_key = key
-	_items = _items.filter(func(item): return item.age < item.life)
+	if not ShaderTuning.previewing(): _items = _items.filter(func(item): return item.age / time_scale < item.life)
 
 ## 上限分の四角を1枚のmeshにまとめる。UV.xへ粒番号を埋め、順序と頂点数を固定する。
 static func _particle_mesh(mode: int) -> ArrayMesh:
@@ -94,7 +104,9 @@ static func _reach(mat: ShaderMaterial, radius: float) -> float:
 	var spark_seconds: float = _value(mat, "spark_seconds")
 	var sparks := 0.16 + 6.6 * _value(mat, "spark_speed") * (1.0 - exp(-0.6 * (spark_seconds + 0.06))) / 0.6 + 17.0 / maxf(radius, 1.0)
 	var ring: float = 0.21 + _value(mat, "ring_size") + 3.0 / maxf(radius, 1.0)
-	return maxf(1.7, maxf(sparks, ring))
+	var cinders := 1.05 + 22.0 / 38.0 * _value(mat, "cinder_speed") * _value(mat, "cinder_seconds") + 2.0 / maxf(radius, 1.0)
+	var smoke := 0.8 + 15.0 / 38.0 * 1.3 + (sqrt(12.0 * 12.0 + 16.0 * 16.0) / 38.0) * _value(mat, "smoke_seconds")
+	return maxf(maxf(1.7, cinders), maxf(smoke, maxf(sparks, ring)))
 
 ## 最後の煙・燃えかす・火の粉が消えるまでの秒。
 static func _life(mat: ShaderMaterial) -> float:

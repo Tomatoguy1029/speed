@@ -7,6 +7,17 @@ extends RefCounted
 const SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const PREFIX := "shader/"
 const LEGACY_PREFIXES := {"shader/mine_burst/": "shader/blast_burst/", "shader/bomber_burst/": "shader/blast_burst/"}
+const BURST_SHADERS := ["blast_burst", "bomber_burst", "mine_burst", "fire_burst", "hydra_burst"]
+
+## 表示専用の時計。1で元の速さ、2で同じ動きを2倍の時間をかけて描く。
+static func burst_time_scale(key: String, fallback := "") -> float:
+	return maxf(0.05, float(SETTINGS.resolved_values(key, fallback).get("burst_duration_scale", 1.0)))
+
+static func burst_number(key: String, name: String, original: float) -> float:
+	return float(SETTINGS.values_for(key).get(name, original))
+
+static func previewing() -> bool:
+	return SETTINGS._preview_enabled
 
 static func field(shader: Shader, uniform: String) -> String:
 	return PREFIX + shader.resource_path.get_file().get_basename() + "/" + uniform
@@ -23,6 +34,22 @@ static func saved_value(values: Dictionary, name: String, fallback: Variant) -> 
 static func apply(mat: ShaderMaterial, key: String, fallback := "", component := "") -> void:
 	if mat == null or mat.shader == null: return
 	var values := SETTINGS.component_values(key, component, fallback) if not component.is_empty() else SETTINGS.resolved_values(key, fallback)
+	if mat.shader.resource_path.get_file().get_basename() in BURST_SHADERS:
+		# 再読込で上書きが消えた項目も、使用元の初期値へ戻す。
+		# FireBurstsが渡す専用パレットはshaderの既定色より優先する。
+		if not mat.has_meta("burst_defaults"):
+			var initial_values := {}
+			for info in tunables(mat.shader):
+				var original: Variant = mat.get_shader_parameter(info.name)
+				initial_values[info.name] = original if original != null else default_value(mat.shader, info.name)
+			mat.set_meta("burst_defaults", initial_values)
+		var originals: Dictionary = mat.get_meta("burst_defaults")
+		for uniform: String in originals: mat.set_shader_parameter(uniform, originals[uniform])
+		# shaderはCanvasItemのCOLORを上書きするため、塗りと明るさを明示的に渡す。
+		var tint: Color = values.get("effect_tint", Color.WHITE)
+		var energy := float(values.get("glow_energy", 1.0))
+		mat.set_shader_parameter("effect_color", tint)
+		mat.set_shader_parameter("effect_energy", energy)
 	if values.is_empty(): return
 	var prefix := PREFIX + mat.shader.resource_path.get_file().get_basename() + "/"
 	var legacy_prefix := legacy_field(prefix)

@@ -20,6 +20,9 @@ varying flat vec4 particle_state;
 varying flat vec4 particle_extra;
 varying flat vec4 particle_color;
 varying flat float max_reach;
+// 表示用の全体色と明るさ。CanvasItemのmodulateとは独立して適用する。
+uniform vec4 effect_color : source_color = vec4(1.0);
+uniform float effect_energy = 1.0;
 group_uniforms tuning;
 uniform vec4 c0 : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform vec4 c1 : source_color = vec4(1.0, 0.949, 0.659, 1.0);

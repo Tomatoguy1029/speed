@@ -4,6 +4,9 @@ uniform vec4 tint : source_color = vec4(1.0,0.6,0.3,1.0);
 uniform float progress = 0.0;
 uniform float pixels = 48.0;
 uniform float seed = 0.0;
+// 表示用の全体色と明るさ。CanvasItemのmodulateとは独立して適用する。
+uniform vec4 effect_color : source_color = vec4(1.0);
+uniform float effect_energy = 1.0;
 group_uniforms tuning;
 uniform float spokes : hint_range(4,48,1) = 18.0;
 uniform float ring_start : hint_range(0,0.8,0.01) = 0.12;
@@ -35,5 +38,5 @@ void fragment(){
  float chips=step(chip_threshold,hash(floor(p*chip_density)+seed))*step(ring_radius-0.12,r)*step(r,ring_radius+0.13);
  float alpha=(ring*ring_opacity+inner+rays*ray_opacity+chips)*(1.0-progress);
  vec3 color=tint.rgb*(brightness+chips)+vec3(inner*1.4+ring*0.25);
- COLOR=vec4(color,clamp(alpha,0.0,1.0)*tint.a);
+ COLOR=vec4(color*effect_energy,clamp(alpha,0.0,1.0)*tint.a)*effect_color;
 }

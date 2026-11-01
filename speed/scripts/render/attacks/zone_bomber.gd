@@ -9,8 +9,10 @@ var _blasts: BlastBursts
 var _seen: Dictionary = {}
 var _world_time := 0.0
 var preview_paused := false
+var preview_speed := 1.0
 var _preview_age := 0.0
 var _preview_shape := Vector2.ZERO
+var _preview_seed := -1.0
 
 func setup(render: RunPresentation) -> void:
 	super.setup(render)
@@ -28,6 +30,9 @@ func _create_blasts() -> void:
 	_blasts = BLAST_BURSTS.new()
 	_blasts.shader = burst_shader()
 	_blasts.key = KEY
+	if rm == null:
+		if _preview_seed < 0.0: _preview_seed = randf() * 9.0
+		_blasts.seed_override = _preview_seed
 	_blasts.setup(1.82 * (rm.cfg.character_scale if rm != null else 1.3) * pixel_scale)
 	if rm != null:
 		_blasts.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
@@ -58,7 +63,7 @@ func _spawn(at: Vector2, radius: float, age: float) -> void:
 
 ## 実行時はRunPresentationから世界時間で更新。単独シーンのときだけ反復プレビューする。
 func _process(dt: float) -> void:
-	if rm == null: preview_step(0.0 if preview_paused else dt)
+	if rm == null: preview_step(0.0 if preview_paused else dt * preview_speed)
 
 func preview_restart(age := 0.0) -> void:
 	if is_instance_valid(_blasts):
@@ -75,13 +80,13 @@ func preview_step(dt: float) -> void:
 		preview_restart(_preview_age)
 	_preview_age += dt
 	_blasts.step(dt)
-	if _preview_age >= _preview_life() + 0.45: preview_restart()
+	if dt > 0.0 and _preview_age >= _preview_life() + 0.45: preview_restart()
 
 func _preview_life() -> float:
 	var mat := ShaderMaterial.new()
 	mat.shader = burst_shader()
 	ShaderTuning.apply(mat, KEY)
-	return BlastBursts._life(mat)
+	return BlastBursts._life(mat) * ShaderTuning.burst_time_scale(KEY)
 
 func _exit_tree() -> void:
 	if rm != null and is_instance_valid(_blasts): _blasts.queue_free()

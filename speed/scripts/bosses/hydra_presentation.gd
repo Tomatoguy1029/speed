@@ -83,12 +83,12 @@ func advance_effects(world_dt: float) -> void:
 				event.cue = &"attack_started"
 				event.erase("delay")
 	for flash in flashes.duplicate():
-		flash.life-=world_dt
-		if flash.life<=0.0:
+		flash.age += world_dt
+		_update_burst(flash)
+		if flash.life <= 0.0 and not ShaderTuning.previewing():
 			sprites[flash.id].queue_free()
 			sprites.erase(flash.id)
 			flashes.erase(flash)
-		else:sprites[flash.id].material.set_shader_parameter("progress",1.0-flash.life/flash.duration)
 	if is_instance_valid(hydra) and hydra.recovery_t <= 0.0 and slots.has(-1) and slots[-1].cue == &"recovery_started":
 		slots.erase(-1)
 	queue_redraw()
@@ -138,8 +138,34 @@ func _flash(event: Dictionary)->void:
 	if event.cue==&"hit":color=hit_color
 	sprite.material.set_shader_parameter("tint",color)
 	sprite.material.set_shader_parameter("pixels",diameter/4.0 * burst_pixel_scale)
+	sprite.set_meta("burst_diameter", diameter)
 	sprite.material.set_shader_parameter("seed",float(serial%19))
+	ShaderTuning.apply(sprite.material, _burst_profile(), scene_file_path)
 	add_child(sprite)
 	sprites[serial]=sprite
 	var duration:=0.8 if large else maxf(flash_duration,0.3)
-	flashes.append({"id":serial,"position":event.position,"cue":event.cue,"life":duration,"duration":duration})
+	flashes.append({"id":serial,"position":event.position,"cue":event.cue,"life":duration,"duration":duration,"age":0.0,"large":large})
+	if flashes.size() > 96:
+		var oldest: Dictionary = flashes.pop_front()
+		sprites[oldest.id].queue_free()
+		sprites.erase(oldest.id)
+
+func _burst_profile() -> String:
+	return "boss/body/hydra"
+
+func _update_burst(flash: Dictionary) -> void:
+	var values := EFFECT_SETTINGS.resolved_values(_burst_profile(), scene_file_path)
+	var duration := maxf(0.01, float(values.get("burst_large_seconds" if flash.large else "burst_small_seconds", 0.8 if flash.large else maxf(flash_duration, 0.3))))
+	var age: float = flash.age / ShaderTuning.burst_time_scale(_burst_profile(), scene_file_path)
+	flash.duration = duration
+	flash.life = duration - age
+	var sprite: Sprite2D = sprites[flash.id]
+	sprite.visible = age < duration
+	sprite.material.set_shader_parameter("progress", clampf(age / duration, 0.0, 1.0))
+
+func refresh_visual_settings() -> void:
+	for flash in flashes:
+		var sprite: Sprite2D = sprites[flash.id]
+		ShaderTuning.apply(sprite.material, _burst_profile(), scene_file_path)
+		sprite.material.set_shader_parameter("pixels", float(sprite.get_meta("burst_diameter")) / 4.0 * burst_pixel_scale)
+		_update_burst(flash)
