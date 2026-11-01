@@ -232,6 +232,15 @@ Dictionary SpeedRunCore::inspect() const {
     out["world_time"] = runtime.state.world_time;
     out["sim_time"] = runtime.state.sim_time;
     out["ticks"] = runtime.state.ticks;
+    out["world_real_accum"] = runtime.state.control.world_real_accum;
+    out["world_dt_accum"] = runtime.state.control.world_dt_accum;
+    out["world_scale"] = runtime.state.control.world_scale;
+    out["world_steps"] = runtime.state.control.world_steps;
+    out["world_updates"] = runtime.state.control.world_updates;
+    out["last_world_real_dt"] = runtime.state.control.last_world_real_dt;
+    out["last_world_dt"] = runtime.state.control.last_world_dt;
+    out["bonus_remaining"] = runtime.state.control.bonus_remaining;
+    out["time_limit_reached"] = runtime.state.control.time_limit_reached;
     out["rng_state"] = (runtime.state.started && !runtime.state.closed) ? String::num_int64(runtime.state.control.rng.get_state()) : String();
     return out;
 }
@@ -553,7 +562,7 @@ bool SpeedRunCore::configure_frame(const Dictionary &config) {
         if (!std::isfinite(values[i]) || values[i] <= 0) return false;
     }
     if (std::floor(values[0]) != values[0] || values[0] > INT32_MAX) return false;
-    runtime.state.world_div = int64_t(values[0]); runtime.state.frame_grid_cell = values[1]; runtime.state.trace_radius = values[2]; runtime.state.frame_ready = true;
+    runtime.state.control.world_tick_div = int64_t(values[0]); runtime.state.frame_grid_cell = values[1]; runtime.state.trace_radius = values[2]; runtime.state.frame_ready = true;
     return true;
 }
 
@@ -601,11 +610,11 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     if (check_run_end()) return true;
     const double world_dt = real_dt * world_scale();
     runtime.state.time += real_dt; runtime.state.world_time += world_dt;
-    runtime.state.world_accum += world_dt; ++runtime.state.world_steps;
-    const bool world_step = runtime.state.world_steps >= runtime.state.world_div;
-    const double accumulated = runtime.state.world_accum;
+    runtime.state.control.world_dt_accum += world_dt; ++runtime.state.control.world_steps;
+    const bool world_step = runtime.state.control.world_steps >= runtime.state.control.world_tick_div;
+    const double accumulated = runtime.state.control.world_dt_accum;
     if (world_step) {
-        runtime.state.world_accum = 0; runtime.state.world_steps = 0;
+        runtime.state.control.world_dt_accum = 0; runtime.state.control.world_steps = 0;
         if (runtime.state.attack_budget.frame_enabled) {
             sync_attack_budget();
             if (!advance_attack_budget(runtime.state.world_time)) return false;

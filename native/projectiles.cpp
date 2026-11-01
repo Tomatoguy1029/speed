@@ -124,6 +124,7 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
             Dictionary event; event["pos"] = impact; event["dir"] = vel.normalized();
             event["visual_key"] = String(shot.visual); event["kind"] = shot.kind;
             emit_event("shot_hit", event);
+            if (runtime.state.phase != Phase::Play) { shot.pos=position;shot.life=life;return true; }
             if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else life = 0; }
         }
         shot.pos = position; shot.life = life;

@@ -30,6 +30,8 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 	for field in Schema.SCHEMA.records[0].fields:
 		if field.has("config"): data.RunConfig[0][field.name] = config.get(field.config)
 		elif field.has("value"): data.RunConfig[0][field.name] = field.value
+	data.RunConfig[0].world_tick_div = maxi(1,int(config.world_tick_div))
+	data.RunConfig[0].time_limit = stage.time_limit if stage != null else -1.0
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.ChaseDefinition = [row]

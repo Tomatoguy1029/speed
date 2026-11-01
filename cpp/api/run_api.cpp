@@ -37,7 +37,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     if (!candidate->configure_content(bytes)) return failure(1,"bundle","生成物の版・参照・署名を確認してください");
     speed::apply_config(candidate->runtime.content->config,candidate->runtime.state);
     auto &state=candidate->runtime.state;const auto &s=state.ship_config;const auto &d=state.draw_config;const auto &c=state.control;
-    if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || d.charge_time<=0 || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
+    if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || d.charge_time<=0 || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1 || state.frame_grid_cell<=0) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
     candidate->runtime.api_run_id=options["run_id"];candidate->runtime.api_development=int64_t(options["mode"])==1;
     candidate->runtime.state.control.stage_id=String(options["stage_id"]);candidate->runtime.api_configured=true;
     state.hitstop_enabled=settings.get("hitstop",true);
@@ -60,6 +60,7 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.ship.vel=Vector2(0,-state.ship_config.base_max_speed*0.3);state.ship.hp=state.ship_config.max_hp;
     state.ship_ready=state.draw_ready=true;
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
+    if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
     ++state.control.revision;return success(progress(runtime));
 }
 Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,const Dictionary &viewport) {
@@ -70,7 +71,6 @@ Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,co
         viewport.size()!=1 || !is(viewport,"logical_size",Variant::VECTOR2)) return failure(1,"input/viewport","固定更新の入力が不正です");
     const Vector2 size=viewport["logical_size"];
     if (!size.is_finite() || size.x<=0 || size.y<=0) return failure(1,"logical_size","論理サイズは有限の正数にしてください");
-    if (runtime.state.phase!=Phase::Play && runtime.state.phase!=Phase::Paused) return failure(4,"phase","このphaseの更新はまだ登録されていません");
     if (runtime.state.control.tick==INT64_MAX || runtime.state.control.revision==INT64_MAX) return failure(9,"tick","更新番号が上限です");
     if (!speed::RunRunner::step_play(*this,1.0/120.0,input,size)) return failure(8,"step","更新の整合を確認してください");
     ++runtime.state.control.tick;++runtime.state.control.revision;return success(progress(runtime));
@@ -94,12 +94,20 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
             else if (!bool(payload["paused"]) && runtime.state.phase==Phase::Paused) runtime.state.phase=Phase(runtime.state.control.resume_phase);
             response=success();
         }
+    } else if ((kind=="set_ui_overlay" || kind=="set_ui_reward") && payload.size()==1 && is(payload,"active",Variant::BOOL)) {
+        if (kind=="set_ui_overlay") runtime.state.control.ui_overlay=payload["active"];
+        else runtime.state.control.ui_reward=payload["active"];
+        response=success();
     } else if (kind=="set_settings" && payload.size()==1 && is(payload,"hitstop",Variant::BOOL)) {
         runtime.state.hitstop_enabled=payload["hitstop"];if (!runtime.state.hitstop_enabled) runtime.state.hitstop=0;response=success();
     } else if (kind=="dev_spawn" && runtime.api_development && payload.size()==2 && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite()) {
-        auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],Dictionary());response=entity>0?success(entity):failure(5,"definition_id","生成できる定義がありません");
+        auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],Dictionary());
+        if (entity>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
+        response=entity>0?success(entity):failure(5,"definition_id","生成できる定義がありません");
     } else if (kind=="dev_remove" && runtime.api_development && payload.size()==1 && is(payload,"entity_id",Variant::INT)) {
-        response=remove_enemy(int64_t(payload["entity_id"]))?success():failure(5,"entity_id","対象がありません");
+        const bool removed=remove_enemy(int64_t(payload["entity_id"]));
+        if (removed) rebuild_enemy_grid(runtime.state.frame_grid_cell);
+        response=removed?success():failure(5,"entity_id","対象がありません");
     } else response=failure(1,"kind/payload","未登録の命令または引数です");
     if (bool(response["ok"])) ++runtime.state.control.revision;
     runtime.last_command_id=id;runtime.last_command_response=response.duplicate(true);return response;
@@ -109,7 +117,7 @@ Dictionary SpeedRunCore::frame_run() const {
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_frame","開始していないランです");
     const auto &control=runtime.state.control;Dictionary camera;camera["center"]=control.camera_center;camera["zoom"]=control.camera_zoom;camera["half"]=runtime.state.view_half;
     Dictionary value=progress(runtime);value["run_id"]=runtime.api_run_id;value["camera"]=camera;
-    Dictionary ui;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();value["ui"]=ui;
+    Dictionary ui;ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();value["ui"]=ui;
     value["events"]=runtime.state.events.duplicate(true);value["resource_requests"]=Array();value["result"]=Variant();return success(value);
 }
 Dictionary SpeedRunCore::dispose_run() {

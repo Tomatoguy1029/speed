@@ -225,9 +225,8 @@ struct RunState {
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
-    double time = 0.0, world_time = 0.0, sim_time = 0.0, world_accum = 0.0;
+    double time = 0.0, world_time = 0.0, sim_time = 0.0;
     double frame_grid_cell = 160, trace_radius = 0;
-    int64_t world_div = 1, world_steps = 0;
     bool frame_ready = false;
     enum class Phase { Play = 0, LevelUp = 1, Paused = 2, Dying = 3, Finishing = 4, Ended = 5 };
     Phase phase = Phase::Play;

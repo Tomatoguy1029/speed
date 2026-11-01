@@ -330,9 +330,29 @@
           "min": 0,
           "runtime": "control.look_ahead",
           "config": "look_ahead"
+        },
+        {
+          "name": "world_tick_div",
+          "type": "u32",
+          "min": 1,
+          "config": "world_tick_div",
+          "runtime": "control.world_tick_div"
+        },
+        {
+          "name": "grid_cell",
+          "type": "f64",
+          "min": 0,
+          "config": "grid_cell",
+          "runtime": "frame_grid_cell"
+        },
+        {
+          "name": "time_limit",
+          "type": "f64",
+          "value": -1,
+          "runtime": "control.time_limit"
         }
       ],
-      "version": 3
+      "version": 4
     },
     {
       "name": "StringEntry",

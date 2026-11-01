@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--clock-only" in OS.get_cmdline_user_args():
+		check(check_run_clock(), "時計と世界更新の確認が最後まで完了する")
+		print("[run_clock] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--bridge-only" in OS.get_cmdline_user_args():
 		check(check_run_bridge(), "入力接続の確認が最後まで完了する")
 		print("[run_bridge] failed=%d" % failed)
@@ -286,6 +291,7 @@ func check_run_bridge() -> bool:
 	malformed.hero_press = 1
 	check(bridge.step(1.0/120.0,malformed,{"logical_size":Vector2(640,480)}).code==1, "入力の全フィールドを型で検査する")
 	check(bridge.step(1.0/120.0,bridge.pack_intent(input),{"logical_size":Vector2(640,480),"zoom":1.0}).code==1, "カメラ倍率を外部から渡さない")
+	check(bridge.command("pause",{"paused":false}).ok, "入力の再入確認前にPLAYへ戻す")
 	var reentry := []
 	var provider := func() -> Intent:
 		reentry.append(bridge.command("pause",{"paused":false}).code)
@@ -298,4 +304,118 @@ func check_run_bridge() -> bool:
 	next.auto_step = false
 	check(next.id>previous_id and next.bridge!=null and next.bridge.read_frame().value.tick==0, "再出撃は別のランIDと状態を使う")
 	next.free()
+	return true
+
+func clock_fixture(config: GameConfig, definition: EnemyDef, combat := false, split := false):
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var bytes: PackedByteArray = builder.compile_chase(definition,config,schema.sha256("時計の固定入力".to_utf8_buffer()))
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	check(bridge.configure(bytes,{"api_version":1,"run_id":51,"mode":1,"stage_id":"clock","profile":{},"settings":{}}).ok, "時計の固定条件を読み込む")
+	if combat:
+		# 未移行の戦闘サービスは既存の設定口から試験条件だけを渡す。
+		var combat_config := {}
+		for key in load("res://tests/native_combat.gd").COMBAT_CONFIG: combat_config[key] = config.get(key)
+		combat_config.ram_speed_ratio = 0.0
+		check(bridge._core.configure_combat(combat_config,{"attack_mult":1.0,"crit_chance":0.0,"crit_mult":config.crit_mult}), "停止を起こす戦闘の固定条件を設定する")
+		check(bridge._core.configure_pickups({"xp_bonus":1.0,"gem_max":10,"drop_base":0.0,"drop_max":0.0,"drop_power_exp":0.0,"big_crystal_shift_time":1.0,
+			"big_crystal_xp":config.xp_crystal_values,"big_crystal_weights_start":[1.0,0.0,0.0],"big_crystal_weights_end":[1.0,0.0,0.0]},
+			{"xp_mult":1.0,"xp_pickup_radius":1.0,"pickup_radius":1.0,"pickup_speed_mult":1.0}), "戦闘の依存条件を設定する")
+	if split:
+		check(bridge._core.configure_projectiles({"hull_debris_life":1.0,"hull_debris_knock":0.0,"corpse_trail_points":0},
+			{"chance":1.0,"damage":1.0,"angle_min":0.0,"angle_max":0.0,"generations":1,"max":100}), "反復中の追加を起こす固定条件を設定する")
+	check(bridge.start(41).ok, "時計の確認用ランを開始する")
+	return bridge
+
+func clock_step(bridge, intent: Intent = null) -> void:
+	if intent == null: intent = Intent.new()
+	check(bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(640,480)}).ok, "時計の固定更新を進める")
+
+func check_run_clock() -> bool:
+	var dt := 1.0/120.0
+	var config := ContentManager.base.duplicate(true) as GameConfig
+	config.world_tick_div = 3
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.speed = 100.0
+	var bridge = clock_fixture(config,definition)
+	var ship: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
+	check(bridge.command("dev_spawn",{"definition_id":String(definition.id),"position":ship+Vector2(200,0)}).ok, "開発命令から敵と検索索引を更新する")
+	var before: Array = bridge._core.enemies_snapshot()
+	clock_step(bridge)
+	clock_step(bridge)
+	var pending: Dictionary = bridge._core.inspect()
+	check(pending.world_updates==0 and absf(pending.world_real_accum-2*dt)<1e-9 and absf(pending.world_dt_accum-2*dt)<1e-9, "世界更新の前は二つのdtを保存する")
+	check(bridge._core.enemies_snapshot()==before, "間引き中に敵を更新しない")
+	var point: int = bridge.checkpoint().value
+	clock_step(bridge)
+	var after: Array = bridge._core.enemies_snapshot()
+	var boundary: Dictionary = bridge._core.inspect()
+	check(boundary.world_updates==1 and boundary.world_steps==0 and boundary.world_real_accum==0.0 and boundary.world_dt_accum==0.0, "境界で蓄積を一度だけ渡してリセットする")
+	check(after!=before and absf(boundary.last_world_real_dt-3*dt)<1e-9, "敵へ蓄積した時間を渡す")
+	check(bridge.restore(point).ok, "境界直前の保持点へ復帰する")
+	clock_step(bridge)
+	check(bridge._core.enemies_snapshot()==after and bridge._core.inspect().world_updates==1, "復帰した二つのdtで同じ境界を再現する")
+	bridge.release_checkpoint(point)
+	check(bridge.command("set_ui_overlay",{"active":true}).ok, "UI停止を設定する")
+	var stopped: Dictionary = bridge._core.inspect()
+	var polls := []
+	var provider := func() -> Intent:
+		polls.append(true)
+		return Intent.new()
+	check(bridge.poll_and_step(dt,provider,Vector2(640,480)).ok and polls.is_empty(), "UI停止中は入力を消費しない")
+	var frozen: Dictionary = bridge._core.inspect()
+	check(frozen.time==stopped.time and frozen.sim_time==stopped.sim_time and frozen.world_time==stopped.world_time and frozen.world_real_accum==stopped.world_real_accum, "UI停止中は時計と蓄積を保つ")
+	bridge.command("set_ui_overlay",{"active":false})
+	bridge.command("set_ui_reward",{"active":true})
+	clock_step(bridge)
+	check(bridge._core.inspect().sim_time==stopped.sim_time, "報酬表示中もPLAYの時計を止める")
+	bridge.command("set_ui_reward",{"active":false})
+	bridge.command("pause",{"paused":true})
+	clock_step(bridge)
+	check(bridge._core.inspect().sim_time==stopped.sim_time, "PAUSEDでは時計を止める")
+	bridge.command("pause",{"paused":false})
+	clock_step(bridge)
+	check(bridge._core.inspect().sim_time>stopped.sim_time, "再開後に一度だけ時間を進める")
+	bridge.dispose()
+	config.world_tick_div = 2
+	config.draw_time_scale = 0.25
+	var slow = clock_fixture(config,definition)
+	var draw := Intent.new()
+	draw.press = true
+	draw.has_cursor = true
+	draw.pen = slow.read_frame().value.ui.ship.ship_pos
+	clock_step(slow,draw)
+	draw.press = false
+	clock_step(slow,draw)
+	var scaled: Dictionary = slow._core.inspect()
+	check(absf(scaled.last_world_real_dt-2*dt)<1e-9 and absf(scaled.last_world_dt-0.5*dt)<1e-9, "描線スローでも実dtと世界dtを混同しない")
+	slow.dispose()
+	config.world_tick_div = 1
+	definition.stage_hp = 0.1
+	definition.speed = 0.0
+	var hit = clock_fixture(config,definition,true)
+	ship = hit.read_frame().value.ui.ship.ship_pos
+	hit.command("dev_spawn",{"definition_id":String(definition.id),"position":ship})
+	clock_step(hit)
+	check(hit._core.combat_snapshot().hitstop>0, "体当たりの停止を発生させる")
+	var hit_before: Dictionary = hit._core.inspect()
+	draw = Intent.new()
+	draw.press = true
+	draw.pen = ship
+	clock_step(hit,draw)
+	var hit_after: Dictionary = hit._core.inspect()
+	check(hit_after.sim_time>hit_before.sim_time and hit_after.time==hit_before.time and hit_after.world_time==hit_before.world_time and hit.read_frame().value.ui.draw.drawing, "ヒットストップ中も入力を受け、ランと世界の時計は進めない")
+	hit.dispose()
+	definition.stage_hp = 1000000.0
+	for reuse in [false,true]:
+		var shots = clock_fixture(config,definition,true,true)
+		shots.command("dev_spawn",{"definition_id":String(definition.id),"position":Vector2(100,0)})
+		if reuse: check(shots._core.fire_shot(Vector2.ZERO,0.0,0.0,{"speed":120.0,"life":0.0}), "先に通過する空き行を作る")
+		check(shots._core.fire_shot(Vector2(100,0),0.0,0.0,{"speed":120.0,"life":0.5}), "後方追加を起こす弾を作る")
+		clock_step(shots)
+		var children: Array = shots._core.projectiles_snapshot()
+		check(children.size()==2, "更新中に作られた二つの行を保持する")
+		if children.size()==2:
+			check(absf(children[0].age-(dt if reuse else 2*dt))<1e-6 and absf(children[1].age-2*dt)<1e-6, "後ろへ足した行と通過済み空き行の再利用を区別する")
+		shots.dispose()
 	return true

@@ -39,7 +39,7 @@ void SpeedRunCore::step_death(double real_dt) {
     if (runtime.state.sequence_t >= t3) {
         runtime.state.draw.drawing = false; runtime.state.draw.tracing = false;
         runtime.state.ship.vel = Vector2();
-        runtime.state.world_accum = 0; runtime.state.world_steps = 0; runtime.state.hitstop = 0;
+        runtime.state.control.world_real_accum = runtime.state.control.world_dt_accum = 0; runtime.state.control.world_steps = 0; runtime.state.hitstop = 0;
         runtime.state.phase = Phase::Ended;
     }
 }

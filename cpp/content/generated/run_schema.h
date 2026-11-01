@@ -54,6 +54,9 @@ struct RunConfig {
     double camera_zoom_exp{};
     double camera_zoom_min{};
     double camera_look_ahead{};
+    uint32_t world_tick_div{};
+    double grid_cell{};
+    double time_limit{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -152,6 +155,11 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.camera_zoom_min < 0) return false;
     if (!input.read_f64(out.camera_look_ahead)) return false;
     if (out.camera_look_ahead < 0) return false;
+    if (!input.read_u32(out.world_tick_div)) return false;
+    if (out.world_tick_div < 1) return false;
+    if (!input.read_f64(out.grid_cell)) return false;
+    if (out.grid_cell < 0) return false;
+    if (!input.read_f64(out.time_limit)) return false;
     return true;
 }
 struct StringEntry {
@@ -348,8 +356,8 @@ struct ContentRecords {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 3) return false;
-        if (count > input.remaining()/380) return false;
+        if (version != 4) return false;
+        if (count > input.remaining()/400) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -503,6 +511,9 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.control.zoom_exp=config.camera_zoom_exp;
     state.control.zoom_min=config.camera_zoom_min;
     state.control.look_ahead=config.camera_look_ahead;
+    state.control.world_tick_div=config.world_tick_div;
+    state.frame_grid_cell=config.grid_cell;
+    state.control.time_limit=config.time_limit;
 }
 inline EnemyDefinition to_enemy(const ChaseDefinition &row, const godot::StringName &id) {
     EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;

@@ -58,7 +58,8 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 	if not source.is_valid():
 		_busy = false
 		return _error(1,"input","入力元がありません")
-	var intent = source.call()
+	var frame: Dictionary = _core.frame_run()
+	var intent = source.call() if frame.ok and frame.value.ui.input_enabled else Intent.new()
 	if not intent is Intent:
 		_busy = false
 		return _error(1,"input","Intentを返す入力元を指定してください")
