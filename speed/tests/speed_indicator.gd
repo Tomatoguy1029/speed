@@ -1,10 +1,16 @@
 extends Node
 
+const INDICATOR := preload("res://scripts/ui/speed_indicator.gd")
 var failed := 0
+
 func check(ok: bool, label: String) -> void:
 	if not ok:
 		failed += 1
 		push_error(label)
+
+func advance(indicator: INDICATOR, mode: int, seconds: float) -> void:
+	for i in roundi(seconds * 60.0):
+		indicator.advance(mode, 1.0 / 60.0)
 
 func _ready() -> void:
 	var hud = preload("res://scripts/ui/hud.gd").new()
@@ -12,55 +18,96 @@ func _ready() -> void:
 	hud.run.state = RunState.new()
 	hud.run.cfg = GameConfig.new()
 	hud.run.cfg.steer_cruise = 0.3
+	hud._speed_indicator = INDICATOR.new()
 	var state := hud.run.state as RunState
 	state.stats = ShipStats.new()
 	state.stats.max_speed = 100.0
 	state.ship_vel = Vector2(30, 0)
-	check(hud._speed_indicator_mode() == 0, "巡航速度では通常色")
+	check(hud._speed_indicator_mode() == INDICATOR.NORMAL, "巡航速度では通常表示")
 	state.ship_vel = Vector2(60, 0)
-	check(hud._speed_indicator_mode() == 1, "巡航速度を超えたら高速色")
+	check(hud._speed_indicator_mode() == INDICATOR.FAST, "巡航速度を超えたら高速表示")
 	state.ship_vel = Vector2(30, 0)
 	state.glide = true
-	check(hud._speed_indicator_mode() == 1, "突進後の勢いが残る間は高速色")
+	check(hud._speed_indicator_mode() == INDICATOR.FAST, "勢いが残る間は速度が巡航と等しくても高速表示")
 	state.ship_boost_t = 0.1
-	check(hud._speed_indicator_mode() == 2, "ブースト保持を高速状態より優先")
+	check(hud._speed_indicator_mode() == INDICATOR.BOOST, "ブースト保持を高速状態より優先")
 	state.ship_boost_t = 0.0
 	state.tracing = true
-	check(hud._speed_indicator_mode() == 2, "突進中はブースト色")
+	check(hud._speed_indicator_mode() == INDICATOR.BOOST, "突進中はブースト表示")
 	state.tracing = false
 	state.glide = false
-	check(hud._speed_indicator_mode() == 0, "突進と勢いが終わると通常色へ戻る")
-	state.ship_vel = Vector2.ZERO
-	var left: float = hud._speed_indicator_angle()
-	check(left > -PI / 2.0 and left < deg_to_rad(-85.0), "停止時は左端のすぐ手前")
-	state.ship_vel = Vector2(30, 0)
-	check(is_equal_approx(hud._speed_indicator_angle(), left), "通常の巡航速度でも左端近くへ戻す")
-	state.ship_vel = Vector2(-50, 0)
-	var middle: float = hud._speed_indicator_angle()
-	state.ship_vel = Vector2(50, 0)
-	check(is_equal_approx(hud._speed_indicator_angle(), middle) and middle > left, "移動方向によらず速度で針を動かす")
-	state.ship_vel = Vector2(100, 0)
-	var right: float = hud._speed_indicator_angle()
-	check(is_equal_approx(right, deg_to_rad(-10.0)), "最高速度でも右端の1目盛り手前")
-	state.ship_vel = Vector2(200, 0)
-	check(is_equal_approx(hud._speed_indicator_angle(), right), "最高速度を超えても針を振り切らせない")
-	hud._speed_needle_angle = left
+	check(hud._speed_indicator_mode() == INDICATOR.NORMAL, "実際の突進と高速移動が終わると通常表示")
+
+	var indicator = hud._speed_indicator
+	indicator.rng.seed = 12
+	var low := 8.0
+	var high := 0.0
+	for i in 600:
+		var before: float = indicator.value
+		indicator.advance(INDICATOR.NORMAL, 1.0 / 60.0)
+		low = minf(low, indicator.value)
+		high = maxf(high, indicator.value)
+		check(absf(indicator.value - before) < 0.06, "通常の揺れは高速でプルプル動かない")
+	check(low >= 1.0 and high <= 2.0 and high - low > 0.2, "通常は1〜2の中で小さく不規則に動く")
+
+	var before_boost: float = indicator.value
+	var before_color: Color = indicator.fill_color
+	state.tracing = true
 	hud._update_speed_indicator(1.0 / 60.0)
-	check(hud._speed_needle_angle > left and hud._speed_needle_angle < right, "速度が跳ねても針は瞬間移動しない")
-	hud._speed_needle_angle = left
-	hud._update_speed_indicator(0.1)
-	var after_tenth: float = hud._speed_needle_angle
-	check(after_tenth > lerpf(left, right, 0.85) and after_tenth < right, "0.1秒で目標の近くまで素早く跳ね上がる")
-	hud._speed_needle_angle = left
-	for i in 6: hud._update_speed_indicator(1.0 / 60.0)
-	check(is_equal_approx(hud._speed_needle_angle, after_tenth), "追従の速さはフレーム間隔によらない")
+	check(indicator.value > before_boost and indicator.value < 3.0, "ブースト開始で針は瞬間移動しない")
+	check(absf(indicator.fill_color.r - before_color.r) < 0.08, "内部色も開始フレームで瞬間切替しない")
+	advance(indicator, INDICATOR.BOOST, 1.5)
+	check(indicator.value >= 7.0 and indicator.value <= 8.0, "ブースト中は7〜8へ上がる")
+	check(indicator.fill_color.r > 0.84 and indicator.fill_color.g < 0.38,
+			"ブースト内部は採用した赤へ到達する")
+	check(INDICATOR.BOOST_COLOR == Color("#da5c60"), "採用したブースト赤を使う")
+
+	var boost_value: float = indicator.value
+	indicator.advance(INDICATOR.FAST, 1.0 / 60.0)
+	check(indicator.value > 7.0 and indicator.value <= boost_value + 0.02, "高速へ移る境界でも針の慣性を保つ")
+	check(indicator.fill_color.g < 0.4, "高速への状態境界で内部を黄色へ瞬間切替しない")
+	advance(indicator, INDICATOR.FAST, 3.5)
+	low = 8.0
+	high = 0.0
+	for i in 360:
+		indicator.advance(INDICATOR.FAST, 1.0 / 60.0)
+		low = minf(low, indicator.value)
+		high = maxf(high, indicator.value)
+	check(low >= 4.0 and high <= 6.0 and high - low > 0.1, "高速中も4〜6の中で微かに不規則に動く")
+	check(indicator.fill_color.is_equal_approx(INDICATOR.FAST_COLOR), "高速中は既存の黄色へ落ち着く")
+
+	indicator.advance(INDICATOR.NORMAL, 1.0 / 60.0)
+	check(indicator.value > 4.0, "高速終了で針を瞬間的に通常範囲へ戻さない")
+	advance(indicator, INDICATOR.NORMAL, 3.5)
+	check(indicator.value >= 1.0 and indicator.value <= 2.0, "高速終了後は通常範囲へ戻る")
+	check(indicator.fill_color.g > 0.79 and indicator.fill_color.b > 0.88, "通常の水色へ連続的に戻る")
+
+	var value_before_pause: float = indicator.value
+	before_color = indicator.fill_color
 	state.phase = RunState.Phase.PAUSED
 	hud._update_speed_indicator(1.0)
-	check(is_equal_approx(hud._speed_needle_angle, after_tenth), "ポーズ中は針も止める")
+	check(indicator.value == value_before_pause and indicator.fill_color == before_color, "ポーズ中は針と内部色を保つ")
 	state.phase = RunState.Phase.PLAY
-	state.ship_vel = Vector2(30, 0)
-	for i in 60: hud._update_speed_indicator(1.0 / 60.0)
-	check(is_equal_approx(hud._speed_needle_angle, left), "巡航に戻ると針が左端近くまで下がる")
+	hud.run.ui_overlay_active = true
+	hud._update_speed_indicator(1.0)
+	check(indicator.value == value_before_pause, "メニュー中は揺れの時計も止める")
+	hud.run.ui_overlay_active = false
+	hud.run.ui_reward_active = true
+	hud._update_speed_indicator(1.0)
+	check(indicator.value == value_before_pause, "報酬画面中も表示時計を止める")
+
+	var a = INDICATOR.new()
+	var b = INDICATOR.new()
+	a.rng.seed = 42
+	b.rng.seed = 42
+	for mode in [INDICATOR.NORMAL, INDICATOR.BOOST, INDICATOR.FAST, INDICATOR.NORMAL]:
+		for i in 240: a.advance(mode, 1.0 / 60.0)
+		for i in 120: b.advance(mode, 1.0 / 30.0)
+		check(is_equal_approx(a.value, b.value) and a.fill_color.is_equal_approx(b.fill_color),
+				"フレーム間隔が変わっても揺れ・慣性・色の進みが一致する")
+	a.free()
+	b.free()
+	indicator.free()
 	hud.free()
 	print("[speed-indicator] failures=", failed)
 	get_tree().quit(1 if failed else 0)

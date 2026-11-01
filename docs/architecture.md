@@ -732,6 +732,8 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - 導入は `GameManager.Screen.INTRO` と `scenes/app/intro.tscn` が持つ。`scripts/runtime/intro_sequence.gd` が場面進行と操作待ち、`intro_practice.gd` が星・練習相手・見本線を管理する。`scripts/ui/intro_screen.gd` は状態を表示してセッションへ命令を渡し、`scripts/render/intro_visual.gd` が差し替え用の仮演出を描く。
 - 導入は独立した `RunSession` の `RunSimulation` と、本番の `run.tscn` の World・Camera・入力・描画を使う。複製した共通設定と専用の `RuntimeStage` を渡し、`lab_mode` の状態を導入シーケンスから既存の更新処理で進める。`hud` オプションで専用の最小 UI に替え、リリース版でも同じ操作を使う。
 
+速度計はHUDがランの突進・ブースト保持・滑走と巡航速度超過を読み、`scripts/ui/speed_indicator.gd`へ表示状態を渡す。表示専用の乱数で時間間隔を持つ目標を選び、実秒の固定刻みで針の慣性と内部色を更新する。HUDが位相とオーバーレイに応じて更新を止め、速度計のNode・独立したShaderMaterial・画像参照をHUDの寿命で保持する。固定の画像とshaderは依存参照から取得し、shaderが元画像の内部色だけを現在の表示色へ置換する。輪郭とマスクは既存画像を使い、実行時の入力は表示状態・経過時間・表示用の乱数とする。
+
 ## 13. 音
 
 `tools/content/build_audio.gd` が `.content/audio.res` のAudioBankへ効果音とループBGMをまとめる。AudioManagerは起動時に生成済みのバンクを読み、BGMは専用のMusicバスと単一の再生口で切り替える。ボス出現によるフェードの予約は、次の切り替えや画面退出で取り消す。メニューのBGMはMain、戦闘のBGMはHUDが所有し、前の画面の退出で次の画面の曲を止めない。
