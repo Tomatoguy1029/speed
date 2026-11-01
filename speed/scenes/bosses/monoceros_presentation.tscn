@@ -1,6 +1,7 @@
 [gd_scene format=3]
 [ext_resource type="Script" path="res://scripts/bosses/monoceros_presentation.gd" id="visual"]
 [ext_resource type="PackedScene" path="res://scenes/bosses/monoceros_parts.tscn" id="parts"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/horn/horn.tres" id="horn"]
 [node name="MonocerosPresentation" type="Node2D"]
 texture_filter = 1
 script = ExtResource("visual")
@@ -9,13 +10,9 @@ script = ExtResource("visual")
 position = Vector2(37, 0)
 rotation = -1.5707963267949
 
-[node name="SwordGlow" type="Polygon2D" parent="Parts/Head/Lower"]
-visible = false
-position = Vector2(0, -50)
-color = Color(0.623529, 0.909804, 1, 1)
-polygon = PackedVector2Array(-4, 105, -9, 111, 0, 131.6, 9, 111, 4, 105)
-
-[node name="Guard" type="Line2D" parent="Parts/Head/Lower/SwordGlow"]
-points = PackedVector2Array(-19, 110, 19, 110)
-width = 7.0
-default_color = Color(0.917647, 1, 1, 1)
+[node name="Horn" type="Sprite2D" parent="Parts/Head/Lower"]
+position = Vector2(0, 55)
+texture = ExtResource("horn")
+centered = false
+offset = Vector2(-23.5, -4)
+hframes = 15

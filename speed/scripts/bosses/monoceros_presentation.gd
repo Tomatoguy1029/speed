@@ -28,7 +28,13 @@ var _neck_facing := 0.0
 var _head_facing := 0.0
 var _tail_facing := 0.0
 var _flame_facing := 0.0
+var _horn_phase := 1
+var _horn_elapsed := 0.0
+var _horn_source_seconds := 0.0
+var _horn_durations: PackedFloat32Array
+var _horn_lengths: PackedFloat32Array
 @onready var parts: PartsVisual = $Parts
+@onready var horn: Sprite2D = $Parts/Head/Lower/Horn
 
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
@@ -40,6 +46,13 @@ func bind_monoceros(owner_actor: MonocerosBoss) -> void:
 	_head_facing = _body_facing
 	_tail_facing = _body_facing
 	_flame_facing = _body_facing
+	_horn_durations = horn.texture.get_meta("durations")
+	_horn_lengths = horn.texture.get_meta("core_lengths")
+	_horn_source_seconds = 0.0
+	for i in range(1, _horn_durations.size()): _horn_source_seconds += _horn_durations[i]
+	_horn_phase = actor.phase
+	_horn_elapsed = float(actor.def.params.phase_time) if actor.phase >= 2 and actor.mode != &"phase" else 0.0
+	horn.material = parts.get_node("Head/Lower/Sprite/head_gold_armor").material.duplicate()
 	actor.presentation_event.connect(_event)
 	actor.presentation_advanced.connect(_advance)
 	material = actor.hit_feedback.make_material()
@@ -48,6 +61,9 @@ func bind_monoceros(owner_actor: MonocerosBoss) -> void:
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
+	if event.cue == &"phase_changed":
+		_horn_phase = actor.phase
+		_horn_elapsed = 0.0
 	queue_redraw()
 
 func _advance(dt: float) -> void:
@@ -98,12 +114,33 @@ func _sync_parts(dt: float) -> void:
 		leg.rotation = leg_pose.rotation
 		leg.scale.y = leg_pose.stretch
 		leg.get_node("Foot").position.y = leg_pose.foot
-	var sword := parts.get_node("Head/Lower/SwordGlow") as Polygon2D
-	sword.visible = actor.phase == 2
-	sword.color = WARNING
-	sword.self_modulate = horn_tint
-	sword.polygon = PackedVector2Array([Vector2(-4, 105), Vector2(-9, 111), Vector2(0, actor.horn_length() / k - 46), Vector2(9, 111), Vector2(4, 105)])
-	parts.get_node("Head/Lower/SwordGlow/Guard").visible = sword.visible
+	_sync_horn(dt, k, horn_tint)
+
+func _sync_horn(dt: float, body_scale: float, tint: Color) -> void:
+	var duration := maxf(0.001, float(actor.def.params.phase_time))
+	if _horn_phase != actor.phase:
+		_horn_phase = actor.phase
+		_horn_elapsed = 0.0 if actor.mode == &"phase" else duration
+	var progress := 0.0
+	horn.frame = 0
+	if actor.phase >= 2:
+		_horn_elapsed = minf(duration, _horn_elapsed + dt)
+		progress = _horn_elapsed / duration
+		var time := progress * _horn_source_seconds
+		for i in range(1, _horn_durations.size()):
+			horn.frame = i
+			if time < _horn_durations[i]: break
+			time -= _horn_durations[i]
+	# 判定を変えず、首の旋回・外観の位置補正を含む根元から先端までを合わせる。
+	var root := actor.to_local(horn.global_position)
+	var axis := (actor.to_local(horn.to_global(Vector2.DOWN)) - root).normalized()
+	var radius := actor.table.r[actor.body]
+	var reach := radius * lerpf(float(actor.def.params.horn_length_ratio), float(actor.def.params.horn_length_ratio_p2), progress)
+	horn.scale.y = maxf(1.0, reach - root.dot(axis)) / (body_scale * _horn_lengths[horn.frame])
+	horn.self_modulate = tint
+	var source := parts.get_node("Head/Lower/Sprite/head_gold_armor").material as ShaderMaterial
+	for key in ["painted", "paint"]:
+		(horn.material as ShaderMaterial).set_shader_parameter(key, source.get_shader_parameter(key))
 
 ## 技の進行から角の明るさだけを読む。攻撃中も溜めと同じ色で光らせる。
 func _horn_glow() -> float:

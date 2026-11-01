@@ -6,7 +6,7 @@
 
 リポジトリルートから辿る。改修で移動していればシンボルと呼び出し元を `rg` で追う。
 
-- [play_recorder.gd](../../../../speed/scripts/dev/play_recorder.gd)：JSONL出力・区間集計・F9・性能窓・ライブ調整通知。
+- [play_recorder.gd](../../../../speed/scripts/dev/play_recorder.gd)：JSONL出力・区間集計・Ctrl+F9・性能窓・ライブ調整通知。
 - [recording_identity.gd](../../../../speed/scripts/dev/recording_identity.gd)：初期条件・コード/データ/実効値の識別。
 - `speed/scripts/runtime/run_simulation.gd`・`run_session.gd`：開始時の条件、ラン/世界時計、イベントの接続。
 - `speed/scripts/managers/run_manager.gd`、`speed/addons/stage_launcher/`・`spawn_timeline/`：開始経路。
