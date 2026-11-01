@@ -23,6 +23,6 @@ demo/docs/keporusu.md
 /speed/native/bin/
 
 /cpp/godot-cpp/
-/cpp/*.os
+/cpp/**/*.os
 /cpp/.sconsign.dblite
 /speed/extensions/run/bin/
