@@ -27,7 +27,14 @@ render_mode unshaded, blend_premul_alpha;
 uniform sampler2D enemy0 : source_color, filter_nearest;
 uniform sampler2D enemy1 : source_color, filter_nearest;
 uniform sampler2D enemy2 : source_color, filter_nearest;
+uniform sampler2D enemy3 : source_color, filter_nearest;
+uniform sampler2D enemy4 : source_color, filter_nearest;
+uniform sampler2D enemy5 : source_color, filter_nearest;
+uniform sampler2D enemy6 : source_color, filter_nearest;
 uniform float clock = 0.0;
+uniform float contents_count = 7.0;
+uniform float contents_fill = 1.0;
+uniform float trail_reach = 1000000.0;
 group_uniforms tuning;
 uniform vec4 bolt_dark : source_color = vec4(0.0784, 0.4706, 0.2706, 1.0);
 uniform vec4 bolt_edge : source_color = vec4(0.1255, 0.6784, 0.3529, 1.0);
@@ -47,7 +54,8 @@ uniform float tail_count : hint_range(0.0, 14.0, 1.0) = 14.0;
 uniform float tail_opacity : hint_range(0.0, 1.0, 0.05) = 1.0;
 uniform float glint_scale : hint_range(0.0, 2.0, 0.1) = 1.0;
 uniform float glow_strength : hint_range(0.0, 3.0, 0.05) = 1.0;
-uniform float contents_opacity : hint_range(0.0, 1.0, 0.05) = 0.0;
+uniform float contents_opacity : hint_range(0.0, 1.0, 0.05) = 1.0;
+uniform float contents_scale : hint_range(0.5, 1.5, 0.05) = 1.0;
 group_uniforms;
 varying vec2 bolt_pixel;
 const vec2 POS[7] = vec2[7](vec2(0,-13),vec2(-14,-4),vec2(13,-3),vec2(-10,12),vec2(12,12),vec2(1,9),vec2(0,-1));
@@ -62,8 +70,8 @@ const float DASH_JITTER[14] = float[14](0.581434672,0.317614623,0.261262306,0.35
 const float DASH_SALT[14] = float[14](84.000000000,791.000000000,477.000000000,675.000000000,703.000000000,491.000000000,229.000000000,334.000000000,106.000000000,912.000000000,79.000000000,38.000000000,789.000000000,353.000000000);
 
 void vertex() {
-	// 元の128x32とpivot(108,16)。55は既存の弾ノードの位置補正と相殺する。
-	bolt_pixel = UV*vec2(128.0,32.0)-vec2(108.0,16.0);
+	// 光のx方向とpivotを保持し、敵塊の上下へ余白を持たせる。
+	bolt_pixel = UV*vec2(132.0,48.0)-vec2(108.0,24.0);
 	VERTEX = bolt_pixel*bolt_scale+vec2(55.0,0.0);
 }
 uint hash_step(uint h, uint n) {
@@ -88,7 +96,22 @@ float glow_at(vec2 p, vec2 center, float radius) {
 	return f*f;
 }
 vec4 piece(int j, vec2 uv) {
-	return j == 0 || j == 5 || j == 6 ? texture(enemy0,uv) : (j == 1 || j == 4 ? texture(enemy1,uv) : texture(enemy2,uv));
+	if (j == 0) return texture(enemy0,uv);
+	if (j == 1) return texture(enemy1,uv);
+	if (j == 2) return texture(enemy2,uv);
+	if (j == 3) return texture(enemy3,uv);
+	if (j == 4) return texture(enemy4,uv);
+	if (j == 5) return texture(enemy5,uv);
+	return texture(enemy6,uv);
+}
+vec2 piece_size(int j) {
+	if (j == 0) return vec2(textureSize(enemy0,0));
+	if (j == 1) return vec2(textureSize(enemy1,0));
+	if (j == 2) return vec2(textureSize(enemy2,0));
+	if (j == 3) return vec2(textureSize(enemy3,0));
+	if (j == 4) return vec2(textureSize(enemy4,0));
+	if (j == 5) return vec2(textureSize(enemy5,0));
+	return vec2(textureSize(enemy6,0));
 }
 void fragment() {
 	vec2 cell = floor(bolt_pixel);
@@ -146,22 +169,29 @@ void fragment() {
 		if (distance == 0.0) col = bolt_core;
 		light += bolt_light.rgb*glow_at(p,vec2(1.0,0.5),4.0+arm*2.0)*0.5;
 	}
-	// 圧縮した実雑魚は任意表示。元絵は維持し、芯の中へ縮尺表示する。
-	if (contents_opacity > 0.001 && abs(p.x) < 10.0 && abs(p.y) < 10.0) {
-		for (int j=0; j<7; j++) {
-			float a = ANGLES[j];
-			vec2 size = j == 0 || j == 5 || j == 6 ? vec2(23) : (j == 1 || j == 4 ? vec2(32) : vec2(13,26));
-			vec2 uv = mat2(vec2(cos(a),-sin(a)),vec2(sin(a),cos(a)))*(p*4.0-POS[j])/(size*SIZES[j])+0.5;
-			if (all(greaterThanEqual(uv,vec2(0))) && all(lessThan(uv,vec2(1)))) {
-				vec4 art = piece(j,uv);
-				col.rgb = mix(col.rgb,art.rgb,art.a*contents_opacity);
-				col.a = max(col.a,art.a*contents_opacity);
-			}
-		}
-	}
 	vec2 closest = vec2(clamp(p.x,-bolt_length,1.0),0.5);
 	light += bolt_edge.rgb*glow_at(p,closest,9.0)*0.4;
 	light += bolt_edge.rgb*glow_at(p,vec2(-2.0,0.5),20.0)*0.5*glint;
 	light += bolt_core.rgb*glow_at(p,vec2(1.0,0.5),6.0)*0.25;
 	COLOR = vec4((col.rgb*col.a+light*glow_strength)*bolt_brightness,col.a);
+	// 収納した敵の塗装済み画像を光より前へ重ねる。発光で塊を白く塗り潰さない。
+	float mass_scale = contents_scale*mix(0.55,1.0,clamp(contents_fill,0.0,1.0));
+	if (contents_opacity > 0.001 && contents_count > 0.0 && abs(p.x) < 24.0 && abs(p.y) < 24.0) {
+		vec4 mass = vec4(0.0);
+		for (int j=0; j<7; j++) {
+			if (float(j) >= contents_count) break;
+			float a = ANGLES[j];
+			vec2 size = piece_size(j);
+			size /= max(1.0,max(size.x,size.y)/33.0);
+			vec2 uv = mat2(vec2(cos(a),-sin(a)),vec2(sin(a),cos(a)))*(p*2.0/mass_scale-POS[j])/(size*SIZES[j])+0.5;
+			if (all(greaterThanEqual(uv,vec2(0))) && all(lessThan(uv,vec2(1)))) {
+				vec4 art = piece(j,uv);
+				mass = vec4(mass.rgb*(1.0-art.a)+art.rgb*art.a,art.a+mass.a*(1.0-art.a));
+			}
+		}
+		float alpha = mass.a*contents_opacity;
+		COLOR = vec4(COLOR.rgb*(1.0-alpha)+mass.rgb*contents_opacity,alpha+COLOR.a*(1.0-alpha));
+	}
+	// 射出直後の長い尾は口より後ろへ描かない。判定・弾の位置はそのまま。
+	if (p.x*bolt_scale < -trail_reach) COLOR = vec4(0.0);
 }

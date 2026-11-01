@@ -4,9 +4,15 @@ const SHADER := preload("res://shaders/pump_shell.gdshader")
 const RUNTIME_SHADER := preload("res://shaders/pump_shell_runtime.gdshader")
 const TUNED_SHADERS := [SHADER]
 const KEY := "res://scenes/attacks/shell.tscn"
-const CONTENTS := [preload("res://assets/pixel/drifter.png"), preload("res://assets/pixel/swarm.png"), preload("res://assets/pixel/splitling.png")]
 var _mesh: QuadMesh
 var _nodes: Array[MeshInstance2D] = []
+var _content_types: Array[PackedStringArray] = []
+var _content_full: Array[float] = []
+var _trail_reach: Array[float] = []
+var _textures: Dictionary = {}
+var _preview_images: Dictionary = {}
+var _preview_contents := PackedStringArray(["bomber", "splitter", "splitling", "bomber", "splitter", "splitling", "bomber",
+	"splitter", "splitling", "bomber", "splitter", "splitling", "bomber", "splitter", "splitling", "bomber", "splitter", "splitling", "bomber", "splitter"])
 var _count := 0
 var preview_paused := false
 var _preview_age := 0.0
@@ -18,7 +24,7 @@ func setup(render: RunPresentation) -> void:
 func _prepare_mesh() -> void:
 	if _mesh != null: return
 	_mesh = QuadMesh.new()
-	# vertex shaderが128x32の描画域を作る。上限倍率まで収めるculling用の寸法。
+	# vertex shaderが132x48の描画域を作る。上限倍率まで収めるculling用の寸法。
 	_mesh.size = Vector2(800, 256)
 
 func _ready() -> void:
@@ -31,10 +37,26 @@ func begin_batch() -> void:
 func end_batch() -> void:
 	for n in range(_count, _nodes.size()): _nodes[n].hide()
 func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> bool:
-	_present(c, pos, pr.hostile_vel[i].angle(), pr.hostile_r[i], state.world_time)
+	var payload: Dictionary = pr.pump_shells.get(i, {})
+	var angle := pr.hostile_vel[i].angle()
+	var direction := Vector2.from_angle(angle)
+	var mouth: Vector2 = payload.get("mouth", pos - direction * 1000.0)
+	var reach := maxf(0.0, (pos - mouth).dot(direction))
+	_present(c, pos, angle, pr.hostile_r[i], state.world_time, payload.get("types", PackedStringArray()), float(payload.get("full", 0.0)), reach)
 	return true
 
-func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: float) -> void:
+## 通常ランはScopeで準備済みの塗装画像を共有する。編集用の単独プレビューも生成済み画像を読む。
+func _contents_texture(type: StringName) -> Texture2D:
+	if not _textures.has(type):
+		if rm != null:
+			_textures[type] = rm._enemy_texture(type)
+		else:
+			var look := RunPresentation.load_look(type)
+			var def := load("res://data/enemies/%s.tres" % type) as EnemyDef
+			_textures[type] = RunPresentation.look_texture(look, _preview_images, def.armor_colors) if look != null and def != null else null
+	return _textures[type]
+
+func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: float, contents: PackedStringArray, full: float, reach := 1000000.0) -> void:
 	if _count == _nodes.size():
 		var created := MeshInstance2D.new()
 		created.mesh = _mesh
@@ -42,11 +64,14 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 		created_material.shader = RUNTIME_SHADER if rm != null else SHADER
 		if rm != null:
 			created_material.set_shader_parameter("linear_colors", RenderingServer.get_current_rendering_method() != "gl_compatibility")
-		for k in 3: created_material.set_shader_parameter("enemy%d" % k, CONTENTS[k])
 		created.material = created_material
 		created.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 		c.add_child(created)
 		_nodes.append(created)
+		_content_types.append(PackedStringArray())
+		_content_full.append(-1.0)
+		_trail_reach.append(-1.0)
+	var slot := _count
 	var node := _nodes[_count]
 	_count += 1
 	var scale_px := radius / 38.0 * flight_scale
@@ -57,6 +82,32 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 	node.modulate = RenderPipeline.plain_color(rm._layers.projectiles, effect_tint) if rm != null else Color.WHITE
 	node.show()
 	var material := node.material as ShaderMaterial
+	if _content_types[slot] != contents or _content_full[slot] != full:
+		# 最初に各種類を1枚ずつ拾い、残りは収納順で詰める。画像のない仮図形は白い矩形にしない。
+		var samples := PackedStringArray()
+		var distinct := {}
+		for type in contents:
+			if samples.size() == 7: break
+			if not distinct.has(type) and _contents_texture(StringName(type)) != null:
+				distinct[type] = true
+				samples.append(type)
+		var skipped := {}
+		for type in contents:
+			if samples.size() == 7: break
+			if not distinct.has(type): continue
+			if not skipped.has(type):
+				skipped[type] = true
+				continue
+			samples.append(type)
+		for k in samples.size(): material.set_shader_parameter("enemy%d" % k, _contents_texture(StringName(samples[k])))
+		material.set_shader_parameter("contents_count", float(samples.size()))
+		material.set_shader_parameter("contents_fill", full)
+		_content_types[slot] = contents
+		_content_full[slot] = full
+	var local_reach := minf(432.0, reach / maxf(scale_px, 0.001))
+	if _trail_reach[slot] != local_reach:
+		material.set_shader_parameter("trail_reach", local_reach)
+		_trail_reach[slot] = local_reach
 	material.set_shader_parameter("clock", clock)
 	if rm == null: ShaderTuning.apply(material, KEY)
 
@@ -73,5 +124,5 @@ func preview_step(dt: float) -> void:
 	begin_batch()
 	if _preview_age < 640.0 / 900.0:
 		var at := Vector2((-320.0 + 900.0 * _preview_age) * 0.6, 0.0)
-		_present(self, at, 0.0, 26.0 * 0.6, _preview_age)
+		_present(self, at, 0.0, 26.0 * 0.6, _preview_age, _preview_contents, 1.0)
 	end_batch()

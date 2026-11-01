@@ -6,6 +6,7 @@ class_name ProjectileSystem
 extends RunSystem
 
 func dispose() -> void:
+	pump_shells.clear()
 	clear_combat_observations()
 	for attack in _attached_attacks.values():
 		attack.dispose()
@@ -112,6 +113,8 @@ var hostile_wait := PackedFloat32Array()
 ## 圧縮弾が破裂する範囲の半径（圧縮弾のほかは 0）
 var hostile_burst := PackedFloat32Array()
 var hostile_slots: RowSlots
+## ポンプ圧縮弾だけの表示用スナップショット。敵の種類・充填率・口の位置を弾の寿命で持つ。
+var pump_shells: Dictionary = {}
 ## 実験の攻撃グループ。行の再利用時に必ず上書きする。
 var lab_context := 0
 var lab_hostile_group: Dictionary = {}
@@ -439,8 +442,8 @@ func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void
 	emit_attack(&"lump", [i, angle, speed, r, dmg])
 
 ## ポンプ座の圧縮弾を撃つ。距離 range を飛ぶか何かに当たると、半径 burst で破裂して dmg を与える。
-func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float) -> void:
-	emit_attack(&"shell", [i, angle, speed, r, range, burst, dmg])
+func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float, contents: PackedStringArray = PackedStringArray()) -> void:
+	emit_attack(&"shell", [i, angle, speed, r, range, burst, dmg, contents])
 
 ## ケフェウス座の兵の細長い光弾を、from から向き angle へ撃つ。直進し、追尾しない。
 func fire_bolt(from: Vector2, angle: float, speed: float, dmg: float) -> void:
@@ -455,6 +458,7 @@ func fire_slash(from: Vector2, angle: float, speed: float, size: float, range: f
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:
 	var i := hostile_slots.take()
+	pump_shells.erase(i)
 	if director != null and lab_context > 0:
 		lab_hostile_group[i] = lab_context
 	else:
@@ -576,6 +580,7 @@ func _update_hostile(dt: float) -> void:
 	if _hostile_clear_pending:
 		_hostile_clear_pending = false
 		hostile_slots.clear()
+		pump_shells.clear()
 
 ## 機体の周り radius に入った敵の弾を1つ消す（バリアシステム）。消したら true。
 func _hostile_shape(kind: int) -> HostileShape:
@@ -600,6 +605,7 @@ func block_one(center: Vector2, radius: float) -> bool:
 
 ## ボスの撃破などで、敵の弾と攻撃の形をすべて消す。
 func clear_hostile() -> void:
+	pump_shells.clear()
 	clear_combat_observations("cleared")
 	hazard_slots.clear()
 	if _hostile_updating:
@@ -880,6 +886,7 @@ func clear_combat_observations(reason := "recording_end") -> void:
 	for row: int in _combat_hazards.keys(): _combat_end(_combat_hazards, row, reason, hazard_pos[row])
 
 func _end_hostile(row: int, reason: String, at: Vector2) -> void:
+	pump_shells.erase(row)
 	var scene: StringName = hostile_visual[row]
 	if scene == &"": scene = StringName("res://scenes/attacks/%s.tscn" % HostileKind.keys()[hostile_kind[row]].to_lower())
 	end_attack_visual(scene, "Hit" if reason in ["contact", "obstacle"] else "Fade", at)

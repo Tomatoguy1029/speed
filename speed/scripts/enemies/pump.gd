@@ -3,6 +3,8 @@ extends EnemyBehavior
 
 ## 吸い込み口の位置（胴体の中心から前へ、半径に対する割合。pump.png の口に合わせる）
 const MOUTH := 0.85
+## 所有者の個体IDごとに、飲み込み済みの種類だけを保持する。発射・所有者の消失で回収する。
+var _stored_types: Dictionary = {}
 
 func _base_radius(i: int) -> float:
 	var t := table
@@ -10,6 +12,9 @@ func _base_radius(i: int) -> float:
 
 func _init() -> void:
 	watches_rows = true
+
+func clear() -> void:
+	_stored_types.clear()
 
 ## 所有は対象の列に持つ。飲み込み後の在庫（buds）とは独立させる。
 func _pulling(i: int) -> bool:
@@ -34,6 +39,8 @@ func on_row_gone(i: int) -> void:
 	_release(i)
 	# 所有者になるのはポンプだけ。巻き込み撃破の各雑魚で全敵を再走査しない。
 	if t.beh[i] != index: return
+	# 視界外からの再配置は同じ個体・在庫を保つ。撃破・解放だけが収納を捨てる。
+	if t.dead[i] != 0 or t.alive[i] == 0: _stored_types.erase(t.id[i])
 	for j in t.alive.size():
 		if t.alive[j] != 0 and t.pump_owner[j] == i:
 			_release(j)
@@ -87,7 +94,8 @@ func _pump(i: int, dt: float) -> void:
 				_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i] * 2.0, dt)
 			if t.timer[i] <= 0.0:
 				projectiles.fire_shell(i, t.facing[i], float(p.shell_speed), float(p.shell_r), float(p.shell_range),
-					float(p.burst_radius), float(p.bullet_dmg))
+					float(p.burst_radius), float(p.bullet_dmg), _stored_types.get(t.id[i], PackedStringArray()))
+				_stored_types.erase(t.id[i])
 				t.buds[i] = 0
 				t.charge[i] = 0.0
 				t.vel[i] -= Vector2.from_angle(t.facing[i]) * float(p.shell_speed) * 0.3
@@ -130,6 +138,9 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 		var d := mouth - t.pos[j]
 		var dist := d.length()
 		if dist < bite and t.bud_t[i] <= 0.0 and t.buds[i] < int(p.store_max):
+			var contents: PackedStringArray = _stored_types.get(t.id[i], PackedStringArray())
+			contents.append(String(t.type[j]))
+			_stored_types[t.id[i]] = contents
 			t.buds[i] += 1
 			t.bud_t[i] = float(p.swallow_interval)
 			state.emit(&"swallow", {"enemy_type": t.type[j], "pos": t.pos[j], "r": t.r[j], "facing": t.facing[j],

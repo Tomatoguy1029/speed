@@ -23,7 +23,7 @@ profiles = {
 "shader/pump_shell/bolt_length": 60.0,
 "shader/pump_shell/bolt_scale": 3.000000037253,
 "shader/pump_shell/bolt_width": 1.80000001937156,
-"shader/pump_shell/contents_opacity": 0.30000000447036,
+"shader/pump_shell/contents_opacity": 1.0,
 "shader/pump_shell/glint_scale": 2.0,
 "shader/pump_shell/glow_strength": 1.5000000223518
 },

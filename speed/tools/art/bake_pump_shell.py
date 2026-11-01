@@ -47,7 +47,7 @@ def specialize():
 
     def constant(match):
         kind, name, _hint, default = match.groups()
-        if name in ("enemy0", "enemy1", "enemy2", "clock"):
+        if name in {"enemy%d" % i for i in range(7)} | {"clock", "contents_count", "contents_fill", "trail_reach"}:
             return match[0]
         found.add(name)
         value = overrides.get(name, default)
