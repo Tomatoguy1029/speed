@@ -2,6 +2,7 @@
 extends EnemyVisual
 const BODY_SHADER := preload("res://shaders/pump_reservoir.gdshader")
 const WIND_SHADER := preload("res://shaders/pump_wind.gdshader")
+const SWALLOW_SECONDS := 0.2
 const ENEMIES := [preload("res://assets/pixel/drifter.png"), preload("res://assets/pixel/swarm.png"), preload("res://assets/pixel/splitling.png")]
 var swallows: Array[Dictionary] = []
 var _bodies: Array[MeshInstance2D] = []
@@ -21,7 +22,7 @@ func setup(render: RunPresentation, behavior_name: StringName) -> void:
 func on_event(ev: Dictionary) -> void:
 	if swallows.size() < 120:
 		swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing,
-			"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.48})
+			"row": ev.row, "id": ev.id, "life": SWALLOW_SECONDS})
 
 func update(dt: float) -> void:
 	for f in swallows: f.life -= dt
@@ -74,6 +75,7 @@ func draw_body(_c: CanvasItem, t: EnemyTable, i: int, p: Vector2) -> bool:
 	mat.set_shader_parameter("normal_tex", look.normal)
 	var swelling := clampf((t.r[i] / maxf(_base_radius(t, i), 0.001) - 1.0) / maxf(float(t.def[i].params.grow), 0.001), 0.0, 1.0)
 	mat.set_shader_parameter("full", 1.0 if t.mode[i] == EnemyTable.Mode.WINDUP else swelling)
+	mat.set_shader_parameter("stored_full", clampf(float(t.buds[i]) / float(t.def[i].params.store_max), 0.0, 1.0))
 	mat.set_shader_parameter("clock", state.world_time)
 	mat.set_shader_parameter("flash", minf(1.0, t.flash[i] * 10.0))
 	mat.set_shader_parameter("normal_strength", t.def[i].visual_value("normal_strength", rm.lighting_settings.normal_strength))
@@ -97,8 +99,8 @@ func draw_layer(c: CanvasItem, _view: Rect2) -> void:
 	if state.cinematic_hide_enemies: return
 	var t := run.enemies.table
 	for sw in swallows:
-		if not run.enemies.is_same(sw.row, sw.id): continue
-		var k := clampf(1.0 - float(sw.life) / 0.48, 0.0, 1.0)
+		if not run.enemies.is_same(sw.row, sw.id) or t.buds[sw.row] <= 0: continue
+		var k := clampf(1.0 - float(sw.life) / SWALLOW_SECONDS, 0.0, 1.0)
 		var scale_px := _source_scale(t, sw.row)
 		var u := Vector2.from_angle(t.facing[sw.row])
 		var mouth := t.pos[sw.row] + u * 15.725 * scale_px
@@ -108,6 +110,6 @@ func draw_layer(c: CanvasItem, _view: Rect2) -> void:
 		if tex == null: continue
 		var r := rm.enemy_sprite_radius(sw.type, sw.r) * lerpf(1.0, 0.12, minf(k / 0.625, 1.0))
 		var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
-		c.draw_set_transform(at, rm._enemy_sprite_angle(sw.type, sw.facing + float(sw.spin) * k * 0.48))
+		c.draw_set_transform(at, rm._enemy_sprite_angle(sw.type, sw.facing))
 		c.draw_texture_rect(tex, Rect2(-size / 2, size), false, Color(1, 1, 1, minf(1.0, (1.0 - k) * 5.0)))
 		c.draw_set_transform(Vector2.ZERO)

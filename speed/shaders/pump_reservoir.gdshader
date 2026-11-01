@@ -6,6 +6,7 @@ uniform sampler2D enemy0 : source_color, filter_nearest;
 uniform sampler2D enemy1 : source_color, filter_nearest;
 uniform sampler2D enemy2 : source_color, filter_nearest;
 uniform float full = 0.0;
+uniform float stored_full = 0.0;
 uniform float clock = 0.0;
 uniform float flash = 0.0;
 uniform float brightness = 1.0;
@@ -36,17 +37,19 @@ void fragment() {
 		float angle = float(j) * 2.39996;
 		vec2 center = vec2(12.0, 27.0) + vec2(cos(angle), sin(angle)) * (j == 0 ? 0.0 : 3.8);
 		vec2 uv = (source - center) / (j % 3 == 2 ? vec2(4,8) : vec2(8)) + 0.5;
-		if (float(j) < ceil(full * 7.0) && all(greaterThanEqual(uv, vec2(0))) && all(lessThan(uv, vec2(1)))) {
+		if (float(j) < ceil(stored_full * 7.0) && all(greaterThanEqual(uv, vec2(0))) && all(lessThan(uv, vec2(1)))) {
 			vec4 piece = j % 3 == 0 ? texture(enemy0, uv) : (j % 3 == 1 ? texture(enemy1, uv) : texture(enemy2, uv));
 			contents = mix(contents, piece, piece.a);
 		}
 	}
-	vec4 inside = mix(base, contents, contents.a * base.a);
+	// Baseは赤い芯以外が透過。収納物は後部の内側へ表示し、Baseのalphaで消さない。
+	float contents_alpha = valid && rear && !front ? contents.a : 0.0;
+	vec4 inside = mix(base, contents, contents_alpha);
 	if (base.r > base.g * 1.4 && base.r > 0.1) inside = base;
 	albedo = armor;
 	albedo.rgb = mix(armor.rgb, vec3(1.0), flash * 0.8);
 	vec3 color = mix(inside.rgb, albedo.rgb * ambient, armor.a);
-	COLOR = vec4(color * brightness, max(base.a, armor.a));
+	COLOR = vec4(color * brightness, max(max(base.a, armor.a), contents_alpha));
 	vec3 n = texture(normal_tex, sample_uv).rgb * 2.0 - 1.0;
 	n.y *= -1.0;
 	n = normalize(vec3(n.xy * normal_strength, max(n.z, 0.001)));
