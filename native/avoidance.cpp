@@ -62,7 +62,7 @@ bool SpeedRunCore::avoid_strong(double dt) {
             if (distance_sq > reach * reach) continue;
             if (distance_sq < radius * radius) {
                 const double distance = std::sqrt(distance_sq);
-                const Vector2 normal = distance > 0.001 ? offset / distance : Vector2::from_angle(double((e.id * 17 + obstacle.id * 31) % 360) * Math_PI / 180.0);
+                const Vector2 normal = distance > 0.001 ? offset / distance : Vector2::from_angle(double((e.id * 17 + obstacle.id * 31) % 360) * godot::Math::PI / 180.0);
                 const double depth = radius - distance; inside += normal * depth;
                 if (depth > most_inside) { most_inside = depth; fallback = normal; }
                 continue;

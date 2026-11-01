@@ -88,7 +88,7 @@ func difference(left: Variant, right: Variant, path := "result") -> String:
 ## 比較を明示的に起動したときだけ読み込む。通常ランへ未完成の実体を混ぜない。
 func create_native() -> RefCounted:
 	if not ClassDB.class_exists(&"SpeedRunCore"):
-		GDExtensionManager.load_extension("res://native/run_core.gdextension")
+		GDExtensionManager.load_extension("res://extensions/run/run_core.gdextension")
 	if not ClassDB.class_exists(&"SpeedRunCore"):
 		return null
 	return ClassDB.instantiate(&"SpeedRunCore")

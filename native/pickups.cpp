@@ -59,7 +59,7 @@ void SpeedRunCore::drop_gem(Vector2 position, double value) {
             gem_queue_head = 0;
         }
     }
-    const double angle = rng->randf() * (2.0 * Math_PI);
+    const double angle = rng->randf() * (2.0 * godot::Math::PI);
     const Vector2 at = position + Vector2::from_angle(angle) * 8.0;
     size_t row = gems.size();
     if (free_gems.empty()) gems.emplace_back();
@@ -76,7 +76,7 @@ void SpeedRunCore::drop_enemy_pickups(const Enemy &enemy) {
     drop_gem(enemy.pos, value);
     const int64_t coin_count = enemy.elite ? 3 + rng->randi_range(0, 3) : (rng->randf() < 0.03 ? 1 : 0);
     for (int64_t k = 0; k < coin_count; ++k) {
-        const double angle = rng->randf() * (2.0 * Math_PI);
+        const double angle = rng->randf() * (2.0 * godot::Math::PI);
         const double share = rng->randf();
         const Coin coin{enemy.pos + Vector2::from_angle(angle) * share * enemy.radius, true, false};
         if (free_coins.empty()) coins.push_back(coin);

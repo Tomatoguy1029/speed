@@ -170,7 +170,7 @@ PackedFloat32Array SpeedRunCore::friendly_buffer(StringName visual, double pixel
         if (!shot.alive || shot.visual != visual) continue;
         const Vector2 position = (shot.pos / pixel).round() * pixel;
         const double size = 18.0 * pixel * scale;
-        const double angle = Math::fposmod(double(shot.vel.angle()), 2.0 * Math_PI) / (2.0 * Math_PI);
+        const double angle = Math::fposmod(double(shot.vel.angle()), 2.0 * godot::Math::PI) / (2.0 * godot::Math::PI);
         out[index++] = size; out[index++] = 0; out[index++] = 0; out[index++] = position.x;
         out[index++] = 0; out[index++] = size; out[index++] = 0; out[index++] = position.y;
         out[index++] = angle; out[index++] = visual == StringName("weapon/scatter") && shot.life < 0.09 ? 1 : 0;

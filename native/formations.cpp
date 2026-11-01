@@ -93,13 +93,13 @@ PackedInt64Array SpeedRunCore::spawn_formation(int64_t index, int64_t layout, in
     if (li < 0 || ei < 0) return ids;
     Vector2 heading = ship.vel.length() > 40.0 ? ship.vel.normalized() : ship.heading;
     if (heading == Vector2()) heading = Vector2(0,-1);
-    const double turn = double(heading.angle()) + Math_PI / 2.0;
+    const double turn = double(heading.angle()) + godot::Math::PI / 2.0;
     const double stretch = std::max(1.0, double(std::min(view_half.x, view_half.y)) * 2.0 / std::max(formation_base_view, 1.0));
     const Vector2 origin = formation.entries[ei].pos * stretch;
     for (const auto &marker : formation.layouts[li].placements[ei]) {
         if (!types.is_empty() && !types.has(String(marker.type))) continue;
         const Vector2 position = ship_pos + (marker.offset + origin).rotated(turn);
-        const double facing = turn + marker.rotation - Math_PI / 2.0;
+        const double facing = turn + marker.rotation - godot::Math::PI / 2.0;
         Dictionary options;
         options["facing"] = facing; options["attack_group"] = group; options["attack_value"] = value;
         if (managed.get_type() != Variant::NIL && group > 0) options["attack_managed"] = managed;
