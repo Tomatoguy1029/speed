@@ -200,9 +200,14 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 		else: view.get_node("Hud").free()
 		cpp_input_source = view.get_node("World/InputRouter").poll
 		add_child(view)
+		bridge.subscribe("audio",AudioManager.consume_cpp_frame)
 	else:
 		var router = preload("res://scripts/input/input_router.gd").new()
 		add_child(router)
 		cpp_input_source = router.poll
+	for recorder: Node in get_tree().get_nodes_in_group("cpp_recorders"):
+		recorder.attach_cpp(self)
 	started.emit()
+	var delivered: Dictionary = bridge.collect_frame()
+	if not delivered.ok: push_warning(delivered.message)
 	return OK

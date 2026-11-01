@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--events-only" in OS.get_cmdline_user_args():
+		check(check_run_events(), "通知の配信と受領確認を最後まで確認する")
+		print("[run_events] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--attack-owner-only" in OS.get_cmdline_user_args():
 		check(check_attack_owners(), "攻撃の所有と終了条件を最後まで確認する")
 		print("[attack_owner] failed=%d" % failed)
@@ -759,4 +764,89 @@ func check_attack_owners() -> bool:
 	var zones: Array = hazards._core.hazards_snapshot()
 	check(zones.size()==2 and is_equal_approx(zones[0].time,0.1) and zones[1].time==0.0 and not zones[0].hit,"hazardのfalseで残り全体を打ち切る")
 	hazards.dispose()
+	return true
+
+func check_run_events() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.world_tick_div = 1
+	config.kill_hitstop = 0.0
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.stage_hp = 1.0
+	definition.armor = 0.0
+	definition.speed = 0.0
+	var bridge = clock_fixture(config,definition)
+	if not bridge.has_method("collect_frame"):
+		bridge.dispose()
+		return false
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	var recorder = load("res://scripts/dev/play_recorder.gd").new()
+	# 実際の録画の書込経路を独立した一時ファイルへつなぐ。
+	recorder._cpp_session_id = 51
+	recorder._file = FileAccess.open("/tmp/speed-cpp-m02-events.jsonl",FileAccess.WRITE)
+	var received := [[],[],[]]
+	var reject := [false]
+	var reentry := []
+	var callbacks := [view.receive_frame,AudioManager.consume_cpp_frame,recorder.consume_cpp_frame]
+	for i in range(3):
+		var consumer: Callable = callbacks[i]
+		check(bridge.subscribe("受信%d" % i,func(frame: Dictionary) -> bool:
+			if i==2 and reject[0]: return false
+			received[i].append(frame.duplicate(true))
+			reentry.append(bridge.command("pause",{"paused":true}).code)
+			return consumer.call(frame)),"表示・音・録画を同じ窓口へ登録する")
+	check(bridge.collect_frame().ok,"初期通知を全購読者へ配信する")
+	for i in range(60): clock_step(bridge)
+	var shots: Array = bridge._core.projectiles_snapshot()
+	if shots.is_empty():
+		bridge.dispose()
+		view.free()
+		recorder._file.close()
+		recorder._file = null
+		recorder.free()
+		return false
+	var shot: Dictionary = shots.back()
+	var target: int = combat_enemy(bridge,shot.pos+shot.vel.normalized()*8.0)
+	# 一購読者が受理しなければ、受理済みの相手を重複配信せず再送する。
+	reject[0] = true
+	var response: Dictionary = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	check(response.ok and not bridge.read_frame().value.events.is_empty(),"更新成功を再実行させず、受理待ち通知を保持する")
+	var raw: Dictionary = bridge._core.frame_run()
+	check(raw==bridge._core.frame_run(),"複数回の読取で通知とUI差分を消費しない")
+	var pending: Array = raw.value.events
+	var last: int = pending.back().sequence
+	check(bridge.ack_frame(bridge._epoch,last+1).code==1,"未公開番号のackを拒否する")
+	var counts := [received[0].size(),received[1].size()]
+	reject[0] = false
+	check(bridge.collect_frame().ok and bridge.read_frame().value.events.is_empty(),"全員の受理後に通知を解放する")
+	check(counts==[received[0].size(),received[1].size()],"再送では受領済みの購読者を重複配信しない")
+	for rows: Array in received:
+		var hits := []
+		for frame: Dictionary in rows:
+			for event: Dictionary in frame.events:
+				if event.type==&"hit" and event.payload.id==target: hits.append(event)
+		check(hits.size()==1,"一命中を各購読者が一度だけ受ける")
+		if hits.size()==1: check(hits[0].tick==61 and hits[0].has("t") and hits[0].has("world_t"),"命中時刻と完了固定更新番号を持つ")
+	check(received[0]==received[1] and received[1]==received[2],"全購読者が同じ通知batchを受ける")
+	check(reentry.all(func(code): return code==7),"配信中の更新命令を拒否する")
+	check(bridge.ack_frame(bridge._epoch,last).code==3,"重複ackを拒否する")
+	var metrics: Dictionary = bridge.read_metrics()
+	check(metrics.ok and metrics==bridge.read_metrics() and metrics.value.events_emitted==metrics.value.events_acked,"複数計測者の読取で累積値をresetしない")
+	var saved: int = bridge.checkpoint().value
+	var epoch: int = bridge._epoch
+	check(bridge.restore(saved).ok and bridge.ack_frame(epoch,last).code==3,"復帰前のepochのackを拒否する")
+	check(bridge.read_metrics().value.events_emitted==metrics.value.events_emitted,"復帰で観測の累積値を巻き戻さない")
+	bridge.release_checkpoint(saved)
+	var core = bridge._core
+	check(bridge.dispose().ok and not bridge.read_frame().ok and not bridge.read_metrics().ok and not core.frame_run().ok and not core.ack_frame_run(epoch,last).ok,"破棄後の読取とackを拒否する")
+	recorder._file.flush()
+	recorder._file.close()
+	recorder._file = null
+	var recorded_hits := 0
+	for line in FileAccess.get_file_as_string("/tmp/speed-cpp-m02-events.jsonl").split("\n",false):
+		var row: Dictionary = JSON.parse_string(line)
+		if row.type=="hit" and row.payload.id==target: recorded_hits += 1
+	check(recorded_hits==1,"録画ファイルにも一命中を一度だけ残す")
+	recorder._cpp_session_id = 0
+	recorder.free()
+	view.free()
 	return true

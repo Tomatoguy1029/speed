@@ -158,7 +158,9 @@ public:
     Dictionary start_run(const Variant &seed,const Dictionary &options);
     Dictionary step_run(const Variant &dt,const Dictionary &input,const Dictionary &viewport);
     Dictionary command_run(const Dictionary &envelope);
-    Dictionary frame_run() const;
+    Dictionary frame_run();
+    Dictionary ack_frame_run(int64_t epoch,int64_t sequence);
+    Dictionary metrics_run() const;
     Dictionary render_run(const Rect2 &view,const Variant &alpha) const;
     Dictionary dispose_run();
     bool configure_content(const PackedByteArray &bytes);

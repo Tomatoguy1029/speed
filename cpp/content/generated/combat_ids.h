@@ -91,4 +91,144 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="cannon") {out=VisualRole::Cannon;return true;}
     return false;
 }
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Count};
+inline const char *symbol_name(EventType value) {
+    switch(value) {
+    case EventType::AttackStart: return "attack_start";
+    case EventType::AttackEnd: return "attack_end";
+    case EventType::AttackRetired: return "attack_retired";
+    case EventType::AttackVisualEnd: return "attack_visual_end";
+    case EventType::Bonus: return "bonus";
+    case EventType::BlockImpact: return "block_impact";
+    case EventType::Bounce: return "bounce";
+    case EventType::ClipGroupEnd: return "clip_group_end";
+    case EventType::ClipGroup: return "clip_group";
+    case EventType::CombatDamage: return "combat_damage";
+    case EventType::CombatPlayerDamage: return "combat_player_damage";
+    case EventType::CriticalHit: return "critical_hit";
+    case EventType::DebrisTrail: return "debris_trail";
+    case EventType::DrawStart: return "draw_start";
+    case EventType::Duplicate: return "duplicate";
+    case EventType::EnemyRetire: return "enemy_retire";
+    case EventType::GameOver: return "game_over";
+    case EventType::GaugeFull: return "gauge_full";
+    case EventType::Hit: return "hit";
+    case EventType::HullScatter: return "hull_scatter";
+    case EventType::Hurt: return "hurt";
+    case EventType::Kill: return "kill";
+    case EventType::Launch: return "launch";
+    case EventType::LevelBonus: return "level_bonus";
+    case EventType::Levelup: return "levelup";
+    case EventType::Phase: return "phase";
+    case EventType::Pickup: return "pickup";
+    case EventType::Reroll: return "reroll";
+    case EventType::ShieldBlock: return "shield_block";
+    case EventType::ShieldExpired: return "shield_expired";
+    case EventType::ShieldReflect: return "shield_reflect";
+    case EventType::ShieldStolen: return "shield_stolen";
+    case EventType::ShipDeath: return "ship_death";
+    case EventType::ShipExplode: return "ship_explode";
+    case EventType::ShotHit: return "shot_hit";
+    case EventType::StrongSpawn: return "strong_spawn";
+    case EventType::Text: return "text";
+    case EventType::TimeLimitReached: return "time_limit_reached";
+    case EventType::TraceEnd: return "trace_end";
+    case EventType::Upgrade: return "upgrade";
+    case EventType::Wave: return "wave";
+    case EventType::WeaponFire: return "weapon_fire";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, EventType &out) {
+    if (value=="attack_start") {out=EventType::AttackStart;return true;}
+    if (value=="attack_end") {out=EventType::AttackEnd;return true;}
+    if (value=="attack_retired") {out=EventType::AttackRetired;return true;}
+    if (value=="attack_visual_end") {out=EventType::AttackVisualEnd;return true;}
+    if (value=="bonus") {out=EventType::Bonus;return true;}
+    if (value=="block_impact") {out=EventType::BlockImpact;return true;}
+    if (value=="bounce") {out=EventType::Bounce;return true;}
+    if (value=="clip_group_end") {out=EventType::ClipGroupEnd;return true;}
+    if (value=="clip_group") {out=EventType::ClipGroup;return true;}
+    if (value=="combat_damage") {out=EventType::CombatDamage;return true;}
+    if (value=="combat_player_damage") {out=EventType::CombatPlayerDamage;return true;}
+    if (value=="critical_hit") {out=EventType::CriticalHit;return true;}
+    if (value=="debris_trail") {out=EventType::DebrisTrail;return true;}
+    if (value=="draw_start") {out=EventType::DrawStart;return true;}
+    if (value=="duplicate") {out=EventType::Duplicate;return true;}
+    if (value=="enemy_retire") {out=EventType::EnemyRetire;return true;}
+    if (value=="game_over") {out=EventType::GameOver;return true;}
+    if (value=="gauge_full") {out=EventType::GaugeFull;return true;}
+    if (value=="hit") {out=EventType::Hit;return true;}
+    if (value=="hull_scatter") {out=EventType::HullScatter;return true;}
+    if (value=="hurt") {out=EventType::Hurt;return true;}
+    if (value=="kill") {out=EventType::Kill;return true;}
+    if (value=="launch") {out=EventType::Launch;return true;}
+    if (value=="level_bonus") {out=EventType::LevelBonus;return true;}
+    if (value=="levelup") {out=EventType::Levelup;return true;}
+    if (value=="phase") {out=EventType::Phase;return true;}
+    if (value=="pickup") {out=EventType::Pickup;return true;}
+    if (value=="reroll") {out=EventType::Reroll;return true;}
+    if (value=="shield_block") {out=EventType::ShieldBlock;return true;}
+    if (value=="shield_expired") {out=EventType::ShieldExpired;return true;}
+    if (value=="shield_reflect") {out=EventType::ShieldReflect;return true;}
+    if (value=="shield_stolen") {out=EventType::ShieldStolen;return true;}
+    if (value=="ship_death") {out=EventType::ShipDeath;return true;}
+    if (value=="ship_explode") {out=EventType::ShipExplode;return true;}
+    if (value=="shot_hit") {out=EventType::ShotHit;return true;}
+    if (value=="strong_spawn") {out=EventType::StrongSpawn;return true;}
+    if (value=="text") {out=EventType::Text;return true;}
+    if (value=="time_limit_reached") {out=EventType::TimeLimitReached;return true;}
+    if (value=="trace_end") {out=EventType::TraceEnd;return true;}
+    if (value=="upgrade") {out=EventType::Upgrade;return true;}
+    if (value=="wave") {out=EventType::Wave;return true;}
+    if (value=="weapon_fire") {out=EventType::WeaponFire;return true;}
+    return false;
+}
+inline bool event_field_allowed(EventType type, std::string_view field) {
+    switch(type) {
+    case EventType::AttackStart: return field=="owner" || field=="row" || field=="id" || field=="categories" || field=="token";
+    case EventType::AttackEnd: return field=="token" || field=="owner";
+    case EventType::AttackRetired: return field=="pos" || field=="id" || field=="source_id" || field=="reason";
+    case EventType::AttackVisualEnd: return field=="scene" || field=="phase" || field=="pos";
+    case EventType::Bonus: return field=="enter" || field=="pos";
+    case EventType::BlockImpact: return field=="pos" || field=="normal" || field=="enemy_pos" || field=="r" || field=="armor_bounce";
+    case EventType::Bounce: return field=="pos";
+    case EventType::ClipGroupEnd: return field=="clip" || field=="key";
+    case EventType::ClipGroup: return field=="clip" || field=="key" || field=="n";
+    case EventType::CombatDamage: return field=="pos" || field=="target" || field=="struck_id" || field=="target_id" || field=="cause" || field=="weapon_id" || field=="requested" || field=="resolved" || field=="applied" || field=="overkill" || field=="discarded" || field=="hp_before" || field=="hp_after" || field=="reason" || field=="impact" || field=="shatter_depth";
+    case EventType::CombatPlayerDamage: return field=="pos" || field=="cause" || field=="source" || field=="technique" || field=="requested" || field=="amount" || field=="accepted" || field=="reason" || field=="hp_before" || field=="hp_after";
+    case EventType::CriticalHit: return field=="pos" || field=="enemy_pos" || field=="r" || field=="dir";
+    case EventType::DebrisTrail: return field=="points" || field=="color";
+    case EventType::DrawStart: return false;
+    case EventType::Duplicate: return field=="pos" || field=="directions";
+    case EventType::EnemyRetire: return field=="pos" || field=="id" || field=="reason" || field=="enemy_type";
+    case EventType::GameOver: return false;
+    case EventType::GaugeFull: return false;
+    case EventType::Hit: return field=="pos" || field=="crit" || field=="dmg" || field=="cause" || field=="id";
+    case EventType::HullScatter: return field=="pos" || field=="count";
+    case EventType::Hurt: return field=="pos" || field=="amount" || field=="cause" || field=="source" || field=="hp_after";
+    case EventType::Kill: return field=="pos" || field=="id" || field=="r" || field=="crit" || field=="enemy_type" || field=="meteor_index" || field=="facing" || field=="elite" || field=="cause" || field=="dir" || field=="color" || field=="silent";
+    case EventType::Launch: return field=="pos" || field=="dir" || field=="gauge";
+    case EventType::LevelBonus: return field=="kind" || field=="id" || field=="level" || field=="count";
+    case EventType::Levelup: return field=="level";
+    case EventType::Phase: return field=="id";
+    case EventType::Pickup: return field=="kind";
+    case EventType::Reroll: return false;
+    case EventType::ShieldBlock: return field=="pos";
+    case EventType::ShieldExpired: return field=="pos";
+    case EventType::ShieldReflect: return field=="pos" || field=="normal";
+    case EventType::ShieldStolen: return field=="pos" || field=="facing" || field=="r" || field=="arc" || field=="enemy_type";
+    case EventType::ShipDeath: return field=="pos";
+    case EventType::ShipExplode: return field=="pos";
+    case EventType::ShotHit: return field=="pos" || field=="dir" || field=="visual_key" || field=="kind";
+    case EventType::StrongSpawn: return field=="id" || field=="enemy_type";
+    case EventType::Text: return field=="pos" || field=="text" || field=="color" || field=="size";
+    case EventType::TimeLimitReached: return false;
+    case EventType::TraceEnd: return field=="completed";
+    case EventType::Upgrade: return field=="card";
+    case EventType::Wave: return false;
+    case EventType::WeaponFire: return field=="id" || field=="pos" || field=="angle" || field=="visual_key";
+    default: return false;
+    }
+}
 }

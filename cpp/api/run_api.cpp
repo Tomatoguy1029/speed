@@ -80,9 +80,14 @@ Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,co
     if (!size.is_finite() || size.x<=0 || size.y<=0) return failure(1,"logical_size","論理サイズは有限の正数にしてください");
     if (runtime.state.control.tick==INT64_MAX || runtime.state.control.revision==INT64_MAX) return failure(9,"tick","更新番号が上限です");
     speed::RenderBuilder::capture_previous(runtime);
-    if (!speed::RunRunner::step_play(*this,1.0/120.0,input,size)) return failure(8,"step","更新の整合を確認してください");
+    runtime.frame_workspace.publishing_tick=runtime.state.control.tick+1;
+    const bool advanced=speed::RunRunner::step_play(*this,1.0/120.0,input,size);
     speed::EventBuilder::flush_combat(runtime);
-    ++runtime.state.control.tick;++runtime.state.control.revision;return success(progress(runtime));
+    runtime.frame_workspace.publishing_tick=-1;
+    if (!advanced) return failure(8,"step","更新の整合を確認してください");
+    ++runtime.state.control.tick;++runtime.state.control.revision;
+    if (runtime.frame_workspace.metrics.fixed_steps<INT64_MAX) ++runtime.frame_workspace.metrics.fixed_steps;
+    return success(progress(runtime));
 }
 Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     if (runtime.busy) return failure(7,"command","更新中は再入できません");Guard guard(runtime.busy);
@@ -120,7 +125,11 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat") response=development_combat_command(kind,payload);
     else if (kind=="dev_emit_attack" || kind=="dev_end_attack" || kind=="dev_attack_scope" || kind=="dev_clear_hostile" || kind=="dev_attack_update") response=development_attack_command(kind,payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
-    if (bool(response["ok"])) ++runtime.state.control.revision;
+    speed::EventBuilder::flush_combat(runtime);
+    if (bool(response["ok"])) {
+        ++runtime.state.control.revision;
+        if (runtime.frame_workspace.metrics.commands<INT64_MAX) ++runtime.frame_workspace.metrics.commands;
+    }
     runtime.last_command_id=id;runtime.last_command_response=response.duplicate(true);return response;
 }
 Dictionary SpeedRunCore::render_run(const Rect2 &view,const Variant &alpha) const {
@@ -130,9 +139,10 @@ Dictionary SpeedRunCore::render_run(const Rect2 &view,const Variant &alpha) cons
         !view.position.is_finite() || !view.size.is_finite() || view.size.x<0 || view.size.y<0) return failure(1,"view/alpha","表示範囲か補間係数が不正です");
     return success(speed::RenderBuilder::read(runtime,view,double(alpha)));
 }
-Dictionary SpeedRunCore::frame_run() const {
+Dictionary SpeedRunCore::frame_run() {
     if (runtime.busy) return failure(7,"read_frame","更新中は再入できません");
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_frame","開始していないランです");
+    if (runtime.frame_workspace.invalid) return failure(8,"events","通知の型・項目・番号が不正です");
     const auto &control=runtime.state.control;Dictionary camera;camera["center"]=control.camera_center;camera["zoom"]=control.camera_zoom;camera["half"]=runtime.state.view_half;
     Dictionary value=progress(runtime);value["run_id"]=runtime.api_run_id;value["camera"]=camera;
     Dictionary ui;ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["max_hp"]=runtime.state.ship_config.max_hp;
@@ -140,8 +150,19 @@ Dictionary SpeedRunCore::frame_run() const {
     ui["ship_vel"]=runtime.state.ship.vel;ui["tracing"]=runtime.state.draw.tracing;ui["ship_boost_t"]=runtime.state.ship.boost_t;ui["glide"]=runtime.state.ship.glide;
     ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
-    ui["character_scale"]=runtime.content->config.character_scale;value["ui"]=ui;
-    value["events"]=runtime.state.events.duplicate(true);value["resource_requests"]=Array();value["result"]=Variant();return success(value);
+    ui["character_scale"]=runtime.content->config.character_scale;value["ui"]=speed::FrameBuilder::ui_delta(runtime,ui);
+    value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=Array();value["result"]=Variant();return success(value);
+}
+Dictionary SpeedRunCore::ack_frame_run(int64_t epoch,int64_t sequence) {
+    if (runtime.busy) return failure(7,"ack_frame","更新中は受領できません");
+    if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"ack_frame","開始していないランです");
+    const int error=speed::FrameBuilder::acknowledge(runtime,epoch,sequence);
+    return error?failure(error,"epoch/sequence","古い世代・受領済み・未公開の通知番号です"):success();
+}
+Dictionary SpeedRunCore::metrics_run() const {
+    if (runtime.busy) return failure(7,"read_metrics","更新中は読めません");
+    if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_metrics","開始していないランです");
+    return success(speed::FrameBuilder::metrics(runtime));
 }
 Dictionary SpeedRunCore::dispose_run() {
     if (runtime.busy) return failure(7,"dispose","更新中は再入できません");Guard guard(runtime.busy);

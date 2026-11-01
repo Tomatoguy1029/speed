@@ -25,8 +25,14 @@ bool SpeedRunCore::configure_combat(const Dictionary &config, const Dictionary &
     return true;
 }
 
-void SpeedRunCore::emit_event(StringName type, Dictionary data) { speed::EventBuilder::flush_combat(runtime); data["type"] = type; runtime.state.events.append(data); }
-Array SpeedRunCore::drain_events() { speed::EventBuilder::flush_combat(runtime); Array out = runtime.state.events; runtime.state.events = Array(); return out; }
+void SpeedRunCore::emit_event(StringName type, Dictionary data) { speed::EventBuilder::flush_combat(runtime); speed::FrameBuilder::append(runtime,type,data); }
+Array SpeedRunCore::drain_events() { speed::EventBuilder::flush_combat(runtime); if (runtime.api_configured) {
+        Array out;for (int64_t i=0;i<runtime.frame_workspace.pending.size();++i) {
+            const auto &event=runtime.frame_workspace.pending[i];auto row=event.payload.duplicate(true);
+            row["type"]=StringName(speed::symbol_name(event.type));row["t"]=event.time;row["world_t"]=event.world_time;out.append(row);
+        }return out;
+    }
+    Array out = runtime.state.events; runtime.state.events = Array(); return out; }
 Dictionary SpeedRunCore::combat_snapshot() const {
     Dictionary out; out["hitstop"] = runtime.state.hitstop; out["dash_stop"] = runtime.state.dash_stop; out["kills"] = runtime.state.kills; return out;
 }

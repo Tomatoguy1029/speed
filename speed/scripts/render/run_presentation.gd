@@ -1582,18 +1582,19 @@ func _sync_picaro() -> void:
 
 func _ready_cpp() -> void:
 	_camera = get_node(camera_path) as Camera2D
-	var snapshot: Dictionary = bridge.read_frame()
+	var snapshot: Dictionary = bridge.latest_frame()
 	if not snapshot.ok: return
 	frame_view = load("res://scripts/render/run_frame_view.gd").new()
 	get_node(world_path).add_child(frame_view)
 	frame_view.setup(cpp_scope,cpp_resources.visuals,float(snapshot.value.ui.character_scale))
+	bridge.subscribe("presentation",frame_view.receive_frame)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],2)
 
 func _present_cpp(delta: float) -> void:
 	if frame_view==null: return
-	var snapshot: Dictionary = bridge.read_frame()
+	var snapshot: Dictionary = bridge.latest_frame()
 	if not snapshot.ok:
 		frame_view.hide()
 		return

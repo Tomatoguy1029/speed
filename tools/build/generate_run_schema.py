@@ -10,7 +10,7 @@ WIDTH = {'u8':1,'u32':4,'u64':8,'i64':8,'f32':4,'f64':8,'bool':1,'string':4}
 
 def generate():
     schema=json.loads((ROOT/'cpp/content/schema/run.json').read_text())
-    assert set(schema)=={'schema_version','format_version','abi_version','records','enums'}
+    assert set(schema)=={'schema_version','format_version','abi_version','records','enums','event_fields'}
     enums=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include <cstdint>','#include <string_view>','namespace speed {']
     for name, entries in schema['enums'].items():
         assert len({e['name'] for e in entries})==len(entries) and len({e['value'] for e in entries})==len(entries)
@@ -21,6 +21,12 @@ def generate():
         enums += [f'inline bool parse_symbol(std::string_view value, {name} &out) {{']
         enums += [f'    if (value=={json.dumps(e["value"])}) {{out={name}::{e["name"]};return true;}}' for e in entries]
         enums += ['    return false;','}']
+    enums += ['inline bool event_field_allowed(EventType type, std::string_view field) {','    switch(type) {']
+    for event in schema['enums']['EventType']:
+        allowed=schema['event_fields'][event['value']]
+        condition=' || '.join(f'field=={json.dumps(field)}' for field in allowed) or 'false'
+        enums += [f'    case EventType::{event["name"]}: return {condition};']
+    enums += ['    default: return false;','    }','}']
     enums += ['}']
     records=schema['records']; names={r['name'] for r in records}
     assert len(names)==len(records) and len({r['section'] for r in records})==len(records)

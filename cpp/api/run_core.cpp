@@ -15,6 +15,8 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("step_run", "dt", "input", "viewport"), &SpeedRunCore::step_run);
     ClassDB::bind_method(D_METHOD("command_run", "envelope"), &SpeedRunCore::command_run);
     ClassDB::bind_method(D_METHOD("frame_run"), &SpeedRunCore::frame_run);
+    ClassDB::bind_method(D_METHOD("ack_frame_run","epoch","sequence"), &SpeedRunCore::ack_frame_run);
+    ClassDB::bind_method(D_METHOD("metrics_run"), &SpeedRunCore::metrics_run);
     ClassDB::bind_method(D_METHOD("render_run","view","alpha"), &SpeedRunCore::render_run);
     ClassDB::bind_method(D_METHOD("dispose_run"), &SpeedRunCore::dispose_run);
 
@@ -222,6 +224,7 @@ void SpeedRunCore::close() {
     runtime.state.grid = EnemyGrid();
     runtime.state.attacks={};
     runtime.state.events.clear();runtime.state.combat_events.clear();runtime.state.previous_poses={};
+    runtime.frame_workspace={};
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.bite_zones.clear(); runtime.state.free_bite_zones.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;

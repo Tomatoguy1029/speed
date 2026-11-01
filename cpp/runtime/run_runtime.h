@@ -3,6 +3,7 @@
 #include "../content/content_bundle.h"
 #include <memory>
 #include "../output/render_builder.h"
+#include "../output/frame_builder.h"
 #include "../systems/combat_hooks.h"
 
 namespace speed {
@@ -16,6 +17,7 @@ public:
     std::shared_ptr<const ContentBundle> content = std::make_shared<const ContentBundle>();
     RunWorkspace workspace;
     mutable RenderWorkspace render_workspace;
+    FrameWorkspace frame_workspace;
     CombatHooks combat_hooks;
     int64_t epoch=1;
     int64_t api_run_id=0, last_command_id=0;

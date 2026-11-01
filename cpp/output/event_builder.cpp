@@ -36,7 +36,7 @@ CombatEvent event_for(RunRuntime &run,const DamageRequest &request,EnemyHandle t
     }
     event.impact=request.has_impact?request.impact:event.pos;return event;
 }
-void append(RunRuntime &run,const char *type,godot::Dictionary data) {data["type"]=godot::StringName(type);run.state.events.append(data);}
+void append(RunRuntime &run,const char *type,godot::Dictionary data) {FrameBuilder::append(run,godot::StringName(type),data);}
 }
 void EventBuilder::enemy_damage(RunRuntime &run,const DamageRequest &request,const DamageResult &result) {
     auto event=event_for(run,request,result.target);event.kind=CombatEventKind::EnemyDamage;event.reason=result.reason;
@@ -62,6 +62,7 @@ void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &reques
 void EventBuilder::flush_combat(RunRuntime &run) {
     for (const auto &e:run.state.combat_events) {
         godot::Dictionary d;d["pos"]=e.pos;
+        if (run.api_configured) {d["t"]=e.time;d["world_t"]=e.world_time;}
         const godot::StringName cause(symbol_name(e.cause));
         switch(e.kind) {
         case CombatEventKind::AttackRetired: {

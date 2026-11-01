@@ -1150,6 +1150,382 @@
         "name": "Cannon",
         "value": "cannon"
       }
+    ],
+    "EventType": [
+      {
+        "name": "AttackStart",
+        "value": "attack_start"
+      },
+      {
+        "name": "AttackEnd",
+        "value": "attack_end"
+      },
+      {
+        "name": "AttackRetired",
+        "value": "attack_retired"
+      },
+      {
+        "name": "AttackVisualEnd",
+        "value": "attack_visual_end"
+      },
+      {
+        "name": "Bonus",
+        "value": "bonus"
+      },
+      {
+        "name": "BlockImpact",
+        "value": "block_impact"
+      },
+      {
+        "name": "Bounce",
+        "value": "bounce"
+      },
+      {
+        "name": "ClipGroupEnd",
+        "value": "clip_group_end"
+      },
+      {
+        "name": "ClipGroup",
+        "value": "clip_group"
+      },
+      {
+        "name": "CombatDamage",
+        "value": "combat_damage"
+      },
+      {
+        "name": "CombatPlayerDamage",
+        "value": "combat_player_damage"
+      },
+      {
+        "name": "CriticalHit",
+        "value": "critical_hit"
+      },
+      {
+        "name": "DebrisTrail",
+        "value": "debris_trail"
+      },
+      {
+        "name": "DrawStart",
+        "value": "draw_start"
+      },
+      {
+        "name": "Duplicate",
+        "value": "duplicate"
+      },
+      {
+        "name": "EnemyRetire",
+        "value": "enemy_retire"
+      },
+      {
+        "name": "GameOver",
+        "value": "game_over"
+      },
+      {
+        "name": "GaugeFull",
+        "value": "gauge_full"
+      },
+      {
+        "name": "Hit",
+        "value": "hit"
+      },
+      {
+        "name": "HullScatter",
+        "value": "hull_scatter"
+      },
+      {
+        "name": "Hurt",
+        "value": "hurt"
+      },
+      {
+        "name": "Kill",
+        "value": "kill"
+      },
+      {
+        "name": "Launch",
+        "value": "launch"
+      },
+      {
+        "name": "LevelBonus",
+        "value": "level_bonus"
+      },
+      {
+        "name": "Levelup",
+        "value": "levelup"
+      },
+      {
+        "name": "Phase",
+        "value": "phase"
+      },
+      {
+        "name": "Pickup",
+        "value": "pickup"
+      },
+      {
+        "name": "Reroll",
+        "value": "reroll"
+      },
+      {
+        "name": "ShieldBlock",
+        "value": "shield_block"
+      },
+      {
+        "name": "ShieldExpired",
+        "value": "shield_expired"
+      },
+      {
+        "name": "ShieldReflect",
+        "value": "shield_reflect"
+      },
+      {
+        "name": "ShieldStolen",
+        "value": "shield_stolen"
+      },
+      {
+        "name": "ShipDeath",
+        "value": "ship_death"
+      },
+      {
+        "name": "ShipExplode",
+        "value": "ship_explode"
+      },
+      {
+        "name": "ShotHit",
+        "value": "shot_hit"
+      },
+      {
+        "name": "StrongSpawn",
+        "value": "strong_spawn"
+      },
+      {
+        "name": "Text",
+        "value": "text"
+      },
+      {
+        "name": "TimeLimitReached",
+        "value": "time_limit_reached"
+      },
+      {
+        "name": "TraceEnd",
+        "value": "trace_end"
+      },
+      {
+        "name": "Upgrade",
+        "value": "upgrade"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "WeaponFire",
+        "value": "weapon_fire"
+      }
+    ]
+  },
+  "event_fields": {
+    "attack_start": [
+      "owner",
+      "row",
+      "id",
+      "categories",
+      "token"
+    ],
+    "attack_end": [
+      "token",
+      "owner"
+    ],
+    "attack_retired": [
+      "pos",
+      "id",
+      "source_id",
+      "reason"
+    ],
+    "attack_visual_end": [
+      "scene",
+      "phase",
+      "pos"
+    ],
+    "bonus": [
+      "enter",
+      "pos"
+    ],
+    "block_impact": [
+      "pos",
+      "normal",
+      "enemy_pos",
+      "r",
+      "armor_bounce"
+    ],
+    "bounce": [
+      "pos"
+    ],
+    "clip_group_end": [
+      "clip",
+      "key"
+    ],
+    "clip_group": [
+      "clip",
+      "key",
+      "n"
+    ],
+    "combat_damage": [
+      "pos",
+      "target",
+      "struck_id",
+      "target_id",
+      "cause",
+      "weapon_id",
+      "requested",
+      "resolved",
+      "applied",
+      "overkill",
+      "discarded",
+      "hp_before",
+      "hp_after",
+      "reason",
+      "impact",
+      "shatter_depth"
+    ],
+    "combat_player_damage": [
+      "pos",
+      "cause",
+      "source",
+      "technique",
+      "requested",
+      "amount",
+      "accepted",
+      "reason",
+      "hp_before",
+      "hp_after"
+    ],
+    "critical_hit": [
+      "pos",
+      "enemy_pos",
+      "r",
+      "dir"
+    ],
+    "debris_trail": [
+      "points",
+      "color"
+    ],
+    "draw_start": [],
+    "duplicate": [
+      "pos",
+      "directions"
+    ],
+    "enemy_retire": [
+      "pos",
+      "id",
+      "reason",
+      "enemy_type"
+    ],
+    "game_over": [],
+    "gauge_full": [],
+    "hit": [
+      "pos",
+      "crit",
+      "dmg",
+      "cause",
+      "id"
+    ],
+    "hull_scatter": [
+      "pos",
+      "count"
+    ],
+    "hurt": [
+      "pos",
+      "amount",
+      "cause",
+      "source",
+      "hp_after"
+    ],
+    "kill": [
+      "pos",
+      "id",
+      "r",
+      "crit",
+      "enemy_type",
+      "meteor_index",
+      "facing",
+      "elite",
+      "cause",
+      "dir",
+      "color",
+      "silent"
+    ],
+    "launch": [
+      "pos",
+      "dir",
+      "gauge"
+    ],
+    "level_bonus": [
+      "kind",
+      "id",
+      "level",
+      "count"
+    ],
+    "levelup": [
+      "level"
+    ],
+    "phase": [
+      "id"
+    ],
+    "pickup": [
+      "kind"
+    ],
+    "reroll": [],
+    "shield_block": [
+      "pos"
+    ],
+    "shield_expired": [
+      "pos"
+    ],
+    "shield_reflect": [
+      "pos",
+      "normal"
+    ],
+    "shield_stolen": [
+      "pos",
+      "facing",
+      "r",
+      "arc",
+      "enemy_type"
+    ],
+    "ship_death": [
+      "pos"
+    ],
+    "ship_explode": [
+      "pos"
+    ],
+    "shot_hit": [
+      "pos",
+      "dir",
+      "visual_key",
+      "kind"
+    ],
+    "strong_spawn": [
+      "id",
+      "enemy_type"
+    ],
+    "text": [
+      "pos",
+      "text",
+      "color",
+      "size"
+    ],
+    "time_limit_reached": [],
+    "trace_end": [
+      "completed"
+    ],
+    "upgrade": [
+      "card"
+    ],
+    "wave": [],
+    "weapon_fire": [
+      "id",
+      "pos",
+      "angle",
+      "visual_key"
     ]
   }
 }

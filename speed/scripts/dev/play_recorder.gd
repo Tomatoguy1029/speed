@@ -42,6 +42,9 @@ var _recording_id := ""
 var _io_failed := false
 var armed := false
 var _run: RunSimulation = null
+## 通知経路の移行用。区間集計と旧JSONLとの対応はD02で接続する。
+var _cpp_session_id := 0
+var _cpp_time := 0.0
 ## 記録中のランのセッション（木から出たら記録を閉じる）
 var _session: RunSession = null
 ## 記録中だけ開く、録画用の処理時間の記録（ゲーム側・表示側・敵の描画の行の数）。性能の区間ごとに書いて空にする
@@ -103,6 +106,7 @@ func _ready() -> void:
 		set_process(false)
 		set_process_input(false)
 		return
+	add_to_group("cpp_recorders")
 	var layer := CanvasLayer.new()
 	layer.layer = 120
 	add_child(layer)
@@ -142,6 +146,10 @@ func _set_armed(on: bool) -> void:
 	if on:
 		get_tree().node_added.connect(_on_node_added)
 		for run in get_tree().get_nodes_in_group("recordable_runs"):
+			if run.bridge!=null:
+				_begin(run,true)
+				if _cpp_session_id>0: break
+				continue
 			if run.sim.state == null:
 				_on_node_added(run)
 				continue
@@ -163,6 +171,9 @@ func _on_node_added(node: Node) -> void:
 
 func _begin(session: RunSession, during_run := false) -> void:
 	if not is_instance_valid(session):
+		return
+	if session.bridge!=null:
+		_begin_cpp(session,during_run)
 		return
 	var run := session.sim
 	if not armed or run == _run or session.is_queued_for_deletion() or run.state == null or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
@@ -572,6 +583,19 @@ func _on_phase_changed(phase: int) -> void:
 
 ## ランの記録を閉じる。
 func _end(result: String) -> void:
+	if _cpp_session_id>0:
+		_write({"type":"end","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"result":result})
+		_flush()
+		_saved_text = "記録に失敗しました" if _io_failed else "保存："+_file.get_path().get_file()
+		_saved_t = SAVED_NOTICE
+		if _file!=null: _file.close()
+		_file = null
+		_cpp_session_id = 0
+		for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
+			if c.callable.get_object()==self: _session.tree_exiting.disconnect(c.callable)
+		_session = null
+		_update_label()
+		return
 	if _run == null:
 		return
 	# 表示用の待ち行列は消費せず、終了直前の未通知分だけ記録する。
@@ -648,8 +672,11 @@ func _update_label() -> void:
 		return
 	_label.visible = armed or _saved_t > 0.0
 	var text := "● REC 待機"
-	if _saved_t > 0.0 and _run == null:
+	if _saved_t > 0.0 and _run == null and _cpp_session_id==0:
 		text = _saved_text
+	elif _cpp_session_id>0:
+		var t := int(_cpp_time)
+		text = "● REC %d:%02d" % [t / 60, t % 60]
 	elif _run != null:
 		var t := int(_run.state.time)
 		text = "● REC %d:%02d" % [t / 60, t % 60]
@@ -837,3 +864,53 @@ func _fail_io() -> void:
 
 func _exit_tree() -> void:
 	_end("quit")
+
+## 未録画でも購読し、記録開始時に通知の所有権を奪わない。
+func attach_cpp(session: RunSession) -> void:
+	if session.bridge!=null:
+		session.bridge.subscribe("recorder:%d" % get_instance_id(),consume_cpp_frame)
+
+func _begin_cpp(session: RunSession, during_run: bool) -> void:
+	if not armed or _cpp_session_id==session.id or session.is_queued_for_deletion() or not session.is_in_group("recordable_runs"): return
+	var snapshot: Dictionary = session.bridge.read_frame()
+	if not snapshot.ok: return
+	_end("quit")
+	attach_cpp(session)
+	var directory := _recording_directory()
+	if DirAccess.make_dir_recursive_absolute(directory)!=OK:
+		_open_failed()
+		return
+	var stamp := Time.get_datetime_string_from_system().replace(":","").replace("-","").replace("T","_")
+	var base := directory.path_join("cpp_run%d_%s" % [session.id,stamp])
+	var path := base+".jsonl"
+	var suffix := 1
+	while FileAccess.file_exists(path):
+		path = "%s_%d.jsonl" % [base,suffix]
+		suffix += 1
+	_file = FileAccess.open(path,FileAccess.WRITE)
+	if _file==null:
+		_open_failed()
+		return
+	_session = session
+	_cpp_session_id = session.id
+	_cpp_time = snapshot.value.ui.run_time
+	_io_failed = false
+	_real_start_us = Time.get_ticks_usec()
+	_recording_id = "%d-%d" % [session.id,_real_start_us]
+	_write({"type":"header","format":"cpp_events_v1","version":1,"run_id":session.id,
+		"recording_id":_recording_id,"epoch":snapshot.value.epoch,"tick":snapshot.value.tick,"during_run":during_run})
+	session.tree_exiting.connect(_end.bind("quit"))
+	_update_label()
+
+## 共通の封筒をそのまま保存し、他の購読者の通知列を消費しない。
+func consume_cpp_frame(frame: Dictionary) -> bool:
+	if _cpp_session_id==0 or frame.run_id!=_cpp_session_id: return true
+	_cpp_time = frame.ui.run_time
+	for event: Dictionary in frame.events:
+		var record: Dictionary = event.duplicate(true)
+		record["run_id"] = frame.run_id
+		record["recording_id"] = _recording_id
+		_write(record)
+	_update_label()
+	# 書込失敗は記録側で終了させる。同じ行の再試行で重複記録しない。
+	return true

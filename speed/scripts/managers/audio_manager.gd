@@ -210,3 +210,24 @@ func _ensure_bus(bus: StringName) -> void:
 	var idx := AudioServer.bus_count - 1
 	AudioServer.set_bus_name(idx, bus)
 	AudioServer.set_bus_send(idx, &"Master")
+
+## C++側の通知を読むだけで、戦闘の更新や乱数には触れない。
+func consume_cpp_frame(frame: Dictionary) -> bool:
+	for event: Dictionary in frame.events:
+		var data: Dictionary = event.payload
+		match event.type:
+			&"levelup": play(&"levelup_notice",-6.0)
+			&"kill":
+				if not data.get("silent",false): play(&"kill",-10.0,randf_range(0.9,1.2))
+			&"hurt": play(&"hurt",-4.0)
+			&"weapon_fire":
+				if data.id in [&"W01",&"W23"]: play(&"blaster",-12.0)
+			&"launch": play(&"dash",-6.0)
+			&"trace_end", &"game_over": end_dash()
+			&"block_impact": play(&"bounce",-8.0)
+			&"shield_reflect": play(&"block",-10.0,1.8)
+			&"shield_stolen": play(&"pickup",-5.0,0.7)
+			&"shield_block": play(&"block",-10.0,1.3)
+			&"boss_explode": play(&"boom")
+			&"bomber_explode": play(&"bomber_explode",-12.0)
+	return true

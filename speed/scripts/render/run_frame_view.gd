@@ -9,7 +9,7 @@ var _scope: ContentResourceScope
 var _pixel := 1.82
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
-var _event_count := 0
+var _queued_events: Array[Dictionary] = []
 var _epoch := 0
 var _jet_time := 0.0
 var _flame: Sprite2D
@@ -129,17 +129,23 @@ func apply_frame(frame: Dictionary) -> bool:
 	submit_us = Time.get_ticks_usec()-begin
 	return true
 
-func update_effects(frame: Dictionary, dt: float) -> void:
+## 固定更新の間に届いた通知を、次の表示まで保持する。
+func receive_frame(frame: Dictionary) -> bool:
 	if frame.epoch!=_epoch:
 		_epoch = frame.epoch
-		_event_count = 0
+		_queued_events.clear()
 		_flashes = ShotFlashes.new()
-	if frame.events.size()<_event_count: _event_count = 0
-	for i in range(_event_count,frame.events.size()):
-		var event: Dictionary = frame.events[i]
+	for event: Dictionary in frame.events:
+		var payload: Dictionary = event.payload.duplicate(true)
+		payload["type"] = event.type
+		_queued_events.append(payload)
+	return true
+
+func update_effects(frame: Dictionary, dt: float) -> void:
+	for event: Dictionary in _queued_events:
 		if event.type==&"weapon_fire" and event.get("id")==&"W01": _flashes.fire(event.angle)
 		if event.type==&"shot_hit" and event.get("visual_key")=="weapon/forward": _flashes.hit(event.pos,event.dir,2)
-	_event_count = frame.events.size()
+	_queued_events.clear()
 	var ui: Dictionary = frame.ui
 	var active: bool = ui.input_enabled
 	var world_dt: float = dt*ui.world_scale if active else 0.0
