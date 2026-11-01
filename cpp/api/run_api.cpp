@@ -72,6 +72,7 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
 Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,const Dictionary &viewport) {
     if (runtime.busy) return failure(7,"step","更新中は再入できません");Guard guard(runtime.busy);
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"step","開始していないランです");
+    if (runtime.state.attacks.hostile_updating) return failure(7,"step","攻撃の個別更新中です");
     speed::InputFrame input;
     if (delta.get_type()!=Variant::FLOAT || double(delta)!=1.0/120.0 || !speed::decode_input(data,input) ||
         viewport.size()!=1 || !is(viewport,"logical_size",Variant::VECTOR2)) return failure(1,"input/viewport","固定更新の入力が不正です");
@@ -117,6 +118,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         if (removed) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=removed?success():failure(5,"entity_id","対象がありません");
     } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat") response=development_combat_command(kind,payload);
+    else if (kind=="dev_emit_attack" || kind=="dev_end_attack" || kind=="dev_attack_scope" || kind=="dev_clear_hostile" || kind=="dev_attack_update") response=development_attack_command(kind,payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     if (bool(response["ok"])) ++runtime.state.control.revision;
     runtime.last_command_id=id;runtime.last_command_response=response.duplicate(true);return response;

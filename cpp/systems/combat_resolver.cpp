@@ -1,5 +1,6 @@
 #include "combat_resolver.h"
 #include "combat_hooks.h"
+#include "attack_system.h"
 #include "enemy_system.h"
 #include "pickup_system.h"
 #include "../output/event_builder.h"
@@ -107,6 +108,7 @@ KillResult CombatResolver::kill_enemy(RunRuntime &run,const DamageRequest &reque
     if (!state.enemy_handles.contains(result.target) || state.enemies[result.target.slot].dead) {result.reason=CombatReason::Dead;return result;}
     state.enemies[result.target.slot].dead=true;state.dead_rows.push_back(result.target.slot);
     if (!enemy.is_boss) ++state.kills;
+    AttackSystem::source_ended(state,result.target,AttackEndReason::ParticipantEnd);
     EnemySystem::leave_hound(state,result.target.slot);
     run.combat_hooks.death_marked(run,death);
     EventBuilder::enemy_kill(run,death);result.killed=true;

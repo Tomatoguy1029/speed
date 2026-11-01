@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/attack_system.h"
 #include "geometry.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/output/event_builder.h"
@@ -8,11 +9,11 @@
 #include <limits>
 using namespace godot;
 
-size_t SpeedRunCore::add_hostile(Hostile shot) {
-    size_t row;
-    if (runtime.state.free_hostiles.empty()) { row = runtime.state.hostiles.size(); runtime.state.hostiles.push_back(std::move(shot)); }
-    else { row = runtime.state.free_hostiles.back(); runtime.state.free_hostiles.pop_back(); runtime.state.hostiles[row] = std::move(shot); }
-    return row;
+size_t SpeedRunCore::add_hostile(Hostile shot,speed::AttackSpec spec) {
+    if (!spec.policies) spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;
+    if (spec.cause==speed::Cause::None) spec.cause=shot.kind==1?speed::Cause::Missile:shot.kind==2?speed::Cause::Reflected:speed::Cause::Bullet;
+    const auto handle=speed::AttackSystem::emit_hostile(runtime.state,std::move(shot),spec);
+    const auto *record=speed::AttackSystem::get(runtime.state,handle);return record?record->row:SIZE_MAX;
 }
 
 int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
@@ -22,10 +23,10 @@ int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
         const String key = keys_in[i];
         if (key != "kind" && key != "pos" && key != "vel" && key != "speed" && key != "r" && key != "life" && key != "dmg" && key != "slow" && key != "turn" && key != "stone" && key != "wait" && key != "attack_token") return -1;
     }
-    Hostile shot;
+    Hostile shot;speed::AttackSpec spec;
     if (fields.has("attack_token")) {
         if (fields["attack_token"].get_type() != Variant::INT || int64_t(fields["attack_token"]) < 0) return -1;
-        shot.attack_token = fields["attack_token"];
+        spec.owner.budget.value = fields["attack_token"];
     }
     shot.kind = fields["kind"];
     if (shot.kind < 0 || shot.kind > 2) return -1;
@@ -43,7 +44,7 @@ int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
     if (!fields.has("dmg") || (fields["dmg"].get_type() != Variant::FLOAT && fields["dmg"].get_type() != Variant::INT)) return -1;
     shot.damage = fields["dmg"];
     if (!std::isfinite(shot.damage) || shot.damage < 0) return -1;
-    return add_hostile(std::move(shot));
+    const auto row=add_hostile(std::move(shot),spec);return row==SIZE_MAX?-1:int64_t(row);
 }
 
 bool SpeedRunCore::damage_ship(double amount,double slow,StringName cause,StringName source) {
@@ -68,18 +69,22 @@ static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double ra
 
 bool SpeedRunCore::step_hostiles(double world_dt) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
+    if (!speed::AttackSystem::begin_hostile_update(runtime.state)) return false;
+    struct UpdateEnd {RunState &state;~UpdateEnd(){speed::AttackSystem::finish_hostile_update(state);}} update_end{runtime.state};
     const Vector2 keep = runtime.state.view_half + Vector2(400, 400);
     for (size_t row = 0; row < runtime.state.hostiles.size(); ++row) {
         auto &shot = runtime.state.hostiles[row];
         if (!shot.alive) continue;
-        const auto release = [&]() { shot.alive = false; runtime.state.free_hostiles.push_back(row); };
+        const auto processing_handle=shot.attack;
+        auto end_reason=speed::AttackEndReason::Lifetime;
+        const auto release = [&]() { speed::AttackSystem::end(runtime.state,processing_handle,end_reason); };
         double life = shot.life;
         if (life <= 0) { release(); continue; }
         const Vector2 from = shot.pos;
         if (shot.stone > 0) {
             shot.stone = double(shot.stone) - world_dt;
             const double reach = double(shot.radius) + runtime.state.ship_config.ship_radius;
-            if (runtime.state.ship.pos.distance_squared_to(from) <= reach * reach) release();
+            if (runtime.state.ship.pos.distance_squared_to(from) <= reach * reach) {end_reason=speed::AttackEndReason::Hit;release();}
             continue;
         }
         Vector2 vel = shot.vel;
@@ -102,9 +107,10 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
             if (t >= 0) {
                 static const StringName causes[] = {"bullet", "missile", "reflected"};
                 damage_ship(shot.damage, shot.slow, causes[shot.kind]);
-                life = 0; to = from + (to - from) * t;
+                end_reason=speed::AttackEndReason::Hit;life = 0; to = from + (to - from) * t;
             }
         }
+        if (!speed::AttackSystem::get(runtime.state,processing_handle)) continue;
         if (life <= 0) release();
         else {
             shot.pos = to; shot.life = life;

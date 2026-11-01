@@ -1,4 +1,5 @@
 #include "enemy_system.h"
+#include "attack_system.h"
 #include <algorithm>
 namespace speed {
 EnemyHandle EnemySystem::insert(godot::RunState &state, uint32_t slot, const godot::RunState::Enemy &enemy) {
@@ -19,6 +20,7 @@ bool EnemySystem::retire(godot::RunState &state,EnemyHandle handle,RetireReason 
     if (!state.enemy_handles.contains(handle)) return false;
     const size_t row=handle.slot;auto &enemy=state.enemies[row];
     if (!enemy.alive) return false;
+    AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);
     leave_hound(state,row);
     auto &rows=state.behavior_rows[enemy.behavior_group];
     const size_t last=rows.back();rows[enemy.behavior_slot]=last;

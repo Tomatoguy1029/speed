@@ -10,6 +10,11 @@ template<class Tag> struct Handle {
     uint32_t generation = 0;
 };
 struct EnemyTag {};
+struct AttackTag {};struct TechniqueTag {};struct ParticipantTag {};struct BossTag {};struct EncounterTag {};
+using AttackHandle=Handle<AttackTag>;using TechniqueHandle=Handle<TechniqueTag>;using ParticipantHandle=Handle<ParticipantTag>;
+using BossHandle=Handle<BossTag>;using EncounterHandle=Handle<EncounterTag>;
+template<class Tag> constexpr bool same_handle(Handle<Tag> a,Handle<Tag> b) {return a.slot==b.slot && a.generation==b.generation;}
+template<class Tag> constexpr uint64_t handle_key(Handle<Tag> value) {return uint64_t(value.generation)<<32 | value.slot;}
 using EnemyHandle = Handle<EnemyTag>;
 
 template<class Tag> class EntityStore {

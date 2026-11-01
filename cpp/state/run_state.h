@@ -2,6 +2,7 @@
 #include "../../native/runtime_data.h"
 #include "entity_store.h"
 #include "combat_types.h"
+#include "attack_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -24,6 +25,7 @@ namespace godot {
 struct RunState {
     speed::RunControlState control;
     speed::PreviousPoseState previous_poses;
+    speed::AttackState attacks;
     enum class EnemyMode { Move, Windup, Dash, Recover };
     struct Enemy {
         int64_t id = 0;
@@ -61,6 +63,7 @@ struct RunState {
             int64_t id = 0; size_t row = 0;
             double cost = 1, until = 0, start = 0;
             bool passive = false;
+            uint32_t residuals=0;
             Vector2 pos;
             PackedStringArray categories;
             HashMap<int64_t, Member> members;
@@ -183,6 +186,7 @@ struct RunState {
     struct Friendly {
         bool alive = true, pierce = false, no_crit = false;
         int64_t kind = 0, generation = 0, pierce_left = 0, id = 0;
+        speed::AttackHandle attack;
         Vector2 pos, vel;
         float radius = 5, life = 0.9f, age = 0, knock = 250, angle = 0, spin = 0;
         double damage = 0;
@@ -193,7 +197,6 @@ struct RunState {
     };
     // 命中中に後ろへ追加しても、処理中の弾への参照を保つ。
     std::deque<Friendly> friends;
-    int64_t next_attack_id=1;
     std::vector<size_t> free_friends;
     size_t live_friends = 0, live_debris = 0;
     struct ProjectileConfig {
@@ -205,20 +208,21 @@ struct RunState {
     } projectile_config;
     struct Hostile {
         bool alive = true;
-        int64_t kind = 0, attack_token = 0;
+        int64_t kind = 0;
+        speed::AttackHandle attack;
         Vector2 pos, vel;
         float speed = 0, radius = 0, life = 0, slow = 0, turn = 0, gap = 0, stone = 0, wait = 0;
         double damage = 0;
     };
     struct BiteZone {
         Vector2 pos;
-        float radius = 0, time = 0, delay = 0;
+        float radius = 0, time = 0, delay = 0, duration = 0;
         double damage = 0;
         Color color;
-        int64_t attack_token = 0;
+        speed::AttackHandle attack;
         bool alive = true, hit = false;
     };
-    std::vector<BiteZone> bite_zones;
+    std::deque<BiteZone> bite_zones;
     std::vector<size_t> free_bite_zones;
     struct BiteZoneConfig {
         bool ready = false, hit = false, fade = false;

@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/attack_system.h"
 #include "geometry.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
@@ -39,7 +40,12 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         enemy.charge = 1.0 - std::max(0.0, enemy.timer) / def.bite.telegraph;
         if (enemy.timer <= 0) {
             const Vector2 at = from + Vector2::from_angle(enemy.facing) * (enemy.radius + def.bite.reach * 0.5);
-            fire_bite_zone(at, def.bite.radius, 0.0, def.bite.damage, def.color.lightened(0.4), token);
+            if (runtime.state.bite_zone_config.ready) {
+                BiteZone zone;zone.pos=at;zone.radius=def.bite.radius;zone.damage=def.bite.damage;zone.color=def.color.lightened(0.4);
+                speed::AttackSpec spec;spec.owner.budget.value=token;spec.owner.live_source=runtime.state.enemy_handles.at(uint32_t(row));
+                spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;spec.cause=speed::Cause::Blast;
+                speed::AttackSystem::emit_hazard(runtime.state,zone,spec);
+            }
             enemy.charge = 0; enemy.mode = EnemyMode::Recover; enemy.timer = def.bite.rest;
         }
     } else {

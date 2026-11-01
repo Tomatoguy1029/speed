@@ -1,4 +1,5 @@
 #include "checkpoint.h"
+#include "../systems/attack_system.h"
 #include <cmath>
 #include <limits>
 #include <unordered_set>
@@ -68,10 +69,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     for (auto row:state.dead_rows) if (row>=state.enemies.size() || !state.enemies[row].alive || !state.enemies[row].dead) return false;
     for (const auto &pack:state.hound_packs) for (auto row:pack.value)
         if (row>=state.enemies.size() || !state.enemies[row].alive || !state.enemies[row].in_pack || state.enemies[row].pack!=pack.key) return false;
-    return true;
+    return AttackSystem::rebuild(state);
 }
 int64_t CheckpointStore::hold(const RunRuntime &runtime) {
-    if (!runtime.content || next_checkpoint_id==INT64_MAX) return 0;
+    if (runtime.state.attacks.hostile_updating || runtime.state.attacks.hostile_clear_pending || !runtime.content || next_checkpoint_id==INT64_MAX) return 0;
     const auto &progression=runtime.state.progression;
     if (!value_only(progression.data) || !value_only(progression.stats) || !value_only(progression.weapons) ||
         !value_only(progression.traits) || !value_only(progression.cards) || !value_only(runtime.state.forward_parameters)) return 0;

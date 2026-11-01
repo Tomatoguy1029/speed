@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/attack_system.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -100,6 +101,7 @@ double SpeedRunCore::survey_population(double target) {
         const Variant sampled = population_spawn_point(0.0);
         if (sampled.get_type() != Variant::VECTOR2) continue;
         auto &enemy = runtime.state.enemies[row];
+        speed::AttackSystem::source_ended(runtime.state,runtime.state.enemy_handles.at(uint32_t(row)),speed::AttackEndReason::Relocate);
         enemy.pos = sampled;
         const Vector2 toward = (runtime.state.ship_pos - enemy.pos).normalized();
         enemy.vel = toward * enemy.speed; enemy.facing = toward.angle();

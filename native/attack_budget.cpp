@@ -87,6 +87,7 @@ bool SpeedRunCore::request_attack(StringName owner, const PackedStringArray &cat
     group.until = until; group.start = budget.now; group.cost = cost;
     group.pos = runtime.state.enemies[row].pos; group.type = runtime.content->definitions[runtime.state.enemies[row].definition].id;
     group.members.insert(id, AttackBudget::Member{row, until, false, false});
+    if (budget.serial==INT64_MAX) return false;
     const int64_t token = ++budget.serial;
     budget.groups.insert(token, group); budget.owners.insert(owner, token); budget.waiting.erase(owner);
     Dictionary event; event["owner"] = String(owner); event["row"] = int64_t(row); event["id"] = id;
@@ -147,6 +148,7 @@ int64_t SpeedRunCore::passive_attack(StringName owner, int64_t id) {
     if (!runtime.state.started || runtime.state.closed || runtime.state.attack_formation_mode) return 0;
     const auto found = runtime.state.rows_by_id.find(id); if (found == runtime.state.rows_by_id.end()) return 0;
     auto &budget = runtime.state.attack_budget;
+    if (budget.serial==INT64_MAX) return 0;
     const int64_t token = ++budget.serial;
     AttackBudget::Group group;
     group.owner = String(owner) + ":passive:" + String::num_int64(token);
@@ -180,12 +182,9 @@ bool SpeedRunCore::advance_attack_budget(double at) {
         if (reached(at, group.until)) expired.push_back(entry.key);
     }
     if (!expired.empty()) {
-        std::unordered_set<int64_t> live;
-        for (const auto &shot : runtime.state.hostiles) if (shot.alive) live.insert(shot.attack_token);
-        for (const auto &zone : runtime.state.bite_zones) if (zone.alive) live.insert(zone.attack_token);
         for (int64_t token : expired) {
             auto &group = budget.groups[token];
-            if (live.count(token) || !group.external.empty()) continue;
+            if (group.residuals || !group.external.empty()) continue;
             Dictionary event; event["token"] = token; event["owner"] = String(group.owner); emit_event("attack_end", event);
             if (attack_token(group.owner) == token) budget.owners.erase(group.owner);
             budget.groups.erase(token);

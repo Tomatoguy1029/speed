@@ -1,4 +1,5 @@
 #include "run_runner.h"
+#include "../systems/attack_system.h"
 #include "../api/run_core.h"
 #include <algorithm>
 #include <cmath>
@@ -87,7 +88,7 @@ void RunRunner::leave_bonus(godot::SpeedRunCore &core) {
     for (size_t row=0;row<state.enemies.size();++row) if (state.enemies[row].alive && !state.enemies[row].dead) {
         state.enemies[row].dead=true;state.dead_rows.push_back(row);
     }
-    state.hostiles.clear();state.free_hostiles.clear();state.bite_zones.clear();state.free_bite_zones.clear();
+    AttackSystem::clear_bonus(state);AttackSystem::clear_hostile(state,AttackEndReason::BonusClear);
     godot::Dictionary event;event["enter"]=false;event["pos"]=state.ship.pos;core.emit_event("bonus",event);
 }
 }

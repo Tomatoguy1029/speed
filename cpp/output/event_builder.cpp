@@ -64,6 +64,15 @@ void EventBuilder::flush_combat(RunRuntime &run) {
         godot::Dictionary d;d["pos"]=e.pos;
         const godot::StringName cause(symbol_name(e.cause));
         switch(e.kind) {
+        case CombatEventKind::AttackRetired: {
+            static const char *reasons[]={"lifetime","technique_cancel","technique_end","participant_end","boss_clear","bonus_clear","hit","relocate"};
+            d["id"]=e.target_id;d["source_id"]=e.source_entity_id;d["reason"]=reasons[uint8_t(e.attack_end_reason)];
+            d["t"]=e.time;d["world_t"]=e.world_time;append(run,"attack_retired",d);
+            if (e.attack_pool==AttackPool::Hazard && run.state.bite_zone_config.fade &&
+                (e.attack_end_reason==AttackEndReason::Lifetime || e.attack_end_reason==AttackEndReason::ParticipantEnd || e.attack_end_reason==AttackEndReason::TechniqueCancel || e.attack_end_reason==AttackEndReason::TechniqueEnd)) {
+                godot::Dictionary visual;visual["scene"]=run.state.bite_zone_config.scene;visual["phase"]="Fade";visual["pos"]=e.pos;append(run,"attack_visual_end",visual);
+            }break;
+        }
         case CombatEventKind::EnemyDamage:
             d["target"]="enemy";d["struck_id"]=e.struck_id;d["target_id"]=e.target_id;d["cause"]=cause;d["weapon_id"]=e.weapon_id;
             d["requested"]=e.requested;d["resolved"]=e.resolved;d["applied"]=e.applied;d["overkill"]=e.overkill;

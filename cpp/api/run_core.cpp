@@ -70,6 +70,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("spawn_hostile", "fields"), &SpeedRunCore::spawn_hostile);
     ClassDB::bind_method(D_METHOD("step_hostiles", "world_dt"), &SpeedRunCore::step_hostiles);
     ClassDB::bind_method(D_METHOD("hostiles_snapshot"), &SpeedRunCore::hostiles_snapshot);
+    ClassDB::bind_method(D_METHOD("attack_snapshot"), &SpeedRunCore::attack_snapshot);
     ClassDB::bind_method(D_METHOD("configure_projectiles", "config", "split"), &SpeedRunCore::configure_projectiles, DEFVAL(Dictionary()));
     ClassDB::bind_method(D_METHOD("burst_debris", "position", "count", "speed", "damage", "color", "source_id"), &SpeedRunCore::burst_debris);
     ClassDB::bind_method(D_METHOD("fire_shot", "from", "angle", "damage", "options"), &SpeedRunCore::fire_shot, DEFVAL(Dictionary()));
@@ -219,6 +220,7 @@ void SpeedRunCore::close() {
     runtime.state.attack_budget = AttackBudget();
     runtime.state.draw = Draw();
     runtime.state.grid = EnemyGrid();
+    runtime.state.attacks={};
     runtime.state.events.clear();runtime.state.combat_events.clear();runtime.state.previous_poses={};
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.bite_zones.clear(); runtime.state.free_bite_zones.clear(); runtime.state.bite_zone_config = BiteZoneConfig();

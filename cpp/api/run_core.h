@@ -23,6 +23,7 @@ class SpeedRunCore : public RefCounted {
     GDCLASS(SpeedRunCore, RefCounted)
     speed::RunRuntime runtime;
     friend class speed::RunRunner;
+    Dictionary development_attack_command(const String &kind,const Dictionary &payload);
     Dictionary development_combat_command(const String &kind,const Dictionary &payload);
     bool step_ship_input(double real_dt,double world_dt,const speed::InputFrame &input);
     bool handle_draw_input(const speed::InputFrame &input,int64_t clock_msec,double camera_zoom);
@@ -84,7 +85,7 @@ class SpeedRunCore : public RefCounted {
     size_t add_friend(Friendly shot);
     void duplicate_friend(size_t source, Vector2 impact);
     void end_bite_visual(bool hit, Vector2 at);
-    size_t add_hostile(Hostile shot);
+    size_t add_hostile(Hostile shot,speed::AttackSpec spec={});
     bool damage_ship(double amount, double slow, StringName cause, StringName source = StringName());
     void step_forward(double world_dt);
     bool check_run_end();
@@ -146,6 +147,7 @@ public:
     int64_t spawn_hostile(const Dictionary &fields);
     bool step_hostiles(double world_dt);
     Array hostiles_snapshot() const;
+    Array attack_snapshot() const;
     bool configure_projectiles(const Dictionary &config, const Dictionary &split);
     bool burst_debris(Vector2 position, int64_t count, double speed, double damage, Color color, int64_t source_id);
     bool fire_shot(Vector2 from, double angle, double damage, const Dictionary &options);

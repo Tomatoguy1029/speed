@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/attack_system.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -6,14 +7,11 @@
 using namespace godot;
 
 size_t SpeedRunCore::add_friend(Friendly shot) {
-    if (runtime.state.next_attack_id==INT64_MAX) return SIZE_MAX;
-    shot.id=runtime.state.next_attack_id++;
-    ++runtime.state.live_friends;
-    if (shot.kind == 1) ++runtime.state.live_debris;
-    size_t row;
-    if (runtime.state.free_friends.empty()) { row = runtime.state.friends.size(); runtime.state.friends.push_back(std::move(shot)); }
-    else { row = runtime.state.free_friends.back(); runtime.state.free_friends.pop_back(); runtime.state.friends[row] = std::move(shot); }
-    return row;
+    speed::AttackSpec spec;spec.policies=speed::policy(speed::EndPolicy::NaturalLifetime);
+    if (shot.weapon_id==StringName("W01")) spec.weapon=1;
+    if (!speed::parse_symbol(String(shot.cause).utf8().get_data(),spec.cause)) return SIZE_MAX;
+    const auto handle=speed::AttackSystem::emit_friendly(runtime.state,std::move(shot),spec);
+    const auto *record=speed::AttackSystem::get(runtime.state,handle);return record?record->row:SIZE_MAX;
 }
 
 bool SpeedRunCore::fire_shot(Vector2 from, double angle, double damage, const Dictionary &options) {
@@ -76,9 +74,11 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
     for (size_t i = 0; i < runtime.state.friends.size(); ++i) {
         auto &shot = runtime.state.friends[i];
         if (!shot.alive) continue;
+        const auto processing_handle=shot.attack;
         const Vector2 from = shot.pos, vel = shot.vel, to = from + vel * world_dt;
         Vector2 position = to;
         double life = double(shot.life) - world_dt;
+        auto end_reason=speed::AttackEndReason::Lifetime;
         shot.age = double(shot.age) + world_dt;
         shot.angle = double(shot.angle) + double(shot.spin) * world_dt;
         if (shot.kind == 1 && shot.visual != StringName("weapon/knockback")) {
@@ -112,32 +112,35 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
                     reflected.vel = direction * def.reflect_speed; reflected.speed = def.reflect_speed;
                     reflected.radius = std::clamp(double(shot.radius), 5.0, 10.0);
                     reflected.life = def.reflect_life; reflected.damage = def.reflect_damage;
-                    add_hostile(std::move(reflected));
+                    speed::AttackSpec reflected_spec;reflected_spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;
+                    reflected_spec.owner.live_source=runtime.state.enemy_handles.at(uint32_t(hit.row));
+                    add_hostile(std::move(reflected),reflected_spec);
                     target.fire_t = std::max(0.01, def.reflect_interval); target.flash = 0.1;
                     Dictionary reflected_event; reflected_event["pos"] = impact; reflected_event["normal"] = normal;
                     emit_event("shield_reflect", reflected_event);
                 }
-                position = impact; life = 0; break;
+                position = impact;life = 0;end_reason=speed::AttackEndReason::Hit;break;
             }
             shot.hit_ids.insert(enemy.id);
             damage_enemy(hit.row, shot.damage, shot.cause, false, speed > 0 ? vel / speed : Vector2(), shot.knock, &impact);
+            if (!speed::AttackSystem::get(runtime.state,processing_handle)) break;
             duplicate_friend(i, impact);
             Dictionary event; event["pos"] = impact; event["dir"] = vel.normalized();
             event["visual_key"] = String(shot.visual); event["kind"] = shot.kind;
             emit_event("shot_hit", event);
             if (runtime.state.phase != Phase::Play) { shot.pos=position;shot.life=life;return true; }
-            if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else life = 0; }
+            if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else {life=0;end_reason=speed::AttackEndReason::Hit;} }
         }
+        if (!speed::AttackSystem::get(runtime.state,processing_handle)) continue;
         shot.pos = position; shot.life = life;
         if (life <= 0) {
             if (shot.kind == 1) {
-                --runtime.state.live_debris;
                 if (shot.visual != StringName("weapon/knockback") && shot.trail.size() > 1) {
                     Dictionary ended; ended["points"] = shot.trail; ended["color"] = shot.color;
                     emit_event("debris_trail", ended);
                 }
             }
-            shot.alive = false; --runtime.state.live_friends; runtime.state.free_friends.push_back(i);
+            speed::AttackSystem::end(runtime.state,processing_handle,end_reason);
         }
     }
     return true;

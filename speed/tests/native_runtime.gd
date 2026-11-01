@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--attack-owner-only" in OS.get_cmdline_user_args():
+		check(check_attack_owners(), "攻撃の所有と終了条件を最後まで確認する")
+		print("[attack_owner] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--render-only" in OS.get_cmdline_user_args() or "--render-enemies-only" in OS.get_cmdline_user_args():
 		check(await check_run_render("--render-enemies-only" in OS.get_cmdline_user_args()), "描画付きの代表経路を最後まで確認する")
 		print("[run_render] failed=%d" % failed)
@@ -662,4 +667,96 @@ func check_run_render(enemies_only := false) -> bool:
 	session.free()
 	await get_tree().process_frame
 	check(world.get_ref()==null and not bridge.read_render(viewport,1.0).ok,"解放したランの表示と資源を残さない")
+	return true
+
+func attack_fixture():
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.speed = 0.0
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.compile_chase(definition,config,schema.sha256("攻撃所有の固定入力".to_utf8_buffer()))
+	check(bridge.configure(bytes,{"api_version":1,"run_id":71,"mode":1,"stage_id":"attack","profile":{},"settings":{}}).ok,"攻撃所有の固定条件を設定する")
+	check(bridge._core.configure_bite_zone({"version":1,"duration":0.5,"hit":false,"fade":false,"scene":"res://scenes/attacks/zone.tscn"}),"範囲攻撃の寿命を設定する")
+	check(bridge.start(42).ok,"攻撃所有の固定場面を開始する")
+	return bridge
+
+func owned_attack(bridge, options: Dictionary) -> Dictionary:
+	var args := {"pool":1,"position":Vector2(1000,500),"life":0.3,"policies":1}
+	args.merge(options,true)
+	var result: Dictionary = bridge.command("dev_emit_attack",args)
+	check(result.ok,"所有・終了条件を指定して実際の攻撃を出す")
+	return result.value if result.ok else {}
+
+func attack_ids(bridge) -> Array:
+	return bridge._core.attack_snapshot().map(func(a): return a.id)
+
+func budget_has(bridge, token: int) -> bool:
+	return bridge._core.attack_budget_snapshot().groups.any(func(g): return g.token==token)
+
+func check_attack_owners() -> bool:
+	var run = attack_fixture()
+	var owner: int = combat_enemy(run,Vector2(900,500))
+	check(run._core.request_attack("残留",PackedStringArray(["bullet"]),owner,0.05,0.0,1.0),"残留攻撃の予算を確保する")
+	var token: int = run._core.attack_token("残留")
+	var first := owned_attack(run,{"owner_id":owner,"budget":token,"life":0.1})
+	var second := owned_attack(run,{"owner_id":owner,"budget":token,"life":0.1})
+	var attached := owned_attack(run,{"pool":2,"owner_id":owner,"budget":token,"attached":true,"policies":8})
+	check(run._core.attack_snapshot()[0].residuals==3,"同じ予算の残留参照を生成時に増やす")
+	check(run.command("dev_kill",{"entity_id":owner}).value.killed,"発生元を撃破する")
+	var active: Array = run._core.attack_snapshot()
+	check(active.size()==2 and active.all(func(a): return a.source_id==owner and not a.source_alive and a.residuals==2),"発生元の生存参照を切り、残留弾の予算を保つ")
+	check(not attack_ids(run).has(attached.id),"発生元に付いた範囲だけを死亡時に外す")
+	check(run._core.advance_attack_budget(0.1) and budget_has(run,token),"発生元と予告が終わっても残留弾が枠を保つ")
+	check(run.command("dev_end_attack",{"handle":first.handle}).value,"一つ目の残留弾を終了する")
+	check(run._core.attack_snapshot()[0].residuals==1,"一つ残っている間は予算を保つ")
+	check(not run.command("dev_end_attack",{"handle":first.handle}).value,"二度目の終了で参照を減らさない")
+	check(run._core.step_hostiles(0.2) and run._core.attack_snapshot().is_empty(),"最後の弾を自然寿命で回収する")
+	check(run._core.advance_attack_budget(0.2) and not budget_has(run,token),"所定の予算更新で最後の保持を解放する")
+	var replacement := owned_attack(run,{})
+	check(replacement.id>second.id and not run.command("dev_end_attack",{"handle":second.handle}).value and attack_ids(run).has(replacement.id),"再利用した攻撃へ古い参照を適用しない")
+	run.dispose()
+	var scoped = attack_fixture()
+	var scope := PackedInt64Array([7,1])
+	var entries := {}
+	for flags in [1,2,4,8,16,32]: entries[flags] = owned_attack(scoped,{"policies":flags,"technique":scope,"participant":scope,"boss":scope})
+	scoped.command("dev_attack_scope",{"event":"technique_end","handle":PackedInt64Array([7,2])})
+	check(attack_ids(scoped).size()==6,"世代の違う技の終了を適用しない")
+	scoped.command("dev_attack_scope",{"event":"technique_end","handle":scope})
+	check(not attack_ids(scoped).has(entries[4].id) and attack_ids(scoped).has(entries[2].id),"技の自然終了は取消時だけ消す攻撃を残す")
+	scoped.command("dev_attack_scope",{"event":"technique_cancel","handle":scope})
+	check(not attack_ids(scoped).has(entries[2].id) and attack_ids(scoped).has(entries[1].id),"技の取消でも通常の残留弾を残す")
+	scoped.command("dev_attack_scope",{"event":"participant_end","handle":scope})
+	check(not attack_ids(scoped).has(entries[8].id),"参加者終了の条件を独立して適用する")
+	scoped.command("dev_attack_scope",{"event":"boss_end","handle":scope})
+	check(not attack_ids(scoped).has(entries[16].id) and attack_ids(scoped).has(entries[32].id),"ボス終了とボーナス消去を混同しない")
+	scoped.command("dev_attack_scope",{"event":"bonus"})
+	check(attack_ids(scoped)==[entries[1].id],"ボーナスで指定した攻撃だけを消す")
+	check(scoped._core.step_hostiles(0.5) and scoped._core.attack_snapshot().is_empty(),"通常の残留弾を寿命まで進める")
+	scoped.dispose()
+	var moving = attack_fixture()
+	owner = combat_enemy(moving,Vector2(900,500))
+	var fixed := owned_attack(moving,{"pool":2,"owner_id":owner,"attached":true})
+	var flying := owned_attack(moving,{"owner_id":owner})
+	moving.command("dev_attack_scope",{"event":"relocate","owner_id":owner})
+	check(not attack_ids(moving).has(fixed.id) and attack_ids(moving).has(flying.id),"再配置は付いた攻撃を消し、飛んでいる弾を残す")
+	moving.dispose()
+	var clearing = attack_fixture()
+	owned_attack(clearing,{"pool":1})
+	owned_attack(clearing,{"pool":2})
+	check(clearing.command("dev_attack_update",{"begin":true}).ok,"敵弾の更新手順を開始する")
+	check(clearing.command("dev_clear_hostile").ok,"更新中の全消去を受け付ける")
+	check(clearing._core.hostiles_snapshot().size()==1 and clearing._core.hazards_snapshot().is_empty(),"範囲は即時、更新中の敵弾は更新後に回収する")
+	owned_attack(clearing,{"pool":1})
+	check(clearing.command("dev_attack_update",{"begin":false}).ok and clearing._core.attack_snapshot().is_empty(),"更新中に増えた敵弾も最後の全消去で回収する")
+	clearing.dispose()
+	var hazards = attack_fixture()
+	owned_attack(hazards,{"pool":2,"life":0.5})
+	owned_attack(hazards,{"pool":2,"life":0.5})
+	hazards.command("pause",{"paused":true})
+	check(hazards._core.step_hazards(0.1),"ランが止まった範囲更新を受け付ける")
+	var zones: Array = hazards._core.hazards_snapshot()
+	check(zones.size()==2 and is_equal_approx(zones[0].time,0.1) and zones[1].time==0.0 and not zones[0].hit,"hazardのfalseで残り全体を打ち切る")
+	hazards.dispose()
 	return true

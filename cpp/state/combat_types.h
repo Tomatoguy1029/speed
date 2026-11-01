@@ -46,9 +46,12 @@ struct ShipDamageRequest {
     HitPolicy hit_policy=HitPolicy::EveryTick;
 };
 struct ShipDamageResult { bool accepted=false;CombatReason reason=CombatReason::Invalid;double hp_before=0,hp_after=0,amount=0; };
-enum class CombatEventKind { EnemyDamage, Hit, CriticalHit, Kill, ShieldBlock, ShipDamage, Hurt, Retire };
+enum class AttackEndReason : uint8_t;
+enum class AttackPool : uint8_t;
+enum class CombatEventKind { AttackRetired, EnemyDamage, Hit, CriticalHit, Kill, ShieldBlock, ShipDamage, Hurt, Retire };
 // 表示と観測は値を待ち列へ写す。死亡後の行の再利用に依存させない。
 struct CombatEvent {
+    AttackEndReason attack_end_reason{};AttackPool attack_pool{};int64_t source_entity_id=0;
     CombatEventKind kind=CombatEventKind::EnemyDamage;
     Cause cause=Cause::None;
     CombatReason reason=CombatReason::Applied;
