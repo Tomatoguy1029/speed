@@ -166,7 +166,9 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		state.glide = false
 		var n := hit_pos - t.pos[i]
 		n = n.normalized() if n.length_squared() > 0.0 else -dir
-		state.emit(&"block_impact", {"pos": hit_pos, "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
+		# pos は機体の中心ではなく、敵の接触面。石化・壁等と共用するイベントは演出だけ区別する。
+		state.emit(&"block_impact", {"pos": t.pos[i] + n * t.r[i], "normal": n,
+			"enemy_pos": t.pos[i], "r": t.r[i], "armor_bounce": true})
 		# 押し出すのは機体の本体の大きさまで（なぞり中の太い当たり判定の分は押し出さない）
 		state.ship_pos = t.pos[i] + n * (t.r[i] + cfg.ship_radius + 1.0)
 		var vn := state.ship_vel.dot(n)

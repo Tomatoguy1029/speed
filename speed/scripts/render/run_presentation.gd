@@ -99,6 +99,7 @@ var _hostile_batch: InstanceBatch
 var _coin_batch: InstanceBatch
 var _ship_visual: RefCounted
 var _critical_hits: RefCounted
+var _armor_blocks: RefCounted
 var _meteor_visual: RefCounted
 var _body_visual: RefCounted
 var _equipment_visuals: Dictionary = {}
@@ -122,6 +123,7 @@ func _ready() -> void:
 	_ship_visual = load("res://scripts/render/ship_visual.gd").new()
 	_ship_visual.setup(self)
 	_critical_hits = load("res://scripts/render/critical_hit.gd").new()
+	_armor_blocks = load("res://scripts/render/armor_block.gd").new()
 	_body_visual = load("res://scripts/render/body_visual.gd").new()
 	_read_settings()
 	SaveManager.settings_changed.connect(_read_settings)
@@ -473,8 +475,11 @@ func _handle_events(events: Array[Dictionary]) -> void:
 				elif ev.cause == &"ram":
 					shake = maxf(shake, 5.0)
 			&"block_impact":
-				_sparks(ev.pos, ev.normal, cfg.block_spark_count, Color("#ffd28a"))
-				impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": ev.normal, "life": cfg.block_impact_life, "max": cfg.block_impact_life, "color": Color("#ffe9a8")})
+				if ev.get("armor_bounce", false):
+					_armor_blocks.add(ev.pos, ev.normal)
+				else:
+					_sparks(ev.pos, ev.normal, cfg.block_spark_count, Color("#ffd28a"))
+					impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": ev.normal, "life": cfg.block_impact_life, "max": cfg.block_impact_life, "color": Color("#ffe9a8")})
 			&"critical_hit":
 				_critical_hits.add(ev.pos, ev.enemy_pos + Vector2(0, -ev.r - _px(10.0)), ev.dir)
 			&"shield_reflect":
@@ -619,6 +624,7 @@ func _shatter_meteor(ev: Dictionary) -> void:
 
 func _update_fx(dt: float) -> void:
 	_critical_hits.update(dt)
+	_armor_blocks.update(dt)
 	for shard in meteor_shards:
 		shard.pos += shard.vel * dt
 		shard.angle += shard.spin * dt
@@ -1352,6 +1358,7 @@ func _draw_round_arc(c: CanvasItem, center: Vector2, radius: float, start: float
 
 func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)
+	_armor_blocks.draw(c)
 	for bm in beams:
 		var k: float = bm.life / bm.max
 		var key := String(bm.get("visual_key", ""))
