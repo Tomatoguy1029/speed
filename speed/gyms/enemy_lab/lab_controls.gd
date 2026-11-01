@@ -51,7 +51,7 @@ func _ready() -> void:
 	_appearance(_page(tr("lab.appearance.title")))
 
 func _appearance(page: Node) -> void:
-	_appearance_hashes = ContentManager.source_hashes.duplicate()
+	refresh_appearance_baselines()
 	_text(page, tr("lab.appearance.help"))
 	_button(page, tr("lab.boss_parts.open"), _open_boss_parts)
 	_button(page, tr("lab.appearance.bomber"), _inspect_bomber)
@@ -92,6 +92,10 @@ func _appearance(page: Node) -> void:
 		var key: String = entry[0]
 		_lighting_fields[key] = _number(page, tr("lab.appearance." + key), LIGHTING.get(key), entry[1], entry[2], entry[3], _set_visual.bind(key))
 	_text(page, tr("lab.appearance.type_help"))
+
+## 明示的な本番データ再読込の成功後だけ、新しい保存元を競合検出の基準にする。
+func refresh_appearance_baselines() -> void:
+	_appearance_hashes = ContentManager.source_hashes.duplicate()
 
 func _open_boss_parts() -> void:
 	if not is_instance_valid(lab.session.run): return

@@ -813,6 +813,7 @@ func _reload_data() -> void:
 	session.cancel_seek()
 	while _busy: await get_tree().process_frame
 	if ContentManager.reload_experiment_data():
+		controls.refresh_appearance_baselines()
 		await _reset()
 		_fill_palette()
 		_messages.text = tr("lab.data_reloaded")
