@@ -124,7 +124,7 @@ func _paint_armor_piece(region: int, restore: bool) -> void:
 	var def: EnemyDef = lab.session.run.enemies.def_of(_appearance_type)
 	var colors := def.armor_colors.duplicate(true)
 	var source: String = _armor_view.data.key
-	var palette: Dictionary = colors.get(source, {}).duplicate()
+	var palette: Dictionary = ARMOR_VIEW.PAINT.region_colors(_armor_view.data, colors)
 	if restore:
 		palette.erase(str(region))
 	else:

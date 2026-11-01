@@ -128,6 +128,7 @@
 - `phoenix`（ほうおう座）は `assets/pixel/phoenix/` のBase・Decoration・Armorを重ね、装甲へNormalの陰影を適用する。装甲の塗装でも羽のディテールを保持する。
 - `cepheus`・`cepheus_soldier` は各専用フォルダの本体・装甲・法線を使う。召喚する兵にも同じ専用画像を適用する。
 - `corona` は [冠の描画](../art-style.md#46-みなみのかんむり座) を使う。
+- `reticle`・`corona` は[実験場の外観編集](../../dev/tools/enemy-lab.md#外観の項目)で、装甲片と接続フレームを個別に塗装できる。
 - 絵がまだない種類は、敵の定義の形（`shape`：丸・菱形・六角形・矢じり・四角）の図形を、敵の色で描く。png を置くと絵に替わる。
 - 全敵とボスの表示と当たり判定に `config.character_scale` を掛ける。
 - 静止スプライトで、個別のアニメーションはない。
