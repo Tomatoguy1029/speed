@@ -1,18 +1,13 @@
 #include "combat_hooks.h"
+#include "attack_budget.h"
 #include "../runtime/run_runtime.h"
 #include "../../native/geometry.h"
 #include <cmath>
 namespace speed {
 namespace {
 void passive_death(RunRuntime &run,const DeathContext &death) {
-    auto &state=run.state;if (state.attack_formation_mode || death.corpse.is_boss) return;
-    auto &budget=state.attack_budget;
-    if (budget.serial==INT64_MAX) return;
-    const int64_t token=++budget.serial;godot::RunState::AttackBudget::Group group;
-    group.owner=godot::String::num_int64(death.corpse.id)+":passive:"+godot::String::num_int64(token);
-    group.id=death.corpse.id;group.row=death.target.slot;group.until=budget.now;group.start=budget.now;group.passive=true;
-    group.pos=death.corpse.pos;group.type=run.content->definitions[death.corpse.definition-1].id;
-    group.categories.append("zone");budget.groups.insert(token,group);
+    auto &state=run.state;if (state.world.attack_formation_mode || death.corpse.is_boss) return;
+    AttackBudgetSystem(run).passive(std::to_string(death.corpse.id),death.target);
 }
 bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {
     const auto &enemy=run.state.enemies[target.slot];

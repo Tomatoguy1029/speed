@@ -1,0 +1,57 @@
+{
+  "records": [
+    {
+      "name": "BudgetPhase",
+      "section": 16,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "budget",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "AttackCategory": [
+      {
+        "name": "Aimed",
+        "value": "aimed"
+      },
+      {
+        "name": "Homing",
+        "value": "homing"
+      },
+      {
+        "name": "Dash",
+        "value": "dash"
+      },
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "Zone",
+        "value": "zone"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "Residue",
+        "value": "residue"
+      }
+    ]
+  }
+}

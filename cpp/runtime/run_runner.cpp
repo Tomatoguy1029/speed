@@ -53,7 +53,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (world_step) {
         control.world_real_accum=control.world_dt_accum=0;control.world_steps=0;
         control.last_world_real_dt=wr;control.last_world_dt=wd;++control.world_updates;
-        if (state.attack_budget.frame_enabled) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
+        if (state.world.attack_budget.frame_enabled) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
         // 地形・ボスは各種類の移植で、この世界更新区間へ接続する。
         core.advance_enemies(wd);
         if (!core.avoid_strong(wd)) return false;

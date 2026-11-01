@@ -1,221 +1,67 @@
 #include "run_core.h"
-#include "../cpp/systems/timing.h"
-#include <algorithm>
+#include "../cpp/systems/attack_budget.h"
+#include "../cpp/systems/population_system.h"
 #include <cmath>
-#include <limits>
 using namespace godot;
 namespace {
-constexpr double rounding = 4.0 * std::numeric_limits<double>::epsilon();
-bool greater(double a, double b) { return a > b && a - b > std::max(std::abs(a), std::abs(b)) * rounding; }
-bool reached(double time,double deadline) {return speed::expired(time,deadline);}
-bool number(const Variant &v, double &out) {
-    if (v.get_type() != Variant::FLOAT && v.get_type() != Variant::INT) return false;
-    out = v; return std::isfinite(out);
+std::string name(const String &value) {return value.utf8().get_data();}
+std::string name(const StringName &value) {return String(value).utf8().get_data();}
+bool number(const Variant &value,double &out) {
+    if (value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) return false;
+    out=value;return std::isfinite(out);
 }
 }
 bool SpeedRunCore::configure_attack_budget(const Dictionary &settings) {
-    if (runtime.state.closed) return false;
-    const Variant enabled = settings.get("enabled", false);
-    if (enabled.get_type() != Variant::BOOL) return false;
-    double budget = runtime.state.attack_budget.budget, jitter = runtime.state.attack_budget.jitter;
-    if (settings.has("budget") && !number(settings["budget"], budget)) return false;
-    if (settings.has("jitter") && !number(settings["jitter"], jitter)) return false;
-    runtime.state.attack_budget.enabled = enabled; runtime.state.attack_budget.budget = budget; runtime.state.attack_budget.jitter = jitter;
-    return true;
+    if (runtime.state.closed || settings.get("enabled",false).get_type()!=Variant::BOOL) return false;
+    auto &state=runtime.state.world.attack_budget;double budget=state.budget,jitter=state.jitter;
+    if ((settings.has("budget") && !number(settings["budget"],budget)) || (settings.has("jitter") && !number(settings["jitter"],jitter))) return false;
+    return speed::AttackBudgetSystem::configure(runtime.state,{bool(settings.get("enabled",false)),budget,jitter});
 }
-bool SpeedRunCore::set_attack_guard(bool active, double until) {
-    if (runtime.state.closed || std::isnan(until)) return false;
-    runtime.state.attack_budget.guard = active; runtime.state.attack_budget.guard_until = until; return true;
+bool SpeedRunCore::set_attack_guard(bool active,double until) {
+    return speed::AttackBudgetSystem::set_guard(runtime.state,active,until);
 }
-double SpeedRunCore::used_attack_cost() const {
-    double total = 0;
-    for (const auto &entry : runtime.state.attack_budget.groups) total += entry.value.cost;
-    return total;
+double SpeedRunCore::used_attack_cost() const {return speed::AttackBudgetSystem::used_cost(runtime.state);}
+bool SpeedRunCore::request_attack(StringName owner,const PackedStringArray &categories,int64_t id,double duration,double priority,double cost) {
+    const auto found=runtime.state.rows_by_id.find(id);if (found==runtime.state.rows_by_id.end()) return false;
+    speed::BudgetRequest request;request.owner=name(owner);request.source=runtime.state.enemy_handles.at(uint32_t(found->second));
+    request.duration=duration;request.priority=priority;request.cost=cost;
+    for (int64_t i=0;i<categories.size();++i) {
+        speed::AttackCategory category;if (!speed::parse_symbol(categories[i].utf8().get_data(),category)) return false;
+        request.categories.push_back(category);
+    }
+    return speed::AttackBudgetSystem(runtime).request(request);
 }
-StringName SpeedRunCore::next_attack_owner() const {
-    if (runtime.state.attack_budget.budget <= 0) return StringName();
-    StringName winner; double best = -std::numeric_limits<double>::infinity();
-    for (const auto &entry : runtime.state.attack_budget.waiting) {
-        const auto &item = entry.value;
-        if (greater(item.cost, runtime.state.attack_budget.budget)) continue;
-        const double score = item.priority - item.since * 0.2;
-        if (winner == StringName() || score > best) { winner = entry.key; best = score; }
-    }
-    return winner;
+int64_t SpeedRunCore::attack_token(StringName owner) const {return speed::AttackBudgetSystem::token(runtime.state,name(owner));}
+bool SpeedRunCore::owns_attack(StringName owner,int64_t id) const {return speed::AttackBudgetSystem::owns(runtime.state,name(owner),id);}
+void SpeedRunCore::cancel_attack_wait(StringName owner,int64_t id) {speed::AttackBudgetSystem(runtime).cancel_wait(name(owner),id);}
+void SpeedRunCore::cancel_attack(StringName owner,int64_t id) {speed::AttackBudgetSystem(runtime).cancel(name(owner),id);}
+void SpeedRunCore::track_attack_external(int64_t token,const String &key) {speed::AttackBudgetSystem(runtime).external(token,name(key),true);}
+void SpeedRunCore::release_attack_external(int64_t token,const String &key) {speed::AttackBudgetSystem(runtime).external(token,name(key),false);}
+int64_t SpeedRunCore::passive_attack(StringName owner,int64_t id) {
+    const auto found=runtime.state.rows_by_id.find(id);if (found==runtime.state.rows_by_id.end()) return 0;
+    return speed::AttackBudgetSystem(runtime).passive(name(owner),runtime.state.enemy_handles.at(uint32_t(found->second)));
 }
-bool SpeedRunCore::request_attack(StringName owner, const PackedStringArray &categories, int64_t id, double duration, double priority, double cost) {
-    if (!runtime.state.started || runtime.state.closed || !std::isfinite(duration) || !std::isfinite(priority)) return false;
-    const auto found = runtime.state.rows_by_id.find(id);
-    if (found == runtime.state.rows_by_id.end()) return false;
-    if (!std::isfinite(cost) || cost < 0) cost = 1;
-    if (cost == 0 || categories.is_empty()) return true;
-    auto &budget = runtime.state.attack_budget;
-    const size_t row = found->second;
-    const double until = budget.now + std::max(0.05, duration);
-    if (!std::isfinite(until)) return false;
-    if (const auto *token = budget.owners.getptr(owner)) {
-        auto &group = budget.groups[*token];
-        if (const auto *member = group.members.getptr(id)) return !member->closed;
-        if (!runtime.state.attack_formation_mode) return false;
-        if (budget.enabled && (budget.budget <= 0 || greater(used_attack_cost(), budget.budget))) return false;
-        group.members.insert(id, AttackBudget::Member{row, until, false, false});
-        group.until = std::max(group.until, until);
-        return true;
-    }
-    auto *waiting = budget.waiting.getptr(owner);
-    if (!waiting) {
-        AttackBudget::Waiting item;
-        item.id = id; item.row = row; item.since = budget.now; item.categories = categories;
-        budget.waiting.insert(owner, item); waiting = budget.waiting.getptr(owner);
-    }
-    waiting->priority = priority; waiting->cost = cost;
-    if (budget.enabled) {
-        const StringName next = next_attack_owner();
-        if (next != StringName() && next != owner) return false;
-    }
-    const double used = used_attack_cost();
-    if ((budget.guard && budget.now <= budget.guard_until) || (budget.enabled &&
-            (budget.budget <= 0 || (cost > 0 && used >= budget.budget) || greater(used + cost, budget.budget)))) {
-        waiting->has_ready = false; return false;
-    }
-    if (budget.enabled && budget.now > waiting->since + 0.001 && budget.jitter > 0) {
-        if (!waiting->has_ready) { waiting->ready = budget.now + runtime.state.control.rng.randf() * budget.jitter; waiting->has_ready = true; }
-        if (!reached(budget.now, waiting->ready)) return false;
-    }
-    AttackBudget::Group group;
-    group.owner = owner; group.row = row; group.id = id; group.categories = categories;
-    group.until = until; group.start = budget.now; group.cost = cost;
-    group.pos = runtime.state.enemies[row].pos; group.type = runtime.content->definitions[runtime.state.enemies[row].definition].id;
-    group.members.insert(id, AttackBudget::Member{row, until, false, false});
-    if (budget.serial==INT64_MAX) return false;
-    const int64_t token = ++budget.serial;
-    budget.groups.insert(token, group); budget.owners.insert(owner, token); budget.waiting.erase(owner);
-    Dictionary event; event["owner"] = String(owner); event["row"] = int64_t(row); event["id"] = id;
-    Array cats; for (int i = 0; i < categories.size(); ++i) cats.append(categories[i]);
-    event["categories"] = cats; event["token"] = token; emit_event("attack_start", event);
-    return true;
+bool SpeedRunCore::advance_attack_budget(double at) {return speed::AttackBudgetSystem(runtime).advance(at);}
+bool SpeedRunCore::attack_guard_active() const {return speed::AttackBudgetSystem::guard_active(runtime.state);}
+void SpeedRunCore::sync_attack_budget() {speed::PopulationSystem::sync_attack_budget(runtime);}
+bool SpeedRunCore::set_attack_budget_mode(bool enabled,bool from_stage) {
+    if (runtime.state.closed || (enabled && !runtime.state.frame_ready) || (from_stage && runtime.content->budget_phases.empty() && (!runtime.state.spawn_timeline_ready || runtime.state.spawn_timeline.phases.empty()))) return false;
+    speed::AttackBudgetSystem::set_mode(runtime.state,enabled,from_stage);
+    if (enabled) sync_attack_budget();return true;
 }
 Dictionary SpeedRunCore::attack_budget_snapshot() const {
-    Dictionary out; Array groups, waiting;
-    for (const auto &entry : runtime.state.attack_budget.groups) {
-        const auto &group = entry.value; Dictionary row; Array members;
-        for (const auto &m : group.members) {
-            Dictionary member; member["id"] = m.key; member["until"] = m.value.until;
-            member["begun"] = m.value.begun; member["closed"] = m.value.closed; members.append(member);
+    const auto &budget=runtime.state.world.attack_budget;Dictionary out;Array groups,waiting;
+    for (const auto &entry:budget.groups) {
+        const auto &group=entry.value;Dictionary row;Array members;
+        for (const auto &m:group.members) {
+            Dictionary member;member["id"]=m.key;member["until"]=m.value.until;member["begun"]=m.value.begun;member["closed"]=m.value.closed;members.append(member);
         }
-        row["token"] = entry.key; row["owner"] = String(group.owner); row["id"] = group.id;
-        row["cost"] = group.cost; row["until"] = group.until; row["start"] = group.start;
-        row["passive"] = group.passive; row["members"] = members; groups.append(row);
+        row["token"]=entry.key;row["owner"]=String::utf8(group.owner.c_str());row["id"]=group.id;row["cost"]=group.cost;
+        row["until"]=group.until;row["start"]=group.start;row["passive"]=group.passive;row["members"]=members;groups.append(row);
     }
-    for (const auto &entry : runtime.state.attack_budget.waiting) {
-        const auto &item = entry.value; Dictionary row;
-        row["owner"] = String(entry.key); row["id"] = item.id; row["since"] = item.since;
-        row["priority"] = item.priority; row["cost"] = item.cost;
-        if (item.has_ready) row["ready"] = item.ready;
-        waiting.append(row);
+    for (const auto &entry:budget.waiting) {
+        const auto &item=entry.value;Dictionary row;row["owner"]=String::utf8(entry.key.c_str());row["id"]=item.id;
+        row["since"]=item.since;row["priority"]=item.priority;row["cost"]=item.cost;if (item.has_ready) row["ready"]=item.ready;waiting.append(row);
     }
-    out["used"] = used_attack_cost(); out["serial"] = runtime.state.attack_budget.serial; out["now"] = runtime.state.attack_budget.now;
-    out["groups"] = groups; out["waiting"] = waiting; return out;
-}
-
-int64_t SpeedRunCore::attack_token(StringName owner) const {
-    const auto *token = runtime.state.attack_budget.owners.getptr(owner); return token ? *token : 0;
-}
-bool SpeedRunCore::owns_attack(StringName owner, int64_t id) const {
-    const auto *group = runtime.state.attack_budget.groups.getptr(attack_token(owner));
-    if (!group) return false;
-    const auto *member = group->members.getptr(id); return member && !member->closed;
-}
-void SpeedRunCore::cancel_attack_wait(StringName owner, int64_t id) {
-    auto *waiting = runtime.state.attack_budget.waiting.getptr(owner);
-    if (waiting && (id < 0 || waiting->id == id)) runtime.state.attack_budget.waiting.erase(owner);
-}
-void SpeedRunCore::cancel_attack(StringName owner, int64_t id) {
-    cancel_attack_wait(owner, id);
-    auto *group = runtime.state.attack_budget.groups.getptr(attack_token(owner));
-    if (!group) return;
-    if (auto *member = group->members.getptr(id)) { member->closed = true; member->until = runtime.state.attack_budget.now; }
-    group->until = runtime.state.attack_budget.now;
-    for (const auto &entry : group->members) group->until = std::max(group->until, entry.value.until);
-}
-void SpeedRunCore::track_attack_external(int64_t token, const String &key) {
-    if (auto *group = runtime.state.attack_budget.groups.getptr(token)) group->external.insert(key.utf8().get_data());
-}
-void SpeedRunCore::release_attack_external(int64_t token, const String &key) {
-    if (auto *group = runtime.state.attack_budget.groups.getptr(token)) group->external.erase(key.utf8().get_data());
-}
-int64_t SpeedRunCore::passive_attack(StringName owner, int64_t id) {
-    if (!runtime.state.started || runtime.state.closed || runtime.state.attack_formation_mode) return 0;
-    const auto found = runtime.state.rows_by_id.find(id); if (found == runtime.state.rows_by_id.end()) return 0;
-    auto &budget = runtime.state.attack_budget;
-    if (budget.serial==INT64_MAX) return 0;
-    const int64_t token = ++budget.serial;
-    AttackBudget::Group group;
-    group.owner = String(owner) + ":passive:" + String::num_int64(token);
-    group.id = id; group.row = found->second; group.until = budget.now; group.start = budget.now; group.passive = true;
-    group.pos = runtime.state.enemies[group.row].pos; group.type = runtime.content->definitions[runtime.state.enemies[group.row].definition].id;
-    group.categories.append("zone"); budget.groups.insert(token, group); return token;
-}
-bool SpeedRunCore::advance_attack_budget(double at) {
-    if (!runtime.state.started || runtime.state.closed || !std::isfinite(at) || at < runtime.state.attack_budget.now) return false;
-    auto &budget = runtime.state.attack_budget; budget.now = at;
-    std::vector<int64_t> expired;
-    for (auto &entry : budget.groups) {
-        auto &group = entry.value;
-        if (!group.members.is_empty()) {
-            group.until = at;
-            for (auto &m : group.members) {
-                auto &member = m.value;
-                if (!member.closed) {
-                    const auto found = runtime.state.rows_by_id.find(m.key);
-                    const bool same = found != runtime.state.rows_by_id.end() && found->second == member.row && !runtime.state.enemies[member.row].dead;
-                    const bool active = same && owns_attack(group.owner, m.key) &&
-                        (runtime.state.enemies[member.row].mode == EnemyMode::Windup || runtime.state.enemies[member.row].mode == EnemyMode::Dash);
-                    if (active) { member.begun = true; member.until = at + 0.05; }
-                    else if (!same || member.begun || runtime.state.enemies[member.row].fire_t > runtime.content->definitions[runtime.state.enemies[member.row].definition].attack_telegraph || reached(at, member.until)) {
-                        member.closed = true; member.until = at;
-                    }
-                }
-                group.until = std::max(group.until, member.until);
-            }
-        }
-        if (reached(at, group.until)) expired.push_back(entry.key);
-    }
-    if (!expired.empty()) {
-        for (int64_t token : expired) {
-            auto &group = budget.groups[token];
-            if (group.residuals || !group.external.empty()) continue;
-            Dictionary event; event["token"] = token; event["owner"] = String(group.owner); emit_event("attack_end", event);
-            if (attack_token(group.owner) == token) budget.owners.erase(group.owner);
-            budget.groups.erase(token);
-        }
-    }
-    std::vector<StringName> cancelled;
-    for (const auto &entry : budget.waiting) {
-        const auto found = runtime.state.rows_by_id.find(entry.value.id);
-        if (found == runtime.state.rows_by_id.end() || found->second != entry.value.row || runtime.state.enemies[entry.value.row].dead || runtime.state.enemies[entry.value.row].stone > 0 || runtime.state.enemies[entry.value.row].knock_t > 0 || runtime.state.enemies[entry.value.row].shove_time > 0) cancelled.push_back(entry.key);
-    }
-    for (const auto &owner : cancelled) budget.waiting.erase(owner);
-    return true;
-}
-
-bool SpeedRunCore::attack_guard_active() const {
-    return runtime.state.attack_budget.guard && runtime.state.attack_budget.now <= runtime.state.attack_budget.guard_until;
-}
-void SpeedRunCore::sync_attack_budget() {
-    if (!runtime.state.attack_budget.stage_budget) return;
-    size_t phase = 0;
-    for (size_t i = 1; i < runtime.state.spawn_timeline.phases.size(); ++i) {
-        if (runtime.state.spawn_timeline.phases[i].start > runtime.state.time) break;
-        phase = i;
-    }
-    runtime.state.attack_formation_mode = true; runtime.state.attack_budget.enabled = true;
-    runtime.state.attack_budget.budget = std::max(int64_t(0), runtime.state.spawn_timeline.phases[phase].budget);
-    runtime.state.attack_budget.jitter = 0;
-}
-bool SpeedRunCore::set_attack_budget_mode(bool enabled, bool from_stage) {
-    if (runtime.state.closed || (enabled && !runtime.state.frame_ready) || (from_stage && (!runtime.state.spawn_timeline_ready || runtime.state.spawn_timeline.phases.empty()))) return false;
-    runtime.state.attack_budget.frame_enabled = enabled; runtime.state.attack_budget.stage_budget = from_stage;
-    if (enabled) sync_attack_budget();
-    return true;
+    out["used"]=used_attack_cost();out["serial"]=budget.serial;out["now"]=budget.now;out["groups"]=groups;out["waiting"]=waiting;return out;
 }

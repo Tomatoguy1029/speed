@@ -63,7 +63,6 @@ class SpeedRunCore : public RefCounted {
     void sync_attack_budget();
     bool attack_guard_active() const;
     double used_attack_cost() const;
-    StringName next_attack_owner() const;
     void reset_enemy_bounds();
     std::vector<size_t> query_enemy_rows(Vector2 lo, Vector2 hi) const;
     void refresh_progression_stats();
@@ -91,8 +90,7 @@ class SpeedRunCore : public RefCounted {
     void step_forward(double world_dt);
     bool check_run_end();
     void step_death(double real_dt);
-    StringName enemy_attack_owner(const Enemy &enemy) const;
-    bool admit_bite(Enemy &enemy, double dt);
+    bool admit_bite(size_t row, double dt);
     void advance_biter(size_t row, double dt, bool far);
     void update_pushed(Enemy &enemy, double dt);
     void advance_enemies(double delta);

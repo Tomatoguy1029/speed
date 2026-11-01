@@ -38,6 +38,15 @@ CombatEvent event_for(RunRuntime &run,const DamageRequest &request,EnemyHandle t
 }
 void append(RunRuntime &run,const char *type,godot::Dictionary data) {FrameBuilder::append(run,godot::StringName(type),data);}
 }
+void EventBuilder::budget_started(RunRuntime &run,const std::string &owner,int64_t id,uint32_t row,const std::vector<AttackCategory> &categories,int64_t token) {
+    flush_combat(run);godot::Dictionary data;godot::Array cats;
+    for (auto category:categories) cats.append(godot::String(symbol_name(category)));
+    data["owner"]=godot::String::utf8(owner.c_str());data["row"]=int64_t(row);data["id"]=id;data["categories"]=cats;data["token"]=token;
+    FrameBuilder::append(run,"attack_start",data);
+}
+void EventBuilder::budget_ended(RunRuntime &run,const std::string &owner,int64_t token) {
+    flush_combat(run);godot::Dictionary data;data["owner"]=godot::String::utf8(owner.c_str());data["token"]=token;FrameBuilder::append(run,"attack_end",data);
+}
 void EventBuilder::enemy_damage(RunRuntime &run,const DamageRequest &request,const DamageResult &result) {
     auto event=event_for(run,request,result.target);event.kind=CombatEventKind::EnemyDamage;event.reason=result.reason;
     event.requested=result.requested;event.resolved=result.resolved;event.applied=result.applied;event.overkill=result.overkill;

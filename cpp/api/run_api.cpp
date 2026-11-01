@@ -2,6 +2,9 @@
 #include "../runtime/run_runner.h"
 #include "../output/event_builder.h"
 #include "../output/render_builder.h"
+#include "../systems/population_system.h"
+#include "../systems/attack_budget.h"
+#include "../systems/enemy_system.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <climits>
@@ -47,6 +50,10 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     state.forward.life=forward.life;state.forward.spread=forward.spread;state.forward.knock=forward.knock;state.forward.pierce=forward.pierce;
     state.forward.character_scale=candidate->runtime.content->config.character_scale;state.forward.ready=true;
     state.hitstop_enabled=settings.get("hitstop",true);
+    if (!candidate->runtime.content->budget_phases.empty()) {
+        speed::AttackBudgetSystem::set_mode(state,true,true);
+        speed::PopulationSystem::sync_attack_budget(candidate->runtime);
+    }
     runtime=std::move(candidate->runtime);
     PackedByteArray digest;digest.resize(32);std::copy(runtime.content->payload_sha256.begin(),runtime.content->payload_sha256.end(),digest.ptrw());
     Dictionary value;value["bundle_hash"]=digest.hex_encode();value["epoch"]=runtime.epoch;return success(value);
@@ -118,6 +125,11 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],Dictionary());
         if (entity>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=entity>0?success(entity):failure(5,"definition_id","生成できる定義がありません");
+    } else if (kind=="dev_relocate" && runtime.api_development && payload.size()==2 && is(payload,"entity_id",Variant::INT) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite()) {
+        const auto found=runtime.state.rows_by_id.find(int64_t(payload["entity_id"]));
+        const bool moved=found!=runtime.state.rows_by_id.end() && speed::EnemySystem::relocate(runtime,runtime.state.enemy_handles.at(uint32_t(found->second)),payload["position"]);
+        if (moved) rebuild_enemy_grid(runtime.state.frame_grid_cell);
+        response=moved?success():failure(5,"entity_id","再配置できる対象がありません");
     } else if (kind=="dev_remove" && runtime.api_development && payload.size()==1 && is(payload,"entity_id",Variant::INT)) {
         const bool removed=remove_enemy(int64_t(payload["entity_id"]));
         if (removed) rebuild_enemy_grid(runtime.state.frame_grid_cell);

@@ -548,6 +548,20 @@ inline bool read(BinaryReader &input, ContactDefinition &out) {
     if (out.half_width < 0) return false;
     return true;
 }
+struct BudgetPhase {
+    uint32_t id{};
+    double start{};
+    double budget{};
+};
+inline bool read(BinaryReader &input, BudgetPhase &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.start)) return false;
+    if (out.start < 0) return false;
+    if (!input.read_f64(out.budget)) return false;
+    if (out.budget < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -564,6 +578,7 @@ struct ContentRecords {
     std::vector<ForwardDefinition> ForwardDefinition_rows;
     std::vector<BiteDefinition> BiteDefinition_rows;
     std::vector<ContactDefinition> ContactDefinition_rows;
+    std::vector<BudgetPhase> BudgetPhase_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -663,6 +678,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { ContactDefinition row; if (!read(input,row)) return false; out.ContactDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 16: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { BudgetPhase row; if (!read(input,row)) return false; out.BudgetPhase_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -697,6 +718,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BiteDefinition_rows) if (!BiteDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ContactDefinition_ids;
     for (const auto &row:data.ContactDefinition_rows) if (!ContactDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BudgetPhase_ids;
+    for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -828,5 +851,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=15;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=16;
 }

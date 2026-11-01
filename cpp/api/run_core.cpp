@@ -2,6 +2,7 @@
 #include "../output/event_builder.h"
 #include "../../native/geometry.h"
 #include "../systems/enemy_system.h"
+#include "../systems/attack_budget.h"
 #include "../behaviors/enemies/pursuit.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
@@ -221,7 +222,7 @@ void SpeedRunCore::close() {
     runtime.replace_definitions({}); runtime.state.formations.clear(); runtime.state.clips.clear(); runtime.state.clips_ready = false;
     runtime.state.spawn_timeline = speed::SpawnTimeline();
     runtime.state.population = Population();
-    runtime.state.attack_budget = AttackBudget();
+    runtime.state.world.attack_budget = AttackBudget();
     runtime.state.draw = Draw();
     runtime.state.grid = EnemyGrid();
     runtime.state.attacks={};
@@ -460,7 +461,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     if (options.has("attack_managed") && options["attack_managed"].get_type() != Variant::BOOL) return -1;
     enemy.attack_priority = options.get("attack_priority", def.attack_priority);
     enemy.attack_value = enemy.attack_group > 0 ? double(options.get("attack_value", 1.0)) : def.attack_value;
-    enemy.attack_managed = !runtime.state.attack_formation_mode ? def.attack_weight > 0 :
+    enemy.attack_managed = !runtime.state.world.attack_formation_mode ? def.attack_weight > 0 :
         (enemy.attack_group > 0 ? bool(options.get("attack_managed", enemy.attack_value > 0)) : def.attack_managed);
     enemy.hp = enemy.max_hp = def.hp;
     enemy.radius = def.radius; enemy.armor = def.armor; enemy.xp = def.xp; enemy.speed = def.speed;
@@ -622,7 +623,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     const double accumulated = runtime.state.control.world_dt_accum;
     if (world_step) {
         runtime.state.control.world_dt_accum = 0; runtime.state.control.world_steps = 0;
-        if (runtime.state.attack_budget.frame_enabled) {
+        if (runtime.state.world.attack_budget.frame_enabled) {
             sync_attack_budget();
             if (!advance_attack_budget(runtime.state.world_time)) return false;
         }
@@ -651,9 +652,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
 }
 
 bool SpeedRunCore::set_attack_formation_mode(bool enabled) {
-    if (runtime.state.closed) return false;
-    runtime.state.attack_formation_mode = enabled;
-    return true;
+    return speed::AttackBudgetSystem::set_formation_mode(runtime.state,enabled);
 }
 
 Array SpeedRunCore::enemy_attack_snapshot() const {

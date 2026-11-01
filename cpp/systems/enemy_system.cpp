@@ -1,7 +1,32 @@
 #include "enemy_system.h"
 #include "attack_system.h"
+#include "tracking_policy.h"
+#include "../runtime/run_runtime.h"
 #include <algorithm>
 namespace speed {
+bool EnemySystem::attack_active(const godot::RunState &state,EnemyHandle handle) {
+    if (!state.enemy_handles.contains(handle)) return false;
+    const auto &enemy=state.enemies[handle.slot];
+    return enemy.mode==godot::RunState::EnemyMode::Windup || enemy.mode==godot::RunState::EnemyMode::Dash || AttackSystem::has_attached(state,handle);
+}
+bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt) {
+    if (!run.state.enemy_handles.contains(handle)) return false;
+    const auto &enemy=run.state.enemies[handle.slot];
+    return enemy.fire_t<=run.content->definitions[enemy.definition].attack_telegraph+dt;
+}
+bool EnemySystem::relocate(RunRuntime &run,EnemyHandle handle,godot::Vector2 position) {
+    auto &state=run.state;
+    if (!state.enemy_handles.contains(handle) || !position.is_finite()) return false;
+    auto &enemy=state.enemies[handle.slot];if (enemy.dead || enemy.held) return false;
+    AttackSystem::source_ended(state,handle,AttackEndReason::Relocate);
+    enemy.pos=position;
+    const auto toward=(state.ship_pos-position).normalized();
+    const TrackingPolicy tracking{state.draw.tracing,enemy.held,state.enemy_handles.contains(enemy.pump_owner)};
+    enemy.vel=tracking.velocity(enemy.vel,enemy.facing,toward*enemy.speed);
+    if (!tracking.locked()) enemy.facing=toward.angle();
+    enemy.mode=godot::RunState::EnemyMode::Move;enemy.timer=enemy.charge=0;
+    enemy.fire_t=run.content->definitions[enemy.definition].fire_interval;return true;
+}
 EnemyHandle EnemySystem::insert(godot::RunState &state, uint32_t slot, const godot::RunState::Enemy &enemy) {
     auto handle = state.enemy_handles.attach(slot, enemy.id);
     if (state.enemy_handles.contains(handle)) state.enemies[slot] = enemy;

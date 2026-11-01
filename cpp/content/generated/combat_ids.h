@@ -207,6 +207,29 @@ inline bool parse_symbol(std::string_view value, ContactShapeKind &out) {
     if (value=="rect") {out=ContactShapeKind::Rect;return true;}
     return false;
 }
+enum class AttackCategory : uint32_t {Aimed=0,Homing=1,Dash=2,Beam=3,Zone=4,Wave=5,Residue=6,Count};
+inline const char *symbol_name(AttackCategory value) {
+    switch(value) {
+    case AttackCategory::Aimed: return "aimed";
+    case AttackCategory::Homing: return "homing";
+    case AttackCategory::Dash: return "dash";
+    case AttackCategory::Beam: return "beam";
+    case AttackCategory::Zone: return "zone";
+    case AttackCategory::Wave: return "wave";
+    case AttackCategory::Residue: return "residue";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, AttackCategory &out) {
+    if (value=="aimed") {out=AttackCategory::Aimed;return true;}
+    if (value=="homing") {out=AttackCategory::Homing;return true;}
+    if (value=="dash") {out=AttackCategory::Dash;return true;}
+    if (value=="beam") {out=AttackCategory::Beam;return true;}
+    if (value=="zone") {out=AttackCategory::Zone;return true;}
+    if (value=="wave") {out=AttackCategory::Wave;return true;}
+    if (value=="residue") {out=AttackCategory::Residue;return true;}
+    return false;
+}
 inline bool event_field_allowed(EventType type, std::string_view field) {
     switch(type) {
     case EventType::AttackStart: return field=="owner" || field=="row" || field=="id" || field=="categories" || field=="token";

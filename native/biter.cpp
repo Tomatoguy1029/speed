@@ -1,5 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/attack_system.h"
+#include "../cpp/systems/attack_budget.h"
+#include "../cpp/systems/enemy_system.h"
 #include "geometry.h"
 #include "../cpp/behaviors/enemies/pursuit.h"
 #include <godot_cpp/core/math.hpp>
@@ -7,28 +9,23 @@
 #include <cmath>
 using namespace godot;
 
-StringName SpeedRunCore::enemy_attack_owner(const Enemy &enemy) const {
-    return runtime.state.attack_formation_mode && enemy.attack_group > 0 ?
-        String("formation:") + String::num_int64(enemy.attack_group) : String::num_int64(enemy.id);
-}
-bool SpeedRunCore::admit_bite(Enemy &enemy, double dt) {
-    if (!enemy.attack_managed) return true;
-    const auto &def = runtime.content->definitions[enemy.definition];
-    const StringName owner = enemy_attack_owner(enemy);
-    const bool active = owns_attack(owner, enemy.id) && (enemy.mode == EnemyMode::Windup || enemy.mode == EnemyMode::Dash);
-    if (!active && enemy.fire_t <= def.attack_telegraph + dt) {
-        PackedStringArray categories; categories.append("zone");
-        if (!request_attack(owner, categories, enemy.id, def.bite.telegraph + 0.1, enemy.attack_priority,
-                runtime.state.attack_formation_mode ? enemy.attack_value : def.attack_weight)) {
-            enemy.charge = 0; return false;
-        }
-    }
-    return true;
+bool SpeedRunCore::admit_bite(size_t row,double dt) {
+    auto &enemy=runtime.state.enemies[row];if (!enemy.attack_managed) return true;
+    const auto &def=runtime.content->definitions[enemy.definition];
+    const auto actor=runtime.state.enemy_handles.at(uint32_t(row));
+    const auto owner=speed::AttackBudgetSystem::owner(runtime.state,enemy.id,enemy.attack_group);
+    speed::AttackBudgetSystem budget(runtime);
+    const bool active=budget.owns(owner,enemy.id) && speed::EnemySystem::attack_active(runtime.state,actor);
+    if (!active && speed::EnemySystem::attack_due(runtime,actor,dt)) {
+        const speed::BudgetRequest request{owner,{speed::AttackCategory::Zone},actor,def.bite.telegraph+0.1,enemy.attack_priority,
+            runtime.state.world.attack_formation_mode?enemy.attack_value:def.attack_weight};
+        if (!budget.request(request)) {enemy.charge=0;return false;}
+    }return true;
 }
 void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     auto &enemy = runtime.state.enemies[row]; const auto &def = runtime.content->definitions[enemy.definition];
     const Vector2 from = enemy.pos;
-    const int64_t token = enemy.attack_managed && enemy.mode == EnemyMode::Windup ? attack_token(enemy_attack_owner(enemy)) : 0;
+    const int64_t token = enemy.attack_managed && enemy.mode == EnemyMode::Windup ? speed::AttackBudgetSystem::token(runtime.state,speed::AttackBudgetSystem::owner(runtime.state,enemy.id,enemy.attack_group)) : 0;
     if (far && (enemy.id + runtime.state.ticks) % 3 != 0) { enemy.pos += enemy.vel * dt; return; }
     const double bdt = far ? dt * 3.0 : dt;
     const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
@@ -64,7 +61,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
             if (enemy.timer <= 0) enemy.mode = EnemyMode::Move;
         } else {
             const double reach = enemy.radius + (def.bite.reach + runtime.state.ship_config.ship_radius);
-            if (distance * distance <= reach * reach && admit_bite(enemy, bdt)) {
+            if (distance * distance <= reach * reach && admit_bite(row, bdt)) {
                 enemy.mode = EnemyMode::Windup; enemy.timer = def.bite.telegraph;
                 if (def.id!=StringName("biter")) enemy.flash = 0.1;
             }

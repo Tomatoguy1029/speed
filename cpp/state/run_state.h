@@ -3,6 +3,7 @@
 #include "entity_store.h"
 #include "combat_types.h"
 #include "attack_state.h"
+#include "world_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -56,34 +57,8 @@ struct RunState {
     std::deque<Enemy> enemies;
     speed::EntityStore<speed::EnemyTag> enemy_handles;
     HashMap<int64_t, std::vector<size_t>> hound_packs;
-    bool attack_formation_mode = false;
-    struct AttackBudget {
-        struct Member { size_t row = 0; double until = 0; bool begun = false, closed = false; };
-        struct Group {
-            StringName owner, type;
-            int64_t id = 0; size_t row = 0;
-            double cost = 1, until = 0, start = 0;
-            bool passive = false;
-            uint32_t residuals=0;
-            Vector2 pos;
-            PackedStringArray categories;
-            HashMap<int64_t, Member> members;
-            std::unordered_set<std::string> external;
-        };
-        struct Waiting {
-            int64_t id = 0; size_t row = 0;
-            double since = 0, priority = 0, cost = 1, ready = 0;
-            bool has_ready = false;
-            PackedStringArray categories;
-        };
-        // HashMapの列挙は登録順。優先度が同点の待機と加算順を保持する。
-        HashMap<int64_t, Group> groups;
-        HashMap<StringName, int64_t> owners;
-        HashMap<StringName, Waiting> waiting;
-        bool enabled = false, guard = false, frame_enabled = false, stage_budget = false;
-        double budget = 4, jitter = 0.3, now = 0, guard_until = -1;
-        int64_t serial = 0;
-    } attack_budget;
+    using AttackBudget=speed::AttackBudgetState;
+    speed::WorldState world;
     struct Formation {
         struct Marker { StringName type; Vector2 offset; double rotation = 0; };
         struct Entry { double weight = 0; Vector2 pos; };

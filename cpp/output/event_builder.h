@@ -1,10 +1,14 @@
 #pragma once
 #include "../state/combat_types.h"
+#include <string>
+#include <vector>
 #include <godot_cpp/variant/dictionary.hpp>
 namespace speed {
 class RunRuntime;
 class EventBuilder {
 public:
+    static void budget_started(RunRuntime &,const std::string &owner,int64_t id,uint32_t row,const std::vector<AttackCategory> &,int64_t token);
+    static void budget_ended(RunRuntime &,const std::string &owner,int64_t token);
     static void enemy_damage(RunRuntime &,const DamageRequest &,const DamageResult &);
     static void enemy_hit(RunRuntime &,const DamageRequest &,EnemyHandle);
     static void enemy_kill(RunRuntime &,const DeathContext &);

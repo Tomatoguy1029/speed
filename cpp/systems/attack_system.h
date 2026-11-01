@@ -5,6 +5,7 @@ struct ContentBundle;
 class AttackSystem {
 public:
     static bool mark_ship_hit(godot::RunState &,AttackHandle);
+    static bool has_attached(const godot::RunState &,EnemyHandle);
     static void record_ship_position(godot::RunState &,AttackHandle);
     static bool configure_contact(const ContentBundle &,uint32_t definition,AttackSpec &);
     static AttackHandle emit_friendly(godot::RunState &,godot::RunState::Friendly,AttackSpec);

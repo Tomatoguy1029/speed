@@ -63,6 +63,14 @@ bool AttackSystem::mark_ship_hit(State &state,AttackHandle handle) {
     if (!get(state,handle)) return false;
     state.attacks.records[handle.slot].ship_hit=true;return true;
 }
+bool AttackSystem::has_attached(const State &state,EnemyHandle source) {
+    const auto found=state.attacks.by_source.find(state.enemy_handles.entity_id(source));
+    if (found==state.attacks.by_source.end()) return false;
+    for (auto handle:found->second) {
+        const auto *record=get(state,handle);
+        if (record && record->spec.owner.attached && same_handle(record->spec.owner.live_source,source)) return true;
+    }return false;
+}
 void AttackSystem::record_ship_position(State &state,AttackHandle handle) {
     if (!get(state,handle)) return;
     auto &record=state.attacks.records[handle.slot];record.ship_previous=state.ship.pos;record.ship_previous_ready=true;
@@ -175,7 +183,7 @@ bool AttackSystem::hazard_before_touch(const State &state,AttackHandle handle) {
 bool AttackSystem::rebuild(State &state) {
     auto &all=state.attacks;if (all.next_id<=0 || all.records.size()>=UINT32_MAX || all.hostile_updating || all.hostile_clear_pending) return false;
     all.by_source.clear();all.by_technique.clear();all.by_participant.clear();all.by_boss.clear();all.by_encounter.clear();
-    for (auto &group:state.attack_budget.groups) group.value.residuals=0;
+    AttackBudgetSystem::reset_residuals(state);
     std::unordered_set<int64_t> ids;std::unordered_set<uint32_t> free;
     for (uint32_t i=0;i<all.records.size();++i) {
         const auto &record=all.records[i];const auto h=all.handles.at(i);

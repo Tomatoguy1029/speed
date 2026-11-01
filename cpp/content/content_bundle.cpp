@@ -53,6 +53,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->forward_levels=records.ForwardDefinition_rows;
     bundle->bites=records.BiteDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
+    bundle->budget_phases=records.BudgetPhase_rows;
+    for (size_t i=1;i<bundle->budget_phases.size();++i) if (bundle->budget_phases[i].start<bundle->budget_phases[i-1].start) return {};
     for (const auto &bite:bundle->bites) {
         const auto &first=bundle->bites.front();
         if (bite.duration!=first.duration || bite.scene!=first.scene || bite.hit!=first.hit || bite.fade!=first.fade) return {};

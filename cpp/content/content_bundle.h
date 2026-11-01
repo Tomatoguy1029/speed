@@ -17,6 +17,7 @@ struct ContentBundle {
     std::vector<ForwardDefinition> forward_levels;
     std::vector<BiteDefinition> bites;
     std::vector<ContactDefinition> contacts;
+    std::vector<BudgetPhase> budget_phases;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);
 };
 }
