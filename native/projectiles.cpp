@@ -6,16 +6,16 @@
 using namespace godot;
 
 size_t SpeedRunCore::add_friend(Friendly shot) {
-    ++live_friends;
-    if (shot.kind == 1) ++live_debris;
+    ++runtime.state.live_friends;
+    if (shot.kind == 1) ++runtime.state.live_debris;
     size_t row;
-    if (free_friends.empty()) { row = friends.size(); friends.push_back(std::move(shot)); }
-    else { row = free_friends.back(); free_friends.pop_back(); friends[row] = std::move(shot); }
+    if (runtime.state.free_friends.empty()) { row = runtime.state.friends.size(); runtime.state.friends.push_back(std::move(shot)); }
+    else { row = runtime.state.free_friends.back(); runtime.state.free_friends.pop_back(); runtime.state.friends[row] = std::move(shot); }
     return row;
 }
 
 bool SpeedRunCore::fire_shot(Vector2 from, double angle, double damage, const Dictionary &options) {
-    if (!started || closed || !combat_ready || !from.is_finite() || !std::isfinite(angle) || !std::isfinite(damage) || damage < 0) return false;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.combat_ready || !from.is_finite() || !std::isfinite(angle) || !std::isfinite(damage) || damage < 0) return false;
     const Array keys = options.keys();
     for (int i = 0; i < keys.size(); ++i) {
         const String key = keys[i];
@@ -67,13 +67,13 @@ static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double ra
 }
 
 bool SpeedRunCore::step_projectiles(double world_dt) {
-    if (!started || closed || !combat_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.combat_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
     struct Hit { double time; size_t row; };
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
     // 命中で末尾へ増えた弾は同じ更新で進め、既に通った空き行は次回に進める。
-    for (size_t i = 0; i < friends.size(); ++i) {
-        auto &shot = friends[i];
+    for (size_t i = 0; i < runtime.state.friends.size(); ++i) {
+        auto &shot = runtime.state.friends[i];
         if (!shot.alive) continue;
         const Vector2 from = shot.pos, vel = shot.vel, to = from + vel * world_dt;
         Vector2 position = to;
@@ -82,13 +82,13 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         shot.angle = double(shot.angle) + double(shot.spin) * world_dt;
         if (shot.kind == 1 && shot.visual != StringName("weapon/knockback")) {
             shot.trail.append(to);
-            if (shot.trail.size() > projectile_config.trail_points) shot.trail.remove_at(0);
+            if (shot.trail.size() > runtime.state.projectile_config.trail_points) shot.trail.remove_at(0);
         }
-        const double padding = double(shot.radius) + std::max(combat_config.max_enemy_radius, grid.max_radius);
+        const double padding = double(shot.radius) + std::max(runtime.state.combat_config.max_enemy_radius, runtime.state.grid.max_radius);
         const Vector2 pad(padding, padding);
         hits.clear();
         for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
-            const auto &enemy = enemies[row];
+            const auto &enemy = runtime.state.enemies[row];
             if (shot.hit_ids.count(enemy.id)) continue;
             const double t = segment_circle(from, to, enemy.pos, double(shot.radius) + enemy.radius);
             if (t >= 0) hits.push_back({t, row});
@@ -96,13 +96,13 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
         const double speed = vel.length();
         for (const auto &hit : hits) {
-            const auto &enemy = enemies[hit.row];
+            const auto &enemy = runtime.state.enemies[hit.row];
             if (life <= 0 || enemy.dead || shot.hit_ids.count(enemy.id)) continue;
             const Vector2 impact = from.lerp(to, hit.time);
             if (shot.kind == 0 && blocks_front(hit.row, impact, vel)) {
-                auto &target = enemies[hit.row];
+                auto &target = runtime.state.enemies[hit.row];
                 if (target.fire_t <= 0) {
-                    const auto &def = definitions[target.definition];
+                    const auto &def = runtime.content->definitions[target.definition];
                     Vector2 normal = (impact - target.pos).normalized();
                     if (normal.is_zero_approx()) normal = Vector2::from_angle(target.facing);
                     const Vector2 direction = (vel - normal * 2.0 * vel.dot(normal)).normalized();
@@ -129,13 +129,13 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         shot.pos = position; shot.life = life;
         if (life <= 0) {
             if (shot.kind == 1) {
-                --live_debris;
+                --runtime.state.live_debris;
                 if (shot.visual != StringName("weapon/knockback") && shot.trail.size() > 1) {
                     Dictionary ended; ended["points"] = shot.trail; ended["color"] = shot.color;
                     emit_event("debris_trail", ended);
                 }
             }
-            shot.alive = false; --live_friends; free_friends.push_back(i);
+            shot.alive = false; --runtime.state.live_friends; runtime.state.free_friends.push_back(i);
         }
     }
     return true;
@@ -143,8 +143,8 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
 
 Array SpeedRunCore::projectiles_snapshot() const {
     Array out;
-    for (size_t row = 0; row < friends.size(); ++row) {
-        const auto &shot = friends[row];
+    for (size_t row = 0; row < runtime.state.friends.size(); ++row) {
+        const auto &shot = runtime.state.friends[row];
         if (!shot.alive) continue;
         std::vector<int64_t> sorted(shot.hit_ids.begin(), shot.hit_ids.end());
         std::sort(sorted.begin(), sorted.end());
@@ -160,13 +160,13 @@ Array SpeedRunCore::projectiles_snapshot() const {
 
 PackedFloat32Array SpeedRunCore::friendly_buffer(StringName visual, double pixel, double scale, double clock) const {
     PackedFloat32Array buffer;
-    if (!started || closed || !std::isfinite(pixel) || pixel <= 0 || !std::isfinite(scale) || scale <= 0 || !std::isfinite(clock)) return buffer;
+    if (!runtime.state.started || runtime.state.closed || !std::isfinite(pixel) || pixel <= 0 || !std::isfinite(scale) || scale <= 0 || !std::isfinite(clock)) return buffer;
     int64_t count = 0;
-    for (const auto &shot : friends) if (shot.alive && shot.visual == visual) ++count;
+    for (const auto &shot : runtime.state.friends) if (shot.alive && shot.visual == visual) ++count;
     buffer.resize(count * 12);
     float *out = buffer.ptrw();
     int64_t index = 0;
-    for (const auto &shot : friends) {
+    for (const auto &shot : runtime.state.friends) {
         if (!shot.alive || shot.visual != visual) continue;
         const Vector2 position = (shot.pos / pixel).round() * pixel;
         const double size = 18.0 * pixel * scale;

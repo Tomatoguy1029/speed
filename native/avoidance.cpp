@@ -6,34 +6,34 @@
 using namespace godot;
 
 bool SpeedRunCore::can_avoid_strong(size_t row) const {
-    const auto &e = enemies[row];
+    const auto &e = runtime.state.enemies[row];
     // 部位・ボス・吸引の状態は各経路の移行時にここへ接続する。
-    return e.alive && !e.dead && definitions[e.definition].rank <= 2 && e.mode == EnemyMode::Move &&
+    return e.alive && !e.dead && runtime.content->definitions[e.definition].rank <= 2 && e.mode == EnemyMode::Move &&
         !e.held && e.stone <= 0 && e.shove_time <= 0 && e.knock_t <= 0;
 }
 void SpeedRunCore::capture_avoidance() {
-    avoidance_ids.resize(enemies.size()); avoidance_from.resize(enemies.size());
-    for (size_t row = 0; row < enemies.size(); ++row) {
-        avoidance_ids[row] = can_avoid_strong(row) ? enemies[row].id : -1;
-        if (avoidance_ids[row] >= 0) avoidance_from[row] = enemies[row].pos;
+    runtime.workspace.avoidance_ids.resize(runtime.state.enemies.size()); runtime.workspace.avoidance_from.resize(runtime.state.enemies.size());
+    for (size_t row = 0; row < runtime.state.enemies.size(); ++row) {
+        runtime.workspace.avoidance_ids[row] = can_avoid_strong(row) ? runtime.state.enemies[row].id : -1;
+        if (runtime.workspace.avoidance_ids[row] >= 0) runtime.workspace.avoidance_from[row] = runtime.state.enemies[row].pos;
     }
 }
 double SpeedRunCore::avoidance_clearance(Vector2 point, size_t row, const std::vector<size_t> &candidates) const {
     double gap = std::numeric_limits<double>::infinity();
-    for (size_t other : candidates) gap = std::min(gap, double(point.distance_to(enemies[other].pos)) - enemies[row].radius - enemies[other].radius - 2.0);
+    for (size_t other : candidates) gap = std::min(gap, double(point.distance_to(runtime.state.enemies[other].pos)) - runtime.state.enemies[row].radius - runtime.state.enemies[other].radius - 2.0);
     return gap;
 }
 bool SpeedRunCore::avoid_strong(double dt) {
-    if (!started || closed || !std::isfinite(dt) || dt < 0) return false;
+    if (!runtime.state.started || runtime.state.closed || !std::isfinite(dt) || dt < 0) return false;
     if (dt == 0) return true;
     std::vector<size_t> obstacles;
     HashMap<Vector2i, std::vector<size_t>> cells;
     double normal_radius = 0, normal_step = 0;
-    for (size_t row = 0; row < enemies.size(); ++row) {
-        const auto &e = enemies[row];
+    for (size_t row = 0; row < runtime.state.enemies.size(); ++row) {
+        const auto &e = runtime.state.enemies[row];
         if (!e.alive || e.dead || e.held) continue;
-        if (definitions[e.definition].rank >= 3) obstacles.push_back(row);
-        else if (row < avoidance_ids.size() && avoidance_ids[row] == e.id && can_avoid_strong(row)) {
+        if (runtime.content->definitions[e.definition].rank >= 3) obstacles.push_back(row);
+        else if (row < runtime.workspace.avoidance_ids.size() && runtime.workspace.avoidance_ids[row] == e.id && can_avoid_strong(row)) {
             normal_radius = std::max(normal_radius, e.radius); normal_step = std::max(normal_step, e.speed * dt);
         }
     }
@@ -41,23 +41,23 @@ bool SpeedRunCore::avoid_strong(double dt) {
     constexpr double cell_size = 160.0;
     auto cell_of = [](Vector2 p) { return Vector2i(int32_t(std::floor(p.x / cell_size)), int32_t(std::floor(p.y / cell_size))); };
     for (size_t row : obstacles) {
-        const auto &e = enemies[row]; const double extent = e.radius + normal_radius + normal_step + 2.0;
+        const auto &e = runtime.state.enemies[row]; const double extent = e.radius + normal_radius + normal_step + 2.0;
         // GDScriptは減算をdoubleで行ってからセル座標を作る。
         const Vector2i lo(int32_t(std::floor((double(e.pos.x)-extent)/cell_size)),int32_t(std::floor((double(e.pos.y)-extent)/cell_size)));
         const Vector2i hi(int32_t(std::floor((double(e.pos.x)+extent)/cell_size)),int32_t(std::floor((double(e.pos.y)+extent)/cell_size)));
         for (int64_t y = lo.y; y <= hi.y; ++y) for (int64_t x = lo.x; x <= hi.x; ++x) cells[Vector2i(x,y)].push_back(row);
     }
-    for (size_t row = 0; row < std::min(avoidance_ids.size(), enemies.size()); ++row) {
-        auto &e = enemies[row];
-        if (avoidance_ids[row] != e.id || !can_avoid_strong(row)) continue;
-        const Vector2 from = avoidance_from[row];
+    for (size_t row = 0; row < std::min(runtime.workspace.avoidance_ids.size(), runtime.state.enemies.size()); ++row) {
+        auto &e = runtime.state.enemies[row];
+        if (runtime.workspace.avoidance_ids[row] != e.id || !can_avoid_strong(row)) continue;
+        const Vector2 from = runtime.workspace.avoidance_from[row];
         const auto *candidates = cells.getptr(cell_of(from)); if (!candidates) continue;
         const Vector2 intended = e.pos - from; const double limit = e.speed * dt;
         if (limit <= 0 || intended.length() > limit + 0.01) continue;
         Vector2 inside, fallback; double most_inside = -1, near_depth = 0; int64_t near_row = -1;
         for (size_t other : *candidates) {
             if (other == row) continue;
-            const auto &obstacle = enemies[other]; const double radius = e.radius + obstacle.radius + 2.0;
+            const auto &obstacle = runtime.state.enemies[other]; const double radius = e.radius + obstacle.radius + 2.0;
             const Vector2 offset = from - obstacle.pos; const double distance_sq = offset.length_squared(); const double reach = radius + limit;
             if (distance_sq > reach * reach) continue;
             if (distance_sq < radius * radius) {
@@ -81,10 +81,10 @@ bool SpeedRunCore::avoid_strong(double dt) {
             }
             corrected = outward * limit;
         } else if (near_row >= 0) {
-            const Vector2 radial = (from - enemies[near_row].pos).normalized();
+            const Vector2 radial = (from - runtime.state.enemies[near_row].pos).normalized();
             corrected -= radial * std::min(0.0, double(corrected.dot(radial)));
             if (corrected.length_squared() < 0.000001) {
-                const double side = (e.id + enemies[near_row].id) % 2 == 0 ? 1.0 : -1.0;
+                const double side = (e.id + runtime.state.enemies[near_row].id) % 2 == 0 ? 1.0 : -1.0;
                 corrected = radial.orthogonal() * side * intended.length();
             } else corrected = corrected.normalized() * intended.length();
         }

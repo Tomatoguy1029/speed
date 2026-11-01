@@ -8,13 +8,13 @@ using namespace godot;
 
 size_t SpeedRunCore::add_hostile(Hostile shot) {
     size_t row;
-    if (free_hostiles.empty()) { row = hostiles.size(); hostiles.push_back(std::move(shot)); }
-    else { row = free_hostiles.back(); free_hostiles.pop_back(); hostiles[row] = std::move(shot); }
+    if (runtime.state.free_hostiles.empty()) { row = runtime.state.hostiles.size(); runtime.state.hostiles.push_back(std::move(shot)); }
+    else { row = runtime.state.free_hostiles.back(); runtime.state.free_hostiles.pop_back(); runtime.state.hostiles[row] = std::move(shot); }
     return row;
 }
 
 int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
-    if (!started || closed || !ship_ready || !fields.has("kind") || fields["kind"].get_type() != Variant::INT) return -1;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !fields.has("kind") || fields["kind"].get_type() != Variant::INT) return -1;
     const Array keys_in = fields.keys();
     for (int i = 0; i < keys_in.size(); ++i) {
         const String key = keys_in[i];
@@ -45,20 +45,20 @@ int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
 }
 
 bool SpeedRunCore::damage_ship(double amount, double slow, StringName cause, StringName source) {
-    if (phase != Phase::Play || controls_locked || encounter_protected) return false;
-    if (ship.shield_t > 0) {
-        if (ship.shield_flash <= 0) { Dictionary event; event["pos"] = ship.pos; emit_event("shield_block", event); }
-        ship.shield_flash = 0.12;
+    if (runtime.state.phase != Phase::Play || runtime.state.controls_locked || runtime.state.encounter_protected) return false;
+    if (runtime.state.ship.shield_t > 0) {
+        if (runtime.state.ship.shield_flash <= 0) { Dictionary event; event["pos"] = runtime.state.ship.pos; emit_event("shield_block", event); }
+        runtime.state.ship.shield_flash = 0.12;
         return false;
     }
-    if (ship.invuln > 0 || invincible) return false;
-    ship.hp -= amount;
-    if (slow > 0) ship.glide = false;
-    ship.vel *= 1.0 - std::min(0.9, slow);
-    ship.invuln = ship_config.invulnerability;
-    ship.hurt = ship_config.ship_hurt_time;
-    Dictionary hit; hit["pos"] = ship.pos; hit["amount"] = amount; hit["cause"] = cause; hit["source"] = source;
-    hit["t"] = time; hit["world_t"] = world_time; hit["hp_after"] = ship.hp; emit_event("hurt", hit);
+    if (runtime.state.ship.invuln > 0 || runtime.state.invincible) return false;
+    runtime.state.ship.hp -= amount;
+    if (slow > 0) runtime.state.ship.glide = false;
+    runtime.state.ship.vel *= 1.0 - std::min(0.9, slow);
+    runtime.state.ship.invuln = runtime.state.ship_config.invulnerability;
+    runtime.state.ship.hurt = runtime.state.ship_config.ship_hurt_time;
+    Dictionary hit; hit["pos"] = runtime.state.ship.pos; hit["amount"] = amount; hit["cause"] = cause; hit["source"] = source;
+    hit["t"] = runtime.state.time; hit["world_t"] = runtime.state.world_time; hit["hp_after"] = runtime.state.ship.hp; emit_event("hurt", hit);
     return true;
 }
 
@@ -76,38 +76,38 @@ static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double ra
 }
 
 bool SpeedRunCore::step_hostiles(double world_dt) {
-    if (!started || closed || !ship_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
-    const Vector2 keep = view_half + Vector2(400, 400);
-    for (size_t row = 0; row < hostiles.size(); ++row) {
-        auto &shot = hostiles[row];
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
+    const Vector2 keep = runtime.state.view_half + Vector2(400, 400);
+    for (size_t row = 0; row < runtime.state.hostiles.size(); ++row) {
+        auto &shot = runtime.state.hostiles[row];
         if (!shot.alive) continue;
-        const auto release = [&]() { shot.alive = false; free_hostiles.push_back(row); };
+        const auto release = [&]() { shot.alive = false; runtime.state.free_hostiles.push_back(row); };
         double life = shot.life;
         if (life <= 0) { release(); continue; }
         const Vector2 from = shot.pos;
         if (shot.stone > 0) {
             shot.stone = double(shot.stone) - world_dt;
-            const double reach = double(shot.radius) + ship_config.ship_radius;
-            if (ship.pos.distance_squared_to(from) <= reach * reach) release();
+            const double reach = double(shot.radius) + runtime.state.ship_config.ship_radius;
+            if (runtime.state.ship.pos.distance_squared_to(from) <= reach * reach) release();
             continue;
         }
         Vector2 vel = shot.vel;
         if (shot.wait > 0) { shot.wait = double(shot.wait) - world_dt; vel = Vector2(); }
         if (shot.kind == 1) {
             const double turn = double(shot.turn) * world_dt, current = vel.angle();
-            const double difference = double(((aim_ready ? enemy_aim : ship_pos) - shot.pos).angle()) - current;
+            const double difference = double(((runtime.state.aim_ready ? runtime.state.enemy_aim : runtime.state.ship_pos) - shot.pos).angle()) - current;
             const double wrapped = speed::angle_difference(difference);
             const Vector2 steered = Vector2::from_angle(current + std::clamp(wrapped, -turn, turn)) * shot.speed;
             if (steered != vel) { vel = steered; shot.vel = vel; }
         }
         Vector2 to = from + vel * world_dt;
         life -= world_dt;
-        const Vector2 relative = to - view_center;
+        const Vector2 relative = to - runtime.state.view_center;
         if (shot.kind != 1 && (std::abs(relative.x) > keep.x || std::abs(relative.y) > keep.y) && relative.dot(vel) > 0) life = 0;
         const double step = double(shot.speed) * world_dt;
-        const double reach = double(shot.radius) + ship_config.ship_radius + step;
-        if (ship.pos.distance_squared_to(to) <= reach * reach) {
-            const double t = segment_circle(from, to, ship.pos, double(shot.radius) + ship_config.ship_radius);
+        const double reach = double(shot.radius) + runtime.state.ship_config.ship_radius + step;
+        if (runtime.state.ship.pos.distance_squared_to(to) <= reach * reach) {
+            const double t = segment_circle(from, to, runtime.state.ship.pos, double(shot.radius) + runtime.state.ship_config.ship_radius);
             if (t >= 0) {
                 static const StringName causes[] = {"bullet", "missile", "reflected"};
                 damage_ship(shot.damage, shot.slow, causes[shot.kind]);
@@ -126,8 +126,8 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
 
 Array SpeedRunCore::hostiles_snapshot() const {
     Array out;
-    for (size_t row = 0; row < hostiles.size(); ++row) {
-        const auto &shot = hostiles[row];
+    for (size_t row = 0; row < runtime.state.hostiles.size(); ++row) {
+        const auto &shot = runtime.state.hostiles[row];
         if (!shot.alive) continue;
         Dictionary item;
         item["row"] = int64_t(row); item["kind"] = shot.kind; item["pos"] = shot.pos; item["vel"] = shot.vel;

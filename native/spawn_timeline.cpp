@@ -38,7 +38,7 @@ double sample(const speed::SpawnTimeline::Curve &curve, double at) {
 }
 
 bool SpeedRunCore::configure_spawn_timeline(const Dictionary &data) {
-    if (started || closed) return false;
+    if (runtime.state.started || runtime.state.closed) return false;
     speed::SpawnTimeline parsed;
     double version;
     if (!number(data.get("version", Variant()), version) || version != 2) return false;
@@ -98,15 +98,15 @@ bool SpeedRunCore::configure_spawn_timeline(const Dictionary &data) {
         if (!number(row.get("rank", Variant()), type.rank) || !number(row.get("max_alive", Variant()), type.maximum) || row.get("ranged", Variant()).get_type() != Variant::BOOL) return false;
         type.ranged = row["ranged"]; parsed.types.push_back(type);
     }
-    spawn_timeline = std::move(parsed); spawn_timeline_ready = true;
-    population = Population(); clips.clear(); clips_ready = false;
+    runtime.state.spawn_timeline = std::move(parsed); runtime.state.spawn_timeline_ready = true;
+    runtime.state.population = Population(); runtime.state.clips.clear(); runtime.state.clips_ready = false;
     return true;
 }
 
 Dictionary SpeedRunCore::spawn_target(double at, bool bonus) const {
     Dictionary out;
-    if (!started || closed || !spawn_timeline_ready || !std::isfinite(at) || at < 0) return out;
-    const auto &timeline = spawn_timeline;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.spawn_timeline_ready || !std::isfinite(at) || at < 0) return out;
+    const auto &timeline = runtime.state.spawn_timeline;
     size_t n = 0;
     for (size_t k = 1; k < timeline.phases.size(); ++k) {
         if (timeline.phases[k].start > at) break;

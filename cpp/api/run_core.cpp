@@ -1,5 +1,6 @@
 #include "run_core.h"
-#include "geometry.h"
+#include "../../native/geometry.h"
+#include "../systems/enemy_system.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <algorithm>
@@ -108,81 +109,76 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("close"), &SpeedRunCore::close);
     ClassDB::bind_method(D_METHOD("checkpoint"), &SpeedRunCore::checkpoint);
     ClassDB::bind_method(D_METHOD("update_enemy_definition", "id", "data"), &SpeedRunCore::update_enemy_definition);
+    ClassDB::bind_method(D_METHOD("enemy_handle", "id"), &SpeedRunCore::enemy_handle);
+    ClassDB::bind_method(D_METHOD("valid_enemy_handle", "handle"), &SpeedRunCore::valid_enemy_handle);
     ClassDB::bind_method(D_METHOD("inspect"), &SpeedRunCore::inspect);
 }
 
 bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) {
-    if (started || closed || first_id <= 0 || first_gem_seq < 0) return false;
-    if (lifecycle_ready && !frame_ready) return false;
-    if (forward.ready && !combat_ready) return false;
-    if ((draw_ready && !ship_ready) || (combat_ready && (!ship_ready || !pickups_ready))) return false;
-    if (frame_ready && (!ship_ready || !draw_ready || !combat_ready || !pickups_ready)) return false;
-    for (const auto &def : definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) && (!ship_ready || !bite_zone_config.ready)) return false;
-    next_id = first_id;
-    next_gem_seq = first_gem_seq;
-    rng.instantiate();
-    rng->set_seed(seed);
-    started = true;
+    if (runtime.state.started || runtime.state.closed || first_id <= 0 || first_gem_seq < 0) return false;
+    if (runtime.state.lifecycle_ready && !runtime.state.frame_ready) return false;
+    if (runtime.state.forward.ready && !runtime.state.combat_ready) return false;
+    if ((runtime.state.draw_ready && !runtime.state.ship_ready) || (runtime.state.combat_ready && (!runtime.state.ship_ready || !runtime.state.pickups_ready))) return false;
+    if (runtime.state.frame_ready && (!runtime.state.ship_ready || !runtime.state.draw_ready || !runtime.state.combat_ready || !runtime.state.pickups_ready)) return false;
+    for (const auto &def : runtime.content->definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) && (!runtime.state.ship_ready || !runtime.state.bite_zone_config.ready)) return false;
+    runtime.state.next_id = first_id;
+    runtime.state.next_gem_seq = first_gem_seq;
+    runtime.state.rng.instantiate();
+    runtime.state.rng->set_seed(seed);
+    runtime.state.started = true;
     return true;
 }
 
 bool SpeedRunCore::step(double delta) {
-    if (!started || closed || !std::isfinite(delta) || delta <= 0.0 || !std::isfinite(time + delta)) return false;
-    if (!rows_by_id.empty() && !motion_ready) return false;
-    time += delta;
-    world_time += delta;
+    if (!runtime.state.started || runtime.state.closed || !std::isfinite(delta) || delta <= 0.0 || !std::isfinite(runtime.state.time + delta)) return false;
+    if (!runtime.state.rows_by_id.empty() && !runtime.state.motion_ready) return false;
+    runtime.state.time += delta;
+    runtime.state.world_time += delta;
     advance_enemies(delta);
     return true;
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
     capture_avoidance();
-    ++ticks;
-    if (aim_ready && !draw.tracing) {
-        const Vector2 toward = ship_pos - enemy_aim;
+    ++runtime.state.ticks;
+    if (runtime.state.aim_ready && !runtime.state.draw.tracing) {
+        const Vector2 toward = runtime.state.ship_pos - runtime.state.enemy_aim;
         const double distance = toward.length();
         if (distance >= 1e-6) {
-            const double step = std::min(distance * (1.0 - std::exp(-delta / enemy_aim_lag)), enemy_aim_speed * delta);
-            enemy_aim += toward / distance * step;
+            const double step = std::min(distance * (1.0 - std::exp(-delta / runtime.state.enemy_aim_lag)), runtime.state.enemy_aim_speed * delta);
+            runtime.state.enemy_aim += toward / distance * step;
         }
     }
-    const Vector2 limit = view_half * 1.25 + Vector2(300, 300);
-    for (size_t group = 0; group < behavior_rows.size(); ++group) {
-      const auto &rows = behavior_rows[group];
-      if (behavior_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
+    const Vector2 limit = runtime.state.view_half * 1.25 + Vector2(300, 300);
+    for (size_t group = 0; group < runtime.state.behavior_rows.size(); ++group) {
+      const auto &rows = runtime.state.behavior_rows[group];
+      if (runtime.state.behavior_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
       for (size_t row : rows) {
-        auto &enemy = enemies[row];
+        auto &enemy = runtime.state.enemies[row];
         if (enemy.dead || enemy.held) continue;
         if (enemy.stone > 0) { enemy.stone -= delta; enemy.vel = Vector2(); continue; }
         if (enemy.hit_cd > 0) enemy.hit_cd -= delta;
         if (enemy.flash > 0) enemy.flash -= delta;
         enemy.age += delta;
-        const auto &def = definitions[enemy.definition];
+        const auto &def = runtime.content->definitions[enemy.definition];
         if (def.kind == speed::EnemyDefinition::Kind::Shield && enemy.slash_hold) { enemy.vel = Vector2(); continue; }
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta); continue; }
-        const Vector2 relative = enemy.pos - view_center;
+        const Vector2 relative = enemy.pos - runtime.state.view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
-        if (!far || (enemy.id + ticks) % 3 == 0) {
+        if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
             if (def.kind == speed::EnemyDefinition::Kind::Shield) {
                 const double bdt = far ? delta * 3.0 : delta;
                 enemy.fire_t = std::max(0.0, enemy.fire_t - bdt);
-                const Vector2 toward = enemy_aim - enemy.pos;
+                const Vector2 toward = runtime.state.enemy_aim - enemy.pos;
                 double distance = toward.length();
                 if (distance < 0.001) distance = 1;
                 enemy.vel += (toward / distance * enemy.speed - enemy.vel) * std::min(1.0, def.accel * bdt);
-                const double difference = double((ship_pos - enemy.pos).angle()) - enemy.facing;
+                const double difference = double((runtime.state.ship_pos - enemy.pos).angle()) - enemy.facing;
                 const double wrapped = speed::angle_difference(difference);
                 enemy.facing += std::clamp(wrapped, -def.turn * bdt, def.turn * bdt);
             } else {
-                const Vector2 toward = ship_pos - enemy.pos;
-                const double distance = toward.length();
-                enemy.vel = Vector2();
-                if (distance > 0.001) {
-                    const Vector2 unit = toward / distance;
-                    enemy.vel = unit * enemy.speed;
-                    enemy.facing = unit.angle();
-                }
+                speed::EnemySystem::aim_chase(enemy, runtime.state.ship_pos);
             }
         }
         enemy.pos += enemy.vel * delta;
@@ -191,47 +187,47 @@ void SpeedRunCore::advance_enemies(double delta) {
 }
 
 void SpeedRunCore::close() {
-    closed = true;
-    rng.unref();
-    avoidance_ids.clear(); avoidance_from.clear();
-    progression = Progression();
-    hound_packs.clear();
-    enemies.clear();
-    enemies.shrink_to_fit();
-    free_rows.clear();
-    behavior_rows.clear(); behavior_kinds.clear();
-    dead_rows.clear();
-    rows_by_id.clear();
-    definitions.clear(); formations.clear(); clips.clear(); clips_ready = false;
-    spawn_timeline = speed::SpawnTimeline();
-    population = Population();
-    attack_budget = AttackBudget();
-    draw = Draw();
-    grid = EnemyGrid();
-    events.clear();
-    hostiles.clear(); free_hostiles.clear();
-    bite_zones.clear(); free_bite_zones.clear(); bite_zone_config = BiteZoneConfig();
-    friends.clear(); free_friends.clear(); live_friends = 0; live_debris = 0;
-    gems.clear(); coins.clear(); free_gems.clear(); free_coins.clear(); gem_queue.clear(); collections.clear();
+    runtime.state.closed = true;
+    runtime.state.rng.unref();
+    runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
+    runtime.state.progression = Progression();
+    runtime.state.hound_packs.clear();
+    runtime.state.enemies.clear(); runtime.state.enemy_handles = {};
+    runtime.state.enemies.shrink_to_fit();
+    runtime.state.free_rows.clear();
+    runtime.state.behavior_rows.clear(); runtime.state.behavior_kinds.clear();
+    runtime.state.dead_rows.clear();
+    runtime.state.rows_by_id.clear();
+    runtime.replace_definitions({}); runtime.state.formations.clear(); runtime.state.clips.clear(); runtime.state.clips_ready = false;
+    runtime.state.spawn_timeline = speed::SpawnTimeline();
+    runtime.state.population = Population();
+    runtime.state.attack_budget = AttackBudget();
+    runtime.state.draw = Draw();
+    runtime.state.grid = EnemyGrid();
+    runtime.state.events.clear();
+    runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
+    runtime.state.bite_zones.clear(); runtime.state.free_bite_zones.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
+    runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;
+    runtime.state.gems.clear(); runtime.state.coins.clear(); runtime.state.free_gems.clear(); runtime.state.free_coins.clear(); runtime.state.gem_queue.clear(); runtime.state.collections.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {
     Dictionary out;
-    out["active"] = started && !closed;
-    out["phase"] = int(phase);
-    out["sequence_t"] = sequence_t;
-    out["closed"] = closed;
-    out["time"] = time;
-    out["world_time"] = world_time;
-    out["sim_time"] = sim_time;
-    out["ticks"] = ticks;
-    out["rng_state"] = rng.is_valid() ? String::num_int64(rng->get_state()) : String();
+    out["active"] = runtime.state.started && !runtime.state.closed;
+    out["phase"] = int(runtime.state.phase);
+    out["sequence_t"] = runtime.state.sequence_t;
+    out["closed"] = runtime.state.closed;
+    out["time"] = runtime.state.time;
+    out["world_time"] = runtime.state.world_time;
+    out["sim_time"] = runtime.state.sim_time;
+    out["ticks"] = runtime.state.ticks;
+    out["rng_state"] = runtime.state.rng.is_valid() ? String::num_int64(runtime.state.rng->get_state()) : String();
     return out;
 }
 
 // 入力全体を検証してから差し替え、不正な途中結果を残さない。
 bool SpeedRunCore::configure(const Dictionary &data) {
-    if (started || closed || !data.has("version") ||
+    if (runtime.state.started || runtime.state.closed || !data.has("version") ||
             (data["version"].get_type() != Variant::INT && data["version"].get_type() != Variant::FLOAT) || double(data["version"]) != 2.0 ||
             !data.has("enemies") || data["enemies"].get_type() != Variant::ARRAY) return false;
     double aim_lag = 0, aim_speed = 0;
@@ -349,22 +345,22 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         }
         parsed.push_back(def);
     }
-    definitions = std::move(parsed); formations.clear(); clips.clear(); clips_ready = false;
-    population = Population();
-    enemy_aim_lag = aim_lag; enemy_aim_speed = aim_speed; aim_ready = aim_lag > 0;
+    runtime.replace_definitions(std::move(parsed)); runtime.state.formations.clear(); runtime.state.clips.clear(); runtime.state.clips_ready = false;
+    runtime.state.population = Population();
+    runtime.state.enemy_aim_lag = aim_lag; runtime.state.enemy_aim_speed = aim_speed; runtime.state.aim_ready = aim_lag > 0;
     return true;
 }
 
 bool SpeedRunCore::set_motion_context(Vector2 ship, Vector2 center, Vector2 half) {
-    if (!started || closed || !ship.is_finite() || !center.is_finite() || !half.is_finite() || half.x <= 0 || half.y <= 0) return false;
-    if (!motion_ready) enemy_aim = ship;
-    ship_pos = ship; view_center = center; view_half = half;
-    motion_ready = true;
+    if (!runtime.state.started || runtime.state.closed || !ship.is_finite() || !center.is_finite() || !half.is_finite() || half.x <= 0 || half.y <= 0) return false;
+    if (!runtime.state.motion_ready) runtime.state.enemy_aim = ship;
+    runtime.state.ship_pos = ship; runtime.state.view_center = center; runtime.state.view_half = half;
+    runtime.state.motion_ready = true;
     return true;
 }
 
 bool SpeedRunCore::configure_enemy_order(const PackedStringArray &order) {
-    if (started || closed) return false;
+    if (runtime.state.started || runtime.state.closed) return false;
     std::vector<speed::EnemyDefinition::Kind> kinds;
     for (int64_t i = 0; i < order.size(); ++i) {
         if (order[i] != "chase" && order[i] != "shield" && order[i] != "biter" && order[i] != "hound") return false;
@@ -372,23 +368,23 @@ bool SpeedRunCore::configure_enemy_order(const PackedStringArray &order) {
         if (std::find(kinds.begin(), kinds.end(), kind) != kinds.end()) return false;
         kinds.push_back(kind);
     }
-    behavior_kinds = std::move(kinds);
-    behavior_rows.clear(); behavior_rows.resize(behavior_kinds.size());
+    runtime.state.behavior_kinds = std::move(kinds);
+    runtime.state.behavior_rows.clear(); runtime.state.behavior_rows.resize(runtime.state.behavior_kinds.size());
     return true;
 }
 
 PackedInt64Array SpeedRunCore::enemy_order_snapshot() const {
     PackedInt64Array out;
-    if (closed) return out;
-    for (const auto &rows : behavior_rows) for (size_t row : rows) out.push_back(enemies[row].id);
+    if (runtime.state.closed) return out;
+    for (const auto &rows : runtime.state.behavior_rows) for (size_t row : rows) out.push_back(runtime.state.enemies[row].id);
     return out;
 }
 
 int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dictionary &options) {
-    if (!started || closed || !position.is_finite() || next_id == INT64_MAX) return -1;
+    if (!runtime.state.started || runtime.state.closed || !position.is_finite() || runtime.state.next_id == INT64_MAX) return -1;
     size_t definition = 0;
-    while (definition < definitions.size() && definitions[definition].id != type) ++definition;
-    if (definition == definitions.size()) return -1;
+    while (definition < runtime.content->definitions.size() && runtime.content->definitions[definition].id != type) ++definition;
+    if (definition == runtime.content->definitions.size()) return -1;
     Enemy enemy;
     const Array keys = options.keys();
     for (int i = 0; i < keys.size(); ++i) {
@@ -415,7 +411,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     }
     enemy.definition = definition;
     enemy.pos = position;
-    const auto &def = definitions[definition];
+    const auto &def = runtime.content->definitions[definition];
     if (options.has("attack_group")) {
         const Variant group = options["attack_group"];
         if (group.get_type() != Variant::INT || int64_t(group) < 0) return -1;
@@ -428,7 +424,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     if (options.has("attack_managed") && options["attack_managed"].get_type() != Variant::BOOL) return -1;
     enemy.attack_priority = options.get("attack_priority", def.attack_priority);
     enemy.attack_value = enemy.attack_group > 0 ? double(options.get("attack_value", 1.0)) : def.attack_value;
-    enemy.attack_managed = !attack_formation_mode ? def.attack_weight > 0 :
+    enemy.attack_managed = !runtime.state.attack_formation_mode ? def.attack_weight > 0 :
         (enemy.attack_group > 0 ? bool(options.get("attack_managed", enemy.attack_value > 0)) : def.attack_managed);
     enemy.hp = enemy.max_hp = def.hp;
     enemy.radius = def.radius; enemy.armor = def.armor; enemy.xp = def.xp; enemy.speed = def.speed;
@@ -451,46 +447,49 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
         enemy.xp = def.xp * z * (enemy.elite ? 4.0 : 1.0);
         for (double value : {enemy.radius, enemy.hp, enemy.armor, enemy.xp}) if (!std::isfinite(value)) return -1;
     }
-    size_t row = enemies.size();
-    if (free_rows.empty()) enemies.emplace_back();
-    else { row = free_rows.back(); free_rows.pop_back(); }
-    const auto found = std::find(behavior_kinds.begin(), behavior_kinds.end(), def.kind);
-    enemy.behavior_group = size_t(found - behavior_kinds.begin());
-    if (found == behavior_kinds.end()) { behavior_kinds.push_back(def.kind); behavior_rows.emplace_back(); }
-    auto &active_rows = behavior_rows[enemy.behavior_group];
+    while (!runtime.state.free_rows.empty() && !runtime.state.enemy_handles.reusable(runtime.state.free_rows.back())) runtime.state.free_rows.pop_back();
+    if (runtime.state.free_rows.empty() && runtime.state.enemies.size() >= UINT32_MAX) return -1;
+    size_t row = runtime.state.enemies.size();
+    if (runtime.state.free_rows.empty()) runtime.state.enemies.emplace_back();
+    else { row = runtime.state.free_rows.back(); runtime.state.free_rows.pop_back(); }
+    const auto found = std::find(runtime.state.behavior_kinds.begin(), runtime.state.behavior_kinds.end(), def.kind);
+    enemy.behavior_group = size_t(found - runtime.state.behavior_kinds.begin());
+    if (found == runtime.state.behavior_kinds.end()) { runtime.state.behavior_kinds.push_back(def.kind); runtime.state.behavior_rows.emplace_back(); }
+    auto &active_rows = runtime.state.behavior_rows[enemy.behavior_group];
     enemy.behavior_slot = active_rows.size(); active_rows.push_back(row);
-    enemy.id = next_id++;
-    enemy.fire_t = definitions[definition].fire_interval * (0.5 + rng->randf() * 0.5);
+    enemy.id = runtime.state.next_id++;
+    enemy.fire_t = runtime.content->definitions[definition].fire_interval * (0.5 + runtime.state.rng->randf() * 0.5);
     enemy.alive = true;
-    enemies[row] = enemy;
-    rows_by_id[enemy.id] = row;
+    speed::EnemySystem::insert(runtime.state, uint32_t(row), enemy);
+    runtime.state.rows_by_id[enemy.id] = row;
     if (def.kind == speed::EnemyDefinition::Kind::Hound) spawn_hounds(row, options);
     if (def.rank >= 3) { Dictionary event; event["id"] = enemy.id; event["enemy_type"] = def.id; emit_event("strong_spawn", event); }
     return enemy.id;
 }
 
 bool SpeedRunCore::remove_enemy(int64_t id) {
-    if (!started || closed) return false;
-    auto found = rows_by_id.find(id);
-    if (found == rows_by_id.end()) return false;
+    if (!runtime.state.started || runtime.state.closed) return false;
+    auto found = runtime.state.rows_by_id.find(id);
+    if (found == runtime.state.rows_by_id.end()) return false;
     remove_hound(found->second);
-    auto &enemy = enemies[found->second];
-    auto &active_rows = behavior_rows[enemy.behavior_group];
+    auto &enemy = runtime.state.enemies[found->second];
+    auto &active_rows = runtime.state.behavior_rows[enemy.behavior_group];
     const size_t last = active_rows.back();
     active_rows[enemy.behavior_slot] = last;
-    enemies[last].behavior_slot = enemy.behavior_slot;
+    runtime.state.enemies[last].behavior_slot = enemy.behavior_slot;
     active_rows.pop_back();
     enemy.alive = false;
-    free_rows.push_back(found->second);
-    rows_by_id.erase(found);
+    speed::EnemySystem::release(runtime.state, uint32_t(found->second));
+    if (runtime.state.enemy_handles.reusable(found->second)) runtime.state.free_rows.push_back(found->second);
+    runtime.state.rows_by_id.erase(found);
     return true;
 }
 
 Array SpeedRunCore::enemies_snapshot() const {
     Array out;
-    for (const auto &enemy : enemies) {
+    for (const auto &enemy : runtime.state.enemies) {
         if (!enemy.alive) continue;
-        const auto &def = definitions[enemy.definition];
+        const auto &def = runtime.content->definitions[enemy.definition];
         Dictionary row;
         row["id"] = enemy.id; row["type"] = String(def.id);
         row["pos"] = Array::make(enemy.pos.x, enemy.pos.y);
@@ -512,14 +511,14 @@ Array SpeedRunCore::enemies_snapshot() const {
 // 最新の所有状態から2D変換8値と表示色4値をまとめて渡す。
 PackedFloat32Array SpeedRunCore::enemy_buffer(StringName type, double scale, double angle_offset) const {
     PackedFloat32Array buffer;
-    if (!started || closed || !std::isfinite(scale) || scale <= 0 || !std::isfinite(angle_offset)) return buffer;
+    if (!runtime.state.started || runtime.state.closed || !std::isfinite(scale) || scale <= 0 || !std::isfinite(angle_offset)) return buffer;
     int64_t count = 0;
-    for (const auto &enemy : enemies) if (enemy.alive && !enemy.dead && definitions[enemy.definition].id == type) ++count;
+    for (const auto &enemy : runtime.state.enemies) if (enemy.alive && !enemy.dead && runtime.content->definitions[enemy.definition].id == type) ++count;
     buffer.resize(count * 12);
     float *out = buffer.ptrw();
     int64_t index = 0;
-    for (const auto &enemy : enemies) {
-        if (!enemy.alive || enemy.dead || definitions[enemy.definition].id != type) continue;
+    for (const auto &enemy : runtime.state.enemies) {
+        if (!enemy.alive || enemy.dead || runtime.content->definitions[enemy.definition].id != type) continue;
         const double radius = enemy.radius * scale;
         const double angle = enemy.facing + angle_offset;
         const double c = std::cos(angle) * radius, s = std::sin(angle) * radius;
@@ -532,7 +531,7 @@ PackedFloat32Array SpeedRunCore::enemy_buffer(StringName type, double scale, dou
 
 
 bool SpeedRunCore::configure_frame(const Dictionary &config) {
-    if (started || closed) return false;
+    if (runtime.state.started || runtime.state.closed) return false;
     double values[3];
     const char *keys[] = {"world_tick_div", "grid_cell", "trace_radius"};
     for (int i = 0; i < 3; ++i) {
@@ -543,98 +542,98 @@ bool SpeedRunCore::configure_frame(const Dictionary &config) {
         if (!std::isfinite(values[i]) || values[i] <= 0) return false;
     }
     if (std::floor(values[0]) != values[0] || values[0] > INT32_MAX) return false;
-    world_div = int64_t(values[0]); frame_grid_cell = values[1]; trace_radius = values[2]; frame_ready = true;
+    runtime.state.world_div = int64_t(values[0]); runtime.state.frame_grid_cell = values[1]; runtime.state.trace_radius = values[2]; runtime.state.frame_ready = true;
     return true;
 }
 
 bool SpeedRunCore::set_run_guards(const Dictionary &guards) {
-    if (!started || closed) return false;
+    if (!runtime.state.started || runtime.state.closed) return false;
     const Array keys = guards.keys();
     for (int i = 0; i < keys.size(); ++i) {
         const String key = keys[i];
         if (key != "controls_locked" && key != "encounter_protected" && key != "steering_locked" && key != "invincible" && key != "hitstop_enabled") return false;
         if (guards[keys[i]].get_type() != Variant::BOOL) return false;
     }
-    controls_locked = guards.get("controls_locked", controls_locked);
-    encounter_protected = guards.get("encounter_protected", encounter_protected);
-    steering_locked = guards.get("steering_locked", steering_locked);
-    invincible = guards.get("invincible", invincible);
-    hitstop_enabled = guards.get("hitstop_enabled", hitstop_enabled);
-    if (!hitstop_enabled) hitstop = 0;
+    runtime.state.controls_locked = guards.get("controls_locked", runtime.state.controls_locked);
+    runtime.state.encounter_protected = guards.get("encounter_protected", runtime.state.encounter_protected);
+    runtime.state.steering_locked = guards.get("steering_locked", runtime.state.steering_locked);
+    runtime.state.invincible = guards.get("invincible", runtime.state.invincible);
+    runtime.state.hitstop_enabled = guards.get("hitstop_enabled", runtime.state.hitstop_enabled);
+    if (!runtime.state.hitstop_enabled) runtime.state.hitstop = 0;
     return true;
 }
 
 bool SpeedRunCore::set_paused(bool paused) {
-    if (!started || closed || (phase != Phase::Play && phase != Phase::Paused)) return false;
-    phase = paused ? Phase::Paused : Phase::Play;
-    if (paused) hitstop = 0;
+    if (!runtime.state.started || runtime.state.closed || (runtime.state.phase != Phase::Play && runtime.state.phase != Phase::Paused)) return false;
+    runtime.state.phase = paused ? Phase::Paused : Phase::Play;
+    if (paused) runtime.state.hitstop = 0;
     return true;
 }
 
 bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 center, Vector2 half, double camera_zoom) {
-    if (!started || closed || !frame_ready || !std::isfinite(real_dt) || real_dt <= 0 ||
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.frame_ready || !std::isfinite(real_dt) || real_dt <= 0 ||
             !center.is_finite() || !half.is_finite() || half.x <= 0 || half.y <= 0 || !std::isfinite(camera_zoom) || camera_zoom <= 0) return false;
     for (const char *key : {"touch", "has_cursor", "stick_active", "press", "alt_press", "pen_release"}) if (input.has(key) && input[key].get_type() != Variant::BOOL) return false;
     for (const char *key : {"cursor", "stick", "pen"}) if (input.has(key) && (input[key].get_type() != Variant::VECTOR2 || !Vector2(input[key]).is_finite())) return false;
-    if (phase == Phase::Dying) { step_death(real_dt); return true; }
-    if (phase != Phase::Play) return true;
-    if (controls_locked || encounter_protected) hitstop = 0;
-    const Dictionary intent = controls_locked || steering_locked ? Dictionary() : input;
-    if (controls_locked) ship.vel = Vector2();
-    sim_time += real_dt;
-    if (!motion_ready) enemy_aim = ship_pos;
-    view_center = center; view_half = half; motion_ready = true;
-    handle_draw(intent, int64_t(std::round(sim_time * 1000.0)), camera_zoom);
-    if (hitstop > 0) { hitstop = std::max(0.0, hitstop - real_dt); return true; }
-    if (!draw.tracing && dash_stop > 0) dash_stop = std::max(0.0, dash_stop - real_dt * combat_config.kill_hitstop_regen);
+    if (runtime.state.phase == Phase::Dying) { step_death(real_dt); return true; }
+    if (runtime.state.phase != Phase::Play) return true;
+    if (runtime.state.controls_locked || runtime.state.encounter_protected) runtime.state.hitstop = 0;
+    const Dictionary intent = runtime.state.controls_locked || runtime.state.steering_locked ? Dictionary() : input;
+    if (runtime.state.controls_locked) runtime.state.ship.vel = Vector2();
+    runtime.state.sim_time += real_dt;
+    if (!runtime.state.motion_ready) runtime.state.enemy_aim = runtime.state.ship_pos;
+    runtime.state.view_center = center; runtime.state.view_half = half; runtime.state.motion_ready = true;
+    handle_draw(intent, int64_t(std::round(runtime.state.sim_time * 1000.0)), camera_zoom);
+    if (runtime.state.hitstop > 0) { runtime.state.hitstop = std::max(0.0, runtime.state.hitstop - real_dt); return true; }
+    if (!runtime.state.draw.tracing && runtime.state.dash_stop > 0) runtime.state.dash_stop = std::max(0.0, runtime.state.dash_stop - real_dt * runtime.state.combat_config.kill_hitstop_regen);
     step_draw(real_dt);
     if (check_run_end()) return true;
     const double world_dt = real_dt * world_scale();
-    time += real_dt; world_time += world_dt;
-    world_accum += world_dt; ++world_steps;
-    const bool world_step = world_steps >= world_div;
-    const double accumulated = world_accum;
+    runtime.state.time += real_dt; runtime.state.world_time += world_dt;
+    runtime.state.world_accum += world_dt; ++runtime.state.world_steps;
+    const bool world_step = runtime.state.world_steps >= runtime.state.world_div;
+    const double accumulated = runtime.state.world_accum;
     if (world_step) {
-        world_accum = 0; world_steps = 0;
-        if (attack_budget.frame_enabled) {
+        runtime.state.world_accum = 0; runtime.state.world_steps = 0;
+        if (runtime.state.attack_budget.frame_enabled) {
             sync_attack_budget();
-            if (!advance_attack_budget(world_time)) return false;
+            if (!advance_attack_budget(runtime.state.world_time)) return false;
         }
         advance_enemies(accumulated);
         avoid_strong(accumulated);
         if (check_run_end()) return true;
-        rebuild_enemy_grid(frame_grid_cell);
+        rebuild_enemy_grid(runtime.state.frame_grid_cell);
     }
     step_ship(real_dt, world_dt, intent);
-    if (world_dt > 0 && !controls_locked) step_forward(world_dt);
+    if (world_dt > 0 && !runtime.state.controls_locked) step_forward(world_dt);
     if (world_step && accumulated > 0) {
         step_projectiles(accumulated);
         step_hostiles(accumulated);
         step_hazards(accumulated);
     }
     if (check_run_end()) return true;
-    for (size_t row : dead_rows) if (enemies[row].alive && enemies[row].dead) remove_enemy(enemies[row].id);
-    dead_rows.clear();
+    for (size_t row : runtime.state.dead_rows) if (runtime.state.enemies[row].alive && runtime.state.enemies[row].dead) remove_enemy(runtime.state.enemies[row].id);
+    runtime.state.dead_rows.clear();
     if (world_step) {
-        if (population.frame_enabled && !population.blocked && !attack_guard_active() && !step_population(accumulated, population.bonus)) return false;
+        if (runtime.state.population.frame_enabled && !runtime.state.population.blocked && !attack_guard_active() && !step_population(accumulated, runtime.state.population.bonus)) return false;
         step_pickups(accumulated);
 
     }
-    if (progression.ready) open_cards(false);
+    if (runtime.state.progression.ready) open_cards(false);
     return true;
 }
 
 bool SpeedRunCore::set_attack_formation_mode(bool enabled) {
-    if (closed) return false;
-    attack_formation_mode = enabled;
+    if (runtime.state.closed) return false;
+    runtime.state.attack_formation_mode = enabled;
     return true;
 }
 
 Array SpeedRunCore::enemy_attack_snapshot() const {
     Array out;
-    if (closed) return out;
+    if (runtime.state.closed) return out;
     std::vector<const Enemy *> ordered;
-    for (const auto &enemy : enemies) if (enemy.alive) ordered.push_back(&enemy);
+    for (const auto &enemy : runtime.state.enemies) if (enemy.alive) ordered.push_back(&enemy);
     std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) { return a->id < b->id; });
     for (const auto *enemy : ordered) {
         Dictionary row;
@@ -643,4 +642,17 @@ Array SpeedRunCore::enemy_attack_snapshot() const {
         row["managed"] = enemy->attack_managed; out.append(row);
     }
     return out;
+}
+
+PackedInt64Array SpeedRunCore::enemy_handle(int64_t id) const {
+    PackedInt64Array out;
+    auto found = runtime.state.rows_by_id.find(id);
+    if (found == runtime.state.rows_by_id.end()) return out;
+    const auto handle = runtime.state.enemy_handles.at(uint32_t(found->second));
+    out.push_back(handle.slot); out.push_back(handle.generation);
+    return out;
+}
+bool SpeedRunCore::valid_enemy_handle(PackedInt64Array value) const {
+    if (runtime.state.closed || value.size() != 2 || value[0] < 0 || value[0] >= UINT32_MAX || value[1] <= 0 || value[1] > UINT32_MAX) return false;
+    return runtime.state.enemy_handles.contains({uint32_t(value[0]), uint32_t(value[1])});
 }

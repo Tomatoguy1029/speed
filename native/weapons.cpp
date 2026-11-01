@@ -4,7 +4,7 @@
 using namespace godot;
 
 bool SpeedRunCore::configure_forward(const Dictionary &parameters, int64_t level, double character_scale) {
-    if (started || closed || level < 1 || !std::isfinite(character_scale) || character_scale <= 0) return false;
+    if (runtime.state.started || runtime.state.closed || level < 1 || !std::isfinite(character_scale) || character_scale <= 0) return false;
     ForwardWeapon parsed;
     const char *keys[] = {"interval_by_level", "damage_by_level", "pierce_by_level"};
     double interval = 0, damage = 0, pierce = 0;
@@ -30,38 +30,38 @@ bool SpeedRunCore::configure_forward(const Dictionary &parameters, int64_t level
     }
     parsed.interval = interval; parsed.damage = damage; parsed.pierce = int64_t(pierce);
     parsed.character_scale = character_scale; parsed.ready = true;
-    forward = parsed; forward_parameters=parameters.duplicate(true);
+    runtime.state.forward = parsed; runtime.state.forward_parameters=parameters.duplicate(true);
     return true;
 }
 
 void SpeedRunCore::step_forward(double world_dt) {
-    if (!forward.ready) return;
-    forward.recoil = std::max(0.0, forward.recoil - world_dt);
-    if (draw.drawing || draw.tracing) return;
-    forward.elapsed += world_dt;
-    if (forward.elapsed < forward.interval) return;
-    forward.elapsed = std::fmod(forward.elapsed, forward.interval);
+    if (!runtime.state.forward.ready) return;
+    runtime.state.forward.recoil = std::max(0.0, runtime.state.forward.recoil - world_dt);
+    if (runtime.state.draw.drawing || runtime.state.draw.tracing) return;
+    runtime.state.forward.elapsed += world_dt;
+    if (runtime.state.forward.elapsed < runtime.state.forward.interval) return;
+    runtime.state.forward.elapsed = std::fmod(runtime.state.forward.elapsed, runtime.state.forward.interval);
     // 弾数が整数でも、元の共通弾数処理は乱数を一回進める。
-    rng->randf();
-    const double angle = ship.heading.angle();
-    const Vector2 origin = ship.pos + ship.heading * 16.0 * 1.82 * forward.character_scale;
+    runtime.state.rng->randf();
+    const double angle = runtime.state.ship.heading.angle();
+    const Vector2 origin = runtime.state.ship.pos + runtime.state.ship.heading * 16.0 * 1.82 * runtime.state.forward.character_scale;
     Friendly shot;
     shot.pos = origin; shot.vel = Vector2::from_angle(angle) * 1300.0;
-    shot.damage = combat_config.base_attack * combat_config.attack_mult * combat_config.atk_scale * forward.damage;
-    shot.life = forward.life; shot.pierce_left = forward.pierce; shot.knock = forward.knock;
+    shot.damage = runtime.state.combat_config.base_attack * runtime.state.combat_config.attack_mult * runtime.state.combat_config.atk_scale * runtime.state.forward.damage;
+    shot.life = runtime.state.forward.life; shot.pierce_left = runtime.state.forward.pierce; shot.knock = runtime.state.forward.knock;
     shot.color = Color::html("ffe46b"); shot.weapon_id = "W01"; shot.visual = "weapon/forward";
     add_friend(std::move(shot));
-    forward.recoil = 0.12;
+    runtime.state.forward.recoil = 0.12;
     Dictionary event; event["id"] = StringName("W01"); event["pos"] = origin; event["angle"] = angle; event["visual_key"] = "weapon/forward";
     emit_event("weapon_fire", event);
 }
 
 Dictionary SpeedRunCore::forward_snapshot() const {
-    Dictionary out; out["elapsed"] = forward.elapsed; out["recoil"] = forward.recoil; return out;
+    Dictionary out; out["elapsed"] = runtime.state.forward.elapsed; out["recoil"] = runtime.state.forward.recoil; return out;
 }
 
 bool SpeedRunCore::set_forward_level(int64_t level) {
-    if (!started || closed || !forward.ready || level<1) return false;
-    const Array intervals=forward_parameters["interval_by_level"], damages=forward_parameters["damage_by_level"], pierces=forward_parameters["pierce_by_level"];
-    forward.interval=intervals[std::min(level-1,intervals.size()-1)]; forward.damage=damages[std::min(level-1,damages.size()-1)]; forward.pierce=int64_t(pierces[std::min(level-1,pierces.size()-1)]); return true;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.forward.ready || level<1) return false;
+    const Array intervals=runtime.state.forward_parameters["interval_by_level"], damages=runtime.state.forward_parameters["damage_by_level"], pierces=runtime.state.forward_parameters["pierce_by_level"];
+    runtime.state.forward.interval=intervals[std::min(level-1,intervals.size()-1)]; runtime.state.forward.damage=damages[std::min(level-1,damages.size()-1)]; runtime.state.forward.pierce=int64_t(pierces[std::min(level-1,pierces.size()-1)]); return true;
 }

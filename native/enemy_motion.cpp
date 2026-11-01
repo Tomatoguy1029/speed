@@ -16,8 +16,8 @@ void SpeedRunCore::update_pushed(Enemy &enemy, double dt) {
 
 // 比較・実験場からの操作口。通常の更新では所有している個体へ直接適用する。
 bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
-    if (!started || closed) return false;
-    const auto found = rows_by_id.find(id); if (found == rows_by_id.end()) return false;
+    if (!runtime.state.started || runtime.state.closed) return false;
+    const auto found = runtime.state.rows_by_id.find(id); if (found == runtime.state.rows_by_id.end()) return false;
     const Array keys = state.keys();
     for (int i = 0; i < keys.size(); ++i) {
         if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return false;
@@ -29,7 +29,7 @@ bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
             if (value.get_type() != Variant::VECTOR2 || !Vector2(value).is_finite()) return false;
         } else return false;
     }
-    auto &enemy = enemies[found->second];
+    auto &enemy = runtime.state.enemies[found->second];
     if (state.has("held")) enemy.held = state["held"];
     if (state.has("slash_hold")) enemy.slash_hold = state["slash_hold"];
     if (state.has("stone")) enemy.stone = state["stone"];
@@ -42,7 +42,7 @@ bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
 
 Array SpeedRunCore::enemy_motion_snapshot() const {
     std::vector<const Enemy *> ordered;
-    for (const auto &enemy : enemies) if (enemy.alive) ordered.push_back(&enemy);
+    for (const auto &enemy : runtime.state.enemies) if (enemy.alive) ordered.push_back(&enemy);
     std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) { return a->id < b->id; });
     Array out;
     for (const auto *e : ordered) {

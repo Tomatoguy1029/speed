@@ -22,7 +22,7 @@ template<class T> int64_t pick(const std::vector<T> &items, const Ref<RandomNumb
 }
 
 bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
-    if (started || closed || !std::isfinite(base_view) || base_view < 0) return false;
+    if (runtime.state.started || runtime.state.closed || !std::isfinite(base_view) || base_view < 0) return false;
     std::vector<Formation> parsed;
     for (int i = 0; i < data.size(); ++i) {
         if (data[i].get_type() != Variant::DICTIONARY) return false;
@@ -46,7 +46,7 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
             for (int t = 0; t < types.size(); ++t) {
                 if (types[t].get_type() != Variant::STRING && types[t].get_type() != Variant::STRING_NAME) return false;
                 const StringName type = types[t];
-                if (std::none_of(definitions.begin(), definitions.end(), [&](const auto &d) { return d.id == type; })) return false;
+                if (std::none_of(runtime.content->definitions.begin(), runtime.content->definitions.end(), [&](const auto &d) { return d.id == type; })) return false;
                 layout.types.push_back(type);
             }
             layout.managed = row.get("managed", Variant());
@@ -65,7 +65,7 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
                     if (type.get_type() != Variant::STRING && type.get_type() != Variant::STRING_NAME) return false;
                     marker.type = type;
                     if (marker.type != layout.types[m]) return false;
-                    if (std::none_of(definitions.begin(), definitions.end(), [&](const auto &d) { return d.id == marker.type; })) return false;
+                    if (std::none_of(runtime.content->definitions.begin(), runtime.content->definitions.end(), [&](const auto &d) { return d.id == marker.type; })) return false;
                     if (!point(item.get("offset", Variant()), marker.offset) || !scalar(item.get("rotation", Variant()), marker.rotation)) return false;
                     converted.push_back(marker);
                 }
@@ -75,30 +75,30 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
         }
         parsed.push_back(std::move(formation));
     }
-    formations = std::move(parsed); formation_base_view = base_view;
-    clips.clear(); clips_ready = false;
+    runtime.state.formations = std::move(parsed); runtime.state.formation_base_view = base_view;
+    runtime.state.clips.clear(); runtime.state.clips_ready = false;
     return true;
 }
 
 PackedInt64Array SpeedRunCore::spawn_formation(int64_t index, int64_t layout, int64_t entry, const PackedStringArray &types, double value, const Variant &priority, const Variant &managed) {
     PackedInt64Array ids;
-    if (!started || closed || !ship_ready || !motion_ready || index < 0 || index >= int64_t(formations.size()) || !std::isfinite(value)) return ids;
+    if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.motion_ready || index < 0 || index >= int64_t(runtime.state.formations.size()) || !std::isfinite(value)) return ids;
     double priority_value = 0;
     if (priority.get_type() != Variant::NIL && !scalar(priority, priority_value)) return ids;
     if (managed.get_type() != Variant::NIL && managed.get_type() != Variant::BOOL) return ids;
-    const auto &formation = formations[index];
-    const int64_t group = value >= 0 ? next_id : 0;
-    const int64_t li = layout >= 0 && layout < int64_t(formation.layouts.size()) ? layout : pick(formation.layouts, rng);
-    const int64_t ei = entry >= 0 && entry < int64_t(formation.entries.size()) ? entry : pick(formation.entries, rng);
+    const auto &formation = runtime.state.formations[index];
+    const int64_t group = value >= 0 ? runtime.state.next_id : 0;
+    const int64_t li = layout >= 0 && layout < int64_t(formation.layouts.size()) ? layout : pick(formation.layouts, runtime.state.rng);
+    const int64_t ei = entry >= 0 && entry < int64_t(formation.entries.size()) ? entry : pick(formation.entries, runtime.state.rng);
     if (li < 0 || ei < 0) return ids;
-    Vector2 heading = ship.vel.length() > 40.0 ? ship.vel.normalized() : ship.heading;
+    Vector2 heading = runtime.state.ship.vel.length() > 40.0 ? runtime.state.ship.vel.normalized() : runtime.state.ship.heading;
     if (heading == Vector2()) heading = Vector2(0,-1);
     const double turn = double(heading.angle()) + godot::Math::PI / 2.0;
-    const double stretch = std::max(1.0, double(std::min(view_half.x, view_half.y)) * 2.0 / std::max(formation_base_view, 1.0));
+    const double stretch = std::max(1.0, double(std::min(runtime.state.view_half.x, runtime.state.view_half.y)) * 2.0 / std::max(runtime.state.formation_base_view, 1.0));
     const Vector2 origin = formation.entries[ei].pos * stretch;
     for (const auto &marker : formation.layouts[li].placements[ei]) {
         if (!types.is_empty() && !types.has(String(marker.type))) continue;
-        const Vector2 position = ship_pos + (marker.offset + origin).rotated(turn);
+        const Vector2 position = runtime.state.ship_pos + (marker.offset + origin).rotated(turn);
         const double facing = turn + marker.rotation - godot::Math::PI / 2.0;
         Dictionary options;
         options["facing"] = facing; options["attack_group"] = group; options["attack_value"] = value;

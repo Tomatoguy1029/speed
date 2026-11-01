@@ -4,12 +4,12 @@
 using namespace godot;
 
 void SpeedRunCore::spawn_hounds(size_t row, const Dictionary &options) {
-    auto &enemy = enemies[row];
-    const auto &def = definitions[enemy.definition];
+    auto &enemy = runtime.state.enemies[row];
+    const auto &def = runtime.content->definitions[enemy.definition];
     enemy.pack = options.get("hound_pack", enemy.id); enemy.in_pack = true;
-    hound_packs[enemy.pack].push_back(row);
+    runtime.state.hound_packs[enemy.pack].push_back(row);
     if (!options.has("vel")) {
-        enemy.vel = (ship_pos - enemy.pos).normalized() * enemy.speed;
+        enemy.vel = (runtime.state.ship_pos - enemy.pos).normalized() * enemy.speed;
         enemy.facing = enemy.vel.angle();
     }
     if (options.has("hound_pack")) return;
@@ -25,19 +25,19 @@ void SpeedRunCore::spawn_hounds(size_t row, const Dictionary &options) {
     }
 }
 bool SpeedRunCore::running_hound(size_t row) const {
-    const auto &e = enemies[row];
+    const auto &e = runtime.state.enemies[row];
     return e.alive && !e.dead && !e.held && e.stone <= 0 && e.shove_time <= 0 && e.knock_t <= 0 && e.mode != EnemyMode::Windup;
 }
 Vector2 SpeedRunCore::hound_velocity(size_t row) const {
-    const auto &e = enemies[row]; const auto &pack = definitions[e.definition].pack;
-    const auto *members = hound_packs.getptr(e.pack);
+    const auto &e = runtime.state.enemies[row]; const auto &pack = runtime.content->definitions[e.definition].pack;
+    const auto *members = runtime.state.hound_packs.getptr(e.pack);
     const double gap = std::max(1.0, pack.gap), reach = std::max(1.0, pack.reach);
     Vector2 separation, center, velocity;
     int count = 0;
-    const bool following = e.follow_ready && e.follow_until >= world_time;
+    const bool following = e.follow_ready && e.follow_until >= runtime.state.world_time;
     for (size_t other : *members) {
         if (other == row || !running_hound(other)) continue;
-        const auto &neighbor = enemies[other];
+        const auto &neighbor = runtime.state.enemies[other];
         const Vector2 offset = e.pos - neighbor.pos;
         const double distance = offset.length();
         if (!following && distance > reach) continue;
@@ -51,7 +51,7 @@ Vector2 SpeedRunCore::hound_velocity(size_t row) const {
         desired += separation * e.speed * pack.separation;
         return desired.limit_length(top);
     }
-    const Vector2 chase = (ship_pos - e.pos).normalized() * e.speed;
+    const Vector2 chase = (runtime.state.ship_pos - e.pos).normalized() * e.speed;
     if (count == 0) return chase;
     Vector2 desired = chase.lerp(velocity / count, std::clamp(pack.alignment, 0.0, 1.0));
     desired += (center / count - e.pos) / reach * e.speed * pack.cohesion;
@@ -60,33 +60,33 @@ Vector2 SpeedRunCore::hound_velocity(size_t row) const {
 }
 void SpeedRunCore::prepare_hounds(const std::vector<size_t> &rows) {
     for (size_t row : rows) {
-        auto &e = enemies[row]; e.pursuit_ready = running_hound(row);
+        auto &e = runtime.state.enemies[row]; e.pursuit_ready = running_hound(row);
         if (e.pursuit_ready) e.pursuit = hound_velocity(row);
     }
 }
 void SpeedRunCore::remove_hound(size_t row) {
-    auto &e = enemies[row]; if (!e.in_pack) return;
-    auto &members = hound_packs[e.pack];
+    auto &e = runtime.state.enemies[row]; if (!e.in_pack) return;
+    auto &members = runtime.state.hound_packs[e.pack];
     members.erase(std::remove(members.begin(), members.end(), row), members.end());
-    if (members.empty()) hound_packs.erase(e.pack);
+    if (members.empty()) runtime.state.hound_packs.erase(e.pack);
     e.in_pack = false; e.pursuit_ready = false; e.follow_ready = false;
 }
 bool SpeedRunCore::follow_hound(int64_t id, Vector2 goal, double until, double scale) {
-    if (!started || closed || !goal.is_finite() || !std::isfinite(until) || !std::isfinite(scale) || scale < 0) return false;
-    const auto found = rows_by_id.find(id); if (found == rows_by_id.end()) return false;
-    auto &e = enemies[found->second]; if (!e.in_pack || e.dead) return false;
+    if (!runtime.state.started || runtime.state.closed || !goal.is_finite() || !std::isfinite(until) || !std::isfinite(scale) || scale < 0) return false;
+    const auto found = runtime.state.rows_by_id.find(id); if (found == runtime.state.rows_by_id.end()) return false;
+    auto &e = runtime.state.enemies[found->second]; if (!e.in_pack || e.dead) return false;
     e.follow_ready = true; e.follow_goal = goal; e.follow_until = until; e.follow_scale = scale;
     return true;
 }
 Dictionary SpeedRunCore::hound_snapshot() const {
     Array packs, follows;
-    for (const auto &entry : hound_packs) {
+    for (const auto &entry : runtime.state.hound_packs) {
         Dictionary pack; Array members;
-        for (size_t row : entry.value) members.append(enemies[row].id);
+        for (size_t row : entry.value) members.append(runtime.state.enemies[row].id);
         pack["id"] = entry.key; pack["members"] = members; packs.append(pack);
     }
     std::vector<const Enemy *> ordered;
-    for (const auto &e : enemies) if (e.alive && e.follow_ready) ordered.push_back(&e);
+    for (const auto &e : runtime.state.enemies) if (e.alive && e.follow_ready) ordered.push_back(&e);
     std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) { return a->id < b->id; });
     for (const auto *e : ordered) {
         Dictionary follow; follow["id"] = e->id; follow["goal"] = e->follow_goal;
