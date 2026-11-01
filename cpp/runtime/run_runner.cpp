@@ -58,6 +58,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         control.last_world_real_dt=wr;control.last_world_dt=wd;++control.world_updates;
         if (state.world.attack_budget.frame_enabled) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
         FieldSystem::update(core.runtime);
+        FieldSystem::stream_rocks(core.runtime,wd);
         // ボスは各種類の移植で、この世界更新区間へ接続する。
         core.advance_enemies(wd);
         if (!core.avoid_strong(wd)) return false;
@@ -92,7 +93,7 @@ void RunRunner::leave_bonus(godot::SpeedRunCore &core) {
     auto &state=core.runtime.state;
     state.control.bonus_remaining=0;
     // 現在移行済みの敵は通常敵。ボス・地形の除外は各登録型で接続する。
-    for (size_t row=0;row<state.enemies.size();++row) if (state.enemies[row].alive && !state.enemies[row].dead) {
+    for (size_t row=0;row<state.enemies.size();++row) if (state.enemies[row].alive && !state.enemies[row].dead && !state.field.rock_handles.contains(state.enemies[row].rock)) {
         state.enemies[row].dead=true;state.dead_rows.push_back(row);
     }
     AttackSystem::clear_bonus(state);AttackSystem::clear_hostile(state,AttackEndReason::BonusClear);

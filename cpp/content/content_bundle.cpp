@@ -61,6 +61,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->lifecycle=records.LifecycleDefinition_rows.front();
     bundle->field_bodies=records.FieldBodyDefinition_rows;
     for (const auto &body:bundle->field_bodies) if (body.radius<=0) return {};
+    bundle->rock_fields=records.RockFieldDefinition_rows;
+    if (bundle->rock_fields.size()>1) return {};
     bundle->moon_definitions=records.MoonDefinition_rows;
     for (const auto &moon:bundle->moon_definitions) if (moon.orbit_max<moon.orbit_min || moon.radius_min<=0 || moon.radius_max<moon.radius_min) return {};
     bundle->equipment=records.LoadoutDefinition_rows;
@@ -86,7 +88,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=2 && row.kind!=3) return {};
+        if (row.kind!=0 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto bite=std::find_if(bundle->bites.begin(),bundle->bites.end(),[&](const auto &b){return b.id==row.id;});
         if (row.kind==2 || row.kind==3) {

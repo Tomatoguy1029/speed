@@ -12,6 +12,16 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
     if (kind=="dev_field_query") {
         if (p.get("action",Variant()).get_type()!=Variant::STRING) return reply(false);
         const String action=p["action"];
+        if (action=="rocks" && p.size()==1) {
+            Array rocks;
+            for (uint32_t i=0;i<runtime.state.field.rocks.size();++i) {
+                const auto &rock=runtime.state.field.rocks[i];Dictionary item;
+                item["id"]=i+1;item["kind"]=int(rock.kind);item["initial_position"]=rock.position;item["position"]=speed::FieldSystem::rock_at(runtime,rock);
+                item["velocity"]=rock.velocity;item["size"]=rock.size;item["facing"]=rock.facing;item["spin"]=rock.spin;item["manual"]=rock.manual;item["destroyed"]=rock.destroyed;
+                item["enemy_id"]=runtime.state.enemy_handles.entity_id(rock.proxy);rocks.push_back(item);
+            }
+            return reply(true,rocks);
+        }
         if (action=="snapshot" && p.size()==1) {
             Array bodies;
             for (uint32_t i=0;i<runtime.state.field.bodies.size();++i) {
@@ -31,6 +41,27 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
         if (action=="push") return reply(true,speed::FieldSystem::push_out(runtime,p["position"],p["radius"]));
         if (action=="gap") {const double gap=speed::FieldSystem::body_gap(runtime,p["position"],p["radius"]);return reply(true,std::isfinite(gap)?Variant(gap):Variant());}
         return reply(false);
+    }
+    if (kind=="dev_add_rock") {
+        if (runtime.content->rock_fields.empty() || !point(p,"position") || !p.has("kind") || p["kind"].get_type()!=Variant::INT || int64_t(p["kind"])<0 || int64_t(p["kind"])>=int64_t(speed::RockKind::Comet)) return reply(false);
+        speed::FieldRock rock;rock.kind=speed::RockKind(int64_t(p["kind"]));rock.position=p["position"];
+        for (const auto &key:p.keys()) {
+            if (key.get_type()!=Variant::STRING) return reply(false);const String name=key;
+            if (name=="position" || name=="kind") continue;
+            if (name=="velocity") {if (!point(p,"velocity")) return reply(false);rock.velocity=p[key];}
+            else if (name=="manual") {if (p[key].get_type()!=Variant::BOOL) return reply(false);rock.manual=p[key];}
+            else if (name=="size" || name=="facing" || name=="spin") {
+                const Variant v=p[key];if ((v.get_type()!=Variant::INT && v.get_type()!=Variant::FLOAT) || !std::isfinite(double(v))) return reply(false);
+                if (name=="size") {if (double(v)<=0) return reply(false);rock.size=v;}else if (name=="facing") rock.facing=v;else rock.spin=v;
+            } else return reply(false);
+        }
+        const auto handle=speed::FieldSystem::add_rock(runtime,rock);return reply(runtime.state.field.rock_handles.contains(handle),int64_t(handle.slot)+1);
+    }
+    if (kind=="dev_stream_rocks") {
+        if (runtime.content->rock_fields.empty() || p.size()!=3 || !point(p,"center") || !point(p,"half") || Vector2(p["half"]).x<0 || Vector2(p["half"]).y<0 ||
+            !p.has("dt") || (p["dt"].get_type()!=Variant::FLOAT && p["dt"].get_type()!=Variant::INT) || !std::isfinite(double(p["dt"])) || double(p["dt"])<=0) return reply(false);
+        runtime.state.view_center=p["center"];runtime.state.view_half=p["half"];speed::FieldSystem::stream_rocks(runtime,p["dt"]);
+        return reply(rebuild_enemy_grid(runtime.state.frame_grid_cell));
     }
     if (runtime.state.phase==Phase::Ended || runtime.state.draw.drawing || runtime.state.draw.tracing ||
         (p.size()!=2 && p.size()!=3) || !point(p,"position") || !point(p,"velocity") ||

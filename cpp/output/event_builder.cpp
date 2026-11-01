@@ -32,7 +32,7 @@ CombatEvent event_for(RunRuntime &run,const DamageRequest &request,EnemyHandle t
     event.crit=request.crit;event.direction=request.direction;event.time=state.time;event.world_time=state.world_time;
     if (state.enemy_handles.contains(target)) {
         const auto &enemy=state.enemies[target.slot];event.definition=uint32_t(enemy.definition+1);
-        event.pos=enemy.pos;event.radius=enemy.radius;event.facing=enemy.facing;event.elite=enemy.elite;
+        event.pos=enemy.pos;event.meteor_index=state.field.rock_handles.contains(enemy.rock)?int64_t(enemy.rock.slot):-1;event.radius=enemy.radius;event.facing=enemy.facing;event.elite=enemy.elite;
     }
     event.impact=request.has_impact?request.impact:event.pos;return event;
 }
@@ -94,7 +94,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             d["pos"]=e.impact;d["enemy_pos"]=e.pos;d["r"]=e.radius;d["dir"]=e.direction;append(run,"critical_hit",d);break;
         case CombatEventKind::Kill:
             d["id"]=e.target_id;d["r"]=e.radius;d["crit"]=e.crit;d["t"]=e.time;d["world_t"]=e.world_time;
-            d["enemy_type"]=definition_name(run,e.definition);d["meteor_index"]=-1;d["facing"]=e.facing;
+            d["enemy_type"]=definition_name(run,e.definition);d["meteor_index"]=e.meteor_index;d["facing"]=e.facing;
             d["elite"]=e.elite;d["cause"]=cause;d["dir"]=e.direction;
             if (e.definition && e.definition<=run.content->definitions.size()) d["color"]=run.content->definitions[e.definition-1].color;
             append(run,"kill",d);break;

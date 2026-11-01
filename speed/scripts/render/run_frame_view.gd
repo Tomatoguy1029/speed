@@ -17,6 +17,7 @@ var _jet_time := 0.0
 var pipeline: RenderPipeline
 var _particles: Array[Dictionary] = []
 var _rings: Array[Dictionary] = []
+var _meteor_shards: Array[Dictionary] = []
 var _zoom := 1.0
 var _particle_canvas: Node2D
 var _dim: Node2D
@@ -46,7 +47,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		for p: Dictionary in _particles:
 			var color: Color = p.color
 			color.a = clampf(p.life/p.max,0.0,1.0)
-			_particle_canvas.draw_circle(p.pos,maxf(1.0,roundf(p.size*0.6))*_pixel,color))
+			_particle_canvas.draw_circle(p.pos,maxf(1.0,roundf(p.size*0.6))*_pixel,color)
+		for shard: Dictionary in _meteor_shards:
+			_particle_canvas.draw_set_transform(shard.pos,shard.angle)
+			_particle_canvas.draw_texture(shard.texture,-shard.texture.get_size()*0.5,Color(1,1,1,shard.life/0.65))
+		_particle_canvas.draw_set_transform(Vector2.ZERO))
 	_dim = Node2D.new()
 	_layer(16).add_child(_dim)
 	_dim.draw.connect(func():
@@ -83,7 +88,7 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 		batch = InstanceBatch.new()
 		if entry.role==4: batch.setup_polygon(InstanceBatch.circle_points(24))
 		else:
-			batch.setup_texture(_scope.resources.get(entry.path) as Texture2D)
+			batch.setup_texture(_scope.resources.get(entry.path) as Texture2D,entry.get("rect",Rect2()))
 			var material := ShaderMaterial.new()
 			material.shader = load("res://shaders/xp_crystal.gdshader" if entry.role==3 else "res://shaders/pixel_sprite.gdshader")
 			batch.material = material
@@ -183,6 +188,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_flashes = ShotFlashes.new()
 		_particles.clear()
 		_rings.clear()
+		_meteor_shards.clear()
 	for event: Dictionary in frame.events:
 		var payload: Dictionary = event.payload.duplicate(true)
 		payload["type"] = event.type
@@ -192,6 +198,15 @@ func receive_frame(frame: Dictionary) -> bool:
 func update_effects(frame: Dictionary, dt: float) -> void:
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
+		if event.type==&"kill" and event.get("enemy_type")==&"meteor":
+			var frames: SpriteFrames = _scope.resources.get("res://.content/meteor_pieces.res")
+			if frames!=null:
+				var animation := StringName("meteor_%d" % (posmod(int(event.meteor_index),2)+1))
+				for i in frames.get_frame_count(animation):
+					var texture := frames.get_frame_texture(animation,i) as AtlasTexture
+					var offset: Vector2 = (texture.get_meta("offset") as Vector2).rotated(event.facing)
+					_meteor_shards.append({"texture":texture,"pos":event.pos+offset*0.35,"vel":offset.normalized()*100.0+event.dir*60.0,
+						"angle":event.facing,"spin":-1.5 if i%2==0 else 1.5,"life":0.65})
 		if event.type==&"ring":
 			if _rings.size()>80: _rings.pop_front()
 			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
@@ -210,6 +225,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		p.pos += p.vel*effect_dt
 		p.vel *= 1.0-2.5*effect_dt
 		p.life -= effect_dt
+	for shard: Dictionary in _meteor_shards:
+		shard.pos += shard.vel*effect_dt
+		shard.angle += shard.spin*effect_dt
+		shard.life -= effect_dt
+	_meteor_shards = _meteor_shards.filter(func(shard: Dictionary): return shard.life>0.0)
 	for ring: Dictionary in _rings: ring.life -= effect_dt
 	_rings = _rings.filter(func(ring: Dictionary): return ring.life>0.0)
 	_particles = _particles.filter(func(p: Dictionary): return p.life>0.0)

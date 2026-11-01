@@ -56,9 +56,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead) continue;
         const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id) continue;
         const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
-        const double radius=enemy.radius*definition.sprite_scale;
+        const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
+        const double radius=meteor?FieldSystem::rock_sprite_radius(run,uint32_t(i)):enemy.radius*definition.sprite_scale;
         if (!view.grow(radius*1.4142135623730951).has_point(pose.position)) continue;
-        auto &enemy_batch=batch(definition.visual_id,8,int32_t(enemy.definition));
+        auto &enemy_batch=batch(FieldSystem::rock_visual(run,uint32_t(i)),meteor?7:8,int32_t(enemy.definition));
         if (definition.kind==EnemyDefinition::Kind::Biter) {
             enemy_batch.biter=true;enemy_batch.modes.push_back(int32_t(enemy.mode));enemy_batch.charges.push_back(enemy.charge);
             enemy_batch.timers.push_back(enemy.timer);enemy_batch.rests.push_back(definition.bite.rest);
@@ -66,14 +67,16 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const bool warning=definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {enemy_batch.glows.push_back(pose.position.x);enemy_batch.glows.push_back(pose.position.y);enemy_batch.glows.push_back(radius);}
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,
-            Color(enemy.flash>0 || warning?1.0:0.0,0,0,1),enemy.flash>0 || warning?1:0);
+            Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1),enemy.flash>0 || warning?1:0);
     }
     for (size_t i=0;i<state.friends.size();++i) {
         const auto &shot=state.friends[i];if (!shot.alive) continue;
-        const auto pose=interpolate(previous,{shot.id,shot.pos,shot.vel.angle()},i,true,alpha);
-        const double radius=18.0*1.82*config.character_scale;
+        const auto pose=interpolate(previous,{shot.id,shot.pos,shot.kind==2?double(shot.angle):double(shot.vel.angle())},i,true,alpha);
+        const bool saw=shot.kind==2 && shot.type==StringName("saw");
+        const double radius=saw?double(shot.radius):18.0*1.82*config.character_scale;
         if (!view.grow(radius).has_point(pose.position)) continue;
-        batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1));
+        if (saw && !run.content->rock_fields.empty()) batch(run.content->definitions[run.content->rock_fields.front().saw-1].visual_id,10,0).add(shot.id,pose.position,pose.angle,radius,Color(0,0,0,1));
+        else batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1));
     }
     const Color crystal_colors[]={Color::html("08deff"),Color::html("945cff"),Color::html("ffb609")};
     const double pixel=1.82*config.character_scale;

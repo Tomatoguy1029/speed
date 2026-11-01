@@ -84,7 +84,152 @@
           "ref": "ResourceKey"
         }
       ]
+    },
+    {
+      "name": "RockFieldDefinition",
+      "section": 23,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "meteor_count",
+          "type": "u32"
+        },
+        {
+          "name": "iron_count",
+          "type": "u32"
+        },
+        {
+          "name": "saw_count",
+          "type": "u32"
+        },
+        {
+          "name": "planet_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_coin_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_heal_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_magnet_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "iron",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "saw",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "meteor_visual_0",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_1",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_2",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_3",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_4",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_5",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_radius_0",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_radius_1",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
-  "enums": {}
+  "enums": {
+    "RockKind": [
+      {
+        "name": "Belt",
+        "value": "belt"
+      },
+      {
+        "name": "Drift",
+        "value": "drift"
+      },
+      {
+        "name": "Iron",
+        "value": "iron"
+      },
+      {
+        "name": "Saw",
+        "value": "saw"
+      },
+      {
+        "name": "Comet",
+        "value": "comet"
+      }
+    ]
+  }
 }

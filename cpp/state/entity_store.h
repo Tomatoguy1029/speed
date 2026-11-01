@@ -9,7 +9,8 @@ template<class Tag> struct Handle {
     uint32_t slot = UINT32_MAX;
     uint32_t generation = 0;
 };
-struct EnemyTag {};
+struct EnemyTag {};struct RockTag {};
+using RockHandle=Handle<RockTag>;
 struct AttackTag {};struct TechniqueTag {};struct ParticipantTag {};struct BossTag {};struct EncounterTag {};
 using AttackHandle=Handle<AttackTag>;using TechniqueHandle=Handle<TechniqueTag>;using ParticipantHandle=Handle<ParticipantTag>;
 using BossHandle=Handle<BossTag>;using EncounterHandle=Handle<EncounterTag>;

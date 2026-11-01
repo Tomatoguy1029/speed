@@ -4,11 +4,11 @@ const Schema = preload("res://tools/content/generated/run_schema.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"biter",&"hound"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"biter",&"hound",&"meteor",&"obstacle",&"saw"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"biter":2,&"hound":3}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -57,6 +57,9 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		pack.id = 1
 		data.HoundDefinition = [pack]
 	var sprite := stage.enemy_sprite_path(definition.id) if stage!=null else "res://assets/pixel/%s.png" % definition.id
+	if definition.behavior==&"meteor":
+		sprite = "res://assets/pixel/meteor_0.png"
+		row.sprite_angle = 0.0
 	var look: EnemyLook
 	var skin := sprite.get_file().get_basename()
 	var visual_index: StageResources = stage.resources if stage!=null and stage.resources!=null and not stage.resources.look_paths.is_empty() else ContentManager.visual_index
@@ -122,8 +125,11 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var visuals: Array[Dictionary] = []
 	var field_visuals: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
-	for i in stage.resources.enemy_ids.size():
-		var id: String = stage.resources.enemy_ids[i]
+	var enemy_ids := stage.resources.enemy_ids.duplicate()
+	for terrain in ["meteor","iron","saw"]:
+		if not terrain in enemy_ids: enemy_ids.append(terrain)
+	for i in enemy_ids.size():
+		var id: String = enemy_ids[i]
 		var definition: EnemyDef = definitions.get(StringName(id))
 		if definition == null:
 			definition = ResourceLoader.load("res://data/enemies/%s.tres" % id,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as EnemyDef
@@ -191,8 +197,25 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		visuals.append(row)
 		if row.role==9: data.FieldBodyDefinition[0].visual = row.id
 		else: data.MoonDefinition[0].visual = row.id
+	var terrain := {"id":1}
+	for key in ["meteor_count","iron_count","saw_count","planet_radius","meteor_coin_chance","meteor_heal_chance","meteor_magnet_chance","saw_speed","saw_power","saw_life"]:
+		terrain[key] = config.get(key)
+	for id in ["meteor","iron","saw"]: terrain[id] = enemy_ids.find(id)+1
+	for variant in 2:
+		var path := "res://assets/pixel/%s_spritesheet.png" % ("meteor" if variant==0 else "meteor2")
+		var texture: Texture2D = load(path)
+		if texture==null: return ERR_CANT_OPEN
+		var size := float(texture.get_height())
+		terrain["meteor_radius_%d" % variant] = size*0.5
+		for damage in 3:
+			var key: int = data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":key,"role":0})
+			visuals.append({"id":key,"role":0,"path":path,"rect":Rect2(size*damage,0.0,size,size)})
+			terrain["meteor_visual_%d" % (variant*3+damage)] = key
+	data.RockFieldDefinition = [terrain]
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
+	paths.append("res://.content/meteor_pieces.res")
 	for visual: Dictionary in visuals:
 		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():

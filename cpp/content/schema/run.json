@@ -840,7 +840,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 3
+          "max": 6
         },
         {
           "name": "turn",
@@ -849,7 +849,7 @@
           "native": "turn"
         }
       ],
-      "version": 5
+      "version": 6
     },
     {
       "name": "LoadoutDefinition",
@@ -1236,6 +1236,10 @@
       {
         "name": "HullDebris",
         "value": "hullDebris"
+      },
+      {
+        "name": "Saw",
+        "value": "saw"
       }
     ],
     "VisualRole": [

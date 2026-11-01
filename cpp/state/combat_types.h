@@ -70,7 +70,7 @@ struct CombatEvent {
     double requested=0,resolved=0,applied=0,overkill=0,hp_before=0,hp_after=0;
     double radius=0,facing=0,time=0,world_time=0;
     bool crit=false,elite=false,killed=false,accepted=false;
-    int32_t shatter_depth=0;
+    int32_t shatter_depth=0;int64_t meteor_index=-1;
 };
 const char *combat_reason_name(CombatReason reason);
 }

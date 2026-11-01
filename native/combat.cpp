@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/field.h"
 #include "geometry.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/output/event_builder.h"
@@ -87,7 +88,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     std::vector<Hit> hits;
     for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
         const auto &enemy = runtime.state.enemies[row];
-        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(enemy.id) > 0 : (enemy.hit_cd > 0 && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
+        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(enemy.id) > 0 : (enemy.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
         const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
         if (t >= 0) hits.push_back({t, row});
     }
@@ -116,7 +117,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             runtime.state.ship_pos = runtime.state.ship.pos;
             return true;
         }
-        if (!runtime.state.draw.tracing && enemy.hit_cd > 0) continue;
+        if (!runtime.state.draw.tracing && enemy.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock)) continue;
         const bool rear = std::abs(angle_difference((position - enemy.pos).angle(), enemy.facing + godot::Math::PI)) <= def.weak_arc;
         const bool crit = (def.weak_arc > 0 && rear) || runtime.state.control.rng.randf() < c.crit_chance;
         if (enemy.stone > 0) {
@@ -125,6 +126,18 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             Dictionary event; event["pos"] = enemy.pos; event["normal"] = -direction;
             event["enemy_pos"] = enemy.pos; event["r"] = enemy.radius; emit_event("block_impact", event);
             kill_enemy(hit.row, false, fast ? StringName("ram") : StringName("touch"), direction);
+            continue;
+        }
+        if (speed::FieldSystem::contact_rock(*this,uint32_t(hit.row),direction,from,speed)) continue;
+        if (!fast && runtime.state.field.rock_handles.contains(enemy.rock)) {
+            Vector2 normal=position-enemy.pos;normal=normal.length_squared()>0?normal.normalized():-direction;
+            runtime.state.ship.pos=enemy.pos+normal*(enemy.radius+radius+1.0);
+            const double vn=runtime.state.ship.vel.dot(normal);
+            if (vn<0) {runtime.state.ship.vel-=normal*2.0*vn;runtime.state.ship.vel*=c.bounce_keep;}
+            if (enemy.hit_cd<=0) {
+                enemy.hit_cd=0.25;Dictionary impact;impact["pos"]=position;impact["normal"]=normal;impact["enemy_pos"]=enemy.pos;impact["r"]=enemy.radius;emit_event("block_impact",impact);
+                damage_enemy(hit.row,attack*0.25,"bump",false,-normal);
+            }
             continue;
         }
         if (!fast) {

@@ -74,7 +74,7 @@ double SpeedRunCore::survey_population(double target) {
     }
     for (const auto &rows : runtime.state.behavior_rows) for (size_t row : rows) {
         const auto &enemy = runtime.state.enemies[row];
-        if (enemy.dead) continue;
+        if (enemy.dead || runtime.state.field.rock_handles.contains(enemy.rock)) continue;
         if (p.maximum[enemy.definition] > 0) ++p.type_counts[enemy.definition];
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const double x = std::abs(relative.x), y = std::abs(relative.y);

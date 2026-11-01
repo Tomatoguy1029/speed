@@ -3,12 +3,19 @@ extends Node
 var failed := 0
 var mute_checks := false
 var moons_finished := false
+var rocks_finished := false
 func check(ok: bool, message: String) -> void:
 	if mute_checks: return
 	if not ok:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-rocks" in OS.get_cmdline_user_args():
+		await check_cpp_rocks()
+		check(rocks_finished,"岩の確認本体が最後まで進んだ")
+		print("[cpp_rocks] %d failures" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-moons" in OS.get_cmdline_user_args() or "--cpp-moons-tail" in OS.get_cmdline_user_args() or "--cpp-moons-events" in OS.get_cmdline_user_args():
 		mute_checks = "--cpp-moons-tail" in OS.get_cmdline_user_args() or "--cpp-moons-events" in OS.get_cmdline_user_args()
 		await check_cpp_moons()
@@ -348,3 +355,125 @@ func check_cpp_moons() -> void:
 	context.enemies = null
 	session.free()
 	moons_finished = true
+
+func rock_snapshot(bridge) -> Array:
+	var result: Dictionary = bridge.command("dev_field_query",{"action":"rocks"})
+	check(result.ok,"岩の配置と敵IDを読み取る")
+	return result.value if result.ok else []
+
+func check_cpp_rocks() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 100.0
+	config.moon_count = 0
+	config.meteor_count = 1
+	config.iron_count = 1
+	config.saw_count = 1
+	config.start_radius = 1500.0
+	config.world_tick_div = 1
+	config.meteor_coin_chance = 1.0
+	config.meteor_heal_chance = 1.0
+	config.meteor_magnet_chance = 1.0
+	var stage := RuntimeStage.new()
+	stage.index = 85
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_rocks"
+	var builder = load("res://tools/content/build_run_content.gd")
+	check(builder!=null and builder.can_instantiate(),"岩の生成入口を読み込める")
+	if builder==null or not builder.can_instantiate(): return
+	var built: Error = builder.build(stage,config,output,"岩の配置と生成・退場・破壊".sha256_text())
+	check(built==OK,"地形の敵定義・配置の値・隕石の画像シートを生成する")
+	if built!=OK: return
+	var index_path := output.path_join("stage_85.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":44},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"隕石・鉄屑・鋸と破片の資源を準備して開始する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var generated := rock_snapshot(bridge)
+	var kinds := {}
+	for rock: Dictionary in generated:
+		kinds[rock.kind] = true
+		check(rock.position.length()>=config.planet_radius+200.0 and rock.position.length()<=config.field_radius-100.0,"初期配置を惑星と外縁から離す")
+	check(kinds.has(1) and kinds.has(2) and kinds.has(3),"設定した漂流隕石・鉄屑・丸鋸を配置する")
+	var ids: Array[int] = []
+	for entry in [[0,Vector2(-1500,0),40.0,false],[2,Vector2(-1500,250),35.0,false],
+		[3,Vector2(-1500,-250),30.0,false],[0,Vector2(-1500,700),40.0,true]]:
+		var added: Dictionary = bridge.command("dev_add_rock",{"kind":entry[0],"position":entry[1],"size":entry[2],"manual":entry[3]})
+		check(added.ok,"固定の岩を配置する")
+		if not added.ok:
+			session.free()
+			return
+		ids.append(int(added.value))
+	var size := 60.0 if (ids[0]-1)%2==0 else 40.0
+	var collision_radius := size*config.character_scale
+	check(bridge.command("dev_ship_motion",{"position":Vector2(-1500-collision_radius-config.ship_radius+0.5,0),"velocity":Vector2(30,0)}).ok,"生成直後に岩へ触れる機体を置く")
+	fixed_step(bridge)
+	var rocks := rock_snapshot(bridge)
+	var first_ids: Array[int] = []
+	for id in ids:
+		var rock: Dictionary = rocks[id-1]
+		check(rock.enemy_id>0 and not rock.destroyed,"画面近傍の配置と敵の論理IDを結ぶ")
+		first_ids.append(int(rock.enemy_id))
+	var ship: Dictionary = bridge.read_frame().value.ui.ship
+	check(ship.ship_pos.x<=-1500-collision_radius-config.ship_radius and ship.ship_vel.x<=0.0,"生成した同じ更新で低速接触を反射し、岩を通り抜けない")
+	var render: Dictionary = bridge.read_render(Rect2(-2300,-1000,1600,2000)).value
+	for id in first_ids:
+		var shown := false
+		for batch: Dictionary in render.batches:
+			if batch.ids.has(id): shown = true
+		check(shown,"隕石・鉄屑・丸鋸・手動配置を表示する")
+	check(bridge.command("dev_stream_rocks",{"center":Vector2(8000,8000),"half":Vector2(100,100),"dt":0.2}).ok,"表示範囲を岩から離す")
+	rocks = rock_snapshot(bridge)
+	for i in 3: check(rocks[ids[i]-1].enemy_id==0 and not rocks[ids[i]-1].destroyed,"画面外の敵行だけを退場させて配置を残す")
+	check(rocks[ids[3]-1].enemy_id==first_ids[3],"手動配置は画面外でも同じ敵IDで残す")
+	check(bridge.command("dev_stream_rocks",{"center":Vector2(-1500,0),"half":Vector2(700,700),"dt":0.2}).ok,"岩を表示範囲へ戻す")
+	rocks = rock_snapshot(bridge)
+	for i in 3: check(rocks[ids[i]-1].enemy_id>first_ids[i],"再入場は新しい敵IDを同じ岩に結ぶ")
+	var before: Dictionary = bridge._core.pickups_snapshot()
+	check(before.gems.is_empty() and before.coins.is_empty() and before.capsules.is_empty(),"画面外への退場はドロップを出さない")
+	var target: int = rocks[ids[0]-1].enemy_id
+	var killed: Dictionary = bridge.command("dev_kill",{"entity_id":target,"cause":"ram"})
+	check(killed.ok and killed.value.killed,"隕石の撃破を共通の撃破・報酬へ通す")
+	var drops: Dictionary = bridge._core.pickups_snapshot()
+	check(not drops.gems.is_empty() and drops.coins.size()>=1 and drops.coins.size()<=3 and drops.capsules.size()==2,"隕石の固定結晶・固有の部品数・回復/マグネットを出す")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(not presentation.frame_view._meteor_shards.is_empty(),"隕石の撃破から既存の画像片を表示する")
+	fixed_step(bridge)
+	check(bridge.command("dev_stream_rocks",{"center":Vector2(8000,8000),"half":Vector2(100,100),"dt":0.2}).ok,"撃破後にも画面外を処理する")
+	check(bridge.command("dev_stream_rocks",{"center":Vector2(-1500,0),"half":Vector2(700,700),"dt":0.2}).ok,"撃破後に表示範囲を戻す")
+	rocks = rock_snapshot(bridge)
+	check(rocks[ids[0]-1].destroyed and rocks[ids[0]-1].enemy_id==0,"撃破後は画面を出入りしても復活させない")
+	var saw_id: int = rocks[ids[2]-1].enemy_id
+	check(saw_id>0,"鋸の接触対象を保持する")
+	var rejected: Dictionary = bridge.command("dev_damage",{"entity_id":saw_id,"amount":1000000.0,"cause":"shot"})
+	check(rejected.ok and rejected.value.reason=="damage_gate","丸鋸は通常の攻撃で壊さない")
+	var saw: Dictionary
+	for enemy: Dictionary in bridge._core.enemies_snapshot():
+		if enemy.id==saw_id: saw = enemy
+	var at := Vector2(saw.pos[0],saw.pos[1])
+	var from := at-Vector2(saw.radius+config.ship_radius+2.0,0)
+	check(bridge.command("dev_ship_motion",{"position":at+Vector2(saw.radius+config.ship_radius+2.0,0),"velocity":Vector2(800,0)}).ok,"鋸を横断する機体を設定する")
+	bridge._core.collide_ship(from,config.ship_radius)
+	var shots: Array = bridge._core.projectiles_snapshot()
+	var launched := false
+	for shot: Dictionary in shots:
+		if shot.type==&"saw": launched = shot.kind==2 and shot.pierce and shot.vel.x>=config.saw_speed and is_equal_approx(shot.radius,saw.radius)
+	check(launched,"接触方向へ同じ半径の貫通する鋸を投射する")
+	check(bridge.command("dev_stream_rocks",{"center":Vector2(-1500,0),"half":Vector2(700,700),"dt":0.2}).ok,"鋸接触後の配置を同期する")
+	rocks = rock_snapshot(bridge)
+	check(rocks[ids[2]-1].destroyed and rocks[ids[2]-1].enemy_id==0,"投射した鋸の配置を復活させない")
+	var held_drops: Dictionary = bridge._core.pickups_snapshot()
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"岩・敵との参照・破壊状態とドロップを保持する")
+	check(bridge.command("dev_stream_rocks",{"center":Vector2(8000,8000),"half":Vector2(100,100),"dt":0.2}).ok,"保持点のあとに表示範囲を変える")
+	check(bridge.restore(held.value).ok and rock_snapshot(bridge)==rocks and bridge._core.pickups_snapshot()==held_drops,"保持点から岩の配置・敵ID・破壊状態へ戻す")
+	bridge.release_checkpoint(held.value)
+	await get_tree().process_frame
+	session.free()
+	rocks_finished = true

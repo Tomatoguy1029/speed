@@ -8,7 +8,7 @@ using namespace godot;
 bool SpeedRunCore::can_avoid_strong(size_t row) const {
     const auto &e = runtime.state.enemies[row];
     // 部位・ボス・吸引の状態は各経路の移行時にここへ接続する。
-    return e.alive && !e.dead && runtime.content->definitions[e.definition].rank <= 2 && e.mode == EnemyMode::Move &&
+    return e.alive && !e.dead && !runtime.state.field.rock_handles.contains(e.rock) && runtime.content->definitions[e.definition].rank <= 2 && e.mode == EnemyMode::Move &&
         !e.held && e.stone <= 0 && e.shove_time <= 0 && e.knock_t <= 0;
 }
 void SpeedRunCore::capture_avoidance() {

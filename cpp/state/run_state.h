@@ -46,6 +46,7 @@ struct RunState {
         bool alive = false, dead = false, elite = false, is_boss = false, hull_scattered = false;
         double guard = 0;
         speed::EnemyHandle damage_target;
+        speed::RockHandle rock;
         speed::EnemyHandle pump_owner;
         double hit_cd = 0, flash = 0;
         double stone = 0, knock_t = 0, shove_time = 0;
@@ -158,6 +159,9 @@ struct RunState {
     struct Coin { Vector2 pos; bool alive = true, pulled = false; };
     std::vector<Gem> gems;
     std::vector<Coin> coins;
+    enum class CapsuleKind {Heal,Magnet,CometWeapon};
+    struct Capsule {Vector2 pos;double age=0;CapsuleKind kind=CapsuleKind::Heal;uint32_t weapon=0;bool drop=true;};
+    std::vector<Capsule> capsules;
     std::vector<size_t> free_gems, free_coins;
     Array collections;
     std::vector<std::pair<size_t, int64_t>> gem_queue;

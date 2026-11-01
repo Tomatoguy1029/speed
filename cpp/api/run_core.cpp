@@ -174,7 +174,7 @@ void SpeedRunCore::advance_enemies(double delta) {
       if (runtime.state.behavior_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
       for (size_t row : rows) {
         auto &enemy = runtime.state.enemies[row];
-        if (enemy.dead || enemy.held) continue;
+        if (enemy.dead || enemy.held || runtime.state.field.rock_handles.contains(enemy.rock)) continue;
         if (enemy.stone > 0) { enemy.stone=speed::remaining_time(enemy.stone,delta); enemy.vel = Vector2(); continue; }
         if (enemy.hit_cd > 0) enemy.hit_cd=speed::remaining_time(enemy.hit_cd,delta);
         if (enemy.guard > 0) enemy.guard=speed::remaining_time(enemy.guard,delta);
@@ -235,7 +235,7 @@ void SpeedRunCore::close() {
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.bite_zones.clear(); runtime.state.free_bite_zones.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;
-    runtime.state.gems.clear(); runtime.state.coins.clear(); runtime.state.free_gems.clear(); runtime.state.free_coins.clear(); runtime.state.gem_queue.clear(); runtime.state.collections.clear();
+    runtime.state.gems.clear(); runtime.state.coins.clear();runtime.state.capsules.clear(); runtime.state.free_gems.clear(); runtime.state.free_coins.clear(); runtime.state.gem_queue.clear(); runtime.state.collections.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {
@@ -421,91 +421,36 @@ PackedInt64Array SpeedRunCore::enemy_order_snapshot() const {
     return out;
 }
 
-int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dictionary &options) {
-    if (!runtime.state.started || runtime.state.closed || !position.is_finite() || runtime.state.next_id == INT64_MAX) return -1;
-    size_t definition = 0;
-    while (definition < runtime.content->definitions.size() && runtime.content->definitions[definition].id != type) ++definition;
-    if (definition == runtime.content->definitions.size()) return -1;
-    Enemy enemy;
-    const Array keys = options.keys();
-    for (int i = 0; i < keys.size(); ++i) {
-        if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return -1;
-        const String key = keys[i];
-        if (key != "elite" && key != "size" && key != "facing" && key != "vel" && key != "attack_group" && key != "attack_value" && key != "attack_priority" && key != "attack_managed" && key != "knock" && key != "hound_pack") return -1;
-    }
-    if (options.has("elite") && options["elite"].get_type() != Variant::BOOL) return -1;
-    if (options.has("hound_pack") && options["hound_pack"].get_type() != Variant::INT) return -1;
-    enemy.elite = options.get("elite", false);
-    if (options.has("facing")) {
-        const Variant facing = options["facing"];
-        if ((facing.get_type() != Variant::FLOAT && facing.get_type() != Variant::INT) || !std::isfinite(double(facing))) return -1;
-        enemy.facing = facing;
-    }
-    if (options.has("vel")) {
-        if (options["vel"].get_type() != Variant::VECTOR2 || !Vector2(options["vel"]).is_finite()) return -1;
-        enemy.vel = options["vel"];
-    }
-    if (options.has("knock")) {
-        const Variant value = options["knock"];
-        if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return -1;
-        enemy.knock_t = value;
-    }
-    enemy.definition = definition;
-    enemy.pos = position;
-    const auto &def = runtime.content->definitions[definition];
-    if (options.has("attack_group")) {
-        const Variant group = options["attack_group"];
-        if (group.get_type() != Variant::INT || int64_t(group) < 0) return -1;
-        enemy.attack_group = group;
-    }
-    for (const char *key : {"attack_value", "attack_priority"}) if (options.has(key)) {
-        const Variant value = options[key];
-        if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return -1;
-    }
-    if (options.has("attack_managed") && options["attack_managed"].get_type() != Variant::BOOL) return -1;
-    enemy.attack_priority = options.get("attack_priority", def.attack_priority);
-    enemy.attack_value = enemy.attack_group > 0 ? double(options.get("attack_value", 1.0)) : def.attack_value;
-    enemy.attack_managed = !runtime.state.world.attack_formation_mode ? def.attack_weight > 0 :
-        (enemy.attack_group > 0 ? bool(options.get("attack_managed", enemy.attack_value > 0)) : def.attack_managed);
-    enemy.hp = enemy.max_hp = def.hp;
-    enemy.radius = def.radius; enemy.armor = def.armor; enemy.xp = def.xp; enemy.speed = def.speed;
-    if ((options.has("size") || enemy.elite) && !def.scaling.ready) return -1;
-    if (def.scaling.ready) {
-        const auto &s = def.scaling;
-        double size = s.radius;
-        if (options.has("size")) {
-            const Variant value = options["size"];
-            if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value)) || double(value) <= 0) return -1;
-            size = value;
+int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Dictionary &options) {
+    if (!runtime.state.started || runtime.state.closed || !runtime.content) return -1;
+    size_t definition=0;while (definition<runtime.content->definitions.size() && runtime.content->definitions[definition].id!=type) ++definition;
+    if (definition==runtime.content->definitions.size()) return -1;
+    speed::EnemySpawn params;params.position=position;
+    for (const auto &key:options.keys()) {
+        if (key.get_type()!=Variant::STRING && key.get_type()!=Variant::STRING_NAME) return -1;
+        const String name=key;const Variant value=options[key];
+        if (name=="elite" || name=="attack_managed") {
+            if (value.get_type()!=Variant::BOOL) return -1;
+            if (name=="elite") params.elite=value;else {params.has_managed=true;params.managed=value;}
+        } else if (name=="vel") {if (value.get_type()!=Variant::VECTOR2 || !Vector2(value).is_finite()) return -1;params.velocity=value;}
+        else if (name=="attack_group" || name=="hound_pack") {
+            if (value.get_type()!=Variant::INT || (name=="attack_group" && int64_t(value)<0)) return -1;
+            if (name=="attack_group") params.group=value;else params.hound_pack=value;
+        } else {
+            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value))) return -1;
+            if (name=="size") {if (double(value)<=0) return -1;params.size=value;}
+            else if (name=="facing") params.facing=value;
+            else if (name=="knock") params.knock=value;
+            else if (name=="attack_value") {params.has_value=true;params.value=value;}
+            else if (name=="attack_priority") {params.has_priority=true;params.priority=value;}
+            else return -1;
         }
-        const double z = size / s.radius;
-        double radius = size * (enemy.elite ? 1.25 : 1.0);
-        if (s.fixed_sprite) radius = s.radius;
-        radius *= s.character;
-        enemy.radius = radius * s.visual * s.collision;
-        enemy.hp = enemy.max_hp = s.hp * z * z * s.hp_mult * (enemy.elite ? 3.0 : 1.0);
-        enemy.armor = s.armor * z * s.armor_mult * (enemy.elite ? 1.3 : 1.0);
-        enemy.xp = def.xp * z * (enemy.elite ? 4.0 : 1.0);
-        for (double value : {enemy.radius, enemy.hp, enemy.armor, enemy.xp}) if (!std::isfinite(value)) return -1;
     }
-    while (!runtime.state.free_rows.empty() && !runtime.state.enemy_handles.reusable(runtime.state.free_rows.back())) runtime.state.free_rows.pop_back();
-    if (runtime.state.free_rows.empty() && runtime.state.enemies.size() >= UINT32_MAX) return -1;
-    size_t row = runtime.state.enemies.size();
-    if (runtime.state.free_rows.empty()) runtime.state.enemies.emplace_back();
-    else { row = runtime.state.free_rows.back(); runtime.state.free_rows.pop_back(); }
-    const auto found = std::find(runtime.state.behavior_kinds.begin(), runtime.state.behavior_kinds.end(), def.kind);
-    enemy.behavior_group = size_t(found - runtime.state.behavior_kinds.begin());
-    if (found == runtime.state.behavior_kinds.end()) { runtime.state.behavior_kinds.push_back(def.kind); runtime.state.behavior_rows.emplace_back(); }
-    auto &active_rows = runtime.state.behavior_rows[enemy.behavior_group];
-    enemy.behavior_slot = active_rows.size(); active_rows.push_back(row);
-    enemy.id = runtime.state.next_id++;
-    enemy.fire_t = runtime.content->definitions[definition].fire_interval * (0.5 + runtime.state.control.rng.randf() * 0.5);
-    enemy.alive = true;
-    speed::EnemySystem::insert(runtime.state, uint32_t(row), enemy);
-    runtime.state.rows_by_id[enemy.id] = row;
-    if (def.kind == speed::EnemyDefinition::Kind::Hound) spawn_hounds(row, options);
-    if (def.rank >= 3) { Dictionary event; event["id"] = enemy.id; event["enemy_type"] = def.id; emit_event("strong_spawn", event); }
-    return enemy.id;
+    const int64_t id=speed::EnemySystem::spawn_base(runtime,definition,params);if (id<0) return id;
+    const auto &def=runtime.content->definitions[definition];const auto row=runtime.state.rows_by_id.at(id);
+    if (def.kind==speed::EnemyDefinition::Kind::Hound) spawn_hounds(row,options);
+    if (def.rank>=3) {Dictionary event;event["id"]=id;event["enemy_type"]=def.id;emit_event("strong_spawn",event);}
+    return id;
 }
 
 bool SpeedRunCore::remove_enemy(int64_t id) {

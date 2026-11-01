@@ -51,7 +51,8 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
     for (const auto &coin : runtime.state.coins) if (coin.alive) {
         Dictionary row; row["pos"] = coin.pos; row["pulled"] = coin.pulled; visible_coins.append(row);
     }
-    Dictionary out; out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.xp_dropped;
+    Array capsules;for (const auto &capsule:runtime.state.capsules) {Dictionary row;row["kind"]=int(capsule.kind);row["pos"]=capsule.pos;row["age"]=capsule.age;row["weapon"]=capsule.weapon;row["drop"]=capsule.drop;capsules.push_back(row);}
+    Dictionary out;out["capsules"]=capsules;out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.xp_dropped;
     return out;
 }
 

@@ -382,7 +382,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 3) return false;
+    if (out.kind > 6) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     return true;
@@ -729,6 +729,74 @@ inline bool read(BinaryReader &input, MoonDefinition &out) {
     if (out.visual < 1) return false;
     return true;
 }
+struct RockFieldDefinition {
+    uint32_t id{};
+    uint32_t meteor_count{};
+    uint32_t iron_count{};
+    uint32_t saw_count{};
+    double planet_radius{};
+    double meteor_coin_chance{};
+    double meteor_heal_chance{};
+    double meteor_magnet_chance{};
+    double saw_speed{};
+    double saw_power{};
+    double saw_life{};
+    uint32_t meteor{};
+    uint32_t iron{};
+    uint32_t saw{};
+    uint32_t meteor_visual_0{};
+    uint32_t meteor_visual_1{};
+    uint32_t meteor_visual_2{};
+    uint32_t meteor_visual_3{};
+    uint32_t meteor_visual_4{};
+    uint32_t meteor_visual_5{};
+    double meteor_radius_0{};
+    double meteor_radius_1{};
+};
+inline bool read(BinaryReader &input, RockFieldDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.meteor_count)) return false;
+    if (!input.read_u32(out.iron_count)) return false;
+    if (!input.read_u32(out.saw_count)) return false;
+    if (!input.read_f64(out.planet_radius)) return false;
+    if (out.planet_radius < 0) return false;
+    if (!input.read_f64(out.meteor_coin_chance)) return false;
+    if (out.meteor_coin_chance < 0) return false;
+    if (!input.read_f64(out.meteor_heal_chance)) return false;
+    if (out.meteor_heal_chance < 0) return false;
+    if (!input.read_f64(out.meteor_magnet_chance)) return false;
+    if (out.meteor_magnet_chance < 0) return false;
+    if (!input.read_f64(out.saw_speed)) return false;
+    if (out.saw_speed < 0) return false;
+    if (!input.read_f64(out.saw_power)) return false;
+    if (out.saw_power < 0) return false;
+    if (!input.read_f64(out.saw_life)) return false;
+    if (out.saw_life < 0) return false;
+    if (!input.read_u32(out.meteor)) return false;
+    if (out.meteor < 1) return false;
+    if (!input.read_u32(out.iron)) return false;
+    if (out.iron < 1) return false;
+    if (!input.read_u32(out.saw)) return false;
+    if (out.saw < 1) return false;
+    if (!input.read_u32(out.meteor_visual_0)) return false;
+    if (out.meteor_visual_0 < 1) return false;
+    if (!input.read_u32(out.meteor_visual_1)) return false;
+    if (out.meteor_visual_1 < 1) return false;
+    if (!input.read_u32(out.meteor_visual_2)) return false;
+    if (out.meteor_visual_2 < 1) return false;
+    if (!input.read_u32(out.meteor_visual_3)) return false;
+    if (out.meteor_visual_3 < 1) return false;
+    if (!input.read_u32(out.meteor_visual_4)) return false;
+    if (out.meteor_visual_4 < 1) return false;
+    if (!input.read_u32(out.meteor_visual_5)) return false;
+    if (out.meteor_visual_5 < 1) return false;
+    if (!input.read_f64(out.meteor_radius_0)) return false;
+    if (out.meteor_radius_0 < 0) return false;
+    if (!input.read_f64(out.meteor_radius_1)) return false;
+    if (out.meteor_radius_1 < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -752,6 +820,7 @@ struct ContentRecords {
     std::vector<HoundDefinition> HoundDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
+    std::vector<RockFieldDefinition> RockFieldDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -774,7 +843,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 5) return false;
+        if (version != 6) return false;
         if (count > input.remaining()/236) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -893,6 +962,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { MoonDefinition row; if (!read(input,row)) return false; out.MoonDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 23: {
+        if (version != 1) return false;
+        if (count > input.remaining()/124) return false;
+        for (uint32_t i=0; i<count; ++i) { RockFieldDefinition row; if (!read(input,row)) return false; out.RockFieldDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -941,6 +1016,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
     for (const auto &row:data.MoonDefinition_rows) if (!MoonDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> RockFieldDefinition_ids;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!RockFieldDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -958,6 +1035,15 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.iron)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.saw)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_0)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_1)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_2)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_3)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_4)) return false;
+    for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_5)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -1078,5 +1164,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=22;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=23;
 }

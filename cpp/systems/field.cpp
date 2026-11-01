@@ -24,6 +24,7 @@ void FieldSystem::initialize(RunRuntime &run) {
         }
     }
     update(run);
+    initialize_rocks(run);
 }
 void FieldSystem::update(RunRuntime &run) {
     for (auto &body:run.state.field.bodies) if (body.moon) {
@@ -98,6 +99,12 @@ bool FieldSystem::validate(const godot::RunState &state,const ContentBundle &con
     for (const auto &body:state.field.bodies) if (body.definition>=(body.moon?content.moon_definitions.size():content.field_bodies.size()) ||
         !body.position.is_finite() || !std::isfinite(body.radius) || body.radius<=0 || !std::isfinite(body.orbit) || body.orbit<0 ||
         !std::isfinite(body.a0) || (body.direction!=1 && body.direction!=-1)) return false;
-    return true;
+    for (uint32_t i=0;i<state.field.rocks.size();++i) {
+        const auto &rock=state.field.rocks[i];
+        if (!state.field.rock_handles.contains(state.field.rock_handles.at(i)) || rock.kind>=RockKind::Count || !rock.position.is_finite() || !rock.velocity.is_finite() ||
+            !std::isfinite(rock.size) || rock.size<=0 || !std::isfinite(rock.facing) || !std::isfinite(rock.spin) || !std::isfinite(rock.born) || !std::isfinite(rock.gone)) return false;
+        if (state.enemy_handles.contains(rock.proxy) && !same_handle(state.enemies[rock.proxy.slot].rock,state.field.rock_handles.at(i))) return false;
+    }
+    return std::isfinite(state.field.stream_t);
 }
 }

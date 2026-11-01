@@ -153,7 +153,7 @@ Array SpeedRunCore::projectiles_snapshot() const {
         Dictionary item;
         item["row"] = int64_t(row); item["kind"] = shot.kind; item["generation"] = shot.generation; item["pos"] = shot.pos; item["vel"] = shot.vel;
         item["radius"] = shot.radius; item["damage"] = shot.damage; item["life"] = shot.life; item["age"] = shot.age;
-        item["pierce_left"] = shot.pierce_left; item["hit_ids"] = ids; item["angle"] = shot.angle; item["trail"] = shot.trail;
+        item["cause"]=shot.cause;item["type"]=shot.type;item["pierce"]=shot.pierce;item["pierce_left"] = shot.pierce_left; item["hit_ids"] = ids; item["angle"] = shot.angle; item["trail"] = shot.trail;
         out.append(item);
     }
     return out;

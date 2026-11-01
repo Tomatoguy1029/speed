@@ -9,6 +9,7 @@ void passive_death(RunRuntime &run,const DeathContext &death) {
     auto &state=run.state;if (state.world.attack_formation_mode || death.corpse.is_boss) return;
     AttackBudgetSystem(run).passive(std::to_string(death.corpse.id),death.target);
 }
+bool saw_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest &) {return run.state.enemies[target.slot].stone>0;}
 bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {
     const auto &enemy=run.state.enemies[target.slot];
     if (enemy.stone>0) return true;
@@ -17,7 +18,7 @@ bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest 
     return toward.length_squared()==0 || std::abs(angle_difference(double(toward.angle())-enemy.facing))>run.content->definitions[enemy.definition].front_arc;
 }
 }
-CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);}
+CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);}
 bool CombatHooks::register_enemy(EnemyDefinition::Kind kind,EnemyPolicy policy) {
     if (dispatch_depth) return false;policies[kind]=policy;return true;
 }

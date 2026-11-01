@@ -91,11 +91,18 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     if (!state.pickup_config.fixed_rewards) {drop_legacy(run,enemy);return;}
     for (uint8_t kind=0;kind<3;++kind) for (uint32_t i=0;i<definition.xp_rewards[kind];++i) drop_crystal(run,enemy.pos,kind);
     if (definition.gold_eligible && state.control.rng.randf()<state.pickup_config.strong_gold_chance) drop_crystal(run,enemy.pos,2);
-    const int64_t count=enemy.elite?3+state.control.rng.randi_range(0,3).value():(state.control.rng.randf()<0.03?1:0);
+    const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor && !run.content->rock_fields.empty();
+    const double chance=meteor?run.content->rock_fields.front().meteor_coin_chance:0.03;
+    const int64_t count=enemy.elite?3+state.control.rng.randi_range(0,3).value():(state.control.rng.randf()<chance?(meteor?1+state.control.rng.randi_range(0,2).value():1):0);
     for (int64_t i=0;i<count;++i) {
         const double angle=state.control.rng.randf()*2.0*godot::Math::PI,share=state.control.rng.randf();
         const godot::RunState::Coin coin{enemy.pos+godot::Vector2::from_angle(angle)*share*enemy.radius,true,false};
         if (state.free_coins.empty()) state.coins.push_back(coin);else {state.coins[state.free_coins.back()]=coin;state.free_coins.pop_back();}
+    }
+    if (meteor) {
+        const auto &config=run.content->rock_fields.front();
+        if (state.control.rng.randf()<config.meteor_heal_chance) state.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Heal});
+        if (state.control.rng.randf()<config.meteor_magnet_chance) state.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Magnet});
     }
 }
 }
