@@ -8,6 +8,23 @@
 #include <algorithm>
 #include <cmath>
 namespace speed {
+ShipContactResult CombatResolver::attack_ship_damage(RunRuntime &run,AttackHandle handle,const ContactShape &shape,double amount,double slow) {
+    ShipContactResult result;const auto *attack=AttackSystem::get(run.state,handle);
+    if (!attack) return result;
+    const auto spec=attack->spec;const auto &policy=spec.contact;
+    const auto before=attack->ship_previous_ready?attack->ship_previous:run.state.ship.pos;
+    const ShipMotion ship{before,run.state.ship.pos,run.state.ship_config.ship_radius};
+    result.touching=CollisionQuery::touches(shape,ship,{policy.add_ship_radius,policy.ship_sweep});
+    AttackSystem::record_ship_position(run.state,handle);
+    if (!result.touching || (attack->ship_hit && policy.hit_policy!=HitPolicy::EveryTick)) return result;
+    if (policy.hit_policy==HitPolicy::MarkBefore) AttackSystem::mark_ship_hit(run.state,handle);
+    ShipDamageRequest request;request.amount=amount;request.slow=slow;request.cause=spec.cause;
+    request.source=spec.owner.source_definition;request.technique=spec.source_technique;
+    request.scale=policy.scale;request.hit_policy=policy.hit_policy;
+    result.attempted=true;result.damage=ship_damage(run,request);
+    if (policy.hit_policy==HitPolicy::MarkAfter || (policy.hit_policy==HitPolicy::MarkIfAccepted && result.damage.accepted)) AttackSystem::mark_ship_hit(run.state,handle);
+    return result;
+}
 namespace {
 CombatReason protection(const RunRuntime &run,EnemyHandle target) {
     const auto &state=run.state;

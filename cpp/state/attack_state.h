@@ -24,6 +24,9 @@ struct AttackSpec {
     EndPolicies policies=0;
     TechniqueHandle technique;ParticipantHandle participant;BossHandle boss;EncounterHandle encounter;
     Cause cause=Cause::None;WeaponId weapon=0;
+    ShipContactPolicy contact;
+    TechniqueId source_technique=0;
+    uint32_t contact_definition=0;
 };
 struct AttackRecord {
     AttackSpec spec;
@@ -31,6 +34,9 @@ struct AttackRecord {
     uint32_t row=0;
     int64_t id=0;
     bool alive=false;
+    bool ship_hit=false;
+    godot::Vector2 ship_previous;
+    bool ship_previous_ready=false;
 };
 
 struct AttackState {

@@ -10,7 +10,13 @@ WIDTH = {'u8':1,'u32':4,'u64':8,'i64':8,'f32':4,'f64':8,'bool':1,'string':4}
 
 def generate():
     schema=json.loads((ROOT/'cpp/content/schema/run.json').read_text())
-    assert set(schema)=={'schema_version','format_version','abi_version','records','enums','event_fields'}
+    assert set(schema)=={'schema_version','format_version','abi_version','records','enums','event_fields','includes'}
+    for include in schema['includes']:
+        assert Path(include).name==include and include.endswith('.json')
+        extra=json.loads((ROOT/'cpp/content/schema'/include).read_text())
+        assert set(extra)=={'records','enums'} and not set(extra['enums']) & set(schema['enums'])
+        schema['records'] += extra['records']
+        schema['enums'].update(extra['enums'])
     enums=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include <cstdint>','#include <string_view>','namespace speed {']
     for name, entries in schema['enums'].items():
         assert len({e['name'] for e in entries})==len(entries) and len({e['value'] for e in entries})==len(entries)
@@ -34,7 +40,7 @@ def generate():
         assert set(record)<= {'name','section','fields','enabled','version'}
         keys=set()
         for field in record['fields']:
-            assert set(field)<= {'name','type','min','max','source','ref','native','runtime','config','value'}
+            assert set(field)<= {'name','type','min','max','source','ref','native','runtime','config','value','multiplier'}
             assert field['name'].isidentifier() and field['type'] in TYPES
             assert field.get('ref',record['name']) in names
             assert field.get('source',field['name']) not in keys
@@ -98,7 +104,7 @@ static func write_content(data: Dictionary, input_sha256: PackedByteArray) -> Pa
 		var start := payload.get_position()
 		for row in data[record.name]:
 			for field in record.fields:
-				_put(payload,field.type,row[field.get("source",field.name)])
+				_put(payload,field.type,row[field.get("source",field.name)]*field.multiplier if field.has("multiplier") else row[field.get("source",field.name)])
 		sections.append([record.section,start,payload.get_position()-start,data[record.name].size(),record.get("version",1)])
 	var output := StreamPeerBuffer.new()
 	output.big_endian = false

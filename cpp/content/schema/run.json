@@ -1592,5 +1592,8 @@
       "angle",
       "visual_key"
     ]
-  }
+  },
+  "includes": [
+    "attacks.json"
+  ]
 }

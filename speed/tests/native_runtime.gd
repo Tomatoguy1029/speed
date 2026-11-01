@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--geometry-only" in OS.get_cmdline_user_args() or "--geometry-sweep-only" in OS.get_cmdline_user_args():
+		check(check_contact_geometry("--geometry-sweep-only" in OS.get_cmdline_user_args()),"攻撃の形と共通被弾を最後まで確認する")
+		print("[run_geometry] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--events-only" in OS.get_cmdline_user_args():
 		check(check_run_events(), "通知の配信と受領確認を最後まで確認する")
 		print("[run_events] failed=%d" % failed)
@@ -850,3 +855,90 @@ func check_run_events() -> bool:
 	recorder.free()
 	view.free()
 	return true
+
+func contact_attack(bridge, definition: int, owner: int = 0, pool: int = 1) -> PackedInt64Array:
+	var result: Dictionary = bridge.command("dev_emit_attack",{"pool":pool,"position":Vector2(10000,0),"contact_definition":definition,"cause":"rain","owner_id":owner})
+	check(result.ok,"型付きの接触定義から攻撃を生成する")
+	return result.value.handle if result.ok else PackedInt64Array()
+
+func contact_query(bridge, definition: int, shape: Dictionary, expected: bool, label: String) -> void:
+	var handle := contact_attack(bridge,definition)
+	var payload := shape.duplicate(true)
+	payload.handle = handle
+	var result: Dictionary = bridge.command("dev_contact",payload)
+	check(result.ok and result.value.touching==expected,label)
+	if definition in range(10,17): check(result.ok and result.value.half_width==1.0,"全幅から片側幅への変換を生成時に一度だけ行う")
+	bridge.command("dev_end_attack",{"handle":handle})
+
+func check_contact_geometry(sweep_only := false) -> bool:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 0.0
+	config.world_tick_div = 1
+	config.invuln_time = 0.0
+	config.atk_scale = 2.0
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var records: Dictionary = builder.chase_records(definition,config)
+	for kind in range(7): records.ContactDefinition.append({"id":10+kind,"shape":kind,"scale":0,"hit_policy":3,"add_ship_radius":false,"ship_sweep":false,"width":2.0})
+	for entry in [[30,true,false],[31,false,true],[32,false,false]]:
+		records.ContactDefinition.append({"id":entry[0],"shape":0,"scale":0,"hit_policy":3,"add_ship_radius":entry[1],"ship_sweep":entry[2],"width":0.0})
+	for policy in range(4): records.ContactDefinition.append({"id":40+policy,"shape":0,"scale":0,"hit_policy":policy,"add_ship_radius":false,"ship_sweep":false,"width":0.0})
+	records.ContactDefinition.append({"id":44,"shape":0,"scale":1,"hit_policy":3,"add_ship_radius":false,"ship_sweep":false,"width":0.0})
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = schema.write_content(records,"形状の固定入力".sha256_buffer())
+	check(bridge.configure(bytes,{"api_version":1,"run_id":81,"mode":1,"stage_id":"geometry","profile":{},"settings":{}}).ok and bridge.start(42).ok,"形と倍率・一回制限を共通スキーマから読む")
+	if sweep_only:
+		check_contact_sweep(bridge)
+		bridge.dispose()
+		return true
+	contact_query(bridge,10,{"center":Vector2(2,0),"radius":2.0},true,"円の境界は当たる")
+	contact_query(bridge,10,{"center":Vector2(2.001,0),"radius":2.0},false,"円の外側は当たらない")
+	contact_query(bridge,11,{"points":PackedVector2Array([Vector2(-5,1),Vector2(5,1)])},true,"線分の片側幅の境界は当たる")
+	contact_query(bridge,11,{"points":PackedVector2Array([Vector2(-5,1.001),Vector2(5,1.001)])},false,"線分の片側幅の外は当たらない")
+	contact_query(bridge,12,{"before":PackedVector2Array([Vector2(-2,-2),Vector2(2,-2)]),"points":PackedVector2Array([Vector2(-2,2),Vector2(2,2)])},true,"移動した線分が作る四角形の内側を拾う")
+	contact_query(bridge,13,{"points":PackedVector2Array([Vector2(-3,1),Vector2.ZERO,Vector2(3,1)])},true,"折れ線の各区間と頂点を拾う")
+	contact_query(bridge,14,{"center":Vector2(-2,0),"radius":2.0,"angle":0.0,"arc":0.0},true,"扇の半径と角度の境界は当たる")
+	contact_query(bridge,14,{"center":Vector2(-2,0.01),"radius":3.0,"angle":0.0,"arc":0.0},false,"扇の角度の外は当たらない")
+	contact_query(bridge,15,{"center":Vector2(-4,0),"radius":3.0},true,"輪の外側の境界は当たる")
+	contact_query(bridge,15,{"center":Vector2(-2,0),"radius":3.0},true,"輪の内側の境界は当たる")
+	contact_query(bridge,15,{"center":Vector2(-1.999,0),"radius":3.0},false,"輪の内側の空洞は当たらない")
+	contact_query(bridge,15,{"center":Vector2(-3,0),"radius":3.0,"gap_angle":0.0,"gap_arc":0.2},false,"輪の切れ目では当たらない")
+	contact_query(bridge,16,{"center":Vector2(1,0),"half":Vector2.ONE},true,"矩形の境界は当たる")
+	contact_query(bridge,16,{"center":Vector2(1.001,0),"half":Vector2.ONE},false,"矩形の外は当たらない")
+	contact_query(bridge,10,{"center":Vector2(1.0+config.ship_radius,0),"radius":1.0},false,"機体半径を足さない攻撃を保つ")
+	contact_query(bridge,30,{"center":Vector2(1.0+config.ship_radius,0),"radius":1.0},true,"機体半径を足す攻撃の境界を拾う")
+	var owner: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(10000,10000)}).value
+	for policy in range(4):
+		var attack := contact_attack(bridge,40+policy,owner)
+		bridge.command("pause",{"paused":true})
+		var data := {"handle":attack,"radius":1.0,"amount":2.0,"apply":true}
+		var refused: Dictionary = bridge.command("dev_contact",data)
+		check(refused.ok and refused.value.attempted and not refused.value.damage.accepted and refused.value.damage.reason=="run_phase","拒否された被弾試行も共通経路で記録する")
+		bridge.command("pause",{"paused":false})
+		var again: Dictionary = bridge.command("dev_contact",data)
+		check(again.ok and again.value.attempted==(policy>=2),"当たり済みにする条件を攻撃ごとに保つ")
+		var third: Dictionary = bridge.command("dev_contact",data)
+		check(third.ok and third.value.attempted==(policy==3),"every_tickだけは繰り返し判定する")
+		bridge.command("dev_end_attack",{"handle":attack})
+	var scaled := contact_attack(bridge,44,owner)
+	var result: Dictionary = bridge.command("dev_contact",{"handle":scaled,"radius":1.0,"amount":3.0,"apply":true})
+	check(result.ok and result.value.damage.amount==6.0 and result.value.damage.hp_before-result.value.damage.hp_after==6.0,"定義が選んだ攻撃だけatk_scaleを掛ける")
+	var damage_events: Array = bridge.read_frame().value.events.filter(func(e):return e.type==&"combat_player_damage")
+	check(damage_events.size()==8 and damage_events.all(func(e):return e.payload.cause==&"rain" and e.payload.source==&"drifter"),"原因名・発生元・実HP減少と拒否理由を同じ通知へ残す")
+	bridge.command("dev_end_attack",{"handle":scaled})
+	check_contact_sweep(bridge)
+	bridge.dispose()
+	return true
+
+func check_contact_sweep(bridge) -> void:
+	var from: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
+	var sweep_attack := contact_attack(bridge,31,0,0)
+	var point_attack := contact_attack(bridge,32,0,0)
+	clock_step(bridge)
+	clock_step(bridge)
+	var to: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
+	for entry in [[sweep_attack,true],[point_attack,false]]:
+		var response: Dictionary = bridge.command("dev_contact",{"handle":entry[0],"center":from.lerp(to,0.25),"radius":0.0001})
+		check(response.ok and response.value.touching==entry[1],"前の判定位置から機体を掃引し、点判定の攻撃は通過を拾わない")
+		bridge.command("dev_end_attack",{"handle":entry[0]})

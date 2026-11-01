@@ -184,6 +184,29 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="weapon_fire") {out=EventType::WeaponFire;return true;}
     return false;
 }
+enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,Count};
+inline const char *symbol_name(ContactShapeKind value) {
+    switch(value) {
+    case ContactShapeKind::PointCircle: return "point_circle";
+    case ContactShapeKind::SegmentCircle: return "segment_circle";
+    case ContactShapeKind::SweptSegment: return "sweep_segment";
+    case ContactShapeKind::Polyline: return "polyline";
+    case ContactShapeKind::Fan: return "fan";
+    case ContactShapeKind::RingBand: return "ring_band";
+    case ContactShapeKind::Rect: return "rect";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, ContactShapeKind &out) {
+    if (value=="point_circle") {out=ContactShapeKind::PointCircle;return true;}
+    if (value=="segment_circle") {out=ContactShapeKind::SegmentCircle;return true;}
+    if (value=="sweep_segment") {out=ContactShapeKind::SweptSegment;return true;}
+    if (value=="polyline") {out=ContactShapeKind::Polyline;return true;}
+    if (value=="fan") {out=ContactShapeKind::Fan;return true;}
+    if (value=="ring_band") {out=ContactShapeKind::RingBand;return true;}
+    if (value=="rect") {out=ContactShapeKind::Rect;return true;}
+    return false;
+}
 inline bool event_field_allowed(EventType type, std::string_view field) {
     switch(type) {
     case EventType::AttackStart: return field=="owner" || field=="row" || field=="id" || field=="categories" || field=="token";

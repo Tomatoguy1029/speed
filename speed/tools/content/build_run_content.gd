@@ -35,6 +35,9 @@ static func chase_records(definition: EnemyDef, config: GameConfig, stage: Runti
 		elif field.has("value"): data.RunConfig[0][field.name] = field.value
 	data.RunConfig[0].world_tick_div = maxi(1,int(config.world_tick_div))
 	data.RunConfig[0].time_limit = stage.time_limit if stage != null else -1.0
+	data.ContactDefinition = [
+		{"id":1,"shape":1,"scale":0,"hit_policy":1,"add_ship_radius":true,"ship_sweep":false,"width":0.0},
+		{"id":2,"shape":0,"scale":0,"hit_policy":0,"add_ship_radius":true,"ship_sweep":false,"width":0.0}]
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.EnemyRecord = [row]
@@ -101,6 +104,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.StringEntry.append({"id":i+1,"value":id})
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.RunConfig = resolved.RunConfig
+		data.ContactDefinition = resolved.ContactDefinition
 		if data.ResourceKey.is_empty():
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)
 			data.LoadoutDefinition = resolved.LoadoutDefinition

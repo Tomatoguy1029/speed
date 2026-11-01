@@ -1,5 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/attack_system.h"
+#include "../cpp/systems/combat_resolver.h"
+#include "../cpp/output/event_builder.h"
 #include <cmath>
 using namespace godot;
 
@@ -23,6 +25,7 @@ int64_t SpeedRunCore::fire_bite_zone(Vector2 at, double radius, double delay, do
     if (!std::isfinite(zone.radius) || !std::isfinite(zone.delay)) return -1;
     speed::AttackSpec spec;spec.owner.budget.value=token;
     spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;spec.cause=speed::Cause::Blast;
+    if (!runtime.content->contacts.empty()) speed::AttackSystem::configure_contact(*runtime.content,2,spec);
     const auto handle=speed::AttackSystem::emit_hazard(runtime.state,zone,spec);
     const auto *record=speed::AttackSystem::get(runtime.state,handle);return record?record->row:-1;
 }
@@ -50,10 +53,15 @@ bool SpeedRunCore::step_hazards(double dt) {
         if (!speed::AttackSystem::hazard_before_touch(runtime.state,processing_handle)) return true;
         // 円形判定は発動時の一回だけ。範囲外でも以後は表示だけ残す。
         zone.hit = true;
-        const double reach = double(zone.radius) + runtime.state.ship_config.ship_radius;
-        if (zone.pos.distance_squared_to(runtime.state.ship.pos) > reach * reach) continue;
+        const auto *contact_record=speed::AttackSystem::get(runtime.state,processing_handle);
+        if (!contact_record) continue;
+        const auto &policy=contact_record->spec.contact;
+        const auto previous=contact_record->ship_previous_ready?contact_record->ship_previous:runtime.state.ship.pos;
+        if (!speed::CollisionQuery::touches(speed::PointCircle{zone.pos,double(zone.radius)},
+            {previous,runtime.state.ship.pos,runtime.state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) continue;
         end_bite_visual(true, runtime.state.ship.pos);
-        damage_ship(zone.damage, 0.0, "blast");
+        speed::CombatResolver::attack_ship_damage(runtime,processing_handle,speed::PointCircle{zone.pos,double(zone.radius)},zone.damage,0.0);
+        speed::EventBuilder::flush_combat(runtime);
         if (runtime.state.phase != Phase::Play) return true;
     }
     return true;

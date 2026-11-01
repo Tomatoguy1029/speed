@@ -524,6 +524,30 @@ inline bool read(BinaryReader &input, BiteDefinition &out) {
     if (!input.read_bool(out.fade)) return false;
     return true;
 }
+struct ContactDefinition {
+    uint32_t id{};
+    uint32_t shape{};
+    uint32_t scale{};
+    uint32_t hit_policy{};
+    bool add_ship_radius{};
+    bool ship_sweep{};
+    double half_width{};
+};
+inline bool read(BinaryReader &input, ContactDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.shape)) return false;
+    if (out.shape > 6) return false;
+    if (!input.read_u32(out.scale)) return false;
+    if (out.scale > 1) return false;
+    if (!input.read_u32(out.hit_policy)) return false;
+    if (out.hit_policy > 3) return false;
+    if (!input.read_bool(out.add_ship_radius)) return false;
+    if (!input.read_bool(out.ship_sweep)) return false;
+    if (!input.read_f64(out.half_width)) return false;
+    if (out.half_width < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -539,6 +563,7 @@ struct ContentRecords {
     std::vector<ResourceKey> ResourceKey_rows;
     std::vector<ForwardDefinition> ForwardDefinition_rows;
     std::vector<BiteDefinition> BiteDefinition_rows;
+    std::vector<ContactDefinition> ContactDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -632,6 +657,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { BiteDefinition row; if (!read(input,row)) return false; out.BiteDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 15: {
+        if (version != 1) return false;
+        if (count > input.remaining()/26) return false;
+        for (uint32_t i=0; i<count; ++i) { ContactDefinition row; if (!read(input,row)) return false; out.ContactDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -664,6 +695,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ForwardDefinition_rows) if (!ForwardDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BiteDefinition_ids;
     for (const auto &row:data.BiteDefinition_rows) if (!BiteDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ContactDefinition_ids;
+    for (const auto &row:data.ContactDefinition_rows) if (!ContactDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -795,5 +828,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=14;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=15;
 }

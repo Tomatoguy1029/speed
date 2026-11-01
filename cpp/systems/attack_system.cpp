@@ -1,9 +1,15 @@
 #include "attack_system.h"
 #include "attack_budget.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
 namespace speed {
+bool AttackSystem::configure_contact(const ContentBundle &content,uint32_t definition,AttackSpec &spec) {
+    const auto found=std::find_if(content.contacts.begin(),content.contacts.end(),[&](const auto &v){return v.id==definition;});
+    if (found==content.contacts.end()) return false;
+    spec.contact_definition=definition;spec.contact={DamageScale(found->scale),HitPolicy(found->hit_policy),found->add_ship_radius,found->ship_sweep};return true;
+}
 namespace {
 using State=godot::RunState;
 using Index=std::unordered_map<uint64_t,std::vector<AttackHandle>>;
@@ -40,7 +46,7 @@ AttackHandle register_attack(State &state,AttackPool pool,uint32_t row,AttackSpe
     if (all.free_records.empty()) all.records.emplace_back();else {slot=all.free_records.back();all.free_records.pop_back();}
     const auto handle=all.handles.attach(slot,all.next_id);
     if (!all.handles.contains(handle)) {AttackBudgetSystem::release(state,spec.owner.budget);return {};}
-    all.records[slot]={spec,pool,row,all.next_id++,true};add_indexes(state,handle,all.records[slot]);return handle;
+    all.records[slot]={spec,pool,row,all.next_id++,true,false,state.ship.pos,true};add_indexes(state,handle,all.records[slot]);return handle;
 }
 std::vector<AttackHandle> indexed(const Index &index,uint64_t key) {
     auto found=index.find(key);return found==index.end()?std::vector<AttackHandle>():found->second;
@@ -52,6 +58,14 @@ void filter_end(State &state,const std::vector<AttackHandle> &items,EndPolicies 
 }
 const AttackRecord *AttackSystem::get(const State &state,AttackHandle handle) {
     return state.attacks.handles.contains(handle) && handle.slot<state.attacks.records.size() && state.attacks.records[handle.slot].alive?&state.attacks.records[handle.slot]:nullptr;
+}
+bool AttackSystem::mark_ship_hit(State &state,AttackHandle handle) {
+    if (!get(state,handle)) return false;
+    state.attacks.records[handle.slot].ship_hit=true;return true;
+}
+void AttackSystem::record_ship_position(State &state,AttackHandle handle) {
+    if (!get(state,handle)) return;
+    auto &record=state.attacks.records[handle.slot];record.ship_previous=state.ship.pos;record.ship_previous_ready=true;
 }
 AttackHandle AttackSystem::emit_friendly(State &state,State::Friendly value,AttackSpec spec) {
     const size_t row=state.free_friends.empty()?state.friends.size():state.free_friends.back();if (row>=UINT32_MAX) return {};

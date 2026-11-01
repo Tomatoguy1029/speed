@@ -1,0 +1,77 @@
+{
+  "records": [
+    {
+      "name": "ContactDefinition",
+      "section": 15,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "shape",
+          "type": "u32",
+          "max": 6
+        },
+        {
+          "name": "scale",
+          "type": "u32",
+          "max": 1
+        },
+        {
+          "name": "hit_policy",
+          "type": "u32",
+          "max": 3
+        },
+        {
+          "name": "add_ship_radius",
+          "type": "bool"
+        },
+        {
+          "name": "ship_sweep",
+          "type": "bool"
+        },
+        {
+          "name": "half_width",
+          "source": "width",
+          "type": "f64",
+          "min": 0,
+          "multiplier": 0.5
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "ContactShapeKind": [
+      {
+        "name": "PointCircle",
+        "value": "point_circle"
+      },
+      {
+        "name": "SegmentCircle",
+        "value": "segment_circle"
+      },
+      {
+        "name": "SweptSegment",
+        "value": "sweep_segment"
+      },
+      {
+        "name": "Polyline",
+        "value": "polyline"
+      },
+      {
+        "name": "Fan",
+        "value": "fan"
+      },
+      {
+        "name": "RingBand",
+        "value": "ring_band"
+      },
+      {
+        "name": "Rect",
+        "value": "rect"
+      }
+    ]
+  }
+}

@@ -9,6 +9,11 @@ using TechniqueId=uint32_t;
 enum class CombatReason { Applied, Invalid, Dead, Nonpositive, RunPhase, Guard, ControlsLocked, EncounterProtected, DamageGate, PhaseFloor, BossDefeated, Shield, Invulnerability, DebugInvincible, Barrier };
 enum class DamageScale { None, AtkScale };
 enum class HitPolicy { MarkBefore, MarkAfter, MarkIfAccepted, EveryTick };
+struct ShipContactPolicy {
+    DamageScale scale=DamageScale::None;
+    HitPolicy hit_policy=HitPolicy::MarkAfter;
+    bool add_ship_radius=true,ship_sweep=false;
+};
 enum class RetireReason { Outside, Relocate, Regenerate, BonusClear, Development, DeathCleanup };
 struct DamageRequest {
     EnemyHandle struck;
@@ -46,6 +51,7 @@ struct ShipDamageRequest {
     HitPolicy hit_policy=HitPolicy::EveryTick;
 };
 struct ShipDamageResult { bool accepted=false;CombatReason reason=CombatReason::Invalid;double hp_before=0,hp_after=0,amount=0; };
+struct ShipContactResult {bool touching=false,attempted=false;ShipDamageResult damage;};
 enum class AttackEndReason : uint8_t;
 enum class AttackPool : uint8_t;
 enum class CombatEventKind { AttackRetired, EnemyDamage, Hit, CriticalHit, Kill, ShieldBlock, ShipDamage, Hurt, Retire };

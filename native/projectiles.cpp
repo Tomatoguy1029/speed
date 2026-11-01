@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/combat_resolver.h"
 #include "../cpp/systems/attack_system.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
@@ -52,18 +53,6 @@ bool SpeedRunCore::fire_shot(Vector2 from, double angle, double damage, const Di
     return add_friend(std::move(shot))!=SIZE_MAX;
 }
 
-static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double radius) {
-    const Vector2 f = from - center;
-    const double cc = double(f.length_squared()) - radius * radius;
-    if (cc <= 0) return 0;
-    const Vector2 d = to - from;
-    const double a = d.length_squared();
-    if (a == 0) return -1;
-    const double b = 2.0 * f.dot(d), disc = b * b - 4.0 * a * cc;
-    if (disc < 0) return -1;
-    const double t = (-b - std::sqrt(disc)) / (2.0 * a);
-    return t >= 0 && t <= 1 ? t : -1;
-}
 
 bool SpeedRunCore::step_projectiles(double world_dt) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.combat_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
@@ -91,7 +80,7 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
             const auto &enemy = runtime.state.enemies[row];
             if (shot.hit_ids.count(enemy.id)) continue;
-            const double t = segment_circle(from, to, enemy.pos, double(shot.radius) + enemy.radius);
+            const double t = speed::CollisionQuery::segment_circle_t(from, to, enemy.pos, double(shot.radius) + enemy.radius);
             if (t >= 0) hits.push_back({t, row});
         }
         SortArray<Hit, Earlier>().sort(hits.data(), hits.size());

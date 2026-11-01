@@ -34,13 +34,13 @@ Array SpeedRunCore::attack_snapshot() const {
 Dictionary SpeedRunCore::development_attack_command(const String &kind,const Dictionary &d) {
     if (!runtime.api_development) return response(false);auto &state=runtime.state;Variant value;
     if (kind=="dev_emit_attack") {
-        if (!keys(d,{"pool","position","velocity","life","damage","radius","delay","owner_id","budget","policies","attached","technique","participant","boss","encounter"}) || !d.has("pool") || d["pool"].get_type()!=Variant::INT || int64_t(d["pool"])<0 || int64_t(d["pool"])>2 || !d.has("position") || d["position"].get_type()!=Variant::VECTOR2 || !Vector2(d["position"]).is_finite()) return response(false);
+        if (!keys(d,{"pool","position","velocity","life","damage","radius","delay","owner_id","budget","policies","attached","contact_definition","cause","source_technique","technique","participant","boss","encounter"}) || !d.has("pool") || d["pool"].get_type()!=Variant::INT || int64_t(d["pool"])<0 || int64_t(d["pool"])>2 || !d.has("position") || d["position"].get_type()!=Variant::VECTOR2 || !Vector2(d["position"]).is_finite()) return response(false);
         speed::AttackSpec spec;
         for (auto key:{"owner_id","budget","policies"}) if (d.has(key) && (d[key].get_type()!=Variant::INT || int64_t(d[key])<0)) return response(false);
         const int64_t policies=d.get("policies",1);if (policies<1 || policies>63) return response(false);spec.policies=uint32_t(policies);
         spec.owner.budget.value=d.get("budget",0);
         if (d.has("attached") && d["attached"].get_type()!=Variant::BOOL) return response(false);spec.owner.attached=d.get("attached",false);
-        if (d.has("owner_id")) {
+        if (d.has("owner_id") && int64_t(d["owner_id"])>0) {
             const auto found=state.rows_by_id.find(int64_t(d["owner_id"]));if (found==state.rows_by_id.end()) return response(false);
             spec.owner.live_source=state.enemy_handles.at(uint32_t(found->second));
         }
@@ -49,11 +49,21 @@ Dictionary SpeedRunCore::development_attack_command(const String &kind,const Dic
         double life,damage,radius,delay;
         if (!scalar(d,"life",life,1) || !scalar(d,"damage",damage,0) || !scalar(d,"radius",radius,2) || !scalar(d,"delay",delay,0)) return response(false);
         Vector2 velocity;if (d.has("velocity")) {if (d["velocity"].get_type()!=Variant::VECTOR2 || !Vector2(d["velocity"]).is_finite()) return response(false);velocity=d["velocity"];}
+        if (d.has("contact_definition")) {
+            if (d["contact_definition"].get_type()!=Variant::INT || int64_t(d["contact_definition"])<=0 || uint64_t(int64_t(d["contact_definition"]))>UINT32_MAX ||
+                !speed::AttackSystem::configure_contact(*runtime.content,uint32_t(int64_t(d["contact_definition"])),spec)) return response(false);
+        }
+        if (d.has("source_technique")) {
+            if (d["source_technique"].get_type()!=Variant::INT || int64_t(d["source_technique"])<0 || uint64_t(int64_t(d["source_technique"]))>UINT32_MAX) return response(false);
+            spec.source_technique=uint32_t(int64_t(d["source_technique"]));
+        }
+        speed::Cause cause=speed::Cause::None;
+        if (d.has("cause") && (d["cause"].get_type()!=Variant::STRING || !speed::parse_symbol(String(d["cause"]).utf8().get_data(),cause))) return response(false);
         speed::AttackHandle emitted;const Vector2 pos=d["position"];
         switch(int64_t(d["pool"])) {
-        case 0: {Friendly shot;shot.pos=pos;shot.vel=velocity;shot.life=life;shot.radius=radius;shot.damage=damage;spec.cause=speed::Cause::Shot;emitted=speed::AttackSystem::emit_friendly(state,shot,spec);break;}
-        case 1: {Hostile shot;shot.pos=pos;shot.vel=velocity;shot.speed=velocity.length();shot.life=life;shot.radius=radius;shot.damage=damage;spec.cause=speed::Cause::Bullet;emitted=speed::AttackSystem::emit_hostile(state,shot,spec);break;}
-        case 2: {if (!state.bite_zone_config.ready) return response(false);BiteZone zone;zone.pos=pos;zone.radius=radius;zone.delay=delay;zone.duration=life;zone.damage=damage;spec.cause=speed::Cause::Blast;emitted=speed::AttackSystem::emit_hazard(state,zone,spec);break;}
+        case 0: {Friendly shot;shot.pos=pos;shot.vel=velocity;shot.life=life;shot.radius=radius;shot.damage=damage;spec.cause=cause==speed::Cause::None?speed::Cause::Shot:cause;emitted=speed::AttackSystem::emit_friendly(state,shot,spec);break;}
+        case 1: {Hostile shot;shot.pos=pos;shot.vel=velocity;shot.speed=velocity.length();shot.life=life;shot.radius=radius;shot.damage=damage;spec.cause=cause==speed::Cause::None?speed::Cause::Bullet:cause;emitted=speed::AttackSystem::emit_hostile(state,shot,spec);break;}
+        case 2: {if (!state.bite_zone_config.ready) return response(false);BiteZone zone;zone.pos=pos;zone.radius=radius;zone.delay=delay;zone.duration=life;zone.damage=damage;spec.cause=cause==speed::Cause::None?speed::Cause::Blast:cause;emitted=speed::AttackSystem::emit_hazard(state,zone,spec);break;}
         }
         const auto *record=speed::AttackSystem::get(state,emitted);if (!record) return response(false);
         Dictionary created;created["id"]=record->id;created["handle"]=packed(emitted);created["row"]=record->row;value=created;

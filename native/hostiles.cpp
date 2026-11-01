@@ -10,6 +10,7 @@
 using namespace godot;
 
 size_t SpeedRunCore::add_hostile(Hostile shot,speed::AttackSpec spec) {
+    if (!spec.contact_definition && !runtime.content->contacts.empty()) speed::AttackSystem::configure_contact(*runtime.content,1,spec);
     if (!spec.policies) spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;
     if (spec.cause==speed::Cause::None) spec.cause=shot.kind==1?speed::Cause::Missile:shot.kind==2?speed::Cause::Reflected:speed::Cause::Bullet;
     const auto handle=speed::AttackSystem::emit_hostile(runtime.state,std::move(shot),spec);
@@ -54,18 +55,6 @@ bool SpeedRunCore::damage_ship(double amount,double slow,StringName cause,String
     const auto result=speed::CombatResolver::ship_damage(runtime,request);speed::EventBuilder::flush_combat(runtime);return result.accepted;
 }
 
-static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double radius) {
-    const Vector2 f = from - center;
-    const double cc = double(f.length_squared()) - radius * radius;
-    if (cc <= 0) return 0;
-    const Vector2 d = to - from;
-    const double a = d.length_squared();
-    if (a == 0) return -1;
-    const double b = 2.0 * f.dot(d), disc = b * b - 4.0 * a * cc;
-    if (disc < 0) return -1;
-    const double t = (-b - std::sqrt(disc)) / (2.0 * a);
-    return t >= 0 && t <= 1 ? t : -1;
-}
 
 bool SpeedRunCore::step_hostiles(double world_dt) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
@@ -100,14 +89,17 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         life -= world_dt;
         const Vector2 relative = to - runtime.state.view_center;
         if (shot.kind != 1 && (std::abs(relative.x) > keep.x || std::abs(relative.y) > keep.y) && relative.dot(vel) > 0) life = 0;
+        const auto *record=speed::AttackSystem::get(runtime.state,processing_handle);
+        if (!record) continue;
+        const double body_radius=record->spec.contact.add_ship_radius?runtime.state.ship_config.ship_radius:0;
         const double step = double(shot.speed) * world_dt;
-        const double reach = double(shot.radius) + runtime.state.ship_config.ship_radius + step;
-        if (runtime.state.ship.pos.distance_squared_to(to) <= reach * reach) {
-            const double t = segment_circle(from, to, runtime.state.ship.pos, double(shot.radius) + runtime.state.ship_config.ship_radius);
-            if (t >= 0) {
-                static const StringName causes[] = {"bullet", "missile", "reflected"};
-                damage_ship(shot.damage, shot.slow, causes[shot.kind]);
-                end_reason=speed::AttackEndReason::Hit;life = 0; to = from + (to - from) * t;
+        const double reach = double(shot.radius) + body_radius + step;
+        if (record->spec.contact.ship_sweep || runtime.state.ship.pos.distance_squared_to(to) <= reach * reach) {
+            const auto contact=speed::CombatResolver::attack_ship_damage(runtime,processing_handle,speed::SegmentCircle{from,to,double(shot.radius)},shot.damage,shot.slow);
+            speed::EventBuilder::flush_combat(runtime);
+            if (contact.touching) {
+                const double t=speed::CollisionQuery::segment_circle_t(from,to,runtime.state.ship.pos,double(shot.radius)+body_radius);
+                end_reason=speed::AttackEndReason::Hit;life=0;if (t>=0) to=from+(to-from)*t;
             }
         }
         if (!speed::AttackSystem::get(runtime.state,processing_handle)) continue;

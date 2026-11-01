@@ -43,6 +43,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
                 BiteZone zone;zone.pos=at;zone.radius=def.bite.radius;zone.damage=def.bite.damage;zone.color=def.color.lightened(0.4);
                 speed::AttackSpec spec;spec.owner.budget.value=token;spec.owner.live_source=runtime.state.enemy_handles.at(uint32_t(row));
                 spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;spec.cause=speed::Cause::Blast;
+                if (!runtime.content->contacts.empty()) speed::AttackSystem::configure_contact(*runtime.content,2,spec);
                 speed::AttackSystem::emit_hazard(runtime.state,zone,spec);
             }
             enemy.charge = 0; enemy.mode = EnemyMode::Recover; enemy.timer = def.bite.rest;
