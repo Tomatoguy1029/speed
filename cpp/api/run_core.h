@@ -25,6 +25,7 @@ class SpeedRunCore : public RefCounted {
     friend class speed::RunRunner;
     friend class speed::ProgressionSystem;
     friend class speed::FieldSystem;
+    Dictionary development_hostile_command(const String &kind,const Dictionary &payload);
     Dictionary development_attack_command(const String &kind,const Dictionary &payload);
     Dictionary development_contact_command(const Dictionary &payload);
     Dictionary development_field_command(const String &kind,const Dictionary &payload);

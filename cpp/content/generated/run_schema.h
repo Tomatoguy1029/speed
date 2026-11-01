@@ -461,7 +461,7 @@ inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 10) return false;
+    if (out.role > 12) return false;
     return true;
 }
 struct ForwardDefinition {
@@ -575,6 +575,41 @@ inline bool read(BinaryReader &input, ContactDefinition &out) {
     if (!input.read_bool(out.ship_sweep)) return false;
     if (!input.read_f64(out.half_width)) return false;
     if (out.half_width < 0) return false;
+    return true;
+}
+struct HostileDefinition {
+    uint32_t id{};
+    uint32_t kind{};
+    double radius{};
+    double life{};
+    double damage{};
+    double slow{};
+    double turn{};
+    uint32_t visual{};
+    uint32_t stone_visual{};
+    uint32_t contact{};
+};
+inline bool read(BinaryReader &input, HostileDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 2) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.slow)) return false;
+    if (out.slow < 0) return false;
+    if (!input.read_f64(out.turn)) return false;
+    if (out.turn < 0) return false;
+    if (!input.read_u32(out.visual)) return false;
+    if (out.visual < 1) return false;
+    if (!input.read_u32(out.stone_visual)) return false;
+    if (out.stone_visual < 1) return false;
+    if (!input.read_u32(out.contact)) return false;
+    if (out.contact < 1) return false;
     return true;
 }
 struct BudgetPhase {
@@ -814,6 +849,7 @@ struct ContentRecords {
     std::vector<BiteDefinition> BiteDefinition_rows;
     std::vector<LifecycleDefinition> LifecycleDefinition_rows;
     std::vector<ContactDefinition> ContactDefinition_rows;
+    std::vector<HostileDefinition> HostileDefinition_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
@@ -897,7 +933,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 7) return false;
+        if (version != 8) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -924,6 +960,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/26) return false;
         for (uint32_t i=0; i<count; ++i) { ContactDefinition row; if (!read(input,row)) return false; out.ContactDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 24: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { HostileDefinition row; if (!read(input,row)) return false; out.HostileDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 16: {
@@ -1004,6 +1046,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.LifecycleDefinition_rows) if (!LifecycleDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ContactDefinition_ids;
     for (const auto &row:data.ContactDefinition_rows) if (!ContactDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HostileDefinition_ids;
+    for (const auto &row:data.HostileDefinition_rows) if (!HostileDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
@@ -1030,6 +1074,9 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ForwardDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BiteDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.BiteDefinition_rows) if (!ResourceKey_ids.count(row.visual_key)) return false;
+    for (const auto &row:data.HostileDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
+    for (const auto &row:data.HostileDefinition_rows) if (!ResourceKey_ids.count(row.stone_visual)) return false;
+    for (const auto &row:data.HostileDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -1164,5 +1211,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=23;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=24;
 }

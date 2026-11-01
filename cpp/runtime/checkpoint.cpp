@@ -69,6 +69,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             !state.enemy_handles.reusable(uint32_t(row))) return false;
     }
     for (auto row:state.dead_rows) if (row>=state.enemies.size() || !state.enemies[row].alive || !state.enemies[row].dead) return false;
+    for (const auto &shot:state.hostiles) if (shot.alive && shot.definition>content.hostile_definitions.size()) return false;
     if (!FieldSystem::validate(state,content)) return false;
     if (!GroupSystem::validate(state)) return false;
     return AttackSystem::rebuild(state);

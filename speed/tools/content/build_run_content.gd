@@ -103,6 +103,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		visuals.append({"id":key,"role":10,"path":"res://assets/pixel/moon.png"})
 		data.MoonDefinition = [{"id":1,"count":config.moon_count,"orbit_min":1500.0,"orbit_max":config.field_radius-600.0,
 			"angle_jitter":0.3,"radius_min":110.0,"radius_max":180.0,"angular_speed":config.moon_orbit_speed,"visual":key}]
+	var bullet_visual: int = data.ResourceKey.size()+1
+	data.ResourceKey.append({"id":bullet_visual,"role":11})
+	visuals.append({"id":bullet_visual,"role":11,"path":""})
+	data.ResourceKey.append({"id":bullet_visual+1,"role":12})
+	visuals.append({"id":bullet_visual+1,"role":12,"path":""})
+	data.HostileDefinition = [{"id":1,"kind":0,"radius":7.0,"life":4.0,"damage":7.0,"slow":0.0,"turn":0.0,
+		"visual":bullet_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	for i in weapon.level_steps.size():
 		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
@@ -124,6 +131,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var equipment_resources: Array = []
 	var visuals: Array[Dictionary] = []
 	var field_visuals: Array = []
+	var attack_visuals: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	var enemy_ids := stage.resources.enemy_ids.duplicate()
 	for terrain in ["meteor","iron","saw"]:
@@ -165,7 +173,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
 			data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
 			data.MoonDefinition = resolved.MoonDefinition.duplicate(true)
+			data.HostileDefinition = resolved.HostileDefinition.duplicate(true)
 			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [9,10])
+			attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12])
 		var visual: Dictionary = package.visuals[5].duplicate()
 		visual.id = i+6
 		data.ResourceKey.append({"id":visual.id,"role":visual.role})
@@ -197,6 +207,12 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		visuals.append(row)
 		if row.role==9: data.FieldBodyDefinition[0].visual = row.id
 		else: data.MoonDefinition[0].visual = row.id
+	for resource: Dictionary in attack_visuals:
+		var row := resource.duplicate()
+		row.id = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":row.id,"role":row.role})
+		visuals.append(row)
+		data.HostileDefinition[0]["visual" if row.role==11 else "stone_visual"] = row.id
 	var terrain := {"id":1}
 	for key in ["meteor_count","iron_count","saw_count","planet_radius","meteor_coin_chance","meteor_heal_chance","meteor_magnet_chance","saw_speed","saw_power","saw_life"]:
 		terrain[key] = config.get(key)

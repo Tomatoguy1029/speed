@@ -2,6 +2,7 @@
 #include <godot_cpp/classes/hashing_context.hpp>
 #include <algorithm>
 #include <cstring>
+#include <cmath>
 #include <unordered_set>
 namespace speed {
 std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByteArray &bytes) {
@@ -54,6 +55,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->bites=records.BiteDefinition_rows;
     bundle->hounds=records.HoundDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
+    bundle->hostile_definitions=records.HostileDefinition_rows;
+    for (const auto &shot:bundle->hostile_definitions) {
+        if (shot.life<=0 || shot.radius<=0) return {};
+        for (double value:{shot.radius,shot.life,shot.slow,shot.turn}) if (!std::isfinite(float(value))) return {};
+    }
     bundle->budget_phases=records.BudgetPhase_rows;
     if (records.ProgressionDefinition_rows.size()!=1 || records.ProgressionDefinition_rows.front().xp_base<=0) return {};
     bundle->progression=records.ProgressionDefinition_rows.front();
@@ -80,7 +86,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (level.weapon!=1 || level.level!=i+1 || level.interval<=0) return {};
     }
     for (const auto &visual:bundle->visuals) {
-        if (visual.role>10) return {};
+        if (visual.role>12) return {};
     }
     std::unordered_set<std::string> names;
     for (const auto &row:records.EnemyRecord_rows) {

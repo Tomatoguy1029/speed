@@ -965,10 +965,10 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 10
+          "max": 12
         }
       ],
-      "version": 7
+      "version": 8
     },
     {
       "name": "ForwardDefinition",
@@ -1286,6 +1286,14 @@
       {
         "name": "Moon",
         "value": "moon"
+      },
+      {
+        "name": "HostileShot",
+        "value": "hostile_shot"
+      },
+      {
+        "name": "StoneShot",
+        "value": "stone_shot"
       }
     ],
     "EventType": [
@@ -1480,6 +1488,10 @@
       {
         "name": "Ring",
         "value": "ring"
+      },
+      {
+        "name": "Shoot",
+        "value": "shoot"
       }
     ],
     "ResultKind": [
@@ -1733,6 +1745,10 @@
       "radius",
       "color",
       "life"
+    ],
+    "shoot": [
+      "pos",
+      "kind"
     ]
   },
   "includes": [

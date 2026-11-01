@@ -87,6 +87,8 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 	else:
 		batch = InstanceBatch.new()
 		if entry.role==4: batch.setup_polygon(InstanceBatch.circle_points(24))
+		elif entry.role==11: preload("res://scripts/render/attacks/bullet.gd").setup_batch(batch)
+		elif entry.role==12: batch.setup_polygon(InstanceBatch.circle_points(32))
 		else:
 			batch.setup_texture(_scope.resources.get(entry.path) as Texture2D,entry.get("rect",Rect2()))
 			var material := ShaderMaterial.new()

@@ -40,6 +40,65 @@
           "multiplier": 0.5
         }
       ]
+    },
+    {
+      "name": "HostileDefinition",
+      "section": 24,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "stone_visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {
@@ -71,6 +130,20 @@
       {
         "name": "Rect",
         "value": "rect"
+      }
+    ],
+    "HostileKind": [
+      {
+        "name": "Bullet",
+        "value": "bullet"
+      },
+      {
+        "name": "Missile",
+        "value": "missile"
+      },
+      {
+        "name": "Reflected",
+        "value": "reflected"
       }
     ]
   }

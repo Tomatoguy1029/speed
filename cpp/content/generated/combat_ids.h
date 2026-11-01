@@ -72,7 +72,7 @@ inline bool parse_symbol(std::string_view value, Cause &out) {
     if (value=="saw") {out=Cause::Saw;return true;}
     return false;
 }
-enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,Count};
+enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,Count};
 inline const char *symbol_name(VisualRole value) {
     switch(value) {
     case VisualRole::EnemySprite: return "enemy_sprite";
@@ -86,6 +86,8 @@ inline const char *symbol_name(VisualRole value) {
     case VisualRole::AttackScene: return "attack_scene";
     case VisualRole::Planet: return "planet";
     case VisualRole::Moon: return "moon";
+    case VisualRole::HostileShot: return "hostile_shot";
+    case VisualRole::StoneShot: return "stone_shot";
     default: return "";
     }
 }
@@ -101,9 +103,11 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="attack_scene") {out=VisualRole::AttackScene;return true;}
     if (value=="planet") {out=VisualRole::Planet;return true;}
     if (value=="moon") {out=VisualRole::Moon;return true;}
+    if (value=="hostile_shot") {out=VisualRole::HostileShot;return true;}
+    if (value=="stone_shot") {out=VisualRole::StoneShot;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -154,6 +158,7 @@ inline const char *symbol_name(EventType value) {
     case EventType::RunFinished: return "run_finished";
     case EventType::Crash: return "crash";
     case EventType::Ring: return "ring";
+    case EventType::Shoot: return "shoot";
     default: return "";
     }
 }
@@ -206,6 +211,7 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="run_finished") {out=EventType::RunFinished;return true;}
     if (value=="crash") {out=EventType::Crash;return true;}
     if (value=="ring") {out=EventType::Ring;return true;}
+    if (value=="shoot") {out=EventType::Shoot;return true;}
     return false;
 }
 enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
@@ -244,6 +250,21 @@ inline bool parse_symbol(std::string_view value, ContactShapeKind &out) {
     if (value=="fan") {out=ContactShapeKind::Fan;return true;}
     if (value=="ring_band") {out=ContactShapeKind::RingBand;return true;}
     if (value=="rect") {out=ContactShapeKind::Rect;return true;}
+    return false;
+}
+enum class HostileKind : uint32_t {Bullet=0,Missile=1,Reflected=2,Count};
+inline const char *symbol_name(HostileKind value) {
+    switch(value) {
+    case HostileKind::Bullet: return "bullet";
+    case HostileKind::Missile: return "missile";
+    case HostileKind::Reflected: return "reflected";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, HostileKind &out) {
+    if (value=="bullet") {out=HostileKind::Bullet;return true;}
+    if (value=="missile") {out=HostileKind::Missile;return true;}
+    if (value=="reflected") {out=HostileKind::Reflected;return true;}
     return false;
 }
 enum class AttackCategory : uint32_t {Aimed=0,Homing=1,Dash=2,Beam=3,Zone=4,Wave=5,Residue=6,Count};
@@ -359,6 +380,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::RunFinished: return field=="result_id" || field=="kind";
     case EventType::Crash: return field=="pos" || field=="power";
     case EventType::Ring: return field=="pos" || field=="radius" || field=="color" || field=="life";
+    case EventType::Shoot: return field=="pos" || field=="kind";
     default: return false;
     }
 }

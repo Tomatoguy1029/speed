@@ -72,13 +72,13 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         if (life <= 0) { release(); continue; }
         const Vector2 from = shot.pos;
         if (shot.stone > 0) {
-            shot.stone = double(shot.stone) - world_dt;
+            shot.stone = speed::remaining_time(shot.stone,world_dt);
             const double reach = double(shot.radius) + runtime.state.ship_config.ship_radius;
             if (runtime.state.ship.pos.distance_squared_to(from) <= reach * reach) {end_reason=speed::AttackEndReason::Hit;release();}
             continue;
         }
         Vector2 vel = shot.vel;
-        if (shot.wait > 0) { shot.wait = double(shot.wait) - world_dt; vel = Vector2(); }
+        if (shot.wait > 0) { shot.wait = speed::remaining_time(shot.wait,world_dt); vel = Vector2(); }
         if (shot.kind == 1) {
             const double turn = double(shot.turn) * world_dt, current = vel.angle();
             const double difference = double(((runtime.state.aim_ready ? runtime.state.enemy_aim : runtime.state.ship_pos) - shot.pos).angle()) - current;

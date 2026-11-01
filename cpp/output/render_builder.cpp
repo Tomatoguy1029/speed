@@ -1,5 +1,6 @@
 #include "render_builder.h"
 #include "../systems/field.h"
+#include "../systems/attack_system.h"
 #include "../runtime/run_runtime.h"
 #include "../systems/motion_math.h"
 #include "../systems/group_system.h"
@@ -77,6 +78,12 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (!view.grow(radius).has_point(pose.position)) continue;
         if (saw && !run.content->rock_fields.empty()) batch(run.content->definitions[run.content->rock_fields.front().saw-1].visual_id,10,0).add(shot.id,pose.position,pose.angle,radius,Color(0,0,0,1));
         else batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1));
+    }
+    for (const auto &shot:state.hostiles) {
+        if (!shot.alive || !shot.definition || !view.grow(40.0).has_point(shot.pos)) continue;
+        const auto &definition=run.content->hostile_definitions[shot.definition-1];const auto *record=AttackSystem::get(state,shot.attack);if (!record) continue;
+        batch(definition.visual,10,0).add(record->id,shot.pos,0,shot.radius,Color(1,1,1,1));
+        if (shot.stone>0) batch(definition.stone_visual,10,1).add(record->id,shot.pos,0,shot.radius*1.3,Color(0.62,0.6,0.58,0.9));
     }
     const Color crystal_colors[]={Color::html("08deff"),Color::html("945cff"),Color::html("ffb609")};
     const double pixel=1.82*config.character_scale;

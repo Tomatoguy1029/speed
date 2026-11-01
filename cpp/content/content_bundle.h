@@ -18,6 +18,7 @@ struct ContentBundle {
     std::vector<BiteDefinition> bites;
     std::vector<HoundDefinition> hounds;
     std::vector<ContactDefinition> contacts;
+    std::vector<HostileDefinition> hostile_definitions;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;
     LifecycleDefinition lifecycle;
