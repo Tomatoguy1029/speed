@@ -518,7 +518,8 @@ func _can_avoid_strong(i: int) -> bool:
 	return t.alive[i] != 0 and t.dead[i] == 0 and t.def[i] != null and t.def[i].rank <= 2 \
 		and t.is_boss[i] == 0 and t.meteor_index[i] < 0 and t.parent[i] < 0 \
 		and t.mode[i] == EnemyTable.Mode.MOVE and t.held[i] == 0 and t.stone[i] <= 0.0 \
-		and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.pump_owner[i] < 0
+		and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.pump_owner[i] < 0 \
+		and not motion.turn_locked(i)
 
 func _capture_avoidance_starts() -> void:
 	var t := table

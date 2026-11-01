@@ -507,8 +507,9 @@ func _recycle(i: int) -> bool:
 	var t := table
 	t.pos[i] = p
 	var to_ship: Vector2 = (state.ship_pos - p).normalized()
-	t.vel[i] = to_ship * t.speed[i]
-	t.facing[i] = to_ship.angle()
+	t.vel[i] = enemies.motion.steering_velocity(i, to_ship * t.speed[i])
+	if not enemies.motion.turn_locked(i):
+		t.facing[i] = to_ship.angle()
 	t.mode[i] = EnemyTable.Mode.MOVE
 	t.timer[i] = 0.0
 	t.charge[i] = 0.0

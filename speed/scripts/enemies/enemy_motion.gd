@@ -17,6 +17,20 @@ var _face_move: float:
 func setup(system: EnemySystem) -> void:
 	m = system
 
+## ブースト中の星1の自律操舵を止める。捕捉・吸引は外力側の移動を使う。
+func turn_locked(i: int) -> bool:
+	return (state.tracing or state.glide or state.ship_boost_t > 0.0) \
+		and table.def[i] != null and table.def[i].rank == 1 and table.is_boss[i] == 0 \
+		and table.parent[i] < 0 and table.held[i] == 0 and table.pump_owner[i] < 0
+
+## 速さの更新を保ち、操舵を止めた個体は今の進行方向を維持する。
+func steering_velocity(i: int, desired: Vector2) -> Vector2:
+	if not turn_locked(i):
+		return desired
+	var v := table.vel[i]
+	var direction := v.normalized() if v.length_squared() > 0.000001 else Vector2.from_angle(table.facing[i])
+	return direction * desired.length()
+
 ## 行 i の敵が、位置 p から margin 以内に天体があるか（FieldSystem.near_body と同じ条件）。
 ## 前回確かめたときの天体の表面までの距離から、その後に動いた距離と月が動けた距離を引き、
 ## まだ margin より遠ければ確かめずに false を返す。瞬間移動も、前回の位置からの距離に入る。
@@ -65,9 +79,12 @@ func _steer_to(i: int, target: Vector2, speed: float, accel: float, dt: float) -
 	if dist < 0.001:
 		dist = 1.0
 	var k := minf(1.0, accel * dt)
-	table.vel[i] += (d / dist * speed - table.vel[i]) * k
+	var desired := steering_velocity(i, d / dist * speed)
+	table.vel[i] += (desired - table.vel[i]) * k
 
 func _turn_toward(i: int, target: float, rate: float, dt: float) -> void:
+	if turn_locked(i):
+		return
 	table.facing[i] += clampf(Geom.angle_diff(target, table.facing[i]), -rate * dt, rate * dt)
 
 ## 移動中の向き：進む向きと機体への向きを config.enemy_face_move の割合で混ぜた向きへ回す。
@@ -94,6 +111,9 @@ func _chase(i: int, dt: float) -> void:
 ## 狙った位置へ速さ speed で向かい（加速 accel）、進む向きと機体への向きを混ぜた向きへ毎秒 turn まで回る。
 ## 追跡と距離を保つ動きの共通部分（よく呼ぶので、関数をまとめて呼び出しを減らす）。
 func _move_to(i: int, target: Vector2, speed: float, accel: float, turn: float, dt: float) -> void:
+	if turn_locked(i):
+		_steer_to(i, target, speed, accel, dt)
+		return
 	var t := table
 	var from := t.pos[i]
 	var d := target - from

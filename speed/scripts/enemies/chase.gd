@@ -67,9 +67,10 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 			var dist := d.length()
 			var v := Vector2.ZERO
 			if dist > 0.001:
-				var f := facing[i]
-				var turn_max := turn[i] * bdt
-				facing[i] = f + clampf(wrapf(d.angle() - f, -PI, PI), -turn_max, turn_max)
+				if not m.motion.turn_locked(i):
+					var f := facing[i]
+					var turn_max := turn[i] * bdt
+					facing[i] = f + clampf(wrapf(d.angle() - f, -PI, PI), -turn_max, turn_max)
 				v = Vector2.from_angle(facing[i]) * speed[i]
 			vel[i] = v
 			pos[i] = from + v * dt

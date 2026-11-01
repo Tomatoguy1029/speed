@@ -113,7 +113,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 				var d := ship - from
 				var dist := d.length()
 				vel[i] = _pursuit_velocity(i, ship, bdt)
-				if vel[i].length_squared() > 0.000001:
+				if vel[i].length_squared() > 0.000001 and not self.m.motion.turn_locked(i):
 					facing[i] = vel[i].angle()
 				if m == EnemyTable.Mode.RECOVER:
 					timer[i] -= bdt
