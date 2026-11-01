@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/snake.png-43863eb399f6ba4a428fb71b88201af3.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/snake.png"
+dest_files=["res://.godot/imported/snake.png-43863eb399f6ba4a428fb71b88201af3.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

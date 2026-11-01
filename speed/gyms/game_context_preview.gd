@@ -16,6 +16,8 @@ var _active := false
 var _mode := "landmark"
 var _clock := 0.0
 var _settings: EnemyMarkSettings
+var _elite_settings: EnemyMarkSettings
+var _elite_landmark := CheckButton.new()
 var _boost_values: Dictionary = {}
 var _has_boost_values := false
 var _follow_cursor := false
@@ -81,17 +83,14 @@ func _ready() -> void:
 	restart.pressed.connect(preview_restart)
 	environment.add_child(restart)
 	add_child(_enemy_row)
-	# HeroSystemの抽選と同じrank条件。部位は親のon_spawnから作る。
-	for key in ContentManager.enemies:
-		var definition: EnemyDef = ContentManager.enemies[key]
-		if definition.rank >= 2 and definition.rank <= 5:
-			_enemy_ids.append(StringName(key))
-	_enemy_ids.sort()
-	for key in _enemy_ids:
-		_enemy.add_item(ContentManager.enemies[key].display_name)
-	if &"telescope" in _enemy_ids: _enemy.select(_enemy_ids.find(&"telescope"))
+	_refresh_enemy_choices()
 	_enemy_row.add_child(_enemy)
 	_enemy.item_selected.connect(func(_index: int): _spawn_target())
+	_elite_landmark.text = "目印の星と併せて表示"
+	_enemy_row.add_child(_elite_landmark)
+	_elite_landmark.toggled.connect(func(_value: bool):
+		if is_instance_valid(_session) and _target >= 0:
+			_session.sim.enemies.table.landmark[_target] = 1 if _elite_landmark.button_pressed else 0)
 	for caption in ["合体", "分離・上", "分離・下"]: _form.add_item(caption)
 	_enemy_row.add_child(_form)
 	_form.item_selected.connect(func(_index: int): _spawn_target())
@@ -222,12 +221,55 @@ func _complete_reward_context() -> void:
 
 ## editorが保持する未保存Resourceを受け取る。読み直し・保存・bakeを行わない。
 func set_landmark_settings(settings: EnemyMarkSettings) -> void:
+	var changed := _mode != "landmark"
 	_settings = settings
 	_mode = "landmark"
-	if is_instance_valid(_aura):
-		_aura.settings = settings
+	_configure_landmark_preview()
+	if is_node_ready():
+		if changed:
+			_refresh_enemy_choices()
+			_spawn_target()
+		_refresh_mode()
+
+func _configure_landmark_preview() -> void:
+	if not is_instance_valid(_render): return
+	if not is_instance_valid(_aura):
+		var previous: Node2D = _render._landmark_aura
+		_aura = AURA.new()
+		_aura.settings = _settings
+		_aura.z_index = previous.z_index
+		previous.get_parent().add_child(_aura)
+		_aura.setup(_render)
+		previous.free()
+		_render._landmark_aura = _aura
+	else:
+		_aura.settings = _settings
 		_aura.refresh()
-	if is_node_ready(): _refresh_mode()
+
+func set_elite_settings(settings: EnemyMarkSettings) -> void:
+	var changed := _mode != "elite"
+	_elite_settings = settings
+	_mode = "elite"
+	if is_instance_valid(_render): _render._elite_crackle.set_settings(settings)
+	if is_node_ready():
+		if changed:
+			_refresh_enemy_choices()
+			_spawn_target()
+		_refresh_mode()
+
+func _refresh_enemy_choices() -> void:
+	var previous: StringName = _enemy_ids[_enemy.selected] if not _enemy_ids.is_empty() and _enemy.selected >= 0 else &""
+	var masks := load("res://assets/effects/landmark/masks.tres")
+	var elites: Array = masks.get_meta("elite_candidates", [])
+	_enemy_ids.clear()
+	_enemy.clear()
+	for key in ContentManager.enemies:
+		var definition: EnemyDef = ContentManager.enemies[key]
+		if definition.rank >= 2 and definition.rank <= 5 or (_mode == "elite" and String(key) in elites): _enemy_ids.append(StringName(key))
+	_enemy_ids.sort()
+	for key in _enemy_ids: _enemy.add_item(ContentManager.enemies[key].display_name)
+	var preferred: StringName = previous if previous in _enemy_ids else &"pulser" if _mode == "elite" else &"telescope"
+	if preferred in _enemy_ids: _enemy.select(_enemy_ids.find(preferred))
 
 func set_boost_values(values: Dictionary) -> void:
 	_boost_values = values.duplicate(true)
@@ -247,14 +289,15 @@ func set_active(active: bool) -> void:
 	if active and not is_instance_valid(_session): _build_context()
 
 func _refresh_mode() -> void:
-	_enemy_row.visible = _mode in ["landmark", "reward"]
+	_enemy_row.visible = _mode in ["landmark", "elite", "reward"]
+	_elite_landmark.visible = _mode == "elite"
 	_boost_row.visible = _mode == "boost"
 	_pause_control.visible = _mode != "reward"
 	_restart_control.visible = _mode != "reward"
 	_frame.focus_mode = Control.FOCUS_ALL if _mode == "reward" else Control.FOCUS_NONE
 	_help.visible = _operating()
 	if is_instance_valid(_session) and _target >= 0:
-		_session.sim.enemies.table.landmark[_target] = 1 if _mode == "landmark" else 0
+		_session.sim.enemies.table.landmark[_target] = 1 if _mode == "landmark" or (_mode == "elite" and _elite_landmark.button_pressed) else 0
 		_apply_boost()
 
 func _build_context() -> void:
@@ -317,15 +360,9 @@ func _build_context() -> void:
 	_render.show_background = true
 	for fire: PixelFire in _render._background_fires + _render._static_fires:
 		fire.manual = true
-	if _mode != "reward":
-		var runtime_aura: Node2D = _render._landmark_aura
-		_aura = AURA.new()
-		_aura.settings = _settings
-		_aura.z_index = runtime_aura.z_index
-		runtime_aura.get_parent().add_child(_aura)
-		_aura.setup(_render)
-		runtime_aura.free()
-		_render._landmark_aura = _aura
+	if _mode == "landmark":
+		_configure_landmark_preview()
+	if _mode == "elite": _render._elite_crackle.set_settings(_elite_settings)
 	var layer := CanvasLayer.new()
 	layer.name = "Hud"
 	layer.layer = maxi(10, _render._look_names.size() + 5)
@@ -376,9 +413,9 @@ func _spawn_target() -> void:
 			_reward_failure("この敵の生成済み外観がありません。別の敵を選ぶか、既存の生成済み資源を準備してください。自動生成・仮図形への置換は行いません。")
 			return
 		_reward_problem = ""
-	_target = run.enemies.spawn(definition, _center + Vector2(70, 0), {"facing": -PI / 2.0})
+	_target = run.enemies.spawn(definition, _center + Vector2(70, 0), {"facing": -PI / 2.0, "elite": _mode == "elite"})
 	var t := run.enemies.table
-	t.landmark[_target] = 1 if _mode == "landmark" else 0
+	t.landmark[_target] = 1 if _mode == "landmark" or (_mode == "elite" and _elite_landmark.button_pressed) else 0
 	_base_radius = t.r[_target]
 	_form.visible = definition.behavior == &"ruler"
 	_pump.visible = definition.behavior == &"pump"

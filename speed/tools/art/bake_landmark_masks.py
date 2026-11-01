@@ -14,6 +14,7 @@ import re
 import numpy as np
 from PIL import Image
 from scipy.ndimage import distance_transform_edt
+from elite_contacts import PackedPoints, contacts_for
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "assets/effects/landmark"
@@ -22,6 +23,7 @@ inputs = {}
 entries = {}
 observed_sizes = {}
 fallback_shapes = {}
+contact_entries = {}
 
 
 def sha(path):
@@ -56,6 +58,8 @@ def look_alpha(name):
         file = refs[match[1]]
         image = Image.open(ROOT / file[6:]).convert("RGBA")
         inputs[file] = sha(ROOT / file[6:])
+        import_path = (ROOT / file[6:]).with_suffix(".png.import")
+        if import_path.exists(): inputs[resource_path(import_path)] = sha(import_path)
         layer = np.array(image.getchannel("A")) > 0
         if alpha is not None and alpha.shape != layer.shape:
             raise ValueError("Mismatched layer dimensions: " + file)
@@ -84,7 +88,9 @@ def bake(key, name, alpha, layers, extra=None):
         channels = [encoded, encode(front), encode(rear)]
     image = Image.fromarray(np.stack(channels, axis=2), "RGB")
     file = OUTPUT / (name + ".png")
-    image.save(file)
+    # Preserve byte-identical existing masks, including their checked-in import identity.
+    if not file.exists() or not np.array_equal(np.array(Image.open(file).convert("RGB")), np.array(image)):
+        image.save(file)
     # Import configuration is a source asset. Godot creates its own cache later.
     digest = hashlib.md5(resource_path(file).encode()).hexdigest()
     cache = "res://.godot/imported/" + file.name + "-" + digest + ".ctex"
@@ -106,6 +112,21 @@ def bake(key, name, alpha, layers, extra=None):
              "layers": layers}
     entry.update(extra or {})
     entries[key] = entry
+    contact_alpha = encoded[PAD:-PAD, PAD:-PAD] == 0
+    groups = None
+    if key == "res://data/visuals/looks/biter.tres":
+        groups = []
+        parts_text = source_text(ROOT / "data/visuals/biter_parts.tres")
+        for part, name in enumerate(re.findall(r'"name": "([^"]+)"', parts_text)):
+            mask = ROOT / "assets/pixel/biter/parts" / name / "mask.png"
+            inputs[resource_path(mask)] = sha(mask)
+            # Partition maps are CPU source bytes, independent of Godot's import UID/cache.
+            groups.append((part, contact_alpha & (np.array(Image.open(mask).convert("L")) > 0)))
+    contact_entries[key] = {"source_radius": entry["source_radius"],
+                            "origin": entry["body_origin"],
+                            "biter": key == "res://data/visuals/looks/biter.tres",
+                            "pump": bool(entry.get("pump", False)),
+                            "patterns": contacts_for(key, contact_alpha, groups)}
 
 
 def placeholder(shape):
@@ -127,6 +148,8 @@ def placeholder(shape):
 
 
 def gd(value):
+    if isinstance(value, PackedPoints):
+        return "PackedVector2Array(" + ", ".join(str(float(v)) for point in value for v in point) + ")"
     if isinstance(value, dict):
         return "{" + ",\n".join(json.dumps(k) + ": " + gd(v) for k, v in sorted(value.items())) + "}"
     if isinstance(value, tuple):
@@ -138,16 +161,39 @@ def gd(value):
     return json.dumps(value)
 
 
+def elite_candidates():
+    result = set()
+    for path in sorted((ROOT / "data/stages").glob("stage_*.tres")):
+        text = path.read_text()
+        match = re.search(r'^zako_curves = (.+)$', text, re.M)
+        if not match:
+            continue
+        refs = re.findall(r'SubResource\("([^"]+)"\)', match[1])
+        for ref in refs:
+            block = re.search(r'\[sub_resource[^\n]*id="' + re.escape(ref) + r'"\]\n(.*?)(?=\n\[|\Z)', text, re.S)
+            ident = value(block[1], "type", '&""').strip('&"') if block else ""
+            definition = ROOT / "data/enemies" / (ident + ".tres")
+            if definition.exists() and int(value(definition.read_text(), "max_alive", "0")) == 0:
+                result.add(ident)
+    return sorted(result)
+
+
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     source_text(ROOT / "shaders/pump_outline.gdshaderinc")
+    source_text(ROOT / "tools/art/bake_landmark_masks.py")
+    source_text(ROOT / "tools/art/elite_contacts.py")
     candidates = {}
     for path in sorted((ROOT / "data/enemies").glob("*.tres")):
         text = path.read_text()
         if 2 <= int(value(text, "rank", "0")) <= 5:
             candidates[path.stem] = text
+    elites = elite_candidates()
+    covered = dict(candidates)
+    for ident in elites:
+        covered[ident] = (ROOT / "data/enemies" / (ident + ".tres")).read_text()
     looks = set()
-    for ident, text in candidates.items():
+    for ident, text in covered.items():
         # Values are observed from the current working tree, never baked into alpha.
         size_text = value(text, "radius", "0") + "|" + (re.search(
             r'visual_settings = \{(.*?)\n\}', text, re.S)[1] if "visual_settings = {" in text else "")
@@ -162,6 +208,7 @@ def main():
             path = ROOT / "assets/pixel" / (ident + ".png")
             if path.exists():
                 inputs[resource_path(path)] = sha(path)
+                if path.with_suffix(".png.import").exists(): inputs[resource_path(path.with_suffix(".png.import"))] = sha(path.with_suffix(".png.import"))
                 alpha = np.array(Image.open(path).convert("RGBA").getchannel("A")) > 0
                 bake("sprite:" + ident, ident, alpha, [resource_path(path)])
             else:
@@ -175,7 +222,7 @@ def main():
         match = re.search(r'enemy_looks = \{(.*?)\n\}', path.read_text(), re.S)
         if match:
             for ident, skin in re.findall(r'"([^"]+)": "([^"]+)"', match[1]):
-                if ident in candidates:
+                if ident in covered:
                     if not (ROOT / "data/visuals/looks" / (skin + ".tres")).exists():
                         raise ValueError("Unresolved stage landmark look: " + skin)
                     looks.add(skin)
@@ -208,11 +255,17 @@ def main():
         header += '[ext_resource type="Texture2D" path=%s id="%s"]\n' % (json.dumps(path), index)
     metadata = {"bake_version": 1, "padding": PAD, "distance_units_per_channel": 8,
                 "size_policy": "source pixels; body scale applied at runtime; size changes need no rebake",
-                "inputs": inputs, "candidates": sorted(candidates), "stage_aliases": aliases,
+                "inputs": inputs, "candidates": sorted(candidates), "elite_candidates": elites, "stage_aliases": aliases,
                 "fallback_shapes": fallback_shapes,
                 "observed_size_inputs": observed_sizes, "masks": masks}
     body = "\n[resource]\n" + "\n".join("metadata/" + k + " = " + gd(v) for k, v in metadata.items()) + "\n"
     (OUTPUT / "masks.tres").write_text(header + body)
+    outline = re.search(r'float\[72\]\((.*?)\)', (ROOT / "shaders/pump_outline.gdshaderinc").read_text())[1]
+    contact_header = '[gd_resource type="Resource" load_steps=2 format=3]\n\n[ext_resource type="Resource" path="res://assets/effects/landmark/masks.tres" id="1"]\n\n[resource]\n'
+    contact_data = {"bake_version": 1, "masks": "EXT:1", "inputs": dict(inputs),
+                    "mask_manifest_sha256": sha(OUTPUT / "masks.tres"),
+                    "pump_outline": [float(v) for v in outline.split(",")], "entries": contact_entries}
+    (OUTPUT / "elite_contacts.tres").write_text(contact_header + "\n".join("metadata/" + k + " = " + gd(v) for k, v in contact_data.items()) + "\n")
     print("Baked %d masks for %d candidate definitions into %s" % (len(texture_paths), len(candidates), OUTPUT))
 
 

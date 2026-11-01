@@ -84,14 +84,28 @@ static func _validate_landmark_masks() -> Error:
 		push_error("目印候補が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
 		return ERR_INVALID_DATA
 	var aliases := {}
+	var elites := {}
 	for file in DirAccess.get_files_at("res://data/stages"):
 		if not file.begins_with("stage_") or not file.ends_with(".tres"): continue
 		var stage := load("res://data/stages/" + file) as StageDef
+		for curve: SpawnCurve in stage.zako_curves:
+			var definition := load("res://data/enemies/%s.tres" % curve.type) as EnemyDef
+			if definition != null and definition.max_alive == 0: elites[String(curve.type)] = true
 		for id: String in stage.enemy_looks:
-			if id in candidates: aliases[id + ":" + file.get_basename()] = stage.enemy_looks[id]
+			if id in candidates or id in masks.get_meta("elite_candidates", []): aliases[id + ":" + file.get_basename()] = stage.enemy_looks[id]
+	var elite_ids := elites.keys()
+	elite_ids.sort()
+	if elite_ids != masks.get_meta("elite_candidates", []):
+		push_error("エリート対象が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
+		return ERR_INVALID_DATA
 	if aliases != masks.get_meta("stage_aliases", {}):
 		push_error("目印候補の外観が変わりました。tools/art/bake_landmark_masks.pyでベイクしてください。")
 		return ERR_INVALID_DATA
+	var contacts := ResourceLoader.load("res://assets/effects/landmark/elite_contacts.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if contacts == null or contacts.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+	if contacts.get_meta("mask_manifest_sha256", "") != FileAccess.get_sha256("res://assets/effects/landmark/masks.tres"): return ERR_INVALID_DATA
+	for path: String in contacts.get_meta("inputs", {}):
+		if FileAccess.get_sha256(path) != contacts.get_meta("inputs")[path]: return ERR_INVALID_DATA
 	return OK
 
 static func _validate_biter_parts() -> Error:

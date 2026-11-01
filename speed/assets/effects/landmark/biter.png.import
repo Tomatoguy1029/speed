@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/biter.png-5a58f1c0cab2b120e421935fe44f3a97.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/biter.png"
+dest_files=["res://.godot/imported/biter.png-5a58f1c0cab2b120e421935fe44f3a97.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

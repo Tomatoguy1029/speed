@@ -106,3 +106,21 @@ func draw_body(_c: CanvasItem, t: EnemyTable, i: int, p: Vector2) -> bool:
 func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var look := rm.look_of(t.type[i])
 	if look == null or look.source_path != SOURCE_LOOK: super.draw_marks(c, t, i)
+
+## 放電の接点も、本体・左右の顎と同じ支点・回転・波動変形へ置く。
+func elite_pose(t: EnemyTable, i: int, part_index: int, deformation: Dictionary) -> Transform2D:
+	var radius := sprite_radius(t,i)
+	var angle := rm._enemy_sprite_angle(t.type[i],t.facing[i])
+	var part: Dictionary = _parts[part_index]
+	var jaw := deg_to_rad(_jaw_degrees(t,i))
+	var turn := jaw if part.name == "jaw_left" else -jaw if part.name == "jaw_right" else 0.0
+	var pivot: Vector2 = part.pivot*(radius/17.0)
+	var center := t.pos[i]+(pivot-pivot.rotated(turn)).rotated(angle)
+	var pose := Transform2D(angle+turn,center).scaled_local(Vector2.ONE*(radius/17.0))
+	if not deformation.is_empty() and deformation.direction.length_squared()>0.0001:
+		var normal: Vector2 = deformation.direction.normalized()
+		var side := normal.orthogonal()
+		for column in 2:
+			pose[column]=normal*pose[column].dot(normal)*(1.0-0.5*deformation.amount)+side*pose[column].dot(side)*(1.0+0.6*deformation.amount)
+	pose.origin-=pose.basis_xform(Vector2(10,17))
+	return pose

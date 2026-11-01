@@ -11,6 +11,13 @@ extends Resource
 @export_range(0.0, 2.0, 0.05) var intensity := 0.9
 @export var color := Color("#e9c872")
 @export var highlight := Color("#fff0c6")
+## エリートの局所放電。待ち時間と同時本数を独立して調整する。
+@export_range(0.04, 0.5, 0.005) var interval_min := 0.075
+@export_range(0.01, 1.0, 0.01) var interval_random := 0.21
+@export_range(0.1, 2.0, 0.01) var interval_max := 0.65
+@export_range(1, 4, 1) var arc_count := 3
+@export_range(0, 3, 1) var spark_count := 3
+@export var shadow := Color("#080407")
 ## 目印は画像空間の距離場を使い、本体と同じ倍率で表示する。
 @export_range(1.0, 10.0, 0.25) var aura_width := 5.0
 @export_range(0.0, 12.0, 0.25) var aura_variation := 6.25
@@ -97,11 +104,7 @@ func apply_aura_to(material: ShaderMaterial) -> void:
 		material.set_shader_parameter(AURA_FIELDS[key][3], get(key))
 
 func apply_to(material: ShaderMaterial) -> void:
-	material.set_shader_parameter("pixel_grid", pixel_grid)
-	material.set_shader_parameter("inner_radius", inner_radius)
-	material.set_shader_parameter("outer_radius", outer_radius)
-	material.set_shader_parameter("noise_scale", noise_scale)
-	material.set_shader_parameter("motion_speed", motion_speed)
 	material.set_shader_parameter("intensity", intensity)
 	material.set_shader_parameter("mark_color", color)
 	material.set_shader_parameter("highlight_color", highlight)
+	material.set_shader_parameter("shadow_color", shadow)

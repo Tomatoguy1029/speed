@@ -1,0 +1,16 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/splitter.png-58c6ccfde3260c464a936ab899d366e3.ctex"
+
+[deps]
+source_file="res://assets/effects/landmark/splitter.png"
+dest_files=["res://.godot/imported/splitter.png-58c6ccfde3260c464a936ab899d366e3.ctex"]
+
+[params]
+compress/mode=0
+compress/normal_map=0
+mipmaps/generate=false
+process/fix_alpha_border=false
+process/premult_alpha=false
+process/size_limit=0

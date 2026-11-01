@@ -110,6 +110,7 @@ var _hero_aura: MeshInstance2D
 var _hero_aura_material: ShaderMaterial
 var _field_boundary: DrawLayer
 var _landmark_aura: Node2D
+var _elite_crackle: Node2D
 ## 開発版の計測の記録先：表示側の処理時間と、敵の描画1回あたりの行の数
 var perf := PerfLog.new()
 var perf_rows := PerfLog.new()
@@ -163,6 +164,9 @@ func _ready() -> void:
 	_landmark_aura.z_index = -2
 	_layers.enemies.add_child(_landmark_aura)
 	_landmark_aura.setup(self)
+	_elite_crackle = load("res://scripts/render/elite_crackle.gd").new()
+	_lit_enemy_marks.add_child(_elite_crackle)
+	_elite_crackle.setup(self)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _look_names.size() + 2)
@@ -916,6 +920,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 
 func _draw_enemies(c: CanvasItem) -> void:
 	_landmark_aura.begin()
+	_elite_crackle.begin()
 	var wave_deformations := {}
 	var quake = run.loadout.weapon_behaviors.get(&"W04")
 	if quake != null:
@@ -980,7 +985,9 @@ func _draw_enemies(c: CanvasItem) -> void:
 		# g成分は自爆予告の赤い装甲。被弾の白いフラッシュとは分ける。
 		if t.def[i] != null and t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
 			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
-		if visual != null and visual.draw_body(c, t, i, p):
+		var custom_body := visual != null and visual.draw_body(c, t, i, p)
+		if elite[i] != 0: _elite_crackle.add_enemy(t,i,wave_deformations.get(t.id[i],{}))
+		if custom_body:
 			self_drawn += 1
 			continue
 		batched += 1
@@ -1003,6 +1010,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 			marked += 1
 			_draw_enemy_marks(c, t, i)
 	perf.since(&"draw_enemies.rows", t0)
+	_elite_crackle.end()
 	t0 = Time.get_ticks_usec()
 	for key in _batches:
 		if key != &"gem":
@@ -1163,13 +1171,11 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false, tint)
 	c.draw_set_transform(Vector2.ZERO)
 
-## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。種類ごとの飾りは見た目の処理が描く。
+## 背面の弱点・予告・HPバーと種類固有の飾り。エリートは共有バッチへ描く。
 func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
 	var v := _visual_of(t, i)
-	if t.elite[i] != 0:
-		c.draw_arc(p, r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
 	var weak := t.weak_arc[i]
 	if weak > 0.0 and t.type[i] not in EnemyDef.NATIVE_SPRITES and (v == null or v.draws_weak_arc):
 		var f := t.facing[i]
