@@ -32,7 +32,8 @@ const SLOTS := preload(ART + "combat_ui_components.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const SPEED_METERS := [preload(ART + "speed_indicator_meter.png"), preload(ART + "speed_indicator_fast.png"), preload(ART + "speed_indicator_boost.png")]
 const SPEED_NEEDLE := preload(ART + "speed_indicator_needle.png")
-const SPEED_NEEDLE_COLORS := [Color.WHITE, Color("#fff1b8"), Color("#ffd2ab")]
+const SPEED_NEEDLE_MIN := -87.0 * PI / 180.0
+const SPEED_NEEDLE_MAX := -10.0 * PI / 180.0
 ## 針画像の丸い根元の中心。目盛りの右下の支点へ重ねる。
 const SPEED_NEEDLE_PIVOT := Vector2(6.5, 36.5)
 const ICONS := preload(ART + "icons.png")
@@ -109,6 +110,7 @@ var _ring_amount := 1.0
 var _pause_after_reward := false
 var _menu_overlay: Control
 var _overlay_focus: WeakRef
+var _speed_needle_angle := SPEED_NEEDLE_MIN
 
 func _ready() -> void:
 	_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
@@ -411,6 +413,7 @@ func _notification(what: int) -> void:
 			run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_update_speed_indicator(delta)
 	_laser_audio.sync(run)
 	var slow := run.state.phase == RunState.Phase.PLAY and run.draw.world_scale() < 0.999
 	if run.state.phase == RunState.Phase.FINISHING:
@@ -907,16 +910,24 @@ func _speed_indicator_mode() -> int:
 	return 0
 
 func _speed_indicator_angle() -> float:
-	var amount := clampf(run.state.ship_vel.length() / maxf(1.0, run.state.stats.max_speed), 0.0, 1.0)
-	return lerpf(-PI / 2.0, 0.0, amount)
+	var maximum := maxf(1.0, run.state.stats.max_speed)
+	var cruise := maximum * run.cfg.steer_cruise
+	var amount := clampf((run.state.ship_vel.length() - cruise) / maxf(1.0, maximum - cruise), 0.0, 1.0)
+	return lerpf(SPEED_NEEDLE_MIN, SPEED_NEEDLE_MAX, amount)
+
+func _update_speed_indicator(delta: float) -> void:
+	if run.state.phase != RunState.Phase.PLAY or run.ui_overlay_active or run.ui_reward_active:
+		return
+	# フレーム間隔によらず素早く追従し、目標を飛び越えない。
+	_speed_needle_angle = lerpf(_speed_needle_angle, _speed_indicator_angle(), 1.0 - exp(-22.0 * maxf(0.0, delta)))
 
 func _draw_speed_indicator(factor: float) -> void:
 	var mode := _speed_indicator_mode()
 	var meter: Texture2D = SPEED_METERS[mode]
 	var origin := (size - (meter.get_size() + Vector2.ONE * 8.0) * factor).round()
 	draw_texture_rect(meter, Rect2(origin, meter.get_size() * factor), false)
-	draw_set_transform(origin + meter.get_size() * factor, _speed_indicator_angle(), Vector2.ONE * factor)
-	draw_texture(SPEED_NEEDLE, -SPEED_NEEDLE_PIVOT, SPEED_NEEDLE_COLORS[mode])
+	draw_set_transform(origin + meter.get_size() * factor, _speed_needle_angle, Vector2.ONE * factor)
+	draw_texture(SPEED_NEEDLE, -SPEED_NEEDLE_PIVOT)
 	draw_set_transform(Vector2.ZERO)
 
 ## ミニマップ（右上）。自機を中心に、世界の方角と縮尺を保って出す（仕様書 17）。
