@@ -148,6 +148,7 @@ class Runner extends "res://scripts/bosses/monoceros/technique_runner.gd":
 		released = false
 
 	func _face_target(host: MonocerosBoss, dt: float, turn: float) -> void:
+		if host.tracking_locked(): return
 		var target := host.run_state.enemy_aim if host._tracks_during_warn() else host.aim_point
 		host.table.facing[host.body] = rotate_toward(host.table.facing[host.body], (target - host.table.pos[host.body]).angle(), turn * dt)
 

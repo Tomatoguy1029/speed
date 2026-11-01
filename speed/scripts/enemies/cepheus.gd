@@ -96,7 +96,7 @@ func _cepheus_reform(i: int) -> void:
 	var p: Dictionary = t.def[i].params
 	t.buds[i] = mini(t.buds[i] + 1, CEPHEUS_TIERS.size())
 	t.anchor[i] = t.pos[i]
-	t.facing[i] = (state.ship_pos - t.pos[i]).angle()
+	t.facing[i] = m.motion.tracking_angle(i, (state.ship_pos - t.pos[i]).angle())
 	var size: int = CEPHEUS_TIERS[t.buds[i] - 1]
 	var soldiers := _soldiers_of(i)
 	var k := 0

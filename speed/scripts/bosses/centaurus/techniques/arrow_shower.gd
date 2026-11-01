@@ -136,7 +136,7 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 				host.path_side *= -1.0
 			if r.pattern == "wall":
 				var at := host.table.pos[host.body]
-				var toward := host.run_state.ship_pos - at
+				var toward := host.tracking_target(host.run_state.ship_pos) - at
 				var direction := toward.normalized() if toward.length_squared() > 0.0 else Vector2.from_angle(host.table.facing[host.body])
 				var center := at + direction * clampf(toward.length() * float(r.wall_ratio), float(r.wall_min), float(r.wall_max))
 				for j in int(r.count):

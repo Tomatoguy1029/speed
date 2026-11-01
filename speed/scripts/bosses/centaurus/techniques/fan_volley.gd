@@ -95,7 +95,7 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 		host.mode = &"shooting"
 		while fired < int(r.shots) and elapsed >= float(r.warn) + fired * float(r.interval):
 			var mouth := host.bow_mouth()
-			var angle := (host.run_state.enemy_aim - mouth).angle()
+			var angle := host.tracking_angle((host.run_state.enemy_aim - mouth).angle())
 			for j in int(r.count):
 				var offset := (float(j) / (int(r.count) - 1) - 0.5) * deg_to_rad(float(r.spread)) if int(r.count) > 1 else 0.0
 				host.ctx.projectiles.emit_attack(&"light_arrow", [mouth, angle + offset, float(r.speed), float(r.radius), float(r.travel), float(r.damage) * host.ctx.cfg.atk_scale, false, float(r.length)], r.get("shot_visual"))

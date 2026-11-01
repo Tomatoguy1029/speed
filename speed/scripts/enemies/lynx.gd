@@ -20,7 +20,7 @@ func _lynx(i: int, dt: float) -> void:
 	if _gun_timer(i, dt):
 		var side := lynx_side(i)
 		t.buds[i] += 1
-		var a := (state.ship_pos - t.pos[i]).angle()
+		var a := m.motion.tracking_angle(i, (state.ship_pos - t.pos[i]).angle())
 		projectiles.fire_slash(t.pos[i] + Vector2.from_angle(a) * t.r[i], a, float(p.slash_speed), float(p.slash_size),
 			float(p.slash_range), float(p.bullet_dmg), side)
 

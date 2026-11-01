@@ -181,8 +181,8 @@ class Runner extends "res://scripts/bosses/monoceros/techniques/charge.gd".Runne
 		match stage:
 			&"gather":
 				if not host.locked:
-					host.table.facing[host.body] = rotate_toward(host.table.facing[host.body], (host.run_state.ship_pos - host.table.pos[host.body]).angle(), float(r.aim_turn) * dt)
-					host.aim_point = host.run_state.ship_pos
+					host.table.facing[host.body] = host.tracking_angle(rotate_toward(host.table.facing[host.body], (host.run_state.ship_pos - host.table.pos[host.body]).angle(), float(r.aim_turn) * dt))
+					host.aim_point = host.tracking_target(host.run_state.ship_pos)
 					if stage_time >= float(r.warn) - float(r.lock_time):
 						host.locked = true
 						host._cue(&"aim_locked")

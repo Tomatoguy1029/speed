@@ -35,6 +35,7 @@ func release(host: CentaurusBoss) -> void:
 	var power := kind() == &"power_shot"
 	var target := (host.run_state.ship_pos if power else host.run_state.enemy_aim) if host._tracks_during_warn() else host.warn_aim
 	var angle := (target - mouth).angle()
+	if host.tracking_locked(): angle = host.table.facing[host.body]
 	if power and host.alerting:
 		mouth = host.power_aim_origin()
 		angle = host.power_aim_angle()

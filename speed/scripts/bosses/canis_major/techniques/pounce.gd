@@ -113,10 +113,11 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 		host._cue(&"telegraph")
 
 	func _aim(host: CanisMajorBoss, dt: float) -> void:
-		host.aim_point = host.run_state.ship_pos + host.run_state.ship_vel * (maxf(0, warn_time - stage_time) + float(values.lead_extra))
+		host.aim_point = host.tracking_target(host.run_state.ship_pos + host.run_state.ship_vel * (maxf(0, warn_time - stage_time) + float(values.lead_extra)))
 		host._face(host.aim_point, host.def.turn, dt)
 
 	func lock_aim(host: CanisMajorBoss) -> void:
+		if host.tracking_locked(): host.aim_point = host.tracking_target(host.aim_point)
 		host.locked = true
 		var to := host.aim_point - host.table.pos[host.body]
 		host.direction = to.normalized() if to.length_squared() > 1.0 else Vector2.from_angle(host.table.facing[host.body])

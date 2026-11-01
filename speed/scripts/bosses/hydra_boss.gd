@@ -355,14 +355,14 @@ func _move(dt: float) -> void:
 		var middle:=Vector2.ZERO
 		for n in participants:middle+=Vector2.from_angle(n.base_angle)
 		var wanted: float=d.angle()-middle.angle()
-		t.facing[i] = rotate_toward(t.facing[i],wanted,def.turn*dt)
+		t.facing[i] = tracking_angle(rotate_toward(t.facing[i],wanted,def.turn*dt))
 	var swimming := (dist > float(p.engage) or not run_state.view_rect().grow(-table.r[i]).has_point(t.pos[i])) and not busy and recovery_t <= 0.0
-	var want := d / dist * def.speed if swimming else Vector2.ZERO
+	var want := ctx.enemies.motion.steering_velocity(i, d / dist * def.speed) if swimming else Vector2.ZERO
 	t.vel[i] += (want - t.vel[i]) * minf(1.0, def.accel * dt)
 	if busy or recovery_t > 0.0:
 		t.vel[i] = Vector2.ZERO
 	# 構えている間は胴体の向きを保ち、狙いは首先で表す。
-	if swimming:
+	if swimming and not tracking_locked():
 		t.facing[i] += clampf(Geom.angle_diff(d.angle(), t.facing[i]), -def.turn * dt, def.turn * dt)
 	var from := t.pos[i]
 	t.pos[i] += t.vel[i] * dt
@@ -598,8 +598,8 @@ func start_normal(index: int, attack: StringName, internal_step := false) -> boo
 	n.motion.erase("normal_phase")
 	n.motion.erase("lunge_done")
 	n.motion.erase("extension")
-	n.target = run_state.ship_pos
-	if attack==&"thunder_drop":n.target+=run_state.ship_vel*float(move_params(attack).thunder_lead)
+	n.target = neck_tracking_target(n, run_state.ship_pos)
+	if attack==&"thunder_drop":n.target=neck_tracking_target(n, n.target+run_state.ship_vel*float(move_params(attack).thunder_lead))
 	_cue(&"warning_started",attack,index)
 	return true
 
@@ -634,7 +634,7 @@ func position_head(index: int, dt: float) -> void:
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
 
 func aim_neck(n: Neck, desired: float, dt: float) -> void:
-	if dt<=0.0:return
+	if dt<=0.0 or tracking_locked():return
 	if separated and n != immortal_neck:
 		n.look_angle = rotate_toward(n.look_angle, desired, float(def.params.squad.look_player_turn) * dt)
 		return
@@ -656,7 +656,7 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 	match neck.mode:
 		&"tech_aim":
 			var direction: float=(neck.target-_neck_base(neck)).angle()
-			neck.angle=lerp_angle(neck.angle,direction,minf(1.0,dt*6.0))
+			if not tracking_locked(): neck.angle=lerp_angle(neck.angle,direction,minf(1.0,dt*6.0))
 			neck.length=move_toward(neck.length,float(def.params.neck_rest)*0.35,float(def.params.neck_rest)*dt*2.0)
 			neck.glow=minf(1.0,neck.glow+dt*1.5)
 		&"tech_lunge":_north_step(neck,minf(1.0,neck.t/_north_duration),dt)
@@ -745,7 +745,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 
 ## 予告の間に自機を追うか。技の設定が無い動作は追う。
 func tracks_during_warn(id: StringName) -> bool:
-	return not _moves.has(id) or _moves[id].track_during_warn
+	return not tracking_locked() and (not _moves.has(id) or _moves[id].track_during_warn)
 
 func attack_playing() -> bool:
 	return busy
@@ -802,7 +802,7 @@ func _final_strike_tick(dt: float) -> void:
 		table.guard[n.row] = 1.0
 		if separated:
 			n.velocity = Vector2.ZERO
-			n.angle = lerp_angle(n.angle, (ship - n.free_pos).angle(), minf(1.0, dt * 6.0))
+			if not tracking_locked(): n.angle = lerp_angle(n.angle, (ship - n.free_pos).angle(), minf(1.0, dt * 6.0))
 		else:
 			aim_neck(n, (ship - _neck_base(n)).angle(), dt)
 			n.length = move_toward(n.length, float(def.params.neck_rest), float(def.params.neck_rest) * dt)
@@ -811,7 +811,8 @@ func _final_strike_tick(dt: float) -> void:
 		table.facing[n.row] = n.angle
 		_follow_neck(n, dt)
 		var head: Vector2 = table.pos[n.row]
-		var points := PackedVector2Array([head, head + (ship - head).normalized() * reach])
+		var direction := Vector2.from_angle(n.angle) if tracking_locked() else (ship - head).normalized()
+		var points := PackedVector2Array([head, head + direction * reach])
 		if not _final_beams.has(n.row_id):
 			_final_beams[n.row_id] = attack_field.add_shape(points, width, maxf(0.0, _final_charge - float(def.params.final_widen_time) - final_strike_t),
 				_final_charge + 10.0, 0.0, &"beam", n.row, Vector2.ZERO, true)
@@ -1196,7 +1197,7 @@ func begin_separation()->void:
 	immortal_neck=Neck.new()
 	immortal_neck.kind=&"immortal"
 	immortal_neck.free_pos=table.pos[body]
-	immortal_neck.angle=(table.pos[body]-run_state.ship_pos).angle()
+	immortal_neck.angle=tracking_angle((table.pos[body]-run_state.ship_pos).angle())
 	immortal_neck.look_angle=immortal_neck.angle
 	immortal_row=ctx.enemies.spawn_part(body,ctx.enemies.def_of(&"hydra_immortal"),immortal_neck.free_pos)
 	immortal_id=table.id[immortal_row]
@@ -1232,7 +1233,7 @@ func tick_bearer(dt: float)->void:
 		n.t=0.0
 		n.locked=false
 		n.step=0
-		n.target=run_state.ship_pos
+		n.target=neck_tracking_target(n, run_state.ship_pos)
 		_cue(&"warning_started",&"bite_thrust",-2)
 	elif not alone and not busy:
 		n.cd=maxf(0.0,n.cd-dt)
@@ -1249,7 +1250,7 @@ func tick_bearer(dt: float)->void:
 			n.free_pos=n.free_pos.lerp(target,1.0-exp(-4.0*dt))
 			n.velocity=Vector2.ZERO
 		else:steer_snake(n,target,dt,float(def.params.bearer_speed)/float(def.params.snake_speed),grid_hold)
-	if not alone and not busy: SNAKE.update_look(n, run_state.ship_pos, dt, _time, run_state.rng, def.params.squad, &"bearer", false)
+	if not alone and not busy: SNAKE.update_look(n, run_state.ship_pos, dt, _time, run_state.rng, def.params.squad, &"bearer", false, tracking_locked())
 	var at:=_head_pos(n)
 	table.pos[immortal_row]=at
 	table.facing[immortal_row]=n.angle if alone or busy else n.look_angle
@@ -1283,7 +1284,7 @@ func grid_plan()->Dictionary:
 func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formation:=false) -> void:
 	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
 	n.free_pos = from
-	SNAKE.steer(n, snake_destination(n, target, formation), dt, def.params, speed_scale)
+	SNAKE.steer(n, snake_destination(n, target, formation), dt, def.params, speed_scale, tracking_locked())
 	_finish_snake_step(n, from)
 
 func snake_destination(n: Neck, target: Vector2, formation: bool) -> Vector2:
@@ -1305,14 +1306,14 @@ func snake_destination(n: Neck, target: Vector2, formation: bool) -> Vector2:
 func swim_snake(n: Neck, force: Vector2, speed: float, turn: float, dt: float) -> void:
 	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
 	n.free_pos = from
-	SNAKE.apply_force(n, force, speed, turn, dt, def.params.squad)
+	SNAKE.apply_force(n, force, speed, turn, dt, def.params.squad, tracking_locked())
 	_finish_snake_step(n, from)
 
 func swim_bearer(n: Neck, target: Vector2, speed: float, turn: float, dt: float) -> void:
 	var from: Vector2 = arena.safe_point(n.free_pos, table.r[n.row] + 1.0)
 	n.free_pos = from
 	var offset := snake_destination(n, target, true) - from
-	if offset.length() > 4.0: n.angle = rotate_toward(n.angle, offset.angle(), turn * clampf(offset.length() / 90.0, 0.2, 1.0) * dt)
+	if offset.length() > 4.0 and not tracking_locked(): n.angle = rotate_toward(n.angle, offset.angle(), turn * clampf(offset.length() / 90.0, 0.2, 1.0) * dt)
 	var amount := speed * minf(1.0, offset.length() / 130.0) * (0.3 + 0.7 * maxf(0.0, cos(angle_difference(n.angle, offset.angle()))))
 	n.velocity = n.velocity.lerp(Vector2.from_angle(n.angle) * amount, 1.0 - exp(-2.5 * dt))
 	n.free_pos += n.velocity * dt
@@ -1334,6 +1335,7 @@ func _finish_snake_step(n: Neck, from: Vector2) -> void:
 func move_reach(id: StringName) -> Dictionary:
 	return _moves[id].range_info(move_params(id)) if _moves.has(id) else {"origin": "head", "max": INF}
 func tick_normal(neck, dt: float) -> void:
+	if tracking_locked() and not neck.locked: neck.target = neck_tracking_target(neck, neck.target)
 	if separated and neck != immortal_neck:
 		NORMAL_SWIM.tick(self, neck, dt)
 		return
@@ -1354,3 +1356,8 @@ func tech_kind(id: StringName) -> StringName:
 
 func head_angle(n: Neck) -> float:
 	return n.look_angle if separated and (n.mode == &"idle" or _normal_moves.has(n.mode)) else n.angle
+
+func neck_tracking_target(n: Neck, target: Vector2) -> Vector2:
+	if not tracking_locked(): return target
+	var origin := _head_pos(n)
+	return origin + Vector2.from_angle(head_angle(n)) * maxf(1.0, origin.distance_to(target))

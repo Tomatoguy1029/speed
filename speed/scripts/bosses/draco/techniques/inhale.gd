@@ -157,7 +157,7 @@ class Runner extends BossTechnique.Runner:
 		if a.elapsed < inhale_time:
 			if not caught:
 				a.combat_trace.evaluate()
-				a.table.facing[a.body] = rotate_toward(a.table.facing[a.body], (a.run_state.ship_pos - a.table.pos[a.body]).angle(), INHALE_TURN * dt)
+				a.table.facing[a.body] = a.tracking_angle(rotate_toward(a.table.facing[a.body], (a.run_state.ship_pos - a.table.pos[a.body]).angle(), INHALE_TURN * dt))
 				a.direction = Vector2.from_angle(a.table.facing[a.body])
 			var toward: Vector2 = mouth - a.run_state.ship_pos
 			if toward.length() < float(a.rule().pull_range) and not caught:

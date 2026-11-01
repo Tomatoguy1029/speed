@@ -1,15 +1,16 @@
 ## 独立蛇の操舵と、通過した頭位置をたどる胴体。世界時間で動作を混ぜる。
 extends RefCounted
-static func steer(n, target: Vector2, dt: float, p: Dictionary, speed_scale:=1.0)->void:
+static func steer(n, target: Vector2, dt: float, p: Dictionary, speed_scale:=1.0, locked:=false)->void:
 	var offset: Vector2=target-n.free_pos
 	var previous: float=n.angle
-	if offset.length()>1.0:
+	if offset.length()>1.0 and not locked:
 		n.angle=rotate_toward(n.angle,offset.angle(),float(p.snake_turn)*dt)
 	# 目標へ着いたら減速して止まる。最低速度があると目標の周囲を旋回し続け、胴体履歴が一箇所へ巻き込まれる。
 	var speed: float=float(p.snake_speed)*speed_scale*clampf(offset.length()/100.0,0.0,1.0)
 	speed*=0.3+0.7*maxf(0.0,cos(angle_difference(n.angle,offset.angle())))
 	var desired:=Vector2.from_angle(n.angle)*speed
 	n.velocity=n.velocity.lerp(desired,1.0-exp(-float(p.snake_accel)*dt))
+	if locked: n.velocity=Vector2.from_angle(n.angle)*n.velocity.length()
 	n.free_pos+=n.velocity*dt
 	n.motion.turn=angle_difference(previous,n.angle)/maxf(dt,0.001)
 static func follow(n, head: Vector2, dt: float, time: float, p: Dictionary)->void:
@@ -122,11 +123,11 @@ static func boid_force(n, target: Vector2, heads: Array, bearer, player: Vector2
 	var urgency := clampf(smooth.length() / float(p.urgency), 0.0, 1.0)
 	return ((seek + alignment + cohesion) * (1.0 - float(p.avoid_reduction) * urgency) + avoid).limit_length(maxf(speed, 80.0) * float(p.block_force_cap if blocking else p.force_cap))
 
-static func apply_force(n, force: Vector2, speed: float, turn: float, dt: float, p: Dictionary) -> void:
+static func apply_force(n, force: Vector2, speed: float, turn: float, dt: float, p: Dictionary, locked:=false) -> void:
 	var velocity: Vector2 = n.velocity + force * dt
 	var previous: float = n.angle
-	if velocity.length() > 8.0:
-		n.angle = rotate_toward(n.angle, velocity.angle(), turn * dt)
+	if velocity.length() > 8.0 or locked:
+		if not locked: n.angle = rotate_toward(n.angle, velocity.angle(), turn * dt)
 		var amount := minf(velocity.length(), maxf(speed, 60.0) * float(p.velocity_cap)) * (float(p.velocity_floor) + (1.0 - float(p.velocity_floor)) * maxf(0.0, cos(angle_difference(n.angle, velocity.angle()))))
 		n.velocity = Vector2.from_angle(n.angle) * amount
 	else:
@@ -139,7 +140,7 @@ static func watch_player(n, rng: RandomNumberGenerator, p: Dictionary, role: Str
 	var timing: Vector2 = p.look[role].on
 	n.motion.look_time = rng.randf_range(timing.x, timing.y)
 
-static func update_look(n, player: Vector2, dt: float, time: float, rng: RandomNumberGenerator, p: Dictionary, role: StringName, keep: bool) -> void:
+static func update_look(n, player: Vector2, dt: float, time: float, rng: RandomNumberGenerator, p: Dictionary, role: StringName, keep: bool, locked:=false) -> void:
 	var settings: Dictionary = p.look[role]
 	n.motion.look_time = float(n.motion.get("look_time", 0.0)) - dt
 	if n.motion.look_time <= 0.0:
@@ -150,6 +151,7 @@ static func update_look(n, player: Vector2, dt: float, time: float, rng: RandomN
 	if keep:
 		n.motion.look_on = true
 		n.motion.look_time = maxf(n.motion.look_time, 0.3)
+	if locked: return
 	var on: bool = n.motion.look_on
 	var desired: float = (player - n.free_pos).angle() + sin(time * float(p.look_wave_speed) + n.base_angle) * float(p.look_wave) if on else n.angle + float(n.motion.get("look_offset", 0.0))
 	desired = n.angle + clampf(angle_difference(n.angle, desired), -float(settings.limit), float(settings.limit))

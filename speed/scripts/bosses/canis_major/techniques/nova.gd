@@ -138,7 +138,7 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 					host._hounds().release_order(i)
 				if member.get("stationed",false):
 					host._hounds().quiet(i,host.run_state.world_time+host.FOLLOW_HOLD,Vector2.ZERO)
-					host.table.facing[i] = rotate_toward(host.table.facing[i],float(member.angle),float(cfg.face_turn)*dt)
+					host.table.facing[i] = host.ctx.enemies.motion.tracking_angle(i, rotate_toward(host.table.facing[i],float(member.angle),float(cfg.face_turn)*dt))
 				else:
 					var route_goal := goal
 					var center := host.table.pos[host.body]

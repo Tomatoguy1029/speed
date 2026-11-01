@@ -113,9 +113,9 @@ func body_points() -> PackedVector2Array:
 
 func aim_target(lead_seconds := 0.0) -> Vector2:
 	if run_state.tracing:
-		return run_state.enemy_aim
+		return tracking_target(run_state.enemy_aim)
 	var lead: Vector2 = run_state.ship_vel*maxf(0.0,lead_seconds)
-	return run_state.ship_pos+lead.limit_length(float(def.params.get("aim_lead_cap",280.0)))
+	return tracking_target(run_state.ship_pos+lead.limit_length(float(def.params.get("aim_lead_cap",280.0))))
 
 func mouth_pos() -> Vector2:
 	return table.pos[body]+Vector2.from_angle(table.facing[body])*120.0*head_scale*perspective_scale

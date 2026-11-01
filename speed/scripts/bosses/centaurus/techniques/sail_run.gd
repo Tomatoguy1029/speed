@@ -125,7 +125,7 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 		var interval := maxf(float(r.interval), 0.001)
 		while fired * interval <= running and fired * interval < duration:
 			var mouth := host.bow_mouth()
-			var aim := (host.run_state.enemy_aim - mouth).angle()
+			var aim := host.tracking_angle((host.run_state.enemy_aim - mouth).angle())
 			host.ctx.projectiles.emit_attack(&"light_arrow", [mouth, aim, float(r.speed), float(r.radius), float(r.travel), float(r.damage) * host.ctx.cfg.atk_scale, false, float(r.length)], r.get("shot_visual"))
 			fired += 1
 			host._cue(&"sail_shot")

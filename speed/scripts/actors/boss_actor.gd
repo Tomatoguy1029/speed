@@ -24,6 +24,15 @@ var run_state: RunState:
 var table: EnemyTable:
 	get: return ctx.enemies.table
 
+func tracking_locked() -> bool:
+	return ctx.enemies.motion.turn_locked(body)
+
+func tracking_target(target: Vector2) -> Vector2:
+	return ctx.enemies.motion.tracking_target(body, target)
+
+func tracking_angle(desired: float) -> float:
+	return ctx.enemies.motion.tracking_angle(body, desired)
+
 func bind(context: RunContext, row: int, d: BossDef) -> void:
 	ctx = context
 	body = row

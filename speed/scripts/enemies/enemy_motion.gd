@@ -17,11 +17,18 @@ var _face_move: float:
 func setup(system: EnemySystem) -> void:
 	m = system
 
-## ブースト中の星1の自律操舵を止める。捕捉・吸引は外力側の移動を使う。
+## ブースト中の自律操舵を止める。捕捉・吸引は外力側の移動を使う。
 func turn_locked(i: int) -> bool:
 	return (state.tracing or state.glide or state.ship_boost_t > 0.0) \
-		and table.def[i] != null and table.def[i].rank == 1 and table.is_boss[i] == 0 \
-		and table.parent[i] < 0 and table.held[i] == 0 and table.pump_owner[i] < 0
+		and table.held[i] == 0 and table.pump_owner[i] < 0
+
+## 再照準だけを止め、攻撃で確定した旋回や軌道は呼び出し側で保つ。
+func tracking_angle(i: int, desired: float) -> float:
+	return table.facing[i] if turn_locked(i) else desired
+
+func tracking_target(i: int, target: Vector2) -> Vector2:
+	if not turn_locked(i): return target
+	return table.pos[i] + Vector2.from_angle(table.facing[i]) * maxf(1.0, table.pos[i].distance_to(target))
 
 ## 速さの更新を保ち、操舵を止めた個体は今の進行方向を維持する。
 func steering_velocity(i: int, desired: Vector2) -> Vector2:

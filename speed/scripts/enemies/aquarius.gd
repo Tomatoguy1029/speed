@@ -50,7 +50,7 @@ func _aquarius(i: int, dt: float) -> void:
 			t.fire_t[i] -= dt
 			if t.fire_t[i] <= 0.0 and dist <= approach * 1.25:
 				t.fire_t[i] = float(p.fire_interval)
-				var a := to_ship.angle()
+				var a := m.motion.tracking_angle(i, to_ship.angle())
 				var n := int(p.beams)
 				# 照射の瞬間の衝撃と、照射後に崩れて残る水しぶきの演出（描画が本体の生存を確かめる）
 				state.emit(&"aquarius_aim", {"pos": t.pos[i], "angle": a, "count": n, "length": float(p.beam_len),

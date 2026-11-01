@@ -143,7 +143,7 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 			if not item.marked and host.clock >= float(item.at):
 				item.marked = true
 				item.from = host.table.pos[i]
-				item.angle = (host.run_state.ship_pos - host.table.pos[i]).angle()
+				item.angle = host.ctx.enemies.motion.tracking_angle(i, (host.run_state.ship_pos - host.table.pos[i]).angle())
 				host.lunging.append(i)
 				host._hounds().release_order(i)
 				host._hounds().quiet(i, host.run_state.world_time + float(values.each_warn)+float(values.hound_beam_time), Vector2.ZERO)

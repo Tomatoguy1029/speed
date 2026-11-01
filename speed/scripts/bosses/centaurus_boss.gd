@@ -183,7 +183,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			table.facing[body] = _runner.locked_angle
 		elif mode == &"windup" and not _tracks_during_warn():
 			if _runner_for().kind() != &"rear_attack": _face(warn_aim, def.turn, dt)
-		elif _runner_for().kind() == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
+		elif _runner_for().kind() == &"power_shot": table.facing[body] = tracking_angle((run_state.ship_pos - table.pos[body]).angle())
 		elif _runner_for().kind() != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
 		if mode == &"strike": _strike_tick()
 		if timeline.is_playing(): timeline.advance(dt)
@@ -464,7 +464,7 @@ func _position_tick(dt: float) -> void:
 	var target := aim + direction * clampf(distance, float(def.params.keep_min), float(def.params.keep_max))
 	var step := target - at
 	if step.length() > 24.0:
-		_move_body(step.limit_length(def.speed * dt), dt)
+		_move_body(ctx.enemies.motion.steering_velocity(body, step.limit_length(def.speed * dt)), dt)
 	else:
 		table.vel[body] = Vector2.ZERO
 	_face(aim, def.turn, dt)
@@ -486,6 +486,7 @@ func _scan_guards(dt: float) -> void:
 	guard_point = sum / count if count >= int(def.params.guard_min) else Vector2.INF
 
 func _face(point: Vector2, rate: float, dt: float) -> void:
+	if tracking_locked(): return
 	var prior := table.facing[body]
 	table.facing[body] = rotate_toward(prior, (point - table.pos[body]).angle(), rate * dt)
 	turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
@@ -580,9 +581,9 @@ func _leap_ready() -> bool:
 func _begin_leap() -> void:
 	mode = &"leap"
 	leap_time = 0.0
-	table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
+	table.facing[body] = tracking_angle((run_state.ship_pos - table.pos[body]).angle())
 	leap_from = table.pos[body]
-	var away := (leap_from - run_state.ship_pos).normalized()
+	var away := (leap_from - tracking_target(run_state.ship_pos)).normalized()
 	if away == Vector2.ZERO: away = -Vector2.from_angle(table.facing[body])
 	leap_to = leap_from + away * float(def.params.leap_distance)
 	leap_ready_at = clock + float(def.params.leap_cd)

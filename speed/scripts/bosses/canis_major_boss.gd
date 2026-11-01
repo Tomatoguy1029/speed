@@ -533,6 +533,7 @@ func _release_pack() -> void:
 	_toughen_pack()
 
 func _face(point: Vector2, rate: float, dt: float) -> void:
+	if tracking_locked(): return
 	var prior := table.facing[body]
 	table.facing[body] = rotate_toward(prior, (point - table.pos[body]).angle(), rate * dt)
 	turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
