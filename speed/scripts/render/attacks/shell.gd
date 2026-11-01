@@ -2,6 +2,7 @@
 extends AttackVisual
 const SHADER := preload("res://shaders/pump_shell.gdshader")
 const RUNTIME_SHADER := preload("res://shaders/pump_shell_runtime.gdshader")
+const RUNTIME_DATA := preload("res://data/visuals/pump_shell_runtime.tres")
 const TUNED_SHADERS := [SHADER]
 const KEY := "res://scenes/attacks/shell.tscn"
 var _mesh: QuadMesh
@@ -16,6 +17,14 @@ var _preview_contents := PackedStringArray(["bomber", "splitter", "splitling", "
 var _count := 0
 var preview_paused := false
 var _preview_age := 0.0
+
+func _apply_effect_settings() -> void:
+	if ShaderTuning.previewing():
+		super._apply_effect_settings()
+		return
+	var fixed: Dictionary = RUNTIME_DATA.get_meta("values")
+	flight_scale = float(fixed.flight_scale)
+	effect_tint = fixed.effect_tint
 
 func setup(render: RunPresentation) -> void:
 	super.setup(render)
@@ -61,8 +70,9 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 		var created := MeshInstance2D.new()
 		created.mesh = _mesh
 		var created_material := ShaderMaterial.new()
-		created_material.shader = RUNTIME_SHADER if rm != null else SHADER
-		if rm != null:
+		var editable := rm == null or ShaderTuning.previewing()
+		created_material.shader = SHADER if editable else RUNTIME_SHADER
+		if not editable:
 			created_material.set_shader_parameter("linear_colors", RenderingServer.get_current_rendering_method() != "gl_compatibility")
 		created.material = created_material
 		created.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
@@ -109,7 +119,7 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 		material.set_shader_parameter("trail_reach", local_reach)
 		_trail_reach[slot] = local_reach
 	material.set_shader_parameter("clock", clock)
-	if rm == null: ShaderTuning.apply(material, KEY)
+	if material.shader == SHADER: ShaderTuning.apply(material, KEY)
 
 ## 単独プレビューも同じ光弾・描画パラメータを使う。飛行を画面内へ縮尺表示する。
 func _process(dt: float) -> void:

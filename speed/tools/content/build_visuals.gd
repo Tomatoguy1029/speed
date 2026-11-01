@@ -4,6 +4,8 @@ extends RefCounted
 const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 
 static func build(output: String) -> Error:
+	var profiles_error: Error = preload("res://tools/content/build_effect_profiles.gd").validate()
+	if profiles_error != OK: return profiles_error
 	var burst_error := _validate_burst_noise()
 	if burst_error != OK: return burst_error
 	var mask_error := _validate_landmark_masks()

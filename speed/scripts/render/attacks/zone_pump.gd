@@ -3,6 +3,9 @@ extends "res://scripts/render/attacks/zone_bomber.gd"
 
 const PUMP_KEY := "res://scenes/attacks/zone_pump.tscn"
 
+func burst_key() -> String:
+	return PUMP_KEY
+
 func burst_shader() -> Shader:
 	return BlastBursts.SHADER
 

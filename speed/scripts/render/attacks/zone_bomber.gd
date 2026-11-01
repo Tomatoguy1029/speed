@@ -2,6 +2,7 @@
 extends AttackVisual
 const KEY := "res://scenes/attacks/zone_bomber.tscn"
 const BLAST_BURSTS := preload("res://scripts/render/fx/blast_bursts.gd")
+const BURST_RUNTIME := preload("res://scripts/render/fx/burst_runtime.gd")
 const TUNED_SHADERS := [preload("res://shaders/bomber_burst.gdshader")]
 @export_range(0.5, 4.0, 0.05) var pixel_scale := 1.0
 @export_range(0.25, 3.0, 0.05) var effect_scale := 0.8333333333333333
@@ -13,6 +14,18 @@ var preview_speed := 1.0
 var _preview_age := 0.0
 var _preview_shape := Vector2.ZERO
 var _preview_seed := -1.0
+
+func burst_key() -> String:
+	return KEY
+
+func _apply_effect_settings() -> void:
+	var fixed := BURST_RUNTIME.profile(burst_key(), rm == null)
+	if fixed.is_empty():
+		super._apply_effect_settings()
+		return
+	pixel_scale = float(fixed.pixel_scale)
+	effect_scale = float(fixed.effect_scale)
+	effect_tint = fixed.effect_tint
 
 func setup(render: RunPresentation) -> void:
 	super.setup(render)
@@ -29,7 +42,8 @@ func burst_shader() -> Shader:
 func _create_blasts() -> void:
 	_blasts = BLAST_BURSTS.new()
 	_blasts.shader = burst_shader()
-	_blasts.key = KEY
+	_blasts.key = burst_key()
+	_blasts.live_edit = rm == null
 	if rm == null:
 		if _preview_seed < 0.0: _preview_seed = randf() * 9.0
 		_blasts.seed_override = _preview_seed

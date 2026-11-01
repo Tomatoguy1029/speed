@@ -5,6 +5,7 @@ extends WeaponVisual
 ## 戦闘エフェクトツールで調整する shader
 const TUNED_SHADERS := [preload("res://shaders/mine_burst.gdshader")]
 const EFFECT_KEY := "weapon/mines"
+const BURST_RUNTIME := preload("res://scripts/render/fx/burst_runtime.gd")
 var booms: Array[Dictionary] = []
 
 func setup(render: RunPresentation, owner_behavior) -> void:
@@ -26,7 +27,9 @@ func on_event(ev: Dictionary) -> void:
 
 func tick(_dt: float) -> void:
 	var dt := world_dt()
-	var time_scale := ShaderTuning.burst_time_scale(_effect_key())
+	var fixed := BURST_RUNTIME.profile(EFFECT_KEY)
+	var time_scale := float(fixed.time_scale) if not fixed.is_empty() else ShaderTuning.burst_time_scale(EFFECT_KEY)
+	var energy := float(fixed.glow_energy) if not fixed.is_empty() else visual_number("glow_energy", 1.0)
 	var p := painter()
 	p.begin()
 	var t := state.world_time
@@ -39,11 +42,14 @@ func tick(_dt: float) -> void:
 		if armed and age < 0.22: p.thick_ring(pos, 6.0, 1, Color("#cfeaff"))
 	for b in booms:
 		b.age += dt
-		var energy := visual_number("glow_energy", 1.0)
 		draw_explosion_debris(p, b.pos, b.debris, b.age, time_scale, energy)
 	if not ShaderTuning.previewing(): booms = booms.filter(func(b): return b.age / time_scale < 0.4)
 	blasts(TUNED_SHADERS[0]).step(dt)
 	p.end()
+
+func visual_color(original: Color) -> Color:
+	var fixed := BURST_RUNTIME.profile(EFFECT_KEY)
+	return original * (fixed.effect_tint as Color) if not fixed.is_empty() else super.visual_color(original)
 
 ## 単体プレビューも同じ半径・破片を使う。
 static func blast_radius(radius: float, cell: float) -> float:

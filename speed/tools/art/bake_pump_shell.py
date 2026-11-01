@@ -6,6 +6,7 @@ writes only the flight shader; impact and death debris use separate resources.
 """
 import argparse
 import hashlib
+import json
 import math
 from pathlib import Path
 import re
@@ -15,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "data/visuals/effect_settings.tres"
 TEMPLATE = ROOT / "shaders/pump_shell.gdshader"
 OUTPUT = ROOT / "shaders/pump_shell_runtime.gdshader"
+DATA = ROOT / "data/visuals/pump_shell_runtime.tres"
 KEY = "res://scenes/attacks/shell.tscn"
 PREFIX = "shader/pump_shell/"
 
@@ -84,15 +86,38 @@ def specialize():
     return metadata + header + "varying vec2 bolt_pixel;" + body, len(found), len(overrides)
 
 
+def generate():
+    source_bytes = SOURCE.read_bytes()
+    shader, count, overrides = specialize()
+    profile = re.search(r'^"' + re.escape(KEY) + r'": \{\n(.*?)^\}', source_bytes.decode(), re.M | re.S)
+    saved = dict(re.findall(r'^"([^"]+)": (.+?)(?:,)?$', profile[1], re.M))
+    tint = saved.get("effect_tint", "Color(1, 1, 1, 1)")
+    if not re.fullmatch(r'Color\([\d.eE+, -]+\)', tint):
+        raise ValueError("Unsupported flight tint: " + tint)
+    inputs = {"res://" + path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in
+              ("tools/art/bake_pump_shell.py", "shaders/pump_shell.gdshader", "scripts/render/attacks/shell.gd")}
+    metadata = ('[gd_resource type="Resource" format=3]\n\n[resource]\n'
+                'metadata/bake_version = 1\nmetadata/source_sha256 = "' + hashlib.sha256(source_bytes).hexdigest() + '"\n'
+                'metadata/values = {"flight_scale": ' + repr(float(saved.get("flight_scale", "1.0"))) + ', "effect_tint": ' + tint + '}\n'
+                'metadata/inputs = ' + json.dumps(inputs, indent=4) + '\n'
+                'metadata/saved_profiles = ' + json.dumps({KEY: hashlib.sha256(profile[0].encode()).hexdigest()}, indent=4) + '\n'
+                'metadata/outputs = ' + json.dumps({"res://shaders/pump_shell_runtime.gdshader": hashlib.sha256(shader.encode()).hexdigest()}, indent=4) + '\n')
+    if SOURCE.read_bytes() != source_bytes:
+        raise ValueError("Saved profiles changed during flight bake; rerun from the latest values")
+    return {OUTPUT: shader, DATA: metadata}, count, overrides
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Compare the embedded output without writing")
     args = parser.parse_args()
-    text, count, overrides = specialize()
+    outputs, count, overrides = generate()
     if args.check:
-        if not OUTPUT.exists() or OUTPUT.read_text() != text:
+        if any(not path.exists() or path.read_text() != text for path, text in outputs.items()):
             raise SystemExit("Pump flight runtime shader differs from its saved profile/defaults")
         print("Pump flight runtime shader matches %d artist constants (%d saved overrides)." % (count, overrides))
     else:
-        OUTPUT.write_text(text)
+        for path, text in outputs.items():
+            if not path.exists() or path.read_text() != text:
+                path.write_text(text)
         print("Embedded %d pump flight constants (%d saved overrides)." % (count, overrides))
