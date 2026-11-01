@@ -772,9 +772,12 @@ func _select(path: String) -> void:
 	_boss_preview.visible = live_effect
 	_boss_preview.set_active(live_effect)
 	if path == MINE_BLAST or ENEMY_EFFECTS.has(path) or _move_targets.has(path) or path.begins_with("res://"):
-		var scene_path: String = ENEMY_EFFECTS[path].scene if ENEMY_EFFECTS.has(path) else _move_targets[path].visual if _move_targets.has(path) else path
-		var scene := load(scene_path) as PackedScene if path != MINE_BLAST and not scene_path.is_empty() else null
-		_sample = MINE_PREVIEW.new() if path == MINE_BLAST else scene.instantiate() as Node2D if scene != null else null
+		if path == MINE_BLAST:
+			_sample = MINE_PREVIEW.new()
+		else:
+			var scene_path: String = ENEMY_EFFECTS[path].scene if ENEMY_EFFECTS.has(path) else _move_targets[path].visual if _move_targets.has(path) else path
+			var scene := load(scene_path) as PackedScene if not scene_path.is_empty() else null
+			if scene != null: _sample = scene.instantiate() as Node2D
 		if not boss_effect and _sample != null:
 			var base_modulate := _sample.modulate
 			_sample.position = Vector2(240, 240)
