@@ -430,10 +430,20 @@ inline bool read(BinaryReader &input, LoadoutDefinition &out) {
 }
 struct HeroDefinition {
     uint32_t id{};
+    std::string external_id{};
+    uint32_t stage{};
+    double cooldown{};
+    double duration{};
 };
 inline bool read(BinaryReader &input, HeroDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_u32(out.stage)) return false;
+    if (!input.read_f64(out.cooldown)) return false;
+    if (out.cooldown < 0) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (out.duration < 0) return false;
     return true;
 }
 struct FieldDefinition {
@@ -3871,6 +3881,34 @@ inline bool read(BinaryReader &input, AfterimageDefinition &out) {
     if (out.delay > 0.5) return false;
     return true;
 }
+struct FlashSlashDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    uint32_t cuts{};
+    uint32_t streaks{};
+    double multiplier{};
+    double pause{};
+    double sweep{};
+};
+inline bool read(BinaryReader &input, FlashSlashDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_u32(out.cuts)) return false;
+    if (out.cuts < 1) return false;
+    if (!input.read_u32(out.streaks)) return false;
+    if (out.streaks < 1) return false;
+    if (!input.read_f64(out.multiplier)) return false;
+    if (out.multiplier < 0) return false;
+    if (!input.read_f64(out.pause)) return false;
+    if (out.pause < 0) return false;
+    if (!input.read_f64(out.sweep)) return false;
+    if (out.sweep < 0) return false;
+    return true;
+}
 struct BossDefinition {
     uint32_t id{};
     std::string external_id{};
@@ -4483,6 +4521,74 @@ inline bool read(BinaryReader &input, BossFlowForbidden &out) {
     if (!input.read_string(out.right)) return false;
     return true;
 }
+struct HeroStar {
+    uint32_t id{};
+    uint32_t hero{};
+    double x{};
+    double y{};
+};
+inline bool read(BinaryReader &input, HeroStar &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.hero)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    return true;
+}
+struct HeroLink {
+    uint32_t id{};
+    uint32_t hero{};
+    uint32_t a{};
+    uint32_t b{};
+};
+inline bool read(BinaryReader &input, HeroLink &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.hero)) return false;
+    if (!input.read_u32(out.a)) return false;
+    if (!input.read_u32(out.b)) return false;
+    return true;
+}
+struct HeroConfig {
+    uint32_t id{};
+    double scale{};
+    double glow_range{};
+    double guard_range{};
+    double star_radius{};
+    double next_time{};
+    double spacing{};
+    double first_min{};
+    double first_max{};
+    double second_min{};
+    double second_max{};
+    uint32_t guards{};
+};
+inline bool read(BinaryReader &input, HeroConfig &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.scale)) return false;
+    if (out.scale < 0) return false;
+    if (!input.read_f64(out.glow_range)) return false;
+    if (out.glow_range < 0) return false;
+    if (!input.read_f64(out.guard_range)) return false;
+    if (out.guard_range < 0) return false;
+    if (!input.read_f64(out.star_radius)) return false;
+    if (out.star_radius < 0) return false;
+    if (!input.read_f64(out.next_time)) return false;
+    if (out.next_time < 0) return false;
+    if (!input.read_f64(out.spacing)) return false;
+    if (out.spacing < 0) return false;
+    if (!input.read_f64(out.first_min)) return false;
+    if (out.first_min < 0) return false;
+    if (!input.read_f64(out.first_max)) return false;
+    if (out.first_max < 0) return false;
+    if (!input.read_f64(out.second_min)) return false;
+    if (out.second_min < 0) return false;
+    if (!input.read_f64(out.second_max)) return false;
+    if (out.second_max < 0) return false;
+    if (!input.read_u32(out.guards)) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -4615,6 +4721,7 @@ struct ContentRecords {
     std::vector<InterceptorDefinition> InterceptorDefinition_rows;
     std::vector<DashRangeDroneDefinition> DashRangeDroneDefinition_rows;
     std::vector<AfterimageDefinition> AfterimageDefinition_rows;
+    std::vector<FlashSlashDefinition> FlashSlashDefinition_rows;
     std::vector<BossDefinition> BossDefinition_rows;
     std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
     std::vector<BossTechniqueStage> BossTechniqueStage_rows;
@@ -4629,6 +4736,9 @@ struct ContentRecords {
     std::vector<BossFlowFilter> BossFlowFilter_rows;
     std::vector<BossFlowWeight> BossFlowWeight_rows;
     std::vector<BossFlowForbidden> BossFlowForbidden_rows;
+    std::vector<HeroStar> HeroStar_rows;
+    std::vector<HeroLink> HeroLink_rows;
+    std::vector<HeroConfig> HeroConfig_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -4663,9 +4773,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 6: {
-        if (version != 1) return false;
-        if (count) return false;
-        if (count > input.remaining()/4) return false;
+        if (version != 2) return false;
+        if (count > input.remaining()/28) return false;
         for (uint32_t i=0; i<count; ++i) { HeroDefinition row; if (!read(input,row)) return false; out.HeroDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -5422,6 +5531,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { AfterimageDefinition row; if (!read(input,row)) return false; out.AfterimageDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 208: {
+        if (version != 1) return false;
+        if (count > input.remaining()/44) return false;
+        for (uint32_t i=0; i<count; ++i) { FlashSlashDefinition row; if (!read(input,row)) return false; out.FlashSlashDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 150: {
         if (version != 2) return false;
         if (count > input.remaining()/124) return false;
@@ -5504,6 +5619,24 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/16) return false;
         for (uint32_t i=0; i<count; ++i) { BossFlowForbidden row; if (!read(input,row)) return false; out.BossFlowForbidden_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 280: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { HeroStar row; if (!read(input,row)) return false; out.HeroStar_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 281: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { HeroLink row; if (!read(input,row)) return false; out.HeroLink_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 282: {
+        if (version != 1) return false;
+        if (count > input.remaining()/88) return false;
+        for (uint32_t i=0; i<count; ++i) { HeroConfig row; if (!read(input,row)) return false; out.HeroConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -5772,6 +5905,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DashRangeDroneDefinition_rows) if (!DashRangeDroneDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> AfterimageDefinition_ids;
     for (const auto &row:data.AfterimageDefinition_rows) if (!AfterimageDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> FlashSlashDefinition_ids;
+    for (const auto &row:data.FlashSlashDefinition_rows) if (!FlashSlashDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossDefinition_ids;
     for (const auto &row:data.BossDefinition_rows) if (!BossDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossTechniqueDefinition_ids;
@@ -5800,6 +5935,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BossFlowWeight_rows) if (!BossFlowWeight_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossFlowForbidden_ids;
     for (const auto &row:data.BossFlowForbidden_rows) if (!BossFlowForbidden_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HeroStar_ids;
+    for (const auto &row:data.HeroStar_rows) if (!HeroStar_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HeroLink_ids;
+    for (const auto &row:data.HeroLink_rows) if (!HeroLink_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HeroConfig_ids;
+    for (const auto &row:data.HeroConfig_rows) if (!HeroConfig_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -5930,6 +6071,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.InterceptorDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.DashRangeDroneDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.AfterimageDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.FlashSlashDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.BossBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -5945,6 +6087,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BossFlowFilter_rows) if (!BossFlowSection_ids.count(row.section)) return false;
     for (const auto &row:data.BossFlowWeight_rows) if (!BossFlowSection_ids.count(row.section)) return false;
     for (const auto &row:data.BossFlowForbidden_rows) if (!BossFlowSection_ids.count(row.section)) return false;
+    for (const auto &row:data.HeroStar_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
+    for (const auto &row:data.HeroLink_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -6071,5 +6215,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=145;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=149;
 }
