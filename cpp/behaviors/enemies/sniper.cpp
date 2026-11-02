@@ -52,7 +52,7 @@ void SniperBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     auto &s=r.state;auto &e=s.enemies[row];const auto &p=definition(r,row);const auto handle=s.enemy_handles.at(row);const auto aim=s.enemy_aim;
     const auto d=e.pos-aim,u=d/std::max(1.0,double(d.length()));const TrackingPolicy tracking{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)};
     EnemyMotion::steer(e,aim+u*p.keep+godot::Vector2(-u.y,u.x)*150.0*(e.id%2?1.0:-1.0),e.speed,p.accel,dt,tracking);
-    if (e.mode==EnemyMode::Recover) {e.timer=float(e.timer-dt);search(r,row,dt);std::get<SniperState>(e.behavior_state).rays.clear();if (e.timer<=0) e.mode=EnemyMode::Move;return;}
+    if (e.mode==EnemyMode::Recover) {e.timer=e.timer-dt;search(r,row,dt);std::get<SniperState>(e.behavior_state).rays.clear();if (e.timer<=0) e.mode=EnemyMode::Move;return;}
     if (!in_range(r,row)) {cancel(r,row);search(r,row,dt);return;}
     cast(r,row,true);if (sight(r,row,s.ship_pos)!=1) {cancel(r,row);search(r,row,dt);return;}
     const auto owner=AttackBudgetSystem::owner(s,e.id,e.attack_group);AttackBudgetSystem budget(r);
@@ -65,13 +65,13 @@ void SniperBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     }
     cast(r,row,false);EnemyMotion::turn(e,(s.ship_pos-e.pos).angle(),p.track_turn,dt,tracking);
     if (e.mode==EnemyMode::Windup) {
-        e.timer=float(e.timer-dt);if (e.timer>0) return;
+        e.timer=e.timer-dt;if (e.timer>0) return;
         BeamParams beam;beam.position=lens(e);beam.angle=e.facing;beam.length=reach(r,row,e.facing);beam.half_width=p.laser_half_width;
         beam.delay=p.laser_delay;beam.active=p.laser_time;beam.damage=p.damage;beam.color=godot::Color(1.0,0.3,0.25);beam.style=BeamStyle::Telescope;beam.owner=handle;beam.attached=false;if (e.attack_managed) beam.budget.value=budget.token(owner);
         const auto emitted=BeamSystem::emit(r,beam);if (AttackSystem::get(s,emitted)) event(r,"enemy_laser_fire",row);
         godot::Dictionary out;out["pos"]=beam.position;out["angle"]=beam.angle;out["length"]=beam.length;out["width"]=p.laser_half_width*2.0;FrameBuilder::append(r,"telescope_fire",out);
-        e.charge=0;e.mode=EnemyMode::Recover;e.timer=float(p.cooldown);return;
+        e.charge=0;e.mode=EnemyMode::Recover;e.timer=p.cooldown;return;
     }
-    e.charge=float(std::min(1.0,e.charge+dt/p.lock_fill));if (e.charge>=1.0) {e.mode=EnemyMode::Windup;e.timer=float(p.laser_charge);godot::Dictionary out;out["pos"]=lens(e);FrameBuilder::append(r,"telescope_charge",out);event(r,"enemy_laser_charge",row);}
+    e.charge=std::min(1.0,e.charge+dt/p.lock_fill);if (e.charge>=1.0) {e.mode=EnemyMode::Windup;e.timer=p.laser_charge;godot::Dictionary out;out["pos"]=lens(e);FrameBuilder::append(r,"telescope_charge",out);event(r,"enemy_laser_charge",row);}
 }
 }

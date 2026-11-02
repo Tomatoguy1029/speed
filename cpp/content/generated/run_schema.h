@@ -397,7 +397,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 15) return false;
+    if (out.kind > 17) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -1354,6 +1354,64 @@ inline bool read(BinaryReader &input, SniperDefinition &out) {
     if (out.cooldown < 0) return false;
     return true;
 }
+struct MarlinDefinition {
+    uint32_t id{};
+    double accel{};
+    double keep{};
+    double warn{};
+    double dash_speed{};
+    double dash_time{};
+    double recover{};
+};
+inline bool read(BinaryReader &input, MarlinDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.warn)) return false;
+    if (out.warn < 0) return false;
+    if (!input.read_f64(out.dash_speed)) return false;
+    if (out.dash_speed < 0) return false;
+    if (!input.read_f64(out.dash_time)) return false;
+    if (out.dash_time < 0) return false;
+    if (!input.read_f64(out.recover)) return false;
+    if (out.recover < 0) return false;
+    return true;
+}
+struct PulserDefinition {
+    uint32_t id{};
+    double accel{};
+    double keep{};
+    double warn{};
+    double arc{};
+    double radius{};
+    double speed{};
+    double width{};
+    double damage{};
+};
+inline bool read(BinaryReader &input, PulserDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.warn)) return false;
+    if (out.warn < 0) return false;
+    if (!input.read_f64(out.arc)) return false;
+    if (out.arc < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.speed)) return false;
+    if (out.speed < 0) return false;
+    if (!input.read_f64(out.width)) return false;
+    if (out.width < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -1869,6 +1927,8 @@ struct ContentRecords {
     std::vector<DashDefinition> DashDefinition_rows;
     std::vector<BattleshipDefinition> BattleshipDefinition_rows;
     std::vector<SniperDefinition> SniperDefinition_rows;
+    std::vector<MarlinDefinition> MarlinDefinition_rows;
+    std::vector<PulserDefinition> PulserDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -2166,6 +2226,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { SniperDefinition row; if (!read(input,row)) return false; out.SniperDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 64: {
+        if (version != 1) return false;
+        if (count > input.remaining()/52) return false;
+        for (uint32_t i=0; i<count; ++i) { MarlinDefinition row; if (!read(input,row)) return false; out.MarlinDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 65: {
+        if (version != 1) return false;
+        if (count > input.remaining()/68) return false;
+        for (uint32_t i=0; i<count; ++i) { PulserDefinition row; if (!read(input,row)) return false; out.PulserDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -2368,6 +2440,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BattleshipDefinition_rows) if (!BattleshipDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> SniperDefinition_ids;
     for (const auto &row:data.SniperDefinition_rows) if (!SniperDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MarlinDefinition_ids;
+    for (const auto &row:data.MarlinDefinition_rows) if (!MarlinDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PulserDefinition_ids;
+    for (const auto &row:data.PulserDefinition_rows) if (!PulserDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -2449,6 +2525,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DashDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.BattleshipDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.SniperDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.MarlinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.PulserDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -2592,5 +2670,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=63;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=65;
 }
