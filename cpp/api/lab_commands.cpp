@@ -37,11 +37,11 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         speed::apply_timeline_scenario(runtime,timeline);return reply(true);
     }
     if (command=="dev_set_scenario" && (kind=="lab" || kind=="intro")) {
-        if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty"})) return reply(false);
-        for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);
+        if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty","enemy_ai"})) return reply(false);
+        for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty","enemy_ai"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);
         Vector2 at=s.ship.pos;if (p.has("position") && !point(p,"position",at)) return reply(false);
         double gauge,time,level;if (!scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0 || !scalar(p,"time",s.time,time) || time<0 || !scalar(p,"level",s.loadout.level,level) || level<1 || level>1000) return reply(false);
-        c.lab_mode=p.get("lab_mode",true);s.population.frame_enabled=p.get("auto_spawn",false);s.world.boss_spawned=!bool(p.get("auto_boss",false));s.invincible=p.get("invincible",true);
+        c.lab_mode=p.get("lab_mode",true);c.lab_enemy_ai=p.get("enemy_ai",true);s.population.frame_enabled=p.get("auto_spawn",false);s.world.boss_spawned=!bool(p.get("auto_boss",false));s.invincible=p.get("invincible",true);
         s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();s.view_center=s.enemy_aim=at;c.camera_center=at;c.camera_ready=false;s.draw.gauge=gauge;s.time=time;s.loadout.level=int64_t(level);speed::EquipmentSystem::refresh_effects(runtime);
         if (bool(p.get("empty",false))) {s.field.bodies.clear();s.field.rocks.clear();s.field.wells.clear();s.field.warp_gone=-1;}
         return reply(true);
@@ -109,7 +109,7 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         c.camera_center=s.view_center=center;c.camera_zoom=zoom;c.logical_size=size;s.view_half=size/(2.0*zoom);c.camera_ready=true;c.cinematic_bars=bars;return reply(true);
     }
     if (kind=="finish_input" && p.is_empty()) {
-        s.hitstop=0;c.world_scale=1;s.draw.drawing=s.draw.tracing=false;s.ship.vel=Vector2();c.world_real_accum=c.world_dt_accum=0;c.world_steps=0;return reply(true);
+        s.hitstop=0;c.world_scale=1;s.draw.drawing=s.draw.tracing=false;s.draw.path.clear();s.draw.points.clear();s.ship.vel=Vector2();s.ship.glide=false;s.ship.boost_t=s.ship.fade_t=0;c.world_real_accum=c.world_dt_accum=0;c.world_steps=0;return reply(true);
     }
     if (kind=="enemy_motion") {
         if (p.size()!=2 || p.get("entity_id",Variant()).get_type()!=Variant::INT) return reply(false);
@@ -156,9 +156,10 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         c.lab_pinned=p["value"];c.lab_pin=at;if (c.lab_pinned) {s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();}return reply(true);
     }
     if (kind=="ship") {
-        Vector2 at;double gauge;if (!keys(p,{"position","velocity","gauge"}) || !point(p,"position",at) || !scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0) return reply(false);
+        Vector2 at;double gauge;if (!keys(p,{"position","velocity","gauge","capacity"}) || !point(p,"position",at) || !scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0) return reply(false);
         Vector2 velocity;if (p.has("velocity") && !point(p,"velocity",velocity)) return reply(false);
-        s.ship.pos=s.ship_pos=at;s.ship.vel=velocity;s.draw.gauge=gauge;return reply(true);
+        double capacity;if (!scalar(p,"capacity",s.draw_config.capacity,capacity) || capacity<=0 || (p.has("capacity") && !c.lab_mode)) return reply(false);
+        s.ship.pos=s.ship_pos=at;s.ship.vel=velocity;s.draw.gauge=gauge;s.draw_config.capacity=capacity;return reply(true);
     }
     if (kind=="time" || kind=="level") {
         double value;if (p.size()!=1 || !scalar(p,"value",0,value) || value<(kind=="level"?1:0) || (kind=="level" && value>1000)) return reply(false);

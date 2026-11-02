@@ -166,14 +166,32 @@ var _flame: Sprite2D
 var _spark: Sprite2D
 var build_us := 0
 var submit_us := 0
+## 制作画面だけが表示用の行・時計を差し替える。C++の状態へ書き戻さない。
+var authoring_frame: Callable
+var authoring_clock := -1.0
+var authoring_paused := false
+var landmark_aura: Node2D
+var elite_crackle: Node2D
+var _mark_clock := 0.0
 
 func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_scale: float) -> void:
 	metrics_record = perf.open(&"metrics")
 	_scope = scope
 	_pixel = 1.82*character_scale
+	landmark_aura = preload("res://scripts/render/landmark_aura.gd").new()
+	landmark_aura.z_index = -2
+	add_child(landmark_aura)
+	landmark_aura.setup(scope)
 	for entry in entries: visuals[int(entry.id)] = entry
 	for entry: Dictionary in entries:
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
+	var mark_layer := CanvasLayer.new()
+	mark_layer.layer = _shield_layer+1
+	mark_layer.follow_viewport_enabled = true
+	add_child(mark_layer)
+	elite_crackle = preload("res://scripts/render/elite_crackle.gd").new()
+	mark_layer.add_child(elite_crackle)
+	elite_crackle.setup(scope)
 	_hero_power_visual = preload("res://scripts/render/equipment/heroes.gd").new()
 	_layer(9).add_child(_hero_power_visual)
 	_hero_fire_canvas = DrawLayer.new()
@@ -477,6 +495,10 @@ func _valid(frame: Dictionary) -> bool:
 	for row in frame.batches:
 		if not row is Dictionary or not visuals.has(row.get("visual_id")) or not row.get("ids") is PackedInt64Array or not row.get("transforms") is PackedFloat32Array or not row.get("colors") is PackedColorArray or not row.get("flags") is PackedInt32Array: return false
 		var count: int = row.ids.size()
+		if row.has("marks"):
+			if not row.marks is PackedInt32Array or row.marks.size()!=count: return false
+			for mark: int in row.marks:
+				if mark<0 or mark>3: return false
 		if visuals[row.visual_id].get("ruler",false):
 			if not row.get("ruler_sides") is PackedInt32Array or row.ruler_sides.size()!=count: return false
 			for side: int in row.ruler_sides:
@@ -592,11 +614,63 @@ func _valid(frame: Dictionary) -> bool:
 		if not row is Dictionary or not visuals.has(row.get("part_key")) or not row.get("transform") is Transform2D or not row.get("visible") is bool or not row.get("visual_state") is int: return false
 	return true
 
+## 表示の本体と同じFrameから、輪郭・顎・ポンプ・分離形態を読む。
+func _update_marks(frame: Dictionary) -> void:
+	var clock := authoring_clock if authoring_clock >= 0.0 else _mark_clock
+	landmark_aura.begin()
+	elite_crackle.begin(clock)
+	for row: Dictionary in frame.batches:
+		var marks: PackedInt32Array = row.get("marks",PackedInt32Array())
+		if marks.is_empty(): continue
+		var entry: Dictionary = visuals[row.visual_id]
+		var look: EnemyLook = _scope.resources.get(entry.get("path","")) as EnemyLook
+		for i in row.ids.size():
+			if marks[i] == 0: continue
+			var n := i*6
+			var pose := Transform2D(Vector2(row.transforms[n],row.transforms[n+1]),Vector2(row.transforms[n+2],row.transforms[n+3]),Vector2(row.transforms[n+4],row.transforms[n+5]))
+			var key: String = look.source_path if look != null else entry.get("mark_key","")
+			if look != null and look.split_other != null:
+				var side: int = row.get("ruler_sides",PackedInt32Array())[i] if row.has("ruler_sides") else 0
+				if side == 1:
+					key = look.split_other.source_path
+					pose = pose*Transform2D(look.split_other.angle-look.angle,Vector2.ZERO)
+				elif side == 0: key += ":joined"
+			var body := {"id":int(row.ids[i]),"key":key,"pose":pose}
+			if row.has("pump"):
+				var pump: PackedFloat32Array = row.pump
+				body.pump_full = pump[i*9+4]
+				body.pose = Transform2D(pump[i*9+2],pose.origin).scaled_local(Vector2.ONE*pump[i*9+3]*18.5)
+			if row.has("biter") and not String(entry.get("biter_parts","")).is_empty():
+				var source: Resource = _scope.resources.get(entry.biter_parts)
+				var parts: Array = []
+				var values: Dictionary = row.biter
+				var jaw := deg_to_rad(preload("res://scripts/render/run_enemy_frame.gd").jaw_angle(values.modes[i],values.charges[i],values.timers[i],values.rests[i]))
+				var radius: float = row.deformations[i*5] if row.has("deformations") else pose.x.length()
+				var angle: float = row.deformations[i*5+1] if row.has("deformations") else pose.x.angle()
+				for part: Dictionary in source.get_meta("parts",[]):
+					var turn := jaw if part.name=="jaw_left" else -jaw if part.name=="jaw_right" else 0.0
+					var pivot: Vector2 = (part.pivot-Vector2(10,17))*(radius/17.0)
+					var center := pose.origin+(pivot-pivot.rotated(turn)).rotated(angle)
+					var part_pose := Transform2D(angle+turn,center).scaled_local(Vector2.ONE*(radius/17.0))
+					if row.has("deformations"):
+						var d: PackedFloat32Array = row.deformations
+						var normal := Vector2(d[i*5+2],d[i*5+3]).normalized()
+						var side := normal.orthogonal()
+						for column in 2: part_pose[column] = normal*part_pose[column].dot(normal)*(1.0-0.5*d[i*5+4])+side*part_pose[column].dot(side)*(1.0+0.6*d[i*5+4])
+					part_pose.origin -= part_pose.basis_xform(Vector2(10,17))
+					parts.append(part_pose)
+				body.parts = parts
+			if (marks[i]&1)!=0: landmark_aura.add_body(body,clock)
+			if (marks[i]&2)!=0: elite_crackle.add_body(body)
+	elite_crackle.end()
+
 func apply_frame(frame: Dictionary) -> bool:
+	if authoring_frame.is_valid(): frame = authoring_frame.call(frame)
 	var begin := Time.get_ticks_usec()
 	if not _valid(frame): return false
 	_hero_power_visual.petrified = frame.get("petrified_enemies",PackedFloat32Array())
 	_hero_power_visual.queue_redraw()
+	_update_marks(frame)
 	var next_shots := {}
 	for row: Dictionary in frame.batches:
 		if visuals[row.visual_id].role==2: next_shots[row.visual_id] = row.transforms
@@ -929,6 +1003,7 @@ func apply_frame(frame: Dictionary) -> bool:
 
 ## 固定更新の間に届いた通知を、次の表示まで保持する。
 func receive_frame(frame: Dictionary) -> bool:
+	_mark_clock = float(frame.ui.world_time)
 	if frame.epoch!=_epoch:
 		_epoch = frame.epoch
 		ruler_shake=0.0
@@ -1030,6 +1105,14 @@ func receive_frame(frame: Dictionary) -> bool:
 	return true
 
 func update_effects(frame: Dictionary, dt: float) -> void:
+	if authoring_clock >= 0.0:
+		frame = frame.duplicate()
+		frame.ui = frame.ui.duplicate()
+		frame.ui.world_time = authoring_clock
+		frame.ui.presentation_frozen = authoring_paused
+		if authoring_paused:
+			dt = 0.0
+			frame.ui.input_enabled = false
 	_finale_overlay={}
 	_finale_rect=Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0).grow(400.0)
 	for body: Dictionary in frame.ui.get("boss_bodies",[]):

@@ -95,7 +95,7 @@ func _set_glows(values: PackedFloat32Array) -> void:
 	_glows = values
 	queue_redraw()
 
-func _jaw(mode: int, charge: float, timer: float, rest: float) -> float:
+static func jaw_angle(mode: int, charge: float, timer: float, rest: float) -> float:
 	if mode==1: return -8.0*smoothstep(0.0,1.0,charge)
 	if mode!=3: return 0.0
 	var age := maxf(0.0,rest-timer)
@@ -123,7 +123,7 @@ func apply_frame(row: Dictionary) -> void:
 		var jaw := 0.0
 		if _biting:
 			var values: Dictionary = row.biter
-			if _biter: jaw = deg_to_rad(_jaw(values.modes[i],values.charges[i],values.timers[i],values.rests[i]))
+			if _biter: jaw = deg_to_rad(jaw_angle(values.modes[i],values.charges[i],values.timers[i],values.rests[i]))
 			if values.modes[i]==3:
 				var spark_age: float = values.rests[i]-values.timers[i]-SNAP
 				if spark_age>=0.0 and spark_age<SPARK_TIME:

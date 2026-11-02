@@ -48,6 +48,7 @@ Dictionary RenderBatchBuffer::value() {
     out["transforms"]=transforms;out["colors"]=colors;out["flags"]=flags;
     if (biter) {Dictionary values;values["modes"]=modes;values["charges"]=charges;values["timers"]=timers;values["rests"]=rests;out["biter"]=values;}
     if (!ruler_sides.is_empty()) out["ruler_sides"]=ruler_sides;
+    if (!marks.is_empty()) out["marks"]=marks;
     if (!glows.is_empty()) out["glows"]=glows;
     if (!gunner.is_empty()) out["gunner"]=gunner;
     if (!sniper.is_empty()) out["sniper"]=sniper;
@@ -85,7 +86,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     auto &groups=run.render_workspace.batches;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
-        out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
+        out.marks.clear();out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
     PackedFloat32Array comet_values,crow_values,petrified_enemies;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
@@ -177,6 +178,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         for (const auto &w:state.loadout.contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
         if (flash) color.r=1;
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,color,enemy.flash>0 || warning || flash?1:0);
+        const auto *parent=state.enemy_handles.contains(enemy.parent)?&state.enemies[enemy.parent.slot]:nullptr;
+        enemy_batch.marks.push_back((enemy.landmark || (parent && parent->landmark)?1:0) | (enemy.elite || (parent && parent->elite)?2:0));
         enemy_batch.instances.back().deformation=deform;enemy_batch.instances.back().amount=amount;
     }
     for (size_t i=0;i<state.friends.size();++i) {
