@@ -34,7 +34,7 @@ struct CanisHoundLungeHazard {
     godot::Vector2 previous,velocity;
     int64_t action=0;
     double until=0,last_world_time=-1;
-    bool sweep=true,shared_hit=false,overwrite_velocity=true,release_on_cancel=true,release_on_end=true,defer_first_contact=false;
+    bool sweep=true,shared_hit=false,overwrite_velocity=true,release_on_cancel=true,release_on_end=true,defer_first_contact=false,manual_retained=false;
 };
 struct HydraShapeHazard {std::vector<godot::Vector2> points;double width=0;};
 struct HazardState {

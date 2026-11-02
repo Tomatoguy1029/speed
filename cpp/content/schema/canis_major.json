@@ -824,6 +824,37 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisHuntPounceDefinition",
+      "section": 350,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "stream",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "pounce",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

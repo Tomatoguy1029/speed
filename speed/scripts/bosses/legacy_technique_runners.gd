@@ -7,6 +7,7 @@ const RUNNERS := {
 	"res://scripts/data_types/boss_techniques/hydra/bite_thrust.gd":"res://scripts/bosses/hydra/techniques/bite_thrust.gd",
 	"res://scripts/data_types/boss_techniques/centaurus/sail_run.gd":"res://scripts/bosses/centaurus/techniques/sail_run.gd",
 	"res://scripts/data_types/boss_techniques/centaurus/arrow_shower.gd":"res://scripts/bosses/centaurus/techniques/arrow_shower.gd",
+	"res://scripts/data_types/boss_techniques/canis_major/hunt_pounce.gd":"res://scripts/bosses/canis_major/techniques/hunt_pounce.gd",
 	"res://scripts/data_types/boss_techniques/canis_major/hunt.gd":"res://scripts/bosses/canis_major/techniques/hunt.gd",
 	"res://scripts/data_types/boss_techniques/canis_major/stream.gd":"res://scripts/bosses/canis_major/techniques/stream.gd",
 	"res://scripts/data_types/boss_techniques/canis_major/blaze.gd":"res://scripts/bosses/canis_major/techniques/blaze.gd",

@@ -82,7 +82,7 @@ func _draw() -> void:
 		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))
 		var mouth := Vector2(float(state.radius)*0.84,0.0)
 		draw_line(mouth,mouth+Vector2(float(technique.beam_length),0.0),Color(color,alpha),width)
-	if (technique.get("technique","")=="pounce" or (technique.get("technique","")=="bay" and technique.get("jumping",false))) and int(technique.get("stage",5))==0:
+	if (technique.get("technique","")=="pounce" or (technique.get("technique","") in ["bay","hunt_pounce"] and technique.get("jumping",false))) and int(technique.get("stage",5))==0:
 		var reach := position.distance_to(technique.aim)
 		var color := Color("#ff667d") if technique.locked else Color("#f2b567")
 		draw_line(Vector2(float(state.radius),0.0),Vector2(maxf(float(state.radius),reach),0.0),Color(color,0.35+float(state.charge)*0.4),6.0 if technique.locked else 3.0)

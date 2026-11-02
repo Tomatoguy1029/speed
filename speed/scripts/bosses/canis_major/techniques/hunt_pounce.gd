@@ -1,17 +1,6 @@
-## 追い立てと飛びかかりの値と動き。
+## 通常入口を切り替えるまで使う互換Runner。
 @tool
-extends BossTechnique
-
-## 最後の猟犬の発進から飛びかかりの予告まで（秒）
-@export_range(0,100000,0.01) var gap := 0.1:
-	set(value):
-		gap = value
-		_values_dirty = true
-## 再使用待ち（秒）
-@export_range(0,100000,0.01) var cd := 9.0:
-	set(value):
-		cd = value
-		_values_dirty = true
+extends "res://scripts/data_types/boss_techniques/canis_major/hunt_pounce.gd"
 
 func make_runner() -> RefCounted:
 	return Runner.new()

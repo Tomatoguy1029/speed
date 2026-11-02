@@ -3,7 +3,7 @@
 namespace speed {
 struct HoundLungeSettings {
     double speed=0,duration=0,damage=0,grace=0;
-    bool sweep=true,shared_hit=false,overwrite_velocity=true,quiet=true,release_on_cancel=true,release_on_end=true,defer_first_contact=false,track_aim=true;
+    bool sweep=true,shared_hit=false,overwrite_velocity=true,quiet=true,release_on_cancel=true,release_on_end=true,defer_first_contact=false,track_aim=true,manual_retained=false;
     TechniqueHandle technique;
     uint32_t source_technique=0;
 };

@@ -23,6 +23,12 @@ func _ready() -> void:
 	if "--cpp-hydra-swim" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_swim")
 		return
+	if "--cpp-canis-hunt-pounce" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_hunt_pounce")
+		return
+	if "--cpp-canis-hunt-residue" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_hunt_residue")
+		return
 	if "--cpp-canis-hunt" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_hunt")
 		return
@@ -1582,7 +1588,7 @@ func native_centaurus_shower() -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 共通の本体・表示と、指定した1技を既存ボス検査へつなぐ。
-func canis_move_case(name: String, changes: Dictionary, flowing := false, body_changes := {}, obstacle := false, start_delay := 0.0) -> Dictionary:
+func canis_move_case(name: String, changes: Dictionary, flowing := false, body_changes := {}, obstacle := false, start_delay := 0.0, dependency_changes := {}) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 100.0 if obstacle else 0.0
@@ -1596,6 +1602,12 @@ func canis_move_case(name: String, changes: Dictionary, flowing := false, body_c
 	for key in changes: move.set(key,changes[key])
 	var package: Dictionary = builder.canis_technique_package(definition,move,cfg)
 	if package.is_empty(): return {}
+	for table: String in package.records:
+		for row: Dictionary in package.records[table]:
+			var technique: Dictionary = package.records.BossTechniqueDefinition[int(row.technique)-1] if row.has("technique") else row if table=="BossTechniqueDefinition" else {}
+			if technique.is_empty() or not dependency_changes.has(technique.external_id): continue
+			for key: String in dependency_changes[technique.external_id]:
+				if row.has(key): row[key] = dependency_changes[technique.external_id][key]
 	if flowing:
 		var rules = load("res://data/bosses/ai/canis_major_action_rules.tres").duplicate(true)
 		rules.techniques.assign([move])
@@ -3677,4 +3689,128 @@ func native_canis_hunt() -> void:
 	bridge.dispose();c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_hunt] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 内包する順番と一度だけの飛びかかりを、同じ本体clockで進める。
+func native_canis_hunt_pounce() -> void:
+	var dependencies := {"stream":{"warn":0.05,"interval":0.02,"each_warn":0.01,"lunge_speed":100.0,"lunge_time":0.5,"min_hounds":2},"pounce":{"warn":0.1,"lock":0.03,"active":0.08,"recover":0.04,"overshoot":10.0,"damage":7.0}}
+	var c := canis_move_case("hunt_pounce",{"gap":0.02,"track_during_warn":false},false,{"pack_size":3,"lead_max":3},false,0.5,dependencies)
+	check(not c.is_empty(),"追い立てと飛びかかりの全編集値と依存する二つの技を生成する")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var records: Dictionary = c.package.records
+	check(c.move.make_runner()==null and records.CanisHuntPounceDefinition.size()==2 and records.CanisStreamDefinition.size()==2 and records.CanisPounceDefinition.size()==2 and records.CanisHuntPounceDefinition[1].stream==4 and records.CanisHuntPounceDefinition[1].pounce==6 and records.BossTechniqueStage.is_empty(),"二形態の依存参照を一意に生成し、戦闘method trackを残さない")
+	var events: Array = []
+	bridge.subscribe("記録確認",func(packet): events.append_array(packet.events);return true)
+	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	for k in 50:
+		if t.sent: break
+		bridge._core.step(1.0/120.0)
+		t = bridge.command("dev_boss_state").value[0]
+	var sequence_checkpoint: Dictionary = bridge.checkpoint()
+	var lost: int = t.sequence[2].actor
+	for k in 50:
+		if t.jumping: break
+		bridge._core.step(1.0/120.0)
+		t = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(t.jumping and not t.jump_active and t.left==1 and is_equal_approx(t.jump_age,1.0/120.0) and body.clock>=t.last_launch+0.02 and not canis_lunges(bridge).is_empty(),"猟犬の最後の発進とgapの直後に一度だけの跳躍予告を始める")
+	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
+	bridge._core.set_motion_context(Vector2(300,300),Vector2(300,300),Vector2(3000,2000))
+	bridge._core.step(0.06)
+	t = bridge.command("dev_boss_state").value[0]
+	check(not t.locked and t.aim.x>320.0 and t.facing>0.0,"外側が追尾無効でも飛びかかり自身の追尾値で残り予告と速度を先読みする")
+	bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.locked,"内側の予告時計を加算した後に着地点を固定する")
+	var locked: Vector2 = t.aim
+	bridge.command("dev_ship_motion",{"position":Vector2(-800,-800),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(-800,-800),Vector2(-800,-800),Vector2(3000,2000))
+	bridge._core.step(0.03)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.jump_active and t.aim==locked and t.jump_age==0.0,"発進tickは移動せず固定した着地点を保つ")
+	var launched_checkpoint: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.04)
+	var moved: Dictionary = bridge.command("dev_boss_state").value[0].duplicate(true)
+	var lunges: Array = canis_lunges(bridge).duplicate(true)
+	check(bridge.restore(launched_checkpoint.value).ok,"内側の二つのRunnerと固定した着地点へ復帰する")
+	bridge._core.step(0.04)
+	check(bridge.command("dev_boss_state").value[0]==moved and canis_lunges(bridge)==lunges,"復帰後も本体の移動・猟犬・乱数・予告時計を一致させる")
+	bridge._core.step(0.05)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==2 and t.jump_done and t.left==0,"跳躍一回の終了で内側pounceの硬直へ進む")
+	var residue: Array = canis_lunges(bridge).duplicate(true)
+	check(not residue.is_empty() and residue.all(func(v): return v.manual_retained),"早く終わった編集値ではSourceと同じ残留した突進を保持する")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==5,"外側の回復値ではなくpounceの回復値で自然終了する")
+	bridge._core.step(0.5)
+	var stopped: Array = canis_lunges(bridge)
+	check(stopped.size()==residue.size() and stopped[0].from==residue[0].from and stopped[0].until==residue[0].until,"自然終了後は残留突進の判定更新と期限の整理を止める")
+	var ended_checkpoint: Dictionary = bridge.checkpoint()
+	var old_id: int = t.id
+	var next_ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(next_ticket.ok and bridge.command("dev_boss_state").value[0].id>old_id and canis_lunges(bridge).size()==residue.size(),"自然終了したticketを再利用し、旧Runnerの残留を勝手に取り消さない")
+	bridge._core.step(0.01)
+	check(canis_lunges(bridge)[0].from==residue[0].from,"行を再利用した別の技を旧Handleから進めない")
+	check(bridge.restore(ended_checkpoint.value).ok,"旧Handleのまま停止した残留も復帰する")
+	bridge.command("dev_remove",{"entity_id":residue[0].actor})
+	bridge._core.step(0.01)
+	check(canis_lunges(bridge).size()==residue.size()-1,"停止中でも消失した参加者の攻撃を解放する")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(canis_lunges(bridge).is_empty(),"本体終了では自然終了後の残留も回収する")
+	bridge.restore(launched_checkpoint.value)
+	bridge.command("dev_ship_motion",{"position":locked,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.08)
+	bridge.command("dev_boss_state")
+	check(bridge._core.ship_snapshot().ship_hp<hp and events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="pounce" and e.payload.technique=="hunt_pounce"),"本体の掃引で実ダメージを出し、原因と外側の技名を記録する")
+	bridge.restore(launched_checkpoint.value)
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	check(bridge.command("dev_boss_state").value[0].stage==7 and canis_lunges(bridge).is_empty(),"途中取消では並行する猟犬も解放する")
+	bridge.restore(sequence_checkpoint.value)
+	bridge.command("dev_remove",{"entity_id":lost})
+	for k in 60:
+		bridge._core.step(1.0/120.0)
+		t = bridge.command("dev_boss_state").value[0]
+		if t.jumping: break
+	check(t.jumping and not t.sequence[2].launched,"予定した猟犬が消失しても本体の予告を予定時刻に始める")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(c.view._boss_body_displays.values()[0].technique.jumping,"内側の着地点と本体の跳躍姿勢を正式表示へ渡す")
+	for checkpoint in [sequence_checkpoint,launched_checkpoint,ended_checkpoint]: bridge.release_checkpoint(checkpoint.value)
+	bridge.dispose();c.view.queue_free()
+	c = canis_move_case("hunt_pounce",{},true,{"pack_size":1,"lead_max":1},false,0.0,dependencies);bridge = c.bridge
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value.is_empty(),"通常選択では内側streamの最低猟犬数を守る")
+	bridge.dispose();c.view.queue_free()
+	c = canis_move_case("hunt_pounce",{},true,{"pack_size":3,"lead_max":3},false,0.0,dependencies);bridge = c.bridge
+	var body_state: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body_state.max_hp*0.55,"cause":"bullet"})
+	bridge._core.step(0.01);bridge._core.step(2.0);bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value.is_empty(),"第2形態では追い立てと飛びかかりを通常選択しない")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_hunt_pounce] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 前の一式で未確認だった、短い狙撃の後に残る突進の停止だけを照合する。
+func native_canis_hunt_residue() -> void:
+	var c := canis_move_case("hunt",{"gap":0.0,"aim_warn":0.01,"beam_time":0.01,"recover":0.01},false,{"pack_size":1,"lead_max":1})
+	if c.is_empty(): check(false,"残留確認の入力を生成する");get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	for k in 180:
+		if t.stage==2: break
+		bridge._core.step(1.0/120.0)
+		t = bridge.command("dev_boss_state").value[0]
+	var residual: Array = canis_lunges(bridge).duplicate(true)
+	check(not residual.is_empty(),"短い狙撃では技を終えても発射した突進を消さない")
+	bridge._core.step(0.03);bridge._core.step(0.6)
+	check(canis_lunges(bridge).size()==residual.size() and canis_lunges(bridge)[0].from==residual[0].from,"追い立てと狙撃も自然終了後に突進の判定更新を止める")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(canis_lunges(bridge).is_empty(),"自然終了後の停止した突進も本体の終了で解放する")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_hunt_residue] failures=",failed)
 	get_tree().quit(1 if failed else 0)
