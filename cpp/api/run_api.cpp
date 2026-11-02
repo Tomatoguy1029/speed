@@ -372,6 +372,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["pickup_radius"]=runtime.state.pickup_config.coin_radius;ui["xp_pickup_radius"]=runtime.state.pickup_config.xp_radius;
     ui["attack_mult"]=runtime.state.combat_config.attack_mult;ui["attack_power"]=speed::CombatResolver::attack_power(runtime);
     ui["crit_chance"]=runtime.state.combat_config.crit_chance;ui["crit_mult"]=runtime.state.combat_config.crit_mult;
+    Dictionary run_up;const auto &ru=runtime.state.loadout.run_up;run_up["ready"]=ru.ready;run_up["first"]=ru.first;run_up["strength"]=ru.strength;run_up["distance"]=ru.distance;run_up["maximum"]=ru.multiplier;Array run_up_hits;for (const auto &h:ru.hits) {Dictionary item;item["id"]=int64_t(h.id);item["pos"]=h.pos;item["dir"]=h.direction;item["age"]=h.age;run_up_hits.push_back(item);}run_up["hits"]=run_up_hits;ui["run_up"]=run_up;
     Dictionary end_blast;const auto &blast=runtime.state.loadout.end_blast;end_blast["ready"]=blast.ready;end_blast["radius"]=blast.radius*runtime.state.loadout.effects.area;end_blast["secondary"]=blast.secondary;
     Array pending_blasts,blast_visuals;for (const auto &p:blast.pending) {Dictionary item;item["pos"]=p.pos;item["radius"]=p.radius;item["damage"]=p.damage;item["delay"]=p.delay;pending_blasts.push_back(item);}
     for (const auto &v:blast.visuals) {Dictionary item;item["id"]=int64_t(v.id);item["pos"]=v.pos;item["radius"]=v.radius;item["age"]=v.age;blast_visuals.push_back(item);}end_blast["pending"]=pending_blasts;end_blast["visuals"]=blast_visuals;ui["end_blast"]=end_blast;

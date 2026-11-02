@@ -2,6 +2,7 @@
 #include "../cpp/systems/field.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
 #include "../cpp/behaviors/traits/rampage.h"
+#include "../cpp/behaviors/traits/runUp.h"
 #include "../cpp/behaviors/weapons/endBlast.h"
 #include <algorithm>
 #include <cmath>
@@ -110,6 +111,7 @@ void SpeedRunCore::commit_draw() {
     runtime.state.draw.seg_pos = 0;
     runtime.state.draw.drawing = false;
     runtime.state.draw.tracing = true;
+    speed::RunUpBehavior::launch(runtime);
     speed::FullChargeBehavior::launch(runtime);
     speed::RampageBehavior::launch(runtime);
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;

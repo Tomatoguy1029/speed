@@ -4,11 +4,15 @@ extends WeaponVisual
 ## 光がはじけて短い衝撃の線が全方向へ広がる（爆発にはしない）。
 
 var hits: Array[Dictionary] = []
+var _frame_seen := {}
 
 func claims(ev: Dictionary) -> bool:
 	return ev.type == &"explode" and ev.get("cause", &"") == &"runUp"
 
 func on_event(ev: Dictionary) -> void:
+	frame_event(ev,state.ship_heading)
+
+func frame_event(ev: Dictionary, heading: Vector2) -> void:
 	if ev.type != &"run_up_hit": return
 	var rays: Array[Dictionary] = []
 	for i in 24:
@@ -16,25 +20,40 @@ func on_event(ev: Dictionary) -> void:
 			"w": 2 if randf() < 0.4 else 1, "c": randf(), "delay": randf() * 0.03})
 	var tails: Array[Dictionary] = []
 	for i in 10: tails.append({"off": (randf() - 0.5) * 14.0, "len": 8.0 + randf() * 22.0})
-	hits.append({"pos": ev.pos, "dir": ev.dir if ev.dir != Vector2.ZERO else state.ship_heading, "age": 0.0, "rays": rays, "tails": tails})
+	hits.append({"pos": ev.pos, "dir": ev.dir if ev.dir != Vector2.ZERO else heading, "age": 0.0, "rays": rays, "tails": tails})
+
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+
+func sync_frame(values: Array) -> void:
+	var alive := {}
+	for value: Dictionary in values:
+		alive[value.id] = true
+		if _frame_seen.has(value.id): continue
+		frame_event({"type":&"run_up_hit","pos":value.pos,"dir":value.dir},value.dir)
+		hits[-1].age = value.age
+	_frame_seen = alive
 
 func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+	frame_tick(world_dt(),state.ship_pos,state.ship_heading,behavior.ctx.loadout.boost_distance,float(behavior.def.params.distance),behavior.first,state.tracing,state.world_time,active)
+
+func frame_tick(dt: float, pos: Vector2, heading: Vector2, distance: float, limit: float, first: bool, tracing: bool, clock: float, enabled: bool) -> void:
+	var p: PixelPainter = _painter if rm==null else painter()
 	p.begin()
-	if active and state.tracing and behavior.first:
-		_streaks(p)
+	if enabled and tracing and first: _streaks(p,pos,heading,distance,limit,clock)
 	for h in hits:
 		h.age += dt
-		_hit(p, h)
-	hits = hits.filter(func(h): return h.age < 0.4)
+		_hit(p,h)
+	hits = hits.filter(func(h): return h.age<0.4)
 	p.end()
 
-func _streaks(p: PixelPainter) -> void:
-	var x := clampf(behavior.ctx.loadout.boost_distance / float(behavior.def.params.distance), 0.0, 1.0)
-	var ke := (exp(3.0 * x) - 1.0) / (exp(3.0) - 1.0)
-	var t := state.world_time
-	var u := state.ship_heading
+func _streaks(p: PixelPainter, pos: Vector2, heading: Vector2, distance: float, limit: float, clock: float) -> void:
+	var x := clampf(distance/limit,0.0,1.0)
+	var ke := (exp(3.0*x)-1.0)/(exp(3.0)-1.0)
+	var t := clock
+	var u := heading
 	var n := u.orthogonal()
 	for i in 16:
 		var h1 := float((i * 73) % 100) / 100.0
@@ -48,7 +67,7 @@ func _streaks(p: PixelPainter) -> void:
 		var alpha := (0.25 + 0.6 * ke) * (1.0 - ph) * (1.0 - 0.5 * absf(spread) / reach)
 		var color := Color(1.0, 245.0 / 255.0, 200.0 / 255.0, alpha) if h2 < 0.35 else Color(1.0, (185.0 + roundf(h1 * 40.0)) / 255.0, (70.0 + roundf(h2 * 60.0)) / 255.0, alpha)
 		var width := roundi(0.7 + 1.6 * ke * (1.0 - absf(spread) / reach) * (0.5 + h2 * 0.5))
-		var start := state.ship_pos - u * back * p.px + n * side * p.px
+		var start := pos - u * back * p.px + n * side * p.px
 		p.line(start, start - u * length * p.px, color, maxi(1, width))
 
 func _hit(p: PixelPainter, h: Dictionary) -> void:

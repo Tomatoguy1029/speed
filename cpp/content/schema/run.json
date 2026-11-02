@@ -1322,6 +1322,10 @@
       {
         "name": "CritBeam",
         "value": "critBeam"
+      },
+      {
+        "name": "RunUp",
+        "value": "runUp"
       }
     ],
     "VisualRole": [
@@ -1674,6 +1678,10 @@
       {
         "name": "RockBreak",
         "value": "rock_break"
+      },
+      {
+        "name": "RunUpHit",
+        "value": "run_up_hit"
       }
     ],
     "ResultKind": [
@@ -2144,6 +2152,11 @@
       "facing",
       "dir",
       "color"
+    ],
+    "run_up_hit": [
+      "pos",
+      "dir",
+      "strength"
     ]
   },
   "includes": [

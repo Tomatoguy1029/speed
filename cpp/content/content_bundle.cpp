@@ -150,6 +150,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->equipment_assets=records.LoadoutAsset_rows;
     bundle->numeric_traits=records.NumericTraitLevel_rows;
     bundle->full_charge_levels=records.FullChargeDefinition_rows;
+    bundle->run_up_levels=records.RunUpDefinition_rows;
     bundle->rampage_levels=records.RampageDefinition_rows;
     bundle->duplicator_levels=records.DuplicatorDefinition_rows;
     if (records.PostMaxChargeDefinition_rows.size()!=1) return {};
@@ -186,6 +187,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.external_id=="T37") {
             if (d.kind!=1 || d.maximum_level!=bundle->duplicator_levels.size()) return {};
             for (size_t i=0;i<bundle->duplicator_levels.size();++i) {const auto &level=bundle->duplicator_levels[i];if (level.equipment!=d.id || level.level!=i+1 || level.angle_min>level.angle_max) return {};}
+            continue;
+        }
+        if (d.external_id=="T32") {
+            if (d.kind!=1 || d.maximum_level!=bundle->run_up_levels.size()) return {};
+            for (size_t i=0;i<bundle->run_up_levels.size();++i) if (bundle->run_up_levels[i].equipment!=d.id || bundle->run_up_levels[i].level!=i+1 || bundle->run_up_levels[i].distance<=0) return {};
             continue;
         }
         if (d.external_id=="T33") {

@@ -62,6 +62,8 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+var _run_up_visual: RefCounted
+var _run_up_world_time := -1.0
 var _end_blast_visual: RefCounted
 var _end_blast_world_time := -1.0
 var _full_burst_visual: RefCounted
@@ -577,6 +579,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _end_blast_visual!=null: _end_blast_visual.dispose()
 		_end_blast_visual = null
 		_end_blast_world_time = -1.0
+		if _run_up_visual!=null: _run_up_visual.dispose()
+		_run_up_visual = null
+		_run_up_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_debris_trails.clear()
@@ -653,6 +658,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rampage_visual.dispose()
 		_rampage_visual = null
 		_rampage_world_time = -1.0
+	var equipped_run_up: bool = frame.ui.get("run_up",{}).get("ready",false)
+	if equipped_run_up and _run_up_visual==null:
+		_run_up_visual = preload("res://scripts/render/equipment/runUp.gd").new()
+		_run_up_visual.setup_frame(_layer(18),_pixel)
+	if not equipped_run_up and _run_up_visual!=null:
+		_run_up_visual.dispose()
+		_run_up_visual = null
+		_run_up_world_time = -1.0
 	var equipped_end_blast: bool = frame.ui.get("end_blast",{}).get("ready",false)
 	if equipped_end_blast and _end_blast_visual==null:
 		_end_blast_visual = preload("res://scripts/render/equipment/endBlast.gd").new()
@@ -731,7 +744,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 				var layers: Dictionary = library.get_meta("looks",{}).get(event.get("scene",""),{})
 				var phase: String = event.phase
 				_attack_ends.append({"mesh":layers.get(phase),"sprites":layers.get(phase+"_sprites",[]),"pos":event.pos,"duration":event.get("duration",0.25 if phase=="Hit" else 0.2),"age":0.0,"tint":event.get("tint",Color.WHITE)})
-		if event.type==&"explode" and event.get("cause",&"")!=&"endBlast":
+		if event.type==&"explode" and event.get("cause",&"") not in [&"endBlast",&"runUp"]:
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":event.life,"max":event.life})
 			if event.radius>=150.0 and pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.4)
 		if event.type==&"debris_trail" and event.get("life",0.0)>0.0:
@@ -819,6 +832,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var run_up_dt: float = 0.0 if _run_up_world_time<0.0 else maxf(0.0,ui.world_time-_run_up_world_time)
+	_run_up_world_time = ui.world_time if equipped_run_up else -1.0
+	if _run_up_visual!=null:
+		_run_up_visual.frame_tick(run_up_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.full_charge.distance,ui.run_up.distance,ui.run_up.first,ui.draw.tracing,ui.world_time,_ship_visible)
+		_run_up_visual.sync_frame(ui.run_up.hits)
 	var end_blast_dt: float = 0.0 if _end_blast_world_time<0.0 else maxf(0.0,ui.world_time-_end_blast_world_time)
 	_end_blast_world_time = ui.world_time if equipped_end_blast else -1.0
 	if _end_blast_visual!=null:

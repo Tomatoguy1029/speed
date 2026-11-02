@@ -666,6 +666,48 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "RunUpDefinition",
+      "section": 78,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "multiplier",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

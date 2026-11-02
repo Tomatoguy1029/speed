@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/attacks/wall.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
+#include "../cpp/behaviors/traits/runUp.h"
 #include "../cpp/behaviors/enemies/shield.h"
 #include "../cpp/systems/field.h"
 #include "geometry.h"
@@ -105,7 +106,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         const double speed = runtime.state.ship.vel.length();
         const Vector2 direction = speed > 0 ? runtime.state.ship.vel / speed : Vector2();
         if (runtime.state.draw.tracing) speed::FullChargeBehavior::prepare(runtime,from.distance_to(position));
-        const double attack = speed::CombatResolver::attack_power(runtime);
+        const double attack = speed::CombatResolver::attack_power(runtime)*speed::RunUpBehavior::multiplier(runtime,from.distance_to(position));
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
         const bool front = blocks_front(hit.row, position, direction) || (fast && def.ram_guard);
         if (front && (!fast || (!runtime.state.draw.tracing && enemy.hit_cd > 0))) {
@@ -156,7 +157,8 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
                 speed::ShieldBehavior::steal(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));
                 damage = std::max(damage, enemy.hp);
             }
-            damage_enemy(hit.row, damage, "ram", crit, direction,160.0,&position);
+            speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));request.amount=damage;request.cause=speed::Cause::Ram;request.crit=crit;request.direction=direction;request.impact=position;request.has_impact=true;
+            const auto result=speed::CombatResolver::damage_enemy(runtime,request);speed::EventBuilder::flush_combat(runtime);
             enemy.hit_cd = c.contact_cooldown;
             if (runtime.state.draw.tracing) {
                 runtime.state.draw.inside[enemy.id] = hit.row;
@@ -172,6 +174,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
                 const double loss = enemy.dead ? (0.004 + enemy.radius * 0.0006) : (0.1 + enemy.radius * 0.002);
                 runtime.state.ship.vel *= 1.0 - std::min(0.6, loss);
             }
+            speed::RunUpBehavior::contact(runtime,position,direction,result.applied);
             continue;
         }
         runtime.state.ship.glide = false;
@@ -187,6 +190,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         runtime.state.ship.boost_t = 0;
         if (!front) damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
         enemy.hit_cd = 0.25;
+        speed::RunUpBehavior::contact(runtime,position,direction,0);
         Dictionary bounce; bounce["pos"] = runtime.state.ship.pos; emit_event("bounce", bounce);
         runtime.state.ship_pos = runtime.state.ship.pos;
         return true;

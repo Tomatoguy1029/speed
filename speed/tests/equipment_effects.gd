@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t32" in OS.get_cmdline_user_args():
+		await check_cpp_t32()
+		print("[cpp_t32] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-w29" in OS.get_cmdline_user_args() or "--cpp-w29-tail" in OS.get_cmdline_user_args():
 		await check_cpp_w29()
 		print("[cpp_w29] failed=%d" % failures)
@@ -2129,3 +2135,116 @@ func check_cpp_w29() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"終端爆発の状態と表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_t32() -> void:
+	var capture := ErrorCapture.new()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.base_attack = 100.0
+	config.xp_base = 100000.0
+	# 通常候補は固定seed 632の3回目の引き直しでT32を含む。
+	var seed_value := 632
+	var session = await trait_test_session("T32",config,seed_value)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("t32",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var definition: TraitDef = ContentManager.definition(&"traits",&"T32")
+	var gear: TraitDef = ContentManager.definition(&"traits",&"T04")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,config.trait_max_stacks+1):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T32","levels":level}).ok,"助走を全段取得する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		for offset in [Vector2(400,0),Vector2(400,70),Vector2(750,0)]:
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+offset}).value
+			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+			if offset.y>0: bridge.command("dev_damage",{"entity_id":enemy,"amount":3.0,"knock":0.0,"no_crit":true})
+		events.clear()
+		trait_start_trace(bridge,850.0)
+		bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.01)
+		check(bridge._ui.run_up.first and bridge._ui.run_up.strength==0.0 and presentation.frame_view._run_up_visual!=null,"発進で最初の接触を待ち距離から尾を表示する")
+		var before: Dictionary = bridge._ui.run_up.duplicate(true)
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.run_up==before,"停止中は最初の接触と助走距離を進めない")
+		bridge.command("pause",{"paused":false})
+		var saved: Dictionary = bridge.checkpoint()
+		var shown := false
+		for tick in 70:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not shown and not bridge._ui.run_up.first:
+				presentation._present_cpp(0.01)
+				check(presentation.frame_view._run_up_visual.hits.size()==1,"最初の接触だけを光と衝撃線として表示する")
+				shown = true
+		var expected: Dictionary = bridge._ui.run_up.duplicate(true)
+		var expected_enemies: Array = core.enemies_snapshot()
+		var hits: Array = events.filter(func(event): return event.type==&"combat_damage" and event.payload.cause==&"ram")
+		var area_hits: Array = events.filter(func(event): return event.type==&"combat_damage" and event.payload.cause==&"runUp")
+		var flashes: Array = events.filter(func(event): return event.type==&"run_up_hit")
+		check(hits.size()==2 and flashes.size()==1 and not bridge._ui.run_up.first,"一回のなぞりで最初だけ助走を使い連続した敵を撃破する")
+		if not hits.is_empty():
+			var distance: float = origin.distance_to(hits[0].payload.impact)
+			var strength: float = (exp(3.0*clampf(distance/definition.params.distance,0.0,1.0))-1.0)/(exp(3.0)-1.0)
+			var gear_strength: float = (exp(3.0*clampf(distance/config.draw_length,0.0,1.0))-1.0)/(exp(3.0)-1.0)
+			var expected_attack: float = config.base_attack*(1.0+(gear.params.mult_base+gear.params.mult_per*5.0-1.0)*gear_strength)*(1.0+(definition.params.mult_base+definition.params.mult_per*level-1.0)*strength)
+			check(is_equal_approx(hits[0].payload.requested,expected_attack) and is_equal_approx(flashes[0].payload.strength,strength),"全段で命中地点までの指数倍率とギア倍率を合成する")
+			check(not area_hits.is_empty() and is_equal_approx(area_hits[0].payload.requested,hits[0].payload.applied*definition.params.area_damage),"範囲攻撃は過剰分を除いた実際の減少HPを基準にする")
+		if hits.size()>1:
+			var d: float = origin.distance_to(hits[1].payload.impact)
+			var factor: float = 1.0+(gear.params.mult_base+gear.params.mult_per*5.0-1.0)*(exp(3.0*clampf(d/config.draw_length,0.0,1.0))-1.0)/(exp(3.0)-1.0)
+			check(is_equal_approx(hits[1].payload.requested,config.base_attack*factor),"2体目の体当たりへ助走倍率を持ち越さない")
+		check(bridge._ui.kills==3,"最初の範囲攻撃と次の体当たりで実際の連鎖撃破を処理する")
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		for tick in 70: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.run_up==expected and core.enemies_snapshot()==expected_enemies,"最初の接触・強さと連鎖結果を値型復帰で再現する")
+		bridge.release_checkpoint(saved.value)
+		bridge.command("dev_remove_trait",{"id":"T32"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.run_up.ready and presentation.frame_view._run_up_visual==null,"解除で助走状態と表示を片付ける")
+		if failures: break
+	for distance in [0.0,210.0]:
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T32","levels":3})
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
+		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+		events.clear()
+		trait_start_trace(bridge,400.0)
+		for tick in 60:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not bridge._ui.run_up.first: break
+		var flashes: Array = events.filter(func(event): return event.type==&"run_up_hit")
+		check(flashes.size()==1 and (bridge._ui.run_up.strength==0.0 if distance==0.0 else bridge._ui.run_up.strength>0.0 and bridge._ui.run_up.strength<1.0),"距離0と上限未満の発動境界を指数曲線で扱う")
+		var saved: Dictionary = bridge.checkpoint()
+		presentation._present_cpp(0.01)
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._run_up_visual.hits.size()==1,"接触後の短い衝撃表示も値型復帰から作り直す")
+		bridge.release_checkpoint(saved.value)
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T32","levels":1})
+	await trait_select_upgrade(session,"T32",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"助走の状態と表示に実行エラーがない: %s" % [capture.messages()])

@@ -53,6 +53,12 @@ struct EndBlastWeaponState {
     std::vector<EndBlastPending> pending;
     std::vector<EndBlastVisual> visuals;
 };
+struct RunUpHitState {godot::Vector2 pos,direction;double age=0;uint64_t id=0;};
+struct RunUpState {
+    bool ready=false,first=true;
+    double strength=0,distance=1,multiplier=1,radius=0,area_damage=0;
+    uint64_t next_visual=1;std::vector<RunUpHitState> hits;
+};
 struct RampageState {
     bool ready=false;
     uint64_t kills=0;
@@ -74,6 +80,7 @@ struct EquipmentEffects {
 struct LoadoutState {
     EquipmentEffects effects;
     bool full_burst_owned=false,full_burst_active=false;
+    RunUpState run_up;
     RampageState rampage;
     DuplicatorState duplicator;
     double boost_distance=0,full_charge_maximum=1;

@@ -214,6 +214,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.LoadoutDefinition.append({"id":gear_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T04","comet_only":false})
 	for level in range(1,config.trait_max_stacks+1):
 		data.FullChargeDefinition.append({"id":level,"equipment":gear_id,"level":level,"multiplier":float(gear.params.mult_base)+float(gear.params.mult_per)*level})
+	var run_up := load("res://data/traits/T32_runUp.tres") as TraitDef
+	if run_up==null: return {}
+	var run_up_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":run_up_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T32","comet_only":false})
+	for level in range(1,config.trait_max_stacks+1):
+		data.RunUpDefinition.append({"id":level,"equipment":run_up_id,"level":level,"distance":float(run_up.params.distance),"multiplier":float(run_up.params.mult_base)+float(run_up.params.mult_per)*level,"radius":float(run_up.params.radius_base)+float(run_up.params.radius_per)*level,"area_damage":float(run_up.params.area_damage)})
 	var rampage := load("res://data/traits/T33_rampage.tres") as TraitDef
 	if rampage==null: return {}
 	var rampage_id: int = data.LoadoutDefinition.size()+1
@@ -318,6 +324,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":gear_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":gear_id,"asset":key})
+	var run_up_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T32")
+	if run_up_entry==null: return {}
+	for path in run_up_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":run_up_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":run_up_id,"asset":key})
 	var rampage_entry: ContentEntry = ContentManager.catalog.find(&"traits",rampage.id)
 	if rampage_entry==null: return {}
 	for path in rampage_entry.resources:
@@ -542,6 +555,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.BarrierDefinition = resolved.BarrierDefinition
 			data.BarrierPostDefinition = resolved.BarrierPostDefinition
 			data.FullChargeDefinition = resolved.FullChargeDefinition
+			data.RunUpDefinition = resolved.RunUpDefinition
 			data.RampageDefinition = resolved.RampageDefinition
 			data.DuplicatorDefinition = resolved.DuplicatorDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
