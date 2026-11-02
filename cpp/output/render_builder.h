@@ -10,7 +10,7 @@
 namespace speed {
 class RunRuntime;
 struct RenderBatchBuffer {
-    struct Instance {int64_t id;godot::Vector2 at;double angle,radius;godot::Color color;int32_t flags;};
+    struct Instance {int64_t id;godot::Vector2 at;double angle,radius;godot::Color color;int32_t flags;godot::Vector2 deformation;double amount=0;};
     uint32_t visual=0;int32_t layer=0,order=0;
     std::vector<Instance> instances;
     bool biter=false;

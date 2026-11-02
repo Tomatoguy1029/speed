@@ -1407,6 +1407,10 @@
       {
         "name": "CoronaThrow",
         "value": "corona_throw"
+      },
+      {
+        "name": "ContactWave",
+        "value": "contactWave"
       }
     ],
     "VisualRole": [
@@ -1819,6 +1823,10 @@
       {
         "name": "Swallow",
         "value": "swallow"
+      },
+      {
+        "name": "SpaceQuake",
+        "value": "space_quake"
       }
     ],
     "ResultKind": [
@@ -2378,6 +2386,11 @@
       "visual_id",
       "sprite_radius",
       "sprite_angle"
+    ],
+    "space_quake": [
+      "pos",
+      "radius",
+      "life"
     ]
   },
   "includes": [

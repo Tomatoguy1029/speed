@@ -116,6 +116,10 @@ func apply_frame(row: Dictionary) -> void:
 		var radius := Vector2(row.transforms[n],row.transforms[n+1]).length()
 		var angle := atan2(row.transforms[n+1],row.transforms[n])
 		var position := Vector2(row.transforms[n+4],row.transforms[n+5])
+		var deformation: PackedFloat32Array = row.get("deformations",PackedFloat32Array())
+		if not deformation.is_empty():
+			radius = deformation[i*5]
+			angle = deformation[i*5+1]
 		var jaw := 0.0
 		if _biting:
 			var values: Dictionary = row.biter
@@ -134,6 +138,7 @@ func apply_frame(row: Dictionary) -> void:
 			var center := position+(pivot-pivot.rotated(turn)).rotated(angle)
 			var began := Time.get_ticks_usec() if perf.active else 0
 			part.base.add(center,angle+turn,radius,row.colors[i])
+			if not deformation.is_empty(): part.base.deform_last(Vector2(deformation[i*5+2],deformation[i*5+3]),deformation[i*5+4])
 			perf.since(&"enemies.body",began)
 
 func end() -> void:

@@ -35,9 +35,12 @@ Dictionary RenderBatchBuffer::value() {
     for (size_t i=0;i<instances.size();++i) {
         const auto &v=instances[i];const float c=std::cos(v.angle)*v.radius,s=std::sin(v.angle)*v.radius;
         id[i]=v.id;flag[i]=v.flags;color[i]=v.color;
-        t[i*6]=c;t[i*6+1]=s;t[i*6+2]=-s;t[i*6+3]=c;t[i*6+4]=v.at.x;t[i*6+5]=v.at.y;
+        godot::Vector2 x(c,s),y(-s,c);
+        if (v.deformation.length_squared()>0.0001) {const auto n=v.deformation.normalized(),side=godot::Vector2(-n.y,n.x);x=n*x.dot(n)*(1-0.5*v.amount)+side*x.dot(side)*(1+0.6*v.amount);y=n*y.dot(n)*(1-0.5*v.amount)+side*y.dot(side)*(1+0.6*v.amount);}
+        t[i*6]=x.x;t[i*6+1]=x.y;t[i*6+2]=y.x;t[i*6+3]=y.y;t[i*6+4]=v.at.x;t[i*6+5]=v.at.y;
     }
-    Dictionary out;out["visual_id"]=visual;out["layer"]=layer;out["order"]=order;out["ids"]=ids;
+    PackedFloat32Array deformations;bool deformed=false;for (const auto &v:instances) {deformed=deformed || v.amount>0;for (float value:{float(v.radius),float(v.angle),v.deformation.x,v.deformation.y,float(v.amount)}) deformations.push_back(value);}
+    Dictionary out;if (deformed) out["deformations"]=deformations;out["visual_id"]=visual;out["layer"]=layer;out["order"]=order;out["ids"]=ids;
     out["transforms"]=transforms;out["colors"]=colors;out["flags"]=flags;
     if (biter) {Dictionary values;values["modes"]=modes;values["charges"]=charges;values["timers"]=timers;values["rests"]=rests;out["biter"]=values;}
     if (!ruler_sides.is_empty()) out["ruler_sides"]=ruler_sides;
@@ -165,7 +168,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (warning) {enemy_batch.glows.push_back(pose.position.x);enemy_batch.glows.push_back(pose.position.y);enemy_batch.glows.push_back(radius);}
         auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):definition.color):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
         if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode==EnemyMode::Windup) color.g=std::fmod(enemy.charge*3.0,1.0)>=0.45?1.0:0.0;
-        enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,color,enemy.flash>0 || warning?1:0);
+        godot::Vector2 deform;double amount=0;bool flash=false;
+        for (const auto &w:state.loadout.contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
+        if (flash) color.r=1;
+        enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,color,enemy.flash>0 || warning || flash?1:0);
+        enemy_batch.instances.back().deformation=deform;enemy_batch.instances.back().amount=amount;
     }
     for (size_t i=0;i<state.friends.size();++i) {
         const auto &shot=state.friends[i];if (!shot.alive || shot.kind!=int64_t(FriendKind::Shot)) continue;

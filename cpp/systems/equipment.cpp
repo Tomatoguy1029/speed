@@ -1,8 +1,15 @@
 #include "equipment.h"
 #include "../behaviors/weapons/forward.h"
+#include "../behaviors/weapons/contactWave.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
+void EquipmentSystem::contact(RunRuntime &run,godot::Vector2 pos) {
+    for (const auto &owned:run.state.loadout.weapons) {
+        if (run.state.phase!=godot::RunState::Phase::Play) return;
+        if (run.content->equipment[owned.definition-1].external_id=="W04") ContactWaveBehavior::contact(run,pos);
+    }
+}
 void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
     run.state.loadout.full_charge_maximum=1;
@@ -93,6 +100,9 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W04") {
+            const auto &level=run.content->contact_wave_levels[next-1];auto &w=run.state.loadout.contact_wave;
+            w.ready=true;w.definition=id;w.radius=level.radius;w.damage=level.damage;w.knock=level.knock;w.area_increment=level.area_increment;w.knockback_increment=level.knockback_increment;
         } else if (d.external_id=="W03") {
             const auto &level=run.content->knockback_levels[next-1];auto &k=run.state.loadout.knockback;
             k.ready=true;k.definition=id;k.chain_limit=level.chain_limit;k.chance=level.chance;k.speed=level.speed;k.life=level.life;k.base_damage=level.base_damage;k.base_attack=level.base_attack;k.base_knock=level.base_knock;k.base_life=level.base_life;
@@ -144,6 +154,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W04") run.state.loadout.contact_wave={};
     else if (external=="W03") run.state.loadout.knockback={};
     else if (external=="W07") run.state.loadout.mines={};
     else if (external=="W29") run.state.loadout.end_blast={};

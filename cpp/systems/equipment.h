@@ -3,6 +3,7 @@
 namespace speed {
 class EquipmentSystem {
 public:
+    static void contact(RunRuntime &,godot::Vector2 position);
     static int64_t shot_count(RunRuntime &,int64_t base);
     static double weapon_damage_factor(const RunRuntime &,uint32_t definition);
     static bool grant(RunRuntime &,uint32_t definition,uint32_t levels=1);

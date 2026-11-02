@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w04" in OS.get_cmdline_user_args() or "--cpp-w04-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_w04()
+		print("[cpp_w04] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-t06-source-clock" in OS.get_cmdline_user_args():
 		var completed: bool = await check_cpp_t06_source_clock()
 		check(completed,"槍本体と火花の元の時計を最後まで確認する")
@@ -2841,3 +2846,102 @@ func check_cpp_w03() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"星砕きの状態と表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_w04() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	var session = await trait_test_session("W04",config,604)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W04")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var retry: bool = "--cpp-w04-fixes" in OS.get_cmdline_user_args()
+	for level in range(5 if retry else 1,definition.level_steps.size()+1):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		var grant: Dictionary = bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W04","levels":level})
+		if not retry or level>1: check(grant.ok,"震空を全段取得する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
+		bridge.command("dev_post_scatter",{"interval":0,"projectile":0,"duration":0,"knockback":2,"area":2})
+		bridge.command("dev_post_weapon_power",{"damage":2,"followup":0})
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		var struck: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(100,0)}).value
+		core.set_enemy_motion(struck,{"held":true,"vel":Vector2.ZERO})
+		trait_start_trace(bridge,1000.0)
+		for tick in 30:
+			var step: Dictionary = bridge.step(1.0/120.0,idle,viewport)
+			if not retry or level>1: check(step.ok and bridge.read_frame().ok and bridge.delivery_error.ok,"接触から波の発動まで通知を配信する")
+			if not bridge._ui.contact_wave.waves.is_empty(): break
+		check(not bridge._ui.contact_wave.waves.is_empty(),"実際の体当たりから接触波を発動する")
+		if bridge._ui.contact_wave.waves.is_empty(): break
+		var wave: Dictionary = bridge._ui.contact_wave.waves[0]
+		var tier: int = definition.level_steps[level-1]
+		var area: TraitDef = ContentManager.definition(&"traits",&"T34")
+		var expected_radius: float = definition.params.radius*(1.0+0.1*(tier-1))*(1.0+area.stack_bonus(2))*(1.0+2.0*config.post_max.increments.area)
+		if not retry or level>1: check(is_equal_approx(wave.radius,expected_radius) and is_equal_approx(wave.damage,bridge._ui.attack_power*definition.params.damage*(1.0+0.3*(tier-1))*(1.0+2.0*config.post_max.increments.weapon_damage)),"全段の半径と発動時威力・最大段後倍率を一度だけ合成する")
+		core.step_draw(1.0)
+		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":wave.pos+Vector2(0,60)}).value
+		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
+		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==target)[0].hp
+		for tick in 240:
+			bridge.step(1.0/120.0,idle,viewport)
+			if bridge._ui.contact_wave.waves.is_empty(): break
+			if bridge._ui.contact_wave.waves[0].caught.any(func(h): return h.id==target and h.age>0.05): break
+		if bridge._ui.contact_wave.waves.is_empty():
+			check(false,"波が消えるまでに対象を捕捉する")
+			break
+		wave = bridge._ui.contact_wave.waves[0]
+		check(wave.caught.any(func(h): return h.id==target) and core.enemies_snapshot().filter(func(e): return e.id==target)[0].pos[1]>wave.pos.y+60.0,"IDと経過時間を保存し別のheld状態の敵も押し運ぶ")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._contact_wave_visual!=null and not presentation.frame_view._contact_wave_visual.quakes.is_empty() and not presentation.pipeline._ripples.is_empty(),"閃光・火花と画面の歪みを通常表示へ渡す")
+		var render: Dictionary = bridge.read_render(Rect2(wave.pos-Vector2(1000,1000),Vector2(2000,2000))).value
+		var distorted := false
+		for batch: Dictionary in render.batches:
+			var at: int = batch.ids.find(target)
+			if at>=0:
+				var x := Vector2(batch.transforms[at*6],batch.transforms[at*6+1])
+				var y := Vector2(batch.transforms[at*6+2],batch.transforms[at*6+3])
+				distorted = absf(x.length()-y.length())>0.01
+		check(distorted,"捕捉中の敵本体と装甲へ同じ変形を渡す")
+		var saved: Dictionary = bridge.checkpoint()
+		var held_state: Dictionary = bridge._ui.contact_wave.duplicate(true)
+		bridge.command("pause",{"paused":true})
+		bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.contact_wave==held_state,"停止中は捕捉と波の時計を止める")
+		bridge.command("pause",{"paused":false})
+		var steps := 0
+		for tick in 240:
+			bridge.step(1.0/120.0,idle,viewport)
+			steps += 1
+			if bridge._ui.contact_wave.waves[0].done.has(target): break
+		var after: Dictionary = bridge._ui.contact_wave.duplicate(true)
+		var enemies: Array = core.enemies_snapshot()
+		var victims: Array = enemies.filter(func(e): return e.id==target)
+		var damaged_once: bool = hp<=wave.damage if victims.is_empty() else is_equal_approx(victims[0].hp,hp-wave.damage)
+		check(damaged_once and after.waves[0].done.has(target) and not after.waves[0].caught.any(func(h): return h.id==target),"捕捉時間の後に一度だけ命中し捕捉を解く")
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		check(bridge._ui.contact_wave==held_state,"途中復帰で捕捉IDと経過・未命中状態を戻す")
+		for tick in steps: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.contact_wave==after and core.enemies_snapshot()==enemies,"復帰後も押し運びと命中済み集合・HPを再現する")
+		bridge.command("dev_remove_weapon",{"id":"W04"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.contact_wave.ready and bridge._ui.contact_wave.waves.is_empty() and presentation.frame_view._contact_wave_visual==null and presentation.pipeline._ripples.is_empty(),"途中解除で捕捉・波・変形と専用表示を片付ける")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"震空の状態と表示に実行エラーがない: %s" % [errors.messages()])

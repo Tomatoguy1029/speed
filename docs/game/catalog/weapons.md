@@ -11,7 +11,7 @@
 | No.03 | リアブラスター | 後方へ1発ずつ撃ち、ブラスターと同じ項目が伸びる | 逃げる向きに進みながら後ろを撃つ | `scripts/weapons/rear.gd`、`data/weapons/W23_rear.tres`。C++ランは `cpp/behaviors/weapons/rear.cpp` が後方砲台からの全Lvの発射・取得と解除・復帰を扱い、表示は `scripts/render/equipment/rear.gd` が受け持つ | 射撃の釣り合いは試遊待ち。英語・素材は確認待ち |
 | No.04 | ストライクウィング | 周回する編隊が近い敵を分担して狙い、射撃時に標的へ向きを合わせて時間差の2連射で撃つ。各弾は命中済みの敵を個別に保持する | 近い敵を分担して撃つ | `scripts/weapons/interceptor.gd`、`data/weapons/W25_interceptor.tres` | 射撃の釣り合いは試遊待ち。英語・素材は確認待ち |
 | No.05 | エスコートウィング | ブーストでV字の編隊を展開し、横の敵を貫く。編隊は同じブーストで各敵に一度だけ追加直撃する | 群れの中央を通り左右も掃く | `scripts/weapons/dashRangeDrone.gd`、`data/weapons/W26_dashRangeDrone.tres` | 英語・素材・見た目は確認待ち |
-| No.06 | 震空 | 高速で触れた位置から空間の歪みを広げる。先頭で押し運んだ敵へ、先頭が抜けたところで威力を与える | 密集した群れを通る | `scripts/weapons/contactWave.gd`、`data/weapons/W04_contactWave.tres` | 英語・素材・見た目は確認待ち |
+| No.06 | 震空 | 高速で触れた位置から空間の歪みを広げる。先頭で押し運んだ敵へ、先頭が抜けたところで威力を与える | 密集した群れを通る | `scripts/weapons/contactWave.gd`、`data/weapons/W04_contactWave.tres`。C++ランは `cpp/behaviors/weapons/contactWave.cpp` が波ごとの捕捉ID・押し運び・一度だけの命中・解除と復帰を扱い、捕捉中の変形と `scripts/render/equipment/contactWave.gd` の閃光・画面の歪みへ渡す | 英語・素材・見た目は確認待ち |
 | No.07 | ソニックブーム | ブーストとそのあとの勢いの間、移動した距離ごとに音の輪が一斉に強く光る。後方の輪が重なる円錐のふちへ当たり、横へ押してから遅れて威力を与える。同じ敵には勢いを含むブーストごとに一度当たる | 長く群れを通り、進路の横を掃く | `scripts/weapons/sonic.gd`、`data/weapons/W08_sonic.tres` | 英語・素材・見た目は確認待ち |
 | No.08 | アークフィールド | 普段・高速の接触から周囲の敵へ黄の雷を枝分かれさせる。枝で追加対象枠を共有し、同じ敵には放電ごとに一度当たる。隕石を除く | 群れへ踏み込んで周囲へ雷を広げる | `scripts/weapons/contactArc.gd`、`data/weapons/W17_contactArc.tres`。レベルアップ後も再発動待ちを維持し、接触電撃のSEは停止する | 英語・素材・見た目は確認待ち |
 | No.09 | ミラージュ | 光の分身が実際のブースト経路を時間差でなぞり、通常の体当たりの威力を機数で分けて追撃する。分身による撃破は直撃で完結し、船体の牽引・星砕き・撃破時の武器や特性の発動を重ねない | 抜けた線へ分身を続けて通す | `scripts/weapons/afterimage.gd`、`data/weapons/W27_afterimage.tres` | 英語・素材・見た目は確認待ち |

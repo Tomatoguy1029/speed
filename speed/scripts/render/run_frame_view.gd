@@ -89,6 +89,8 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+var _contact_wave_visual: RefCounted
+var _contact_wave_world_time := -1.0
 var _knockback_visual: RefCounted
 var _knockback_world_time := -1.0
 var _vortex_visual: RefCounted
@@ -857,6 +859,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _vortex_visual!=null: _vortex_visual.dispose()
 		_vortex_visual = null
 		_vortex_world_time = -1.0
+		if _contact_wave_visual!=null: _contact_wave_visual.dispose()
+		_contact_wave_visual = null
+		_contact_wave_world_time = -1.0
 		if _knockback_visual!=null: _knockback_visual.dispose()
 		_knockback_visual = null
 		_knockback_world_time = -1.0
@@ -903,6 +908,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_rear_canvas.visible = equipped_rear and _ship_visible
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
 	_rear_canvas.queue_redraw()
+	var equipped_contact_wave: bool = frame.ui.get("contact_wave",{}).get("ready",false)
+	if equipped_contact_wave and _contact_wave_visual==null:
+		_contact_wave_visual = preload("res://scripts/render/equipment/contactWave.gd").new()
+		_contact_wave_visual.setup_frame(_layer(14),_pixel)
+	if not equipped_contact_wave and _contact_wave_visual!=null:
+		_contact_wave_visual.dispose()
+		_contact_wave_visual = null
+		_contact_wave_world_time = -1.0
 	var equipped_knockback: bool = frame.ui.get("knockback",{}).get("ready",false)
 	if equipped_knockback and _knockback_visual==null:
 		_knockback_visual = preload("res://scripts/render/equipment/knockback.gd").new()
@@ -1166,6 +1179,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var contact_wave_dt: float = 0.0 if _contact_wave_world_time<0.0 else maxf(0.0,ui.world_time-_contact_wave_world_time)
+	_contact_wave_world_time = ui.world_time if equipped_contact_wave else -1.0
+	if _contact_wave_visual!=null:
+		_contact_wave_visual.sync_frame(ui.contact_wave.waves,contact_wave_dt)
+		_contact_wave_visual.frame_tick(contact_wave_dt)
+	if pipeline!=null:
+		pipeline.sync_contact_ripples(ui.get("contact_wave",{}).get("waves",[]),_pixel)
+		ShaderTuning.apply(pipeline.ripple_material(),"weapon/contactWave")
 	var knockback_dt: float = 0.0 if _knockback_world_time<0.0 else maxf(0.0,ui.world_time-_knockback_world_time)
 	_knockback_world_time = ui.world_time if equipped_knockback else -1.0
 	if _knockback_visual!=null:

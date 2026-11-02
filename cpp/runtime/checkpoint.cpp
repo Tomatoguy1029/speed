@@ -46,6 +46,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     if (!std::isfinite(state.control.world_real_accum) || !std::isfinite(state.control.world_dt_accum) ||
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
+    for (const auto &w:state.loadout.contact_wave.waves) {
+        if (!w.pos.is_finite() || !std::isfinite(w.age) || !std::isfinite(w.radius) || !std::isfinite(w.damage) || w.age<0 || w.radius<0 || w.damage<0) return false;
+        for (const auto &h:w.caught) if (h.id<=0 || !std::isfinite(h.age) || h.age<0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
+    }
     state.rows_by_id.clear();
     std::unordered_set<size_t> visited,free;
     for (size_t group=0;group<state.behavior_rows.size();++group) {

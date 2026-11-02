@@ -2,6 +2,7 @@
 #include "../cpp/systems/attacks/wall.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
 #include "../cpp/behaviors/traits/runUp.h"
+#include "../cpp/systems/equipment.h"
 #include "../cpp/behaviors/enemies/shield.h"
 #include "../cpp/systems/field.h"
 #include "geometry.h"
@@ -176,6 +177,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
                 const double loss = enemy.dead ? (0.004 + enemy.radius * 0.0006) : (0.1 + enemy.radius * 0.002);
                 runtime.state.ship.vel *= 1.0 - std::min(0.6, loss);
             }
+            speed::EquipmentSystem::contact(runtime,position);
             speed::RunUpBehavior::contact(runtime,position,direction,result.applied);
             continue;
         }
@@ -192,6 +194,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         runtime.state.ship.boost_t = 0;
         if (gate==speed::GateResult::Allow) damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
         enemy.hit_cd = 0.25;
+        speed::EquipmentSystem::contact(runtime,position);
         speed::RunUpBehavior::contact(runtime,position,direction,0);
         Dictionary bounce; bounce["pos"] = runtime.state.ship.pos; emit_event("bounce", bounce);
         runtime.state.ship_pos = runtime.state.ship.pos;
