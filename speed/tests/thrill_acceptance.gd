@@ -1259,7 +1259,9 @@ func _test_cpp_natural(stage: int, definition: StageDef) -> void:
 		return
 	var saw := {"early":false,"growth":false,"late":false,"boss":false,"fired":false,"ended":false}
 	var event_counts := {}
+	var observed := {"frame":{}}
 	owner.bridge.subscribe("S進行記録",func(frame: Dictionary):
+		observed.frame = frame
 		for event: Dictionary in frame.events:
 			var kind := str(event.type)
 			event_counts[kind] = int(event_counts.get(kind,0))+1
@@ -1281,7 +1283,10 @@ func _test_cpp_natural(stage: int, definition: StageDef) -> void:
 		if not step.ok:
 			_check(false,"通常固定更新に未対応処理や通知エラーがない: "+str(step))
 			break
-		frame = owner.bridge.read_frame().value
+		if not owner.bridge.delivery_error.is_empty() and not owner.bridge.delivery_error.ok:
+			_check(false,"表示通知の配信を完了する: "+str(owner.bridge.delivery_error))
+			break
+		frame = observed.frame
 		saw.early = saw.early or frame.ui.run_time>=10.0
 		saw.growth = saw.growth or frame.ui.level>1
 		saw.late = saw.late or frame.ui.run_time>=definition.boss_start(ContentManager.cfg)-1.0
