@@ -1,6 +1,6 @@
 [gd_resource type="Resource" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/fan_volley.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/centaurus/fan_volley.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/fan_volley_visual.tscn" id="visual"]
 
 [ext_resource type="PackedScene" path="res://scenes/attacks/owned/centaurus_fan_volley.tscn" id="effect_owner"]

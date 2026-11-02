@@ -51,13 +51,13 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot",&"stomp"]: return {}
+	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot",&"stomp",&"fan_volley"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusFanDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
 	var boss := {"id":1,"external_id":"centaurus","kind":1,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
 	records.BossDefinition = [boss]
-	if move.technique in [&"volley",&"rain",&"power_shot"]:
+	if move.technique in [&"volley",&"rain",&"power_shot",&"fan_volley"]:
 		var visual: AttackVisual = source.shot_visual.instantiate()
 		visual._apply_effect_settings()
 		var style := {"id":1,"cosmic":move.technique==&"power_shot","contact":1,"flight_scale":visual.flight_scale}
@@ -75,9 +75,13 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9 if move.technique==&"rear_attack" else 10 if move.technique==&"rain" else 11 if move.technique==&"power_shot" else 12,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9 if move.technique==&"rear_attack" else 10 if move.technique==&"rain" else 11 if move.technique==&"power_shot" else 12 if move.technique==&"stomp" else 13,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage","speed"]: row[key] = float(values.get(key,0.0))
-		if move.technique==&"stomp":
+		if move.technique==&"fan_volley":
+			row.active = (int(values.shots)-1)*float(values.interval)
+			records.BossTechniqueDefinition.append(row)
+			records.CentaurusFanDefinition.append({"id":phase,"technique":phase,"shots":int(values.shots),"count":int(values.count),"interval":float(values.interval),"spread":deg_to_rad(float(values.spread)),"radius":float(values.radius),"length":float(values.length),"travel":float(values.travel),"projectile":1})
+		elif move.technique==&"stomp":
 			row.active = float(values.active)
 			records.BossTechniqueDefinition.append(row)
 			records.CentaurusStompDefinition.append({"id":phase,"technique":phase,"radius":float(values.range_radius),"half_angle":deg_to_rad(float(values.half_angle))})
@@ -148,6 +152,7 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 	for volley in records.CentaurusVolleyDefinition: volley.projectile += offset
 	for rain in records.CentaurusRainDefinition: rain.projectile += offset
 	for power in records.CentaurusPowerDefinition: power.projectile += offset
+	for fan in records.CentaurusFanDefinition: fan.projectile += offset
 	for key in records:
 		if key!="LightArrowDefinition": package.records[key] = records[key]
 	for scene: PackedScene in [move.get("shot_visual"),move.visual]:

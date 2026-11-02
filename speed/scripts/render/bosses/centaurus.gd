@@ -164,7 +164,7 @@ func _draw() -> void:
 		draw_arc(Vector2(-14, 0), 60.0 + grow * 90.0, 0.0, TAU, 32, Color(sail_star_color, 0.8 * (1.0 - grow)), pixel_size * 2.0)
 	if pulse > 0.0:
 		draw_arc(Vector2(62, 0), 30.0 + (0.3 - pulse) * 80.0, 0.0, TAU, 20, Color(STRING, pulse * 2.5), pixel_size)
-	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain","power_shot"]:
+	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain","power_shot","fan_volley"]:
 		var pull := Vector2(62.0+cos(1.1)*26.0-float(state.charge)*34.0,0.0)
 		var power: bool = technique.get("technique","")=="power_shot"
 		var glow := DANGER if bool(technique.get("alerting",false)) else WARNING

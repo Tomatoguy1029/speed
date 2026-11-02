@@ -138,6 +138,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->centaurus_rears=records.CentaurusRearDefinition_rows;
     bundle->centaurus_rains=records.CentaurusRainDefinition_rows;
     bundle->centaurus_powers=records.CentaurusPowerDefinition_rows;
+    bundle->centaurus_fans=records.CentaurusFanDefinition_rows;
     bundle->centaurus_stomps=records.CentaurusStompDefinition_rows;bundle->centaurus_stomp_feet=records.CentaurusStompFoot_rows;
     bundle->boss_finish=records.BossFinishDefinition_rows;
     if (bundle->boss_finish.size()>1 || (!bundle->boss_finish.empty() && (bundle->boss_finish.front().id!=1 || bundle->boss_finish.front().zoom<=0))) return {};
@@ -150,9 +151,13 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
-        if (p.id!=i+1 || p.kind>12 || p.active<=0 || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":"stomp")) return {};
+        if (p.id!=i+1 || p.kind>13 || (p.active<=0 && p.kind!=13) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":"fan_volley")) return {};
         std::vector<BossTechniqueStage> stages;
         for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
+        if (p.kind==13) {
+            const auto fan=std::find_if(bundle->centaurus_fans.begin(),bundle->centaurus_fans.end(),[&](const auto &v){return v.technique==p.id;});
+            if (fan==bundle->centaurus_fans.end() || bundle->bosses[p.boss-1].kind!=1 || p.speed<=0 || fan->radius<=0 || fan->travel<=0 || !stages.empty() || p.active!=(fan->shots-1)*fan->interval) return {};continue;
+        }
         if (p.kind==12) {
             const auto stomp=std::find_if(bundle->centaurus_stomps.begin(),bundle->centaurus_stomps.end(),[&](const auto &v){return v.technique==p.id;});
             if (stomp==bundle->centaurus_stomps.end() || bundle->bosses[p.boss-1].kind!=1 || !stages.empty()) return {};
@@ -197,6 +202,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             commands[stage.command]=true;prior=stage.at;
         }
     }
+    for (size_t i=0;i<bundle->centaurus_fans.size();++i) if (bundle->centaurus_fans[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_fans[i].technique-1].kind!=13) return {};
     for (size_t i=0;i<bundle->centaurus_stomps.size();++i) if (bundle->centaurus_stomps[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_stomps[i].technique-1].kind!=12) return {};
     for (size_t i=0;i<bundle->centaurus_stomp_feet.size();++i) if (bundle->centaurus_stomp_feet[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_stomp_feet[i].technique-1].kind!=12) return {};
     for (size_t i=0;i<bundle->centaurus_powers.size();++i) if (bundle->centaurus_powers[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_powers[i].technique-1].kind!=11) return {};
