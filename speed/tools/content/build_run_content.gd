@@ -34,6 +34,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	row.sprite_angle = PI/2.0 if definition.id in EnemyDef.NATIVE_SPRITES else -PI/2.0
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
+	data.GravityDefinition = [{"id":1,"life":config.gravity_life,"radius":config.gravity_radius,"pull":config.gravity_pull}]
 	data.RunConfig = [{"id":1,"aim_lag":resolved.motion.aim_lag,"aim_speed":resolved.motion.aim_speed,"crystal_low":config.xp_crystal_values[0],"crystal_mid":config.xp_crystal_values[1],"crystal_high":config.xp_crystal_values[2]}]
 	for field in Schema.SCHEMA.records[0].fields:
 		if field.has("config"): data.RunConfig[0][field.name] = config.get(field.config)
@@ -543,6 +544,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.ContactDefinition = resolved.ContactDefinition
 		data.BeamDefinition = resolved.BeamDefinition
 		data.WaveDefinition = resolved.WaveDefinition
+		data.GravityDefinition = resolved.GravityDefinition
 		data.WallDefinition = resolved.WallDefinition
 		data.SlashDefinition = resolved.SlashDefinition
 		data.BoltDefinition = resolved.BoltDefinition

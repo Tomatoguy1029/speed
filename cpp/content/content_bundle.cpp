@@ -143,6 +143,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->lifecycle=records.LifecycleDefinition_rows.front();
     bundle->field_bodies=records.FieldBodyDefinition_rows;
     for (const auto &body:bundle->field_bodies) if (body.radius<=0) return {};
+    if (records.GravityDefinition_rows.size()!=1 || records.GravityDefinition_rows.front().life<=0) return {};
+    bundle->gravity=records.GravityDefinition_rows.front();
+    for (double value:{bundle->gravity.life,bundle->gravity.radius,bundle->gravity.pull}) if (!std::isfinite(float(value))) return {};
     bundle->rock_fields=records.RockFieldDefinition_rows;
     if (bundle->rock_fields.size()>1) return {};
     bundle->moon_definitions=records.MoonDefinition_rows;

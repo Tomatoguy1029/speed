@@ -2,6 +2,7 @@
 #include "collision_query.h"
 #include "../output/frame_builder.h"
 #include <cmath>
+#include <algorithm>
 #include <limits>
 #include <godot_cpp/core/math.hpp>
 namespace speed {
@@ -105,6 +106,7 @@ bool FieldSystem::validate(const godot::RunState &state,const ContentBundle &con
             !std::isfinite(rock.size) || rock.size<=0 || !std::isfinite(rock.facing) || !std::isfinite(rock.spin) || !std::isfinite(rock.born) || !std::isfinite(rock.gone)) return false;
         if (state.enemy_handles.contains(rock.proxy) && !same_handle(state.enemies[rock.proxy.slot].rock,state.field.rock_handles.at(i))) return false;
     }
+    for (const auto &w:state.field.wells) if (!w.position.is_finite() || !std::isfinite(w.born) || !std::isfinite(w.life) || w.life<=0 || !std::isfinite(w.radius) || w.radius<0 || !std::isfinite(w.pull) || w.pull<0) return false;
     return std::isfinite(state.field.stream_t);
 }
 std::vector<SightBlocker> FieldSystem::sight_blockers(const RunRuntime &run,godot::Vector2 lens,double length) {
@@ -124,6 +126,42 @@ double FieldSystem::sight_reach(godot::Vector2 direction,double length,const std
         if (perpendicular<=double(b.radius)*b.radius) reach=std::min(reach,std::max(0.0,along-std::sqrt(std::max(0.0,double(b.radius)*b.radius-perpendicular))));
     }
     return reach;
+}
+
+namespace {
+godot::Vector2 well_pull(godot::Vector2 center,godot::Vector2 at,double reach,double strength) {
+    const auto delta=center-at;const double distance=delta.length();if (distance>=reach || distance<1.0) return {};
+    return delta/distance*strength*(1.0-distance/reach);
+}
+}
+bool FieldSystem::add_well(RunRuntime &r,godot::Vector2 position,double life,double radius,double pull) {
+    if (!position.is_finite() || !std::isfinite(life) || life<=0 || !std::isfinite(radius) || radius<0 || !std::isfinite(pull) || pull<0 || !std::isfinite(float(radius)) || !std::isfinite(float(pull))) return false;
+    r.state.field.wells.push_back({position,r.state.world_time,life,radius,pull});return true;
+}
+bool FieldSystem::spawn_well(RunRuntime &r) {
+    auto &s=r.state;godot::Vector2 position;
+    for (int attempt=0;attempt<8;++attempt) {
+        const double x=s.control.rng.randf_range(-0.7,0.7)*s.view_half.x;const double y=s.control.rng.randf_range(-0.7,0.7)*s.view_half.y;position=s.view_center+godot::Vector2(x,y);
+        if (position.distance_to(s.ship.pos)>300 && body_gap(r,position,0)>100) break;
+    }
+    const auto &p=r.content->gravity;return add_well(r,position,p.life,p.radius,p.pull);
+}
+void FieldSystem::step_gravity(RunRuntime &r,double dt) {
+    if (dt<=0) return;auto &s=r.state;auto &wells=s.field.wells;const double now=s.world_time;
+    wells.erase(std::remove_if(wells.begin(),wells.end(),[&](const auto &w){return now-w.born>=w.life;}),wells.end());
+    const bool fast=s.draw.tracing || s.ship.glide || s.ship.vel.length()>=s.ship_config.max_speed*s.combat_config.ram_speed_ratio;
+    for (const auto &well:wells) {
+        const double k=1.0-(now-well.born)/well.life,reach=well.radius*k,strength=well.pull*k*dt;
+        if (!fast) s.ship.vel+=well_pull(well.position,s.ship.pos,reach,strength);
+        for (auto &e:s.enemies) if (e.alive && !e.dead && !e.is_boss && !s.field.rock_handles.contains(e.rock) && !e.parent.generation) e.vel+=well_pull(well.position,e.pos,reach,strength);
+        for (auto &shot:s.hostiles) if (shot.alive) shot.vel+=well_pull(well.position,shot.pos,reach,strength);
+    }
+}
+void FieldSystem::comet_gravity(RunRuntime &r,const DeathContext &death) {
+    const auto cause=death.request.cause;
+    if (cause==Cause::None || cause==Cause::Wave || cause==Cause::Chain || cause==Cause::PumpBurst || cause==Cause::Marlin || cause==Cause::Collapse || !r.state.enemy_handles.contains(death.target)) return;
+    const auto rock=r.state.enemies[death.target.slot].rock;if (!r.state.field.rock_handles.contains(rock)) return;const auto &source=r.state.field.rocks[rock.slot];
+    if (source.kind!=RockKind::Comet || source.rare_weapon) return;const auto &p=r.content->gravity;add_well(r,death.corpse.pos,p.life,p.radius,p.pull);
 }
 
 }

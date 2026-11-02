@@ -19,6 +19,7 @@ struct FieldRock {
     bool destroyed=false,manual=false;
     EnemyHandle proxy;
 };
+struct GravityWell {godot::Vector2 position;double born=0,life=0,radius=0,pull=0;};
 struct FieldState {bool ready=false;double body_speed_max=0;std::vector<FieldBody> bodies;
-    double stream_t=0;std::vector<FieldRock> rocks;EntityStore<RockTag> rock_handles;};
+    double stream_t=0;std::vector<GravityWell> wells;std::vector<FieldRock> rocks;EntityStore<RockTag> rock_handles;};
 }

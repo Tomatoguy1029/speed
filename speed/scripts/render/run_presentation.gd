@@ -804,18 +804,19 @@ func _draw_field(c: CanvasItem) -> void:
 		for n in 3:
 			var a0 := state.world_time * (2.0 + n) + n * 2.1
 			c.draw_arc(f.warp_pos, wr * (0.5 + 0.2 * n), a0, a0 + PI * 1.4, 24, Color(0.85, 0.7, 1.0, 0.8), _px(3.0))
-	# 重力：縮みながら渦を巻く
-	for w in f.wells:
-		var k := 1.0 - (state.world_time - w.born) / w.life
-		var reach := w.radius * k
-		c.draw_circle(w.pos, reach, Color(0.35, 0.2, 0.6, 0.12))
-		for n in 3:
-			var rr := reach * fposmod(1.0 - state.world_time * 0.6 - n / 3.0, 1.0)
-			c.draw_arc(w.pos, maxf(rr, 1.0), 0, TAU, 40, Color(0.7, 0.55, 1.0, 0.35), _px(2.0))
-		c.draw_circle(w.pos, maxf(6.0, reach * 0.08), Color(0.08, 0.02, 0.15, 0.9))
+	for well in f.wells: draw_gravity(c,well.pos,well.born,well.life,well.radius,state.world_time,_px(1.0))
 	for b in f.bodies:
 		if view.grow(b.r).has_point(b.pos):
 			_body_visual.draw(c, b)
+
+## 重力の渦を、旧ランと値型フレームで共用する。
+static func draw_gravity(c: CanvasItem, position: Vector2, born: float, life: float, radius: float, now: float, pixel: float) -> void:
+	var reach := radius*(1.0-(now-born)/life)
+	c.draw_circle(position,reach,Color(0.35,0.2,0.6,0.12))
+	for n in 3:
+		var r := reach*fposmod(1.0-now*0.6-n/3.0,1.0)
+		c.draw_arc(position,maxf(r,1.0),0,TAU,40,Color(0.7,0.55,1.0,0.35),pixel*2.0)
+	c.draw_circle(position,maxf(6.0,reach*0.08),Color(0.08,0.02,0.15,0.9))
 
 ## 英雄の星座：全体から淡金色の光がにじみ、つないだ星と光線がさらに強く輝く。
 func _draw_hero(c: CanvasItem) -> void:

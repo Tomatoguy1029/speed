@@ -10,6 +10,11 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-gravity" in OS.get_cmdline_user_args():
+		await check_cpp_gravity()
+		print("[cpp_gravity] %d failures" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-rocks" in OS.get_cmdline_user_args():
 		await check_cpp_rocks()
 		check(rocks_finished,"岩の確認本体が最後まで進んだ")
@@ -477,3 +482,136 @@ func check_cpp_rocks() -> void:
 	await get_tree().process_frame
 	session.free()
 	rocks_finished = true
+
+func gravity_enemy(core, id: int) -> Dictionary:
+	for enemy: Dictionary in core.enemies_snapshot():
+		if enemy.id==id: return enemy
+	return {}
+
+func check_cpp_gravity() -> void:
+	mute_checks = "--cpp-gravity-tail" in OS.get_cmdline_user_args()
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 1200.0
+	cfg.planet_radius = 0.0
+	cfg.world_tick_div = 1
+	cfg.gravity_life = 0.5
+	cfg.gravity_radius = 500.0
+	cfg.gravity_pull = 1000.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 57
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter","hydra_bite"])
+	var output := "res://.content/dev/run_gravity"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"重力の吸引と世界時計".sha256_text())
+	check(built==OK,"重力の編集値を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_57.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":574},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"重力のあるランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	fixed_step(bridge)
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	core.set_motion_context(target,target,Vector2(640,360))
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed":574,"empty":true,"field":{"terrain":false,"rocks":false,"gimmicks":false},"config":{"start_radius":1200.0,"planet_radius":0.0,"gravity_life":0.5,"gravity_radius":500.0,"gravity_pull":1000.0}})
+	var run: RunSimulation = lab.run
+	run.state.ship_pos = target
+	run.state.ship_vel = Vector2.ZERO
+	run.state.world_time = core.inspect().world_time
+	var center := target+Vector2(100,0)
+	var point := target+Vector2(0,80)
+	var row := run.enemies.spawn(run.enemies.def_of(&"drifter"),point)
+	var id: int = core.spawn_enemy(&"drifter",point,{"guard":100.0})
+	var boss_row := run.enemies.spawn(run.enemies.def_of(&"drifter"),point)
+	run.enemies.table.is_boss[boss_row] = 1
+	var boss: int = core.spawn_enemy(&"drifter",point,{"is_boss":true})
+	var part_row := run.enemies.spawn_part(boss_row,run.enemies.def_of(&"hydra_bite"),point)
+	var part: int = bridge.command("dev_spawn_part",{"parent_id":boss,"definition_id":"hydra_bite","position":point}).value
+	for enemy_id in [id,boss,part]: core.set_enemy_motion(enemy_id,{"held":true})
+	bridge.command("dev_add_rock",{"position":point,"kind":0,"manual":true})
+	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
+	var rock: int = bridge.command("dev_field_query",{"action":"rocks"}).value[0].enemy_id
+	var rock_row := run.enemies.spawn(run.enemies.def_of(&"meteor"),point,{"meteor_index":0})
+	var shot := run.projectiles._add_hostile(point,Vector2(0,20),20.0,7.0,4.0,1.0,0.0,0.0,ProjectileSystem.HostileKind.BULLET)
+	core.spawn_hostile({"kind":0,"pos":point,"vel":Vector2(0,20),"speed":20.0,"r":7.0,"life":4.0,"dmg":1.0,"slow":0.0,"turn":0.0})
+	run.field.add_well(center,0.5,500.0,1000.0)
+	check(bridge.command("dev_add_well",{"position":center,"life":0.5,"radius":500.0,"pull":1000.0}).ok,"同じ位置と世界寿命の重力を生成する")
+	core.step(0.1)
+	run.state.world_time += 0.1
+	run.field.gimmick(&"gravity").tick(0.1,0.1)
+	bridge.command("dev_tick_gravity",{"dt":0.1})
+	check(core.ship_snapshot().ship_vel.is_equal_approx(run.state.ship_vel) and run.state.ship_vel.x>0.0,"低速の機体を現行と同じ強さで中心へ引く")
+	var actual := gravity_enemy(core,id)
+	check(Vector2(actual.vel[0],actual.vel[1]).is_equal_approx(run.enemies.table.vel[row]) and core.hostiles_snapshot()[0].vel.is_equal_approx(run.projectiles.hostile_vel[shot]),"普通の敵と敵弾を同じ吸引で動かす")
+	for enemy_id in [boss,part,rock]:
+		actual = gravity_enemy(core,enemy_id)
+		check(Vector2(actual.vel[0],actual.vel[1])==Vector2.ZERO,"ボス・部位・岩を重力で引かない")
+	var velocity: Vector2 = core.ship_snapshot().ship_vel
+	bridge.command("dev_tick_gravity",{"dt":0.0})
+	check(core.ship_snapshot().ship_vel==velocity,"世界dtが0なら吸引を重ねない")
+	for fast in [true,false]:
+		var speed := Vector2.ZERO if fast else Vector2(100000,0)
+		run.state.glide = fast
+		run.state.ship_vel = speed
+		bridge.command("dev_ship_motion",{"position":target,"velocity":speed,"glide":fast})
+		core.step(0.1)
+		run.state.world_time += 0.1
+		run.field.gimmick(&"gravity").tick(0.1,0.1)
+		bridge.command("dev_tick_gravity",{"dt":0.1})
+		check(core.ship_snapshot().ship_vel==speed and run.state.ship_vel==speed,"滑空中と閾値以上の機体を重力で引かない")
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(frame.gravity.wells.size()==5 and is_equal_approx(frame.gravity.time,run.state.world_time) and presentation.frame_view.apply_frame(frame),"同じ世界時計で縮む渦と三本の輪を通常画面へ表示する")
+	await get_tree().process_frame
+	var pending: Dictionary = bridge.checkpoint()
+	var clock: float = core.inspect().world_time
+	bridge.command("pause",{"paused":true})
+	fixed_step(bridge)
+	check(core.inspect().world_time==clock and core.ship_snapshot().ship_vel==Vector2(100000,0),"停止中は重力の期限と吸引を進めない")
+	bridge.command("pause",{"paused":false})
+	fixed_step(bridge)
+	run.state.world_time += 1.0/120.0
+	run.field.gimmick(&"gravity").tick(1.0/120.0,1.0/120.0)
+	actual = gravity_enemy(core,id)
+	check(Vector2(actual.vel[0],actual.vel[1]).is_equal_approx(run.enemies.table.vel[row]),"再開後は通常Runnerの世界更新で吸引を一度だけ進める")
+	var future: Array = core.enemies_snapshot()
+	check(bridge.restore(pending.value).ok,"重力の位置・生成時刻・寿命を値から復帰する")
+	fixed_step(bridge)
+	check(core.enemies_snapshot()==future,"復帰後の世界更新でも吸引を重ねず同じ結果へ進む")
+	core.step(0.3)
+	bridge.command("dev_tick_gravity",{"dt":0.3})
+	check(bridge.command("dev_field_query",{"action":"wells"}).value.is_empty(),"世界寿命で重力が消滅し定期発生を始めない")
+	frame = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	check(frame.gravity.wells.is_empty() and presentation.frame_view.apply_frame(frame),"寿命終了後の渦を通常表示から消す")
+	core.set_motion_context(target,target,Vector2(640,360))
+	# 配置条件は現行と同じにし、乱数列は設計17.1のPCG32を使う。
+	mute_checks = false
+	check(core.inspect().rng_state=="8101019391883367851","配置直前の戦闘乱数を保持する")
+	check(bridge.command("dev_spawn_well",{}).ok,"明示したランダム配置の重力を生成する")
+	var well: Dictionary = bridge.command("dev_field_query",{"action":"wells"}).value[0]
+	var expected := target+Vector2((-0.7+1.4*372258371.0/4294967296.0)*640.0,(-0.7+1.4*2721001807.0/4294967296.0)*360.0)
+	check(well.position==expected and well.life==0.5 and well.radius==500.0 and well.pull==1000.0 and core.inspect().rng_state=="-5510157158986812203","配置の距離条件・編集値とPCG32の二つの出力を保持する")
+	var count: int = bridge.command("dev_field_query",{"action":"wells"}).value.size()
+	for cause in ["wave","bullet"]:
+		var now: float = core.inspect().world_time
+		check(bridge.command("dev_add_rock",{"position":target+Vector2(250,250),"kind":4,"manual":true,"born":now,"gone":now+10.0}).ok,"寿命を持つ通常の彗星を生成する")
+		bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
+		var rocks: Array = bridge.command("dev_field_query",{"action":"rocks"}).value
+		var comet: int = rocks.back().enemy_id
+		var killed: Dictionary = bridge.command("dev_kill",{"entity_id":comet,"cause":cause})
+		check(comet>0 and killed.ok and killed.value.killed,"通常の彗星を共通撃破へ渡す")
+		if cause=="bullet": count += 1
+		check(bridge.command("dev_field_query",{"action":"wells"}).value.size()==count,"敵の波の破壊では増やさず機体側の彗星撃破で重力を一つ残す")
+	bridge.release_checkpoint(pending.value)
+	lab.free()
+	session.free()

@@ -206,6 +206,35 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "GravityDefinition",
+      "section": 77,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0,
+          "config": "gravity_life"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0,
+          "config": "gravity_radius"
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0,
+          "config": "gravity_pull"
+        }
+      ]
     }
   ],
   "enums": {

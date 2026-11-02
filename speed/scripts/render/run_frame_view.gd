@@ -35,6 +35,8 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _gravity := {}
+var _gravity_canvas: DrawLayer
 var _reticle := PackedFloat32Array()
 var _soldier := PackedFloat32Array()
 var _mutiny_beams: Array[Dictionary] = []
@@ -148,6 +150,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		for effect: Dictionary in _shield_transfers:
 			preload("res://scripts/render/shield_visual.gd").transfer(canvas,effect,_ship_visual_position)
 
+	_gravity_canvas = DrawLayer.new()
+	_gravity_canvas.draw_fn = func(canvas: CanvasItem):
+		var values: PackedFloat64Array = _gravity.get("wells",PackedFloat64Array())
+		for n in range(0,values.size(),5): RunPresentation.draw_gravity(canvas,Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],_gravity.time,1.0/maxf(_zoom,0.01))
+	_layer(1).add_child(_gravity_canvas)
 	_gunner_marks = DrawLayer.new()
 	_gunner_marks.draw_fn = func(canvas: CanvasItem):
 		var began := Time.get_ticks_usec() if perf.active else 0
@@ -249,6 +256,13 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
+	if frame.has("gravity"):
+		var wells = frame.gravity
+		if not wells is Dictionary or not wells.get("wells") is PackedFloat64Array or wells.wells.size()%5!=0 or not (wells.get("time") is float or wells.get("time") is int) or not is_finite(wells.time): return false
+		for value: float in wells.wells:
+			if not is_finite(value): return false
+		for n in range(0,wells.wells.size(),5):
+			if wells.wells[n+3]<=0.0 or wells.wells[n+4]<0.0: return false
 	if frame.has("pulser"):
 		if not frame.pulser is PackedFloat64Array or frame.pulser.size()%6!=0: return false
 		for value in frame.pulser:
@@ -534,6 +548,9 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Dictionary in _shape_displays.values():
 		display.node.visible = display.used
 		if display.circles!=display.previous_circles: display.node.queue_redraw()
+	if frame.has("gravity") and frame.gravity!=_gravity:
+		_gravity = frame.gravity
+		_gravity_canvas.queue_redraw()
 	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
 	if frame.has("marlin"): _marlin_visual.apply_frame(frame.marlin,_sniper_world_time,_zoom)
 	for row: Dictionary in frame.poses:

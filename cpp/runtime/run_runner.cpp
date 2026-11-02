@@ -69,6 +69,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (state.world.attack_budget.frame_enabled) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
         FieldSystem::update(core.runtime);
         FieldSystem::stream_rocks(core.runtime,wd);
+        FieldSystem::step_gravity(core.runtime,wd);
         // ボスは各種類の移植で、この世界更新区間へ接続する。
         core.advance_enemies(wd);
         if (!core.avoid_strong(wd)) return false;

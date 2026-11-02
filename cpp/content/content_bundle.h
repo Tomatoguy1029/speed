@@ -66,6 +66,7 @@ struct ContentBundle {
     std::vector<FieldBodyDefinition> field_bodies;
     std::vector<MoonDefinition> moon_definitions;
     std::vector<RockFieldDefinition> rock_fields;
+    GravityDefinition gravity;
     std::vector<LoadoutDefinition> equipment;
     std::vector<LoadoutAsset> equipment_assets;
     std::vector<NumericTraitLevel> numeric_traits;

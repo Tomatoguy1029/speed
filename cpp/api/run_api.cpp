@@ -315,7 +315,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_fire_beam" || kind=="dev_move_beam" || kind=="dev_fire_cross" || kind=="dev_fire_flood") response=development_beam_command(kind,payload);
     else if (kind=="dev_fire_enemy" || kind=="dev_fire_missile" || kind=="dev_stone_hostiles") response=development_hostile_command(kind,payload);
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
-    else if (kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
+    else if (kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
     else if (kind=="dev_contact") response=development_contact_command(payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);

@@ -165,6 +165,9 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (!view.grow(radius+p.width*26).has_point(e.pos)) continue;
         for (double value:{double(e.pos.x),double(e.pos.y),radius,p.width,1.0-std::clamp(e.timer/std::max(p.warn,0.001),0.0,1.0),double(e.id%4093)}) pulser.push_back(value);
     }
+    Dictionary gravity;PackedFloat64Array well_values;
+    for (const auto &well:state.field.wells) for (double value:{double(well.position.x),double(well.position.y),well.born,well.life,well.radius}) well_values.push_back(value);
+    gravity["time"]=state.world_time;gravity["wells"]=well_values;
     Dictionary marlin;PackedInt64Array marlin_ids;PackedFloat64Array marlin_values;
     for (size_t i=0;i<state.enemies.size();++i) {
         const auto &e=state.enemies[i];if (!e.alive || e.dead || e.held || e.stone>0) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Marlin) continue;
@@ -200,6 +203,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;return out;
+    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;return out;
 }
 }
