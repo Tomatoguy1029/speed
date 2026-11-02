@@ -1,11 +1,12 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
 namespace speed {class HydraNormalAttack {public:
-    static bool supports(uint32_t kind) {return (kind>=64 && kind<=68) || kind==80 || kind==81 || kind==91 || kind==92;}
+    static bool supports(uint32_t kind) {return (kind>=64 && kind<=68) || kind==80 || kind==81 || kind==75 || kind==91 || kind==92;}
     static void step_thunder(RunRuntime &,TechniqueState &,double);
     static void lightning(RunRuntime &,BossBodyState &,TechniqueState &,godot::Vector2,double,const HydraThunderDefinition &);
     static void step_headbutt(RunRuntime &,TechniqueState &,double);
     static void step_thrust(RunRuntime &,TechniqueState &,double,const HydraThunderDefinition * = nullptr);
+    static void step_wind(RunRuntime &,TechniqueState &,double);
     static void step_blades(RunRuntime &,TechniqueState &,double);
     static void step_fixed(RunRuntime &,TechniqueState &,double);
     static void step_rubble(RunRuntime &,TechniqueState &,double);

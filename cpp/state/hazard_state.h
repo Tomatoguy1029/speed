@@ -37,7 +37,7 @@ struct CanisHoundLungeHazard {
     double until=0,last_world_time=-1;
     bool sweep=true,shared_hit=false,overwrite_velocity=true,release_on_cancel=true,release_on_end=true,defer_first_contact=false,manual_retained=false;
 };
-struct HydraShapeHazard {std::vector<godot::Vector2> points;double width=0;std::vector<godot::Vector2> before,last_points;godot::Vector2 velocity;double age=0,delay=0,life=0;EnemyHandle follow;double fill=1;std::vector<godot::Vector3> feed;};
+struct HydraShapeHazard {std::vector<godot::Vector2> points;double width=0;std::vector<godot::Vector2> before,last_points;godot::Vector2 velocity;double age=0,delay=0,life=0,wind_force=0;EnemyHandle follow;double fill=1;std::vector<godot::Vector3> feed;};
 struct HazardState {
     godot::Vector2 pos;
     float time=0,delay=0,duration=0;

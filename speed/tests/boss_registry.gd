@@ -9,6 +9,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-wind-resource" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_wind_resource")
+		return
+	if "--cpp-hydra-wind" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_wind")
+		return
 	if "--cpp-hydra-headbutt-loss" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_headbutt_loss")
 		return
@@ -5425,3 +5431,88 @@ func native_hydra_headbutt_loss() -> void:
 		check(b.command("dev_boss_body_state").value[0].effects.is_empty(),"踏み込み中と落雷後の参加首消失で首所有の判定を回収する")
 		b.dispose()
 	print("[cpp_hydra_headbutt_loss] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_wind() -> void:
+	var edits := {"normal_charge":0.15,"wind_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"wind_length":300.0,"wind_width":90.0,"wind_force":400.0}
+	hydra_wind_resource_check()
+	var c := hydra_normal_case(true,{},edits,"wind_band")
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	var events: Array=[];bridge.subscribe("風の帯の記録",func(packet):events.append_array(packet.events);return true)
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0];var head: Dictionary=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*200.0,"velocity":Vector2.ZERO})
+	for tick in 100:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==75,"共通フローが渦の首から風の帯を自然に選ぶ")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	bridge._core.step(0.08);bridge._core.step_hazards(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty() and body.necks[1].glow>0.0 and not body.necks[1].locked,"予告中は狙いと発光だけを更新し風を出さない")
+	bridge._core.step(0.08);bridge._core.step_hazards(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[1].locked and body.effects.size()==1 and body.effects[0].kind=="wind" and is_equal_approx(body.effects[0].wind_force,400.0) and is_equal_approx(body.effects[0].life,0.4),"溜め後に押す力と寿命を持つ無害な風の線分を作る")
+	var first: Dictionary=body.effects[0].duplicate(true)
+	bridge.command("dev_ship_motion",{"position":Vector2(900,-600),"velocity":Vector2.ZERO});bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects[0].points==first.points,"分離前の風の起点と向きを固定する")
+	var firing: Dictionary=bridge.checkpoint();var point: Vector2=first.points[0].lerp(first.points[1],0.5);var direction: Vector2=(first.points[1]-first.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2.ZERO})
+	var held: Dictionary=bridge.checkpoint();var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025);body=bridge.command("dev_boss_body_state").value[0];var ship: Dictionary=bridge._core.ship_snapshot()
+	check(ship.ship_vel.distance_to(direction*400.0*0.025)<0.001 and ship.ship_hp==hp and ship.ship_hurt==0.0 and ship.ship_invuln==0.0,"接触はforce×世界dtだけ押し、倍率・ダメージ・被弾表示・無敵時間を付けない")
+	var expected: Dictionary=body.duplicate(true);var expected_velocity: Vector2=ship.ship_vel
+	check(held.ok and bridge.restore(held.value).ok,"風の形・力・時計と機体速度を保持して戻す");bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(bridge.command("dev_boss_body_state").value[0]==expected and bridge._core.ship_snapshot().ship_vel==expected_velocity,"復帰後も同じ押し出しと形へ進む")
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(bridge._core.ship_snapshot().ship_vel.distance_to(direction*20.0)<0.001,"同じ風に触れている間は毎tick押し出す")
+	bridge.restore(firing.value);bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2.ZERO,"glide":true});bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(bridge._core.ship_snapshot().ship_vel==Vector2.ZERO,"滑空中は風で速度を足さない")
+	bridge.restore(firing.value);bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2(c.cfg.base_max_speed,0)});bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(bridge._core.ship_snapshot().ship_vel==Vector2(c.cfg.base_max_speed,0),"最高速度ちょうどでは風で速度を足さない")
+	bridge.restore(firing.value);bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2.ZERO})
+	bridge._core.handle_draw({"has_cursor":true,"pen":point,"press":true},0,1.0);bridge._core.handle_draw({"has_cursor":true,"pen":point+Vector2(200,0),"press":true},1000,1.0)
+	var tracing: bool=bridge._core.draw_snapshot().tracing;var before_velocity: Vector2=bridge._core.ship_snapshot().ship_vel
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(tracing and before_velocity.length()<c.cfg.base_max_speed and bridge._core.ship_snapshot().ship_vel==before_velocity,"最高速度より遅い突進中も風で速度を足さない")
+	bridge.command("dev_boss_body_state")
+	check(not events.any(func(e):return e.type=="combat_player_damage" and e.payload.cause=="wind"),"風の接触から0ダメージの戦闘通知を出さない")
+	bridge.restore(firing.value);var view=hydra_move_view(c);await get_tree().process_frame
+	bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"途中取消で風を回収する")
+	bridge.restore(firing.value);body=bridge.command("dev_boss_body_state").value[0];bridge.command("dev_damage",{"entity_id":body.necks[1].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[1].alive and body.effects.is_empty() and not body.boss_dead,"参加首の消失で風だけを消す")
+	bridge.restore(firing.value);bridge._core.step(0.5);bridge._core.step_hazards(0.5);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[1].mode=="idle" and body.effects.is_empty() and is_equal_approx(body.necks[1].cd,0.05),"自然終了したtickは新しい待ち時間を減らさず風を消す")
+	head=body.necks[1];bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*200.0,"velocity":Vector2.ZERO})
+	for tick in 30:bridge._core.step(0.025)
+	check(bridge.command("dev_boss_state").value.any(func(a):return a.id>first_id and a.kind==75),"首の待ち後に次の風の帯へ進む")
+	bridge.release_checkpoint(held.value);bridge.release_checkpoint(firing.value);bridge.dispose();view.queue_free()
+	c=hydra_normal_case(false,{},edits,"wind_band");bridge=c.bridge;body=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[1]
+	if head.cd>0:bridge._core.step(head.cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*200.0,"velocity":Vector2.ZERO})
+	check(bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1}).ok,"分離後も同じ風の帯の登録を使う")
+	bridge._core.step(0.08);bridge._core.step_hazards(0.08);bridge._core.step(0.08);bridge._core.step_hazards(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].points[0].distance_to(body.necks[1].position)<0.001,"分離後は動く頭から風の帯を始める")
+	var old_origin: Vector2=body.effects[0].points[0];held=bridge.checkpoint();bridge._core.step(0.05);bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0];expected=body.duplicate(true)
+	check(body.effects[0].points[0].distance_to(body.necks[1].position)<0.001 and body.effects[0].points[0]!=old_origin,"分離後の風は固定した向きを保って動く頭に追従する")
+	check(held.ok and bridge.restore(held.value).ok,"分離後の持続する風も保持して戻す");bridge._core.step(0.05);bridge._core.step_hazards(0.05)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"分離後の風も同じ操舵・頭追従・時計へ復帰する")
+	bridge._core.step(0.4);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[1].normal_phase==2 and body.effects.is_empty(),"分離後はholdへ入った更新で風を消す")
+	bridge.release_checkpoint(held.value);bridge.dispose();await get_tree().process_frame
+	print("[cpp_hydra_wind] failures=",failed);get_tree().quit(1 if failed else 0)
+
+
+func hydra_wind_resource_check() -> void:
+	var move=load("res://data/bosses/hydra_moves/wind_band.tres")
+	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"wind_band" and is_equal_approx(move.range_info(move.values()).max,430.0),"風の帯の編集値・範囲案内・互換RunnerとUID参照を分ける")
+
+
+func native_hydra_wind_resource() -> void:
+	hydra_wind_resource_check()
+	print("[cpp_hydra_wind_resource] failures=",failed);get_tree().quit(1 if failed else 0)

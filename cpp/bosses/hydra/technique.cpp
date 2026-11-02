@@ -20,7 +20,7 @@ std::vector<EnemyHandle> HydraTechnique::participants(const RunRuntime &r,const 
 bool HydraTechnique::all_participants_alive(const RunRuntime &r,const HydraTechniqueState &v) {return !v.participants.empty() && std::all_of(v.participants.begin(),v.participants.end(),[&](auto h){return r.state.enemy_handles.contains(h) && !r.state.enemies[h.slot].dead;});}
 bool HydraTechnique::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {
     const auto *b=PhaseController::find(r,actor);if (!b || !r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead || b->hydra.necks.empty() || b->mode!=BossMode::Idle || busy(r,*b) || b->hydra.growth_left>0 || b->hydra.chance_left>0 || b->hydra.recovery_left>0 || b->hydra.major_padding_left>0 || (rule(r,definition).combo?b->hydra.combo_left:b->hydra.major_cd)>0 || !rule(r,definition).timeline_available || b->hydra.separation_pending || b->hydra.separation_left>0) return false;
-    if (auto it=b->hydra.major_until.find(definition);it!=b->hydra.major_until.end() && r.state.world_time<it->second) return false;
+    if (auto it=b->hydra.major_until.find(definition);it!=b->hydra.major_until.end() && b->clock<it->second) return false;
     if (r.content->boss_techniques[definition-1].kind==74) return participants(r,*b,{HydraHeadKind::Beam,HydraHeadKind::Beam}).size()==2;
     if (r.content->boss_techniques[definition-1].kind==73) return b->hydra.separated && grid_plan(r,*b,definition).has_value();
     if (r.content->boss_techniques[definition-1].kind==83) return participants(r,*b,{HydraHeadKind::Debris,HydraHeadKind::Beam}).size()==2;
@@ -45,7 +45,7 @@ void HydraTechnique::finish(RunRuntime &r,TechniqueState &t,bool cancelled) {
     auto *b=PhaseController::find(r,t.actor);if (!b) return;const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=rule(r,t.definition);
     if (auto *move=std::get_if<HydraTornadoState>(&std::get<HydraTechniqueState>(t.detail).move)) for (auto h:move->rubble) if (r.state.enemy_handles.contains(h) && !r.state.enemies[h.slot].dead) EnemySystem::mark_dead(r,h);
     if (auto *move=std::get_if<HydraShatterState>(&std::get<HydraTechniqueState>(t.detail).move)) for (const auto &stone:move->rubble) if (r.state.enemy_handles.contains(stone.actor) && !r.state.enemies[stone.actor.slot].dead) EnemySystem::mark_dead(r,stone.actor);
-    b->hydra.major_padding_left=cancelled?0:v.major_recovery_padding;b->hydra.recovery_left=p.recover;b->hydra.major_cd=v.global_cd;b->hydra.major_until[t.definition]=r.state.world_time+p.cd;
+    b->hydra.major_padding_left=cancelled?0:v.major_recovery_padding;b->hydra.recovery_left=p.recover;b->hydra.major_cd=v.global_cd;b->hydra.major_until[t.definition]=b->clock+p.cd;
     for (auto &n:b->hydra.necks) if (n.major==t.definition) {const auto at=n.strike_pos;const auto offset=at-HydraBody::neck_base(r,*b,n);n.angle=offset.angle();n.length=offset.length();n.free_pos=n.strike_pos=at;n.major=0;n.locked=n.extension=false;n.emission={};n.glow=n.elapsed=0;n.step=0;}
     if (cancelled) AttackBudgetSystem(r).cancel("boss:"+std::to_string(r.state.enemy_handles.entity_id(t.actor)),r.state.enemy_handles.entity_id(t.actor));
     t.stage=cancelled?TechniqueStage::Cancelled:TechniqueStage::Finished;cue(r,*b,cancelled?"interrupted":"finished",t.definition);cue(r,*b,"recovery_started",t.definition,p.recover);AttackSystem::end_technique(r.state,r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data())),cancelled);

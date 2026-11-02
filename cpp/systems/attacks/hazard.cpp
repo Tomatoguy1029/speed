@@ -52,6 +52,10 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         const auto *contact=get(state,handle);if (!contact) continue;const auto &policy=contact->spec.contact;
         const auto previous=contact->ship_previous_ready?contact->ship_previous:state.ship.pos;
         if (!CollisionQuery::touches(shape,{previous,state.ship.pos,state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) {if (std::holds_alternative<HydraShapeHazard>(current.shape)) record_ship_position(state,handle);continue;}
+        if (const auto *hydra=std::get_if<HydraShapeHazard>(&current.shape)) {
+            if (contact->spec.cause==Cause::Wind) {if (!state.draw.tracing && !state.ship.glide && state.ship.vel.length()<state.ship_config.max_speed && hydra->points.size()>=2) state.ship.vel+=(hydra->points.back()-hydra->points.front()).normalized()*(hydra->wind_force*dt);record_ship_position(state,handle);continue;}
+            if (current.damage<=0) {record_ship_position(state,handle);continue;}
+        }
         if (!std::holds_alternative<WallHazard>(current.shape)) current.hit=true;
         if (circle && circle->kind!=CircleHazardKind::Blast && state.bite_zone_config.hit) {
             godot::Dictionary event;if (state.bite_zone_config.visual_key) event["visual_key"]=state.bite_zone_config.visual_key;else event["scene"]=state.bite_zone_config.scene;

@@ -1669,6 +1669,37 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraWindBandDefinition",
+      "section": 383,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "force",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

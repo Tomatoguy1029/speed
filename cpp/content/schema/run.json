@@ -1555,6 +1555,10 @@
       {
         "name": "Lightning",
         "value": "lightning"
+      },
+      {
+        "name": "Wind",
+        "value": "wind"
       }
     ],
     "VisualRole": [

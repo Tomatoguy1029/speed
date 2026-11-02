@@ -15,7 +15,7 @@ void HydraTechnique::tornado(RunRuntime &r,TechniqueState &t,double) {
         move.initialized=true;move.direction=(r.state.ship_pos-wind.strike_pos).normalized();if (move.direction==godot::Vector2()) move.direction=godot::Vector2::from_angle(wind.angle);
         move.center=wind.strike_pos+move.direction*120;move.from=debris.strike_pos;wind.angle=move.direction.angle();debris.angle=(move.center-debris.strike_pos).angle();
         move.vortex=emit(r,t,wind.actor,{move.center,move.center+godot::Vector2(0.1,0)},p.width*0.8,0,p.charge,Cause::TornadoCharge);
-        if (const auto *record=AttackSystem::get(r.state,move.vortex)) {r.state.hazards[record->row].damage=0;r.state.hazards[record->row].hit=true;}
+        if (const auto *record=AttackSystem::get(r.state,move.vortex)) {r.state.hazards[record->row].damage=0;}
         for (int j=0;j<3;++j) {EnemySpawn spawn;spawn.position=debris.strike_pos;spawn.origin=SpawnOrigin::BossPart;const auto id=EnemySystem::spawn(r,p.enemy-1,spawn);if (id>0) {const auto actor=r.state.enemy_handles.at(r.state.rows_by_id.at(id));move.rubble.push_back(actor);r.state.enemies[actor.slot].radius=26+6*j;}}
         HydraNormalAttack::cue(r,*b,wind,"gather_started",t.definition);
     }
