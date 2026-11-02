@@ -2,12 +2,14 @@
 extends Node2D
 @export var body_texture: Texture2D
 @export var neck_spacing_pixels := 14.0
+var frame_scope: ContentResourceScope
 var state := {}
 var hit := 0.0
 var arena: Node2D
 var effects := {}
 var shot_scenes := {}
 func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
+	frame_scope = scope
 	for entry in entries.values():
 		if entry.has("hydra_move"): shot_scenes[entry.hydra_move] = scope.resources.get(entry.path)
 var white: Texture2D

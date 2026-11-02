@@ -6,7 +6,6 @@ extends Node2D
 @export_range(0.25, 3.0, 0.05) var needle_width_scale := 1.0
 @export_range(0.25, 3.0, 0.05) var streak_lifetime_scale := 1.0
 var world_clock := -1.0
-var actor: MonocerosBoss
 var rng := RandomNumberGenerator.new()
 var effects: Array[Dictionary] = []
 var retained: bool:
@@ -14,12 +13,6 @@ var retained: bool:
 
 func _ready() -> void:
 	rng.randomize()
-
-func on_event(event: Dictionary) -> void:
-	if event.cue in [&"defeated", &"final_strike"]:
-		effects.clear()
-	elif event.technique == technique_id and event.cue == &"slash_release":
-		_add_effects(actor.last_slash.duplicate(),float(actor.rule().slash_width))
 
 func _add_effects(line: PackedVector2Array, width: float) -> void:
 	effects.append({"line":line,"width":width,"age":0.0,"life":0.6*streak_lifetime_scale})
@@ -50,7 +43,7 @@ func advance(dt: float) -> void:
 		if float(effects[index].age) >= float(effects[index].life): effects.remove_at(index)
 
 func _body_point(world_point: Vector2) -> Vector2:
-	return world_point if actor==null else (world_point - actor.table.pos[actor.body]).rotated(-actor.table.facing[actor.body])
+	return world_point
 
 func _needle(a: Vector2, b: Vector2, width: float, color: Color) -> void:
 	var center := (a + b) * 0.5
@@ -58,7 +51,7 @@ func _needle(a: Vector2, b: Vector2, width: float, color: Color) -> void:
 	draw_colored_polygon(PackedVector2Array([a, center + side, b, center - side]), color)
 
 func _draw() -> void:
-	if actor!=null and not actor.has_body(): return
+
 	for effect: Dictionary in effects:
 		var t := clampf(float(effect.age) / float(effect.life), 0.0, 1.0)
 		var taper := 1.0 if t <= 0.25 else (1.0 - t) / 0.75

@@ -18,10 +18,10 @@ func apply_frame(value: Dictionary) -> void:
 	queue_redraw()
 
 func _separated() -> bool:
-	return bool(frame.get("separated",false)) if not frame.is_empty() else host.separated
+	return bool(frame.get("separated",false))
 
 func _origin() -> Vector2:
-	return frame.position if not frame.is_empty() else host.table.pos[host.body]
+	return frame.get("position",Vector2.ZERO)
 
 
 func _ready() -> void:
@@ -35,49 +35,30 @@ func _ready() -> void:
 		material.set_shader_parameter(entry[0], Vector3(direction.x, direction.y, LIGHTING.height).normalized())
 
 func _draw() -> void:
-	if not frame.is_empty():
-		if body_only:
-			if not _separated() and body_texture!=null:
-				var radius: float = frame.radius
-				draw_texture_rect(body_texture,Rect2(Vector2.ONE*-radius,Vector2.ONE*radius*2.0),false)
-			return
-		var factor: float = float(frame.radius)*2.0/host.body_texture.get_width() if host.body_texture!=null else 1.0
-		for index in frame.necks.size():
-			var neck: Dictionary = frame.necks[index]
-			if heads_only:
-				var texture: Texture2D = head_textures.get(StringName(neck.kind))
-				if neck.alive and texture!=null:
-					draw_set_transform(neck.position-frame.position,float(neck.facing)-PI*0.5,Vector2.ONE*factor)
-					draw_texture(texture,-texture.get_size()*0.5)
-			elif neck.alive or float(neck.length)>0.0: _chain(neck.points,factor,index,false)
-		if frame.has("bearer"):
-			var bearer: Dictionary = frame.bearer
-			if not heads_only: _chain(bearer.points,factor,frame.necks.size(),true)
-			elif bearer.alive:
-				var texture: Texture2D = head_textures.get(&"immortal")
-				if texture!=null:
-					draw_set_transform(bearer.position-frame.position,float(bearer.facing)-PI*0.5,Vector2.ONE*factor)
-					draw_texture(texture,-texture.get_size()*0.5)
-		draw_set_transform(Vector2.ZERO)
-		return
-	if host == null or host.ctx == null or not host.has_body(): return
+	if frame.is_empty(): return
 	if body_only:
-		if not host.separated and body_texture != null:
-			var radius: float = host.table.r[host.body]
-			draw_texture_rect(body_texture, Rect2(Vector2.ONE * -radius, Vector2.ONE * radius * 2.0), false)
+		if not _separated() and body_texture!=null:
+			var radius: float = frame.radius
+			draw_texture_rect(body_texture,Rect2(Vector2.ONE*-radius,Vector2.ONE*radius*2.0),false)
 		return
-	if heads_only:
-		_draw_heads()
-		return
-	if segments.is_empty(): return
-	var radius: float = host.table.r[host.body]
-	var scale_factor: float = radius * 2.0 / host.body_texture.get_width() if host.body_texture != null else radius / 64.0
-	for index in host.necks.size():
-		var neck = host.necks[index]
-		if neck.row >= 0 or neck.length > 0.0:
-			_chain(neck.segs, scale_factor, index, false)
-	if host.separated and host.immortal_neck != null:
-		_chain(host.immortal_neck.segs, scale_factor, host.necks.size(), true)
+	var factor: float = float(frame.radius)*2.0/host.body_texture.get_width() if host.body_texture!=null else 1.0
+	for index in frame.necks.size():
+		var neck: Dictionary = frame.necks[index]
+		if heads_only:
+			var texture: Texture2D = head_textures.get(StringName(neck.kind))
+			if neck.alive and texture!=null:
+				draw_set_transform(neck.position-frame.position,float(neck.facing)-PI*0.5,Vector2.ONE*factor)
+				draw_texture(texture,-texture.get_size()*0.5)
+		elif neck.alive or float(neck.length)>0.0: _chain(neck.points,factor,index,false)
+	if frame.has("bearer"):
+		var bearer: Dictionary = frame.bearer
+		if not heads_only: _chain(bearer.points,factor,frame.necks.size(),true)
+		elif bearer.alive:
+			var texture: Texture2D = head_textures.get(&"immortal")
+			if texture!=null:
+				draw_set_transform(bearer.position-frame.position,float(bearer.facing)-PI*0.5,Vector2.ONE*factor)
+				draw_texture(texture,-texture.get_size()*0.5)
+	draw_set_transform(Vector2.ZERO)
 
 func _chain(points: PackedVector2Array, factor: float, variant: int, special: bool) -> void:
 	if points.size() < 2: return
@@ -117,18 +98,3 @@ func _stamp(texture: Texture2D, points: PackedVector2Array, distance: float, fac
 			draw_texture(texture, -texture.get_size() * 0.5)
 			return
 		distance -= length
-
-func _draw_heads() -> void:
-	var factor: float = host.table.r[host.body] * 2.0 / host.body_texture.get_width() if host.body_texture != null else 1.0
-	for neck in host.necks:
-		if host._alive(neck): _head(neck.row, neck.kind, factor)
-	if host.separated and host.immortal_neck != null and host._alive(host.immortal_neck):
-		_head(host.immortal_row, &"immortal", factor)
-	draw_set_transform(Vector2.ZERO)
-
-func _head(row: int, kind: StringName, factor: float) -> void:
-	var texture := head_textures.get(kind) as Texture2D
-	if texture == null: return
-	var at: Vector2 = host.table.pos[row] - host.table.pos[host.body]
-	draw_set_transform(at, host.table.facing[row] - PI * 0.5, Vector2.ONE * factor)
-	draw_texture(texture, -texture.get_size() * 0.5)

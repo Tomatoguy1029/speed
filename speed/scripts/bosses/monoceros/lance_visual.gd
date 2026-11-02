@@ -12,7 +12,6 @@ const ENERGY := preload("res://scripts/bosses/monoceros/technique_visual.gd").EN
 var flash := 0.0
 var frame := {}
 var world_clock := -1.0
-var actor: MonocerosBoss
 var rng := RandomNumberGenerator.new()
 var particles: Array[Dictionary] = []
 var rings: Array[Dictionary] = []
@@ -51,34 +50,6 @@ func frame_event(event: Dictionary) -> void:
 func _ready() -> void:
 	rng.randomize()
 
-func on_event(event: Dictionary) -> void:
-	if event.cue in [&"defeated", &"final_strike"]:
-		particles.clear()
-		rings.clear()
-		return
-	if event.technique != technique_id: return
-	var u := Vector2.from_angle(actor.table.facing[actor.body])
-	match event.cue:
-		&"lance_launch":
-			rings.append({"center": actor.table.pos[actor.body], "angle": 0.0, "age": 0.0, "life": 0.35, "sonic": false})
-			_existing_screen_flash()
-		&"sonic_boom":
-			rings.append({"center": actor.table.pos[actor.body] + u * float(actor.rule().boom_ahead), "angle": u.angle(), "age": 0.0, "life": 0.4, "sonic": true})
-		&"lance_shatter":
-			var points := actor.horn_points()
-			# formが0へ戻った瞬間なので、砕ける前の穂先までを復元する。
-			var tip := actor.table.pos[actor.body] + u * (actor.horn_length() + float(actor.rule().head_length))
-			for j in shard_count:
-				particles.append({"kind": &"shard", "from": points[0].lerp(tip, float(j) / maxf(1.0, shard_count - 1.0)), "velocity": Vector2.from_angle(rng.randf_range(0.0, TAU)) * rng.randf_range(80.0, 240.0) * shard_speed_scale, "age": 0.0, "life": rng.randf_range(0.6, 0.9)})
-
-func _existing_screen_flash() -> void:
-	var parent := actor.get_parent()
-	if parent == null or parent.get_parent() == null: return
-	var display := parent.get_parent().get_node_or_null("RunPresentation") as RunPresentation
-	if display != null and display.run != null and display.run.ctx == actor.ctx:
-		# 既存の白い光は毎秒2ずつ減るので、0.4秒分を渡す。
-		display.flash = maxf(display.flash, 0.4 * 2.0)
-
 func advance(dt: float) -> void:
 	flash = maxf(0.0,flash-dt*2.0)
 	for index in range(particles.size() - 1, -1, -1):
@@ -87,30 +58,30 @@ func advance(dt: float) -> void:
 	for index in range(rings.size() - 1, -1, -1):
 		rings[index].age = float(rings[index].age) + dt
 		if float(rings[index].age) >= float(rings[index].life): rings.remove_at(index)
-	var gathering: bool = not frame.is_empty() and frame.stage==0 and frame.sequence_stage==0 if actor==null else actor.technique==technique_id and actor.mode==&"windup" and actor._runner.stage==&"gather"
+	var gathering: bool = not frame.is_empty() and frame.stage==0 and frame.sequence_stage==0
 	if not gathering:
 		gather_emit = 0.0
 		return
 	gather_emit += gather_rate * dt
-	var points: PackedVector2Array = frame.horn if actor==null else actor.horn_points()
+	var points: PackedVector2Array = frame.horn
 	while gather_emit >= 1.0:
 		gather_emit -= 1.0
 		var from := points[1] + Vector2.from_angle(rng.randf_range(0.0, TAU)) * rng.randf_range(140.0, 260.0)
 		particles.append({"kind": &"gather", "from": from, "to": points[0].lerp(points[1], 0.5), "age": 0.0, "life": gather_lifetime})
 
 func _body_point(world_point: Vector2) -> Vector2:
-	return world_point if actor==null else (world_point - actor.table.pos[actor.body]).rotated(-actor.table.facing[actor.body])
+	return world_point
 
 func _draw() -> void:
-	if actor==null and flash>0.0:
+	if flash>0.0:
 		var inverse := get_canvas_transform().affine_inverse()
 		var bounds := get_viewport_rect()
 		draw_colored_polygon(PackedVector2Array([inverse*bounds.position,inverse*Vector2(bounds.end.x,bounds.position.y),inverse*bounds.end,inverse*Vector2(bounds.position.x,bounds.end.y)]),Color(1,1,1,flash*0.5))
-	if actor != null and not actor.has_body(): return
+
 	for ring: Dictionary in rings:
 		var t := clampf(float(ring.age) / float(ring.life), 0.0, 1.0)
 		if ring.sonic:
-			var back := float(ring.angle) + PI - (actor.table.facing[actor.body] if actor!=null else 0.0)
+			var back := float(ring.angle) + PI - 0.0
 			draw_arc(_body_point(ring.center), lerpf(40.0, 190.0, t), back - 0.9, back + 0.9, 32, Color(ENERGY, 0.5 * (1.0 - t)), ring_width * (1.0 - t) + 1.0, false)
 		else:
 			draw_arc(_body_point(ring.center), lerpf(40.0, 220.0, t), 0.0, TAU, 48, Color(ENERGY, 1.0 - t), ring_width, false)
@@ -118,13 +89,13 @@ func _draw() -> void:
 		var t := clampf(float(particle.age) / float(particle.life), 0.0, 1.0)
 		var point: Vector2 = Vector2(particle.from).lerp(particle.to, t) if particle.kind == &"gather" else Vector2(particle.from) + Vector2(particle.velocity) * float(particle.age)
 		draw_circle(_body_point(point), 2.5, Color(ENERGY, 1.0 - t))
-	if actor==null and frame.is_empty(): return
-	if actor!=null and (actor.technique!=technique_id or actor.mode not in [&"windup",&"active"]): return
-	var form: float = frame.form if actor==null else float(actor._runner.form)
+	if frame.is_empty(): return
+
+	var form: float = frame.form
 	if form <= 0.0: return
-	var points: PackedVector2Array = frame.horn if actor==null else actor.horn_points()
-	var u := Vector2.from_angle(frame.facing if actor==null else actor.table.facing[actor.body])
-	var head: float = (frame.head_length if actor==null else float(actor.rule().head_length)) * form
+	var points: PackedVector2Array = frame.horn
+	var u := Vector2.from_angle(frame.facing)
+	var head: float = (frame.head_length) * form
 	# 判定線の先端が穂先。元の角先を引いて、表示だけ二重に伸ばさない。
 	var tip := points[1]
 	var horn_tip := tip - u * head
