@@ -4,6 +4,7 @@ namespace speed {
 class PhaseController {
 public:
     static EnemyHandle spawn(RunRuntime &,uint32_t definition,godot::Vector2,bool entrance);
+    static bool automatic(RunRuntime &);
     static void step(RunRuntime &,double dt);
     static BossBodyState *find(RunRuntime &,EnemyHandle);
     static const BossBodyState *find(const RunRuntime &,EnemyHandle);

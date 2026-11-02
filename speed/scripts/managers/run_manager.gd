@@ -13,7 +13,7 @@ var current_id := -1
 
 ## 通常のゲームのランを作る。ステージとモードは GameManager の選択から読む。
 ## 資源の読み込みを開始して返す。呼び出し側が木へ入れると描画の準備を進める。
-func create_run() -> RunSession:
+func create_run(overrides := {}) -> RunSession:
 	var before := Time.get_ticks_usec()
 	var prepared := GameManager.run_start_content.duplicate(true)
 	var start_time := GameManager.run_start_time
@@ -28,6 +28,7 @@ func create_run() -> RunSession:
 	var options := {"runtime":"cpp","cpp_index":prepared.get("index",""),"cpp_signature":prepared.get("signature",""),
 		"cpp_profile":ProfileManager.for_cpp(false),"seed":randi(),"endless":GameManager.run_endless,
 		"cpp_start":{"equipment":[],"lab_mode":false}}
+	if OS.is_debug_build() and overrides.get("seed") is int: options.seed = overrides.seed
 	if timeline: options.cpp_start.scenario = {"kind":"timeline","params":{"time":start_time}}
 	var session := _register(RunSession.new(),options)
 	session.loading_timings["stage_and_profile_ms"] = (Time.get_ticks_usec()-before)/1000.0

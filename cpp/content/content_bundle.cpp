@@ -182,6 +182,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->centaurus_sails=records.CentaurusSailDefinition_rows;
     bundle->centaurus_combos=records.CentaurusComboDefinition_rows;
     bundle->centaurus_stomps=records.CentaurusStompDefinition_rows;bundle->centaurus_stomp_feet=records.CentaurusStompFoot_rows;
+    bundle->stage_boss=records.StageBossDefinition_rows;
+    if (bundle->stage_boss.size()>1 || (!bundle->stage_boss.empty() && bundle->stage_boss.front().id!=1)) return {};
     bundle->boss_finish=records.BossFinishDefinition_rows;
     if (bundle->boss_finish.size()>1 || (!bundle->boss_finish.empty() && (bundle->boss_finish.front().id!=1 || bundle->boss_finish.front().zoom<=0))) return {};
     bundle->bosses=records.BossDefinition_rows;

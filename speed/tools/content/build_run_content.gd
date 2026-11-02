@@ -2614,9 +2614,15 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var encounter_error := encounter_records(data,encounter_profile,enemy_ids)
 	if encounter_error!=OK: return encounter_error
 	var resolved_bosses: Dictionary = boss_definitions.duplicate()
-	if stage.boss_id==&"draco" and not resolved_bosses.has(&"draco"): resolved_bosses[&"draco"] = load("res://data/bosses/draco.tres")
+	if not stage.boss_id.is_empty() and not resolved_bosses.has(stage.boss_id): resolved_bosses[stage.boss_id] = _definition(&"bosses",stage.boss_id)
 	var bosses_error := append_bosses(data,visuals,resolved_bosses,config,stage,boss_programs)
 	if bosses_error!=OK: return bosses_error
+	if stage.boss_enabled:
+		var body_id := 0
+		for body: Dictionary in data.BossBodyDefinition:
+			if data.BossDefinition[body.boss-1].external_id==String(stage.boss_id): body_id = body.id
+		if body_id==0: return ERR_UNAVAILABLE
+		data.StageBossDefinition = [{"id":1,"body":body_id,"start":stage.boss_start(config),"spread":config.boss_time_spread if stage.boss_time<0.0 else 0.0}]
 	for boss: Dictionary in data.BossDefinition:
 		if boss.external_id!="draco": continue
 		var source: BossDef = resolved_bosses.get(&"draco",resolved_bosses.get("draco"))

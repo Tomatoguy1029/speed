@@ -664,6 +664,32 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "StageBossDefinition",
+      "section": 450,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "body",
+          "type": "u32",
+          "ref": "BossBodyDefinition"
+        },
+        {
+          "name": "start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}
