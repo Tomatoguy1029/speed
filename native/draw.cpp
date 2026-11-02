@@ -4,6 +4,8 @@
 #include "../cpp/behaviors/weapons/dashRangeDrone.h"
 #include "../cpp/behaviors/weapons/massTow.h"
 #include "run_core.h"
+#include "../cpp/bosses/flow/phase_controller.h"
+#include "../cpp/bosses/draco/pose.h"
 #include "../cpp/behaviors/weapons/flashSlash.h"
 #include "../cpp/behaviors/weapons/afterimage.h"
 #include "../cpp/systems/field.h"
@@ -234,7 +236,9 @@ bool SpeedRunCore::step_draw(double real_dt) {
         for (auto it = runtime.state.draw.inside.begin(); it != runtime.state.draw.inside.end();) {
             const auto &enemy = runtime.state.enemies[it->second];
             const double radius = enemy.radius + runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime) + 2.0;
-            if (!enemy.alive || enemy.dead || enemy.id != it->first || enemy.pos.distance_squared_to(from) > radius * radius) it = runtime.state.draw.inside.erase(it);
+            bool inside=enemy.pos.distance_squared_to(from)<=radius*radius;
+            if (enemy.alive && !enemy.dead && enemy.id==it->first) {const auto *boss=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(uint32_t(it->second)));if (boss && runtime.content->bosses[runtime.content->boss_bodies[boss->definition-1].boss-1].kind==4) inside=speed::DracoPose::contains(runtime,*boss,from,runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime)+2.0);}
+            if (!enemy.alive || enemy.dead || enemy.id != it->first || !inside) it = runtime.state.draw.inside.erase(it);
             else ++it;
         }
         runtime.state.draw.seg_pos += move;

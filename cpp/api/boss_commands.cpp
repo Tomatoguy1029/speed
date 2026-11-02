@@ -7,6 +7,7 @@
 #include "../bosses/canis_major/body.h"
 #include "../bosses/hydra/body.h"
 #include "../bosses/draco/body.h"
+#include "../bosses/draco/pose.h"
 #include "../bosses/canis_major/flames.h"
 #include "../bosses/canis_major/hound_lunge.h"
 #include "../systems/attack_system.h"
@@ -30,6 +31,16 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));const auto target=runtime.state.rows_by_id.find(int64_t(p["target"]));const int64_t definition=p["definition"],observation=p["observation"];if (found==runtime.state.rows_by_id.end() || definition<=0 || uint64_t(definition)>runtime.content->canis_flames.size() || observation<0) return result(false);
         auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=2 || body->mode>=speed::BossMode::Defeated) return result(false);
         const auto handle=speed::CanisFlames::begin(runtime,*body,definition,target==runtime.state.rows_by_id.end()?speed::EnemyHandle{}:runtime.state.enemy_handles.at(target->second),observation);const auto *record=speed::AttackSystem::get(runtime.state,handle);return result(record!=nullptr,record?record->id:0);
+    }
+    if (kind=="dev_draco_pose") {
+        if (p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);
+        const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=4 || body->mode>=speed::BossMode::Defeated) return result(false);
+        const String operation=p["operation"];
+        if (operation=="reset" && p.size()==2) {speed::DracoPose::reset(runtime,*body);return result(true);}
+        if (operation=="depth" && p.size()==4) {for (const char *key:{"depth","alpha"}) if ((p.get(key,Variant()).get_type()!=Variant::FLOAT && p.get(key,Variant()).get_type()!=Variant::INT) || !std::isfinite(double(p[key]))) return result(false);speed::DracoPose::depth(runtime,*body,p["depth"],p["alpha"]);return result(true);}
+        if (operation=="contains" && p.size()==4 && p.get("point",Variant()).get_type()==Variant::VECTOR2 && Vector2(p["point"]).is_finite() && (p.get("radius",Variant()).get_type()==Variant::FLOAT || p.get("radius",Variant()).get_type()==Variant::INT) && std::isfinite(double(p["radius"])) && double(p["radius"])>=0) return result(true,speed::DracoPose::contains(runtime,*body,p["point"],p["radius"]));
+        if (operation=="override" && p.size()==3 && p.get("points",Variant()).get_type()==Variant::PACKED_VECTOR2_ARRAY) {const PackedVector2Array points=p["points"];if (points.size()<2 || points.size()>4096) return result(false);for (auto v:points) if (!v.is_finite()) return result(false);body->draco.override_points.clear();for (auto v:points) body->draco.override_points.push_back(v);runtime.state.enemies[body->actor.slot].pos=points[0];speed::DracoPose::update(runtime,*body);return result(true);}
+        return result(false);
     }
     if (kind=="dev_boss_body_state") return result(p.is_empty(),speed::PhaseController::snapshot(runtime));
     if (kind=="dev_spawn_boss") {

@@ -94,14 +94,16 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     std::vector<Hit> hits;
     for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
         const auto &enemy = runtime.state.enemies[row];
-        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(enemy.id) > 0 : (enemy.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
+        const auto target=speed::CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(row)));if (!runtime.state.enemy_handles.contains(target)) continue;const auto &health=runtime.state.enemies[target.slot];
+        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(health.id) > 0 : (health.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
         const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
         if (t >= 0) hits.push_back({t, row});
     }
     SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
     for (const auto &hit : hits) {
         auto &enemy = runtime.state.enemies[hit.row];
-        if (enemy.dead || (runtime.state.draw.tracing && runtime.state.draw.inside.count(enemy.id) > 0)) continue;
+        const auto target=speed::CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));if (!runtime.state.enemy_handles.contains(target)) continue;auto &health=runtime.state.enemies[target.slot];
+        if (enemy.dead || (runtime.state.draw.tracing && runtime.state.draw.inside.count(health.id) > 0)) continue;
         const auto &def = runtime.content->definitions[enemy.definition];
         const Vector2 position = from.lerp(to, hit.time);
         const double speed = runtime.state.ship.vel.length();
@@ -110,26 +112,26 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         const double attack = speed::CombatResolver::attack_power(runtime)*speed::RunUpBehavior::multiplier(runtime,from.distance_to(position));
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
         const bool front = blocks_front(hit.row, position, direction);
-        if (front && (!fast || (!runtime.state.draw.tracing && enemy.hit_cd > 0))) {
+        if (front && (!fast || (!runtime.state.draw.tracing && health.hit_cd > 0))) {
             Vector2 normal = position - enemy.pos;
             normal = normal.length_squared() > 0 ? normal.normalized() : -direction;
             runtime.state.ship.pos = enemy.pos + normal * (enemy.radius + radius + 1.0);
             const double vn = runtime.state.ship.vel.dot(normal);
             if (vn < 0) { runtime.state.ship.vel -= normal * 2.0 * vn; runtime.state.ship.vel *= c.bounce_keep; }
-            if (enemy.hit_cd <= 0) {
-                enemy.hit_cd = 0.25;
+            if (health.hit_cd <= 0) {
+                health.hit_cd = 0.25;
                 Dictionary event; event["pos"] = position; event["normal"] = normal; event["enemy_pos"] = enemy.pos; event["r"] = enemy.radius;
                 emit_event("block_impact", event);
             }
             runtime.state.ship_pos = runtime.state.ship.pos;
             return true;
         }
-        if (!runtime.state.draw.tracing && enemy.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock)) continue;
+        if (!runtime.state.draw.tracing && health.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock)) continue;
         const bool rear = def.kind==speed::EnemyDefinition::Kind::Shield?speed::ShieldBehavior::rear_open(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position):std::abs(angle_difference((position - enemy.pos).angle(), enemy.facing + godot::Math::PI)) <= def.weak_arc;
         const bool crit = (def.weak_arc > 0 && rear) || runtime.state.control.rng.randf() < c.crit_chance;
         if (enemy.stone > 0) {
-            enemy.hit_cd = c.contact_cooldown;
-            if (runtime.state.draw.tracing) runtime.state.draw.inside[enemy.id] = hit.row;
+            health.hit_cd = c.contact_cooldown;
+            if (runtime.state.draw.tracing) runtime.state.draw.inside[health.id] = target.slot;
             Dictionary event; event["pos"] = enemy.pos; event["normal"] = -direction;
             event["enemy_pos"] = enemy.pos; event["r"] = enemy.radius; emit_event("block_impact", event);
             kill_enemy(hit.row, false, fast ? StringName("ram") : StringName("touch"), direction);
@@ -141,21 +143,21 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             runtime.state.ship.pos=enemy.pos+normal*(enemy.radius+radius+1.0);
             const double vn=runtime.state.ship.vel.dot(normal);
             if (vn<0) {runtime.state.ship.vel-=normal*2.0*vn;runtime.state.ship.vel*=c.bounce_keep;}
-            if (enemy.hit_cd<=0) {
-                enemy.hit_cd=0.25;Dictionary impact;impact["pos"]=position;impact["normal"]=normal;impact["enemy_pos"]=enemy.pos;impact["r"]=enemy.radius;emit_event("block_impact",impact);
+            if (health.hit_cd<=0) {
+                health.hit_cd=0.25;Dictionary impact;impact["pos"]=position;impact["normal"]=normal;impact["enemy_pos"]=enemy.pos;impact["r"]=enemy.radius;emit_event("block_impact",impact);
                 damage_enemy(hit.row,attack*0.25,"bump",false,-normal);
             }
             continue;
         }
         if (!fast) {
-            enemy.hit_cd = c.contact_cooldown;
+            health.hit_cd = c.contact_cooldown;
             damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction, 160.0, &position);
             speed::EquipmentSystem::electric_contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));
             continue;
         }
         speed::DamageRequest gate_request;gate_request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));gate_request.cause=speed::Cause::Ram;gate_request.direction=direction;gate_request.impact=position;gate_request.has_impact=true;
         const auto gate=speed::CombatResolver::gate(runtime,gate_request.struck,gate_request);
-        if (gate==speed::GateResult::Pass) {enemy.hit_cd=c.contact_cooldown;if (runtime.state.draw.tracing) runtime.state.draw.inside[enemy.id]=hit.row;continue;}
+        if (gate==speed::GateResult::Pass) {health.hit_cd=c.contact_cooldown;if (runtime.state.draw.tracing) runtime.state.draw.inside[health.id]=target.slot;continue;}
         if (gate==speed::GateResult::Allow && (runtime.state.loadout.effects.ignore_armor || (runtime.state.draw.tracing && speed::HeroesSystem::trace_width(runtime)>1.0) || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
             double damage = attack * (crit ? c.crit_mult : 1.0);
             if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
@@ -164,10 +166,10 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             }
             speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));request.amount=damage;request.cause=speed::Cause::Ram;request.crit=crit;request.direction=direction;request.impact=position;request.has_impact=true;
             const auto result=speed::CombatResolver::damage_enemy(runtime,request);speed::EventBuilder::flush_combat(runtime);
-            enemy.hit_cd = c.contact_cooldown;
+            health.hit_cd = c.contact_cooldown;
             if (runtime.state.draw.tracing) {
-                runtime.state.draw.inside[enemy.id] = hit.row;
-                const int64_t passes = ++runtime.state.draw.passes[enemy.id];
+                runtime.state.draw.inside[health.id] = target.slot;
+                const int64_t passes = ++runtime.state.draw.passes[health.id];
                 if (passes > 1) {
                     Dictionary text; text["pos"] = enemy.pos + Vector2(enemy.radius, -enemy.radius - 16.0);
                     text["text"] = String::utf8("×") + String::num_int64(passes);
@@ -195,7 +197,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (runtime.state.ship.vel.length() < c.bounce_min_speed) runtime.state.ship.vel = normal * c.bounce_min_speed;
         runtime.state.ship.boost_t = 0;
         if (gate==speed::GateResult::Allow) damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
-        enemy.hit_cd = 0.25;
+        health.hit_cd = 0.25;
         speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position);
         speed::RunUpBehavior::contact(runtime,position,direction,0);
         Dictionary bounce; bounce["pos"] = runtime.state.ship.pos; emit_event("bounce", bounce);

@@ -162,7 +162,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
-        if (p.id!=i+1 || (p.kind>16 && p.kind!=40 && p.kind!=41 && p.kind!=42 && p.kind!=43 && p.kind!=44 && p.kind!=45) || (p.active<=0 && p.kind!=13 && p.kind!=14) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.kind==15?"sail_run":p.kind==40?"command":p.kind==41?"howl":p.kind==42?"pounce":p.kind==43?"sirius":p.kind==44?"pounce":p.kind==45?"blaze":p.external_id)) return {};
+        if (p.id!=i+1 || (p.kind>16 && p.kind!=40 && p.kind!=41 && p.kind!=42 && p.kind!=43 && p.kind!=44 && p.kind!=45) || (p.active<=0 && p.kind!=13 && p.kind!=14) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.kind==15?"sail_run":p.kind==40?"command":p.kind==41?"howl":p.kind==42?"pounce":p.kind==43?"sirius":p.kind==44?"bay":p.kind==45?"blaze":p.external_id)) return {};
         std::vector<BossTechniqueStage> stages;
         for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
         if (p.kind==16) {

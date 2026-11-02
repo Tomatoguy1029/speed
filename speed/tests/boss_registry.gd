@@ -8,6 +8,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-draco-pose" in OS.get_cmdline_user_args() or "--cpp-draco-pose-contact" in OS.get_cmdline_user_args():
+		call_deferred("native_draco_pose")
+		return
 	if "--cpp-draco-body" in OS.get_cmdline_user_args():
 		call_deferred("native_draco_body")
 		return
@@ -2997,3 +3000,104 @@ func native_canis_blaze() -> void:
 	await get_tree().process_frame
 	print("[cpp_canis_blaze] failures=",failed)
 	get_tree().quit(1 if failed else 0)
+
+func native_draco_pose() -> void:
+	var form = load("res://scripts/bosses/draco_form.gd")
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/draco.tres")
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	check(bridge.configure(bytes,{"api_version":1,"run_id":151,"mode":1,"stage_id":"B_draco_pose","profile":{},"settings":{"hitstop":false}}).ok,"姿勢と寸法の編集値をC++へ読む")
+	bridge.start(151,{"position":Vector2(500,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	if "--cpp-draco-pose-contact" in OS.get_cmdline_user_args():
+		native_draco_pose_contact(bridge,id)
+		bridge.dispose()
+		print("[B_draco_pose_contact] failures=",failed)
+		get_tree().quit(1 if failed else 0)
+		return
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var neutral := PackedVector2Array([Vector2.ZERO])
+	for j in int(definition.params.body_segments):
+		var t := float(j+1)/float(definition.params.body_segments)
+		neutral.append(Vector2(-t*float(definition.params.body_length),sin(t*TAU*1.25)*float(definition.params.body_wave)*sin(t*PI*0.8)))
+	var original_length: float = form.length(neutral)
+	for j in neutral.size(): neutral[j] *= float(definition.params.body_length)/original_length
+	var same: bool = body.body_points.size()==neutral.size()
+	for j in neutral.size(): same = same and body.body_points[j].distance_to(neutral[j])<0.002
+	check(same,"最初の姿勢は既存と同じ波と長さの点列を使う")
+	var base_radius: float = body.radius
+	check(is_equal_approx(base_radius,definition.radius*float(definition.params.head_scale)),"頭の半径にキャラクター倍率を重ねない")
+	for depth in [0.25,0.1,1.0]:
+		check(bridge.command("dev_draco_pose",{"entity_id":id,"operation":"depth","depth":depth,"alpha":0.4}).ok,"深度と透明度を適用する")
+		body = bridge.command("dev_boss_body_state").value[0]
+		check(is_equal_approx(body.radius,base_radius*depth) and is_equal_approx(body.alpha,0.4),"深度は頭の命中半径と表示の両方へ同じ倍率を渡す")
+		for j in body.segments.size():
+			var fraction := float(j+1)/float(body.segments.size())
+			check(body.segments[j].position.distance_to(form.sample(body.body_points,fraction))<0.002 and is_equal_approx(body.segments[j].radius,float(definition.params.body_width)*0.5*form.taper(fraction)*depth),"描画と部位は同じ距離分率と尾の太さを使う")
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"reset"})
+	var override := PackedVector2Array([Vector2.ZERO,Vector2(80,0),Vector2(80,500),Vector2(900,500)])
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"override","points":override})
+	body = bridge.command("dev_boss_body_state").value[0]
+	for j in body.segments.size():
+		check(body.segments[j].position.distance_to(form.sample(override,float(j+1)/float(body.segments.size())))<0.002,"違う点数の姿勢でも部位を距離で配置する")
+	var along: float = form.fractions(override)[-2]
+	var middle: Vector2 = override[-2].lerp(override[-1],0.5)
+	var half_width: float = float(definition.params.body_width)*0.5*form.taper(lerpf(along,1.0,0.5))
+	check(bridge.command("dev_draco_pose",{"entity_id":id,"operation":"contains","point":middle+Vector2(0,half_width+3.9),"radius":4.0}).value,"尾の節の間も半径を足して命中する")
+	check(not bridge.command("dev_draco_pose",{"entity_id":id,"operation":"contains","point":middle+Vector2(0,half_width+4.1),"radius":4.0}).value,"尾の実半径を外れた点は命中しない")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"上書き点列を値として保持する")
+	bridge._core.step(0.1)
+	var after: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(bridge.restore(held.value).ok,"上書き点列と深度を復帰する")
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"復帰後の姿勢と尾の位置が一致する")
+	bridge.release_checkpoint(held.value)
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"depth","depth":0.25,"alpha":0.4})
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"reset"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(body.perspective_scale,1.0) and is_equal_approx(body.alpha,1.0) and is_equal_approx(body.radius,base_radius),"取消で深度・透明度・頭の寸法を戻す")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(package.visuals)
+	view.setup(scope,entries,cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value),"姿勢を正式表示へ渡す")
+	var display = view._boss_body_displays.values()[0]
+	check(display.scale==Vector2.ONE and display.state.body_points==body.body_points,"表示は点列の深度に別の倍率を重ねない")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var tail: Vector2 = (body.segments[-1].position+body.segments[-2].position)*0.5
+	var normal: Vector2 = (body.segments[-1].position-body.segments[-2].position).normalized().orthogonal()
+	var before_hp: float = body.hp
+	bridge._core.rebuild_enemy_grid(128.0)
+	check(bridge.command("dev_emit_attack",{"pool":0,"position":tail-normal*90.0,"velocity":normal*450.0,"life":2.0,"damage":50.0,"radius":4.0}).ok,"最小の味方弾を生成する")
+	bridge._core.step_projectiles(0.4)
+	check(bridge.command("dev_boss_body_state").value[0].hp<before_hp,"本番の広域検索を通った半径4の味方弾が尾の節の間へ命中する")
+	native_draco_pose_contact(bridge,id)
+	bridge.command("dev_cancel_boss",{"entity_id":id})
+	view.free()
+	bridge.dispose()
+	print("[B_draco_pose] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+
+func native_draco_pose_contact(bridge, id: int) -> void:
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"override","points":PackedVector2Array([Vector2.ZERO,Vector2(-500,0)])})
+	bridge._core.rebuild_enemy_grid(128.0)
+	bridge.command("dev_ship_motion",{"position":Vector2(-700,0),"velocity":Vector2(600,0)})
+	bridge.collect_frame()
+	check(bridge._core.handle_draw({"has_cursor":true,"pen":Vector2(-700,0),"press":true},0,1.0),"尾から頭への描線を開始する")
+	check(bridge._core.handle_draw({"has_cursor":true,"pen":Vector2(200,0),"press":true},1000,1.0) and bridge._core.draw_snapshot().tracing,"尾から頭へ通る描線を確定する")
+	for frame in 20: bridge._core.step_draw(0.04)
+	var damage_events: Array = bridge.read_frame().value.events.filter(func(event):return event.type==&"combat_damage" and event.payload.get("cause")==&"ram" and event.payload.get("target_id")==id and float(event.payload.get("applied",0.0))>0.0)
+	check(damage_events.size()==1,"胴から頭まで同じ描線で通っても全身から離れるまでは一度だけ当たる")
