@@ -6,6 +6,23 @@
 #include <algorithm>
 #include <cmath>
 namespace speed {
+bool ZoneSystem::explode(RunRuntime &run,godot::Vector2 center,double radius,double damage,Cause cause,double knock,double life,const godot::Color &color) {
+    const double reach=radius+std::max(run.state.combat_config.max_enemy_radius,run.state.grid.max_radius);
+    const auto rows=CollisionQuery::enemy_rows(run.state,center-godot::Vector2(reach,reach),center+godot::Vector2(reach,reach));
+    std::vector<EnemyHandle> targets;targets.reserve(rows.size());
+    for (auto row:rows) targets.push_back(run.state.enemy_handles.at(uint32_t(row)));
+    for (auto target:targets) {
+        if (!run.state.enemy_handles.contains(target)) continue;
+        const auto &enemy=run.state.enemies[target.slot];if (!enemy.alive || enemy.dead) continue;
+        const auto delta=enemy.pos-center;if (delta.length_squared()>(radius+enemy.radius)*(radius+enemy.radius)) continue;
+        DamageRequest request;request.struck=target;request.amount=damage;request.cause=cause;request.knock=knock;
+        request.direction=delta.length_squared()>0?delta.normalized():godot::Vector2();
+        CombatResolver::damage_enemy(run,request);
+        if (run.state.phase!=godot::RunState::Phase::Play) return false;
+    }
+    EventBuilder::flush_combat(run);godot::Dictionary event;event["pos"]=center;event["radius"]=radius;event["cause"]=symbol_name(cause);event["color"]=color;event["life"]=life;FrameBuilder::append(run,"explode",event);
+    return true;
+}
 const char *ZoneSystem::scene(uint32_t style) {
     static const char *paths[]={"res://scenes/attacks/zone.tscn","res://scenes/attacks/zone_reticle.tscn","res://scenes/attacks/zone_lightning.tscn","res://scenes/attacks/zone_bite.tscn","res://scenes/attacks/zone_aquila.tscn","res://scenes/attacks/zone_phoenix.tscn","res://scenes/attacks/zone_bomber.tscn","res://scenes/attacks/zone_pump.tscn"};
     return style<uint32_t(ZoneStyle::Count)?paths[style]:"";

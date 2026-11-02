@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w29" in OS.get_cmdline_user_args() or "--cpp-w29-tail" in OS.get_cmdline_user_args():
+		await check_cpp_w29()
+		print("[cpp_w29] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t36" in OS.get_cmdline_user_args() or "--cpp-t36-fixes" in OS.get_cmdline_user_args() or "--cpp-t36-interval" in OS.get_cmdline_user_args():
 		await check_cpp_t36()
 		print("[cpp_t36] failed=%d" % failures)
@@ -1692,12 +1698,12 @@ func trait_select_upgrade(session, id: String, config: GameConfig, idle: Diction
 	var selected := {}
 	for attempt in config.reroll_count+1:
 		cards = bridge._ui.cards
-		print("[特性の通常候補] 特性=%s 引き直し=%d 候補=%s" % [id,attempt,cards.candidates.map(func(card): return card.id)])
+		print("[装備の通常候補] 装備=%s 引き直し=%d 候補=%s" % [id,attempt,cards.candidates.map(func(card): return card.id)])
 		for card: Dictionary in cards.candidates:
 			if card.id==id: selected = card
 		if not selected.is_empty() or attempt==config.reroll_count: break
 		if not bridge.command("reroll",{"offer_id":cards.offer_id}).ok: break
-	check(not selected.is_empty(),"通常の候補に対象の特性を出す")
+	check(not selected.is_empty(),"通常の候補に対象の装備を出す")
 	if selected.is_empty(): return
 	bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":selected.candidate_id})
 	for tick in 120:
@@ -1706,7 +1712,8 @@ func trait_select_upgrade(session, id: String, config: GameConfig, idle: Diction
 		if bridge._ui.phase==0: break
 		await get_tree().process_frame
 	session.cpp_choices.poll()
-	check(bridge._ui.trait_levels.any(func(item): return item.id==id and item.level>=2) and session.cpp_choices.equipped.has("trait:"+id),"カードの資源準備後に取得段を一度だけ確定する")
+	var kind := "weapon" if id.begins_with("W") else "trait"
+	check(bridge._ui[kind+"_levels"].any(func(item): return item.id==id and item.level>=2) and session.cpp_choices.equipped.has(kind+":"+id),"カードの資源準備後に取得段を一度だけ確定する")
 
 func check_cpp_t04() -> void:
 	OS.add_logger(capture)
@@ -2025,3 +2032,100 @@ func check_cpp_t36() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"フルバーストの状態と表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_w29() -> void:
+	var capture := ErrorCapture.new()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	# 通常候補は固定seed 630の1回目の引き直しでW29を含む。
+	var seed_value := 630
+	var session = await trait_test_session("W29",config,seed_value)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	var initial: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("w29",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W29")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in ([] if "--cpp-w29-tail" in OS.get_cmdline_user_args() else range(1,definition.level_steps.size()+1)):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W29","levels":level}).ok,"終端爆発を全段取得する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
+		bridge.command("dev_post_weapon_power",{"damage":2,"followup":0})
+		var target: Vector2 = core.ship_snapshot().ship_pos+Vector2(120,75)
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target}).value
+		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+		events.clear()
+		trait_start_trace(bridge,120.0)
+		for tick in 80:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not bridge._ui.draw.tracing: break
+		var booms: Array = events.filter(func(event): return event.type==&"explode" and event.payload.cause==&"endBlast")
+		check(booms.size()==1 and is_equal_approx(booms[0].payload.radius,definition.params.radius_by_level[level-1]),"終了時に全段の主爆発を一度発動する")
+		var pending: Array = bridge._ui.end_blast.pending
+		var count: int = definition.params.secondary_by_level[level-1]
+		check(pending.size()==count,"全段の外周爆発数を生成値どおり予約する")
+		var hits: Array = events.filter(func(event): return event.type==&"combat_damage" and event.payload.cause==&"endBlast")
+		var gear: TraitDef = ContentManager.definition(&"traits",&"T04")
+		var gear_power: float = 1.0+(gear.params.mult_base+gear.params.mult_per*5.0-1.0)*(exp(3.0*120.0/config.draw_length)-1.0)/(exp(3.0)-1.0)
+		var expected: float = config.base_attack*gear_power*(1.0+2.0*config.post_max.increments.weapon_damage)*definition.params.damage_by_level[level-1]
+		check(not hits.is_empty() and is_equal_approx(hits[0].payload.requested,expected) and bridge._ui.full_charge.burst_power==1.0,"終了時のギア倍率と最大段後倍率を命中へ固定してからリセットする")
+		for i in pending.size():
+			check(is_equal_approx(pending[i].radius,float(definition.params.radius_by_level[level-1])*definition.params.secondary_radius) and is_equal_approx(pending[i].damage,expected*definition.params.secondary_damage),"予約に半径と威力を値で保持する")
+			var distance: float = pending[i].pos.distance_to(booms[0].payload.pos)
+			check(distance>=definition.params.radius_by_level[level-1]*0.8999 and distance<=definition.params.radius_by_level[level-1]*1.1001,"外周位置の乱数を共通列で範囲内に使う")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._end_blast_visual!=null and presentation.frame_view._end_blast_visual.booms.size()==1 and presentation.frame_view._end_blast_visual._plasmas!=null,"主爆発を本番の紫のプラズマ表示へ渡す")
+		var saved: Dictionary = bridge.checkpoint()
+		var before: Dictionary = bridge._ui.end_blast.duplicate(true)
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.1)
+		check(bridge._ui.end_blast==before,"停止中は予約と残留表示の時計を進めない")
+		bridge.command("pause",{"paused":false})
+		for tick in 60: bridge.step(1.0/120.0,idle,viewport)
+		var after: Dictionary = bridge._ui.end_blast.duplicate(true)
+		var enemies: Array = core.enemies_snapshot()
+		check(events.filter(func(event): return event.type==&"explode" and event.payload.cause==&"endBlast").size()==count+1 and bridge._ui.end_blast.pending.is_empty(),"予約順で外周爆発を一度ずつ命中させる")
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._end_blast_visual.booms.size()==1,"復帰した主爆発の残留表示を状態から再構成する")
+		for tick in 60: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.end_blast==after and core.enemies_snapshot()==enemies,"復帰後の予約順・命中・残留寿命を再現する")
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		bridge.command("dev_remove_weapon",{"id":"W29"})
+		presentation._present_cpp(0.01)
+		events.clear()
+		for tick in 130: bridge.step(1.0/120.0,idle,viewport)
+		check(not bridge._ui.end_blast.ready and bridge._ui.end_blast.pending.is_empty() and presentation.frame_view._end_blast_visual==null and events.all(func(event): return event.type!=&"explode" or event.payload.cause!=&"endBlast"),"途中解除で残りの予約と専用表示を片付ける")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W29","levels":5})
+	trait_start_trace(bridge,120.0)
+	for tick in 210: bridge.step(1.0/120.0,idle,viewport)
+	presentation._present_cpp(0.01)
+	check(bridge._ui.end_blast.pending.is_empty() and bridge._ui.end_blast.visuals.is_empty() and presentation.frame_view._end_blast_visual.booms.is_empty(),"最終爆発の残留時間後に予約と表示を自然消滅する")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W29","levels":1})
+	await trait_select_upgrade(session,"W29",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"終端爆発の状態と表示に実行エラーがない: %s" % [capture.messages()])

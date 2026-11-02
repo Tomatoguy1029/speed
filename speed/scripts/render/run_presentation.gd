@@ -1595,6 +1595,13 @@ func _present_cpp(delta: float) -> void:
 	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	cpp_background.update_frame(frame.camera)
 	frame_view.update_effects(frame,delta)
+	if frame_view._end_blast_visual!=null:
+		shake = maxf(shake,frame_view._end_blast_visual.frame_shake)
+		frame_view._end_blast_visual.frame_shake = 0.0
+	if not frame.ui.get("presentation_frozen",false):
+		shake = maxf(0.0,shake-delta*40.0)
+		_camera.offset = Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)
+	else: _camera.offset = Vector2.ZERO
 	frame_view.perf.since(&"view_effects",effects_start)
 	var tail_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")

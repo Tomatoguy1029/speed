@@ -1314,6 +1314,10 @@
       {
         "name": "Interceptor",
         "value": "interceptor"
+      },
+      {
+        "name": "EndBlast",
+        "value": "endBlast"
       }
     ],
     "VisualRole": [

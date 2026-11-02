@@ -58,6 +58,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->rear_levels=records.RearDefinition_rows;
     if (records.RearPostDefinition_rows.size()!=1) return {};
     bundle->rear_post=records.RearPostDefinition_rows.front();
+    bundle->end_blast_levels=records.EndBlastDefinition_rows;
     bundle->barrier_levels=records.BarrierDefinition_rows;
     if (records.BarrierPostDefinition_rows.size()!=1) return {};
     bundle->barrier_post=records.BarrierPostDefinition_rows.front();
@@ -192,6 +193,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.external_id=="T04") {
             if (d.kind!=1 || d.maximum_level!=bundle->full_charge_levels.size()) return {};
             for (size_t i=0;i<bundle->full_charge_levels.size();++i) if (bundle->full_charge_levels[i].equipment!=d.id || bundle->full_charge_levels[i].level!=i+1) return {};
+            continue;
+        }
+        if (d.external_id=="W29") {
+            if (d.kind!=0 || d.comet_only || d.maximum_level!=bundle->end_blast_levels.size() || !power_weapons.count(d.id)) return {};
+            for (size_t i=0;i<bundle->end_blast_levels.size();++i) if (bundle->end_blast_levels[i].weapon!=d.id || bundle->end_blast_levels[i].level!=i+1) return {};
             continue;
         }
         if (d.external_id=="W05") {

@@ -81,6 +81,10 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W29") {
+            const auto &level=run.content->end_blast_levels[next-1];auto &weapon=run.state.loadout.end_blast;
+            weapon.ready=true;weapon.definition=id;weapon.radius=level.radius;weapon.damage=level.damage;weapon.secondary=level.secondary;
+            weapon.secondary_radius=level.secondary_radius;weapon.secondary_damage=level.secondary_damage;weapon.secondary_delay=level.secondary_delay;weapon.secondary_step=level.secondary_step;weapon.knock=level.knock;
         } else if (d.external_id=="W02") {
             const auto &level=run.content->scatter_levels[next-1];auto &scatter=run.state.loadout.scatter;
             if (scatter.ready) scatter.fire.remaining+=level.interval-scatter.interval;
@@ -114,6 +118,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W29") run.state.loadout.end_blast={};
     else if (external=="W02") run.state.loadout.scatter={};
     else return false;
     owned.erase(current);refresh_effects(run);return true;

@@ -604,6 +604,68 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "EndBlastDefinition",
+      "section": 69,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "secondary_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary_step",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

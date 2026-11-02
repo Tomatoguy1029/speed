@@ -36,6 +36,23 @@ struct BarrierWeaponState {
     double durability=-1,restore=0,maximum=0,revive=0,radius=0,damage=0,shell_radius=0,knock=0;
     std::vector<BarrierWaveState> waves;
 };
+struct EndBlastPending {
+    godot::Vector2 pos;
+    double radius=0,damage=0,delay=0;
+};
+struct EndBlastVisual {
+    godot::Vector2 pos;
+    double radius=0,age=0;
+    uint64_t id=0;
+};
+struct EndBlastWeaponState {
+    bool ready=false;
+    uint32_t definition=0,secondary=0;
+    uint64_t next_visual=1;
+    double radius=0,damage=0,secondary_radius=0,secondary_damage=0,secondary_delay=0,secondary_step=0,knock=0;
+    std::vector<EndBlastPending> pending;
+    std::vector<EndBlastVisual> visuals;
+};
 struct RampageState {
     bool ready=false;
     uint64_t kills=0;
@@ -60,6 +77,7 @@ struct LoadoutState {
     RampageState rampage;
     DuplicatorState duplicator;
     double boost_distance=0,full_charge_maximum=1;
+    EndBlastWeaponState end_blast;
     ScatterWeaponState scatter;
     RearWeaponState rear;
     BarrierWeaponState barrier;

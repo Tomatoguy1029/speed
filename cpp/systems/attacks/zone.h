@@ -11,6 +11,7 @@ struct ZoneParams {
 };
 class ZoneSystem {
 public:
+    static bool explode(RunRuntime &,godot::Vector2,double radius,double damage,Cause,double knock,double life,const godot::Color &color=godot::Color::html("ffb36b"));
     static AttackHandle emit(RunRuntime &,const ZoneParams &);
     static bool activate(RunRuntime &,AttackHandle);
     static void end_visual(RunRuntime &,uint32_t definition,bool hit,godot::Vector2);

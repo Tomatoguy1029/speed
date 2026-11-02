@@ -17,6 +17,32 @@ enum { MOTE, FLAKE, STAR }
 const TUNED_SHADERS := [preload("res://shaders/plasma_burst.gdshader")]
 var booms: Array[Dictionary] = []
 var _plasmas: PlasmaBursts
+var _frame_parent: Node2D
+var _frame_seen := {}
+var frame_shake := 0.0
+
+func _effect_key() -> String: return "weapon/endBlast"
+
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_frame_parent = parent
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+
+func sync_frame(values: Array) -> void:
+	var alive := {}
+	for value: Dictionary in values:
+		alive[value.id] = true
+		if _frame_seen.has(value.id): continue
+		_frame_seen[value.id] = true
+		_add({"pos":value.pos,"radius":value.radius})
+		booms[-1].age = value.age
+		_step(booms[-1],value.age)
+		_plasmas._items[-1].age = value.age
+	_frame_seen = alive
+
+func frame_event(ev: Dictionary, radius: float, secondary: int) -> void:
+	if claims(ev) and float(ev.radius)>=radius*0.9: frame_shake = maxf(frame_shake,7.0 if secondary>0 else 4.0)
 
 func dispose() -> void:
 	if is_instance_valid(_plasmas): _plasmas.queue_free()
@@ -26,11 +52,11 @@ func dispose() -> void:
 func plasmas() -> PlasmaBursts:
 	if _plasmas == null:
 		_plasmas = PlasmaBursts.new()
-		_plasmas.setup(1.82 * cfg.character_scale)
+		_plasmas.setup(_painter.px if rm==null else 1.82*cfg.character_scale)
 		_plasmas.key = _effect_key()
 		_plasmas.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-		_plasmas.modulate = RenderPipeline.plain_color(rm._layers.fx, visual_color(Color.WHITE))
-		rm._layers.fx.add_child(_plasmas)
+		_plasmas.modulate = RenderPipeline.plain_color(_frame_parent if rm==null else rm._layers.fx,visual_color(Color.WHITE))
+		(_frame_parent if rm==null else rm._layers.fx).add_child(_plasmas)
 	return _plasmas
 
 func claims(ev: Dictionary) -> bool:
@@ -38,11 +64,13 @@ func claims(ev: Dictionary) -> bool:
 
 func on_event(ev: Dictionary) -> void:
 	if not claims(ev): return
-	# 球の半径は倒す範囲の 0.96 倍（ドット数）
-	var rad: float = float(ev.radius) / painter().px * 0.96
-	var main: bool = float(ev.radius) >= behavior.area(behavior.at_level("radius_by_level")) * 0.9
-	plasmas().add(ev.pos, rad, BALL)
-	if main: rm.shake = maxf(rm.shake, 7.0 if int(behavior.at_level("secondary_by_level")) > 0 else 4.0)
+	var main: bool = float(ev.radius)>=behavior.area(behavior.at_level("radius_by_level"))*0.9
+	if main: rm.shake = maxf(rm.shake,7.0 if int(behavior.at_level("secondary_by_level"))>0 else 4.0)
+	_add(ev)
+
+func _add(ev: Dictionary) -> void:
+	var rad: float = float(ev.radius)/(_painter if rm==null else painter()).px*0.96
+	plasmas().add(ev.pos,rad,BALL)
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var s := rad / 35.0
@@ -57,8 +85,10 @@ func on_event(ev: Dictionary) -> void:
 	booms.append({"pos": ev.pos, "rad": rad, "age": 0.0, "parts": parts, "rng": rng, "seed": rng.randi()})
 
 func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+	frame_tick(world_dt())
+
+func frame_tick(dt: float) -> void:
+	var p: PixelPainter = _painter if rm==null else painter()
 	p.begin()
 	for b in booms:
 		b.age += dt

@@ -2,6 +2,7 @@
 #include "../cpp/systems/field.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
 #include "../cpp/behaviors/traits/rampage.h"
+#include "../cpp/behaviors/weapons/endBlast.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -146,6 +147,7 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
 
 void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
+    speed::EndBlastBehavior::end(runtime);
     speed::RampageBehavior::end(runtime);
     speed::FullChargeBehavior::end(runtime);
     const double speed = std::max(double(runtime.state.ship.vel.length()), runtime.state.draw.before_speed);
