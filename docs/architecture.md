@@ -195,7 +195,7 @@ classDiagram
   RunPresentation --> RunSimulation : run
 ```
 
-実装の入口は [RunSession](../speed/scripts/runtime/run_session.gd)、[RunSimulation](../speed/scripts/runtime/run_simulation.gd)、[RunContext](../speed/scripts/runtime/run_context.gd)。種類別の処理との接続は [6.1](#61-敵とボスの-ai)、資源の準備と解放は [8.1](#81-定義データresource) に示す。
+実装の入口は [RunSession](../speed/scripts/runtime/run_session.gd)、[RunSimulation](../cpp/runtime/run_runner.cpp)、[RunContext](../cpp/runtime/run_runner.h)。種類別の処理との接続は [6.1](#61-敵とボスの-ai)、資源の準備と解放は [8.1](#81-定義データresource) に示す。
 
 ### 4.4 守る決まり
 
@@ -288,7 +288,7 @@ classDiagram
   WeaponVisual --> TraitBehavior : behavior
 ```
 
-EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../speed/scripts/enemies/enemy_behavior.gd)、[WeaponBehavior](../speed/scripts/weapons/weapon_behavior.gd)、[TraitBehavior](../speed/scripts/traits/trait_behavior.gd)、[EnemyVisual](../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../speed/scripts/render/equipment/weapon_visual.gd) にある。
+EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../cpp/systems/enemy_system.cpp)、[WeaponBehavior](../cpp/systems/equipment.cpp)、[TraitBehavior](../cpp/systems/equipment.cpp)、[EnemyVisual](../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../speed/scripts/render/equipment/weapon_visual.gd) にある。
 
 EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時間を受け取り、高速突進の移動区間を判定する。`full_rate` が有効な種類は、画面外でも行動と区間判定を毎回進める。石化・外力による移動は共通の前処理で扱う。
 
@@ -668,7 +668,7 @@ sequenceDiagram
   P->>V: draw_marks / draw_objects<br/>draw_shotなど
 ```
 
-AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisualは状態と種類別の演出を描く。実装の入口は [RunState.emit](../speed/scripts/data_types/run_state.gd)、[RunSimulation.flush_events](../speed/scripts/runtime/run_simulation.gd)、[RunPresentation](../speed/scripts/render/run_presentation.gd)、[DrawLayer](../speed/scripts/render/draw_layer.gd)。HUDも `frame_events` を購読し、カード候補と位相の変更は `cards_changed`・`phase_changed` で受け取る。
+AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisualは状態と種類別の演出を描く。実装の入口は [RunState.emit](../cpp/state/run_state.h)、[RunSimulation.flush_events](../cpp/runtime/run_runner.cpp)、[RunPresentation](../speed/scripts/render/run_presentation.gd)、[DrawLayer](../speed/scripts/render/draw_layer.gd)。HUDも `frame_events` を購読し、カード候補と位相の変更は `cards_changed`・`phase_changed` で受け取る。
 
 ### 10.2 層・資源・画面効果
 

@@ -190,7 +190,7 @@ F4パネルを開く操作はランを自動停止しない。数値入力中は
 
 表形式の共通値編集は「プロジェクト → ツール → データ編集」（プラグイン `Data Editor`）から開く。共通値を変更する作業は基礎担当の範囲で行う。
 
-UIと保存の実装は[調整パネル](../../speed/scripts/dev/stage_enemy_panel.gd)・[保存処理](../../speed/scripts/dev/stage_enemy_edit.gd)、ライブ反映は[EnemySystem](../../speed/scripts/runtime/systems/enemy_system.gd)を参照する。共通基準を調整する場合の編集先は[AI向け資料](stage-production-ai.md#編集先を選ぶ)、素材の差し替えも同資料から辿る。
+UIと保存の実装は[調整パネル](../../speed/scripts/dev/stage_enemy_panel.gd)・[保存処理](../../speed/scripts/dev/stage_enemy_edit.gd)、ライブ反映は[EnemySystem](../../cpp/systems/enemy_system.cpp)を参照する。共通基準を調整する場合の編集先は[AI向け資料](stage-production-ai.md#編集先を選ぶ)、素材の差し替えも同資料から辿る。
 
 ### タイムライン・編成・重み
 
@@ -301,7 +301,7 @@ Dolphin                         EnemyFormation：編成の根
 
 編集元の保存を確認し、目盛りをクリックして「再生」で出現、向き、数、補充間隔、攻撃の重なりを見る。起動前の生成に失敗すると実行を中止し、「実行用データの生成に失敗」をGodotの出力へ表示する。参照先や検証エラーを修正してから再度実行する。シーンやタイムラインの変更は保存後にランを起動し直して確認する。実行中のランで敵数値だけを試す入口は[5.1](stage-production.md#51-f4でステージ内の敵数値を試す)。通しの成長と録画の比較には[6章](stage-production.md#6-記録と感想で調整する)を使う。
 
-操作一覧は右上の「？」と[設計書14.2](../architecture.md#142-出現タイムラインのエディタ拡張)、候補・保存欄の実装は[インスペクター拡張](../../speed/addons/spawn_timeline/type_checks.gd)、抽選の実装は[SpawnSystem](../../speed/scripts/runtime/systems/spawn_system.gd)を参照する。
+操作一覧は右上の「？」と[設計書14.2](../architecture.md#142-出現タイムラインのエディタ拡張)、候補・保存欄の実装は[インスペクター拡張](../../speed/addons/spawn_timeline/type_checks.gd)、抽選の実装は[SpawnSystem](../../cpp/systems/population_system.cpp)を参照する。
 
 ### ボスの区間フロー・攻撃値・タイムライン
 
