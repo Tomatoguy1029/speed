@@ -17,6 +17,10 @@ var _source: RuntimeStage
 var _definitions := {}
 var _config: GameConfig
 var _output := ""
+var _baseline_config: GameConfig
+var _baseline_stage: StageDef
+var _baseline_definitions := {}
+var _seek_view_mode := SubViewport.UPDATE_ALWAYS
 const BUILDER := preload("res://tools/content/build_run_content.gd")
 const LOADER := preload("res://scripts/runtime/run_content_loader.gd")
 const PROJECTION := preload("res://gyms/enemy_lab/lab_projection.gd")
@@ -69,7 +73,7 @@ func reset(settings := {}) -> void:
 	_seek_serial += 1
 	seeking = false
 	for checkpoint in checkpoints:
-		if is_instance_valid(checkpoint.scene): checkpoint.scene.queue_free()
+		_free_checkpoint(checkpoint)
 	checkpoints.clear()
 	history.clear()
 	edit_undo.clear()
@@ -90,9 +94,13 @@ func reset(settings := {}) -> void:
 			spec.overrides[id]["visual_settings"] = ContentManager.enemies[type].visual_settings.duplicate(true)
 		if not spec.overrides[id].has("armor_colors"):
 			spec.overrides[id]["armor_colors"] = ContentManager.enemies[type].armor_colors.duplicate(true)
+	_baseline_config = ContentManager.base.duplicate(true)
+	_baseline_stage = ContentManager.stage(int(spec.get("stage",1))).duplicate(true)
+	_baseline_definitions = ContentManager.enemies.duplicate(true)
 	baseline = FORMAT.baseline()
 	furthest = 0
 	await _rebuild()
+	_restore_seek_view()
 	changed.emit()
 
 func _rebuild() -> void:
@@ -101,7 +109,7 @@ func _rebuild() -> void:
 	if is_instance_valid(scene):
 		if scene.get_parent()!=null: scene.get_parent().remove_child(scene)
 		scene.queue_free()
-	_config = ContentManager.base.duplicate(true)
+	_config = _baseline_config.duplicate(true)
 	for key in spec.get("config",{}): _config.set(key,spec.config[key])
 	_config.trait_slots = maxi(_config.trait_slots,spec.get("traits",{}).size())
 	var flags: Dictionary = spec.get("field",{})
@@ -116,13 +124,13 @@ func _rebuild() -> void:
 		_config.comet_interval_max = 1e8
 		_config.gravity_interval_min = 1e8
 		_config.gravity_interval_max = 1e8
-	var stage: StageDef = ContentManager.stage(int(spec.get("stage",1))).duplicate(true)
+	var stage: StageDef = _baseline_stage.duplicate(true)
 	_source = load("res://tools/content/build_runtime_stage.gd").compile(stage)
 	_source.resources = _source.resources.duplicate(true)
 	_source.resources.enemy_ids = PackedStringArray()
 	_definitions = {}
-	for id in ContentManager.enemies:
-		var definition: EnemyDef = ContentManager.enemies[id].duplicate(true)
+	for id in _baseline_definitions:
+		var definition: EnemyDef = _baseline_definitions[id].duplicate(true)
 		for key in spec.get("overrides",{}).get(String(id),{}):
 			var value = spec.overrides[String(id)][key]
 			if key=="params": definition.params.merge(value,true)
@@ -141,7 +149,8 @@ func _rebuild() -> void:
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
 	scene = RunManager.create_session(viewport if viewport!=null else self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":int(spec.get("seed",932)),"hud":true,"cpp_edit_source":{"stage":_source,"config":_config,"definitions":_definitions}},viewport!=null)
 	scene.auto_step = false
-	while scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
+	while is_instance_valid(scene) and scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
+	if not is_instance_valid(scene): return
 	if scene.bridge==null:
 		last_error = {"ok":false,"message":"実験のC++ランを開始できません"}
 		run = null
@@ -480,6 +489,9 @@ func row_for_id(id: int) -> int:
 	return -1
 
 func seek(target: int, instant := false) -> void:
+	if not seeking and viewport!=null:
+		_seek_view_mode = viewport.render_target_update_mode
+		viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	_seek_serial += 1
 	var request := _seek_serial
 	playing = false
@@ -498,6 +510,18 @@ func seek(target: int, instant := false) -> void:
 		scene = item.scene
 		run = item.run
 		bridge = scene.bridge
+		var restored: Dictionary = bridge.restore(int(item.checkpoint))
+		bridge.release_checkpoint(int(item.checkpoint))
+		if not restored.ok:
+			last_error = restored
+			_free_checkpoint(item)
+			scene = null
+			run = null
+			await _rebuild()
+			if request!=_seek_serial: return
+			seeking = false
+			_restore_seek_view()
+			return
 		_definitions = run.enemies.data.definitions
 		_config = run.cfg
 		scene.process_mode = Node.PROCESS_MODE_INHERIT
@@ -519,8 +543,13 @@ func seek(target: int, instant := false) -> void:
 		return
 	var epoch := _epoch
 	while tick < target:
-		for n in mini(120, target - tick):
+		for n in mini(120,target-tick):
+			var previous_tick := tick
 			step()
+			if tick==previous_tick:
+				seeking = false
+				_restore_seek_view()
+				return
 		# Reset と編集の復元は、完成した状態だけを次の描画へ渡す。
 		if not instant:
 			seek_progress.emit(float(tick) / maxf(1, target))
@@ -529,6 +558,9 @@ func seek(target: int, instant := false) -> void:
 			return
 	furthest = end
 	seeking = false
+	_refresh_projection()
+	bridge.collect_frame()
+	_restore_seek_view()
 	changed.emit()
 
 ## 最後に再生を始めた時刻の状態に戻す（配置は残す）。それ以降の記録は分岐として残し、そこから新しく遊べるようにする。
@@ -561,6 +593,15 @@ func cancel_seek() -> void:
 	_seek_serial += 1
 	seeking = false
 	playing = false
+	_restore_seek_view()
+
+func _restore_seek_view() -> void:
+	if is_instance_valid(viewport): viewport.render_target_update_mode = _seek_view_mode
+
+func _free_checkpoint(item: Dictionary) -> void:
+	if not is_instance_valid(item.scene): return
+	if item.scene.bridge!=null and item.has("checkpoint"): item.scene.bridge.release_checkpoint(int(item.checkpoint))
+	item.scene.free()
 
 func digest() -> String:
 	var record: Dictionary = bridge.read_recording(false)
@@ -573,7 +614,11 @@ func _checkpoint_key(at: int) -> String:
 ## 状態をコピーせず、停止したシーン全体を保持する。HSM とタイムラインも同じ実体で復元する。
 func _cache_current() -> void:
 	if not is_instance_valid(scene) or not is_instance_valid(run): return
-	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true), "pinned": pinned,
+	var held: Dictionary = bridge.checkpoint()
+	if not held.ok:
+		last_error = held
+		return
+	checkpoints.append({"checkpoint":held.value,"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true), "pinned": pinned,
 		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "selected": selected, "key": _state_key})
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	# 表示枠に残すと、保存した過去の場面も重なって描かれる
@@ -583,7 +628,7 @@ func _cache_current() -> void:
 	run = null
 	while checkpoints.size() > 3:
 		var old: Dictionary = checkpoints.pop_front()
-		if is_instance_valid(old.scene): old.scene.queue_free()
+		_free_checkpoint(old)
 
 func definition_for_row(row: int) -> Resource:
 	var t = run.enemies.table
@@ -674,7 +719,7 @@ func _restore_edit(source: Array[Dictionary], target: Array[Dictionary]) -> void
 		changed.emit()
 		return
 	source.pop_back()
-	target.append({"history":history.duplicate(true),"end":furthest,"tick":tick,"commands":item.get("opposite",[]),"opposite":commands})
+	target.append({"history":history.duplicate(true),"end":furthest,"tick":tick,"commands":[],"opposite":[]})
 	# 配置・削除などは同じ時刻まで非表示で復元し、編集時刻には戻さない。
 	var at := tick
 	var end := furthest
@@ -691,7 +736,7 @@ func _restore_edit(source: Array[Dictionary], target: Array[Dictionary]) -> void
 func _exit_tree() -> void:
 	_seek_serial += 1
 	for checkpoint in checkpoints:
-		if is_instance_valid(checkpoint.scene): checkpoint.scene.free()
+		_free_checkpoint(checkpoint)
 	checkpoints.clear()
 	if is_instance_valid(scene) and scene.get_parent()!=self: scene.free()
 	bridge = null

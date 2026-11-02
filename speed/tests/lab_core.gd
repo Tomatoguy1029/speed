@@ -11,6 +11,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-replay" in OS.get_cmdline_user_args() or "--cpp-lab-replay-placement" in OS.get_cmdline_user_args():
+		await cpp_lab_replay()
+		print("[cpp_lab_replay] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab-history" in OS.get_cmdline_user_args():
 		await cpp_lab_history()
 		print("[cpp_lab_history] passed=%d failed=%d" % [passed,failed])
@@ -191,3 +196,54 @@ func cpp_lab_history() -> void:
 		check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"履歴編集後の読取・回収・通知配信が成功する")
 		lab.queue_free()
 	await get_tree().process_frame
+
+func cpp_lab_replay() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"empty":true,"overrides":{"gunner":{"speed":0.0}}})
+	check(lab.perform("spawn",{"type":"gunner","pos":[500,0]}),"攻撃を持つ敵を配置する")
+	for n in 48: lab.step()
+	var tick: int = lab.tick
+	var firing: String = lab.digest()
+	check(lab.perform("spawn",{"type":"drifter","pos":[700,400]}),"攻撃中の現在tickで敵を追加する")
+	for n in 12: lab.step()
+	await lab.undo_edit()
+	check(lab.tick==tick+12 and lab.run.enemies.count()==1,"配置の取消は後続入力を保ち現在tickまで再構築する")
+	await lab.redo_edit()
+	check(lab.tick==tick+12 and lab.run.enemies.count()==2,"再配置も現在tickまで再構築する")
+	await lab.seek(tick)
+	check(lab.run.enemies.count()==2,"配置時刻の命令を同じ境界で適用する")
+	if "--cpp-lab-replay-placement" in OS.get_cmdline_user_args():
+		lab.queue_free()
+		await get_tree().process_frame
+		return
+	await lab.reset({"empty":true,"overrides":{"drifter":{"speed":0.0}}})
+	lab.perform("spawn",{"type":"drifter","pos":[500,0]})
+	for n in 12: lab.step()
+	var old_hash: String = lab.bridge.read_recording(true).value.identity.payload_sha256
+	var old_epoch: int = lab.bridge.read_frame().value.epoch
+	await lab.seek(0)
+	for n in 24: lab.step()
+	lab.perform("parameter",{"type":"drifter","key":"speed","value":20.0})
+	var new_hash: String = lab.bridge.read_recording(true).value.identity.payload_sha256
+	await lab.seek(12)
+	check(old_hash!=new_hash and lab.bridge.read_recording(true).value.identity.payload_sha256==old_hash and lab.run.enemies.table.speed[0]==0.0,"seekで保持した旧ContentBundleへ戻る")
+	check(lab.bridge.read_frame().value.epoch>old_epoch,"復帰は共通保持の新epochへ切り替える")
+	for target in [0,24,6,18,3]: await lab.seek(target)
+	check(lab.checkpoints.size()<=3,"保持するSessionとC++保持点の上限を守る")
+	lab.perform("command",{"name":"dev_add_xp","args":{"amount":100.0}})
+	lab.step()
+	check(lab.run.state.phase==RunState.Phase.LEVELUP,"カード待ちを復元対象に含める")
+	var card_tick: int = lab.tick
+	lab.perform("spawn",{"type":"drifter","pos":[900,500]})
+	await lab.undo_edit()
+	check(lab.tick==card_tick and lab.run.state.phase==RunState.Phase.LEVELUP,"カード待ちでも配置取消のtickと候補待ちを維持する")
+	lab.cancel_seek()
+	check(not lab.seeking and not lab.playing,"取消後の古いseekを進めない")
+	await lab.reset({"empty":true})
+	check(lab.tick==0 and lab.checkpoints.is_empty() and lab.edit_undo.is_empty() and lab.edit_redo.is_empty(),"Resetで開始状態とundo/redoと保持点へ戻る")
+	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"再構築の後の読取・回収・通知配信が成功する")
+	var ids: Array = RunManager._sessions.keys().duplicate()
+	lab.queue_free()
+	await get_tree().process_frame
+	check(ids.all(func(id): return RunManager.session(id)==null),"画面破棄で現在と保持中の全Sessionを解放する")
