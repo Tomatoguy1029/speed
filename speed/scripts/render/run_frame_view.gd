@@ -18,6 +18,7 @@ var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
 var _lance_hits: Array = []
+var _cross := PackedFloat32Array()
 var _aquarius := PackedFloat32Array()
 var _flood_groups: Dictionary = {}
 var _shell_displays: Dictionary = {}
@@ -169,6 +170,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
 		preload("res://scripts/render/enemies/aquarius.gd").draw_frame(canvas,_aquarius,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/cross.gd").draw_frame(canvas,_cross,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/reticle.gd").draw_frame(canvas,_reticle,1.0/maxf(_zoom,0.01))
@@ -331,6 +333,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
 			for value: float in row.gunner:
 				if not is_finite(value): return false
+		if row.has("cross"):
+			if not row.cross is PackedFloat32Array or row.cross.size()%9!=0: return false
+			for value: float in row.cross:
+				if not is_finite(value): return false
 		if row.has("aquarius"):
 			if not row.aquarius is PackedFloat32Array or row.aquarius.size()%5!=0: return false
 			for value: float in row.aquarius:
@@ -405,6 +411,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	var previous_lynx := _lynx
 	var previous_dolphin := _dolphin
 	var previous_sniper := _sniper
+	_cross = PackedFloat32Array()
 	_aquarius = PackedFloat32Array()
 	_gunner = PackedFloat32Array()
 	_beamer = PackedFloat32Array()
@@ -416,6 +423,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	_dolphin = PackedFloat32Array()
 	_sniper = PackedFloat32Array()
 	for row: Dictionary in frame.batches:
+		if row.has("cross"): _cross.append_array(row.cross)
 		if row.has("aquarius"): _aquarius.append_array(row.aquarius)
 		if row.has("gunner"): _gunner.append_array(row.gunner)
 		if row.has("beamer"): _beamer.append_array(row.beamer)

@@ -5,7 +5,7 @@ extends RefCounted
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: StageDef = null) -> Dictionary:
-	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius"]:
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius",&"cross"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -80,6 +80,15 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 			row.clock[pair[0]] = float(definition.params[pair[1]])
 		for key in row.clock:
 			if not is_finite(row.clock[key]) or (key not in ["long_speed","short_speed"] and row.clock[key]<0.0): return {}
+	if definition.behavior == &"cross":
+		row.cross_enemy = {"accel":definition.accel}
+		for pair in [["stand_off","stand_off"],["align_tol","align_tol"],["telegraph","telegraph"],["beam_time","beam_time"],["beam_length","beam_len"],["beam_width","beam_width"],["rest","rest"],["damage","bullet_dmg"]]:
+			if not definition.params.has(pair[1]): return {}
+			row.cross_enemy[pair[0]] = float(definition.params[pair[1]])
+		row.cross_enemy.admission_duration = row.cross_enemy.telegraph+row.cross_enemy.beam_time+0.1
+		for value in row.cross_enemy.values():
+			if not is_finite(value) or value<0.0: return {}
+		if row.cross_enemy.telegraph<=0.0: return {}
 	if definition.behavior == &"aquarius":
 		row.aquarius = {"accel":definition.accel,"beams":int(definition.params.get("beams",0))}
 		for pair in [["approach","approach"],["telegraph","telegraph"],["beam_time","beam_time"],["beam_length","beam_len"],["beam_width","beam_width"],["spread","beam_spread"],["rest","rest"],["damage","bullet_dmg"]]:

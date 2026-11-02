@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-cross-enemy" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_cross_enemy()
+		check(finished,"みなみじゅうじ座の指定確認を最後まで実施する")
+		print("[cpp_cross_enemy] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-aquarius" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_aquarius()
 		check(finished,"みずがめ座の指定確認を最後まで実施する")
@@ -1083,5 +1089,67 @@ func check_cpp_aquarius() -> bool:
 	check(cpp_core.hazards_snapshot().is_empty(),"照射中に発生元を先に消しても水流の所有参照を残さない")
 	cpp_bridge.release_checkpoint(pending.value)
 	cpp_bridge.release_checkpoint(initial.value)
+	cpp_session.free()
+	return true
+
+func check_cpp_cross_enemy() -> bool:
+	var tuning := {"cross":{"speed":0.0,"params.telegraph":0.2,"params.beam_time":0.3,"params.beam_len":500.0,"params.beam_width":20.0,"params.bullet_dmg":6.0,"params.rest":0.1,"params.fire_interval":0.5,"params.stand_off":180.0,"params.align_tol":8.0}}
+	if not await prepare_cpp_attack(109,"cross_enemy",PackedStringArray(["cross","drifter"]),tuning): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(160,160),"velocity":Vector2.ZERO})
+	cpp_core.set_attack_formation_mode(true)
+	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"cross","position":cpp_origin}).value
+	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	cpp_core.step(0.6)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"予算がなければ十字の予告を始めない")
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_core.step(0.6)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"機体と縦横がそろう前は射撃へ進まない")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(180,0),"velocity":Vector2.ZERO})
+	cpp_core.step(0.01)
+	var hazards: Array = cpp_core.hazards_snapshot()
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and hazards.size()==4,"機体とそろうと4辺の予告を生成する")
+	if hazards.size()!=4: cpp_session.free(); return false
+	for k in 4:
+		check(is_equal_approx(hazards[k].angle,k*PI/2.0) and is_equal_approx(hazards[k].length,500.0) and is_equal_approx(hazards[k].half_width,10.0) and is_equal_approx(hazards[k].delay,0.2) and is_equal_approx(hazards[k].active,0.3),"辺%dは編集値を使って固定の縦横へ伸びる" % k)
+	check(cpp_core.attack_budget_snapshot().groups.size()==1 and cpp_core.attack_budget_snapshot().used==1.0,"4辺は同じ攻撃予算の枠を共有する")
+	cpp_core.step(0.1)
+	cpp_core.step_hazards(0.1)
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.apply_frame(frame) and presentation.frame_view._cross.size()==9,"十字の予告線と中心の光を通常画面で描く")
+	await get_tree().process_frame
+	var pending: Dictionary = cpp_bridge.checkpoint()
+	var before: Array = cpp_core.enemy_motion_snapshot()
+	var warned: Array = cpp_core.hazards_snapshot()
+	cpp_core.step(0.11)
+	cpp_core.step_hazards(0.11)
+	var events: Array = cpp_bridge.read_frame().value.events
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-6.0) and events.filter(func(e): return e.type==&"enemy_laser_fire" and e.payload.id==actor).size()==1,"予告後に一度照射し攻撃中の休みに入る")
+	frame = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	check(frame.shapes.size()==4 and frame.shapes.all(func(h): return h.kind==ENUMS.RenderShapeKind.Polyline) and presentation.frame_view.apply_frame(frame),"4辺のビームを通常画面で描く")
+	await get_tree().process_frame
+	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before and cpp_core.hazards_snapshot()==warned,"十字の予告と個体の時刻・chargeを復元する")
+	cpp_core.step(0.11)
+	cpp_core.step_hazards(0.11)
+	cpp_core.step(0.31)
+	cpp_core.step_hazards(0.31)
+	check(cpp_core.hazards_snapshot().is_empty() and cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER,"ビームの終了後も編集した休みの残りを保つ")
+	cpp_core.step(0.1)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and is_equal_approx(cpp_motion_for(actor).fire_t,0.5),"休みの終わりから編集した射撃間隔で再開する")
+	cpp_bridge.restore(pending.value)
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	check(cpp_core.hazards_snapshot().is_empty(),"予告中に発生元を先に倒すと4辺を掃除する")
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"cross","position":cpp_origin}).value
+	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0,"行を再利用した別個体へ予告や攻撃状態を漏らさない")
+	cpp_bridge.restore(pending.value)
+	cpp_core.step(0.11)
+	cpp_core.step_hazards(0.11)
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	check(cpp_core.hazards_snapshot().is_empty(),"照射中に発生元を消しても付いた4辺を残さない")
+	cpp_bridge.release_checkpoint(pending.value)
 	cpp_session.free()
 	return true

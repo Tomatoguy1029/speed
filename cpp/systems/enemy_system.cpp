@@ -79,7 +79,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     const auto &enemy=run.state.enemies[handle.slot];
     const auto &definition=run.content->definitions[enemy.definition];
     if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle) return true;
-    if (definition.kind==EnemyDefinition::Kind::Dolphin || definition.kind==EnemyDefinition::Kind::Aquarius) return enemy.fire_t<=dt;
+    if (definition.kind==EnemyDefinition::Kind::Dolphin || definition.kind==EnemyDefinition::Kind::Aquarius || definition.kind==EnemyDefinition::Kind::Cross) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
     return enemy.fire_t<=definition.attack_telegraph+dt;
 }
