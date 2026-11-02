@@ -2059,6 +2059,10 @@
       {
         "name": "CanisIgniteArrived",
         "value": "canis_ignite_arrived"
+      },
+      {
+        "name": "CanisCue",
+        "value": "canis_cue"
       }
     ],
     "ResultKind": [
@@ -2779,6 +2783,14 @@
       "from",
       "life",
       "observation"
+    ],
+    "canis_cue": [
+      "id",
+      "technique",
+      "cue",
+      "position",
+      "angle",
+      "world_time"
     ]
   },
   "includes": [

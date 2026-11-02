@@ -6,6 +6,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-canis-command-next" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_command_next")
+		return
+	if "--cpp-canis-command" in OS.get_cmdline_user_args() or "--cpp-canis-command-runtime" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_command")
+		return
 	if "--cpp-centaurus-shower" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_shower")
 		return
@@ -1496,4 +1502,142 @@ func native_centaurus_shower() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_shower] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func canis_move_case(name: String, changes: Dictionary, flowing := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.base_hp = 1000.0
+	var definition = load("res://data/bosses/canis_major.tres").duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.call_below = 0
+	definition.speed = 0.0
+	var move = load("res://data/bosses/canis_major_moves/%s.tres" % name).duplicate(true)
+	for key in changes: move.set(key,changes[key])
+	var package: Dictionary = builder.canis_technique_package(definition,move,cfg)
+	if package.is_empty(): return {}
+	if flowing:
+		var rules = load("res://data/bosses/ai/canis_major_action_rules.tres").duplicate(true)
+		rules.techniques.assign([move])
+		rules.combos = {}
+		rules.conditions = {name:{"min":0.0,"max":5000.0}}
+		rules.costs = {name:1.0}
+		rules.selection_bias = {}
+		rules.condition_groups = {}
+		rules.graph_nodes = {}
+		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
+		flow.maximum_stamina = 10.0
+		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		for key in records: package.records[key] = records[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":159,"mode":1,"stage_id":"B_canis_major_"+name,"profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(159,{"position":Vector2(2000,0)})
+	bridge.command("dev_ship_motion",{"position":Vector2(2000,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(2000,0),Vector2(2000,0),Vector2(3000,2000))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(package.visuals)
+	view.setup(scope,entries,cfg.character_scale)
+	bridge.subscribe("表示",view.receive_frame)
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	return {"bridge":bridge,"view":view,"scope":scope,"id":id,"package":package,"move":move}
+
+
+func native_canis_command() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/canis_major_moves/command.tres")
+	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
+	if "--cpp-canis-command-runtime" not in OS.get_cmdline_user_args():
+		check(move.make_runner()==null and records.CanisCommandDefinition.size()==2 and records.CanisCommandDefinition[0].lunge_speed==move.lunge_speed and records.CanisCommandDefinition[1].lunge_speed==move.lunge_speed_p2 and records.BossTechniqueDefinition[1].cd==move.cd_p2,"号令の編集値と第2形態の実効値を生成する")
+		check(records.BossTechniqueStage.size()==4 and records.BossTechniqueStage[0].at==move.warn and records.BossTechniqueStage[1].at==move.warn+move.lunge_time+0.05,"発動と終了を静的method trackから独立した時刻へ生成する")
+	var c := canis_move_case("command",{"warn":0.1,"lunge_time":0.2,"lunge_speed":100.0,"lunge_speed_p2":100.0,"recover":0.05,"cd":0.0},true)
+	check(not c.is_empty(),"号令の値・本体・フロー・正式表示を同じ入口から読む")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge._core.step(0.01)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.kind==40 and t.stage==0,"フローの条件から号令を選択して予告を開始する")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var display = c.view._boss_body_displays.values()[0]
+	check(display.technique.technique=="command" and display.technique.stage==0,"正式な本体の口輪へ予告を渡す")
+	var before: Dictionary = bridge.checkpoint()
+	check(before.ok,"予告の世代付き猟犬と段階を保持する")
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	var lunges: Array = canis_lunges(bridge)
+	check(t.stage==1 and lunges.size()==c.package.records.CanisBodyDefinition[0].pack_size and lunges.all(func(v): return not v.sweep and v.shared_hit and not v.overwrite and not v.hit),"warnで全猟犬へ発進し発動tickには命中を評価しない")
+	var active: Dictionary = bridge.checkpoint()
+	check(active.ok,"飛び出した猟犬の位置・当たり・指示を保持する")
+	bridge._core.step(0.01)
+	var after: Array = canis_lunges(bridge)
+	check(bridge.restore(active.value).ok,"号令の実行中へ復帰する")
+	bridge._core.step(0.01)
+	check(canis_lunges(bridge)==after,"復帰後の猟犬と1回制限が同じ状態へ進む")
+	var at: Vector2 = after[0].position
+	bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(at,at,Vector2(3000,2000))
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.hit and canis_lunges(bridge).all(func(v): return v.hit) and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale),"猟犬の点と機体の移動線分から技全体で1回だけダメージを与える")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var unchanged: Array = canis_lunges(bridge).duplicate(true)
+	for i in 7: c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(not display._trails.is_empty() and display._trails.values()[0].points.size()<=6 and canis_lunges(bridge)==unchanged,"6点以内の正式な軌跡は読むだけで戦闘へ書き戻さない")
+	bridge._core.step(0.24)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and canis_lunges(bridge).is_empty(),"lunge_timeと0.05秒の後に命中を閉じ硬直へ移る")
+	bridge._core.step(0.05)
+	bridge._core.step(0.01)
+	bridge._core.step(0.15)
+	check(bridge.command("dev_boss_state").value.any(func(v): return v.stage==0 and v.id>t.id),"硬直終了をフローへ返し次の行動を開始する")
+	check(bridge.restore(before.value).ok,"取消確認のため予告を戻す")
+	var ticket: PackedInt64Array = [0,1]
+	check(bridge.command("dev_cancel_technique",{"ticket":ticket}).ok and canis_lunges(bridge).is_empty(),"予告取消で猟犬の警告と未発動の攻撃を閉じる")
+	bridge.restore(active.value)
+	check(bridge.command("dev_cancel_technique",{"ticket":ticket}).ok and canis_lunges(bridge).is_empty() and not bridge._core.hound_snapshot().follows.is_empty(),"実行取消はfollowを即解除せず命中だけを閉じる")
+	bridge.restore(active.value)
+	var target: int = canis_lunges(bridge)[0].actor
+	bridge.command("dev_remove",{"entity_id":target})
+	bridge._core.step(0.01)
+	check(not canis_lunges(bridge).any(func(v): return v.actor==target) and not bridge.command("dev_boss_body_state").value[0].boss_dead,"猟犬の消失はその猟犬だけの攻撃を閉じる")
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.01)
+	check(canis_lunges(bridge).is_empty() and bridge.command("dev_boss_state").value[0].stage==7,"本体消失は号令と全猟犬の当たりを閉じる")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"号令の出来事を既存の配信へ通す")
+	bridge.release_checkpoint(before.value)
+	bridge.release_checkpoint(active.value)
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_command] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 号令の成功済みの実行検査を繰り返さず、次行動の待ちだけを照合する。
+
+func native_canis_command_next() -> void:
+	var c := canis_move_case("command",{"warn":0.1,"lunge_time":0.2,"lunge_speed":100.0,"lunge_speed_p2":100.0,"recover":0.05,"cd":0.0},true)
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge._core.step(0.01)
+	var first: Dictionary = bridge.command("dev_boss_state").value[0]
+	bridge._core.step(0.1)
+	bridge._core.step(0.25)
+	bridge._core.step(0.05)
+	bridge._core.step(0.01)
+	bridge._core.step(0.15)
+	check(bridge.command("dev_boss_state").value.any(func(v): return v.stage==0 and v.id>first.id),"硬直終了をフローへ返し再選択待ちの後に次の行動を開始する")
+	print("次行動の状態: ",bridge.command("dev_boss_state").value," フロー: ",bridge.command("dev_boss_flow_state").value)
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_command_next] failures=",failed)
 	get_tree().quit(1 if failed else 0)

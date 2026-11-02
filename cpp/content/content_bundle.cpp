@@ -130,6 +130,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
+    bundle->canis_commands=records.CanisCommandDefinition_rows;
     bundle->canis_flames=records.CanisFlameDefinition_rows;
     for (size_t i=0;i<bundle->canis_flames.size();++i) {const auto &p=bundle->canis_flames[i];if (p.id!=i+1 || records.BossDefinition_rows[p.boss-1].kind!=2 || p.particle_life<=0 || p.duration<=0) return {};}
     bundle->boss_bodies=records.BossBodyDefinition_rows;
@@ -152,9 +153,13 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
-        if (p.id!=i+1 || p.kind>14 || (p.active<=0 && p.kind!=13 && p.kind!=14) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.external_id)) return {};
+        if (p.id!=i+1 || (p.kind>14 && p.kind!=40) || (p.active<=0 && p.kind!=13 && p.kind!=14) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.kind==40?"command":p.external_id)) return {};
         std::vector<BossTechniqueStage> stages;
         for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
+        if (p.kind==40) {
+            const auto v=std::find_if(bundle->canis_commands.begin(),bundle->canis_commands.end(),[&](const auto &v){return v.technique==p.id;});
+            if (v==bundle->canis_commands.end() || bundle->bosses[p.boss-1].kind!=2 || v->lunge_time<=0 || p.active!=v->lunge_time+0.05 || stages.size()!=2 || stages[0].command!=1 || stages[0].at!=p.warn || stages[1].command!=2 || stages[1].at!=p.warn+v->lunge_time+0.05) return {};continue;
+        }
         if (p.kind==14) {
             const auto shower=std::find_if(bundle->centaurus_showers.begin(),bundle->centaurus_showers.end(),[&](const auto &v){return v.technique==p.id;});
             if (shower==bundle->centaurus_showers.end() || bundle->bosses[p.boss-1].kind!=1 || !stages.empty() || shower->wall_min>shower->wall_max || p.external_id!=(shower->pattern==0?"shower_chase":shower->pattern==1?"shower_wall":"shower_path")) return {};continue;
@@ -208,6 +213,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         }
     }
     for (size_t i=0;i<bundle->centaurus_showers.size();++i) if (bundle->centaurus_showers[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_showers[i].technique-1].kind!=14) return {};
+    for (size_t i=0;i<bundle->canis_commands.size();++i) if (bundle->canis_commands[i].id!=i+1 || bundle->boss_techniques[bundle->canis_commands[i].technique-1].kind!=40) return {};
     for (size_t i=0;i<bundle->centaurus_fans.size();++i) if (bundle->centaurus_fans[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_fans[i].technique-1].kind!=13) return {};
     for (size_t i=0;i<bundle->centaurus_stomps.size();++i) if (bundle->centaurus_stomps[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_stomps[i].technique-1].kind!=12) return {};
     for (size_t i=0;i<bundle->centaurus_stomp_feet.size();++i) if (bundle->centaurus_stomp_feet[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_stomp_feet[i].technique-1].kind!=12) return {};

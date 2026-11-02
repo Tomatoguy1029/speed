@@ -3,6 +3,7 @@
 extends RefCounted
 const RUNNERS := {
 	"res://scripts/data_types/boss_techniques/centaurus/arrow_shower.gd":"res://scripts/bosses/centaurus/techniques/arrow_shower.gd",
+	"res://scripts/data_types/boss_techniques/canis_major/command.gd":"res://scripts/bosses/canis_major/techniques/command.gd",
 	"res://scripts/data_types/boss_techniques/centaurus/fan_volley.gd":"res://scripts/bosses/centaurus/techniques/fan_volley.gd",
 	"res://scripts/data_types/boss_techniques/centaurus/stomp.gd":"res://scripts/bosses/centaurus/techniques/stomp.gd",
 	"res://scripts/data_types/boss_techniques/centaurus/power_shot.gd":"res://scripts/bosses/centaurus/techniques/power_shot.gd",

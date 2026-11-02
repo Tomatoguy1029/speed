@@ -55,8 +55,9 @@ struct MonocerosSwordState {
     bool released=false;
     godot::Vector2 target;
 };
+struct CanisCommandState {std::vector<EnemyHandle> warned;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CanisCommandState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;

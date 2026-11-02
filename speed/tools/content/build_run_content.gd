@@ -9,6 +9,7 @@ const BossProgram = preload("res://tools/content/build_boss_program.gd")
 
 ## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
 static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if definition!=null and definition.id==&"canis_major": return canis_technique_records(definition,move)
 	if definition!=null and definition.id==&"centaurus": return centaurus_technique_records(definition,move)
 	if definition==null or definition.id!=&"monoceros" or move==null or move.technique not in [&"charge",&"kick",&"sweep",&"lance",&"return_charge",&"horn_wave",&"horn_dance",&"sword_flash"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
@@ -48,6 +49,37 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			command.technique = phase
 			records.BossTechniqueStage.append(command)
 	return records
+
+## 号令の実効値と、旧method trackに対応する段階を生成する。
+static func canis_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if move==null or move.technique!=&"command": return {}
+	var source: BossTechnique = BossProgram.snapshot(move)
+	var boss := {"id":1,"external_id":"canis_major","kind":2,"turn":definition.turn,"speed":definition.speed}
+	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[]}
+	for phase in [1,2]:
+		var values: Dictionary = source.values().duplicate(true)
+		if phase==2:
+			for key: String in source.values():
+				if key.ends_with("_p2"): values[key.trim_suffix("_p2")] = source.values()[key]
+		var row := {}
+		for record in Schema.SCHEMA.records:
+			if record.name!="BossTechniqueDefinition": continue
+			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
+		row.merge({"id":phase,"boss":1,"external_id":"command","kind":40,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		for key in ["warn","recover","cd","damage"]: row[key] = float(values[key])
+		row.active = float(values.lunge_time)+0.05
+		records.BossTechniqueDefinition.append(row)
+		records.CanisCommandDefinition.append({"id":phase,"technique":phase,"lunge_speed":float(values.lunge_speed),"lunge_time":float(values.lunge_time),"min_hounds":int(values.min_hounds)})
+		for stage in [{"command":1,"at":row.warn},{"command":2,"at":row.warn+float(values.lunge_time)+0.05}]: records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":stage.command,"at":stage.at})
+	return records
+
+static func canis_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
+	var package := boss_body_package(definition,config)
+	var records := canis_technique_records(definition,move)
+	if package.is_empty() or records.is_empty(): return {}
+	for key in records: package.records[key] = records[key]
+	return package
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
@@ -370,7 +402,7 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 		if technique.phase==1: ids[String(technique.external_id)] = technique.id
 	for move in rules.techniques:
 		if not ids.has(String(move.technique)): return {}
-	records.BossFlowProgram = [{"id":1,"boss":1,"maximum_stamina":flow.maximum_stamina,"partial_rest":flow.partial_rest,"empty_rest":flow.empty_rest,"idle_only":rules.adapter in [&"monoceros",&"centaurus"],"allow_parallel":rules.allow_parallel_attacks,"has_bias":not rules.selection_bias.is_empty()}]
+	records.BossFlowProgram = [{"id":1,"boss":1,"maximum_stamina":flow.maximum_stamina,"partial_rest":flow.partial_rest,"empty_rest":flow.empty_rest,"idle_only":rules.adapter in [&"monoceros",&"centaurus",&"canis_major"],"allow_parallel":rules.allow_parallel_attacks,"has_bias":not rules.selection_bias.is_empty()}]
 	var sources: Array = rules.techniques.map(func(move): return String(move.technique)) + rules.combos.keys()
 	for source in sources:
 		var combo: bool = rules.combos.has(source)

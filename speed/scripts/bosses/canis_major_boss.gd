@@ -72,7 +72,7 @@ var _rules := {}
 func configure_flow(program: Resource) -> void:
 	action_rules = program.data.rules
 	_moves.clear()
-	for move in action_rules.techniques: _moves[move.technique] = move
+	for move in action_rules.techniques: _moves[move.technique] = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(move)
 	_apply_phase()
 	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)

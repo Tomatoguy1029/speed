@@ -23,6 +23,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	var dt: float = maxf(0.0,float(body.clock)-_clock) if _clock>=0.0 else 0.0
 	if _clock>float(body.clock): gait = 0.0
 	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock))
+	_track_command(body,attack,dt)
 	state = body
 	technique = attack
 	_clock = float(body.clock)
@@ -41,3 +42,45 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
 	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(body.charge),0.0)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE
+
+## 描画専用の短い履歴。戦闘の猟犬位置へ書き戻さない。
+var _trails: Dictionary = {}
+var _lunge_layer: Node2D
+func _track_command(body: Dictionary, attack: Dictionary, dt: float) -> void:
+	if _lunge_layer==null:
+		_lunge_layer = Node2D.new()
+		_lunge_layer.top_level = true
+		_lunge_layer.draw.connect(_draw_command_lunges)
+		add_child(_lunge_layer)
+	var live := {}
+	if attack.get("technique","")=="command" and int(attack.get("stage",5))==1:
+		for lunge: Dictionary in body.get("lunges",[]):
+			live[lunge.actor] = true
+			var trail: Dictionary = _trails.get(lunge.actor,{"points":PackedVector2Array(),"radius":lunge.radius})
+			if dt>0.0 or trail.points.is_empty():
+				trail.points.append(lunge.position)
+				if trail.points.size()>6: trail.points = trail.points.slice(trail.points.size()-6)
+			_trails[lunge.actor] = trail
+	for id in _trails.keys():
+		if not live.has(id): _trails.erase(id)
+	_lunge_layer.queue_redraw()
+	queue_redraw()
+func _draw() -> void:
+	if technique.get("technique","")!="command" or int(technique.get("stage",5))!=0: return
+	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE*float(state.radius)/100.0)
+	for ring in 2:
+		var grow := fmod(float(state.clock)*2.5+ring*0.5,1.0)
+		draw_arc(Vector2(84.0,0.0),20.0+grow*90.0,0.0,TAU,32,Color(Color("#f2b567"),1.0-grow),3.0)
+func _draw_command_lunges() -> void:
+	for id in _trails:
+		var trail: Dictionary = _trails[id]
+		var points: PackedVector2Array = trail.points
+		var radius: float = trail.radius
+		for j in range(1,points.size()):
+			var f := float(j)/float(points.size()-1)
+			_lunge_layer.draw_line(points[j-1],points[j],Color(Color("#ff667d"),0.15+0.55*f),radius*(0.4+0.9*f),true)
+		var at: Vector2 = points[points.size()-1]
+		var flicker := 0.75+0.25*sin(float(state.clock)*40.0+float(id))
+		_lunge_layer.draw_circle(at,radius*1.9,Color(Color("#ff667d"),0.22*flicker))
+		_lunge_layer.draw_circle(at,radius*1.3,Color(Color("#f2b567"),0.35*flicker))
+		_lunge_layer.draw_arc(at,radius*1.3,0.0,TAU,20,Color(Color("#e8f6ff"),0.8*flicker),2.1,true)
