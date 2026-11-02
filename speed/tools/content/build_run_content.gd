@@ -1,6 +1,7 @@
 ## Resourceの実効値を解決し、共通スキーマの書込へ渡す。
 extends RefCounted
 const Schema = preload("res://tools/content/generated/run_schema.gd")
+const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
@@ -160,6 +161,8 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		visuals.append({"id":reflected_visual,"role":13,"path":""})
 		data.HostileDefinition.append({"id":2,"kind":2,"radius":5.0,"life":source.shield.reflect_life,"damage":source.shield.reflect_dmg,"slow":0.0,"turn":0.0,
 			"visual":reflected_visual,"stone_visual":bullet_visual+1,"contact":1})
+	data.HostileDefinition.append({"id":data.HostileDefinition.size()+1,"kind":1,"radius":Missile.RADIUS,"life":Missile.LIFE,"damage":Missile.DEFAULT_DAMAGE,"slow":0.0,"turn":0.0,
+		"visual":bullet_visual,"stone_visual":bullet_visual+1,"contact":1})
 	for i in weapon.level_steps.size():
 		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
@@ -229,10 +232,16 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ForwardDefinition = resolved.ForwardDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
 			data.LifecycleDefinition = resolved.LifecycleDefinition
+			for section in ["PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:
+				data[section] = resolved[section]
 			equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
 			data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
 			data.MoonDefinition = resolved.MoonDefinition.duplicate(true)
-			data.HostileDefinition = resolved.HostileDefinition.slice(0,1).duplicate(true)
+			for projectile: Dictionary in resolved.HostileDefinition:
+				if projectile.kind==2: continue
+				var attack := projectile.duplicate()
+				attack.id = data.HostileDefinition.size()+1
+				data.HostileDefinition.append(attack)
 			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [9,10])
 			attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12,13])
 		for attack_visual: Dictionary in package.visuals:

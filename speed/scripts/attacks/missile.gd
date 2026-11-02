@@ -1,5 +1,8 @@
 ## 誘導弾：turn の速さで敵の狙いの方へ向きを変える。追いかけるので、画面の外へ出ても消さない。
 extends HostileShape
+const RADIUS := 9.0
+const LIFE := 4.5
+const DEFAULT_DAMAGE := 7.0
 
 func _init() -> void:
 	leaves_view = false
@@ -11,5 +14,5 @@ func steer(ps: ProjectileSystem, i: int, vel: Vector2, aim: Vector2, dt: float) 
 
 func spawn(ps: ProjectileSystem, pos: Vector2, muzzle: float, angle: float, speed: float, values: Dictionary) -> void:
 	var u := Vector2.from_angle(angle)
-	ps._add_hostile(pos + u * muzzle, u * speed, speed, 9.0, 4.5,
-		float(values.get("bullet_dmg", 7.0)), values.get("slow", 0.0), values.get("missile_turn", 0.0), ProjectileSystem.HostileKind.MISSILE)
+	ps._add_hostile(pos + u * muzzle, u * speed, speed, RADIUS, LIFE,
+		float(values.get("bullet_dmg", DEFAULT_DAMAGE)), values.get("slow", 0.0), values.get("missile_turn", 0.0), ProjectileSystem.HostileKind.MISSILE)

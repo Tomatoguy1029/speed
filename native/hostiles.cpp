@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/field.h"
 #include "../cpp/systems/attack_system.h"
+#include "../cpp/systems/attacks/missile.h"
 #include "geometry.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/output/event_builder.h"
@@ -79,17 +80,14 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         }
         Vector2 vel = shot.vel;
         if (shot.wait > 0) { shot.wait = speed::remaining_time(shot.wait,world_dt); vel = Vector2(); }
-        if (shot.kind == 1) {
-            const double turn = double(shot.turn) * world_dt, current = vel.angle();
-            const double difference = double(((runtime.state.aim_ready ? runtime.state.enemy_aim : runtime.state.ship_pos) - shot.pos).angle()) - current;
-            const double wrapped = speed::angle_difference(difference);
-            const Vector2 steered = Vector2::from_angle(current + std::clamp(wrapped, -turn, turn)) * shot.speed;
-            if (steered != vel) { vel = steered; shot.vel = vel; }
+        if (shot.kind==int64_t(speed::HostileKind::Missile)) {
+            const auto steered=speed::MissileSystem::steer(runtime,shot,vel,world_dt);
+            if (steered!=vel) {vel=steered;shot.vel=vel;}
         }
         Vector2 to = from + vel * world_dt;
         life -= world_dt;
         const Vector2 relative = to - runtime.state.view_center;
-        if (shot.kind != 1 && (std::abs(relative.x) > keep.x || std::abs(relative.y) > keep.y) && relative.dot(vel) > 0) life = 0;
+        if (shot.kind!=int64_t(speed::HostileKind::Missile) && (std::abs(relative.x) > keep.x || std::abs(relative.y) > keep.y) && relative.dot(vel) > 0) life = 0;
         const auto *record=speed::AttackSystem::get(runtime.state,processing_handle);
         if (!record) continue;
         const double body_radius=record->spec.contact.add_ship_radius?runtime.state.ship_config.ship_radius:0;

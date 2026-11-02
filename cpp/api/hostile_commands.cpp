@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../systems/attacks/bullet.h"
+#include "../systems/attacks/missile.h"
 #include "../systems/attack_system.h"
 #include <cmath>
 using namespace godot;
@@ -25,7 +26,7 @@ Dictionary SpeedRunCore::development_hostile_command(const String &kind,const Di
         else if (name=="damage") values.damage=double(value);else if (name=="slow") values.slow=double(value);else if (name=="turn") values.turn=double(value);else return result(false);
     }
     if (!p.has("angle") || !p.has("speed")) return result(false);
-    const auto handle=speed::BulletSystem::fire_enemy(runtime,runtime.state.enemy_handles.at(uint32_t(source->second)),angle,shot_speed,values);
+    const auto handle=kind=="dev_fire_missile"?speed::MissileSystem::fire_enemy(runtime,runtime.state.enemy_handles.at(uint32_t(source->second)),angle,shot_speed,values):speed::BulletSystem::fire_enemy(runtime,runtime.state.enemy_handles.at(uint32_t(source->second)),angle,shot_speed,values);
     const auto *attack=speed::AttackSystem::get(runtime.state,handle);if (!attack) return result(false);
     Dictionary created;created["row"]=attack->row;created["id"]=attack->id;return result(true,created);
 }

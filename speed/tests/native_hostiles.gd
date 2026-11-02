@@ -16,6 +16,13 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-missile" in OS.get_cmdline_user_args() or "--cpp-missile-gap-fixes" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_missile()
+		check(finished,"誘導弾の確認を最後まで実施する")
+		print("[cpp_missile] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
 	if "--cpp-bullet" in OS.get_cmdline_user_args() or "--cpp-bullet-fixes" in OS.get_cmdline_user_args():
 		bullet_fixes = "--cpp-bullet-fixes" in OS.get_cmdline_user_args()
 		mute_checks = bullet_fixes
@@ -245,3 +252,170 @@ func check_cpp_bullet() -> void:
 	lab.free()
 	session.free()
 	bullet_finished = true
+
+func missile_emit_pair(run: RunSimulation,bridge,position: Vector2,angle: float,speed: float,settings: Dictionary) -> Dictionary:
+	var row: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),position)
+	var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":position})
+	check(spawned.ok,"誘導弾の生存する発生元を生成する")
+	if not spawned.ok: return {}
+	run.projectiles.fire_enemy(row,angle,speed,&"missile",settings)
+	var emitted: Dictionary = bridge.command("dev_fire_missile",{"source_id":spawned.value,"angle":angle,"speed":speed,
+		"damage":float(settings.get("bullet_dmg",7.0)),"slow":float(settings.get("slow",0.0)),"turn":float(settings.get("missile_turn",0.0))})
+	check(emitted.ok,"発生元の位置・半径と定義値から誘導弾を発射する")
+	if not emitted.ok: return {}
+	return {"source_row":row,"source_id":spawned.value,"attack":emitted.value}
+
+func missile_reset(run: RunSimulation,bridge,point: Dictionary,target: Vector2,config: GameConfig) -> bool:
+	if not bridge.restore(point.value).ok:
+		check(false,"誘導弾の固定場面へ戻る")
+		return false
+	bridge.collect_frame()
+	run.projectiles.clear_hostile()
+	run.state.ship_pos = target
+	run.state.ship_vel = Vector2(100,0)
+	run.state.ship_hp = config.base_hp
+	run.state.ship_invuln = 0.0
+	run.state.ship_hurt = 0.0
+	run.state.enemy_aim = target
+	run.state.view_center = target
+	run.state.view_half = Vector2(640,360)
+	bridge._core.set_motion_context(target,target,Vector2(640,360))
+	return true
+
+func check_cpp_missile() -> bool:
+	var gap_fixes := "--cpp-missile-gap-fixes" in OS.get_cmdline_user_args()
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 1500.0
+	config.planet_radius = 100.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	config.atk_scale = 3.0
+	var stage := RuntimeStage.new()
+	stage.index = 87
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"])
+	var builder = load("res://tools/content/build_run_content.gd")
+	var output := "res://.content/dev/run_missile"
+	var built: Error = builder.build(stage,config,output,"誘導弾の発生元・追尾・石化・飛行・被弾・終了".sha256_text())
+	check(built==OK,"誘導弾と反射弾・全種類共通の固定値を同じステージへ生成する")
+	if built!=OK: return false
+	var path := output.path_join("stage_87.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":348},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"誘導弾を生成する通常の状態・資源・表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return false
+	var bridge = session.bridge
+	var core = bridge._core
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed":348,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
+		"config":{"start_radius":1500.0,"planet_radius":100.0,"moon_count":0,"atk_scale":3.0}})
+	var run: RunSimulation = lab.run
+	var target := Vector2(-900,0)
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(100,0)})
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(100,0)})
+	core.set_motion_context(target,target,Vector2(640,360))
+	var empty: Dictionary = bridge.checkpoint()
+	if not missile_reset(run,bridge,empty,target,config): return false
+	var params: Dictionary = (load("res://data/enemies/missile.tres") as EnemyDef).params
+	var settings := {"bullet_dmg":float(params.get("bullet_dmg",7.0)),"slow":float(params.get("slow",0.0)),"missile_turn":float(params.get("missile_turn",0.0))}
+	var speed: float = params.missile_speed
+	var emitted: Dictionary = missile_emit_pair(run,bridge,Vector2(-1500,0),PI*0.5,speed,settings)
+	if emitted.is_empty(): return false
+	if gap_fixes:
+		# 先に通った表示・命中・復帰は繰り返さず、失敗した地形の余裕だけを照合する。
+		run.projectiles._update_hostile(0.1)
+		core.step_hostiles(0.1)
+		var view := Rect2(-1800,-500,1500,1000)
+		run.projectiles.stone_hostile(view,0.2)
+		bridge.command("dev_stone_hostiles",{"view":view,"duration":0.2})
+		for dt in [0.1,0.15]:
+			run.projectiles._update_hostile(dt)
+			core.step_hostiles(dt)
+		bullet_pair_step(run,core,0.05,"解除後は追尾と寿命を再開する")
+		if not missile_reset(run,bridge,empty,target,config): return false
+		emitted = missile_emit_pair(run,bridge,Vector2(-4000,2000),PI,speed,settings)
+		if emitted.is_empty(): return false
+		bullet_pair_step(run,core,0.1,"画面外で遠ざかっても継続する")
+		bridge.release_checkpoint(empty.value)
+		lab.free()
+		session.free()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		return true
+	var source_radius: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==emitted.source_id)[0].radius
+	var comparison = COMPARE.new()
+	check(comparison.difference(comparison.plain(snapshot(run.projectiles)),comparison.plain(core.hostiles_snapshot())).is_empty(),"誘導弾の発射位置・速度・寿命が今の生成と一致する")
+	bullet_pair_step(run,core,0.1,"旋回上限つきの追尾")
+	var visual := 0
+	var stone_visual := 0
+	for entry: Dictionary in session.cpp_resources.visuals:
+		if entry.role==11: visual = entry.id
+		if entry.role==12: stone_visual = entry.id
+	var frame: Dictionary = bridge.read_render(Rect2(-1800,-500,1500,1000)).value
+	check(frame.batches.any(func(batch): return batch.visual_id==visual and batch.ids.has(int(emitted.attack.id)) and is_equal_approx(batch.transforms[0],9.0)),"誘導弾を実際の半径と安定した攻撃IDで表示する")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.batches.has(visual),"共通の二重の円の表示を通常画面へ渡す")
+	var stone_view := Rect2(-1800,-500,1500,1000)
+	run.projectiles.stone_hostile(stone_view,0.2)
+	bridge.command("dev_stone_hostiles",{"view":stone_view,"duration":0.2})
+	bullet_pair_step(run,core,0.1,"石化中は飛行と寿命を止める")
+	frame = bridge.read_render(stone_view).value
+	check(frame.batches.any(func(batch): return batch.visual_id==stone_visual and batch.ids.has(int(emitted.attack.id))),"石化した誘導弾を同じIDの石表示へ渡す")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.batches.has(stone_visual),"石化表示も通常の表示経路へ渡す")
+	var frozen: Dictionary = bridge.checkpoint()
+	bullet_pair_step(run,core,0.15,"石化の終了境界でもその更新は動かない")
+	bullet_pair_step(run,core,0.05,"解除後は追尾と寿命を再開する")
+	var resumed: Array = core.hostiles_snapshot()
+	check(bridge.restore(frozen.value).ok,"石化途中の旋回・寿命・位置を保持して復帰する")
+	bridge.collect_frame()
+	core.step_hostiles(0.15)
+	core.step_hostiles(0.05)
+	check(core.hostiles_snapshot()==resumed,"復帰後も同じ解除・追尾の状態へ進む")
+	bridge.release_checkpoint(frozen.value)
+	if not missile_reset(run,bridge,empty,target,config): return false
+	emitted = missile_emit_pair(run,bridge,Vector2(-1500,0),0.0,speed,settings)
+	if emitted.is_empty(): return false
+	bridge.command("dev_kill",{"entity_id":emitted.source_id,"cause":"ram"})
+	run.combat.kill_enemy(emitted.source_row)
+	check(core.attack_snapshot().any(func(attack): return attack.id==int(emitted.attack.id) and attack.source_id==emitted.source_id and not attack.source_alive),"発生元を倒しても独立した誘導弾と出所を保つ")
+	bullet_pair_step(run,core,1.5,"高速な機体横断で被弾して終了する")
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-settings.bullet_dmg) and is_equal_approx(run.state.ship_hp,core.ship_snapshot().ship_hp),"誘導弾が一度だけ被弾させ、atk_scaleを重ねて掛けない")
+	var hit_frame: Dictionary = bridge.read_frame().value
+	check(hit_frame.events.any(func(event): return event.type==&"hurt" and event.payload.cause==&"missile"),"機体の被弾をmissileの原因で共通記録へ渡す")
+	if not missile_reset(run,bridge,empty,target,config): return false
+	emitted = missile_emit_pair(run,bridge,Vector2(-4000,2000),PI,speed,settings)
+	if emitted.is_empty(): return false
+	bullet_pair_step(run,core,0.1,"画面外で遠ざかっても継続する")
+	check(core.hostiles_snapshot().size()==1,"誘導弾は通常弾の画面外退場へ入れない")
+	bullet_pair_step(run,core,5.0,"自然寿命で終了する")
+	check(core.hostiles_snapshot().is_empty(),"寿命が終わった誘導弾を回収する")
+	if not missile_reset(run,bridge,empty,target,config): return false
+	var straight: Dictionary = settings.duplicate()
+	straight.missile_turn = 0.0
+	emitted = missile_emit_pair(run,bridge,Vector2(-300,0),0.0,speed,straight)
+	if emitted.is_empty(): return false
+	bullet_pair_step(run,core,1.0,"天体との交差で終了する")
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"先に当たった地形で回収し機体へ被弾を通さない")
+	if not missile_reset(run,bridge,empty,target,config): return false
+	emitted = missile_emit_pair(run,bridge,target-Vector2(source_radius,0),0.0,speed,straight)
+	if emitted.is_empty(): return false
+	run.projectiles.stone_hostile(stone_view,1.0)
+	bridge.command("dev_stone_hostiles",{"view":stone_view,"duration":1.0})
+	bullet_pair_step(run,core,0.01,"石化中の機体接触")
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"石化中の接触はダメージなしで弾を回収する")
+	bridge.release_checkpoint(empty.value)
+	lab.free()
+	session.free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return true
