@@ -66,6 +66,20 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t10-motion" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t10_motion()
+		check(finished,"最高速度の操舵を最後まで照合する")
+		print("[cpp_t10_motion] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
+	if "--cpp-t10" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t10()
+		check(finished,"最高速度の確認を最後まで実施する")
+		print("[cpp_t10] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t09" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t09()
 		check(finished,"急所見切りの確認を最後まで実施する")
@@ -647,4 +661,83 @@ func check_cpp_t09() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"急所見切りの状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func check_cpp_t10() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: TraitDef = load("res://data/traits/T10_speed.tres")
+	var factor := 1.2
+	var profile := {"mult":{"max_speed":factor},"reduce":{"charge_time":0.9}}
+	var bridge = t07_bridge(config,profile)
+	if bridge==null: return false
+	var core = bridge._core
+	check(is_equal_approx(bridge._ui.max_speed,config.base_max_speed*factor),"未取得時は永続強化を掛けた最高速度を使う")
+	check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*0.9),"速度の永続値を読んでも充填の永続値を保つ")
+	var velocity: Vector2 = core.ship_snapshot().ship_vel
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T10","levels":1}).ok,"T10を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.max_speed,config.base_max_speed*factor*(1.0+definition.stack_bonus(level))),"tresの各段を永続強化の後に一度適用する")
+		check(core.ship_snapshot().ship_vel==velocity,"取得時に今の速度を勝手に書き換えない")
+	var trained: float = bridge._ui.max_speed
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T10","levels":1}).ok and bridge._ui.max_speed==trained,"上限を越えて最高速度を増やさない")
+	bridge.command("dev_post_speed",{"stacks":2})
+	var expected := trained*config.post_max.factor(&"max_speed",{&"max_speed":2})
+	check(is_equal_approx(bridge._ui.max_speed,expected),"最大段後の速度倍率を通常の育成後に掛ける")
+	var saved: Dictionary = bridge.checkpoint()
+	# 同じ最高速度を使う操舵と自然減速を、既存の利用側で1回進める。
+	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
+	check(core.step_ship(1.0,1.0,{"touch":true,"stick_active":true,"stick":Vector2.RIGHT*(config.stick_dead_zone+1.0)}),"機体の操舵と移動を進める")
+	var cruise := minf(config.steer_accel,expected*config.steer_cruise)
+	var floor_speed := expected*config.cruise_floor
+	var result := floor_speed+(cruise-floor_speed)*exp(-config.cruise_drag) if cruise>floor_speed else cruise
+	check(absf(core.ship_snapshot().ship_vel.length()-result)<0.0001,"操舵と減速は同じ実効最高速度を使う")
+	var position: Vector2 = core.ship_snapshot().ship_pos
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":position},0,1.0)
+	check(is_equal_approx(core.draw_snapshot().draw_limit,config.draw_length*expected/config.base_max_speed),"描線の距離にも実効最高速度の比率が効く")
+	core.handle_draw({"touch":true,"pen_release":true},100,1.0)
+	velocity = core.ship_snapshot().ship_vel
+	bridge.command("dev_remove_trait",{"id":"T10"})
+	check(is_equal_approx(bridge._ui.max_speed,config.base_max_speed*factor*config.post_max.factor(&"max_speed",{&"max_speed":2})) and core.ship_snapshot().ship_vel==velocity,"解除で特性分だけを外し、現在の慣性速度を保つ")
+	bridge.command("dev_post_speed",{"stacks":0})
+	check(is_equal_approx(bridge._ui.max_speed,config.base_max_speed*factor),"最大段後の倍率も外すと永続強化までの速度へ戻る")
+	check(bridge.restore(saved.value).ok,"取得段・永続値・最大段後の速度を保持して復帰する")
+	bridge.collect_frame()
+	check(is_equal_approx(bridge._ui.max_speed,expected),"復帰後も同じ実効最高速度を渡す")
+	bridge.release_checkpoint(saved.value)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(is_equal_approx(hud._cpp_ui.max_speed,expected) and hud._speed_indicator_mode()==hud.SPEED_INDICATOR.NORMAL,"HUDの通常の速度判定も実効最高速度を使う")
+	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2(expected*config.steer_cruise+2.0,0)})
+	check(hud._speed_indicator_mode()==hud.SPEED_INDICATOR.FAST,"巡航より速い状態も同じ境界で速度計へ渡す")
+	hud.free()
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"最高速度の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func check_cpp_t10_motion() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var bridge = t07_bridge(config,{"mult":{"max_speed":1.2}})
+	if bridge==null: return false
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T10","levels":config.trait_max_stacks})
+	bridge.command("dev_post_speed",{"stacks":2})
+	var expected: float = bridge._ui.max_speed
+	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
+	bridge._core.step_ship(1.0,1.0,{"touch":true,"stick_active":true,"stick":Vector2.RIGHT*(config.stick_dead_zone+1.0)})
+	var cruise := minf(config.steer_accel,expected*config.steer_cruise)
+	var floor_speed := expected*config.cruise_floor
+	var result := floor_speed+(cruise-floor_speed)*exp(-config.cruise_drag) if cruise>floor_speed else cruise
+	var actual: float = bridge._core.ship_snapshot().ship_vel.length()
+	check(absf(actual-result)<0.0001,"操舵と減速は同じ実効最高速度を使う: expected=%.12f actual=%.12f max=%.12f" % [result,actual,expected])
+	bridge.dispose()
 	return true

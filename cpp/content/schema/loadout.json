@@ -49,9 +49,14 @@
           "name": "crit_bonus",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "speed_bonus",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 4
+      "version": 5
     },
     {
       "name": "PostMaxChargeDefinition",
@@ -101,6 +106,22 @@
         },
         {
           "name": "increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxMotionDefinition",
+      "section": 33,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "max_speed_increment",
           "type": "f64",
           "min": 0
         }

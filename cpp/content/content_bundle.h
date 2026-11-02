@@ -34,6 +34,7 @@ struct ContentBundle {
     std::vector<NumericTraitLevel> numeric_traits;
     PostMaxChargeDefinition post_charge;
     PostMaxCritDefinition post_crit;
+    PostMaxMotionDefinition post_motion;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);
 };
 }
