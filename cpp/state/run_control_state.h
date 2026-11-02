@@ -1,5 +1,6 @@
 #pragma once
 #include "../runtime/run_random.h"
+#include <vector>
 #include "../runtime/input_frame.h"
 #include <godot_cpp/variant/string_name.hpp>
 namespace speed {
@@ -17,5 +18,9 @@ struct RunControlState {
     godot::Vector2 camera_center, logical_size;
     double camera_zoom=1, base_view=1, zoom_ref_speed=1, zoom_exp=0, zoom_min=1, look_ahead=0;
     bool camera_ready=false;
+    bool lab_mode=false, lab_pinned=false;
+    godot::Vector2 lab_pin;
+    struct LabSchedule {uint32_t definition=0;int64_t start=0,end=0,interval=1,count=1;double probability=1,radius=0,spacing=60,facing=0;godot::Vector2 position;bool enabled=true,elite=false;};
+    std::vector<LabSchedule> lab_schedule;
 };
 }

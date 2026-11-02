@@ -130,6 +130,11 @@ func read_frame() -> Dictionary:
 	if _busy: return _error(7,"read_frame","更新中は再入できません")
 	return _read_locked() if _core != null else _error(4,"read_frame","破棄済みです")
 
+func read_lab() -> Dictionary:
+	if _busy: return _error(7,"lab","更新中は実験の状態を読めません")
+	if _core==null: return _error(4,"lab","開始していないランです")
+	return _core.lab_state_run()
+
 func read_encounter() -> Dictionary:
 	if _busy: return _error(7,"encounter","更新中は配置の状態を読めません")
 	if _core==null: return _error(4,"encounter","開始していないランです")

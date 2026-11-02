@@ -26,6 +26,7 @@ class SpeedRunCore : public RefCounted {
     friend class speed::ProgressionSystem;
     friend class speed::PickupSystem;
     friend class speed::FieldSystem;
+    Dictionary development_lab_command(const String &,const Dictionary &);
     Dictionary development_boss_command(const String &,const Dictionary &);
     Dictionary development_hull_command(const String &,const Dictionary &);
     Dictionary development_shell_command(const Dictionary &);
@@ -119,6 +120,7 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    Dictionary lab_state_run() const;
     PackedInt64Array enemy_handle(int64_t id) const;
     bool valid_enemy_handle(PackedInt64Array handle) const;
     bool set_attack_budget_mode(bool enabled, bool from_stage);

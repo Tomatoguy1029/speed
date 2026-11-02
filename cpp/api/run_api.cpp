@@ -180,7 +180,9 @@ Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,co
     speed::RenderBuilder::capture_previous(runtime);
     runtime.frame_workspace.publishing_tick=runtime.state.control.tick+1;
     const double previous_world_time=runtime.state.world_time;
+    if (runtime.state.control.lab_pinned) {runtime.state.ship.pos=runtime.state.control.lab_pin;runtime.state.ship_pos=runtime.state.ship.pos;runtime.state.ship.vel=Vector2();}
     const bool advanced=speed::RunRunner::step_play(*this,1.0/120.0,input,size);
+    if (runtime.state.control.lab_pinned) {runtime.state.ship.pos=runtime.state.control.lab_pin;runtime.state.ship_pos=runtime.state.ship.pos;runtime.state.ship.vel=Vector2();}
     speed::EventBuilder::flush_combat(runtime);
     runtime.frame_workspace.publishing_tick=-1;
     if (!advanced) return failure(8,"step","更新の整合を確認してください");
@@ -296,8 +298,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=speed::BossFinish::skip(runtime)?success():failure(4,"phase","クリア演出中だけスキップできます");
     } else if (kind=="dev_finish" && runtime.api_development && payload.size()==1 && is(payload,"cleared",Variant::BOOL)) {
         response=speed::Lifecycle::finish(runtime,bool(payload["cleared"])?speed::ResultKind::Clear:speed::ResultKind::Death)?success():failure(4,"result","結果は確定済みです");
-    } else if (kind=="dev_spawn" && runtime.api_development && payload.size()==2 && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite()) {
-        Dictionary options;options["spawn_origin"]=int64_t(speed::SpawnOrigin::DevPlacement);
+    } else if (kind=="dev_spawn" && runtime.api_development && keys(payload,{"definition_id","position","facing","elite"}) && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite() && (!payload.has("elite") || is(payload,"elite",Variant::BOOL)) && (!payload.has("facing") || ((is(payload,"facing",Variant::FLOAT) || is(payload,"facing",Variant::INT)) && std::isfinite(double(payload["facing"]))))) {
+        Dictionary options;options["facing"]=payload.get("facing",0.0);options["elite"]=payload.get("elite",false);options["spawn_origin"]=int64_t(speed::SpawnOrigin::DevPlacement);
         auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],options);
         if (entity>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=entity>0?success(entity):failure(5,"definition_id","生成できる定義がありません");
@@ -336,7 +338,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_tune" && payload.size()==3 && is(payload,"target_id",Variant::STRING) && is(payload,"revision",Variant::INT) && is(payload,"values",Variant::PACKED_BYTE_ARRAY)) {
         Dictionary replace;replace["definition_id"]=payload["target_id"];replace["expected_revision"]=payload["revision"];replace["replacement"]=payload["values"];
         response=speed::DevCommands::replace_definition(runtime,replace);
-    } else if (kind=="dev_edit" && payload.size()==2 && is(payload,"kind",Variant::STRING) && is(payload,"payload",Variant::DICTIONARY) && (String(payload["kind"])=="parameter" || String(payload["kind"])=="boss_parameter" || String(payload["kind"])=="config")) response=speed::DevCommands::replace_definition(runtime,payload["payload"]);
+    } else if (kind=="dev_set_scenario" || (kind=="dev_edit" && payload.has("kind") && String(payload["kind"])!="parameter" && String(payload["kind"])!="boss_parameter" && String(payload["kind"])!="config")) response=development_lab_command(kind,payload);
+    else if (kind=="dev_edit" && payload.size()==2 && is(payload,"kind",Variant::STRING) && is(payload,"payload",Variant::DICTIONARY) && (String(payload["kind"])=="parameter" || String(payload["kind"])=="boss_parameter" || String(payload["kind"])=="config")) response=speed::DevCommands::replace_definition(runtime,payload["payload"]);
     else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat" || kind=="dev_corona_after_combat") response=development_combat_command(kind,payload);
     else if (kind=="dev_friend_births" || kind=="dev_friend_reserve") response=development_friend_command(kind,payload);
     else if (kind=="dev_emit_attack" || kind=="dev_end_attack" || kind=="dev_attack_scope" || kind=="dev_clear_hostile" || kind=="dev_attack_update") response=development_attack_command(kind,payload);

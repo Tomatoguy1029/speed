@@ -79,7 +79,7 @@ func _text(parent: Node, value: String) -> Label:
 
 func refresh(force := false) -> void:
 	if session == null or not is_instance_valid(session.run): return
-	var t: EnemyTable = session.run.enemies.table
+	var t: Dictionary = session.run.enemies.table
 	var i: int = session.selected
 	if i < 0 or i >= t.alive.size() or not t.alive[i] or t.dead[i]:
 		session.selected = -1
@@ -97,11 +97,11 @@ func refresh(force := false) -> void:
 	_health.value = t.hp[i]
 	_hp.text = tr("lab.ui.hp") % [t.hp[i], t.max_hp[i]]
 	var attack: float = session.run.combat.attack_power()
-	var pierce := attack >= t.armor[i]
-	var state := tr("lab.message_09a8e159ad") if t.charge[i] > 0 or t.mode[i] == EnemyTable.Mode.WINDUP else (tr("lab.status_active") if t.mode[i] == EnemyTable.Mode.DASH else (tr("lab.status_wait") if t.mode[i] == EnemyTable.Mode.RECOVER else tr("lab.message_d44a3e6526")))
+	var pierce = attack >= t.armor[i]
+	var state = tr("lab.message_09a8e159ad") if t.charge[i] > 0 or t.mode[i] == EnemyTable.Mode.WINDUP else (tr("lab.status_active") if t.mode[i] == EnemyTable.Mode.DASH else (tr("lab.status_wait") if t.mode[i] == EnemyTable.Mode.RECOVER else tr("lab.message_d44a3e6526")))
 	_state.text = tr("lab.message_6fb30df6c1") if pierce else tr("lab.message_2c343fabe5")
 	_state.add_theme_color_override("font_color", UI.ACCENT if pierce else Color("#ffbf83"))
-	var live := tr("lab.message_6170cb0f1e") % [t.hp[i], t.max_hp[i], t.armor[i], attack, _state.text, state, t.pos[i].x, t.pos[i].y, rad_to_deg(t.facing[i])]
+	var live = tr("lab.message_6170cb0f1e") % [t.hp[i], t.max_hp[i], t.armor[i], attack, _state.text, state, t.pos[i].x, t.pos[i].y, rad_to_deg(t.facing[i])]
 	var director = session.run.projectiles.director
 	var owner := str(t.id[i])
 	for key in director.waiting:
@@ -118,7 +118,7 @@ func refresh(force := false) -> void:
 			var control = _controls[key]
 			if control is SpinBox and not control.get_line_edit().has_focus(): control.set_value_no_signal(value)
 			elif control is CheckButton: control.set_pressed_no_signal(value)
-		var individual := t.elite[i]
+		var individual = t.elite[i]
 		if individual != _individual_snapshot:
 			_individual_snapshot = individual
 			if is_instance_valid(_elite): _elite.set_pressed_no_signal(t.elite[i] != 0)
@@ -130,23 +130,23 @@ func refresh(force := false) -> void:
 		node.queue_free()
 	_controls.clear()
 	_elite = null
-	var note := _text(_values, tr("lab.ui.type_values"))
+	var note = _text(_values, tr("lab.ui.type_values"))
 	note.add_theme_font_size_override("font_size", 12)
 	note.add_theme_color_override("font_color", UI.MUTED)
 	note.tooltip_text = tr("lab.message_479576c49c")
-	var basics := UI.fold(_values, tr("lab.ui.basic"), true)
-	var names := {"hp": tr("lab.message_341a7b515f"), "toughness": tr("lab.toughness"), "armor": tr("lab.message_7d629f79a9"), "speed": tr("lab.message_80c64a0375"), "radius": tr("lab.message_b982dccaae")}
+	var basics = UI.fold(_values, tr("lab.ui.basic"), true)
+	var names = {"hp": tr("lab.message_341a7b515f"), "toughness": tr("lab.toughness"), "armor": tr("lab.message_7d629f79a9"), "speed": tr("lab.message_80c64a0375"), "radius": tr("lab.message_b982dccaae")}
 	# 星1〜5の敵の HP は星と HP の属性で決まるので、HP の代わりに属性を変える
-	var hp_key := "toughness" if def is EnemyDef and def.uses_hp_table(session.run.cfg) else "hp"
+	var hp_key = "toughness" if def is EnemyDef and def.uses_hp_table(session.run.cfg) else "hp"
 	for key in ([hp_key, "armor", "speed", "radius"] if def is EnemyDef else ["speed", "radius"]): _field(basics, key, names[key], def.get(key))
 	var frequent := ["fire_interval", "telegraph", "windup", "recover"]
 	for key in frequent:
 		if def.params.has(key): _parameter(basics, def, key)
-	var advanced := UI.fold(_values, tr("lab.ui.attack_details"))
+	var advanced = UI.fold(_values, tr("lab.ui.attack_details"))
 	for key in def.params:
 		if not key in frequent: _parameter(advanced, def, key)
 	if def is EnemyDef:
-		var individual := UI.fold(_values, tr("lab.ui.individual"))
+		var individual = UI.fold(_values, tr("lab.ui.individual"))
 		var row := HBoxContainer.new()
 		individual.add_child(row)
 		_elite = CheckButton.new()
@@ -155,7 +155,7 @@ func refresh(force := false) -> void:
 		_individual_snapshot = t.elite[i]
 		row.add_child(_elite)
 		UI.button(individual, tr("lab.message_597e81eb3a"), func(): session.perform("individual", {"id": _identity, "elite": _elite.button_pressed}); refresh(true))
-	var live_box := UI.fold(_values, tr("lab.ui.live_details"))
+	var live_box = UI.fold(_values, tr("lab.ui.live_details"))
 	_details = _text(live_box, live)
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_details.add_theme_font_size_override("font_size", 12)
@@ -193,7 +193,7 @@ func _field(parent: Node, key: String, label: String, value, help := "") -> void
 		_controls[key] = spin
 
 func _change(key: String, value) -> void:
-	var t: EnemyTable = session.run.enemies.table
+	var t: Dictionary = session.run.enemies.table
 	var i: int = session.selected
 	if i >= 0 and i < t.alive.size() and session.definition_for_row(i) != null:
 		session.perform("boss_parameter" if t.is_boss[i] else "parameter", {"type": String(t.type[i]), "key": key, "value": value})

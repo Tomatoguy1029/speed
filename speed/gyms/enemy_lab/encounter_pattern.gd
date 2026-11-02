@@ -10,17 +10,17 @@ func capture(session, path: PackedVector2Array, jitter := 60.0, margin := 20.0) 
 	if path.size() < 2:
 		return {}
 	var regions := []
-	var t := session.run.enemies.table as EnemyTable
+	var t = session.run.enemies.table
 	var origin := path[0]
 	for i in t.alive.size():
 		if t.alive[i] and not t.dead[i]:
-			var offset := t.pos[i] - origin
+			var offset = t.pos[i] - origin
 			regions.append({"type": String(t.type[i]), "pos": [offset.x, offset.y], "jitter": maxf(0, jitter),
 				"angle": t.facing[i], "elite": t.elite[i] != 0,
 				"role": "fodder" if t.gate[i] == EnemyTable.Gate.NONE and t.hp[i] <= session.run.combat.attack_power() and t.armor[i] <= session.run.combat.attack_power() else "avoid"})
 	var points := []
 	for point in path:
-		var offset := point - origin
+		var offset = point - origin
 		points.append([offset.x, offset.y])
 	return {"route": points, "regions": regions, "anchor": [origin.x, origin.y], "margin": margin,
 		"rotation": PI, "scale_min": 0.8, "scale_max": 1.0, "min_fodder": 1, "window": 0.0, "attempts": 32}
@@ -49,13 +49,13 @@ func generate(source, pattern: Dictionary, seed_value: int) -> Dictionary:
 		var roles_valid := true
 		var positions := []
 		for command in commands:
-			var at := worker.vector(command.args.pos)
+			var at = worker.vector(command.args.pos)
 			for point in positions:
 				if at.distance_to(point) < float(pattern.get("min_spacing", 0)): roles_valid = false
 			positions.append(at)
 			worker.perform(command.kind, command.args)
 			if command.args.get("role") == "avoid":
-				var t: EnemyTable = worker.run.enemies.table
+				var t: Dictionary = worker.run.enemies.table
 				var row: int = worker.selected
 				if row >= 0 and CHECK.distance_to_path(t.pos[row], path) <= t.r[row] + CHECK.sweep_radius(worker.run, float(pattern.get("margin", 20))):
 					roles_valid = false

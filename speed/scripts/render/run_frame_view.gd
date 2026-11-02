@@ -344,6 +344,21 @@ func _exhaust(path: String, factor: float) -> Sprite2D:
 	_layer(4).add_child(sprite)
 	return sprite
 
+## 実験場の明示した外観編集だけ、新しい表示資源へ切り替える。
+## 停止して保持した別Sessionの資源や描画実体は変更しない。
+func replace_lab_visuals(scope: ContentResourceScope, entries: Array[Dictionary]) -> void:
+	_scope = scope
+	for entry: Dictionary in entries:
+		var id: int = entry.id
+		if visuals.get(id,{})==entry: continue
+		visuals[id] = entry.duplicate(true)
+		if enemy_frames.has(id):
+			enemy_frames[id].queue_free()
+			enemy_frames.erase(id)
+		if batches.has(id):
+			batches[id].queue_free()
+			batches.erase(id)
+
 func _batch(id: int, layer: int) -> InstanceBatch:
 	if batches.has(id): return batches[id]
 	var entry: Dictionary = visuals[id]

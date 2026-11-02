@@ -7,6 +7,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-lab" in OS.get_cmdline_user_args():
+		await check_cpp_lab_constraints()
+		print("[cpp_lab_constraints] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-encounter" in OS.get_cmdline_user_args():
 		check(await check_cpp_encounter(),"採用した配置規則の指定確認を最後まで行う")
 		print("[cpp_encounter] failed=%d" % failed)
@@ -223,3 +228,28 @@ func check_cpp_encounter() -> bool:
 		bridge.unsubscribe("配置確認")
 		session.free()
 	return true
+
+func check_cpp_lab_constraints() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"empty":true})
+	var route := PackedVector2Array([Vector2(-300,0),Vector2(300,0)])
+	check(lab.perform("spawn",{"type":"drifter","pos":[0,0]}),"制約確認の敵を正式命令で置く")
+	check(CHECK.validate(lab,route).valid,"C++所有の弱い敵は障害物にしない")
+	check(CHECK.validate(lab,route,20,1).status=="unsupported","動く敵の静止判定を時間幅の保証にしない")
+	lab.perform("spawn",{"type":"armored","pos":[0,0]})
+	var blocked: Dictionary = CHECK.validate(lab,route)
+	check(not blocked.valid and blocked.blockers.all(func(row): return not row.reason.is_empty()),"C++の中間衝突と理由を同じ形式で表示する")
+	lab.perform("clear")
+	lab.perform("spawn",{"type":"drifter","pos":[0,0]})
+	lab.perform("parameter",{"type":"drifter","key":"speed","value":0})
+	check(CHECK.validate(lab,route,20,1).status=="window","静止したモデルの時間幅を直接判定する")
+	lab.perform("ship",{"pos":[0,0],"gauge":0.01})
+	var low: Dictionary = CHECK.validate(lab,route)
+	check(not low.valid and low.length>low.budget,"ゲージ不足と長さ超過を同じC++判定で表示する")
+	lab.perform("ship",{"pos":[0,0],"gauge":1.0})
+	lab.history.append({"tick":lab.tick+120,"kind":"spawn","args":{"type":"drifter","pos":[900,900]}})
+	check(CHECK.validate(lab,route,20,2).status=="unsupported","120Hzの未来命令を時間幅へ含める")
+	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"制約の問い合わせ後も通知配信が成功する")
+	lab.queue_free()
+	await get_tree().process_frame

@@ -11,6 +11,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab" in OS.get_cmdline_user_args():
+		await cpp_lab()
+		print("[cpp_lab_core] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-definition-edits" in OS.get_cmdline_user_args():
 		check(await cpp_definition_edits(), "型付き定義編集の確認を最後まで行う")
 		print("[cpp_definition_edits] passed=%d failed=%d" % [passed, failed])
@@ -114,3 +119,37 @@ func cpp_definition_edits() -> bool:
 		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.get("ok",false),"編集後の読取・回収・通知配信が成功する")
 		bridge.dispose()
 	return true
+
+func cpp_lab() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	var data_before := JSON.stringify(SaveManager.data)
+	await lab.reset({"seed":932,"empty":true,"stage":4})
+	check(lab.bridge!=null and lab.scene.runtime_kind=="cpp" and lab.run!=null,"実験場は旧RunSimulationを作らずC++Sessionを使う")
+	if lab.run==null: lab.queue_free(); return
+	check(lab.last_error.get("ok",false),"開始設定が成功する: "+str(lab.last_error))
+	if not lab.last_error.get("ok",false): lab.queue_free(); return
+	check(lab.run.state.stage.boss_id==&"hydra" and lab.run.state.phase==RunState.Phase.PLAY,"元のステージとカード待ちのない入口を保つ")
+	check(lab.perform("spawn",{"type":"gunner","pos":[200,0],"count":3}) and lab.run.enemies.count()==3,"手動配置は通常の生成サービスへ接続する")
+	var id: int = lab.run.enemies.table.id[lab.selected]
+	check(lab.perform("move",{"id":id,"pos":[300,50],"angle":0.25}) and lab.run.enemies.table.pos[lab.selected]==Vector2(300,50),"論理IDで選択と移動を行う")
+	check(lab.perform("pin",{"value":true,"pos":[-600,0]}),"機体固定を正式命令で設定する")
+	for n in 120: lab.step()
+	check(is_equal_approx(lab.run.state.time,1.0) and lab.run.state.ship_pos==Vector2(-600,0),"120Hzで進めながら機体だけを固定する")
+	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"更新・読取・回収・通知配信が成功する")
+	check(lab.perform("delete",{"id":id}) and lab.row_for_id(id)<0,"削除後の選択に再利用した行を混ぜない")
+	var digest: String = lab.digest()
+	await lab.seek(0)
+	for checkpoint in lab.checkpoints: checkpoint.scene.queue_free()
+	lab.checkpoints.clear()
+	await lab.seek(120)
+	check(lab.digest()==digest,"同じ入力と手動配置を固定tickで再現する")
+	check(JSON.stringify(SaveManager.data)==data_before,"実験で共有セーブを変えない")
+	await lab.reset({"empty":true})
+	check(lab.run.enemies.count()==0,"Resetで開始状態へ戻る")
+	check(lab.perform("schedule",{"entries":[{"type":"drifter","pos":[500,500],"start":0,"end":0,"interval":1}]}),"予定配置をC++へ渡す")
+	lab.step()
+	check(lab.run.enemies.count()==1,"予定配置をC++の時計と乱数で実行する")
+	print("[cpp_lab_core] 未実施: うみへびの首を含む再生（該当種類の移行待ち）")
+	lab.queue_free()
+	await get_tree().process_frame

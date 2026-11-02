@@ -61,7 +61,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 	for phase in session.run.state.stage.phases:
 		if ContentManager.phases.has(phase.id): phase_ids.append(String(phase.id))
 	var commands := [{"tick": 0, "kind": "phase_set", "args": {"ids": phase_ids}}]
-	var t := session.run.enemies.table as EnemyTable
+	var t = session.run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.dead[i] or t.parent[i] >= 0:
 			continue
@@ -121,7 +121,7 @@ static func validate(data: Dictionary) -> String:
 		return TranslationServer.translate("lab.message_5aa5077c96")
 	if not data.get("spec") is Dictionary or not data.get("history") is Array or not data.get("branches", []) is Array:
 		return TranslationServer.translate("lab.message_03af38d54f")
-	var format_error := TranslationServer.translate("lab.message_03af38d54f")
+	var format_error = TranslationServer.translate("lab.message_03af38d54f")
 	for key in ["tick", "end", "branch_serial"]:
 		if data.has(key) and (not _number_ok(data[key]) or float(data[key]) < 0): return format_error
 	if int(data.get("tick", 0)) > int(data.get("end", 0)): return format_error

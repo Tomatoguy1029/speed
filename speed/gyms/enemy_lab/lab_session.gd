@@ -10,7 +10,16 @@ const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
 const DT := 1.0 / 120.0
 
 var scene: RunSession
-var run: RunSimulation
+var run: RefCounted
+var bridge: RefCounted
+var last_error := {}
+var _source: RuntimeStage
+var _definitions := {}
+var _config: GameConfig
+var _output := ""
+const BUILDER := preload("res://tools/content/build_run_content.gd")
+const LOADER := preload("res://scripts/runtime/run_content_loader.gd")
+const PROJECTION := preload("res://gyms/enemy_lab/lab_projection.gd")
 var baseline: Dictionary = {}
 var spec: Dictionary = {}
 var history: Array[Dictionary] = []
@@ -36,7 +45,7 @@ var _selected_row := -1
 var _selected_id := -1
 var selected: int:
 	get:
-		return _selected_row if is_instance_valid(run) and run.enemies.is_same(_selected_row, _selected_id) and not run.enemies.table.dead[_selected_row] else -1
+		return row_for_id(_selected_id) if is_instance_valid(run) else -1
 	set(value):
 		_selected_row = value
 		_selected_id = run.enemies.table.id[value] if is_instance_valid(run) and value >= 0 and value < run.enemies.table.id.size() else -1
@@ -90,84 +99,71 @@ func _rebuild() -> void:
 	revision += 1
 	_epoch += 1
 	if is_instance_valid(scene):
-		if scene.get_parent() != null:
-			scene.get_parent().remove_child(scene)
+		if scene.get_parent()!=null: scene.get_parent().remove_child(scene)
 		scene.queue_free()
-	var cfg: GameConfig = ContentManager.base.duplicate(true)
-	for key in spec.get("config", {}):
-		cfg.set(key, spec.config[key])
-	# 旧実験セッションの5枠装備はすべて復元し、そのセッションだけ枠数を保持する。
-	cfg.trait_slots = maxi(cfg.trait_slots, spec.get("traits", {}).size())
-	var field_flags: Dictionary = spec.get("field", {})
-	var terrain: bool = field_flags.get("terrain", not spec.get("empty", true))
-	var rocks: bool = field_flags.get("rocks", not spec.get("empty", true))
-	var gimmicks: bool = field_flags.get("gimmicks", not spec.get("empty", true))
-	if not terrain: cfg.moon_count = 0
-	if not rocks:
-		cfg.meteor_count = 0
-		cfg.iron_count = 0
-		cfg.saw_count = 0
-	if not gimmicks:
-		cfg.comet_interval_min = 1e8
-		cfg.comet_interval_max = 1e8
-		cfg.gravity_interval_min = 1e8
-		cfg.gravity_interval_max = 1e8
-	var stage: StageDef = ContentManager.stage(int(spec.get("stage", 1))).duplicate(true)
-	var defs: Dictionary = ContentManager.enemies.duplicate()
-	for id in spec.get("overrides", {}):
-		if defs.has(StringName(id)):
-			var def: EnemyDef = defs[StringName(id)].duplicate(true)
-			for key in spec.overrides[id]:
-				if key == "params":
-					for param in spec.overrides[id][key]: def.params[param] = safe_parameter(param, spec.overrides[id][key][param])
-				else: def.set(key, spec.overrides[id][key])
-			defs[StringName(id)] = def
-	var options := {"lab": true, "config": cfg, "stage_index": stage.index, "stage": load("res://tools/content/build_runtime_stage.gd").compile(stage),
-		"live_visuals": ARMOR_PAINT.live_look,
-		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
-		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {}), "director": spec.get("director", {})}
-	# 表示のない試行は表示を作らない。実験場が自分の時計で進め、出来事も自分で読む
-	scene = RunManager.create_session(viewport if viewport != null else self, options, viewport != null)
+	_config = ContentManager.base.duplicate(true)
+	for key in spec.get("config",{}): _config.set(key,spec.config[key])
+	_config.trait_slots = maxi(_config.trait_slots,spec.get("traits",{}).size())
+	var flags: Dictionary = spec.get("field",{})
+	var terrain: bool = flags.get("terrain",not spec.get("empty",true))
+	if not terrain: _config.moon_count = 0
+	if not flags.get("rocks",not spec.get("empty",true)):
+		_config.meteor_count = 0
+		_config.iron_count = 0
+		_config.saw_count = 0
+	if not flags.get("gimmicks",not spec.get("empty",true)):
+		_config.comet_interval_min = 1e8
+		_config.comet_interval_max = 1e8
+		_config.gravity_interval_min = 1e8
+		_config.gravity_interval_max = 1e8
+	var stage: StageDef = ContentManager.stage(int(spec.get("stage",1))).duplicate(true)
+	_source = load("res://tools/content/build_runtime_stage.gd").compile(stage)
+	_source.resources = _source.resources.duplicate(true)
+	_source.resources.enemy_ids = PackedStringArray()
+	_definitions = {}
+	for id in ContentManager.enemies:
+		var definition: EnemyDef = ContentManager.enemies[id].duplicate(true)
+		for key in spec.get("overrides",{}).get(String(id),{}):
+			var value = spec.overrides[String(id)][key]
+			if key=="params": definition.params.merge(value,true)
+			else: definition.set(key,value)
+		if not BUILDER.chase_package(definition,_config,_source).is_empty():
+			_definitions[id] = definition
+			_source.resources.enemy_ids.append(String(id))
+	# 未移行種類は配置時に失敗として返す。旧ランで補完しない。
+	_output = "res://.content/dev/lab_%d_%d" % [OS.get_process_id(),get_instance_id()]
+	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions)
+	if built!=OK:
+		last_error = {"ok":false,"message":"実験の定義を生成できません: "+error_string(built)}
+		run = null
+		return
+	var index_path := _output.path_join("stage_%d.json" % _source.index)
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+	scene = RunManager.create_session(viewport if viewport!=null else self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":int(spec.get("seed",932)),"hud":true,"cpp_edit_source":{"stage":_source,"config":_config,"definitions":_definitions}},viewport!=null)
 	scene.auto_step = false
-	scene.set_process(false)
-	run = scene.sim
-	run.bosses.definitions = ContentManager.bosses.duplicate()
-	for id in spec.get("boss_overrides", {}):
-		if ContentManager.bosses.has(StringName(id)):
-			var boss: BossDef = ContentManager.bosses[StringName(id)].duplicate(true)
-			for key in spec.boss_overrides[id]:
-				if key == "params":
-					for param in spec.boss_overrides[id][key]: boss.params[param] = safe_parameter(param, spec.boss_overrides[id][key][param])
-				else: boss.set(key, spec.boss_overrides[id][key])
-			run.bosses.definitions[StringName(id)] = boss
-	run.input_source = func(): return _intent
-	run.ship.invincible = spec.get("invincible", true)
-	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if not terrain or spec.has("ship_pos") else run.state.ship_pos
-	# 機体を置き直したので、カメラと敵の狙いも機体の位置から始める
-	run.state.view_center = run.state.ship_pos
-	run.state.enemy_aim = run.state.ship_pos
-	run.state.time = float(spec.get("time", 0.0))
-	run.state.gauge = float(spec.get("gauge", 1.0))
-	if not rocks: run.field.rocks.clear()
-	if not terrain:
-		run.field.bodies.clear()
-		run.field.moons.clear()
-		run.field.planet.pos = Vector2(1e7, 1e7)
-		run.field.planet.r = 0
-		run.field.refresh_bodies()
-	if not spec.get("auto_boss", false):
-		run.state.boss_spawned = true
-	var weapon_ids: Array = spec.get("weapons", {}).keys()
-	weapon_ids.sort()
-	for id in weapon_ids:
-		run.loadout.grant(&"weapon", StringName(id), int(spec.weapons[id]))
-	var trait_ids: Array = spec.get("traits", {}).keys()
-	trait_ids.sort()
-	for id in trait_ids:
-		run.loadout.grant(&"trait", StringName(id), int(spec.traits[id]))
-	run.state.level = int(spec.get("level", 1))
-	run.loadout.refresh_stats()
-	run.state.hero_power = StringName(spec.get("hero", ""))
+	while scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
+	if scene.bridge==null:
+		last_error = {"ok":false,"message":"実験のC++ランを開始できません"}
+		run = null
+		return
+	bridge = scene.bridge
+	run = PROJECTION.new()
+	run.cfg = _config
+	run.enemies.data.definitions = _definitions
+	run.bosses.definitions = ContentManager.bosses.duplicate(true)
+	run.state.data.stage = stage
+	run.input = scene.cpp_input_source.get_object()
+	bridge.subscribe("実験の履歴",_consume_frame)
+	var scenario := {"lab_mode":true,"auto_spawn":spec.get("auto_spawn",false),"auto_boss":spec.get("auto_boss",false),"invincible":spec.get("invincible",true),"time":float(spec.get("time",0.0)),"gauge":float(spec.get("gauge",1.0)),"level":int(spec.get("level",1)),"empty":not terrain}
+	if not terrain or spec.has("ship_pos"): scenario.position = vector(spec.get("ship_pos",[0,0]))
+	last_error = bridge.command("dev_set_scenario",{"kind":"lab","params":scenario})
+	if not last_error.ok: return
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	for kind in ["weapon","trait"]:
+		var owned: Dictionary = spec.get("weapons" if kind=="weapon" else "traits",{})
+		var ids := owned.keys()
+		ids.sort()
+		for id in ids: bridge.command("dev_grant_equipment",{"id":String(id),"kind":kind,"levels":int(owned[id])})
 	tick = 0
 	selected = -1
 	_cursor = 0
@@ -178,9 +174,28 @@ func _rebuild() -> void:
 	pinned = null
 	_accumulator = 0
 	events.clear()
-	schedule = spec.get("schedule", []).duplicate(true)
+	schedule = spec.get("schedule",[]).duplicate(true)
+	_apply("schedule",{"entries":schedule})
 	_apply_recorded()
-	run.combat.rebuild_grid()
+	_refresh_projection()
+
+func _refresh_projection() -> bool:
+	if bridge==null or run==null: return false
+	var read: Dictionary = bridge.read_lab()
+	var frame: Dictionary = bridge.read_frame()
+	if not read.ok or not frame.ok:
+		last_error = read if not read.ok else frame
+		return false
+	run.refresh(read.value,frame.value.ui)
+	return true
+
+func _consume_frame(frame: Dictionary) -> bool:
+	for item: Dictionary in frame.events:
+		var event: Dictionary = item.payload.duplicate(true)
+		event.merge({"type":item.type,"tick":item.tick,"t":item.t,"world_t":item.world_t},true)
+		events.append(event)
+		event_recorded.emit(event)
+	return true
 
 func vector(value) -> Vector2:
 	if value is Vector2:
@@ -223,113 +238,57 @@ func _take_live_input() -> void:
 ## 描いたルートを、本番の描画と同じ処理で少しずつ描き、描き終えたら確定して駆け抜けさせる。
 ## 長さの上限・地形・角の補正は本番どおりにかかる。操作の履歴の "route" から始まるので、再生しても同じになる。
 func _draw_route_step() -> void:
-	if _route_play.is_empty():
-		return
+	if _route_play.is_empty(): return
 	var path: PackedVector2Array = _route_play.points
 	var frames: int = _route_play.frames
 	var n: int = _route_play.n
-	var draw := run.draw
-	if n == 0:
-		if run.state.drawing or run.state.tracing or run.state.gauge_amount() < run.cfg.draw_min_charge:
+	if n==0:
+		var started: Dictionary = bridge.command("dev_edit",{"kind":"draw","payload":{"action":"start","position":path[0]}})
+		if not started.ok:
 			_route_play = {}
 			return
-		var it := Intent.new()
-		it.press = true
-		it.has_cursor = true
-		it.pen = path[0]
-		it.cursor = path[0]
-		draw._start(it)
-	if not run.state.drawing:
-		_route_play = {}
-		return
-	var index := clampf(float(n + 1) / frames * (path.size() - 1), 0, path.size() - 1)
-	var previous := float(n) / frames * (path.size() - 1)
-	for k in range(ceili(previous), floori(index) + 1):
-		if k > 0 and k < path.size():
-			draw._extend(path[k])
-	var lo := mini(floori(index), path.size() - 2)
-	draw._extend(path[lo].lerp(path[lo + 1], index - lo))
-	_route_play.n = n + 1
-	if n + 1 >= frames:
-		if run.state.drawing:
-			draw._commit(Intent.new())
+	var index := clampf(float(n+1)/frames*(path.size()-1),0,path.size()-1)
+	var previous := float(n)/frames*(path.size()-1)
+	for k in range(ceili(previous),floori(index)+1):
+		if k>0 and k<path.size(): bridge.command("dev_edit",{"kind":"draw","payload":{"action":"extend","position":path[k]}})
+	var lo := mini(floori(index),path.size()-2)
+	bridge.command("dev_edit",{"kind":"draw","payload":{"action":"extend","position":path[lo].lerp(path[lo+1],index-lo)}})
+	_route_play.n = n+1
+	if n+1>=frames:
+		bridge.command("dev_edit",{"kind":"draw","payload":{"action":"commit"}})
 		_route_play = {}
 
-## 一覧から置いたフィールドの要素を加える。惑星は動かない障害物、彗星は機体の方へまっすぐ横切る。
-## 重力とワープホールは、現れたときと同じ大きさ・時間で置く。経験値の結晶はひとまとまりで散らす。
-func _add_field(kind: String, at: Vector2, radius: float) -> void:
-	var field := run.field
-	var cfg := run.cfg
-	match kind:
-		"planet":
-			var body := FieldSystem.Body.new()
-			body.pos = at
-			body.r = maxf(10.0, radius)
-			body.is_planet = true
-			field.bodies.append(body)
-			field.refresh_bodies()
-			# 天体までの距離の覚えを捨てて、新しい惑星を確かめ直させる
-			run.enemies.table.body_gap.fill(-1.0)
-			run.projectiles.hostile_gap.fill(0.0)
-		"comet":
-			var rock := FieldSystem.Rock.new()
-			rock.lab_manual = true
-			rock.kind = &"comet"
-			var u := (run.state.ship_pos - at).normalized()
-			if u == Vector2.ZERO: u = Vector2.RIGHT
-			rock.pos = at
-			rock.vel = u * cfg.comet_speed
-			rock.born = run.state.world_time
-			rock.gone = rock.born + (at.distance_to(run.state.ship_pos) + 2500.0) / cfg.comet_speed
-			rock.size = maxf(20.0, radius)
-			rock.facing = u.angle()
-			field.rocks.append(rock)
-			field.gimmick(&"meteors")._stream_t = 0.0
-		"gravity":
-			field.add_well(at, cfg.gravity_life, cfg.gravity_radius, cfg.gravity_pull)
-		"warp":
-			field.warp_pos = at
-			field.warp_gone = run.state.world_time + cfg.warp_life
-		"gem":
-			# 経験値の結晶を12個、半径 radius の中に散らす（からす座の回収を試す）
-			for k in 12:
-				var u := Vector2.from_angle(k * 2.399963) * sqrt((k + 0.5) / 12.0) * radius
-				run.pickups.drop_crystal(at + u, PickupSystem.GemKind.LOW)
-
-## 機体を固定している間は、毎回の更新の前後で機体を固定した位置に戻し、速度を0にする。
-func _hold_ship() -> void:
-	if pinned == null:
-		return
-	run.state.ship_pos = pinned
-	run.state.ship_vel = Vector2.ZERO
+func _add_field(kind: String, at: Vector2, radius: float) -> Dictionary:
+	if kind=="gem":
+		for k in 12:
+			var u := Vector2.from_angle(k*2.399963)*sqrt((k+0.5)/12.0)*radius
+			var result: Dictionary = bridge.command("dev_drop_crystal",{"position":at+u,"kind":PickupSystem.GemKind.LOW})
+			if not result.ok: return result
+		return {"ok":true}
+	if kind=="planet": return bridge.command("dev_edit",{"kind":"planet","payload":{"position":at,"radius":maxf(10.0,radius)}})
+	if kind=="comet":
+		var direction: Vector2 = (run.state.ship_pos-at).normalized()
+		if direction==Vector2.ZERO: direction = Vector2.RIGHT
+		return bridge.command("dev_add_rock",{"kind":preload("res://tools/content/generated/run_schema.gd").ENUMS.RockKind.Comet,"position":at,"velocity":direction*_config.comet_speed,"born":float(run.state.world_time),"gone":float(run.state.world_time)+(at.distance_to(run.state.ship_pos)+2500.0)/_config.comet_speed,"size":maxf(20.0,radius),"facing":direction.angle(),"manual":true})
+	if kind=="warp": return bridge.command("dev_set_warp",{"position":at,"life":float(_config.warp_life)})
+	if kind=="gravity": return bridge.command("dev_add_well",{"position":at,"life":float(_config.gravity_life),"radius":float(_config.gravity_radius),"pull":float(_config.gravity_pull)})
+	return {"ok":false,"message":"このフィールドの手動配置はまだ移行していません"}
 
 func step() -> void:
-	if not is_instance_valid(run):
-		return
-	_run_schedule()
-	run.projectiles.director.advance(run.state.world_time, run.enemies)
+	if not is_instance_valid(run): return
 	_draw_route_step()
-	_hold_ship()
-	run._play_tick(DT)
-	_hold_ship()
+	last_error = bridge.step(DT,bridge.pack_intent(_intent),{"logical_size":Vector2(1280,720)})
+	if not last_error.ok:
+		playing = false
+		return
 	_intent.press = false
 	_intent.alt_press = false
 	_intent.hero_press = false
 	_intent.pen_release = false
-	var shown: Array[Dictionary] = []
-	for item in run.state.events:
-		var event: Dictionary = item.duplicate(true)
-		event["tick"] = tick
-		events.append(event)
-		event_recorded.emit(event)
-		shown.append(item)
-	run.state.events.clear()
-	# 本番の描画と HUD へ出来事を渡す（爆発・文字など）。早送りの間は渡さない
-	if viewport != null and not seeking and not shown.is_empty():
-		run.frame_events.emit(shown)
 	revision += 1
 	tick += 1
-	furthest = maxi(furthest, tick)
+	furthest = maxi(furthest,tick)
+	_refresh_projection()
 	_apply_recorded()
 
 func _apply_recorded() -> void:
@@ -340,261 +299,181 @@ func _apply_recorded() -> void:
 	if _state_key.is_empty() or old_cursor != _cursor:
 		_state_key = _checkpoint_key(tick)
 
-func perform(kind: String, args := {}) -> void:
-	if seeking or not is_instance_valid(run):
-		return
-	if kind != "input":
-		edit_undo.append({"history": history.duplicate(true), "end": furthest, "tick": tick,
-			"commands": _inverse_edit(kind, args), "opposite": [{"kind": kind, "args": args.duplicate(true)}]})
-		if edit_undo.size() > 20: edit_undo.pop_front()
+func perform(kind: String, args := {}) -> bool:
+	if seeking or not is_instance_valid(run): return false
+	var inverse := _inverse_edit(kind,args) if kind!="input" else []
+	if not _apply(kind,args): return false
+	if kind!="input":
+		edit_undo.append({"history":history.duplicate(true),"end":furthest,"tick":tick,"commands":inverse,"opposite":[{"kind":kind,"args":args.duplicate(true)}]})
+		if edit_undo.size()>20: edit_undo.pop_front()
 		edit_redo.clear()
-	if tick < furthest:
-		branches.append({"name": current_branch, "history": history.duplicate(true), "end": furthest})
+	if tick<furthest:
+		branches.append({"name":current_branch,"history":history.duplicate(true),"end":furthest})
 		branch_serial += 1
-		current_branch = TranslationServer.translate("lab.message_549e9c3c03") % branch_serial
-		history = history.filter(func(e): return int(e.tick) <= tick)
+		current_branch = tr("lab.message_549e9c3c03") % branch_serial
+		history = history.filter(func(e): return int(e.tick)<=tick)
 		furthest = tick
 	revision += 1
-	history.append({"tick": tick, "kind": kind, "args": args.duplicate(true)})
+	history.append({"tick":tick,"kind":kind,"args":args.duplicate(true)})
 	_cursor = history.size()
-	_apply(kind, args)
 	_state_key = _checkpoint_key(tick)
-	# 入力は再生のときと同じく格子を作り直さない（作り直すと再生と展開がずれる）
-	if kind != "input":
-		run.combat.rebuild_grid()
 	changed.emit()
+	return true
 
-func _apply(kind: String, args: Dictionary) -> void:
+func _apply(kind: String, args: Dictionary) -> bool:
+	last_error = _apply_command(kind,args)
+	if last_error.get("ok",false): _refresh_projection()
+	else: push_warning(last_error.get("message","実験の編集に失敗しました"))
+	return last_error.get("ok",false)
+
+func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 	match kind:
 		"spawn":
-			var def := run.enemies.def_of(StringName(args.get("type", "drifter")))
-			if def == null:
-				return
-			var origin := vector(args.get("pos", [0, 0]))
-			for k in clampi(int(args.get("count", 1)), 1, 10000):
-				var offset := Vector2.from_angle(k * 2.399963) * sqrt(float(k)) * float(args.get("spacing", 60))
-				var opts := {"facing": float(args.get("angle", 0)), "elite": args.get("elite", false)}
-				if def.id in [&"meteor", &"iron", &"saw"]:
-					var rock := FieldSystem.Rock.new()
-					rock.lab_manual = true
-					rock.kind = &"belt" if def.id == &"meteor" else def.id
-					rock.pos = origin + offset
-					rock.size = def.radius * run.cfg.character_scale
-					rock.facing = float(opts.facing)
-					opts.meteor_index = run.field.rocks.size()
-					opts.size = rock.size
-					run.field.rocks.append(rock)
-				selected = run.enemies.spawn(def, origin + offset, opts)
-				if opts.has("meteor_index"):
-					var rock = run.field.rocks[opts.meteor_index]
-					rock.row = selected
-					rock.row_id = run.enemies.table.id[selected]
-			run.state.emit(&"lab_spawn", {"pos": origin, "enemy_type": def.id})
-		"formation":
-			# 敵の組み合わせのシーンの配置と出現位置を選んで、機体のまわりに並べる
-			var path := String(args.get("path", ""))
-			if ResourceLoader.exists(path):
-				var data: Dictionary = load("res://tools/content/build_runtime_stage.gd").formation(load(path))
-				run.spawn.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
-				run.state.emit(&"lab_spawn", {"pos": run.state.ship_pos, "enemy_type": &"formation"})
-		"edit_range":
-			var row := row_for_id(int(args.get("id", -1)))
-			if row >= 0:
-				var definition := definition_for_row(row)
-				var edit := {"type": String(run.enemies.table.type[row]), "key": "params." + String(args.get("key", "")), "value": maxf(0.01, float(args.get("length", 1)))}
-				if definition is BossDef: _edit_boss_definition(edit)
-				else: _edit_definition(edit)
-				_apply("move", {"id": int(args.id), "pos": run.enemies.table.pos[row], "angle": float(args.get("angle", run.enemies.table.facing[row]))})
-		"move":
-			var row := row_for_id(int(args.get("id", -1)))
-			if row >= 0:
-				var t := run.enemies.table
-				var origin := t.pos[row]
-				var delta_angle := float(args.get("angle", t.facing[row])) - t.facing[row]
-				var delta := vector(args.pos) - origin
-				var family := [row]
-				for n in range(0, t.parts[row].size(), 2):
-					if run.enemies.is_same(t.parts[row][n], t.parts[row][n + 1]):
-						family.append(t.parts[row][n])
-				for child in family:
-					if child != row:
-						t.pos[child] = origin + (t.pos[child] - origin).rotated(delta_angle) + delta
-						t.facing[child] += delta_angle
-					for h in t.links[child]:
-						if run.projectiles.owns_hazard(h, child, t.id[child]):
-							var point := origin + (run.projectiles.hazard_pos[h] - origin).rotated(delta_angle) + delta
-							run.projectiles.move_hazard(h, point, run.projectiles.hazard_angle[h] + delta_angle)
-				run.enemies.table.pos[row] = vector(args.pos)
-				if run.enemies.table.meteor_index[row] >= 0:
-					run.field.rocks[run.enemies.table.meteor_index[row]].pos = vector(args.pos)
-				run.enemies.table.facing[row] = float(args.get("angle", run.enemies.table.facing[row]))
-		"individual":
-			var row := row_for_id(int(args.get("id", -1)))
-			if row >= 0 and run.enemies.table.def[row] != null:
-				var t := run.enemies.table
-				var ratio := t.hp[row] / maxf(0.001, t.max_hp[row])
-				run.enemies.apply_scaling(row, t.def[row], {"elite": args.get("elite", t.elite[row] != 0), "size": maxf(0.1, float(args.get("size", t.def[row].radius)))})
-				t.hp[row] = t.max_hp[row] * ratio
-		"delete":
-			var row := row_for_id(int(args.get("id", -1)))
-			if row >= 0:
-				run.enemies.mark_dead(row)
-				run.enemies.cleanup()
+			var id := String(args.get("type","drifter"))
+			if not _definitions.has(StringName(id)): return {"ok":false,"message":"この敵はまだ移行していません: "+id}
+			var origin := vector(args.get("pos",[0,0]))
+			for k in clampi(int(args.get("count",1)),1,10000):
+				var offset := Vector2.from_angle(k*2.399963)*sqrt(float(k))*float(args.get("spacing",60))
+				var result: Dictionary = bridge.command("dev_spawn",{"definition_id":id,"position":origin+offset,"facing":float(args.get("angle",0)),"elite":bool(args.get("elite",false))})
+				if not result.ok: return result
+				_selected_id = result.value
+			_refresh_projection()
+			_selected_row = row_for_id(_selected_id)
+			return {"ok":true}
+		"delete": return bridge.command("dev_remove",{"entity_id":int(args.get("id",-1))})
 		"clear":
-			run.bosses.remove_boss()
-			run.enemies.clear_all()
-			run.projectiles.clear_hostile()
-		"boss":
-			for k in clampi(int(args.get("count", 1)), 1, 32):
-				selected = run.bosses.spawn_lab(StringName(args.get("type", "hydra")), vector(args.get("pos", [0, 0])) + Vector2(k * 400, 0))
-		"command":
-			run.command(StringName(args.get("name", "")), args.get("args", {}))
+			for id in run.enemies.table.id:
+				var result: Dictionary = bridge.command("dev_remove",{"entity_id":int(id)})
+				if not result.ok: return result
+			return bridge.command("dev_clear_hostile",{})
+		"individual":
+			var payload := {"entity_id":int(args.get("id",-1))}
+			for key in ["elite","size"]:
+				if args.has(key): payload[key] = args[key]
+			return bridge.command("dev_edit",{"kind":"individual","payload":payload})
+		"edit_range":
+			var row := row_for_id(int(args.get("id",-1)))
+			if row<0: return {"ok":false}
+			var edited := _edit_definition({"type":String(run.enemies.table.type[row]),"key":"params."+String(args.get("key","")),"value":maxf(0.01,float(args.get("length",1)))})
+			if not edited.ok: return edited
+			return _apply_command("move",{"id":int(args.id),"pos":run.enemies.table.pos[row],"angle":float(args.get("angle",run.enemies.table.facing[row]))})
+		"director":
+			var payload := {}
+			for key in ["enabled","budget","jitter"]:
+				if args.has(key): payload[key] = args[key]
+			return bridge.command("dev_edit",{"kind":"director","payload":payload})
+		"guard": return bridge.command("dev_edit",{"kind":"guard","payload":{"until":float(args.get("until",run.state.world_time))}})
+		"move": return bridge.command("dev_edit",{"kind":"move","payload":{"entity_id":int(args.get("id",-1)),"position":vector(args.get("pos",[0,0])),"angle":float(args.get("angle",0))}})
 		"input":
 			var previous := _intent
 			_intent = Intent.new()
-			_intent.has_cursor = args.get("has_cursor", true)
-			_intent.cursor = vector(args.get("cursor", [0, 0]))
-			_intent.pen = vector(args.get("pen", args.get("cursor", [0, 0])))
-			_intent.press = previous.press or args.get("press", false)
-			_intent.hero_press = previous.hero_press or args.get("hero", false)
-			_intent.alt_press = previous.alt_press or args.get("alt_press", false)
-			_intent.touch = args.get("touch", false)
-			_intent.pen_release = args.get("release", false)
+			_intent.has_cursor = args.get("has_cursor",true)
+			_intent.cursor = vector(args.get("cursor",[0,0]))
+			_intent.pen = vector(args.get("pen",args.get("cursor",[0,0])))
+			_intent.press = previous.press or args.get("press",false)
+			_intent.alt_press = previous.alt_press or args.get("alt_press",false)
+			_intent.hero_press = previous.hero_press or args.get("hero",false)
+			_intent.pen_release = args.get("release",false)
+			_intent.touch = args.get("touch",false)
+			return {"ok":true}
 		"route":
 			var points := PackedVector2Array()
-			for p in args.get("points", []):
-				points.append(vector(p))
-			if points.size() >= 2:
-				_route_play = {"points": points, "n": 0,
-					"frames": clampi(ceili(maxf(float(args.get("draw_seconds", 0.5)), run.cfg.draw_confirm_delay) / DT), 1, roundi(30.0 / DT))}
-		"field":
-			_add_field(String(args.get("kind", "")), vector(args.get("pos", [0, 0])), float(args.get("radius", 0)))
+			for point in args.get("points",[]): points.append(vector(point))
+			if points.size()<2: return {"ok":false,"message":"ルートには2点以上必要です"}
+			_route_play = {"points":points,"n":0,"frames":clampi(ceili(maxf(float(args.get("draw_seconds",0.5)),run.cfg.draw_confirm_delay)/DT),1,3600)}
+			return {"ok":true}
 		"pin":
-			pinned = vector(args.pos) if args.get("value", false) else null
-			if pinned != null:
-				run.state.ship_pos = pinned
-				run.state.ship_vel = Vector2.ZERO
-		"invincible":
-			run.ship.invincible = args.get("value", true)
-		"ship":
-			run.state.ship_pos = vector(args.get("pos", [0, 0]))
-			run.state.ship_vel = Vector2.ZERO
-			run.state.gauge = float(args.get("gauge", run.state.gauge))
-		"config":
-			var key := String(args.get("key", ""))
-			if key in ["base_attack", "base_max_speed", "draw_length", "draw_confirm_delay", "draw_time_scale", "trace_radius", "boss_hp", "boss_armor"] and typeof(args.get("value")) in [TYPE_INT, TYPE_FLOAT]:
-				run.cfg.set(key, clampf(float(args.value), 0.001, 1.0) if key == "draw_time_scale" else maxf(0.01, float(args.value)))
-				run.loadout.refresh_stats()
-		"phase_set":
-			var phases := []
-			for id in args.get("ids", []):
-				if ContentManager.phases.has(StringName(id)): phases.append(ContentManager.phases[StringName(id)])
-			if not phases.is_empty(): run.state.stage.phases = phases
-		"meta":
-			run.state.meta_override[String(args.get("id", ""))] = clampi(int(args.get("level", 0)), 0, 100)
-			run.ctx.profile = ProfileManager.compute(run.state.meta_override)
-			run.loadout.refresh_stats()
-		"time":
-			run.state.time = maxf(0, float(args.get("value", 0)))
-		"level":
-			run.state.level = clampi(int(args.get("value", 1)), 1, 1000)
-			run.loadout.refresh_stats()
-		"hero":
-			run.state.hero_power = StringName(args.get("id", ""))
-			run.state.hero_active_t = 0
-		"loadout":
-			if args.get("reset", false):
-				run.loadout.reset_loadout()
-			else:
-				run.loadout.grant(StringName(args.get("kind", "weapon")), StringName(args.get("id", "")), clampi(int(args.get("level", 1)), 1, 100))
+			var position := vector(args.get("pos",[0,0]))
+			var result: Dictionary = bridge.command("dev_edit",{"kind":"pin","payload":{"value":bool(args.get("value",false)),"position":position}})
+			if result.ok: pinned = position if args.get("value",false) else null
+			return result
+		"ship": return bridge.command("dev_edit",{"kind":"ship","payload":{"position":vector(args.get("pos",[0,0])),"gauge":float(args.get("gauge",run.state.gauge))}})
+		"invincible","time","level": return bridge.command("dev_edit",{"kind":kind,"payload":{"value":args.get("value")}})
 		"schedule":
-			schedule = args.get("entries", []).duplicate(true)
-		"guard":
-			run.projectiles.director.guard = args.duplicate(true)
-		"director":
-			run.projectiles.director.configure(args)
-		"boss_appearance":
-			_edit_boss_appearance(args)
-		"boss_parameter":
-			_edit_boss_definition(args)
-		"parameter":
-			_edit_definition(args)
-		"armor_paint":
-			_edit_armor(args)
+			var entries: Array = args.get("entries",[]).duplicate(true)
+			for entry: Dictionary in entries:
+				entry.position = vector(entry.get("pos",[0,0]))
+				entry.erase("pos")
+			var result: Dictionary = bridge.command("dev_edit",{"kind":"schedule","payload":{"entries":entries}})
+			if result.ok: schedule = args.get("entries",[]).duplicate(true)
+			return result
+		"parameter","armor_paint","config": return _edit_definition(args,kind)
+		"loadout":
+			if args.get("reset",false):
+				for item in [["weapon",run.state.weapons],["trait",run.state.traits]]:
+					for id in item[1]: bridge.command("dev_remove_"+item[0],{"id":String(id)})
+				return {"ok":true}
+			return bridge.command("dev_grant_equipment",{"id":String(args.get("id","")),"kind":String(args.get("kind","weapon")),"levels":clampi(int(args.get("level",1)),1,100)})
+		"command": return bridge.command(String(args.get("name","")),args.get("args",{}))
+		"field": return _add_field(String(args.get("kind","")),vector(args.get("pos",[0,0])),float(args.get("radius",0)))
+		"phase_set":
+			# 空の選択は既存の途中再生プリセットでも変更なしとして扱う。
+			if args.get("ids",[]).is_empty(): return {"ok":true}
+	return {"ok":false,"message":"この実験命令はまだ移行していません: "+kind}
 
-func _edit_armor(args: Dictionary) -> void:
-	var type := StringName(args.get("type", ""))
-	var original := run.enemies.def_of(type)
-	if original == null or not ARMOR_PAINT.valid_palettes(args.get("colors")):
-		return
-	var def: EnemyDef = original.duplicate(true)
-	def.armor_colors = args.colors.duplicate(true)
-	run.enemies.definitions[type] = def
-	var table := run.enemies.table
-	for i in table.alive.size():
-		if table.alive[i] and table.type[i] == type:
-			table.def[i] = def
-
-func _edit_definition(args: Dictionary) -> void:
-	var type := StringName(args.get("type", ""))
-	var def := run.enemies.def_of(type)
-	if def == null:
-		return
-	def = def.duplicate(true)
-	var key := String(args.get("key", ""))
-	if not args.has("value") or typeof(args.value) not in [TYPE_INT, TYPE_FLOAT, TYPE_BOOL]:
-		return
-	if typeof(args.value) == TYPE_FLOAT and not is_finite(args.value):
-		return
-	if key.begins_with("visual."):
-		var field := key.trim_prefix("visual.")
-		if not EnemyDef.VISUAL_LIMITS.has(field):
-			return
-		var limits: Vector2 = EnemyDef.VISUAL_LIMITS[field]
-		if args.get("inherit", false) == true:
-			def.visual_settings.erase(field)
-		else:
-			def.visual_settings[field] = clampf(float(args.value), limits.x, limits.y)
-	elif key.begins_with("params."):
-		if not def.params.has(key.trim_prefix("params.")):
-			return
-		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
+func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
+	var next := _definitions.duplicate(true)
+	var config := _config.duplicate(true) as GameConfig
+	var type := StringName(args.get("type",""))
+	var key := String(args.get("key",""))
+	if kind=="config":
+		if key not in ["base_attack","base_max_speed","draw_length","draw_confirm_delay","draw_time_scale","trace_radius","boss_hp","boss_armor"]: return {"ok":false}
+		config.set(key,maxf(0.001,float(args.get("value",0.0))))
 	else:
-		if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight", "hitstop_multiplier"]:
-			return
-		if key == "toughness":
-			def.toughness = clampi(int(args.value), -1, 1)
-		else:
-			def.set(key, maxf(0.01 if key in ["hp", "radius"] else 0.0, float(args.value)))
-	run.enemies.definitions[type] = def
-	var t := run.enemies.table
-	for i in t.alive.size():
-		if not t.alive[i] or t.type[i] != type:
-			continue
-		var old: EnemyDef = t.def[i]
-		if key == "hp" or key == "toughness":
-			var ratio := t.hp[i] / maxf(0.001, t.max_hp[i])
-			t.max_hp[i] *= def.base_hp(run.cfg) / maxf(old.base_hp(run.cfg), 0.001)
-			t.hp[i] = t.max_hp[i] * ratio
-		elif key == "armor":
-			if old.armor > 0.0:
-				t.armor[i] *= def.armor / old.armor
-			else:
-				var size_factor := sqrt(t.max_hp[i] / maxf(0.001, old.base_hp(run.cfg) * run.cfg.enemy_hp_mult * (3.0 if t.elite[i] else 1.0)))
-				t.armor[i] = def.armor * size_factor * run.cfg.enemy_armor_mult * (1.3 if t.elite[i] else 1.0)
-		elif key == "speed":
-			t.speed[i] = t.speed[i] * def.speed / old.speed if old.speed > 0.0 else def.speed
-		elif key == "radius":
-			t.r[i] *= def.radius / maxf(old.radius, 0.001)
-		elif key in ["visual.scale", "visual.collision_scale"]:
+		if not next.has(type): return {"ok":false}
+		var definition: EnemyDef = next[type]
+		if kind=="armor_paint":
+			if not ARMOR_PAINT.valid_palettes(args.get("colors")): return {"ok":false}
+			definition.armor_colors = args.colors.duplicate(true)
+		elif key.begins_with("visual."):
 			var field := key.trim_prefix("visual.")
-			t.r[i] *= def.visual_value(field, 1.0) / old.visual_value(field, 1.0)
-		t.def[i] = def
-		if key == "attack_weight":
-			t.attack_managed[i] = int(def.attack_weight > 0.0)
+			if not EnemyDef.VISUAL_LIMITS.has(field): return {"ok":false}
+			if args.get("inherit",false): definition.visual_settings.erase(field)
+			else: definition.visual_settings[field] = clampf(float(args.value),EnemyDef.VISUAL_LIMITS[field].x,EnemyDef.VISUAL_LIMITS[field].y)
+		elif key.begins_with("params."):
+			if not definition.params.has(key.trim_prefix("params.")): return {"ok":false}
+			definition.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."),args.value)
+		elif key in ["hp","toughness","armor","speed","radius","accel","turn","xp","weak_arc","attack_weight","hitstop_multiplier"]:
+			definition.set(key,clampi(int(args.value),-1,1) if key=="toughness" else maxf(0.01 if key in ["hp","radius"] else 0.0,float(args.value)))
+		else: return {"ok":false}
+	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next)
+	if built!=OK: return {"ok":false,"message":"編集の定義を生成できません"}
+	var path := _output.path_join("stage_%d.json" % _source.index)
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var bundle: Dictionary = LOADER.read_bundle(path,index.input_sha256)
+	if bundle.is_empty(): return {"ok":false,"message":"編集の定義を読み込めません"}
+	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "parameter")
+	if result.ok:
+		_definitions = next
+		_config = config
+		run.cfg = config
+		run.enemies.data.definitions = next
+		# 外観は表示側だけが所有し、当たりに効く値は上の定義置換で適用する。
+		scene.cpp_resources = bundle.resources
+		if scene.view!=null:
+			var presentation: RunPresentation = scene.view.get_node("RunPresentation")
+			var scope := ContentResourceScope.new()
+			scope.resources = presentation.cpp_scope.resources.duplicate()
+			scope.warmup_complete = true
+			var palettes := {}
+			for entry: Dictionary in bundle.resources.visuals:
+				if entry.role!=6: continue
+				var enemy_index: int = entry.id-6
+				if enemy_index<0 or enemy_index>=_source.resources.enemy_ids.size(): continue
+				var id := StringName(_source.resources.enemy_ids[enemy_index])
+				if not next.has(id): continue
+				if not palettes.has(entry.path): palettes[entry.path] = []
+				palettes[entry.path].append(next[id].armor_colors)
+			for visual_path in palettes:
+				var look: EnemyLook = scope.resources[visual_path]
+				scope.provide(visual_path,ARMOR_PAINT.prepare_look(load(look.source_path),palettes[visual_path]))
+			presentation.cpp_resources = bundle.resources
+			presentation.cpp_scope = scope
+			presentation.frame_view.replace_lab_visuals(scope,bundle.resources.visuals)
+	return result
 
 func row_for_id(id: int) -> int:
-	var t := run.enemies.table
+	var t = run.enemies.table
 	for i in t.alive.size():
 		if t.alive[i] and not t.dead[i] and t.id[i] == id:
 			return i
@@ -618,6 +497,9 @@ func seek(target: int, instant := false) -> void:
 		checkpoints.remove_at(nearest)
 		scene = item.scene
 		run = item.run
+		bridge = scene.bridge
+		_definitions = run.enemies.data.definitions
+		_config = run.cfg
 		scene.process_mode = Node.PROCESS_MODE_INHERIT
 		if viewport != null and scene.get_parent() == null:
 			viewport.add_child(scene)
@@ -680,57 +562,10 @@ func cancel_seek() -> void:
 	seeking = false
 	playing = false
 
-func _run_schedule() -> void:
-	if run.projectiles.director.guard_active():
-		return
-	for entry in schedule:
-		if not entry.get("enabled", true):
-			continue
-		var start := roundi(float(entry.get("start", 0)) / DT)
-		var interval := maxi(1, roundi(float(entry.get("interval", 1)) / DT))
-		var end := roundi(float(entry.get("end", 600)) / DT)
-		if tick >= start and tick <= end and (tick - start) % interval == 0:
-			if run.state.rng.randf() > float(entry.get("probability", 1)): continue
-			var at := vector(entry.get("pos", [0, 0])) + Vector2.from_angle(run.state.rng.randf() * TAU) * sqrt(run.state.rng.randf()) * float(entry.get("radius", 0))
-			entry = entry.duplicate(true)
-			entry.pos = [at.x, at.y]
-			_apply("boss" if ContentManager.bosses.has(StringName(entry.get("type", ""))) else "spawn", entry)
-
 func digest() -> String:
-	var actors := []
-	for owner in run.bosses.actors:
-		if is_instance_valid(owner):
-			actors.append(_stable(owner, 0))
-	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.behaviors, 0),
-		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
-		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
-
-## オブジェクトのアドレスを比較せず、戦闘値・部位・攻撃タイマーを比較する。
-func _stable(value, depth: int):
-	if depth > 5: return null
-	if value is RandomNumberGenerator: return [value.seed, value.state]
-	if value is Dictionary:
-		var out := {}
-		for key in value: out[key] = _stable(value[key], depth + 1)
-		return out
-	if value is Array:
-		var out := []
-		for item in value: out.append(_stable(item, depth + 1))
-		return out
-	if value is Object:
-		var out := {}
-		for property in value.get_property_list():
-			if not int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE: continue
-			var key: String = property.name
-			var item = value.get(key)
-			if item is Node or item is Callable or item is Signal or item is GDScript: continue
-			if key in ["_near", "_buf", "_hits", "ctx", "m", "director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
-			out[key] = _stable(item, depth + 1)
-		if value is BossActor and value.has_node("Timeline"):
-			var timeline: AnimationPlayer = value.get_node("Timeline")
-			out["timeline"] = [timeline.current_animation, timeline.current_animation_position if timeline.is_playing() else 0.0]
-		return out
-	return value
+	var record: Dictionary = bridge.read_recording(false)
+	var snapshot: Dictionary = bridge.read_lab()
+	return str(hash(var_to_bytes([tick,record.value if record.ok else {},snapshot.value if snapshot.ok else {}])))
 
 func _checkpoint_key(at: int) -> String:
 	return str(hash(var_to_bytes([spec, history.filter(func(e): return int(e.tick) <= at)])))
@@ -751,41 +586,14 @@ func _cache_current() -> void:
 		if is_instance_valid(old.scene): old.scene.queue_free()
 
 func definition_for_row(row: int) -> Resource:
-	var t := run.enemies.table
+	var t = run.enemies.table
 	return run.bosses.definitions.get(t.type[row]) if t.is_boss[row] else t.def[row]
 
-func _edit_boss_appearance(args: Dictionary) -> void:
-	var type := StringName(args.get("type", ""))
-	var original: BossDef = run.bosses.definitions.get(type)
-	if original == null or not BossDef.valid_part_appearance(args.get("parts")): return
-	var definition := original.duplicate(true) as BossDef
-	definition.part_appearance = args.parts.duplicate(true)
-	run.bosses.definitions[type] = definition
-	for owner in run.bosses.actors:
-		if owner.has_body() and owner.def.id == type:
-			owner.def = definition
-			if owner.has_method("refresh_appearance"): owner.refresh_appearance()
+func _edit_boss_appearance(_args: Dictionary) -> void:
+	last_error = {"ok":false,"message":"このボスの外観編集はまだ移行していません"}
 
-
-func _edit_boss_definition(args: Dictionary) -> void:
-	var type := StringName(args.get("type", ""))
-	var original: BossDef = run.bosses.definitions.get(type)
-	if original == null or not args.has("value") or typeof(args.value) not in [TYPE_INT, TYPE_FLOAT, TYPE_BOOL]: return
-	var def: BossDef = original.duplicate(true)
-	var key := String(args.get("key", ""))
-	if key.begins_with("params.") and def.params.has(key.trim_prefix("params.")):
-		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
-	elif key in ["speed", "radius", "accel", "turn", "xp", "weak_arc", "hitstop_multiplier"]:
-		def.set(key, maxf(0.0 if key == "hitstop_multiplier" else 0.01, float(args.value)))
-	else:
-		return
-	run.bosses.definitions[type] = def
-	for owner in run.bosses.actors:
-		if owner.has_body() and owner.def.id == type:
-			owner.def = def
-			var row: int = owner.body
-			if key == "speed": run.enemies.table.speed[row] = def.speed
-			if key == "radius": run.enemies.table.r[row] = def.radius * run.cfg.character_scale
+func _edit_boss_definition(_args: Dictionary) -> void:
+	last_error = {"ok":false,"message":"このボスの定義編集はまだ移行していません"}
 
 static func safe_parameter(key: String, value):
 	if value is bool: return value
@@ -809,7 +617,7 @@ func _inverse_edit(kind: String, args: Dictionary) -> Array:
 	var previous := args.duplicate(true)
 	match kind:
 		"armor_paint":
-			var def := run.enemies.def_of(StringName(args.get("type", "")))
+			var def = run.enemies.def_of(StringName(args.get("type", "")))
 			if def == null: return []
 			previous.colors = def.armor_colors.duplicate(true)
 		"boss_appearance":
@@ -862,7 +670,7 @@ func _restore_edit(source: Array[Dictionary], target: Array[Dictionary]) -> void
 		_cursor = history.size()
 		_state_key = _checkpoint_key(tick)
 		revision += 1
-		run.combat.rebuild_grid()
+		_refresh_projection()
 		changed.emit()
 		return
 	# 配置・削除などは同じ時刻まで非表示で復元し、編集時刻には戻さない。
@@ -877,3 +685,12 @@ func _restore_edit(source: Array[Dictionary], target: Array[Dictionary]) -> void
 	furthest = maxi(at, int(item.end))
 	await seek(at, true)
 	furthest = maxi(end, furthest)
+
+func _exit_tree() -> void:
+	_seek_serial += 1
+	for checkpoint in checkpoints:
+		if is_instance_valid(checkpoint.scene): checkpoint.scene.free()
+	checkpoints.clear()
+	if is_instance_valid(scene) and scene.get_parent()!=self: scene.free()
+	bridge = null
+	run = null

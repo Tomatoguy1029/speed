@@ -58,6 +58,16 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.phase==Phase::Dying) {core.step_death(dt);return true;}
     if (state.phase!=Phase::Play) return true;
     if (state.controls_locked || state.encounter_protected) state.hitstop=0;
+    // 制作側に乱数や出現判断を置かず、同じ固定tickで予定配置を実行する。
+    if (control.lab_mode && !core.attack_guard_active()) for (const auto &entry:control.lab_schedule) {
+        if (!entry.enabled || control.tick<entry.start || control.tick>entry.end || (control.tick-entry.start)%entry.interval) continue;
+        if (control.rng.randf()>entry.probability) continue;
+        const auto at=entry.position+godot::Vector2::from_angle(control.rng.randf()*6.283185307179586)*std::sqrt(control.rng.randf())*entry.radius;
+        for (int64_t n=0;n<entry.count;++n) {
+            godot::Dictionary options;options["spawn_origin"]=int64_t(SpawnOrigin::DevPlacement);options["facing"]=entry.facing;options["elite"]=entry.elite;
+            core.spawn_enemy(core.runtime.content->definitions[entry.definition].id,at+godot::Vector2::from_angle(n*2.399963)*std::sqrt(double(n))*entry.spacing,options);
+        }
+    }
     control.last_input=raw_input;
     InputFrame input=state.steering_locked || state.controls_locked?InputFrame():raw_input;
     if (state.controls_locked) state.ship.vel=godot::Vector2();
