@@ -55,9 +55,11 @@ struct MonocerosSwordState {
     bool released=false;
     godot::Vector2 target;
 };
+struct CanisSequenceItem {EnemyHandle actor;double mark=0,launch=0;bool marked=false,launched=false;};
+struct CanisHowlState {bool formed=false;double last_launch=0;std::vector<CanisSequenceItem> sequence;};
 struct CanisCommandState {std::vector<EnemyHandle> warned;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CanisCommandState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CanisCommandState,CanisHowlState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;
@@ -101,7 +103,12 @@ struct CentaurusBodyState {
     int32_t path_side=1,sail_side=1;
 };
 struct CanisHoundRef {EnemyHandle actor;double base_hp=0;godot::Color color;};
+struct CanisRingMember {EnemyHandle actor;double angle=0;};
 struct CanisBodyState {
+    std::vector<CanisRingMember> ring;
+    godot::Vector2 ring_center;
+    double ring_started=-1,ring_tick_at=0;
+    uint32_t ring_definition=0;
     bool pack_spawned=false,barking=false,calling=false;
     double call_left=0,call_ready_at=0,lead_scan=0,turn_motion=0;
     std::unordered_set<int64_t> lunge_hits;

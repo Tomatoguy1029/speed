@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 40
+          "max": 41
         },
         {
           "name": "phase",
@@ -515,7 +515,7 @@
           "min": 0
         }
       ],
-      "version": 16
+      "version": 17
     },
     {
       "name": "BossTechniqueStage",

@@ -263,6 +263,107 @@
           "type": "u32"
         }
       ]
+    },
+    {
+      "name": "CanisHowlDefinition",
+      "section": 343,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "catch_up",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "close_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "gap_slots",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "gaps",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "gather_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_close",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "ring_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spawn_out",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "summon_max",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "follow_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "follow_rate",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "seq_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "seq_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tail",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

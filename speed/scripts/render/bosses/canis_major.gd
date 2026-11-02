@@ -38,7 +38,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	var legs := ["RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg"]
 	for i in legs.size(): parts.get_node(legs[i]).rotation = sin(gait+(0.0 if i==0 or i==3 else PI))*(0.16 if moving else 0.015)
 	parts.get_node("Tail").rotation = sin(gait*0.4)*0.07
-	parts.get_node("Head").rotation = 0.0
+	parts.get_node("Head").rotation = -0.45*smoothstep(0.0,0.65,float(body.charge)) if attack.get("technique","")=="howl" and int(attack.get("stage",5))==0 else 0.0
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
 	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(body.charge),0.0)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE

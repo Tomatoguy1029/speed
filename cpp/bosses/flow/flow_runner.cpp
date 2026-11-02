@@ -22,7 +22,7 @@ std::vector<uint32_t> children(const ContentBundle &c,uint32_t parent) {std::vec
 std::vector<uint32_t> sections(const ContentBundle &c,uint32_t flow) {std::vector<uint32_t> out;for (const auto &p:c.flow_sections) if (p.flow==flow) out.push_back(p.id);return out;}
 bool filtered_target(const ContentBundle &c,const BossFlowNode &node) {
     if (node.kind!=1) return true;const auto &t=c.boss_techniques[node.technique-1];
-    return c.bosses[t.boss-1].kind==1 && t.external_id!="rear_attack" && t.external_id!="stomp";
+    return c.bosses[t.boss-1].kind==2 || (c.bosses[t.boss-1].kind==1 && t.external_id!="rear_attack" && t.external_id!="stomp");
 }
 bool available(const RunRuntime &r,const BossFlowState &f,uint32_t id,unsigned depth=0) {
     if (!id || id>r.content->flow_nodes.size() || depth>24) return false;const auto &p=r.content->flow_nodes[id-1];const auto list=children(*r.content,id);

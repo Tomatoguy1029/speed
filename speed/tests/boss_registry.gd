@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-canis-howl" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_howl")
+		return
 	if "--cpp-canis-command-next" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_command_next")
 		return
@@ -240,7 +243,7 @@ func centaurus_volley_case(flow_enabled := false) -> Dictionary:
 		rules.graph_nodes = {}
 		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
 		flow.maximum_stamina = 10.0
-		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -418,7 +421,7 @@ func centaurus_rear_case(flow_enabled := false) -> Dictionary:
 		rules.graph_nodes = {}
 		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
 		flow.maximum_stamina = 10.0
-		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -547,7 +550,7 @@ func centaurus_rain_case(flow_enabled := false) -> Dictionary:
 		rules.graph_nodes = {}
 		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
 		flow.maximum_stamina = 10.0
-		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -764,7 +767,7 @@ func centaurus_power_case(flow_enabled := false,tracking := true) -> Dictionary:
 		rules.graph_nodes = {}
 		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
 		flow.maximum_stamina = 10.0
-		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -1036,7 +1039,7 @@ func centaurus_stomp_case(flow_enabled := false) -> Dictionary:
 		rules.graph_nodes = {}
 		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
 		flow.maximum_stamina = 10.0
-		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -1528,7 +1531,7 @@ func canis_move_case(name: String, changes: Dictionary, flowing := false) -> Dic
 		rules.graph_nodes = {}
 		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
 		flow.maximum_stamina = 10.0
-		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -1640,4 +1643,106 @@ func native_canis_command_next() -> void:
 	c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_command_next] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 遠吠えの輪・追従・順番発進を既存のボス検査で確認する。
+func native_canis_howl() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/canis_major_moves/howl.tres")
+	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
+	check(move.make_runner()==null and records.CanisHowlDefinition.size()==2 and records.BossTechniqueStage.is_empty(),"遠吠えの編集値を手動進行の型付き定義へ生成する")
+	for field in builder.Schema.SCHEMA.records.filter(func(v): return v.name=="CanisHowlDefinition")[0].fields:
+		if field.name not in ["id","technique"]: check(records.CanisHowlDefinition[0][field.name]==move.get(field.name),"遠吠えの実効値を保持する: "+field.name)
+	var changes := {"warn":0.1,"ring_count":10,"summon_max":1,"ring_radius":300.0,"ring_close":200.0,"spawn_out":100.0,"gather_time":0.05,"close_time":0.1,"follow_time":0.2,"follow_rate":4.0,"seq_interval":0.02,"seq_warn":0.05,"lunge_speed":100.0,"lunge_time":0.1,"tail":0.15,"recover":0.05,"cd":0.0,"track_during_warn":false}
+	var c := canis_move_case("howl",changes,true)
+	check(not c.is_empty(),"遠吠えを通常選択と正式表示へつなぐ")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge._core.step(0.01)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.kind==41 and t.stage==0,"フローから遠吠えを選択して予告する")
+	bridge._core.set_motion_context(Vector2(2000,1000),Vector2(2000,1000),Vector2(3000,2000))
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].facing>0.0,"遠吠えはtrack_during_warnの値によらず遅延照準へ向く")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var display = c.view._boss_body_displays.values()[0]
+	check(display.parts.get_node("Head").rotation<0.0,"正式パーツで遠吠えの予告姿勢を使う")
+	var before: Dictionary = bridge.checkpoint()
+	check(before.ok,"形成前の時計と乱数を保持する")
+	bridge._core.step(0.05)
+	t = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(t.stage==1 and t.formed and body.ring.size()==9 and t.sequence.size()==9,"率いる8体を使い不足分を召喚上限1体まで補う")
+	check(is_equal_approx(body.ring_radius,300.0) and body.ring_started>=0.0,"形成時は開始半径で自機の位置を中心にする")
+	var formed: Dictionary = body.duplicate(true)
+	var order: Array = t.sequence.duplicate(true)
+	check(bridge.restore(before.value).ok,"形成前の乱数と状態へ復帰する")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_body_state").value[0]==formed and bridge.command("dev_boss_state").value[0].sequence==order,"復帰後も輪のずれ・薄い所・召喚・発進順が一致する")
+	var ring_ids: Array = body.ring.map(func(v): return v.id)
+	var base_angles: Array = body.ring.map(func(v): return v.angle)
+	check(base_angles.all(func(a): return a>=base_angles[0]) and base_angles.any(func(a): return is_equal_approx((a-base_angles[0])/TAU*14.0,7.0)),"空ける2箇所を含む14等分の位置へ配置する")
+	var center: Vector2 = formed.ring_center
+	bridge.command("dev_ship_motion",{"position":center+Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(center+Vector2(100,0),center+Vector2(100,0),Vector2(3000,2000))
+	bridge._core.step(0.05)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.ring_center.is_equal_approx(center+Vector2(100,0)*(1.0-exp(-4.0*0.05))) and is_equal_approx(body.ring_radius,300.0),"gather_timeの間は半径を保ち世界時計で中心を指数追従する")
+	var ring_saved: Dictionary = bridge.checkpoint()
+	check(ring_saved.ok,"輪の中心・個体世代・次の予告時刻を保持する")
+	bridge._core.step(0.05)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(body.ring_radius,250.0),"gather_time後はclose_timeの間に半径を線形で狭める")
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.sequence[0].marked and not t.sequence[0].launched,"follow_timeの後に最初の猟犬を予告する")
+	bridge._core.step(0.05)
+	var lunges: Array = canis_lunges(bridge)
+	check(lunges.size()==1 and lunges[0].sweep and not lunges[0].shared_hit and lunges[0].overwrite,"seq_warn後に猟犬ごとの掃引突進を1体ずつ出す")
+	var active: Dictionary = bridge.checkpoint()
+	check(active.ok,"輪と発進中の猟犬を一緒に保持する")
+	var target: int = lunges[0].actor
+	var at: Vector2 = lunges[0].position
+	bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(at,at,Vector2(3000,2000))
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.01)
+	check(canis_lunges(bridge).any(func(v): return v.actor==target and v.hit) and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale),"猟犬の移動線分と機体から個体ごとに1回だけ実ダメージを出す")
+	body = bridge.command("dev_boss_body_state").value[0]
+	var frozen_center: Vector2 = body.ring_center
+	bridge._core.step(0.02)
+	check(bridge.command("dev_boss_body_state").value[0].ring_center==frozen_center,"follow_time後は輪の中心を固定して順番発進を続ける")
+	var after: Array = canis_lunges(bridge)
+	var after_body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(bridge.restore(active.value).ok,"発進途中へ復帰する")
+	bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(at,at,Vector2(3000,2000))
+	bridge._core.step(0.01)
+	bridge._core.step(0.02)
+	check(canis_lunges(bridge)==after and bridge.command("dev_boss_body_state").value[0]==after_body,"復帰後も突進・輪の残り・次の発進が一致する")
+	var read_only: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(display.state.ring==read_only.ring and bridge.command("dev_boss_body_state").value[0]==read_only,"正式表示は輪の現在状態を読むだけにする")
+	bridge._core.step(0.5)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and canis_lunges(bridge).is_empty() and bridge.command("dev_boss_body_state").value[0].ring_started<0.0,"最後の発進とtailの後に輪と残る突進を閉じる")
+	bridge._core.step(0.05)
+	bridge._core.step(0.01)
+	bridge._core.step(0.15)
+	check(bridge.command("dev_boss_state").value.any(func(v): return v.stage==0 and v.id>t.id),"遠吠えの硬直後に次行動へ戻る")
+	bridge.restore(ring_saved.value)
+	var ticket: PackedInt64Array = [0,1]
+	check(bridge.command("dev_cancel_technique",{"ticket":ticket}).ok and bridge.command("dev_boss_body_state").value[0].ring_started<0.0 and canis_lunges(bridge).is_empty(),"形成中の取消で輪・予告・未発進の指示を解く")
+	bridge.restore(active.value)
+	bridge.command("dev_remove",{"entity_id":target})
+	bridge._core.step(0.01)
+	check(not canis_lunges(bridge).any(func(v): return v.actor==target) and not bridge.command("dev_boss_body_state").value[0].boss_dead,"猟犬消失はその個体だけを閉じる")
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.01)
+	check(canis_lunges(bridge).is_empty() and bridge.command("dev_boss_body_state").value[0].ring_started<0.0 and bridge.command("dev_boss_state").value[0].stage==7,"本体消失は輪と全突進を取消する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"遠吠えの出来事を表示と記録へ配信する")
+	for held in [before,ring_saved,active]: bridge.release_checkpoint(held.value)
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_howl] failures=",failed)
 	get_tree().quit(1 if failed else 0)
