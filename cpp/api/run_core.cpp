@@ -5,6 +5,7 @@
 #include "../bosses/canis_major/hound_lunge.h"
 #include "../bosses/canis_major/howl.h"
 #include "run_core.h"
+#include "../systems/timing.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
 #include "../bosses/flow/phase_controller.h"
@@ -333,7 +334,7 @@ bool SpeedRunCore::advance_enemies(double delta) {
     if (runtime.api_configured && !speed::PhaseController::automatic(runtime)) return false;
     if (runtime.state.heroes.boss_stun>0) {
         const double real_dt=runtime.state.control.last_world_real_dt>0?runtime.state.control.last_world_real_dt:delta;
-        runtime.state.heroes.boss_stun-=real_dt;
+        runtime.state.heroes.boss_stun=speed::remaining_time(runtime.state.heroes.boss_stun,real_dt);
         for (const auto &body:runtime.state.bosses.bodies) if (runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) runtime.state.enemies[body.actor.slot].vel=Vector2();
     } else {
         speed::MonocerosHornWave::advance_waves(runtime,delta);
