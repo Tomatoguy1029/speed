@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-meteor" in OS.get_cmdline_user_args():
+		call_deferred("native_meteor")
+		return
 	if "--cpp-draco-star-fan" in OS.get_cmdline_user_args():
 		call_deferred("native_star_fan")
 		return
@@ -232,10 +235,17 @@ func _ready() -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 既存ブレスの遮蔽・破壊・中断へC++の状態と描画を接続する。
-func breath_fixture(move: BossTechnique, flow_enabled := false) -> Dictionary:
+func breath_fixture(move: BossTechnique, flow_enabled := false, moves: Array = []) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg: GameConfig = load("res://data/config.tres").duplicate(true)
 	var package: Dictionary = builder.draco_technique_package(load("res://data/bosses/draco.tres"),move,cfg)
+	if not moves.is_empty():
+		package=builder.boss_body_package(load("res://data/bosses/draco.tres"),cfg)
+		var records: Dictionary=builder.draco_set_records(load("res://data/bosses/draco.tres"),moves)
+		for record in records:package.records[record]=records[record]
+		for part: BossTechnique in moves:
+			if part.technique in [&"breath",&"meteor"]:builder.append_draco_breath_rock(package,part,cfg)
+			builder.append_draco_style(package,part)
 	if flow_enabled:
 		var rules=load("res://scripts/data_types/boss_action_rules.gd").new()
 		rules.adapter=&"draco";rules.techniques.assign([move]);rules.conditions={"breath":{}}
@@ -805,4 +815,80 @@ func native_star_fan() -> void:
 		bridge._core.step_hostiles(6.0)
 		check(bridge._core.hostiles_snapshot().is_empty(),"残る星弾も自然寿命で終わる")
 		bridge.dispose()
+	native_draco_move_flow(move)
+
+func native_meteor() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/meteor.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	check(fixture.package.records.DracoMeteorDefinition.size()==3,"隕石投射の実効値を3形態へ生成する")
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	check(a.start_attack(&"meteor") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で隕石投射を開始する")
+	var error:=0.0
+	var times_equal:=true
+	var saved: Array=[]
+	var shown: Array=[]
+	for frame in 240:
+		a.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and is_equal_approx(attack.stage_time,a.elapsed)
+		var rocks: Array=a._runner.rocks if a._runner!=null else a.placed_meteors
+		check(attack.rocks.size()==rocks.size() and attack.telegraph_paths.is_empty(),"3個の岩だけを作りブレスの扇は出さない")
+		for j in rocks.size():error=maxf(error,rocks[j].pos.distance_to(attack.rocks[j].position))
+		if attack.stage not in saved and attack.stage<3:
+			saved.append(attack.stage)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"隕石投射の予告・実行・回復を値型で保持する")
+			bridge._core.step(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			check(bridge.restore(held.value).ok,"隕石投射の途中へ復帰する")
+			bridge._core.step(1.0/120.0)
+			check(bridge.command("dev_boss_state").value==future,"復帰後の岩の位置・生存・段階が一致する")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if attack.stage not in shown and attack.stage<3:
+			shown.append(attack.stage);await show_native_draco(fixture,body,attack)
+		if attack.stage==5 and a.mode==&"idle":break
+	check(times_equal and error<0.1,"岩の口元からの補間と予告・実行・回復・終了のtickがSourceと一致する: %s"%error)
+	check(saved.size()==3 and shown.size()==3 and a.placed_meteors.size()==3,"通常終了で3個の岩を置いたまま次の技へ渡す")
+	var placed: Array=bridge.command("dev_boss_state").value[0].rocks.duplicate(true)
+	check(bridge.checkpoint().ok,"置いた岩の所有を終了後にも値型で保持する")
+	var reused: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+	check(reused.ok and attack.reused and attack.rocks==placed,"次の隕石投射は既存の岩を同じ位置・IDのまま引き取る")
+	bridge.command("dev_cancel_technique",{"ticket":reused.value})
+	check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return not rock.alive and rock.destroyed),"取消は引き取った岩も壊す")
+	bridge.dispose();source.session.free()
+	var breath: BossTechnique=load("res://data/bosses/draco_moves/breath.tres")
+	fixture=breath_fixture(move,false,[move,breath]);bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	for frame in 200:bridge._core.step(1.0/120.0)
+	placed=bridge.command("dev_boss_state").value[0].rocks.duplicate(true)
+	check(bridge.command("dev_damage",{"entity_id":placed[0].actor,"amount":1000000.0,"cause":"shot"}).ok,"置いた岩は自機から攻撃して壊せる")
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":4})
+	attack=bridge.command("dev_boss_state").value[0]
+	check(attack.reused and attack.rocks.size()==2 and attack.rocks[0].actor==placed[1].actor and attack.rocks[1].actor==placed[2].actor,"次のブレスは破壊済みを除いた2個の岩だけを同じIDで引き取る")
+	bridge.dispose()
+	for target in [0,1,2]:
+		fixture=breath_fixture(move);bridge=fixture.bridge
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 240:
+			bridge._core.step(1.0/120.0)
+			if bridge.command("dev_boss_state").value[0].stage==target:break
+		bridge.command("dev_cancel_technique",{"ticket":started.value})
+		check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return not rock.alive and rock.destroyed),"予告・実行・回復の取消は岩を壊す")
+		bridge.dispose()
+	fixture=breath_fixture(move);bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
+	check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return not rock.alive and rock.destroyed),"本体消失で投射中の岩を壊す")
+	bridge.dispose()
+	fixture=breath_fixture(move);bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	for frame in 200:bridge._core.step(1.0/120.0)
+	var changed: Dictionary=bridge.command("dev_damage",{"entity_id":fixture.boss,"amount":1000000.0,"cause":"shot"})
+	check(changed.ok and bridge.command("dev_boss_body_state").value[-1].phase==2 and bridge.command("dev_boss_body_state").value[-1].placed_meteors.is_empty() and bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return not rock.alive and rock.destroyed),"形態の境界は置いた岩を破壊して所有を消す")
+	bridge.dispose()
 	native_draco_move_flow(move)

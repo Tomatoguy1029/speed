@@ -345,6 +345,42 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DracoMeteorDefinition",
+      "section": 440,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "rock_enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "rocks",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "rock_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rock_spacing",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

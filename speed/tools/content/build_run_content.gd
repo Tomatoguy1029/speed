@@ -77,20 +77,21 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ドラコはSourceの3形態を生成する。未登録技は生成エラーとして残す。
 static func draco_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam",&"tail_sweep",&"star_fan"]: return {}
+	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam",&"tail_sweep",&"star_fan",&"meteor"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"draco","kind":4,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[]}
 	for phase in [1,2,3]:
 		var values: Dictionary = source.values().duplicate(true)
 		# Draco.rule()はSource上、形態別の値上書きを行わない。
 		var row := {}
 		for field in Schema.SCHEMA.records.filter(func(v):return v.name=="BossTechniqueDefinition")[0].fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100,&"tail_sweep":101,&"star_fan":102}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100,&"tail_sweep":101,&"star_fan":102,&"meteor":103}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values.get(key,0.0))
 		records.BossTechniqueDefinition.append(row)
 		if source.technique==&"bite": records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
+		elif source.technique==&"meteor": records.DracoMeteorDefinition.append({"id":phase,"technique":phase,"rock_enemy":1,"rocks":int(values.rocks),"rock_distance":float(values.rock_distance),"rock_spacing":float(values.rock_spacing)})
 		elif source.technique==&"star_fan": records.DracoStarFanDefinition.append({"id":phase,"technique":phase,"projectile":1,"lead_cap":float(values.lead_cap),"count":int(values.count),"arc":float(values.arc),"radius":float(values.radius),"speed":float(values.speed)})
 		elif source.technique==&"tail_sweep": records.DracoTailSweepDefinition.append({"id":phase,"technique":phase,"half_angle":float(values.half_angle)})
 		elif source.technique==&"tail_slam": records.DracoTailSlamDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"radius":float(values.radius)})
@@ -100,7 +101,7 @@ static func draco_technique_records(definition: BossDef, move: BossTechnique) ->
 	return records
 
 static func draco_set_records(definition: BossDef, moves: Array) -> Dictionary:
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[]}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
@@ -125,7 +126,7 @@ static func draco_technique_package(definition: BossDef, move: BossTechnique, co
 	var records := draco_technique_records(definition,move)
 	if package.is_empty() or records.is_empty(): return {}
 	for key in records: package.records[key] = records[key]
-	if move.technique==&"breath": append_draco_breath_rock(package,move,config)
+	if move.technique in [&"breath",&"meteor"]: append_draco_breath_rock(package,move,config)
 	if move.technique==&"star_fan": append_draco_star_bolt(package,move)
 	append_draco_style(package,move)
 	return package
@@ -149,7 +150,7 @@ static func append_draco_breath_rock(package: Dictionary, move: BossTechnique, c
 	data.ResourceKey.append({"id":visual.id,"role":visual.role})
 	package.visuals.append(visual)
 	data.EnemyRecord.append(enemy)
-	data.StringEntry.append({"id":enemy.id,"value":"draco_breath_rock"})
+	data.StringEntry.append({"id":enemy.id,"value":"draco_"+str(move.technique)+"_rock"})
 	data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
 	var population: Dictionary = source.records.PopulationType[0].duplicate(true)
 	population.id = data.PopulationType.size()+1;population.enemy=enemy.id
@@ -157,7 +158,7 @@ static func append_draco_breath_rock(package: Dictionary, move: BossTechnique, c
 	var hull: Dictionary = source.records.FriendHullLook[0].duplicate(true)
 	hull.id = data.FriendHullLook.size()+1;hull.enemy = enemy.id
 	data.FriendHullLook.append(hull)
-	for row in data.DracoBreathDefinition: row.rock_enemy = enemy.id
+	for row in data["DracoMeteorDefinition" if move.technique==&"meteor" else "DracoBreathDefinition"]: row.rock_enemy = enemy.id
 
 ## 固定の描画設定は生成時に解決する。
 static func append_draco_style(package: Dictionary, move: BossTechnique) -> void:
@@ -1047,7 +1048,7 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 		for key in techniques: package.records[key] = techniques[key]
 	if definition.id==&"draco":
 		for move in rules.techniques:
-			if move.technique==&"breath": append_draco_breath_rock(package,move,config)
+			if move.technique in [&"breath",&"meteor"]: append_draco_breath_rock(package,move,config)
 			if move.technique==&"star_fan": append_draco_star_bolt(package,move)
 			append_draco_style(package,move)
 	var compiled := boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
