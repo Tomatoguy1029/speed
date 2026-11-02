@@ -440,10 +440,42 @@ inline bool read(BinaryReader &input, FieldDefinition &out) {
 }
 struct PopulationDefinition {
     uint32_t id{};
+    bool active{};
+    double density{};
+    double bonus_pop{};
+    double boss_start{};
+    double recycle_scale{};
+    double region_cap{};
+    double margin{};
+    double field_radius{};
+    double planet_radius{};
+    double total_cap{};
+    double refill_time{};
 };
 inline bool read(BinaryReader &input, PopulationDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
+    if (!input.read_bool(out.active)) return false;
+    if (!input.read_f64(out.density)) return false;
+    if (out.density < 0) return false;
+    if (!input.read_f64(out.bonus_pop)) return false;
+    if (out.bonus_pop < 0) return false;
+    if (!input.read_f64(out.boss_start)) return false;
+    if (out.boss_start < 0) return false;
+    if (!input.read_f64(out.recycle_scale)) return false;
+    if (out.recycle_scale < 0) return false;
+    if (!input.read_f64(out.region_cap)) return false;
+    if (out.region_cap < 0) return false;
+    if (!input.read_f64(out.margin)) return false;
+    if (out.margin < 0) return false;
+    if (!input.read_f64(out.field_radius)) return false;
+    if (out.field_radius < 0) return false;
+    if (!input.read_f64(out.planet_radius)) return false;
+    if (out.planet_radius < 0) return false;
+    if (!input.read_f64(out.total_cap)) return false;
+    if (out.total_cap < 0) return false;
+    if (!input.read_f64(out.refill_time)) return false;
+    if (out.refill_time < 0) return false;
     return true;
 }
 struct FormationDefinition {
@@ -1098,6 +1130,113 @@ inline bool read(BinaryReader &input, BudgetPhase &out) {
     if (out.start < 0) return false;
     if (!input.read_f64(out.budget)) return false;
     if (out.budget < 0) return false;
+    return true;
+}
+struct PopulationPhase {
+    uint32_t id{};
+    std::string external_id{};
+    double start{};
+    double pop_from{};
+    double pop_to{};
+    double rate{};
+    double xp_bonus{};
+    double surge_interval{};
+    double surge_pop{};
+    double surge_ranged{};
+    double surge_elite{};
+    double wave_interval{};
+    uint32_t attack_budget{};
+    uint32_t wave_type{};
+};
+inline bool read(BinaryReader &input, PopulationPhase &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_f64(out.start)) return false;
+    if (!input.read_f64(out.pop_from)) return false;
+    if (!input.read_f64(out.pop_to)) return false;
+    if (!input.read_f64(out.rate)) return false;
+    if (!input.read_f64(out.xp_bonus)) return false;
+    if (!input.read_f64(out.surge_interval)) return false;
+    if (!input.read_f64(out.surge_pop)) return false;
+    if (!input.read_f64(out.surge_ranged)) return false;
+    if (!input.read_f64(out.surge_elite)) return false;
+    if (!input.read_f64(out.wave_interval)) return false;
+    if (!input.read_u32(out.attack_budget)) return false;
+    if (!input.read_u32(out.wave_type)) return false;
+    return true;
+}
+struct PopulationMix {
+    uint32_t id{};
+    uint32_t phase{};
+    uint32_t enemy{};
+    double weight{};
+};
+inline bool read(BinaryReader &input, PopulationMix &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.phase)) return false;
+    if (out.phase < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    if (!input.read_f64(out.weight)) return false;
+    return true;
+}
+struct PopulationCurve {
+    uint32_t id{};
+    uint32_t enemy{};
+};
+inline bool read(BinaryReader &input, PopulationCurve &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    return true;
+}
+struct PopulationPoint {
+    uint32_t id{};
+    uint32_t curve{};
+    double time{};
+    double value{};
+    double slope{};
+};
+inline bool read(BinaryReader &input, PopulationPoint &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.curve)) return false;
+    if (out.curve < 1) return false;
+    if (!input.read_f64(out.time)) return false;
+    if (!input.read_f64(out.value)) return false;
+    if (!input.read_f64(out.slope)) return false;
+    return true;
+}
+struct PopulationWindow {
+    uint32_t id{};
+    double start{};
+    double end{};
+};
+inline bool read(BinaryReader &input, PopulationWindow &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.start)) return false;
+    if (!input.read_f64(out.end)) return false;
+    return true;
+}
+struct PopulationType {
+    uint32_t id{};
+    uint32_t enemy{};
+    double rank{};
+    double maximum{};
+    bool ranged{};
+};
+inline bool read(BinaryReader &input, PopulationType &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    if (!input.read_f64(out.rank)) return false;
+    if (!input.read_f64(out.maximum)) return false;
+    if (!input.read_bool(out.ranged)) return false;
     return true;
 }
 struct ProgressionDefinition {
@@ -1852,6 +1991,23 @@ inline bool read(BinaryReader &input, GravityDefinition &out) {
     if (out.pull < 0) return false;
     return true;
 }
+struct WarpDefinition {
+    uint32_t id{};
+    double radius{};
+    double life{};
+    double bonus_time{};
+};
+inline bool read(BinaryReader &input, WarpDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.bonus_time)) return false;
+    if (out.bonus_time < 0) return false;
+    return true;
+}
 struct NumericTraitLevel {
     uint32_t id{};
     uint32_t equipment{};
@@ -2416,6 +2572,12 @@ struct ContentRecords {
     std::vector<ShellDefinition> ShellDefinition_rows;
     std::vector<ShellSource> ShellSource_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
+    std::vector<PopulationPhase> PopulationPhase_rows;
+    std::vector<PopulationMix> PopulationMix_rows;
+    std::vector<PopulationCurve> PopulationCurve_rows;
+    std::vector<PopulationPoint> PopulationPoint_rows;
+    std::vector<PopulationWindow> PopulationWindow_rows;
+    std::vector<PopulationType> PopulationType_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
@@ -2441,6 +2603,7 @@ struct ContentRecords {
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
     std::vector<GravityDefinition> GravityDefinition_rows;
+    std::vector<WarpDefinition> WarpDefinition_rows;
     std::vector<NumericTraitLevel> NumericTraitLevel_rows;
     std::vector<PostMaxChargeDefinition> PostMaxChargeDefinition_rows;
     std::vector<PostMaxCritDefinition> PostMaxCritDefinition_rows;
@@ -2509,9 +2672,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 8: {
-        if (version != 1) return false;
-        if (count) return false;
-        if (count > input.remaining()/4) return false;
+        if (version != 2) return false;
+        if (count > input.remaining()/85) return false;
         for (uint32_t i=0; i<count; ++i) { PopulationDefinition row; if (!read(input,row)) return false; out.PopulationDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -2692,6 +2854,42 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { BudgetPhase row; if (!read(input,row)) return false; out.BudgetPhase_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 84: {
+        if (version != 1) return false;
+        if (count > input.remaining()/96) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationPhase row; if (!read(input,row)) return false; out.PopulationPhase_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 85: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationMix row; if (!read(input,row)) return false; out.PopulationMix_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 86: {
+        if (version != 1) return false;
+        if (count > input.remaining()/8) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationCurve row; if (!read(input,row)) return false; out.PopulationCurve_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 87: {
+        if (version != 1) return false;
+        if (count > input.remaining()/32) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationPoint row; if (!read(input,row)) return false; out.PopulationPoint_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 88: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationWindow row; if (!read(input,row)) return false; out.PopulationWindow_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 89: {
+        if (version != 1) return false;
+        if (count > input.remaining()/25) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationType row; if (!read(input,row)) return false; out.PopulationType_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 17: {
         if (version != 1) return false;
         if (count > input.remaining()/84) return false;
@@ -2840,6 +3038,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/28) return false;
         for (uint32_t i=0; i<count; ++i) { GravityDefinition row; if (!read(input,row)) return false; out.GravityDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 83: {
+        if (version != 1) return false;
+        if (count > input.remaining()/28) return false;
+        for (uint32_t i=0; i<count; ++i) { WarpDefinition row; if (!read(input,row)) return false; out.WarpDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 30: {
@@ -3040,6 +3244,18 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ShellSource_rows) if (!ShellSource_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationPhase_ids;
+    for (const auto &row:data.PopulationPhase_rows) if (!PopulationPhase_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationMix_ids;
+    for (const auto &row:data.PopulationMix_rows) if (!PopulationMix_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationCurve_ids;
+    for (const auto &row:data.PopulationCurve_rows) if (!PopulationCurve_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationPoint_ids;
+    for (const auto &row:data.PopulationPoint_rows) if (!PopulationPoint_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationWindow_ids;
+    for (const auto &row:data.PopulationWindow_rows) if (!PopulationWindow_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationType_ids;
+    for (const auto &row:data.PopulationType_rows) if (!PopulationType_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
     for (const auto &row:data.ProgressionDefinition_rows) if (!ProgressionDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LoadoutAsset_ids;
@@ -3090,6 +3306,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.RockFieldDefinition_rows) if (!RockFieldDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> GravityDefinition_ids;
     for (const auto &row:data.GravityDefinition_rows) if (!GravityDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> WarpDefinition_ids;
+    for (const auto &row:data.WarpDefinition_rows) if (!WarpDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> NumericTraitLevel_ids;
     for (const auto &row:data.NumericTraitLevel_rows) if (!NumericTraitLevel_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PostMaxChargeDefinition_ids;
@@ -3164,6 +3382,11 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FloodDefinition_rows) if (!BeamDefinition_ids.count(row.beam)) return false;
     for (const auto &row:data.ShellDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.ShellSource_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.PopulationMix_rows) if (!PopulationPhase_ids.count(row.phase)) return false;
+    for (const auto &row:data.PopulationMix_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.PopulationCurve_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.PopulationPoint_rows) if (!PopulationCurve_ids.count(row.curve)) return false;
+    for (const auto &row:data.PopulationType_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -3335,5 +3558,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=82;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=89;
 }
