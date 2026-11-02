@@ -65,7 +65,7 @@ def package(root, lock, args):
     if args.platform == 'macos':
         universal = libraries / library_name('macos', 'universal')
         run(['lipo', '-create', *[libraries / library_name('macos', arch) for arch in arches], '-output', universal])
-        run(['lipo', '-verify_arch', *arches, universal])
+        run(['lipo', universal, '-verify_arch', *arches])
         extension = project / 'extensions/run/run_core.gdextension'
         config = extension.read_text()
         for arch in arches:
@@ -84,7 +84,7 @@ def package(root, lock, args):
     engine = [args.godot, '--headless', '--path', project]
     # importで型・資源索引を準備してから、正規の共通生成へ渡す。
     run([*engine, '--editor', '--import', '--log-file', destination / 'import.log'])
-    run([*engine, '--editor', '--script', 'res://tools/content/build_all.gd', '--log-file', destination / 'generate.log', '--', '--force'])
+    run([*engine, '--script', 'res://tools/content/build_all.gd', '--log-file', destination / 'generate.log', '--', '--force'])
     if not args.verify:
         save.write_text(original_save)
     output = destination / 'export'
