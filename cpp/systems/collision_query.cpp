@@ -35,6 +35,7 @@ double CollisionQuery::point_segment_squared(Point point,Point from,Point to) {
     const double t=delta.length_squared()>0?std::clamp(double((point-from).dot(delta))/delta.length_squared(),0.0,1.0):0;
     return point.distance_squared_to(from+delta*t);
 }
+bool CollisionQuery::point_in_polygon(Point point,const std::vector<Point> &points) {if (points.size()<3) return false;bool inside=false;for (size_t i=0,j=points.size()-1;i<points.size();j=i++) {if (point_segment_squared(point,points[i],points[j])==0) return true;if ((points[i].y>point.y)!=(points[j].y>point.y) && point.x<(points[j].x-points[i].x)*(point.y-points[i].y)/(points[j].y-points[i].y)+points[i].x) inside=!inside;}return inside;}
 namespace {
 bool crosses(Point a,Point b,Point c,Point d) {
     const Point r=b-a,s=d-c,q=c-a;const double den=r.cross(s);

@@ -77,7 +77,8 @@ struct CanisNovaState {double started=0;std::vector<CanisNovaPair> pairs;std::ve
 struct CanisRelayItem {EnemyHandle actor;double at=0,angle=0;godot::Vector2 from;bool marked=false,fired=false,released=false;};
 struct CanisRelayState {CanisFlameAimState aim;double started=0,last_fire=0,tint_until=0;std::vector<CanisRelayItem> items;bool ordered=false,aiming=false,cancelled=false;};
 struct DracoBiteState {godot::Vector2 origin,retracted,strike;std::vector<godot::Vector2> base,landed;};
-struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::variant<DracoBiteState> move;};
+struct DracoBreathState {std::vector<RockHandle> rocks;std::vector<godot::Vector2> destinations,base,recovering;godot::Vector2 mouth;double axis=0,fan_angle=0;bool reused=false;};
+struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState> move;};
 struct TechniqueState {
     std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState> detail;
     int64_t id=0;
@@ -172,7 +173,10 @@ struct DracoCycleState {
     double time=0,next_cycle=12,zoom=1,return_depth=1,return_alpha=1,return_angle=0;
     godot::Vector2 home,from,return_from;
 };
+struct DracoImpact {godot::Vector2 position;double time=0,radius=0;uint32_t technique=0;};
 struct DracoBodyState {
+    std::vector<RockHandle> placed_meteors;
+    std::vector<DracoImpact> impacts;
     DracoCycleState cycle;
     DracoIntroState intro;
     std::vector<DracoPicaroMember> picaro;

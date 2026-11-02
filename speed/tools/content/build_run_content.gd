@@ -77,24 +77,25 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ドラコはSourceの3形態を生成する。未登録技は生成エラーとして残す。
 static func draco_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"draco" or move==null or move.technique!=&"bite": return {}
+	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"draco","kind":4,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[]}
 	for phase in [1,2,3]:
 		var values: Dictionary = source.values().duplicate(true)
 		# Draco.rule()はSource上、形態別の値上書きを行わない。
 		var row := {}
 		for field in Schema.SCHEMA.records.filter(func(v):return v.name=="BossTechniqueDefinition")[0].fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":96,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
-		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values[key])
+		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":96 if source.technique==&"bite" else 97,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values.get(key,0.0))
 		records.BossTechniqueDefinition.append(row)
-		records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
+		if source.technique==&"bite": records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
+		else: records.DracoBreathDefinition.append({"id":phase,"technique":phase,"rock_enemy":1,"rocks":int(values.rocks),"rock_distance":float(values.rock_distance),"rock_spacing":float(values.rock_spacing),"half_angle":float(values.half_angle),"sweep":float(values.sweep)})
 	return records
 
 static func draco_set_records(definition: BossDef, moves: Array) -> Dictionary:
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[]}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
@@ -119,17 +120,49 @@ static func draco_technique_package(definition: BossDef, move: BossTechnique, co
 	var records := draco_technique_records(definition,move)
 	if package.is_empty() or records.is_empty(): return {}
 	for key in records: package.records[key] = records[key]
+	if move.technique==&"breath": append_draco_breath_rock(package,move,config)
 	append_draco_style(package,move)
 	return package
+
+## 通常隕石から独立した投石定義を、固定報酬の正規解決で生成する。
+static func append_draco_breath_rock(package: Dictionary, move: BossTechnique, config: GameConfig) -> void:
+	var definition: EnemyDef = load("res://data/enemies/meteor.tres").duplicate(true)
+	definition.hp = float(move.rock_hp);definition.stage_hp = definition.hp
+	definition.radius = float(move.rock_radius);definition.speed = 0.0
+	definition.xp_reward_counts = PackedInt32Array([0,0,0])
+	var source := chase_package(definition,config)
+	var data: Dictionary = package.records
+	var enemy: Dictionary = source.records.EnemyRecord[0].duplicate(true)
+	enemy.id = data.EnemyRecord.size()+1
+	# meteor_index付きのSourceはcharacter_scaleを掛けない。
+	enemy.scaling_character = 1.0
+	enemy.radius = enemy.scaling_radius*enemy.scaling_visual*enemy.scaling_collision
+	var visual: Dictionary = source.visuals[enemy.visual_id-1].duplicate(true)
+	visual.id = data.ResourceKey.size()+1
+	enemy.visual_id = visual.id
+	data.ResourceKey.append({"id":visual.id,"role":visual.role})
+	package.visuals.append(visual)
+	data.EnemyRecord.append(enemy)
+	data.StringEntry.append({"id":enemy.id,"value":"draco_breath_rock"})
+	data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
+	var population: Dictionary = source.records.PopulationType[0].duplicate(true)
+	population.id = data.PopulationType.size()+1;population.enemy=enemy.id
+	data.PopulationType.append(population)
+	var hull: Dictionary = source.records.FriendHullLook[0].duplicate(true)
+	hull.id = data.FriendHullLook.size()+1;hull.enemy = enemy.id
+	data.FriendHullLook.append(hull)
+	for row in data.DracoBreathDefinition: row.rock_enemy = enemy.id
 
 ## 固定の描画設定は生成時に解決する。
 static func append_draco_style(package: Dictionary, move: BossTechnique) -> void:
 	var visual: Node2D = move.visual.instantiate()
 	load("res://data/visuals/effect_settings.tres").apply_to(visual)
 	var style := {}
-	for key in ["telegraph_line_width","active_line_width","telegraph_fill_opacity","telegraph_progress_opacity","telegraph_edge_opacity","motion_trail_opacity"]: style[key] = float(visual.get(key))
+	for key in ["telegraph_line_width","active_line_width","telegraph_fill_opacity","telegraph_progress_opacity","telegraph_edge_opacity","motion_trail_opacity","impact_lifetime","collapse_lifetime"]: style[key] = float(visual.get(key))
 	visual.free()
-	var appearance: Dictionary = package.visuals[-1].appearance
+	var appearance := {}
+	for asset: Dictionary in package.visuals:
+		if asset.get("boss","")=="draco": appearance=asset.appearance;break
 	if not appearance.has("draco_styles"): appearance.draco_styles = {}
 	appearance.draco_styles[str(move.technique)] = style
 
@@ -904,7 +937,9 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 	else:
 		for key in techniques: package.records[key] = techniques[key]
 	if definition.id==&"draco":
-		for move in rules.techniques: append_draco_style(package,move)
+		for move in rules.techniques:
+			if move.technique==&"breath": append_draco_breath_rock(package,move,config)
+			append_draco_style(package,move)
 	var compiled := boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 	if compiled.is_empty(): return {}
 	if definition.id==&"centaurus":
@@ -1820,13 +1855,24 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			hull.id = data.FriendHullLook.size()+1
 			hull.enemy = index
 			data.FriendHullLook.append(hull)
-		# 護衛などは通常敵の同じ定義へ結び、本体だけを追加する。
-		for enemy: Dictionary in source.EnemyRecord:
-			if maps.EnemyRecord.has(enemy.id): continue
-			var external: String = source.StringEntry[enemy.id-1].value
-			var found: Array = data.StringEntry.filter(func(entry): return entry.value==external)
-			if found.size()!=1: return ERR_INVALID_DATA
-			maps.EnemyRecord[enemy.id] = found[0].id
+		for original: Dictionary in source.EnemyRecord:
+			if maps.EnemyRecord.has(original.id): continue
+			var enemy := original.duplicate(true)
+			var name: String = source.StringEntry[original.id-1].value
+			var found: Array = data.StringEntry.filter(func(row):return row.value==name)
+			if not found.is_empty(): maps.EnemyRecord[original.id]=found[0].id;continue
+			var visual: Dictionary = package.visuals[original.visual_id-1].duplicate(true)
+			visual.id=data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":visual.id,"role":visual.role});visuals.append(visual)
+			enemy.id=data.EnemyRecord.size()+1;enemy.visual_id=visual.id
+			maps.EnemyRecord[original.id]=enemy.id;data.EnemyRecord.append(enemy)
+			data.StringEntry.append({"id":enemy.id,"value":name});data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
+			for original_type: Dictionary in source.PopulationType:
+				if original_type.enemy!=original.id:continue
+				var population:=original_type.duplicate(true);population.id=data.PopulationType.size()+1;population.enemy=enemy.id;data.PopulationType.append(population)
+			for original_hull: Dictionary in source.FriendHullLook:
+				if original_hull.enemy!=original.id: continue
+				var hull := original_hull.duplicate(true);hull.id=data.FriendHullLook.size()+1;hull.enemy=enemy.id;data.FriendHullLook.append(hull)
 		for record: Dictionary in Schema.SCHEMA.records:
 			if not tables.has(record.name): continue
 			if record.name=="BossFinishDefinition" and not data[record.name].is_empty():

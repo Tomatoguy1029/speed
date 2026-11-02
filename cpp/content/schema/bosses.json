@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 96
+          "max": 97
         },
         {
           "name": "phase",

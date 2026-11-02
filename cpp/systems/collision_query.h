@@ -21,6 +21,7 @@ public:
     static std::vector<size_t> enemy_rows(const godot::RunState &,Point lo,Point hi,bool include_dead=false);
     static double segment_circle_t(Point from,Point to,Point center,double radius);
     static double point_segment_squared(Point point,Point from,Point to);
+    static bool point_in_polygon(Point,const std::vector<Point> &);
     static bool sweep_segment(Point ship_before,Point ship_now,Point from,Point to,double radius);
     static bool touches(const ContactShape &,const ShipMotion &,ContactGeometry);
 };

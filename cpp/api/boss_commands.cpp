@@ -10,6 +10,7 @@
 #include "../bosses/draco/intro.h"
 #include "../bosses/draco/cycle.h"
 #include "../bosses/draco/pose.h"
+#include "../bosses/draco/technique.h"
 #include "../bosses/draco/picaro.h"
 #include "../bosses/canis_major/flames.h"
 #include "../bosses/canis_major/hound_lunge.h"
@@ -62,6 +63,7 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         if (p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=4 || body->mode>=speed::BossMode::Defeated) return result(false);
         const String operation=p["operation"];
+        if (operation=="placed_meteors" && p.size()==4 && p.get("definition",Variant()).get_type()==Variant::INT && p.get("points",Variant()).get_type()==Variant::PACKED_VECTOR2_ARRAY) {const int64_t definition=p["definition"];const PackedVector2Array points=p["points"];if (definition<1 || uint64_t(definition)>runtime.content->definitions.size() || runtime.content->definitions[definition-1].kind!=speed::EnemyDefinition::Kind::Meteor || points.size()>2048) return result(false);for (auto point:points) if (!point.is_finite()) return result(false);for (auto point:points) {const auto rock=speed::DracoTechnique::spawn_rock(runtime,uint32_t(definition),point);if (!runtime.state.field.rock_handles.contains(rock)) return result(false);body->draco.placed_meteors.push_back(rock);}return result(true);}
         if (operation=="reset" && p.size()==2) {speed::DracoPose::reset(runtime,*body);return result(true);}
         if (operation=="depth" && p.size()==4) {for (const char *key:{"depth","alpha"}) if ((p.get(key,Variant()).get_type()!=Variant::FLOAT && p.get(key,Variant()).get_type()!=Variant::INT) || !std::isfinite(double(p[key]))) return result(false);speed::DracoPose::depth(runtime,*body,p["depth"],p["alpha"]);return result(true);}
         if (operation=="contains" && p.size()==4 && p.get("point",Variant()).get_type()==Variant::VECTOR2 && Vector2(p["point"]).is_finite() && (p.get("radius",Variant()).get_type()==Variant::FLOAT || p.get("radius",Variant()).get_type()==Variant::INT) && std::isfinite(double(p["radius"])) && double(p["radius"])>=0) return result(true,speed::DracoPose::contains(runtime,*body,p["point"],p["radius"]));

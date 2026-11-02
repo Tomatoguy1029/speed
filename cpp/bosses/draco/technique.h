@@ -8,6 +8,7 @@ namespace speed {class DracoTechnique {public:
     static void cancel(RunRuntime &,TechniqueState &);
     static bool validate(const TechniqueState &,const ContentBundle &);
     static godot::Dictionary snapshot(const RunRuntime &,const TechniqueState &);
+    static RockHandle spawn_rock(RunRuntime &,uint32_t,godot::Vector2);
     static double smooth(double);
     static std::vector<godot::Vector2> neutral(const RunRuntime &,const BossBodyState &,godot::Vector2,double);
     static std::vector<godot::Vector2> fit(const std::vector<godot::Vector2> &,const std::vector<godot::Vector2> &);

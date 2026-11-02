@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-breath" in OS.get_cmdline_user_args() or "--cpp-draco-breath-rays" in OS.get_cmdline_user_args():
+		call_deferred("native_breath")
+		return
 	check(ResourceLoader.exists("res://data/bosses/draco.tres"), "竜のボス定義を登録する")
 	if failed:
 		get_tree().quit(1)
@@ -211,4 +214,145 @@ func _ready() -> void:
 		sim.state.lab_mode=true
 	session.free()
 	print("[draco] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 既存ブレスの遮蔽・破壊・中断へC++の状態と描画を接続する。
+func breath_fixture(move: BossTechnique, flow_enabled := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg: GameConfig = load("res://data/config.tres").duplicate(true)
+	var package: Dictionary = builder.draco_technique_package(load("res://data/bosses/draco.tres"),move,cfg)
+	if flow_enabled:
+		var rules=load("res://scripts/data_types/boss_action_rules.gd").new()
+		rules.adapter=&"draco";rules.techniques.assign([move]);rules.conditions={"breath":{}}
+		var flow=load("res://scripts/data_types/boss_flow_def.gd").new()
+		flow.sections=[{"request":"normal","cap":2.0,"next":0,"action_count":1}]
+		var compiled: Dictionary=builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		for key in compiled: package.records[key]=compiled[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":194,"mode":1,"stage_id":"B_draco_breath","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"ブレスと報酬ゼロの専用投石定義を生成して読む")
+	if not configured.ok: print(configured);return {}
+	bridge.start(105,{"position":Vector2(700,0),"lab_mode":true})
+	var captured: Array = []
+	bridge.subscribe("確認",func(frame):captured.append_array(frame.events);return true)
+	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"level":1,"position":Vector2(700,0),"invincible":false}})
+	bridge._core.set_motion_context(Vector2(700,0),Vector2(700,0),Vector2(800,450))
+	var boss: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	return {"bridge":bridge,"boss":boss,"package":package,"captured":captured}
+
+func native_breath() -> void:
+	var rays_only := "--cpp-draco-breath-rays" in OS.get_cmdline_user_args()
+	var move: BossTechnique = load("res://data/bosses/draco_moves/breath.tres")
+	var fixture := breath_fixture(move)
+	if fixture.is_empty(): get_tree().quit(1);return
+	var bridge = fixture.bridge
+	var stage: RuntimeStage = ContentManager.runtime_stage(5).duplicate(true)
+	stage.boss_enabled=false
+	var session := RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":105},false)
+	session.auto_step=false
+	var sim: RunSimulation=session.sim
+	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
+	var actor=sim.bosses.actor
+	actor.selection_enabled=false;actor.clock=0.0;actor.cycle.cancel();actor.cancel_attack()
+	sim.state.ship_pos=Vector2(700,0);sim.state.enemy_aim=Vector2(700,0);sim.state.ship_vel=Vector2.ZERO;sim.state.ship_invuln=0.0
+	check(actor.start_attack(&"breath") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++のブレスを開始する")
+	var driver=actor._runner
+	var max_rock_error := 0.0
+	var max_ray_error := 0.0
+	var stage_equal := true
+	var facing_error := 0.0
+	var behind_safe := true
+	var damaged_after_break := false
+	for frame in 610:
+		actor.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		stage_equal=stage_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[actor.mode]
+		facing_error=maxf(facing_error,absf(angle_difference(body.facing,actor.table.facing[actor.body])))
+		for j in attack.rocks.size(): max_rock_error=maxf(max_rock_error,attack.rocks[j].position.distance_to(driver.rocks[j].pos))
+		if attack.attack_points.size()==actor.attack_points.size():
+			for j in attack.attack_points.size(): max_ray_error=maxf(max_ray_error,attack.attack_points[j].distance_to(actor.attack_points[j]))
+		elif attack.stage==1 and actor.mode==&"active": check(false,"遮蔽の光線数がSourceと一致する")
+		if frame==275:
+			behind_safe=not fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.accepted)
+			sim.enemies.mark_dead(driver.rocks[1].row)
+			bridge.command("dev_kill",{"entity_id":attack.rocks[1].actor,"cause":"debug"})
+		if frame==280 and not rays_only:
+			damaged_after_break=fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.cause==&"breath" and event.payload.source==&"draco" and event.payload.accepted)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"遮蔽破壊後のブレス・岩・光線を保持する")
+			bridge._core.step(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			check(bridge.restore(held.value).ok,"ブレスの途中へ復帰する")
+			bridge._core.step(1.0/120.0)
+			check(bridge.command("dev_boss_state").value==future,"復帰後も同じ遮蔽光線で進む")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if not rays_only and frame in [120,280,430]:
+			var appearance := {}
+			for visual: Dictionary in fixture.package.visuals:
+				if visual.get("boss","")=="draco":appearance=visual.appearance
+			var display=load("res://scripts/render/bosses/draco.gd").new()
+			add_child(display);display.apply_frame(body,attack,appearance);display.queue_redraw();await get_tree().process_frame
+			check(display._parts.visible,"扇の予告・遮蔽されたブレス・岩の破壊を状態から描画する")
+			display.free()
+	if rays_only:
+		check(max_ray_error<0.1,"Sourceと65光線の遮蔽点列が一致する: %s"%max_ray_error)
+		bridge.dispose();session.free()
+		print("[cpp_draco_breath_rays] failures=",failed)
+		get_tree().quit(1 if failed else 0)
+		return
+	check(stage_equal and facing_error<0.0001,"Sourceの開始・発動・終了時刻と薙ぐ向きが一致する")
+	check(max_rock_error<0.1 and max_ray_error<0.1,"投石の移動と65光線の遮蔽点列が一致する: %s/%s"%[max_rock_error,max_ray_error])
+	check(behind_safe and damaged_after_break,"岩の裏は安全で、遮蔽を壊した光線から被弾する")
+	check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return rock.destroyed and not rock.alive),"自然終了は残る岩をすべて崩す")
+	for seconds in [0.3,1.5,3.7]:
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in int(seconds*120):bridge._core.step(1.0/120.0)
+		check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"予告・実行・回復の途中で取消できる")
+		check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return rock.destroyed and not rock.alive),"途中取消も投石をすべて崩す")
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return rock.destroyed and not rock.alive),"本体消失はブレスと所有する投石を取り消す")
+	bridge.dispose();session.free()
+	var clear: BossTechnique=move.duplicate(true);clear.rocks=0
+	for at in [Vector2(1000,230),Vector2(1000,210)]:
+		fixture=breath_fixture(clear);bridge=fixture.bridge
+		bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		bridge._core.step(1.1)
+		bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+		bridge._core.step(1.2);bridge.command("dev_boss_state")
+		var hit: bool=fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.accepted)
+		check(hit==(at.y<220.0),"ブレスは機体半径を足さない点判定を保つ")
+		bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+		bridge._core.step(1.0/120.0);bridge.command("dev_boss_state")
+		if at.y<220.0:check(fixture.captured.filter(func(event):return event.type==&"combat_player_damage" and event.payload.accepted).size()==2,"ブレスの直接判定は技全体の1回制限を加えない")
+		bridge.dispose()
+	fixture=breath_fixture(move);bridge=fixture.bridge
+	var positions := PackedVector2Array([Vector2(502,-240),Vector2(502,0),Vector2(502,240)])
+	var rock_enemy: int=fixture.package.records.DracoBreathDefinition[0].rock_enemy
+	check(bridge.command("dev_draco_pose",{"entity_id":fixture.boss,"operation":"placed_meteors","definition":rock_enemy,"points":positions}).ok,"先行する投石の記録を既存の場面準備へ渡す")
+	var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	var reused: Dictionary=bridge.command("dev_boss_state").value[0]
+	check(reused.reused and reused.rocks.size()==3,"前の技が置いた同じ岩をブレスで再利用する")
+	bridge._core.step(0.6)
+	reused=bridge.command("dev_boss_state").value[0]
+	var stable := true
+	for j in positions.size():stable=stable and reused.rocks[j].position.is_equal_approx(positions[j])
+	check(stable,"再利用した岩を予告中に口から動かし直さない")
+	bridge.command("dev_cancel_technique",{"ticket":started.value})
+	check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return rock.destroyed and not rock.alive),"再利用した岩も取消で崩す")
+	bridge.dispose()
+	fixture=breath_fixture(clear,true);bridge=fixture.bridge
+	var first := -1
+	var second := false
+	for frame in 700:
+		bridge._core.step(1.0/120.0)
+		var active: Array=bridge.command("dev_boss_state").value
+		if not active.is_empty():
+			if first<0:first=active[0].id
+			elif active.any(func(t):return t.id!=first and t.stage==0):second=true;break
+	check(first>0 and second,"ブレスを候補から選んで自然終了後に次の行動へ進める")
+	bridge.dispose()
+	print("[cpp_draco_breath] failures=",failed)
 	get_tree().quit(1 if failed else 0)
