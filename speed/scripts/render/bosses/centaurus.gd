@@ -6,6 +6,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var sail_star_color := Color("#fff6c8")
 @export var open_color := Color("#9fe8ff")
 const PARTS = preload("res://scenes/bosses/centaurus_parts.tscn")
+var _rain_visual: Node2D
 var _parts: Node2D
 var state := {}
 var technique := {}
@@ -36,6 +37,10 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	if _technique_id!=int(attack.get("id",0)):
 		_technique_id = int(attack.get("id",0))
 		_released = 0
+	if _rain_visual==null:
+		_rain_visual = preload("res://scripts/render/bosses/centaurus_rain.gd").new()
+		add_child(_rain_visual)
+	_rain_visual.apply_frame(attack.get("rain",{}) if int(attack.get("stage",5))==1 else {},float(body.clock))
 	technique = attack
 	_world_clock = float(body.clock)
 	position = body.position
@@ -64,6 +69,7 @@ func _mode() -> StringName:
 	if state.mode==3: return &"final"
 	if state.mode>=4: return &"defeated"
 	if state.get("leaping",false): return &"leap"
+	if technique.get("technique","")=="rain" and int(technique.get("stage",5))==1: return &"rain"
 	if technique.get("technique","")=="rear_attack" and int(technique.get("stage",5))==1: return &"strike"
 	return [&"windup",&"shooting",&"recovery",&"idle",&"idle",&"idle",&"idle",&"idle"][int(technique.get("stage",5))]
 
@@ -139,7 +145,7 @@ func _draw() -> void:
 		draw_arc(Vector2(-14, 0), 60.0 + grow * 90.0, 0.0, TAU, 32, Color(sail_star_color, 0.8 * (1.0 - grow)), pixel_size * 2.0)
 	if pulse > 0.0:
 		draw_arc(Vector2(62, 0), 30.0 + (0.3 - pulse) * 80.0, 0.0, TAU, 20, Color(STRING, pulse * 2.5), pixel_size)
-	if _mode()==&"windup" and technique.get("technique","")=="volley":
+	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain"]:
 		var pull := Vector2(62.0+cos(1.1)*26.0-float(state.charge)*34.0,0.0)
 		draw_line(pull,pull+Vector2(56.0,0.0),WARNING,pixel_size*1.5)
 	draw_set_transform(Vector2.ZERO)

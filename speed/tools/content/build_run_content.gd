@@ -51,13 +51,13 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"volley",&"rear_attack"]: return {}
+	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"LightArrowDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"LightArrowDefinition":[]}
 	var boss := {"id":1,"external_id":"centaurus","kind":1,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
 	records.BossDefinition = [boss]
-	if move.technique==&"volley":
+	if move.technique in [&"volley",&"rain"]:
 		var visual: AttackVisual = source.shot_visual.instantiate()
 		visual._apply_effect_settings()
 		var style := {"id":1,"cosmic":false,"contact":1,"flight_scale":visual.flight_scale}
@@ -75,9 +75,20 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9 if move.technique==&"rear_attack" else 10,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage","speed"]: row[key] = float(values.get(key,0.0))
-		if move.technique==&"rear_attack":
+		if move.technique==&"rain":
+			row.active = int(values.traces)*float(values.trace_length)/maxf(float(values.trace_speed),1.0)+(int(values.traces)-1)*float(values.trace_gap)+float(values.drop_delay)+float(values.fall)+float(values.linger)+0.3
+			records.BossTechniqueDefinition.append(row)
+			var rain := {"id":phase,"technique":phase,"projectile":1}
+			for key in ["traces","arrows_per_step"]: rain[key] = int(values[key])
+			for key in ["arrow_gap","circle_radius","drop_delay","drop_height","fade","fall","forward","linger","trace_bend","trace_gap","trace_length","trace_speed"]: rain[key] = float(values[key])
+			var fan: BossTechnique = load("res://data/bosses/centaurus_moves/fan_volley.tres")
+			rain.arrow_radius = fan.radius
+			rain.arrow_length = fan.length
+			records.CentaurusRainDefinition.append(rain)
+			records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":6,"at":row.warn})
+		elif move.technique==&"rear_attack":
 			row.active = float(values.active)
 			records.BossTechniqueDefinition.append(row)
 			records.CentaurusRearDefinition.append({"id":phase,"technique":phase,"back_offset":float(values.back_offset),"radius":float(values.range_radius)})
@@ -102,6 +113,7 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 		style.id += offset
 		package.records.LightArrowDefinition.append(style)
 	for volley in records.CentaurusVolleyDefinition: volley.projectile += offset
+	for rain in records.CentaurusRainDefinition: rain.projectile += offset
 	for key in records:
 		if key!="LightArrowDefinition": package.records[key] = records[key]
 	for scene: PackedScene in [move.get("shot_visual"),move.visual]:

@@ -222,6 +222,107 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CentaurusRainDefinition",
+      "section": 323,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "traces",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "arrows_per_step",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "arrow_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "drop_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "drop_height",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fade",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fall",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "forward",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "linger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_bend",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
     }
   ],
   "enums": {}

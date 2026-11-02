@@ -74,6 +74,7 @@ struct ContentBundle {
     std::vector<CentaurusBodyDefinition> centaurus_bodies;
     std::vector<CentaurusVolleyDefinition> centaurus_volleys;
     std::vector<CentaurusRearDefinition> centaurus_rears;
+    std::vector<CentaurusRainDefinition> centaurus_rains;
     std::vector<BossFinishDefinition> boss_finish;
     std::vector<BossDefinition> bosses;
     std::vector<BossTechniqueDefinition> boss_techniques;
