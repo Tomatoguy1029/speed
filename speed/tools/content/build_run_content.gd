@@ -736,8 +736,8 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 static func draco_cycle_candidates(definition: BossDef) -> Array:
 	var choices: Array = definition.params.get("picaro_candidates",[]).duplicate()
 	if choices.is_empty():
-		for id in ContentManager.catalog.table(&"enemies"):
-			var entry: ContentEntry = ContentManager.catalog.find(&"enemies",id)
+		for id in _catalog().table(&"enemies"):
+			var entry: ContentEntry = _catalog().find(&"enemies",id)
 			var source := load(entry.path) as EnemyDef
 			if source!=null and source.rank>0 and source.gate not in [&"solid",&"immortal"]: choices.append(id)
 	return choices if not choices.is_empty() else [&"biter"]
@@ -2171,7 +2171,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	for id in cycle_dependencies:
-		var entry: ContentEntry = ContentManager.catalog.find(&"enemies",StringName(id))
+		var entry: ContentEntry = _catalog().find(&"enemies",StringName(id))
 		if entry==null: return ERR_INVALID_DATA
 		if not entry.path in paths: paths.append(entry.path)
 	paths.append("res://.content/meteor_pieces.res")
