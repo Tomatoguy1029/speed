@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w21" in OS.get_cmdline_user_args():
+		await check_cpp_w21()
+		print("[cpp_w21] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-t05" in OS.get_cmdline_user_args():
 		await check_cpp_t05()
 		print("[cpp_t05] failed=%d" % failures)
@@ -3296,3 +3301,107 @@ func check_cpp_t05() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"チェインショックの状態・命中・表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_w21() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	var session = await trait_test_session("W21",config,621)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	check(bridge.step(1.0/120.0,idle,viewport).ok,"初期更新を通す")
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W21")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,definition.level_steps.size()+1):
+		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"全段の基準を復元する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W21","levels":level}).ok,"牽引船体を全段取得する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":5}).ok,"星砕きより先に捕獲する条件を用意する")
+		var start: Vector2 = trait_start_trace(bridge,1200.0)
+		var sources: Array[int] = []
+		for j in 6:
+			var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":start+Vector2(0,15.0*j)}).value
+			check(bridge.command("dev_damage",{"entity_id":id,"amount":100000.0,"cause":"ram"}).ok,"撃破入口から船体を回収する")
+			sources.append(id)
+		check(bridge._ui.mass_tow.cargo.size()==6 and core.projectiles_snapshot().is_empty(),"死亡した船体を値コピーし星砕きを抑える")
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"捕獲通知を表示と記録へ配信する")
+		check(bridge.step(1.0/120.0,idle,viewport).ok,"元の敵の行を回収する更新を通す")
+		check(core.enemies_snapshot().is_empty() and bridge._ui.mass_tow.cargo.size()==6,"元の敵が消えても牽引する")
+		var replacement: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":start+Vector2(0,900)}).value
+		core.set_enemy_motion(replacement,{"held":true,"vel":Vector2.ZERO})
+		check(bridge._ui.mass_tow.cargo[0].source_id==sources[0],"再利用した敵の行と船体を混同しない")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._mass_tow_visual!=null and not presentation.frame_view._hull_displays.is_empty(),"船体の絵・房の光と鎖を本番表示へ渡す")
+		var towing: Dictionary = bridge.checkpoint()
+		bridge.command("pause",{"paused":true})
+		var paused: Dictionary = bridge._ui.mass_tow.duplicate(true)
+		bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.mass_tow==paused,"停止中は牽引と発射時計を止める")
+		bridge.command("pause",{"paused":false})
+		for tick in 5: bridge.step(1.0/120.0,idle,viewport)
+		var expected: Dictionary = bridge._ui.mass_tow.duplicate(true)
+		check(bridge.restore(towing.value).ok and bridge.collect_frame().ok,"牽引途中の値を復元する")
+		for tick in 5: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.mass_tow==expected,"揺れ・相対位置・角度と発射時計を再現する")
+		check(bridge.restore(towing.value).ok and bridge.collect_frame().ok,"解除条件の牽引値を復元する")
+		bridge.command("dev_remove_weapon",{"id":"W21"})
+		presentation._present_cpp(0.01)
+		check(bridge._ui.mass_tow.cargo.is_empty() and presentation.frame_view._mass_tow_visual==null,"途中解除で未発射船体と専用表示を片付ける")
+		check(bridge.restore(towing.value).ok and bridge.collect_frame().ok,"解除前の牽引状態へ戻せる")
+		for tick in 120:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not bridge._ui.tracing: break
+		check(not bridge._ui.tracing and bridge._ui.mass_tow.cargo.all(func(c): return c.ready),"描線の終了で船体を発射可能にする")
+		var held: Dictionary = bridge.checkpoint()
+		var emitted := 0
+		var interval: float = definition.params.interval/(1.0+0.12*(definition.level_steps[level-1]-1))
+		var previous: float = bridge._ui.mass_tow.fire_t
+		for tick in 100:
+			var steer := idle.duplicate()
+			steer.stick_active = true
+			steer.stick = Vector2.DOWN if tick%2==0 else Vector2.UP
+			check(bridge.step(1.0/120.0,steer,viewport).ok and bridge.read_frame().ok and bridge.delivery_error.ok,"船体の発射と通知を更新する")
+			var value: Dictionary = bridge._ui.mass_tow
+			var delta: int = 6-value.cargo.size()-emitted
+			if delta>0:
+				var shots: Array = core.projectiles_snapshot().filter(func(v): return v.get("source_id",-1) in sources)
+				check(shots.size()==emitted+delta,"船体を共通の貫通弾へ渡す")
+				var shot: Dictionary = shots[-1]
+				check(is_equal_approx(shot.damage,bridge._ui.attack_power*definition.params.damage*(1.0+0.3*(definition.level_steps[level-1]-1))*maxf(1.0,shot.radius/definition.params.size_ref)) and absf((shot.vel as Vector2).length()-definition.params.shot_speed)<0.001,"全段の威力と勢いを足さない発射速度を保つ")
+				check((shot.vel as Vector2).normalized().is_equal_approx(bridge._ui.ship.ship_heading),"発射するごとに現在の機首を読む")
+				if not value.cargo.is_empty(): check(absf(value.fire_t-(previous-1.0/120.0+interval*delta))<0.0001,"発射時計の負の余りへ間隔を足す")
+				emitted += delta
+			previous = value.fire_t
+			if value.cargo.is_empty(): break
+		check(emitted==6 and bridge._ui.mass_tow.fire_t==0.0,"全船体を撃ち出すと発射時計を戻す")
+		var fired: Array = core.projectiles_snapshot()
+		var after: Dictionary = bridge._ui.mass_tow.duplicate(true)
+		check(bridge.restore(held.value).ok and bridge.collect_frame().ok,"発射待ちへ途中復帰する")
+		# 発射中の結果は牽引中と別に、同じ入力列で保持と復帰を比べる。
+		for tick in 100:
+			var steer := idle.duplicate()
+			steer.stick_active = true
+			steer.stick = Vector2.DOWN if tick%2==0 else Vector2.UP
+			bridge.step(1.0/120.0,steer,viewport)
+			if bridge._ui.mass_tow.cargo.is_empty(): break
+		check(bridge._ui.mass_tow==after and core.projectiles_snapshot()==fired,"発射待ち復帰で船体の位置・向き・寿命を再現する")
+		presentation._present_cpp(0.01)
+		check(bridge.delivery_error.ok,"船体の発射演出を配信する")
+		bridge.command("dev_remove_weapon",{"id":"W21"})
+		check(core.projectiles_snapshot()==fired,"解除後も発射済み船体の自然寿命を保つ")
+		bridge.release_checkpoint(held.value)
+		bridge.release_checkpoint(towing.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"牽引船体の状態と表示に実行エラーがない: %s" % [errors.messages()])

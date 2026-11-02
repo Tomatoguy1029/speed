@@ -47,6 +47,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
     for (const auto &v:state.loadout.kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
+    if (!std::isfinite(state.loadout.mass_tow.fire.remaining)) return false;
+    for (const auto &c:state.loadout.mass_tow.cargo) if (!c.pos.is_finite() || !c.relative.is_finite() || !std::isfinite(c.angle) || c.radius<=0 || !std::isfinite(c.radius) || c.source_id<=0 || !c.definition || c.definition>content.definitions.size()) return false;
     if (!std::isfinite(state.loadout.contact_arc.ready_at)) return false;
     for (const auto &v:state.loadout.contact_arc.visuals) {if (!std::isfinite(v.age) || v.age<0 || v.segments.size()%2) return false;for (auto p:v.segments) if (!p.is_finite()) return false;}
     for (const auto &f:state.loadout.sonic.frames) if (!f.pos.is_finite() || !std::isfinite(f.age) || f.age<0) return false;

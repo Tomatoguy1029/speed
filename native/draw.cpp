@@ -1,3 +1,4 @@
+#include "../cpp/behaviors/weapons/massTow.h"
 #include "run_core.h"
 #include "../cpp/systems/field.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
@@ -157,7 +158,8 @@ void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
     for (const auto &owned:runtime.state.loadout.weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
-        if (id=="W29") speed::EndBlastBehavior::end(runtime);
+        if (id=="W21") speed::MassTowBehavior::end(runtime);
+        else if (id=="W29") speed::EndBlastBehavior::end(runtime);
         else if (id=="W07") speed::MinesBehavior::end(runtime);
     }
     for (const auto &owned:runtime.state.loadout.traits) {

@@ -569,7 +569,15 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		if not comet_entry.comet_only: continue
 		var comet_weapon: WeaponDef = load(comet_entry.path)
 		if comet_weapon==null: return {}
-		data.LoadoutDefinition.append({"id":data.LoadoutDefinition.size()+1,"kind":0,"maximum_level":comet_weapon.level_steps.size(),"external_id":String(comet_weapon.id),"comet_only":true})
+		var comet_equipment: int = data.LoadoutDefinition.size()+1
+		data.LoadoutDefinition.append({"id":comet_equipment,"kind":0,"maximum_level":comet_weapon.level_steps.size(),"external_id":String(comet_weapon.id),"comet_only":true})
+		if comet_weapon.id==&"W21":
+			var post: Dictionary = config.post_max.target(comet_weapon.id)
+			for level in comet_weapon.level_steps.size():
+				var values := {"id":level+1,"weapon":comet_equipment,"level":level+1,"damage":float(comet_weapon.params.damage)*(1.0+0.3*(comet_weapon.level_steps[level]-1)),"interval":float(comet_weapon.params.interval)/(1.0+0.12*(comet_weapon.level_steps[level]-1)),"visible":int(comet_weapon.params.visible),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_interval":config.post_max.minimum_interval}
+				for key in ["capture_radius","hold","follow","shot_speed","size_ref","life","knock","clump_spacing"]: values[key] = float(comet_weapon.params[key])
+				for key in ["projectile","duration","knockback","area","interval"]: values[key+"_increment"] = float(config.post_max.increments.get({"projectile":"projectile_speed","interval":"weapon_interval"}.get(key,key),0.0)) if post.has(key) else 0.0
+				data.MassTowDefinition.append(values)
 	var crit_definition := load("res://data/traits/T09_critRate.tres") as TraitDef
 	if crit_definition==null: return {}
 	data.PostMaxCritDefinition = [{"id":1,"trait_maximum":float(crit_definition.params.get("max",1.0)),"trained_bonus":crit_definition.stack_bonus(config.trait_max_stacks),"increment":float(config.post_max.increments.get("crit_chance",0.0))}]
@@ -588,6 +596,15 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_wave_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if contact_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":sonic_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if sonic_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_arc_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if arc_target.has("followup") else 0.0})
+	var tow_weapon: int = data.MassTowDefinition[0].weapon
+	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":tow_weapon,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(&"W21").has("followup") else 0.0})
+	var tow_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W21")
+	if tow_entry==null: return {}
+	for path in tow_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":tow_weapon})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":tow_weapon,"asset":key})
 	var arc_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W17")
 	if arc_entry==null: return {}
 	for path in arc_entry.resources:
@@ -1000,6 +1017,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.KnockbackDefinition = resolved.KnockbackDefinition
 			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
+			data.MassTowDefinition = resolved.MassTowDefinition
 			data.ContactArcDefinition = resolved.ContactArcDefinition
 			data.SonicDefinition = resolved.SonicDefinition
 			data.ContactWaveDefinition = resolved.ContactWaveDefinition

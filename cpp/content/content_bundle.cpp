@@ -63,6 +63,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->knockback_levels=records.KnockbackDefinition_rows;
     bundle->mines_levels=records.MinesDefinition_rows;
     bundle->contact_arc_levels=records.ContactArcDefinition_rows;
+    bundle->mass_tow_levels=records.MassTowDefinition_rows;
     bundle->sonic_levels=records.SonicDefinition_rows;
     bundle->contact_wave_levels=records.ContactWaveDefinition_rows;
     bundle->end_blast_levels=records.EndBlastDefinition_rows;
@@ -276,6 +277,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.external_id=="T04") {
             if (d.kind!=1 || d.maximum_level!=bundle->full_charge_levels.size()) return {};
             for (size_t i=0;i<bundle->full_charge_levels.size();++i) if (bundle->full_charge_levels[i].equipment!=d.id || bundle->full_charge_levels[i].level!=i+1) return {};
+            continue;
+        }
+        if (d.external_id=="W21") {
+            if (d.kind!=0 || !d.comet_only || d.maximum_level!=bundle->mass_tow_levels.size() || !power_weapons.count(d.id) || bundle->friend_hulls.empty()) return {};
+            for (size_t i=0;i<bundle->mass_tow_levels.size();++i) {const auto &v=bundle->mass_tow_levels[i];if (v.weapon!=d.id || v.level!=i+1 || v.size_ref<=0 || v.interval<=0 || v.life<=0) return {};}
             continue;
         }
         if (d.external_id=="W17") {

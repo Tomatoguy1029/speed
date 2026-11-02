@@ -1,3 +1,4 @@
+#include "../behaviors/weapons/massTow.h"
 #include "render_builder.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/phase_controller.h"
@@ -261,6 +262,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     marlin["ids"]=marlin_ids;marlin["values"]=marlin_values;marlin["view"]=view;
     Array batches;for (auto &group:groups) if (!group.second.instances.empty()) batches.push_back(group.second.value());
     Array shapes;
+    MassTowBehavior::render(run,view,shapes);
     for (uint32_t row=0;row<state.friends.size();++row) {FriendDebrisSystem::render(run,row,view,shapes,alpha);FriendHullSystem::render(run,row,view,shapes,alpha);}
     for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);WallSystem::render(run,row,view,shapes);BlastSystem::render(run,row,view,shapes);ZoneSystem::render(run,row,view,shapes);FloodSystem::render(run,row,view,shapes);}
     for (uint32_t row=0;row<state.hostiles.size();++row) {SlashSystem::render(run,row,view,shapes);BoltSystem::render(run,row,view,shapes);LightArrowSystem::render(run,row,view,shapes);ShellSystem::render(run,row,view,shapes);}

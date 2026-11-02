@@ -92,6 +92,7 @@ var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
 var _kill_sonic_visual: RefCounted
+var _mass_tow_visual: RefCounted
 var _contact_arc_visual: RefCounted
 var _sonic_visual: RefCounted
 var _sonic_world_time := -1.0
@@ -879,6 +880,8 @@ func receive_frame(frame: Dictionary) -> bool:
 		_vortex_world_time = -1.0
 		if _kill_sonic_visual!=null: _kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+		if _mass_tow_visual!=null: _mass_tow_visual.dispose()
+		_mass_tow_visual = null
 		if _contact_arc_visual!=null: _contact_arc_visual.dispose()
 		_contact_arc_visual = null
 		if _sonic_visual!=null: _sonic_visual.dispose()
@@ -940,6 +943,13 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_kill_sonic and _kill_sonic_visual!=null:
 		_kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+	var equipped_tow: bool = frame.ui.get("mass_tow",{}).get("ready",false)
+	if equipped_tow and _mass_tow_visual==null:
+		_mass_tow_visual = preload("res://scripts/render/equipment/massTow.gd").new()
+		_mass_tow_visual.setup_frame(_layer(18),_pixel)
+	if not equipped_tow and _mass_tow_visual!=null:
+		_mass_tow_visual.dispose()
+		_mass_tow_visual = null
 	var equipped_arc: bool = frame.ui.get("contact_arc",{}).get("ready",false)
 	if equipped_arc and _contact_arc_visual==null:
 		_contact_arc_visual = preload("res://scripts/render/equipment/contactArc.gd").new()
@@ -1066,6 +1076,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		_boss_lance_visual.frame_event(event)
 		_boss_wave_visual.frame_event(event)
+		if _mass_tow_visual!=null and (event.type in [&"anchor_capture",&"anchor_fire"] or event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow"): _mass_tow_visual.frame_event(event)
+		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
+		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
 		if event.type==&"shield_stolen":
 			_shield_transfers.append({"pos":event.pos,"facing":event.facing,"r":event.r,"arc":event.arc,"life":0.3,"max":0.3})
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})
@@ -1231,6 +1244,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
+	if _mass_tow_visual!=null:
+		_mass_tow_visual.sync_frame(ui.mass_tow,ui.ship,ui.world_time)
+		_mass_tow_visual.frame_tick(world_dt)
 	if _contact_arc_visual!=null: _contact_arc_visual.frame_tick(ui.contact_arc,ui.ship,_zoom,_ship_visible)
 	var sonic_dt: float = 0.0 if _sonic_world_time<0.0 else maxf(0.0,ui.world_time-_sonic_world_time)
 	_sonic_world_time = ui.world_time if equipped_sonic else -1.0

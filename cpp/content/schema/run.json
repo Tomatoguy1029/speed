@@ -1880,6 +1880,14 @@
       {
         "name": "WaveRelease",
         "value": "wave_release"
+      },
+      {
+        "name": "AnchorCapture",
+        "value": "anchor_capture"
+      },
+      {
+        "name": "AnchorFire",
+        "value": "anchor_fire"
       }
     ],
     "ResultKind": [
@@ -2487,6 +2495,15 @@
     ],
     "wave_release": [
       "pos"
+    ],
+    "anchor_capture": [
+      "pos",
+      "to"
+    ],
+    "anchor_fire": [
+      "pos",
+      "dir",
+      "radius"
     ]
   },
   "includes": [

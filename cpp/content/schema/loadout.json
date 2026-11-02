@@ -1238,6 +1238,118 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "MassTowDefinition",
+      "section": 203,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "capture_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "follow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "size_ref",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clump_spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visible",
+          "type": "u32",
+          "min": 1
+        }
+      ]
     }
   ],
   "enums": {
