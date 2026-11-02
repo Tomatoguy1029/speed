@@ -536,6 +536,106 @@
           "ref": "LightArrowDefinition"
         }
       ]
+    },
+    {
+      "name": "CentaurusShowerDefinition",
+      "section": 328,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "pattern",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "count",
+          "type": "u32"
+        },
+        {
+          "name": "mark_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rain_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "linger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "step",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wall_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wall_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wall_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ahead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
     }
   ],
   "enums": {}

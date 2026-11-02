@@ -30,5 +30,6 @@ void CentaurusFan::step(RunRuntime &r,TechniqueState &t,double dt) {
     if (fired>=v.shots) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;cue(r,t,"recovery_started");}
 }
 bool CentaurusFan::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=std::get_if<CentaurusVolleyState>(&t.detail);return v && v->released<=rule(c,t).shots;}
-godot::Dictionary CentaurusFan::snapshot(const RunRuntime &r,const TechniqueState &t) {const auto &p=rule(*r.content,t);godot::Dictionary out;out["released"]=std::get<CentaurusVolleyState>(t.detail).released;out["interval"]=p.interval;return out;}
+godot::Dictionary CentaurusFan::snapshot(const RunRuntime &r,const TechniqueState &t) {const auto &p=rule(*r.content,t);godot::Dictionary out;out["released"]=std::get<CentaurusVolleyState>(t.detail).released;out["interval"]=p.interval;
+    if (r.state.enemy_handles.contains(t.actor)) {const auto &e=r.state.enemies[t.actor.slot];const auto *body=PhaseController::find(r,t.actor);const auto &b=*std::find_if(r.content->centaurus_bodies.begin(),r.content->centaurus_bodies.end(),[&](const auto &v){return v.body==body->definition;});out["bow_mouth"]=e.pos+godot::Vector2::from_angle(e.facing)*e.radius*b.bow_reach;}return out;}
 }

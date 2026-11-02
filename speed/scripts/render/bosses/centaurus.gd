@@ -6,6 +6,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var sail_star_color := Color("#fff6c8")
 @export var open_color := Color("#9fe8ff")
 const PARTS = preload("res://scenes/bosses/centaurus_parts.tscn")
+var _shower_visual: Node2D
 var _rain_visual: Node2D
 var _parts: Node2D
 var state := {}
@@ -42,6 +43,10 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		_rain_visual = preload("res://scripts/render/bosses/centaurus_rain.gd").new()
 		add_child(_rain_visual)
 	_rain_visual.apply_frame(attack.get("rain",{}) if int(attack.get("stage",5))==1 else {},float(body.clock))
+	if _shower_visual==null:
+		_shower_visual = preload("res://scripts/render/bosses/centaurus_shower.gd").new()
+		add_child(_shower_visual)
+	_shower_visual.apply_frame(attack.get("shower",{}) if int(attack.get("stage",5))==1 else {},body)
 	if bool(attack.get("alerting",false)) and not _alerting: pulse = 0.3
 	_alerting = bool(attack.get("alerting",false))
 	technique = attack
@@ -72,7 +77,7 @@ func _mode() -> StringName:
 	if state.mode==3: return &"final"
 	if state.mode>=4: return &"defeated"
 	if state.get("leaping",false): return &"leap"
-	if technique.get("technique","")=="rain" and int(technique.get("stage",5))==1: return &"rain"
+	if technique.get("technique","") in ["rain","shower_chase","shower_wall","shower_path"] and int(technique.get("stage",5))==1: return &"rain"
 	if technique.get("technique","") in ["rear_attack","stomp"] and int(technique.get("stage",5))==1: return &"strike"
 	return [&"windup",&"shooting",&"recovery",&"idle",&"idle",&"idle",&"idle",&"idle"][int(technique.get("stage",5))]
 
@@ -142,8 +147,14 @@ func _draw() -> void:
 			draw_line(from,end,Color(1.0,0.75 if bool(technique.alerting) else 0.95,0.6,0.8),0.8)
 	if technique.get("technique","")=="stomp" and int(technique.get("stage",5))<2:
 		var points := PackedVector2Array([to_local(technique.center)])
-		for i in 33: points.append(to_local(technique.center+Vector2.from_angle(float(state.facing)+lerpf(-float(technique.half_angle),float(technique.half_angle),i/32.0))*float(technique.range_radius)))
-		draw_colored_polygon(points,Color(DANGER if int(technique.stage)==1 else WARNING,0.2))
+		for i in 25: points.append(to_local(technique.center+Vector2.from_angle(float(state.facing)+lerpf(-float(technique.half_angle),float(technique.half_angle),i/24.0))*float(technique.range_radius)))
+		var style := EFFECT_SETTINGS.resolved_values("boss/move/centaurus/stomp","res://scenes/bosses/centaurus/stomp_visual.tscn")
+		draw_colored_polygon(points,Color(DANGER if int(technique.stage)==1 else WARNING,float(style.get("attack_opacity",0.28)) if int(technique.stage)==1 else float(style.get("warning_opacity",0.12))))
+		if int(technique.stage)==1:
+			var grow := clampf(float(technique.pose_time)/maxf(float(technique.active_duration),0.001),0.0,1.0)
+			draw_arc(to_local(technique.center),float(technique.range_radius)*grow,-float(technique.half_angle),float(technique.half_angle),24,DANGER,float(style.get("line_width",3.0)))
+	if technique.get("technique","")=="fan_volley" and _mode()==&"windup":
+		LIGHT_ARROW.draw_arrow(self,to_local(technique.bow_mouth),0.0,10.0+float(state.charge)*6.0,false,float(state.clock))
 	var r := float(state.radius)
 	var k := r / 90.0
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
@@ -164,7 +175,7 @@ func _draw() -> void:
 		draw_arc(Vector2(-14, 0), 60.0 + grow * 90.0, 0.0, TAU, 32, Color(sail_star_color, 0.8 * (1.0 - grow)), pixel_size * 2.0)
 	if pulse > 0.0:
 		draw_arc(Vector2(62, 0), 30.0 + (0.3 - pulse) * 80.0, 0.0, TAU, 20, Color(STRING, pulse * 2.5), pixel_size)
-	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain","power_shot","fan_volley"]:
+	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain","power_shot"]:
 		var pull := Vector2(62.0+cos(1.1)*26.0-float(state.charge)*34.0,0.0)
 		var power: bool = technique.get("technique","")=="power_shot"
 		var glow := DANGER if bool(technique.get("alerting",false)) else WARNING

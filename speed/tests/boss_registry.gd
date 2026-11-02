@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-centaurus-shower" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_shower")
+		return
 	if "--cpp-centaurus-fan-aim" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_fan_aim")
 		return
@@ -1350,4 +1353,147 @@ func native_centaurus_fan_aim() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_fan_aim] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func centaurus_shower_case(pattern := "chase") -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	var definition = load("res://data/bosses/centaurus.tres").duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.guard_count = 0
+	definition.params.guard_min = 0
+	definition.speed = 0.0
+	var move = load("res://data/bosses/centaurus_moves/shower_"+pattern+".tres").duplicate(true)
+	move.warn = 0.1
+	move.count = 3
+	move.count_p2 = 3 if pattern=="path" else 5
+	move.interval = 0.1
+	move.step = 0.1
+	move.mark_time = 0.15
+	move.rain_time = 0.05
+	move.linger = 0.3
+	move.recover = 0.05
+	move.cd = 0.0
+	var package: Dictionary = builder.centaurus_technique_package(definition,move,cfg)
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	if bytes.is_empty():
+		for record in builder.Schema.SCHEMA.records:
+			for row in package.records[record.name]:
+				if not builder.Schema._valid_record(row,record): print("生成入力の不一致: ",record.name," ",row)
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":158,"mode":1,"stage_id":"B_centaurus_arrow_shower","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(158,{"position":Vector2(500,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge._core.set_motion_context(Vector2(500,0),Vector2(500,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	if pattern=="path":
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+		bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp*0.6,"cause":"bullet"})
+		bridge._core.step(0.001)
+		bridge._core.step(definition.params.phase_time)
+	bridge.command("dev_ship_motion",{"position":Vector2(500,0),"velocity":Vector2.ZERO})
+	return {"bridge":bridge,"id":id,"package":package,"events":events}
+
+## 降り注ぐ矢の3配置・着弾だけの円判定・表示の残留と復帰を確認する。
+func native_centaurus_shower() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	for pattern in ["chase","wall","path"]:
+		var move = load("res://data/bosses/centaurus_moves/shower_"+pattern+".tres")
+		var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
+		check(records.CentaurusShowerDefinition.size()==2 and records.CentaurusShowerDefinition[0].pattern==["chase","wall","path"].find(pattern) and records.CentaurusShowerDefinition[0].count==move.count and records.CentaurusShowerDefinition[1].count==move.count_p2 and records.CentaurusShowerDefinition[0].linger==move.linger and records.CentaurusShowerDefinition[0].rain_time==move.rain_time and records.BossTechniqueStage.is_empty(),"3パターンの実効値と形態別の数を生成する: "+pattern)
+		check(move.make_runner()==null,"3つの制作Resourceから戦闘Runnerを分離する: "+pattern)
+	var c := centaurus_shower_case()
+	check(not c.is_empty(),"追尾の円を制作入口から型付き状態へ接続する")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
+	bridge.command("dev_ship_motion",{"position":Vector2(500,0),"velocity":Vector2(100,0)})
+	var rng: String = bridge._core.inspect().rng_state
+	bridge._core.step(0.1)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.stage==1 and t.shower.marks.size()==1 and t.shower.placed==1 and t.shower.marks[0].center.is_equal_approx(Vector2(550,0)) and t.shower.marks[0].shown and not t.shower.marks[0].landed,"warnで今の位置と速度から予測した円を1つ置く")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,1.0)
+	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0]._mode()==&"rain" and not view._boss_body_displays.values()[0]._shower_visual.groups.is_empty(),"粉の円と降る矢を正式表示へつなぐ")
+	await get_tree().process_frame
+	var held: Dictionary = bridge.checkpoint()
+	bridge.command("dev_ship_motion",{"position":Vector2(550,0),"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.15)
+	t = bridge.command("dev_boss_state").value[0]
+	var after: Dictionary = t.duplicate(true)
+	var hp_after: float = bridge._core.ship_snapshot().ship_hp
+	check(t.shower.marks[0].landed and is_equal_approx(hp-hp_after,load("res://data/bosses/centaurus_moves/shower_chase.tres").damage*load("res://data/config.tres").atk_scale),"着弾の瞬間だけ今の機体位置を円で判定して倍率を1回掛ける")
+	check(bridge.restore(held.value).ok,"開始時計・円の予告/着弾・残り配置を復帰する")
+	bridge.command("dev_ship_motion",{"position":Vector2(550,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.15)
+	check(bridge.command("dev_boss_state").value[0]==after and bridge._core.ship_snapshot().ship_hp==hp_after,"復帰後も同じ円と着弾結果になる")
+	bridge.release_checkpoint(held.value)
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp==hp_after,"着弾済みの円は無敵が解けても再び当てない")
+	bridge.command("dev_ship_motion",{"position":Vector2(1000,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.25)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==2 and t.shower.marks.is_empty() and bridge._core.hostiles_snapshot().is_empty(),"不足した配置に追いつき全円の余韻が終われば判定を閉じる")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==5,"硬直が終われば技が自然終了する")
+	check(bridge._core.inspect().rng_state==rng,"粉と矢の散らばりで戦闘乱数を消費しない")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"円の配置・着弾と独立したarrow_shower原因の通知を配信する")
+	bridge.dispose()
+	view.queue_free()
+	c = centaurus_shower_case("wall")
+	bridge = c.bridge
+	ticket = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	var marks: Array = t.shower.marks
+	check(marks.size()==3 and marks[1].center.is_equal_approx(Vector2(225,0)) and is_equal_approx(marks[0].at,0.2) and is_equal_approx(marks[1].at,0.1) and is_equal_approx(marks[2].at,0.2) and not marks[0].shown and marks[1].shown,"壁は距離割合と上下限で中心を決め、中央から外へ予告する")
+	var visual = load("res://scripts/render/bosses/centaurus_shower.gd").new()
+	add_child(visual)
+	visual.apply_frame(t.shower,bridge.command("dev_boss_body_state").value[0])
+	hp = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_cancel_technique",{"ticket":ticket})
+	bridge.command("dev_ship_motion",{"position":Vector2(225,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.2)
+	t = bridge.command("dev_boss_state").value[0]
+	visual.apply_frame({},bridge.command("dev_boss_body_state").value[0])
+	check(t.stage==7 and t.shower.marks.is_empty() and bridge._core.ship_snapshot().ship_hp==hp and not visual.groups.is_empty(),"取消で円の判定を消し、表示の矢だけは薄く残す")
+	bridge._core.step(1.0)
+	visual.apply_frame({},bridge.command("dev_boss_body_state").value[0])
+	check(visual.groups.is_empty(),"表示だけ残した矢も期限で消える")
+	bridge.dispose()
+	visual.queue_free()
+	c = centaurus_shower_case("path")
+	bridge = c.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(500,0),"velocity":Vector2(100,0)})
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	marks = t.shower.marks
+	check(marks.size()==3 and marks[1].center.is_equal_approx(Vector2(760,0)) and is_equal_approx(float(marks[2].at)-float(marks[0].at),0.2),"横切りは機体の進む向きの先を塞ぎ、端から順番に円を置く")
+	var first_center: Vector2 = marks[0].center
+	bridge._core.step(0.5)
+	bridge._core.step(0.05)
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.1)
+	marks = bridge.command("dev_boss_state").value[0].shower.marks
+	check(marks.size()==3 and marks[2].center.is_equal_approx(first_center),"横切りの配置は次の技で左右を反転する")
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.3)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_state").value[0].shower.marks.is_empty(),"参加者消失で横切りの未着弾を止める")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_shower] failures=",failed)
 	get_tree().quit(1 if failed else 0)
