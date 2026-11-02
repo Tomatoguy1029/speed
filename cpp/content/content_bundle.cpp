@@ -28,7 +28,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         Section section;uint32_t zero;
         if (!table.read_u32(section.kind) || !table.read_u32(section.version) || !table.read_u64(section.offset) ||
             !table.read_u64(section.length) || !table.read_u32(section.count) || !table.read_u32(zero) || zero ||
-            section.kind<1 || section.kind>SECTION_COUNT || !kinds.insert(section.kind).second ||
+            section.kind<1 || !kinds.insert(section.kind).second ||
             section.offset<payload_begin || section.offset>uint64_t(bytes.size()) || section.length>uint64_t(bytes.size())-section.offset) return {};
         sections.push_back(section);
     }

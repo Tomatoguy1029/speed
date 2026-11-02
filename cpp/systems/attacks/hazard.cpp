@@ -30,11 +30,12 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         }
         if (!get(state,handle)) continue;
         if (time>=state.hazards[row].delay && !hazard_act(state,handle,dt)) return true;
-        auto &current=state.hazards[row];
-        if (time<current.delay || current.hit) continue;
+        const auto &pending=state.hazards[row];
+        if (time<pending.delay || pending.hit) continue;
         if (!hazard_before_touch(state,handle)) return true;
-        if (current.zone_definition && !ZoneSystem::activate(run,handle)) {EventBuilder::flush_combat(run);return true;}
+        if (pending.zone_definition && !ZoneSystem::activate(run,handle)) {EventBuilder::flush_combat(run);return true;}
         if (!get(state,handle)) continue;
+        auto &current=state.hazards[row];
         const auto *circle=std::get_if<CircleHazard>(&current.shape);
         const ContactShape shape=circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
         if (circle) current.hit=true;

@@ -26,10 +26,13 @@ bool ZoneSystem::activate(RunRuntime &run,AttackHandle handle) {
     const double radius=std::get<CircleHazard>(hazard.shape).radius;
     const double padding=std::max(run.state.combat_config.max_enemy_radius,run.state.grid.max_radius),reach=radius+padding;
     const auto rows=CollisionQuery::enemy_rows(run.state,hazard.pos-godot::Vector2(reach,reach),hazard.pos+godot::Vector2(reach,reach));
-    for (auto row:rows) {
-        const auto &enemy=run.state.enemies[row];if (!enemy.alive || enemy.dead) continue;
+    std::vector<EnemyHandle> targets;targets.reserve(rows.size());
+    for (auto row:rows) targets.push_back(run.state.enemy_handles.at(uint32_t(row)));
+    for (auto target:targets) {
+        if (!run.state.enemy_handles.contains(target)) continue;
+        const auto &enemy=run.state.enemies[target.slot];if (!enemy.alive || enemy.dead) continue;
         const auto delta=enemy.pos-hazard.pos;if (delta.length_squared()>(radius+enemy.radius)*(radius+enemy.radius)) continue;
-        DamageRequest request;request.struck=run.state.enemy_handles.at(uint32_t(row));request.amount=hazard.enemy_damage;
+        DamageRequest request;request.struck=target;request.amount=hazard.enemy_damage;
         request.direction=delta.length_squared()>0?delta.normalized():godot::Vector2();request.cause=Cause::Chain;request.no_crit=true;request.knock=300;
         CombatResolver::damage_enemy(run,request);
         if (run.state.phase!=godot::RunState::Phase::Play) return false;

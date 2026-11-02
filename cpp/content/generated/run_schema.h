@@ -397,7 +397,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 20) return false;
+    if (out.kind > 21) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -1572,6 +1572,32 @@ inline bool read(BinaryReader &input, SoldierDefinition &out) {
     if (out.mutiny_shot < 0) return false;
     return true;
 }
+struct AurigaDefinition {
+    uint32_t id{};
+    double accel{};
+    double trail_step{};
+    double trail_time{};
+    double trail_width{};
+    double wheel_gap{};
+    double damage{};
+};
+inline bool read(BinaryReader &input, AurigaDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.trail_step)) return false;
+    if (out.trail_step < 0) return false;
+    if (!input.read_f64(out.trail_time)) return false;
+    if (out.trail_time < 0) return false;
+    if (!input.read_f64(out.trail_width)) return false;
+    if (out.trail_width < 0) return false;
+    if (!input.read_f64(out.wheel_gap)) return false;
+    if (out.wheel_gap < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -2124,6 +2150,7 @@ struct ContentRecords {
     std::vector<DolphinDefinition> DolphinDefinition_rows;
     std::vector<LynxDefinition> LynxDefinition_rows;
     std::vector<SoldierDefinition> SoldierDefinition_rows;
+    std::vector<AurigaDefinition> AurigaDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -2464,6 +2491,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { SoldierDefinition row; if (!read(input,row)) return false; out.SoldierDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 73: {
+        if (version != 1) return false;
+        if (count > input.remaining()/52) return false;
+        for (uint32_t i=0; i<count; ++i) { AurigaDefinition row; if (!read(input,row)) return false; out.AurigaDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -2686,6 +2719,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.LynxDefinition_rows) if (!LynxDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> SoldierDefinition_ids;
     for (const auto &row:data.SoldierDefinition_rows) if (!SoldierDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> AurigaDefinition_ids;
+    for (const auto &row:data.AurigaDefinition_rows) if (!AurigaDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -2776,6 +2811,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DolphinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.LynxDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.SoldierDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.AurigaDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -2920,5 +2956,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=71;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=72;
 }

@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--schema-section-ids" in OS.get_cmdline_user_args():
+		check(check_schema_section_ids(),"区画の番号と件数を分けた読込確認を最後まで実施する")
+		print("[schema_section_ids] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--assets-only" in OS.get_cmdline_user_args() or "--assets-loading-only" in OS.get_cmdline_user_args():
 		check(await check_run_assets("--assets-loading-only" in OS.get_cmdline_user_args()),"表示資源の生成・準備・取消と保持を最後まで確認する")
 		print("[run_assets] failed=%d" % failed)
@@ -1398,4 +1403,26 @@ func check_run_assets(loading_only := false) -> bool:
 	check(live.bridge!=null and live.view!=null and live._sim==null,"資源とGPU準備の後でC++と表示だけを公開する")
 	if live.bridge!=null: check(live.bridge.read_frame().value.tick==0,"準備中に戦闘の時間を消費しない")
 	live.free()
+	return true
+
+func check_schema_section_ids() -> bool:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var records: Dictionary = builder.chase_records(ContentManager.enemies[&"drifter"],ContentManager.base)
+	var bytes: PackedByteArray = schema.write_content(records,"区画番号の読込".sha256_buffer())
+	check(not bytes.is_empty(),"既知の区画を共通スキーマから生成する")
+	if bytes.is_empty(): return false
+	var maximum := 0
+	var count := int(bytes.decode_u32(16))
+	for index in count: maximum=maxi(maximum,int(bytes.decode_u32(88+32*index)))
+	print("[schema_section_ids] count=%d max_id=%d" % [count,maximum])
+	var comparison = load("res://tools/compare_runtime.gd").new()
+	var core = comparison.create_native()
+	check(core.configure_content(bytes),"件数より大きい既知IDも生成形式に従って読み込む")
+	core.close()
+	var damaged := bytes.duplicate()
+	damaged.encode_u32(88,0xffffffff)
+	var invalid = comparison.create_native()
+	check(not invalid.configure_content(resign_content(damaged,schema)),"未知IDは共通readerが拒否する")
+	invalid.close()
 	return true
