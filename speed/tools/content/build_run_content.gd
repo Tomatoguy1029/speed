@@ -77,20 +77,21 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ドラコはSourceの3形態を生成する。未登録技は生成エラーとして残す。
 static func draco_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam"]: return {}
+	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam",&"tail_sweep"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"draco","kind":4,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[]}
 	for phase in [1,2,3]:
 		var values: Dictionary = source.values().duplicate(true)
 		# Draco.rule()はSource上、形態別の値上書きを行わない。
 		var row := {}
 		for field in Schema.SCHEMA.records.filter(func(v):return v.name=="BossTechniqueDefinition")[0].fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100,&"tail_sweep":101}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values.get(key,0.0))
 		records.BossTechniqueDefinition.append(row)
 		if source.technique==&"bite": records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
+		elif source.technique==&"tail_sweep": records.DracoTailSweepDefinition.append({"id":phase,"technique":phase,"half_angle":float(values.half_angle)})
 		elif source.technique==&"tail_slam": records.DracoTailSlamDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"radius":float(values.radius)})
 		elif source.technique==&"leap": records.DracoLeapDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap)})
 		elif source.technique==&"charge": records.DracoChargeDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"overshoot":float(values.overshoot)})
@@ -98,7 +99,7 @@ static func draco_technique_records(definition: BossDef, move: BossTechnique) ->
 	return records
 
 static func draco_set_records(definition: BossDef, moves: Array) -> Dictionary:
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[]}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
@@ -161,7 +162,10 @@ static func append_draco_style(package: Dictionary, move: BossTechnique) -> void
 	var visual: Node2D = move.visual.instantiate()
 	load("res://data/visuals/effect_settings.tres").apply_to(visual)
 	var style := {}
-	for key in ["telegraph_line_width","active_line_width","telegraph_fill_opacity","telegraph_progress_opacity","telegraph_edge_opacity","motion_trail_opacity","impact_lifetime","collapse_lifetime"]: style[key] = float(visual.get(key))
+	if move.technique==&"tail_sweep":
+		for key in ["base_color","progress_color","outline_color","outline_width"]: style[key]=visual.get(key)
+	else:
+		for key in ["telegraph_line_width","active_line_width","telegraph_fill_opacity","telegraph_progress_opacity","telegraph_edge_opacity","motion_trail_opacity","impact_lifetime","collapse_lifetime"]: style[key] = float(visual.get(key))
 	visual.free()
 	var appearance := {}
 	for asset: Dictionary in package.visuals:

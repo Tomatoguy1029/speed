@@ -277,6 +277,28 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DracoTailSweepDefinition",
+      "section": 438,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0,
+          "max": 3.141592653589793
+        }
+      ]
     }
   ],
   "enums": {}

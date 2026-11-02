@@ -82,7 +82,8 @@ struct DracoStagingState {uint8_t phase=0;bool enter=false;double side=1,height=
 struct DracoChargeState {DracoStagingState staging;godot::Vector2 origin,destination,settled;bool positioned=false;};
 struct DracoLeapState {DracoStagingState staging;godot::Vector2 origin,destination,takeoff,landed;bool positioned=false;};
 struct DracoTailSlamState {godot::Vector2 origin,target;std::vector<godot::Vector2> base,lifted,last;bool fired=false;};
-struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState> move;};
+struct DracoTailSweepState {godot::Vector2 origin;double facing=0;std::vector<godot::Vector2> base,last,prior,area;};
+struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState> move;};
 struct CanisSiriusFlameState {double age=0,emit_left=0;bool started=false;};
 struct TechniqueState {
     std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState,CanisSiriusFlameState> detail;

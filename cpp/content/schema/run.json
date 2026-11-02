@@ -1535,6 +1535,10 @@
       {
         "name": "WindBlade",
         "value": "wind_blade"
+      },
+      {
+        "name": "TailSweep",
+        "value": "tail_sweep"
       }
     ],
     "VisualRole": [

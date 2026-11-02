@@ -70,6 +70,22 @@ func _draw_rift() -> void:
 func _draw_technique() -> void:
 	if attack.is_empty() or int(attack.get("stage",5))>=5 or _move_style.is_empty(): return
 	var progress: float = attack.get("windup_progress",0.0) if int(attack.get("stage",0))==0 else 1.0
+	var polygon: PackedVector2Array=attack.get("telegraph_polygon",PackedVector2Array())
+	if polygon.size()>=3:
+		var shape:=PackedVector2Array()
+		var center: Vector2=to_local(attack.telegraph_center)
+		var far:=0.0
+		for point in polygon:
+			var local:=to_local(point)
+			shape.append(local);far=maxf(far,local.distance_to(center))
+		draw_colored_polygon(shape,_move_style.base_color)
+		var circle:=PackedVector2Array()
+		for j in 64:circle.append(center+Vector2.from_angle(TAU*j/64.0)*far*progress)
+		if progress>0.0:
+			for part in Geometry2D.intersect_polygons(shape,circle):draw_colored_polygon(part,_move_style.progress_color)
+		var outline: Color=_move_style.outline_color
+		outline.a+=progress*0.4
+		draw_polyline(shape+PackedVector2Array([shape[0]]),outline,float(_move_style.outline_width),false)
 	var paths: Array = attack.get("telegraph_paths",[])
 	if paths.is_empty() and not attack.get("warning",PackedVector2Array()).is_empty(): paths=[attack.warning]
 	for warning: PackedVector2Array in paths:
