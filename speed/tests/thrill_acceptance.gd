@@ -1279,18 +1279,19 @@ func _test_cpp_diagnostic(stage: int, definition: StageDef) -> void:
 	# 自然通しの失敗で、独立した後半と終了の接続確認を飛ばさない。
 	var owner := await _cpp_open(stage)
 	if owner.bridge!=null:
+		var input: Dictionary = owner.bridge.pack_intent(Intent.new())
 		var frame: Dictionary = owner.bridge.read_frame().value
 		_cpp_choose(owner,frame)
 		for i in 1000:
 			owner.cpp_choices.poll()
-			owner.bridge.step(1.0/120.0,{}, {"logical_size":Vector2(1280,720)})
+			owner.bridge.step(1.0/120.0,input, {"logical_size":Vector2(1280,720)})
 			frame = owner.bridge.read_frame().value
 			if frame.ui.phase==RunState.Phase.PLAY: break
 			await get_tree().process_frame
 		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"invincible","args":{}}})
 		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"time","args":{"seconds":definition.boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1}}})
 		for tick in 120*50:
-			var step: Dictionary = owner.bridge.step(1.0/120.0,{}, {"logical_size":Vector2(1280,720)})
+			var step: Dictionary = owner.bridge.step(1.0/120.0,input, {"logical_size":Vector2(1280,720)})
 			if not step.ok:
 				_check(false,"時間短縮した後半の更新: "+str(step))
 				break
