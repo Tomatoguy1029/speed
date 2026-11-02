@@ -1,5 +1,6 @@
 #pragma once
 #include "entity_store.h"
+#include "combat_types.h"
 #include "../content/generated/combat_ids.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
@@ -175,10 +176,15 @@ struct HydraNeckState {
     double base_angle=0,angle=0,length=0,head_hp=0,cd=0,aim_wait=0,aim_velocity=0;
     bool has_aim=false,burned=false;
     double regrow=0;
-    godot::Vector2 aim_target;
+    godot::Vector2 aim_target,free_pos,velocity,strike_from,strike_pos,target;
+    double look_angle=0,elapsed=0,glow=0,turn=0,hit_left=0;
+    uint32_t normal=0,normal_phase=0;
+    bool locked=false,extension=false,lunge_done=false;
+    std::vector<godot::Vector2> trail;
+    double weights[6]={};
     std::vector<godot::Vector2> points;
 };
-struct HydraBodyState {bool separation_pending=false,separated=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
+struct HydraBodyState {DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
     HydraBodyState hydra;
     DracoBodyState draco;

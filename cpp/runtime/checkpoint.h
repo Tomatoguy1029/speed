@@ -3,7 +3,7 @@
 #include <unordered_map>
 
 namespace speed {
-inline constexpr uint32_t STATE_SCHEMA_VERSION=130;
+inline constexpr uint32_t STATE_SCHEMA_VERSION=131;
 struct RunCheckpoint {
     uint32_t state_schema_version=STATE_SCHEMA_VERSION;
     std::array<uint8_t,32> payload_sha256{};

@@ -196,6 +196,166 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraNormalDefinition",
+      "section": 372,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "head_kind",
+          "type": "u32",
+          "max": 4
+        },
+        {
+          "name": "aim_tracking",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "attack_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bite_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cost",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraSwimDefinition",
+      "section": 373,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "immortal",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "separation_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "immortal_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "snake_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "snake_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "snake_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bearer_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "solo_bearer_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "look_player_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "attack_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_momentum",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraNormalGate",
+      "section": 374,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "minimum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle",
+          "type": "f64"
+        },
+        {
+          "name": "half_angle",
+          "type": "f64"
+        },
+        {
+          "name": "distance_origin",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "angle_origin",
+          "type": "u32",
+          "max": 1
+        },
+        {
+          "name": "ignore_when_separated",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "enums": {

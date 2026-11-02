@@ -37,7 +37,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         if (!get(state,handle)) continue;
         auto &current=state.hazards[row];
         const auto *circle=std::get_if<CircleHazard>(&current.shape);
-        const ContactShape shape=circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
+        const ContactShape shape=std::holds_alternative<HydraShapeHazard>(current.shape)?ContactShape(Polyline{std::get<HydraShapeHazard>(current.shape).points,{},std::get<HydraShapeHazard>(current.shape).width*0.5}):circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
         if (circle) current.hit=true;
         const auto *contact=get(state,handle);if (!contact) continue;const auto &policy=contact->spec.contact;
         const auto previous=contact->ship_previous_ready?contact->ship_previous:state.ship.pos;

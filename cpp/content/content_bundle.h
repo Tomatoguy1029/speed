@@ -72,6 +72,9 @@ struct ContentBundle {
     std::vector<BossFlowForbidden> flow_forbidden;
     std::vector<HydraBodyDefinition> hydra_bodies;
     std::vector<HydraRegrowDefinition> hydra_regrow;
+    std::vector<HydraNormalDefinition> hydra_normals;
+    std::vector<HydraNormalGate> hydra_normal_gates;
+    std::vector<HydraSwimDefinition> hydra_swim;
     std::vector<CanisBodyDefinition> canis_bodies;
     std::vector<DracoBodyDefinition> draco_bodies;
     std::vector<DracoCycleDefinition> draco_cycles;

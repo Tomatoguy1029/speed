@@ -425,6 +425,52 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	var body := {"id":1,"boss":1,"enemy":row.id,"hp_floor_enabled":false}
 	for key in ["entrance_time","initial_wait","phase_threshold","phase_time","final_beam_width","final_reach","final_warn_width","final_widen_time"]:
 		if definition.id==&"draco":
+			body[key] = float(definition.params.get(key,{"entrance_time":0.0,"initial_wait":0.0,"phase_threshold":0.7,"phase_time":1.0,"final_beam_width":0.0,"final_reach":0.0,"final_warn_width":0.0,"final_widen_time":1.0}[key]))
+		else:
+			if not definition.params.has(key) and definition.id!=&"hydra": return {}
+			body[key] = float(definition.params.get(key,{"phase_threshold":0.75,"final_reach":1400.0,"final_widen_time":0.35}.get(key,0.0)))
+	data.BossBodyDefinition = [body]
+	if definition.id==&"hydra":
+		row.armor = 0.0
+		row.scaling_armor = 0.0
+		var hydra := {"id":1,"boss":1,"accel":definition.accel,"arena_x":definition.params.arena_size.x,"arena_y":definition.params.arena_size.y}
+		for name in ["bite","vortex","debris","beam","thunder","immortal"]:
+			var source: EnemyDef = load("res://data/enemies/hydra_%s.tres" % name)
+			var head: Dictionary = chase_package(source,config).records.EnemyRecord[0].duplicate(true)
+			head.id = data.EnemyRecord.size()+1
+			head.visual_id = row.visual_id
+			data.EnemyRecord.append(head)
+			data.PartDefinition.append({"id":head.id})
+			data.StringEntry.append({"id":head.id,"value":"hydra_"+name})
+			data.DefinitionIndex.append({"id":head.id,"enemy":head.id})
+			data.PopulationType.append({"id":head.id,"enemy":head.id,"rank":5,"maximum":1,"ranged":false})
+			hydra[name] = head.id
+		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="HydraBodyDefinition")[0].fields:
+			if hydra.has(field.name): continue
+			hydra[field.name] = definition.params[field.name]
+		var immortal_definition: int = hydra.immortal
+		hydra.erase("immortal")
+		data.HydraBodyDefinition = [hydra]
+		var regrow := {"id":1,"boss":1,"growth_first":float(definition.params.growth_thresholds[0]),"growth_second":float(definition.params.growth_thresholds[1])}
+		for key in ["regrow","regrow_per_head","regrow_combo","fire_regrow_scale","chance_time","growth_time","debris_dmg"]: regrow[key] = float(definition.params[key])
+		data.HydraRegrowDefinition = [regrow]
+		var swim := {"id":1,"boss":1,"immortal":immortal_definition}
+		for key in ["separation_time","immortal_hp","snake_speed","snake_turn","snake_accel","bearer_speed","solo_bearer_distance"]: swim[key] = float(definition.params[key])
+		for key in ["look_player_turn","attack_speed","lunge_momentum"]: swim[key] = float(definition.params.squad[key])
+		data.HydraSwimDefinition = [swim]
+		# 移植済み通常技だけを生成する。ほかの種類は各種類の移行で登録する。
+		var bite: BossTechnique = load("res://data/bosses/hydra_moves/bite_thrust.tres")
+		var values: Dictionary = definition.params.merged(bite.values(),true)
+		var normal := {}
+		for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
+		normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge),"hold":float(values.normal_hold),"damage":float(values.bite_dmg),"passes":1,"cuts":1},true)
+		data.BossTechniqueDefinition = [normal]
+		data.HydraNormalDefinition = [{"id":1,"technique":1,"head_kind":0,"aim_tracking":float(values.get("aim_tracking",0.0)),"attack_cd":float(values.attack_cd),"bite_radius":float(values.bite_radius),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs["bite_thrust"])}]
+		var action_rules: Resource = load("res://data/bosses/ai/hydra_action_rules.tres")
+		data.HydraNormalGate = []
+		for gate: Dictionary in action_rules.active_gates_for("bite_thrust"):
+			data.HydraNormalGate.append({"id":data.HydraNormalGate.size()+1,"technique":1,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",1.7976931348623157e308)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"distance_origin":int(gate.get("distance_origin",0)),"angle_origin":int(gate.get("angle_origin",0)),"ignore_when_separated":bool(gate.get("ignore_when_separated",false))})
+	if definition.id==&"draco":
 		var draco := {"id":1,"boss":1,"head_radius":definition.radius,"part_hp":definition.hp,"part_armor":definition.armor}
 		for key in ["body_length","body_width","head_scale","body_wave","aim_lead_cap","approach_distance"]: draco[key] = float(definition.params[key])
 		draco.entrance_quiet = float(definition.params.get("entrance_quiet",2.5))

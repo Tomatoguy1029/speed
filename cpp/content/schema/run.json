@@ -1511,6 +1511,10 @@
       {
         "name": "Blaze",
         "value": "blaze"
+      },
+      {
+        "name": "Bite",
+        "value": "bite"
       }
     ],
     "VisualRole": [

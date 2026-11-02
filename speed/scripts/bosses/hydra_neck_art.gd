@@ -50,6 +50,9 @@ func _draw() -> void:
 					draw_set_transform(neck.position-frame.position,float(neck.facing)-PI*0.5,Vector2.ONE*factor)
 					draw_texture(texture,-texture.get_size()*0.5)
 			elif neck.alive or float(neck.length)>0.0: _chain(neck.points,factor,index,false)
+		if frame.has("bearer"):
+			var bearer: Dictionary = frame.bearer
+			if not heads_only: _chain(bearer.points,factor,frame.necks.size(),true)
 		draw_set_transform(Vector2.ZERO)
 		return
 	if host == null or host.ctx == null or not host.has_body(): return

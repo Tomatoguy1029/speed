@@ -8,6 +8,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-common" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_common")
+		return
+	if "--cpp-hydra-swim" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_swim")
+		return
 	if "--cpp-canis-stream-cancel" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_stream_cancel")
 		return
@@ -3218,4 +3224,133 @@ func native_canis_stream_cancel() -> void:
 	bridge.dispose();c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_stream_cancel] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func hydra_normal_case() -> Dictionary:
+	var c := hydra_regrow_case()
+	if c.is_empty(): return c
+	var bridge = c.bridge
+	bridge._core.set_motion_context(Vector2(1600,0),Vector2.ZERO,Vector2(2500,1800))
+	bridge._core.set_run_guards({"invincible":true})
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp*0.7,"cause":"shot"})
+	bridge._core.step(0.101)
+	bridge._core.step(0.101)
+	bridge._core.step(4.0)
+	return c
+
+
+func native_hydra_common() -> void:
+	var c := hydra_normal_case()
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.size()==8,"噛みつく2本を含む実際の8本への成長を使う")
+	bridge.command("dev_ship_motion",{"position":body.necks[0].position,"velocity":Vector2.ZERO})
+	var first: Dictionary = bridge.command("dev_boss_technique",{"entity_id":body.necks[0].id,"definition":1})
+	bridge.command("dev_ship_motion",{"position":body.necks[5].position,"velocity":Vector2.ZERO})
+	var second: Dictionary = bridge.command("dev_boss_technique",{"entity_id":body.necks[5].id,"definition":1})
+	check(first.ok and second.ok and first.value!=second.value,"並行する首の噛みつきが別々の技チケットを持つ")
+	for _tick in 65: bridge._core.step(0.01)
+	body = bridge.command("dev_boss_body_state").value[0]
+	var observed: Array = bridge.command("dev_boss_state").value
+	check(body.necks[0].locked and body.necks[5].locked and observed.filter(func(t): return t.kind==64 and t.stage<5).size()==2,"共通処理の狙い固定と観測を首ごとに保つ")
+	check(bridge.command("dev_cancel_technique",{"ticket":first.value}).ok,"一方の噛みつきを途中で取り消す")
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[0].mode=="idle" and body.necks[5].mode=="bite_thrust" and not body.boss_dead,"取消が並行首と勝利状態へ漏れない")
+	var old: int = body.necks[0].id
+	var body_hp: float = body.hp
+	bridge.command("dev_damage",{"entity_id":old,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(1.8)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[0].alive and body.necks[0].id!=old and body.hp==body_hp and not body.boss_dead,"首の破壊・再生は新IDと独立HPを保ち本体勝利にしない")
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"})
+	bridge._core.step(0.001)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.separated and body.necks.size()==8 and body.necks.all(func(n): return n.alive) and not body.boss_dead,"瓦礫を壊す実経路で全首を回復して分離する")
+	bridge._core.step(1.21)
+	bridge._core.step(4.0)
+	body = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_ship_motion",{"position":body.necks[0].position+Vector2(200,0),"velocity":Vector2.ZERO})
+	var split: Dictionary = bridge.command("dev_boss_technique",{"entity_id":body.necks[0].id,"definition":1})
+	check(split.ok,"分離後も同じ登録済み噛みつきを開始する")
+	for _tick in 65: bridge._core.step(0.01)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[0].locked and body.necks[0].mode=="bite_thrust" and not body.effects.is_empty(),"分離した首の伸長と点列の判定を共通技から出す")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"分離した噛みつきの狙い・伸長・残留形状を保持する")
+	bridge._core.step(0.04)
+	var expected: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(bridge.restore(held.value).ok,"分離後の攻撃途中へ値で戻す")
+	bridge._core.step(0.04)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"復帰後も首ごとの進行と形状が一致する")
+	bridge.release_checkpoint(held.value)
+	bridge.command("dev_cancel_technique",{"ticket":split.value})
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.mode==5 and not body.boss_dead and body.effects.is_empty(),"分離後の途中取消も本体勝利を誤発火しない")
+	bridge.dispose()
+	print("[cpp_hydra_common] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+
+func native_hydra_swim() -> void:
+	var c := hydra_normal_case()
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":body.necks[0].id,"amount":1000.0,"cause":"shot"})
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"})
+	bridge._core.step(0.001)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.separated and body.participants.size()==10 and body.bearer.alive and body.necks.all(func(n): return n.alive and is_equal_approx(n.hp,n.max_hp)),"実分離で全首と不死首の所有・HPを作る")
+	var before := body.duplicate(true)
+	bridge._core.step(0.1)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.position==before.position and body.necks[0].position==before.necks[0].position and body.separation_left<before.separation_left,"分離演出中は保護して位置の更新を止める")
+	bridge._core.step(1.2)
+	bridge._core.step(0.025)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.bearer.velocity.length()>0 and body.bearer.points.size()>8 and body.bearer.points[-1].distance_to(body.bearer.position)<0.001,"不死首が操舵し、胴体の先端が確定した頭に一致する")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.025)
+	var expected: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"分離の時計・速度・履歴・姿勢を保持して戻す")
+	bridge._core.step(0.025)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"泳ぎの途中復帰後の軌道と点列が一致する")
+	bridge.release_checkpoint(held.value)
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,c.cfg.character_scale)
+	var render: Dictionary = bridge.read_render(Rect2(-2500,-1800,5000,3600)).value
+	check(view.apply_frame(render),"分離後の蛇と不死首を正式素材へ表示する")
+	var display = view._boss_body_displays.values()[0]
+	check(display.get_node("NeckArtwork").frame.has("bearer") and display.get_node("NeckArtwork").immortal!=null,"不死首と尾の素材を読み取り専用点列へ渡す")
+	var snapshot: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	view.apply_frame(render)
+	bridge._core.step(0.0)
+	check(bridge.command("dev_boss_body_state").value[0]==snapshot,"表示と世界停止は泳ぎの状態を更新しない")
+	body = snapshot
+	var dead_head: int = body.necks[0].id
+	bridge.command("dev_damage",{"entity_id":dead_head,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(5.0)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[0].alive and not body.boss_dead,"分離後に落とした首は再生しない")
+	var bearer_id: int = body.bearer.id
+	bridge.command("dev_damage",{"entity_id":bearer_id,"amount":1.0,"cause":"shot"})
+	bridge._core.step(0.025)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.hp==body.bearer.hp and body.hp<snapshot.hp,"不死首の独立HPだけを本体の表示HPへ同期する")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.mode==5 and not body.has("arena") and not body.bearer.alive and body.necks.all(func(n): return not n.alive) and not body.boss_dead,"途中取消で囲い・蛇・不死首を終了する")
+	view.queue_free();bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_hydra_swim] failures=",failed)
 	get_tree().quit(1 if failed else 0)
