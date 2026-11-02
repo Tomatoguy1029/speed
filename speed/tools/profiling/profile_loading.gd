@@ -25,7 +25,6 @@ func _measure() -> void:
 	_runs = root.get_node("RunManager")
 	root.get_node("SaveManager").data = root.get_node("SaveManager").default_data()
 	_manager.boot_request = Callable()
-	_runs.session_created.connect(func(session): session.sim.options.seed = 1029)
 	var main := (load("res://scenes/app/main.tscn") as PackedScene).instantiate()
 	root.add_child(main)
 	await process_frame
@@ -42,7 +41,7 @@ func _measure() -> void:
 		var begin := Time.get_ticks_usec()
 		if attempt == 0: _manager.start_run(_options.stage)
 		else: _manager.retry_run()
-		while _runs.current() == null or _runs.current().sim.state == null: await process_frame
+		while _runs.current() == null or _runs.current().bridge == null: await process_frame
 		var session = _runs.current()
 		var started_us := Time.get_ticks_usec()
 		while _manager.screen_transition_active: await process_frame
@@ -52,10 +51,17 @@ func _measure() -> void:
 			"interactive_ms": (Time.get_ticks_usec() - begin) / 1000.0,
 			"phases": session.loading_timings.duplicate()}
 		# 最初のカードを即時要求し、資源の準備待ちと最初の実プレイのフレームも観測する。
-		while session.sim.state.cards.is_empty(): await process_frame
+		var cards: Dictionary = session.bridge.read_frame().value.ui.cards
+		while cards.get("candidates",[]).is_empty():
+			await process_frame
+			cards = session.bridge.read_frame().value.ui.cards
 		var choice_us := Time.get_ticks_usec()
-		session.sim.command(&"choose_card", {"index": 0})
-		while session.sim.state.start_pick: await process_frame
+		var chosen: Dictionary = session.bridge.command("choose_card", {"offer_id":cards.offer_id,"candidate_id":cards.candidates[0].candidate_id})
+		if not chosen.ok:
+			push_error("ロード計測の初回候補を選べませんでした: "+str(chosen))
+			quit(1)
+			return
+		while session.bridge.read_frame().value.ui.cards.offer_id==cards.offer_id: await process_frame
 		await RenderingServer.frame_post_draw
 		result["first_choice_ms"] = (Time.get_ticks_usec() - choice_us) / 1000.0
 		var frames := []
