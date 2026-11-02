@@ -865,6 +865,58 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "ReticleDefinition",
+      "section": 76,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "break_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "exit_margin",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "follow_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "follow_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "small_r",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

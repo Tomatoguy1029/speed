@@ -42,6 +42,7 @@ Dictionary RenderBatchBuffer::value() {
     if (!dolphin.is_empty()) out["dolphin"]=dolphin;
     if (!lynx.is_empty()) out["lynx"]=lynx;
     if (!soldier.is_empty()) out["soldier"]=soldier;
+    if (!reticle.is_empty()) out["reticle"]=reticle;
     if (!battleship.is_empty()) out["battleship"]=battleship;
     if (!missile.is_empty()) out["missile"]=missile;
     if (!beamer.is_empty()) out["beamer"]=beamer;
@@ -67,7 +68,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     auto &groups=run.render_workspace.batches;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
-        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();
+        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();
     }
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
@@ -90,6 +91,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         if (definition.kind==EnemyDefinition::Kind::Gunner && enemy.charge>0) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.gunner.push_back(value);
+        }
+        if (definition.kind==EnemyDefinition::Kind::Reticle) {
+            const auto &target=std::get<ReticleState>(enemy.behavior_state);const bool valid=enemy.mode==EnemyMode::Windup && state.enemy_handles.contains(target.rock);
+            const auto at=valid?state.enemies[target.rock.slot].pos:Vector2();const double radius=valid?state.enemies[target.rock.slot].radius:0;const auto color=definition.color.lightened(0.2);
+            for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge),color.r,color.g,color.b,float(valid),at.x,at.y,float(radius)}) enemy_batch.reticle.push_back(value);
         }
         if (definition.kind==EnemyDefinition::Kind::Soldier) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.mode),float(enemy.charge),float(0.5+0.5*std::sin(state.world_time*30.0+double(enemy.id)))}) enemy_batch.soldier.push_back(value);

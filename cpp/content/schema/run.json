@@ -868,7 +868,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 22
+          "max": 23
         },
         {
           "name": "turn",
@@ -1670,6 +1670,10 @@
       {
         "name": "CriticalLanceHit",
         "value": "critical_lance_hit"
+      },
+      {
+        "name": "RockBreak",
+        "value": "rock_break"
       }
     ],
     "ResultKind": [
@@ -2132,6 +2136,14 @@
       "pos",
       "radius",
       "direction"
+    ],
+    "rock_break": [
+      "pos",
+      "r",
+      "meteor_index",
+      "facing",
+      "dir",
+      "color"
     ]
   },
   "includes": [

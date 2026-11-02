@@ -18,6 +18,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
     if (def.kind==EnemyDefinition::Kind::Auriga) enemy.behavior_state=AurigaState{};
     if (def.kind==EnemyDefinition::Kind::Clock) enemy.behavior_state=ClockState{};
+    if (def.kind==EnemyDefinition::Kind::Reticle) enemy.behavior_state=ReticleState{};
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
@@ -76,7 +77,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     if (!run.state.enemy_handles.contains(handle)) return false;
     const auto &enemy=run.state.enemies[handle.slot];
     const auto &definition=run.content->definitions[enemy.definition];
-    if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock) return true;
+    if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle) return true;
     if (definition.kind==EnemyDefinition::Kind::Dolphin) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
     return enemy.fire_t<=definition.attack_telegraph+dt;
@@ -101,6 +102,10 @@ EnemyHandle EnemySystem::insert(godot::RunState &state, uint32_t slot, const god
 }
 void EnemySystem::leave_hound(godot::RunState &state,size_t row) {
     GroupSystem::leave(state,state.enemy_handles.at(uint32_t(row)));
+}
+bool EnemySystem::mark_dead(RunRuntime &run,EnemyHandle handle) {
+    auto &state=run.state;if (!state.enemy_handles.contains(handle) || state.enemies[handle.slot].dead) return false;
+    state.enemies[handle.slot].dead=true;state.dead_rows.push_back(handle.slot);AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);leave_hound(state,handle.slot);return true;
 }
 bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason) {
     auto &state=run.state;

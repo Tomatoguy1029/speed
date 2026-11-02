@@ -10,6 +10,7 @@
 #include "../behaviors/enemies/marlin.h"
 #include "../behaviors/enemies/pulser.h"
 #include "../behaviors/enemies/dolphin.h"
+#include "../behaviors/enemies/reticle.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -221,6 +222,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::AurigaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Clock) {
                 speed::ClockBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Reticle) {
+                speed::ReticleBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Dolphin) {
                 speed::DolphinBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Pulser) {

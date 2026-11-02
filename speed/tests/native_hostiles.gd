@@ -16,6 +16,11 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-reticle" in OS.get_cmdline_user_args():
+		await check_cpp_reticle()
+		print("[cpp_reticle] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-clock" in OS.get_cmdline_user_args():
 		await check_cpp_clock()
 		print("[cpp_clock] failed=%d" % failed)
@@ -1405,5 +1410,105 @@ func check_cpp_clock() -> void:
 	core.configure_attack_budget({"enabled":false,"budget":1.0,"jitter":0.0})
 	core.step(0.1)
 	check(core.hazards_snapshot().size()==2,"参照相手が先に消えても古い行を追わず針を出す")
+	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func check_cpp_reticle() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 1200.0
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 92
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["reticle","telescope"])
+	stage.enemy_tuning = {"reticle":{"speed":0.0,"params.aim_time":0.2,"params.break_interval":0.3,"params.small_r":90.0,"params.exit_margin":20.0},"telescope":{"speed":0.0}}
+	var output := "res://.content/dev/run_reticle"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"レチクル座の遮蔽岩の破壊".sha256_text())
+	check(built==OK,"レチクル座の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_92.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":929},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"レチクル座のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var tel_position := target-Vector2(600,0)
+	var telescope_id: int = core.spawn_enemy(&"telescope",tel_position,{"facing":0.0})
+	core.set_enemy_motion(telescope_id,{"held":true})
+	var position := tel_position+Vector2(-30,-150)
+	var id: int = core.spawn_enemy(&"reticle",position,{})
+	bridge.command("dev_add_rock",{"position":target-Vector2(220,0),"kind":0,"manual":true})
+	bridge.command("dev_add_rock",{"position":target-Vector2(200,300),"kind":0,"manual":true})
+	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
+	var rocks: Array = bridge.command("dev_field_query",{"action":"rocks"}).value
+	var rock: int = rocks[0].enemy_id
+	var outside: int = rocks[1].enemy_id
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and not dolphin_enemy(core,rock).dead,"予算0では遮蔽岩へ照準を始めない")
+	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.WINDUP and pulse_motion(core,id).target_id==rock and is_equal_approx(pulse_motion(core,id).timer,0.2),"望遠鏡のレンズと機体の間の小隕石だけを狙う")
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	core.step(0.1)
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(900,400),Vector2(1800,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var warning := false
+	for batch: Dictionary in frame.batches:
+		if batch.has("reticle"): warning = batch.reticle.size()==12 and batch.reticle[8]==1.0
+	check(warning and presentation.frame_view.apply_frame(frame),"岩の四隅と本体からの照準線を通常画面へ表示する")
+	await get_tree().process_frame
+	var kills: int = core.combat_snapshot().kills
+	var xp: float = core.pickups_snapshot().xp_dropped
+	var ship_hp: float = core.ship_snapshot().ship_hp
+	core.step(0.11)
+	check(dolphin_enemy(core,rock).dead and not dolphin_enemy(core,outside).dead and pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and pulse_motion(core,id).fire_t==0.3,"予告後に狙った岩だけを破壊して編集値の間隔へ戻る")
+	check(core.combat_snapshot().kills==kills and core.pickups_snapshot().xp_dropped==xp and core.ship_snapshot().ship_hp==ship_hp,"岩の破壊を撃破・経験値・機体ダメージへ数えない")
+	var output_frame: Dictionary = bridge.read_frame().value
+	check(output_frame.events.any(func(event): return event.type==&"beam") and output_frame.events.any(func(event): return event.type==&"rock_break"),"ビームと岩の破片を共通イベントへ渡す")
+	presentation.frame_view.receive_frame(output_frame)
+	presentation.frame_view.update_effects(output_frame,0.0)
+	check(not presentation.frame_view._mutiny_beams.is_empty() and not presentation.frame_view._meteor_shards.is_empty(),"発射した光線と岩の破片を通常画面へ表示する")
+	await get_tree().process_frame
+	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
+	rocks = bridge.command("dev_field_query",{"action":"rocks"}).value
+	check(rocks[0].destroyed and rocks[0].enemy_id==0,"破壊した岩は配置元でも破壊済みとなり再出現しない")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"狙う岩Handle・時計・支援状態を値から復帰する")
+	core.step(0.21)
+	var future: Array = core.enemy_motion_snapshot()
+	bridge.restore(pending.value)
+	core.step(0.21)
+	check(core.enemy_motion_snapshot()==future,"復帰後も同じ岩を破壊し保持元へ変更を漏らさない")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":rock,"cause":"bullet"})
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and not pulse_motion(core,id).target_alive,"照準中の岩を先に壊すと発射を取り消す")
+	bridge.restore(pending.value)
+	core.remove_enemy(telescope_id)
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.DASH and not dolphin_enemy(core,rock).dead,"支援先を先に消すと岩を撃たず退却する")
+	var kills_before_exit: int = core.combat_snapshot().kills
+	bridge.command("dev_relocate",{"entity_id":id,"position":target-Vector2(700,0)})
+	core.step(0.1)
+	check(dolphin_enemy(core,id).dead and core.combat_snapshot().kills==kills_before_exit,"画面外で離れる支援機を撃破に数えず退場させる")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step(0.3)
+	check(not dolphin_enemy(core,rock).dead,"予告中の本体撃破では岩を破壊しない")
+	core.remove_enemy(id)
+	var replacement: int = core.spawn_enemy(&"reticle",position,{})
+	check(replacement!=id and pulse_motion(core,replacement).target_id==0 and pulse_motion(core,replacement).charge==0.0,"行の再利用で古い岩と照準を引き継がない")
 	bridge.release_checkpoint(pending.value)
 	session.free()

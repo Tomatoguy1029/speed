@@ -66,6 +66,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         if (e->parent_id) {row["parent_id"]=e->parent_id;row["parent_alive"]=runtime.state.enemy_handles.contains(e->parent) && !runtime.state.enemies[e->parent.slot].dead;}
         if (!e->parts.empty()) row["parts_alive"]=int64_t(speed::EnemySystem::parts_alive(runtime.state,runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id)))));
         if (const auto *sniper=std::get_if<speed::SniperState>(&e->behavior_state)) {PackedFloat32Array rays;for (float value:sniper->rays) rays.push_back(value);row["sight_rays"]=rays;}
+        if (const auto *reticle=std::get_if<speed::ReticleState>(&e->behavior_state)) {row["target_id"]=reticle->rock_id;row["target_alive"]=runtime.state.enemy_handles.contains(reticle->rock) && !runtime.state.enemies[reticle->rock.slot].dead;}
         if (const auto *clock=std::get_if<speed::ClockState>(&e->behavior_state)) {row["spin"]=e->spin;godot::PackedInt64Array hands;for (auto hand:clock->hands) {const auto *record=speed::AttackSystem::get(runtime.state,hand);hands.push_back(record?record->id:0);}row["hands"]=hands;}
         if (const auto *soldier=std::get_if<speed::SoldierState>(&e->behavior_state)) {row["king_id"]=soldier->king_id;row["slot"]=soldier->slot;row["formation_anchor"]=soldier->formation.anchor;}
         if (const auto *lynx=std::get_if<speed::LynxState>(&e->behavior_state)) row["buds"]=lynx->buds;

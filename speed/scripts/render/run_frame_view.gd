@@ -35,6 +35,7 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _reticle := PackedFloat32Array()
 var _soldier := PackedFloat32Array()
 var _mutiny_beams: Array[Dictionary] = []
 var _lynx := PackedFloat32Array()
@@ -143,6 +144,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/reticle.gd").draw_frame(canvas,_reticle,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/soldier.gd").draw_frame(canvas,_soldier,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/lynx.gd").draw_frame(canvas,_lynx,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/dolphin.gd").draw_frame(canvas,_dolphin,1.0/maxf(_zoom,0.01))
@@ -257,6 +259,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.beamer is PackedFloat32Array or row.beamer.size()%10!=0: return false
 			for value: float in row.beamer:
 				if not is_finite(value): return false
+		if row.has("reticle"):
+			if not row.reticle is PackedFloat32Array or row.reticle.size()%12!=0: return false
+			for value: float in row.reticle:
+				if not is_finite(value): return false
 		if row.has("soldier"):
 			if not row.soldier is PackedFloat32Array or row.soldier.size()%7!=0: return false
 			for value: float in row.soldier:
@@ -344,6 +350,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	var previous_beamer := _beamer
 	var previous_missile := _missile
 	var previous_battleship := _battleship
+	var previous_reticle := _reticle
 	var previous_soldier := _soldier
 	var previous_lynx := _lynx
 	var previous_dolphin := _dolphin
@@ -352,6 +359,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	_beamer = PackedFloat32Array()
 	_missile = PackedFloat32Array()
 	_battleship = PackedFloat32Array()
+	_reticle = PackedFloat32Array()
 	_soldier = PackedFloat32Array()
 	_lynx = PackedFloat32Array()
 	_dolphin = PackedFloat32Array()
@@ -361,12 +369,13 @@ func apply_frame(frame: Dictionary) -> bool:
 		if row.has("beamer"): _beamer.append_array(row.beamer)
 		if row.has("missile"): _missile.append_array(row.missile)
 		if row.has("battleship"): _battleship.append_array(row.battleship)
+		if row.has("reticle"): _reticle.append_array(row.reticle)
 		if row.has("soldier"): _soldier.append_array(row.soldier)
 		if row.has("lynx"): _lynx.append_array(row.lynx)
 		if row.has("dolphin"): _dolphin.append_array(row.dolphin)
 		if row.has("sniper"): _sniper.append_array(row.sniper)
 	# 描画命令はCanvasItemが保持する。変わらない予告は再構築しない。
-	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin or _lynx!=previous_lynx or _soldier!=previous_soldier: _gunner_marks.queue_redraw()
+	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin or _lynx!=previous_lynx or _soldier!=previous_soldier or _reticle!=previous_reticle: _gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	var packed_bytes := 0
@@ -677,7 +686,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})
 		if event.type==&"shield_block":
 			_rings.append({"pos":event.pos,"radius":float(frame.ui.ship_radius)*3.0,"color":Color("#bcefff"),"life":0.18,"max":0.18})
-		if event.type==&"kill" and event.get("enemy_type")==&"meteor":
+		if (event.type==&"kill" and event.get("enemy_type")==&"meteor") or event.type==&"rock_break":
 			var frames: SpriteFrames = _scope.resources.get("res://.content/meteor_pieces.res")
 			if frames!=null:
 				var animation := StringName("meteor_%d" % (posmod(int(event.meteor_index),2)+1))
@@ -686,6 +695,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 					var offset: Vector2 = (texture.get_meta("offset") as Vector2).rotated(event.facing)
 					_meteor_shards.append({"texture":texture,"pos":event.pos+offset*0.35,"vel":offset.normalized()*100.0+event.dir*60.0,
 						"angle":event.facing,"spin":-1.5 if i%2==0 else 1.5,"life":0.65})
+		if event.type==&"rock_break":
+			_burst(event.pos,event.color,10,300.0,event.dir)
+			_rings.append({"pos":event.pos,"radius":event.r*1.2,"color":Color(1.0,0.95,0.6),"life":0.2,"max":0.2})
 		if event.type==&"beam":
 			var life: float = event.get("life",0.4)*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_mutiny_beams.append({"from":event.from,"to":event.to,"width":event.width,"life":life,"max":life,"color":event.get("color",Color(1,0.95,0.6))})
