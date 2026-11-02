@@ -61,11 +61,13 @@ struct CanisSiriusState {uint32_t shot=0;double age=0,gap_left=0;bool fired=fals
 struct CanisPounceState {uint32_t definition=0;int64_t left=1;double stage_time=0,warn_time=0;bool jumping=false,done=false;};
 struct CanisBayMember {EnemyHandle actor;double angle=0,phase=0,cool=0,bark=0,warn=-1;AttackHandle lunge;bool nipping=false;};
 struct CanisBayState {std::vector<CanisBayMember> members;CanisPounceState jump;double heading=0;bool jumping=false;};
+struct CanisBlazeChosen {EnemyHandle actor;double at=0;bool sent=false,lit=false;};
+struct CanisBlazeState {std::vector<CanisBlazeChosen> chosen;double age=0;};
 struct CanisSequenceItem {EnemyHandle actor;double mark=0,launch=0;bool marked=false,launched=false;};
 struct CanisHowlState {bool formed=false;double last_launch=0;std::vector<CanisSequenceItem> sequence;};
 struct CanisCommandState {std::vector<EnemyHandle> warned;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;
@@ -113,7 +115,9 @@ struct CentaurusBodyState {
 };
 struct CanisHoundRef {EnemyHandle actor;double base_hp=0;godot::Color color;};
 struct CanisRingMember {EnemyHandle actor;double angle=0;};
+struct CanisBurningHound {EnemyHandle actor;uint32_t definition=0,technique=0;double base_hp=0,age=0,blink_age=-1;godot::Color color;};
 struct CanisBodyState {
+    std::vector<CanisBurningHound> burning;
     std::vector<CanisRingMember> ring;
     godot::Vector2 ring_center;
     double ring_started=-1,ring_tick_at=0;

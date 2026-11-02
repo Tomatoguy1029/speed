@@ -32,6 +32,9 @@ func _ready() -> void:
 	if "--cpp-centaurus-sail" in OS.get_cmdline_user_args() or "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_sail")
 		return
+	if "--cpp-canis-blaze" in OS.get_cmdline_user_args():
+		await native_canis_blaze()
+		return
 	if "--cpp-canis-bay" in OS.get_cmdline_user_args():
 		await native_canis_bay()
 		return
@@ -2913,4 +2916,84 @@ func native_draco_body() -> void:
 	view.free()
 	bridge.dispose()
 	print("[B_draco_body] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 点火後の猟犬を技と別の寿命で更新し、爆発・解除・表示まで照合する。
+func native_canis_blaze() -> void:
+	var c := canis_move_case("blaze",{"warn":0.3,"count":2,"min_hounds":2,"ignite_at":0.2,"ignite_step":0.1,"run_speed":40.0,"stop_dist":120.0,"max_run":0.5,"blink":0.2,"explode_radius":100.0,"damage":7.0,"recover":0.05},false,{"pack_size":4,"lead_scan":0.01})
+	check(not c.is_empty(),"燃える猟犬の全編集値と炎の表示資源を生成する")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	var observed: Array = []
+	bridge.subscribe("記録確認",func(packet): observed.append_array(packet.events); return true)
+	check(c.move.make_runner()==null and c.package.records.CanisBlazeDefinition.size()==2 and c.package.records.CanisBlazeDefinition[0].turn_fast==load("res://data/bosses/canis_major_moves/bay.tres").turn_fast and c.package.records.CanisFlameDefinition[4].duration==0.1,"編集Resourceを分け、Bayから借りる操舵と点火間隔も生成する")
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(started.ok,"制作入口から燃える猟犬だけを発動する")
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.chosen.size()==2 and t.chosen[0].at==0.2 and is_equal_approx(t.chosen[1].at,0.3),"近い猟犬に順番ごとの点火時刻を割り当てる")
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.chosen[0].sent and not t.chosen[0].lit and not t.chosen[1].sent,"点火の1間隔前にだけ口元からの火の移送を始める")
+	var pending: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.11)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.burning.size()==1 and body.led.size()==3 and body.burning[0].age==0.11,"点火した猟犬を隊形から外し同じtickの炎更新で走行時計を進める")
+	var burning: Dictionary = body.burning[0]
+	var cfg = load("res://data/config.tres")
+	check(is_equal_approx(burning.max_hp,cfg.base_attack*cfg.atk_scale*0.5),"点火した猟犬の最大HPを体当たり基準の半分へ変える")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var display = c.view._boss_body_displays.values()[0]
+	check(display.flames.displays.has("猟犬:%d" % burning.actor) and display.flames.displays.has("口元の点火"),"正式表示へ猟犬の炎と点火中の口元を渡す")
+	var active: Dictionary = bridge.checkpoint()
+	check(active.ok,"点火済みの猟犬・元のHP・個別時計を保持する")
+	bridge._core.step(0.1)
+	var after: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(after.burning.size()==2 and after.led.size()==2 and bridge.command("dev_boss_state").value[0].stage==2,"2体目の点火で技は硬直へ移り燃える猟犬は本体側へ残す")
+	check(bridge.restore(active.value).ok,"点火途中へ復帰する")
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"復帰後も点火順・隊形からの除外・走行を一致させる")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].burning.size()==2,"技の自然終了後も点火済みの猟犬は残る")
+	bridge.restore(active.value)
+	bridge.command("dev_cancel_technique",{"ticket":started.value})
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].burning.size()==1,"取消は未点火の予定だけを止め点火済みの猟犬を残す")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	var restored: Array = bridge.read_lab().value.enemies.filter(func(e): return e.id==burning.actor)
+	check(bridge.command("dev_boss_body_state").value[0].burning.is_empty() and restored.size()==1 and is_equal_approx(restored[0].max_hp,burning.base_hp),"本体の終了で点火を解除し元の最大HPへ戻す")
+	bridge.restore(active.value)
+	bridge.command("dev_cancel_technique",{"ticket":started.value})
+	bridge.command("dev_relocate",{"entity_id":burning.actor,"position":Vector2(2000,0)})
+	bridge._core.step(0.01)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.burning.size()==1 and is_equal_approx(body.burning[0].blink_age,0.01),"機体の近くで明滅を始め同じtickから明滅時計を進める")
+	var blinking: Dictionary = bridge.checkpoint()
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.2)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.burning.is_empty() and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*cfg.atk_scale),"明滅の期限に円判定で1回ダメージを与え猟犬自身を死亡させる")
+	check(observed.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="blaze" and e.payload.technique=="blaze"),"爆発の原因と発動元の技を共通記録へ渡す")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	c.view.update_effects(bridge.read_frame().value,0.0)
+	display = c.view._boss_body_displays.values()[0]
+	display.apply_frame(body,{})
+	check(not display.flames.bursts.is_empty() and display.flames.displays.keys().any(func(k): return str(k).begins_with("爆発:")),"猟犬が死亡した後も爆発の炎は表示寿命まで残す")
+	check(bridge.restore(blinking.value).ok,"明滅途中へ復帰する")
+	bridge.command("dev_remove",{"entity_id":burning.actor})
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].burning.is_empty() and not bridge.command("dev_boss_body_state").value[0].boss_dead,"燃える猟犬だけの消失では爆発も本体死亡も起こさない")
+	bridge.restore(active.value)
+	bridge.command("dev_cancel_technique",{"ticket":started.value})
+	bridge._core.step(0.4)
+	check(bridge.command("dev_boss_body_state").value[0].burning.is_empty(),"走行時間の上限からも明滅と爆発へ進む")
+	bridge.restore(pending.value)
+	bridge.command("dev_remove",{"entity_id":t.chosen[0].actor})
+	bridge._core.step(0.11)
+	check(bridge.command("dev_boss_body_state").value[0].burning.is_empty(),"未点火の参加者が消失したときは点火しない")
+	for held in [pending,active,blinking]: bridge.release_checkpoint(held.value)
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"点火・明滅・爆発と表示用通知を同じ共通配信へ渡す")
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_blaze] failures=",failed)
 	get_tree().quit(1 if failed else 0)

@@ -3,6 +3,10 @@ extends Node2D
 const FIRE := preload("res://scripts/bosses/canis_major/pixel_fire_display.gd")
 const COMPONENTS := preload("res://scripts/render/fx/visual_effect_components.gd")
 var presets := {}
+var burning_preset: PixelFireSettings
+var burst_presets := {}
+var bursts := {}
+var _burst_serial := 0
 var trail_preset: PixelFireSettings
 var displays := {}
 var fading := {}
@@ -11,12 +15,18 @@ func setup(scope: ContentResourceScope, assets: Dictionary) -> void:
 	top_level = true
 	for asset: Dictionary in assets.values():
 		if asset.has("canis_flame"): presets[int(asset.canis_flame)] = COMPONENTS.fire("boss/move/canis_major/"+("sirius" if "jet" in asset.path else "blaze" if "ignite" in asset.path else "sirius_flame"),scope.resources[asset.path])
+		if asset.get("canis_burning",false): burning_preset = COMPONENTS.fire("boss/move/canis_major/blaze",scope.resources[asset.path])
+		if asset.has("canis_burst"): burst_presets[int(asset.canis_burst)] = COMPONENTS.fire("boss/move/canis_major/blaze",scope.resources[asset.path])
 		if asset.get("canis_trail",false): trail_preset = COMPONENTS.fire("boss/move/canis_major/sirius",scope.resources[asset.path])
 func clear() -> void:
 	for display in displays.values(): display.queue_free()
 	displays.clear()
 	fading.clear()
+	bursts.clear()
 func frame_event(event: Dictionary) -> void:
+	if event.type==&"canis_cue" and event.get("cue","")=="blaze_explode":
+		_burst_serial += 1
+		bursts[_burst_serial] = {"pos":event.position,"radius":event.radius,"profile":event.profile,"started":float(event.world_time)-float(event.get("age",0.0))}
 	if event.type==&"canis_ignite_arrived":
 		var effect: Dictionary = event.duplicate(true)
 		effect.started = _clock
@@ -38,7 +48,7 @@ func _transfer(effect: Dictionary, progress: float) -> Array:
 		var p := clampf(progress-k*0.045,0.0,1.0)
 		samples.append({"pos":effect.from+to*p+side*sin(p*PI)*minf(60.0,to.length()*0.15),"radius":lerpf(22.0,8.0,k/4.0),"seed":k})
 	return samples
-func apply_frame(rows: Array, clock: float) -> void:
+func apply_frame(rows: Array, clock: float, burning: Array = [], mouth: Dictionary = {}) -> void:
 	if _clock>clock: clear()
 	_clock = clock
 	var seen := {}
@@ -71,6 +81,29 @@ func apply_frame(rows: Array, clock: float) -> void:
 		var key := "点火:%d" % id
 		seen[key] = true
 		_cloud(key,preset,_transfer({"from":event.from,"to":event.pos},1.0),clock,0.0,1.0-smoothstep(0.0,preset.lifetime,clock-float(event.started)))
+	for row: Dictionary in burning:
+		var key := "猟犬:%d" % row.actor
+		seen[key] = true
+		_cloud(key,burning_preset,[{"pos":row.position,"radius":row.radius*1.6,"seed":row.actor}],clock,0.0,0.4 if row.flash>0.0 else 1.0)
+	if not mouth.is_empty() and (mouth.get("active",false) or rows.any(func(row): return row.kind==3) or not fading.is_empty()):
+		var key := "口元の点火"
+		seen[key] = true
+		_cloud(key,presets.get(5),[{"pos":mouth.position,"radius":28.0,"seed":0}],clock)
+	for id in bursts.keys():
+		var event: Dictionary = bursts[id]
+		var preset: PixelFireSettings = burst_presets.get(event.profile)
+		var age: float = maxf(0.0,clock-float(event.started))
+		if preset==null or age>=preset.lifetime:
+			bursts.erase(id)
+			continue
+		var key := "爆発:%d" % id
+		seen[key] = true
+		if not displays.has(key):
+			var fire := FIRE.new()
+			fire.setup(preset)
+			add_child(fire)
+			displays[key] = fire
+		displays[key].burst(event.pos,float(event.radius),age/preset.lifetime,clock)
 	for key in displays.keys():
 		if not seen.has(key):
 			displays[key].queue_free()

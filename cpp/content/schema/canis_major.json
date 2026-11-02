@@ -627,6 +627,107 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisBlazeDefinition",
+      "section": 347,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "flame",
+          "type": "u32",
+          "ref": "CanisFlameDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "min_hounds",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "ignite_at",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ignite_step",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "run_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_dist",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "max_run",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blink",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "explode_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrive",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "decel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "face_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_fast",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_switch",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

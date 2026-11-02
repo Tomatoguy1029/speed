@@ -1507,6 +1507,10 @@
       {
         "name": "Stomp",
         "value": "stomp"
+      },
+      {
+        "name": "Blaze",
+        "value": "blaze"
       }
     ],
     "VisualRole": [
@@ -2794,7 +2798,10 @@
       "cue",
       "position",
       "angle",
-      "world_time"
+      "world_time",
+      "radius",
+      "profile",
+      "age"
     ],
     "hydra_cue": [
       "id",

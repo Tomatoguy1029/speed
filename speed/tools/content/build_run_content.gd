@@ -52,11 +52,11 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## 号令の実効値と、旧method trackに対応する段階を生成する。
 static func canis_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius",&"bay"]: return {}
+	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius",&"bay",&"blaze"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"canis_major","kind":2,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[],"CanisBayDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[],"CanisBayDefinition":[],"CanisBlazeDefinition":[]}
 	for phase in [1,2]:
 		var values: Dictionary = source.values().duplicate(true)
 		if phase==2:
@@ -66,9 +66,17 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43 if move.technique==&"sirius" else 44,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43 if move.technique==&"sirius" else 44 if move.technique==&"bay" else 45,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage"]: row[key] = float(values.get(key,0.0))
-		if move.technique==&"bay":
+		if move.technique==&"blaze":
+			row.active = maxf(0.001,float(values.ignite_at)+maxi(0,int(values.count)-1)*float(values.ignite_step))
+			records.BossTechniqueDefinition.append(row)
+			var detail := {"id":phase,"technique":phase,"flame":phase+4}
+			for key in ["count","min_hounds","ignite_at","ignite_step","run_speed","stop_dist","max_run","blink","explode_radius"]: detail[key] = int(values[key]) if key in ["count","min_hounds"] else float(values[key])
+			var steering: Dictionary = load("res://data/bosses/canis_major_moves/bay.tres").values()
+			for key in ["arrive","decel","face_turn","turn_slow","turn_fast","turn_switch","accel"]: detail[key] = float(steering[key])
+			records.CanisBlazeDefinition.append(detail)
+		elif move.technique==&"bay":
 			row.active = maxf(0.001,float(values.pounce_at))
 			records.BossTechniqueDefinition.append(row)
 			var detail := {"id":phase,"technique":phase,"pounce":phase+2}
@@ -119,6 +127,13 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 	var records := canis_technique_records(definition,move)
 	if package.is_empty() or records.is_empty(): return {}
 	for key in records: package.records[key] = records[key]
+	if move.technique==&"blaze":
+		for phase in [1,2]:
+			package.records.CanisFlameDefinition[phase+3].duration = move.ignite_step
+			package.records.CanisFlameDefinition[phase+3].particle_life = move.ignite_step
+			var visual: int = package.records.ResourceKey.size()+1
+			package.records.ResourceKey.append({"id":visual,"role":7})
+			package.visuals.append({"id":visual,"role":7,"path":move.explosion_fire.resource_path,"canis_burst":phase})
 	if move.technique==&"sirius":
 		for phase in [1,2]:
 			var values: Dictionary = BossProgram.snapshot(move).values().duplicate(true)
@@ -455,6 +470,9 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		var trail_visual: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":trail_visual,"role":7})
 		package.visuals.append({"id":trail_visual,"role":7,"path":"res://data/visuals/canis_fire_trail.tres","canis_trail":true})
+		var burning_visual: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":burning_visual,"role":7})
+		package.visuals.append({"id":burning_visual,"role":7,"path":"res://data/visuals/canis_fire_hound.tres","canis_burning":true})
 		var hound: EnemyDef = load("res://data/enemies/hound.tres")
 		var hound_visual: Dictionary = package.visuals[5]
 		if hound_visual.role==6:

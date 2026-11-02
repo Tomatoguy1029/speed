@@ -30,7 +30,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		gait = 0.0
 		_pulse_until = -1.0
 	pulse = maxf(0.0,_pulse_until-float(body.clock))
-	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock))
+	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock),body.get("burning",[]),{"position":body.position+Vector2.from_angle(float(body.facing))*float(body.radius)*0.84,"active":attack.get("technique","")=="blaze" and int(attack.get("stage",5))==0})
 	_track_command(body,attack,dt)
 	state = body
 	technique = attack
