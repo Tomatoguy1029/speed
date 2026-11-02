@@ -23,6 +23,6 @@ void HydraNormalAttack::step_bolt(RunRuntime &r,TechniqueState &t,double dt) {
     t.aim=n.target;t.locked=n.locked;t.direction=godot::Vector2::from_angle(free?n.look_angle:n.angle);t.stage=time<p.warn?TechniqueStage::Windup:time<p.warn+p.active?TechniqueStage::Active:TechniqueStage::Recovery;
     auto &part=r.state.enemies[t.actor.slot];part.pos=HydraBody::head_position(r,*b,n);part.facing=b->hydra.separated?n.look_angle:n.angle;
     if (time>=p.warn+p.active+p.hold) {const auto at=part.pos;if (!b->hydra.separated) n.angle=(at-base).angle();n.length=at.distance_to(base);n.free_pos=at;n.locked=n.extension=false;n.normal=0;n.cd=v.attack_cd;t.stage=TechniqueStage::Finished;AttackSystem::end_technique(r.state,r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data())),false);AttackSystem::source_ended(r.state,t.actor,AttackEndReason::TechniqueEnd);if (b->hydra.separated) HydraSquad::watch_player(r,*b,n,&n==&b->hydra.bearer?HydraSquadRole::Bearer:HydraSquad::profile(n));cue(r,*b,n,"finished");}
-    t.previous_ship=r.state.ship_pos;HydraBody::follow_neck(r,*b,n,dt);
+    t.previous_ship=r.state.ship_pos;
 }
 }

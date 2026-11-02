@@ -1016,15 +1016,37 @@ static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Di
 	return records
 
 static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"hydra" or move==null or move.technique!=&"curve": return {}
+	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid"]: return {}
 	var values: Dictionary = definition.params.merged(move.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":72,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":float(values.performance_time),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.beam_dmg),"passes":1,"cuts":1},true)
-	return {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(move.technique)]),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal],"HydraCurveDefinition":[{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.curve_delay),"time":float(values.curve_time),"lag":float(values.curve_lag),"turn":float(values.curve_turn)}]}
+	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":72 if move.technique==&"curve" else 73,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":float(values.performance_time),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.beam_dmg),"passes":1,"cuts":1},true)
+	var records := {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(move.technique)]),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal],"HydraCurveDefinition":[{"id":1,"technique":1,"length":float(values.get("beam_len",0.0)),"width":float(values.beam_width),"delay":float(values.get("curve_delay",0.0)),"time":float(values.get("curve_time",0.0)),"lag":float(values.get("curve_lag",0.0)),"turn":float(values.get("curve_turn",0.0))}]}
+
+	if move.technique==&"grid":
+		records.erase("HydraCurveDefinition")
+		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"delay":float(values.normal_charge),"time":float(values.grid_time),"planning_width":float(definition.params.beam_width),"clearance":float(definition.params.grid_clearance),"tolerance":float(definition.params.grid_tolerance),"formation_timeout":float(definition.params.formation_timeout),"minimum":int(definition.params.grid_minimum)}]
+		records.HydraGridLayout=[];records.HydraGridSlot=[];records.HydraGridPath=[]
+		var regions := [&"center",&"right",&"left",&"up",&"down"]
+		for name in definition.params.grid_layouts:
+			var layout: Dictionary=definition.params.grid_layouts[name]
+			var id: int=records.HydraGridLayout.size()+1
+			var mask := 0
+			for region in 5:
+				if definition.params.grid_regions.get(regions[region],&"provisional")==name:mask|=1<<region
+			if mask==0:continue
+			records.HydraGridLayout.append({"id":id,"technique":1,"name":String(name),"region_mask":mask})
+			var slots: Array=layout.slots.duplicate(true);slots.sort_custom(func(a,b):return int(a.priority)<int(b.priority))
+			for index in slots.size():
+				var slot: Dictionary=slots[index]
+				records.HydraGridSlot.append({"id":records.HydraGridSlot.size()+1,"layout":id,"order":index,"from_x":float(slot.from.x),"from_y":float(slot.from.y),"to_x":float(slot.to.x),"to_y":float(slot.to.y)})
+			for index in layout.path.size():
+				var point: Vector2=layout.path[index]
+				records.HydraGridPath.append({"id":records.HydraGridPath.size()+1,"layout":id,"order":index,"x":float(point.x),"y":float(point.y)})
+	return records
 
 static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var records := hydra_major_records(definition,move) if move.technique==&"curve" else hydra_normal_records(definition,move)
+	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid"] else hydra_normal_records(definition,move)
 	if records.is_empty(): return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}

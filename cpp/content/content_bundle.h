@@ -78,6 +78,10 @@ struct ContentBundle {
     std::vector<HydraFixedBeamDefinition> hydra_fixed_beams;
     std::vector<HydraWindBladesDefinition> hydra_wind_blades;
     std::vector<HydraCurveDefinition> hydra_curves;
+    std::vector<HydraGridDefinition> hydra_grids;
+    std::vector<HydraGridLayout> hydra_grid_layouts;
+    std::vector<HydraGridSlot> hydra_grid_slots;
+    std::vector<HydraGridPath> hydra_grid_paths;
     std::vector<HydraMajorDefinition> hydra_majors;
     std::vector<HydraNormalGate> hydra_normal_gates;
     std::vector<HydraSwimDefinition> hydra_swim;

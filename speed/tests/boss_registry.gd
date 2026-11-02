@@ -9,6 +9,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-grid" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_grid")
+		return
 	if "--cpp-hydra-curve" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_curve")
 		return
@@ -4680,11 +4683,13 @@ func native_canis_finish_display() -> void:
 	print("[cpp_canis_finish_display] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-func hydra_major_case(selected_move: String, edits: Dictionary, flowing := false) -> Dictionary:
+func hydra_major_case(selected_move: String, edits: Dictionary, flowing := false, body_changes := {}, config_changes := {}) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true);cfg.planet_radius=0.0
+	for key in config_changes:cfg.set(key,config_changes[key])
 	var definition = load("res://data/bosses/hydra.tres").duplicate(true);definition.speed=0.0
 	definition.params.merge({"head_hp":10.0,"growth_time":0.1,"tech_cd":0.05,"debris_dmg":0.0},true)
+	definition.params.merge(body_changes,true)
 	var move = load("res://data/bosses/hydra_moves/%s.tres" % selected_move).duplicate(true);move.assign_values(edits)
 	var package: Dictionary = builder.hydra_technique_package(definition,move,cfg)
 	if package.is_empty(): check(false,"大技の編集値を生成する");return {}
@@ -4770,3 +4775,78 @@ func native_hydra_curve() -> void:
 	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge.command("dev_boss_state").value[0].stage==7,"全参加首の消失では大技を中断する")
 	bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free();await get_tree().process_frame
 	print("[cpp_hydra_curve] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func hydra_grid_separate(c: Dictionary) -> void:
+	var bridge=c.bridge
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"})
+	bridge._core.step(0.11);bridge._core.step(0.001);bridge._core.step(1.21)
+	bridge.command("dev_ship_motion",{"position":Vector2(-200,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(1400,1000))
+
+func native_hydra_grid() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.8,"normal_charge":0.1,"grid_time":0.35,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1}
+	var c := hydra_major_case("grid",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":true})
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"grid" and c.package.records.HydraGridSlot.size()==8,"格子の編集Resourceと配置の順序付き生成値を分ける")
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離前には格子を開始しない")
+	hydra_grid_separate(c)
+	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(100,80));bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value.is_empty(),"狭い表示領域では安全な格子を作れず選択しない")
+	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(1400,1000))
+	for tick in 40:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==73,"分離後の共通フローから格子ビームを自然に選ぶ")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var t: Dictionary=actions[0];var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var source = load("res://data/bosses/hydra.tres")
+	var maximum: float=c.cfg.draw_length*c.cfg.base_max_speed/c.cfg.base_max_speed
+	var reference: Dictionary=load("res://scripts/bosses/hydra_grid.gd").build(Rect2(Vector2(-1400,-1000),Vector2(2800,2000)).intersection(body.arena),Vector2(-200,0),8,source.params,c.cfg.ship_radius,maximum)
+	check(not reference.is_empty() and t.grid_name==String(reference.name) and is_equal_approx(t.grid_length,reference.length) and t.grid_bearer.distance_to(reference.bearer)<0.001,"領域・回転・倍率・経路予算をSourceの配置関数へ照合する")
+	var equal: bool = not reference.is_empty() and reference.beams.size()==t.grid_starts.size()
+	if equal:
+		for i in reference.beams.size():equal=equal and t.grid_starts[i].distance_to(reference.beams[i][0])<0.001 and t.grid_ends[i].distance_to(reference.beams[i][1])<0.001
+	check(equal,"優先順で選んだ全ビームの始点と終点がSourceに一致する")
+	check(t.positioning and t.elapsed==0.0 and t.performance_time==0.0 and body.effects.is_empty(),"配置中は予告と攻撃の時計を止めて形を出さない")
+	var preparing: Dictionary=bridge.checkpoint();bridge._core.step(0.1);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true);var expected_t: Dictionary=bridge.command("dev_boss_state").value[0].duplicate(true)
+	check(preparing.ok and bridge.restore(preparing.value).ok,"配置計画・到着集合・不死首の目標を保持して戻す");bridge._core.step(0.1)
+	check(bridge.command("dev_boss_body_state").value[0]==expected and bridge.command("dev_boss_state").value[0]==expected_t,"配置途中の復帰後も同じ操舵と時計へ進む")
+	var ready := false
+	for tick in 600:
+		bridge._core.step(0.02);bridge._core.step_hazards(0.02)
+		t=bridge.command("dev_boss_state").value[0]
+		if t.stage==7:break
+		if not t.positioning and not bridge.command("dev_boss_body_state").value[0].effects.is_empty():ready=true;break
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(ready and body.effects.size()==8 and body.bearer.position.distance_to(t.grid_bearer)<=6.0,"全首と不死首の配置完了後に予告を進めて8本の格子を放つ")
+	if not ready:print(t);bridge.dispose();get_tree().quit(1);return
+	check(body.effects.all(func(e):return e.points.size()==2 and is_equal_approx(e.delay,0.1) and is_equal_approx(e.life,0.35)),"格子は線分・個別の遅れ・寿命を持つ")
+	check(body.necks.all(func(n):return n.points[-1].distance_to(n.position)<0.001),"大技の位置を確定した後に首点列を1回だけ同期する")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	var firing: Dictionary=bridge.checkpoint();var events: Array=[];bridge.subscribe("格子の記録",func(packet):events.append_array(packet.events);return true)
+	bridge._core.set_run_guards({"invincible":false});var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":body.effects[0].points[0].lerp(body.effects[0].points[1],0.5),"velocity":Vector2.ZERO})
+	for tick in 7:bridge._core.step(0.02);bridge._core.step_hazards(0.02);bridge.command("dev_boss_body_state")
+	check(hp>bridge._core.ship_snapshot().ship_hp and events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="beam" and e.payload.technique=="grid"),"格子の実命中とbeam・gridの記録を同じ経路へ渡す")
+	bridge.restore(firing.value);body=bridge.command("dev_boss_body_state").value[0];bridge.command("dev_damage",{"entity_id":body.necks[0].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.size()==7 and bridge.command("dev_boss_state").value[0].stage==1,"1本の参加首が消えても残りの格子を続ける")
+	bridge.restore(firing.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で格子と配置の所有を解放する")
+	bridge.restore(firing.value)
+	for tick in 50:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"格子の寿命が終われば線分を消す")
+	for tick in 80:bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(a):return a.id>first_id and a.kind==73),"自然終了と余白を過ぎると次の行動へ戻る")
+	bridge.restore(firing.value);body=bridge.command("dev_boss_body_state").value[0]
+	for n in body.necks:bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.01);check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"全参加首の消失で格子を中断する")
+	bridge.release_checkpoint(preparing.value);bridge.release_checkpoint(firing.value);bridge.dispose();view.queue_free()
+	c=hydra_major_case("grid",edits,false,{"formation_timeout":0.01});bridge=c.bridge;hydra_grid_separate(c)
+	check(bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"配置待ちの直接入口を開始する");bridge._core.step(0.02)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"配置の制限時間を超えると攻撃を出さず中断する");bridge.dispose()
+	c=hydra_major_case("grid",edits,false,{}, {"draw_length":1.0});bridge=c.bridge;hydra_grid_separate(c)
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"一筆の長さ予算に経路が入らないと格子を選べない");bridge.dispose()
+	await get_tree().process_frame;print("[cpp_hydra_grid] failures=",failed);get_tree().quit(1 if failed else 0)

@@ -16,6 +16,7 @@ bool HydraTechnique::busy(const RunRuntime &r,const BossBodyState &b) {return st
 bool HydraTechnique::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {
     const auto *b=PhaseController::find(r,actor);if (!b || !r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead || b->hydra.necks.empty() || b->mode!=BossMode::Idle || busy(r,*b) || b->hydra.growth_left>0 || b->hydra.chance_left>0 || b->hydra.recovery_left>0 || b->hydra.major_padding_left>0 || (rule(r,definition).combo?b->hydra.combo_left:b->hydra.major_cd)>0 || !rule(r,definition).timeline_available || b->hydra.separation_pending || b->hydra.separation_left>0) return false;
     if (auto it=b->hydra.major_until.find(definition);it!=b->hydra.major_until.end() && r.state.world_time<it->second) return false;
+    if (r.content->boss_techniques[definition-1].kind==73) return b->hydra.separated && grid_plan(r,*b,definition).has_value();
     return !b->hydra.separated && b->hydra.necks.size()>=5 && std::count_if(b->hydra.necks.begin(),b->hydra.necks.end(),[&](const auto &n){return HydraRegrow::alive(r,n);})>=3;
 }
 bool HydraTechnique::reserve(RunRuntime &r,EnemyHandle actor,uint32_t definition) {if (r.state.world.attack_formation_mode) return true;const auto &p=rule(r,definition);BudgetRequest request;request.owner="boss:"+std::to_string(r.state.enemy_handles.entity_id(actor));request.categories={AttackCategory::Dash,AttackCategory::Beam,AttackCategory::Zone,AttackCategory::Aimed};request.source=actor;request.duration=12;request.priority=1.5;request.cost=p.cost;return AttackBudgetSystem(r).request(request);}
@@ -27,7 +28,7 @@ void HydraTechnique::begin(RunRuntime &r,TechniqueState &t) {
     auto *b=PhaseController::find(r,t.actor);t.detail=HydraTechniqueState{};t.previous_ship=r.state.ship_pos;if (rule(r,t.definition).combo) b->hydra.combo_left=rule(r,t.definition).combo_cd;auto &v=std::get<HydraTechniqueState>(t.detail);
     for (uint32_t i=0;i<r.state.bosses.techniques.size();++i) if (&r.state.bosses.techniques[i]!=&t && HydraNormalAttack::body(r,r.state.bosses.techniques[i].actor)==b) TechniqueRunner::cancel(r,r.state.bosses.handles.at(i));
     for (auto &n:b->hydra.necks) if (HydraRegrow::alive(r,n)) {v.participants.push_back(n.actor);n.strike_pos=n.strike_from=HydraBody::head_position(r,*b,n);n.major=t.definition;n.locked=false;n.step=0;n.emission={};n.target=r.state.ship_pos;}
-    cue(r,*b,"warning_started",t.definition,r.content->boss_techniques[t.definition-1].warn);curve(r,t,0);
+    cue(r,*b,"warning_started",t.definition,r.content->boss_techniques[t.definition-1].warn);if (r.content->boss_techniques[t.definition-1].kind==73) grid_prepare(r,t);else curve(r,t,0);
 }
 void HydraTechnique::finish(RunRuntime &r,TechniqueState &t,bool cancelled) {
     auto *b=PhaseController::find(r,t.actor);if (!b) return;const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=rule(r,t.definition);
@@ -40,11 +41,13 @@ void HydraTechnique::cancel(RunRuntime &r,TechniqueState &t) {finish(r,t,true);}
 void HydraTechnique::step(RunRuntime &r,TechniqueState &t,double dt) {
     auto *b=PhaseController::find(r,t.actor);if (!b || !b->hydra.attack_field_advance || b->hydra.growth_left>0 || b->hydra.separation_left>0 || b->mode>=BossMode::Defeated) return;auto &v=std::get<HydraTechniqueState>(t.detail);const auto &p=r.content->boss_techniques[t.definition-1];
     if (std::none_of(v.participants.begin(),v.participants.end(),[&](auto actor){return r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;})) {finish(r,t,true);return;}
+    if (p.kind==73 && std::get<HydraGridState>(v.move).positioning && !grid_position(r,t,dt)) return;
     t.elapsed+=dt;if (t.elapsed>=p.warn+p.active) {finish(r,t,false);return;}
-    if (t.elapsed>=p.warn) {if (!v.playing) {v.playing=true;cue(r,*b,"attack_started",t.definition);}v.time+=dt;t.stage=TechniqueStage::Active;curve(r,t,dt);}
-    for (auto &n:b->hydra.necks) if (HydraRegrow::alive(r,n)) {auto &e=r.state.enemies[n.actor.slot];e.pos=HydraBody::head_position(r,*b,n);e.facing=n.angle;HydraBody::follow_neck(r,*b,n,dt);}t.previous_ship=r.state.ship_pos;
+    if (t.elapsed>=p.warn) {if (!v.playing) {v.playing=true;cue(r,*b,"attack_started",t.definition);}v.time+=dt;t.stage=TechniqueStage::Active;if (p.kind==73) grid(r,t);else curve(r,t,dt);}
+    t.previous_ship=r.state.ship_pos;
 }
 // Sourceのflow選択→timeline→首姿勢→attack_fieldの順で一度だけ進める。
 void HydraTechnique::tick(RunRuntime &r,double dt) {for (auto &t:r.state.bosses.techniques) if (t.stage<TechniqueStage::Finished && supports(r.content->boss_techniques[t.definition-1].kind)) step(r,t,dt);}
-bool HydraTechnique::validate(const TechniqueState &t,const ContentBundle &) {const auto *v=std::get_if<HydraTechniqueState>(&t.detail);return v && std::holds_alternative<HydraCurveState>(v->move) && std::isfinite(v->time) && v->time>=0 && !v->participants.empty();}
+bool HydraTechnique::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=std::get_if<HydraTechniqueState>(&t.detail);if (!v || !std::isfinite(v->time) || v->time<0 || v->participants.empty() || v->participants.size()>8) return false;if (c.boss_techniques[t.definition-1].kind==72) return std::holds_alternative<HydraCurveState>(v->move);const auto *g=std::get_if<HydraGridState>(&v->move);if (!g || !std::isfinite(g->position_elapsed) || g->position_elapsed<0 || !g->plan.layout || g->plan.layout>c.hydra_grid_layouts.size() || g->plan.starts.size()!=v->participants.size() || g->plan.ends.size()!=v->participants.size() || g->arrived.size()!=v->participants.size() || !g->plan.bearer.is_finite() || !std::isfinite(g->plan.length)) return false;for (const auto *points:{&g->plan.starts,&g->plan.ends,&g->plan.path}) for (auto p:*points) if (!p.is_finite()) return false;return true;}
+godot::Dictionary HydraTechnique::snapshot(const TechniqueState &t,const ContentBundle &c) {const auto &v=std::get<HydraTechniqueState>(t.detail);godot::Dictionary out;out["performance_time"]=v.time;godot::Array participants;for (auto actor:v.participants) participants.push_back(int64_t(handle_key(actor)));out["participants"]=participants;if (const auto *g=std::get_if<HydraGridState>(&v.move)) {out["positioning"]=g->positioning;out["position_elapsed"]=g->position_elapsed;out["grid_name"]=godot::String(c.hydra_grid_layouts[g->plan.layout-1].name.c_str());out["grid_bearer"]=g->plan.bearer;out["grid_length"]=g->plan.length;godot::PackedVector2Array path,starts,ends;for (auto p:g->plan.path) path.push_back(p);for (auto p:g->plan.starts) starts.push_back(p);for (auto p:g->plan.ends) ends.push_back(p);out["grid_path"]=path;out["grid_starts"]=starts;out["grid_ends"]=ends;}return out;}
 }

@@ -1296,6 +1296,144 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraGridDefinition",
+      "section": 381,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "width",
+          "type": "f64"
+        },
+        {
+          "name": "delay",
+          "type": "f64"
+        },
+        {
+          "name": "time",
+          "type": "f64"
+        },
+        {
+          "name": "planning_width",
+          "type": "f64"
+        },
+        {
+          "name": "clearance",
+          "type": "f64"
+        },
+        {
+          "name": "tolerance",
+          "type": "f64"
+        },
+        {
+          "name": "formation_timeout",
+          "type": "f64"
+        },
+        {
+          "name": "minimum",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "HydraGridLayout",
+      "section": 384,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "region_mask",
+          "type": "u32",
+          "max": 31
+        }
+      ]
+    },
+    {
+      "name": "HydraGridSlot",
+      "section": 385,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "ref": "HydraGridLayout"
+        },
+        {
+          "name": "order",
+          "type": "u32"
+        },
+        {
+          "name": "from_x",
+          "type": "f64"
+        },
+        {
+          "name": "from_y",
+          "type": "f64"
+        },
+        {
+          "name": "to_x",
+          "type": "f64"
+        },
+        {
+          "name": "to_y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "HydraGridPath",
+      "section": 386,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "ref": "HydraGridLayout"
+        },
+        {
+          "name": "order",
+          "type": "u32"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        }
+      ]
     }
   ],
   "enums": {

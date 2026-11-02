@@ -1,4 +1,5 @@
 #include "squad.h"
+#include "technique.h"
 #include "body.h"
 #include "regrow.h"
 #include "normal_attack.h"
@@ -49,6 +50,7 @@ void HydraSquad::counter(RunRuntime &r,BossBodyState &b,double dt) {const auto &
 void HydraSquad::block(RunRuntime &r,BossBodyState &b) {const auto &p=rule(r,b);const auto heads=live(r,b);if (b.hydra.bearer.free_pos.distance_to(r.state.ship_pos)>=p.block_distance && b.hydra.squad.panic<=0) {for (auto *n:heads) n->motion.block=-1;return;}for (auto *n:heads) if (n->normal || n->motion.counter || n->motion.attack) n->motion.block=-1;const V player=r.state.ship_pos+r.state.ship.vel*p.block_predict,delta=b.hydra.bearer.free_pos-player,center=player+delta*p.block_fraction;for (int i=0;i<int(p.block_count);++i) {const V point=center+delta.normalized().orthogonal()*p.block_spread*(i==0?1:-1);HydraNeckState *current=nullptr;for (auto *n:heads) if (n->motion.block==i) current=n;if (!current) {double closest=INFINITY;for (auto *n:heads) if (!n->normal && !n->motion.attack && !n->motion.counter && n->motion.block<0 && !custom_owns(r,b,*n)) {const double d=n->free_pos.distance_squared_to(point);if (d<closest) {closest=d;current=n;}}}if (current) {current->motion.block=i;current->motion.block_target=point;}}}
 void HydraSquad::started(BossBodyState &b,HydraNeckState &n) {n.motion.reserved=0;n.motion.last_attack=b.clock;for (auto actor:b.hydra.squad.pair) if (same_handle(actor,n.actor)) b.hydra.squad.pair_launched=true;}
 bool HydraSquad::custom_owns(const RunRuntime &r,const BossBodyState &b,const HydraNeckState &) {
+    if (HydraTechnique::busy(r,b)) return true;
     for (const auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor) && f.active) for (auto row:f.roots) if (row<f.nodes.size() && f.nodes[row].status==FlowStatus::Running && r.content->flow_nodes[f.nodes[row].definition-1].kind>=2) return true;
     return false;
 }

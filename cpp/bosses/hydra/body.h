@@ -8,6 +8,7 @@ namespace speed {class HydraBody {public:
     static godot::Vector2 head_position(const RunRuntime &,const BossBodyState &,const HydraNeckState &);
     static void follow_neck(RunRuntime &,BossBodyState &,HydraNeckState &,double);
     static void step(RunRuntime &,BossBodyState &,double);
+    static void finish_frame(RunRuntime &,double);
     static void release(RunRuntime &,BossBodyState &);
     static void part_defeated(RunRuntime &,const DeathContext &);
     static bool validate(const godot::RunState &,const ContentBundle &,const BossBodyState &);
