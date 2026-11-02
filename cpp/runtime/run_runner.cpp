@@ -9,6 +9,7 @@
 #include "../behaviors/traits/fullBurst.h"
 #include "../systems/attacks/light_lances.h"
 #include "../behaviors/traits/runUp.h"
+#include "../behaviors/traits/vortex.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
 #include "../systems/pickup_system.h"
@@ -94,7 +95,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         } else if (state.forward.ready) core.step_forward(world_dt);
         if (state.phase==Phase::Play) for (const auto &owned:state.loadout.traits) {
             const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
-            if (id=="T32") RunUpBehavior::step(core.runtime,world_dt);
+            if (id=="T03") VortexBehavior::step(core.runtime,world_dt);
+            else if (id=="T32") RunUpBehavior::step(core.runtime,world_dt);
             else if (id=="T33") RampageBehavior::step(core.runtime,world_dt);
             else if (id=="T36") FullBurstBehavior::step(core.runtime);
         }

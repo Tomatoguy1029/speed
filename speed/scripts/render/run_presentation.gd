@@ -1599,6 +1599,9 @@ func _present_cpp(delta: float) -> void:
 	if frame_view._end_blast_visual!=null:
 		shake = maxf(shake,frame_view._end_blast_visual.frame_shake)
 		frame_view._end_blast_visual.frame_shake = 0.0
+	if frame_view._vortex_visual!=null:
+		shake = maxf(shake,frame_view._vortex_visual.frame_shake)
+		frame_view._vortex_visual.frame_shake = 0.0
 	if not frame.ui.get("presentation_frozen",false):
 		shake = maxf(0.0,shake-delta*40.0)
 		_camera.offset = Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)

@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t03" in OS.get_cmdline_user_args() or "--cpp-t03-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_t03()
+		print("[cpp_t03] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-w07" in OS.get_cmdline_user_args() or "--cpp-w07-fixes" in OS.get_cmdline_user_args():
 		await check_cpp_w07()
 		print("[cpp_w07] failed=%d" % failures)
@@ -1659,7 +1665,7 @@ func trait_test_session(id: String, config: GameConfig, seed_value: int):
 	var stage := RuntimeStage.new()
 	stage.index = 84
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"] if id=="T03" else ["drifter"])
 	var output := "res://.content/dev/run_"+id
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder.build(stage,config,output,(id+"の状態と表示").sha256_text())==OK,"行動特性の段ごとの値と資源を生成する")
@@ -2378,3 +2384,116 @@ func check_cpp_w07() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"機雷の状態と表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_t03() -> void:
+	var retry: bool = "--cpp-t03-fixes" in OS.get_cmdline_user_args()
+	var capture := ErrorCapture.new()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	# 通常候補は固定seed 604の初回にT03を含む。
+	var seed_value := 604
+	var session = await trait_test_session("T03",config,seed_value)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("t03",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var definition: TraitDef = ContentManager.definition(&"traits",&"T03")
+	var gear: TraitDef = ContentManager.definition(&"traits",&"T04")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,config.trait_max_stacks+1):
+		var should_check: bool = not retry or level>1
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		var granted: Dictionary = bridge.command("dev_grant_equipment",{"kind":"trait","id":"T03","levels":level})
+		if should_check: check(granted.ok,"終端の渦を全段取得する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
+		events.clear()
+		trait_start_trace(bridge,400.0)
+		for tick in 70:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not bridge._ui.draw.tracing: break
+		var items: Array = bridge._ui.vortex.items
+		if should_check: check(items.size()==1 and events.filter(func(event): return event.type==&"end_hole").size()==1,"なぞりの終端で渦を一度生成する")
+		var expected_damage: float = config.base_attack*(1.0+(gear.params.mult_base+gear.params.mult_per*5.0-1.0)*(exp(3.0*400.0/config.draw_length)-1.0)/(exp(3.0)-1.0))*(definition.params.damage_base+definition.params.damage_per*level)
+		if should_check: check(is_equal_approx(items[0].radius,definition.params.radius_by_level[level-1]) and is_equal_approx(items[0].damage,expected_damage) and is_equal_approx(items[0].duration,definition.params.charge+definition.params.hold+definition.params.collapse),"全段の半径と終了時のギア倍率・寿命を渦へ固定する")
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._vortex_visual!=null and presentation.frame_view._vortex_visual.holes.size()==1 and is_instance_valid(presentation.frame_view._vortex_visual.holes[0].lens),"溜めの粒と機体の下のレンズを本番表示へ渡す")
+		var before: Dictionary = bridge._ui.vortex.duplicate(true)
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.1)
+		if should_check: check(bridge._ui.vortex==before,"停止中は渦・捕捉・回復の時計を進めない")
+		bridge.command("pause",{"paused":false})
+		while bridge._ui.vortex.items[0].age+1.0/120.0<definition.params.charge: bridge.step(1.0/120.0,idle,viewport)
+		var center: Vector2 = core.ship_snapshot().ship_pos
+		for offset in [Vector2(0,100),Vector2(35,120),Vector2(70,130)]:
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+offset}).value
+			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+		var guarded: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(-40,-100)}).value
+		core.set_enemy_motion(guarded,{"held":true,"vel":Vector2.ZERO})
+		bridge.command("dev_enemy_combat",{"entity_id":guarded,"guard":1.0})
+		var tough: int = bridge.command("dev_spawn",{"definition_id":"shield","position":center+Vector2(60,-120)}).value
+		core.set_enemy_motion(tough,{"held":true,"vel":Vector2.ZERO})
+		var saved: Dictionary = bridge.checkpoint()
+		if should_check: check(events.all(func(event): return event.type!=&"hole_capture"),"溜めの境界より前は捕捉しない")
+		bridge.step(1.0/120.0,idle,viewport)
+		bridge.step(1.0/120.0,idle,viewport)
+		var captures: Array = events.filter(func(event): return event.type==&"hole_capture")
+		if should_check: check(captures.size()==3 and bridge._ui.vortex.items[0].kills==3 and bridge._ui.kills==3,"溜めを終えた渦が倒しきれる通常敵を連続して捕捉する")
+		if should_check: check(bridge._ui.vortex.items[0].pos==core.ship_snapshot().ship_pos and bridge._ui.vortex.items[0].pos!=center,"渦が飛行中の機体に追従する")
+		var survivors: Array = core.enemies_snapshot()
+		var guarded_state: Dictionary = survivors.filter(func(enemy): return enemy.id==guarded)[0]
+		var tough_state: Dictionary = survivors.filter(func(enemy): return enemy.id==tough)[0]
+		if should_check: check(not guarded_state.hull_scattered and not tough_state.hull_scattered and tough_state.hp<ContentManager.enemies[&"shield"].hp and tough_state.dead==0,"拒否した捕捉の船体印を戻し倒しきれない敵にはダメージだけを与える")
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._vortex_visual.captures.size()==3,"捕捉した敵だけを細かい粒で引き込む表示へ渡す")
+		for tick in 10: bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(events.filter(func(event): return event.type==&"combat_damage" and event.payload.cause==&"vortex").size()==5,"同じ渦が一度命中した敵を重ねて攻撃しない")
+		var after: Dictionary = bridge._ui.vortex.duplicate(true)
+		var expected_enemies: Array = core.enemies_snapshot()
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		for tick in 12: bridge.step(1.0/120.0,idle,viewport)
+		if bridge._ui.vortex!=after: print("[T03復帰差 渦] 期待=%s 実際=%s" % [after,bridge._ui.vortex])
+		if core.enemies_snapshot()!=expected_enemies: print("[T03復帰差 敵] 期待=%s 実際=%s" % [expected_enemies,core.enemies_snapshot()])
+		check(bridge._ui.vortex==after and core.enemies_snapshot()==expected_enemies,"命中ID・捕捉数・残留表示と敵の結果を復帰で再現する")
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._vortex_visual.captures.size()==3,"復帰した捕捉の粒も状態から作り直す")
+		var recovered := false
+		for tick in 70:
+			var gauge: float = bridge._ui.draw.gauge
+			bridge.step(1.0/120.0,idle,viewport)
+			if bridge._ui.vortex.items.is_empty():
+				var amount: float = 3.0/definition.params.kills_by_level[level-1]
+				if should_check: check(is_equal_approx(bridge._ui.draw.gauge,minf(bridge._ui.capacity,minf(1.0,gauge+1.0/120.0/bridge._ui.charge_time)+amount)),"渦が消える瞬間に段ごとの撃破数からゲージを一度戻す")
+				recovered = true
+				break
+		if should_check: check(recovered,"渦の溜め・保持・崩壊を終えて終了する")
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._vortex_visual.heals.size()==1,"終了のゲージ回復を通常のゲージ色の光へ渡す")
+		bridge.command("dev_remove_trait",{"id":"T03"})
+		presentation._present_cpp(0.01)
+		if should_check: check(not bridge._ui.vortex.ready and bridge._ui.vortex.items.is_empty() and presentation.frame_view._vortex_visual==null,"解除で残る渦とレンズ・捕捉・回復表示を片付ける")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T03","levels":1})
+	await trait_select_upgrade(session,"T03",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"終端の渦の状態と表示に実行エラーがない: %s" % [capture.messages()])

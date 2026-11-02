@@ -790,6 +790,58 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "VortexDefinition",
+      "section": 82,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "kills",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "collapse",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

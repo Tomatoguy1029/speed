@@ -7,13 +7,16 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
     run.state.loadout.full_charge_maximum=1;
     run.state.loadout.full_burst_owned=false;
-    bool rampage_owned=false,run_up_owned=false;
+    bool rampage_owned=false,run_up_owned=false,vortex_owned=false;
     run.state.loadout.duplicator={};
     effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0,attack_bonus=0,pickup_bonus=0,length_bonus=0,glide_bonus=0;
     for (const auto &owned:run.state.loadout.traits) {
         if (run.content->equipment[owned.definition-1].external_id=="T36") run.state.loadout.full_burst_owned=true;
         for (const auto &level:run.content->duplicator_levels) if (level.equipment==owned.definition && level.level==owned.level) {
             auto &d=run.state.loadout.duplicator;d.ready=true;d.chance=level.chance;d.damage=level.damage;d.maximum=level.maximum;d.angle_min=level.angle_min;d.angle_max=level.angle_max;
+        }
+        for (const auto &level:run.content->vortex_levels) if (level.equipment==owned.definition && level.level==owned.level) {
+            auto &v=run.state.loadout.vortex;v.ready=true;v.damage=level.damage;v.radius=level.radius;v.kills=level.kills;v.charge=level.charge;v.hold=level.hold;v.collapse=level.collapse;vortex_owned=true;
         }
         for (const auto &level:run.content->run_up_levels) if (level.equipment==owned.definition && level.level==owned.level) {
             auto &r=run.state.loadout.run_up;r.ready=true;r.distance=level.distance;r.multiplier=level.multiplier;r.radius=level.radius;r.area_damage=level.area_damage;run_up_owned=true;
@@ -27,6 +30,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
         }
     }
     if (!run.state.loadout.full_burst_owned) run.state.loadout.full_burst_active=false;
+    if (!vortex_owned) run.state.loadout.vortex={};
     if (!run_up_owned) run.state.loadout.run_up={};
     if (!rampage_owned) run.state.loadout.rampage={};
     effects.damage_multiplier=1+run.state.loadout.rampage.bonus*run.state.loadout.rampage.strength;
@@ -102,6 +106,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
         } else return false;
     } else if (d.external_id=="T37") {
         if (std::none_of(run.content->duplicator_levels.begin(),run.content->duplicator_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
+    } else if (d.external_id=="T03") {
+        if (std::none_of(run.content->vortex_levels.begin(),run.content->vortex_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
     } else if (d.external_id=="T32") {
         if (std::none_of(run.content->run_up_levels.begin(),run.content->run_up_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
     } else if (d.external_id=="T33") {

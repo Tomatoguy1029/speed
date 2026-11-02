@@ -52,7 +52,7 @@ bool SpeedRunCore::restore_checkpoint(int64_t id) {
     candidate->runtime.state=speed::clone_state(checkpoint->state);
     candidate->runtime.content=checkpoint->content;
     const double grid_cell=candidate->runtime.state.grid.cell;
-    candidate->runtime.state.grid={};
+    // セル境界も候補順に影響するため、保存した範囲を保って索引だけを再構築する。
     if (!speed::rebuild_state_indexes(candidate->runtime.state,*candidate->runtime.content) ||
         !candidate->rebuild_enemy_grid(grid_cell)) return false;
     candidate->runtime.epoch=runtime.epoch+1;

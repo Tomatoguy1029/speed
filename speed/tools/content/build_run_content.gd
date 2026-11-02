@@ -215,6 +215,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.LoadoutDefinition.append({"id":gear_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T04","comet_only":false})
 	for level in range(1,config.trait_max_stacks+1):
 		data.FullChargeDefinition.append({"id":level,"equipment":gear_id,"level":level,"multiplier":float(gear.params.mult_base)+float(gear.params.mult_per)*level})
+	var vortex := load("res://data/traits/T03_vortex.tres") as TraitDef
+	if vortex==null: return {}
+	var vortex_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":vortex_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T03","comet_only":false})
+	for level in range(1,config.trait_max_stacks+1):
+		data.VortexDefinition.append({"id":level,"equipment":vortex_id,"level":level,"damage":float(vortex.params.damage_base)+float(vortex.params.damage_per)*level,"radius":float(vortex.params.radius_by_level[level-1]),"kills":float(vortex.params.kills_by_level[level-1]),"charge":float(vortex.params.charge),"hold":float(vortex.params.hold),"collapse":float(vortex.params.collapse)})
 	var run_up := load("res://data/traits/T32_runUp.tres") as TraitDef
 	if run_up==null: return {}
 	var run_up_id: int = data.LoadoutDefinition.size()+1
@@ -341,6 +347,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":gear_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":gear_id,"asset":key})
+	var vortex_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T03")
+	if vortex_entry==null: return {}
+	for path in vortex_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":vortex_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":vortex_id,"asset":key})
 	var run_up_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T32")
 	if run_up_entry==null: return {}
 	for path in run_up_entry.resources:
@@ -574,6 +587,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.BarrierDefinition = resolved.BarrierDefinition
 			data.BarrierPostDefinition = resolved.BarrierPostDefinition
 			data.FullChargeDefinition = resolved.FullChargeDefinition
+			data.VortexDefinition = resolved.VortexDefinition
 			data.RunUpDefinition = resolved.RunUpDefinition
 			data.RampageDefinition = resolved.RampageDefinition
 			data.DuplicatorDefinition = resolved.DuplicatorDefinition

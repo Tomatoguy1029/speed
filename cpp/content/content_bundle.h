@@ -71,6 +71,7 @@ struct ContentBundle {
     std::vector<LoadoutAsset> equipment_assets;
     std::vector<NumericTraitLevel> numeric_traits;
     std::vector<FullChargeDefinition> full_charge_levels;
+    std::vector<VortexDefinition> vortex_levels;
     std::vector<RunUpDefinition> run_up_levels;
     std::vector<RampageDefinition> rampage_levels;
     std::vector<DuplicatorDefinition> duplicator_levels;

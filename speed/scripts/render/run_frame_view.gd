@@ -64,6 +64,8 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+var _vortex_visual: RefCounted
+var _vortex_world_time := -1.0
 var _mines_visual: RefCounted
 var _mines_world_time := -1.0
 var _mines_overlay: Sprite2D
@@ -611,6 +613,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _mines_visual!=null: _mines_visual.dispose()
 		_mines_visual = null
 		_mines_world_time = -1.0
+		if _vortex_visual!=null: _vortex_visual.dispose()
+		_vortex_visual = null
+		_vortex_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_debris_trails.clear()
@@ -687,6 +692,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rampage_visual.dispose()
 		_rampage_visual = null
 		_rampage_world_time = -1.0
+	var equipped_vortex: bool = frame.ui.get("vortex",{}).get("ready",false)
+	if equipped_vortex and _vortex_visual==null:
+		_vortex_visual = preload("res://scripts/render/equipment/vortex.gd").new()
+		_vortex_visual.setup_frame(_layer(14),_layer(18),_layer(19),_pixel)
+	if not equipped_vortex and _vortex_visual!=null:
+		_vortex_visual.dispose()
+		_vortex_visual = null
+		_vortex_world_time = -1.0
 	var equipped_mines: bool = frame.ui.get("mines",{}).get("ready",false)
 	if equipped_mines and _mines_visual==null:
 		_mines_visual = preload("res://scripts/render/equipment/mines.gd").new()
@@ -741,7 +754,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})
 		if event.type==&"shield_block":
 			_rings.append({"pos":event.pos,"radius":float(frame.ui.ship_radius)*3.0,"color":Color("#bcefff"),"life":0.18,"max":0.18})
-		if (event.type==&"kill" and event.get("enemy_type")==&"meteor") or event.type==&"rock_break":
+		if (event.type==&"kill" and event.get("enemy_type")==&"meteor" and event.get("cause",&"")!=&"vortex") or event.type==&"rock_break":
 			var frames: SpriteFrames = _scope.resources.get("res://.content/meteor_pieces.res")
 			if frames!=null:
 				var animation := StringName("meteor_%d" % (posmod(int(event.meteor_index),2)+1))
@@ -874,6 +887,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var vortex_dt: float = 0.0 if _vortex_world_time<0.0 else maxf(0.0,ui.world_time-_vortex_world_time)
+	_vortex_world_time = ui.world_time if equipped_vortex else -1.0
+	if _vortex_visual!=null:
+		_vortex_visual.sync_frame(ui.vortex.visuals,vortex_dt)
+		_vortex_visual.frame_tick(vortex_dt,ui.ship.ship_pos)
 	var mines_dt: float = 0.0 if _mines_world_time<0.0 else maxf(0.0,ui.world_time-_mines_world_time)
 	_mines_world_time = ui.world_time if equipped_mines else -1.0
 	if _mines_visual!=null:

@@ -1330,6 +1330,10 @@
       {
         "name": "Mine",
         "value": "mine"
+      },
+      {
+        "name": "Vortex",
+        "value": "vortex"
       }
     ],
     "VisualRole": [
@@ -1686,6 +1690,18 @@
       {
         "name": "RunUpHit",
         "value": "run_up_hit"
+      },
+      {
+        "name": "EndHole",
+        "value": "end_hole"
+      },
+      {
+        "name": "HoleCapture",
+        "value": "hole_capture"
+      },
+      {
+        "name": "HoleRecover",
+        "value": "hole_recover"
       }
     ],
     "ResultKind": [
@@ -2161,6 +2177,21 @@
       "pos",
       "dir",
       "strength"
+    ],
+    "end_hole": [
+      "pos",
+      "life"
+    ],
+    "hole_capture": [
+      "pos",
+      "radius",
+      "enemy_type",
+      "color",
+      "facing"
+    ],
+    "hole_recover": [
+      "pos",
+      "amount"
     ]
   },
   "includes": [

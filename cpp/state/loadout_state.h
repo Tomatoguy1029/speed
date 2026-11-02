@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_set>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/color.hpp>
 namespace speed {
 struct ForwardWeaponState {
     bool ready = false;
@@ -68,6 +69,26 @@ struct EndBlastWeaponState {
     std::vector<EndBlastPending> pending;
     std::vector<EndBlastVisual> visuals;
 };
+struct VortexInstance {
+    godot::Vector2 pos;
+    uint64_t id=0,kills=0;
+    double age=0,radius=0,damage=0,duration=0;
+    std::unordered_set<int64_t> hits;
+};
+struct VortexVisual {
+    godot::Vector2 pos;
+    godot::Color color;
+    uint64_t id=0;
+    uint32_t kind=0,definition=0;
+    double age=0,life=0,radius=0,facing=0,amount=0;
+};
+struct VortexState {
+    bool ready=false;
+    uint64_t serial=0;
+    double damage=0,radius=0,kills=1,charge=0,hold=0,collapse=0;
+    std::vector<VortexInstance> items;
+    std::vector<VortexVisual> visuals;
+};
 struct RunUpHitState {godot::Vector2 pos,direction;double age=0;uint64_t id=0;};
 struct RunUpState {
     bool ready=false,first=true;
@@ -95,6 +116,7 @@ struct EquipmentEffects {
 struct LoadoutState {
     EquipmentEffects effects;
     bool full_burst_owned=false,full_burst_active=false;
+    VortexState vortex;
     RunUpState run_up;
     RampageState rampage;
     DuplicatorState duplicator;

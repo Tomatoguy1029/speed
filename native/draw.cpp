@@ -3,6 +3,7 @@
 #include "../cpp/behaviors/traits/fullCharge.h"
 #include "../cpp/behaviors/traits/rampage.h"
 #include "../cpp/behaviors/traits/runUp.h"
+#include "../cpp/behaviors/traits/vortex.h"
 #include "../cpp/behaviors/weapons/endBlast.h"
 #include "../cpp/behaviors/weapons/mines.h"
 #include <algorithm>
@@ -155,7 +156,12 @@ void SpeedRunCore::end_trace(bool completed) {
         if (id=="W29") speed::EndBlastBehavior::end(runtime);
         else if (id=="W07") speed::MinesBehavior::end(runtime);
     }
-    speed::RampageBehavior::end(runtime);
+    for (const auto &owned:runtime.state.loadout.traits) {
+        if (runtime.state.phase!=RunState::Phase::Play) break;
+        const auto &id=runtime.content->equipment[owned.definition-1].external_id;
+        if (id=="T33") speed::RampageBehavior::end(runtime);
+        else if (id=="T03") speed::VortexBehavior::end(runtime);
+    }
     speed::FullChargeBehavior::end(runtime);
     const double speed = std::max(double(runtime.state.ship.vel.length()), runtime.state.draw.before_speed);
     const Vector2 direction = runtime.state.ship.vel.is_zero_approx() ? runtime.state.ship.heading : runtime.state.ship.vel.normalized();

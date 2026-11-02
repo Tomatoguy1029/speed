@@ -535,7 +535,7 @@ Array SpeedRunCore::enemies_snapshot() const {
         row["pos"] = Array::make(enemy.pos.x, enemy.pos.y);
         row["vel"] = Array::make(enemy.vel.x, enemy.vel.y);
         row["hp"] = enemy.hp; row["armor"] = enemy.armor;
-        row["radius"] = enemy.radius; row["facing"] = enemy.facing; row["dead"] = enemy.dead ? 1 : 0;
+        row["radius"] = enemy.radius; row["facing"] = enemy.facing; row["dead"] = enemy.dead ? 1 : 0;row["hull_scattered"]=enemy.hull_scattered;
         out.append(row);
     }
     // 比較用コピーだけをID順へ並べる。実行中の格納位置は変えない。
