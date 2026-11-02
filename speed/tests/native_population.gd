@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-hero-special" in OS.get_cmdline_user_args():
+		check_semantics_hero_special()
+		print("[semantics_hero_special] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-duplicator-values" in OS.get_cmdline_user_args():
 		check_semantics_duplicator_values()
 		print("[semantics_duplicator_values] failed=%d" % failed)
@@ -1533,3 +1538,67 @@ func check_semantics_trait_boundaries() -> void:
 		cases+=1;print("SEMANTICS_TRAIT_BOUNDARY_CASE %s failed=%d"%[id,failed]);run.dispose();bridge.dispose()
 		if failed:break
 	print("SEMANTICS_TRAIT_BOUNDARIES ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+func check_semantics_hero_special() -> void:
+	var probe=COMPARE.new().create_native()
+	if probe==null:check(false,"英雄固有値のC++拡張を読む");return
+	probe.close()
+	var config:GameConfig=ContentManager.base.duplicate(true)
+	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0;config.base_crit_chance=0
+	var stage:=RuntimeStage.new();stage.boss_enabled=false;stage.index=207;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter"])
+	var definition:EnemyDef=ContentManager.enemies[&"drifter"].duplicate(true);definition.hp=100000.0
+	var definitions:={&"drifter":definition};var output:="res://.content/dev/semantics_hero_special"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1英雄の固有値".sha256_text(),definitions)!=OK:check(false,"英雄固有値の定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_207.json")));var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
+	var cases:=0;var from_id:=""
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-hero-from="):from_id=arg.trim_prefix("--semantics-hero-from=")
+	var ids:=["gemini","hercules","perseus"]
+	for id:String in ids:
+		if not from_id.is_empty() and ids.find(id)<ids.find(from_id):continue
+		var run:=semantics_legacy(config,stage,definitions,79)
+		run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies();run.loadout.reset_loadout();run.enemies._next_id=1
+		var bridge=semantics_bridge(bytes,79)
+		if bridge==null:check(false,"英雄の固有値のC++ランを開始する");run.dispose();OS.remove_logger(capture);return
+		var pair:=[]
+		if id!="gemini":pair=semantics_spawn_pair(run,bridge,run.state.ship_pos+Vector2(120,0));bridge._core.rebuild_enemy_grid(200.0)
+		if id=="perseus":
+			run.enemies.table.is_boss[pair[0]]=1;bridge.command("dev_enemy_combat",{"entity_id":pair[1],"is_boss":true})
+		run.state.hero_power=StringName(id);run.heroes.activate();bridge.command("dev_set_hero",{"id":id});bridge.command("dev_hero_activate",{})
+		if id=="gemini":
+			semantics_start_trace(run,bridge,600.0)
+			var it:=Intent.new();it.press=true;it.touch=true;it.pen=run.state.ship_pos+Vector2(0,200)
+			run.draw.intent=it;run.draw.handle_input();bridge._core.handle_draw(bridge.pack_intent(it),3000,1.0)
+			it.press=false;it.has_cursor=true;it.pen+=Vector2(600,0);it.pen_release=true
+			run.draw.intent=it;run.draw.handle_input();bridge._core.handle_draw(bridge.pack_intent(it),4000,1.0)
+		for tick in (32 if id=="gemini" else 20):
+			var expected:={};var actual:={}
+			if id=="gemini":
+				run.draw.tick(0.01,0.0);bridge._core.step_draw(0.01);bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":run.state.time})
+				var twin:Dictionary=bridge.read_frame().value.ui.hero.twin
+				expected={"position":run.state.twin_pos,"tracing":run.state.twin_tracing,"rate":run.draw.twin_run.rate,"segment_position":run.draw.twin_run.seg_pos}
+				actual=semantics_fields(twin,["position","tracing","rate","segment_position"])
+			elif id=="hercules":
+				var dt:=0.3 if tick in [1,2] else 0.1
+				run.state.time+=dt;run.heroes.tick(dt,0.0);bridge.command("dev_tick_heroes",{"dt":dt,"run_time":run.state.time})
+				var behavior=run.heroes.behavior(&"hercules");var fire:Dictionary=bridge.read_frame().value.ui.hero.hercules
+				var falls:=[];var burns:=[];var native_falls:=[];var native_burns:=[]
+				for value:Vector3 in behavior.falls:falls.append(float(value.z))
+				for value:Vector3 in behavior.burns:burns.append(float(value.z))
+				for n in range(2,fire.falls.size(),3):native_falls.append(fire.falls[n])
+				for n in range(2,fire.burns.size(),3):native_burns.append(fire.burns[n])
+				expected={"falls":falls,"burns":burns,"fire_t":behavior._fire_t,"burn_tick":behavior._burn_tick,"hp":run.enemies.table.hp[pair[0]]}
+				actual={"falls":native_falls,"burns":native_burns,"fire_t":fire.fire_time,"burn_tick":fire.burn_tick,"hp":bridge._core.enemies_snapshot()[0].hp}
+			else:
+				run.bosses.tick(0.1,0.0);bridge._core.step(0.1);bridge.command("set_ui_overlay",{"active":false})
+				expected.stun=run.state.boss_stun;actual.stun=bridge.read_frame().value.ui.hero.boss_stun
+			if id=="hercules" and "--semantics-hero-from=hercules" in OS.get_cmdline_user_args() and tick<1:continue
+			if capture.count()>0:check(false,"英雄固有値の更新エラー %s tick%d: %s"%[id,tick,capture.messages()]);break
+			var found:String=comparison.semantics_difference(expected,actual)
+			check(found.is_empty(),"英雄固有値の指定許容幅 %s tick%d: %s"%[id,tick,found])
+			if not found.is_empty():break
+		cases+=1;print("SEMANTICS_HERO_SPECIAL_CASE %s failed=%d"%[id,failed]);run.dispose();bridge.dispose()
+		if failed:break
+	OS.remove_logger(capture);check(capture.count()==0,"英雄固有値のSource/C++に実行エラーがない")
+	print("SEMANTICS_HERO_SPECIAL ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
