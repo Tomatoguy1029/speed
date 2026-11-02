@@ -1047,6 +1047,45 @@ inline bool read(BinaryReader &input, LightLanceDefinition &out) {
     if (out.maximum < 1) return false;
     return true;
 }
+struct ShellDefinition {
+    uint32_t id{};
+    uint32_t contact{};
+    double flight_scale{};
+    float tint_r{};
+    float tint_g{};
+    float tint_b{};
+    float tint_a{};
+};
+inline bool read(BinaryReader &input, ShellDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.contact)) return false;
+    if (out.contact < 1) return false;
+    if (!input.read_f64(out.flight_scale)) return false;
+    if (out.flight_scale < 0) return false;
+    if (!input.read_f32(out.tint_r)) return false;
+    if (!input.read_f32(out.tint_g)) return false;
+    if (!input.read_f32(out.tint_b)) return false;
+    if (!input.read_f32(out.tint_a)) return false;
+    return true;
+}
+struct ShellSource {
+    uint32_t id{};
+    uint32_t enemy{};
+    double mouth_radius{};
+    uint32_t store_max{};
+};
+inline bool read(BinaryReader &input, ShellSource &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    if (!input.read_f64(out.mouth_radius)) return false;
+    if (out.mouth_radius < 0) return false;
+    if (!input.read_u32(out.store_max)) return false;
+    if (out.store_max < 1) return false;
+    return true;
+}
 struct BudgetPhase {
     uint32_t id{};
     double start{};
@@ -2307,6 +2346,38 @@ inline bool read(BinaryReader &input, MinesDefinition &out) {
     if (out.visual_life < 0) return false;
     return true;
 }
+struct VortexDefinition {
+    uint32_t id{};
+    uint32_t equipment{};
+    uint32_t level{};
+    double damage{};
+    double radius{};
+    double kills{};
+    double charge{};
+    double hold{};
+    double collapse{};
+};
+inline bool read(BinaryReader &input, VortexDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.kills)) return false;
+    if (out.kills < 0) return false;
+    if (!input.read_f64(out.charge)) return false;
+    if (out.charge < 0) return false;
+    if (!input.read_f64(out.hold)) return false;
+    if (out.hold < 0) return false;
+    if (!input.read_f64(out.collapse)) return false;
+    if (out.collapse < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -2342,6 +2413,8 @@ struct ContentRecords {
     std::vector<ZoneDefinition> ZoneDefinition_rows;
     std::vector<FloodDefinition> FloodDefinition_rows;
     std::vector<LightLanceDefinition> LightLanceDefinition_rows;
+    std::vector<ShellDefinition> ShellDefinition_rows;
+    std::vector<ShellSource> ShellSource_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
@@ -2387,6 +2460,7 @@ struct ContentRecords {
     std::vector<EndBlastDefinition> EndBlastDefinition_rows;
     std::vector<RunUpDefinition> RunUpDefinition_rows;
     std::vector<MinesDefinition> MinesDefinition_rows;
+    std::vector<VortexDefinition> VortexDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -2598,6 +2672,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/24) return false;
         for (uint32_t i=0; i<count; ++i) { LightLanceDefinition row; if (!read(input,row)) return false; out.LightLanceDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 80: {
+        if (version != 1) return false;
+        if (count > input.remaining()/32) return false;
+        for (uint32_t i=0; i<count; ++i) { ShellDefinition row; if (!read(input,row)) return false; out.ShellDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 81: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { ShellSource row; if (!read(input,row)) return false; out.ShellSource_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 16: {
@@ -2870,6 +2956,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { MinesDefinition row; if (!read(input,row)) return false; out.MinesDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 82: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { VortexDefinition row; if (!read(input,row)) return false; out.VortexDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -2942,6 +3034,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FloodDefinition_rows) if (!FloodDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LightLanceDefinition_ids;
     for (const auto &row:data.LightLanceDefinition_rows) if (!LightLanceDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ShellDefinition_ids;
+    for (const auto &row:data.ShellDefinition_rows) if (!ShellDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ShellSource_ids;
+    for (const auto &row:data.ShellSource_rows) if (!ShellSource_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
@@ -3032,6 +3128,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.RunUpDefinition_rows) if (!RunUpDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MinesDefinition_ids;
     for (const auto &row:data.MinesDefinition_rows) if (!MinesDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> VortexDefinition_ids;
+    for (const auto &row:data.VortexDefinition_rows) if (!VortexDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -3064,6 +3162,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FriendHullLook_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.ZoneDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.FloodDefinition_rows) if (!BeamDefinition_ids.count(row.beam)) return false;
+    for (const auto &row:data.ShellDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
+    for (const auto &row:data.ShellSource_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -3109,6 +3209,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.EndBlastDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.RunUpDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.MinesDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.VortexDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -3234,5 +3335,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=79;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=82;
 }
