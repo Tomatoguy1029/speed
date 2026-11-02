@@ -278,7 +278,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			var key := "%d:%d:%d" % [row.kind,row.layer,row.order]
 			if not _shape_displays.has(key):
 				var circles: Array = []
-				var node: DrawLayer = preload("res://scripts/render/attacks/zone.gd").frame_group(circles,_pixel) if row.kind==3 else preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
+				var node: DrawLayer = preload("res://scripts/render/attacks/zone.gd").frame_group(circles,func(): return 1.0/maxf(_zoom,0.01)) if row.kind==3 else preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
 				parent.add_child(node)
 				_shape_displays[key] = {"node":node,"circles":circles,"used":false,"previous_circles":[]}
 			display = _shape_displays[key]

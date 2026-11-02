@@ -23,10 +23,10 @@ static func draw_burst(c: CanvasItem, p: Vector2, radius: float, fade: float, co
 	c.draw_circle(p,radius,Color(color,0.45*fade*tint.a))
 	c.draw_arc(p,radius,0.0,TAU,40,Color(1,1,1,0.8*fade)*tint,3.0*pixel)
 
-static func frame_group(circles: Array, pixel: float) -> DrawLayer:
+static func frame_group(circles: Array, pixel: Callable) -> DrawLayer:
 	var node := DrawLayer.new()
 	var tint: Color = EFFECT_SETTINGS.values_for("res://scenes/attacks/zone.tscn").get("effect_tint",Color.WHITE)
 	node.draw_fn = func(canvas: CanvasItem):
 		for circle: Dictionary in circles:
-			draw_burst(canvas,circle.position,circle.radius,circle.color.a,Color(circle.color,1.0)*tint,pixel,tint)
+			draw_burst(canvas,circle.position,circle.radius,circle.color.a,Color(circle.color,1.0)*tint,pixel.call(),tint)
 	return node

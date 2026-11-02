@@ -220,7 +220,7 @@
     },
     {
       "name": "BoltDefinition",
-      "section": 40,
+      "section": 43,
       "fields": [
         {
           "name": "id",

@@ -89,8 +89,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (!state.hazards.empty() && !core.step_hazards(wd)) return false;
     }
     if (core.check_run_end()) return true;
-    for (size_t row:state.dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);
-    state.dead_rows.clear();
+    auto dead_rows=std::move(state.dead_rows);state.dead_rows.clear();
+    for (size_t row:dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);
     if (state.pickups_ready) PickupSystem::prune(core.runtime);
     if (world_step) {
         if (state.population.frame_enabled && !state.population.blocked && !core.attack_guard_active() && !core.step_population(wd,control.bonus_remaining>0)) return false;
