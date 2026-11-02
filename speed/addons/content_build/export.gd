@@ -24,6 +24,10 @@ func _export_begin(_features: PackedStringArray, _is_debug: bool, _path: String,
 			add_file(path, FileAccess.get_file_as_bytes(path), false)
 
 	# ランの索引・値型定義と資源一覧は生成結果の参照を保ったまま登録する。
+	var stamp_path := BUILD.ROOT.path_join("stamp.json")
+	var stamp: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(stamp_path))
+	stamp.outputs = stamp.outputs.filter(func(output):return not String(output).begins_with(BUILD.ROOT.path_join("dev/")))
+	add_file(stamp_path, JSON.stringify(stamp).to_utf8_buffer(), false)
 	_add_runtime_files(BUILD.ROOT.path_join("run"))
 	add_file("res://licenses/run/GODOT.txt", Engine.get_license_text().to_utf8_buffer(), false)
 	var notices := PackedStringArray()
