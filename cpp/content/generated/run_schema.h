@@ -486,10 +486,13 @@ inline bool read(BinaryReader &input, PopulationDefinition &out) {
 }
 struct FormationDefinition {
     uint32_t id{};
+    double base_view{};
 };
 inline bool read(BinaryReader &input, FormationDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
+    if (!input.read_f64(out.base_view)) return false;
+    if (out.base_view < 0) return false;
     return true;
 }
 struct BossFlowDefinition {
@@ -1243,6 +1246,148 @@ inline bool read(BinaryReader &input, PopulationType &out) {
     if (!input.read_f64(out.rank)) return false;
     if (!input.read_f64(out.maximum)) return false;
     if (!input.read_bool(out.ranged)) return false;
+    return true;
+}
+struct FormationEntry {
+    uint32_t id{};
+    uint32_t formation{};
+    double weight{};
+    double x{};
+    double y{};
+};
+inline bool read(BinaryReader &input, FormationEntry &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.formation)) return false;
+    if (out.formation < 1) return false;
+    if (!input.read_f64(out.weight)) return false;
+    if (out.weight < 0) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    return true;
+}
+struct FormationLayout {
+    uint32_t id{};
+    uint32_t formation{};
+    double weight{};
+    double value{};
+    int64_t managed{};
+};
+inline bool read(BinaryReader &input, FormationLayout &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.formation)) return false;
+    if (out.formation < 1) return false;
+    if (!input.read_f64(out.weight)) return false;
+    if (out.weight < 0) return false;
+    if (!input.read_f64(out.value)) return false;
+    if (!input.read_i64(out.managed)) return false;
+    if (out.managed < -1) return false;
+    if (out.managed > 1) return false;
+    return true;
+}
+struct FormationType {
+    uint32_t id{};
+    uint32_t layout{};
+    uint32_t enemy{};
+};
+inline bool read(BinaryReader &input, FormationType &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.layout)) return false;
+    if (out.layout < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    return true;
+}
+struct FormationMarker {
+    uint32_t id{};
+    uint32_t layout{};
+    uint32_t entry{};
+    uint32_t enemy{};
+    double x{};
+    double y{};
+    double rotation{};
+};
+inline bool read(BinaryReader &input, FormationMarker &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.layout)) return false;
+    if (out.layout < 1) return false;
+    if (!input.read_u32(out.entry)) return false;
+    if (out.entry < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    return true;
+}
+struct PopulationClip {
+    uint32_t id{};
+    double start{};
+    double end{};
+    double interval{};
+    uint32_t groups{};
+    double priority{};
+};
+inline bool read(BinaryReader &input, PopulationClip &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.start)) return false;
+    if (!input.read_f64(out.end)) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_u32(out.groups)) return false;
+    if (!input.read_f64(out.priority)) return false;
+    return true;
+}
+struct PopulationClipType {
+    uint32_t id{};
+    uint32_t clip{};
+    uint32_t enemy{};
+};
+inline bool read(BinaryReader &input, PopulationClipType &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.clip)) return false;
+    if (out.clip < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    return true;
+}
+struct PopulationClipFormation {
+    uint32_t id{};
+    uint32_t clip{};
+    uint32_t formation{};
+};
+inline bool read(BinaryReader &input, PopulationClipFormation &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.clip)) return false;
+    if (out.clip < 1) return false;
+    if (!input.read_u32(out.formation)) return false;
+    if (out.formation < 1) return false;
+    return true;
+}
+struct DeathChainDefinition {
+    uint32_t id{};
+    double power{};
+    double radius{};
+    double delay{};
+    double damage{};
+};
+inline bool read(BinaryReader &input, DeathChainDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.power)) return false;
+    if (out.power < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.delay)) return false;
+    if (out.delay < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
     return true;
 }
 struct ProgressionDefinition {
@@ -3204,6 +3349,91 @@ inline bool read(BinaryReader &input, KnockbackDefinition &out) {
     if (out.area_increment < 0) return false;
     return true;
 }
+struct ContactWaveDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    double radius{};
+    double damage{};
+    double knock{};
+    double area_increment{};
+    double knockback_increment{};
+};
+inline bool read(BinaryReader &input, ContactWaveDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.knock)) return false;
+    if (out.knock < 0) return false;
+    if (!input.read_f64(out.area_increment)) return false;
+    if (out.area_increment < 0) return false;
+    if (!input.read_f64(out.knockback_increment)) return false;
+    if (out.knockback_increment < 0) return false;
+    return true;
+}
+struct SonicDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    double damage{};
+    double speed{};
+    double life{};
+    double emit_spacing{};
+    double min_speed{};
+    double nose{};
+    double distance{};
+    double pulse{};
+    double side_speed{};
+    double back_speed{};
+    double decay{};
+    double damage_delay{};
+    double area_increment{};
+    double duration_increment{};
+};
+inline bool read(BinaryReader &input, SonicDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.speed)) return false;
+    if (out.speed < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.emit_spacing)) return false;
+    if (out.emit_spacing < 0) return false;
+    if (!input.read_f64(out.min_speed)) return false;
+    if (out.min_speed < 0) return false;
+    if (!input.read_f64(out.nose)) return false;
+    if (out.nose < 0) return false;
+    if (!input.read_f64(out.distance)) return false;
+    if (out.distance < 0) return false;
+    if (!input.read_f64(out.pulse)) return false;
+    if (out.pulse < 0) return false;
+    if (!input.read_f64(out.side_speed)) return false;
+    if (out.side_speed < 0) return false;
+    if (!input.read_f64(out.back_speed)) return false;
+    if (out.back_speed < 0) return false;
+    if (!input.read_f64(out.decay)) return false;
+    if (out.decay < 0) return false;
+    if (!input.read_f64(out.damage_delay)) return false;
+    if (out.damage_delay < 0) return false;
+    if (!input.read_f64(out.area_increment)) return false;
+    if (out.area_increment < 0) return false;
+    if (!input.read_f64(out.duration_increment)) return false;
+    if (out.duration_increment < 0) return false;
+    return true;
+}
 struct BossDefinition {
     uint32_t id{};
     std::string external_id{};
@@ -3273,6 +3503,23 @@ struct BossTechniqueDefinition {
     double damage{};
     double distance{};
     double post_gap{};
+    double reach{};
+    double hold{};
+    double return_speed{};
+    double approach_speed_start{};
+    double approach_accel{};
+    double approach_speed_max{};
+    double approach_turn{};
+    double approach_min{};
+    double approach_max{};
+    double stop_range{};
+    double twist_time{};
+    double twist{};
+    double stop_time{};
+    double stop_decel{};
+    double windup_twist{};
+    double arc{};
+    double return_time{};
 };
 inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -3280,7 +3527,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 0) return false;
+    if (out.kind > 2) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -3299,6 +3546,40 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (out.distance < 0) return false;
     if (!input.read_f64(out.post_gap)) return false;
     if (out.post_gap < 0) return false;
+    if (!input.read_f64(out.reach)) return false;
+    if (out.reach < 0) return false;
+    if (!input.read_f64(out.hold)) return false;
+    if (out.hold < 0) return false;
+    if (!input.read_f64(out.return_speed)) return false;
+    if (out.return_speed < 0) return false;
+    if (!input.read_f64(out.approach_speed_start)) return false;
+    if (out.approach_speed_start < 0) return false;
+    if (!input.read_f64(out.approach_accel)) return false;
+    if (out.approach_accel < 0) return false;
+    if (!input.read_f64(out.approach_speed_max)) return false;
+    if (out.approach_speed_max < 0) return false;
+    if (!input.read_f64(out.approach_turn)) return false;
+    if (out.approach_turn < 0) return false;
+    if (!input.read_f64(out.approach_min)) return false;
+    if (out.approach_min < 0) return false;
+    if (!input.read_f64(out.approach_max)) return false;
+    if (out.approach_max < 0) return false;
+    if (!input.read_f64(out.stop_range)) return false;
+    if (out.stop_range < 0) return false;
+    if (!input.read_f64(out.twist_time)) return false;
+    if (out.twist_time < 0) return false;
+    if (!input.read_f64(out.twist)) return false;
+    if (out.twist < 0) return false;
+    if (!input.read_f64(out.stop_time)) return false;
+    if (out.stop_time < 0) return false;
+    if (!input.read_f64(out.stop_decel)) return false;
+    if (out.stop_decel < 0) return false;
+    if (!input.read_f64(out.windup_twist)) return false;
+    if (out.windup_twist < 0) return false;
+    if (!input.read_f64(out.arc)) return false;
+    if (out.arc < 0) return false;
+    if (!input.read_f64(out.return_time)) return false;
+    if (out.return_time < 0) return false;
     return true;
 }
 struct BossTechniqueStage {
@@ -3612,6 +3893,14 @@ struct ContentRecords {
     std::vector<PopulationPoint> PopulationPoint_rows;
     std::vector<PopulationWindow> PopulationWindow_rows;
     std::vector<PopulationType> PopulationType_rows;
+    std::vector<FormationEntry> FormationEntry_rows;
+    std::vector<FormationLayout> FormationLayout_rows;
+    std::vector<FormationType> FormationType_rows;
+    std::vector<FormationMarker> FormationMarker_rows;
+    std::vector<PopulationClip> PopulationClip_rows;
+    std::vector<PopulationClipType> PopulationClipType_rows;
+    std::vector<PopulationClipFormation> PopulationClipFormation_rows;
+    std::vector<DeathChainDefinition> DeathChainDefinition_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
@@ -3677,6 +3966,8 @@ struct ContentRecords {
     std::vector<VortexDefinition> VortexDefinition_rows;
     std::vector<CritBeamDefinition> CritBeamDefinition_rows;
     std::vector<KnockbackDefinition> KnockbackDefinition_rows;
+    std::vector<ContactWaveDefinition> ContactWaveDefinition_rows;
+    std::vector<SonicDefinition> SonicDefinition_rows;
     std::vector<BossDefinition> BossDefinition_rows;
     std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
     std::vector<BossTechniqueStage> BossTechniqueStage_rows;
@@ -3744,9 +4035,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 9: {
-        if (version != 1) return false;
-        if (count) return false;
-        if (count > input.remaining()/4) return false;
+        if (version != 2) return false;
+        if (count > input.remaining()/12) return false;
         for (uint32_t i=0; i<count; ++i) { FormationDefinition row; if (!read(input,row)) return false; out.FormationDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -3954,6 +4244,54 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/25) return false;
         for (uint32_t i=0; i<count; ++i) { PopulationType row; if (!read(input,row)) return false; out.PopulationType_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 180: {
+        if (version != 1) return false;
+        if (count > input.remaining()/32) return false;
+        for (uint32_t i=0; i<count; ++i) { FormationEntry row; if (!read(input,row)) return false; out.FormationEntry_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 181: {
+        if (version != 1) return false;
+        if (count > input.remaining()/32) return false;
+        for (uint32_t i=0; i<count; ++i) { FormationLayout row; if (!read(input,row)) return false; out.FormationLayout_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 182: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { FormationType row; if (!read(input,row)) return false; out.FormationType_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 183: {
+        if (version != 1) return false;
+        if (count > input.remaining()/40) return false;
+        for (uint32_t i=0; i<count; ++i) { FormationMarker row; if (!read(input,row)) return false; out.FormationMarker_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 184: {
+        if (version != 1) return false;
+        if (count > input.remaining()/40) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationClip row; if (!read(input,row)) return false; out.PopulationClip_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 185: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationClipType row; if (!read(input,row)) return false; out.PopulationClipType_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 186: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { PopulationClipFormation row; if (!read(input,row)) return false; out.PopulationClipFormation_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 187: {
+        if (version != 1) return false;
+        if (count > input.remaining()/36) return false;
+        for (uint32_t i=0; i<count; ++i) { DeathChainDefinition row; if (!read(input,row)) return false; out.DeathChainDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 17: {
@@ -4346,15 +4684,27 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { KnockbackDefinition row; if (!read(input,row)) return false; out.KnockbackDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
-    case 150: {
+    case 200: {
         if (version != 1) return false;
+        if (count > input.remaining()/52) return false;
+        for (uint32_t i=0; i<count; ++i) { ContactWaveDefinition row; if (!read(input,row)) return false; out.ContactWaveDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 201: {
+        if (version != 1) return false;
+        if (count > input.remaining()/124) return false;
+        for (uint32_t i=0; i<count; ++i) { SonicDefinition row; if (!read(input,row)) return false; out.SonicDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 150: {
+        if (version != 2) return false;
         if (count > input.remaining()/124) return false;
         for (uint32_t i=0; i<count; ++i) { BossDefinition row; if (!read(input,row)) return false; out.BossDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 1) return false;
-        if (count > input.remaining()/77) return false;
+        if (version != 3) return false;
+        if (count > input.remaining()/213) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -4514,6 +4864,22 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PopulationWindow_rows) if (!PopulationWindow_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PopulationType_ids;
     for (const auto &row:data.PopulationType_rows) if (!PopulationType_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> FormationEntry_ids;
+    for (const auto &row:data.FormationEntry_rows) if (!FormationEntry_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> FormationLayout_ids;
+    for (const auto &row:data.FormationLayout_rows) if (!FormationLayout_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> FormationType_ids;
+    for (const auto &row:data.FormationType_rows) if (!FormationType_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> FormationMarker_ids;
+    for (const auto &row:data.FormationMarker_rows) if (!FormationMarker_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationClip_ids;
+    for (const auto &row:data.PopulationClip_rows) if (!PopulationClip_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationClipType_ids;
+    for (const auto &row:data.PopulationClipType_rows) if (!PopulationClipType_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PopulationClipFormation_ids;
+    for (const auto &row:data.PopulationClipFormation_rows) if (!PopulationClipFormation_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DeathChainDefinition_ids;
+    for (const auto &row:data.DeathChainDefinition_rows) if (!DeathChainDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
     for (const auto &row:data.ProgressionDefinition_rows) if (!ProgressionDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LoadoutAsset_ids;
@@ -4644,6 +5010,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CritBeamDefinition_rows) if (!CritBeamDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> KnockbackDefinition_ids;
     for (const auto &row:data.KnockbackDefinition_rows) if (!KnockbackDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ContactWaveDefinition_ids;
+    for (const auto &row:data.ContactWaveDefinition_rows) if (!ContactWaveDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> SonicDefinition_ids;
+    for (const auto &row:data.SonicDefinition_rows) if (!SonicDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossDefinition_ids;
     for (const auto &row:data.BossDefinition_rows) if (!BossDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossTechniqueDefinition_ids;
@@ -4709,6 +5079,18 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PopulationCurve_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.PopulationPoint_rows) if (!PopulationCurve_ids.count(row.curve)) return false;
     for (const auto &row:data.PopulationType_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.FormationEntry_rows) if (!FormationDefinition_ids.count(row.formation)) return false;
+    for (const auto &row:data.FormationLayout_rows) if (!FormationDefinition_ids.count(row.formation)) return false;
+    for (const auto &row:data.FormationType_rows) if (!FormationLayout_ids.count(row.layout)) return false;
+    for (const auto &row:data.FormationType_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.FormationMarker_rows) if (!FormationLayout_ids.count(row.layout)) return false;
+    for (const auto &row:data.FormationMarker_rows) if (!FormationEntry_ids.count(row.entry)) return false;
+    for (const auto &row:data.FormationMarker_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.PopulationClipType_rows) if (!PopulationClip_ids.count(row.clip)) return false;
+    for (const auto &row:data.PopulationClipType_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.PopulationClipFormation_rows) if (!PopulationClip_ids.count(row.clip)) return false;
+    for (const auto &row:data.PopulationClipFormation_rows) if (!FormationDefinition_ids.count(row.formation)) return false;
+    for (const auto &row:data.DeathChainDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -4776,6 +5158,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.VortexDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.CritBeamDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.KnockbackDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.ContactWaveDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.SonicDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.BossBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -4917,5 +5301,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=121;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=131;
 }
