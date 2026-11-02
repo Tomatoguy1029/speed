@@ -1,5 +1,5 @@
 ## P10の固定1300体診断。実ステージや描画を含むfpsの判定には使わない。
-extends "res://tests/native_forward.gd"
+extends "res://tests/runtime/run_forward.gd"
 var batches := {}
 func display_data(run: RunSimulation, definitions: Array) -> Array:
 	var out := []
@@ -61,7 +61,7 @@ func _ready() -> void:
 			serial += 1
 	check(run.enemies.count()==1300 and core.enemies_snapshot().size()==1300,"追跡430・噛みつき435・猟犬435体を固定する")
 	var samples := {"gd_update":[],"native_update":[],"gd_display":[],"native_display":[],"gd_total":[],"native_total":[]}
-	var zone_helper = load("res://tests/native_bite_zone.gd").new()
+	var zone_helper = load("res://tests/runtime/run_bite_zone.gd").new()
 	zone_helper.comparison = comparison
 	var hazard_seen := false
 	for tick in 660:

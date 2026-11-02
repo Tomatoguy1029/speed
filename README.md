@@ -40,13 +40,13 @@ godot --headless --path speed --script res://tools/content/build_all.gd -- --for
 
 macOSのローカル確認用アプリは `godot --headless --path speed --export-release macOS /tmp/SPEED.app` で作れます。開発用ファイルの除外と製品公開の設定範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
-接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
+接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/integration/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
 
-全武器MAX後の成長は `godot --headless --path speed res://tests/post_max_progression.tscn`、同じ3択UIとポーズ入力は `res://tests/post_max_ui.tscn` で確認できます。描画付きの確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-postmax-captures` を付けます。
+全武器MAX後の成長は `godot --headless --path speed res://tests/integration/post_max_progression.tscn`、同じ3択UIとポーズ入力は `res://tests/integration/post_max_ui.tscn` で確認できます。描画付きの確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-postmax-captures` を付けます。
 
-敵の出現の仕組み（時間帯・強敵の群れ・出現のクリップ・攻撃の予算）の確認は `godot --headless --path speed res://tests/spawn_formations.tscn`。
+敵の出現の仕組み（時間帯・強敵の群れ・出現のクリップ・攻撃の予算）の確認は `godot --headless --path speed res://tests/runtime/spawn_formations.tscn`。
 
-短時間の性能計測は `godot --path speed --disable-vsync res://tools/profile_run.tscn -- --time=350`。セーブへ書き込まず、ゲームの進行を指定秒へ進めて6秒準備・6秒計測します。
+性能計測の入口は `res://tools/profiling/profile_run.tscn`。生成済みのラン定義がある `/tmp` の独立コピーを使い、`SaveManager.SAVE_PATH` と `SETTINGS_PATH` を両方 `/tmp` 内へ隔離してから `godot-bg` で起動します。`--time` で開始ラン秒、`--seconds` で60秒以上の計測区間、`--revision` で確認したコミットID、`--out` で結果の保存先を指定します。通常の出撃・C++ラン・入力・描画を使い、条件の未成立と性能未達を分けて出力します。
 
 ## 構成
 

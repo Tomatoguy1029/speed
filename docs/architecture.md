@@ -204,7 +204,7 @@ classDiagram
 3. 状態をRunStateと各Systemの列に持ち、処理と表示を分ける。
 4. 種類固有の分岐は、敵・攻撃・武器・特性・英雄・仕掛け・回収の各スクリプトに置く。
 5. セッションの終了時に、通知・コールバック・役者・資源の参照を解放する。実験ごとの設定・乱数・状態の参照を分ける。
-6. `tests/check_rules.gd` がAutoload、Managerのコンテンツ参照、再利用する道具、UIの状態代入、開発用の依存を確認する。
+6. `tests/content/check_rules.gd` がAutoload、Managerのコンテンツ参照、再利用する道具、UIの状態代入、開発用の依存を確認する。
 7. 処理の実行時期は[ビルドと実行時の境界](#151-ビルドと実行時の境界)に従う。設計・レビューで生成元から利用・解放までを照合する。
 
 ### 4.5 シーンの木
@@ -926,7 +926,7 @@ godot --headless --path speed --script res://tools/content/build_all.gd -- --for
 godot --headless --path speed --export-release macOS /tmp/SPEED.app
 ```
 
-`speed/export_presets.cfg` のmacOS設定はローカル確認用の署名・公証なしのアプリを生成する。`gyms/`・`tests/`・`tools/`・`scripts/dev/`・編集用addon・開発用の名前対応表とAutoloadを除外し、生成済みの実行用データを含める。PCKの検査は `python3 speed/tests/export_package.py <PCKのパス>` を使う。製品の署名・公証・ストア公開の設定は未決。
+`speed/export_presets.cfg` のmacOS設定はローカル確認用の署名・公証なしのアプリを生成する。`gyms/`・`tests/`・`tools/`・`scripts/dev/`・編集用addon・開発用の名前対応表とAutoloadを除外し、生成済みの実行用データを含める。PCKの検査は `python3 speed/tests/integration/export_package.py <PCKのパス>` を使う。製品の署名・公証・ストア公開の設定は未決。
 
 ## 16. demo との対応
 

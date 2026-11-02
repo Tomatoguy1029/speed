@@ -17,7 +17,7 @@ const SCENES := {
 	"background": "res://gyms/background_lab/background_lab.tscn",
 	"art": "res://tools/preview_pixel_assets.tscn",
 	"performance": "res://gyms/perf_enemies/perf_enemies.tscn",
-	"profile": "res://tools/profile_run.tscn",
+	"profile": "res://tools/profiling/profile_run.tscn",
 }
 var _button: Button = null
 var _lab_button: Button = null

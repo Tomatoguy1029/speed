@@ -559,7 +559,7 @@ Hydraは基準姿勢の首配置・生存本数・一部の参加条件と、通
 5. 通常の起動前生成とexportは `addons/content_build/builder.gd` からボスプログラムを生成する。`compile()` は版と意味的署名が同じなら再利用し、異なれば一時ファイル経由で置換する。図配置・条件選択の見た目と、接続・条件・技性能等の戦闘内容を分ける。`.content/` を直接修正して合わせない。
 6. 本番を起動し直し、同じ開始条件で録画し、時刻付きの感想と一緒に分析する。実験場の試遊は通常の録画母集団から分ける。画面確認だけで実行した全候補やスタミナ履歴を保存済みと見なさず、[計測の観測限界](../../.agents/skills/speed-balance-analysis/references/measurement.md#編成とボスの調整で観測できる範囲)を確認する。
 
-関連する自動検証の入口は `tests/boss_flow_select.gd`・`boss_flow_stamina.gd`・`boss_flow_range.gd`・`boss_flow_sections.gd`・`boss_flow_groups.gd`・`boss_flow_combo.gd`・`boss_flow_editor_workflow.gd`・`boss_flow_trial_run.gd`。変更リスクに応じて必要な既存検査を選ぶ。これらの読解・自動実行を、実ウィンドウで入力・選択・保存・試遊を操作した手動確認と表現しない。UIを未確認の場合は、その範囲を報告する。
+関連する自動検証の入口は `tests/runtime/boss_flow_select.gd`・`boss_flow_stamina.gd`・`boss_flow_range.gd`・`boss_flow_sections.gd`・`boss_flow_groups.gd`・`boss_flow_combo.gd`・`boss_flow_editor_workflow.gd`・`boss_flow_trial_run.gd`。変更リスクに応じて必要な既存検査を選ぶ。これらの読解・自動実行を、実ウィンドウで入力・選択・保存・試遊を操作した手動確認と表現しない。UIを未確認の場合は、その範囲を報告する。
 
 ## プレイ記録を読む
 
@@ -640,7 +640,7 @@ Godotの新規処理・変更処理は、着手時とレビュー時に[設計�
 4. **更新と寿命を照合する。** キャッシュの鍵・更新条件、既存ランと新しい利用者への参照、Scope等の所有者、取り消し後の実行中処理の回収と未使用資源の解放を確認する。
 5. **実装状態と確認結果を示す。** 見た目・判定・既存データの互換性、生成物の量、読み込み・保持の影響を確認する。未実装と実施済み、実測と未計測を分け、既存の未移行箇所を新規処理の根拠にしない。
 
-`tools/check_docs.py` は文書の配置・表記・リンク等、`speed/tests/check_rules.gd` は依存等の一部の規約を確認する。上記の意味的な判断はコードと生成・利用経路のレビューで行う。チェック通過を方針全体への適合や性能の保証として扱わない。生成・テスト・画面確認の実行は依頼範囲とAGENTS.mdに従う。
+`tools/check_docs.py` は文書の配置・表記・リンク等、`speed/tests/content/check_rules.gd` は依存等の一部の規約を確認する。上記の意味的な判断はコードと生成・利用経路のレビューで行う。チェック通過を方針全体への適合や性能の保証として扱わない。生成・テスト・画面確認の実行は依頼範囲とAGENTS.mdに従う。
 
 ## 編集元を保存し、実行用データを生成する
 

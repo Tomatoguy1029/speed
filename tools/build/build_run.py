@@ -122,8 +122,8 @@ def package(root, lock, args):
             archive.extractall(output)
         for executable in output.glob('*.app/Contents/MacOS/*'):
             executable.chmod(executable.stat().st_mode | 0o111)
-    run([sys.executable, root / 'speed/tests/export_package.py', output, '--platform', args.platform,
-         *(['--runtime'] if args.verify else []), *(['--rendered'] if args.rendered else []), '--script', root / 'speed/tests/check_rules.gd'])
+    run([sys.executable, root / 'speed/tests/integration/export_package.py', output, '--platform', args.platform,
+         *(['--runtime'] if args.verify else []), *(['--rendered'] if args.rendered else []), '--script', root / 'speed/tests/content/check_rules.gd'])
     print('配布物: ' + str(artifact))
 
 
