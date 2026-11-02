@@ -1,6 +1,7 @@
 #include "normal_attack.h"
 #include "squad.h"
 #include "body.h"
+#include "technique.h"
 #include "regrow.h"
 #include "swim.h"
 #include "../../systems/attack_system.h"
@@ -26,7 +27,7 @@ bool HydraNormalAttack::ready(const RunRuntime &r,EnemyHandle actor,uint32_t def
     for (const auto &b:r.state.bosses.bodies) {const HydraNeckState *n=nullptr;if (same_handle(b.hydra.bearer.actor,actor)) n=&b.hydra.bearer;for (const auto &v:b.hydra.necks) if (same_handle(v.actor,actor)) n=&v;if (!n) continue;
         if (n==&b.hydra.bearer && r.content->boss_techniques[definition-1].kind!=64) return false;
         if (b.hydra.separated && n==&b.hydra.bearer && b.hydra.separation_left<=0 && n->cd<=0 && !n->normal && std::none_of(b.hydra.necks.begin(),b.hydra.necks.end(),[&](const auto &v){return r.state.enemy_handles.contains(v.actor) && !r.state.enemies[v.actor.slot].dead;})) return true;
-        if (b.mode!=BossMode::Idle || b.hydra.growth_left>0 || b.hydra.chance_left>0 || b.hydra.recovery_left>0 || b.hydra.separation_pending || b.hydra.separation_left>0 || n->cd>0 || n->normal || (n!=&b.hydra.bearer && uint32_t(n->kind)!=it->head_kind)) return false;
+        if (HydraTechnique::busy(r,b) || b.mode!=BossMode::Idle || b.hydra.growth_left>0 || b.hydra.chance_left>0 || b.hydra.recovery_left>0 || b.hydra.separation_pending || b.hydra.separation_left>0 || n->cd>0 || n->normal || (n!=&b.hydra.bearer && uint32_t(n->kind)!=it->head_kind)) return false;
 
         const auto head=HydraBody::head_position(r,b,*n),base=HydraBody::neck_base(r,b,*n),center=r.state.enemies[b.actor.slot].pos;if (!godot::Rect2(r.state.view_center-r.state.view_half,r.state.view_half*2).grow(-r.state.enemies[actor.slot].radius).has_point(head)) return false;
         for (const auto &gate:r.content->hydra_normal_gates) if (gate.technique==definition) {const auto origin=gate.distance_origin==1?head:gate.distance_origin==2?base:center;const double distance=r.state.ship_pos.distance_to(origin);const auto angular_origin=gate.angle_origin==1?base:center;const double facing=r.state.enemies[b.actor.slot].facing+(gate.angle_origin==1?n->base_angle:0);if (distance>=gate.minimum && distance<=gate.maximum && (b.hydra.separated && gate.ignore_when_separated || std::abs(angle_difference((r.state.ship_pos-angular_origin).angle()-facing-gate.angle))<=gate.half_angle+0.00001)) return true;}return false;

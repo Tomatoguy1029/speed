@@ -9,6 +9,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-curve" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_curve")
+		return
 	if "--cpp-hydra-blades-origin" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_blades_origin")
 		return
@@ -4676,3 +4679,94 @@ func native_canis_finish_display() -> void:
 	await get_tree().process_frame
 	print("[cpp_canis_finish_display] failures=",failed)
 	get_tree().quit(1 if failed else 0)
+
+func hydra_major_case(selected_move: String, edits: Dictionary, flowing := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true);cfg.planet_radius=0.0
+	var definition = load("res://data/bosses/hydra.tres").duplicate(true);definition.speed=0.0
+	definition.params.merge({"head_hp":10.0,"growth_time":0.1,"tech_cd":0.05,"debris_dmg":0.0},true)
+	var move = load("res://data/bosses/hydra_moves/%s.tres" % selected_move).duplicate(true);move.assign_values(edits)
+	var package: Dictionary = builder.hydra_technique_package(definition,move,cfg)
+	if package.is_empty(): check(false,"大技の編集値を生成する");return {}
+	if flowing:
+		var rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
+		rules.techniques.assign([move]);rules.combos={};rules.conditions={selected_move:{}};rules.condition_groups={};rules.graph_nodes={};rules.selection_bias={}
+		var flow = load("res://data/bosses/ai/hydra_flow.tres").duplicate(true);flow.sections=flow.sections.slice(2,3);flow.sections[0].next=0;flow.sections[0].fallback=0
+		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): check(false,"大技の共通フローを生成する");return {}
+		for key in records: package.records[key]=records[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":372,"mode":1,"stage_id":"B_hydra_"+selected_move,"profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"ヒュドラ大技の型付き生成物を読み込む")
+	if not configured.ok: print(configured);return {}
+	bridge.start(372,{"position":Vector2(800,0)})
+	bridge.subscribe("確認",func(_frame): return true);bridge._core.set_attack_formation_mode(true)
+	bridge._core.set_motion_context(Vector2(800,0),Vector2(800,0),Vector2(1400,1000))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp*0.4,"cause":"shot"});bridge._core.step(0.11)
+	return {"bridge":bridge,"package":package,"cfg":cfg,"id":id,"move":move}
+
+func hydra_move_view(c: Dictionary):
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(c.bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"技の点列と予告を正式なshot_visualへ渡す")
+	return view
+
+func native_hydra_curve() -> void:
+	var c := hydra_major_case("curve",{"warning_time":0.15,"performance_time":0.55,"curve_delay":0.12,"curve_time":0.35,"curve_turn":0.45,"curve_lag":1.1,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	var events: Array=[];bridge.subscribe("曲線の記録",func(packet):events.append_array(packet.events);return true)
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"curve","編集Resourceと互換RunnerをUID付きで分ける")
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==72,"五首の共通フローから曲線ビームを自然に選ぶ")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	check(body.count==5 and body.effects.size()==5 and body.effects.all(func(e):return e.points.size()==25 and is_equal_approx(e.delay,0.12) and is_equal_approx(e.life,0.35)),"予告開始で全首に24区間の曲線を作り、独立した遅れと寿命を持つ")
+	var first: Dictionary=body.effects[0].duplicate(true)
+	var angle: float=body.necks[0].angle
+	var at: Vector2=first.points[0]
+	for j in range(1,25):at+=Vector2.from_angle(angle-float(j)/24.0*1.1)*600.0/24.0
+	check(at.distance_to(first.points[-1])<0.001,"ラジアンの軌跡差と24分割の点列がSourceの式に一致する")
+	var facing: float=body.facing
+	bridge._core.step(0.1);bridge._core.step_hazards(0.1);body=bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(body.facing,facing) and body.effects[0].age<body.effects[0].delay,"予告中は本体を回さず、形だけの時計を進める")
+	bridge._core.step(0.05);bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.facing>facing and body.effects[0].points!=first.points,"発動したtickから本体を回して全首の曲線を更新する")
+	var point: Vector2=body.effects[0].points[5]
+	bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2.ZERO})
+	var hp: float=bridge._core.ship_snapshot().ship_hp
+	var held: Dictionary=bridge.checkpoint();bridge._core.step(0.01);bridge._core.step_hazards(0.01);body=bridge.command("dev_boss_body_state").value[0];var expected: Dictionary=body.duplicate(true)
+	check(hp>bridge._core.ship_snapshot().ship_hp,"曲線の掃引判定が実際の機体HPを減らす")
+	check(held.ok and bridge.restore(held.value).ok,"参加首・曲線・本体向き・別時計を保持して戻す")
+	bridge._core.step(0.01);bridge._core.step_hazards(0.01);check(bridge.command("dev_boss_body_state").value[0]==expected,"途中復帰後に同じ点列と時計へ進む")
+	bridge.command("dev_boss_body_state")
+	check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="beam" and e.payload.technique=="curve" and e.payload.source=="hydra"),"命中はbeam・curve・hydraを共通の通知へ出す")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	bridge.restore(held.value);body=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":body.necks[0].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==4 and bridge.command("dev_boss_state").value[0].stage==1,"参加首1本の消失はその曲線だけを消し、残りの首で続ける")
+	bridge.restore(held.value);bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"途中取消で全ての持続曲線を回収する")
+	bridge.restore(held.value)
+	for tick in 36:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty(),"曲線の持続時間で判定を消す")
+	for tick in 60:bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==72),"技の自然終了と余白の後に次の大技を選べる")
+	bridge.restore(held.value);body=bridge.command("dev_boss_body_state").value[0]
+	for n in body.necks:bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge.command("dev_boss_state").value[0].stage==7,"全参加首の消失では大技を中断する")
+	bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free();await get_tree().process_frame
+	print("[cpp_hydra_curve] failures=",failed);get_tree().quit(1 if failed else 0)

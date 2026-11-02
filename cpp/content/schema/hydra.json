@@ -1206,6 +1206,96 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraCurveDefinition",
+      "section": 380,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lag",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraMajorDefinition",
+      "section": 387,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "combo",
+          "type": "bool"
+        },
+        {
+          "name": "timeline_available",
+          "type": "bool"
+        },
+        {
+          "name": "cost",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "global_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "combo_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "major_recovery_padding",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

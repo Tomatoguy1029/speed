@@ -1015,11 +1015,22 @@ static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Di
 		records.HydraNormalGate.append({"id":records.HydraNormalGate.size()+1,"technique":1,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",1.7976931348623157e308)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"distance_origin":int(gate.get("distance_origin",0)),"angle_origin":int(gate.get("angle_origin",0)),"ignore_when_separated":bool(gate.get("ignore_when_separated",false))})
 	return records
 
+static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if definition==null or definition.id!=&"hydra" or move==null or move.technique!=&"curve": return {}
+	var values: Dictionary = definition.params.merged(move.values(),true)
+	var normal := {}
+	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
+	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":72,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":float(values.performance_time),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.beam_dmg),"passes":1,"cuts":1},true)
+	return {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(move.technique)]),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal],"HydraCurveDefinition":[{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.curve_delay),"time":float(values.curve_time),"lag":float(values.curve_lag),"turn":float(values.curve_turn)}]}
+
 static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var records := hydra_normal_records(definition,move)
+	var records := hydra_major_records(definition,move) if move.technique==&"curve" else hydra_normal_records(definition,move)
 	if records.is_empty(): return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
+	# 単独の確認用パッケージでは、本体の仮通常技を大技へ置き換える。
+	for record in Schema.SCHEMA.records:
+		if record.name.begins_with("Hydra") and record.fields.any(func(field):return field.get("ref","")=="BossTechniqueDefinition"): package.records[record.name] = []
 	for key in records: package.records[key] = records[key]
 	var shot: PackedScene = move.get("shot_visual") if move.has_field("shot_visual") else null
 	if shot!=null:

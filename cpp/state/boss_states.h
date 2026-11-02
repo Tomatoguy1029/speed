@@ -86,8 +86,10 @@ struct DracoTailSweepState {godot::Vector2 origin;double facing=0;std::vector<go
 struct DracoStarFanState {std::vector<godot::Vector2> positions;std::vector<double> angles;bool fired=false;};
 struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState> move;};
 struct CanisSiriusFlameState {double age=0,emit_left=0;bool started=false;};
+struct HydraCurveState {};
+struct HydraTechniqueState {double time=0;bool playing=false;std::vector<EnemyHandle> participants;std::variant<HydraCurveState> move;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState,CanisSiriusFlameState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState,CanisSiriusFlameState,HydraTechniqueState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;
@@ -219,13 +221,13 @@ struct HydraNeckState {
     godot::Vector2 aim_target,free_pos,velocity,strike_from,strike_pos,target;
     double look_angle=0,elapsed=0,glow=0,turn=0,hit_left=0,sweep=0;
     AttackHandle emission;
-    uint32_t normal=0,normal_phase=0,step=0;
+    uint32_t normal=0,normal_phase=0,step=0,major=0;
     bool locked=false,extension=false,lunge_done=false;
     std::vector<godot::Vector2> trail;
     double weights[6]={};
     std::vector<godot::Vector2> points;
 };
-struct HydraBodyState {HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false,attack_field_advance=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
+struct HydraBodyState {double major_cd=0,combo_left=0,major_padding_left=0;std::unordered_map<uint32_t,double> major_until;HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false,attack_field_advance=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
     HydraBodyState hydra;
     DracoBodyState draco;

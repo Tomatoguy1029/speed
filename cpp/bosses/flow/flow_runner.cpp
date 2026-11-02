@@ -2,6 +2,7 @@
 #include "../hydra/normal_attack.h"
 #include "../hydra/squad.h"
 #include "technique_runner.h"
+#include "../hydra/technique.h"
 #include "phase_controller.h"
 #include "../monoceros/charge.h"
 #include "../../systems/motion_math.h"
@@ -180,6 +181,7 @@ void FlowRunner::cancel(RunRuntime &r,BossFlowState &f) {for (auto root:f.roots)
 void FlowRunner::step(RunRuntime &r,double dt) {
     std::vector<bool> busy;for (const auto &f:r.state.bosses.flows) busy.push_back(std::any_of(f.participants.begin(),f.participants.end(),[&](auto actor){return actor_busy(r,actor);}));TechniqueRunner::step(r,dt);
     for (size_t i=0;i<r.state.bosses.flows.size();++i) {auto &f=r.state.bosses.flows[i];const bool canis=r.content->bosses[r.content->boss_flows[f.definition-1].boss-1].kind==2;if (!canis || (!f.suspended && !busy[i])) f.clock+=dt;if (!r.state.enemy_handles.contains(f.actor) || r.state.enemies[f.actor.slot].dead) {cancel(r,f);f.blocked=true;continue;}if (f.blocked) {cancel(r,f);continue;}if (f.suspended) continue;if (busy[i] && r.content->boss_flows[f.definition-1].idle_only) continue;tick_flow(r,f,dt);}
+    HydraTechnique::tick(r,dt);
 }
 bool FlowRunner::validate_content(const ContentBundle &c) {
     const auto sequential=[](const auto &rows) {for (size_t i=0;i<rows.size();++i) if (rows[i].id!=i+1) return false;return true;};
