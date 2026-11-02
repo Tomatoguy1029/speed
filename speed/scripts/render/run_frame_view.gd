@@ -29,6 +29,9 @@ var _rear_shells: Array[Dictionary] = []
 var _rear_world_time := -1.0
 var _rear_canvas: DrawLayer
 var _rear_frame: Dictionary = {}
+var _barrier_visual: RefCounted
+var _barrier_armor: Sprite2D
+var _barrier_world_time := -1.0
 var _scatter_world_time := -1.0
 var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
@@ -62,6 +65,12 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	for entry in entries: visuals[int(entry.id)] = entry
 	for entry: Dictionary in entries:
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
+	_barrier_armor = Sprite2D.new()
+	_barrier_armor.texture = _scope.resources.get("res://assets/pixel/airship_armor.png")
+	_barrier_armor.offset = Vector2(0.0,_barrier_armor.texture.get_height()*0.5-30.0) if _barrier_armor.texture!=null else Vector2.ZERO
+	_barrier_armor.scale = Vector2.ONE*character_scale
+	_barrier_armor.hide()
+	_layer(18).add_child(_barrier_armor)
 	_rear_canvas = DrawLayer.new()
 	_layer(18).add_child(_rear_canvas)
 	_rear_canvas.draw_fn = func(canvas: CanvasItem):
@@ -358,6 +367,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		_rear_flashes = ShotFlashes.new()
 		_rear_shells.clear()
 		_rear_world_time = -1.0
+		if _barrier_visual!=null: _barrier_visual.dispose()
+		_barrier_visual = null
+		_barrier_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_meteor_shards.clear()
@@ -386,6 +398,25 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_rear_canvas.visible = equipped_rear and _ship_visible
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
 	_rear_canvas.queue_redraw()
+	var equipped_barrier: bool = frame.ui.get("weapon_levels",[]).any(func(item): return item.id=="W05")
+	var barrier_from_state: bool = equipped_barrier and _barrier_visual==null
+	if barrier_from_state:
+		_barrier_visual = preload("res://scripts/render/equipment/barrier.gd").new()
+		_barrier_visual.setup_frame(_layer(19),_pixel)
+		for wave: Dictionary in frame.ui.barrier.waves:
+			_barrier_visual.hits.append({"angle":wave.angle,"age":wave.age,"broken":wave.broken,"radius":wave.radius,"shattered":false})
+		if frame.ui.barrier.restore_visual_age<0.5: _barrier_visual.restores.append({"age":frame.ui.barrier.restore_visual_age})
+	if not equipped_barrier and _barrier_visual!=null:
+		_barrier_visual.dispose()
+		_barrier_visual = null
+		_barrier_world_time = -1.0
+	_barrier_armor.visible = equipped_barrier and _ship_visible
+	_barrier_armor.position = _ship_visual_position
+	_barrier_armor.rotation = frame.ui.ship.ship_heading.angle()+PI/2.0
+	_barrier_armor.modulate = Color("#ff6b5a") if frame.ui.ship.ship_hurt>0.0 else Color.WHITE
+	if frame.ui.ship.ship_invuln>0.0 and fmod(frame.ui.world_time*20.0,2.0)<1.0: _barrier_armor.modulate.a = 0.5
+	_barrier_armor.get_parent().move_child(_barrier_armor,-1)
+	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
 		if event.type==&"shield_stolen":
@@ -412,6 +443,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*2.4,"color":Color("#ffe27a"),"life":duration,"max":duration})
 			_burst(event.pos,Color("#ffd23f"),14,360.0)
 		if event.type==&"ship_explode": _death_burst(event.pos)
+		if equipped_barrier and not barrier_from_state and event.type in [&"barrier_hit",&"barrier_restore"]: _barrier_visual.on_event(event)
 		if equipped_rear: preload("res://scripts/render/equipment/rear.gd").frame_event(_rear_flashes,_rear_shells,event,frame.ui.ship.ship_heading,frame.ui.rear.mount)
 		if equipped_scatter: preload("res://scripts/render/equipment/scatter.gd").frame_event(_scatter_flashes,event)
 		if equipped_forward: preload("res://scripts/render/equipment/forward.gd").frame_event(_flashes,event)
@@ -462,6 +494,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var barrier_dt: float = 0.0 if _barrier_world_time<0.0 else maxf(0.0,ui.world_time-_barrier_world_time)
+	_barrier_world_time = ui.world_time if equipped_barrier else -1.0
+	if _barrier_visual!=null: _barrier_visual.frame_tick(barrier_dt,ui.ship.ship_pos,ui.ship.ship_heading)
 	var rear_dt: float = 0.0 if _rear_world_time<0.0 else maxf(0.0,ui.world_time-_rear_world_time)
 	_rear_world_time = ui.world_time if equipped_rear else -1.0
 	preload("res://scripts/render/equipment/rear.gd").frame_draw(_rear_flashes,_rear_shells,_effects,rear_dt,ui.rear.mount,ui.rear.aim,equipped_rear)

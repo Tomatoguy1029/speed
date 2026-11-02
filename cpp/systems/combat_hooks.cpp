@@ -1,4 +1,5 @@
 #include "combat_hooks.h"
+#include "../behaviors/weapons/barrier.h"
 #include "../behaviors/enemies/shield.h"
 #include "attack_budget.h"
 #include "../runtime/run_runtime.h"
@@ -16,7 +17,7 @@ bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest 
     return !ShieldBehavior::blocks_front(run,target,request.has_impact?request.impact:enemy.pos,request.direction);
 }
 }
-CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);}
+CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);barrier_hooks.push_back(BarrierBehavior::block);}
 bool CombatHooks::register_enemy(EnemyDefinition::Kind kind,EnemyPolicy policy) {
     if (dispatch_depth) return false;policies[kind]=policy;return true;
 }

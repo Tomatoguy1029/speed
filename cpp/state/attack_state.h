@@ -15,7 +15,7 @@ constexpr EndPolicies policy(EndPolicy flag) {return static_cast<uint32_t>(flag)
 constexpr EndPolicies operator|(EndPolicy a,EndPolicy b) {return policy(a)|policy(b);}
 constexpr bool has_policy(EndPolicies flags,EndPolicy flag) {return (flags&policy(flag))!=0;}
 enum class AttackPool : uint8_t { Friendly,Hostile,Hazard };
-enum class AttackEndReason : uint8_t { Lifetime,TechniqueCancel,TechniqueEnd,ParticipantEnd,BossClear,BonusClear,Hit,Relocate };
+enum class AttackEndReason : uint8_t { Lifetime,TechniqueCancel,TechniqueEnd,ParticipantEnd,BossClear,BonusClear,Hit,Relocate,Barrier };
 struct AttackOwner {
     EnemyHandle live_source;
     int64_t source_id=0;

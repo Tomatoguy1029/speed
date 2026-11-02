@@ -203,6 +203,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
                 changed=speed::EquipmentSystem::grant(runtime,d.id,uint32_t(int64_t(payload["levels"])));
         }
         response=changed?success():failure(5,"equipment","装備を変更できません");
+    } else if (kind=="dev_ship_defense" && runtime.api_development && payload.size()==2 && is(payload,"shield",Variant::FLOAT) && is(payload,"invulnerability",Variant::FLOAT) && std::isfinite(double(payload["shield"])) && std::isfinite(double(payload["invulnerability"])) && double(payload["shield"])>=0 && double(payload["invulnerability"])>=0) {
+        runtime.state.ship.shield_t=payload["shield"];runtime.state.ship.invuln=payload["invulnerability"];response=success();
     } else if (kind=="dev_post_scatter" && runtime.api_development && payload.size()==4 && is(payload,"interval",Variant::INT) && is(payload,"projectile",Variant::INT) && is(payload,"duration",Variant::INT) && is(payload,"knockback",Variant::INT) && int64_t(payload["interval"])>=0 && int64_t(payload["projectile"])>=0 && int64_t(payload["duration"])>=0 && int64_t(payload["knockback"])>=0) {
         auto &p=runtime.state.loadout;p.post_weapon_interval_stacks=uint64_t(int64_t(payload["interval"]));p.post_projectile_speed_stacks=uint64_t(int64_t(payload["projectile"]));p.post_duration_stacks=uint64_t(int64_t(payload["duration"]));p.post_knockback_stacks=uint64_t(int64_t(payload["knockback"]));response=success();
     } else if (kind=="dev_post_length" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
@@ -338,6 +340,7 @@ Dictionary SpeedRunCore::frame_run() {
     }
     ui["laser_voices"]=voices;
     ui["rear"]=rear_snapshot();
+    ui["barrier"]=barrier_snapshot();
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=control.ui_overlay || control.ui_reward || runtime.state.phase==Phase::Paused || runtime.state.phase==Phase::LevelUp || (runtime.state.phase==Phase::Dying && runtime.state.sequence_t<runtime.state.death_freeze);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;

@@ -1298,6 +1298,10 @@
       {
         "name": "StarBolt",
         "value": "star_bolt"
+      },
+      {
+        "name": "Barrier",
+        "value": "barrier"
       }
     ],
     "VisualRole": [
@@ -1606,6 +1610,14 @@
       {
         "name": "CrystalCollect",
         "value": "xp_collect"
+      },
+      {
+        "name": "BarrierHit",
+        "value": "barrier_hit"
+      },
+      {
+        "name": "BarrierRestore",
+        "value": "barrier_restore"
       }
     ],
     "ResultKind": [
@@ -1988,6 +2000,16 @@
       "id",
       "kind",
       "origin"
+    ],
+    "barrier_hit": [
+      "pos",
+      "hit",
+      "angle",
+      "radius",
+      "broken"
+    ],
+    "barrier_restore": [
+      "pos"
     ]
   },
   "includes": [

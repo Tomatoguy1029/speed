@@ -29,6 +29,16 @@ func setup(render: RunPresentation, owner_behavior) -> void:
 	_hexes.setup(p.px, PixelShapes.Shape.HEX, false)
 	rm._layers.top.add_child(_hexes)
 
+## C++の通知と世界時計だけを読む表示。
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	_painter.visibility_layer = 1
+	parent.add_child(_painter)
+	_hexes = PixelShapes.new()
+	_hexes.setup(pixel,PixelShapes.Shape.HEX,false)
+	parent.add_child(_hexes)
+
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"barrier_hit":
@@ -38,18 +48,19 @@ func on_event(ev: Dictionary) -> void:
 			restores.append({"age": 0.0})
 
 func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+	frame_tick(world_dt(),state.ship_pos,state.ship_heading)
+
+func frame_tick(dt: float, center: Vector2, heading: Vector2) -> void:
+	var p: PixelPainter = _painter if rm==null else painter()
 	p.begin()
 	_hexes.begin()
-	var center := state.ship_pos
 	for h in hits:
 		h.age += dt
 		_hit(p, h, center)
 	hits = hits.filter(func(h): return h.age < SPIN + STEP * (_last_ring(h.radius, p.px) - FIRST_RING + 2) + 0.1)
 	for r in restores:
 		r.age += dt
-		_restore(p, r, center)
+		_restore(p, r, center, heading.angle())
 	restores = restores.filter(func(r): return r.age < 0.5)
 	_shards(p, dt)
 	sparks.draw(p, dt)
@@ -142,9 +153,8 @@ func _shards(p: PixelPainter, dt: float) -> void:
 		p.fill(cell.x, cell.y - l, color, 1, l * 2 + 1)
 	crosses = crosses.filter(func(c): return c.age < 0.1)
 
-func _restore(p: PixelPainter, r: Dictionary, center: Vector2) -> void:
+func _restore(p: PixelPainter, r: Dictionary, center: Vector2, heading: float) -> void:
 	var a: float = r.age
-	var heading := state.ship_heading.angle()
 	for at in _lattice(maxf(_cells_radius, 25.0)):
 		var d := at.length()
 		if d < 13.0 or d > 24.0: continue

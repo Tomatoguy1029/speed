@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w05" in OS.get_cmdline_user_args() or "--cpp-w05-retry" in OS.get_cmdline_user_args():
+		await check_cpp_w05()
+		print("[cpp_w05] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-w23" in OS.get_cmdline_user_args():
 		await check_cpp_w23()
 		print("[cpp_w23] failed=%d" % failures)
@@ -1443,3 +1449,172 @@ func check_cpp_w23_detail(session: RunSession,idle: Dictionary,viewport: Diction
 	check(presentation.frame_view._rear_shells.size()==shells+1 and presentation.frame_view._rear_shells[-1].age==0.0,"世界時計が止まる間は薬莢の寿命と位置も止める")
 	bridge.unsubscribe("w23_detail")
 	await get_tree().process_frame
+
+func barrier_defense(bridge, shield: float = 0.0, invulnerability: float = 0.0) -> void:
+	check(bridge.command("dev_ship_defense",{"shield":shield,"invulnerability":invulnerability}).ok,"機体の防御条件を準備する")
+
+func barrier_damage(bridge, amount: float, cause: String = "bullet") -> Dictionary:
+	var result: Dictionary = bridge.command("dev_ship_damage",{"amount":amount,"cause":cause})
+	check(result.ok,"機体への攻撃を共通の防御へ通す")
+	return result.value if result.ok else {}
+
+func check_cpp_w05() -> void:
+	var retry := "--cpp-w05-retry" in OS.get_cmdline_user_args()
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.world_tick_div = 1
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	config.base_attack = 1.0
+	config.base_crit_chance = 0.0
+	var stage := RuntimeStage.new()
+	stage.index = 85
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_W05"
+	var builder = load("res://tools/content/build_run_content.gd")
+	check(builder.build(stage,config,output,"バリアの全Lvと共通防御".sha256_text())==OK,"バリアの全Lvと防御の固定値を生成する")
+	var path := output.path_join("stage_85.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":635},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"バリアの通常の状態・表示を準備する")
+	if session.bridge==null:
+		session.free()
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	bridge.command("set_settings",{"hitstop":false})
+	var initial: Dictionary = bridge.checkpoint()
+	var lab = SESSION.new()
+	add_child(lab)
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W05")
+	var events: Array = []
+	bridge.subscribe("w05_check",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	for level in (range(1,definition.level_steps.size()+1) if not retry else []):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		await lab.reset({"seed":635,"empty":true,"invincible":false,"config":{"planet_radius":0.0,"start_radius":900.0,"base_attack":1.0,"base_crit_chance":0.0}})
+		var run: RunSimulation = lab.run
+		run.loadout.reset_loadout()
+		check(run.loadout.grant(&"weapon",&"W05",level),"現行のバリアを各Lvで取得する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W05","levels":level}).ok,"生成したバリアを各Lvで取得する")
+		run.loadout.grant(&"trait",&"T34",2)
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
+		var barrier = run.loadout.weapon_behaviors[&"W05"]
+		run.state.ship_pos = core.ship_snapshot().ship_pos
+		run.state.ship_heading = core.ship_snapshot().ship_heading
+		var hp: float = core.ship_snapshot().ship_hp
+		var blocked: Dictionary = barrier_damage(bridge,5.0)
+		run.ship.damage(5.0,0.0,&"bullet")
+		check(blocked.reason=="barrier" and core.ship_snapshot().ship_hp==hp and is_equal_approx(core.barrier_snapshot().durability,barrier.durability),"全LvでHPを減らさず同じ耐久を消費する")
+		var wave: Dictionary = core.barrier_snapshot().waves[0]
+		check(is_equal_approx(wave.radius,barrier.waves[0].radius) and is_equal_approx(wave.damage,barrier.waves[0].damage),"全Lvの威力と範囲倍率を防御時の波へ保存する")
+		barrier_defense(bridge)
+		run.state.ship_invuln = 0.0
+		blocked = barrier_damage(bridge,1000.0)
+		run.ship.damage(1000.0,0.0,&"bullet")
+		check(blocked.reason=="barrier" and core.ship_snapshot().ship_hp==hp and core.barrier_snapshot().durability<=0.0 and is_equal_approx(core.barrier_snapshot().restore,barrier.restore),"全Lvで耐久を超える一撃も全量防ぎ同じ復旧時間を使う")
+		var broken: Dictionary = core.barrier_snapshot()
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		check(core.barrier_snapshot()==broken,"停止中は復旧時間と波を進めない")
+		bridge.command("pause",{"paused":false})
+		core.set_run_guards({"controls_locked":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		check(core.barrier_snapshot()==broken,"操作ロック中は復旧時間と波を進めない")
+		core.set_run_guards({"controls_locked":false})
+		for tick in ceili(float(definition.params.revive_by_level[level-1])*120.0)+1:
+			bridge.step(1.0/120.0,idle,viewport)
+			barrier.tick(1.0/120.0,false)
+		check(core.barrier_snapshot().restore==0.0 and is_equal_approx(core.barrier_snapshot().durability,barrier.durability) and barrier.ready(),"全Lvで世界時計に従って耐久を全回復する")
+		check(core.barrier_snapshot().waves.is_empty() and barrier.waves.is_empty(),"波は同じ寿命の式で終了する")
+		if failures: break
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W05","levels":5})
+	var pristine: Dictionary = bridge.checkpoint()
+	if not retry:
+		for condition in [[1.0,1.0,"shield"],[0.0,1.0,"invulnerability"]]:
+			barrier_defense(bridge,condition[0],condition[1])
+			var guarded: Dictionary = barrier_damage(bridge,7.0)
+			check(guarded.reason==condition[2] and core.barrier_snapshot().durability==-1.0 and core.barrier_snapshot().waves.is_empty(),"盾と無敵を先に判定してバリアを消費しない")
+		for guard in ["controls_locked","encounter_protected","invincible"]:
+			barrier_defense(bridge)
+			core.set_run_guards({guard:true})
+			var guarded: Dictionary = barrier_damage(bridge,7.0)
+			check(not guarded.accepted and core.barrier_snapshot().durability==-1.0,"保護中はバリアを消費しない: "+guard)
+			core.set_run_guards({guard:false})
+		for cause in ["debug","final_strike"]:
+			barrier_defense(bridge)
+			var bypass: Dictionary = barrier_damage(bridge,2.0,cause)
+			check(bypass.accepted and bypass.hp_after==bypass.hp_before-2.0 and core.barrier_snapshot().durability==-1.0,"デバッグと時間切れの一撃はバリアの対象外にする")
+	for kind in [0,1]:
+		bridge.restore(pristine.value)
+		bridge.collect_frame()
+		events.clear()
+		var pos: Vector2 = core.ship_snapshot().ship_pos
+		var hp: float = core.ship_snapshot().ship_hp
+		check(core.spawn_hostile({"kind":kind,"pos":pos+Vector2(100,0),"vel":Vector2(-1000,0),"speed":1000.0,"r":5.0,"life":1.0,"dmg":10.0,"slow":0.3,"turn":0.0})>=0,"通常弾とミサイルを実際に生成する")
+		check(core.step_hostiles(0.2),"敵弾を殻へ向けて進める")
+		bridge.step(1.0/120.0,idle,viewport)
+		check(core.hostiles_snapshot().is_empty() and core.ship_snapshot().ship_hp==hp and core.barrier_snapshot().durability==25.0,"通常弾とミサイルを殻で受け止めて一度だけ回収する")
+		check(events.filter(func(event): return event.type==&"attack_retired" and event.payload.reason=="barrier").size()==1 and events.filter(func(event): return event.type==&"combat_player_damage").size()==1 and not events.any(func(event): return event.type==&"hurt"),"遮断の終了理由を残し通常命中と二重に防御しない")
+	bridge.restore(pristine.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
+	bridge.command("dev_post_weapon_power",{"damage":2,"followup":3})
+	bridge.command("dev_post_scatter",{"interval":2,"projectile":0,"duration":0,"knockback":3})
+	barrier_damage(bridge,1000.0)
+	var post: PostMaxConfig = config.post_max
+	check(is_equal_approx(core.barrier_snapshot().restore,post.reduced(float(definition.params.revive_by_level[-1]),&"weapon_interval",{&"weapon_interval":2},post.minimum_interval)),"最大段後の復旧時間を基準から短縮する")
+	var wave: Dictionary = core.barrier_snapshot().waves[0]
+	check(is_equal_approx(wave.damage,4.0*(1+post.amount(&"weapon_damage",{&"weapon_damage":2})+post.amount(&"followup",{&"followup":3}))),"バリアの波へ威力と追撃の共通倍率を適用する")
+	var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":wave.pos+Vector2(60,0)}).value
+	core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+	var hp_before: float = core.enemies_snapshot().filter(func(item): return item.id==enemy)[0].hp
+	for tick in 60: bridge.step(1.0/120.0,idle,viewport)
+	var target: Dictionary = core.enemies_snapshot().filter(func(item): return item.id==enemy)[0]
+	check(is_equal_approx(target.hp,hp_before-wave.damage) and target.vel[0]>0.0 and core.barrier_snapshot().waves[0].hits==[enemy],"段階的に広がる波が敵IDごとに一度だけ命中する")
+	var saved: Dictionary = bridge.checkpoint()
+	var held_wave: Dictionary = core.barrier_snapshot()
+	var held_enemy: Dictionary = target
+	for tick in 20: bridge.step(1.0/120.0,idle,viewport)
+	var expected: Dictionary = core.barrier_snapshot()
+	var expected_enemy: Array = core.enemies_snapshot()
+	check(bridge.restore(saved.value).ok,"耐久と復旧時間・波・命中済みIDを保持して復帰する")
+	bridge.collect_frame()
+	check(core.barrier_snapshot()==held_wave,"復帰直後のバリアの値が一致する")
+	for tick in 20: bridge.step(1.0/120.0,idle,viewport)
+	check(core.barrier_snapshot()==expected and core.enemies_snapshot()==expected_enemy and core.enemies_snapshot().filter(func(item): return item.id==enemy)[0].hp==held_enemy.hp,"復帰後も波が同じ敵へ二重命中しない")
+	bridge.release_checkpoint(saved.value)
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.01)
+	check(presentation.frame_view._barrier_visual!=null and presentation.frame_view._barrier_armor.visible,"バリアの殻と波を通常の表示へ渡す")
+	check(presentation.frame_view._barrier_visual._hexes.multimesh.visible_instance_count>0,"波動の六角形を共通表示で描く")
+	var display_age: float = presentation.frame_view._barrier_visual.hits[0].age if not presentation.frame_view._barrier_visual.hits.is_empty() else -1.0
+	presentation.frame_view.update_effects(bridge.read_frame().value,0.2)
+	if display_age>=0.0: check(presentation.frame_view._barrier_visual.hits[0].age==display_age,"世界時計が止まる間はバリアの表示も止める")
+	check(bridge.command("dev_remove_weapon",{"id":"W05"}).ok and not core.barrier_snapshot().equipped and core.barrier_snapshot().waves.is_empty(),"途中解除でバリアと波を終了する")
+	presentation._present_cpp(0.01)
+	check(presentation.frame_view._barrier_visual==null and not presentation.frame_view._barrier_armor.visible,"解除したバリアの表示を片付ける")
+	bridge.release_checkpoint(pristine.value)
+	bridge.release_checkpoint(initial.value)
+	bridge.unsubscribe("w05_check")
+	lab.free()
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"バリアの状態・防御・命中・表示に実行エラーがない: %s" % [capture.messages()])

@@ -19,6 +19,8 @@ struct ContentBundle {
     ScatterPostDefinition scatter_post;
     std::vector<RearDefinition> rear_levels;
     RearPostDefinition rear_post;
+    std::vector<BarrierDefinition> barrier_levels;
+    BarrierPostDefinition barrier_post;
     std::vector<BiteDefinition> bites;
     std::vector<HoundDefinition> hounds;
     std::vector<GunnerDefinition> gunners;

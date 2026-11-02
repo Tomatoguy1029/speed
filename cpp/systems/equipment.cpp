@@ -54,6 +54,11 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
         else {forward={};forward.base_interval=forward.interval=forward.fire.remaining=level.interval;}
         forward.damage=level.damage;forward.pierce=level.pierce;forward.life=level.life;forward.spread=level.spread;forward.knock=level.knock;
         forward.character_scale=run.content->config.character_scale;forward.ready=true;
+        } else if (d.external_id=="W05") {
+            const auto &level=run.content->barrier_levels[next-1];auto &barrier=run.state.loadout.barrier;
+            if (!barrier.ready) barrier={};
+            barrier.definition=id;barrier.maximum=level.durability;barrier.revive=level.revive;barrier.radius=level.radius;
+            barrier.damage=level.damage;barrier.shell_radius=level.shell_radius;barrier.knock=level.knock;barrier.ready=true;
         } else if (d.external_id=="W23") {
             const auto &level=run.content->rear_levels[next-1];auto &rear=run.state.loadout.rear;
             if (rear.ready) ForwardBehavior::set_interval(rear,level.interval);
@@ -85,6 +90,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     // 発射済みの自然寿命の弾は、装備の解除後も残す。
     const auto &external=run.content->equipment[id-1].external_id;
     if (external=="W01") run.state.forward={};
+    else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
     else if (external=="W02") run.state.loadout.scatter={};
     else return false;

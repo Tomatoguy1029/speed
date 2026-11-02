@@ -77,7 +77,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
         const godot::StringName cause(symbol_name(e.cause));
         switch(e.kind) {
         case CombatEventKind::AttackRetired: {
-            static const char *reasons[]={"lifetime","technique_cancel","technique_end","participant_end","boss_clear","bonus_clear","hit","relocate"};
+            static const char *reasons[]={"lifetime","technique_cancel","technique_end","participant_end","boss_clear","bonus_clear","hit","relocate","barrier"};
             d["id"]=e.target_id;d["source_id"]=e.source_entity_id;d["reason"]=reasons[uint8_t(e.attack_end_reason)];
             d["t"]=e.time;d["world_t"]=e.world_time;append(run,"attack_retired",d);
             if (e.circle_hazard && run.state.bite_zone_config.fade &&

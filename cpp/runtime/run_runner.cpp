@@ -2,6 +2,7 @@
 #include "../systems/attack_system.h"
 #include "../behaviors/weapons/scatter.h"
 #include "../behaviors/weapons/rear.h"
+#include "../behaviors/weapons/barrier.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
 #include "../systems/pickup_system.h"
@@ -75,6 +76,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
             for (const auto &owned:state.loadout.weapons) {
                 const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
                 if (id=="W01") core.step_forward(world_dt);
+                else if (id=="W05") BarrierBehavior::step(core.runtime,world_dt);
                 else if (id=="W23") RearBehavior::step(core.runtime,world_dt);
                 else if (id=="W02") ScatterBehavior::step(core.runtime,world_dt);
                 if (state.phase!=Phase::Play) break;

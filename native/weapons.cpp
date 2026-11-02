@@ -57,6 +57,11 @@ Dictionary SpeedRunCore::rear_snapshot() const {
     out["ready"]=weapon.ready;out["mount"]=runtime.state.ship.pos+Vector2(weapon.mount_x,weapon.mount_y).rotated(runtime.state.ship.heading.angle()+Math::PI/2.0)*weapon.character_scale;out["aim"]=-runtime.state.ship.heading;return out;
 }
 
+Dictionary SpeedRunCore::barrier_snapshot() const {
+    const auto &barrier=runtime.state.loadout.barrier;Dictionary out;out["equipped"]=barrier.ready;out["durability"]=barrier.durability;out["restore"]=barrier.restore;out["restore_visual_age"]=barrier.restore_visual_age;
+    Array waves;for (const auto &wave:barrier.waves) {Dictionary value;value["pos"]=wave.pos;value["age"]=wave.age;value["radius"]=wave.radius;value["damage"]=wave.damage;value["angle"]=wave.angle;value["broken"]=wave.broken;Array hits;std::vector<int64_t> sorted(wave.hits.begin(),wave.hits.end());std::sort(sorted.begin(),sorted.end());for (auto id:sorted) hits.push_back(id);value["hits"]=hits;waves.push_back(value);}out["waves"]=waves;return out;
+}
+
 bool SpeedRunCore::set_forward_level(int64_t level) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.forward.ready || level<1) return false;
     if (runtime.state.forward_parameters.is_empty()) {

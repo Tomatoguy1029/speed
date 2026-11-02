@@ -408,6 +408,90 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "BarrierDefinition",
+      "section": 42,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "durability",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "revive",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BarrierPostDefinition",
+      "section": 43,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

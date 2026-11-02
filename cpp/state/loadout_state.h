@@ -3,6 +3,8 @@
 #include "../systems/timing.h"
 #include <cstdint>
 #include <vector>
+#include <unordered_set>
+#include <godot_cpp/variant/vector2.hpp>
 namespace speed {
 struct ForwardWeaponState {
     bool ready = false;
@@ -21,6 +23,19 @@ struct ScatterWeaponState {
     IntervalTimer fire;
     double recoil=0,base_interval=0,interval=0,damage=0,life=0,spread=0,knock=0;
 };
+struct BarrierWaveState {
+    godot::Vector2 pos;
+    double age=0,radius=0,damage=0,angle=0;
+    bool broken=false;
+    std::unordered_set<int64_t> hits;
+};
+struct BarrierWeaponState {
+    bool ready=false;
+    uint32_t definition=0;
+    double restore_visual_age=1;
+    double durability=-1,restore=0,maximum=0,revive=0,radius=0,damage=0,shell_radius=0,knock=0;
+    std::vector<BarrierWaveState> waves;
+};
 struct EquipmentLevel {uint32_t definition=0,level=0;};
 struct CardCandidate {int64_t id=0;CardKind kind=CardKind::Weapon;uint32_t definition=0,level=0;};
 // 数値特性は取得の境界で畳み、武器の更新中には定義を探索しない。
@@ -32,6 +47,7 @@ struct LoadoutState {
     EquipmentEffects effects;
     ScatterWeaponState scatter;
     RearWeaponState rear;
+    BarrierWeaponState barrier;
     uint64_t post_weapon_interval_stacks=0,post_projectile_speed_stacks=0,post_duration_stacks=0,post_knockback_stacks=0;
 
     double charge_profile_factor=1,speed_profile_factor=1,attack_profile_factor=1,pickup_profile_factor=1,length_profile_factor=1;

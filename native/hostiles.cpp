@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/behaviors/weapons/barrier.h"
 #include "../cpp/systems/field.h"
 #include "../cpp/systems/attack_system.h"
 #include "../cpp/systems/attacks/missile.h"
@@ -100,6 +101,17 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         if (gap<=step) {gap=speed::FieldSystem::body_gap(runtime,from,shot.radius);if (gap<=step) body_hit=speed::FieldSystem::first_body_hit(runtime,from,to,shot.radius);}
         const auto wall=speed::WallSystem::block_hit(runtime,from,to,shot.radius);
         if (wall && (!body_hit || wall->t<body_hit->t)) body_hit=speed::BodyHit{UINT32_MAX,wall->t,wall->point};
+        speed::ShipDamageRequest blocked;blocked.amount=shot.damage;blocked.slow=shot.slow;blocked.cause=record->spec.cause;
+        blocked.source=record->spec.owner.source_definition;blocked.technique=record->spec.source_technique;blocked.scale=record->spec.contact.scale;
+        const Vector2 barrier_end=body_hit?body_hit->point:to;
+        const double barrier_t=speed::BarrierBehavior::segment(runtime,from,barrier_end,shot.radius,blocked);
+        if (barrier_t>=0) {
+            blocked.impact=from+(barrier_end-from)*barrier_t;blocked.has_impact=true;
+            const auto defense=speed::CombatResolver::ship_damage(runtime,blocked);speed::EventBuilder::flush_combat(runtime);
+            if (defense.reason==speed::CombatReason::Barrier) {
+                shot.pos=blocked.impact;end_reason=speed::AttackEndReason::Barrier;release();continue;
+            }
+        }
         if (shot.kind==int64_t(speed::HostileKind::Slash)) {
             if (speed::SlashSystem::contact(runtime,processing_handle,to)) {end_reason=speed::AttackEndReason::Hit;life=0;body_hit.reset();}
         }

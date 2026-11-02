@@ -43,6 +43,8 @@ struct DeathContext {
 };
 struct KillResult { EnemyHandle target;bool killed=false;CombatReason reason=CombatReason::Invalid; };
 struct ShipDamageRequest {
+    godot::Vector2 impact;
+    bool has_impact=false;
     double amount=0,slow=0;
     DamageScale scale=DamageScale::None;
     Cause cause=Cause::None;
