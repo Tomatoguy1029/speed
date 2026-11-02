@@ -1,6 +1,9 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
 namespace speed {class HydraNormalAttack {public:
+    static bool supports(uint32_t kind) {return kind>=64 && kind<=65;}
+    static void step_thrust(RunRuntime &,TechniqueState &,double);
+    static void step_sweep(RunRuntime &,TechniqueState &,double);
     static BossBodyState *body(RunRuntime &,EnemyHandle);
     static HydraNeckState *neck(BossBodyState &,EnemyHandle);
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);

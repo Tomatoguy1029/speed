@@ -37,7 +37,7 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 				image.fill(Color.WHITE)
 				white = ImageTexture.create_from_image(image)
 			var line := preload("res://scenes/attacks/hydra_shape.tscn").instantiate()
-			line.visual_profile_key = "boss/move/hydra/bite_thrust"
+			line.visual_profile_key = "boss/move/hydra/"+String(effect.get("technique","bite_thrust"))
 			line.visual_component = "shape"
 			add_child(line)
 			line.top_level = true
