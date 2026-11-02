@@ -10,9 +10,10 @@ namespace speed {
 int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpawn &p) {
     auto &state=run.state;
     if (!state.started || state.closed || definition>=run.content->definitions.size() || state.next_id==INT64_MAX || !p.position.is_finite() || !p.velocity.is_finite() ||
-        !std::isfinite(p.size) || p.size<0 || !std::isfinite(p.facing) || !std::isfinite(p.knock) || !std::isfinite(p.value) || !std::isfinite(p.priority) || p.group<0) return -1;
+        !std::isfinite(p.size) || p.size<0 || !std::isfinite(p.spin) || !std::isfinite(p.guard) || !std::isfinite(p.hit_cd) || !std::isfinite(float(p.spin)) || !std::isfinite(p.facing) || !std::isfinite(p.knock) || !std::isfinite(p.value) || !std::isfinite(p.priority) || p.group<0) return -1;
     const auto &def=run.content->definitions[definition];godot::RunState::Enemy enemy;
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
+    enemy.spin=float(p.spin);enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
     enemy.attack_group=p.group;enemy.attack_priority=p.has_priority?p.priority:def.attack_priority;
     enemy.attack_value=p.group>0?(p.has_value?p.value:1.0):def.attack_value;
     enemy.attack_managed=!state.world.attack_formation_mode?def.attack_weight>0:(p.group>0?(p.has_managed?p.managed:enemy.attack_value>0):def.attack_managed);

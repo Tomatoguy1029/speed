@@ -64,6 +64,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->beamers=records.BeamerDefinition_rows;
     bundle->missile_enemies=records.MissileEnemyDefinition_rows;
     bundle->rockets=records.RocketDefinition_rows;
+    bundle->drifts=records.DriftDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
     bundle->beams=records.BeamDefinition_rows;
@@ -173,7 +174,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -220,6 +221,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{rocket->life,rocket->fuse,rocket->blast_radius,rocket->blast_duration,rocket->admission_duration}) if (!std::isfinite(float(value))) return {};
             definition.rocket_definition=uint32_t(rocket-bundle->rockets.begin()+1);
         } else if (rocket!=bundle->rockets.end()) return {};
+        const auto drift=std::find_if(bundle->drifts.begin(),bundle->drifts.end(),[&](const auto &d){return d.id==row.id;});
+        if (row.kind==11) {
+            if (drift==bundle->drifts.end()) return {};
+            definition.drift_definition=uint32_t(drift-bundle->drifts.begin()+1);definition.ram_guard=drift->ram_guard;
+        } else if (drift!=bundle->drifts.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;

@@ -13,7 +13,7 @@ struct Enemy {
     size_t definition = 0, behavior_group = 0, behavior_slot = 0;
     Vector2 pos, vel;
     double hp = 0.0, max_hp = 0.0, radius = 0.0, armor = 0.0, xp = 0.0, speed = 0.0;
-    double facing = 0.0, age = 0.0, fire_t = 0.0;
+    double facing = 0.0, age = 0.0, fire_t = 0.0, spin = 0.0;
     EnemyMode mode = EnemyMode::Move;
     double timer = 0, charge = 0;
     bool alive = false, dead = false, elite = false, is_boss = false, hull_scattered = false;

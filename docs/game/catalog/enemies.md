@@ -128,6 +128,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `spreader` | 拡散弾の敵 | 2 | 保留 | 追ってきて、予告のあと本体の正面へ扇状に弾をばらまく | `data/enemies/spreader.tres`（行動は `battleship`） |
 | `clock` | とけい座 | 5 | 採用 | 長針と短針が刃として回り続ける。2本の速さが違う | `data/enemies/clock.tres`、行動 `clock` |
+| `hydra_rubble` | うみへび座の瓦礫 | 採用 | C++の生成・漂流・表示・復帰に対応 | 回転しながら減速し、寿命で消える。体当たりは弾き、武器では壊せる | うみへび座の技で生成 | `data/enemies/hydra_rubble.tres`、`scripts/enemies/drift.gd` |
 
 ### 見た目の実装
 

@@ -105,7 +105,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         const Vector2 direction = speed > 0 ? runtime.state.ship.vel / speed : Vector2();
         const double attack = speed::CombatResolver::attack_power(runtime);
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
-        const bool front = blocks_front(hit.row, position, direction);
+        const bool front = blocks_front(hit.row, position, direction) || (fast && def.ram_guard);
         if (front && (!fast || (!runtime.state.draw.tracing && enemy.hit_cd > 0))) {
             Vector2 normal = position - enemy.pos;
             normal = normal.length_squared() > 0 ? normal.normalized() : -direction;

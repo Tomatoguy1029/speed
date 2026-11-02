@@ -305,6 +305,31 @@
           "ref": "ContactDefinition"
         }
       ]
+    },
+    {
+      "name": "DriftDefinition",
+      "section": 40,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "has_life",
+          "type": "bool"
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ram_guard",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "enums": {}

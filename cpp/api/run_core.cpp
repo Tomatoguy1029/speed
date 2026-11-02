@@ -2,6 +2,7 @@
 #include "../behaviors/enemies/gunner.h"
 #include "../behaviors/enemies/missile.h"
 #include "../behaviors/enemies/rocket.h"
+#include "../behaviors/enemies/drift.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
@@ -196,7 +197,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Rocket) {
+            if (def.kind==speed::EnemyDefinition::Kind::Drift) {
+                speed::DriftBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Rocket) {
                 speed::RocketBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Missile) {
                 speed::MissileBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
@@ -450,6 +453,9 @@ int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Diction
             if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value))) return -1;
             if (name=="size") {if (double(value)<=0) return -1;params.size=value;}
             else if (name=="facing") params.facing=value;
+            else if (name=="spin") params.spin=value;
+            else if (name=="guard") params.guard=value;
+            else if (name=="hit_cd") params.hit_cd=value;
             else if (name=="knock") params.knock=value;
             else if (name=="attack_value") {params.has_value=true;params.value=value;}
             else if (name=="attack_priority") {params.has_priority=true;params.priority=value;}

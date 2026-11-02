@@ -10,6 +10,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-drift-enemy" in OS.get_cmdline_user_args():
+		await check_cpp_drift()
+		print("[cpp_drift_enemy] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-rocket-enemy" in OS.get_cmdline_user_args():
 		await check_cpp_rocket()
 		print("[cpp_rocket_enemy] failed=%d" % failed)
@@ -247,7 +252,7 @@ func check_cpp_gunner() -> void:
 func rocket_state(run: RunSimulation, core, row: int, id: int, label: String) -> void:
 	for enemy: Dictionary in core.enemies_snapshot():
 		if enemy.id!=id: continue
-		check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001,label+"の初回照準と飛行が一致する")
+		check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001,label+"の位置・速度・向きが一致する")
 		check(enemy.dead==run.enemies.table.dead[row],label+"の死亡印が一致する")
 	for motion: Dictionary in core.enemy_motion_snapshot():
 		if motion.id==id: check(motion.mode==run.enemies.table.mode[row] and is_equal_approx(motion.timer,maxf(0.0,run.enemies.table.timer[row])),label+"の飛行状態と寿命が一致する")
@@ -389,4 +394,94 @@ func check_cpp_rocket() -> void:
 		bridge.release_checkpoint(flight.value)
 		lab.free()
 	bridge.release_checkpoint(initial.value)
+	session.free()
+
+func check_cpp_drift() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: config.set(key,0)
+	var definition := load("res://data/enemies/hydra_rubble.tres").duplicate(true) as EnemyDef
+	definition.params.life = 0.35
+	var stage := RuntimeStage.new()
+	stage.index = 83
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["hydra_rubble"])
+	var output := "res://.content/dev/run_drift"
+	var builder = load("res://tools/content/build_run_content.gd")
+	var built: Error = builder.build(stage,config,output,"漂流する瓦礫の生成と終了".sha256_text(),{&"hydra_rubble":definition})
+	check(built==OK,"漂流する瓦礫の編集値と表示を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_83.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":978},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"漂流する瓦礫のランと表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed":978,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"config":{"start_radius":900.0,"planet_radius":100.0}})
+	var run: RunSimulation = lab.run
+	run.state.ship_pos = target
+	run.state.enemy_aim = target
+	run.state.view_center = target
+	run.state.view_half = Vector2(640,360)
+	run.enemies._lod = core.inspect().ticks
+	run.state.rng.state = int(core.inspect().rng_state)
+	run.enemies._next_id = 1
+	var position := target+Vector2(500,100)
+	var options := {"vel":Vector2(150,50),"facing":0.3,"spin":1.7,"guard":0.08,"hit_cd":0.04}
+	var row := run.enemies.spawn(definition,position,options)
+	var id: int = core.spawn_enemy(&"hydra_rubble",position,options)
+	core.set_motion_context(target,target,Vector2(640,360))
+	var pending: Dictionary = {}
+	var pending_state: Array = []
+	var pending_enemies: Array = []
+	for tick in 11:
+		var change := {}
+		match tick:
+			1: change = {"held":true}
+			2: change = {"held":false,"stone":0.05}
+			3: change = {"knock_t":0.05}
+			4: change = {"shove_time":0.05,"shove_vel":Vector2(-120,30)}
+			5: change = {"slash_hold":true}
+			6: change = {"slash_hold":false}
+		if not change.is_empty():
+			for key in change:
+				var column = run.enemies.table.get(key)
+				column[row] = int(change[key]) if change[key] is bool else change[key]
+				run.enemies.table.set(key,column)
+			core.set_enemy_motion(id,change)
+		run.enemies.tick(0.05,0.05)
+		core.step(0.05)
+		rocket_state(run,core,row,id,"漂流/%d" % tick)
+		if tick==6:
+			pending = bridge.checkpoint()
+			pending_state = core.enemy_motion_snapshot()
+			pending_enemies = core.enemies_snapshot()
+			var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
+			var presentation: RunPresentation = session.view.get_node("RunPresentation")
+			check(presentation.frame_view.apply_frame(frame) and not frame.batches.is_empty(),"回転した瓦礫の本体を通常画面へ表示する")
+			await get_tree().process_frame
+	check(run.enemies.table.dead[row]!=0 and core.hazards_snapshot().is_empty(),"寿命で漂流する瓦礫を退場し攻撃を出さない")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==pending_state and core.enemies_snapshot()==pending_enemies,"漂流の回転・押し出し・寿命を値で復帰する")
+	var before: float = core.enemies_snapshot()[0].hp
+	var at := Vector2(core.enemies_snapshot()[0].pos[0],core.enemies_snapshot()[0].pos[1])
+	bridge.command("dev_ship_motion",{"position":at-Vector2(10,0),"velocity":Vector2(1200,0)})
+	core.rebuild_enemy_grid(config.grid_cell)
+	check(core.collide_ship(at-Vector2(80,0),config.ship_radius) and is_equal_approx(core.enemies_snapshot()[0].hp,before),"硬い殻の瓦礫は速い体当たりを弾く")
+	check(bridge.command("dev_damage",{"entity_id":id,"amount":10000.0,"cause":"bullet"}).value.killed,"漂流中の瓦礫を武器で倒せる")
+	var old: PackedInt64Array = core.enemy_handle(id)
+	core.remove_enemy(id)
+	var replacement: int = core.spawn_enemy(&"hydra_rubble",position,{})
+	check(replacement!=id and not core.valid_enemy_handle(old) and core.enemy_motion_snapshot()[0].spin==0.0 and core.enemy_motion_snapshot()[0].age==0.0,"再利用時に古い回転・寿命・外力を引き継がない")
+	bridge.release_checkpoint(pending.value)
+	lab.free()
 	session.free()
