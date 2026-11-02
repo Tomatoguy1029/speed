@@ -6,9 +6,6 @@ var _texture: Texture2D
 var _polygon := PackedVector2Array()
 var _scope: ContentResourceScope
 var _visuals: Dictionary
-func setup(scope: ContentResourceScope, visuals: Dictionary) -> void:
-	_scope = scope
-	_visuals = visuals
 func apply_frame(row: Dictionary) -> void:
 	_row = row
 	_texture = null
@@ -41,3 +38,6 @@ func _draw() -> void:
 	else:
 		draw_circle(Vector2.ZERO,radius,Color("aeb6c4")*row.colors[0])
 	draw_set_transform(Vector2.ZERO)
+func setup(scope: ContentResourceScope, visuals: Dictionary) -> void:
+	_scope = scope
+	_visuals = visuals

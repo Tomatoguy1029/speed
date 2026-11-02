@@ -4,15 +4,6 @@ extends WeaponVisual
 
 var gear: GearFire
 
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	gear = GearFire.new()
-	gear.z_index = -1
-	gear.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-	rm._layers.ship.add_child(gear)
-	gear.setup(1.82 * cfg.character_scale)
-	node = gear
-
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	gear = GearFire.new()
 	gear.z_index = -1
@@ -20,9 +11,6 @@ func setup_frame(parent: Node2D, pixel: float) -> void:
 	parent.add_child(gear)
 	gear.setup(pixel)
 	node = gear
-
-func tick(_dt: float) -> void:
-	frame_tick(world_dt(),state.ship_pos,state.ship_heading,behavior.ctx.loadout.boost_distance/cfg.draw_length,active and state.tracing)
 
 func frame_tick(dt: float, pos: Vector2, heading: Vector2, progress: float, enabled: bool) -> void:
 	var x := clampf(progress,0.0,1.0)

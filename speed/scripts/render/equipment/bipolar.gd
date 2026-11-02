@@ -26,7 +26,6 @@ var _frame_top: Node2D
 var _frame_view := Rect2()
 var _frame_clock := 0.0
 var _frame_seen := {}
-func _effect_key() -> String: return "weapon/bipolar"
 func setup_frame(parent: Node2D, top: Node2D, pixel: float) -> void:
 	_frame_parent = parent
 	_frame_top = top
@@ -60,10 +59,6 @@ func frame_event(event: Dictionary) -> void:
 func frame_tick(dt: float) -> void:
 	_draw_effects(dt)
 
-func claims(ev: Dictionary) -> bool:
-	if ev.type == &"kill": return ev.get("cause", &"") == &"bipolar"
-	return ev.type in [&"ring", &"beam"] and ev.get("visual_key", "") == "weapon/bipolar"
-
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"bipolar_charge":
@@ -73,7 +68,7 @@ func on_event(ev: Dictionary) -> void:
 			_fire(ev)
 		&"kill":
 			if ev.get("cause", &"") != &"bipolar": return
-			(_fires if rm==null else fires()).add(ev.pos, 7.0, 0.5, TEAL, randf() * 0.08)
+			(_fires).add(ev.pos, 7.0, 0.5, TEAL, randf() * 0.08)
 			var side: Vector2 = (ev.dir as Vector2).orthogonal()
 			for sign_side in [-1.0, 1.0]:
 				sparks.add(ev.pos, 4, (side * sign_side).angle(), 1.0, 40.0, 100.0, 0.3, [Color.WHITE, Color("#ff7a6b")])
@@ -81,7 +76,7 @@ func on_event(ev: Dictionary) -> void:
 func _fire(ev: Dictionary) -> void:
 	var from: Vector2 = ev.from
 	var to: Vector2 = ev.to
-	var px: float = (_painter if rm==null else painter()).px
+	var px: float = (_painter).px
 	var node := MeshInstance2D.new()
 	node.mesh = FireBursts._mesh()
 	node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -89,8 +84,8 @@ func _fire(ev: Dictionary) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER
 	node.material = mat
-	node.modulate = RenderPipeline.plain_color(_frame_parent if rm==null else rm._layers.fx)
-	(_frame_parent if rm==null else rm._layers.fx).add_child(node)
+	node.modulate = RenderPipeline.plain_color(_frame_parent)
+	(_frame_parent).add_child(node)
 	var width := 16.0 * float(ev.get("width_scale", 1.0))
 	var pad := Vector2.ONE * (width * 0.7 + 2.0) * px
 	var center := (from + to) * 0.5
@@ -104,9 +99,9 @@ func _fire(ev: Dictionary) -> void:
 	mat.set_shader_parameter("b", (to / px).round())
 	beams.append({"from": from, "to": to, "width": width, "age": 0.0, "node": node, "material": mat})
 	_flash = 0.1
-	if rm!=null: rm.shake = maxf(rm.shake, 5.0)
+
 	for pos in [from, to]:
-		(_fires if rm==null else fires()).add(pos, 20.0, 0.5, TEAL)
+		(_fires).add(pos, 20.0, 0.5, TEAL)
 		sparks.add(pos, 16, 0.0, 7.0, 50.0, 140.0, 0.35, TEAL.slice(0, 3))
 	var n := (to - from).normalized().orthogonal()
 	for i in 70:
@@ -114,19 +109,16 @@ func _fire(ev: Dictionary) -> void:
 		motes.append({"pos": from.lerp(to, randf()), "vel": n * sign_side * (10.0 + randf() * 30.0),
 			"age": -0.55, "life": 0.3 + randf() * 0.2})
 
-func tick(_dt: float) -> void:
-	_draw_effects(world_dt())
-
 func _draw_effects(dt: float) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	p.begin()
 	_tether(p)
 	for c in charges:
-		if rm!=null: c.age += dt
+
 		_charge(p, c)
 	charges = charges.filter(func(c): return c.age < CHARGE_SECONDS)
 	for bm in beams:
-		if rm!=null: bm.age += dt
+
 		_beam(p, bm)
 	for bm in beams:
 		if bm.age >= BEAM_SECONDS: bm.node.queue_free()
@@ -144,7 +136,7 @@ func _draw_effects(dt: float) -> void:
 		p.dot(m.pos, color)
 	motes.resize(kept)
 	sparks.draw(p, dt)
-	(_fires if rm==null else fires()).step(dt)
+	(_fires).step(dt)
 	p.end()
 	_screen_flash(dt)
 
@@ -163,15 +155,15 @@ func _crystal(p: PixelPainter, pos: Vector2, g: float) -> void:
 
 ## なぞっている間：結晶から機体まで、ねじれ合う2本の糸と、機体へ流れる白い粒。
 func _tether(p: PixelPainter) -> void:
-	var origin = (_frame.origin if _frame.active else null) if rm==null else behavior.origin
+	var origin = (_frame.origin if _frame.active else null)
 	if origin == null:
 		_crystal_since = -1.0
 		return
-	if _crystal_since < 0.0: _crystal_since = _frame.started if rm==null else state.world_time
-	var t: float = _frame_clock if rm==null else state.world_time
+	if _crystal_since < 0.0: _crystal_since = _frame.started
+	var t: float = _frame_clock
 	_crystal(p, origin, minf(1.0, (t - _crystal_since) / 0.1))
 	var a := p.cell(origin)
-	var d := p.cell(_frame_ship.ship_pos if rm==null else state.ship_pos) - a
+	var d := p.cell(_frame_ship.ship_pos) - a
 	var length := maxf(d.length(), 1.0)
 	var q := d.orthogonal() / length
 	var i := 0.0
@@ -198,7 +190,7 @@ func _charge(p: PixelPainter, c: Dictionary) -> void:
 
 func _beam(p: PixelPainter, bm: Dictionary) -> void:
 	var a: float = bm.age
-	var t: float = _frame_clock if rm==null else state.world_time
+	var t: float = _frame_clock
 	var base: float = bm.width
 	var width := base + 2.0 * sin(t * 60.0) if a < 0.3 else base * pow(maxf(0.0, 1.0 - (a - 0.3) / 0.4), 0.8)
 	bm.material.set_shader_parameter("width", width)
@@ -225,8 +217,8 @@ func _screen_flash(dt: float) -> void:
 	if _flash_rect == null:
 		_flash_rect = ColorRect.new()
 		_flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		(_frame_top if rm==null else rm._layers.top).add_child(_flash_rect)
-	var view: Rect2 = (_frame_view if rm==null else rm.view_rect()).grow(400.0)
+		(_frame_top).add_child(_flash_rect)
+	var view: Rect2 = (_frame_view).grow(400.0)
 	_flash_rect.visible = true
 	_flash_rect.position = view.position
 	_flash_rect.size = view.size

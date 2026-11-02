@@ -16,10 +16,6 @@ func _apply_effect_settings() -> void:
 
 const TEXTURE := preload("res://assets/fx/light_arrow.svg")
 
-func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> bool:
-	draw_arrow(c, pos, pr.hostile_vel[i].angle(), pr.hostile_r[i] * flight_scale, false, state.world_time, 1.0, effect_tint, pr.hostile_length[i] * flight_scale, _style)
-	return true
-
 static func draw_arrow(c: CanvasItem, pos: Vector2, angle: float, radius: float,
 		cosmic: bool, world_time: float, opacity := 1.0, effect_color := Color.WHITE, length := 0.0, style: Dictionary = {}) -> void:
 	var scale := radius / 12.0

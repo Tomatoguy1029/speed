@@ -1,14 +1,7 @@
 ## SLASHの弾の表示。
 extends AttackVisual
 
-const SHAPE := preload("res://scripts/attacks/slash.gd")
-
-func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> bool:
-	draw_claws(c, pos, pr.hostile_vel[i].angle(), pr.hostile_r[i], pr.hostile_turn[i], 1.0)
-	return true
-
-func draw_claws(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float) -> void:
-	draw_claws_view(c,pos,travel,size,side,a,_px(1.0))
+const SHAPE := preload("res://scripts/data_types/attack_defaults.gd")
 
 static func draw_claws_view(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float, pixel: float) -> void:
 	var thick := SHAPE.SLASH_THICK * size

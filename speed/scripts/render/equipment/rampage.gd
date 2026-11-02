@@ -7,10 +7,6 @@ const TUNED_SHADERS := [preload("res://shaders/build_aura.gdshader")]
 var _aura: Sprite2D
 var _level := 0.0
 
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	_setup(rm._layers.ship)
-
 func setup_frame(parent: Node2D) -> void:
 	_level = -1.0
 	_setup(parent)
@@ -26,9 +22,6 @@ func _setup(parent: Node2D) -> void:
 	_aura.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	parent.add_child(_aura)
 	node = _aura
-
-func tick(_dt: float) -> void:
-	frame_tick(world_dt(),state.ship_pos,state.ship_heading,cfg.character_scale,state.tracing,{"kills":behavior.kills,"target_kills":behavior.def.params.kills,"strength":behavior.strength,"pop":behavior.pop},state.world_time,active)
 
 func frame_tick(dt: float, pos: Vector2, heading: Vector2, scale: float, tracing: bool, power: Dictionary, clock: float, enabled: bool) -> void:
 	_aura.visible = enabled

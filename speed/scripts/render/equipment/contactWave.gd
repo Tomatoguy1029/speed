@@ -9,7 +9,6 @@ const TUNED_SHADERS := [preload("res://shaders/space_ripple.gdshader")]
 var quakes: Array[Dictionary] = []
 var sparks := PixelSparks.new()
 var _frame_seen := {}
-func _effect_key() -> String: return "weapon/contactWave"
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	_painter = PixelPainter.new()
 	_painter.setup_painter(pixel)
@@ -31,14 +30,10 @@ func on_event(ev: Dictionary) -> void:
 	var spikes: Array[Dictionary] = []
 	for i in 9: spikes.append({"a": i / 9.0 * TAU + randf() * 0.5, "l": 8.0 + randf() * 10.0})
 	quakes.append({"pos": ev.pos, "age": 0.0, "spikes": spikes, "burst": false})
-	if rm!=null: rm.pipeline.add_ripple(ev.pos, float(ev.radius), 1.82 * cfg.character_scale)
 
-func tick(_dt: float) -> void:
-	frame_tick(world_dt())
-	tune(rm.pipeline.ripple_material())
 
 func frame_tick(dt: float) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	p.begin()
 	for w in quakes:
 		w.age += dt

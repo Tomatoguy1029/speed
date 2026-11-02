@@ -4,22 +4,13 @@ extends WeaponVisual
 
 var splits: Array[Dictionary] = []
 
-func on_event(ev: Dictionary) -> void:
-	if ev.type != &"duplicate": return
-	var sum := Vector2.ZERO
-	for v in ev.directions: sum += (v as Vector2).normalized()
-	splits.append({"pos": ev.pos, "angle": sum.angle(), "age": 0.0})
-
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	_painter = PixelPainter.new()
 	_painter.setup_painter(pixel)
 	parent.add_child(_painter)
 
-func tick(_dt: float) -> void:
-	frame_tick(world_dt())
-
 func frame_tick(dt: float) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	p.begin()
 	for s in splits:
 		s.age += dt
@@ -63,3 +54,9 @@ func _glow(p: PixelPainter, pos: Vector2, radius: float, alpha: float) -> void:
 func _glow_contains(x: int, y: int, radius: float, alpha: float, threshold: int) -> bool:
 	var d := sqrt(float(x * x + y * y)) / radius
 	return d < 1.0 and (1.0 - d) * alpha * 16.0 > threshold
+
+func on_event(ev: Dictionary) -> void:
+	if ev.type != &"duplicate": return
+	var sum := Vector2.ZERO
+	for v in ev.directions: sum += (v as Vector2).normalized()
+	splits.append({"pos": ev.pos, "angle": sum.angle(), "age": 0.0})

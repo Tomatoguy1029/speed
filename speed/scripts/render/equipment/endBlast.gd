@@ -52,24 +52,18 @@ func dispose() -> void:
 func plasmas() -> PlasmaBursts:
 	if _plasmas == null:
 		_plasmas = PlasmaBursts.new()
-		_plasmas.setup(_painter.px if rm==null else 1.82*cfg.character_scale)
+		_plasmas.setup(_painter.px)
 		_plasmas.key = _effect_key()
 		_plasmas.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-		_plasmas.modulate = RenderPipeline.plain_color(_frame_parent if rm==null else rm._layers.fx,visual_color(Color.WHITE))
-		(_frame_parent if rm==null else rm._layers.fx).add_child(_plasmas)
+		_plasmas.modulate = RenderPipeline.plain_color(_frame_parent,visual_color(Color.WHITE))
+		(_frame_parent).add_child(_plasmas)
 	return _plasmas
 
 func claims(ev: Dictionary) -> bool:
 	return ev.type == &"explode" and ev.get("cause", &"") == &"endBlast"
 
-func on_event(ev: Dictionary) -> void:
-	if not claims(ev): return
-	var main: bool = float(ev.radius)>=behavior.area(behavior.at_level("radius_by_level"))*0.9
-	if main: rm.shake = maxf(rm.shake,7.0 if int(behavior.at_level("secondary_by_level"))>0 else 4.0)
-	_add(ev)
-
 func _add(ev: Dictionary) -> void:
-	var rad: float = float(ev.radius)/(_painter if rm==null else painter()).px*0.96
+	var rad: float = float(ev.radius)/(_painter).px*0.96
 	plasmas().add(ev.pos,rad,BALL)
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
@@ -84,11 +78,8 @@ func _add(ev: Dictionary) -> void:
 		parts.append(_part(FLAKE, dir * 14.0, dir * rng.randf_range(40.0, 140.0) * s * 0.5, rng.randf_range(0.5, LIFE - 0.25), _pick(rng, [C[5], V[3], V[4]]), rng.randf_range(0.6, 1.8), rng))
 	booms.append({"pos": ev.pos, "rad": rad, "age": 0.0, "parts": parts, "rng": rng, "seed": rng.randi()})
 
-func tick(_dt: float) -> void:
-	frame_tick(world_dt())
-
 func frame_tick(dt: float) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	p.begin()
 	for b in booms:
 		b.age += dt

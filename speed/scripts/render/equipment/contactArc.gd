@@ -1,14 +1,8 @@
 extends WeaponVisual
 
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	overlay_order = 20
-	overlay = load("res://assets/pixel/airship_electronic_probe.png")
-
 var _frame: Array = []
 var _zoom := 1.0
 var _probe: Sprite2D
-func _effect_key() -> String: return "weapon/contactArc"
 func setup_frame(parent: Node2D, ship_parent: Node2D, texture: Texture2D, factor: float) -> void:
 	node = Node2D.new()
 	parent.add_child(node)

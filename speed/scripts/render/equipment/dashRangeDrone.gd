@@ -19,24 +19,6 @@ func dispose() -> void:
 	super()
 
 
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	attach("res://scripts/render/dash_range_drone.gd", "DashRangeDrone", 0)
-
-func on_event(ev: Dictionary) -> void:
-	match ev.type:
-		&"escort_deploy":
-			for target in ev.targets: deploys.append({"from": ev.pos, "to": target, "age": 0.0})
-		&"escort_slash":
-			slashes.append({"pos": ev.pos, "dir": ev.dir, "age": 0.0})
-			var side := 1.0 if randf() < 0.5 else -1.0
-			sparks.add(ev.pos, 5, ev.dir.angle() + PI * 0.5 * side, 1.4, 25.0, 70.0, 0.2, [Color.WHITE, Color("#7ff3ff"), Color("#3fd0e8")])
-
-func tick(_dt: float) -> void:
-	var dt := world_dt()
-	node.step(behavior if active else null, cfg, rm.cam_zoom, state, dt)
-	_draw_effects(painter(),dt)
-
 func _draw_effects(p: PixelPainter, dt: float) -> void:
 	p.begin()
 	for d in deploys:
@@ -66,3 +48,12 @@ func _draw_effects(p: PixelPainter, dt: float) -> void:
 	slashes = slashes.filter(func(s): return s.age < 0.16)
 	sparks.draw(p, dt)
 	p.end()
+
+func on_event(ev: Dictionary) -> void:
+	match ev.type:
+		&"escort_deploy":
+			for target in ev.targets: deploys.append({"from": ev.pos, "to": target, "age": 0.0})
+		&"escort_slash":
+			slashes.append({"pos": ev.pos, "dir": ev.dir, "age": 0.0})
+			var side := 1.0 if randf() < 0.5 else -1.0
+			sparks.add(ev.pos, 5, ev.dir.angle() + PI * 0.5 * side, 1.4, 25.0, 70.0, 0.2, [Color.WHITE, Color("#7ff3ff"), Color("#3fd0e8")])

@@ -17,19 +17,6 @@ var _hexes: PixelShapes
 var _cells: Array[Vector2] = []
 var _cells_radius := -1.0
 
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	overlay_order = 10
-	overlay = load("res://assets/pixel/airship_armor.png")
-	# 白い光と淡い青の段の違いが見えるよう、発光させない層へ描く。
-	var p := painter()
-	p.visibility_layer = 1
-	p.reparent(rm._layers.top)
-	_hexes = PixelShapes.new()
-	_hexes.setup(p.px, PixelShapes.Shape.HEX, false)
-	rm._layers.top.add_child(_hexes)
-
-## C++の通知と世界時計だけを読む表示。
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	_painter = PixelPainter.new()
 	_painter.setup_painter(pixel)
@@ -39,19 +26,8 @@ func setup_frame(parent: Node2D, pixel: float) -> void:
 	_hexes.setup(pixel,PixelShapes.Shape.HEX,false)
 	parent.add_child(_hexes)
 
-func on_event(ev: Dictionary) -> void:
-	match ev.type:
-		&"barrier_hit":
-			hits.append({"angle": float(ev.angle), "age": 0.0, "broken": bool(ev.broken), "radius": float(ev.radius), "shattered": false})
-			sparks.add(ev.hit, 8, float(ev.angle), 1.6, 20.0, 60.0, 0.3, [Color.WHITE, Color("#bfe0ff"), Color("#76aaff")])
-		&"barrier_restore":
-			restores.append({"age": 0.0})
-
-func tick(_dt: float) -> void:
-	frame_tick(world_dt(),state.ship_pos,state.ship_heading)
-
 func frame_tick(dt: float, center: Vector2, heading: Vector2) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	p.begin()
 	_hexes.begin()
 	for h in hits:
@@ -168,3 +144,11 @@ func _restore(p: PixelPainter, r: Dictionary, center: Vector2, heading: float) -
 func dispose() -> void:
 	if is_instance_valid(_hexes): _hexes.queue_free()
 	super()
+
+func on_event(ev: Dictionary) -> void:
+	match ev.type:
+		&"barrier_hit":
+			hits.append({"angle": float(ev.angle), "age": 0.0, "broken": bool(ev.broken), "radius": float(ev.radius), "shattered": false})
+			sparks.add(ev.hit, 8, float(ev.angle), 1.6, 20.0, 60.0, 0.3, [Color.WHITE, Color("#bfe0ff"), Color("#76aaff")])
+		&"barrier_restore":
+			restores.append({"age": 0.0})

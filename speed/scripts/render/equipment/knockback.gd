@@ -7,8 +7,6 @@ var hits: Array[Dictionary] = []
 var _frame_seen := {}
 var frame_shake := 0.0
 
-func _effect_key() -> String: return "weapon/knockback"
-
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	_painter = PixelPainter.new()
 	_painter.setup_painter(pixel)
@@ -24,27 +22,19 @@ func sync_frame(values: Array, dt: float) -> void:
 		else: breaks[-1].age = value.age-dt
 	_frame_seen = alive
 
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	overlay_order = 10
-	overlay = load("res://assets/pixel/airship_armor.png")
-
 func on_event(ev: Dictionary) -> void:
 	if String(ev.get("visual_key", "")) != "weapon/knockback": return
 	if ev.type == &"hull_scatter":
 		var glitter: Array[Dictionary] = []
 		for i in 40: glitter.append({"a": randf() * TAU, "v": 30.0 + randf() * 90.0})
 		breaks.append({"pos": ev.pos, "age": 0.0, "glitter": glitter})
-		if rm==null: frame_shake = maxf(frame_shake,4.0)
-		else: rm.shake = maxf(rm.shake,4.0)
+		frame_shake = maxf(frame_shake,4.0)
+
 	elif ev.type == &"shot_hit":
 		hits.append({"pos": ev.pos, "age": 0.0, "turn": randf() * TAU})
 
-func tick(_dt: float) -> void:
-	frame_tick(world_dt(),state.world_time)
-
 func frame_tick(dt: float, clock: float) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	p.begin()
 	for b in breaks:
 		b.age += dt

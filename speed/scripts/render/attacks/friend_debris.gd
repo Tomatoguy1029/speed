@@ -9,9 +9,6 @@ var _zoom := 1.0
 var _painter: PixelPainter
 var _pump: MeshInstance2D
 var _scope: ContentResourceScope
-func setup(scope: ContentResourceScope, pixel: float) -> void:
-	_scope = scope
-	_pixel = pixel
 func apply_frame(row: Dictionary, zoom: float) -> void:
 	_row = row
 	_zoom = maxf(zoom,0.01)
@@ -77,3 +74,6 @@ func _pump_debris() -> void:
 	material.set_shader_parameter("pixel",_pixel)
 	material.set_shader_parameter("spin",_row.angle-dir.angle())
 	material.set_shader_parameter("kind",_row.pump_kind)
+func setup(scope: ContentResourceScope, pixel: float) -> void:
+	_scope = scope
+	_pixel = pixel

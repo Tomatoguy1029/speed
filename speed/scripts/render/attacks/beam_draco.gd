@@ -12,65 +12,6 @@ func _apply_effect_settings() -> void:
 @export_range(0.02, 0.5, 0.01) var fade_seconds := 0.15
 var _layer: DrawLayer
 
-func setup(render: RunPresentation) -> void:
-	super(render)
-	# 頂点の色で描き方を渡すので、色を変える modulate の掛からない層にする
-	_layer = DrawLayer.new()
-	_layer.name = "DracoBeam"
-	_layer.z_index = rm._layers.projectiles.z_index + 1
-	_layer.draw_fn = Callable(self, "_draw_beams")
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://shaders/draco_beam.gdshader")
-	mat.set_shader_parameter("noise_tex", load("res://assets/fx/water_noise.png"))
-	ShaderTuning.apply(mat, PROFILE, scene_file_path)
-	_layer.material = mat
-	_layer.set_meta("shader_tuning_profile", PROFILE)
-	_layer.set_meta("shader_tuning_fallback", scene_file_path)
-	rm.get_node(rm.world_path).add_child(_layer)
-	if not rm.pipeline.rich:
-		_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-
-## 共通の弾の描画では描かず、専用の層に任せる。
-func draw_hazard(_c: CanvasItem, _pr: ProjectileSystem, _i: int, _view: Rect2) -> void:
-	pass
-
-func update(_dt: float) -> void:
-	_layer.queue_redraw()
-
-func _draw_beams(c: CanvasItem) -> void:
-	var pr := rm.run.projectiles
-	var mat := _layer.material as ShaderMaterial
-	# HDR の描画では頂点の色が線形に直されて届くので、shaderで元の値に戻す
-	mat.set_shader_parameter("linear_colors", _layer.get_viewport().use_hdr_2d)
-	mat.set_shader_parameter("clock", rm.state.world_time)
-	mat.set_shader_parameter("pixel", _px(2.0) * float(EFFECT_SETTINGS.resolved_values(PROFILE, scene_file_path).get("pixel_scale", 1.0)))
-	for i in pr.hazard_alive.size():
-		if pr.hazard_visual[i] != &"" and String(pr.hazard_visual[i]) != scene_file_path: continue
-		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.DRACO:
-			continue
-		# 判定は幅の半分まで。光線の太い所が判定の幅と一致する。
-		var half := pr.hazard_width[i] * 0.5
-		var col: Color = pr.hazard_color[i]
-		mat.set_shader_parameter("half0", half)
-		mat.set_shader_parameter("tint", Vector3(col.r * effect_tint.r, col.g * effect_tint.g, col.b * effect_tint.b))
-		mat.set_shader_parameter("opacity", effect_tint.a)
-		var seed := float(i % 17) / 17.0
-		var t := pr.hazard_t[i]
-		var delay := pr.hazard_delay[i]
-		var at := pr.hazard_pos[i]
-		var angle := pr.hazard_angle[i]
-		if t < delay:
-			_orb(c, at, half, clampf(t / maxf(delay, 0.001), 0.0, 1.0), seed)
-			continue
-		var remaining := delay + pr.hazard_active[i] - t
-		var strength := clampf(remaining / maxf(fade_seconds, 0.001), 0.0, 1.0)
-		var length := pr.hazard_len[i]
-		mat.set_shader_parameter("beam_len", length)
-		if length > 1.0: _strip(c, at, angle, length, half, strength, seed)
-		# 撃っている間も口元の光を残す
-		_orb(c, at, half, strength, seed)
-
-## 口元の光の溜め。口を中心にした正方形に描く。
 func _orb(c: CanvasItem, at: Vector2, half: float, strength: float, seed: float) -> void:
 	var size := half * 2.8
 	var col := Color(0.0, strength, seed, 1.0)

@@ -6,12 +6,6 @@ extends WeaponVisual
 var hits: Array[Dictionary] = []
 var _frame_seen := {}
 
-func claims(ev: Dictionary) -> bool:
-	return ev.type == &"explode" and ev.get("cause", &"") == &"runUp"
-
-func on_event(ev: Dictionary) -> void:
-	frame_event(ev,state.ship_heading)
-
 func frame_event(ev: Dictionary, heading: Vector2) -> void:
 	if ev.type != &"run_up_hit": return
 	var rays: Array[Dictionary] = []
@@ -36,11 +30,8 @@ func sync_frame(values: Array) -> void:
 		hits[-1].age = value.age
 	_frame_seen = alive
 
-func tick(_dt: float) -> void:
-	frame_tick(world_dt(),state.ship_pos,state.ship_heading,behavior.ctx.loadout.boost_distance,float(behavior.def.params.distance),behavior.first,state.tracing,state.world_time,active)
-
 func frame_tick(dt: float, pos: Vector2, heading: Vector2, distance: float, limit: float, first: bool, tracing: bool, clock: float, enabled: bool) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	p.begin()
 	if enabled and tracing and first: _streaks(p,pos,heading,distance,limit,clock)
 	for h in hits:

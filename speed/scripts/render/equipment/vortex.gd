@@ -26,8 +26,6 @@ var _frame_top_parent: Node2D
 var _frame_seen := {}
 var frame_shake := 0.0
 
-func _effect_key() -> String: return "trait/vortex"
-
 func setup_frame(parent: Node2D, lens_parent: Node2D, top_parent: Node2D, pixel: float) -> void:
 	_frame_parent = parent
 	_frame_lens_parent = lens_parent
@@ -75,9 +73,6 @@ func _free_lens(h: Dictionary) -> void:
 	if is_instance_valid(h.lens): h.lens.queue_free()
 
 ## 引き込まれて倒れた敵は、砕けながら中心へ消える姿をここで描く。
-func claims(ev: Dictionary) -> bool:
-	return ev.type == &"kill" and ev.get("cause", &"") == &"vortex"
-
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"end_hole":
@@ -90,7 +85,7 @@ func on_event(ev: Dictionary) -> void:
 			lens.material = ShaderMaterial.new()
 			lens.material.shader = LENS
 			lens.z_index = -1
-			(_frame_lens_parent if rm==null else rm._layers.ship).add_child(lens)
+			(_frame_lens_parent).add_child(lens)
 			holes.append({"age": 0.0, "particles": particles, "lens": lens})
 		&"hole_capture":
 			var shards: Array[Dictionary] = []
@@ -102,18 +97,15 @@ func on_event(ev: Dictionary) -> void:
 			for i in 14: dots.append({"a": randf() * TAU, "v": 14.0 + randf() * 26.0, "up": 10.0 + randf() * 22.0, "s": 1.2 + randf() * 1.6, "dl": randf() * 0.12})
 			heals.append({"age": -CRUSH, "dots": dots, "outer": _glow_rect(), "inner": _glow_rect()})
 
-func tick(_dt: float) -> void:
-	frame_tick(world_dt(),state.ship_pos)
-
 func frame_tick(dt: float, center: Vector2) -> void:
-	var p: PixelPainter = _painter if rm==null else painter()
+	var p: PixelPainter = _painter
 	if _add == null:
 		_add = PixelPainter.new()
 		_add.setup_painter(p.px)
 		var add := CanvasItemMaterial.new()
 		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 		_add.material = add
-		(_frame_top_parent if rm==null else rm._layers.top).add_child(_add)
+		(_frame_top_parent).add_child(_add)
 	p.begin()
 	_add.begin()
 	for h in holes:
@@ -183,8 +175,8 @@ func _hole(p: PixelPainter, h: Dictionary, center: Vector2) -> void:
 		if k > 0.6: p.ring(center, ring - 1.0, color)
 	if a>=CHARGE and a<CHARGE+PULL+0.12:
 		var amount := 6.0*(1.0-(a-CHARGE)/(PULL+0.12))
-		if rm==null: frame_shake = maxf(frame_shake,amount)
-		else: rm.shake = maxf(rm.shake,amount)
+		frame_shake = maxf(frame_shake,amount)
+
 	# 溜め：粒が中心へ集まる。中心に近いほど薄れて暗黒に消える
 	for q in h.particles:
 		var pr: float = (a - q.st) / q.du
@@ -283,5 +275,5 @@ func _glow_rect() -> ColorRect:
 	rect.material = ShaderMaterial.new()
 	rect.material.shader = GLOW
 	rect.z_index = -1
-	(_frame_lens_parent if rm==null else rm._layers.ship).add_child(rect)
+	(_frame_lens_parent).add_child(rect)
 	return rect

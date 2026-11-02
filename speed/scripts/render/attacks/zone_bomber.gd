@@ -19,7 +19,7 @@ func burst_key() -> String:
 	return KEY
 
 func _apply_effect_settings() -> void:
-	var fixed := BURST_RUNTIME.profile(burst_key(), rm == null)
+	var fixed := BURST_RUNTIME.profile(burst_key(), true)
 	if fixed.is_empty():
 		super._apply_effect_settings()
 		return
@@ -27,13 +27,8 @@ func _apply_effect_settings() -> void:
 	effect_scale = float(fixed.effect_scale)
 	effect_tint = fixed.effect_tint
 
-func setup(render: RunPresentation) -> void:
-	super.setup(render)
-	_world_time = state.world_time
-	_create_blasts()
-
 func _ready() -> void:
-	if rm == null: preview_restart()
+	if true: preview_restart()
 
 ## 派生する着弾表示は、所有するshaderをここで指定する。
 func burst_shader() -> Shader:
@@ -43,33 +38,12 @@ func _create_blasts() -> void:
 	_blasts = BLAST_BURSTS.new()
 	_blasts.shader = burst_shader()
 	_blasts.key = burst_key()
-	_blasts.live_edit = rm == null
-	if rm == null:
+	_blasts.live_edit = true
+	if true:
 		if _preview_seed < 0.0: _preview_seed = randf() * 9.0
 		_blasts.seed_override = _preview_seed
-	_blasts.setup(1.82 * (rm.cfg.character_scale if rm != null else 1.3) * pixel_scale)
-	if rm != null:
-		_blasts.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-		_blasts.modulate = RenderPipeline.plain_color(rm._layers.fx)
-		rm._layers.fx.add_child(_blasts)
-	else: add_child(_blasts)
-
-func update(_dt: float) -> void:
-	var now := state.world_time
-	_blasts.step(maxf(0.0, now - _world_time))
-	_world_time = now
-	var pr := rm.run.projectiles
-	for row in _seen.keys():
-		if row >= pr.hazard_alive.size() or pr.hazard_alive[row] == 0 or not is_same(_seen[row], pr.hazard_enemy_hit[row]):
-			_seen.erase(row)
-
-func draw_hazard(_c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> void:
-	if pr.hazard_t[i] < pr.hazard_delay[i]: return
-	# spawnごとに新しくなる命中辞書の参照で、行番号再利用と同じ爆発の再描画を区別する。
-	if is_same(_seen.get(i), pr.hazard_enemy_hit[i]): return
-	if not view.grow(pr.hazard_len[i] * effect_scale * 1.2).has_point(pr.hazard_pos[i]): return
-	_seen[i] = pr.hazard_enemy_hit[i]
-	_spawn(pr.hazard_pos[i], pr.hazard_len[i], pr.hazard_t[i] - pr.hazard_delay[i])
+	_blasts.setup(1.82 * 1.3 * pixel_scale)
+	add_child(_blasts)
 
 func _spawn(at: Vector2, radius: float, age: float) -> void:
 	_blasts.add(at, radius / _blasts.px * effect_scale, -age)
@@ -77,7 +51,7 @@ func _spawn(at: Vector2, radius: float, age: float) -> void:
 
 ## 実行時はRunPresentationから世界時間で更新。単独シーンのときだけ反復プレビューする。
 func _process(dt: float) -> void:
-	if rm == null: preview_step(0.0 if preview_paused else dt * preview_speed)
+	if true: preview_step(0.0 if preview_paused else dt * preview_speed)
 
 func preview_restart(age := 0.0) -> void:
 	if is_instance_valid(_blasts):
@@ -103,4 +77,4 @@ func _preview_life() -> float:
 	return BlastBursts._life(mat) * ShaderTuning.burst_time_scale(KEY)
 
 func _exit_tree() -> void:
-	if rm != null and is_instance_valid(_blasts): _blasts.queue_free()
+	if is_instance_valid(_blasts): _blasts.queue_free()

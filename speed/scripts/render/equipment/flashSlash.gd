@@ -10,7 +10,6 @@ var streaks: Array[Dictionary] = []
 var _released := -1.0
 var _add: PixelPainter
 var _streaks: PixelShapes
-var _frame_mode := false
 var _frame_marks: Array = []
 var _frame_scale := 1.0
 var _angles: Dictionary = {}
@@ -34,7 +33,6 @@ func frame_event(ev: Dictionary) -> void:
 		visual.row = -1
 	on_event(visual)
 func setup_frame(parent: Node2D, pixel: float) -> void:
-	_frame_mode = true
 	_add = PixelPainter.new()
 	_add.setup_painter(pixel)
 	var add := CanvasItemMaterial.new()
@@ -71,7 +69,7 @@ func on_event(ev: Dictionary) -> void:
 				var dir: Vector2 = (path[index + 1] - path[index]).normalized()
 				var at: Vector2 = path[index].lerp(path[index + 1], fmod(f * (path.size() - 1), 1.0))
 				var off := (randf() - 0.5) * (24.0 if randf() < 0.7 else 80.0)
-				streaks.append({"pos": at + dir.orthogonal() * off * 1.82 * (_frame_scale if _frame_mode else cfg.character_scale),
+				streaks.append({"pos": at + dir.orthogonal() * off * 1.82 * (_frame_scale),
 					"angle": dir.angle() + (randf() - 0.5) * (0.7 if randf() < 0.6 else 2.6),
 					"len": 30.0 + randf() * (180.0 if randf() < 0.25 else 80.0), "w": 1.4 + randf() * 2.2,
 					"age": -float(ev.pause) - f * float(ev.sweep)})
@@ -81,34 +79,13 @@ func on_event(ev: Dictionary) -> void:
 		&"kill":
 			needles.erase(ev.get("id", -1))
 
-func tick(_dt: float) -> void:
-	_draw_effects(world_dt())
 func _draw_effects(dt: float) -> void:
-	var p: PixelPainter = _add if _frame_mode else painter()
-	if _add == null:
-		_add = PixelPainter.new()
-		_add.setup_painter(p.px)
-		var add := CanvasItemMaterial.new()
-		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		_add.material = add
-		rm._layers.top.add_child(_add)
-		_streaks = PixelShapes.new()
-		_streaks.setup(p.px, PixelShapes.Shape.SPINDLE)
-		rm._layers.top.add_child(_streaks)
+	var p: PixelPainter = _add
 	_add.begin()
 	_streaks.begin()
-	if not _frame_mode and _released >= 0.0: _released += dt
-	var t: EnemyTable = null if _frame_mode else behavior.ctx.enemies.table
 	for id in needles.keys():
 		var nd: Dictionary = needles[id]
-		if _frame_mode:
-			_needle(_add,nd.pos,nd)
-			continue
-		if not behavior.ctx.enemies.is_same(nd.row, id) or t.dead[nd.row] != 0:
-			needles.erase(id)
-			continue
-		nd.age += dt
-		_needle(_add, t.pos[nd.row], nd)
+		_needle(_add,nd.pos,nd)
 	for s in streaks:
 		s.age += dt
 		var k: float = s.age / 0.7

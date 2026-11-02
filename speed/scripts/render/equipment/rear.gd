@@ -4,13 +4,6 @@ const BASE_PATH := "res://assets/pixel/airship_turret_base.png"
 const TURRET_PATH := "res://assets/pixel/airship_turret.png"
 var base: Texture2D
 var turret: Texture2D
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render,owner_behavior)
-	base = load(BASE_PATH)
-	turret = load(TURRET_PATH)
-func draw_extra(c: CanvasItem, ship_pos: Vector2, color: Color) -> void:
-	frame_extra(c,base,turret,ship_pos,state.ship_pos,state.ship_heading,behavior.mount_position(),behavior.aim_direction(),behavior.recoil,cfg.character_scale,visual_color(color))
-
 static func frame_extra(c: CanvasItem, base_texture: Texture2D, turret_texture: Texture2D, ship_pos: Vector2, source_pos: Vector2, heading: Vector2, mount_pos: Vector2, aim: Vector2, recoil: float, scale: float, color: Color) -> void:
 	if base_texture==null or turret_texture==null: return
 	c.draw_set_transform(ship_pos,heading.angle()+PI/2.0)
@@ -24,9 +17,6 @@ static func frame_extra(c: CanvasItem, base_texture: Texture2D, turret_texture: 
 var flashes := ShotFlashes.new()
 var shells: Array[Dictionary] = []
 
-func on_event(ev: Dictionary) -> void:
-	frame_event(flashes,shells,ev,state.ship_heading,behavior.mount_position())
-
 static func frame_event(current: ShotFlashes, current_shells: Array[Dictionary], ev: Dictionary, heading: Vector2, mount: Vector2) -> void:
 	if String(ev.get("visual_key", "")) != "weapon/rear": return
 	if ev.type == &"weapon_fire":
@@ -34,12 +24,6 @@ static func frame_event(current: ShotFlashes, current_shells: Array[Dictionary],
 		var side := Vector2(-heading.y,heading.x)*(30.0+randf()*20.0)+Vector2(randf()-0.5,0.0)*10.0
 		current_shells.append({"pos":mount,"vel":side,"age":0.0})
 	elif ev.type == &"shot_hit": current.hit(ev.pos,ev.dir,2)
-
-func tick(_dt: float) -> void:
-	var p := painter()
-	p.begin()
-	frame_draw(flashes,shells,p,world_dt(),behavior.mount_position(),behavior.aim_direction(),active)
-	p.end()
 
 static func frame_draw(current: ShotFlashes, current_shells: Array[Dictionary], p: PixelPainter, dt: float, mount: Vector2, aim: Vector2, enabled: bool) -> void:
 	if not enabled: return
