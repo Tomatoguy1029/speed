@@ -69,7 +69,7 @@ func _draw_rift() -> void:
 
 func _draw_technique() -> void:
 	if attack.is_empty() or int(attack.get("stage",5))>=5 or _move_style.is_empty(): return
-	var progress: float = attack.get("windup_progress",0.0)
+	var progress: float = attack.get("windup_progress",0.0) if int(attack.get("stage",0))==0 else 1.0
 	var paths: Array = attack.get("telegraph_paths",[])
 	if paths.is_empty() and not attack.get("warning",PackedVector2Array()).is_empty(): paths=[attack.warning]
 	for warning: PackedVector2Array in paths:
@@ -82,6 +82,14 @@ func _draw_technique() -> void:
 			var normal := (path[j+1]-path[j]).normalized().orthogonal()*width
 			for side in [-1,1]: draw_line(path[j]+normal*side,path[j+1]+normal*side,Color(1.0,0.69,0.36,float(_move_style.telegraph_edge_opacity)+progress*0.4),float(_move_style.telegraph_line_width),false)
 		preload("res://scripts/bosses/draco_form.gd").star(self,path[-1],10.0,Color(1.0,0.86,0.6,0.7))
+	for target: Vector2 in attack.get("telegraph_points",PackedVector2Array()):
+		var at: Vector2 = to_local(target)
+		var radius: float = attack.get("telegraph_radius",attack.warning_width)
+		draw_arc(at,radius,0,TAU,48,Color(1.0,0.7,0.35,0.8),float(_move_style.telegraph_line_width),false)
+		draw_arc(at,radius*(1.7-progress*0.7),-PI*0.5,TAU-PI*0.5,48,Color(1.0,0.77,0.5,0.8),4.0,false)
+		for side in [-1,1]:
+			draw_line(at+Vector2(side*(radius+10.0),0),at+Vector2(side*(radius+25.0),0),Color("#f8c879"),float(_move_style.telegraph_line_width),false)
+			draw_line(at+Vector2(0,side*(radius+10.0)),at+Vector2(0,side*(radius+25.0)),Color("#f8c879"),float(_move_style.telegraph_line_width),false)
 	var points: PackedVector2Array = attack.get("attack_points",PackedVector2Array())
 	if points.size()>=2 and points[0].distance_to(points[1])>=8.0:
 		var line := PackedVector2Array()

@@ -77,26 +77,27 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ドラコはSourceの3形態を生成する。未登録技は生成エラーとして残す。
 static func draco_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge"]: return {}
+	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"draco","kind":4,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[]}
 	for phase in [1,2,3]:
 		var values: Dictionary = source.values().duplicate(true)
 		# Draco.rule()はSource上、形態別の値上書きを行わない。
 		var row := {}
 		for field in Schema.SCHEMA.records.filter(func(v):return v.name=="BossTechniqueDefinition")[0].fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values.get(key,0.0))
 		records.BossTechniqueDefinition.append(row)
 		if source.technique==&"bite": records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
+		elif source.technique==&"leap": records.DracoLeapDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap)})
 		elif source.technique==&"charge": records.DracoChargeDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"overshoot":float(values.overshoot)})
 		else: records.DracoBreathDefinition.append({"id":phase,"technique":phase,"rock_enemy":1,"rocks":int(values.rocks),"rock_distance":float(values.rock_distance),"rock_spacing":float(values.rock_spacing),"half_angle":float(values.half_angle),"sweep":float(values.sweep)})
 	return records
 
 static func draco_set_records(definition: BossDef, moves: Array) -> Dictionary:
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[]}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
