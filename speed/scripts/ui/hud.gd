@@ -1089,9 +1089,11 @@ func _draw_boss(W: float) -> void:
 
 ## 世界の位置 p が画面の外なら、画面の端にその向きの矢印を描く（ボス・英雄・レアな彗星）。
 func _draw_edge_arrow(p: Vector2, col: Color) -> void:
-	var s := run.state
-	var rel := p - s.view_center
-	if absf(rel.x) <= s.view_half.x and absf(rel.y) <= s.view_half.y:
+	_draw_edge_arrow_values(p,col,run.state.view_center,run.state.view_half)
+
+func _draw_edge_arrow_values(p: Vector2, col: Color, view_center: Vector2, view_half: Vector2) -> void:
+	var rel := p - view_center
+	if absf(rel.x) <= view_half.x and absf(rel.y) <= view_half.y:
 		return
 	var center := size / 2.0
 	var dir := rel.normalized()
@@ -1220,6 +1222,7 @@ func _draw_cpp() -> void:
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
 		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
 	draw_set_transform(Vector2.ZERO)
+	for comet in _cpp_ui.get("rare_comets",PackedVector2Array()): _draw_edge_arrow_values(comet,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	_draw_cpp_gauge_ring()
 	_draw_banner()
 

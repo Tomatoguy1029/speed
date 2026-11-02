@@ -75,6 +75,7 @@ struct ContentBundle {
     std::vector<RockFieldDefinition> rock_fields;
     GravityDefinition gravity;
     WarpDefinition warp;
+    CometDefinition comet;
     PopulationDefinition population;
     SpawnTimeline population_timeline;
     std::vector<LoadoutDefinition> equipment;

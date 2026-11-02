@@ -261,6 +261,52 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CometDefinition",
+      "section": 90,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rare_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rare_after",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rare_hp_mult",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warp_chance",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

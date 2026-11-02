@@ -43,6 +43,10 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _comets := {}
+var _capsules := {}
+var _comet_canvas: DrawLayer
+var _capsule_canvas: DrawLayer
 var _warp := {}
 var _gravity := {}
 var _gravity_canvas: DrawLayer
@@ -164,6 +168,17 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		for effect: Dictionary in _shield_transfers:
 			preload("res://scripts/render/shield_visual.gd").transfer(canvas,effect,_ship_visual_position)
 
+	_comet_canvas = DrawLayer.new()
+	_comet_canvas.draw_fn = func(canvas: CanvasItem):
+		var values: PackedFloat32Array = _comets.get("values",PackedFloat32Array())
+		for n in range(0,values.size(),6): RunPresentation.draw_comet_values(canvas,Vector2(values[n],values[n+1]),values[n+2],Vector2(values[n+3],values[n+4]),values[n+5]>0.0,_comets.time)
+	_layer(8).add_child(_comet_canvas)
+	_capsule_canvas = DrawLayer.new()
+	_capsule_canvas.z_index = 1
+	_capsule_canvas.draw_fn = func(canvas: CanvasItem):
+		var values: PackedFloat32Array = _capsules.get("values",PackedFloat32Array())
+		for n in range(0,values.size(),3): RunPresentation.draw_capsule_values(canvas,Vector2(values[n],values[n+1]),int(values[n+2]),_capsules.time)
+	_layer(6).add_child(_capsule_canvas)
 	_gravity_canvas = DrawLayer.new()
 	_gravity_canvas.draw_fn = func(canvas: CanvasItem):
 		if _warp.get("gone",-1.0)>=0.0: RunPresentation.draw_warp(canvas,_warp.position,_warp.radius,_warp.time,1.0/maxf(_zoom,0.01))
@@ -275,6 +290,12 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
+	for key in ["comets","capsules"]:
+		if frame.has(key):
+			var data = frame[key]
+			if not data is Dictionary or not data.get("values") is PackedFloat32Array or data.values.size()%(6 if key=="comets" else 3)!=0 or not (data.get("time") is float or data.get("time") is int) or not is_finite(data.time): return false
+			for value: float in data.values:
+				if not is_finite(value): return false
 	if frame.has("warp"):
 		var warp = frame.warp
 		if not warp is Dictionary or not warp.get("position") is Vector2 or not warp.position.is_finite(): return false
@@ -626,6 +647,12 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Dictionary in _shape_displays.values():
 		display.node.visible = display.used
 		if display.circles!=display.previous_circles: display.node.queue_redraw()
+	if frame.has("comets") and frame.comets!=_comets:
+		_comets = frame.comets
+		_comet_canvas.queue_redraw()
+	if frame.has("capsules") and frame.capsules!=_capsules:
+		_capsules = frame.capsules
+		_capsule_canvas.queue_redraw()
 	if frame.has("warp") and frame.warp!=_warp:
 		_warp = frame.warp
 		_gravity_canvas.queue_redraw()

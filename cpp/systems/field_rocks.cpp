@@ -89,7 +89,7 @@ void FieldSystem::stream_rocks(RunRuntime &run,double dt) {
         EnemySpawn params;params.position=at;params.velocity=rock.velocity;params.facing=rock.facing;params.rock=field.rock_handles.at(i);
         params.size=(rock.kind==RockKind::Belt || rock.kind==RockKind::Drift)?(i%2==0?60.0:40.0):rock.size;
         const auto id=EnemySystem::spawn_base(run,definition-1,params);
-        if (id>0) rock.proxy=state.enemy_handles.at(uint32_t(state.rows_by_id.at(id)));
+        if (id>0) {rock.proxy=state.enemy_handles.at(uint32_t(state.rows_by_id.at(id)));if (rock.rare_weapon) {auto &enemy=state.enemies[rock.proxy.slot];enemy.max_hp*=run.content->comet.rare_hp_mult;enemy.hp=enemy.max_hp;}}
     }
 }
 bool FieldSystem::contact_rock(godot::SpeedRunCore &core,uint32_t row,godot::Vector2 direction,godot::Vector2 from,double speed) {

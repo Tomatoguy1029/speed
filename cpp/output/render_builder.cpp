@@ -74,6 +74,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         auto &out=group.second;out.instances.clear();out.biter=false;
         out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();
     }
+    PackedFloat32Array comet_values;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -86,6 +87,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id) continue;
         const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
+        if (meteor && state.field.rock_handles.contains(enemy.rock) && state.field.rocks[enemy.rock.slot].kind==RockKind::Comet) {
+            if (view.grow(enemy.radius*1.4142135623730951).has_point(pose.position)) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),enemy.vel.x,enemy.vel.y,float(state.field.rocks[enemy.rock.slot].rare_weapon!=0)}) comet_values.push_back(value);
+            continue;
+        }
         const double radius=meteor?FieldSystem::rock_sprite_radius(run,uint32_t(i)):enemy.radius*definition.sprite_scale;
         if (!view.grow(radius*1.4142135623730951).has_point(pose.position)) continue;
         auto &enemy_batch=batch(FieldSystem::rock_visual(run,uint32_t(i)),meteor?7:8,int32_t(enemy.definition));
@@ -178,6 +183,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (!view.grow(radius+p.width*26).has_point(e.pos)) continue;
         for (double value:{double(e.pos.x),double(e.pos.y),radius,p.width,1.0-std::clamp(e.timer/std::max(p.warn,0.001),0.0,1.0),double(e.id%4093)}) pulser.push_back(value);
     }
+    Dictionary comets;comets["time"]=state.time;comets["values"]=comet_values;
+    Dictionary capsules;PackedFloat32Array capsule_values;for (const auto &cap:state.pickups.capsules) for (float value:{cap.pos.x,cap.pos.y,float(cap.kind)}) capsule_values.push_back(value);capsules["time"]=state.time;capsules["values"]=capsule_values;
     Dictionary warp;warp["position"]=state.field.warp_pos;warp["gone"]=state.field.warp_gone;warp["radius"]=run.content->warp.radius;warp["time"]=state.world_time;
     Dictionary gravity;PackedFloat64Array well_values;
     for (const auto &well:state.field.wells) for (double value:{double(well.position.x),double(well.position.y),well.born,well.life,well.radius}) well_values.push_back(value);
@@ -231,6 +238,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;return out;
+    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["comets"]=comets;out["capsules"]=capsules;return out;
 }
 }

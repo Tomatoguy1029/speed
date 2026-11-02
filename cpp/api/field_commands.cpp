@@ -9,6 +9,11 @@ bool radius(const Dictionary &p) {if (!p.has("radius")) return false;const auto 
 }
 Dictionary SpeedRunCore::development_field_command(const String &kind,const Dictionary &p) {
     if (!runtime.api_development) return reply(false);
+    if (kind=="dev_spawn_comet" && p.size()==1 && p.has("rare") && p["rare"].get_type()==Variant::BOOL) {const auto h=speed::FieldSystem::spawn_comet(runtime,p["rare"]);return reply(runtime.state.field.rock_handles.contains(h),int64_t(h.slot)+1);}
+    if (kind=="dev_comet_state") {
+        const Variant remaining=p.get("remaining",Variant());if ((p.size()!=1 && p.size()!=2) || (remaining.get_type()!=Variant::FLOAT && remaining.get_type()!=Variant::INT) || !std::isfinite(double(remaining)) || (p.size()==2 && (!p.has("boss_spawned") || p["boss_spawned"].get_type()!=Variant::BOOL))) return reply(false);
+        runtime.state.field.comet_t=remaining;if (p.has("boss_spawned")) runtime.state.world.boss_spawned=p["boss_spawned"];return reply(true);
+    }
     if (kind=="dev_spawn_warp" && p.is_empty()) {speed::FieldSystem::spawn_warp(runtime);return reply(true);}
     if (kind=="dev_set_warp") {
         const Variant life=p.get("life",Variant());if (p.size()!=2 || !point(p,"position") || (life.get_type()!=Variant::FLOAT && life.get_type()!=Variant::INT) || !std::isfinite(double(life)) || double(life)<0 || !std::isfinite(runtime.state.world_time+double(life))) return reply(false);
@@ -37,7 +42,7 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
                 const auto &rock=runtime.state.field.rocks[i];Dictionary item;
                 item["id"]=i+1;item["kind"]=int(rock.kind);item["initial_position"]=rock.position;item["position"]=speed::FieldSystem::rock_at(runtime,rock);
                 item["velocity"]=rock.velocity;item["size"]=rock.size;item["facing"]=rock.facing;item["spin"]=rock.spin;item["manual"]=rock.manual;item["destroyed"]=rock.destroyed;
-                item["enemy_id"]=runtime.state.enemy_handles.entity_id(rock.proxy);rocks.push_back(item);
+                item["enemy_id"]=runtime.state.enemy_handles.entity_id(rock.proxy);item["rare_weapon_id"]=rock.rare_weapon;item["rare_weapon"]=rock.rare_weapon?String::utf8(runtime.content->equipment[rock.rare_weapon-1].external_id.c_str()):String();rocks.push_back(item);
             }
             return reply(true,rocks);
         }
@@ -48,7 +53,7 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
                 item["id"]=i+1;item["position"]=body.position;item["radius"]=body.radius;item["moon"]=body.moon;
                 item["orbit"]=body.orbit;item["a0"]=body.a0;item["direction"]=body.direction;bodies.push_back(item);
             }
-            Dictionary value;value["bodies"]=bodies;value["world_time"]=runtime.state.world_time;value["body_speed_max"]=runtime.state.field.body_speed_max;return reply(true,value);
+            Dictionary value;value["bodies"]=bodies;value["world_time"]=runtime.state.world_time;value["body_speed_max"]=runtime.state.field.body_speed_max;value["comet_t"]=runtime.state.field.comet_t;value["boss_spawned"]=runtime.state.world.boss_spawned;return reply(true,value);
         }
         if (action=="hit" && p.size()==4 && point(p,"from") && point(p,"to") && radius(p)) {
             const auto hit=speed::FieldSystem::first_body_hit(runtime,p["from"],p["to"],p["radius"]);
@@ -68,6 +73,11 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
             if (key.get_type()!=Variant::STRING) return reply(false);const String name=key;
             if (name=="position" || name=="kind") continue;
             if (name=="velocity") {if (!point(p,"velocity")) return reply(false);rock.velocity=p[key];}
+            else if (name=="rare_weapon") {
+                if (p[key].get_type()!=Variant::STRING || rock.kind!=speed::RockKind::Comet) return reply(false);const String id=p[key];
+                for (const auto &d:runtime.content->equipment) if (d.comet_only && String::utf8(d.external_id.c_str())==id) rock.rare_weapon=d.id;
+                if (!rock.rare_weapon) return reply(false);
+            }
             else if (name=="manual") {if (p[key].get_type()!=Variant::BOOL) return reply(false);rock.manual=p[key];}
             else if (name=="size" || name=="facing" || name=="spin" || name=="born" || name=="gone") {
                 const Variant v=p[key];if ((v.get_type()!=Variant::INT && v.get_type()!=Variant::FLOAT) || !std::isfinite(double(v))) return reply(false);

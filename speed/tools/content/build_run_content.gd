@@ -35,6 +35,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	data.PopulationDefinition = [{"id":1,"active":false,"density":config.density_mult,"bonus_pop":config.bonus_pop,"boss_start":0.0,"recycle_scale":config.spawn_recycle_scale,"region_cap":config.spawn_region_cap,"margin":config.spawn_margin,"field_radius":config.field_radius,"planet_radius":config.planet_radius,"total_cap":config.spawn_total_cap,"refill_time":config.spawn_refill_time}]
+	data.CometDefinition = [{"id":1,"interval_min":config.comet_interval_min,"interval_max":config.comet_interval_max,"speed":config.comet_speed,"rare_chance":config.rare_comet_chance,"rare_after":config.rare_comet_after,"rare_hp_mult":config.rare_comet_hp_mult,"warp_chance":config.warp_chance}]
 	data.WarpDefinition = [{"id":1,"radius":config.warp_radius,"life":config.warp_life,"bonus_time":config.bonus_time}]
 	data.GravityDefinition = [{"id":1,"life":config.gravity_life,"radius":config.gravity_radius,"pull":config.gravity_pull}]
 	data.RunConfig = [{"id":1,"aim_lag":resolved.motion.aim_lag,"aim_speed":resolved.motion.aim_speed,"crystal_low":config.xp_crystal_values[0],"crystal_mid":config.xp_crystal_values[1],"crystal_high":config.xp_crystal_values[2]}]
@@ -303,6 +304,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.MinesDefinition.append({"id":level+1,"weapon":mines_id,"level":level+1,"count":int(mines.params.count_by_level[level]),"damage":float(mines.params.damage_by_level[level]),"radius":float(mines.params.radius_by_level[level]),"life":float(mines.params.life_by_level[level]),"maximum":int(mines.params.max),"trigger":float(mines.params.trigger),"spread":float(mines.params.spread),"range_min":float(mines.params.range_min),"range_max":float(mines.params.range_max),"duration_increment":float(config.post_max.increments.get("duration",0.0)) if "life_by_level" in mines_target.get("duration",[]) else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if mines_target.has("knockback") else 0.0,"visual_life":maxf(float(mine_profile.life),0.4)*float(mine_profile.time_scale)})
 	if config.post_max==null: return {}
 	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
+	for comet_id in ContentManager.catalog.table(&"weapons"):
+		var comet_entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(comet_id))
+		if not comet_entry.comet_only: continue
+		var comet_weapon: WeaponDef = load(comet_entry.path)
+		if comet_weapon==null: return {}
+		data.LoadoutDefinition.append({"id":data.LoadoutDefinition.size()+1,"kind":0,"maximum_level":comet_weapon.level_steps.size(),"external_id":String(comet_weapon.id),"comet_only":true})
 	var crit_definition := load("res://data/traits/T09_critRate.tres") as TraitDef
 	if crit_definition==null: return {}
 	data.PostMaxCritDefinition = [{"id":1,"trait_maximum":float(crit_definition.params.get("max",1.0)),"trained_bonus":crit_definition.stack_bonus(config.trait_max_stacks),"increment":float(config.post_max.increments.get("crit_chance",0.0))}]
@@ -618,6 +625,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.WaveDefinition = resolved.WaveDefinition
 		data.PopulationDefinition = resolved.PopulationDefinition
 		data.PopulationType.append({"id":row.id,"enemy":row.id,"rank":definition.rank,"maximum":definition.max_alive,"ranged":definition.ranged})
+		data.CometDefinition = resolved.CometDefinition
 		data.WarpDefinition = resolved.WarpDefinition
 		data.GravityDefinition = resolved.GravityDefinition
 		data.WallDefinition = resolved.WallDefinition

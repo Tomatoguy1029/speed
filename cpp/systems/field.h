@@ -14,6 +14,9 @@ public:
     static bool spawn_well(RunRuntime &);
     static void spawn_warp(RunRuntime &);
     static bool take_warp(RunRuntime &);
+    static RockHandle spawn_comet(RunRuntime &,bool rare);
+    static void step_comets(RunRuntime &,double);
+    static godot::PackedVector2Array rare_comet_positions(const RunRuntime &);
     static void step_gravity(RunRuntime &,double);
     static void comet_gravity(RunRuntime &,const DeathContext &);
     static void update(RunRuntime &);

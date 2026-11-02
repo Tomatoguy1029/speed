@@ -148,6 +148,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (const auto &body:bundle->field_bodies) if (body.radius<=0) return {};
     if (records.GravityDefinition_rows.size()!=1 || records.GravityDefinition_rows.front().life<=0) return {};
     bundle->gravity=records.GravityDefinition_rows.front();
+    if (records.CometDefinition_rows.size()!=1) return {};bundle->comet=records.CometDefinition_rows.front();
+    const auto &comet=bundle->comet;if (comet.interval_max<comet.interval_min || comet.speed<=0 || comet.rare_hp_mult<=0 || comet.rare_chance>1 || comet.warp_chance>1) return {};
+    for (double value:{comet.interval_min,comet.interval_max,comet.speed,comet.rare_after,comet.rare_hp_mult}) if (!std::isfinite(float(value))) return {};
     if (records.WarpDefinition_rows.size()!=1) return {};bundle->warp=records.WarpDefinition_rows.front();
     for (double value:{bundle->warp.radius,bundle->warp.life,bundle->warp.bonus_time}) if (!std::isfinite(float(value))) return {};
     for (double value:{bundle->gravity.life,bundle->gravity.radius,bundle->gravity.pull}) if (!std::isfinite(float(value))) return {};

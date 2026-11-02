@@ -22,5 +22,6 @@ struct FieldRock {
 struct GravityWell {godot::Vector2 position;double born=0,life=0,radius=0,pull=0;};
 struct FieldState {bool ready=false;double body_speed_max=0;std::vector<FieldBody> bodies;
     godot::Vector2 warp_pos;double warp_gone=-1;
+    double comet_t=0;
     double stream_t=0;std::vector<GravityWell> wells;std::vector<FieldRock> rocks;EntityStore<RockTag> rock_handles;};
 }

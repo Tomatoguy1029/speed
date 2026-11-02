@@ -332,7 +332,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_fire_beam" || kind=="dev_move_beam" || kind=="dev_fire_cross" || kind=="dev_fire_flood") response=development_beam_command(kind,payload);
     else if (kind=="dev_fire_enemy" || kind=="dev_fire_missile" || kind=="dev_stone_hostiles") response=development_hostile_command(kind,payload);
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
-    else if (kind=="dev_spawn_warp" || kind=="dev_set_warp" || kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
+    else if (kind=="dev_spawn_comet" || kind=="dev_comet_state" || kind=="dev_spawn_warp" || kind=="dev_set_warp" || kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
     else if (kind=="dev_contact") response=development_contact_command(payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);
@@ -363,7 +363,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["ship_radius"]=runtime.state.ship_config.ship_radius;
     ui["max_speed"]=runtime.state.ship_config.max_speed;ui["steer_cruise"]=runtime.state.ship_config.steer_cruise;
     ui["ship_vel"]=runtime.state.ship.vel;ui["tracing"]=runtime.state.draw.tracing;ui["ship_boost_t"]=runtime.state.ship.boost_t;ui["glide"]=runtime.state.ship.glide;
-    ui["bonus_remaining"]=control.bonus_remaining;ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
+    ui["view_center"]=runtime.state.view_center;ui["view_half"]=runtime.state.view_half;ui["rare_comets"]=speed::FieldSystem::rare_comet_positions(runtime);ui["bonus_remaining"]=control.bonus_remaining;ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
     Array voices;
     const auto &state=runtime.state;
     if (state.phase!=Phase::Finishing && state.phase!=Phase::Ended) for (size_t group=0;group<state.behavior_rows.size();++group) {

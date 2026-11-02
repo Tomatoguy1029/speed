@@ -4,12 +4,20 @@ var failed := 0
 var mute_checks := false
 var moons_finished := false
 var rocks_finished := false
+var comets_finished := false
 func check(ok: bool, message: String) -> void:
 	if mute_checks: return
 	if not ok:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-comets" in OS.get_cmdline_user_args():
+		await check_cpp_comets()
+		mute_checks = false
+		check(comets_finished,"彗星の確認本体が最後まで進んだ")
+		print("[cpp_comets] %d failures" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-warp" in OS.get_cmdline_user_args():
 		await check_cpp_warp()
 		print("[cpp_warp] %d failures" % failed)
@@ -601,11 +609,12 @@ func check_cpp_gravity() -> void:
 	core.set_motion_context(target,target,Vector2(640,360))
 	# 配置条件は現行と同じにし、乱数列は設計17.1のPCG32を使う。
 	mute_checks = false
-	check(core.inspect().rng_state=="8101019391883367851","配置直前の戦闘乱数を保持する")
+	var first := pcg_step(int(core.inspect().rng_state))
+	var second := pcg_step(first[0])
 	check(bridge.command("dev_spawn_well",{}).ok,"明示したランダム配置の重力を生成する")
 	var well: Dictionary = bridge.command("dev_field_query",{"action":"wells"}).value[0]
-	var expected := target+Vector2((-0.7+1.4*372258371.0/4294967296.0)*640.0,(-0.7+1.4*2721001807.0/4294967296.0)*360.0)
-	check(well.position==expected and well.life==0.5 and well.radius==500.0 and well.pull==1000.0 and core.inspect().rng_state=="-5510157158986812203","配置の距離条件・編集値とPCG32の二つの出力を保持する")
+	var expected := target+Vector2((-0.7+1.4*float(first[1])/4294967296.0)*640.0,(-0.7+1.4*float(second[1])/4294967296.0)*360.0)
+	check(well.position==expected and well.life==0.5 and well.radius==500.0 and well.pull==1000.0 and int(core.inspect().rng_state)==second[0],"配置の距離条件・編集値とPCG32の二つの出力を保持する")
 	var count: int = bridge.command("dev_field_query",{"action":"wells"}).value.size()
 	for cause in ["wave","bullet"]:
 		var now: float = core.inspect().world_time
@@ -752,4 +761,138 @@ func check_cpp_warp() -> void:
 	check(core.inspect().bonus_remaining==0.0 and bridge.command("dev_field_query",{"action":"warp"}).value.gone<0.0,"期限切れのワープには入らない")
 	bridge.release_checkpoint(pending.value)
 	bridge.release_checkpoint(before_entry.value)
+	session.free()
+
+func unsigned_shift(value: int, bits: int) -> int:
+	return (value>>bits)&(0x7fffffffffffffff>>(bits-1))
+
+func pcg_step(value: int) -> Array[int]:
+	var lo := value&0xffffffff
+	var hi := unsigned_shift(value,32)
+	var product := lo*1284865837+4150755663
+	var next_hi := (((hi*1284865837)&0xffffffff)+((lo*1481765933)&0xffffffff)+335903614+(product>>32))&0xffffffff
+	var advanced := ((next_hi&0x7fffffff)<<32)|(product&0xffffffff)
+	if next_hi&0x80000000: advanced += -9223372036854775807-1
+	var x := unsigned_shift(unsigned_shift(value,18)^value,27)&0xffffffff
+	var rotation := unsigned_shift(value,59)
+	return [advanced,((x>>rotation)|(x<<((-rotation)&31)))&0xffffffff]
+
+func check_cpp_comets() -> void:
+	mute_checks = "--cpp-comets-tail" in OS.get_cmdline_user_args() or "--cpp-comets-collect" in OS.get_cmdline_user_args() or "--cpp-comets-expiry" in OS.get_cmdline_user_args()
+	var known := pcg_step(8101019391883367851)
+	check(known[1]==372258371 and pcg_step(known[0])[1]==2721001807,"PCGの参照計算が既知の二出力と一致する")
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 1200.0
+	cfg.planet_radius = 0.0
+	cfg.field_radius = 10000.0
+	cfg.world_tick_div = 1
+	cfg.weapon_slots = 1
+	cfg.comet_interval_min = 0.025
+	cfg.comet_interval_max = 0.025
+	cfg.comet_speed = 300.0
+	cfg.rare_comet_after = 0.0
+	cfg.rare_comet_chance = 0.0
+	cfg.rare_comet_hp_mult = 2.0
+	cfg.warp_chance = 1.0
+	cfg.meteor_heal_chance = 0.0
+	cfg.meteor_magnet_chance = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 86
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_comets"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"彗星の軌道と同時破壊の予約".sha256_text())
+	check(built==OK,"彗星の編集値と限定武器のメタ情報を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_86.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":866},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"彗星とカプセルのある通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	for tick in 5: fixed_step(bridge)
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	check(bridge.command("dev_field_query",{"action":"warp"}).value.gone>0.0 and rock_snapshot(bridge).is_empty(),"期限でワープを選んだ回は彗星を重ねない")
+	bridge.command("dev_set_warp",{"position":target+Vector2(2000,0),"life":0.0})
+	fixed_step(bridge)
+	bridge.command("dev_comet_state",{"remaining":0.0,"boss_spawned":true})
+	fixed_step(bridge)
+	var normal: Dictionary = rock_snapshot(bridge).back()
+	check(normal.kind==4 and normal.rare_weapon.is_empty() and is_equal_approx(normal.velocity.length(),300.0) and normal.size>=35.0 and normal.size<=55.0,"通常Runnerの期限から普通の彗星を設定どおり生成する")
+	bridge.command("dev_comet_state",{"remaining":1000.0})
+	var position: Vector2 = normal.position
+	core.step(0.1)
+	check(rock_snapshot(bridge).back().position.is_equal_approx(position+normal.velocity*0.1),"世界秒から彗星の直線軌道を求める")
+	var remaining: float = bridge.command("dev_field_query",{"action":"snapshot"}).value.comet_t
+	bridge.command("pause",{"paused":true})
+	fixed_step(bridge)
+	check(bridge.command("dev_field_query",{"action":"snapshot"}).value.comet_t==remaining,"停止中は次の彗星までの残り秒を進めない")
+	bridge.command("pause",{"paused":false})
+	check(bridge.command("dev_spawn_comet",{"rare":true}).ok,"未装備の限定武器を持つレア彗星を生成する")
+	var rare: Dictionary = rock_snapshot(bridge).back()
+	mute_checks = "--cpp-comets-collect" in OS.get_cmdline_user_args() or "--cpp-comets-expiry" in OS.get_cmdline_user_args()
+	check(rare.rare_weapon in ["W21","W22"],"レア彗星は現行の限定武器から報酬を選ぶ")
+	var now: float = core.inspect().world_time
+	var ids: Array[int] = []
+	for entry in [[target+Vector2(180,0),false],[target+Vector2(260,0),true],[target+Vector2(260,30),true]]:
+		var data := {"position":entry[0],"kind":4,"manual":true,"size":40.0,"velocity":Vector2(300,0),"born":now,"gone":now+10.0}
+		if entry[1]: data["rare_weapon"] = rare.rare_weapon
+		check(bridge.command("dev_add_rock",data).ok,"寿命付きの普通とレア彗星を同じ場面へ置く")
+	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
+	var rocks := rock_snapshot(bridge)
+	for rock: Dictionary in rocks.slice(-3): ids.append(int(rock.enemy_id))
+	var plain := gravity_enemy(core,ids[0])
+	var golden := gravity_enemy(core,ids[1])
+	check(ids.all(func(id): return id>0) and is_equal_approx(golden.hp,plain.hp*2.0),"同じ大きさのレア彗星だけHP倍率を掛ける")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	check(frame.comets.values.size()==18 and frame.comets.values[5]==0.0 and frame.comets.values[11]==1.0 and presentation.frame_view.apply_frame(frame),"普通の白青の尾とレアの金色の尾を共通描画へ渡す")
+	var ui: Dictionary = bridge.read_frame().value.ui
+	check(ui.rare_comets.size()==3 and ui.view_half.x>0.0,"画面外を含むレア彗星の位置をHUDの端の矢印へ渡す")
+	await get_tree().process_frame
+	var wells: int = bridge.command("dev_field_query",{"action":"wells"}).value.size()
+	for id in ids.slice(1):
+		var killed: Dictionary = bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+		check(killed.ok and killed.value.killed,"同じ更新でレア彗星を共通撃破へ渡す")
+	check(core.pickups_snapshot().capsules.size()==2 and bridge.command("dev_field_query",{"action":"wells"}).value.size()==wells,"同時破壊では報酬を個体ごとに一つ出しレアから重力を出さない")
+	check(not bridge.command("dev_kill",{"entity_id":ids[1],"cause":"bullet"}).value.killed and core.pickups_snapshot().capsules.size()==2,"同じ彗星の撃破を二度受け取らない")
+	var drops: Array = core.pickups_snapshot().capsules.duplicate(true)
+	core.step_pickups(30.0)
+	check(core.pickups_snapshot().capsules.size()==2 and core.pickups_snapshot().capsules[0].pos==drops[0].pos,"彗星武器のカプセルは吸い寄せず寿命で消さない")
+	frame = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	check(frame.capsules.values.size()==6 and frame.capsules.values[2]==2.0 and presentation.frame_view.apply_frame(frame),"二つの彗星武器カプセルを通常画面へ表示する")
+	await get_tree().process_frame
+	bridge.read_frame()
+	var saved: Dictionary = bridge.checkpoint()
+	mute_checks = "--cpp-comets-expiry" in OS.get_cmdline_user_args()
+	var equipped: Array = bridge.read_frame().value.ui.weapon_levels.duplicate(true)
+	bridge.command("dev_ship_motion",{"position":target+Vector2(260,15),"velocity":Vector2.ZERO})
+	core.step_pickups(0.001)
+	var collected: Dictionary = core.pickups_snapshot()
+	check(collected.capsules.is_empty() and collected.pending_comet_weapons==[rare.rare_weapon,rare.rare_weapon],"別々のカプセルを回収して二個分の武器を予約する")
+	core.step_pickups(0.001)
+	check(core.pickups_snapshot().pending_comet_weapons==collected.pending_comet_weapons and bridge.read_frame().value.ui.weapon_levels==equipped,"同じ報酬を二度回収せず満枠の装備を保つ")
+	var events: Dictionary = bridge.read_frame().value
+	# read_frameは出来事を消費しないので同じフレームを表示側へ一度だけ届ける。
+	check(events.events.filter(func(e): return e.type==&"pickup" and e.payload.kind==&"comet_weapon").size()==2,"回収を二個分の表示イベントへ渡す")
+	presentation.frame_view.receive_frame(events)
+	presentation.frame_view.update_effects(events,0.0)
+	check(presentation.frame_view._rings.size()>=2,"回収した金色の輪を通常表示へ渡す")
+	check(bridge.restore(saved.value).ok and core.pickups_snapshot().pending_comet_weapons.is_empty() and core.pickups_snapshot().capsules.size()==2,"未回収のカプセルと選んだ報酬を値から復帰する")
+	bridge.command("dev_ship_motion",{"position":target+Vector2(260,15),"velocity":Vector2.ZERO})
+	core.step_pickups(0.001)
+	check(core.pickups_snapshot().pending_comet_weapons==collected.pending_comet_weapons,"復帰後も同じ二個分を予約する")
+	mute_checks = false
+	core.set_motion_context(target,target,Vector2(640,360))
+	check(core.step(20.0),"寿命の確認まで世界秒を進める")
+	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
+	check(gravity_enemy(core,ids[0]).is_empty() and rock_snapshot(bridge).slice(-3)[0].destroyed,"通常彗星は寿命で退場する")
+	bridge.release_checkpoint(saved.value)
+	comets_finished = true
 	session.free()

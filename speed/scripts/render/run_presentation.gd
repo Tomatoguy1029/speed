@@ -926,22 +926,23 @@ func _draw_pickups(c: CanvasItem) -> void:
 		if coin_alive[i] != 0 and view.has_point(pos):
 			_coin_batch.add_upright(pos, cs, COIN_COLOR)
 	_coin_batch.end()
-	for cap: Pickup in p.capsules:
-		match cap.kind:
-			Pickup.Kind.HEAL:
-				c.draw_rect(Rect2(cap.pos - Vector2(14, 11), Vector2(28, 22)), Color.WHITE)
-				c.draw_rect(Rect2(cap.pos - Vector2(3, 8), Vector2(6, 16)), Color("#e8434f"))
-				c.draw_rect(Rect2(cap.pos - Vector2(8, 3), Vector2(16, 6)), Color("#e8434f"))
-			Pickup.Kind.COMET_WEAPON:
-				var pulse := 0.5 + 0.5 * sin(state.time * 5.0)
-				c.draw_circle(cap.pos, 30.0 + pulse * 6.0, Color(1.0, 0.75, 0.25, 0.25))
-				c.draw_colored_polygon(PackedVector2Array([cap.pos + Vector2(0, -22), cap.pos + Vector2(18, 0),
-					cap.pos + Vector2(0, 22), cap.pos + Vector2(-18, 0)]), Color("#efcb70"))
-				c.draw_circle(cap.pos, 7.0, Color("#fff1bf"))
-			Pickup.Kind.MAGNET:
-				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, MAGNET_COLOR, 6.0)
-				c.draw_rect(Rect2(cap.pos + Vector2(-17, 0), Vector2(6, 10)), Color.WHITE)
-				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
+	for cap: Pickup in p.capsules: draw_capsule_values(c,cap.pos,cap.kind,state.time)
+
+static func draw_capsule_values(c: CanvasItem, at: Vector2, kind: int, now: float) -> void:
+	match kind:
+		Pickup.Kind.HEAL:
+			c.draw_rect(Rect2(at-Vector2(14,11),Vector2(28,22)),Color.WHITE)
+			c.draw_rect(Rect2(at-Vector2(3,8),Vector2(6,16)),Color("#e8434f"))
+			c.draw_rect(Rect2(at-Vector2(8,3),Vector2(16,6)),Color("#e8434f"))
+		Pickup.Kind.COMET_WEAPON:
+			var pulse := 0.5+0.5*sin(now*5.0)
+			c.draw_circle(at,30.0+pulse*6.0,Color(1.0,0.75,0.25,0.25))
+			c.draw_colored_polygon(PackedVector2Array([at+Vector2(0,-22),at+Vector2(18,0),at+Vector2(0,22),at+Vector2(-18,0)]),Color("#efcb70"))
+			c.draw_circle(at,7.0,Color("#fff1bf"))
+		Pickup.Kind.MAGNET:
+			c.draw_arc(at,14.0,PI,TAU,16,MAGNET_COLOR,6.0)
+			c.draw_rect(Rect2(at+Vector2(-17,0),Vector2(6,10)),Color.WHITE)
+			c.draw_rect(Rect2(at+Vector2(11,0),Vector2(6,10)),Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
 	_landmark_aura.begin()
@@ -1069,6 +1070,9 @@ func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 ## 彗星：光る核と、進む向きの反対へ伸びる尾。レアな彗星は金色で、周りを光の粒が回る（デザインとアートスタイル）。
 ## 専用の絵ができるまでの仮の描き方。
 func _draw_comet(c: CanvasItem, p: Vector2, r: float, vel: Vector2, rare: bool) -> void:
+	draw_comet_values(c,p,r,vel,rare,state.time)
+
+static func draw_comet_values(c: CanvasItem, p: Vector2, r: float, vel: Vector2, rare: bool, now: float) -> void:
 	var u := vel.normalized() if vel.length_squared() > 1.0 else Vector2.RIGHT
 	var n := Vector2(-u.y, u.x)
 	var core := Color("#ffe9a0") if rare else Color("#dff6ff")
@@ -1083,7 +1087,7 @@ func _draw_comet(c: CanvasItem, p: Vector2, r: float, vel: Vector2, rare: bool) 
 	c.draw_circle(p, r * 0.65, core)
 	if rare:
 		for k in 4:
-			var a := state.time * 3.0 + k * TAU / 4.0
+			var a := now * 3.0 + k * TAU / 4.0
 			c.draw_circle(p + Vector2.from_angle(a) * r * 1.7, maxf(3.0, r * 0.12), Color("#fff3c4"))
 
 ## 絵がまだない敵の仮の図形（+X が前、半径 1）。orb は円、diamond は菱形、hex は六角形、dart は矢じり、それ以外は四角。

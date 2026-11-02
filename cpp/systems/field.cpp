@@ -26,6 +26,7 @@ void FieldSystem::initialize(RunRuntime &run) {
     }
     update(run);
     initialize_rocks(run);
+    field.comet_t=run.state.control.rng.randf_range(run.content->comet.interval_min,run.content->comet.interval_max);
 }
 void FieldSystem::update(RunRuntime &run) {
     for (auto &body:run.state.field.bodies) if (body.moon) {
@@ -102,12 +103,12 @@ bool FieldSystem::validate(const godot::RunState &state,const ContentBundle &con
         !std::isfinite(body.a0) || (body.direction!=1 && body.direction!=-1)) return false;
     for (uint32_t i=0;i<state.field.rocks.size();++i) {
         const auto &rock=state.field.rocks[i];
-        if (!state.field.rock_handles.contains(state.field.rock_handles.at(i)) || rock.kind>=RockKind::Count || !rock.position.is_finite() || !rock.velocity.is_finite() ||
+        if ((rock.rare_weapon && (rock.kind!=RockKind::Comet || rock.rare_weapon>content.equipment.size() || !content.equipment[rock.rare_weapon-1].comet_only)) || !state.field.rock_handles.contains(state.field.rock_handles.at(i)) || rock.kind>=RockKind::Count || !rock.position.is_finite() || !rock.velocity.is_finite() ||
             !std::isfinite(rock.size) || rock.size<=0 || !std::isfinite(rock.facing) || !std::isfinite(rock.spin) || !std::isfinite(rock.born) || !std::isfinite(rock.gone)) return false;
         if (state.enemy_handles.contains(rock.proxy) && !same_handle(state.enemies[rock.proxy.slot].rock,state.field.rock_handles.at(i))) return false;
     }
     for (const auto &w:state.field.wells) if (!w.position.is_finite() || !std::isfinite(w.born) || !std::isfinite(w.life) || w.life<=0 || !std::isfinite(w.radius) || w.radius<0 || !std::isfinite(w.pull) || w.pull<0) return false;
-    return state.field.warp_pos.is_finite() && std::isfinite(state.field.warp_gone) && std::isfinite(state.field.stream_t);
+    return std::isfinite(state.field.comet_t) && state.field.warp_pos.is_finite() && std::isfinite(state.field.warp_gone) && std::isfinite(state.field.stream_t);
 }
 std::vector<SightBlocker> FieldSystem::sight_blockers(const RunRuntime &run,godot::Vector2 lens,double length) {
     std::vector<SightBlocker> out;const auto &state=run.state;
@@ -178,6 +179,33 @@ bool FieldSystem::take_warp(RunRuntime &r) {
     auto &s=r.state;if (s.field.warp_gone<0) return false;if (s.world_time>=s.field.warp_gone) {s.field.warp_gone=-1;return false;}
     const double reach=r.content->warp.radius+s.ship_config.ship_radius;if (s.ship.pos.distance_squared_to(s.field.warp_pos)>reach*reach) return false;
     s.field.warp_gone=-1;return true;
+}
+
+RockHandle FieldSystem::spawn_comet(RunRuntime &r,bool rare) {
+    auto &s=r.state;const auto &p=r.content->comet;const double lead=s.view_half.length()+700.0;
+    for (int attempt=0;attempt<12;++attempt) {
+        const auto u=godot::Vector2::from_angle(s.control.rng.randf()*godot::Math::TAU);const auto side=godot::Vector2(-u.y,u.x)*(s.control.rng.randf()<0.5?1.0:-1.0);
+        const double edge=std::abs(side.x)*s.view_half.x+std::abs(side.y)*s.view_half.y;
+        const auto from=s.view_center-u*lead+side*edge*s.control.rng.randf_range(0.55,0.9),to=from+u*lead*2.0;
+        const double planet=r.content->rock_fields.empty()?0:r.content->rock_fields.front().planet_radius;
+        if (CollisionQuery::segment_circle_t(from,to,{},planet+150.0)>=0 && attempt<11) continue;
+        FieldRock rock;rock.kind=RockKind::Comet;rock.position=from;rock.velocity=u*p.speed;rock.born=s.world_time;rock.gone=s.world_time+lead*2.0/p.speed;rock.size=s.control.rng.randf_range(35.0,55.0);rock.facing=u.angle();
+        if (rare) {
+            std::vector<uint32_t> choices;
+            for (const auto &d:r.content->equipment) if (d.kind==0 && d.comet_only && std::none_of(s.loadout.weapons.begin(),s.loadout.weapons.end(),[&](const auto &owned){return owned.definition==d.id;})) choices.push_back(d.id);
+            if (!choices.empty()) rock.rare_weapon=choices[s.control.rng.randi_range(0,int64_t(choices.size()-1)).value()];
+        }
+        return add_rock(r,rock);
+    }return {};
+}
+void FieldSystem::step_comets(RunRuntime &r,double dt) {
+    if (dt<=0) return;auto &s=r.state;s.field.comet_t-=dt;if (s.field.comet_t>0) return;const auto &p=r.content->comet;
+    s.field.comet_t=s.control.rng.randf_range(p.interval_min,p.interval_max);
+    if (s.control.bonus_remaining<=0 && !s.world.boss_spawned && s.field.warp_gone<0 && s.time>=p.rare_after && s.control.rng.randf()<p.warp_chance) {spawn_warp(r);return;}
+    spawn_comet(r,s.time>=p.rare_after && s.control.rng.randf()<p.rare_chance);
+}
+godot::PackedVector2Array FieldSystem::rare_comet_positions(const RunRuntime &r) {
+    godot::PackedVector2Array out;for (const auto &rock:r.state.field.rocks) if (rock.kind==RockKind::Comet && rock.rare_weapon && !rock.destroyed && r.state.world_time<rock.gone) out.push_back(rock_at(r,rock));return out;
 }
 
 }

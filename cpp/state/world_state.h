@@ -58,6 +58,6 @@ struct AttackBudgetState {
 };
 struct WorldState {
     AttackBudgetState attack_budget;
-    bool attack_formation_mode=false;
+    bool attack_formation_mode=false,boss_spawned=false;
 };
 }

@@ -70,6 +70,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         control.last_world_real_dt=wr;control.last_world_dt=wd;++control.world_updates;
         if (state.world.attack_budget.frame_enabled) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
         FieldSystem::update(core.runtime);
+        FieldSystem::step_comets(core.runtime,wd);
         FieldSystem::stream_rocks(core.runtime,wd);
         FieldSystem::step_gravity(core.runtime,wd);
         // ボスは各種類の移植で、この世界更新区間へ接続する。
