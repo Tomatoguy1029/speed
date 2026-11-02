@@ -2,11 +2,6 @@
 ## Godot --headless --path speed res://tests/integration/hero_guidance.tscn
 extends Node
 
-class BlockedField:
-	extends FieldSystem
-	func body_gap(_p: Vector2, _radius: float) -> float:
-		return 0.0
-
 var failed := 0
 
 func _ready() -> void:

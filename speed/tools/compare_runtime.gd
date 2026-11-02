@@ -1,47 +1,6 @@
-## 固定更新の入力列から、移行前後で照合する観測値を作る。
-## 実験場の正規初期化を使い、描画と実時間の待ちを結果へ混ぜない。
+## C++検査の観測値を展開し、保持前後の違いを表示する。
 extends RefCounted
-const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 const FORMAT_VERSION := 1
-
-func record(host: Node, settings: Dictionary, commands: Array, ticks: int) -> Dictionary:
-	var lab = SESSION.new()
-	host.add_child(lab)
-	await lab.reset(settings)
-	var frames: Array = [snapshot(lab.run, [], 0)]
-	for tick in ticks:
-		for command: Dictionary in commands:
-			if int(command.tick) != tick:
-				continue
-			if command.kind == "hitstop":
-				lab.run.state.hitstop_enabled = true
-				lab.run.state.hitstop = float(command.args.seconds)
-			else:
-				lab.perform(String(command.kind), command.get("args", {}))
-		var event_start: int = lab.events.size()
-		lab.step()
-		frames.append(snapshot(lab.run, lab.events.slice(event_start), tick + 1))
-	lab.free()
-	return {"version": FORMAT_VERSION, "dt": SESSION.DT, "frames": frames}
-
-## 個体は格納行ではなくIDで照合する。完全な内部状態の保存とは別の観測値。
-func snapshot(run: RunSimulation, events: Array, tick: int) -> Dictionary:
-	var state := run.state
-	var table := run.enemies.table
-	var enemies: Array = []
-	for row in table.alive.size():
-		if table.alive[row] == 0:
-			continue
-		enemies.append({"id": table.id[row], "type": String(table.type[row]),
-			"pos": vector(table.pos[row]), "vel": vector(table.vel[row]),
-			"hp": table.hp[row], "armor": table.armor[row], "dead": table.dead[row],
-			"facing": table.facing[row], "radius": table.r[row]})
-	enemies.sort_custom(func(a, b): return a.id < b.id)
-	return {"tick": tick, "time": state.time, "world_time": state.world_time,
-		"phase": int(state.phase), "ship_pos": vector(state.ship_pos),
-		"ship_vel": vector(state.ship_vel), "ship_hp": state.ship_hp,
-		"kills": state.kills, "xp": state.xp, "xp_gained": state.xp_gained,
-		"rng_state": str(state.rng.state), "enemies": enemies, "events": plain(events)}
 
 func vector(value: Vector2) -> Array:
 	return [value.x, value.y]
