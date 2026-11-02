@@ -399,7 +399,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 34) return false;
+    if (out.kind > 37) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -2125,6 +2125,74 @@ inline bool read(BinaryReader &input, CrabDefinition &out) {
     if (out.admission_duration < 0) return false;
     return true;
 }
+struct CrowDefinition {
+    uint32_t id{};
+    uint32_t flock{};
+    double aim_spread{};
+    double flock_gap{};
+    double gather_width{};
+    double gather_behind{};
+    double gather_speed{};
+    double exit_margin{};
+};
+inline bool read(BinaryReader &input, CrowDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.flock)) return false;
+    if (out.flock < 0) return false;
+    if (out.flock > 2147483647) return false;
+    if (!input.read_f64(out.aim_spread)) return false;
+    if (!input.read_f64(out.flock_gap)) return false;
+    if (!input.read_f64(out.gather_width)) return false;
+    if (!input.read_f64(out.gather_behind)) return false;
+    if (!input.read_f64(out.gather_speed)) return false;
+    if (!input.read_f64(out.exit_margin)) return false;
+    return true;
+}
+struct CepheusDefinition {
+    uint32_t id{};
+    uint32_t soldier{};
+    double accel{};
+    double keep{};
+    double fire_interval{};
+    double reinforce_interval{};
+    double summon_time{};
+    double mutiny_time{};
+    double spacing{};
+    double row_near{};
+    double row_far{};
+    double fan_radius{};
+    double fan_step{};
+};
+inline bool read(BinaryReader &input, CepheusDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.soldier)) return false;
+    if (out.soldier < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.fire_interval)) return false;
+    if (out.fire_interval < 0) return false;
+    if (!input.read_f64(out.reinforce_interval)) return false;
+    if (out.reinforce_interval < 0) return false;
+    if (!input.read_f64(out.summon_time)) return false;
+    if (out.summon_time < 0) return false;
+    if (!input.read_f64(out.mutiny_time)) return false;
+    if (out.mutiny_time < 0) return false;
+    if (!input.read_f64(out.spacing)) return false;
+    if (out.spacing < 0) return false;
+    if (!input.read_f64(out.row_near)) return false;
+    if (out.row_near < 0) return false;
+    if (!input.read_f64(out.row_far)) return false;
+    if (out.row_far < 0) return false;
+    if (!input.read_f64(out.fan_radius)) return false;
+    if (out.fan_radius < 0) return false;
+    if (!input.read_f64(out.fan_step)) return false;
+    if (out.fan_step < 0) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -2862,6 +2930,161 @@ inline bool read(BinaryReader &input, CritBeamDefinition &out) {
     if (out.knock < 0) return false;
     return true;
 }
+struct KnockbackDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    double chance{};
+    uint32_t chain_limit{};
+    double speed{};
+    double life{};
+    double base_damage{};
+    double base_attack{};
+    double base_knock{};
+    double base_life{};
+    double projectile_increment{};
+    double duration_increment{};
+    double knockback_increment{};
+    double area_increment{};
+};
+inline bool read(BinaryReader &input, KnockbackDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.chance)) return false;
+    if (out.chance < 0) return false;
+    if (out.chance > 1) return false;
+    if (!input.read_u32(out.chain_limit)) return false;
+    if (out.chain_limit > 2147483646) return false;
+    if (!input.read_f64(out.speed)) return false;
+    if (out.speed < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.base_damage)) return false;
+    if (out.base_damage < 0) return false;
+    if (!input.read_f64(out.base_attack)) return false;
+    if (out.base_attack < 0) return false;
+    if (!input.read_f64(out.base_knock)) return false;
+    if (out.base_knock < 0) return false;
+    if (!input.read_f64(out.base_life)) return false;
+    if (out.base_life < 0) return false;
+    if (!input.read_f64(out.projectile_increment)) return false;
+    if (out.projectile_increment < 0) return false;
+    if (!input.read_f64(out.duration_increment)) return false;
+    if (out.duration_increment < 0) return false;
+    if (!input.read_f64(out.knockback_increment)) return false;
+    if (out.knockback_increment < 0) return false;
+    if (!input.read_f64(out.area_increment)) return false;
+    if (out.area_increment < 0) return false;
+    return true;
+}
+struct BossDefinition {
+    uint32_t id{};
+    std::string external_id{};
+    uint32_t kind{};
+    double lock_lead{};
+    double horn_width{};
+    double horn_length_ratio{};
+    double horn_length_ratio_p2{};
+    double near_clearance{};
+    double reposition_time{};
+    double stuck_time{};
+    double extract_time{};
+    double extract_speed{};
+    double turn{};
+    double speed{};
+};
+inline bool read(BinaryReader &input, BossDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 0) return false;
+    if (!input.read_f64(out.lock_lead)) return false;
+    if (out.lock_lead < 0) return false;
+    if (!input.read_f64(out.horn_width)) return false;
+    if (out.horn_width < 0) return false;
+    if (!input.read_f64(out.horn_length_ratio)) return false;
+    if (out.horn_length_ratio < 0) return false;
+    if (!input.read_f64(out.horn_length_ratio_p2)) return false;
+    if (out.horn_length_ratio_p2 < 0) return false;
+    if (!input.read_f64(out.near_clearance)) return false;
+    if (out.near_clearance < 0) return false;
+    if (!input.read_f64(out.reposition_time)) return false;
+    if (out.reposition_time < 0) return false;
+    if (!input.read_f64(out.stuck_time)) return false;
+    if (out.stuck_time < 0) return false;
+    if (!input.read_f64(out.extract_time)) return false;
+    if (out.extract_time < 0) return false;
+    if (!input.read_f64(out.extract_speed)) return false;
+    if (out.extract_speed < 0) return false;
+    if (!input.read_f64(out.turn)) return false;
+    if (out.turn < 0) return false;
+    if (!input.read_f64(out.speed)) return false;
+    if (out.speed < 0) return false;
+    return true;
+}
+struct BossTechniqueDefinition {
+    uint32_t id{};
+    uint32_t boss{};
+    std::string external_id{};
+    uint32_t kind{};
+    uint32_t phase{};
+    bool track_during_warn{};
+    double warn{};
+    double active{};
+    double recover{};
+    double cd{};
+    double damage{};
+    double distance{};
+    double post_gap{};
+};
+inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 0) return false;
+    if (!input.read_u32(out.phase)) return false;
+    if (out.phase < 1) return false;
+    if (out.phase > 2) return false;
+    if (!input.read_bool(out.track_during_warn)) return false;
+    if (!input.read_f64(out.warn)) return false;
+    if (out.warn < 0) return false;
+    if (!input.read_f64(out.active)) return false;
+    if (out.active < 0) return false;
+    if (!input.read_f64(out.recover)) return false;
+    if (out.recover < 0) return false;
+    if (!input.read_f64(out.cd)) return false;
+    if (out.cd < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.distance)) return false;
+    if (out.distance < 0) return false;
+    if (!input.read_f64(out.post_gap)) return false;
+    if (out.post_gap < 0) return false;
+    return true;
+}
+struct BossTechniqueStage {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t command{};
+    double at{};
+};
+inline bool read(BinaryReader &input, BossTechniqueStage &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.command)) return false;
+    if (out.command > 2) return false;
+    if (!input.read_f64(out.at)) return false;
+    if (out.at < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -2935,6 +3158,8 @@ struct ContentRecords {
     std::vector<SplitDefinition> SplitDefinition_rows;
     std::vector<DefenderDefinition> DefenderDefinition_rows;
     std::vector<CrabDefinition> CrabDefinition_rows;
+    std::vector<CrowDefinition> CrowDefinition_rows;
+    std::vector<CepheusDefinition> CepheusDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -2962,6 +3187,10 @@ struct ContentRecords {
     std::vector<MinesDefinition> MinesDefinition_rows;
     std::vector<VortexDefinition> VortexDefinition_rows;
     std::vector<CritBeamDefinition> CritBeamDefinition_rows;
+    std::vector<KnockbackDefinition> KnockbackDefinition_rows;
+    std::vector<BossDefinition> BossDefinition_rows;
+    std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
+    std::vector<BossTechniqueStage> BossTechniqueStage_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -3402,6 +3631,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CrabDefinition row; if (!read(input,row)) return false; out.CrabDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 140: {
+        if (version != 1) return false;
+        if (count > input.remaining()/56) return false;
+        for (uint32_t i=0; i<count; ++i) { CrowDefinition row; if (!read(input,row)) return false; out.CrowDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 110: {
+        if (version != 1) return false;
+        if (count > input.remaining()/96) return false;
+        for (uint32_t i=0; i<count; ++i) { CepheusDefinition row; if (!read(input,row)) return false; out.CepheusDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -3564,6 +3805,30 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CritBeamDefinition row; if (!read(input,row)) return false; out.CritBeamDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 96: {
+        if (version != 1) return false;
+        if (count > input.remaining()/104) return false;
+        for (uint32_t i=0; i<count; ++i) { KnockbackDefinition row; if (!read(input,row)) return false; out.KnockbackDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 150: {
+        if (version != 1) return false;
+        if (count > input.remaining()/100) return false;
+        for (uint32_t i=0; i<count; ++i) { BossDefinition row; if (!read(input,row)) return false; out.BossDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 151: {
+        if (version != 1) return false;
+        if (count > input.remaining()/77) return false;
+        for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 152: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { BossTechniqueStage row; if (!read(input,row)) return false; out.BossTechniqueStage_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -3712,6 +3977,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DefenderDefinition_rows) if (!DefenderDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CrabDefinition_ids;
     for (const auto &row:data.CrabDefinition_rows) if (!CrabDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CrowDefinition_ids;
+    for (const auto &row:data.CrowDefinition_rows) if (!CrowDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CepheusDefinition_ids;
+    for (const auto &row:data.CepheusDefinition_rows) if (!CepheusDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -3766,6 +4035,14 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.VortexDefinition_rows) if (!VortexDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CritBeamDefinition_ids;
     for (const auto &row:data.CritBeamDefinition_rows) if (!CritBeamDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> KnockbackDefinition_ids;
+    for (const auto &row:data.KnockbackDefinition_rows) if (!KnockbackDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossDefinition_ids;
+    for (const auto &row:data.BossDefinition_rows) if (!BossDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossTechniqueDefinition_ids;
+    for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossTechniqueDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossTechniqueStage_ids;
+    for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueStage_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -3837,6 +4114,9 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.SplitDefinition_rows) if (!EnemyRecord_ids.count(row.child)) return false;
     for (const auto &row:data.DefenderDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.CrabDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.CrowDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.CepheusDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.CepheusDefinition_rows) if (!EnemyRecord_ids.count(row.soldier)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -3861,6 +4141,9 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.MinesDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.VortexDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.CritBeamDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.KnockbackDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -3987,5 +4270,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=99;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=105;
 }
