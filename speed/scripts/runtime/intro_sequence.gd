@@ -35,7 +35,7 @@ func setup(parent: Node, visuals: IntroPresentation) -> void:
 		return
 	var index_path := output.path_join("stage_1.json")
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
-	session = RunManager.create_session(parent,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":932,"hud":false,"cpp_edit_source":{"stage":stage,"config":config,"definitions":definitions}},true)
+	session = RunManager.create_session(parent,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":932,"hud":false,"cpp_start":{"lab_mode":true},"cpp_edit_source":{"stage":stage,"config":config,"definitions":definitions}},true)
 	session.remove_from_group("recordable_runs")
 	session.auto_step = false
 	while is_instance_valid(session) and session.bridge==null and session.cpp_error==OK: await parent.get_tree().process_frame

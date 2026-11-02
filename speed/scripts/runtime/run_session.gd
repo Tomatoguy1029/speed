@@ -233,7 +233,7 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	if not RunManager.ensure_registered(self): return ERR_OUT_OF_MEMORY
 	var next_bridge = preload("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":1,
-		"stage_id":prepared.index.get("stage_id",""),"profile":{},"settings":{}})
+		"stage_id":prepared.index.get("stage_id",""),"profile":options.get("cpp_profile",{}),"settings":{}})
 	if not configured.ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA

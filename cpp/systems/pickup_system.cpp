@@ -122,7 +122,7 @@ bool PickupSystem::release_crystal(RunRuntime &run,size_t row,CrystalRemoval rea
 }
 double PickupSystem::collect_rows(godot::SpeedRunCore &core,const std::vector<size_t> &rows,CrystalCollectMethod method) {
     auto &run=core.runtime;auto &p=run.state.pickups;
-    const double multiplier=run.state.pickup_config.xp_mult*run.state.loadout.xp_gain_mult;
+    const double multiplier=run.state.pickup_config.xp_mult*run.state.loadout.xp_profile_factor*run.state.loadout.xp_gain_mult;
     std::vector<CrystalCollection> details;double base=0;
     for (size_t row:rows) {
         if (row>=p.gems.size() || !p.gems[row].alive) continue;

@@ -149,7 +149,7 @@ func _rebuild() -> void:
 		return
 	var index_path := _output.path_join("stage_%d.json" % _source.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
-	scene = RunManager.create_session(viewport if viewport!=null else self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":int(spec.get("seed",932)),"hud":true,"cpp_edit_source":{"stage":_source,"config":_config,"definitions":_definitions}},viewport!=null)
+	scene = RunManager.create_session(viewport if viewport!=null else self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":int(spec.get("seed",932)),"hud":true,"cpp_start":{"lab_mode":true},"cpp_profile":ProfileManager.for_cpp(true,spec.get("meta",{})),"cpp_edit_source":{"stage":_source,"config":_config,"definitions":_definitions}},viewport!=null)
 	scene.remove_from_group("recordable_runs")
 	scene.auto_step = false
 	while is_instance_valid(scene) and scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
@@ -188,6 +188,7 @@ func _rebuild() -> void:
 	events.clear()
 	schedule = spec.get("schedule",[]).duplicate(true)
 	if not String(spec.get("hero","")).is_empty(): _apply("hero",{"id":String(spec.hero)})
+	if not spec.get("meta",{}).is_empty(): _apply_meta(spec.meta)
 	_apply("schedule",{"entries":schedule})
 	_apply_recorded()
 	_refresh_projection()
@@ -373,6 +374,10 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			var result: Dictionary = bridge.replace_scenario("formation",{"layout":int(args.get("layout",0)),"entry":int(args.get("entry",0))},bundle.bytes)
 			if result.ok: _formation_sources = next_sources
 			return result
+		"meta":
+			var levels: Dictionary = run.state.meta_override.duplicate(true)
+			levels[String(args.get("id",""))] = clampi(int(args.get("level",0)),0,100)
+			return _apply_meta(levels)
 		"hero": return bridge.command("dev_set_hero",{"id":String(args.get("id",""))})
 		"individual":
 			var payload := {"entity_id":int(args.get("id",-1))}
@@ -451,6 +456,13 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 				run.state.data.stage = next
 			return result
 	return {"ok":false,"message":"この実験命令はまだ移行していません: "+kind}
+
+func _apply_meta(levels: Dictionary) -> Dictionary:
+	for id in levels:
+		if String(id) not in PROJECTION.META_IDS: return {"ok":false,"message":"永続強化の種類が不正です"}
+	var packed := PackedInt32Array()
+	for id in PROJECTION.META_IDS: packed.append(clampi(int(levels.get(id,0)),0,100))
+	return bridge.command("dev_edit",{"kind":"meta","payload":{"levels":packed,"profile":ProfileManager.for_cpp(true,levels)}})
 
 func _read_generated() -> Dictionary:
 	var path := _output.path_join("stage_%d.json" % _source.index)
@@ -729,6 +741,8 @@ func _inverse_edit(kind: String, args: Dictionary) -> Array:
 		"config": previous.value = run.cfg.get(String(args.get("key", "")))
 		"invincible": previous.value = run.ship.invincible
 		"time": previous.value = run.state.time
+		"hero": previous.id = String(run.state.hero_power)
+		"meta": previous.level = int(run.state.meta_override.get(String(args.get("id","")),0))
 		"level": previous.value = run.state.level
 		"schedule": previous.entries = schedule.duplicate(true)
 		_: return []

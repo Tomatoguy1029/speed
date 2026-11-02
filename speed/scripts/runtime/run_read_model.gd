@@ -43,14 +43,17 @@ func _base_zoom() -> float:
 	return minf(size.x,size.y)/cfg.base_view*clampf(factor,cfg.zoom_min,1.0)
 func _view_size() -> Vector2:
 	return input.get_viewport().get_visible_rect().size if is_instance_valid(input) else view_size
+const META_IDS := ["atk","charge","hp","length","pickup","reroll","speed","xp"]
 func refresh(snapshot: Dictionary, ui: Dictionary) -> void:
+	var meta := {}
+	for i in snapshot.meta_levels.size(): meta[META_IDS[i]] = snapshot.meta_levels[i]
 	var weapons := {}
 	var traits := {}
 	for item: Dictionary in snapshot.loadout.weapon_levels: weapons[StringName(item.id)] = item.level
 	for item: Dictionary in snapshot.loadout.trait_levels: traits[StringName(item.id)] = item.level
 	var values: Dictionary = snapshot.ship.duplicate(true)
 	values.merge(snapshot.draw,true)
-	values.merge({"phase":ui.phase,"time":snapshot.clock.time,"world_time":snapshot.clock.world_time,"camera_zoom":snapshot.camera_zoom,"cinematic_bars":snapshot.cinematic_bars,"view_half":snapshot.view_half,"view_center":snapshot.view_center,"stats":{"capacity":snapshot.capacity,"max_speed":snapshot.max_speed,"length_mult":snapshot.length_mult},"level":snapshot.loadout.level,"weapons":weapons,"traits":traits,"hero_power":&"","hero_active_t":0.0,"meta_override":{},"lab_mode":snapshot.lab_mode},true)
+	values.merge({"phase":ui.phase,"time":snapshot.clock.time,"world_time":snapshot.clock.world_time,"camera_zoom":snapshot.camera_zoom,"cinematic_bars":snapshot.cinematic_bars,"view_half":snapshot.view_half,"view_center":snapshot.view_center,"stats":{"capacity":snapshot.capacity,"max_speed":snapshot.max_speed,"length_mult":snapshot.length_mult},"level":snapshot.loadout.level,"weapons":weapons,"traits":traits,"hero_power":StringName(snapshot.hero.power),"hero_active_t":snapshot.hero.active,"meta_override":meta,"lab_mode":snapshot.lab_mode},true)
 	values.stage = state.data.get("stage")
 	state.data = values
 	ship.data = {"invincible":snapshot.invincible}

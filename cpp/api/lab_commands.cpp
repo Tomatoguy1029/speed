@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../systems/equipment.h"
+#include "../systems/heroes.h"
 #include "../runtime/dev_commands.h"
 #include "../runtime/checkpoint.h"
 #include "../systems/population_system.h"
@@ -53,6 +54,13 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         runtime=std::move(candidate->runtime);return reply(true,value);
     }
     if (command!="dev_edit") return reply(false);
+    if (kind=="meta") {
+        if (p.size()!=2 || p.get("levels",Variant()).get_type()!=Variant::PACKED_INT32_ARRAY || p.get("profile",Variant()).get_type()!=Variant::DICTIONARY) return reply(false);
+        const PackedInt32Array levels=p["levels"];if (levels.size()!=8) return reply(false);for (auto level:levels) if (level<0 || level>100) return reply(false);
+        speed::RunRuntime next;next.content=runtime.content;next.state=speed::clone_state(s);
+        const Dictionary applied=speed::DevCommands::set_profile(next,p["profile"]);if (!bool(applied["ok"])) return applied;
+        next.state.loadout.meta_levels.assign(levels.ptr(),levels.ptr()+levels.size());runtime.state=std::move(next.state);return reply(true);
+    }
     if (kind=="camera") {
         Vector2 center,size;double zoom,bars;
         if (p.size()!=4 || !point(p,"center",center) || !point(p,"size",size) || size.x<=0 || size.y<=0 || !scalar(p,"zoom",1,zoom) || zoom<=0 || !scalar(p,"bars",0,bars) || bars<0 || bars>1) return reply(false);
@@ -148,5 +156,6 @@ Dictionary SpeedRunCore::lab_state_run() const {
     for (const auto &e:s.enemies) if (e.alive) {
         Dictionary row;row["id"]=e.id;row["type"]=runtime.content->definitions[e.definition].id;row["pos"]=e.pos;row["vel"]=e.vel;row["hp"]=e.hp;row["max_hp"]=e.max_hp;row["armor"]=e.armor;row["speed"]=e.speed;row["r"]=e.radius;row["facing"]=e.facing;row["dead"]=e.dead;row["elite"]=e.elite;row["gate"]=int(runtime.content->definitions[e.definition].gate);row["is_boss"]=e.is_boss;row["mode"]=int(e.mode);row["charge"]=e.charge;row["parent"]=s.enemy_handles.contains(e.parent)?s.enemy_handles.entity_id(e.parent):-1;enemies.push_back(row);
     }
+    value["max_hp"]=s.ship_config.max_hp;value["xp_profile_factor"]=s.loadout.xp_profile_factor;value["hero"]=speed::HeroesSystem::snapshot(runtime);PackedInt32Array meta;for (auto level:s.loadout.meta_levels) meta.push_back(level);value["meta_levels"]=meta;
     value["lab_mode"]=s.control.lab_mode;value["cinematic_bars"]=s.control.cinematic_bars;value["camera_zoom"]=s.control.camera_zoom;value["view_half"]=s.view_half;value["view_center"]=s.view_center;value["capacity"]=s.draw_config.capacity;value["max_speed"]=s.ship_config.max_speed;value["length_mult"]=s.draw_config.length_mult;value["enemies"]=enemies;Array bodies;for (const auto &b:s.field.bodies) {Dictionary row;row["pos"]=b.position;row["r"]=b.radius;bodies.push_back(row);}value["bodies"]=bodies;value["hazards"]=hazards_snapshot();value["hostiles"]=hostiles_snapshot();return reply(true,value);
 }

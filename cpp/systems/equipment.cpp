@@ -68,7 +68,12 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     SonicBehavior::refresh(run);
     run.state.ship_config.glide_duration_mult=1.0+glide_bonus;
     run.state.draw_config.capacity=1.0+capacity_bonus;
-    const auto &p=run.state.loadout;const auto &post=run.content->post_charge;
+    const auto &p=run.state.loadout;
+    const double old_hp=run.state.ship_config.max_hp;
+    run.state.ship_config.max_hp=run.content->config.ship_config_max_hp+p.hp_profile_add;
+    if (old_hp>0 && run.state.ship_config.max_hp>old_hp) run.state.ship.hp+=run.state.ship_config.max_hp-old_hp;
+    run.state.ship.hp=std::min(run.state.ship.hp,run.state.ship_config.max_hp);
+    const auto &post=run.content->post_charge;
     const double base=run.content->config.draw_config_charge_time*p.charge_profile_factor/(1.0+charge_bonus);
     const double floor=std::min(base,std::max(post.minimum_time,base*post.minimum_ratio));
     run.state.draw_config.charge_time=std::max(floor,base*(1.0-post.increment*double(p.post_charge_stacks)));

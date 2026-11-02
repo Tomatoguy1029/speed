@@ -11,6 +11,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-settings" in OS.get_cmdline_user_args():
+		await cpp_lab_settings()
+		print("[cpp_lab_settings] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab-formations" in OS.get_cmdline_user_args() or "--cpp-lab-phase" in OS.get_cmdline_user_args():
 		await cpp_lab_formations()
 		print("[cpp_lab_formations] passed=%d failed=%d" % [passed,failed])
@@ -273,4 +278,35 @@ func cpp_lab_formations() -> void:
 	check(lab.tick==tick and lab.run.enemies.count()==1 and lab.run.state.stage.phases.size()==1 and lab.run.state.stage.phases[0].id==phase.id,"時間帯編集で時計と配置済みの個体を維持する")
 	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"配置と時間帯編集後の読取・回収・通知配信が成功する")
 	lab.queue_free()
+	await get_tree().process_frame
+
+func cpp_lab_settings() -> void:
+	var script := load("res://gyms/enemy_lab/lab_session.gd")
+	var first = script.new()
+	var second = script.new()
+	add_child(first)
+	add_child(second)
+	await first.reset({"empty":true,"hero":"hercules","meta":{"hp":2,"xp":3,"atk":1}})
+	await second.reset({"empty":true})
+	check(first.run!=null and first.last_error.get("ok",false),"英雄と永続強化を指定して開始する")
+	if first.run==null: return
+	check(first.run.state.lab_mode and first.run.state.hero_power==&"hercules" and first.run.state.hero_active_t==0.0,"開始時から実験モードと英雄の正式読取を使う")
+	check(first.run.state.meta_override.hp==2 and first.run.state.meta_override.xp==3,"開始設定の永続強化をC++から読み取る")
+	var initial: Dictionary = first.bridge.read_lab().value
+	check(initial.max_hp==first.run.cfg.base_hp+40.0 and is_equal_approx(initial.attack_power,first.run.cfg.base_attack*1.06),"永続HPと攻撃力を正式な数値へ反映する")
+	var held: Dictionary = first.bridge.checkpoint()
+	var tick: int = first.tick
+	check(first.perform("hero",{"id":"perseus"}) and first.run.state.hero_power==&"perseus","英雄選択を同じtickの正式命令で変更する")
+	await first.undo_edit()
+	check(first.run.state.hero_power==&"hercules" and first.tick==tick,"英雄の取消を現在tickで適用する")
+	check(first.perform("meta",{"id":"hp","level":4}) and first.bridge.read_lab().value.max_hp==first.run.cfg.base_hp+80.0,"永続強化を現在tickへ適用する")
+	await first.undo_edit()
+	check(first.run.state.meta_override.hp==2 and first.bridge.read_lab().value.max_hp==initial.max_hp and first.tick==tick,"永続強化の取消で数値と読取を戻す")
+	check(second.run.state.hero_power==&"" and second.run.state.meta_override.is_empty(),"別Sessionへ試行値を漏らさない")
+	var before: Dictionary = first.bridge.read_lab().value
+	var history: int = first.history.size()
+	check(not first.perform("hero",{"id":"unknown"}) and not first.perform("meta",{"id":"unknown","level":1}) and first.bridge.read_lab().value==before and first.history.size()==history,"不正な選択は状態と履歴を部分変更しない")
+	check(first.bridge.restore(held.value).ok and first.bridge.read_lab().value.hero.power=="hercules" and first.bridge.read_lab().value.meta_levels[2]==2,"保持点へ英雄と永続強化を復元する")
+	first.bridge.release_checkpoint(held.value)
+	for lab in [first,second]: lab.queue_free()
 	await get_tree().process_frame

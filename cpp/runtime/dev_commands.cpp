@@ -59,6 +59,29 @@ godot::Dictionary DevCommands::replace_definition(RunRuntime &run,const godot::D
     godot::Dictionary changed;changed["values"]=tuning_values(*run.content);FrameBuilder::append(run,"enemy_tuning_changed",changed);
     return reply(true);
 }
+godot::Dictionary DevCommands::set_profile(RunRuntime &run,const godot::Dictionary &profile) {
+    using godot::Dictionary;using godot::String;using godot::Variant;
+    for (auto key:profile.keys()) if (String(key)!="mult" && String(key)!="reduce" && String(key)!="add") return reply(false);
+    double charge=1,speed=1,attack=1,pickup=1,length=1,xp=1,hp=0,reroll=0;
+    for (const char *group:{"mult","reduce","add"}) {
+        if (!profile.has(group)) continue;
+        if (profile[group].get_type()!=Variant::DICTIONARY) return reply(false);
+        const Dictionary values=profile[group];
+        for (auto key:values.keys()) {
+            const String name=key;double *target=nullptr;
+            if (String(group)=="mult") {
+                if (name=="max_speed") target=&speed;else if (name=="attack") target=&attack;else if (name=="pickup") target=&pickup;else if (name=="length") target=&length;else if (name=="xp") target=&xp;
+            } else if (String(group)=="reduce" && name=="charge_time") target=&charge;
+            else if (String(group)=="add") {if (name=="max_hp") target=&hp;else if (name=="reroll") target=&reroll;}
+            const Variant value=values[key];
+            if (!target || (value.get_type()!=Variant::INT && value.get_type()!=Variant::FLOAT) || !std::isfinite(double(value)) || double(value)<0 || ((target==&charge || target==&speed || target==&length) && double(value)==0) || (target==&reroll && double(value)>1000000)) return reply(false);
+            *target=value;
+        }
+    }
+    auto &p=run.state.loadout;p.charge_profile_factor=charge;p.speed_profile_factor=speed;p.attack_profile_factor=attack;p.pickup_profile_factor=pickup;p.length_profile_factor=length;p.xp_profile_factor=xp;p.hp_profile_add=hp;p.reroll_profile_add=reroll;
+    if (p.ready) EquipmentSystem::refresh_effects(run);
+    return reply(true);
+}
 godot::Dictionary DevCommands::tuning_saved(RunRuntime &run,const godot::Dictionary &payload) {
     using godot::Variant;
     if (!run.api_development) return reply(false,4);

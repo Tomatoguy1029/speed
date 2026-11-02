@@ -81,7 +81,7 @@ void notify_grant(RunRuntime &run,const CardCandidate &card) {
 }
 }
 void ProgressionSystem::initialize(RunRuntime &run,bool initial) {
-    auto &p=run.state.loadout;const double charge_factor=p.charge_profile_factor,speed_factor=p.speed_profile_factor,attack_factor=p.attack_profile_factor,pickup_factor=p.pickup_profile_factor,length_factor=p.length_profile_factor;p={};p.charge_profile_factor=charge_factor;p.speed_profile_factor=speed_factor;p.attack_profile_factor=attack_factor;p.pickup_profile_factor=pickup_factor;p.length_profile_factor=length_factor;p.ready=true;p.rerolls=run.content->progression.reroll_count;
+    auto &p=run.state.loadout;const auto meta_levels=p.meta_levels;const double hp_add=p.hp_profile_add,xp_factor=p.xp_profile_factor,reroll_add=p.reroll_profile_add;const double charge_factor=p.charge_profile_factor,speed_factor=p.speed_profile_factor,attack_factor=p.attack_profile_factor,pickup_factor=p.pickup_profile_factor,length_factor=p.length_profile_factor;p={};p.charge_profile_factor=charge_factor;p.speed_profile_factor=speed_factor;p.attack_profile_factor=attack_factor;p.pickup_profile_factor=pickup_factor;p.length_profile_factor=length_factor;p.meta_levels=meta_levels;p.hp_profile_add=hp_add;p.xp_profile_factor=xp_factor;p.reroll_profile_add=reroll_add;p.ready=true;p.rerolls=run.content->progression.reroll_count+int64_t(std::llround(reroll_add));
     if (!initial) p.weapons.push_back({1,1});else run.state.forward.ready=false;
     EquipmentSystem::refresh_effects(run);
     run.resource_workspace.requests.clear();

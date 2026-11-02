@@ -66,54 +66,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     if (int64_t(options["api_version"])!=1) return failure(2,"api_version","APIの版が一致しません");
     if (int64_t(options["run_id"])<=0 || int64_t(options["mode"])<0 || int64_t(options["mode"])>1 || String(options["stage_id"]).is_empty()) return failure(1,"options","ラン番号・モード・ステージが不正です");
     const Dictionary profile=options["profile"],settings=options["settings"];
-    if (!keys(profile,{"reduce","mult"}) || (profile.has("reduce") && !is(profile,"reduce",Variant::DICTIONARY)) || (profile.has("mult") && !is(profile,"mult",Variant::DICTIONARY)) || !keys(settings,{"hitstop"}) || (settings.has("hitstop") && !is(settings,"hitstop",Variant::BOOL))) return failure(1,"profile/settings","未登録の設定項目があります");
-    double charge_factor=1;
-    if (profile.has("reduce")) {
-        const Dictionary reduce=profile["reduce"];
-        if (!keys(reduce,{"charge_time"})) return failure(1,"profile.reduce","未登録の永続強化です");
-        if (reduce.has("charge_time")) {
-            const Variant value=reduce["charge_time"];
-            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<=0) return failure(1,"profile.reduce.charge_time","充填倍率は有限の正数にしてください");
-            charge_factor=value;
-        }
-    }
-    double speed_factor=1;
-    if (profile.has("mult")) {
-        const Dictionary mult=profile["mult"];
-        if (!keys(mult,{"max_speed","attack","pickup","length"})) return failure(1,"profile.mult","未登録の永続強化です");
-        if (mult.has("max_speed")) {
-            const Variant value=mult["max_speed"];
-            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<=0) return failure(1,"profile.mult.max_speed","速度倍率は有限の正数にしてください");
-            speed_factor=value;
-        }
-    }
-    double attack_factor=1;
-    if (profile.has("mult")) {
-        const Dictionary mult=profile["mult"];
-        if (mult.has("attack")) {
-            const Variant value=mult["attack"];
-            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<0) return failure(1,"profile.mult.attack","攻撃倍率は有限の非負数にしてください");
-            attack_factor=value;
-        }
-    }
-    double pickup_factor=1;
-    if (profile.has("mult")) {
-        const Dictionary mult=profile["mult"];
-        if (mult.has("pickup")) {
-            const Variant value=mult["pickup"];
-            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<0) return failure(1,"profile.mult.pickup","回収倍率は有限の非負数にしてください");
-            pickup_factor=value;
-        }
-    }
-    double length_factor=1;
-    if (profile.has("mult")) {
-        const Dictionary mult=profile["mult"];
-        if (mult.has("length")) {
-            const Variant value=mult["length"];
-            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<=0) return failure(1,"profile.mult.length","描線倍率は有限の正数にしてください");
-            length_factor=value;
-        }
-    }
+    if (!keys(settings,{"hitstop"}) || (settings.has("hitstop") && !is(settings,"hitstop",Variant::BOOL))) return failure(1,"settings","未登録の設定項目があります");
     if (bytes.size()<88 || std::memcmp(bytes.ptr(),"SPDRUN01",8)) return failure(1,"bundle","生成物の形式が不正です");
     if (bytes.decode_u32(8)!=speed::FORMAT_VERSION || bytes.decode_u32(12)!=speed::ABI_VERSION) return failure(2,"bundle","生成物の版が一致しません");
     Ref<SpeedRunCore> candidate;candidate.instantiate();
@@ -127,7 +80,8 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     state.forward.base_interval=state.forward.interval=forward.interval;state.forward.fire.remaining=forward.interval;state.forward.damage=forward.damage;
     state.forward.life=forward.life;state.forward.spread=forward.spread;state.forward.knock=forward.knock;state.forward.pierce=forward.pierce;
     state.forward.character_scale=candidate->runtime.content->config.character_scale;state.forward.ready=true;
-    state.hitstop_enabled=settings.get("hitstop",true);state.loadout.charge_profile_factor=charge_factor;state.loadout.speed_profile_factor=speed_factor;state.loadout.attack_profile_factor=attack_factor;state.loadout.pickup_profile_factor=pickup_factor;state.loadout.length_profile_factor=length_factor;
+    state.hitstop_enabled=settings.get("hitstop",true);
+    const Dictionary applied=speed::DevCommands::set_profile(candidate->runtime,profile);if (!bool(applied["ok"])) return applied;
     const auto &lifecycle=candidate->runtime.content->lifecycle;
     state.lifecycle_ready=true;state.death_freeze=lifecycle.death_freeze_time;state.death_explosion=lifecycle.death_explosion_time;state.death_game_over=lifecycle.death_game_over_time;
     if (!candidate->runtime.content->budget_phases.empty()) {

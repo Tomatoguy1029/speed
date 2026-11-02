@@ -192,6 +192,8 @@ struct LoadoutState {
     BarrierWeaponState barrier;
     uint64_t post_weapon_interval_stacks=0,post_projectile_speed_stacks=0,post_duration_stacks=0,post_knockback_stacks=0,post_area_stacks=0;
 
+    std::vector<int32_t> meta_levels;
+    double hp_profile_add=0,xp_profile_factor=1,reroll_profile_add=0;
     double charge_profile_factor=1,speed_profile_factor=1,attack_profile_factor=1,pickup_profile_factor=1,length_profile_factor=1;
     uint64_t post_charge_stacks=0,post_crit_stacks=0,post_max_speed_stacks=0,post_weapon_damage_stacks=0,post_followup_stacks=0,post_xp_pickup_stacks=0,post_line_length_stacks=0;
     std::vector<double> weapon_damage_factors;
