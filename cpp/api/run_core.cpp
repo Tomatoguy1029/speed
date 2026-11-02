@@ -10,6 +10,7 @@
 #include "../behaviors/enemies/marlin.h"
 #include "../behaviors/enemies/pulser.h"
 #include "../behaviors/enemies/dolphin.h"
+#include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
 #include "../behaviors/enemies/lynx.h"
 #include "../behaviors/enemies/beamer.h"
@@ -215,6 +216,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::LynxBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Soldier) {
                 speed::SoldierBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Auriga) {
+                speed::AurigaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Dolphin) {
                 speed::DolphinBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Pulser) {

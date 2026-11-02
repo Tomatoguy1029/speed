@@ -74,6 +74,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->marlins=records.MarlinDefinition_rows;
     bundle->pulsers=records.PulserDefinition_rows;
     bundle->dolphins=records.DolphinDefinition_rows;
+    bundle->aurigas=records.AurigaDefinition_rows;
     bundle->soldiers=records.SoldierDefinition_rows;
     bundle->lynxes=records.LynxDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
@@ -243,7 +244,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -345,6 +346,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{item_soldier->accel,item_soldier->bolt_speed,item_soldier->damage,item_soldier->mutiny_shot}) if (!std::isfinite(float(value))) return {};
             definition.soldier_definition=uint32_t(item_soldier-bundle->soldiers.begin()+1);definition.accel=item_soldier->accel;
         } else if (item_soldier!=bundle->soldiers.end()) return {};
+        const auto item_auriga=std::find_if(bundle->aurigas.begin(),bundle->aurigas.end(),[&](const auto &p){return p.id==row.id;});
+        if (row.kind==21) {
+            if (item_auriga==bundle->aurigas.end()) return {};
+            for (double value:{item_auriga->accel,item_auriga->trail_step,item_auriga->trail_time,item_auriga->trail_width,item_auriga->wheel_gap,item_auriga->damage}) if (!std::isfinite(float(value))) return {};
+            definition.auriga_definition=uint32_t(item_auriga-bundle->aurigas.begin()+1);definition.accel=item_auriga->accel;
+        } else if (item_auriga!=bundle->aurigas.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;

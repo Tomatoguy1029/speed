@@ -16,6 +16,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Marlin) enemy.behavior_state=MarlinState{};
     if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
+    if (def.kind==EnemyDefinition::Kind::Auriga) enemy.behavior_state=AurigaState{};
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
@@ -65,6 +66,7 @@ size_t EnemySystem::parts_alive(const godot::RunState &state,EnemyHandle parent)
 bool EnemySystem::attack_active(const godot::RunState &state,EnemyHandle handle) {
     if (!state.enemy_handles.contains(handle)) return false;
     const auto &enemy=state.enemies[handle.slot];
+    if (std::holds_alternative<AurigaState>(enemy.behavior_state)) return true;
     if (std::holds_alternative<SniperState>(enemy.behavior_state)) return enemy.mode==EnemyMode::Windup || enemy.charge>0;
     return enemy.mode==godot::RunState::EnemyMode::Windup || enemy.mode==godot::RunState::EnemyMode::Dash || AttackSystem::has_attached(state,handle);
 }

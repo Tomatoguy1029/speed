@@ -16,6 +16,11 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-auriga" in OS.get_cmdline_user_args():
+		await check_cpp_auriga()
+		print("[cpp_auriga] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-soldier" in OS.get_cmdline_user_args():
 		mute_checks = "--cpp-soldier-tail" in OS.get_cmdline_user_args()
 		await check_cpp_soldier()
@@ -1232,5 +1237,86 @@ func check_cpp_soldier() -> void:
 	core.step(0.01)
 	core.step(0.5)
 	check(dolphin_enemy(core,replacement).dead,"王のない単体配置は反乱後に自然崩壊する")
+	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func check_cpp_auriga() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 79
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["auriga","drifter"])
+	stage.enemy_tuning = {"auriga":{"speed":100.0,"params.trail_step":0.1,"params.trail_time":0.3,"params.trail_width":8.0,"params.wheel_gap":20.0,"params.bullet_dmg":3.0}}
+	var output := "res://.content/dev/run_auriga"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"ぎょしゃ座の車輪跡".sha256_text())
+	check(built==OK,"ぎょしゃ座の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_79.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":799},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"ぎょしゃ座のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var position := target-Vector2(400,0)
+	var id: int = core.spawn_enemy(&"auriga",position,{"facing":0.0})
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.step(0.1)
+	var current := dolphin_enemy(core,id)
+	check(current.vel[0]==100.0 and Vector2(current.pos[0],current.pos[1]).is_equal_approx(position+Vector2(10,0)) and core.hazards_snapshot().is_empty(),"予算0でも走行を続け車輪跡だけを待つ")
+	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	core.step(0.1)
+	check(core.hazards_snapshot().size()==2 and is_equal_approx(pulse_motion(core,id).fire_t,0.1),"最初の帯の前に予算を取り左右一組を生成する")
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(900,400),Vector2(1800,800))).value
+	var walls: Array = frame.shapes.filter(func(shape): return shape.kind==0 and shape.layer==10)
+	check(walls.size()==2 and walls[0].points[0].distance_to(position+Vector2(0,-20))<0.01 and walls[1].points[0].distance_to(position+Vector2(0,20))<0.01 and is_equal_approx(walls[0].widths[1],8.0),"左右の間隔と幅と走行区間を編集値から生成する")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(presentation.frame_view.apply_frame(frame),"本体と左右の燃える車輪跡を通常画面へ表示する")
+	await get_tree().process_frame
+	core.advance_attack_budget(0.8)
+	check(core.attack_budget_snapshot().groups.size()==1 and not core.attack_budget_snapshot().groups[0].members[0].closed,"走行中は攻撃枠の初期期限を越えて保持する")
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	core.step(0.1)
+	check(core.hazards_snapshot().size()==4 and core.attack_budget_snapshot().groups.size()==1,"次の車輪跡でも同じ攻撃枠を使い続ける")
+	var future_motion: Array = core.enemy_motion_snapshot()
+	var future_hazards: Array = core.hazards_snapshot()
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.advance_attack_budget(0.9)
+	check(core.hazards_snapshot().size()==4 and core.attack_snapshot().filter(func(item): return item.pool==2)[0].residuals==4 and core.attack_budget_snapshot().used>0.0,"本体を倒しても残る帯が同じ予算を保持する")
+	var hp: float = core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":position+Vector2(5,-20),"velocity":Vector2.ZERO})
+	core.step_hazards(0.05)
+	check(is_equal_approx(core.ship_snapshot().ship_hp,hp-3.0),"残った車輪跡が編集値のダメージを機体へ与える")
+	core.step_hazards(0.3)
+	core.advance_attack_budget(1.0)
+	check(core.hazards_snapshot().is_empty() and core.attack_budget_snapshot().used==0.0,"車輪跡の自然終了で保持した予算を返す")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"走行の向き・間隔と残る帯を値から復帰する")
+	core.step(0.1)
+	check(core.enemy_motion_snapshot()==future_motion and core.hazards_snapshot()==future_hazards,"復帰後も同じ区間へ帯を残し保持元を変更しない")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step(0.2)
+	check(core.hazards_snapshot().size()==2,"途中撃破で新しい車輪跡を増やさない")
+	core.remove_enemy(id)
+	var replacement: int = core.spawn_enemy(&"auriga",position,{})
+	check(replacement!=id and pulse_motion(core,replacement).age==0.0 and pulse_motion(core,replacement).fire_t==0.0,"行の再利用で時計と古い帯の所有を引き継がない")
+	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	core.set_enemy_motion(replacement,{"pump_owner":owner})
+	core.remove_enemy(owner)
+	core.configure_attack_budget({"enabled":false,"budget":1.0,"jitter":0.0})
+	core.step(0.1)
+	check(dolphin_enemy(core,replacement).vel[0]!=0.0 or dolphin_enemy(core,replacement).vel[1]!=0.0,"参照相手が先に消えても古い行を追わず走る")
 	bridge.release_checkpoint(pending.value)
 	session.free()

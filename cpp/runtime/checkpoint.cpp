@@ -70,6 +70,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         const auto *sniper=std::get_if<SniperState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Sniper)!=(sniper!=nullptr)) return false;
         if (sniper) {if (!sniper->rays.empty() && sniper->rays.size()!=48) return false;for (float v:sniper->rays) if (!std::isfinite(v) || v<0) return false;}
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Auriga)!=std::holds_alternative<AurigaState>(enemy.behavior_state)) return false;
         const auto *soldier=std::get_if<SoldierState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Soldier)!=(soldier!=nullptr)) return false;
         if (soldier && (!soldier->formation.anchor.is_finite() || soldier->formation.tier<1 || soldier->formation.tier>3 || (state.enemy_handles.contains(soldier->king) && state.enemy_handles.entity_id(soldier->king)!=soldier->king_id))) return false;
