@@ -1,5 +1,7 @@
 #include "forward.h"
 #include "../../systems/timing.h"
+#include "../../systems/equipment.h"
+#include "../../systems/combat_resolver.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/attacks/friend_shot.h"
 #include "../../output/frame_builder.h"
@@ -32,7 +34,7 @@ void ForwardBehavior::step(RunRuntime &run,double dt) {
         godot::RunState::Friendly shot;
         shot.pos=origin;shot.vel=godot::Vector2::from_angle(angle+(i-(count-1)/2.0)*forward.spread)*1300.0;
         shot.radius=5.0*effects.area;
-        shot.damage=state.combat_config.base_attack*state.combat_config.attack_mult*state.combat_config.atk_scale*effects.burst_power*effects.damage_multiplier*forward.damage;
+        shot.damage=CombatResolver::attack_power(run)*EquipmentSystem::weapon_damage_factor(run,1)*forward.damage;
         shot.life=forward.life;shot.pierce_left=forward.pierce;shot.knock=forward.knock;
         shot.color=godot::Color::html("ffe46b");shot.weapon_id="W01";shot.visual="weapon/forward";
         FriendShotSystem::emit(run,std::move(shot));

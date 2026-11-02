@@ -974,6 +974,7 @@ struct NumericTraitLevel {
     double capacity_bonus{};
     double crit_bonus{};
     double speed_bonus{};
+    double attack_bonus{};
 };
 inline bool read(BinaryReader &input, NumericTraitLevel &out) {
     if (!input.read_u32(out.id)) return false;
@@ -996,6 +997,8 @@ inline bool read(BinaryReader &input, NumericTraitLevel &out) {
     if (out.crit_bonus < 0) return false;
     if (!input.read_f64(out.speed_bonus)) return false;
     if (out.speed_bonus < 0) return false;
+    if (!input.read_f64(out.attack_bonus)) return false;
+    if (out.attack_bonus < 0) return false;
     return true;
 }
 struct PostMaxChargeDefinition {
@@ -1044,6 +1047,23 @@ inline bool read(BinaryReader &input, PostMaxMotionDefinition &out) {
     if (out.max_speed_increment < 0) return false;
     return true;
 }
+struct PostMaxWeaponPowerDefinition {
+    uint32_t id{};
+    uint32_t equipment{};
+    double damage_increment{};
+    double followup_increment{};
+};
+inline bool read(BinaryReader &input, PostMaxWeaponPowerDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_f64(out.damage_increment)) return false;
+    if (out.damage_increment < 0) return false;
+    if (!input.read_f64(out.followup_increment)) return false;
+    if (out.followup_increment < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -1078,6 +1098,7 @@ struct ContentRecords {
     std::vector<PostMaxChargeDefinition> PostMaxChargeDefinition_rows;
     std::vector<PostMaxCritDefinition> PostMaxCritDefinition_rows;
     std::vector<PostMaxMotionDefinition> PostMaxMotionDefinition_rows;
+    std::vector<PostMaxWeaponPowerDefinition> PostMaxWeaponPowerDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -1262,8 +1283,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 30: {
-        if (version != 5) return false;
-        if (count > input.remaining()/68) return false;
+        if (version != 6) return false;
+        if (count > input.remaining()/76) return false;
         for (uint32_t i=0; i<count; ++i) { NumericTraitLevel row; if (!read(input,row)) return false; out.NumericTraitLevel_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -1283,6 +1304,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/12) return false;
         for (uint32_t i=0; i<count; ++i) { PostMaxMotionDefinition row; if (!read(input,row)) return false; out.PostMaxMotionDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 34: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { PostMaxWeaponPowerDefinition row; if (!read(input,row)) return false; out.PostMaxWeaponPowerDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -1355,6 +1382,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PostMaxCritDefinition_rows) if (!PostMaxCritDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PostMaxMotionDefinition_ids;
     for (const auto &row:data.PostMaxMotionDefinition_rows) if (!PostMaxMotionDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PostMaxWeaponPowerDefinition_ids;
+    for (const auto &row:data.PostMaxWeaponPowerDefinition_rows) if (!PostMaxWeaponPowerDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -1391,6 +1420,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_4)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!ResourceKey_ids.count(row.meteor_visual_5)) return false;
     for (const auto &row:data.NumericTraitLevel_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.PostMaxWeaponPowerDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -1515,5 +1545,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=33;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=34;
 }

@@ -101,7 +101,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         const Vector2 position = from.lerp(to, hit.time);
         const double speed = runtime.state.ship.vel.length();
         const Vector2 direction = speed > 0 ? runtime.state.ship.vel / speed : Vector2();
-        const double attack = c.base_attack * c.attack_mult * c.atk_scale;
+        const double attack = speed::CombatResolver::attack_power(runtime);
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
         const bool front = blocks_front(hit.row, position, direction);
         if (front && (!fast || (!runtime.state.draw.tracing && enemy.hit_cd > 0))) {

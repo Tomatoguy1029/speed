@@ -35,6 +35,7 @@ struct ContentBundle {
     PostMaxChargeDefinition post_charge;
     PostMaxCritDefinition post_crit;
     PostMaxMotionDefinition post_motion;
+    std::vector<PostMaxWeaponPowerDefinition> post_weapon_power;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);
 };
 }

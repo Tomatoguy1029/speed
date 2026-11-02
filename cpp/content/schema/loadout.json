@@ -54,9 +54,14 @@
           "name": "speed_bonus",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "attack_bonus",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 5
+      "version": 6
     },
     {
       "name": "PostMaxChargeDefinition",
@@ -122,6 +127,33 @@
         },
         {
           "name": "max_speed_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxWeaponPowerDefinition",
+      "section": 34,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "damage_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "followup_increment",
           "type": "f64",
           "min": 0
         }

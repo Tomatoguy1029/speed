@@ -8,6 +8,10 @@
 #include <algorithm>
 #include <cmath>
 namespace speed {
+double CombatResolver::attack_power(const RunRuntime &run) {
+    const auto &c=run.state.combat_config;const auto &effects=run.state.loadout.effects;
+    return c.base_attack*c.attack_mult*c.atk_scale*effects.burst_power*effects.damage_multiplier;
+}
 ShipContactResult CombatResolver::attack_ship_damage(RunRuntime &run,AttackHandle handle,const ContactShape &shape,double amount,double slow) {
     ShipContactResult result;const auto *attack=AttackSystem::get(run.state,handle);
     if (!attack) return result;

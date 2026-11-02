@@ -66,6 +66,20 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t11-ram" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t11_ram()
+		check(finished,"攻撃力の体当たり経路を最後まで照合する")
+		print("[cpp_t11_ram] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
+	if "--cpp-t11" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t11()
+		check(finished,"攻撃力の確認を最後まで実施する")
+		print("[cpp_t11] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t10-motion" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t10_motion()
 		check(finished,"最高速度の操舵を最後まで照合する")
@@ -739,5 +753,91 @@ func check_cpp_t10_motion() -> bool:
 	var result := floor_speed+(cruise-floor_speed)*exp(-config.cruise_drag) if cruise>floor_speed else cruise
 	var actual: float = bridge._core.ship_snapshot().ship_vel.length()
 	check(absf(actual-result)<0.0001,"操舵と減速は同じ実効最高速度を使う: expected=%.12f actual=%.12f max=%.12f" % [result,actual,expected])
+	bridge.dispose()
+	return true
+
+func check_cpp_t11() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.base_crit_chance = 0.0
+	var definition: TraitDef = load("res://data/traits/T11_attack.tres")
+	var weapon: WeaponDef = load("res://data/weapons/W01_forward.tres")
+	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	enemy.hp = 1000000.0
+	enemy.armor = 0.0
+	var factor := 1.3
+	var bridge = t07_bridge(config,{"mult":{"attack":factor,"max_speed":1.1}},enemy)
+	if bridge==null: return false
+	var core = bridge._core
+	check(is_equal_approx(bridge._ui.attack_mult,factor),"未取得では永続強化の攻撃倍率を使う")
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T11","levels":1}).ok,"T11を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.attack_mult,factor*(1.0+definition.stack_bonus(level))),"生成した各段の増分を永続倍率へ一度だけ適用する")
+	var trained: float = bridge._ui.attack_mult
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T11","levels":1}).ok and bridge._ui.attack_mult==trained,"上限を越えて攻撃倍率を増やさない")
+	var attack := config.base_attack*trained*config.atk_scale
+	check(is_equal_approx(bridge._ui.attack_power,attack),"基礎攻撃力・特性・永続倍率から共通の攻撃力を求める")
+	check(bridge.command("dev_post_weapon_power",{"damage":2,"followup":3}).ok,"最大段後の武器強化を別の加算へ渡す")
+	check(bridge._ui.attack_mult==trained and is_equal_approx(bridge._ui.attack_power,attack),"武器限定の強化を体当たりの攻撃倍率へ混ぜない")
+	var saved: Dictionary = bridge.checkpoint()
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	for _tick in range(240):
+		bridge.step(1.0/120.0,idle,{"logical_size":Vector2(640,480)})
+		if not core.projectiles_snapshot().is_empty(): break
+	var shots: Array = core.projectiles_snapshot()
+	check(shots.size()==1,"実際のW01更新から弾を1つ発射する")
+	if shots.is_empty(): return false
+	var post := 1.0+config.post_max.amount(&"weapon_damage",{&"weapon_damage":2})
+	if config.post_max.target(weapon.id).has("followup"): post+=config.post_max.amount(&"followup",{&"followup":3})
+	var expected := attack*float(weapon.params.damage_by_level[0])*post
+	check(is_equal_approx(shots[0].damage,expected),"W01は共通攻撃力の後に武器の威力と最大段後の加算を一度だけ掛ける")
+	var target: int = core.spawn_enemy(&"drifter",shots[0].pos+shots[0].vel.normalized()*80.0)
+	core.rebuild_enemy_grid(200.0)
+	var before: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].hp
+	check(core.step_projectiles(0.1),"実際の味方弾を命中まで更新する")
+	var after: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].hp
+	check(is_equal_approx(before-after,expected),"弾の設定値が実際のHP減少へそのまま届く")
+	bridge.command("dev_remove",{"entity_id":target})
+	var contacts: Array = t09_contact_hits(bridge,config,1).filter(func(event): return event.type==&"hit" and event.payload.cause==&"ram")
+	check(contacts.size()==1 and is_equal_approx(contacts[0].payload.dmg,attack),"体当たりはT11を含む共通攻撃力を使い、武器限定の加算を掛けない")
+	bridge.command("dev_remove_trait",{"id":"T11"})
+	check(is_equal_approx(bridge._ui.attack_mult,factor),"解除で特性分だけを外し、永続強化を保つ")
+	bridge.command("dev_post_weapon_power",{"damage":0,"followup":0})
+	check(bridge.restore(saved.value).ok,"取得段と共通攻撃力・武器強化を保持して復帰する")
+	bridge.collect_frame()
+	check(bridge._ui.attack_mult==trained and is_equal_approx(bridge._ui.attack_power,attack),"復帰後も同じ実効攻撃力を公開する")
+	bridge.release_checkpoint(saved.value)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(hud._cpp_ui.attack_mult==trained and hud._cpp_ui.trait_levels.any(func(item): return item.id=="T11" and item.level==config.trait_max_stacks),"HUDへ実効攻撃倍率と所持段を同じ状態から渡す")
+	hud.free()
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"攻撃力の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func check_cpp_t11_ram() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.base_crit_chance = 0.0
+	var definition: TraitDef = load("res://data/traits/T11_attack.tres")
+	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	enemy.hp = 1000000.0
+	enemy.armor = 0.0
+	var bridge = t07_bridge(config,{"mult":{"attack":1.3,"max_speed":1.1}},enemy)
+	if bridge==null: return false
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T11","levels":config.trait_max_stacks})
+	bridge.command("dev_post_weapon_power",{"damage":2,"followup":3})
+	var attack := config.base_attack*1.3*(1.0+definition.stack_bonus(config.trait_max_stacks))*config.atk_scale
+	var contacts: Array = t09_contact_hits(bridge,config,1).filter(func(event): return event.type==&"hit" and event.payload.cause==&"ram")
+	check(contacts.size()==1 and is_equal_approx(contacts[0].payload.dmg,attack),"体当たりへ武器限定の倍率を混ぜない: expected=%s actual=%s" % [attack,contacts])
 	bridge.dispose()
 	return true

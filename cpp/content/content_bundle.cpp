@@ -84,6 +84,10 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->post_crit=records.PostMaxCritDefinition_rows.front();
     if (records.PostMaxMotionDefinition_rows.size()!=1) return {};
     bundle->post_motion=records.PostMaxMotionDefinition_rows.front();
+    bundle->post_weapon_power=records.PostMaxWeaponPowerDefinition_rows;
+    std::unordered_set<uint32_t> power_weapons;
+    for (const auto &power:bundle->post_weapon_power) if (bundle->equipment[power.equipment-1].kind!=0 || !power_weapons.insert(power.equipment).second) return {};
+    if (!power_weapons.count(1)) return {};
     for (size_t i=1;i<bundle->budget_phases.size();++i) if (bundle->budget_phases[i].start<bundle->budget_phases[i-1].start) return {};
     for (const auto &bite:bundle->bites) {
         const auto &first=bundle->bites.front();
@@ -103,7 +107,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.id==1) continue;
         // カプセルは未装備の彗星武器をIDで保持する。実行の登録は武器ごとに確認する。
         if (d.kind==0 && d.comet_only) continue;
-        if (d.kind!=1 || (d.external_id!="T10" && d.external_id!="T09" && d.external_id!="T08" && d.external_id!="T07" && d.external_id!="T34" && d.external_id!="T35" && d.external_id!="T36")) return {};
+        if (d.kind!=1 || (d.external_id!="T11" && d.external_id!="T10" && d.external_id!="T09" && d.external_id!="T08" && d.external_id!="T07" && d.external_id!="T34" && d.external_id!="T35" && d.external_id!="T36")) return {};
         if (d.maximum_level>bundle->numeric_traits.size()) return {};
         for (uint32_t level=1;level<=d.maximum_level;++level) {
             if (std::count_if(bundle->numeric_traits.begin(),bundle->numeric_traits.end(),[&](const auto &v){return v.equipment==d.id && v.level==level;})!=1) return {};

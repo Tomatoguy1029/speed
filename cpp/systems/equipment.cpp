@@ -4,10 +4,10 @@
 namespace speed {
 void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
-    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0;
+    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0,attack_bonus=0;
     for (const auto &owned:run.state.loadout.traits) {
         for (const auto &level:run.content->numeric_traits) if (level.equipment==owned.definition && level.level==owned.level) {
-            effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;capacity_bonus+=level.capacity_bonus;crit_bonus+=level.crit_bonus;speed_bonus+=level.speed_bonus;
+            effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;capacity_bonus+=level.capacity_bonus;crit_bonus+=level.crit_bonus;speed_bonus+=level.speed_bonus;attack_bonus+=level.attack_bonus;
         }
     }
     run.state.draw_config.capacity=1.0+capacity_bonus;
@@ -15,11 +15,17 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     const double base=run.content->config.draw_config_charge_time*p.charge_profile_factor/(1.0+charge_bonus);
     const double floor=std::min(base,std::max(post.minimum_time,base*post.minimum_ratio));
     run.state.draw_config.charge_time=std::max(floor,base*(1.0-post.increment*double(p.post_charge_stacks)));
+    run.state.combat_config.attack_mult=p.attack_profile_factor*(1.0+attack_bonus);
+    auto &powers=run.state.loadout.weapon_damage_factors;powers.assign(run.content->equipment.size(),1.0);
+    for (const auto &power:run.content->post_weapon_power) powers[power.equipment-1]=1.0+power.damage_increment*double(p.post_weapon_damage_stacks)+power.followup_increment*double(p.post_followup_stacks);
     run.state.ship_config.max_speed=run.content->config.ship_config_base_max_speed*p.speed_profile_factor*(1.0+speed_bonus)*(1.0+run.content->post_motion.max_speed_increment*double(p.post_max_speed_stacks));
     const auto &crit=run.content->post_crit;const double crit_base=run.content->config.combat_crit_chance;
     const double cap=std::min(1.0,crit.trait_maximum),trained=std::min(cap,crit_base+crit.trained_bonus);
     const double reserve=std::max(0.0,cap-trained);
     run.state.combat_config.crit_chance=std::min(crit.trait_maximum,crit_base+crit_bonus)+std::min(reserve,crit.increment*double(p.post_crit_stacks));
+}
+double EquipmentSystem::weapon_damage_factor(const RunRuntime &run,uint32_t id) {
+    const auto &powers=run.state.loadout.weapon_damage_factors;return id && id<=powers.size()?powers[id-1]:1.0;
 }
 bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
     if (!levels || !id || id>run.content->equipment.size()) return false;

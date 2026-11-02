@@ -5,6 +5,7 @@ namespace speed {
 class RunRuntime;
 class CombatResolver {
 public:
+    static double attack_power(const RunRuntime &);
     static EnemyHandle damage_target(const RunRuntime &,EnemyHandle);
     static bool allows_hit(const RunRuntime &,EnemyHandle,const DamageRequest &);
     static DamageResult damage_enemy(RunRuntime &,const DamageRequest &);
