@@ -77,20 +77,24 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ドラコはSourceの3形態を生成する。未登録技は生成エラーとして残す。
 static func draco_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam",&"tail_sweep",&"star_fan",&"meteor"]: return {}
+	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam",&"tail_sweep",&"star_fan",&"meteor",&"rifts"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"draco","kind":4,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[],"DracoRiftsDefinition":[]}
 	for phase in [1,2,3]:
 		var values: Dictionary = source.values().duplicate(true)
 		# Draco.rule()はSource上、形態別の値上書きを行わない。
 		var row := {}
 		for field in Schema.SCHEMA.records.filter(func(v):return v.name=="BossTechniqueDefinition")[0].fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100,&"tail_sweep":101,&"star_fan":102,&"meteor":103}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100,&"tail_sweep":101,&"star_fan":102,&"meteor":103,&"rifts":104}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values.get(key,0.0))
 		records.BossTechniqueDefinition.append(row)
 		if source.technique==&"bite": records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
+		elif source.technique==&"rifts":
+			var detail := {"id":phase,"technique":phase,"claw_count":int(values.claw_count)}
+			for key in ["claw_angle","claw_gap","claw_offset","claw_overshoot","interval","scratch_time","scratch_width"]:detail[key]=float(values[key])
+			records.DracoRiftsDefinition.append(detail)
 		elif source.technique==&"meteor": records.DracoMeteorDefinition.append({"id":phase,"technique":phase,"rock_enemy":1,"rocks":int(values.rocks),"rock_distance":float(values.rock_distance),"rock_spacing":float(values.rock_spacing)})
 		elif source.technique==&"star_fan": records.DracoStarFanDefinition.append({"id":phase,"technique":phase,"projectile":1,"lead_cap":float(values.lead_cap),"count":int(values.count),"arc":float(values.arc),"radius":float(values.radius),"speed":float(values.speed)})
 		elif source.technique==&"tail_sweep": records.DracoTailSweepDefinition.append({"id":phase,"technique":phase,"half_angle":float(values.half_angle)})
@@ -101,7 +105,7 @@ static func draco_technique_records(definition: BossDef, move: BossTechnique) ->
 	return records
 
 static func draco_set_records(definition: BossDef, moves: Array) -> Dictionary:
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[],"DracoRiftsDefinition":[]}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}

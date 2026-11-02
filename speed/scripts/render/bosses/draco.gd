@@ -33,6 +33,7 @@ func _draw() -> void:
 	_draw_rift()
 	_draw_technique()
 	_draw_impacts()
+	_draw_rift_walls()
 	var cycle: Dictionary = state.get("cycle",{})
 	if cycle.get("stage",0)==2:
 		for j in 16:
@@ -138,3 +139,27 @@ func _draw_impacts() -> void:
 			var at := center+direction*size
 			var cross := direction.orthogonal()*radius*0.07*(1.0-f)
 			form.quad(self,at-direction*radius*0.22,at+cross,at+direction*radius*0.1,at-cross,Color(0.56,0.62,1.0,1.0-f))
+
+
+## 亀裂の位置と修復中の幅は、戦闘側が出す壁の値だけを使う。
+func _draw_rift_walls() -> void:
+	var form=preload("res://scripts/bosses/draco_form.gd")
+	for wall: Dictionary in state.get("rift_walls",[]):
+		var length: float=wall.length
+		var width: float=wall.width
+		if length<1.0 or width<0.5:continue
+		var origin: Vector2=wall.position
+		var axis:=Vector2.from_angle(float(wall.angle))
+		var normal:=axis.orthogonal()
+		var left:=PackedVector2Array()
+		var right:=PackedVector2Array()
+		var count:=maxi(3,ceili(length/24.0))
+		for j in count+1:
+			var point:=origin+axis*length*float(j)/float(count)
+			var notch:=sin(float(j)*2.7+float(wall.index)*0.31)*width*0.13
+			left.append(to_local(point+normal*(width*0.34+notch)).snapped(Vector2(2,2)))
+			right.append(to_local(point-normal*(width*0.34-notch)).snapped(Vector2(2,2)))
+		for j in count:form.quad(self,left[j],left[j+1],right[j+1],right[j],Color("#050410"))
+		draw_polyline(left,Color("#8770cb"),3.0,false)
+		draw_polyline(right,Color("#40315f"),3.0,false)
+		for j in range(0,count,3):draw_line(left[j].lerp(right[j],0.25),left[j+1],Color(0.68,0.74,1.0,0.45),2.0,false)

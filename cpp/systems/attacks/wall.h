@@ -11,6 +11,7 @@ struct WallParams {
     bool blocking=false,attached=false;
     EnemyHandle owner;
     BudgetToken budget;
+    TechniqueHandle technique;
 };
 struct WallHit {double t=0;godot::Vector2 point,normal;};
 class WallSystem {

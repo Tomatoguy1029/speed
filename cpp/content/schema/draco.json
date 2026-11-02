@@ -381,6 +381,62 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DracoRiftsDefinition",
+      "section": 441,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "claw_count",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "claw_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "claw_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "claw_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "claw_overshoot",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "scratch_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "scratch_width",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

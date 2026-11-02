@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-rifts" in OS.get_cmdline_user_args():
+		call_deferred("native_rifts")
+		return
 	if "--cpp-draco-meteor" in OS.get_cmdline_user_args():
 		call_deferred("native_meteor")
 		return
@@ -890,5 +893,113 @@ func native_meteor() -> void:
 	for frame in 200:bridge._core.step(1.0/120.0)
 	var changed: Dictionary=bridge.command("dev_damage",{"entity_id":fixture.boss,"amount":1000000.0,"cause":"shot"})
 	check(changed.ok and bridge.command("dev_boss_body_state").value[-1].phase==2 and bridge.command("dev_boss_body_state").value[-1].placed_meteors.is_empty() and bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return not rock.alive and rock.destroyed),"形態の境界は置いた岩を破壊して所有を消す")
+	bridge.dispose()
+	native_draco_move_flow(move)
+
+func native_rifts() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/rifts.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	check(fixture.package.records.DracoRiftsDefinition.size()==3 and is_equal_approx(fixture.package.records.BossTechniqueDefinition[0].reach,1500.06),"亀裂はtresの到達距離を丸めず3形態へ生成する")
+	var initial_hp: float=bridge._core.ship_snapshot().ship_hp
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	var sim: RunSimulation=source.sim
+	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
+	check(a.start_attack(&"rifts") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で三本爪の亀裂を開始する")
+	a._runner.staging.side=bridge.command("dev_boss_state").value[0].staging_side
+	var shape_error:=0.0
+	var warning_error:=0.0
+	var ship_error:=0.0
+	var times_equal:=true
+	var hazard_equal:=true
+	var saved: Array=[]
+	var shown: Array=[]
+	var source_alias_difference: Array=[]
+	var moved:=false
+	var gated:=false
+	for frame in 1400:
+		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or is_equal_approx(attack.stage_time,a.elapsed))
+		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked and attack.sides==a._runner.sides
+		var points: PackedVector2Array=a.body_points()
+		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
+		if a.telegraph_paths.size()!=attack.telegraph_paths.size():warning_error=INF
+		else:
+			for j in a.telegraph_paths.size():
+				for k in 2:warning_error=maxf(warning_error,a.telegraph_paths[j][k].distance_to(attack.telegraph_paths[j][k]))
+		var hazards: Array=bridge._core.hazards_snapshot()
+		var source_hazards: Array=[]
+		for row in sim.projectiles.hazard_alive.size():
+			if sim.projectiles.hazard_alive[row]!=0:source_hazards.append(row)
+		# 世代つき参照では、消えたslashの裸行が再利用壁を消すSourceの別名参照を引き継がない。
+		if attack.stage<2:
+			hazard_equal=hazard_equal and hazards.size()==source_hazards.size()
+			var matched: Array=[]
+			for h: Dictionary in hazards:
+				var found:=false
+				for row: int in source_hazards:
+					if row in matched:continue
+					if h.pos.distance_to(sim.projectiles.hazard_pos[row])>0.1 or absf(h.length-sim.projectiles.hazard_len[row])>0.1 or absf(h.half_width*2.0-sim.projectiles.hazard_width[row])>0.01 or absf(h.damage-sim.projectiles.hazard_dmg[row])>0.01 or absf(h.active-sim.projectiles.hazard_active[row])>0.0001 or absf(h.delay-sim.projectiles.hazard_delay[row])>0.0001 or h.blocking!=bool(sim.projectiles.hazard_block[row]):continue
+					found=true;matched.append(row);break
+				hazard_equal=hazard_equal and found
+		elif source_alias_difference.is_empty() and body.closing_walls>0:
+			source_alias_difference=[source_hazards.size(),hazards.size()]
+			check(body.closing_walls==6 and body.rift_walls.size()==6,"世代の切れたslashで再利用された壁を消さず、所有する6本を修復する")
+		if attack.locked and attack.stage==0 and not moved:
+			moved=true
+			var path: PackedVector2Array=attack.rift_paths[0]
+			sim.state.ship_pos=path[0].lerp(path[1],0.5)
+			bridge.command("dev_ship_motion",{"position":sim.state.ship_pos,"velocity":Vector2.ZERO})
+		ship_error=maxf(ship_error,sim.state.ship_pos.distance_to(bridge._core.ship_snapshot().ship_pos))
+		var key: int=6 if attack.stage==5 and body.closing_walls>0 else draco_move_stage(attack)
+		if key not in saved and key in [4,3,0,1,2,6]:
+			saved.append(key)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"退場・入場・予告・実行・回復・修復を値型で保持する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_body: Array=bridge.command("dev_boss_body_state").value
+			var future_hazards: Array=bridge._core.hazards_snapshot()
+			check(bridge.restore(held.value).ok,"亀裂の途中へ復帰する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body and bridge._core.hazards_snapshot()==future_hazards,"復帰後の時計・爪・壁・修復が一致する")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if key not in shown and key in [0,1,2,6] and (key!=1 or attack.sides==2):
+			shown.append(key);await show_native_draco(fixture,body,attack)
+		if key==6 and not gated:
+			gated=true
+			check(not bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"修復が残る間は次の技を開始しない")
+		if attack.stage==5 and body.closing_walls==0 and a.mode==&"idle" and a.closing_walls.is_empty():break
+	check(times_equal and shape_error<0.1 and warning_error<0.1,"退場・入場・予告・左右発火・回復・終了のtickと全身・経路がSourceと一致する: %s/%s"%[shape_error,warning_error])
+	check(hazard_equal,"所有の終了前までslashと壁の生成時刻・形・幅・ダメージがSourceと一致する")
+	check(ship_error<0.1,"壁の伸長中の押し出し位置がSourceと一致する: %s"%ship_error)
+	print("[cpp_draco_rifts] Sourceの裸行再利用で修復開始時の壁数=",source_alias_difference)
+	check(saved.size()==6 and shown.size()==4 and gated and bridge._core.hazards_snapshot().is_empty(),"6段階の保持・表示と修復後の全壁解放を通る")
+	check(bridge._core.ship_snapshot().ship_hp<initial_hp and fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.accepted and event.payload.cause==&"wall" and event.payload.source==&"draco" and event.payload.technique==&"rifts"),"爪が実HPに当たり原因・出所・技名を記録する")
+	bridge.dispose();source.session.free()
+	for target in [4,3,0,1,2]:
+		fixture=breath_fixture(move);bridge=fixture.bridge
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 1200:
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+			if draco_move_stage(attack)==target and (target!=1 or attack.sides==2):break
+		check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"退場・入場・予告・左右実行・回復で取り消す")
+		check(bridge.command("dev_boss_state").value[0].telegraph_paths.is_empty(),"取消は残る予告を消す")
+		for frame in 40:bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		check(bridge._core.hazards_snapshot().is_empty() and bridge.command("dev_boss_body_state").value[-1].closing_walls==0,"取消は回復の待ちを外し0.3秒で残る壁を閉じる")
+		bridge.dispose()
+	fixture=breath_fixture(move);bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	for frame in 1200:
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		if bridge.command("dev_boss_state").value[0].sides==2:break
+	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
+	check(bridge._core.hazards_snapshot().is_empty() and bridge.command("dev_boss_body_state").value[-1].closing_walls==0,"本体消失は付属する爪と壁を解放する")
 	bridge.dispose()
 	native_draco_move_flow(move)

@@ -84,7 +84,8 @@ struct DracoLeapState {DracoStagingState staging;godot::Vector2 origin,destinati
 struct DracoTailSlamState {godot::Vector2 origin,target;std::vector<godot::Vector2> base,lifted,last;bool fired=false;};
 struct DracoTailSweepState {godot::Vector2 origin;double facing=0;std::vector<godot::Vector2> base,last,prior,area;};
 struct DracoStarFanState {std::vector<godot::Vector2> positions;std::vector<double> angles;bool fired=false;};
-struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState> move;};
+struct DracoRiftsState {DracoStagingState staging;std::vector<std::vector<godot::Vector2>> paths;std::vector<AttackHandle> walls,slashes;godot::Vector2 center;uint32_t claws=3,sides=0;bool ended=false;};
+struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState> move;};
 struct CanisSiriusFlameState {double age=0,emit_left=0;bool started=false;};
 struct HydraCurveState {};
 struct HydraGridPlan {uint32_t layout=0,region=0;std::vector<godot::Vector2> starts,ends,path;godot::Vector2 bearer;double length=0;};
@@ -185,7 +186,9 @@ struct DracoCycleState {
     godot::Vector2 home,from,return_from;
 };
 struct DracoImpact {godot::Vector2 position;double time=0,radius=0;uint32_t technique=0;};
+struct DracoClosingWall {AttackHandle attack;godot::Vector2 from;double time=0.3,duration=0.3,delay=0,length=0,half_width=0,angle=0;};
 struct DracoBodyState {
+    std::vector<DracoClosingWall> closing_walls;
     std::vector<RockHandle> placed_meteors;
     std::vector<DracoImpact> impacts;
     DracoCycleState cycle;
