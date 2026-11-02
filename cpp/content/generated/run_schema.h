@@ -3724,6 +3724,73 @@ inline bool read(BinaryReader &input, BipolarDefinition &out) {
     if (!input.read_u32(out.color)) return false;
     return true;
 }
+struct InterceptorDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    double damage{};
+    double interval{};
+    double burst_interval{};
+    double range{};
+    double orbit{};
+    double orbit_speed{};
+    double target_interval{};
+    double shot_radius{};
+    double shot_speed{};
+    double life{};
+    double projectile_increment{};
+    double duration_increment{};
+    double interval_increment{};
+    double minimum_ratio{};
+    double minimum_interval{};
+    uint32_t count{};
+    uint32_t burst{};
+    uint32_t color{};
+};
+inline bool read(BinaryReader &input, InterceptorDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.burst_interval)) return false;
+    if (out.burst_interval < 0) return false;
+    if (!input.read_f64(out.range)) return false;
+    if (out.range < 0) return false;
+    if (!input.read_f64(out.orbit)) return false;
+    if (out.orbit < 0) return false;
+    if (!input.read_f64(out.orbit_speed)) return false;
+    if (out.orbit_speed < 0) return false;
+    if (!input.read_f64(out.target_interval)) return false;
+    if (out.target_interval < 0) return false;
+    if (!input.read_f64(out.shot_radius)) return false;
+    if (out.shot_radius < 0) return false;
+    if (!input.read_f64(out.shot_speed)) return false;
+    if (out.shot_speed < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.projectile_increment)) return false;
+    if (out.projectile_increment < 0) return false;
+    if (!input.read_f64(out.duration_increment)) return false;
+    if (out.duration_increment < 0) return false;
+    if (!input.read_f64(out.interval_increment)) return false;
+    if (out.interval_increment < 0) return false;
+    if (!input.read_f64(out.minimum_ratio)) return false;
+    if (out.minimum_ratio < 0) return false;
+    if (!input.read_f64(out.minimum_interval)) return false;
+    if (out.minimum_interval < 0) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count < 1) return false;
+    if (!input.read_u32(out.burst)) return false;
+    if (out.burst < 1) return false;
+    if (!input.read_u32(out.color)) return false;
+    return true;
+}
 struct BossDefinition {
     uint32_t id{};
     std::string external_id{};
@@ -3853,6 +3920,17 @@ struct BossTechniqueDefinition {
     double glow_angle{};
     double end_time{};
     double end_decay{};
+    uint32_t cuts{};
+    double first_windup{};
+    double lunge_speed{};
+    double lunge_decay{};
+    double slash_min{};
+    double slash_max{};
+    double slash_angle{};
+    double slash_length{};
+    double slash_width{};
+    double slash_hit_time{};
+    double cut_gap{};
 };
 inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -3860,7 +3938,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 6) return false;
+    if (out.kind > 7) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -3999,6 +4077,28 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (out.end_time < 0) return false;
     if (!input.read_f64(out.end_decay)) return false;
     if (out.end_decay < 0) return false;
+    if (!input.read_u32(out.cuts)) return false;
+    if (out.cuts < 1) return false;
+    if (!input.read_f64(out.first_windup)) return false;
+    if (out.first_windup < 0) return false;
+    if (!input.read_f64(out.lunge_speed)) return false;
+    if (out.lunge_speed < 0) return false;
+    if (!input.read_f64(out.lunge_decay)) return false;
+    if (out.lunge_decay < 0) return false;
+    if (!input.read_f64(out.slash_min)) return false;
+    if (out.slash_min < 0) return false;
+    if (!input.read_f64(out.slash_max)) return false;
+    if (out.slash_max < 0) return false;
+    if (!input.read_f64(out.slash_angle)) return false;
+    if (out.slash_angle < 0) return false;
+    if (!input.read_f64(out.slash_length)) return false;
+    if (out.slash_length < 0) return false;
+    if (!input.read_f64(out.slash_width)) return false;
+    if (out.slash_width < 0) return false;
+    if (!input.read_f64(out.slash_hit_time)) return false;
+    if (out.slash_hit_time < 0) return false;
+    if (!input.read_f64(out.cut_gap)) return false;
+    if (out.cut_gap < 0) return false;
     return true;
 }
 struct BossTechniqueStage {
@@ -4396,6 +4496,7 @@ struct ContentRecords {
     std::vector<KillSonicDefinition> KillSonicDefinition_rows;
     std::vector<MassTowDefinition> MassTowDefinition_rows;
     std::vector<BipolarDefinition> BipolarDefinition_rows;
+    std::vector<InterceptorDefinition> InterceptorDefinition_rows;
     std::vector<BossDefinition> BossDefinition_rows;
     std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
     std::vector<BossTechniqueStage> BossTechniqueStage_rows;
@@ -5178,6 +5279,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { BipolarDefinition row; if (!read(input,row)) return false; out.BipolarDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 205: {
+        if (version != 1) return false;
+        if (count > input.remaining()/144) return false;
+        for (uint32_t i=0; i<count; ++i) { InterceptorDefinition row; if (!read(input,row)) return false; out.InterceptorDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 150: {
         if (version != 2) return false;
         if (count > input.remaining()/124) return false;
@@ -5185,8 +5292,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 7) return false;
-        if (count > input.remaining()/553) return false;
+        if (version != 8) return false;
+        if (count > input.remaining()/637) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -5514,6 +5621,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.MassTowDefinition_rows) if (!MassTowDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BipolarDefinition_ids;
     for (const auto &row:data.BipolarDefinition_rows) if (!BipolarDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> InterceptorDefinition_ids;
+    for (const auto &row:data.InterceptorDefinition_rows) if (!InterceptorDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossDefinition_ids;
     for (const auto &row:data.BossDefinition_rows) if (!BossDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossTechniqueDefinition_ids;
@@ -5666,6 +5775,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.KillSonicDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.MassTowDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BipolarDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.InterceptorDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.BossBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -5807,5 +5917,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=140;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=141;
 }
