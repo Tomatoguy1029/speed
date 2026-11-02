@@ -83,6 +83,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (const auto *split=std::get_if<SplitState>(&enemy.behavior_state)) if (!std::isfinite(split->bud_t) || split->bud_t<0) return false;
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Reticle)!=std::holds_alternative<ReticleState>(enemy.behavior_state)) return false;
         if (const auto *reticle=std::get_if<ReticleState>(&enemy.behavior_state)) if (state.enemy_handles.contains(reticle->rock) && state.enemy_handles.entity_id(reticle->rock)!=reticle->rock_id) return false;
+        const auto *triangle=std::get_if<TriangleState>(&enemy.behavior_state);
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Triangle)!=(triangle!=nullptr) || (triangle && (triangle->buds>2 || !std::isfinite(enemy.spin) || enemy.parts.size()!=3))) return false;
         const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Ruler)!=(ruler!=nullptr) || (ruler && (ruler->side< -1 || ruler->side>1))) return false;
         const auto *cepheus=std::get_if<CepheusState>(&enemy.behavior_state);

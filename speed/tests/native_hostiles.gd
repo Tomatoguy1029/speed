@@ -16,6 +16,12 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-triangle" in OS.get_cmdline_user_args():
+		var completed: bool=await check_cpp_triangle()
+		check(completed,"三角形の親の指定条件を最後まで確認する")
+		print("[cpp_triangle] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-ruler" in OS.get_cmdline_user_args():
 		mute_checks="--cpp-ruler-tail" in OS.get_cmdline_user_args() or "--cpp-ruler-voices" in OS.get_cmdline_user_args()
 		var completed: bool=await check_cpp_ruler()
@@ -1871,5 +1877,111 @@ func check_cpp_ruler() -> bool:
 	check(pulse_motion(core,replacement).side==0 and pulse_motion(core,replacement).beam_id==0,"行再利用で左右や古い壁の所有を引き継がない")
 	bridge.release_checkpoint(pending.value)
 	bridge.release_checkpoint(fired.value)
+	session.free()
+	return true
+
+func triangle_parts(core, parent: int) -> Array:
+	return core.enemy_motion_snapshot().filter(func(row): return row.get("parent_id",0)==parent and not dolphin_enemy(core,row.id).dead)
+
+func triangle_vertices(core, parent: int, parts: Array, travel: float, span: float) -> bool:
+	var body: Dictionary=dolphin_enemy(core,parent)
+	var center:=Vector2(body.pos[0],body.pos[1])
+	var motion: Dictionary=pulse_motion(core,parent)
+	for k in parts.size():
+		var a:=center+Vector2.from_angle(motion.spin+TAU*float((k+motion.buds)%3)/3.0)*span
+		var b:=center+Vector2.from_angle(motion.spin+TAU*float((k+motion.buds+1)%3)/3.0)*span
+		var star: Dictionary=dolphin_enemy(core,parts[k].id)
+		if Vector2(star.pos[0],star.pos[1]).distance_to(a.lerp(b,travel))>0.001: return false
+	return true
+
+func check_cpp_triangle() -> bool:
+	var cfg: GameConfig=ContentManager.base.duplicate(true)
+	cfg.start_radius=900.0
+	cfg.planet_radius=0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage:=RuntimeStage.new()
+	stage.index=108
+	stage.resources=StageResources.new()
+	stage.resources.enemy_ids=PackedStringArray(["triangle","drifter"])
+	stage.enemy_tuning={"triangle":{"speed":30.0,"params.move_time":0.2,"params.stop_time":0.1}}
+	var output:="res://.content/dev/run_triangle"
+	var built: Error=preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"三角形の星生成と辺移動".sha256_text())
+	check(built==OK,"三角形と参照する3星を編集値から生成する")
+	if built!=OK: return false
+	var path:=output.path_join("stage_108.json")
+	var index: Dictionary=JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession=RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":1081},true)
+	session.auto_step=false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"三角形の親と星の通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return false
+	var bridge=session.bridge
+	var core=bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+	var target: Vector2=core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.configure_attack_budget({"enabled":true,"budget":2.0,"jitter":0.0})
+	var parent: int=core.spawn_enemy(&"triangle",target+Vector2(400,100),{"facing":PI})
+	var parts: Array=triangle_parts(core,parent)
+	check(parts.size()==3 and parts.all(func(row): return row.age==0.0) and triangle_vertices(core,parent,parts,0.0,150.0),"出生時に3星を共通部位へ登録し固定した三角の頂点へ置く")
+	var view:=Rect2(target-Vector2(900,600),Vector2(1800,1200))
+	var frame: Dictionary=bridge.read_render(view).value
+	var ids:=PackedInt64Array()
+	for batch: Dictionary in frame.batches: ids.append_array(batch.ids)
+	var presentation: RunPresentation=session.view.get_node("RunPresentation")
+	check(ids.size()==3 and not ids.has(parent) and presentation.frame_view.apply_frame(frame),"中心を描かず生成した3星だけを共通表示へ渡す")
+	await get_tree().process_frame
+	var original: Dictionary=dolphin_enemy(core,parent)
+	ruler_tick(core,0.05)
+	var body: Dictionary=dolphin_enemy(core,parent)
+	check(Vector2(body.pos[0],body.pos[1]).distance_to(target)<Vector2(original.pos[0],original.pos[1]).distance_to(target) and triangle_vertices(core,parent,parts,0.0,150.0),"中心はゆっくり機体へ寄り星の停止位置も中心と一緒に動く")
+	ruler_tick(core,0.05)
+	check(pulse_motion(core,parent).mode==EnemyTable.Mode.DASH and core.hazards_snapshot().size()==3,"停止時間の終了で生存する星へ3本の軌跡を付ける")
+	ruler_tick(core,0.05)
+	check(triangle_vertices(core,parent,parts,0.25,150.0) and core.hazards_snapshot().all(func(wall): return wall.length>0 and wall.style==1 and wall.token>0),"星は辺の四分の一へ進みその後ろへ実際の長さの軌跡を伸ばす")
+	var pending: Dictionary=bridge.checkpoint()
+	var before: Array=core.enemy_motion_snapshot()
+	var before_enemies: Array=core.enemies_snapshot()
+	var before_walls: Array=core.hazards_snapshot()
+	frame=bridge.read_render(view).value
+	check(frame.triangle_star.size()==15 and presentation.frame_view.apply_frame(frame),"親の辺移動で3本の赤い軌跡を通常表示へ渡す")
+	await get_tree().process_frame
+	ruler_tick(core,0.05)
+	var future: Array=core.enemy_motion_snapshot()
+	var future_enemies: Array=core.enemies_snapshot()
+	var future_walls: Array=core.hazards_snapshot()
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before and core.enemies_snapshot()==before_enemies and core.hazards_snapshot()==before_walls,"親の固定角度・部位Handle・伸長中の線を値から復帰する")
+	ruler_tick(core,0.05)
+	check(core.enemy_motion_snapshot()==future and core.enemies_snapshot()==future_enemies and core.hazards_snapshot()==future_walls,"復帰後も同じ順で辺を進み保持元を変更しない")
+	for n in 8:
+		if pulse_motion(core,parent).mode==EnemyTable.Mode.MOVE: break
+		ruler_tick(core,0.05)
+	check(pulse_motion(core,parent).buds==1 and core.hazards_snapshot().is_empty() and triangle_vertices(core,parent,parts,0.0,150.0),"次の頂点に着くと線を終了して星を停止する")
+	bridge.command("dev_kill",{"entity_id":parts[0].id,"cause":"shot"})
+	core.remove_enemy(parts[0].id)
+	var unrelated: int=core.spawn_enemy(&"drifter",target+Vector2(600,300),{})
+	for n in 8:
+		ruler_tick(core,0.05)
+		if not core.hazards_snapshot().is_empty(): break
+	check(triangle_parts(core,parent).size()==2 and core.hazards_snapshot().size()==2 and not pulse_motion(core,unrelated).has("parent_id"),"星の先行撃破と行再利用後は元の2星だけが辺を進む")
+	for n in 8:
+		if pulse_motion(core,parent).mode==EnemyTable.Mode.MOVE: break
+		ruler_tick(core,0.05)
+	for k in [1,2]: bridge.command("dev_kill",{"entity_id":parts[k].id,"cause":"shot"})
+	ruler_tick(core,0.01)
+	var result: Dictionary=bridge.read_frame()
+	check(dolphin_enemy(core,parent).dead and core.hazards_snapshot().is_empty() and result.ok and result.value.events.filter(func(event): return event.type==&"kill" and event.payload.enemy_type==&"triangle" and event.payload.cause==&"collapse").size()==1,"全星の撃破で中心を崩壊として一度だけ撃破し線を掃除する")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":parent,"cause":"shot"})
+	ruler_tick(core,0.01)
+	check(parts.all(func(row): return dolphin_enemy(core,row.id).dead) and core.hazards_snapshot().is_empty(),"親の途中撃破で残った3星と軌跡を終了する")
+	bridge.restore(pending.value)
+	core.remove_enemy(parent)
+	var replacement: int=core.spawn_enemy(&"triangle",target+Vector2(400,100),{})
+	ruler_tick(core,0.01)
+	check(replacement!=parent and parts.all(func(row): return dolphin_enemy(core,row.id).dead) and triangle_parts(core,replacement).size()==3 and core.hazards_snapshot().is_empty(),"親の先行削除と行再利用で旧星を新しい中心へ結び付けない")
+	bridge.release_checkpoint(pending.value)
 	session.free()
 	return true

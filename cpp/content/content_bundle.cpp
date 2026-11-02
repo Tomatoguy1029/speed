@@ -121,7 +121,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->coronas=records.CoronaDefinition_rows;
     bundle->clocks=records.ClockDefinition_rows;
     bundle->aurigas=records.AurigaDefinition_rows;
-    bundle->soldiers=records.SoldierDefinition_rows;bundle->cepheus=records.CepheusDefinition_rows;bundle->rulers=records.RulerDefinition_rows;
+    bundle->soldiers=records.SoldierDefinition_rows;bundle->cepheus=records.CepheusDefinition_rows;bundle->rulers=records.RulerDefinition_rows;bundle->triangles=records.TriangleDefinition_rows;
     bundle->lynxes=records.LynxDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
@@ -336,7 +336,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31 && row.kind!=35 && row.kind!=32 && row.kind!=36 && row.kind!=33 && row.kind!=39 && row.kind!=40) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31 && row.kind!=35 && row.kind!=32 && row.kind!=36 && row.kind!=33 && row.kind!=39 && row.kind!=40 && row.kind!=38) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         definition.gate=EnemyDefinition::Gate(row.gate);
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
@@ -435,6 +435,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{item_lynx->accel,item_lynx->keep,item_lynx->warn,item_lynx->slash_speed,item_lynx->slash_size,item_lynx->slash_range,item_lynx->damage}) if (!std::isfinite(float(value))) return {};
             definition.lynx_definition=uint32_t(item_lynx-bundle->lynxes.begin()+1);definition.accel=item_lynx->accel;
         } else if (item_lynx!=bundle->lynxes.end()) return {};
+        const auto triangle=std::find_if(bundle->triangles.begin(),bundle->triangles.end(),[&](const auto &p){return p.id==row.id;});
+        if (row.kind==38) {
+            if (triangle==bundle->triangles.end() || triangle->move_time<=0 || triangle->star>records.EnemyRecord_rows.size() || records.EnemyRecord_rows[triangle->star-1].kind!=32) return {};
+            for (double value:{triangle->move_time,triangle->stop_time,triangle->span,triangle->trail_width,triangle->trail_damage,triangle->admission_duration}) if (!std::isfinite(float(value))) return {};
+            definition.triangle_definition=uint32_t(triangle-bundle->triangles.begin()+1);
+        } else if (triangle!=bundle->triangles.end()) return {};
         const auto ruler=std::find_if(bundle->rulers.begin(),bundle->rulers.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==33) {
             if (ruler==bundle->rulers.end() || ruler->warn<=0) return {};

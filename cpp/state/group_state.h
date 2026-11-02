@@ -14,9 +14,9 @@ struct HoundOrder {
 };
 struct GroupMember {EnemyHandle actor;HoundOrder order;};
 struct Group {
-    enum class Kind {Hounds,Cepheus} kind=Kind::Hounds;
+    enum class Kind {Hounds,Cepheus,Triangle} kind=Kind::Hounds;
     // 群れの番号は最初の個体ID。生存している親は要求しない。
-    EnemyHandle leader;SoldierFormation formation;
+    EnemyHandle leader;Vector2 target;SoldierFormation formation;
     OrderedValues<int64_t,GroupMember> members;
 };
 struct CepheusMark {Vector2 pos,king;godot::Color color;double age=0,life=0;};

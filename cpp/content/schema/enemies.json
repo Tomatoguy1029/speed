@@ -1785,6 +1785,54 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "TriangleDefinition",
+      "section": 170,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "star",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "move_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "span",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

@@ -152,11 +152,11 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 	return records
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9,&"rocket":10,&"drift":11,&"part":12,&"dash":13,&"battleship":14,&"sniper":15,&"marlin":16,&"pulser":17,&"dolphin":18,&"lynx":19,&"soldier":20,&"auriga":21,&"clock":22,&"reticle":23,&"aquarius":24,&"cross":25,&"bomber":28,&"phoenix":29,&"aquila":30,&"split":26,&"defender":27,&"crab":34,&"crow":37,&"cepheus":31,&"pump":35,&"triangle_star":32,&"corona":36,&"ruler":33}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9,&"rocket":10,&"drift":11,&"part":12,&"dash":13,&"battleship":14,&"sniper":15,&"marlin":16,&"pulser":17,&"dolphin":18,&"lynx":19,&"soldier":20,&"auriga":21,&"clock":22,&"reticle":23,&"aquarius":24,&"cross":25,&"bomber":28,&"phoenix":29,&"aquila":30,&"split":26,&"defender":27,&"crab":34,&"crow":37,&"cepheus":31,&"pump":35,&"triangle_star":32,&"corona":36,&"ruler":33,&"triangle":38}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier","gate","gate_arc"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -238,6 +238,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		var item: Dictionary = source.lynx.duplicate()
 		item.id = 1
 		data.LynxDefinition = [item]
+	if definition.behavior==&"triangle":
+		var item: Dictionary=source.triangle.duplicate()
+		item.id=1
+		item.star=1
+		data.TriangleDefinition=[item]
 	if definition.behavior==&"ruler":
 		var item: Dictionary=source.ruler.duplicate()
 		item.id=1
@@ -380,7 +385,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	for point in saw_points: data.FriendSawPoint.append({"id":data.FriendSawPoint.size()+1,"x":point.x,"y":point.y})
 	var polygon := PackedVector2Array()
 	if not ResourceLoader.exists(sprite):
-		if definition.behavior not in [&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler"]: return {}
+		if definition.behavior not in [&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
 		polygon = RunPresentation._placeholder_points(definition.shape)
 		sprite = ""
 		row.sprite_angle = 0.0
@@ -719,6 +724,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	for candidate_id: String in enemy_ids.duplicate():
 		var candidate: EnemyDef = definitions.get(StringName(candidate_id))
 		if candidate==null: candidate = load("res://data/enemies/%s.tres" % candidate_id)
+		if candidate!=null and candidate.behavior==&"triangle" and not "triangle_star" in enemy_ids: enemy_ids.append("triangle_star")
 		if candidate!=null and candidate.behavior==&"cepheus" and not "cepheus_soldier" in enemy_ids: enemy_ids.append("cepheus_soldier")
 		if candidate!=null and candidate.behavior==&"split" and not "splitling" in enemy_ids: enemy_ids.append("splitling")
 	for i in enemy_ids.size():
@@ -751,6 +757,10 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for item: Dictionary in resolved.LynxDefinition:
 			item.id = row.id
 			data.LynxDefinition.append(item)
+		for item: Dictionary in resolved.TriangleDefinition:
+			item.id=row.id
+			item.star=enemy_ids.find("triangle_star")+1
+			data.TriangleDefinition.append(item)
 		for item: Dictionary in resolved.RulerDefinition:
 			item.id=row.id
 			data.RulerDefinition.append(item)

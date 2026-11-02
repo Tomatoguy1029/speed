@@ -49,7 +49,7 @@ bool GroupSystem::warning(const godot::RunState &state,EnemyHandle actor) {const
 bool GroupSystem::validate(const godot::RunState &state) {
     std::unordered_set<int64_t> seen;
     for (const auto &g:state.groups.groups) {
-        if (g.value.members.is_empty()) return false;
+        if (g.value.members.is_empty() || !g.value.target.is_finite()) return false;
         if (g.value.kind==Group::Kind::Cepheus && (!g.value.formation.anchor.is_finite() || g.value.formation.tier<1 || g.value.formation.tier>3)) return false;
         for (const auto &m:g.value.members) if (!state.enemy_handles.contains(m.value.actor) ||
             state.enemy_handles.entity_id(m.value.actor)!=m.key || !seen.insert(m.key).second ||

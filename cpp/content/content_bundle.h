@@ -60,6 +60,7 @@ struct ContentBundle {
     std::vector<SoldierDefinition> soldiers;
     std::vector<CepheusDefinition> cepheus;
     std::vector<RulerDefinition> rulers;
+    std::vector<TriangleDefinition> triangles;
     std::vector<LynxDefinition> lynxes;
     std::vector<ContactDefinition> contacts;
     std::vector<HostileDefinition> hostile_definitions;

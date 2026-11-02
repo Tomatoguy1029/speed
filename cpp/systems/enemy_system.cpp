@@ -6,6 +6,7 @@
 #include "../behaviors/enemies/crow.h"
 #include "../behaviors/enemies/pump.h"
 #include "../behaviors/enemies/corona_vortex.h"
+#include "../behaviors/enemies/triangle.h"
 #include "attack_system.h"
 #include "attack_budget.h"
 #include "group_system.h"
@@ -28,6 +29,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Pump) enemy.behavior_state=PumpState{};
     if (def.kind==EnemyDefinition::Kind::Corona) enemy.behavior_state=CoronaState{};
     if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
+    if (def.kind==EnemyDefinition::Kind::Triangle) enemy.behavior_state=TriangleState{};
     if (def.kind==EnemyDefinition::Kind::Ruler) enemy.behavior_state=RulerState{};
     if (def.kind==EnemyDefinition::Kind::Cepheus) enemy.behavior_state=CepheusState{};
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
@@ -62,6 +64,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     insert(state,uint32_t(row),enemy);state.rows_by_id[enemy.id]=row;
     if (def.kind==EnemyDefinition::Kind::Crab && !p.has_facing) CrabBehavior::steer(run,uint32_t(row));
     if (def.kind==EnemyDefinition::Kind::Crow) CrowBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)),p.flock_member);
+    if (def.kind==EnemyDefinition::Kind::Triangle) TriangleBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)));
     return enemy.id;
 }
 void EnemySystem::flush_spawns(RunRuntime &run) {
@@ -99,6 +102,7 @@ bool EnemySystem::attack_active(const godot::RunState &state,EnemyHandle handle)
     if (std::holds_alternative<PhoenixState>(enemy.behavior_state) && enemy.mode==godot::RunState::EnemyMode::Move && enemy.timer>0) return true;
     if (const auto *clock=std::get_if<ClockState>(&enemy.behavior_state)) return clock->hands[0].generation!=0;
     if (std::holds_alternative<AurigaState>(enemy.behavior_state)) return true;
+    if (std::holds_alternative<TriangleState>(enemy.behavior_state)) return enemy.mode==EnemyMode::Dash;
     if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) return enemy.mode==EnemyMode::Windup || enemy.mode==EnemyMode::Recover || ruler->beam.generation!=0;
     if (std::holds_alternative<SniperState>(enemy.behavior_state)) return enemy.mode==EnemyMode::Windup || enemy.charge>0;
     return enemy.mode==godot::RunState::EnemyMode::Windup || enemy.mode==godot::RunState::EnemyMode::Dash || AttackSystem::has_attached(state,handle);
@@ -109,6 +113,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     const auto &definition=run.content->definitions[enemy.definition];
     if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle || definition.kind==EnemyDefinition::Kind::Phoenix || definition.kind==EnemyDefinition::Kind::Crab) return true;
     if (definition.kind==EnemyDefinition::Kind::Dolphin || definition.kind==EnemyDefinition::Kind::Aquarius || definition.kind==EnemyDefinition::Kind::Cross) return enemy.fire_t<=dt;
+    if (definition.kind==EnemyDefinition::Kind::Triangle) return enemy.mode==EnemyMode::Move && enemy.timer<=dt;
     if (definition.kind==EnemyDefinition::Kind::Ruler) return std::get<RulerState>(enemy.behavior_state).side!=0 && enemy.mode==EnemyMode::Dash && enemy.timer<=dt;
     if (definition.kind==EnemyDefinition::Kind::Cepheus) return std::get<CepheusState>(enemy.behavior_state).tier>0 && enemy.mode==EnemyMode::Move && enemy.timer<=dt;
     if (definition.kind==EnemyDefinition::Kind::Corona) return enemy.fire_t<=dt;
