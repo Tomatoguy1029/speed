@@ -6,6 +6,7 @@ const RUNNERS := {
 	"res://scripts/data_types/boss_techniques/hydra/thunder_headbutt.gd":"res://scripts/bosses/hydra/techniques/thunder_headbutt.gd",
 	"res://scripts/data_types/boss_techniques/hydra/debris_shatter.gd":"res://scripts/bosses/hydra/techniques/debris_shatter.gd",
 	"res://scripts/data_types/boss_techniques/hydra/tornado.gd":"res://scripts/bosses/hydra/techniques/tornado.gd",
+	"res://scripts/data_types/boss_techniques/draco/spiral.gd":"res://scripts/bosses/draco/techniques/spiral.gd",
 	"res://scripts/data_types/boss_techniques/draco/picaro_wall.gd":"res://scripts/bosses/draco/techniques/picaro_wall.gd",
 	"res://scripts/data_types/boss_techniques/draco/rifts.gd":"res://scripts/bosses/draco/techniques/rifts.gd",
 	"res://scripts/data_types/boss_techniques/draco/meteor.gd":"res://scripts/bosses/draco/techniques/meteor.gd",

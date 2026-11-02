@@ -26,7 +26,7 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	hit = float(body.flash)
 	var points := PackedVector2Array()
 	for point: Vector2 in body.body_points: points.append(to_local(point))
-	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),false,hit)
+	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit)
 	queue_redraw()
 func _draw() -> void:
 	if state.is_empty() or not visible: return
@@ -35,6 +35,7 @@ func _draw() -> void:
 	_draw_impacts()
 	_draw_rift_walls()
 	_draw_arrow_impacts()
+	_draw_spiral_charge()
 	var cycle: Dictionary = state.get("cycle",{})
 	if cycle.get("stage",0)==2:
 		for j in 16:
@@ -173,3 +174,18 @@ func _draw_arrow_impacts() -> void:
 		var radius: float=attack.get("impact_radius",85.0)
 		draw_arc(at,radius*(1.8-progress*0.8),0,TAU,48,Color("#baa8ff"),3.0,false)
 		draw_line(to_local(impact.position+Vector2.UP*1200.0*(1.0-progress)),at,Color(0.6,0.75,1.0,progress*0.6),4.0)
+
+func _draw_spiral_charge() -> void:
+	if attack.get("technique","")!="spiral" or int(attack.get("stage",5))!=1: return
+	var coil: float=attack.coil_time
+	var time: float=attack.stage_time
+	if time<coil or time>=coil+float(attack.pause_time): return
+	var progress:=clampf((time-coil)/float(attack.pause_time),0.0,1.0)
+	var center:=to_local(attack.spiral_center)
+	var radius:=lerpf(minf(attack.spiral_horizontal,attack.spiral_extent)*0.56,float(state.body_width)*0.7,progress)
+	var warning:=Color(1.0,0.38,0.23,0.18+progress*0.6)
+	draw_arc(center,radius,0,TAU,64,warning,4.0+progress*4.0,false)
+	for j in 12:
+		var direction:=Vector2.from_angle(j*TAU/12.0)
+		draw_line(center+direction*(radius+20),center+direction*(radius+4),warning,3.0,false)
+	preload("res://scripts/bosses/draco_form.gd").star(self,center,7.0+progress*12.0,warning)

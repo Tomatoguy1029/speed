@@ -5,6 +5,12 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-spiral-contact" in OS.get_cmdline_user_args():
+		call_deferred("native_spiral_contact")
+		return
+	if "--cpp-draco-spiral" in OS.get_cmdline_user_args():
+		call_deferred("native_spiral")
+		return
 	if "--cpp-draco-picaro-wall" in OS.get_cmdline_user_args() or "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args():
 		call_deferred("native_picaro_wall")
 		return
@@ -395,7 +401,7 @@ func native_draco_move_flow(move: BossTechnique) -> void:
 	bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false})
 	var first: int=-1
 	var second:=false
-	for frame in 1200:
+	for frame in (2400 if move.technique==&"spiral" else 1200):
 		bridge._core.step(1.0/120.0)
 		var active: Array=bridge.command("dev_boss_state").value
 		if not active.is_empty():
@@ -1091,3 +1097,106 @@ func native_picaro_wall() -> void:
 	if remaining_only:
 		print("[cpp_draco_picaro_wall_remaining] failures=",failed);get_tree().quit(1 if failed else 0)
 	else:native_draco_move_flow(move)
+
+func spiral_key(attack: Dictionary) -> int:
+	if attack.stage==0:return 0 if attack.departing else 1
+	if attack.stage==1:return 2 if attack.stage_time<attack.coil_time else 3 if attack.stage_time<attack.coil_time+attack.pause_time else 4
+	return 5 if attack.stage==2 else 6
+
+func spiral_camera(bridge,source: Dictionary={}) -> void:
+	bridge.command("dev_edit",{"kind":"camera","payload":{"center":Vector2(700,0),"size":Vector2(1600,900),"zoom":1.0,"bars":0.0}})
+	if not source.is_empty():
+		source.sim.ctx.options.view_size=Vector2(1600,900)
+		source.sim.state.view_center=Vector2(700,0);source.sim.state.view_half=Vector2(800,450);source.sim.state.camera_zoom=1.0
+
+## 既存の螺旋・拘束解放・中断ケースを値型と読取表示へ接続する。
+func native_spiral() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/spiral.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	var sim: RunSimulation=source.sim
+	spiral_camera(bridge,source)
+	check(a.start_attack(&"spiral") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で螺旋収縮を開始する")
+	var times_equal:=true
+	var state_equal:=true
+	var shape_error:=0.0
+	var camera_error:=0.0
+	var saved: Array=[]
+	var shown: Array=[]
+	for frame in 2400:
+		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		var output: Dictionary=bridge.read_frame().value
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or is_equal_approx(attack.stage_time,a.elapsed))
+		state_equal=state_equal and output.ui.controls_locked==sim.state.controls_locked and output.ui.encounter_protected==sim.state.encounter_protected and output.ui.cinematic_camera==sim.state.cinematic_camera
+		camera_error=maxf(camera_error,maxf(output.camera.center.distance_to(sim.state.view_center),maxf(output.camera.half.distance_to(sim.state.view_half),absf(output.camera.zoom-sim.state.camera_zoom))))
+		var points: PackedVector2Array=a.body_points()
+		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
+		if a._runner!=null:state_equal=state_equal and attack.departing==a._runner.departing and attack.holding_player==a._runner.holding_player and attack.charging==a._runner.charging and attack.trapped_hit==a._runner.trapped_hit
+		var key:=spiral_key(attack)
+		if key not in saved and key<6:
+			saved.append(key)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"退場・再入場・巻き・予告・収縮・回復を保持する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_body: Array=bridge.command("dev_boss_body_state").value
+			var future_hazards: Array=bridge._core.hazards_snapshot()
+			check(bridge.restore(held.value).ok,"螺旋の途中へ復帰する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			check(future==bridge.command("dev_boss_state").value and future_body==bridge.command("dev_boss_body_state").value and future_hazards==bridge._core.hazards_snapshot(),"復帰後の胴・壁・カメラと拘束が同じになる")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if key in [0,2,3,4,5] and key not in shown:
+			shown.append(key);await show_native_draco(fixture,body,attack)
+		if attack.stage==5:break
+	check(times_equal and state_equal,"Sourceと退場・再入場・巻きの拘束・解放・固定予告・収縮・終了のtickが一致する")
+	check(shape_error<0.2 and camera_error<0.1,"螺旋の2周・曲げ・追従履歴・カメラの寸法がSourceと一致する: %s/%s"%[shape_error,camera_error])
+	check(saved.size()==6 and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"各段階の復帰と表示を通り、終了時に壁を解放する")
+	check(fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.cause==&"spiral" and e.payload.source==&"draco" and e.payload.technique==&"spiral"),"収縮中の接触の実HPと原因・出所・技名を記録する")
+	check(fixture.captured.filter(func(e):return e.type==&"draco_roar").size()==1,"巻き終わりの咆哮を1回だけ渡す")
+	bridge.dispose();source.session.free()
+	for target in [0,1,2,3,4,5]:
+		fixture=breath_fixture(move);bridge=fixture.bridge;spiral_camera(bridge)
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 2400:
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			if spiral_key(bridge.command("dev_boss_state").value[0])==target:break
+		bridge.command("dev_cancel_technique",{"ticket":started.value})
+		var output: Dictionary=bridge.read_frame().value
+		check(bridge._core.hazards_snapshot().is_empty() and not output.ui.controls_locked and not output.ui.encounter_protected and not output.ui.cinematic_camera,"螺旋の各段階取消は壁・拘束・カメラを返す")
+		bridge.dispose()
+	fixture=breath_fixture(move);bridge=fixture.bridge;spiral_camera(bridge)
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	for frame in 1500:
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		if spiral_key(bridge.command("dev_boss_state").value[0])==2:break
+	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
+	check(bridge._core.hazards_snapshot().is_empty() and not bridge.read_frame().value.ui.controls_locked,"本体消失でも巻き中の拘束と壁を解放する")
+	bridge.dispose()
+	native_draco_move_flow(move)
+
+func native_spiral_contact() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/spiral.tres")
+	var fixture:=breath_fixture(move)
+	var bridge=fixture.bridge
+	spiral_camera(bridge)
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	# 共通壁の先行被弾と分け、収縮が受け付けた実HPだけを確認する。
+	for frame in 2200:
+		bridge._core.step_ship(1.0/120.0,1.0/120.0,{"touch":true})
+		bridge._core.step(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		if spiral_key(attack)==4 and not attack.trapped_hit:
+			var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+			bridge.command("dev_ship_motion",{"position":body.body_points[64],"velocity":Vector2.ZERO})
+		if attack.trapped_hit:break
+	var hits: Array=fixture.captured.filter(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"spiral")
+	if hits.size()!=1:print("収縮の被弾=",fixture.captured.filter(func(e):return e.type==&"combat_player_damage"))
+	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and is_equal_approx(hits[0].payload.hp_before-hits[0].payload.hp_after,35.0),"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
+	bridge.dispose()
+	print("[cpp_draco_spiral_contact] failures=",failed);get_tree().quit(1 if failed else 0)

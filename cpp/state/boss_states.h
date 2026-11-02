@@ -87,7 +87,14 @@ struct DracoStarFanState {std::vector<godot::Vector2> positions;std::vector<doub
 struct DracoRiftsState {DracoStagingState staging;std::vector<std::vector<godot::Vector2>> paths;std::vector<AttackHandle> walls,slashes;godot::Vector2 center;uint32_t claws=3,sides=0;bool ended=false;};
 struct DracoArrowImpact {godot::Vector2 position;double wait=0,warn=0,age=0;bool locked=false;};
 struct DracoPicaroWallState {uint32_t shots=0;std::vector<DracoArrowImpact> impacts;};
-struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState,DracoPicaroWallState> move;};
+struct DracoSpiralState {
+    godot::Vector2 center,correction,held_ship,outside,control,inside,recovery;
+    double extent=1000,horizontal=1000,length=9000,inner=0.2,coil=1.2,pause=1.6,first=0.42,second=0.54,bend=0.24,shrink=2,offset=320,bend_radius=220,zoom=1,departure_time=0,departure_angle=0,hp_before=0;
+    bool camera_before=false,controls_before=false,protection_before=false,departing=true,holding=false,charging=false,trapped=false,trapped_hit=false,hp_sampled=false;
+    std::vector<godot::Vector2> points,trail,entry;
+    std::vector<AttackHandle> walls;
+};
+struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState,DracoPicaroWallState,DracoSpiralState> move;};
 struct CanisSiriusFlameState {double age=0,emit_left=0;bool started=false;};
 struct HydraShatterStone {EnemyHandle actor;godot::Vector2 from,to;bool shattered=false;};
 struct HydraShatterState {bool initialized=false;double aim=0;std::vector<HydraShatterStone> rubble;};

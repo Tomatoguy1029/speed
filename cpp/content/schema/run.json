@@ -1559,6 +1559,10 @@
       {
         "name": "Wind",
         "value": "wind"
+      },
+      {
+        "name": "Spiral",
+        "value": "spiral"
       }
     ],
     "VisualRole": [
@@ -2119,6 +2123,10 @@
       {
         "name": "HydraCue",
         "value": "hydra_cue"
+      },
+      {
+        "name": "DracoRoar",
+        "value": "draco_roar"
       }
     ],
     "ResultKind": [
@@ -2861,6 +2869,10 @@
       "damage",
       "next_count",
       "target"
+    ],
+    "draco_roar": [
+      "pos",
+      "radius"
     ]
   },
   "includes": [

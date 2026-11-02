@@ -504,6 +504,72 @@
           "ref": "EnemyRecord"
         }
       ]
+    },
+    {
+      "name": "DracoSpiralDefinition",
+      "section": 444,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius_factor",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aspect_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "inner_radius_factor",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "coil_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pause",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "exit_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spiral_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shrink_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "touch_invuln",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

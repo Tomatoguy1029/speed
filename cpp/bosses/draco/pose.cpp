@@ -10,6 +10,16 @@ double taper(double t) {return 1.0-0.77*std::pow(std::clamp((t-0.55)/0.45,0.0,1.
 double length(const std::vector<godot::Vector2> &v) {double n=0;for (size_t i=1;i<v.size();++i) n+=v[i-1].distance_to(v[i]);return n;}
 std::vector<godot::Vector2> sample_spine(const std::vector<godot::Vector2> &v,uint32_t count,bool head=true) {std::vector<godot::Vector2> out;if (v.empty() || !count) return out;const double total=length(v);size_t at=0;double traversed=0;for (uint32_t j=0;j<count;++j) {const double target=total*(head?double(j)/std::max(1u,count-1):double(j+1)/count);while (at+2<v.size() && target>traversed+v[at].distance_to(v[at+1])) {traversed+=v[at].distance_to(v[at+1]);++at;}out.push_back(at+1<v.size()?v[at].lerp(v[at+1],(target-traversed)/std::max(0.001,double(v[at].distance_to(v[at+1])))):v.back());}return out;}
 }
+void DracoPose::follow(std::vector<godot::Vector2> &trail,std::vector<godot::Vector2> &points,godot::Vector2 head,double body_length,uint32_t count) {
+    if (trail.size()<2) trail={head,head+godot::Vector2(-body_length,0)};
+    const auto previous=trail.front();const double distance=previous.distance_to(head);
+    if (distance<0.01 && trail.size()==count && std::abs(length(trail)-body_length)<body_length*0.02) {points=trail;return;}
+    if (distance>0.01) {const uint32_t steps=std::max(1,int(std::ceil(distance/24.0)));for (uint32_t j=1;j<=steps;++j) trail.insert(trail.begin(),previous.lerp(head,double(j)/steps));}else trail.front()=head;
+    std::vector<godot::Vector2> path{trail.front()};double remaining=body_length;
+    for (size_t j=1;j<trail.size();++j) {const double span=path.back().distance_to(trail[j]);if (span<0.001) continue;if (span>=remaining) {path.push_back(path.back().lerp(trail[j],remaining/span));remaining=0;break;}path.push_back(trail[j]);remaining-=span;}
+    if (remaining>0.001) {const auto direction=path.size()>1?(path.back()-path[path.size()-2]).normalized():godot::Vector2(-1,0);path.push_back(path.back()+direction*remaining);}
+    trail=std::move(path);points=sample_spine(trail,count);
+}
 std::vector<godot::Vector2> DracoPose::samples(const std::vector<godot::Vector2> &v,uint32_t count) {return sample_spine(v,count);}
 void DracoPose::update(RunRuntime &r,BossBodyState &b) {
     const auto &p=DracoBody::rule(r,b);auto &d=b.draco;const auto &head=r.state.enemies[b.actor.slot];
