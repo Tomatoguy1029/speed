@@ -45,7 +45,7 @@ bool SpeedRunCore::configure_pickups(const Dictionary &config, const Dictionary 
 
 Dictionary SpeedRunCore::pickups_snapshot() const {
     Array visible_gems, visible_coins;
-    for (const auto &gem : runtime.state.pickups.gems) if (gem.alive) {
+    const auto crystal_record=[&](const speed::CrystalState &gem) {
         Dictionary row; row["pos"] = gem.pos; row["value"] = gem.value; row["seq"] = gem.order; row["pulled"] = gem.pulled;
         if (runtime.state.pickup_config.fixed_rewards) {
             row["ground_order"]=int64_t(gem.order);row["id"]=int64_t(gem.id);row["kind"]=int(gem.kind);row["base_xp"]=gem.value;row["velocity"]=gem.velocity;row["wait"]=gem.wait;
@@ -53,8 +53,9 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
             origin["enemy"]=gem.origin.definition?runtime.content->definitions[gem.origin.definition-1].id:StringName();origin["enemy_id"]=gem.origin.enemy_id;
             origin["spawn_t"]=gem.origin.run_time;origin["spawn_world_t"]=gem.origin.world_time;row["origin"]=origin;
         }
-        visible_gems.append(row);
-    }
+        return row;
+    };
+    for (const auto &gem:runtime.state.pickups.gems) if (gem.alive) visible_gems.append(crystal_record(gem));
     for (const auto &coin : runtime.state.pickups.coins) if (coin.alive) {
         Dictionary row; row["pos"] = coin.pos; row["pulled"] = coin.pulled; visible_coins.append(row);
     }
@@ -64,7 +65,15 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
         const auto totals=[](const std::array<speed::CrystalTotal,3> &source) {
             Array values;for (const auto &total:source) {Dictionary value;value["count"]=int64_t(total.count);value["base_xp"]=total.base_xp;values.push_back(value);}return values;
         };
-        Dictionary stats;stats["supplied"]=totals(runtime.state.pickups.supplied);stats["collected"]=totals(runtime.state.pickups.collected);stats["lost"]=totals(runtime.state.pickups.lost);
+        Array cargo;std::array<speed::CrystalTotal,3> ground_totals{},carried_totals{};
+        for (const auto &gem:runtime.state.pickups.gems) if (gem.alive) {++ground_totals[gem.kind].count;ground_totals[gem.kind].base_xp+=gem.value;}
+        for (const auto &entry:runtime.state.pickups.cargo) {
+            Dictionary carrier;carrier["enemy_id"]=entry.enemy_id;Array crystals;
+            for (const auto &gem:entry.crystals) {crystals.push_back(crystal_record(gem));++carried_totals[gem.kind].count;carried_totals[gem.kind].base_xp+=gem.value;}
+            carrier["crystals"]=crystals;cargo.push_back(carrier);
+        }
+        out["cargo"]=cargo;
+        Dictionary stats;stats["ground"]=totals(ground_totals);stats["carried"]=totals(carried_totals);stats["supplied"]=totals(runtime.state.pickups.supplied);stats["collected"]=totals(runtime.state.pickups.collected);stats["lost"]=totals(runtime.state.pickups.lost);
         stats["gold_rolls"]=int64_t(runtime.state.pickups.gold_rolls);stats["gold_won"]=int64_t(runtime.state.pickups.gold_won);out["xp_statistics"]=stats;
         out["absorber_id"]=int64_t(runtime.state.pickups.gem_absorber_id);out["next_ground_order"]=int64_t(runtime.state.pickups.next_ground_order);
 
@@ -85,6 +94,7 @@ Array SpeedRunCore::drain_collections() { Array out = runtime.state.collections;
 
 bool SpeedRunCore::step_pickups(double world_dt) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.pickups_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
+    speed::PickupSystem::prune(runtime);
     if (world_dt == 0) return true;
     const double reach = runtime.state.ship_config.ship_radius + 14.0;
     const double gem_radius = runtime.state.pickup_config.xp_radius;

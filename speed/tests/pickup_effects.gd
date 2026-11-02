@@ -6,6 +6,20 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-cargo-record" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_cargo_record()
+		check(finished,"運搬記録の出所を最後まで照合する")
+		print("[cpp_cargo_record] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
+	if "--cpp-cargo" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_cargo()
+		check(finished,"結晶の運搬の確認を最後まで実施する")
+		print("[cpp_cargo] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
 	if "--cpp-cap" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_cap()
 		check(finished,"上限集約の確認を最後まで実施する")
@@ -270,4 +284,113 @@ func check_cpp_cap() -> bool:
 	check(is_equal_approx(high_row.value,config.xp_crystal_values[2]+config.xp_crystal_values[0]),"黄色の保持量へ供給した基準XPだけを加算する")
 	bridge.dispose()
 
+	return true
+
+func check_cpp_cargo() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.gem_max = 2
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.rank = 0
+	definition.xp_reward_counts = PackedInt32Array([1,0,0])
+	var bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	var records: Array = []
+	bridge.subscribe("cargo",func(frame):
+		records.append_array(frame.events)
+		return true)
+	var carrier: int = bridge._core.spawn_enemy(definition.id,Vector2(-2000,500))
+	var crystal: int = supply_crystal(bridge,Vector2(-2000,500),0)
+	supply_crystal(bridge,Vector2(-1500,500),1)
+	supply_crystal(bridge,Vector2(-1000,500),0)
+	var before: Dictionary = bridge._core.pickups_snapshot()
+	var original: Dictionary = before.gems.filter(func(gem): return gem.id==crystal)[0]
+	check(bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal}).ok,"集約黄色を共通運搬へ渡す")
+	var carried: Dictionary = bridge._core.pickups_snapshot()
+	check(carried.gems.size()==1 and carried.absorber_id==0 and carried.cargo.size()==1,"地面から外すと同時に指定先を解除する")
+	var cargo: Dictionary = carried.cargo[0].crystals[0]
+	check(cargo.id==crystal and cargo.kind==2 and cargo.base_xp==original.base_xp and cargo.origin==original.origin,"色・実保持量・ID・出所を丸ごと保持する")
+	check(base_total(carried.xp_statistics.supplied)==base_total(before.xp_statistics.supplied),"運搬を新規供給へ数えない")
+	check(records.any(func(event): return event.type==&"xp_transfer" and event.payload.id==crystal and event.payload.was_absorber),"集約先を運んだことを記録する")
+	var saved: Dictionary = bridge.checkpoint()
+	supply_crystal(bridge,Vector2(-500,500),2)
+	check(bridge.restore(saved.value).ok and bridge._core.pickups_snapshot()==carried,"運搬表と指定解除・供給量を保持して復帰する")
+	bridge.release_checkpoint(saved.value)
+	supply_crystal(bridge,Vector2(-500,500),2)
+	var filled: Dictionary = bridge._core.pickups_snapshot()
+	records.clear()
+	check(bridge.command("dev_kill",{"entity_id":carrier,"cause":"shot"}).ok,"運搬者を実際の撃破入口で倒す")
+	var dropped: Dictionary = bridge._core.pickups_snapshot()
+	check(dropped.gems.size()==2 and dropped.cargo.is_empty(),"満杯では運搬分も共通の指定先へ集約する")
+	check(is_equal_approx(base_total(dropped.xp_statistics.supplied),base_total(filled.xp_statistics.supplied)+config.xp_crystal_values[0]),"撃破自身の報酬だけを供給へ加え、運搬分を二重計上しない")
+	check(is_equal_approx(base_total(dropped.gems),base_total(dropped.xp_statistics.supplied)),"集約後も全基準XPが保存される")
+	var supplies: Array = records.filter(func(event): return event.type==&"xp_absorb")
+	check(supplies.size()==2 and supplies[0].payload.new_supply and not supplies[1].payload.new_supply and supplies[1].payload.id==crystal and supplies[1].payload.carrier_id==carrier,"自分の報酬から運搬分の順に戻し、IDと由来を記録する")
+	bridge.dispose()
+	# 空きがある場合は、同じIDを新しい地面配置順で戻す。
+	bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	carrier = bridge._core.spawn_enemy(definition.id,Vector2(-2000,500))
+	crystal = supply_crystal(bridge,Vector2(-2000,500),1)
+	original = bridge._core.pickups_snapshot().gems[0]
+	check(bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal}).ok,"通常色を運搬する")
+	bridge.command("dev_kill",{"entity_id":carrier,"cause":"shot"})
+	dropped = bridge._core.pickups_snapshot()
+	var returned: Dictionary = dropped.gems.filter(func(gem): return gem.id==crystal)[0]
+	check(returned.ground_order>original.ground_order and returned.kind==original.kind and returned.base_xp==original.base_xp and returned.origin==original.origin,"再配置だけ新しい順を付け、結晶の意味を変えない")
+	bridge.dispose()
+	# 退却・解放・一括消去は撃破報酬にせず、保存した量をlostへ移す。
+	bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	var lost_before := 0.0
+	for action: String in ["dev_retreat","dev_remove","dev_clear_cargo"]:
+		carrier = bridge._core.spawn_enemy(definition.id,Vector2(-2000,500))
+		crystal = supply_crystal(bridge,Vector2(-2000,500),0)
+		bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal})
+		check(bridge.command(action,{} if action=="dev_clear_cargo" else {"entity_id":carrier}).ok,"運搬者の退却・解放・消去を通す")
+		var lost: Dictionary = bridge._core.pickups_snapshot()
+		check(lost.cargo.is_empty() and is_equal_approx(base_total(lost.xp_statistics.lost),lost_before+config.xp_crystal_values[0]),"運搬を消す際に保持XPだけをlostへ数える")
+		lost_before = base_total(lost.xp_statistics.lost)
+		if action=="dev_clear_cargo": bridge.command("dev_remove",{"entity_id":carrier})
+		var replacement: int = bridge._core.spawn_enemy(definition.id,Vector2(-2000,500))
+		check(replacement!=carrier and bridge._core.pickups_snapshot().cargo.is_empty(),"敵の行を再利用しても別IDへ運搬を漏らさない")
+		bridge.command("dev_remove",{"entity_id":replacement})
+	# ボス本体のように通常報酬へ進まない死体も、world_dt=0の整理で残さない。
+	carrier = bridge._core.spawn_enemy(definition.id,Vector2(-2000,500),{"is_boss":true})
+	crystal = supply_crystal(bridge,Vector2(-2000,500),1)
+	bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal})
+	bridge.command("dev_kill",{"entity_id":carrier,"cause":"shot"})
+	check(bridge._core.step_pickups(0.0),"世界時間が止まっていても運搬者を整理する")
+	var pruned: Dictionary = bridge._core.pickups_snapshot()
+	check(pruned.cargo.is_empty() and is_equal_approx(base_total(pruned.xp_statistics.lost),lost_before+config.xp_crystal_values[1]),"無効運搬者の量を失われた量へ一度だけ移す")
+	check(is_equal_approx(base_total(pruned.xp_statistics.supplied),base_total(pruned.xp_statistics.lost)),"退場と無効参照の整理後も供給量が保存される")
+	bridge.dispose()
+	return true
+
+func check_cpp_cargo_record() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.rank = 0
+	definition.xp_reward_counts = PackedInt32Array([0,0,0])
+	var bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	var records: Array = []
+	bridge.subscribe("cargo_record",func(frame):
+		records.append_array(frame.events)
+		return true)
+	var carrier: int = bridge._core.spawn_enemy(definition.id,Vector2(-2000,500))
+	var crystal: int = supply_crystal(bridge,Vector2(-2000,500),1)
+	var origin: Dictionary = bridge._core.pickups_snapshot().gems[0].origin
+	bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal})
+	bridge.command("dev_kill",{"entity_id":carrier,"cause":"shot"})
+	var loss_carrier: int = bridge._core.spawn_enemy(definition.id,Vector2(-2000,500))
+	bridge.command("dev_carry_crystal",{"entity_id":loss_carrier,"crystal_id":crystal})
+	bridge.command("dev_remove",{"entity_id":loss_carrier})
+	var related: Array = records.filter(func(event): return event.type in [&"xp_drop",&"xp_transfer",&"xp_lost"] and event.payload.id==crystal)
+	check(related.size()==5,"供給・運搬・再配置・再運搬・喪失を同じ結晶IDで記録する")
+	check(related.all(func(event): return event.payload.origin==origin and event.payload.xp==config.xp_crystal_values[1]),"運搬者が変わっても元の供給元・個体・時刻と基準XPを保つ: expected=%s actual=%s" % [var_to_str(origin),var_to_str(related.map(func(event): return event.payload.origin))])
+	bridge.dispose()
 	return true

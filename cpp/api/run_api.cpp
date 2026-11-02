@@ -155,6 +155,18 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=changed?success():failure(5,"equipment","装備を変更できません");
     } else if (kind=="dev_benchmark" && runtime.api_development && payload.size()==1 && is(payload,"leveling",Variant::BOOL)) {
         runtime.state.loadout.xp_gain_mult=bool(payload["leveling"])?1.0:0.0;response=success();
+    } else if (kind=="dev_carry_crystal" && runtime.api_development && payload.size()==2 && is(payload,"entity_id",Variant::INT) && is(payload,"crystal_id",Variant::INT)) {
+        const auto found=runtime.state.rows_by_id.find(int64_t(payload["entity_id"]));bool carried=false;
+        if (found!=runtime.state.rows_by_id.end()) for (size_t row=0;row<runtime.state.pickups.gems.size();++row) {
+            if (runtime.state.pickups.gems[row].alive && runtime.state.pickups.gems[row].id==uint64_t(int64_t(payload["crystal_id"]))) {carried=speed::PickupSystem::carry(runtime,runtime.state.enemy_handles.at(uint32_t(found->second)),row);break;}
+        }
+        response=carried?success():failure(4,"crystal","運搬できる個体がありません");
+    } else if (kind=="dev_retreat" && runtime.api_development && payload.size()==1 && is(payload,"entity_id",Variant::INT)) {
+        const auto found=runtime.state.rows_by_id.find(int64_t(payload["entity_id"]));
+        const bool removed=found!=runtime.state.rows_by_id.end() && speed::EnemySystem::retire(runtime,runtime.state.enemy_handles.at(uint32_t(found->second)),speed::RetireReason::Outside);
+        response=removed?success():failure(4,"entity_id","退却できる敵がいません");
+    } else if (kind=="dev_clear_cargo" && runtime.api_development && payload.is_empty()) {
+        speed::PickupSystem::lose_all(runtime,speed::CargoLoss::Cleared);response=success();
     } else if (kind=="dev_drop_crystal" && runtime.api_development && payload.size()==2 && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite() && is(payload,"kind",Variant::INT) && int64_t(payload["kind"])>=0 && int64_t(payload["kind"])<=2) {
         const uint64_t crystal=speed::PickupSystem::supply(runtime,payload["position"],uint8_t(int64_t(payload["kind"])));
         response=crystal?success(int64_t(crystal)):failure(9,"crystal","結晶を供給できません");

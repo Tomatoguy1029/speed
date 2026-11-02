@@ -64,12 +64,10 @@ void drop_legacy(RunRuntime &run,const Corpse &enemy) {
     }
 }
 
-uint64_t drop_crystal(RunRuntime &run,godot::Vector2 pos,uint8_t kind,const CrystalOrigin &origin,godot::Vector2 velocity={},double wait=0) {
+uint64_t place_crystal(RunRuntime &run,godot::Vector2 pos,CrystalState crystal,bool new_supply,int64_t carrier_id=-1) {
     auto &state=run.state;auto &pickups=state.pickups;
-    if (pickups.next_id==UINT64_MAX || (pickups.live_gems<state.pickup_config.gem_max && pickups.next_ground_order==UINT64_MAX)) {run.frame_workspace.invalid=true;return 0;}
-    const uint64_t id=pickups.next_id++;
-    const double value=run.content->crystal_values[kind];pickups.xp_dropped+=value;
-    ++pickups.supplied[kind].count;pickups.supplied[kind].base_xp+=value;
+    if (pickups.live_gems<state.pickup_config.gem_max && pickups.next_ground_order==UINT64_MAX) {run.frame_workspace.invalid=true;return 0;}
+    const auto id=crystal.id;const double value=crystal.value;
     // 満杯では新しい位置も乱数も作らず、最古の大結晶（なければ最古の結晶）へ加算する。
     if (state.pickups.live_gems>=state.pickup_config.gem_max && state.pickups.live_gems>0) {
         int64_t target=state.pickups.gem_absorber;
@@ -85,17 +83,26 @@ uint64_t drop_crystal(RunRuntime &run,godot::Vector2 pos,uint8_t kind,const Crys
             EventBuilder::crystal_absorber_selected(run,state.pickups.gems[target],before_kind);
         }
         auto &receiver=state.pickups.gems[target];const double before=receiver.value;receiver.value+=value;
-        CrystalState incoming;incoming.id=id;incoming.pos=pos;incoming.kind=kind;incoming.value=value;incoming.origin=origin;
-        EventBuilder::crystal_absorbed(run,incoming,receiver,before);
+        crystal.pos=pos;
+        EventBuilder::crystal_absorbed(run,crystal,receiver,before,new_supply,carrier_id);
         return id;
     }
     const auto at=pos+godot::Vector2::from_angle(state.control.rng.randf()*2.0*godot::Math::PI)*8.0;
     size_t row=state.pickups.gems.size();
     if (state.pickups.free_gems.empty()) state.pickups.gems.emplace_back();else {row=state.pickups.free_gems.back();state.pickups.free_gems.pop_back();}
-    state.pickups.gems[row]={at,value,state.pickups.next_ground_order++,true,false,kind,id,origin,velocity,wait};++state.pickups.live_gems;
-    EventBuilder::crystal_drop(run,state.pickups.gems[row]);
+    crystal.pos=at;crystal.order=state.pickups.next_ground_order++;crystal.alive=true;crystal.pulled=false;
+    state.pickups.gems[row]=crystal;++state.pickups.live_gems;
+    EventBuilder::crystal_drop(run,state.pickups.gems[row],new_supply,carrier_id);
     return id;
 }
+uint64_t drop_crystal(RunRuntime &run,godot::Vector2 pos,uint8_t kind,const CrystalOrigin &origin,godot::Vector2 velocity={},double wait=0) {
+    auto &p=run.state.pickups;
+    if (p.next_id==UINT64_MAX) {run.frame_workspace.invalid=true;return 0;}
+    CrystalState gem;gem.id=p.next_id++;gem.kind=kind;gem.value=run.content->crystal_values[kind];gem.origin=origin;gem.velocity=velocity;gem.wait=wait;
+    p.xp_dropped+=gem.value;++p.supplied[kind].count;p.supplied[kind].base_xp+=gem.value;
+    return place_crystal(run,pos,gem,true);
+}
+
 }
 uint64_t PickupSystem::supply(RunRuntime &run,godot::Vector2 pos,uint8_t kind) {
     if (kind>2 || !pos.is_finite()) return 0;
@@ -110,6 +117,42 @@ bool PickupSystem::release_crystal(RunRuntime &run,size_t row,CrystalRemoval rea
     }
     if (p.gem_absorber_id==gem.id) {EventBuilder::crystal_absorber_released(run,gem.id,reason);p.gem_absorber=-1;p.gem_absorber_id=0;}
     p.gems[row].alive=false;p.free_gems.push_back(row);--p.live_gems;return true;
+}
+bool PickupSystem::carry(RunRuntime &run,EnemyHandle owner,size_t row) {
+    auto &state=run.state;auto &p=state.pickups;
+    if (!state.enemy_handles.contains(owner) || !state.enemies[owner.slot].alive || state.enemies[owner.slot].dead || row>=p.gems.size() || !p.gems[row].alive) return false;
+    const auto crystal=p.gems[row];const auto id=state.enemies[owner.slot].id;
+    auto found=std::find_if(p.cargo.begin(),p.cargo.end(),[&](const auto &cargo){return cargo.enemy_id==id && same_handle(cargo.owner,owner);});
+    if (found==p.cargo.end()) {p.cargo.push_back({owner,id,{}});found=std::prev(p.cargo.end());}
+    found->crystals.push_back(crystal);const bool was_absorber=p.gem_absorber_id==crystal.id;
+    release_crystal(run,row,CrystalRemoval::Stored);EventBuilder::crystal_transferred(run,crystal,id,was_absorber);return true;
+}
+void PickupSystem::redrop(RunRuntime &run,const Corpse &enemy) {
+    auto &cargo=run.state.pickups.cargo;const auto found=std::find_if(cargo.begin(),cargo.end(),[&](const auto &entry){return entry.enemy_id==enemy.id;});
+    if (found==cargo.end()) return;
+    auto crystals=std::move(found->crystals);cargo.erase(found);
+    for (size_t k=0;k<crystals.size();++k) {
+        auto &crystal=crystals[k];crystal.velocity={};crystal.wait=0;
+        const auto pos=enemy.pos+godot::Vector2::from_angle(2.0*godot::Math::PI*double(k)/double(crystals.size()))*(10.0+4.0*double(k%3));
+        place_crystal(run,pos,crystal,false,enemy.id);
+    }
+}
+void PickupSystem::lose(RunRuntime &run,int64_t enemy_id,CargoLoss reason) {
+    auto &p=run.state.pickups;const auto found=std::find_if(p.cargo.begin(),p.cargo.end(),[&](const auto &cargo){return cargo.enemy_id==enemy_id;});
+    if (found==p.cargo.end()) return;
+    for (const auto &crystal:found->crystals) {++p.lost[crystal.kind].count;p.lost[crystal.kind].base_xp+=crystal.value;EventBuilder::crystal_lost(run,crystal,enemy_id,reason);}
+    p.cargo.erase(found);
+}
+void PickupSystem::lose_all(RunRuntime &run,CargoLoss reason) {
+    while (!run.state.pickups.cargo.empty()) lose(run,run.state.pickups.cargo.front().enemy_id,reason);
+}
+void PickupSystem::prune(RunRuntime &run) {
+    auto &state=run.state;
+    for (size_t i=0;i<state.pickups.cargo.size();) {
+        const auto &cargo=state.pickups.cargo[i];const auto owner=cargo.owner;
+        if (!state.enemy_handles.contains(owner) || state.enemy_handles.entity_id(owner)!=cargo.enemy_id || !state.enemies[owner.slot].alive || state.enemies[owner.slot].dead) lose(run,cargo.enemy_id,CargoLoss::OwnerRemoved);
+        else ++i;
+    }
 }
 void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     auto &state=run.state;const auto &definition=run.content->definitions[enemy.definition-1];
@@ -132,6 +175,7 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
         EventBuilder::crystal_gold_roll(run,enemy,won);
         if (won) {origin.source=CrystalSource::StrongGold;drop_crystal(run,enemy.pos,2,origin);}
     }
+    redrop(run,enemy);
     const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor && !run.content->rock_fields.empty();
     const double chance=meteor?run.content->rock_fields.front().meteor_coin_chance:0.03;
     const int64_t count=enemy.elite?3+state.control.rng.randi_range(0,3).value():(state.control.rng.randf()<chance?(meteor?1+state.control.rng.randi_range(0,2).value():1):0);

@@ -77,7 +77,7 @@ void FieldSystem::stream_rocks(RunRuntime &run,double dt) {
         }
         auto &enemy=state.enemies[rock.proxy.slot];enemy.pos=rock_at(run,rock);enemy.vel=rock.velocity;enemy.facing=rock.facing+rock.spin*state.world_time;
         if (rock.kind==RockKind::Comet && state.world_time>=rock.gone) rock.destroyed=true;
-        if (rock.destroyed || (!rock.manual && !near(run,enemy.pos,650.0))) {EnemySystem::retire(state,rock.proxy,RetireReason::Outside);rock.proxy={};}
+        if (rock.destroyed || (!rock.manual && !near(run,enemy.pos,650.0))) {EnemySystem::retire(run,rock.proxy,RetireReason::Outside);rock.proxy={};}
     }
     field.stream_t-=dt;if (field.stream_t>0) return;field.stream_t=0.2;
     for (uint32_t i=0;i<field.rocks.size();++i) {
@@ -100,7 +100,7 @@ bool FieldSystem::contact_rock(godot::SpeedRunCore &core,uint32_t row,godot::Vec
     shot.life=config.saw_life;shot.pierce=true;shot.no_crit=true;shot.knock=300;shot.angle=shot.vel.angle();shot.spin=14;shot.type="saw";shot.cause="saw";shot.color=godot::Color::html("d9dde6");
     AttackSpec spec;spec.cause=Cause::Saw;spec.policies=policy(EndPolicy::NaturalLifetime);AttackSystem::emit_friendly(state,shot,spec);
     godot::Dictionary event;event["pos"]=enemy.pos;event["normal"]=-u;event["enemy_pos"]=enemy.pos;event["r"]=enemy.radius;core.emit_event("block_impact",event);
-    EnemySystem::retire(state,state.enemy_handles.at(row),RetireReason::Development);return true;
+    EnemySystem::retire(core.runtime,state.enemy_handles.at(row),RetireReason::Development);return true;
 }
 uint32_t FieldSystem::rock_visual(const RunRuntime &run,uint32_t row) {
     const auto &enemy=run.state.enemies[row];const auto &definition=run.content->definitions[enemy.definition];

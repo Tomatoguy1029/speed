@@ -1,5 +1,6 @@
 #pragma once
 #include <godot_cpp/variant/vector2.hpp>
+#include "entity_store.h"
 #include <array>
 #include <vector>
 #include <cstdint>
@@ -28,7 +29,9 @@ struct CoinState {godot::Vector2 pos;bool alive=true,pulled=false;};
 enum class CapsuleKind {Heal,Magnet,CometWeapon};
 struct CapsuleState {godot::Vector2 pos;double age=0;CapsuleKind kind=CapsuleKind::Heal;uint32_t weapon=0;bool drop=true;};
 struct CrystalTotal {uint64_t count=0;double base_xp=0;};
+struct CrystalCargo {EnemyHandle owner;int64_t enemy_id=0;std::vector<CrystalState> crystals;};
 struct PickupState {
+    std::vector<CrystalCargo> cargo;
     std::vector<CrystalState> gems;
     std::vector<CoinState> coins;
     std::vector<CapsuleState> capsules;

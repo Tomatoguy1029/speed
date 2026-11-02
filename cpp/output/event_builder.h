@@ -7,12 +7,15 @@ namespace speed {
 class RunRuntime;
 struct CrystalState;
 enum class CrystalRemoval;
+enum class CargoLoss;
 class EventBuilder {
 public:
+    static void crystal_transferred(RunRuntime &,const CrystalState &,int64_t enemy_id,bool was_absorber);
+    static void crystal_lost(RunRuntime &,const CrystalState &,int64_t enemy_id,CargoLoss);
     static void crystal_absorber_selected(RunRuntime &,const CrystalState &,uint8_t before_kind);
     static void crystal_absorber_released(RunRuntime &,uint64_t previous_id,CrystalRemoval);
-    static void crystal_absorbed(RunRuntime &,const CrystalState &incoming,const CrystalState &target,double before);
-    static void crystal_drop(RunRuntime &,const CrystalState &);
+    static void crystal_absorbed(RunRuntime &,const CrystalState &incoming,const CrystalState &target,double before,bool new_supply=true,int64_t carrier_id=-1);
+    static void crystal_drop(RunRuntime &,const CrystalState &,bool new_supply=true,int64_t carrier_id=-1);
     static void crystal_gold_roll(RunRuntime &,const Corpse &,bool won);
     static void crystal_burst(RunRuntime &,const Corpse &);
     static void budget_started(RunRuntime &,const std::string &owner,int64_t id,uint32_t row,const std::vector<AttackCategory> &,int64_t token);

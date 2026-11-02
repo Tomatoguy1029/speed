@@ -123,12 +123,20 @@ godot::Dictionary EventBuilder::ship_result(const ShipDamageResult &result) {
     godot::Dictionary out;out["accepted"]=result.accepted;out["reason"]=combat_reason_name(result.reason);
     out["hp_before"]=result.hp_before;out["hp_after"]=result.hp_after;out["amount"]=result.amount;return out;
 }
-void EventBuilder::crystal_drop(RunRuntime &run,const CrystalState &gem) {
+namespace {
+godot::Dictionary crystal_origin(const RunRuntime &run,const CrystalState &crystal) {
+    const auto &origin=crystal.origin;godot::Dictionary value;
+    value["source"]=godot::String(origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
+    value["enemy"]=definition_name(run,origin.definition);value["enemy_id"]=origin.enemy_id;value["spawn_t"]=origin.run_time;value["spawn_world_t"]=origin.world_time;return value;
+}
+}
+void EventBuilder::crystal_drop(RunRuntime &run,const CrystalState &gem,bool new_supply,int64_t carrier_id) {
     godot::Dictionary event;event["id"]=int64_t(gem.id);event["kind"]=godot::StringName(gem.kind==0?"low":gem.kind==1?"mid":"high");
+    event["origin"]=crystal_origin(run,gem);event["xp"]=gem.value;
     const auto &origin=gem.origin;
-    event["base_xp"]=gem.value;event["source"]=godot::StringName(origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
+    event["base_xp"]=gem.value;event["source"]=godot::StringName(!new_supply?"crow_carry":origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
     event["enemy"]=definition_name(run,origin.definition);event["enemy_id"]=origin.enemy_id;
-    event["spawn_t"]=origin.run_time;event["spawn_world_t"]=origin.world_time;event["pos"]=gem.pos;event["new_supply"]=true;event["ground_count"]=run.state.pickups.live_gems;
+    event["spawn_t"]=origin.run_time;event["spawn_world_t"]=origin.world_time;event["pos"]=gem.pos;event["new_supply"]=new_supply;event["carrier_id"]=carrier_id;event["ground_count"]=run.state.pickups.live_gems;
     FrameBuilder::append(run,"xp_drop",event);
 }
 void EventBuilder::crystal_gold_roll(RunRuntime &run,const Corpse &enemy,bool won) {
@@ -137,6 +145,21 @@ void EventBuilder::crystal_gold_roll(RunRuntime &run,const Corpse &enemy,bool wo
 }
 void EventBuilder::crystal_burst(RunRuntime &run,const Corpse &enemy) {
     godot::Dictionary event;event["pos"]=enemy.pos;event["r"]=enemy.radius;FrameBuilder::append(run,"gem_burst",event);
+}
+
+namespace {
+godot::Dictionary carried_record(const RunRuntime &run,const CrystalState &crystal,int64_t enemy_id) {
+    godot::Dictionary event;event["id"]=int64_t(crystal.id);event["kind"]=godot::StringName(crystal.kind==0?"low":crystal.kind==1?"mid":"high");event["base_xp"]=crystal.value;
+    event["origin"]=crystal_origin(run,crystal);event["xp"]=crystal.value;
+    event["method"]=godot::StringName("crow");event["enemy_id"]=enemy_id;event["enemy"]=definition_name(run,crystal.origin.definition);
+    event["spawn_t"]=crystal.origin.run_time;event["spawn_world_t"]=crystal.origin.world_time;return event;
+}
+}
+void EventBuilder::crystal_transferred(RunRuntime &run,const CrystalState &crystal,int64_t enemy_id,bool was_absorber) {
+    auto event=carried_record(run,crystal,enemy_id);event["was_absorber"]=was_absorber;FrameBuilder::append(run,"xp_transfer",event);
+}
+void EventBuilder::crystal_lost(RunRuntime &run,const CrystalState &crystal,int64_t enemy_id,CargoLoss reason) {
+    auto event=carried_record(run,crystal,enemy_id);event["reason"]=godot::StringName(reason==CargoLoss::Retreat?"retreat":reason==CargoLoss::Released?"released":reason==CargoLoss::Cleared?"cleared":"owner_removed");FrameBuilder::append(run,"xp_lost",event);
 }
 
 void EventBuilder::crystal_absorber_selected(RunRuntime &run,const CrystalState &target,uint8_t before_kind) {
@@ -149,12 +172,12 @@ void EventBuilder::crystal_absorber_released(RunRuntime &run,uint64_t previous_i
     event["previous_id"]=int64_t(previous_id);event["id"]=-1;FrameBuilder::append(run,"xp_absorber",event);
 }
 
-void EventBuilder::crystal_absorbed(RunRuntime &run,const CrystalState &incoming,const CrystalState &target,double before) {
-    const auto &origin=incoming.origin;godot::Dictionary event;
+void EventBuilder::crystal_absorbed(RunRuntime &run,const CrystalState &incoming,const CrystalState &target,double before,bool new_supply,int64_t carrier_id) {
+    const auto &origin=incoming.origin;godot::Dictionary event;event["origin"]=crystal_origin(run,incoming);event["xp"]=incoming.value;
     event["id"]=int64_t(incoming.id);event["kind"]=godot::StringName(incoming.kind==0?"low":incoming.kind==1?"mid":"high");event["base_xp"]=incoming.value;
-    event["source"]=godot::StringName(origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
+    event["source"]=godot::StringName(!new_supply?"crow_carry":origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
     event["enemy"]=definition_name(run,origin.definition);event["enemy_id"]=origin.enemy_id;event["spawn_t"]=origin.run_time;event["spawn_world_t"]=origin.world_time;
-    event["new_supply"]=true;event["target_id"]=int64_t(target.id);event["target_kind"]=godot::StringName("high");event["before_base_xp"]=before;event["after_base_xp"]=target.value;
+    event["new_supply"]=new_supply;event["carrier_id"]=carrier_id;event["target_id"]=int64_t(target.id);event["target_kind"]=godot::StringName("high");event["before_base_xp"]=before;event["after_base_xp"]=target.value;
     event["requested_pos"]=incoming.pos;event["ground_count"]=run.state.pickups.live_gems;FrameBuilder::append(run,"xp_absorb",event);
 }
 

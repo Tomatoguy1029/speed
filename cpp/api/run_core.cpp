@@ -6,6 +6,7 @@
 #include "../output/event_builder.h"
 #include "../../native/geometry.h"
 #include "../systems/enemy_system.h"
+#include "../systems/pickup_system.h"
 #include "../systems/attack_budget.h"
 #include "../behaviors/enemies/pursuit.h"
 #include <godot_cpp/core/class_db.hpp>
@@ -209,6 +210,7 @@ void SpeedRunCore::advance_enemies(double delta) {
 }
 
 void SpeedRunCore::close() {
+    speed::PickupSystem::lose_all(runtime,speed::CargoLoss::Cleared);
     runtime.state.closed = true;
     runtime.state.control.rng = {};
     runtime.combat_hooks=speed::CombatHooks();runtime.render_workspace={};
@@ -457,7 +459,7 @@ bool SpeedRunCore::remove_enemy(int64_t id) {
     const auto found=runtime.state.rows_by_id.find(id);if (found==runtime.state.rows_by_id.end()) return false;
     const auto handle=runtime.state.enemy_handles.at(uint32_t(found->second));
     const auto reason=runtime.state.enemies[found->second].dead?speed::RetireReason::DeathCleanup:speed::RetireReason::Development;
-    const bool removed=speed::EnemySystem::retire(runtime.state,handle,reason);
+    const bool removed=speed::EnemySystem::retire(runtime,handle,reason);
     speed::EventBuilder::flush_combat(runtime);return removed;
 }
 

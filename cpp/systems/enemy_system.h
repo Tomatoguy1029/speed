@@ -16,7 +16,7 @@ public:
     static bool attack_active(const godot::RunState &,EnemyHandle);
     static bool attack_due(const RunRuntime &,EnemyHandle,double dt);
     static EnemyHandle insert(godot::RunState &state, uint32_t slot, const godot::RunState::Enemy &enemy);
-    static bool retire(godot::RunState &state,EnemyHandle enemy,RetireReason reason);
+    static bool retire(RunRuntime &,EnemyHandle enemy,RetireReason reason);
     static void leave_hound(godot::RunState &state,size_t row);
     static void release(godot::RunState &state, uint32_t slot);
 };

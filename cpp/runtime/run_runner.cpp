@@ -2,6 +2,7 @@
 #include "../systems/attack_system.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
+#include "../systems/pickup_system.h"
 #include "../api/run_core.h"
 #include <algorithm>
 #include <cmath>
@@ -77,6 +78,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (core.check_run_end()) return true;
     for (size_t row:state.dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);
     state.dead_rows.clear();
+    if (state.pickups_ready) PickupSystem::prune(core.runtime);
     if (world_step) {
         if (state.population.frame_enabled && !state.population.blocked && !core.attack_guard_active() && !core.step_population(wd,control.bonus_remaining>0)) return false;
         if (state.pickups_ready && !core.step_pickups(wd)) return false;

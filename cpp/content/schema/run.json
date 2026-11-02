@@ -1548,6 +1548,14 @@
       {
         "name": "CrystalAbsorber",
         "value": "xp_absorber"
+      },
+      {
+        "name": "CrystalTransfer",
+        "value": "xp_transfer"
+      },
+      {
+        "name": "CrystalLost",
+        "value": "xp_lost"
       }
     ],
     "ResultKind": [
@@ -1837,7 +1845,10 @@
       "spawn_world_t",
       "pos",
       "new_supply",
-      "ground_count"
+      "ground_count",
+      "carrier_id",
+      "origin",
+      "xp"
     ],
     "xp_gold_roll": [
       "enemy",
@@ -1864,7 +1875,10 @@
       "before_base_xp",
       "after_base_xp",
       "requested_pos",
-      "ground_count"
+      "ground_count",
+      "carrier_id",
+      "origin",
+      "xp"
     ],
     "xp_absorber": [
       "reason",
@@ -1874,6 +1888,32 @@
       "after_kind",
       "before_base_xp",
       "after_base_xp"
+    ],
+    "xp_transfer": [
+      "id",
+      "kind",
+      "base_xp",
+      "method",
+      "enemy_id",
+      "enemy",
+      "spawn_t",
+      "spawn_world_t",
+      "was_absorber",
+      "origin",
+      "xp"
+    ],
+    "xp_lost": [
+      "id",
+      "kind",
+      "base_xp",
+      "method",
+      "enemy_id",
+      "enemy",
+      "spawn_t",
+      "spawn_world_t",
+      "reason",
+      "origin",
+      "xp"
     ]
   },
   "includes": [

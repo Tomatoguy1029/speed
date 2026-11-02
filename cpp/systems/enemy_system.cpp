@@ -1,6 +1,7 @@
 #include "enemy_system.h"
 #include "attack_system.h"
 #include "group_system.h"
+#include "pickup_system.h"
 #include "tracking_policy.h"
 #include "../runtime/run_runtime.h"
 #include <algorithm>
@@ -65,10 +66,12 @@ EnemyHandle EnemySystem::insert(godot::RunState &state, uint32_t slot, const god
 void EnemySystem::leave_hound(godot::RunState &state,size_t row) {
     GroupSystem::leave(state,state.enemy_handles.at(uint32_t(row)));
 }
-bool EnemySystem::retire(godot::RunState &state,EnemyHandle handle,RetireReason reason) {
+bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason) {
+    auto &state=run.state;
     if (!state.enemy_handles.contains(handle)) return false;
     const size_t row=handle.slot;auto &enemy=state.enemies[row];
     if (!enemy.alive) return false;
+    PickupSystem::lose(run,enemy.id,reason==RetireReason::Outside?CargoLoss::Retreat:reason==RetireReason::BonusClear?CargoLoss::Cleared:CargoLoss::Released);
     AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);
     leave_hound(state,row);
     auto &rows=state.behavior_rows[enemy.behavior_group];

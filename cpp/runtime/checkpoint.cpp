@@ -87,6 +87,12 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             !crystal_ids.insert(gem.id).second || !ground_orders.insert(gem.order).second || !gem.pos.is_finite() || !gem.velocity.is_finite() || !std::isfinite(gem.wait) || gem.wait<0 ||
             gem.origin.definition>content.definitions.size()) return false;
     }
+    std::unordered_set<int64_t> carriers;
+    for (const auto &cargo:state.pickups.cargo) {
+        if (!carriers.insert(cargo.enemy_id).second || !state.enemy_handles.contains(cargo.owner) || state.enemy_handles.entity_id(cargo.owner)!=cargo.enemy_id || cargo.crystals.empty()) return false;
+        for (const auto &gem:cargo.crystals) if (!gem.id || gem.id>=state.pickups.next_id || gem.kind>2 || !std::isfinite(gem.value) || gem.value<0 || !crystal_ids.insert(gem.id).second ||
+            gem.origin.definition>content.definitions.size() || !std::isfinite(gem.origin.run_time) || !std::isfinite(gem.origin.world_time)) return false;
+    }
     auto &pickups=state.pickups;
     if (live_crystals!=pickups.live_gems || (state.pickup_config.fixed_rewards && live_crystals>state.pickup_config.gem_max)) return false;
     // 行番号は索引。保持した集約先のIDから再構築する。
