@@ -371,7 +371,7 @@ Dictionary SpeedRunCore::frame_run() {
     Array voices;
     const auto &state=runtime.state;
     if (state.phase!=Phase::Finishing && state.phase!=Phase::Ended) for (size_t group=0;group<state.behavior_rows.size();++group) {
-        if (state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Beamer && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Sniper && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Aquarius && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Cross) continue;
+        if (state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Beamer && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Sniper && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Aquarius && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Cross && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Ruler) continue;
         for (auto row:state.behavior_rows[group]) {
             const auto &enemy=state.enemies[row];if (enemy.dead || enemy.mode!=EnemyMode::Windup || (state.behavior_kinds[group]==speed::EnemyDefinition::Kind::Beamer && enemy.timer<=runtime.content->beamers[runtime.content->definitions[enemy.definition].beamer_definition-1].beam_time)) continue;
             if (state.behavior_kinds[group]==speed::EnemyDefinition::Kind::Aquarius && enemy.timer<=runtime.content->aquarius[runtime.content->definitions[enemy.definition].aquarius_definition-1].beam_time) continue;

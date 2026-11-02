@@ -58,6 +58,7 @@ struct ContentBundle {
     std::vector<AurigaDefinition> aurigas;
     std::vector<SoldierDefinition> soldiers;
     std::vector<CepheusDefinition> cepheus;
+    std::vector<RulerDefinition> rulers;
     std::vector<LynxDefinition> lynxes;
     std::vector<ContactDefinition> contacts;
     std::vector<HostileDefinition> hostile_definitions;

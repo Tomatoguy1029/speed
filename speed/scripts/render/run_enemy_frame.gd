@@ -7,6 +7,7 @@ var _parts: Array[Dictionary] = []
 var _sparks: InstanceBatch
 var _biter := false
 var _biting := false
+var _ruler:=false
 var _glows := PackedFloat32Array()
 var _previous_row: Dictionary = {}
 var _seen := false
@@ -46,6 +47,12 @@ func setup(scope: ContentResourceScope, entry: Dictionary) -> void:
 			_add_part(part.name,part.base,part.armor,part.normal,part.pivot-Vector2(10,17),paint,settings)
 	else:
 		_add_part("body",look.base_texture(),paint,look.normal,Vector2.ZERO,paint,settings)
+		_ruler=entry.get("ruler",false) and look.split_other!=null
+		if _ruler:
+			var lower: EnemyLook=look.split_other
+			var lower_paint: Texture2D=lower.painted_armors[entry.lower_paint]
+			_add_part("lower",lower.base_texture(),lower_paint,lower.normal,Vector2.ZERO,lower_paint,settings)
+			_parts.back().angle=lower.angle-look.angle
 	if _biting:
 		_sparks = InstanceBatch.new()
 		_sparks.setup_shader_quad()
@@ -120,7 +127,9 @@ func apply_frame(row: Dictionary) -> void:
 					var mouth := position+direction*radius*(16.0/17.0)
 					_sparks.add(mouth+direction*12.0*(radius/17.0),angle-PI/2.0,32.0*(radius/17.0),Color(spark_age/SPARK_TIME,0,0,1))
 		for part: Dictionary in _parts:
+			if _ruler and row.ruler_sides[i]!=0 and row.ruler_sides[i]!=(-1 if part.name=="body" else 1): continue
 			var turn := jaw if part.name=="jaw_left" else -jaw if part.name=="jaw_right" else 0.0
+			turn+=float(part.get("angle",0.0))
 			var pivot: Vector2 = part.pivot*(radius/17.0)
 			var center := position+(pivot-pivot.rotated(turn)).rotated(angle)
 			var began := Time.get_ticks_usec() if perf.active else 0

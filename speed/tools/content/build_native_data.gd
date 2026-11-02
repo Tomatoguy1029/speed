@@ -5,7 +5,7 @@ extends RefCounted
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: StageDef = null) -> Dictionary:
-	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona"]:
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -64,6 +64,15 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		for value in row.lynx.values():
 			if not is_finite(value) or value<0.0: return {}
 		if row.lynx.warn<=0.0 or row.fire_interval<=0.0: return {}
+	if definition.behavior == &"ruler":
+		row.ruler={"accel":definition.accel,"beam_start_gap":maxf(0.0,float(definition.params.get("beam_start_gap",0.0)))}
+		for pair in [["keep","keep"],["split_delay","split_delay"],["half_gap","half_gap"],["emit_back","emit_back"],["deploy_speed","deploy_speed"],["deploy_time","deploy_time"],["warn","telegraph"],["beam_len","beam_len"],["beam_width","beam_width"],["beam_time","beam_time"],["damage","bullet_dmg"]]:
+			if not definition.params.has(pair[1]): return {}
+			row.ruler[pair[0]]=float(definition.params[pair[1]])
+		row.ruler.admission_duration=row.ruler.warn+row.ruler.beam_time+0.1
+		for value in row.ruler.values():
+			if not is_finite(value) or value<0.0: return {}
+		if row.ruler.warn<=0.0: return {}
 	if definition.behavior == &"cepheus":
 		row.cepheus = {"accel":definition.accel if definition.accel>0.0 else 2.0}
 		for key in ["keep","fire_interval","reinforce_interval","summon_time","mutiny_time","spacing","row_near","row_far","fan_radius","fan_step"]:

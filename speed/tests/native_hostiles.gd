@@ -16,6 +16,14 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-ruler" in OS.get_cmdline_user_args():
+		mute_checks="--cpp-ruler-tail" in OS.get_cmdline_user_args() or "--cpp-ruler-voices" in OS.get_cmdline_user_args()
+		var completed: bool=await check_cpp_ruler()
+		mute_checks=false
+		check(completed,"じょうぎ座の未実施条件を最後まで確認する")
+		print("[cpp_ruler] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-cepheus-notifications" in OS.get_cmdline_user_args():
 		await check_cpp_cepheus_notifications()
 		print("[cpp_cepheus_notifications] failed=%d" % failed)
@@ -1756,3 +1764,112 @@ func check_cpp_cepheus_notifications() -> void:
 	var presentation: RunPresentation=session.view.get_node("RunPresentation")
 	check(presentation.frame_view._rings.any(func(ring): return ring.radius==70.0),"召喚通知を元の半径70の光の輪として表示する")
 	session.free()
+
+func ruler_tick(core, dt: float) -> void:
+	core.step(dt)
+	core.step_hazards(dt)
+	core.advance_attack_budget(float(core.inspect().world_time))
+
+func check_cpp_ruler() -> bool:
+	var cfg: GameConfig=ContentManager.base.duplicate(true)
+	cfg.start_radius=900.0
+	cfg.planet_radius=0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage:=RuntimeStage.new()
+	stage.index=101
+	stage.resources=StageResources.new()
+	stage.resources.enemy_ids=PackedStringArray(["ruler"])
+	stage.enemy_tuning={"ruler":{"speed":0.0,"params.split_delay":0.1,"params.deploy_time":0.1,"params.deploy_speed":100.0,"params.telegraph":0.1,"params.beam_time":0.2}}
+	var output:="res://.content/dev/run_ruler"
+	var built: Error=preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"じょうぎ座の分裂と照射".sha256_text())
+	check(built==OK,"じょうぎ座の編集値と上下の専用画像を生成する")
+	if built!=OK: return false
+	var path:=output.path_join("stage_101.json")
+	var index: Dictionary=JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession=RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":1011},true)
+	session.auto_step=false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"じょうぎ座のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return false
+	var bridge=session.bridge
+	var core=bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+	var target: Vector2=core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.configure_attack_budget({"enabled":true,"budget":2.0,"jitter":0.0})
+	var first: int=core.spawn_enemy(&"ruler",target+Vector2(400,50),{"attack_group":9,"attack_value":1.0,"attack_priority":3.0})
+	var view:=Rect2(target-Vector2(900,600),Vector2(1800,1200))
+	var frame: Dictionary=bridge.read_render(view).value
+	var presentation: RunPresentation=session.view.get_node("RunPresentation")
+	check(presentation.frame_view.apply_frame(frame),"分裂前の定規を共通表示へ渡す")
+	var display= presentation.frame_view.enemy_frames.values()[0]
+	check(display._parts.size()==2 and display._parts.all(func(part): return part.base._count==1),"分裂前は上下の絵を同じキャンバスに重ねる")
+	await get_tree().process_frame
+	ruler_tick(core,0.05)
+	ruler_tick(core,0.05)
+	var rows: Array=core.enemy_motion_snapshot()
+	check(rows.size()==2 and rows[0].side==1 and rows[1].side==-1 and rows[1].age==0.0,"自己分裂を即時登録し同種の子は次tickから更新する")
+	var second: int=rows[1].id
+	check(is_equal_approx(rows[0].facing,PI) and rows[0].facing==rows[1].facing and rows.all(func(row): return row.attack_priority==3.0),"機体への縦横の大きい軸と親の攻撃設定を両側へ引き継ぐ")
+	for n in 3: ruler_tick(core,0.05)
+	check(pulse_motion(core,first).mode==EnemyTable.Mode.WINDUP and pulse_motion(core,first).charge>0.0,"展開から予告に入り編集された予告時間で構える")
+	var pending: Dictionary=bridge.checkpoint()
+	var before: Array=core.enemy_motion_snapshot()
+	frame=bridge.read_render(view).value
+	check(frame.ruler.size()==24 and presentation.frame_view.apply_frame(frame),"分離した半身と発射元の隙間を含む点線の予告を表示する")
+	check(display._parts.all(func(part): return part.base._count==1),"分離後は各個体が上下どちらか片側だけを描く")
+	await get_tree().process_frame
+	if "--cpp-ruler-voices" in OS.get_cmdline_user_args():
+		mute_checks=false
+		bridge.command("set_ui_overlay",{"active":false})
+		var packet: Dictionary=bridge.read_frame()
+		check(packet.ok and packet.value.ui.laser_voices.size()==2,"両側の構えを既存のチャージ音の読取へ渡す")
+		bridge.command("dev_kill",{"entity_id":first,"cause":"shot"})
+		packet=bridge.read_frame()
+		check(packet.ok and packet.value.ui.laser_voices.size()==1 and packet.value.ui.laser_voices[0].id==second,"途中撃破で倒れた側のチャージ音だけを止める")
+		core.remove_enemy(second)
+		bridge.command("set_ui_overlay",{"active":false})
+		packet=bridge.read_frame()
+		if not "--cpp-ruler-voice-fixes" in OS.get_cmdline_user_args(): check(packet.ok and packet.value.ui.laser_voices.is_empty(),"相手の削除でも残るチャージ音を止める")
+		bridge.release_checkpoint(pending.value)
+		session.free()
+		return true
+	ruler_tick(core,0.05)
+	var walls: Array=core.hazards_snapshot()
+	check(walls.size()==2 and walls.all(func(wall): return wall.blocking and wall.owner_id>0 and wall.token>0 and wall.style==2 and wall.length==2600.0 and wall.half_width==13.0),"両側から予算付きの長いビームの壁を発射する")
+	for wall: Dictionary in walls:
+		var enemy: Dictionary=dolphin_enemy(core,wall.owner_id)
+		var expected: Vector2=Vector2(enemy.pos[0],enemy.pos[1])+Vector2.from_angle(enemy.facing)*(enemy.radius+13.0+80.0)
+		check((wall.pos as Vector2).distance_to(expected)<3.0,"発射元は本体半径・半幅・編集した隙間から決まる")
+	var output_frame: Dictionary=bridge.read_frame()
+	check(output_frame.ok,"分裂と予告・発射の通知を固定の封筒で受け取れる")
+	if output_frame.ok:
+		check(output_frame.value.events.filter(func(event): return event.type==&"ruler_split").size()==1 and output_frame.value.events.filter(func(event): return event.type==&"enemy_laser_fire").size()==2,"分裂1件と両側の発射通知を生成する")
+	frame=bridge.read_render(view).value
+	check(presentation.frame_view.apply_frame(frame) and frame.shapes.any(func(shape): return shape.kind==0),"照射中の光の柱を既存の壁表示へ渡す")
+	await get_tree().process_frame
+	var fired: Dictionary=bridge.checkpoint()
+	var future: Array=core.enemy_motion_snapshot()
+	var future_walls: Array=core.hazards_snapshot()
+	mute_checks=false
+	for n in 5: ruler_tick(core,0.05)
+	check(core.hazards_snapshot().is_empty() and float(core.attack_budget_snapshot().used)==0.0 and pulse_motion(core,first).mode==EnemyTable.Mode.DASH,"照射の正常終了で壁と攻撃予算を解放し再展開する")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"分裂後の左右・予告・予算を値から復帰する")
+	ruler_tick(core,0.05)
+	check(core.enemy_motion_snapshot()==future and core.hazards_snapshot()==future_walls,"復帰後の発射・壁の所有・乱数消費が一致する")
+	bridge.command("dev_kill",{"entity_id":first,"cause":"shot"})
+	core.step_hazards(0.01)
+	core.advance_attack_budget(float(core.inspect().world_time)+0.01)
+	check(core.hazards_snapshot().size()==1 and not dolphin_enemy(core,second).dead,"一方を途中撃破するとそのビームだけ終了し相手は残る")
+	core.remove_enemy(second)
+	core.advance_attack_budget(float(core.inspect().world_time)+1.0)
+	check(core.hazards_snapshot().is_empty() and float(core.attack_budget_snapshot().used)==0.0 and core.attack_budget_snapshot().waiting.is_empty(),"相手の先行削除でも残る線と子の予算待ちを掃除する")
+	core.remove_enemy(first)
+	var replacement: int=core.spawn_enemy(&"ruler",target+Vector2(100,400),{})
+	check(pulse_motion(core,replacement).side==0 and pulse_motion(core,replacement).beam_id==0,"行再利用で左右や古い壁の所有を引き継がない")
+	bridge.release_checkpoint(pending.value)
+	bridge.release_checkpoint(fired.value)
+	session.free()
+	return true

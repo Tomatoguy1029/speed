@@ -1601,6 +1601,8 @@ func _present_cpp(delta: float) -> void:
 	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	cpp_background.update_frame(frame.camera)
 	frame_view.update_effects(frame,delta)
+	shake=maxf(shake,frame_view.ruler_shake)
+	frame_view.ruler_shake=0.0
 	if frame_view._end_blast_visual!=null:
 		shake = maxf(shake,frame_view._end_blast_visual.frame_shake)
 		frame_view._end_blast_visual.frame_shake = 0.0

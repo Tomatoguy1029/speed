@@ -1787,6 +1787,10 @@
       {
         "name": "CepheusSummon",
         "value": "cepheus_summon"
+      },
+      {
+        "name": "RulerSplit",
+        "value": "ruler_split"
       }
     ],
     "ResultKind": [
@@ -2306,6 +2310,11 @@
     ],
     "cepheus_summon": [
       "pos",
+      "color"
+    ],
+    "ruler_split": [
+      "pos",
+      "angle",
       "color"
     ]
   },

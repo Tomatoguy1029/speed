@@ -18,6 +18,8 @@ var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
 var _lance_hits: Array = []
+var ruler_shake:=0.0
+var _ruler:=PackedFloat64Array()
 var _triangle_star := PackedFloat64Array()
 var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
 var _corona := PackedFloat64Array()
@@ -211,6 +213,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/cross.gd").draw_frame(canvas,_cross,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/bomber.gd").draw_frame(canvas,_bomber,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/crab.gd").draw_frame(canvas,_crab,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/ruler.gd").draw_frame(canvas,_ruler,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/triangle_star.gd").draw_frame(canvas,_triangle_star,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/cepheus.gd").draw_frame(canvas,_cepheus,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/aquila.gd").draw_frame(canvas,_aquila,_aquila_view,1.0/maxf(_zoom,0.01))
@@ -344,6 +347,10 @@ func _valid(frame: Dictionary) -> bool:
 		if not frame.pulser is PackedFloat64Array or frame.pulser.size()%6!=0: return false
 		for value in frame.pulser:
 			if not is_finite(value): return false
+	if frame.has("ruler"):
+		if not frame.ruler is PackedFloat64Array or frame.ruler.size()%12!=0: return false
+		for value: float in frame.ruler:
+			if not is_finite(value): return false
 	if frame.has("triangle_star"):
 		if not frame.triangle_star is PackedFloat64Array or frame.triangle_star.size()%5!=0: return false
 		for value: float in frame.triangle_star:
@@ -380,6 +387,10 @@ func _valid(frame: Dictionary) -> bool:
 	for row in frame.batches:
 		if not row is Dictionary or not visuals.has(row.get("visual_id")) or not row.get("ids") is PackedInt64Array or not row.get("transforms") is PackedFloat32Array or not row.get("colors") is PackedColorArray or not row.get("flags") is PackedInt32Array: return false
 		var count: int = row.ids.size()
+		if visuals[row.visual_id].get("ruler",false):
+			if not row.get("ruler_sides") is PackedInt32Array or row.ruler_sides.size()!=count: return false
+			for side: int in row.ruler_sides:
+				if side< -1 or side>1: return false
 		if row.transforms.size()!=count*6 or row.colors.size()!=count or row.flags.size()!=count: return false
 		if visuals[row.visual_id].role==6 and visuals[row.visual_id].get("biting",false):
 			if not row.get("biter") is Dictionary: return false
@@ -550,7 +561,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	for row: Dictionary in rows:
 		if perf.active:
 			packed_bytes+=row.ids.size()*8+row.transforms.size()*4+row.colors.size()*16+row.flags.size()*4
-			for key in ["gunner","beamer","missile","battleship","sniper","glows"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
+			for key in ["gunner","beamer","missile","battleship","sniper","glows","ruler_sides"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
 			if row.has("biter"):
 				for key in row.biter: packed_bytes+=row.biter[key].size()*4
 		if visuals[row.visual_id].role==6:
@@ -726,6 +737,10 @@ func apply_frame(frame: Dictionary) -> bool:
 		_gravity_canvas.queue_redraw()
 	if frame.has("boss_techniques"): _boss_technique_visual.apply_frame(frame.boss_techniques)
 	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
+	var ruler: PackedFloat64Array=frame.get("ruler",PackedFloat64Array())
+	if ruler!=_ruler:
+		_ruler=ruler
+		_gunner_marks.queue_redraw()
 	var triangle_star: PackedFloat64Array = frame.get("triangle_star",PackedFloat64Array())
 	if triangle_star!=_triangle_star:
 		_triangle_star=triangle_star
@@ -770,6 +785,7 @@ func apply_frame(frame: Dictionary) -> bool:
 func receive_frame(frame: Dictionary) -> bool:
 	if frame.epoch!=_epoch:
 		_epoch = frame.epoch
+		ruler_shake=0.0
 		_queued_events.clear()
 		_mutiny_beams.clear()
 		_flashes = ShotFlashes.new()
@@ -970,6 +986,10 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"rock_break":
 			_burst(event.pos,event.color,10,300.0,event.dir)
 			_rings.append({"pos":event.pos,"radius":event.r*1.2,"color":Color(1.0,0.95,0.6),"life":0.2,"max":0.2})
+		if event.type==&"ruler_split":
+			ruler_shake=maxf(ruler_shake,4.0)
+			_rings.append({"pos":event.pos,"radius":46.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
+			_burst(event.pos,event.color,10,260.0)
 		if event.type==&"cepheus_summon":
 			_rings.append({"pos":event.pos,"radius":70.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
 		if event.type==&"beam":

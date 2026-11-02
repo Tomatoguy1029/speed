@@ -1703,6 +1703,88 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "RulerDefinition",
+      "section": 113,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "split_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "emit_back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_len",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_start_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}
