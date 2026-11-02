@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cmath>
+#include <limits>
 #include <unordered_set>
 namespace speed {
 std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByteArray &bytes) {
@@ -147,6 +148,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (const auto &body:bundle->field_bodies) if (body.radius<=0) return {};
     if (records.GravityDefinition_rows.size()!=1 || records.GravityDefinition_rows.front().life<=0) return {};
     bundle->gravity=records.GravityDefinition_rows.front();
+    if (records.WarpDefinition_rows.size()!=1) return {};bundle->warp=records.WarpDefinition_rows.front();
+    for (double value:{bundle->warp.radius,bundle->warp.life,bundle->warp.bonus_time}) if (!std::isfinite(float(value))) return {};
     for (double value:{bundle->gravity.life,bundle->gravity.radius,bundle->gravity.pull}) if (!std::isfinite(float(value))) return {};
     bundle->rock_fields=records.RockFieldDefinition_rows;
     if (bundle->rock_fields.size()>1) return {};
@@ -273,6 +276,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     std::unordered_set<std::string> names;
     for (const auto &row:records.EnemyRecord_rows) {
+        if (row.id!=bundle->definitions.size()+1) return {};
         auto string=std::find_if(records.StringEntry_rows.begin(),records.StringEntry_rows.end(),[&](const auto &s){return s.id==row.id;});
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
@@ -399,6 +403,25 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (item_reticle!=bundle->reticles.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
+    if (records.PopulationDefinition_rows.size()!=1) return {};
+    bundle->population=records.PopulationDefinition_rows.front();const auto &pc=bundle->population;auto &timeline=bundle->population_timeline;
+    if (pc.refill_time<=0) return {};
+    timeline.boss_start=pc.boss_start;timeline.bonus_pop=pc.bonus_pop;timeline.density=pc.density;
+    std::unordered_set<std::string> phases;
+    for (const auto &row:records.PopulationPhase_rows) {
+        if (row.id!=timeline.phases.size()+1 || row.wave_type>bundle->definitions.size() || row.external_id.empty() || !phases.insert(row.external_id).second || (!timeline.phases.empty() && row.start<timeline.phases.back().start) || row.attack_budget>INT32_MAX) return {};
+        SpawnTimeline::Phase p;p.id=godot::String::utf8(row.external_id.c_str());p.start=row.start;p.pop_from=row.pop_from;p.pop_to=row.pop_to;p.rate=row.rate;p.xp_bonus=row.xp_bonus;p.budget=row.attack_budget;p.interval=row.surge_interval;p.pop=row.surge_pop;p.ranged=row.surge_ranged;p.elite=row.surge_elite;p.wave_interval=row.wave_interval;
+        if (row.wave_type) p.wave_type=bundle->definitions[row.wave_type-1].id;else if (row.wave_interval>0) return {};
+        timeline.phases.push_back(std::move(p));
+    }
+    if (pc.active && timeline.phases.empty()) return {};
+    for (const auto &row:records.PopulationMix_rows) timeline.phases[row.phase-1].mix.emplace_back(bundle->definitions[row.enemy-1].id,row.weight);
+    for (const auto &row:records.PopulationCurve_rows) {if (row.id!=timeline.curves.size()+1) return {};SpawnTimeline::Curve curve;curve.type=bundle->definitions[row.enemy-1].id;timeline.curves.push_back(std::move(curve));}
+    for (const auto &row:records.PopulationPoint_rows) {auto &points=timeline.curves[row.curve-1].points;if (!points.empty() && row.time<points.back().time) return {};points.push_back({row.time,row.value,row.slope});}
+    for (const auto &row:records.PopulationWindow_rows) {if (row.end!=-1 && row.end<row.start) return {};timeline.windows.emplace_back(row.start,row.end==-1?std::numeric_limits<double>::infinity():row.end);}
+    if (records.PopulationType_rows.size()!=bundle->definitions.size()) return {};
+    std::unordered_set<uint32_t> types;
+    for (const auto &row:records.PopulationType_rows) {if (!types.insert(row.enemy).second) return {};timeline.types.push_back({bundle->definitions[row.enemy-1].id,row.rank,row.maximum,row.ranged});}
     return bundle;
 }
 }

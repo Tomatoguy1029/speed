@@ -20,6 +20,190 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "PopulationPhase",
+      "section": 84,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "start",
+          "type": "f64"
+        },
+        {
+          "name": "pop_from",
+          "type": "f64"
+        },
+        {
+          "name": "pop_to",
+          "type": "f64"
+        },
+        {
+          "name": "rate",
+          "type": "f64"
+        },
+        {
+          "name": "xp_bonus",
+          "type": "f64"
+        },
+        {
+          "name": "surge_interval",
+          "type": "f64"
+        },
+        {
+          "name": "surge_pop",
+          "type": "f64"
+        },
+        {
+          "name": "surge_ranged",
+          "type": "f64"
+        },
+        {
+          "name": "surge_elite",
+          "type": "f64"
+        },
+        {
+          "name": "wave_interval",
+          "type": "f64"
+        },
+        {
+          "name": "attack_budget",
+          "type": "u32"
+        },
+        {
+          "name": "wave_type",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "PopulationMix",
+      "section": 85,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "phase",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationPhase"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "weight",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationCurve",
+      "section": 86,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "PopulationPoint",
+      "section": 87,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "curve",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationCurve"
+        },
+        {
+          "name": "time",
+          "type": "f64"
+        },
+        {
+          "name": "value",
+          "type": "f64"
+        },
+        {
+          "name": "slope",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationWindow",
+      "section": 88,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "start",
+          "type": "f64"
+        },
+        {
+          "name": "end",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationType",
+      "section": 89,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "rank",
+          "type": "f64"
+        },
+        {
+          "name": "maximum",
+          "type": "f64"
+        },
+        {
+          "name": "ranged",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "enums": {

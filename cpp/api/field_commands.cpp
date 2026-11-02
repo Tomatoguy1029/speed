@@ -9,6 +9,11 @@ bool radius(const Dictionary &p) {if (!p.has("radius")) return false;const auto 
 }
 Dictionary SpeedRunCore::development_field_command(const String &kind,const Dictionary &p) {
     if (!runtime.api_development) return reply(false);
+    if (kind=="dev_spawn_warp" && p.is_empty()) {speed::FieldSystem::spawn_warp(runtime);return reply(true);}
+    if (kind=="dev_set_warp") {
+        const Variant life=p.get("life",Variant());if (p.size()!=2 || !point(p,"position") || (life.get_type()!=Variant::FLOAT && life.get_type()!=Variant::INT) || !std::isfinite(double(life)) || double(life)<0 || !std::isfinite(runtime.state.world_time+double(life))) return reply(false);
+        runtime.state.field.warp_pos=p["position"];runtime.state.field.warp_gone=runtime.state.world_time+double(life);return reply(true);
+    }
     if (kind=="dev_spawn_well" && p.is_empty()) return reply(speed::FieldSystem::spawn_well(runtime));
     if (kind=="dev_add_well") {
         if (p.size()!=4 || !point(p,"position") || !radius(p)) return reply(false);
@@ -22,6 +27,7 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
     if (kind=="dev_field_query") {
         if (p.get("action",Variant()).get_type()!=Variant::STRING) return reply(false);
         const String action=p["action"];
+        if (action=="warp" && p.size()==1) {Dictionary warp;warp["position"]=runtime.state.field.warp_pos;warp["gone"]=runtime.state.field.warp_gone;return reply(true,warp);}
         if (action=="wells" && p.size()==1) {
             Array wells;for (const auto &well:runtime.state.field.wells) {Dictionary row;row["position"]=well.position;row["born"]=well.born;row["life"]=well.life;row["radius"]=well.radius;row["pull"]=well.pull;wells.append(row);}return reply(true,wells);
         }

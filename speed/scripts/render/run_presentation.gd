@@ -797,17 +797,18 @@ func _draw_field(c: CanvasItem) -> void:
 	for b in run.heroes.behavior(&"hercules").burns:
 		var flick := 0.8 + 0.2 * sin(state.world_time * 18.0 + b.x)
 		c.draw_circle(Vector2(b.x, b.y), 80.0 * flick, Color(1.0, 0.45, 0.1, 0.22 * minf(1.0, b.z)))
-	# ワープホール：回る輪
-	if f.warp_gone >= 0.0:
-		var wr := cfg.warp_radius
-		c.draw_circle(f.warp_pos, wr, Color(0.6, 0.3, 1.0, 0.25))
-		for n in 3:
-			var a0 := state.world_time * (2.0 + n) + n * 2.1
-			c.draw_arc(f.warp_pos, wr * (0.5 + 0.2 * n), a0, a0 + PI * 1.4, 24, Color(0.85, 0.7, 1.0, 0.8), _px(3.0))
+	if f.warp_gone>=0.0: draw_warp(c,f.warp_pos,cfg.warp_radius,state.world_time,_px(1.0))
 	for well in f.wells: draw_gravity(c,well.pos,well.born,well.life,well.radius,state.world_time,_px(1.0))
 	for b in f.bodies:
 		if view.grow(b.r).has_point(b.pos):
 			_body_visual.draw(c, b)
+
+## ワープの輪を旧ランと値型フレームで共用する。
+static func draw_warp(c: CanvasItem, position: Vector2, radius: float, now: float, pixel: float) -> void:
+	c.draw_circle(position,radius,Color(0.6,0.3,1.0,0.25))
+	for n in 3:
+		var start := now*(2.0+n)+n*2.1
+		c.draw_arc(position,radius*(0.5+0.2*n),start,start+PI*1.4,24,Color(0.85,0.7,1.0,0.8),pixel*3.0)
 
 ## 重力の渦を、旧ランと値型フレームで共用する。
 static func draw_gravity(c: CanvasItem, position: Vector2, born: float, life: float, radius: float, now: float, pixel: float) -> void:

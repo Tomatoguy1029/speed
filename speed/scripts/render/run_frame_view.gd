@@ -36,6 +36,7 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _warp := {}
 var _gravity := {}
 var _gravity_canvas: DrawLayer
 var _reticle := PackedFloat32Array()
@@ -155,6 +156,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 
 	_gravity_canvas = DrawLayer.new()
 	_gravity_canvas.draw_fn = func(canvas: CanvasItem):
+		if _warp.get("gone",-1.0)>=0.0: RunPresentation.draw_warp(canvas,_warp.position,_warp.radius,_warp.time,1.0/maxf(_zoom,0.01))
 		var values: PackedFloat64Array = _gravity.get("wells",PackedFloat64Array())
 		for n in range(0,values.size(),5): RunPresentation.draw_gravity(canvas,Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],_gravity.time,1.0/maxf(_zoom,0.01))
 	_layer(1).add_child(_gravity_canvas)
@@ -259,6 +261,12 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
+	if frame.has("warp"):
+		var warp = frame.warp
+		if not warp is Dictionary or not warp.get("position") is Vector2 or not warp.position.is_finite(): return false
+		for key in ["gone","radius","time"]:
+			if not (warp.get(key) is float or warp.get(key) is int) or not is_finite(warp[key]): return false
+		if warp.radius<0.0: return false
 	if frame.has("gravity"):
 		var wells = frame.gravity
 		if not wells is Dictionary or not wells.get("wells") is PackedFloat64Array or wells.wells.size()%5!=0 or not (wells.get("time") is float or wells.get("time") is int) or not is_finite(wells.time): return false
@@ -568,6 +576,9 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Dictionary in _shape_displays.values():
 		display.node.visible = display.used
 		if display.circles!=display.previous_circles: display.node.queue_redraw()
+	if frame.has("warp") and frame.warp!=_warp:
+		_warp = frame.warp
+		_gravity_canvas.queue_redraw()
 	if frame.has("gravity") and frame.gravity!=_gravity:
 		_gravity = frame.gravity
 		_gravity_canvas.queue_redraw()

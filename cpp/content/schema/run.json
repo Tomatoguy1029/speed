@@ -946,14 +946,68 @@
     {
       "name": "PopulationDefinition",
       "section": 8,
-      "enabled": false,
       "fields": [
         {
           "name": "id",
           "type": "u32",
           "min": 1
+        },
+        {
+          "name": "active",
+          "type": "bool"
+        },
+        {
+          "name": "density",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bonus_pop",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boss_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recycle_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "region_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "margin",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "field_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "planet_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "total_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "refill_time",
+          "type": "f64",
+          "min": 0
         }
-      ]
+      ],
+      "version": 2
     },
     {
       "name": "FormationDefinition",

@@ -1217,6 +1217,8 @@ func _draw_cpp() -> void:
 	_draw_bar(EXPERIENCE,_experience_fill,float(_cpp_ui.get("xp",0.0))/maxf(1.0,float(_cpp_ui.get("next_xp",1.0))),Color("#b8a0ff"))
 	var seconds := int(_cpp_ui.run_time)
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
+	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
+		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
 	draw_set_transform(Vector2.ZERO)
 	_draw_cpp_gauge_ring()
 	_draw_banner()

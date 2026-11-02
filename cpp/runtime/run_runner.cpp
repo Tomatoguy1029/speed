@@ -12,6 +12,7 @@
 #include "../behaviors/traits/vortex.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
+#include "../systems/enemy_system.h"
 #include "../systems/pickup_system.h"
 #include "../api/run_core.h"
 #include <algorithm>
@@ -117,6 +118,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (state.pickups_ready && !core.step_pickups(wd)) return false;
     }
     state.ship_pos=state.ship.pos;
+    if (state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
     camera(core,dt,size);
     if (!core.check_run_end()) {
         if (state.loadout.ready) ProgressionSystem::open(core);
@@ -124,14 +126,14 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     }
     return true;
 }
+void RunRunner::enter_bonus(godot::SpeedRunCore &core) {
+    auto &s=core.runtime.state;s.control.bonus_remaining=core.runtime.content->warp.bonus_time;s.draw.gauge=1;
+    EnemySystem::clear_regular(core.runtime);AttackSystem::clear_hostile(s,AttackEndReason::BonusClear);
+    godot::Dictionary event;event["enter"]=true;event["pos"]=s.ship.pos;core.emit_event("bonus",event);
+}
 void RunRunner::leave_bonus(godot::SpeedRunCore &core) {
-    auto &state=core.runtime.state;
-    state.control.bonus_remaining=0;
-    // 現在移行済みの敵は通常敵。ボス・地形の除外は各登録型で接続する。
-    for (size_t row=0;row<state.enemies.size();++row) if (state.enemies[row].alive && !state.enemies[row].dead && !state.field.rock_handles.contains(state.enemies[row].rock)) {
-        state.enemies[row].dead=true;state.dead_rows.push_back(row);
-    }
-    AttackSystem::clear_bonus(state);AttackSystem::clear_hostile(state,AttackEndReason::BonusClear);
+    auto &state=core.runtime.state;state.control.bonus_remaining=0;
+    EnemySystem::clear_regular(core.runtime);AttackSystem::clear_hostile(state,AttackEndReason::BonusClear);
     godot::Dictionary event;event["enter"]=false;event["pos"]=state.ship.pos;core.emit_event("bonus",event);
 }
 }

@@ -69,6 +69,9 @@ struct ContentBundle {
     std::vector<MoonDefinition> moon_definitions;
     std::vector<RockFieldDefinition> rock_fields;
     GravityDefinition gravity;
+    WarpDefinition warp;
+    PopulationDefinition population;
+    SpawnTimeline population_timeline;
     std::vector<LoadoutDefinition> equipment;
     std::vector<LoadoutAsset> equipment_assets;
     std::vector<NumericTraitLevel> numeric_traits;

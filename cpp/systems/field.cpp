@@ -107,7 +107,7 @@ bool FieldSystem::validate(const godot::RunState &state,const ContentBundle &con
         if (state.enemy_handles.contains(rock.proxy) && !same_handle(state.enemies[rock.proxy.slot].rock,state.field.rock_handles.at(i))) return false;
     }
     for (const auto &w:state.field.wells) if (!w.position.is_finite() || !std::isfinite(w.born) || !std::isfinite(w.life) || w.life<=0 || !std::isfinite(w.radius) || w.radius<0 || !std::isfinite(w.pull) || w.pull<0) return false;
-    return std::isfinite(state.field.stream_t);
+    return state.field.warp_pos.is_finite() && std::isfinite(state.field.warp_gone) && std::isfinite(state.field.stream_t);
 }
 std::vector<SightBlocker> FieldSystem::sight_blockers(const RunRuntime &run,godot::Vector2 lens,double length) {
     std::vector<SightBlocker> out;const auto &state=run.state;
@@ -162,6 +162,22 @@ void FieldSystem::comet_gravity(RunRuntime &r,const DeathContext &death) {
     if (cause==Cause::None || cause==Cause::Wave || cause==Cause::Chain || cause==Cause::PumpBurst || cause==Cause::Marlin || cause==Cause::Collapse || !r.state.enemy_handles.contains(death.target)) return;
     const auto rock=r.state.enemies[death.target.slot].rock;if (!r.state.field.rock_handles.contains(rock)) return;const auto &source=r.state.field.rocks[rock.slot];
     if (source.kind!=RockKind::Comet || source.rare_weapon) return;const auto &p=r.content->gravity;add_well(r,death.corpse.pos,p.life,p.radius,p.pull);
+}
+
+void FieldSystem::spawn_warp(RunRuntime &r) {
+    auto &s=r.state;const auto &p=r.content->warp;
+    for (int attempt=0;attempt<8;++attempt) {
+        const auto u=godot::Vector2::from_angle(s.control.rng.randf()*godot::Math::TAU);
+        const double edge=std::min(s.view_half.x/std::max(double(std::abs(u.x)),0.001),s.view_half.y/std::max(double(std::abs(u.y)),0.001));
+        s.field.warp_pos=s.view_center+u*edge*0.8;
+        if (body_gap(r,s.field.warp_pos,p.radius)>50 && s.field.warp_pos.length()<s.ship_config.field_radius-200) break;
+    }
+    s.field.warp_gone=s.world_time+p.life;
+}
+bool FieldSystem::take_warp(RunRuntime &r) {
+    auto &s=r.state;if (s.field.warp_gone<0) return false;if (s.world_time>=s.field.warp_gone) {s.field.warp_gone=-1;return false;}
+    const double reach=r.content->warp.radius+s.ship_config.ship_radius;if (s.ship.pos.distance_squared_to(s.field.warp_pos)>reach*reach) return false;
+    s.field.warp_gone=-1;return true;
 }
 
 }

@@ -111,6 +111,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
         speed::AttackBudgetSystem::set_mode(state,true,true);
         speed::PopulationSystem::sync_attack_budget(candidate->runtime);
     }
+    speed::PopulationSystem::prepare(candidate->runtime);
     runtime=std::move(candidate->runtime);
     PackedByteArray digest;digest.resize(32);std::copy(runtime.content->payload_sha256.begin(),runtime.content->payload_sha256.end(),digest.ptrw());
     Dictionary value;value["bundle_hash"]=digest.hex_encode();value["epoch"]=runtime.epoch;return success(value);
@@ -316,7 +317,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_fire_beam" || kind=="dev_move_beam" || kind=="dev_fire_cross" || kind=="dev_fire_flood") response=development_beam_command(kind,payload);
     else if (kind=="dev_fire_enemy" || kind=="dev_fire_missile" || kind=="dev_stone_hostiles") response=development_hostile_command(kind,payload);
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
-    else if (kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
+    else if (kind=="dev_spawn_warp" || kind=="dev_set_warp" || kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
     else if (kind=="dev_contact") response=development_contact_command(payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);
@@ -347,7 +348,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["ship_radius"]=runtime.state.ship_config.ship_radius;
     ui["max_speed"]=runtime.state.ship_config.max_speed;ui["steer_cruise"]=runtime.state.ship_config.steer_cruise;
     ui["ship_vel"]=runtime.state.ship.vel;ui["tracing"]=runtime.state.draw.tracing;ui["ship_boost_t"]=runtime.state.ship.boost_t;ui["glide"]=runtime.state.ship.glide;
-    ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
+    ui["bonus_remaining"]=control.bonus_remaining;ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
     Array voices;
     const auto &state=runtime.state;
     if (state.phase!=Phase::Finishing && state.phase!=Phase::Ended) for (size_t group=0;group<state.behavior_rows.size();++group) {

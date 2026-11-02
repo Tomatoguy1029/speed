@@ -10,6 +10,11 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-warp" in OS.get_cmdline_user_args():
+		await check_cpp_warp()
+		print("[cpp_warp] %d failures" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-gravity" in OS.get_cmdline_user_args():
 		await check_cpp_gravity()
 		print("[cpp_gravity] %d failures" % failed)
@@ -614,4 +619,137 @@ func check_cpp_gravity() -> void:
 		check(bridge.command("dev_field_query",{"action":"wells"}).value.size()==count,"敵の波の破壊では増やさず機体側の彗星撃破で重力を一つ残す")
 	bridge.release_checkpoint(pending.value)
 	lab.free()
+	session.free()
+
+func warp_attacks(bridge, core, at: Vector2) -> void:
+	check(core.spawn_hostile({"kind":0,"pos":at,"vel":Vector2.ZERO,"speed":0.0,"r":2.0,"life":10.0,"dmg":1.0,"slow":0.0,"turn":0.0})>=0,"突入と終了の直前に敵弾を残す")
+	check(bridge.command("dev_fire_wall",{"position":at,"angle":0.0,"length":50.0,"width":10.0,"delay":0.0,"active":10.0,"damage":1.0}).ok,"突入と終了の直前に敵の帯を残す")
+
+func check_cpp_warp() -> void:
+	var phase_only := "--cpp-warp-card-phase" in OS.get_cmdline_user_args()
+	mute_checks = "--cpp-warp-card" in OS.get_cmdline_user_args() or phase_only
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 1200.0
+	cfg.planet_radius = 0.0
+	cfg.world_tick_div = 1
+	cfg.levelup_bonus_chance = 0.0
+	cfg.levelup_bonus_more = 0.0
+	cfg.levelup_bonus_last = 0.0
+	cfg.bonus_time = 0.05
+	cfg.bonus_pop = 6.0
+	cfg.density_mult = 1.0
+	cfg.spawn_refill_time = 0.01
+	cfg.warp_radius = 30.0
+	cfg.warp_life = 0.1
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 83
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter","pulser","lynx","hydra_bite"])
+	stage.enemy_tuning = {"pulser":{"speed":0.0}}
+	var phase := PhaseDef.new()
+	phase.id = &"warp_test"
+	phase.pop_from = 4.0
+	phase.pop_to = 4.0
+	phase.rate = 120.0
+	phase.xp_bonus = 1.0
+	phase.attack_budget = 0
+	phase.mix = {&"drifter":2.0,&"pulser":1.0,&"lynx":1.0}
+	stage.phases = [phase]
+	for pair in [[&"drifter",2.0],[&"pulser",1.0],[&"lynx",1.0]]:
+		var curve := SpawnCurve.new()
+		curve.type = pair[0]
+		curve.points = PackedVector2Array([Vector2(0,pair[1]),Vector2(10,pair[1])])
+		stage.zako_curves.append(curve)
+	var output := "res://.content/dev/run_warp"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"ワープとボーナスの補充".sha256_text())
+	check(built==OK,"ワープと既存配分の時間帯・曲線を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_83.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":835},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"ワープのあるランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	fixed_step(bridge)
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	core.set_motion_context(target,target,Vector2(640,360))
+	var position := target-Vector2(300,0)
+	var ordinary: int = core.spawn_enemy(&"drifter",position,{})
+	var boss: int = core.spawn_enemy(&"drifter",position,{"is_boss":true})
+	var child: int = bridge.command("dev_spawn_part",{"parent_id":boss,"definition_id":"hydra_bite","position":position+Vector2(10,0)}).value
+	for entity in [ordinary,boss,child]: core.set_enemy_motion(entity,{"held":true})
+	bridge.command("dev_add_rock",{"position":position+Vector2(0,200),"kind":0,"manual":true})
+	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
+	var rock: int = bridge.command("dev_field_query",{"action":"rocks"}).value[0].enemy_id
+	var waiting: int = core.spawn_enemy(&"pulser",position,{})
+	core.set_enemy_motion(waiting,{"fire_t":0.0})
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.step(0.01)
+	check(not core.attack_budget_snapshot().waiting.is_empty(),"攻撃の予算待ちを突入前に残す")
+	var friendly: Dictionary = bridge.command("dev_emit_attack",{"pool":0,"position":target+Vector2(1000,0),"velocity":Vector2.ZERO,"life":10.0,"damage":1.0,"radius":2.0,"policies":33})
+	var friend_id: int = friendly.value.id
+	warp_attacks(bridge,core,target+Vector2(1000,0))
+	check(bridge.command("dev_set_warp",{"position":target,"life":0.1}).ok,"機体が触れる位置にワープを置く")
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,400),Vector2(1600,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(frame.warp.gone>frame.warp.time and frame.warp.radius==30.0 and presentation.frame_view.apply_frame(frame),"回る三本のワープの輪を通常画面へ表示する")
+	await get_tree().process_frame
+	var before_entry: Dictionary = bridge.checkpoint()
+	fixed_step(bridge)
+	var clock: float = core.inspect().time
+	check(is_equal_approx(core.inspect().bonus_remaining,0.05) and bridge.command("dev_field_query",{"action":"warp"}).value.gone<0.0,"接触を一度だけ受け取りボーナスへ入る")
+	check(gravity_enemy(core,ordinary).dead and gravity_enemy(core,waiting).dead and not gravity_enemy(core,boss).dead and not gravity_enemy(core,child).dead and not gravity_enemy(core,rock).dead,"通常敵だけを掃除してボス・存命ボス部位・岩を保つ")
+	check(core.hostiles_snapshot().is_empty() and core.hazards_snapshot().is_empty() and core.attack_budget_snapshot().waiting.is_empty(),"敵弾・残る帯・消えた敵の予算待ちを掃除する")
+	check(core.attack_snapshot().any(func(item): return item.id==friend_id and item.pool==0) and bridge.read_frame().value.ui.draw.gauge==1.0,"味方弾を保ちゲージを回復する")
+	var bonus: Dictionary = core.spawn_target(clock,true)
+	var normal: Dictionary = core.spawn_target(clock,false)
+	check(bonus.pop==6.0 and bonus.per_type.get(&"drifter")==4.0 and bonus.per_type.get(&"pulser")==2.0 and not bonus.per_type.has(&"lynx") and normal.per_type.has(&"lynx"),"既存曲線の比率を保ち雑魚と硬めだけのボーナス配分へ切り替える")
+	core.set_population_mode(true,false,false)
+	fixed_step(bridge)
+	var fresh: Array = core.enemies_snapshot().filter(func(enemy): return enemy.id not in [boss,child,rock] and not enemy.dead)
+	check(not fresh.is_empty() and fresh.all(func(enemy): return enemy.type in ["drifter","pulser"]),"通常Runnerが生成済みの配分でボーナスを補充する")
+	check(core.inspect().time==clock and core.inspect().bonus_remaining<0.05,"ボーナス中はラン時計を止め残り秒だけを進める")
+	var pending: Dictionary = bridge.checkpoint()
+	mute_checks = phase_only
+	var xp_ui: Dictionary = bridge.read_frame().value.ui
+	check(is_equal_approx(xp_ui.bonus_remaining,core.inspect().bonus_remaining),"ボーナス残り秒を通常HUDへ渡す")
+	await get_tree().process_frame
+	check(is_equal_approx(session.view.get_node("Hud/HudRoot")._cpp_ui.bonus_remaining,xp_ui.bonus_remaining),"通常HUDがボーナス残り秒を表示に受け取る")
+	bridge.command("dev_add_xp",{"amount":xp_ui.next_xp-xp_ui.xp})
+	fixed_step(bridge)
+	var ui: Dictionary = bridge.read_frame().value.ui
+	mute_checks = false
+	check(ui.phase==RunState.Phase.LEVELUP and ui.cards.offer_id>0,"ボーナス中もレベルアップのカード待ちへ入る")
+	mute_checks = phase_only
+	var paused_time: float = core.inspect().world_time
+	var paused_bonus: float = core.inspect().bonus_remaining
+	fixed_step(bridge)
+	check(core.inspect().time==clock and core.inspect().world_time==paused_time and core.inspect().bonus_remaining==paused_bonus,"カード待ち中は世界時計とボーナス残り秒も止める")
+	mute_checks = "--cpp-warp-card" in OS.get_cmdline_user_args() or phase_only
+	check(bridge.restore(pending.value).ok,"ワープ後のボーナス時計と配分を値から復帰する")
+	warp_attacks(bridge,core,target+Vector2(1000,0))
+	for tick in 8:
+		fixed_step(bridge)
+		if core.inspect().bonus_remaining==0.0: break
+	check(core.inspect().bonus_remaining==0.0 and core.inspect().time==clock,"期限でボーナスを終え通常のラン時計へ戻す")
+	check(core.hostiles_snapshot().is_empty() and core.hazards_snapshot().is_empty() and core.attack_snapshot().any(func(item): return item.id==friend_id),"終了時も敵攻撃だけを消し味方弾を保つ")
+	fresh = core.enemies_snapshot().filter(func(enemy): return enemy.id not in [boss,child,rock] and not enemy.dead)
+	check(not fresh.is_empty() and core.spawn_target(clock,false).per_type.has(&"lynx"),"終了した同じ世界更新で通常配分の補充を再開する")
+	fixed_step(bridge)
+	check(core.inspect().time>clock,"通常へ戻った次の更新でラン時計を進める")
+	check(bridge.restore(before_entry.value).ok,"未取得のワープと残留攻撃へ値から復帰する")
+	bridge.command("dev_ship_motion",{"position":target+Vector2(500,0),"velocity":Vector2.ZERO})
+	core.step(0.2)
+	fixed_step(bridge)
+	check(core.inspect().bonus_remaining==0.0 and bridge.command("dev_field_query",{"action":"warp"}).value.gone<0.0,"期限切れのワープには入らない")
+	bridge.release_checkpoint(pending.value)
+	bridge.release_checkpoint(before_entry.value)
 	session.free()

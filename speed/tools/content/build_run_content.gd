@@ -34,6 +34,8 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	row.sprite_angle = PI/2.0 if definition.id in EnemyDef.NATIVE_SPRITES else -PI/2.0
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
+	data.PopulationDefinition = [{"id":1,"active":false,"density":config.density_mult,"bonus_pop":config.bonus_pop,"boss_start":0.0,"recycle_scale":config.spawn_recycle_scale,"region_cap":config.spawn_region_cap,"margin":config.spawn_margin,"field_radius":config.field_radius,"planet_radius":config.planet_radius,"total_cap":config.spawn_total_cap,"refill_time":config.spawn_refill_time}]
+	data.WarpDefinition = [{"id":1,"radius":config.warp_radius,"life":config.warp_life,"bonus_time":config.bonus_time}]
 	data.GravityDefinition = [{"id":1,"life":config.gravity_life,"radius":config.gravity_radius,"pull":config.gravity_pull}]
 	data.RunConfig = [{"id":1,"aim_lag":resolved.motion.aim_lag,"aim_speed":resolved.motion.aim_speed,"crystal_low":config.xp_crystal_values[0],"crystal_mid":config.xp_crystal_values[1],"crystal_high":config.xp_crystal_values[2]}]
 	for field in Schema.SCHEMA.records[0].fields:
@@ -77,6 +79,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.EnemyRecord = [row]
+	data.PopulationType = [{"id":1,"enemy":1,"rank":definition.rank,"maximum":definition.max_alive,"ranged":definition.ranged}]
 	if definition.behavior in [&"biter",&"hound"]:
 		var visual_scene := "res://scenes/attacks/zone_biter.tscn"
 		var visual: Node = load(visual_scene).instantiate()
@@ -565,6 +568,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.ContactDefinition = resolved.ContactDefinition
 		data.BeamDefinition = resolved.BeamDefinition
 		data.WaveDefinition = resolved.WaveDefinition
+		data.PopulationDefinition = resolved.PopulationDefinition
+		data.PopulationType.append({"id":row.id,"enemy":row.id,"rank":definition.rank,"maximum":definition.max_alive,"ranged":definition.ranged})
+		data.WarpDefinition = resolved.WarpDefinition
 		data.GravityDefinition = resolved.GravityDefinition
 		data.WallDefinition = resolved.WallDefinition
 		data.SlashDefinition = resolved.SlashDefinition
@@ -683,6 +689,26 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			visuals.append({"id":key,"role":0,"path":path,"rect":Rect2(size*damage,0.0,size,size)})
 			terrain["meteor_visual_%d" % (variant*3+damage)] = key
 	data.RockFieldDefinition = [terrain]
+	if not stage.phases.is_empty():
+		data.PopulationDefinition[0].active = true
+		data.PopulationDefinition[0].boss_start = stage.boss_start(config)
+		var enemy_indices := {}
+		for enemy in data.StringEntry: enemy_indices[StringName(enemy.value)] = enemy.id
+		for phase: PhaseDef in stage.phases:
+			var phase_row := {"id":data.PopulationPhase.size()+1,"external_id":String(phase.id),"start":phase.start,"pop_from":phase.pop_from,"pop_to":phase.pop_to,"rate":phase.rate,"xp_bonus":phase.xp_bonus,"attack_budget":phase.attack_budget,"wave_interval":phase.wave_interval,"wave_type":enemy_indices.get(phase.wave_type,0)}
+			if phase.wave_interval>0.0 and phase_row.wave_type==0: return ERR_UNAVAILABLE
+			for key in ["surge_interval","surge_pop","surge_ranged","surge_elite"]: phase_row[key] = phase.surge_value(key,config)
+			data.PopulationPhase.append(phase_row)
+			for enemy in phase.mix:
+				if not enemy_indices.has(StringName(enemy)): return ERR_UNAVAILABLE
+				data.PopulationMix.append({"id":data.PopulationMix.size()+1,"phase":phase_row.id,"enemy":enemy_indices[StringName(enemy)],"weight":float(phase.mix[enemy])})
+		for curve: SpawnCurve in stage.zako_curves:
+			if not enemy_indices.has(curve.type): return ERR_UNAVAILABLE
+			var curve_row := {"id":data.PopulationCurve.size()+1,"enemy":enemy_indices[curve.type]}
+			data.PopulationCurve.append(curve_row)
+			for n in curve.points.size(): data.PopulationPoint.append({"id":data.PopulationPoint.size()+1,"curve":curve_row.id,"time":curve.points[n].x,"value":curve.points[n].y,"slope":SpawnCurve._slope(curve.points,n) if curve.points.size()>1 else 0.0})
+		for window in stage.surge_windows(config): data.PopulationWindow.append({"id":data.PopulationWindow.size()+1,"start":window.x,"end":window.y if is_finite(window.y) else -1.0})
+
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")

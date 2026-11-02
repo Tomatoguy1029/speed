@@ -12,6 +12,8 @@ public:
     static void initialize(RunRuntime &);
     static bool add_well(RunRuntime &,godot::Vector2,double life,double radius,double pull);
     static bool spawn_well(RunRuntime &);
+    static void spawn_warp(RunRuntime &);
+    static bool take_warp(RunRuntime &);
     static void step_gravity(RunRuntime &,double);
     static void comet_gravity(RunRuntime &,const DeathContext &);
     static void update(RunRuntime &);

@@ -1,5 +1,6 @@
 #include "enemy_system.h"
 #include "attack_system.h"
+#include "attack_budget.h"
 #include "group_system.h"
 #include "pickup_system.h"
 #include "tracking_policy.h"
@@ -102,6 +103,13 @@ EnemyHandle EnemySystem::insert(godot::RunState &state, uint32_t slot, const god
 }
 void EnemySystem::leave_hound(godot::RunState &state,size_t row) {
     GroupSystem::leave(state,state.enemy_handles.at(uint32_t(row)));
+}
+void EnemySystem::clear_regular(RunRuntime &run) {
+    auto &state=run.state;AttackBudgetSystem budget(run);
+    for (uint32_t row=0;row<state.enemies.size();++row) {
+        const auto &e=state.enemies[row];if (!e.alive || e.dead || e.is_boss || state.field.rock_handles.contains(e.rock) || (state.enemy_handles.contains(e.parent) && state.enemies[e.parent.slot].is_boss && !state.enemies[e.parent.slot].dead)) continue;
+        const auto owner=AttackBudgetSystem::owner(state,e.id,e.attack_group);budget.cancel(owner,e.id);mark_dead(run,state.enemy_handles.at(row));
+    }
 }
 bool EnemySystem::mark_dead(RunRuntime &run,EnemyHandle handle) {
     auto &state=run.state;if (!state.enemy_handles.contains(handle) || state.enemies[handle.slot].dead) return false;
