@@ -42,7 +42,7 @@ const BossBodyState *PhaseController::find(const RunRuntime &r,EnemyHandle actor
 bool PhaseController::can_start(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,actor) && t.reposition>0) return false;const auto *body=find(r,actor);return !body || (body->mode==BossMode::Idle && body->draco.cycle.stage==DracoCycleStage::None && body->draco.closing_walls.empty() && body->initial_wait<=0 && (!body->phase_pending || r.content->bosses[r.content->boss_bodies[body->definition-1].boss-1].kind==1) && !body->centaurus.leaping);}
 bool PhaseController::automatic(RunRuntime &r) {
     auto &s=r.state;auto &c=s.control;
-    if (c.lab_mode || r.content->stage_boss.empty()) return true;
+    if (r.content->stage_boss.empty() || (c.lab_mode && s.world.boss_spawned)) return true;
     const auto &p=r.content->stage_boss.front();
     if (c.boss_at<0) {c.boss_at=p.start;if (p.spread>0) c.boss_at+=c.rng.randf()*p.spread;}
     if (s.lifecycle.endless || s.world.boss_spawned || s.time<c.boss_at) return true;

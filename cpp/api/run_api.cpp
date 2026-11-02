@@ -122,6 +122,7 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.lifecycle.endless=options.get("endless",false);
     state.control.lab_mode=options.get("lab_mode",false);
     state.population.frame_enabled=state.population.ready && !state.control.lab_mode;
+    if (state.control.lab_mode) state.world.boss_spawned=true;
     state.frame_ready=true;
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
     if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
