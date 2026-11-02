@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/systems/progression.h"
+#include "../cpp/systems/pickup_system.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -45,9 +46,9 @@ bool SpeedRunCore::configure_pickups(const Dictionary &config, const Dictionary 
 Dictionary SpeedRunCore::pickups_snapshot() const {
     Array visible_gems, visible_coins;
     for (const auto &gem : runtime.state.pickups.gems) if (gem.alive) {
-        Dictionary row; row["pos"] = gem.pos; row["value"] = gem.value; row["seq"] = gem.seq; row["pulled"] = gem.pulled;
+        Dictionary row; row["pos"] = gem.pos; row["value"] = gem.value; row["seq"] = gem.order; row["pulled"] = gem.pulled;
         if (runtime.state.pickup_config.fixed_rewards) {
-            row["id"]=int64_t(gem.id);row["kind"]=int(gem.kind);row["base_xp"]=gem.value;row["velocity"]=gem.velocity;row["wait"]=gem.wait;
+            row["ground_order"]=int64_t(gem.order);row["id"]=int64_t(gem.id);row["kind"]=int(gem.kind);row["base_xp"]=gem.value;row["velocity"]=gem.velocity;row["wait"]=gem.wait;
             Dictionary origin;origin["source"]=gem.origin.source==speed::CrystalSource::Enemy?"enemy":gem.origin.source==speed::CrystalSource::StrongGold?"strong_gold":"direct";
             origin["enemy"]=gem.origin.definition?runtime.content->definitions[gem.origin.definition-1].id:StringName();origin["enemy_id"]=gem.origin.enemy_id;
             origin["spawn_t"]=gem.origin.run_time;origin["spawn_world_t"]=gem.origin.world_time;row["origin"]=origin;
@@ -60,9 +61,13 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
     Array capsules;for (const auto &capsule:runtime.state.pickups.capsules) {Dictionary row;row["kind"]=int(capsule.kind);row["pos"]=capsule.pos;row["age"]=capsule.age;row["weapon"]=capsule.weapon;row["drop"]=capsule.drop;capsules.push_back(row);}
     Dictionary out;out["capsules"]=capsules;out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.pickups.xp_dropped;
     if (runtime.state.pickup_config.fixed_rewards) {
-        Dictionary stats;Array supplied;
-        for (const auto &total:runtime.state.pickups.supplied) {Dictionary value;value["count"]=int64_t(total.count);value["base_xp"]=total.base_xp;supplied.push_back(value);}
-        stats["supplied"]=supplied;stats["gold_rolls"]=int64_t(runtime.state.pickups.gold_rolls);stats["gold_won"]=int64_t(runtime.state.pickups.gold_won);out["xp_statistics"]=stats;
+        const auto totals=[](const std::array<speed::CrystalTotal,3> &source) {
+            Array values;for (const auto &total:source) {Dictionary value;value["count"]=int64_t(total.count);value["base_xp"]=total.base_xp;values.push_back(value);}return values;
+        };
+        Dictionary stats;stats["supplied"]=totals(runtime.state.pickups.supplied);stats["collected"]=totals(runtime.state.pickups.collected);stats["lost"]=totals(runtime.state.pickups.lost);
+        stats["gold_rolls"]=int64_t(runtime.state.pickups.gold_rolls);stats["gold_won"]=int64_t(runtime.state.pickups.gold_won);out["xp_statistics"]=stats;
+        out["absorber_id"]=int64_t(runtime.state.pickups.gem_absorber_id);out["next_ground_order"]=int64_t(runtime.state.pickups.next_ground_order);
+
     }
     return out;
 }
@@ -98,9 +103,7 @@ bool SpeedRunCore::step_pickups(double world_dt) {
         }
         if (distance < reach) {
             collect_pickup("gem", gem.value);
-            gem.alive = false;
-            runtime.state.pickups.free_gems.push_back(row);
-            --runtime.state.pickups.live_gems;
+            speed::PickupSystem::release_crystal(runtime,row,speed::CrystalRemoval::Collected);
         }
     }
     const double coin_radius = runtime.state.pickup_config.coin_radius * 1.3;

@@ -600,7 +600,7 @@
           "config": "enemy_face_move"
         }
       ],
-      "version": 6
+      "version": 7
     },
     {
       "name": "StringEntry",
@@ -1540,6 +1540,14 @@
       {
         "name": "GemBurst",
         "value": "gem_burst"
+      },
+      {
+        "name": "CrystalAbsorb",
+        "value": "xp_absorb"
+      },
+      {
+        "name": "CrystalAbsorber",
+        "value": "xp_absorber"
       }
     ],
     "ResultKind": [
@@ -1840,6 +1848,32 @@
     "gem_burst": [
       "pos",
       "r"
+    ],
+    "xp_absorb": [
+      "id",
+      "kind",
+      "base_xp",
+      "source",
+      "enemy",
+      "enemy_id",
+      "spawn_t",
+      "spawn_world_t",
+      "new_supply",
+      "target_id",
+      "target_kind",
+      "before_base_xp",
+      "after_base_xp",
+      "requested_pos",
+      "ground_count"
+    ],
+    "xp_absorber": [
+      "reason",
+      "id",
+      "previous_id",
+      "before_kind",
+      "after_kind",
+      "before_base_xp",
+      "after_base_xp"
     ]
   },
   "includes": [

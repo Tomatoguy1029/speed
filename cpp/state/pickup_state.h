@@ -10,13 +10,13 @@ enum class CrystalSource : uint8_t { Direct,Enemy,StrongGold };
 struct CrystalOrigin {
     CrystalSource source=CrystalSource::Direct;
     uint32_t definition=0;
-    int64_t enemy_id=0;
+    int64_t enemy_id=-1;
     double run_time=0,world_time=0;
 };
 struct CrystalState {
     godot::Vector2 pos;
     double value=0;
-    int64_t seq=0;
+    uint64_t order=0;
     bool alive=false,pulled=false;
     uint8_t kind=0;
     uint64_t id=0;
@@ -33,9 +33,10 @@ struct PickupState {
     std::vector<CoinState> coins;
     std::vector<CapsuleState> capsules;
     std::vector<size_t> free_gems,free_coins;
-    std::vector<std::pair<size_t,int64_t>> gem_queue;
+    std::vector<std::pair<size_t,uint64_t>> gem_queue;
     size_t gem_queue_head=0;
-    int64_t next_gem_seq=0,live_gems=0,gem_absorber=-1,gem_absorber_seq=-1;
+    uint64_t next_ground_order=0,gem_absorber_id=0;
+    int64_t live_gems=0,gem_absorber=-1;
     double xp_dropped=0;
     uint64_t next_id=1,gold_rolls=0,gold_won=0;
     std::array<CrystalTotal,3> supplied{},collected{},lost{};

@@ -79,11 +79,23 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
         }
     }
+    std::unordered_set<uint64_t> crystal_ids,ground_orders;
+    int64_t live_crystals=0;
     for (const auto &gem:state.pickups.gems) if (gem.alive) {
-        if (!gem.id || gem.id>=state.pickups.next_id || gem.kind>2 || !std::isfinite(gem.value) || gem.value<0 ||
-            !gem.pos.is_finite() || !gem.velocity.is_finite() || !std::isfinite(gem.wait) || gem.wait<0 ||
+        ++live_crystals;
+        if (!gem.id || gem.id>=state.pickups.next_id || gem.order>=state.pickups.next_ground_order || gem.kind>2 || !std::isfinite(gem.value) || gem.value<0 ||
+            !crystal_ids.insert(gem.id).second || !ground_orders.insert(gem.order).second || !gem.pos.is_finite() || !gem.velocity.is_finite() || !std::isfinite(gem.wait) || gem.wait<0 ||
             gem.origin.definition>content.definitions.size()) return false;
     }
+    auto &pickups=state.pickups;
+    if (live_crystals!=pickups.live_gems || (state.pickup_config.fixed_rewards && live_crystals>state.pickup_config.gem_max)) return false;
+    // 行番号は索引。保持した集約先のIDから再構築する。
+    pickups.gem_absorber=-1;
+    for (size_t row=0;row<pickups.gems.size();++row) {
+        const auto &gem=pickups.gems[row];
+        if (gem.alive && gem.kind==2 && gem.id==pickups.gem_absorber_id) {pickups.gem_absorber=int64_t(row);break;}
+    }
+    if (pickups.gem_absorber<0) pickups.gem_absorber_id=0;
     if (!FieldSystem::validate(state,content)) return false;
     if (!GroupSystem::validate(state)) return false;
     return AttackSystem::rebuild(state);

@@ -6,8 +6,12 @@
 namespace speed {
 class RunRuntime;
 struct CrystalState;
+enum class CrystalRemoval;
 class EventBuilder {
 public:
+    static void crystal_absorber_selected(RunRuntime &,const CrystalState &,uint8_t before_kind);
+    static void crystal_absorber_released(RunRuntime &,uint64_t previous_id,CrystalRemoval);
+    static void crystal_absorbed(RunRuntime &,const CrystalState &incoming,const CrystalState &target,double before);
     static void crystal_drop(RunRuntime &,const CrystalState &);
     static void crystal_gold_roll(RunRuntime &,const Corpse &,bool won);
     static void crystal_burst(RunRuntime &,const Corpse &);

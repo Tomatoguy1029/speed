@@ -7,6 +7,7 @@
 #include "../systems/attack_budget.h"
 #include "../systems/enemy_system.h"
 #include "../systems/progression.h"
+#include "../systems/pickup_system.h"
 #include "../systems/equipment.h"
 #include "../systems/field.h"
 #include <godot_cpp/core/class_db.hpp>
@@ -154,6 +155,9 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=changed?success():failure(5,"equipment","装備を変更できません");
     } else if (kind=="dev_benchmark" && runtime.api_development && payload.size()==1 && is(payload,"leveling",Variant::BOOL)) {
         runtime.state.loadout.xp_gain_mult=bool(payload["leveling"])?1.0:0.0;response=success();
+    } else if (kind=="dev_drop_crystal" && runtime.api_development && payload.size()==2 && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite() && is(payload,"kind",Variant::INT) && int64_t(payload["kind"])>=0 && int64_t(payload["kind"])<=2) {
+        const uint64_t crystal=speed::PickupSystem::supply(runtime,payload["position"],uint8_t(int64_t(payload["kind"])));
+        response=crystal?success(int64_t(crystal)):failure(9,"crystal","結晶を供給できません");
     } else if (kind=="dev_add_xp" && runtime.api_development && payload.size()==1 && (is(payload,"amount",Variant::FLOAT) || is(payload,"amount",Variant::INT))) {
         response=speed::ProgressionSystem::add_experience(*this,payload["amount"])?success():failure(1,"amount","最終取得XPが不正です");
     } else if (kind=="abort" && payload.size()==1 && is(payload,"reason",Variant::INT)) {

@@ -6,6 +6,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-cap" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_cap()
+		check(finished,"上限集約の確認を最後まで実施する")
+		print("[cpp_cap] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-reward" in OS.get_cmdline_user_args() or "--cpp-reward-view" in OS.get_cmdline_user_args():
 		if "--cpp-reward-view" not in OS.get_cmdline_user_args(): await check_cpp_reward()
 		var finished: bool = await check_cpp_reward_view()
@@ -187,4 +193,81 @@ func check_cpp_reward_view() -> bool:
 		bridge.dispose()
 	await get_tree().process_frame
 	await get_tree().process_frame
+	return true
+
+func supply_crystal(bridge,position: Vector2,kind: int) -> int:
+	var result: Dictionary = bridge.command("dev_drop_crystal",{"position":position,"kind":kind})
+	check(result.ok,"実際の共通供給で結晶を置く")
+	return int(result.value) if result.ok else 0
+
+func base_total(rows: Array) -> float:
+	var result := 0.0
+	for row: Dictionary in rows: result+=float(row.get("value",row.get("base_xp",0.0)))
+	return result
+
+func check_cpp_cap() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.gem_max = 3
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	definition.rank = 1
+	definition.xp_reward_counts = PackedInt32Array([6,0,0])
+	var bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	var records: Array = []
+	bridge.subscribe("cap",func(frame):
+		records.append_array(frame.events)
+		return true)
+	var oldest: int = supply_crystal(bridge,Vector2(-2000,500),0)
+	var second: int = supply_crystal(bridge,Vector2(-1500,500),0)
+	var enemy: int = bridge._core.spawn_enemy(definition.id,Vector2(-1000,500))
+	check(bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"}).ok,"上限直前で複数個の固定報酬を供給する")
+	var full: Dictionary = bridge._core.pickups_snapshot()
+	check(full.gems.size()==3 and full.absorber_id==oldest,"黄色なしの満杯では最古の個体を集約先にする")
+	var target: Dictionary = full.gems.filter(func(gem): return gem.id==oldest)[0]
+	check(target.kind==2 and is_equal_approx(target.value,6.0*config.xp_crystal_values[0]),"元の保持XPを失わず黄色へ変えて余剰を足す")
+	check(is_equal_approx(base_total(full.gems),8.0*config.xp_crystal_values[0]),"まとめた個体数に関係なく供給した全基準XPを保つ")
+	check(records.any(func(event): return event.type==&"xp_absorber" and event.payload.reason==&"oldest_promoted" and event.payload.id==oldest),"集約先の変色と選択を記録する")
+	var random_before: String = bridge._core.inspect().rng_state
+	var incoming: int = supply_crystal(bridge,Vector2(-500,500),0)
+	var absorbed: Dictionary = bridge._core.pickups_snapshot()
+	check(bridge._core.inspect().rng_state==random_before and absorbed.next_ground_order==full.next_ground_order,"満杯では位置の散らしと地面の再配置を行わない")
+	check(absorbed.gems.size()==3 and absorbed.absorber_id==oldest and incoming>3,"供給IDと地面の配置順を独立して進める")
+	var absorption: Array = records.filter(func(event): return event.type==&"xp_absorb" and event.payload.id==incoming)
+	check(absorption.size()==1 and absorption[0].payload.target_id==oldest,"吸収元と指定先の別々のIDを記録する")
+	# 指定先を回収し、同じ行を再利用したあとも古いIDを指さない。
+	target = absorbed.gems.filter(func(gem): return gem.id==oldest)[0]
+	bridge.command("dev_ship_motion",{"position":target.pos,"velocity":Vector2.ZERO})
+	bridge._core.step_pickups(0.001)
+	var collected: Dictionary = bridge._core.pickups_snapshot()
+	check(collected.gems.size()==2 and collected.absorber_id==0,"指定先を回収した時点で集約先を解除する")
+	bridge.collect_frame()
+	check(records.any(func(event): return event.type==&"xp_absorber" and event.payload.reason==&"collected" and event.payload.previous_id==oldest),"指定先の回収による解除を記録する")
+	var replacement: int = supply_crystal(bridge,Vector2(-1000,900),0)
+	var replaced: Dictionary = bridge._core.pickups_snapshot()
+	var returned: Dictionary = replaced.gems.filter(func(gem): return gem.id==replacement)[0]
+	check(returned.ground_order==3 and returned.id>returned.ground_order,"再利用行にも新しいIDと地面配置順を与える")
+	supply_crystal(bridge,Vector2(-500,900),0)
+	var selected: Dictionary = bridge._core.pickups_snapshot()
+	check(selected.absorber_id==second,"次の超過では残った最古の結晶を選び直す")
+	check(is_equal_approx(base_total(selected.gems)+base_total(selected.xp_statistics.collected),base_total(selected.xp_statistics.supplied)),"回収済みと地面を合わせると全供給量が保存される")
+	var saved: Dictionary = bridge.checkpoint()
+	supply_crystal(bridge,Vector2(-500,900),1)
+	check(bridge.restore(saved.value).ok and bridge._core.pickups_snapshot()==selected,"指定先・配置順・供給量を保持して復帰する")
+	bridge.release_checkpoint(saved.value)
+	bridge.dispose()
+	# 最古の個体より新しくても、黄色がある場合は最古黄色を優先する。
+	bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	supply_crystal(bridge,Vector2(-2000,500),0)
+	var high: int = supply_crystal(bridge,Vector2(-1500,500),2)
+	supply_crystal(bridge,Vector2(-1000,500),2)
+	supply_crystal(bridge,Vector2(-500,500),0)
+	var result: Dictionary = bridge._core.pickups_snapshot()
+	check(result.absorber_id==high and result.gems.size()==3,"既存の最古黄色を優先し、全色を上限以内に保つ")
+	var high_row: Dictionary = result.gems.filter(func(gem): return gem.id==high)[0]
+	check(is_equal_approx(high_row.value,config.xp_crystal_values[2]+config.xp_crystal_values[0]),"黄色の保持量へ供給した基準XPだけを加算する")
+	bridge.dispose()
+
 	return true

@@ -145,7 +145,7 @@ bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) 
     if (runtime.state.frame_ready && (!runtime.state.ship_ready || !runtime.state.draw_ready || !runtime.state.combat_ready || !runtime.state.pickups_ready)) return false;
     for (const auto &def : runtime.content->definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) && (!runtime.state.ship_ready || !runtime.state.bite_zone_config.ready)) return false;
     runtime.state.next_id = first_id;
-    runtime.state.pickups.next_gem_seq = first_gem_seq;
+    runtime.state.pickups.next_ground_order = first_gem_seq;
     runtime.state.control.rng.set_seed(seed);
     runtime.state.started = true;
     return true;

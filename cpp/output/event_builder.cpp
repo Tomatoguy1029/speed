@@ -1,4 +1,5 @@
 #include "event_builder.h"
+#include "../systems/pickup_system.h"
 #include "../runtime/run_runtime.h"
 #include <algorithm>
 namespace speed {
@@ -136,6 +137,25 @@ void EventBuilder::crystal_gold_roll(RunRuntime &run,const Corpse &enemy,bool wo
 }
 void EventBuilder::crystal_burst(RunRuntime &run,const Corpse &enemy) {
     godot::Dictionary event;event["pos"]=enemy.pos;event["r"]=enemy.radius;FrameBuilder::append(run,"gem_burst",event);
+}
+
+void EventBuilder::crystal_absorber_selected(RunRuntime &run,const CrystalState &target,uint8_t before_kind) {
+    godot::Dictionary event;event["reason"]=godot::StringName(before_kind==2?"oldest_high":"oldest_promoted");event["id"]=int64_t(target.id);
+    event["before_kind"]=godot::StringName(before_kind==0?"low":before_kind==1?"mid":"high");event["after_kind"]=godot::StringName("high");
+    event["before_base_xp"]=target.value;event["after_base_xp"]=target.value;FrameBuilder::append(run,"xp_absorber",event);
+}
+void EventBuilder::crystal_absorber_released(RunRuntime &run,uint64_t previous_id,CrystalRemoval reason) {
+    godot::Dictionary event;event["reason"]=godot::StringName(reason==CrystalRemoval::Collected?"collected":reason==CrystalRemoval::Stored?"carried":reason==CrystalRemoval::Lost?"lost":"absorbed");
+    event["previous_id"]=int64_t(previous_id);event["id"]=-1;FrameBuilder::append(run,"xp_absorber",event);
+}
+
+void EventBuilder::crystal_absorbed(RunRuntime &run,const CrystalState &incoming,const CrystalState &target,double before) {
+    const auto &origin=incoming.origin;godot::Dictionary event;
+    event["id"]=int64_t(incoming.id);event["kind"]=godot::StringName(incoming.kind==0?"low":incoming.kind==1?"mid":"high");event["base_xp"]=incoming.value;
+    event["source"]=godot::StringName(origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
+    event["enemy"]=definition_name(run,origin.definition);event["enemy_id"]=origin.enemy_id;event["spawn_t"]=origin.run_time;event["spawn_world_t"]=origin.world_time;
+    event["new_supply"]=true;event["target_id"]=int64_t(target.id);event["target_kind"]=godot::StringName("high");event["before_base_xp"]=before;event["after_base_xp"]=target.value;
+    event["requested_pos"]=incoming.pos;event["ground_count"]=run.state.pickups.live_gems;FrameBuilder::append(run,"xp_absorb",event);
 }
 
 }
