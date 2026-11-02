@@ -42,7 +42,7 @@ void SonicBehavior::step(RunRuntime &r,double dt) {
         const double scale_knock=e.is_boss || (s.enemy_handles.contains(e.parent) && s.enemies[e.parent.slot].is_boss)?0:d.knockback;
         if (scale_knock>0) {e.pos+=h.velocity*dt*scale_knock;h.velocity*=decay;}
         if (!h.hit && h.age>=h.delay) {h.hit=true;DamageRequest request;request.struck=h.target;request.amount=h.damage;request.cause=Cause::Sonic;request.knock=0;CombatResolver::damage_enemy(r,request);
-            const auto &after=s.enemies[h.target.slot];const auto direction=h.velocity.normalized();w.visuals.push_back({w.next_visual++,h.id,after.pos,direction,s.world_time,true,after.dead});godot::Dictionary event;event["pos"]=after.pos;event["dir"]=direction;event["dead"]=after.dead;FrameBuilder::append(r,"sonic_impact",event);}
+            EventBuilder::flush_combat(r);const auto &after=s.enemies[h.target.slot];const auto direction=h.velocity.normalized();w.visuals.push_back({w.next_visual++,h.id,after.pos,direction,s.world_time,true,after.dead});godot::Dictionary event;event["pos"]=after.pos;event["dir"]=direction;event["dead"]=after.dead;FrameBuilder::append(r,"sonic_impact",event);}
     }
     w.pending.erase(std::remove_if(w.pending.begin(),w.pending.end(),[&](const auto &h){return h.age>=0.7 || !s.enemy_handles.contains(h.target) || s.enemies[h.target.slot].dead;}),w.pending.end());EventBuilder::flush_combat(r);
 }
