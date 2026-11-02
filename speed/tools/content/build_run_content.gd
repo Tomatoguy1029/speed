@@ -161,6 +161,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 				"pickup_bonus":trait_def.stack_bonus(level) if id=="T12" else 0.0,
 				"length_bonus":trait_def.stack_bonus(level) if id=="T14" else 0.0,
 				"glide_bonus":trait_def.stack_bonus(level) if id=="T31" else 0.0})
+	var gear := load("res://data/traits/T04_fullCharge.tres") as TraitDef
+	if gear==null: return {}
+	var gear_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":gear_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T04","comet_only":false})
+	for level in range(1,config.trait_max_stacks+1):
+		data.FullChargeDefinition.append({"id":level,"equipment":gear_id,"level":level,"multiplier":float(gear.params.mult_base)+float(gear.params.mult_per)*level})
 	var scatter := load("res://data/weapons/W02_scatter.tres") as WeaponDef
 	if scatter==null: return {}
 	var scatter_id: int = data.LoadoutDefinition.size()+1
@@ -232,6 +238,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":barrier_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":barrier_id,"asset":key})
+	var gear_entry: ContentEntry = ContentManager.catalog.find(&"traits",gear.id)
+	if gear_entry==null: return {}
+	for path in gear_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":gear_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":gear_id,"asset":key})
 	if config.planet_radius>0.0:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":9})
@@ -371,6 +384,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.RearPostDefinition = resolved.RearPostDefinition
 			data.BarrierDefinition = resolved.BarrierDefinition
 			data.BarrierPostDefinition = resolved.BarrierPostDefinition
+			data.FullChargeDefinition = resolved.FullChargeDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
 			data.LifecycleDefinition = resolved.LifecycleDefinition
 			for section in ["PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:

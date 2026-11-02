@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t04" in OS.get_cmdline_user_args():
+		await check_cpp_t04()
+		print("[cpp_t04] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-w05" in OS.get_cmdline_user_args() or "--cpp-w05-retry" in OS.get_cmdline_user_args():
 		await check_cpp_w05()
 		print("[cpp_w05] failed=%d" % failures)
@@ -1618,3 +1624,177 @@ func check_cpp_w05() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"バリアの状態・防御・命中・表示に実行エラーがない: %s" % [capture.messages()])
+
+func trait_test_session(id: String, config: GameConfig, seed_value: int):
+	var stage := RuntimeStage.new()
+	stage.index = 84
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_"+id
+	var builder = load("res://tools/content/build_run_content.gd")
+	check(builder.build(stage,config,output,(id+"の状態と表示").sha256_text())==OK,"行動特性の段ごとの値と資源を生成する")
+	var path := output.path_join("stage_84.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":seed_value},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"行動特性の通常の状態と表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return null
+	return session
+
+func trait_test_config() -> GameConfig:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.world_tick_div = 1
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	config.base_crit_chance = 0.0
+	return config
+
+func trait_start_trace(bridge, length: float, direction: Vector2 = Vector2.RIGHT) -> Vector2:
+	var pos: Vector2 = bridge._core.ship_snapshot().ship_pos
+	var input: Dictionary = bridge.pack_intent(Intent.new())
+	input.press = true
+	input.touch = true
+	input.pen = pos
+	check(bridge._core.handle_draw(input,1000,1.0),"実際の描線入力で開始する")
+	input.press = false
+	input.has_cursor = true
+	input.pen = pos+direction*length
+	input.pen_release = true
+	check(bridge._core.handle_draw(input,1010,1.0),"実際の描線を確定して発進する")
+	bridge.collect_frame()
+	return pos
+
+func trait_select_upgrade(session, id: String, config: GameConfig, idle: Dictionary, viewport: Dictionary) -> void:
+	var bridge = session.bridge
+	check(bridge.command("dev_add_xp",{"amount":bridge._ui.next_xp}).ok,"通常の特性選択に必要な経験値を得る")
+	bridge.step(1.0/120.0,idle,viewport)
+	var cards: Dictionary = bridge._ui.cards
+	var selected := {}
+	for attempt in config.reroll_count+1:
+		cards = bridge._ui.cards
+		print("[特性の通常候補] 特性=%s 引き直し=%d 候補=%s" % [id,attempt,cards.candidates.map(func(card): return card.id)])
+		for card: Dictionary in cards.candidates:
+			if card.id==id: selected = card
+		if not selected.is_empty() or attempt==config.reroll_count: break
+		if not bridge.command("reroll",{"offer_id":cards.offer_id}).ok: break
+	check(not selected.is_empty(),"通常の候補に対象の特性を出す")
+	if selected.is_empty(): return
+	bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":selected.candidate_id})
+	for tick in 120:
+		session.cpp_choices.poll()
+		bridge.step(1.0/120.0,idle,viewport)
+		if bridge._ui.phase==0: break
+		await get_tree().process_frame
+	session.cpp_choices.poll()
+	check(bridge._ui.trait_levels.any(func(item): return item.id==id and item.level>=2) and session.cpp_choices.equipped.has("trait:"+id),"カードの資源準備後に取得段を一度だけ確定する")
+
+func check_cpp_t04() -> void:
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	var session = await trait_test_session("T04",config,634)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	bridge.command("set_settings",{"hitstop":false})
+	var initial: Dictionary = bridge.checkpoint()
+	var lab = SESSION.new()
+	add_child(lab)
+	await lab.reset({"seed":634,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
+	var run: RunSimulation = lab.run
+	run.loadout.grant(&"trait",&"T04",config.trait_max_stacks)
+	var gear = run.loadout.trait_behaviors[&"T04"]
+	for level in range(1,config.trait_max_stacks+1):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		gear.n = level
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":level}).ok,"ギアアップを共通の入口で各段まで取得する")
+		bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W05","levels":1})
+		check(is_equal_approx(bridge._ui.full_charge.maximum,gear.multiplier(config.draw_length)),"生成した各段の最大倍率が現行と一致する")
+		trait_start_trace(bridge,config.draw_length)
+		check(bridge._ui.full_charge.distance==0.0 and bridge._ui.full_charge.burst_power==1.0 and not bridge._ui.full_charge.ignore_armor,"発進時に距離・倍率・装甲無視を戻す")
+		for tick in 65:
+			bridge.step(1.0/120.0,idle,viewport)
+			var ui: Dictionary = bridge._ui
+			var expected: float = gear.multiplier(ui.full_charge.distance) if ui.draw.tracing else 1.0
+			check(is_equal_approx(ui.full_charge.burst_power,expected) and is_equal_approx(ui.attack_power,config.base_attack*expected),"走った距離の指数曲線を全攻撃の攻撃力へ一度だけ掛ける")
+			if tick==25 and ui.draw.tracing:
+				barrier_damage(bridge,1.0)
+				check(is_equal_approx(core.barrier_snapshot().waves[-1].damage,ui.attack_power*2.0),"なぞり中の別装備も同じ時点の攻撃倍率を読む")
+		check(not bridge._ui.draw.tracing and bridge._ui.full_charge.burst_power==1.0,"なぞり終了で倍率を戻す")
+		if failures: break
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
+	gear.n = 5
+	var origin: Vector2 = core.ship_snapshot().ship_pos
+	for distance in [200.0,500.0,800.0]:
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
+		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+	var contacts: Array = []
+	bridge.subscribe("t04_contacts",func(frame: Dictionary):
+		for event: Dictionary in frame.events:
+			if event.type==&"combat_damage" and event.payload.cause==&"ram": contacts.append(event.payload)
+		return true)
+	trait_start_trace(bridge,config.draw_length)
+	for tick in 20: bridge.step(1.0/120.0,idle,viewport)
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.01)
+	check(presentation.frame_view._full_charge_visual!=null and presentation.frame_view._full_charge_visual.gear.fire.emitting,"なぞり中の炎を通常の表示へ渡す")
+	var before: Dictionary = bridge._ui.full_charge.duplicate()
+	var clock: float = presentation.frame_view._full_charge_visual.gear.fire._clock
+	bridge.command("pause",{"paused":true})
+	for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+	presentation._present_cpp(0.2)
+	check(bridge._ui.full_charge==before and presentation.frame_view._full_charge_visual.gear.fire._clock==clock,"停止中は距離・倍率・炎の時計を進めない")
+	bridge.command("pause",{"paused":false})
+	var saved: Dictionary = bridge.checkpoint()
+	for tick in 10: bridge.step(1.0/120.0,idle,viewport)
+	var expected_draw: Dictionary = core.draw_snapshot()
+	var expected_power: Dictionary = bridge._ui.full_charge.duplicate()
+	var expected_enemies: Array = core.enemies_snapshot()
+	check(bridge.restore(saved.value).ok,"距離・倍率・なぞり途中の状態へ戻る")
+	bridge.collect_frame()
+	for tick in 10: bridge.step(1.0/120.0,idle,viewport)
+	check(core.draw_snapshot()==expected_draw and bridge._ui.full_charge==expected_power and core.enemies_snapshot()==expected_enemies,"復帰後も距離・同期した倍率・命中結果を再現する")
+	bridge.release_checkpoint(saved.value)
+	for tick in 40: bridge.step(1.0/120.0,idle,viewport)
+	check(bridge._ui.kills==3,"一つのなぞりで連続する敵を実際に撃破する")
+	for hit: Dictionary in contacts:
+		check(is_equal_approx(hit.requested,config.base_attack*gear.multiplier(origin.distance_to(hit.impact))),"命中位置までの距離を撃破より先に反映する")
+	check(not contacts.is_empty(),"命中直前の距離係数を実際のダメージで確認する")
+	bridge.unsubscribe("t04_contacts")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
+	origin = core.ship_snapshot().ship_pos
+	var iron: int = bridge.command("dev_spawn",{"definition_id":"iron","position":origin+Vector2(250,0)}).value
+	core.set_enemy_motion(iron,{"held":true,"vel":Vector2.ZERO})
+	trait_start_trace(bridge,config.draw_length)
+	for tick in 25: bridge.step(1.0/120.0,idle,viewport)
+	check(not bridge._ui.draw.tracing and bridge._ui.full_charge.distance<config.draw_length and not bridge._ui.full_charge.ignore_armor and bridge._ui.full_charge.burst_power==1.0,"倍率が足りない装甲では弾かれ、装甲無視を有効にしない")
+	check(bridge.command("dev_remove_trait",{"id":"T04"}).ok and bridge._ui.full_charge.maximum==1.0 and bridge._ui.full_charge.burst_power==1.0,"解除時に蓄積した倍率を終了する")
+	presentation._present_cpp(0.01)
+	check(presentation.frame_view._full_charge_visual==null,"解除した炎の表示を片付ける")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":1})
+	await trait_select_upgrade(session,"T04",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	lab.free()
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"ギアアップの発動・同期・表示に実行エラーがない: %s" % [capture.messages()])

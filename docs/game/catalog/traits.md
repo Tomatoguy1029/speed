@@ -10,7 +10,7 @@
 | No.02 | チェインショック | ブースト中に一定数倒すたびに、倒した敵から衝撃波が出て連鎖する。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T05_killSonic.tres`、`scripts/traits/killSonic.gd` | 英語・素材・見た目は確認待ち |
 | No.03 | 大容量チャージ | ゲージの容量が増え、1回で描ける長さと勢いが伸びる。 | 能力値を伸ばす | `data/traits/T08_capacity.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.04 | 軌跡延長 | 描ける線の長さが伸びる。 | 能力値を伸ばす | `data/traits/T14_length.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
-| No.05 | ギアアップ | ブースト中、進むほど攻撃力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T04_fullCharge.tres`、`scripts/traits/fullCharge.gd` | 英語・素材・見た目は確認待ち |
+| No.05 | ギアアップ | ブースト中、進むほど攻撃力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T04_fullCharge.tres`、`scripts/traits/fullCharge.gd`。C++ランは `cpp/behaviors/traits/fullCharge.cpp` が距離係数・発進と終了・命中直前の倍率・復帰を扱い、表示は `scripts/render/equipment/fullCharge.gd` が受け持つ | 英語・素材・見た目は確認待ち |
 | No.06 | クリティカルランス | クリティカルのたびに、光の槍が前へ貫く。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T06_critBeam.tres`、`scripts/traits/critBeam.gd`、`scripts/attacks/light_lances.gd` | 英語・素材・見た目は確認待ち |
 | No.07 | 急所見切り | クリティカルが出やすくなる。 | 能力値を伸ばす | `data/traits/T09_critRate.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.08 | 助走 | 最初の敵に当たるまでの距離が長いほど、強い一撃と範囲攻撃になる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T32_runUp.tres`、`scripts/traits/runUp.gd` | 英語・素材・見た目は確認待ち |

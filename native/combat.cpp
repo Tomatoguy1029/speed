@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/systems/attacks/wall.h"
+#include "../cpp/behaviors/traits/fullCharge.h"
 #include "../cpp/behaviors/enemies/shield.h"
 #include "../cpp/systems/field.h"
 #include "geometry.h"
@@ -103,6 +104,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         const Vector2 position = from.lerp(to, hit.time);
         const double speed = runtime.state.ship.vel.length();
         const Vector2 direction = speed > 0 ? runtime.state.ship.vel / speed : Vector2();
+        if (runtime.state.draw.tracing) speed::FullChargeBehavior::prepare(runtime,from.distance_to(position));
         const double attack = speed::CombatResolver::attack_power(runtime);
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
         const bool front = blocks_front(hit.row, position, direction) || (fast && def.ram_guard);
@@ -148,7 +150,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction, 160.0, &position);
             continue;
         }
-        if (!front && attack >= enemy.armor * (crit ? c.crit_armor : 1.0)) {
+        if (!front && (runtime.state.loadout.effects.ignore_armor || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
             double damage = attack * (crit ? c.crit_mult : 1.0);
             if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
                 speed::ShieldBehavior::steal(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));

@@ -32,6 +32,8 @@ var _rear_frame: Dictionary = {}
 var _barrier_visual: RefCounted
 var _barrier_armor: Sprite2D
 var _barrier_world_time := -1.0
+var _full_charge_visual: RefCounted
+var _full_charge_world_time := -1.0
 var _scatter_world_time := -1.0
 var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
@@ -370,6 +372,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _barrier_visual!=null: _barrier_visual.dispose()
 		_barrier_visual = null
 		_barrier_world_time = -1.0
+		if _full_charge_visual!=null: _full_charge_visual.dispose()
+		_full_charge_visual = null
+		_full_charge_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_meteor_shards.clear()
@@ -417,6 +422,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if frame.ui.ship.ship_invuln>0.0 and fmod(frame.ui.world_time*20.0,2.0)<1.0: _barrier_armor.modulate.a = 0.5
 	_barrier_armor.get_parent().move_child(_barrier_armor,-1)
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
+	var equipped_full_charge: bool = frame.ui.get("trait_levels",[]).any(func(item): return item.id=="T04")
+	if equipped_full_charge and _full_charge_visual==null:
+		_full_charge_visual = preload("res://scripts/render/equipment/fullCharge.gd").new()
+		_full_charge_visual.setup_frame(_layer(18),_pixel)
+	if not equipped_full_charge and _full_charge_visual!=null:
+		_full_charge_visual.dispose()
+		_full_charge_visual = null
+		_full_charge_world_time = -1.0
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
 		if event.type==&"shield_stolen":
@@ -494,6 +507,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var full_charge_dt: float = 0.0 if _full_charge_world_time<0.0 else maxf(0.0,ui.world_time-_full_charge_world_time)
+	_full_charge_world_time = ui.world_time if equipped_full_charge else -1.0
+	if _full_charge_visual!=null: _full_charge_visual.frame_tick(full_charge_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.full_charge.distance/ui.base_draw_length,ui.draw.tracing and _ship_visible)
 	var barrier_dt: float = 0.0 if _barrier_world_time<0.0 else maxf(0.0,ui.world_time-_barrier_world_time)
 	_barrier_world_time = ui.world_time if equipped_barrier else -1.0
 	if _barrier_visual!=null: _barrier_visual.frame_tick(barrier_dt,ui.ship.ship_pos,ui.ship.ship_heading)

@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/systems/field.h"
+#include "../cpp/behaviors/traits/fullCharge.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -107,6 +108,7 @@ void SpeedRunCore::commit_draw() {
     runtime.state.draw.seg_pos = 0;
     runtime.state.draw.drawing = false;
     runtime.state.draw.tracing = true;
+    speed::FullChargeBehavior::launch(runtime);
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;
     Dictionary launch; launch["pos"] = runtime.state.ship.pos; launch["dir"] = dir; launch["gauge"] = runtime.state.draw.amount;
     emit_event("launch", launch);
@@ -142,6 +144,7 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
 
 void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
+    speed::FullChargeBehavior::end(runtime);
     const double speed = std::max(double(runtime.state.ship.vel.length()), runtime.state.draw.before_speed);
     const Vector2 direction = runtime.state.ship.vel.is_zero_approx() ? runtime.state.ship.heading : runtime.state.ship.vel.normalized();
     runtime.state.ship.vel = direction * speed;
@@ -185,7 +188,8 @@ bool SpeedRunCore::step_draw(double real_dt) {
         runtime.state.ship.pos = a + u * runtime.state.draw.seg_pos;
         runtime.state.ship.vel = u * runtime.state.draw.speed;
         runtime.state.ship.heading = u;
-        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) { end_trace(false); return true; }
+        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) {speed::FullChargeBehavior::trail(runtime,from,runtime.state.ship.pos);end_trace(false);return true;}
+        speed::FullChargeBehavior::trail(runtime,from,runtime.state.ship.pos);
         const double speed = runtime.state.ship.vel.length();
         if (speed < runtime.state.draw.speed) runtime.state.draw.speed = speed;
         if (runtime.state.draw.seg_pos >= length - 1e-9) { ++runtime.state.draw.segment; runtime.state.draw.seg_pos = 0; }

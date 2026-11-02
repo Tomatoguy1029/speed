@@ -42,9 +42,11 @@ struct CardCandidate {int64_t id=0;CardKind kind=CardKind::Weapon;uint32_t defin
 struct EquipmentEffects {
     double area=1,shot_amount=1,full_gauge_rate=0;
     double burst_power=1,damage_multiplier=1;
+    bool ignore_armor=false;
 };
 struct LoadoutState {
     EquipmentEffects effects;
+    double boost_distance=0,full_charge_maximum=1;
     ScatterWeaponState scatter;
     RearWeaponState rear;
     BarrierWeaponState barrier;

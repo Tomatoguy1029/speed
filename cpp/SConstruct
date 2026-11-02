@@ -40,5 +40,5 @@ if env.get('is_msvc', False):
 else:
     env.Append(CXXFLAGS=['-ffp-contract=off'])
 name = 'speed_runtime' + env['suffix'] + ('.dylib' if env['platform'] == 'macos' else '.dll')
-library = env.SharedLibrary(str(out / name), Glob('../native/*.cpp') + Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/enemies/*.cpp'))
+library = env.SharedLibrary(str(out / name), Glob('../native/*.cpp') + Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp'))
 Default(library)

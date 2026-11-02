@@ -50,6 +50,7 @@ struct ContentBundle {
     std::vector<LoadoutDefinition> equipment;
     std::vector<LoadoutAsset> equipment_assets;
     std::vector<NumericTraitLevel> numeric_traits;
+    std::vector<FullChargeDefinition> full_charge_levels;
     PostMaxChargeDefinition post_charge;
     PostMaxCritDefinition post_crit;
     PostMaxMotionDefinition post_motion;
