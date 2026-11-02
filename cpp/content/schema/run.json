@@ -868,7 +868,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 37
+          "max": 40
         },
         {
           "name": "turn",
@@ -1791,6 +1791,26 @@
       {
         "name": "RulerSplit",
         "value": "ruler_split"
+      },
+      {
+        "name": "BossSpawn",
+        "value": "boss_spawn"
+      },
+      {
+        "name": "BossPhase",
+        "value": "boss_phase"
+      },
+      {
+        "name": "BossDefeated",
+        "value": "boss_defeated"
+      },
+      {
+        "name": "BossCancelled",
+        "value": "boss_cancelled"
+      },
+      {
+        "name": "FinalStrike",
+        "value": "final_strike"
       }
     ],
     "ResultKind": [
@@ -2316,6 +2336,28 @@
       "pos",
       "angle",
       "color"
+    ],
+    "boss_spawn": [
+      "pos"
+    ],
+    "boss_phase": [
+      "id",
+      "boss",
+      "phase",
+      "reason"
+    ],
+    "boss_defeated": [
+      "pos",
+      "id",
+      "dir",
+      "cause"
+    ],
+    "boss_cancelled": [
+      "id",
+      "boss"
+    ],
+    "final_strike": [
+      "t"
     ]
   },
   "includes": [

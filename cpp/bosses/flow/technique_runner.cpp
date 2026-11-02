@@ -1,5 +1,6 @@
 #include "technique_runner.h"
 #include "../monoceros/charge.h"
+#include "phase_controller.h"
 #include "../../systems/attack_system.h"
 #include <algorithm>
 #include <cmath>
@@ -16,7 +17,13 @@ bool TechniqueRunner::running(const RunRuntime &run,TechniqueHandle handle) {
 }
 TechniqueHandle TechniqueRunner::begin(RunRuntime &run,EnemyHandle actor,uint32_t definition) {
     auto &s=run.state;
-    if (!definition || definition>run.content->boss_techniques.size() || !s.enemy_handles.contains(actor) || s.enemies[actor.slot].dead || s.bosses.next_id==INT64_MAX) return {};
+    if (const auto *body=PhaseController::find(run,actor)) {
+        if (!definition || definition>run.content->boss_techniques.size()) return {};
+        const auto &base=run.content->boss_techniques[definition-1];
+        if (base.boss!=run.content->boss_bodies[body->definition-1].boss) return {};
+        definition=0;for (const auto &p:run.content->boss_techniques) if (p.boss==base.boss && p.external_id==base.external_id && p.phase==body->phase) {definition=p.id;break;}
+    }
+    if (!PhaseController::can_start(run,actor) || !definition || definition>run.content->boss_techniques.size() || !s.enemy_handles.contains(actor) || s.enemies[actor.slot].dead || s.bosses.next_id==INT64_MAX) return {};
     for (const auto &t:s.bosses.techniques) if (live(t.stage) && same_handle(t.actor,actor)) return {};
     size_t row=0;while (row<s.bosses.techniques.size() && (live(s.bosses.techniques[row].stage) || s.bosses.techniques[row].ticket_refs)) ++row;
     if (row==s.bosses.techniques.size()) s.bosses.techniques.emplace_back();

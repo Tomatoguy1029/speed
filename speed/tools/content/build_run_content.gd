@@ -36,6 +36,45 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			records.BossTechniqueStage.append(command)
 	return records
 
+## 共通本体の生成入力。技の登録は各ボスの移植経路が追加する。
+static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictionary:
+	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}
+	# 機体・装備・接触など共通セクションの生成を既存の入口へそろえる。
+	var package := chase_package(load("res://data/enemies/drifter.tres"),config)
+	if package.is_empty(): return {}
+	var data: Dictionary = package.records
+	var row: Dictionary = data.EnemyRecord[0]
+	var hp: float = definition.hp if definition.use_def_stats else config.boss_hp
+	var armor: float = definition.armor if definition.use_def_stats else config.boss_armor
+	row.kind = 39 if definition.id==&"monoceros" else 40
+	row.radius = definition.radius*config.character_scale
+	row.hp = hp*config.enemy_hp_mult
+	row.armor = armor*config.enemy_armor_mult
+	row.speed = definition.speed
+	row.turn = definition.turn
+	row.xp = 0.0
+	row.scaling_radius = definition.radius
+	row.scaling_hp = hp
+	row.scaling_armor = armor
+	row.scaling_hp_mult = config.enemy_hp_mult
+	row.scaling_armor_mult = config.enemy_armor_mult
+	row.scaling_character = config.character_scale
+	row.scaling_visual = 1.0
+	row.scaling_collision = 1.0
+	row.fixed_sprite = true
+	row.knockback = 0.0
+	row.gate = 0
+	data.StringEntry[0].value = String(definition.id)
+	var boss := {"id":1,"external_id":String(definition.id),"kind":0 if definition.id==&"monoceros" else 1,"turn":definition.turn,"speed":definition.speed}
+	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed"]: boss[key] = float(definition.params.get(key,0.0))
+	data.BossDefinition = [boss]
+	var body := {"id":1,"boss":1,"enemy":1,"hp_floor_enabled":false}
+	for key in ["entrance_time","initial_wait","phase_threshold","phase_time","final_beam_width","final_reach","final_warn_width","final_widen_time"]:
+		if not definition.params.has(key): return {}
+		body[key] = float(definition.params[key])
+	data.BossBodyDefinition = [body]
+	return package
+
 static func _flow_condition(records: Dictionary, gate: Dictionary) -> int:
 	for key in gate:
 		if key not in ["min","max","angle","half_angle","min_phase"]: return 0

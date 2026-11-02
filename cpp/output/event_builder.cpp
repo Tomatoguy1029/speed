@@ -106,10 +106,10 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             append(run,"kill",d);break;
         case CombatEventKind::ShieldBlock:append(run,"shield_block",d);break;
         case CombatEventKind::Hurt:
-            d["amount"]=e.resolved;d["cause"]=cause;d["source"]=definition_name(run,e.source);d["t"]=e.time;
+            d["amount"]=e.resolved;d["cause"]=cause;d["source"]=e.cause==Cause::FinalStrike?godot::StringName("boss"):definition_name(run,e.source);d["t"]=e.time;
             d["world_t"]=e.world_time;d["hp_after"]=e.hp_after;append(run,"hurt",d);break;
         case CombatEventKind::ShipDamage:
-            d["cause"]=cause;d["source"]=definition_name(run,e.source);d["technique"]=e.technique;
+            d["cause"]=cause;d["source"]=e.cause==Cause::FinalStrike?godot::StringName("boss"):definition_name(run,e.source);d["technique"]=e.technique;
             if (e.technique && e.technique<=run.content->boss_techniques.size()) {
                 const auto &technique=run.content->boss_techniques[e.technique-1];
                 d["technique"]=godot::StringName(technique.external_id.c_str());

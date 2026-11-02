@@ -16,7 +16,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 0
+          "max": 1
         },
         {
           "name": "lock_lead",
@@ -166,6 +166,71 @@
         },
         {
           "name": "at",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BossBodyDefinition",
+      "section": 162,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "hp_floor_enabled",
+          "type": "bool"
+        },
+        {
+          "name": "entrance_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "initial_wait",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "phase_threshold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "phase_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_beam_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_warn_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_widen_time",
           "type": "f64",
           "min": 0
         }

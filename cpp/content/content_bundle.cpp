@@ -93,12 +93,13 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_filters=records.BossFlowFilter_rows;
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
+    bundle->boss_bodies=records.BossBodyDefinition_rows;
     bundle->bosses=records.BossDefinition_rows;
     bundle->boss_techniques=records.BossTechniqueDefinition_rows;
     bundle->boss_stages=records.BossTechniqueStage_rows;
     for (size_t i=0;i<bundle->bosses.size();++i) {
         const auto &p=bundle->bosses[i];
-        if (p.id!=i+1 || p.external_id!="monoceros" || p.kind!=0 || p.horn_length_ratio<=0 || p.horn_length_ratio_p2<=0) return {};
+        if (p.id!=i+1 || (p.external_id!=(p.kind==0?"monoceros":"centaurus")) || (p.kind==0 && (p.horn_length_ratio<=0 || p.horn_length_ratio_p2<=0))) return {};
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
@@ -335,7 +336,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31 && row.kind!=35 && row.kind!=32 && row.kind!=36 && row.kind!=33) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31 && row.kind!=35 && row.kind!=32 && row.kind!=36 && row.kind!=33 && row.kind!=39 && row.kind!=40) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         definition.gate=EnemyDefinition::Gate(row.gate);
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
@@ -558,6 +559,10 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto &owner=bundle->definitions[row.owner-1];if (!owner.corona_definition) return {};
         const auto target=std::find_if(bundle->definitions.begin(),bundle->definitions.end(),[&](const auto &d){return godot::String(d.id).utf8().get_data()==row.name;});
         if (target!=bundle->definitions.end()) bundle->corona_ammunition[owner.corona_definition-1].push_back({uint32_t(target-bundle->definitions.begin()),row.weight,row.damage});
+    }
+    for (size_t i=0;i<bundle->boss_bodies.size();++i) {
+        const auto &body=bundle->boss_bodies[i];const auto &boss=bundle->bosses[body.boss-1];
+        if (body.id!=i+1 || body.phase_threshold<=0 || body.phase_threshold>=1 || body.final_widen_time<=0 || bundle->definitions[body.enemy-1].kind!=(boss.kind==0?EnemyDefinition::Kind::Monoceros:EnemyDefinition::Kind::Centaurus)) return {};
     }
     return bundle;
 }

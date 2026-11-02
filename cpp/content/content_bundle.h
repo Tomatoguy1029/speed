@@ -51,6 +51,7 @@ struct ContentBundle {
     std::vector<BossFlowFilter> flow_filters;
     std::vector<BossFlowWeight> flow_weights;
     std::vector<BossFlowForbidden> flow_forbidden;
+    std::vector<BossBodyDefinition> boss_bodies;
     std::vector<BossDefinition> bosses;
     std::vector<BossTechniqueDefinition> boss_techniques;
     std::vector<BossTechniqueStage> boss_stages;

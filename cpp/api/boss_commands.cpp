@@ -1,10 +1,29 @@
 #include "run_core.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
+#include "../bosses/flow/phase_controller.h"
+#include "../bosses/monoceros/body.h"
+#include "../bosses/centaurus/body.h"
+#include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dictionary &p) {
     const auto result=[](bool ok,Variant value=Variant()){Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"boss";out["message"]=ok?"":"ボス技の命令が不正です";out["value"]=value;return out;};
     if (!runtime.api_development) return result(false);
+    if (kind=="dev_boss_body_state") return result(p.is_empty(),speed::PhaseController::snapshot(runtime));
+    if (kind=="dev_spawn_boss") {
+        if (p.size()!=3 || p.get("definition",Variant()).get_type()!=Variant::INT || p.get("position",Variant()).get_type()!=Variant::VECTOR2 || p.get("entrance",Variant()).get_type()!=Variant::BOOL) return result(false);
+        const int64_t definition=p["definition"];if (definition<=0 || uint64_t(definition)>runtime.content->boss_bodies.size()) return result(false);
+        const auto &d=runtime.content->bosses[runtime.content->boss_bodies[definition-1].boss-1];const auto actor=d.kind==0?speed::MonocerosBody::spawn(runtime,definition,p["position"],p["entrance"]):speed::CentaurusBody::spawn(runtime,definition,p["position"],p["entrance"]);
+        return result(runtime.state.enemy_handles.contains(actor),runtime.state.enemy_handles.entity_id(actor));
+    }
+    if (kind=="dev_cancel_boss" || kind=="dev_boss_final") {
+        if (p.get("entity_id",Variant()).get_type()!=Variant::INT || p.size()!=(kind=="dev_boss_final"?2:1)) return result(false);
+        const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);const auto actor=runtime.state.enemy_handles.at(found->second);
+        if (!speed::PhaseController::find(runtime,actor)) return result(false);
+        if (kind=="dev_cancel_boss") {speed::PhaseController::cancel(runtime,actor);return result(true);}
+        const Variant charge=p.get("charge",Variant());if ((charge.get_type()!=Variant::FLOAT && charge.get_type()!=Variant::INT) || !std::isfinite(double(charge))) return result(false);
+        return result(speed::PhaseController::begin_final(runtime,actor,charge));
+    }
     if (kind=="dev_boss_flow_state") return result(p.is_empty(),speed::FlowRunner::snapshot(runtime));
     if (kind=="dev_cancel_flow") {
         if (p.size()!=1 || p.get("entity_id",Variant()).get_type()!=Variant::INT) return result(false);

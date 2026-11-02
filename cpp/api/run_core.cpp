@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
+#include "../bosses/flow/phase_controller.h"
 #include "../behaviors/enemies/gunner.h"
 #include "../behaviors/enemies/missile.h"
 #include "../behaviors/enemies/rocket.h"
@@ -197,6 +198,7 @@ bool SpeedRunCore::step(double delta) {
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
+    speed::PhaseController::step(runtime,delta);
     speed::FlowRunner::step(runtime,delta);
     capture_avoidance();
     ++runtime.state.ticks;
@@ -218,7 +220,7 @@ void SpeedRunCore::advance_enemies(double delta) {
       for (size_t row : rows) {
         if (!runtime.state.enemy_handles.contains(update_handles[row])) continue;
         auto &enemy = runtime.state.enemies[row];
-        if (enemy.dead || enemy.held || speed::TechniqueRunner::owns(runtime,update_handles[row]) || runtime.state.field.rock_handles.contains(enemy.rock)) continue;
+        if (enemy.dead || enemy.is_boss || enemy.held || speed::TechniqueRunner::owns(runtime,update_handles[row]) || runtime.state.field.rock_handles.contains(enemy.rock)) continue;
         if (enemy.stone > 0) { enemy.stone=speed::remaining_time(enemy.stone,delta); enemy.vel = Vector2(); continue; }
         if (enemy.hit_cd > 0) enemy.hit_cd=speed::remaining_time(enemy.hit_cd,delta);
         if (enemy.guard > 0) enemy.guard=speed::remaining_time(enemy.guard,delta);

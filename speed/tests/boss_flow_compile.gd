@@ -4,6 +4,12 @@ func check(ok: bool, label: String) -> void:
 	print("[boss-compile] ", "PASS " if ok else "FAIL ", label)
 	if not ok: failed += 1
 func _initialize() -> void:
+	if "--cpp-shared-final-record" in OS.get_cmdline_user_args():
+		call_deferred("check_cpp_shared_final_record")
+		return
+	if "--cpp-shared" in OS.get_cmdline_user_args():
+		call_deferred("check_cpp_shared")
+		return
 	if "--cpp-b00" in OS.get_cmdline_user_args():
 		call_deferred("check_cpp_technique")
 		return
@@ -120,4 +126,112 @@ func check_cpp_technique() -> void:
 	bridge.release_checkpoint(held.value)
 	bridge.dispose()
 	print("[cpp_b00] failed=%d"%failed)
+	quit(1 if failed else 0)
+
+func shared_fixture(kind: String) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/%s.tres"%kind).duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.entrance_time = 0.1
+	definition.params.phase_time = 0.06
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	var data: Dictionary = package.records
+	if kind=="monoceros":
+		var move = load("res://data/bosses/monoceros_moves/charge.tres").duplicate(true)
+		var techniques: Dictionary = builder.boss_technique_records(definition,move)
+		for key in techniques: data[key] = techniques[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(data,"0".repeat(64).hex_decode())
+	if not bridge.configure(bytes,{"api_version":1,"run_id":147,"mode":1,"stage_id":"B_shared","profile":{},"settings":{"hitstop":false}}).ok: return {}
+	bridge.start(147,{"position":Vector2(1000,0)})
+	bridge.command("dev_ship_motion",{"position":Vector2(1000,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1000,0),Vector2(0,0),Vector2(640,360))
+	var spawned: Dictionary = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":true})
+	if not spawned.ok: return {}
+	return {"bridge":bridge,"id":spawned.value}
+
+func shared_body(bridge) -> Dictionary: return bridge.command("dev_boss_body_state").value[0]
+func shared_damage(bridge, id: int, amount: float) -> Dictionary:
+	return bridge.command("dev_damage",{"entity_id":id,"amount":amount,"cause":"bullet"}).value
+
+func check_cpp_shared() -> void:
+	for kind in ["monoceros","centaurus"]:
+		var fixture := shared_fixture(kind)
+		check(not fixture.is_empty(),"共通入口から%s本体を生成する"%kind)
+		if fixture.is_empty():
+			quit(1)
+			return
+		var bridge = fixture.bridge
+		var state := shared_body(bridge)
+		check(state.mode==0 and state.position==Vector2(-1280,0) and state.boss_spawned,"実際の登場確定で出現済みを保持する")
+		var damage := shared_damage(bridge,fixture.id,state.max_hp*0.6)
+		state = shared_body(bridge)
+		check(is_equal_approx(state.hp,state.max_hp*0.4) and state.pending and state.mode==0,"登場中も被弾し閾値を跨ぐ超過分を保持する")
+		bridge._core.step(0.1)
+		check(shared_body(bridge).mode==1 and shared_body(bridge).phase==1,"登場が自然に終わるtickでは形態を変えない")
+		bridge._core.step(0.02)
+		state = shared_body(bridge)
+		check(state.phase==2 and state.mode==2 and is_equal_approx(state.hp,state.max_hp*0.4),"待機へ戻った次tickで同じ共通形態境界へ進む")
+		var held: Dictionary = bridge.checkpoint()
+		check(held.ok,"登場と形態の値状態を保持する")
+		bridge._core.step(0.04)
+		var expected := shared_body(bridge)
+		bridge.restore(held.value)
+		bridge._core.step(0.04)
+		check(shared_body(bridge)==expected,"形態途中から同じ時計と残り時間へ復帰する")
+		bridge.release_checkpoint(held.value)
+		bridge._core.step(0.03)
+		check(shared_body(bridge).mode==1,"形態移行を自然に終える")
+		if kind=="monoceros":
+			var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+			check(started.ok and bridge.command("dev_boss_state").value[0].definition==2,"共通本体の現在形態から技の実効値を選ぶ")
+		shared_damage(bridge,fixture.id,state.max_hp*2)
+		bridge.command("dev_cancel_boss",{"entity_id":fixture.id})
+		state = shared_body(bridge)
+		var frame: Dictionary = bridge.read_frame()
+		check(state.mode==4 and state.boss_spawned and shared_body(bridge).boss_dead and frame.ok,"自然撃破を先に確定し出現済みを戻さず通知を配信する")
+		check(frame.value.events.filter(func(event): return event.type==&"boss_defeated").size()==1 and not frame.value.events.any(func(event): return event.type==&"boss_cancelled"),"撃破後の取消は決着を上書きしない")
+		bridge.dispose()
+		fixture = shared_fixture(kind)
+		bridge = fixture.bridge
+		bridge.command("dev_cancel_boss",{"entity_id":fixture.id})
+		var position: Vector2 = shared_body(bridge).position
+		bridge._core.step(0.3)
+		shared_damage(bridge,fixture.id,shared_body(bridge).max_hp*2)
+		frame = bridge.read_frame()
+		check(shared_body(bridge).mode==5 and shared_body(bridge).position==position and not shared_body(bridge).boss_dead and frame.ok,"登場取消を先に確定した本体は後から決着を起こさない")
+		bridge.dispose()
+	var fixture := shared_fixture("monoceros")
+	var bridge = fixture.bridge
+	check(bridge.command("dev_boss_final",{"entity_id":fixture.id,"charge":0.1}).ok and not bridge.command("dev_boss_final",{"entity_id":fixture.id,"charge":0.1}).ok,"決着時計を一度だけ開始する")
+	bridge._core.step(0.1)
+	shared_body(bridge)
+	var frame: Dictionary = bridge.read_frame()
+	check(shared_body(bridge).final_landed and bridge._core.ship_snapshot().ship_hp<0.0 and frame.ok,"共通の決着時計が自然終了して強制一撃を一度だけ配信する")
+	check(frame.value.events.any(func(event): return event.type==&"combat_player_damage" and event.payload.cause==&"final_strike" and event.payload.source==&"boss"),"決着の原因と出所を既存の記録契約へ渡す")
+	bridge.dispose()
+	fixture = shared_fixture("monoceros")
+	bridge = fixture.bridge
+	bridge.command("dev_boss_final",{"entity_id":fixture.id,"charge":0.1})
+	bridge._core.step(0.05)
+	bridge.command("dev_cancel_boss",{"entity_id":fixture.id})
+	bridge._core.step(0.1)
+	check(not shared_body(bridge).final_landed and bridge._core.ship_snapshot().ship_hp>0 and bridge.read_frame().ok,"取消後には決着時計を進めず強制一撃を出さない")
+	bridge.dispose()
+	print("[cpp_shared] failed=%d"%failed)
+	quit(1 if failed else 0)
+
+## 失敗した通知条件だけを同じ固定場面で確認し直す。
+func check_cpp_shared_final_record() -> void:
+	var fixture := shared_fixture("monoceros")
+	var bridge = fixture.bridge
+	bridge.command("dev_boss_final",{"entity_id":fixture.id,"charge":0.1})
+	bridge._core.step(0.1)
+	shared_body(bridge)
+	var frame: Dictionary = bridge.read_frame()
+	check(frame.ok and frame.value.events.any(func(event): return event.type==&"combat_player_damage" and event.payload.cause==&"final_strike" and event.payload.source==&"boss"),"決着の原因と出所を既存の記録契約へ渡す")
+	bridge.dispose()
+	print("[cpp_shared_final_record] failed=%d"%failed)
 	quit(1 if failed else 0)

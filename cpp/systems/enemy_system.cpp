@@ -1,4 +1,5 @@
 #include "enemy_system.h"
+#include "../bosses/flow/phase_controller.h"
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/defender.h"
 #include "../behaviors/enemies/crab.h"
@@ -57,7 +58,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     const auto found=std::find(state.behavior_kinds.begin(),state.behavior_kinds.end(),def.kind);enemy.behavior_group=found-state.behavior_kinds.begin();
     if (found==state.behavior_kinds.end()) {state.behavior_kinds.push_back(def.kind);state.behavior_rows.emplace_back();}
     auto &rows=state.behavior_rows[enemy.behavior_group];enemy.behavior_slot=rows.size();rows.push_back(row);enemy.id=state.next_id++;
-    enemy.fire_t=def.fire_interval*(0.5+state.control.rng.randf()*0.5);enemy.alive=true;
+    enemy.fire_t=p.is_boss?0:def.fire_interval*(0.5+state.control.rng.randf()*0.5);enemy.alive=true;
     insert(state,uint32_t(row),enemy);state.rows_by_id[enemy.id]=row;
     if (def.kind==EnemyDefinition::Kind::Crab && !p.has_facing) CrabBehavior::steer(run,uint32_t(row));
     if (def.kind==EnemyDefinition::Kind::Crow) CrowBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)),p.flock_member);
@@ -121,6 +122,7 @@ bool EnemySystem::relocate(RunRuntime &run,EnemyHandle handle,godot::Vector2 pos
     if (!state.enemy_handles.contains(handle) || !position.is_finite()) return false;
     auto &enemy=state.enemies[handle.slot];if (enemy.dead || enemy.held) return false;
     CoronaVortex::release(run,handle);PumpBehavior::gone(run,handle,false);
+    PhaseController::cancel(run,handle);
     AttackSystem::source_ended(state,handle,AttackEndReason::Relocate);
     enemy.pos=position;
     const auto toward=(state.ship_pos-position).normalized();
@@ -160,6 +162,7 @@ bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason)
     PumpBehavior::gone(run,handle,true);
     CoronaVortex::release(run,handle);
     PickupSystem::lose(run,enemy.id,reason==RetireReason::Outside?CargoLoss::Retreat:reason==RetireReason::BonusClear?CargoLoss::Cleared:CargoLoss::Released);
+    PhaseController::cancel(run,handle);
     AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);
     leave_hound(state,row);
     auto &rows=state.behavior_rows[enemy.behavior_group];

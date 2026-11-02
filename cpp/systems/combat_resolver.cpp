@@ -117,6 +117,7 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     if (policy.body_damaged) policy.body_damaged(run,result.target);
     if (!state.enemy_handles.contains(result.target)) {result.reason=CombatReason::Invalid;EventBuilder::enemy_damage(run,request,result);return result;}
     result.hp_after=state.enemies[result.target.slot].hp;
+    if (result.hp_after>result.hp_before-result.resolved) result.reason=CombatReason::PhaseFloor;
     result.applied=std::max(0.0,result.hp_before-std::max(0.0,result.hp_after));
     result.overkill=result.hp_after<=0?std::max(0.0,result.resolved-std::max(0.0,result.hp_before)):0;
     result.reason=result.hp_after>result.hp_before-result.resolved?CombatReason::PhaseFloor:CombatReason::Applied;
