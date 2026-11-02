@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-saw" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_saw()
+		check(finished,"丸鋸の不足条件を最後まで確認する")
+		print("[cpp_saw] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-fling-corpse" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_fling_corpse()
 		check(finished,"死体投射の指定確認を最後まで実施する")
@@ -835,6 +841,41 @@ func check_cpp_fling_corpse() -> bool:
 	cpp_core.step_projectiles(1.0)
 	check(cpp_core.projectiles_snapshot().is_empty(),"投射した死体と複製は寿命で消える")
 	check(cpp_bridge.restore(held.value).ok and cpp_core.projectiles_snapshot()==state,"死体投射の位置・速度・角度・命中ID・寿命を復元する")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()
+	return true
+
+func check_cpp_saw() -> bool:
+	if not await prepare_cpp_duplicator_attack(104,"saw"): return false
+	cpp_bridge.command("dev_add_rock",{"position":cpp_origin,"kind":3,"size":20.0,"manual":true})
+	cpp_bridge.command("dev_stream_rocks",{"center":cpp_origin,"half":Vector2(640,480),"dt":0.1})
+	var rocks: Array = cpp_bridge.command("dev_field_query",{"action":"rocks"}).value
+	var source: int = rocks[0].enemy_id
+	var actor: Dictionary = cpp_core.enemies_snapshot().filter(func(e): return e.id==source)[0]
+	var edge: float = actor.radius+cpp_config.ship_radius+2.0
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(edge,0),"velocity":Vector2(800,0)})
+	cpp_core.collide_ship(cpp_origin-Vector2(edge,0),cpp_config.ship_radius)
+	var shots: Array = cpp_core.projectiles_snapshot()
+	check(shots.size()==3 and shots.all(func(p): return p.saw and p.type==&"saw" and p.cause==&"saw" and p.source_id==-1 and p.source_definition==0 and p.pierce and p.vel.x>0 and is_equal_approx(p.radius,actor.radius) and is_equal_approx(p.life,cpp_config.saw_life)),"接触した丸鋸から同じ半径と寿命の元1本・複製2本を生成する")
+	if shots.size()!=3: cpp_session.free(); return false
+	check(is_equal_approx(shots[0].vel.x,cpp_config.saw_speed),"接触の速度が遅くても丸鋸の指定速度で投射する")
+	cpp_bridge.command("dev_stream_rocks",{"center":cpp_origin,"half":Vector2(640,480),"dt":0.1})
+	rocks = cpp_bridge.command("dev_field_query",{"action":"rocks"}).value
+	check(rocks[0].destroyed and rocks[0].enemy_id==0,"投射元のフィールド丸鋸を再出現させない")
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(250,0)}).value
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(350,0)}).value
+	cpp_core.step_projectiles(0.1)
+	var moving: Array = cpp_core.projectiles_snapshot()
+	check(moving.all(func(p): return is_equal_approx(p.angle,1.4)) and moving[0].pos.distance_to(shots[0].pos+shots[0].vel*0.1)<0.001,"丸鋸の元と複製は14rad毎秒で回り連続した軌道を進む")
+	var held: Dictionary = cpp_bridge.checkpoint()
+	check(held.ok,"投射元が消えた丸鋸と複製の値を保持する")
+	cpp_core.step_projectiles(0.2)
+	var events: Array = cpp_bridge.read_frame().value.events
+	var hits: Array = events.filter(func(e): return e.type==&"combat_damage" and e.payload.cause==&"saw")
+	check(hits.size()>=2 and hits[0].payload.target_id==near and hits[1].payload.target_id==far and cpp_core.projectiles_snapshot().size()==3,"丸鋸は近い敵から貫通し命中から再複製しない")
+	cpp_core.step_projectiles(2.0)
+	check(cpp_core.projectiles_snapshot().is_empty(),"丸鋸の元と複製は指定の寿命で消える")
+	check(cpp_bridge.restore(held.value).ok and cpp_core.projectiles_snapshot()==moving,"丸鋸の回転・軌道・寿命・元情報を復元する")
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_session.free()
 	return true
