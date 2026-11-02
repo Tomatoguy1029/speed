@@ -30,16 +30,17 @@ std::vector<uint64_t> LightLancesSystem::fire(RunRuntime &run,const LightLancePa
             }
         }
         const auto direction=lance.velocity.normalized(),to=lance.from+direction*lance.length;godot::Dictionary event;event["from"]=lance.from;event["to"]=to;event["width"]=lance.width;FrameBuilder::append(run,"critical_lance",event);
-        struct Hit {double fraction;size_t row;};struct Earlier {bool operator()(const Hit &a,const Hit &b) const{return a.fraction<b.fraction;}};
+        struct Hit {double fraction;EnemyHandle target;};struct Earlier {bool operator()(const Hit &a,const Hit &b) const{return a.fraction<b.fraction;}};
         std::vector<Hit> hits;const double padding=lance.width*0.5+std::max(state.combat_config.max_enemy_radius,state.grid.max_radius);const auto pad=godot::Vector2(padding,padding);
         for (auto row:CollisionQuery::enemy_rows(state,lance.from.min(to)-pad,lance.from.max(to)+pad)) {
             const auto &enemy=state.enemies[row];if (enemy.dead || state.attacks.lances[item].hits.count(enemy.id)) continue;
-            const double fraction=CollisionQuery::segment_circle_t(lance.from,to,enemy.pos,enemy.radius+lance.width*0.5);if (fraction>=0) hits.push_back({fraction,row});
+            const double fraction=CollisionQuery::segment_circle_t(lance.from,to,enemy.pos,enemy.radius+lance.width*0.5);if (fraction>=0) hits.push_back({fraction,state.enemy_handles.at(uint32_t(row))});
         }
         if (hits.size()>1) godot::SortArray<Hit,Earlier>().sort(hits.data(),int64_t(hits.size()));
         for (auto hit:hits) {
-            const auto &enemy=state.enemies[hit.row];if (!enemy.alive || enemy.dead) continue;
-            const auto handle=state.enemy_handles.at(uint32_t(hit.row));state.attacks.lances[item].hits.insert(enemy.id);
+            const auto handle=hit.target;if (!state.enemy_handles.contains(handle)) continue;
+            const auto &enemy=state.enemies[handle.slot];if (!enemy.alive || enemy.dead) continue;
+            state.attacks.lances[item].hits.insert(enemy.id);
             DamageRequest request;request.struck=handle;request.amount=lance.damage;request.cause=Cause::CritBeam;request.no_crit=true;request.direction=direction;request.knock=lance.knock;
             CombatResolver::damage_enemy(run,request);EventBuilder::flush_combat(run);
             visual_hits.push_back({handle,direction});
