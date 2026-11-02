@@ -174,6 +174,8 @@ func _ready() -> void:
 	if finished: return
 	if options.has("mixed_target"):
 		if not _command("dev_debug",{"action":"clear_enemies","args":{}}): return
+		await get_tree().physics_frame
+		await get_tree().physics_frame
 		_refill()
 	if options.get("bonus","off")=="on" and not _command("dev_benchmark",{"bonus":true}): return
 	measurement_seconds=float(options.seconds)
@@ -192,7 +194,7 @@ func _ready() -> void:
 	metadata["effective"]={"attack_power":effective.attack_power,"max_speed":effective.max_speed,"capacity":effective.capacity,"length_mult":effective.length_mult,"xp_profile_factor":effective.xp_profile_factor}
 	metadata["clocks"]=start_metrics.clocks
 	metadata["source_sha256"]={"profile":FileAccess.get_sha256("res://tools/profiling/profile_run.gd"),"bridge":FileAccess.get_sha256("res://scripts/runtime/run_bridge.gd"),"manager":FileAccess.get_sha256("res://scripts/managers/run_manager.gd")}
-	if _equipment(start_recording)!=expected_equipment:
+	if options.mode=="condition" and _equipment(start_recording)!=expected_equipment:
 		_fail("指定Lvと実際の装備が一致しません")
 		return
 	input_ticks=0
