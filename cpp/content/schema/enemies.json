@@ -438,6 +438,105 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "SniperDefinition",
+      "section": 59,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "band_len",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "band_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "band_narrow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "track_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "search_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "search_sway",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "search_period",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_fill",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_half_width",
+          "type": "f64",
+          "min": 0,
+          "source": "laser_width",
+          "multiplier": 0.5
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cooldown",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

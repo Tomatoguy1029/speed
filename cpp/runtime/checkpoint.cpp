@@ -67,6 +67,9 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     }
     for (const auto &enemy:state.enemies) if (enemy.alive) {
         if (state.enemy_handles.contains(enemy.parent) && state.enemy_handles.entity_id(enemy.parent)!=enemy.parent_id) return false;
+        const auto *sniper=std::get_if<SniperState>(&enemy.behavior_state);
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Sniper)!=(sniper!=nullptr)) return false;
+        if (sniper) {if (!sniper->rays.empty() && sniper->rays.size()!=48) return false;for (float v:sniper->rays) if (!std::isfinite(v) || v<0) return false;}
         std::unordered_set<uint64_t> parts;
         for (auto part:enemy.parts) {
             if (!parts.insert(handle_key(part)).second) return false;

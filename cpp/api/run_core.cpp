@@ -6,6 +6,7 @@
 #include "../behaviors/enemies/part.h"
 #include "../behaviors/enemies/dash.h"
 #include "../behaviors/enemies/battleship.h"
+#include "../behaviors/enemies/sniper.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
@@ -201,7 +202,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Battleship) {
+            if (def.kind==speed::EnemyDefinition::Kind::Sniper) {
+                speed::SniperBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Battleship) {
                 speed::BattleshipBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Dash) {
                 speed::DashBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);

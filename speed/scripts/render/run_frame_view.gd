@@ -21,6 +21,9 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _sniper := PackedFloat32Array()
+var _sniper_world_time := 0.0
+var _telescope_beams: Array[Dictionary] = []
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
@@ -103,6 +106,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/sniper.gd").draw_frame(canvas,_sniper,_sniper_world_time,1.0/maxf(_zoom,0.01))
 		perf.since(&"view_draw.attacks",began)
 	_layer(9).add_child(_gunner_marks)
 	_effects = PixelPainter.new()
@@ -111,6 +115,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_particle_canvas = Node2D.new()
 	_layer(14).add_child(_particle_canvas)
 	_particle_canvas.draw.connect(func():
+		for beam: Dictionary in _telescope_beams:
+			var color := Color(1.0,0.3,0.22,beam.life/beam.max)
+			_particle_canvas.draw_line(beam.from,beam.to,color,beam.width)
+			_particle_canvas.draw_circle(beam.from,beam.width*0.5,color)
+			_particle_canvas.draw_circle(beam.to,beam.width*0.5,color)
 		for ring: Dictionary in _rings:
 			var k: float = ring.life/ring.max
 			var color: Color = EFFECT_SETTINGS.tinted("",ring.color)
@@ -186,6 +195,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.beamer is PackedFloat32Array or row.beamer.size()%10!=0: return false
 			for value: float in row.beamer:
 				if not is_finite(value): return false
+		if row.has("sniper"):
+			if not row.sniper is PackedFloat32Array or row.sniper.size()%59!=0: return false
+			for value: float in row.sniper:
+				if not is_finite(value): return false
 		if row.has("battleship"):
 			if not row.battleship is PackedFloat32Array or row.battleship.size()%6!=0: return false
 			for value: float in row.battleship:
@@ -243,24 +256,27 @@ func apply_frame(frame: Dictionary) -> bool:
 	var previous_beamer := _beamer
 	var previous_missile := _missile
 	var previous_battleship := _battleship
+	var previous_sniper := _sniper
 	_gunner = PackedFloat32Array()
 	_beamer = PackedFloat32Array()
 	_missile = PackedFloat32Array()
 	_battleship = PackedFloat32Array()
+	_sniper = PackedFloat32Array()
 	for row: Dictionary in frame.batches:
 		if row.has("gunner"): _gunner.append_array(row.gunner)
 		if row.has("beamer"): _beamer.append_array(row.beamer)
 		if row.has("missile"): _missile.append_array(row.missile)
 		if row.has("battleship"): _battleship.append_array(row.battleship)
+		if row.has("sniper"): _sniper.append_array(row.sniper)
 	# 描画命令はCanvasItemが保持する。変わらない予告は再構築しない。
-	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship: _gunner_marks.queue_redraw()
+	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper: _gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	var packed_bytes := 0
 	for row: Dictionary in rows:
 		if perf.active:
 			packed_bytes+=row.ids.size()*8+row.transforms.size()*4+row.colors.size()*16+row.flags.size()*4
-			for key in ["gunner","beamer","missile","battleship","glows"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
+			for key in ["gunner","beamer","missile","battleship","sniper","glows"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
 			if row.has("biter"):
 				for key in row.biter: packed_bytes+=row.biter[key].size()*4
 		if visuals[row.visual_id].role==6:
@@ -342,6 +358,8 @@ func apply_frame(frame: Dictionary) -> bool:
 			line.z_index = -1 if row.get("behind_parent",false) else 0
 			line.width = row.widths[i]
 			line.default_color = row.colors[i]
+			line.begin_cap_mode = Line2D.LINE_CAP_ROUND if row.get("rounded",false) else Line2D.LINE_CAP_NONE
+			line.end_cap_mode = line.begin_cap_mode
 			line.show()
 			line_index += 1
 	for display: Dictionary in _shape_displays.values():
@@ -454,6 +472,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rampage_visual = null
 		_rampage_world_time = -1.0
 	_zoom = frame.camera.zoom
+	_sniper_world_time = float(frame.ui.world_time)
+	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	for event: Dictionary in _queued_events:
 		if event.type==&"shield_stolen":
 			_shield_transfers.append({"pos":event.pos,"facing":event.facing,"r":event.r,"arc":event.arc,"life":0.3,"max":0.3})
@@ -469,6 +489,12 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 					var offset: Vector2 = (texture.get_meta("offset") as Vector2).rotated(event.facing)
 					_meteor_shards.append({"texture":texture,"pos":event.pos+offset*0.35,"vel":offset.normalized()*100.0+event.dir*60.0,
 						"angle":event.facing,"spin":-1.5 if i%2==0 else 1.5,"life":0.65})
+		if event.type==&"telescope_charge": _rings.append({"pos":event.pos,"radius":30.0,"color":Color(1.0,0.4,0.3),"life":0.2,"max":0.2})
+		if event.type==&"telescope_fire":
+			var direction := Vector2.from_angle(event.angle)
+			_telescope_beams.append({"from":event.pos,"to":event.pos+direction*event.length,"width":event.width*1.6,"life":0.28,"max":0.28})
+			_rings.append({"pos":event.pos,"radius":40.0,"color":Color(1.0,0.75,0.6),"life":0.22,"max":0.22})
+			_burst(event.pos,Color(1.0,0.5,0.35),10,500.0,direction)
 		if event.type==&"ring":
 			if _rings.size()>80: _rings.pop_front()
 			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
@@ -517,6 +543,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		shard.angle += shard.spin*effect_dt
 		shard.life -= effect_dt
 	_meteor_shards = _meteor_shards.filter(func(shard: Dictionary): return shard.life>0.0)
+	for beam: Dictionary in _telescope_beams: beam.life -= effect_dt
+	_telescope_beams = _telescope_beams.filter(func(beam: Dictionary): return beam.life>0.0)
 	for ring: Dictionary in _rings: ring.life -= effect_dt
 	_rings = _rings.filter(func(ring: Dictionary): return ring.life>0.0)
 	_particles = _particles.filter(func(p: Dictionary): return p.life>0.0)
@@ -555,15 +583,15 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 func _death_burst(at: Vector2) -> void:
 	_burst(at,Color("#9fe8ff"),60,500.0)
 
-func _burst(at: Vector2,color: Color,count: int,speed: float) -> void:
+func _burst(at: Vector2,color: Color,count: int,speed: float,direction := Vector2.ZERO) -> void:
 	if pipeline!=null and pipeline.sparks.available():
-		pipeline.sparks.burst(at,color,count*2,Vector2.ZERO,speed,0.7,5.0)
+		pipeline.sparks.burst(at,color,count*2,direction,speed,0.7,5.0)
 		return
 	if _particles.size()>500: return
 	for i in mini(count,8):
 		var angle := randf()*TAU
 		var velocity := speed*(0.3+randf())
-		_particles.append({"pos":at,"vel":Vector2.from_angle(angle)*velocity*0.6,"life":0.5+randf()*0.4,"max":0.9,"color":color,"size":2.0+randf()*4.0})
+		_particles.append({"pos":at,"vel":Vector2.from_angle(angle)*velocity*0.6+direction*speed*0.4,"life":0.5+randf()*0.4,"max":0.9,"color":color,"size":2.0+randf()*4.0})
 
 func _timed_shape(canvas: CanvasItem, original: Callable) -> void:
 	var began := Time.get_ticks_usec() if perf.active else 0

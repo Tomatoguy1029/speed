@@ -586,6 +586,10 @@
       {
         "name": "Guide",
         "value": "guide"
+      },
+      {
+        "name": "Telescope",
+        "value": "telescope"
       }
     ],
     "WaveStyle": [

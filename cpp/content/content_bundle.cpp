@@ -70,6 +70,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->drifts=records.DriftDefinition_rows;
     bundle->dashes=records.DashDefinition_rows;
     bundle->battleships=records.BattleshipDefinition_rows;
+    bundle->snipers=records.SniperDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
     bundle->beams=records.BeamDefinition_rows;
@@ -221,7 +222,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -287,6 +288,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{battleship->warn,battleship->bullet_speed,battleship->slow,battleship->spread,battleship->weak_arc,battleship->admission_duration}) if (!std::isfinite(float(value))) return {};
             definition.battleship_definition=uint32_t(battleship-bundle->battleships.begin()+1);definition.weak_arc=battleship->weak_arc;
         } else if (battleship!=bundle->battleships.end()) return {};
+        const auto sniper=std::find_if(bundle->snipers.begin(),bundle->snipers.end(),[&](const auto &s){return s.id==row.id;});
+        if (row.kind==15) {
+            if (sniper==bundle->snipers.end() || sniper->lock_fill<=0 || sniper->search_period<=0 || sniper->band_width<=0 || sniper->band_narrow<=0 || sniper->laser_charge<=0) return {};
+            for (double value:{sniper->accel,sniper->keep,sniper->band_len,sniper->band_width,sniper->band_narrow,sniper->track_turn,sniper->search_turn,sniper->search_sway,sniper->search_period,sniper->lock_fill,sniper->laser_charge,sniper->laser_delay,sniper->laser_time,sniper->laser_half_width,sniper->cooldown}) if (!std::isfinite(float(value))) return {};
+            definition.sniper_definition=uint32_t(sniper-bundle->snipers.begin()+1);definition.accel=sniper->accel;
+        } else if (sniper!=bundle->snipers.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;

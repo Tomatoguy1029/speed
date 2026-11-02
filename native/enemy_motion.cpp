@@ -65,6 +65,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         if (runtime.content->definitions[e->definition].kind==speed::EnemyDefinition::Kind::Drift) row["spin"]=e->spin;
         if (e->parent_id) {row["parent_id"]=e->parent_id;row["parent_alive"]=runtime.state.enemy_handles.contains(e->parent) && !runtime.state.enemies[e->parent.slot].dead;}
         if (!e->parts.empty()) row["parts_alive"]=int64_t(speed::EnemySystem::parts_alive(runtime.state,runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id)))));
+        if (const auto *sniper=std::get_if<speed::SniperState>(&e->behavior_state)) {PackedFloat32Array rays;for (float value:sniper->rays) rays.push_back(value);row["sight_rays"]=rays;}
         row["mode"] = int(e->mode); row["timer"] = e->timer; row["charge"] = e->charge; out.append(row);
     }
     return out;

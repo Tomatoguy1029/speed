@@ -868,7 +868,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 14
+          "max": 15
         },
         {
           "name": "turn",
@@ -1618,6 +1618,14 @@
       {
         "name": "BarrierRestore",
         "value": "barrier_restore"
+      },
+      {
+        "name": "TelescopeCharge",
+        "value": "telescope_charge"
+      },
+      {
+        "name": "TelescopeFire",
+        "value": "telescope_fire"
       }
     ],
     "ResultKind": [
@@ -2010,6 +2018,15 @@
     ],
     "barrier_restore": [
       "pos"
+    ],
+    "telescope_charge": [
+      "pos"
+    ],
+    "telescope_fire": [
+      "pos",
+      "angle",
+      "length",
+      "width"
     ]
   },
   "includes": [

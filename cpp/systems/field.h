@@ -3,9 +3,12 @@
 #include <optional>
 namespace godot {class SpeedRunCore;}
 namespace speed {
+struct SightBlocker {godot::Vector2 offset;float radius=0;};
 struct BodyHit {uint32_t body=0;double t=0;godot::Vector2 point;};
 class FieldSystem {
 public:
+    static std::vector<SightBlocker> sight_blockers(const RunRuntime &,godot::Vector2 lens,double length);
+    static double sight_reach(godot::Vector2 direction,double length,const std::vector<SightBlocker> &);
     static void initialize(RunRuntime &);
     static void update(RunRuntime &);
     static void initialize_rocks(RunRuntime &);

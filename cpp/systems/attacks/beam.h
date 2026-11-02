@@ -9,6 +9,7 @@ struct BeamParams {
     godot::Color color=godot::Color::html("ff5a6e");
     BeamStyle style=BeamStyle::Plain;
     EnemyHandle owner;
+    bool attached=true;
     BudgetToken budget;
 };
 class BeamSystem {

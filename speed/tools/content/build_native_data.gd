@@ -5,7 +5,7 @@ extends RefCounted
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: StageDef = null) -> Dictionary:
-	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship"]:
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -51,6 +51,15 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		for value in row.gunner.values():
 			if not is_finite(value) or value<0.0: return {}
 		if row.gunner.telegraph<=0.0 or row.fire_interval<=0.0: return {}
+	if definition.behavior == &"sniper":
+		row.sniper = {"accel":definition.accel if definition.accel>0.0 else 2.0,"damage":float(definition.params.get("bullet_dmg",0.0))}
+		for key in ["keep","band_len","band_width","band_narrow","track_turn","search_turn","search_sway","search_period","lock_fill","lock_decay","laser_charge","laser_delay","laser_time","laser_width","cooldown"]:
+			if not definition.params.has(key): return {}
+			row.sniper[key] = float(definition.params[key])
+		for value in row.sniper.values():
+			if not is_finite(value) or value<0.0: return {}
+		for key in ["lock_fill","search_period","band_width","band_narrow","laser_charge"]:
+			if row.sniper[key]<=0.0: return {}
 	if definition.behavior == &"battleship":
 		row.battleship = {"weak_arc":definition.weak_arc,"volley":int(definition.params.get("volley",0)),"admission_duration":float(definition.params.get("telegraph",0.0))+float(definition.params.get("dash_time",definition.params.get("beam_time",definition.params.get("blast_delay",0.2))))+0.1}
 		for pair in [["telegraph","telegraph"],["bullet_speed","bullet_speed"],["damage","bullet_dmg"],["slow","slow"],["spread","spread"]]:

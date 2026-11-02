@@ -107,4 +107,23 @@ bool FieldSystem::validate(const godot::RunState &state,const ContentBundle &con
     }
     return std::isfinite(state.field.stream_t);
 }
+std::vector<SightBlocker> FieldSystem::sight_blockers(const RunRuntime &run,godot::Vector2 lens,double length) {
+    std::vector<SightBlocker> out;const auto &state=run.state;
+    for (const auto &enemy:state.enemies) if (enemy.alive && !enemy.dead && state.field.rock_handles.contains(enemy.rock)) {
+        const auto offset=enemy.pos-lens;const float radius=enemy.radius;
+        if (offset.length_squared()<=(length+radius)*(length+radius)) out.push_back({offset,radius});
+    }
+    for (const auto &body:state.field.bodies) if (body.position.distance_to(lens)<length+body.radius) out.push_back({body.position-lens,float(body.radius)});
+    return out;
+}
+double FieldSystem::sight_reach(godot::Vector2 direction,double length,const std::vector<SightBlocker> &blockers) {
+    double reach=length;
+    for (const auto &b:blockers) {
+        const double along=b.offset.dot(direction);if (along<-b.radius) continue;
+        const double perpendicular=b.offset.length_squared()-along*along;
+        if (perpendicular<=double(b.radius)*b.radius) reach=std::min(reach,std::max(0.0,along-std::sqrt(std::max(0.0,double(b.radius)*b.radius-perpendicular))));
+    }
+    return reach;
+}
+
 }

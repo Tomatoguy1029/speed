@@ -3,10 +3,13 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <cstddef>
 #include <vector>
+#include <variant>
 namespace speed {
 using godot::Vector2;
 enum class EnemyMode { Move, Windup, Dash, Recover };
+struct SniperState {std::vector<float> rays;};
 struct Enemy {
+    std::variant<std::monostate,SniperState> behavior_state;
     int64_t id = 0;
     int64_t attack_group = 0;
     double attack_value = 1, attack_priority = 0;

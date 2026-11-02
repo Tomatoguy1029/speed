@@ -11,9 +11,9 @@ AttackHandle BeamSystem::emit(RunRuntime &run,const BeamParams &p) {
     for (float channel:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(channel)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.delay=p.delay;hazard.duration=p.active;hazard.damage=p.damage;hazard.color=p.color;
     hazard.shape=BeamHazard{float(p.angle),float(p.length),float(p.half_width),float(p.arc),1,uint32_t(p.style)};
-    AttackSpec spec;spec.cause=Cause::Beam;spec.owner.live_source=p.owner;spec.owner.attached=p.owner.generation>0;spec.owner.budget=p.budget;
+    AttackSpec spec;spec.cause=Cause::Beam;spec.owner.live_source=p.owner;spec.owner.attached=p.owner.generation>0 && p.attached;spec.owner.budget=p.budget;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
-    if (p.owner.generation) spec.policies|=policy(EndPolicy::CancelWithParticipant);
+    if (p.owner.generation && p.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);
     if (!AttackSystem::configure_contact(*run.content,run.content->beams.front().contact,spec)) return {};
     return AttackSystem::emit_hazard(run.state,hazard,spec);
 }
@@ -51,7 +51,8 @@ void BeamSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
         auto color=hazard.color;color.a=0.25+0.5*k;colors.push_back(color);
     } else {
         const auto to=hazard.pos+Vector2::from_angle(beam->angle)*beam->length;
-        const double fade=1.0-std::clamp(double(hazard.time-hazard.delay)/std::max(0.001,double(hazard.duration)),0.0,1.0)*0.6;
+        double fade=1.0-std::clamp(double(hazard.time-hazard.delay)/std::max(0.001,double(hazard.duration)),0.0,1.0)*0.6;
+        if (beam->style==uint32_t(BeamStyle::Telescope)) {const double edge=std::min(0.08,double(hazard.duration));const double k=std::clamp((double(hazard.delay)+hazard.duration-hazard.time)/std::max(0.001,edge),0.0,1.0);fade*=k*k*(3.0-2.0*k);shape["rounded"]=true;}
         const double full_width=beam->half_width*2.0;
         const double sizes[]={full_width*1.6,full_width,std::max(2.0/zoom,full_width*0.3)};
         Color palette[]={hazard.color,hazard.color,Color(1,1,1,1)};const double alpha[]={0.35,0.9,0.85};
