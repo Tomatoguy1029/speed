@@ -2,6 +2,7 @@
 ## C++の状態や技実行へは渡さない。
 extends RefCounted
 const RUNNERS := {
+	"res://scripts/data_types/boss_techniques/monoceros/lance.gd":"res://scripts/bosses/monoceros/techniques/lance.gd",
 	"res://scripts/data_types/boss_techniques/monoceros/sweep.gd":"res://scripts/bosses/monoceros/techniques/sweep.gd",
 	"res://scripts/data_types/boss_techniques/monoceros/charge.gd":"res://scripts/bosses/monoceros/techniques/charge.gd",
 	"res://scripts/data_types/boss_techniques/monoceros/kick.gd":"res://scripts/bosses/monoceros/techniques/kick.gd",

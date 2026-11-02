@@ -1852,6 +1852,18 @@
       {
         "name": "ContactBolt",
         "value": "bolt"
+      },
+      {
+        "name": "LanceLaunch",
+        "value": "lance_launch"
+      },
+      {
+        "name": "SonicBoom",
+        "value": "sonic_boom"
+      },
+      {
+        "name": "LanceShatter",
+        "value": "lance_shatter"
       }
     ],
     "ResultKind": [
@@ -2432,6 +2444,24 @@
     ],
     "bolt": [
       "segments"
+    ],
+    "lance_launch": [
+      "pos",
+      "direction",
+      "horn",
+      "head_length"
+    ],
+    "sonic_boom": [
+      "pos",
+      "direction",
+      "horn",
+      "head_length"
+    ],
+    "lance_shatter": [
+      "pos",
+      "direction",
+      "horn",
+      "head_length"
     ]
   },
   "includes": [

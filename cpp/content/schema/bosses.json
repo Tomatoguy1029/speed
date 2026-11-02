@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 2
+          "max": 3
         },
         {
           "name": "phase",
@@ -243,9 +243,59 @@
           "name": "return_time",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "back_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boom_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boom_ahead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shatter_time",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 3
+      "version": 4
     },
     {
       "name": "BossTechniqueStage",

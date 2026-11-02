@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-lance" in OS.get_cmdline_user_args() or "--cpp-lance-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_lance")
+		return
 	if "--cpp-sweep" in OS.get_cmdline_user_args():
 		call_deferred("native_sweep")
 		return
@@ -436,7 +439,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	if planet_x==500.0 or moon or name in ["kick","sweep"]: cfg.character_scale = 1.0
+	if planet_x==500.0 or moon or name in ["kick","sweep","lance"]: cfg.character_scale = 1.0
 	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.approach_speed = 0.0
@@ -445,7 +448,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	var package: Dictionary = builder.boss_body_package(definition,cfg)
 	var move = load("res://data/bosses/monoceros_moves/%s.tres"%name).duplicate(true)
 	if move.has_field("warn"): move.warn = 0.25
-	move.active = 0.2
+	if move.has_field("active"): move.active = 0.2
 	if move.has_field("active_p2"): move.active_p2 = 0.2
 	move.recover = 0.05
 	move.cd = 0.0
@@ -454,6 +457,17 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		move.reach = 240.0
 		move.hold = 0.1
 		move.return_speed = TAU
+	if name=="lance":
+		move.warn = 0.2
+		move.lock_time = 0.05
+		move.aim_turn = 2.0
+		move.back_speed = 40.0
+		move.speed = 1000.0
+		move.distance = 600.0 if planet_x==500.0 else 200.0
+		move.stop_time = 0.2
+		move.stop_decay = 9.0
+		move.shatter_time = 0.1
+		move.boom_interval = 0.025
 	if name=="sweep":
 		move.active = 0.1
 		move.approach_speed_start = 100.0
@@ -486,7 +500,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		rules.graph_nodes = {}
 		var program = load("res://scripts/data_types/boss_flow_def.gd").new()
 		program.maximum_stamina = 10.0
-		program.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		program.sections = [{"request":"major" if name=="lance" else "normal","weights":({"major":1.0} if name=="lance" else {"single":1.0}),"cap":1.0,"action_count":1,"next":0}]
 		var flows: Dictionary = builder.boss_flow_records(rules,program,records.BossTechniqueDefinition)
 		for key in flows: records[key] = flows[key]
 	if obstacle:
@@ -803,4 +817,84 @@ func native_sweep() -> void:
 		owner.free()
 	await get_tree().process_frame
 	print("[cpp_monoceros_sweep] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_lance() -> void:
+	var fixture := charge_fixture(true,false,450.0,false,"lance")
+	if "--cpp-lance-retry" not in OS.get_cmdline_user_args(): check(not fixture.is_empty(),"光の槍の生成と読込を完了する")
+	if fixture.is_empty(): get_tree().quit(1); return
+	var bridge = fixture.bridge
+	var definition: Dictionary = fixture.records.BossTechniqueDefinition[0]
+	if "--cpp-lance-retry" not in OS.get_cmdline_user_args(): check(definition.kind==3 and definition.active==0.2 and definition.width==48.0 and definition.head_length==60.0 and fixture.records.BossTechniqueStage.is_empty(),"光の槍の実効値と段階時計を生成しmethod trackを残さない")
+	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(fixture.move)
+	if "--cpp-lance-retry" not in OS.get_cmdline_user_args(): check(fixture.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.6) and legacy.reach_limit(100.0)==360.0,"光の槍をPureDataへ分離し通常入口のRunnerと到達距離を保つ")
+	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==0 and state.stage==0,"本体フローで光の槍を自然選択する")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.position.is_equal_approx(Vector2(-4,0)) and is_equal_approx(state.form,0.75) and not state.locked,"溜め中は後退し二次補間で槍の長さと光を形成する")
+	var visual = load("res://scripts/bosses/monoceros/lance_visual.gd").new()
+	add_child(visual)
+	visual.apply_frame([state],0.1)
+	visual.apply_frame([state],0.15)
+	check(not visual.particles.is_empty(),"途中の表示からも光を集める粒を再構成する")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	var facing: float = state.facing
+	check(state.locked,"発進のlock_time秒前に向きを固定する")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==1 and state.sequence_stage==1 and state.facing==facing and state.form==1.0,"溜め時刻で発進し同じtickでは走らない")
+	var events: Array = fixture.events
+	check(events.any(func(e): return e.type==&"lance_launch"),"発進の光を登録済み通知で配信する")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.hit and is_equal_approx(state.traveled,100.0) and is_equal_approx(state.horn[1].x-state.position.x,237.6),"槍先を含む線分と固有の太さで一回命中する")
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"horn" and e.payload.source==&"monoceros" and e.payload.technique==&"lance") and events.filter(func(e): return e.type==&"sonic_boom").size()==4,"命中の原因と技を記録し一tick内のブームを全て配信する")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.1)
+	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(expected.sequence_stage==2 and expected.traveled==200.0,"所定距離を越えず停止段階へ移る")
+	check(held.ok and bridge.restore(held.value).ok,"槍の形成度・走行距離・ブーム余りを途中復帰する")
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0]==expected,"復帰後も同じ停止段階と槍の形へ進む")
+	bridge.release_checkpoint(held.value)
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==2 and is_equal_approx(state.speed,1000.0*exp(-0.9)) and state.form==0.0 and state.glow==0.0 and bridge._core.ship_snapshot().ship_hp==hp,"停止中は指数減速し光を砕いて当たりを追加しない")
+	check(fixture.events.any(func(e): return e.type==&"lance_shatter" and e.payload.horn[1].x>e.payload.horn[0].x),"砕ける前の槍先を通知に保つ")
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0].stage==2,"停止時間が終わったら回復へ進む")
+	bridge._core.step(0.051)
+	bridge._core.step(0.01)
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value[0].id>state.id,"自然終了後に次の行動を選択する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"光の槍の通知を共通配信へ渡す")
+	bridge.dispose()
+	visual.queue_free()
+	for disappear in [false,true]:
+		fixture = charge_fixture(false,false,450.0,false,"lance")
+		bridge = fixture.bridge
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+		bridge._core.step(0.2)
+		if disappear: bridge.command("dev_kill",{"entity_id":fixture.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+		bridge._core.step(0.2)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and not state.hit and bridge.read_frame().ok,"本体消失で槍を閉じる" if disappear else "取消後に槍の当たりを残さない")
+		bridge.dispose()
+	fixture = charge_fixture(false,true,500.0,false,"lance")
+	bridge = fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+	bridge._core.step(0.2)
+	bridge._core.step(0.4)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==2 and state.stage==1,"光の槍の走行は惑星で刺さらず停止へ進む")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_monoceros_lance] failures=",failed)
 	get_tree().quit(1 if failed else 0)

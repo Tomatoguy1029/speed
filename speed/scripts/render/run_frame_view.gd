@@ -72,6 +72,7 @@ var _pulser_parent: Node2D
 var _phoenix_visual: EnemyVisual
 var _boss_body_displays := {}
 var _boss_technique_visual: Node2D
+var _boss_lance_visual: Node2D
 var _marlin_visual: EnemyVisual
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
@@ -170,6 +171,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	marlin_layer.add_child(marlin_parent)
 	_boss_technique_visual = preload("res://scripts/bosses/monoceros/technique_visual.gd").new()
 	marlin_parent.add_child(_boss_technique_visual)
+	_boss_lance_visual = preload("res://scripts/bosses/monoceros/lance_visual.gd").new()
+	marlin_parent.add_child(_boss_lance_visual)
 	_marlin_visual = preload("res://scripts/render/enemies/marlin.gd").new()
 	_marlin_visual.setup_frame(marlin_parent)
 	_phoenix_visual = preload("res://scripts/render/enemies/phoenix.gd").new()
@@ -749,7 +752,9 @@ func apply_frame(frame: Dictionary) -> bool:
 	if frame.has("gravity") and frame.gravity!=_gravity:
 		_gravity = frame.gravity
 		_gravity_canvas.queue_redraw()
-	if frame.has("boss_techniques"): _boss_technique_visual.apply_frame(frame.boss_techniques)
+	if frame.has("boss_techniques"):
+		_boss_technique_visual.apply_frame(frame.boss_techniques)
+		_boss_lance_visual.apply_frame(frame.boss_techniques,float(frame.boss_bodies[0].clock) if not frame.get("boss_bodies",[]).is_empty() else _sniper_world_time)
 	var body_seen := {}
 	for body: Dictionary in frame.get("boss_bodies",[]):
 		if body.kind!=0: continue
@@ -827,6 +832,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_epoch = frame.epoch
 		ruler_shake=0.0
 		_queued_events.clear()
+		if _boss_lance_visual!=null: _boss_lance_visual.reset_frame()
 		_mutiny_beams.clear()
 		_flashes = ShotFlashes.new()
 		_forward_world_time = -1.0
@@ -1040,6 +1046,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_sniper_world_time = float(frame.ui.world_time)
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	for event: Dictionary in _queued_events:
+		_boss_lance_visual.frame_event(event)
 		if event.type==&"shield_stolen":
 			_shield_transfers.append({"pos":event.pos,"facing":event.facing,"r":event.r,"arc":event.arc,"life":0.3,"max":0.3})
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})

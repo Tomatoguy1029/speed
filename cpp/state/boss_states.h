@@ -13,8 +13,14 @@ struct MonocerosSweepState {
     double elapsed=0,angle=0,glow=0,base=0,speed=0;
     int32_t side=1;
 };
+struct MonocerosLanceState {
+    enum class Stage : uint8_t { Gather,Run,Stop };
+    Stage stage=Stage::Gather;
+    double elapsed=0,form=0,glow=0,traveled=0,boom_time=0,speed=0;
+    bool shattered=false;
+};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;
