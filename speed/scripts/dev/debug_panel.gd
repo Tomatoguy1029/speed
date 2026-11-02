@@ -1,6 +1,6 @@
 ## 調整パネル（仕様書 20）。開発版だけで P キーで開く。
 ##
-## ランの状態は RunSimulation への命令で変え、調整値は ContentManager の実行時の複製（cfg）だけを書き換える。
+## ランの状態は明示命令で変える。C++ではSession専用の調整値を正規生成して適用する。
 ## 「既定値に戻す」で .tres の値に戻る。.tres そのものは書き換えない（設計書 8.3）。
 extends PanelContainer
 
@@ -29,6 +29,9 @@ const SLIDERS := [
 
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var cpp_session: RunSession
+var _commands: RefCounted
+var _content_edit: RefCounted
 var _hud: Control
 var _module: OptionButton
 var _levels: SpinBox
@@ -44,6 +47,9 @@ func _ready() -> void:
 		queue_free()
 		return
 	_hud = get_parent().get_node("HudRoot")
+	if cpp_session!=null:
+		_commands = preload("res://scripts/dev/run_commands.gd").new()
+		_commands.setup_cpp(cpp_session)
 	custom_minimum_size = Vector2(420, 0)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(420, 560)
@@ -68,7 +74,7 @@ func _ready() -> void:
 		var btn := Button.new()
 		btn.text = b[0]
 		btn.add_theme_font_size_override("font_size", 15)
-		btn.pressed.connect(run.command.bind(b[1], b[2]))
+		btn.pressed.connect(_command.bind(b[1], b[2]))
 		grid.add_child(btn)
 	box.add_child(_heading("負荷計測用の敵生成（種類ランダム）"))
 	var spawn_row := HBoxContainer.new()
@@ -108,7 +114,7 @@ func _ready() -> void:
 	box.add_child(row)
 	var reset_loadout := Button.new()
 	reset_loadout.text = "装備をリセット"
-	reset_loadout.pressed.connect(run.command.bind(&"debug_reset_loadout", {}))
+	reset_loadout.pressed.connect(_command.bind(&"debug_reset_loadout", {}))
 	box.add_child(reset_loadout)
 	box.add_child(_heading("調整値（このランの間だけ。.tres は変えない）"))
 	for sdef in SLIDERS:
@@ -214,7 +220,7 @@ func _heading(text: String) -> Label:
 func _input(event: InputEvent) -> void:
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus != null and focus.is_in_group("stage_enemy_tuning_input"): return
-	if run.state.phase in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+	if _phase() in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
 		if visible: _close()
 		return
 	if not visible and not _hud.can_show_menu_overlay(): return
@@ -225,6 +231,7 @@ func _input(event: InputEvent) -> void:
 			_close()
 		elif _hud.show_menu_overlay(self):
 			show()
+			if cpp_session!=null: _editor()
 			_refresh_sliders()
 			_refresh_meta_levels()
 			for button in find_children("*", "Button", true, false):
@@ -236,20 +243,55 @@ func _close() -> void:
 	hide()
 	_hud.close_menu_overlay(self)
 
+func _phase() -> int:
+	if cpp_session!=null:
+		var frame: Dictionary = cpp_session.bridge.read_frame() if cpp_session.bridge!=null else {"ok":false}
+		return int(frame.value.ui.phase) if frame.ok else RunState.Phase.ENDED
+	return run.state.phase if run!=null and run.state!=null else RunState.Phase.ENDED
+
+func _command(name: StringName, args: Dictionary) -> void:
+	if cpp_session==null:
+		run.command(name,args)
+		return
+	var result: Dictionary = await _commands.handle_cpp(name,args)
+	if not result.ok: _status.text = result.message
+
 func _process(_delta: float) -> void:
+	if cpp_session!=null:
+		if not visible or cpp_session.bridge==null: return
+		var frame: Dictionary = cpp_session.bridge.read_frame()
+		var metrics: Dictionary = cpp_session.bridge.read_metrics()
+		if frame.ok and metrics.ok:
+			_status.text = "無敵 %s　敵 %d 体　経過 %.0f 秒" % ["ON" if frame.value.ui.invincible else "OFF",metrics.value.get("enemies",0),frame.value.ui.run_time]
+		return
 	if visible and run.state != null:
 		_status.text = "無敵 %s　敵 %d 体　経過 %.0f 秒" % ["ON" if run.ship.invincible else "OFF", run.enemies.count(), run.state.time]
 
 func _grant() -> void:
 	var id: StringName = _module.get_item_metadata(_module.selected)
 	var kind := &"weapon" if String(id).begins_with("W") else &"trait"
-	run.command(&"debug_grant", {"kind": kind, "id": id, "levels": int(_levels.value)})
+	_command(&"debug_grant", {"kind": kind, "id": id, "levels": int(_levels.value)})
 
 func _spawn_enemies() -> void:
 	_enemy_count.apply()
-	run.command(&"debug_spawn_enemies", {"count": int(_enemy_count.value)})
+	_command(&"debug_spawn_enemies", {"count": int(_enemy_count.value)})
+
+func _editor() -> RefCounted:
+	if _content_edit==null: _content_edit = load("res://scripts/dev/run_content_edit.gd").for_session(cpp_session)
+	return _content_edit
 
 func _on_slider(value: float, key: String) -> void:
+	if cpp_session!=null:
+		var edit := _editor()
+		if not edit.error.is_empty():
+			_status.text = edit.error
+			return
+		var next: GameConfig = edit.config.duplicate(true)
+		next.set(key,int(value) if typeof(next.get(key))==TYPE_INT else value)
+		var applied: Dictionary = edit.apply_config(next)
+		if not applied.ok: _status.text = applied.message
+		_refresh_sliders()
+		return
 	var cfg := ContentManager.cfg
 	if typeof(cfg.get(key)) == TYPE_INT:
 		cfg.set(key, int(value))
@@ -260,11 +302,21 @@ func _on_slider(value: float, key: String) -> void:
 
 func _refresh_sliders() -> void:
 	for key in _sliders:
-		var v = ContentManager.cfg.get(key)
+		var config: GameConfig = _content_edit.config if _content_edit!=null and _content_edit.config!=null else (ContentManager.base if cpp_session!=null else ContentManager.cfg)
+		var v = config.get(key)
 		_sliders[key][0].set_value_no_signal(float(v))
 		_sliders[key][1].text = "%s %s" % [_sliders[key][2], str(snappedf(float(v), 0.01))]
 
 func _reset_defaults() -> void:
+	if cpp_session!=null:
+		var edit := _editor()
+		if not edit.error.is_empty():
+			_status.text = edit.error
+			return
+		var applied: Dictionary = edit.apply_config(ContentManager.base.duplicate(true))
+		if not applied.ok: _status.text = applied.message
+		_refresh_sliders()
+		return
 	# 実行時の複製の中身を .tres の値に戻す（RunSimulation などが同じ複製を持っているため、中身を書き戻す）
 	var base := ContentManager.base
 	for prop in base.get_property_list():

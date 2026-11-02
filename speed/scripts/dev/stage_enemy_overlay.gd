@@ -61,8 +61,8 @@ func _ensure_contents() -> void:
 	panel = PANEL.new()
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if cpp_session!=null:
-		content_edit = load("res://scripts/dev/run_content_edit.gd").new()
-		if not content_edit.attach(cpp_session):
+		content_edit = load("res://scripts/dev/run_content_edit.gd").for_session(cpp_session)
+		if not content_edit.error.is_empty():
 			var problem := Label.new()
 			problem.text = content_edit.error
 			problem.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

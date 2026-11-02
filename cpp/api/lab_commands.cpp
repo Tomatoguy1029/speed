@@ -61,6 +61,8 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         runtime=std::move(candidate->runtime);return reply(true,value);
     }
     if (command!="dev_edit") return reply(false);
+    if (kind=="debug_action") return development_debug_command(p);
+    if (kind=="debug_content" && s.control.resume_phase!=int32_t(Phase::Finishing) && s.control.resume_phase!=int32_t(Phase::Ended)) return speed::DevCommands::replace_definition(runtime,p,true);
     if (kind=="equipment_preview" || kind=="equipment_seed") {
         if (!c.lab_mode || s.phase!=RunState::Phase::Play || p.get("id",Variant()).get_type()!=Variant::STRING) return reply(false);
         const String id=p["id"];const speed::LoadoutDefinition *definition=nullptr;
@@ -190,6 +192,7 @@ Dictionary SpeedRunCore::lab_state_run() const {
     for (const auto &e:s.enemies) if (e.alive) {
         Dictionary row;row["id"]=e.id;row["type"]=runtime.content->definitions[e.definition].id;row["pos"]=e.pos;row["vel"]=e.vel;row["hp"]=e.hp;row["max_hp"]=e.max_hp;row["armor"]=e.armor;row["speed"]=e.speed;row["r"]=e.radius;row["facing"]=e.facing;row["dead"]=e.dead;row["elite"]=e.elite;row["gate"]=int(runtime.content->definitions[e.definition].gate);row["is_boss"]=e.is_boss;row["mode"]=int(e.mode);row["charge"]=e.charge;row["parent"]=s.enemy_handles.contains(e.parent)?s.enemy_handles.entity_id(e.parent):-1;enemies.push_back(row);
     }
-    value["max_hp"]=s.ship_config.max_hp;value["xp_profile_factor"]=s.loadout.xp_profile_factor;value["hero"]=speed::HeroesSystem::snapshot(runtime);PackedInt32Array meta;for (auto level:s.loadout.meta_levels) meta.push_back(level);value["meta_levels"]=meta;
+    value["draw_time_scale"]=s.draw_config.time_scale;value["max_hp"]=s.ship_config.max_hp;value["xp_profile_factor"]=s.loadout.xp_profile_factor;value["hero"]=speed::HeroesSystem::snapshot(runtime);PackedInt32Array meta;for (auto level:s.loadout.meta_levels) meta.push_back(level);value["meta_levels"]=meta;
+    PackedStringArray definitions;for (const auto &d:runtime.content->definitions) definitions.push_back(d.id);value["definition_ids"]=definitions;
     value["lab_mode"]=s.control.lab_mode;value["cinematic_bars"]=s.control.cinematic_bars;value["camera_zoom"]=s.control.camera_zoom;value["view_half"]=s.view_half;value["view_center"]=s.view_center;value["capacity"]=s.draw_config.capacity;value["max_speed"]=s.ship_config.max_speed;value["length_mult"]=s.draw_config.length_mult;value["enemies"]=enemies;Array bodies;for (const auto &b:s.field.bodies) {Dictionary row;row["pos"]=b.position;row["r"]=b.radius;bodies.push_back(row);}value["bodies"]=bodies;value["hazards"]=hazards_snapshot();value["hostiles"]=hostiles_snapshot();return reply(true,value);
 }

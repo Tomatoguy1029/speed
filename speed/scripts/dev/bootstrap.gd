@@ -90,6 +90,12 @@ func _decorate_cpp(reference: WeakRef) -> void:
 	if session==null or session.view==null: return
 	var hud := session.view.get_node_or_null("Hud")
 	if hud==null: return
+	var panel := DEBUG_PANEL.new()
+	panel.name = "DebugPanel"
+	panel.cpp_session = session
+	panel.position = Vector2(16,110)
+	panel.size = Vector2(420,580)
+	hud.add_child(panel)
 	var tuning := ENEMY_TUNING.new()
 	tuning.name = "StageEnemyTuning"
 	tuning.cpp_session = session

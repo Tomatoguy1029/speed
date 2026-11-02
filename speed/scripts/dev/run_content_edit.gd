@@ -12,6 +12,14 @@ var signature := ""
 var error := ""
 var saved_index_path := ""
 var _saved_bytes := PackedByteArray()
+var _busy := false
+
+static func for_session(owner: RunSession) -> RefCounted:
+	if owner.has_meta("dev_content_edit"): return owner.get_meta("dev_content_edit")
+	var editor = load("res://scripts/dev/run_content_edit.gd").new()
+	if not editor.attach(owner): return editor
+	owner.set_meta("dev_content_edit",editor)
+	return editor
 
 func attach(owner: RunSession) -> bool:
 	session = weakref(owner)
@@ -42,6 +50,12 @@ func attach(owner: RunSession) -> bool:
 	if source==null or config==null:
 		error = "このランの編集元を読み込めません。"
 		return false
+	var current: Dictionary = owner.bridge.read_lab()
+	if not current.ok:
+		error = "このランの定義を読み込めません。"
+		return false
+	source.resources = source.resources.duplicate(true)
+	source.resources.enemy_ids = current.value.definition_ids
 	# このランで参照する基準を最初に複製し、以後の再読込から隔離する。
 	for id: String in source.resources.enemy_ids:
 		if not definitions.has(StringName(id)):
@@ -61,6 +75,7 @@ func sync_values() -> bool:
 	return true
 
 func apply(tuning: Dictionary) -> Dictionary:
+	if _busy: return _failure("資源の準備中です。")
 	var owner: RunSession = session.get_ref() if session!=null else null
 	if owner==null or owner.bridge==null: return _failure("対象のランは終了しています。")
 	if tuning==values: return {"ok":true,"value":null}
@@ -71,7 +86,7 @@ func apply(tuning: Dictionary) -> Dictionary:
 	var next := source.duplicate(true) as RuntimeStage
 	next.enemy_tuning = tuning.duplicate(true)
 	var output := "res://.content/dev/live_%d" % owner.id
-	var built: Error = BUILD.build(next,config,output,signature,definitions)
+	var built: Error = BUILD.build(next,config,output,signature,definitions,[],{},owner.cpp_resources)
 	if built!=OK: return _failure("定義の生成に失敗しました: %s" % error_string(built))
 	var index_path := output.path_join("stage_%d.json" % next.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
@@ -80,6 +95,7 @@ func apply(tuning: Dictionary) -> Dictionary:
 	var result: Dictionary = owner.bridge.replace_definition("config",prepared.bytes,"config")
 	if result.ok:
 		values = tuning.duplicate(true)
+		source = next
 		error = ""
 	else: error = result.message
 	return result
@@ -107,3 +123,74 @@ func notify_saved(path: String) -> Dictionary:
 	var owner: RunSession = session.get_ref() if session!=null else null
 	if owner==null or owner.bridge==null or _saved_bytes.is_empty(): return _failure("保存済みの生成物を通知できません。")
 	return owner.bridge.command("dev_tuning_saved",{"path":path,"bundle":_saved_bytes})
+
+## パネルの値は、このSessionの複製を正規生成してからまとめて適用する。
+func apply_config(next_config: GameConfig) -> Dictionary:
+	if _busy: return _failure("資源の準備中です。")
+	var owner: RunSession = session.get_ref() if session!=null else null
+	if owner==null or owner.bridge==null: return _failure("対象のランは終了しています。")
+	var built: Dictionary = _build(source,next_config)
+	if not built.ok: return built
+	var result: Dictionary = owner.bridge.replace_definition("config",built.value.bytes,"config")
+	if result.ok: config = next_config
+	return result
+
+func _build(stage: RuntimeStage, next_config: GameConfig) -> Dictionary:
+	var owner: RunSession = session.get_ref() if session!=null else null
+	if owner==null or owner.bridge==null: return _failure("対象のランは終了しています。")
+	var output := "res://.content/dev/debug_%d" % owner.id
+	var built: Error = BUILD.build(stage,next_config,output,signature,definitions,[],{},owner.cpp_resources)
+	if built!=OK: return _failure("定義の生成に失敗しました: %s" % error_string(built))
+	var path := output.path_join("stage_%d.json" % stage.index)
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var prepared: Dictionary = LOADER.read_bundle(path,index.input_sha256)
+	return {"ok":true,"value":prepared} if not prepared.is_empty() else _failure("生成した定義を読み込めません。")
+
+## ステージ外の敵は、明示生成時にだけ追加する。古い資源番号と装備の保留要求を保つ。
+func prepare_debug_enemies() -> Dictionary:
+	if _busy: return _failure("資源の準備中です。")
+	var owner: RunSession = session.get_ref() if session!=null else null
+	if owner==null or owner.bridge==null: return _failure("対象のランは終了しています。")
+	var next := source.duplicate(true) as RuntimeStage
+	var choices := PackedStringArray()
+	for entry: ContentEntry in ContentManager.sorted(ContentManager.catalog.table(&"enemies")):
+		var id := String(entry.id)
+		var definition: EnemyDef = definitions.get(entry.id)
+		if definition==null:
+			definition = ResourceLoader.load(entry.path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP).duplicate(true)
+			definitions[entry.id] = definition
+		if definition.behavior not in [&"part",&"meteor",&"obstacle",&"saw",&"triangle_star"]: choices.append(id)
+		if id not in next.resources.enemy_ids: next.resources.enemy_ids.append(id)
+	if next.resources.enemy_ids==source.resources.enemy_ids: return {"ok":true,"value":choices}
+	var built := _build(next,config)
+	if not built.ok: return built
+	_busy = true
+	var prepared: Dictionary = built.value
+	var paths := PackedStringArray()
+	for path: String in prepared.resources.paths:
+		if not owner.resources.resources.has(path): paths.append(path)
+	var scope: ContentResourceScope = ContentManager.prepare_resources(paths,DisplayServer.get_name()!="headless",prepared.resources.signatures)
+	owner.closing.connect(scope.cancel.unbind(1),CONNECT_ONE_SHOT)
+	while not scope.is_ready() and is_instance_valid(owner) and owner.bridge!=null:
+		await owner.get_tree().process_frame
+	while not scope.failed and not scope.cancelled and not scope.warmup_complete and is_instance_valid(owner) and owner.bridge!=null:
+		load("res://scripts/render/run_presentation.gd").warm_resources(owner,scope)
+		if not scope.warmup_complete: await owner.get_tree().process_frame
+	_busy = false
+	if not is_instance_valid(owner) or owner.bridge==null or scope.failed or scope.cancelled:
+		scope.cancel()
+		return _failure("追加の外観資源を準備できません。")
+	var result: Dictionary = owner.bridge.replace_definition("config",prepared.bytes,"debug_content")
+	if not result.ok:
+		scope.cancel()
+		return result
+	for path: String in scope.resources: owner.resources.provide(path,scope.resources[path])
+	scope.cancel()
+	owner.cpp_resources = prepared.resources
+	if owner.cpp_choices!=null: owner.cpp_choices.resources = prepared.resources
+	if is_instance_valid(owner.view):
+		var presentation: Node = owner.view.get_node("RunPresentation")
+		presentation.cpp_resources = prepared.resources
+		if presentation.frame_view!=null: presentation.frame_view.replace_lab_visuals(owner.resources,prepared.resources.visuals)
+	source = next
+	return {"ok":true,"value":choices}

@@ -58,7 +58,7 @@ static func _ordered(path: String, seen: Dictionary, paths: PackedStringArray) -
 	for target in _dependencies(path): _ordered(target,seen,paths)
 	paths.append(path)
 
-static func collect(startup: PackedStringArray, visuals: Array, catalog: ContentCatalog) -> Dictionary:
+static func collect(startup: PackedStringArray, visuals: Array, catalog: ContentCatalog, previous_keys := {}) -> Dictionary:
 	var hashes := {}
 	var startup_paths := {}
 	for path in startup:
@@ -72,8 +72,9 @@ static func collect(startup: PackedStringArray, visuals: Array, catalog: Content
 		for key in dependencies:
 			hashes[key] = dependencies[key]
 			if ResourceLoader.exists(key): startup_paths[key] = true
-	var keys := {}
+	var keys: Dictionary = previous_keys.duplicate()
 	var by_path := {}
+	for id: int in keys: by_path[keys[id]] = id
 	for visual: Dictionary in visuals:
 		if not visual.path.is_empty():
 			keys[visual.id] = visual.path

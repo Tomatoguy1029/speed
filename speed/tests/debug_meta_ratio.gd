@@ -19,6 +19,11 @@ func check(ok: bool, label: String) -> void:
 		push_error(label)
 
 func _ready() -> void:
+	if "--cpp-debug" in OS.get_cmdline_user_args():
+		await _test_cpp_debug()
+		print("[cpp_debug_panel] %d failures" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="): shots = arg.trim_prefix("--out=")
 	var had_save := FileAccess.file_exists(SaveManager.SAVE_PATH)
@@ -138,3 +143,74 @@ func _shot() -> void:
 	DirAccess.make_dir_recursive_absolute(shots)
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(shots.path_join("debug_meta_upgrade.png"))
+
+## D_debugだけを実際のC++Sessionと開発パネルで確認する。
+func _test_cpp_debug() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	var baseline := config.draw_time_scale
+	var saved := SaveManager.data.duplicate(true)
+	var stage: StageDef = load("res://data/stages/stage_1.tres")
+	var source: RuntimeStage = load("res://tools/content/build_runtime_stage.gd").compile(stage,"res://.content",config)
+	var output := "res://.content/dev/debug_check"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(source,config,output,"開発パネル確認".sha256_text())
+	check(built==OK,"開始用の定義を正規生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_1.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var options := {"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":734,"cpp_start":{"lab_mode":true},"cpp_edit_source":{"stage":source,"config":config,"definitions":{}}}
+	var session: RunSession = RunManager.create_session(self,options,true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"表示付きのC++ランを開始する")
+	if session.bridge==null:
+		session.free()
+		return
+	var other: RunSession = RunManager.create_session(self,options,false)
+	other.auto_step = false
+	while other.bridge==null and other.cpp_error==OK: await get_tree().process_frame
+	check(other.bridge!=null,"別ランを独立して保持する")
+	var panel: Control = session.view.get_node("Hud/DebugPanel")
+	panel.show()
+	var bridge: RefCounted = session.bridge
+	check((await panel._commands.handle_cpp(&"debug_invincible",{})).ok and bridge.read_frame().value.ui.invincible,"無敵を明示命令で切り替える")
+	check(not other.bridge.read_frame().value.ui.invincible,"別ランの無敵は変えない")
+	check((await panel._commands.handle_cpp(&"debug_grant",{"kind":"weapon","id":"W01","levels":1})).ok,"外観準備後に装備を取得する")
+	var old_keys: Dictionary = session.cpp_resources.keys.duplicate()
+	var old_weapons: Array = bridge.read_frame().value.ui.weapon_levels.duplicate(true)
+	var old_scope: ContentResourceScope = session.resources
+	var old_definitions: PackedStringArray = bridge.read_lab().value.definition_ids
+	var added: Dictionary = await panel._commands.handle_cpp(&"debug_spawn_enemies",{"count":100})
+	check(added.ok,"ステージ外を含む抽選で敵を生成する")
+	if added.ok:
+		check(added.value.size()==100,"指定数を生成する")
+		var current: PackedStringArray = bridge.read_lab().value.definition_ids
+		check(current.size()>old_definitions.size(),"定義を必要時に末尾追加する")
+		check(current.slice(0,old_definitions.size())==old_definitions,"既存の定義番号を維持する")
+		for key: int in old_keys: check(session.cpp_resources.keys[key]==old_keys[key],"既存資源番号を維持する: %d" % key)
+		check(bridge.read_frame().value.ui.weapon_levels==old_weapons,"資源追加でも装備を維持する")
+		var presentation: Node = session.view.get_node("RunPresentation")
+		for visual: Dictionary in session.cpp_resources.visuals:
+			check(presentation.frame_view.visuals.has(visual.id),"追加外観を表示へ登録する")
+			if visual.role==6: check(old_scope.resources.has(visual.path),"追加の生成済み外観をScopeで保持する")
+		await RenderingServer.frame_post_draw
+	panel._on_slider(0.25,"draw_time_scale")
+	check(is_equal_approx(panel._editor().config.draw_time_scale,0.25),"現在ランの設定を変更する")
+	check(is_equal_approx(bridge.read_lab().value.draw_time_scale,0.25),"設定をC++へ反映する")
+	check(is_equal_approx(ContentManager.base.draw_time_scale,baseline),"保存済み設定を保つ")
+	check(is_equal_approx(other.bridge.read_lab().value.draw_time_scale,baseline),"別ランへ試行設定を漏らさない")
+	panel._reset_defaults()
+	check(is_equal_approx(bridge.read_lab().value.draw_time_scale,baseline),"既定値へ戻す")
+	var before: Dictionary = bridge.read_frame().value.ui
+	check((await panel._commands.handle_cpp(&"debug_reset_loadout",{})).ok,"装備をリセットする")
+	var after: Dictionary = bridge.read_frame().value.ui
+	check(after.weapon_levels.is_empty() and after.trait_levels.is_empty(),"装備と専用資源を解除する")
+	check(after.level==before.level and after.xp==before.xp and after.hero==before.hero,"レベル・経験値・英雄を保つ")
+	check(session.cpp_choices.equipped.is_empty(),"装備の外観資源を回収する")
+	check((await panel._commands.handle_cpp(&"debug_fail",{})).ok,"終了へ進める")
+	check(not (await panel._commands.handle_cpp(&"debug_invincible",{})).ok,"終了中の操作を拒否する")
+	bridge.begin_close()
+	check(not bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"invincible","args":{}}}).ok,"終了処理を始めた窓口は命令を受け付けない")
+	check(SaveManager.data==saved,"保存データへ試行値を漏らさない")
+	session.free()
+	check(old_scope.cancelled and old_scope.resources.is_empty(),"終了時に追加外観も回収する")
+	other.free()

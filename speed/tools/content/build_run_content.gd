@@ -1374,7 +1374,7 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			visuals.append(visual)
 	return OK
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}) -> Error:
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
@@ -1754,6 +1754,42 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	if encounter_error!=OK: return encounter_error
 	var bosses_error := append_bosses(data,visuals,boss_definitions,config,stage)
 	if bosses_error!=OK: return bosses_error
+	# 開発中の追加定義は既存の装備・保留要求の資源番号を維持する。
+	if previous_resources!=null:
+		var remap := {}
+		var used := {}
+		var next_id := 1
+		for key: int in previous_resources.keys: next_id = maxi(next_id,key+1)
+		for entry: Dictionary in previous_resources.visuals: next_id = maxi(next_id,int(entry.id)+1)
+		for entry: Dictionary in visuals:
+			var assigned := 0
+			for old: Dictionary in previous_resources.visuals:
+				if used.has(old.id): continue
+				var matches := true
+				for key in ["role","path","equipment","rect","scene"]:
+					if entry.get(key)!=old.get(key): matches = false
+				if matches:
+					assigned = old.id
+					break
+			if assigned==0:
+				assigned = next_id
+				next_id += 1
+			remap[entry.id] = assigned
+			used[assigned] = true
+		for old: Dictionary in previous_resources.visuals:
+			if not used.has(old.id): return ERR_INVALID_DATA
+		for record: Dictionary in Schema.SCHEMA.records:
+			for row: Dictionary in data[record.name]:
+				for field: Dictionary in record.fields:
+					if field.get("ref")=="ResourceKey" or (record.name=="ResourceKey" and field.name=="id"):
+						var original: int = row.get(field.name,field.get("value",0))
+						if original!=0: row[field.name] = remap[original]
+		var next_metadata := {}
+		for key: int in appearance_metadata: next_metadata[remap[key]] = appearance_metadata[key]
+		appearance_metadata = next_metadata
+		for entry: Dictionary in visuals: entry.id = remap[entry.id]
+		visuals.sort_custom(func(a,b): return a.id<b.id)
+		data.ResourceKey.sort_custom(func(a,b): return a.id<b.id)
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")
@@ -1776,7 +1812,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	paths.sort()
 	var profiles_error: Error = preload("res://tools/content/build_visuals.gd").validate()
 	if profiles_error!=OK: return profiles_error
-	var manifest := preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,ContentManager.catalog)
+	var manifest := preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,ContentManager.catalog,previous_resources.keys if previous_resources!=null else {})
 	if manifest.is_empty(): return ERR_INVALID_DATA
 	paths = manifest.paths
 	var resolved_input := source_sha256.to_utf8_buffer()
