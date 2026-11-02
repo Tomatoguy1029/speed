@@ -78,6 +78,15 @@ struct KnockbackState {
     double chance=0,speed=0,life=0,base_damage=0,base_attack=0,base_knock=0,base_life=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0;
     std::vector<KnockbackVisual> visuals;
 };
+struct SonicRing {godot::Vector2 pos;double age=0;};
+struct SonicPending {EnemyHandle target;int64_t id=0;double delay=0,age=0,damage=0;godot::Vector2 velocity;bool hit=false;};
+struct SonicVisual {uint64_t id=0;int64_t target=0;godot::Vector2 pos,direction;double born=0;bool impact=false,dead=false;};
+struct SonicState {
+    bool ready=false,active=false;uint32_t definition=0;uint64_t next_visual=1;
+    godot::Vector2 last;double emission=0,distance=0,pulse=0,speed=0,wave_speed=0,life=0;
+    double damage=0,base_speed=0,base_life=0,emit_spacing=0,min_speed=0,nose=0,pulse_distance=0,pulse_time=0,side_speed=0,back_speed=0,decay=1,damage_delay=0,area_increment=0,duration_increment=0;
+    std::vector<SonicRing> frames;std::vector<SonicPending> pending;std::unordered_set<int64_t> hits;std::vector<SonicVisual> visuals;
+};
 struct ContactWaveCaught {EnemyHandle target;int64_t id=0;double age=0;};
 struct ContactWaveInstance {
     godot::Vector2 pos;uint64_t id=0;double radius=0,damage=0,age=0;
@@ -138,6 +147,7 @@ struct LoadoutState {
     bool full_burst_owned=false,full_burst_active=false;
     KnockbackState knockback;
     ContactWaveState contact_wave;
+    SonicState sonic;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;

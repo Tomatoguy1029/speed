@@ -1019,6 +1019,98 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "SonicDefinition",
+      "section": 201,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "emit_spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "min_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nose",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pulse",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "side_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "back_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

@@ -4,6 +4,7 @@
 #include "../cpp/behaviors/traits/rampage.h"
 #include "../cpp/behaviors/traits/runUp.h"
 #include "../cpp/behaviors/traits/vortex.h"
+#include "../cpp/behaviors/weapons/sonic.h"
 #include "../cpp/behaviors/weapons/endBlast.h"
 #include "../cpp/behaviors/weapons/mines.h"
 #include <algorithm>
@@ -116,6 +117,7 @@ void SpeedRunCore::commit_draw() {
     speed::RunUpBehavior::launch(runtime);
     speed::FullChargeBehavior::launch(runtime);
     speed::RampageBehavior::launch(runtime);
+    speed::SonicBehavior::launch(runtime);
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;
     Dictionary launch; launch["pos"] = runtime.state.ship.pos; launch["dir"] = dir; launch["gauge"] = runtime.state.draw.amount;
     emit_event("launch", launch);

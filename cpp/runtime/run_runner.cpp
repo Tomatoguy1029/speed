@@ -5,6 +5,7 @@
 #include "../behaviors/weapons/rear.h"
 #include "../behaviors/weapons/barrier.h"
 #include "../behaviors/weapons/contactWave.h"
+#include "../behaviors/weapons/sonic.h"
 #include "../behaviors/weapons/endBlast.h"
 #include "../behaviors/weapons/mines.h"
 #include "../behaviors/weapons/knockback.h"
@@ -90,6 +91,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
             for (const auto &owned:state.loadout.weapons) {
                 const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
                 if (id=="W01") core.step_forward(world_dt);
+                else if (id=="W08") SonicBehavior::step(core.runtime,world_dt);
                 else if (id=="W04") ContactWaveBehavior::step(core.runtime,world_dt);
                 else if (id=="W05") BarrierBehavior::step(core.runtime,world_dt);
                 else if (id=="W23") RearBehavior::step(core.runtime,world_dt);

@@ -46,6 +46,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     if (!std::isfinite(state.control.world_real_accum) || !std::isfinite(state.control.world_dt_accum) ||
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
+    for (const auto &f:state.loadout.sonic.frames) if (!f.pos.is_finite() || !std::isfinite(f.age) || f.age<0) return false;
+    for (const auto &h:state.loadout.sonic.pending) if (!h.velocity.is_finite() || !std::isfinite(h.age) || !std::isfinite(h.damage) || h.id<=0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
     for (const auto &w:state.loadout.contact_wave.waves) {
         if (!w.pos.is_finite() || !std::isfinite(w.age) || !std::isfinite(w.radius) || !std::isfinite(w.damage) || w.age<0 || w.radius<0 || w.damage<0) return false;
         for (const auto &h:w.caught) if (h.id<=0 || !std::isfinite(h.age) || h.age<0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;

@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w08" in OS.get_cmdline_user_args() or "--cpp-w08-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_w08()
+		print("[cpp_w08] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w04" in OS.get_cmdline_user_args() or "--cpp-w04-fixes" in OS.get_cmdline_user_args():
 		await check_cpp_w04()
 		print("[cpp_w04] failed=%d" % failures)
@@ -2945,3 +2950,89 @@ func check_cpp_w04() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"震空の状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w08() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	var session = await trait_test_session("W08",config,608)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W08")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var retry: bool = "--cpp-w08-fixes" in OS.get_cmdline_user_args()
+	for level in range(1,definition.level_steps.size()+1):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W08","levels":level}).ok,"発進波を全段取得する")
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		trait_start_trace(bridge,1200.0)
+		var target_pos := Vector2.INF
+		var enemy_definition: EnemyDef = ContentManager.definition(&"enemies",&"drifter")
+		for tick in 240:
+			var step: Dictionary = bridge.step(1.0/120.0,idle,viewport)
+			if not retry or level>1: check(step.ok and bridge.read_frame().ok and bridge.delivery_error.ok,"発進波の固定更新と通知が成功する")
+			var sonic: Dictionary = bridge._ui.sonic
+			if sonic.pulse<=0.05: continue
+			for frame: Dictionary in sonic.frames:
+				if frame.age<0.4: continue
+				var candidate: Vector2 = frame.pos+Vector2(0,sonic.wave_speed*frame.age)
+				var ship_distance: float = candidate.distance_to(core.ship_snapshot().ship_pos)
+				if ship_distance<150.0 or ship_distance>sonic.wave_speed*sonic.life+core.ship_snapshot().ship_vel.length()*sonic.life-50.0: continue
+				var overlaps := 0
+				for ring: Dictionary in sonic.frames:
+					if sonic.wave_speed*ring.age>2.0*1.82*config.character_scale and absf(candidate.distance_to(ring.pos)-sonic.wave_speed*ring.age)<4.0*1.82*config.character_scale+enemy_definition.radius: overlaps += 1
+				if overlaps>=3: target_pos = candidate; break
+			if target_pos.is_finite(): break
+		check(target_pos.is_finite(),"実際に残した輪の後方の重なり位置を取得する")
+		if not target_pos.is_finite(): break
+		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target_pos}).value
+		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
+		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==target)[0].hp
+		for tick in 10:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not bridge._ui.sonic.pending.is_empty(): break
+		check(bridge._ui.sonic.hits.has(target) and not bridge._ui.sonic.pending.is_empty(),"距離で残した3つ以上の輪が後方の敵へ重なる")
+		if bridge._ui.sonic.pending.is_empty(): break
+		var before: Dictionary = bridge._ui.sonic.duplicate(true)
+		check(is_equal_approx(before.wave_speed,definition.params.speed_by_level[level-1]*1.82*config.character_scale) and before.pending[0].age<before.pending[0].delay and is_equal_approx(before.pending[0].damage,bridge._ui.attack_power*definition.params.damage_by_level[level-1]),"全段の生成値を輪の速さと遅延威力へ使う")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._sonic_visual!=null and presentation.frame_view._sonic_visual._rings.multimesh.visible_instance_count>0 and not presentation.frame_view._sonic_visual.pushes.is_empty(),"発進波の輪・蒸気・衝撃の弧を本番表示へ渡す")
+		var saved: Dictionary = bridge.checkpoint()
+		bridge.command("pause",{"paused":true})
+		bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.sonic==before,"停止中は輪・押し運びと遅延時間を進めない")
+		bridge.command("pause",{"paused":false})
+		for tick in 18: bridge.step(1.0/120.0,idle,viewport)
+		var after: Dictionary = bridge._ui.sonic.duplicate(true)
+		var enemies: Array = core.enemies_snapshot()
+		var victim: Dictionary = enemies.filter(func(e): return e.id==target)[0]
+		check(after.pending[0].hit and is_equal_approx(victim.hp,hp-before.pending[0].damage) and victim.pos[1]>target_pos.y,"減衰して横後方へ押し運び遅延後に一度だけ命中する")
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		for tick in 18: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.sonic==after and core.enemies_snapshot()==enemies,"途中復帰後も輪・命中ID・減衰速度と遅延威力を再現する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
+		bridge.command("dev_post_scatter",{"interval":0,"projectile":0,"duration":2,"knockback":0,"area":2})
+		var area: TraitDef = ContentManager.definition(&"traits",&"T34")
+		check(is_equal_approx(bridge._ui.sonic.wave_speed,definition.params.speed_by_level[level-1]*1.82*config.character_scale*(1.0+area.stack_bonus(2))*(1.0+2.0*config.post_max.increments.area)) and is_equal_approx(bridge._ui.sonic.life,definition.params.life*(1.0+2.0*config.post_max.increments.duration)) and bridge._ui.sonic.frames==after.frames,"範囲特性と最大段後強化で既存輪の速さと寿命だけを再計算する")
+		bridge.command("dev_remove_weapon",{"id":"W08"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.sonic.ready and bridge._ui.sonic.frames.is_empty() and bridge._ui.sonic.pending.is_empty() and presentation.frame_view._sonic_visual==null,"途中解除で輪・押し運びと専用表示を片付ける")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"発進波の状態と表示に実行エラーがない: %s" % [errors.messages()])

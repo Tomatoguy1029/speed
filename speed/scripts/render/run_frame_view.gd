@@ -89,6 +89,8 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+var _sonic_visual: RefCounted
+var _sonic_world_time := -1.0
 var _contact_wave_visual: RefCounted
 var _contact_wave_world_time := -1.0
 var _knockback_visual: RefCounted
@@ -859,6 +861,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _vortex_visual!=null: _vortex_visual.dispose()
 		_vortex_visual = null
 		_vortex_world_time = -1.0
+		if _sonic_visual!=null: _sonic_visual.dispose()
+		_sonic_visual = null
+		_sonic_world_time = -1.0
 		if _contact_wave_visual!=null: _contact_wave_visual.dispose()
 		_contact_wave_visual = null
 		_contact_wave_world_time = -1.0
@@ -908,6 +913,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_rear_canvas.visible = equipped_rear and _ship_visible
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
 	_rear_canvas.queue_redraw()
+	var equipped_sonic: bool = frame.ui.get("sonic",{}).get("ready",false)
+	if equipped_sonic and _sonic_visual==null:
+		_sonic_visual = preload("res://scripts/render/equipment/sonic.gd").new()
+		_sonic_visual.setup_frame(_layer(14),_pixel)
+	if not equipped_sonic and _sonic_visual!=null:
+		_sonic_visual.dispose()
+		_sonic_visual = null
+		_sonic_world_time = -1.0
 	var equipped_contact_wave: bool = frame.ui.get("contact_wave",{}).get("ready",false)
 	if equipped_contact_wave and _contact_wave_visual==null:
 		_contact_wave_visual = preload("res://scripts/render/equipment/contactWave.gd").new()
@@ -1179,6 +1192,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var sonic_dt: float = 0.0 if _sonic_world_time<0.0 else maxf(0.0,ui.world_time-_sonic_world_time)
+	_sonic_world_time = ui.world_time if equipped_sonic else -1.0
+	if _sonic_visual!=null:
+		_sonic_visual.sync_frame(ui.sonic,{"ship_pos":ui.ship.ship_pos,"ship_heading":ui.ship.ship_heading,"tracing":ui.tracing,"glide":ui.glide},sonic_dt)
+		_sonic_visual.frame_tick(sonic_dt)
 	var contact_wave_dt: float = 0.0 if _contact_wave_world_time<0.0 else maxf(0.0,ui.world_time-_contact_wave_world_time)
 	_contact_wave_world_time = ui.world_time if equipped_contact_wave else -1.0
 	if _contact_wave_visual!=null:
@@ -1235,6 +1253,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	perf.since(&"view_geometry.attacks",draw_start)
 	if active and not ui.draw.drawing and ui.hitstop<=0.0:
 		_jet_time += dt*clampf(ui.ship_vel.length()/ui.base_max_speed,0.0,3.0)
+	_flame.texture = _scope.resources.get("res://assets/pixel/airship_blue_flame.png") if equipped_sonic else _scope.resources.get("res://assets/pixel/airship_flame.png")
 	for sprite in [_flame,_spark]:
 		sprite.position = ui.ship.ship_pos
 		sprite.rotation = ui.ship.ship_heading.angle()+PI/2.0

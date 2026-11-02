@@ -23,6 +23,7 @@ struct ContentBundle {
     RearPostDefinition rear_post;
     std::vector<KnockbackDefinition> knockback_levels;
     std::vector<MinesDefinition> mines_levels;
+    std::vector<SonicDefinition> sonic_levels;
     std::vector<ContactWaveDefinition> contact_wave_levels;
     std::vector<EndBlastDefinition> end_blast_levels;
     std::vector<BarrierDefinition> barrier_levels;

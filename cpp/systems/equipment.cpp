@@ -1,6 +1,7 @@
 #include "equipment.h"
 #include "../behaviors/weapons/forward.h"
 #include "../behaviors/weapons/contactWave.h"
+#include "../behaviors/weapons/sonic.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -47,6 +48,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     effects.damage_multiplier=1+run.state.loadout.rampage.bonus*run.state.loadout.rampage.strength;
     if (run.state.loadout.full_charge_maximum==1) {effects.burst_power=1;effects.ignore_armor=false;}
     run.state.trace_radius=run.content->config.trace_radius*effects.area;
+    SonicBehavior::refresh(run);
     run.state.ship_config.glide_duration_mult=1.0+glide_bonus;
     run.state.draw_config.capacity=1.0+capacity_bonus;
     const auto &p=run.state.loadout;const auto &post=run.content->post_charge;
@@ -100,6 +102,9 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W08") {
+            const auto &v=run.content->sonic_levels[next-1];auto &w=run.state.loadout.sonic;
+            w.ready=true;w.definition=id;w.damage=v.damage;w.base_speed=v.speed;w.base_life=v.life;w.emit_spacing=v.emit_spacing;w.min_speed=v.min_speed;w.nose=v.nose;w.pulse_distance=v.distance;w.pulse_time=v.pulse;w.side_speed=v.side_speed;w.back_speed=v.back_speed;w.decay=v.decay;w.damage_delay=v.damage_delay;w.area_increment=v.area_increment;w.duration_increment=v.duration_increment;
         } else if (d.external_id=="W04") {
             const auto &level=run.content->contact_wave_levels[next-1];auto &w=run.state.loadout.contact_wave;
             w.ready=true;w.definition=id;w.radius=level.radius;w.damage=level.damage;w.knock=level.knock;w.area_increment=level.area_increment;w.knockback_increment=level.knockback_increment;
@@ -154,6 +159,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W08") run.state.loadout.sonic={};
     else if (external=="W04") run.state.loadout.contact_wave={};
     else if (external=="W03") run.state.loadout.knockback={};
     else if (external=="W07") run.state.loadout.mines={};

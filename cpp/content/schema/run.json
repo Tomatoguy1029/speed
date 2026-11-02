@@ -1416,6 +1416,10 @@
       {
         "name": "ContactWave",
         "value": "contactWave"
+      },
+      {
+        "name": "Sonic",
+        "value": "sonic"
       }
     ],
     "VisualRole": [
@@ -1832,6 +1836,14 @@
       {
         "name": "SpaceQuake",
         "value": "space_quake"
+      },
+      {
+        "name": "SonicPush",
+        "value": "sonic_push"
+      },
+      {
+        "name": "SonicImpact",
+        "value": "sonic_impact"
       }
     ],
     "ResultKind": [
@@ -2398,6 +2410,17 @@
       "pos",
       "radius",
       "life"
+    ],
+    "sonic_push": [
+      "pos",
+      "dir",
+      "row",
+      "id"
+    ],
+    "sonic_impact": [
+      "pos",
+      "dir",
+      "dead"
     ]
   },
   "includes": [
