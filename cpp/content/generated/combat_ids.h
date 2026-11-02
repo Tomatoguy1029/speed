@@ -742,6 +742,25 @@ inline bool parse_symbol(std::string_view value, FriendHitKind &out) {
     if (value=="interceptor") {out=FriendHitKind::Interceptor;return true;}
     return false;
 }
+enum class HydraHeadKind : uint32_t {Bite=0,Vortex=1,Debris=2,Beam=3,Thunder=4,Count};
+inline const char *symbol_name(HydraHeadKind value) {
+    switch(value) {
+    case HydraHeadKind::Bite: return "bite";
+    case HydraHeadKind::Vortex: return "vortex";
+    case HydraHeadKind::Debris: return "debris";
+    case HydraHeadKind::Beam: return "beam";
+    case HydraHeadKind::Thunder: return "thunder";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, HydraHeadKind &out) {
+    if (value=="bite") {out=HydraHeadKind::Bite;return true;}
+    if (value=="vortex") {out=HydraHeadKind::Vortex;return true;}
+    if (value=="debris") {out=HydraHeadKind::Debris;return true;}
+    if (value=="beam") {out=HydraHeadKind::Beam;return true;}
+    if (value=="thunder") {out=HydraHeadKind::Thunder;return true;}
+    return false;
+}
 inline bool event_field_allowed(EventType type, std::string_view field) {
     switch(type) {
     case EventType::AttackStart: return field=="owner" || field=="row" || field=="id" || field=="categories" || field=="token";

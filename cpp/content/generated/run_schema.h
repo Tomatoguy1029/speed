@@ -399,7 +399,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 41) return false;
+    if (out.kind > 42) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -3989,7 +3989,7 @@ inline bool read(BinaryReader &input, BossDefinition &out) {
     if (out.id < 1) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 2) return false;
+    if (out.kind > 3) return false;
     if (!input.read_f64(out.lock_lead)) return false;
     if (out.lock_lead < 0) return false;
     if (!input.read_f64(out.horn_width)) return false;
@@ -5388,6 +5388,83 @@ inline bool read(BinaryReader &input, CanisPounceDefinition &out) {
     if (out.chain_warn < 0) return false;
     return true;
 }
+struct HydraBodyDefinition {
+    uint32_t id{};
+    uint32_t boss{};
+    uint32_t bite{};
+    uint32_t vortex{};
+    uint32_t debris{};
+    uint32_t beam{};
+    uint32_t thunder{};
+    double accel{};
+    double engage{};
+    double neck_rest{};
+    double head_hp{};
+    double attack_cd{};
+    double aim_refresh{};
+    double aim_deadzone{};
+    double aim_accel{};
+    double aim_turn{};
+    double neck_slack{};
+    double neck_wave_amplitude{};
+    double neck_wave_frequency{};
+    double neck_wave_speed{};
+    double neck_response{};
+    double arena_x{};
+    double arena_y{};
+    double arena_wall_thickness{};
+    uint32_t neck_segments{};
+    uint32_t neck_iterations{};
+};
+inline bool read(BinaryReader &input, HydraBodyDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_u32(out.bite)) return false;
+    if (!input.read_u32(out.vortex)) return false;
+    if (!input.read_u32(out.debris)) return false;
+    if (!input.read_u32(out.beam)) return false;
+    if (!input.read_u32(out.thunder)) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.engage)) return false;
+    if (out.engage < 0) return false;
+    if (!input.read_f64(out.neck_rest)) return false;
+    if (out.neck_rest < 0) return false;
+    if (!input.read_f64(out.head_hp)) return false;
+    if (out.head_hp < 0) return false;
+    if (!input.read_f64(out.attack_cd)) return false;
+    if (out.attack_cd < 0) return false;
+    if (!input.read_f64(out.aim_refresh)) return false;
+    if (out.aim_refresh < 0) return false;
+    if (!input.read_f64(out.aim_deadzone)) return false;
+    if (out.aim_deadzone < 0) return false;
+    if (!input.read_f64(out.aim_accel)) return false;
+    if (out.aim_accel < 0) return false;
+    if (!input.read_f64(out.aim_turn)) return false;
+    if (out.aim_turn < 0) return false;
+    if (!input.read_f64(out.neck_slack)) return false;
+    if (out.neck_slack < 0) return false;
+    if (!input.read_f64(out.neck_wave_amplitude)) return false;
+    if (out.neck_wave_amplitude < 0) return false;
+    if (!input.read_f64(out.neck_wave_frequency)) return false;
+    if (out.neck_wave_frequency < 0) return false;
+    if (!input.read_f64(out.neck_wave_speed)) return false;
+    if (out.neck_wave_speed < 0) return false;
+    if (!input.read_f64(out.neck_response)) return false;
+    if (out.neck_response < 0) return false;
+    if (!input.read_f64(out.arena_x)) return false;
+    if (out.arena_x < 0) return false;
+    if (!input.read_f64(out.arena_y)) return false;
+    if (out.arena_y < 0) return false;
+    if (!input.read_f64(out.arena_wall_thickness)) return false;
+    if (out.arena_wall_thickness < 0) return false;
+    if (!input.read_u32(out.neck_segments)) return false;
+    if (out.neck_segments < 1) return false;
+    if (!input.read_u32(out.neck_iterations)) return false;
+    if (out.neck_iterations < 1) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -5561,6 +5638,7 @@ struct ContentRecords {
     std::vector<CanisCommandDefinition> CanisCommandDefinition_rows;
     std::vector<CanisHowlDefinition> CanisHowlDefinition_rows;
     std::vector<CanisPounceDefinition> CanisPounceDefinition_rows;
+    std::vector<HydraBodyDefinition> HydraBodyDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -6599,6 +6677,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CanisPounceDefinition row; if (!read(input,row)) return false; out.CanisPounceDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 370: {
+        if (version != 1) return false;
+        if (count > input.remaining()/172) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraBodyDefinition row; if (!read(input,row)) return false; out.HydraBodyDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -6947,6 +7031,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisHowlDefinition_rows) if (!CanisHowlDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisPounceDefinition_ids;
     for (const auto &row:data.CanisPounceDefinition_rows) if (!CanisPounceDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraBodyDefinition_ids;
+    for (const auto &row:data.HydraBodyDefinition_rows) if (!HydraBodyDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -7128,6 +7214,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisCommandDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CanisHowlDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CanisPounceDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.HydraBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.bite)) return false;
+    for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.vortex)) return false;
+    for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.debris)) return false;
+    for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.beam)) return false;
+    for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.thunder)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -7254,5 +7346,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=172;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=173;
 }
