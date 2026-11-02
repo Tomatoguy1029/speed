@@ -2240,6 +2240,56 @@ inline bool read(BinaryReader &input, RunUpDefinition &out) {
     if (out.area_damage < 0) return false;
     return true;
 }
+struct MinesDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    uint32_t count{};
+    double damage{};
+    double radius{};
+    double life{};
+    uint32_t maximum{};
+    double trigger{};
+    double spread{};
+    double range_min{};
+    double range_max{};
+    double duration_increment{};
+    double knockback_increment{};
+    double visual_life{};
+};
+inline bool read(BinaryReader &input, MinesDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_u32(out.maximum)) return false;
+    if (out.maximum < 0) return false;
+    if (!input.read_f64(out.trigger)) return false;
+    if (out.trigger < 0) return false;
+    if (!input.read_f64(out.spread)) return false;
+    if (out.spread < 0) return false;
+    if (!input.read_f64(out.range_min)) return false;
+    if (out.range_min < 0) return false;
+    if (!input.read_f64(out.range_max)) return false;
+    if (out.range_max < 0) return false;
+    if (!input.read_f64(out.duration_increment)) return false;
+    if (out.duration_increment < 0) return false;
+    if (!input.read_f64(out.knockback_increment)) return false;
+    if (out.knockback_increment < 0) return false;
+    if (!input.read_f64(out.visual_life)) return false;
+    if (out.visual_life < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -2318,6 +2368,7 @@ struct ContentRecords {
     std::vector<DuplicatorDefinition> DuplicatorDefinition_rows;
     std::vector<EndBlastDefinition> EndBlastDefinition_rows;
     std::vector<RunUpDefinition> RunUpDefinition_rows;
+    std::vector<MinesDefinition> MinesDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -2789,6 +2840,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { RunUpDefinition row; if (!read(input,row)) return false; out.RunUpDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 79: {
+        if (version != 1) return false;
+        if (count > input.remaining()/100) return false;
+        for (uint32_t i=0; i<count; ++i) { MinesDefinition row; if (!read(input,row)) return false; out.MinesDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -2947,6 +3004,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.EndBlastDefinition_rows) if (!EndBlastDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> RunUpDefinition_ids;
     for (const auto &row:data.RunUpDefinition_rows) if (!RunUpDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MinesDefinition_ids;
+    for (const auto &row:data.MinesDefinition_rows) if (!MinesDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -3023,6 +3082,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DuplicatorDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.EndBlastDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.RunUpDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.MinesDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -3148,5 +3208,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=77;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=78;
 }
