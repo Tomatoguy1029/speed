@@ -1511,8 +1511,9 @@ func _present_cpp(delta: float) -> void:
 		frame_view.hide()
 		return
 	var frame: Dictionary = snapshot.value
-	cam_center = frame.camera.center
-	cam_zoom = frame.camera.zoom
+	var view: Dictionary = view_override if view_override is Dictionary else {}
+	cam_center = view.get("center",frame.camera.center)
+	cam_zoom = float(view.get("zoom",frame.camera.zoom))
 	_camera.position = cam_center
 	_camera.zoom = Vector2.ONE*cam_zoom
 	var half := get_viewport().get_visible_rect().size/(2.0*cam_zoom)
@@ -1542,7 +1543,7 @@ func _present_cpp(delta: float) -> void:
 		frame_view._knockback_visual.frame_shake = 0.0
 	if not frame.ui.get("presentation_frozen",false):
 		shake = maxf(0.0,shake-delta*40.0)
-		_camera.offset = Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)
+		_camera.offset = Vector2.ZERO if not view.is_empty() and not view.get("shake",false) else Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)
 	else: _camera.offset = Vector2.ZERO
 	frame_view.perf.since(&"view_effects",effects_start)
 	var tail_start := Time.get_ticks_usec() if frame_view.perf.active else 0

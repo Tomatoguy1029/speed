@@ -1,5 +1,12 @@
 #include "run_core.h"
 #include "../systems/equipment.h"
+#include "../behaviors/weapons/barrier.h"
+#include "../behaviors/weapons/interceptor.h"
+#include "../behaviors/weapons/forward.h"
+#include "../behaviors/traits/critBeam.h"
+#include "../behaviors/traits/fullBurst.h"
+#include "../behaviors/traits/killSonic.h"
+#include "../behaviors/traits/rampage.h"
 #include "../systems/heroes.h"
 #include "../runtime/dev_commands.h"
 #include "../runtime/checkpoint.h"
@@ -54,6 +61,33 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         runtime=std::move(candidate->runtime);return reply(true,value);
     }
     if (command!="dev_edit") return reply(false);
+    if (kind=="equipment_preview" || kind=="equipment_seed") {
+        if (!c.lab_mode || s.phase!=RunState::Phase::Play || p.get("id",Variant()).get_type()!=Variant::STRING) return reply(false);
+        const String id=p["id"];const speed::LoadoutDefinition *definition=nullptr;
+        for (const auto &d:runtime.content->equipment) if (String::utf8(d.external_id.c_str())==id) definition=&d;
+        if (!definition) return reply(false);const auto &owned=definition->kind==0?s.loadout.weapons:s.loadout.traits;
+        if (std::none_of(owned.begin(),owned.end(),[&](const auto &v){return v.definition==definition->id;})) return reply(false);
+        const auto matches=[&](const auto &levels){return std::any_of(levels.begin(),levels.end(),[&](const auto &v){return v.equipment==definition->id;});};
+        const auto weapon_matches=[&](const auto &levels){return std::any_of(levels.begin(),levels.end(),[&](const auto &v){return v.weapon==definition->id;});};
+        const bool kill_sonic=matches(runtime.content->kill_sonic_levels),rampage=matches(runtime.content->rampage_levels),duplicator=matches(runtime.content->duplicator_levels);
+        if (kind=="equipment_seed") {
+            if (p.size()!=1 || (!kill_sonic && !rampage) || !s.draw.tracing) return reply(false);
+            speed::DeathContext death;death.corpse.pos=s.ship.pos+s.ship.heading*100.0;death.request.cause=speed::Cause::Shot;
+            for (int i=0;i<(kill_sonic?10:150);++i) {if (kill_sonic) speed::KillSonicBehavior::kill(runtime,death);else speed::RampageBehavior::kill(runtime,death);}return reply(true);
+        }
+        Vector2 heading;if (p.size()!=3 || !point(p,"heading",heading) || heading.length_squared()<0.0001 || p.get("targets",Variant()).get_type()!=Variant::PACKED_INT64_ARRAY) return reply(false);
+        const PackedInt64Array ids=p["targets"];std::vector<speed::EnemyHandle> targets;
+        for (const auto entity:ids) {const auto row=s.rows_by_id.find(entity);if (row==s.rows_by_id.end() || s.enemies[row->second].dead) return reply(false);targets.push_back(s.enemy_handles.at(row->second));}
+        if (targets.empty()) return reply(false);heading=heading.normalized();s.ship.heading=heading;s.draw.gauge=s.draw_config.capacity;
+        if (weapon_matches(runtime.content->flash_slash_levels) || duplicator) for (auto target:targets) s.enemies[target.slot].hp=s.enemies[target.slot].max_hp=100.0;
+        if (weapon_matches(runtime.content->knockback_levels)) {s.loadout.knockback.chance=1;speed::DamageRequest hit;hit.struck=targets.front();hit.amount=100;hit.cause=speed::Cause::Shot;hit.direction=heading;speed::CombatResolver::damage_enemy(runtime,hit);}
+        if (weapon_matches(runtime.content->interceptor_levels)) speed::InterceptorBehavior::step(runtime,1.0);
+        if (duplicator) {s.loadout.duplicator.chance=1;if (s.forward.ready) speed::ForwardBehavior::step(runtime,0.5);}
+        if (weapon_matches(runtime.content->barrier_levels)) {speed::ShipDamageRequest hit;hit.amount=1;hit.has_impact=true;hit.impact=s.ship.pos+heading*100;speed::BarrierBehavior::block(runtime,hit,1);}
+        if (matches(runtime.content->crit_beam_levels)) {speed::DamageRequest hit;hit.has_impact=true;hit.impact=s.ship.pos;speed::DamageResult result;speed::CritBeamBehavior::critical(runtime,hit,result);}
+        if (matches(runtime.content->full_charge_levels)) {s.draw.gauge=0.99;speed::FullBurstBehavior::step(runtime);s.draw.gauge=s.draw_config.capacity;speed::FullBurstBehavior::step(runtime);}
+        return reply(true);
+    }
     if (kind=="meta") {
         if (p.size()!=2 || p.get("levels",Variant()).get_type()!=Variant::PACKED_INT32_ARRAY || p.get("profile",Variant()).get_type()!=Variant::DICTIONARY) return reply(false);
         const PackedInt32Array levels=p["levels"];if (levels.size()!=8) return reply(false);for (auto level:levels) if (level<0 || level>100) return reply(false);

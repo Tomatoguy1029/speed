@@ -27,6 +27,10 @@ var _clear_trait := Button.new()
 var _weapon_key := ""
 var _trait_key := ""
 var _preview_trait := false
+var _post_effect := OptionButton.new()
+var _post_count := SpinBox.new()
+var _post_ids: Array[String] = []
+var _post_max := {}
 var _equipment_level := OptionButton.new()
 var _trait_level := OptionButton.new()
 var _final_picker := OptionButton.new()
@@ -111,6 +115,25 @@ func _ready() -> void:
 		_trait_key = ""
 		_change_loadout())
 	_loadout_row.add_child(_clear_trait)
+	var post_label := Label.new()
+	post_label.text = "最大後"
+	_loadout_row.add_child(post_label)
+	for id in ContentManager.base.post_max.increments:
+		if String(id)=="heal": continue
+		_post_ids.append(String(id))
+		_post_effect.add_item(tr("postmax."+String(id)))
+	_loadout_row.add_child(_post_effect)
+	_post_count.min_value = 0
+	_post_count.max_value = 1000
+	_post_count.step = 1
+	_post_count.tooltip_text = "この試遊だけに適用する追加強化の段数"
+	_loadout_row.add_child(_post_count)
+	_post_effect.item_selected.connect(func(index: int): _post_count.set_value_no_signal(int(_post_max.get(_post_ids[index],0))))
+	_post_count.value_changed.connect(func(value: float):
+		var id: String = _post_ids[_post_effect.selected]
+		if value<=0: _post_max.erase(id)
+		else: _post_max[id] = int(value)
+		_change_loadout())
 	_refresh_equipment_labels()
 	for boss_name in FINAL_BOSS_NAMES:
 		_final_picker.add_item(boss_name)
@@ -314,22 +337,27 @@ func _setup_equipment(_key: String, serial: int, keep_playing: bool) -> void:
 	_status.text = "試遊を準備中: " + play_key
 	var settings := {"empty": true, "stage": 1, "ship_pos": [_preview_origin.x, _preview_origin.y], "invincible": true,
 		"director": {"enabled": false}, "weapons": {}, "traits": {}}
+	settings.post_max = _post_max.duplicate(true)
 	if weapon_id != &"": settings["weapons"] = {weapon_id: _equipment_level.selected + 1}
 	if trait_id != &"": settings["traits"] = {trait_id: _trait_level.selected + 1}
 	await session.reset(settings)
 	if serial != _serial: return
-	session.run.state.view_center = Vector2.ZERO
+	if session.bridge==null:
+		_status.text = "試遊を開始できません"
+		return
 	_pause_render_process()
 	if no_equipment:
 		_set_scene_processing(false)
 		_status.text = "試遊する武器・特性を選んでください"
 		refresh_effects()
 		return
-	var behavior = (session.run.loadout.trait_behaviors if play_trait else session.run.loadout.weapon_behaviors).get(play_id)
-	if behavior == null:
+	var owned: Dictionary = session.run.state.traits if play_trait else session.run.state.weapons
+	if not owned.has(play_id):
 		_status.text = "装備を試遊へ設定できません: " + play_key
 		return
-	EQUIPMENT.play(session, play_key, false, _preview_heading)
+	if not EQUIPMENT.play(session, play_key, false, _preview_heading):
+		_status.text = "装備の試行条件を適用できません"
+		return
 	_flush_preview_events()
 	_show_effect_canvas()
 	session.playing = keep_playing
@@ -369,11 +397,17 @@ func _show_effect_canvas() -> void:
 	if render == null: return
 	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud")
 	if hud != null: hud.visible = false
+	if session.bridge!=null:
+		if render.cpp_background!=null: render.cpp_background.visible = false
+		return
 	var layers: Dictionary = render.get("_layers")
 	for name in ["field", "dim"]:
 		if layers.has(name): (layers[name] as CanvasItem).visible = false
 
 func _flush_preview_events() -> void:
+	if session.bridge!=null:
+		session.bridge.collect_frame()
+		return
 	var events: Array[Dictionary] = []
 	for event in session.run.state.events:
 		events.append(event)
@@ -395,19 +429,18 @@ func _on_preview_input(event: InputEvent) -> void:
 				set_effect(_equipment_key, false)
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			var center: Vector2 = _frame.size * 0.5
-			var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
+			var zoom: float = 1280.0/EQUIPMENT_VIEW_WIDTH
 			var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
-			var target: Vector2 = center + (_preview_origin - session.run.state.view_center) * zoom * fit
+			var target: Vector2 = center + (_preview_origin - _render().cam_center) * zoom * fit
 			var direction: Vector2 = event.position - target
 			if direction.length_squared() > 16.0:
 				_preview_heading = direction.normalized()
 				set_effect(_equipment_key, false)
 	elif event is InputEventMouseMotion and _dragging_origin:
-		var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
+		var zoom: float = 1280.0/EQUIPMENT_VIEW_WIDTH
 		var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
 		_preview_origin += event.relative / maxf(zoom * fit, 0.01)
-		session.run.state.ship_pos = _preview_origin
-		session.run.state.enemy_aim = _preview_origin
+		session.perform("ship",{"pos":_preview_origin})
 		_status.text = "発生位置を移動中"
 		refresh_effects()
 
@@ -454,7 +487,8 @@ func refresh_effects() -> void:
 	if render == null: return
 	_refresh_scene_visuals(session.scene.view)
 	_update_preview_camera(render)
-	render._present(0.0)
+	if session.bridge!=null: render._present_cpp(0.0)
+	else: render._present(0.0)
 	_hide_preview_hud()
 	if not _equipment_key.is_empty(): _show_effect_canvas()
 	_sync_preview_shader_time(session.scene.view)
@@ -515,7 +549,8 @@ func _process(_delta: float) -> void:
 	_update_preview_camera(render)
 	if session.playing:
 		_visual_time += _delta * session.speed
-		render._present(_delta * session.speed)
+		if session.bridge!=null: render._present_cpp(_delta * session.speed)
+		else: render._present(_delta * session.speed)
 		_hide_preview_hud()
 		if not _equipment_key.is_empty() or not _enemy_key.is_empty():
 			if not _equipment_key.is_empty(): _show_effect_canvas()
@@ -645,5 +680,4 @@ func _add_preview_enemies() -> void:
 	var origin: Vector2 = session.run.state.ship_pos
 	for offset in [Vector2(180,0),Vector2(240,80),Vector2(240,-80)]:
 		EQUIPMENT.spawn(session,origin+offset.rotated(_preview_heading.angle()))
-	session.run.combat.rebuild_grid()
 	refresh_effects()

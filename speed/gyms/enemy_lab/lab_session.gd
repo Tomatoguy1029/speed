@@ -192,6 +192,9 @@ func _rebuild() -> void:
 		var ids := owned.keys()
 		ids.sort()
 		for id in ids: bridge.command("dev_grant_equipment",{"id":String(id),"kind":kind,"levels":int(owned[id])})
+	if spec.has("post_max"):
+		last_error = bridge.command("dev_edit",{"kind":"post_max","payload":{"stacks":spec.post_max}})
+		if not last_error.ok: return
 	tick = 0
 	selected = -1
 	_cursor = 0
@@ -457,6 +460,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			if result.ok: schedule = args.get("entries",[]).duplicate(true)
 			return result
 		"parameter","armor_paint","config","boss_parameter","boss_appearance": return _edit_definition(args,kind)
+		"post_max": return bridge.command("dev_edit",{"kind":"post_max","payload":{"stacks":args.get("stacks",{})}})
 		"loadout":
 			if args.get("reset",false):
 				for item in [["weapon",run.state.weapons],["trait",run.state.traits]]:
