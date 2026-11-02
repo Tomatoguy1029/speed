@@ -10,6 +10,7 @@
 #include "../systems/attacks/star_bolt.h"
 #include "../systems/attacks/light_arrow.h"
 #include "../systems/attacks/friend_debris.h"
+#include "../systems/attacks/friend_hull.h"
 #include "../runtime/run_runtime.h"
 #include "../systems/motion_math.h"
 #include "../systems/group_system.h"
@@ -106,7 +107,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,color,enemy.flash>0 || warning?1:0);
     }
     for (size_t i=0;i<state.friends.size();++i) {
-        const auto &shot=state.friends[i];if (!shot.alive || shot.kind==int64_t(FriendKind::Debris)) continue;
+        const auto &shot=state.friends[i];if (!shot.alive || shot.kind!=int64_t(FriendKind::Shot)) continue;
         const auto pose=interpolate(previous,{shot.id,shot.pos,shot.kind!=int64_t(FriendKind::Shot)?double(shot.angle):double(shot.vel.angle())},i,true,alpha);
         const bool saw=shot.kind==2 && shot.type==StringName("saw");
         const double radius=saw?double(shot.radius):18.0*1.82*config.character_scale;
@@ -134,7 +135,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     Array batches;for (auto &group:groups) if (!group.second.instances.empty()) batches.push_back(group.second.value());
     Array shapes;
-    for (uint32_t row=0;row<state.friends.size();++row) FriendDebrisSystem::render(run,row,view,shapes,alpha);
+    for (uint32_t row=0;row<state.friends.size();++row) {FriendDebrisSystem::render(run,row,view,shapes,alpha);FriendHullSystem::render(run,row,view,shapes,alpha);}
     for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);WallSystem::render(run,row,view,shapes);BlastSystem::render(run,row,view,shapes);}
     for (uint32_t row=0;row<state.hostiles.size();++row) {SlashSystem::render(run,row,view,shapes);BoltSystem::render(run,row,view,shapes);LightArrowSystem::render(run,row,view,shapes);}
     const auto &points=state.draw.drawing?state.draw.points:state.draw.path;

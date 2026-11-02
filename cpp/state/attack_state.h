@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 namespace speed {
+struct FriendHullState {uint32_t definition=0,source_definition=0;int64_t source_id=-1;bool saw=false;};
 struct FriendDebrisState {uint32_t definition=0;DebrisStyle style=DebrisStyle::Plain;int32_t shatter_depth=0;};
 struct DebrisDeathFixture {uint32_t count=0;double speed=0,damage=0;};
 struct LightArrowState {uint32_t definition=0;float length=0;};

@@ -565,6 +565,97 @@
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "FriendHullDefinition",
+      "section": 61,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "saw_knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_spin",
+          "type": "f64"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "FriendHullLook",
+      "section": 62,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle",
+          "type": "f64"
+        },
+        {
+          "name": "fixed_angle",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "FriendSawPoint",
+      "section": 63,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "x",
+          "type": "f32"
+        },
+        {
+          "name": "y",
+          "type": "f32"
+        }
+      ]
     }
   ],
   "enums": {

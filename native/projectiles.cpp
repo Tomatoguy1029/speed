@@ -71,6 +71,7 @@ Array SpeedRunCore::projectiles_snapshot() const {
         std::sort(sorted.begin(), sorted.end());
         Array ids; for (int64_t id : sorted) ids.append(id);
         Dictionary item;
+        if (runtime.api_configured && shot.kind==int64_t(speed::FriendKind::Hull)) {item["source_id"]=shot.hull.source_id;item["source_definition"]=shot.hull.source_definition;item["saw"]=shot.hull.saw;}
         if (runtime.api_configured && shot.kind==int64_t(speed::FriendKind::Debris)) item["shatter_depth"]=shot.debris.shatter_depth;
         item["row"] = int64_t(row); item["kind"] = shot.kind; item["generation"] = shot.generation; item["pos"] = shot.pos; item["vel"] = shot.vel;
         item["radius"] = shot.radius; item["damage"] = shot.damage; item["life"] = shot.life; item["age"] = shot.age; item["knock"]=shot.knock;

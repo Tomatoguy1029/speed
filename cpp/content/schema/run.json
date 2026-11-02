@@ -1303,7 +1303,8 @@
         "name": "Barrier",
         "value": "barrier"
       },
-      {"name": "Corpse", "value": "corpse"}
+      {"name": "Corpse", "value": "corpse"},
+      {"name": "TowShot", "value": "towShot"}
     ],
     "VisualRole": [
       {
@@ -1664,7 +1665,8 @@
         "name": "LightArrow",
         "value": "light_arrow"
       },
-      {"name": "FriendDebris", "value": "friend_debris"}
+      {"name": "FriendDebris", "value": "friend_debris"},
+      {"name": "FriendHull", "value": "friend_hull"}
     ]
   },
   "event_fields": {

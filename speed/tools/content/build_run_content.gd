@@ -135,12 +135,19 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		if look==null or not look.prepared: return {}
 		row.sprite_angle = look.angle
 		if not look.size_from_collision: row.sprite_scale *= maxf(look.base.get_width(),look.base.get_height())*0.5/maxf(definition.radius,0.001)
+	var tow_tint: Color = preload("res://data/visuals/effect_settings.tres").tinted("weapon/massTow",Color.WHITE)
+	data.FriendHullDefinition = [{"id":1,"contact":4,"saw_knock":300.0,"saw_spin":14.0,"tint_r":tow_tint.r,"tint_g":tow_tint.g,"tint_b":tow_tint.b,"tint_a":tow_tint.a}]
+	data.FriendHullLook = [{"id":1,"enemy":1,"scale":row.sprite_scale,"angle":row.sprite_angle,"fixed_angle":look.fixed_angle if look!=null else false}]
+	var saw_points: PackedVector2Array = preload("res://scripts/render/friendly/saw.gd").unit_points()
+	for point in saw_points: data.FriendSawPoint.append({"id":data.FriendSawPoint.size()+1,"x":point.x,"y":point.y})
 	var polygon := PackedVector2Array()
 	if not ResourceLoader.exists(sprite):
 		if definition.behavior not in [&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper"]: return {}
 		polygon = RunPresentation._placeholder_points(definition.shape)
 		sprite = ""
 		row.sprite_angle = 0.0
+	data.FriendHullLook[0].scale = row.sprite_scale
+	data.FriendHullLook[0].angle = row.sprite_angle
 	var visuals := [{"id":1,"role":1,"path":"res://assets/pixel/airship.png"},
 		{"id":2,"role":2,"path":""},{"id":3,"role":3,"path":"res://assets/pixel/xp_crystal_facets.tres"},
 		{"id":4,"role":4,"path":""},{"id":5,"role":5,"path":"res://assets/pixel/airship_canon.png"},
@@ -356,6 +363,10 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		row.id = i+1
 		row.visual_id = i+6
 		data.EnemyRecord.append(row)
+		var hull_look: Dictionary = resolved.FriendHullLook[0].duplicate()
+		hull_look.id = row.id
+		hull_look.enemy = row.id
+		data.FriendHullLook.append(hull_look)
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
@@ -405,6 +416,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if data.ResourceKey.is_empty():
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)
 			visuals.assign(package.visuals.slice(0,5))
+			data.FriendHullDefinition = resolved.FriendHullDefinition.duplicate(true)
+			data.FriendSawPoint = resolved.FriendSawPoint.duplicate(true)
 			data.FriendDebrisDefinition = resolved.FriendDebrisDefinition.duplicate(true)
 			data.LumpDefinition = resolved.LumpDefinition.duplicate(true)
 			data.RingHoldDefinition = resolved.RingHoldDefinition.duplicate(true)
@@ -453,7 +466,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			var settings := {}
 			for key in ["key_energy","fill_energy","key_angle","fill_angle","height","ambient","normal_strength"]:
 				settings[key] = definition.visual_value(key,lighting.get(key))
-			appearance_metadata[visual.id] = {"settings":settings,"paint":look.colors_key(definition.armor_colors),"biting":definition.behavior==&"biter",
+			appearance_metadata[visual.id] = {"settings":settings,"paint":look.colors_key(definition.armor_colors),"hull_preview":look.preview_key(definition.armor_colors),"biting":definition.behavior==&"biter",
 				"biter_parts":"res://data/visuals/biter_parts.tres" if id=="biter" and look.source_path=="res://data/visuals/looks/biter.tres" else ""}
 	if data.RunConfig.is_empty(): return ERR_INVALID_DATA
 	if not data.BiteDefinition.is_empty():

@@ -81,6 +81,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->ring_holds=records.RingHoldDefinition_rows;
     bundle->lumps=records.LumpDefinition_rows;
     bundle->friend_debris=records.FriendDebrisDefinition_rows;
+    bundle->friend_hulls=records.FriendHullDefinition_rows;bundle->hull_looks=records.FriendHullLook_rows;bundle->saw_points=records.FriendSawPoint_rows;
+    if (!bundle->friend_hulls.empty() && bundle->saw_points.size()!=24) return {};
+    for (size_t i=0;i<bundle->saw_points.size();++i) if (bundle->saw_points[i].id!=i+1) return {};
     for (size_t i=0;i<bundle->lumps.size();++i) {
         const auto &d=bundle->lumps[i];if (d.id!=i+1 || d.life<=0 || !std::isfinite(float(d.life)) ||
             bundle->hostile_definitions[d.projectile-1].kind!=uint32_t(HostileKind::Bullet)) return {};

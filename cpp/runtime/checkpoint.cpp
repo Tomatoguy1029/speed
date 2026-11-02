@@ -83,6 +83,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     for (auto row:state.dead_rows) if (row>=state.enemies.size() || !state.enemies[row].alive || !state.enemies[row].dead) return false;
     for (const auto &shot:state.friends) if (shot.alive) {
         if (shot.definition>content.friend_shots.size()) return false;
+        if (shot.kind==int64_t(FriendKind::Hull)) {
+            if (!shot.hull.definition || shot.hull.definition>content.friend_hulls.size() || (!shot.hull.saw && (!shot.hull.source_definition || shot.hull.source_definition>content.definitions.size())) ||
+                shot.hull.source_id< -1 || !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.angle) || !std::isfinite(shot.spin)) return false;
+        }
         if (shot.kind==int64_t(FriendKind::Debris)) {
             if (!shot.debris.definition || shot.debris.definition>content.friend_debris.size() || shot.debris.style>=DebrisStyle::Count || shot.debris.shatter_depth<0 ||
                 !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.angle) || !std::isfinite(shot.spin)) return false;

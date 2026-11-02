@@ -22,6 +22,11 @@ func _ready() -> void:
 		return
 
 
+	if "--cpp-friend-hull" in OS.get_cmdline_user_args():
+		await check_cpp_friend_hull()
+		print("[cpp_friend_hull] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-friend-debris" in OS.get_cmdline_user_args():
 		await check_cpp_friend_debris()
 		print("[cpp_friend_debris] failed=%d" % failed)
@@ -414,6 +419,56 @@ func check_cpp_friend_debris() -> void:
 	frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
 	check(presentation.frame_view.apply_frame(frame),"ポンプ由来の破片を通常画面で描く")
 	await get_tree().process_frame
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_bridge.release_checkpoint(empty.value)
+	cpp_session.free()
+
+func check_cpp_friend_hull() -> void:
+	if not await prepare_cpp_attack(95,"friend_hull"): return
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(200,0)}).value
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var params := {"position":cpp_origin,"velocity":Vector2(1000,0),"radius":10.0,"damage":10.0,"life":1.0,"knock":300.0,"angle":0.7,"definition_id":"drifter","source_id":source}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_hull",params)
+	check(fired.ok,"元の敵の外観とIDを持つ船体弾を生成する")
+	if not fired.ok: cpp_session.free(); return
+	cpp_core.step_projectiles(0.05)
+	var state: Array = cpp_core.projectiles_snapshot()
+	check(state[0].pos.distance_to(cpp_origin+Vector2(50,0))<0.001 and state[0].source_id==source and state[0].source_definition>0,"船体弾は元のIDを保って直進する")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(frame.shapes.any(func(s): return s.kind==ENUMS.RenderShapeKind.FriendHull and s.visual_id>0 and not s.saw),"船体弾へ元の敵の外観の参照を渡す")
+	check(presentation.frame_view.apply_frame(frame),"元の敵の船体を通常画面で描く")
+	await get_tree().process_frame
+	cpp_bridge.command("dev_remove",{"entity_id":source})
+	var held: Dictionary = cpp_bridge.checkpoint()
+	check(held.ok,"元の敵が退場した後も船体弾を保持する")
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(120,0)}).value
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(220,0)}).value
+	cpp_core.step_projectiles(0.2)
+	var events: Array = cpp_bridge.read_frame().value.events
+	var hits: Array = events.filter(func(e): return e.type==&"combat_damage" and e.payload.cause==&"towShot")
+	check(hits.size()==2 and hits[0].payload.target_id==near and hits[1].payload.target_id==far,"船体弾は近い敵から順に連続命中する")
+	check(cpp_core.projectiles_snapshot().size()==1 and cpp_core.projectiles_snapshot()[0].hit_ids.has(source),"船体弾は貫通して元のIDの命中済み記録を残す")
+	cpp_bridge.restore(held.value)
+	check(cpp_core.projectiles_snapshot()==state,"船体弾の外観・元ID・角度・寿命・命中済みIDを復元する")
+	cpp_bridge.restore(empty.value)
+	var saw: Dictionary = cpp_bridge.command("dev_fire_saw",{"position":cpp_origin,"velocity":Vector2(500,0),"radius":18.0,"damage":10.0,"life":1.0})
+	check(saw.ok,"丸鋸を船体弾の生成器から出す")
+	cpp_core.step_projectiles(0.1)
+	check(is_equal_approx(cpp_core.projectiles_snapshot()[0].angle,1.4),"丸鋸は14rad/sで回る")
+	frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	check(frame.shapes.any(func(s): return s.kind==ENUMS.RenderShapeKind.FriendHull and s.saw and s.hull_points.size()==24) and presentation.frame_view.apply_frame(frame),"丸鋸の24頂点の歯を通常画面で描く")
+	await get_tree().process_frame
+	cpp_bridge.restore(empty.value)
+	params.position = Vector2(-300,0)
+	params.velocity = Vector2(1000,0)
+	check(cpp_bridge.command("dev_fire_hull",params).ok,"天体へ向かう船体弾を生成する")
+	cpp_core.step_projectiles(0.5)
+	check(cpp_core.projectiles_snapshot().is_empty(),"船体弾は天体に当たって消える")
+	cpp_bridge.restore(held.value)
+	cpp_core.step_projectiles(1.0)
+	check(cpp_core.projectiles_snapshot().is_empty(),"船体弾は寿命で消える")
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_bridge.release_checkpoint(empty.value)
 	cpp_session.free()

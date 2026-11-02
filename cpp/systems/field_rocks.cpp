@@ -1,6 +1,7 @@
 #include "field.h"
 #include "enemy_system.h"
 #include "attack_system.h"
+#include "attacks/friend_hull.h"
 #include "../api/run_core.h"
 #include <algorithm>
 #include <cmath>
@@ -95,10 +96,9 @@ bool FieldSystem::contact_rock(godot::SpeedRunCore &core,uint32_t row,godot::Vec
     auto &run=core.runtime;auto &state=run.state;auto &enemy=state.enemies[row];
     if (run.content->definitions[enemy.definition].kind!=EnemyDefinition::Kind::Saw || run.content->rock_fields.empty()) return false;
     const auto &config=run.content->rock_fields.front();const auto u=direction.is_zero_approx()?(enemy.pos-from).normalized():direction;
-    godot::RunState::Friendly shot;shot.kind=2;shot.pos=enemy.pos;shot.vel=u*std::max(config.saw_speed,speed);shot.radius=enemy.radius;
-    shot.damage=state.combat_config.base_attack*state.combat_config.attack_mult*state.combat_config.atk_scale*config.saw_power;
-    shot.life=config.saw_life;shot.pierce=true;shot.no_crit=true;shot.knock=300;shot.angle=shot.vel.angle();shot.spin=14;shot.type="saw";shot.cause="saw";shot.color=godot::Color::html("d9dde6");
-    AttackSpec spec;spec.cause=Cause::Saw;spec.policies=policy(EndPolicy::NaturalLifetime);AttackSystem::emit_friendly(state,shot,spec);
+    FriendHullParams shot;shot.saw=true;shot.position=enemy.pos;shot.velocity=u*std::max(config.saw_speed,speed);shot.radius=enemy.radius;
+    shot.damage=state.combat_config.base_attack*state.combat_config.attack_mult*state.combat_config.atk_scale*config.saw_power;shot.life=config.saw_life;
+    FriendHullSystem::emit(run,shot);
     godot::Dictionary event;event["pos"]=enemy.pos;event["normal"]=-u;event["enemy_pos"]=enemy.pos;event["r"]=enemy.radius;core.emit_event("block_impact",event);
     EnemySystem::retire(core.runtime,state.enemy_handles.at(row),RetireReason::Development);return true;
 }

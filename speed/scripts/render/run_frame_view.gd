@@ -15,6 +15,7 @@ var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
 var _arrow_displays: Dictionary = {}
 var _debris_displays: Dictionary = {}
+var _hull_displays: Dictionary = {}
 var _debris_trails: Array[Dictionary] = []
 var _scope: ContentResourceScope
 var _pixel := 1.82
@@ -223,9 +224,11 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
+		if row.kind==SHAPE_KIND.FriendHull:
+			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("angle") is float or not row.get("saw") is bool or not row.get("visual_id") is int or not row.get("hull_points") is PackedVector2Array: return false
 		if row.kind==SHAPE_KIND.FriendDebris:
 			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("trail") is PackedVector2Array or not row.get("velocity") is Vector2 or row.get("debris_style") not in [0,1,2]: return false
 			for key in ["angle","age","life","clock","trail_width"]:
@@ -317,10 +320,21 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in _wave_displays.values(): display.hide()
 	for display: Node in _arrow_displays.values(): display.hide()
 	for display: Node in _debris_displays.values(): display.hide()
+	for display: Node in _hull_displays.values(): display.hide()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
+		if row.kind==SHAPE_KIND.FriendHull:
+			var key := int(row.order)
+			if not _hull_displays.has(key):
+				var hull := preload("res://scripts/render/attacks/friend_hull.gd").new()
+				parent.add_child(hull)
+				hull.setup(_scope,visuals)
+				_hull_displays[key] = hull
+			_hull_displays[key].apply_frame(row)
+			_hull_displays[key].show()
+			continue
 		if row.kind==SHAPE_KIND.FriendDebris:
 			var key := int(row.order)
 			if not _debris_displays.has(key):
