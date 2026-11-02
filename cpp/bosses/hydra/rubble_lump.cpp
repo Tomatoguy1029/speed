@@ -16,12 +16,14 @@ void HydraNormalAttack::step_rubble(RunRuntime &r,TechniqueState &t,double dt) {
     if (time<p.warn) {aim(r,*b,n,(n.target-from).angle(),dt);n.glow=time/std::max(p.warn,0.001);}
     else if (!n.locked) {
         n.locked=true;n.strike_pos=n.strike_from=from;n.sweep=free?n.look_angle:n.angle;const auto direction=godot::Vector2::from_angle(n.sweep);
-        EnemySpawn spawn;spawn.position=from;spawn.origin=SpawnOrigin::BossPart;spawn.velocity=direction*rubble.speed;spawn.has_velocity=true;
+        for (uint32_t i=0;i<rubble.count;++i) {
+        EnemySpawn spawn;spawn.position=from;spawn.origin=SpawnOrigin::BossPart;spawn.velocity=godot::Vector2::from_angle(n.sweep+rubble.spread*(double(i)/std::max(1.0,double(rubble.count)-1)-0.5))*rubble.speed;spawn.has_velocity=true;
         const auto id=EnemySystem::spawn(r,rubble.enemy-1,spawn);
         if (id>0) {
             const auto actor=r.state.enemy_handles.at(r.state.rows_by_id.at(id));r.state.enemies[actor.slot].radius=rubble.radius;
             HazardState h;h.pos=from;h.duration=rubble.life;h.damage=p.damage;HydraShapeHazard shape;shape.points={from,from+godot::Vector2(0.1,0)};shape.life=rubble.life;shape.width=rubble.radius*2;shape.follow=actor;h.shape=shape;
             AttackSpec spec;spec.owner.live_source=t.actor;spec.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));spec.boss=r.state.bosses.body_handles.at(uint32_t(b-r.state.bosses.bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Rubble;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=AttackSystem::emit_hazard(r.state,h,spec);if (AttackSystem::get(r.state,handle)) r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;
+        }
         }
         cue(r,*b,n,"attack_started",t.definition);
     }

@@ -4892,6 +4892,10 @@ func native_hydra_rubble() -> void:
 	var effect: Dictionary = body.effects[0].duplicate(true)
 	var rubble: Array = bridge._core.enemies_snapshot().filter(func(e): return e.type=="hydra_rubble" and not e.dead)
 	check(rubble.size()==count,"各瓦礫は判定だけでなく敵の行を持つ")
+	if fan:
+		var first_velocity := Vector2(rubble[0].vel[0],rubble[0].vel[1])
+		var last_velocity := Vector2(rubble[-1].vel[0],rubble[-1].vel[1])
+		check(is_equal_approx(first_velocity.length(),400.0) and is_equal_approx(absf(angle_difference(first_velocity.angle(),last_velocity.angle())),1.3),"6個の散弾はラジアンの広がりと同じ初速を保つ")
 	bridge.command("dev_ship_motion",{"position":effect.points[0],"velocity":Vector2.ZERO})
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	var held: Dictionary = bridge.checkpoint()
