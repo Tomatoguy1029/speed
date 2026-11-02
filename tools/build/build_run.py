@@ -33,7 +33,7 @@ def prepare_verification(root, project):
     # 既存確認の本文だけを独立した確認用コピーの起動Scriptへ載せる。
     checks = (root / 'speed/tests/content/check_rules.gd').read_text()
     methods = []
-    for name in ['_package_runtime', '_package_has_legacy']:
+    for name in re.findall(r'^func (_package_\w+)\(', checks, re.M):
         match = re.search(r'^func ' + name + r'\([^\n]*\n.*?(?=^func |\Z)', checks, re.M | re.S)
         if not match:
             raise ValueError('既存の配布確認がありません: ' + name)
@@ -46,7 +46,9 @@ def prepare_verification(root, project):
     ready = 'func _ready() -> void:\n'
     if ready not in text or 'func _package_runtime(' in text:
         raise ValueError('確認用の起動Scriptを安全に準備できません')
-    hook = ('\tif "--package-runtime" in OS.get_cmdline_user_args() or "--package-missing-runtime" in OS.get_cmdline_user_args():\n'
+    hook = ('\tif "--package-loading" in OS.get_cmdline_user_args():\n'
+            '\t\tcall_deferred("_package_loading")\n'
+            '\telif "--package-runtime" in OS.get_cmdline_user_args() or "--package-missing-runtime" in OS.get_cmdline_user_args():\n'
             '\t\tcall_deferred("_package_runtime")\n\t\treturn\n')
     path.write_text(text.replace(ready, ready + hook, 1) + '\n\n' + '\n\n'.join(methods) + '\n')
 
@@ -123,7 +125,8 @@ def package(root, lock, args):
         for executable in output.glob('*.app/Contents/MacOS/*'):
             executable.chmod(executable.stat().st_mode | 0o111)
     run([sys.executable, root / 'speed/tests/integration/export_package.py', output, '--platform', args.platform,
-         *(['--runtime'] if args.verify else []), *(['--rendered'] if args.rendered else []), '--script', root / 'speed/tests/content/check_rules.gd'])
+         *(['--runtime'] if args.verify else []), *(['--rendered'] if args.rendered else []),
+         *(['--loading'] if args.verify_loading else []), '--script', root / 'speed/tests/content/check_rules.gd'])
     print('配布物: ' + str(artifact))
 
 
@@ -142,10 +145,13 @@ def main():
     parser.add_argument('--templates', type=Path, help='version.txtを持つ固定版export templateディレクトリ')
     parser.add_argument('--verify', action='store_true', help='配布エンジンで最小ランとライブラリ欠落時の失敗を確認する')
     parser.add_argument('--rendered', action='store_true', help='Macの配布確認をgodot-bgで描画付き起動する')
+    parser.add_argument('--verify-loading', action='store_true', help='Mac配布版で初回・再出撃・装備準備・取消・戻るの時間と回収を確認する')
     parser.add_argument('--jobs', type=int, default=4)
     args = parser.parse_args()
     if args.rendered and (args.platform != 'macos' or not args.verify):
         parser.error('--rendered はMacの --verify と合わせて指定してください')
+    if args.verify_loading and not (args.package_dir and args.verify and args.rendered):
+        parser.error('--verify-loading はMac配布の --verify --rendered と合わせて指定してください')
     if args.platform == 'windows' and args.arch not in (None, 'x86_64'):
         parser.error('Windowsの対象はx86_64です')
     if not args.sdk.is_dir():

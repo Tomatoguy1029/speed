@@ -14,6 +14,8 @@ var cfg: GameConfig
 
 var catalog: ContentCatalog
 var visual_index: StageResources
+## 生成物の存在確認とアプリ共通定義の読込。出撃の時間とは分けて扱う。
+var startup_timings: Dictionary = {}
 var _tables: Dictionary = {}
 var _definitions: Dictionary = {}
 var enemies: Dictionary:
@@ -45,10 +47,13 @@ var heroes: Dictionary:
 	set(value): _tables[&"heroes"] = value
 
 func _ready() -> void:
+	var began := Time.get_ticks_usec()
 	# エディターの実行前プラグインを通らない起動でも、音源より先に生成する。
 	if not _ensure_runtime_content():
 		get_tree().quit(1)
 		return
+	startup_timings["generated_outputs_check_ms"] = (Time.get_ticks_usec()-began)/1000.0
+	began = Time.get_ticks_usec()
 	base = load(CONFIG_PATH) as GameConfig
 	if OS.has_feature("editor"): source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	reset_runtime()
@@ -58,6 +63,7 @@ func _ready() -> void:
 	if OS.has_feature("editor"):
 		for entry in catalog.entries:
 			source_hashes[entry.path] = FileAccess.get_sha256(entry.path)
+	startup_timings["common_definitions_read_ms"] = (Time.get_ticks_usec()-began)/1000.0
 
 ## 調整値を .tres の値に戻す。
 func reset_runtime() -> void:

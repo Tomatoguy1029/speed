@@ -37,6 +37,7 @@ var _loading: CanvasLayer
 var loading_timings: Dictionary = {}
 var _load_started_us := 0
 var _warm_started_us := 0
+var _start_started_us := 0
 var _progress: ProgressBar
 
 ## 通常の出撃は資源を別スレッドで準備し、準備が終わるまで戦闘の時計を始めない。
@@ -123,12 +124,16 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	cpp_edit_source = options.get("cpp_edit_source",{}).duplicate(true)
 	cpp_error = OK
 	_warm_started_us = 0
+	_start_started_us = Time.get_ticks_usec()
 	var prepared := preload("res://scripts/runtime/run_content_loader.gd").read_bundle(index_path,input_sha256)
+	loading_timings["bundle_read_ms"] = (Time.get_ticks_usec()-_start_started_us)/1000.0
 	if prepared.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
 	if not RunManager.ensure_registered(self): return ERR_OUT_OF_MEMORY
+	var configure_started := Time.get_ticks_usec()
 	var next_bridge = preload("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":1 if OS.is_debug_build() or options.get("cpp_start",{}).get("lab_mode",false) else 0,
 		"stage_id":prepared.index.get("stage_id",""),"profile":options.get("cpp_profile",{}),"settings":{"hitstop":bool(SaveManager.settings.get("hitstop",true))}})
+	loading_timings["core_configure_ms"] = (Time.get_ticks_usec()-configure_started)/1000.0
 	if not configured.ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA
@@ -144,6 +149,7 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	else:
 		resources = ContentResourceScope.new()
 		resources.warmup_complete = true
+	loading_timings["resource_request_ms"] = (Time.get_ticks_usec()-_load_started_us)/1000.0
 	_poll_cpp_loading()
 	return cpp_error
 
@@ -151,15 +157,7 @@ func _poll_cpp_loading() -> void:
 	if _pending_cpp.is_empty() or not _cpp_accepting: return
 	if is_instance_valid(_progress): _progress.value = resources.progress()*100.0
 	if resources.failed or resources.cancelled:
-		cpp_error = ERR_CANT_OPEN
-		_pending_cpp_bridge.dispose()
-		_pending_cpp_bridge = null
-		_pending_cpp.clear()
-		resources.cancel()
-		if _loading!=null:
-			_loading.queue_free()
-			_loading = null
-		loading_failed.emit(cpp_error)
+		_fail_cpp_loading(ERR_CANT_OPEN)
 		return
 	if not resources.is_ready(): return
 	if _warm_started_us==0:
@@ -177,12 +175,12 @@ func _poll_cpp_loading() -> void:
 	var with_view: bool = pending.with_view
 	var start_options: Dictionary = options.get("cpp_start",{}).duplicate(true)
 	start_options.endless = options.get("endless",false)
+	var initialize_started := Time.get_ticks_usec()
 	if not next_bridge.start(pending.seed,start_options).ok:
-		cpp_error = ERR_INVALID_DATA
 		next_bridge.dispose()
-		resources.cancel()
-		loading_failed.emit(cpp_error)
+		_fail_cpp_loading(ERR_INVALID_DATA)
 		return
+	loading_timings["simulation_initialize_ms"] = (Time.get_ticks_usec()-initialize_started)/1000.0
 	if _loading!=null:
 		_loading.queue_free()
 		_loading = null
@@ -193,8 +191,11 @@ func _poll_cpp_loading() -> void:
 	cpp_core = bridge._core
 	cpp_choices = preload("res://scripts/runtime/run_choice_resources.gd").new()
 	cpp_choices.attach(bridge,cpp_resources,self)
+	var scene_started := Time.get_ticks_usec()
 	if with_view:
 		view = (resources.resources[VIEW_PATH] as PackedScene).instantiate()
+		loading_timings["scene_instantiate_ms"] = (Time.get_ticks_usec()-scene_started)/1000.0
+		scene_started = Time.get_ticks_usec()
 		var presentation: Node = view.get_node("RunPresentation")
 		presentation.bridge = bridge
 		presentation.cpp_resources = cpp_resources
@@ -216,11 +217,28 @@ func _poll_cpp_loading() -> void:
 		var router = preload("res://scripts/input/input_router.gd").new()
 		add_child(router)
 		cpp_input_source = router.poll
+	loading_timings["presentation_setup_ms"] = (Time.get_ticks_usec()-scene_started)/1000.0
 	for recorder: Node in get_tree().get_nodes_in_group("cpp_recorders"):
 		recorder.attach_cpp(self)
 	started.emit()
+	var publish_started := Time.get_ticks_usec()
 	var delivered: Dictionary = bridge.collect_frame()
+	loading_timings["initial_publish_ms"] = (Time.get_ticks_usec()-publish_started)/1000.0
+	# 総時間とresource_request_msは内包区間を持つ。項目を足して総時間にしない。
+	loading_timings["loading_total_ms"] = (Time.get_ticks_usec()-_start_started_us)/1000.0
 	if not delivered.ok: push_warning(delivered.message)
+
+func _fail_cpp_loading(error: Error) -> void:
+	cpp_error = error
+	if _pending_cpp_bridge!=null: _pending_cpp_bridge.dispose()
+	_pending_cpp_bridge = null
+	_pending_cpp.clear()
+	if resources!=null: resources.cancel()
+	cpp_resources = null
+	if _loading!=null:
+		_loading.queue_free()
+		_loading = null
+	loading_failed.emit(error)
 
 func _consume_cpp_result(frame: Dictionary) -> bool:
 	_cpp_pending_result = frame.result if frame.result is Dictionary else {}

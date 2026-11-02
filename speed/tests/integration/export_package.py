@@ -77,7 +77,7 @@ def inspect(path: Path, runtime_package=False) -> dict:
     return files
 
 
-def package(path: Path, platform: str, runtime: bool, script: Path, rendered=False) -> None:
+def package(path: Path, platform: str, runtime: bool, script: Path, rendered=False, loading=False) -> None:
     packs = list(path.rglob("*.pck"))
     assert len(packs) == 1, "配布物にはPCKが1つ必要"
     files = inspect(packs[0], True)
@@ -112,6 +112,11 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
     result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
     print(result.stdout)
     assert result.returncode == 0 and "[package_runtime] OK" in result.stdout, "通常ランの開始と最小更新を最後まで実施する"
+    if loading:
+        loading_command = [executable, "--log-file", str(path.parent / "loading.log"), "--", "--package-loading"]
+        result = subprocess.run(loading_command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
+        print(result.stdout)
+        assert result.returncode == 0 and "[package_loading] OK" in result.stdout, "描画付き配布版で出撃準備と資源回収を確認する"
     # 元の配布物を保ち、DLLを抜いた別コピーで旧実装へのfallbackがないことを確かめる。
     with tempfile.TemporaryDirectory(prefix="speed-package-missing-") as temporary:
         missing = Path(temporary) / "export"
@@ -130,11 +135,14 @@ if __name__ == "__main__":
     parser.add_argument("--platform", choices=["macos", "windows"])
     parser.add_argument("--runtime", action="store_true")
     parser.add_argument("--rendered", action="store_true")
+    parser.add_argument("--loading", action="store_true")
     parser.add_argument("--script", type=Path, default=Path(__file__).resolve().parents[1] / "content/check_rules.gd")
     args = parser.parse_args()
     if args.rendered and (args.platform != "macos" or not args.runtime):
         parser.error("--rendered はMacの --runtime と合わせて指定してください")
+    if args.loading and not args.rendered:
+        parser.error("--loading はMacの --runtime --rendered と合わせて指定してください")
     if args.platform:
-        package(args.path.resolve(), args.platform, args.runtime, args.script, args.rendered)
+        package(args.path.resolve(), args.platform, args.runtime, args.script, args.rendered, args.loading)
     else:
         inspect(args.path)

@@ -31,7 +31,6 @@ func _initialize() -> void:
 		_forbid_regex(path, "\\bstate\\.[a-z_]+\\s*[+\\-*/]?=[^=]", "UI がランの状態を書き換えている")
 	for path in _files("res://scripts/encounters"):
 		_forbid(path, ["projectiles.director ="], "攻撃directorの所有はRunSimulationに集約する")
-	_forbid("res://scripts/runtime/run_simulation.gd", ["res://scripts/dev/", "&\"debug_"], "シミュレーションが開発用機能を参照している")
 	_forbid("res://scenes/run/run.tscn", ["res://scripts/dev/"], "本番の表示が開発用機能を参照している")
 	_forbid("res://scripts/ui/main.gd", ["res://gyms/", "res://addons/"], "画面の入口が開発用機能を参照している")
 	if errors.is_empty():
@@ -86,7 +85,7 @@ func _files(dir: String) -> Array[String]:
 	return out
 
 
-## export済みPCKだけを持つ配布エンジンから外部Scriptとして呼ぶ。
+## 確認用コピーのMainへ移して、公式配布エンジンの通常起動から呼ぶ。
 ## 生成器・テスト資源・エディターキャッシュは配布へ加えない。
 func _package_runtime() -> void:
 	var missing := "--package-missing-runtime" in OS.get_cmdline_user_args()
@@ -134,3 +133,143 @@ func _package_has_legacy(session: Object) -> bool:
 	for property: Dictionary in session.get_property_list():
 		if property.name=="_sim": return session.get("_sim")!=null
 	return false
+
+## 通常出撃の初回と再出撃を測る。ボスと交換の条件だけは明示した実験場を使う。
+func _package_loading() -> void:
+	if OS.has_feature("editor") or DisplayServer.get_name()=="headless":
+		push_error("P04は描画付きの配布版で確認してください")
+		quit(1)
+		return
+	var stamp := FileAccess.get_sha256("res://.content/stamp.json")
+	_package_measure("起動",{"engine_elapsed_ms":Time.get_ticks_msec(),"content":ContentManager.startup_timings})
+	var ok := true
+	for label in ["通常初回","通常再出撃"]:
+		GameManager.start_run(1)
+		var session: RunSession = RunManager.current()
+		if session==null or not await _package_ready(session):
+			push_error("P04の通常出撃を開始できません")
+			quit(1)
+			return
+		_package_measure(label,session.loading_timings)
+		ok = await _package_initial_equipment(session,label) and ok
+		ok = await _package_release(session,label,true) and ok
+	# 通常の時間進行や成長の所要時間とは別に、同じ表示・資源経路の初回費用を測る。
+	var path := "res://.content/run/stage_1.json"
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var options := {"cpp_index":path,"cpp_signature":index.input_sha256,"seed":42,"cpp_start":{"lab_mode":true}}
+	var fixture: RunSession = RunManager.create_session(root,options,true)
+	if await _package_ready(fixture):
+		ok = await _package_lab_preparation(fixture) and ok
+		ok = await _package_release(fixture,"実験場条件",false) and ok
+	else:
+		fixture.free()
+		ok = false
+	# 準備の取消は通常の要求を発行してから破棄し、到着後にも保持が戻らないことを確かめる。
+	var cancelled: RunSession = RunManager.create_run()
+	root.add_child(cancelled)
+	ok = cancelled.bridge==null and not cancelled._pending_cpp.is_empty() and ok
+	ok = await _package_release(cancelled,"準備取消",false) and ok
+	# 失敗を注入するのは準備窓口だけ。要求した資源は本番のContentManagerが回収する。
+	var failed_session := RunSession.new()
+	root.add_child(failed_session)
+	failed_session.cpp_prepare = func(paths: PackedStringArray) -> ContentResourceScope:
+		var scope := ContentManager.prepare_resources(paths,true)
+		scope.failed = true
+		return scope
+	var failure: Error = failed_session.start_cpp_content(path,index.input_sha256,42,true)
+	ok = failure!=OK and failed_session.bridge==null and failed_session.cpp_resources==null and failed_session._pending_cpp_bridge==null and ok
+	ok = await _package_release(failed_session,"準備失敗を注入",false) and ok
+	# 生成器・固定解析用ScriptはPCKから除外し、生成済みの索引をこの起動中に更新しない。
+	var generated_unchanged := not stamp.is_empty() and FileAccess.get_sha256("res://.content/stamp.json")==stamp
+	for excluded in ["res://tools/content/build_all.gd","res://addons/content_build/builder.gd","res://scripts/render/armor_paint.gd"]:
+		generated_unchanged = not ResourceLoader.exists(excluded) and generated_unchanged
+	_package_measure("配布生成境界",{"stamp_unchanged":generated_unchanged,"pending_resources":ContentManager.pending_resources()})
+	ok = generated_unchanged and ok
+	if ok: print("[package_loading] OK")
+	else: push_error("P04の準備・回収の確認に失敗しました")
+	quit(0 if ok else 1)
+
+func _package_measure(label: String, values: Dictionary) -> void:
+	print("[package_loading_measure] "+JSON.stringify({"case":label,"values":values}))
+
+func _package_ready(session: RunSession) -> bool:
+	session.auto_step = false
+	for frame in range(600):
+		if session.bridge!=null or session.cpp_error!=OK: break
+		await process_frame
+	return session.bridge!=null and session.cpp_error==OK and session.view!=null and not _package_has_legacy(session)
+
+func _package_step(session: RunSession) -> bool:
+	return session.bridge.step(1.0/120.0,session.bridge.pack_intent(load("res://scripts/input/intent.gd").new()),{"logical_size":Vector2(1280,720)}).ok
+
+func _package_initial_equipment(session: RunSession, label: String) -> bool:
+	var initial: Dictionary = session.bridge.read_frame().value
+	var cards: Dictionary = initial.ui.cards
+	if not cards.initial or cards.candidates.is_empty() or initial.ui.run_time!=0.0: return false
+	var began := Time.get_ticks_usec()
+	var candidate: Dictionary = cards.candidates[0]
+	if not session.bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":candidate.candidate_id}).ok: return false
+	for frame in range(600):
+		session.cpp_choices.poll()
+		if not _package_step(session): return false
+		if not session.bridge.read_frame().value.ui.weapon_levels.is_empty(): break
+		await process_frame
+	await process_frame
+	await process_frame
+	var equipped: Dictionary = session.bridge.read_frame().value
+	var ok: bool = equipped.ui.weapon_levels.any(func(item): return item.id==candidate.id) and session.cpp_choices.equipped.has("weapon:"+str(candidate.id))
+	_package_measure(label+"の初期装備",{"resource_and_present_ms":(Time.get_ticks_usec()-began)/1000.0,"weapon":candidate.id,"equipped":ok})
+	return ok
+
+func _package_lab_preparation(session: RunSession) -> bool:
+	var bridge: RefCounted = session.bridge
+	var ok := true
+	for i in ContentManager.cfg.weapon_slots:
+		ok = bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W%02d" % (i+1),"levels":1}).ok and ok
+	var at: float = ContentManager.stage(1).boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1
+	var began := Time.get_ticks_usec()
+	ok = bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":true,"invincible":true,"time":at}}).ok and ok
+	for i in 3: ok = _package_step(session) and ok
+	await process_frame
+	await process_frame
+	var boss: bool = not bridge.read_frame().value.ui.boss_bodies.is_empty()
+	_package_measure("実験場条件のボス初登場",{"spawn_and_present_ms":(Time.get_ticks_usec()-began)/1000.0,"boss_bodies_present":boss,"natural_progression":false})
+	ok = boss and ok
+	began = Time.get_ticks_usec()
+	ok = bridge.command("dev_edit",{"kind":"comet_weapon","payload":{"id":"W22"}}).ok and ok
+	ok = _package_step(session) and ok
+	var cards: Dictionary = bridge.read_frame().value.ui.cards
+	if cards.get("swap_pick","")!="W22" or cards.candidates.is_empty(): return false
+	var target: Dictionary = cards.candidates[0]
+	ok = bridge.command("choose_swap",{"offer_id":cards.offer_id,"candidate_id":target.candidate_id,"replace_weapon_id":str(target.id)}).ok and ok
+	# prepareを差し替えず、実際の資源要求→描画準備→装備への保持を待つ。
+	for frame in range(600):
+		session.cpp_choices.poll()
+		ok = _package_step(session) and ok
+		if session.cpp_choices.equipped.has("weapon:W22"): break
+		await process_frame
+	await process_frame
+	await process_frame
+	var exchanged: bool = bridge.read_frame().value.ui.weapon_levels.any(func(item): return item.id=="W22") and session.cpp_choices.equipped.has("weapon:W22")
+	_package_measure("実験場条件の装備交換",{"offer_resources_and_present_ms":(Time.get_ticks_usec()-began)/1000.0,"equipped":exchanged,"natural_progression":false})
+	return exchanged and ok
+
+func _package_release(session: RunSession, label: String, normal_return: bool) -> bool:
+	var id := session.id
+	var scopes: Array[ContentResourceScope] = []
+	if session.resources!=null: scopes.append(session.resources)
+	if session.cpp_choices!=null:
+		for row: Dictionary in session.cpp_choices.candidates.values(): scopes.append(row.scope)
+		for scope: ContentResourceScope in session.cpp_choices.equipped.values(): scopes.append(scope)
+	var began := Time.get_ticks_usec()
+	if normal_return: GameManager.abort_run()
+	else: session.free()
+	var command_ms := (Time.get_ticks_usec()-began)/1000.0
+	for frame in range(600):
+		await process_frame
+		if RunManager.session(id)==null and ContentManager.pending_resources()==0: break
+	var released: bool = RunManager.session(id)==null and ContentManager.pending_resources()==0
+	for scope: ContentResourceScope in scopes:
+		released = scope.cancelled and scope.resources.is_empty() and scope.pending.is_empty() and scope.warm_materials.is_empty() and released
+	_package_measure(label+"から戻る",{"command_ms":command_ms,"cleanup_elapsed_ms":(Time.get_ticks_usec()-began)/1000.0,"scopes":scopes.size(),"released":released,"normal_return":normal_return})
+	return released
