@@ -1601,3 +1601,23 @@ func _present_cpp(delta: float) -> void:
 	if hud!=null: hud.apply_snapshot(frame.ui)
 	pipeline.step(0.0 if frame.ui.get("presentation_frozen",not frame.ui.input_enabled) else delta,cam_center,cam_zoom)
 	frame_view.perf.since(&"view_tail",tail_start)
+
+## 表示側も読む人ごとの窓で差分を取り、共有の累積値を消さない。
+func metrics_snapshot() -> Dictionary:
+	if bridge==null: return {}
+	var result: Dictionary = bridge.read_metrics()
+	if not result.ok: return {}
+	var metrics: Dictionary = result.value
+	if frame_view!=null:
+		var update := [0,0,0]
+		var draw := [0,0,0]
+		for key in frame_view.metrics_record:
+			var values: Array = frame_view.metrics_record[key]
+			var target: Array = draw if String(key).begins_with("view_draw.") else update
+			if not String(key).begins_with("view_draw.") and key not in [&"view_submit",&"view_effects",&"view_tail"]: continue
+			target[0] += values[0]
+			target[1] += values[1]
+			target[2] = maxi(target[2],values[2])
+		metrics.timings["view_update"] = update
+		metrics.timings["view_draw"] = draw
+	return metrics

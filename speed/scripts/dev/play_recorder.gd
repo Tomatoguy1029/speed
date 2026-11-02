@@ -45,6 +45,10 @@ var _run: RunSimulation = null
 ## 通知経路の移行用。区間集計と旧JSONLとの対応はD02で接続する。
 var _cpp_session_id := 0
 var _cpp_time := 0.0
+var _cpp_perf_previous := {}
+var _cpp_perf_last_us := 0
+var _cpp_perf_frames := 0
+var _cpp_perf_elapsed_us := 0
 ## 記録中のランのセッション（木から出たら記録を閉じる）
 var _session: RunSession = null
 ## 記録中だけ開く、録画用の処理時間の記録（ゲーム側・表示側・敵の描画の行の数）。性能の区間ごとに書いて空にする
@@ -324,6 +328,9 @@ func _process(delta: float) -> void:
 	if _saved_t > 0.0:
 		_saved_t -= delta
 		_update_label()
+	if _cpp_session_id>0:
+		_cpp_perf_tick(Time.get_ticks_usec())
+		return
 	if _run == null:
 		return
 	_perf_tick(Time.get_ticks_usec())
@@ -585,6 +592,7 @@ func _on_phase_changed(phase: int) -> void:
 ## ランの記録を閉じる。
 func _end(result: String) -> void:
 	if _cpp_session_id>0:
+		_flush_cpp_performance()
 		_write({"type":"end","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"result":result})
 		_flush()
 		_saved_text = "記録に失敗しました" if _io_failed else "保存："+_file.get_path().get_file()
@@ -897,6 +905,10 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 	_cpp_session_id = session.id
 	if not session.closing.is_connected(_end): session.closing.connect(_end)
 	_cpp_time = snapshot.value.ui.run_time
+	_cpp_perf_previous = _cpp_metrics()
+	_cpp_perf_last_us = Time.get_ticks_usec()
+	_cpp_perf_frames = 0
+	_cpp_perf_elapsed_us = 0
 	_io_failed = false
 	_real_start_us = Time.get_ticks_usec()
 	_recording_id = "%d-%d" % [session.id,_real_start_us]
@@ -917,3 +929,26 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 	_update_label()
 	# 書込失敗は記録側で終了させる。同じ行の再試行で重複記録しない。
 	return true
+
+func _cpp_metrics() -> Dictionary:
+	if _session==null or _session.bridge==null: return {}
+	if _session.view!=null: return _session.view.get_node("RunPresentation").metrics_snapshot()
+	var result: Dictionary = _session.bridge.read_metrics()
+	return result.value if result.ok else {}
+
+func _cpp_perf_tick(now: int) -> void:
+	if _cpp_perf_last_us>0:
+		_cpp_perf_elapsed_us += maxi(0,now-_cpp_perf_last_us)
+		_cpp_perf_frames += 1
+	_cpp_perf_last_us = now
+	if _cpp_perf_elapsed_us>=PERF_INTERVAL_US: _flush_cpp_performance()
+
+func _flush_cpp_performance() -> void:
+	if _cpp_perf_frames==0 or _session==null: return
+	var current := _cpp_metrics()
+	if current.is_empty(): return
+	var profile := preload("res://scripts/runtime/run_metrics.gd").window(current,_cpp_perf_previous,_cpp_perf_frames,_cpp_perf_elapsed_us)
+	_write({"type":"performance","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"frames":_cpp_perf_frames,"profile":profile})
+	_cpp_perf_previous = current
+	_cpp_perf_frames = 0
+	_cpp_perf_elapsed_us = 0

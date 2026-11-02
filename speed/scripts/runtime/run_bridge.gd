@@ -14,6 +14,9 @@ var _latest: Dictionary = {}
 var _ui: Dictionary = {}
 var _delivery: Dictionary = {}
 var delivery_error: Dictionary = {}
+var _metrics_record := {}
+var _metrics_bytes := 0
+var _resource_wait_started := 0
 
 static func _error(code: int, field: String, message: String) -> Dictionary:
 	return {"ok":false,"code":code,"field":field,"message":message,"value":null}
@@ -33,6 +36,7 @@ func configure(bytes: PackedByteArray, options: Dictionary) -> Dictionary:
 		_run_id = options.run_id
 		_epoch = result.value.epoch
 		_development = options.mode == 1
+		_metrics_record = perf.open(&"metrics")
 	return result
 
 func start(seed_value: int, options := {}) -> Dictionary:
@@ -111,6 +115,7 @@ func read_render(view: Rect2, alpha := 1.0) -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.render_run(view,alpha)
 	perf.since(&"output_build",began)
+	if result.ok: _metrics_bytes += _packed_bytes(result.value)
 	return result
 
 func read_frame() -> Dictionary:
@@ -175,6 +180,7 @@ func _read_locked() -> Dictionary:
 	_latest = result.value.duplicate(true)
 	_latest.ui = _ui.duplicate(true)
 	var snapshot := _ok(_latest.duplicate(true))
+	_metrics_bytes += _packed_bytes(snapshot.value)
 	perf.since(&"bridge_copy",began)
 	return snapshot
 
@@ -184,12 +190,48 @@ func latest_frame() -> Dictionary:
 	if _latest.is_empty(): return read_frame()
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var snapshot := _ok(_latest.duplicate(true))
+	_metrics_bytes += _packed_bytes(snapshot.value)
 	perf.since(&"bridge_copy",began)
 	return snapshot
 
 func read_metrics() -> Dictionary:
 	if _busy: return _error(7,"read_metrics","更新中は読めません")
-	return _core.metrics_run() if _core!=null else _error(4,"read_metrics","破棄済みです")
+	if _core==null: return _error(4,"read_metrics","破棄済みです")
+	var result: Dictionary = _core.metrics_run()
+	if result.ok:
+		var timing: Dictionary = result.value.timings
+		timing["bridge_copy"] = _metrics_record.get(&"bridge_copy",[0,0,0]).duplicate()
+		var wait: Array = _metrics_record.get(&"resource_wait",[0,0,0]).duplicate()
+		if _resource_wait_started>0:
+			var current := Time.get_ticks_usec()-_resource_wait_started
+			wait[0] += current
+			wait[2] = maxi(wait[2],current)
+		timing["resource_wait"] = wait
+		result.value["packed_bytes"] = _metrics_bytes
+		result.value["packed_bytes_kind"] = "logical_payload"
+	return result
+
+func begin_resource_wait() -> void:
+	if _resource_wait_started==0: _resource_wait_started = Time.get_ticks_usec()
+
+func end_resource_wait() -> void:
+	if _resource_wait_started==0: return
+	perf.add(&"resource_wait",Time.get_ticks_usec()-_resource_wait_started)
+	_resource_wait_started = 0
+
+## Packed配列の論理量。参照共有やエンジン内部の物理コピー量は含めない。
+static func _packed_bytes(value: Variant) -> int:
+	if value is PackedByteArray: return value.size()
+	if value is PackedInt32Array or value is PackedFloat32Array: return value.size()*4
+	if value is PackedInt64Array or value is PackedFloat64Array or value is PackedVector2Array: return value.size()*8
+	if value is PackedVector3Array: return value.size()*12
+	if value is PackedColorArray or value is PackedVector4Array: return value.size()*16
+	var total := 0
+	if value is Dictionary:
+		for item: Variant in value.values(): total += _packed_bytes(item)
+	elif value is Array:
+		for item: Variant in value: total += _packed_bytes(item)
+	return total
 
 func ack_frame(epoch: int, sequence: int) -> Dictionary:
 	if _busy: return _error(7,"ack_frame","配信中は受領できません")
@@ -220,6 +262,7 @@ func _deliver_locked() -> Dictionary:
 		if receiver.epoch==_delivery.epoch and receiver.sequence>=sequence and receiver.revision>=_delivery.state_revision: continue
 		var began := Time.get_ticks_usec() if perf.active else 0
 		var packet: Dictionary = _delivery.duplicate(true)
+		_metrics_bytes += _packed_bytes(packet)
 		perf.since(&"bridge_copy",began)
 		if not receiver.consumer.is_valid() or receiver.consumer.call(packet)!=true:
 			return _error(8,"subscriber", "通知を受け取れません: %s" % name)

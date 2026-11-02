@@ -147,6 +147,7 @@ Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,co
     const Vector2 size=viewport["logical_size"];
     if (!size.is_finite() || size.x<=0 || size.y<=0) return failure(1,"logical_size","論理サイズは有限の正数にしてください");
     if (runtime.state.control.tick==INT64_MAX || runtime.state.control.revision==INT64_MAX) return failure(9,"tick","更新番号が上限です");
+    speed::MetricsTimer measured(runtime.frame_workspace.metrics.sim);
     speed::RenderBuilder::capture_previous(runtime);
     runtime.frame_workspace.publishing_tick=runtime.state.control.tick+1;
     const bool advanced=speed::RunRunner::step_play(*this,1.0/120.0,input,size);
@@ -290,9 +291,11 @@ Dictionary SpeedRunCore::render_run(const Rect2 &view,const Variant &alpha) cons
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_render","開始していないランです");
     if (alpha.get_type()!=Variant::FLOAT || !std::isfinite(double(alpha)) || double(alpha)<0 || double(alpha)>1 ||
         !view.position.is_finite() || !view.size.is_finite() || view.size.x<0 || view.size.y<0) return failure(1,"view/alpha","表示範囲か補間係数が不正です");
+    speed::MetricsTimer measured(runtime.frame_workspace.metrics.output_build);
     return success(speed::RenderBuilder::read(runtime,view,double(alpha)));
 }
 Dictionary SpeedRunCore::frame_run() {
+    speed::MetricsTimer measured(runtime.frame_workspace.metrics.output_build);
     if (runtime.busy) return failure(7,"read_frame","更新中は再入できません");
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_frame","開始していないランです");
     if (runtime.frame_workspace.invalid) return failure(8,"events","通知の型・項目・番号が不正です");
@@ -339,7 +342,7 @@ Dictionary SpeedRunCore::ack_frame_run(int64_t epoch,int64_t sequence) {
 Dictionary SpeedRunCore::metrics_run() const {
     if (runtime.busy) return failure(7,"read_metrics","更新中は読めません");
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_metrics","開始していないランです");
-    return success(speed::FrameBuilder::metrics(runtime));
+    return success(speed::MetricsBuilder::read(runtime));
 }
 Dictionary SpeedRunCore::dispose_run() {
     if (runtime.busy) return failure(7,"dispose","更新中は再入できません");Guard guard(runtime.busy);

@@ -1,5 +1,6 @@
 #pragma once
 #include "../content/generated/combat_ids.h"
+#include "metrics_builder.h"
 #include <godot_cpp/variant/dictionary.hpp>
 #include <deque>
 
@@ -12,12 +13,9 @@ struct Notification {
     EventType type{};
     godot::Dictionary payload;
 };
-struct OutputMetrics {
-    int64_t fixed_steps=0,commands=0,events_emitted=0,events_acked=0;
-};
 struct FrameWorkspace {
     std::deque<Notification> pending;
-    OutputMetrics metrics;
+    mutable OutputMetrics metrics;
     int64_t next_sequence=1,acked=0,exposed=0,publishing_tick=-1;
     int64_t ui_revision=-1;
     godot::Dictionary previous_ui,ui_delta;

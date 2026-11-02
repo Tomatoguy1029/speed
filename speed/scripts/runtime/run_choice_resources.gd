@@ -55,6 +55,7 @@ func poll() -> void:
 		candidates.erase(id)
 	for request: Dictionary in frame.resource_requests:
 		if not candidates.has(request.request_id):
+			bridge.begin_resource_wait()
 			var card := {}
 			for candidate: Dictionary in cards.get("candidates",[]):
 				if candidate.get("request_id")==request.request_id: card = candidate
@@ -91,6 +92,8 @@ func poll() -> void:
 		var status := -2 if scope.cancelled else -1 if scope.failed else 1
 		var response: Dictionary = bridge.command("resources_complete",{"request_id":request.request_id,"status":status})
 		if response.ok: row.notified = true
+
+	if candidates.values().all(func(row): return row.notified): bridge.end_resource_wait()
 
 func close() -> void:
 	if _closed: return

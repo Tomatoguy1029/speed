@@ -18,6 +18,7 @@ func _ready() -> void:
 func _on_session_created(session: RunSession) -> void:
 	if session.runtime_kind=="cpp":
 		session.add_to_group("recordable_runs")
+		session.started.connect(_decorate_cpp.bind(weakref(session)),CONNECT_ONE_SHOT)
 		return
 	var commands := COMMANDS.new()
 	commands.setup(session.sim)
@@ -83,3 +84,14 @@ func _consume_launch_request() -> bool:
 	GameManager.run_start_source = StageLaunchRequest.source
 	GameManager.start_run(stage)
 	return true
+
+func _decorate_cpp(reference: WeakRef) -> void:
+	var session := reference.get_ref() as RunSession
+	if session==null or session.view==null: return
+	var hud := session.view.get_node_or_null("Hud")
+	if hud==null: return
+	var overlay := PERF_OVERLAY.new()
+	overlay.name = "PerfOverlay"
+	overlay.bridge = session.bridge
+	overlay.view = session.view.get_node("RunPresentation")
+	hud.add_child(overlay)

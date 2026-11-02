@@ -237,6 +237,7 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	_pending_cpp_bridge = next_bridge
 	_pending_cpp = {"seed":seed_value,"options":options.duplicate(true),"with_view":with_view}
 	_load_started_us = Time.get_ticks_usec()
+	next_bridge.begin_resource_wait()
 	if with_view:
 		_show_loading()
 		resources = cpp_prepare.call(cpp_resources.paths) if cpp_prepare.is_valid() else ContentManager.prepare_resources(cpp_resources.paths,DisplayServer.get_name()!="headless",cpp_resources.signatures)
@@ -285,6 +286,7 @@ func _poll_cpp_loading() -> void:
 	if _loading!=null:
 		_loading.queue_free()
 		_loading = null
+	next_bridge.end_resource_wait()
 	bridge = next_bridge
 	bridge.subscribe("result",_consume_cpp_result)
 	if RunManager.current_id==id or options.get("manage_result",false): cpp_finished.connect(GameManager.finish_cpp_run)

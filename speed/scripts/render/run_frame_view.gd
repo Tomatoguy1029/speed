@@ -2,6 +2,7 @@
 extends Node2D
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
 var perf := PerfLog.new()
+var metrics_record := {}
 var visuals: Dictionary = {}
 var batches: Dictionary = {}
 var parts: Dictionary = {}
@@ -44,6 +45,7 @@ var build_us := 0
 var submit_us := 0
 
 func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_scale: float) -> void:
+	metrics_record = perf.open(&"metrics")
 	_scope = scope
 	_pixel = 1.82*character_scale
 	for entry in entries: visuals[int(entry.id)] = entry

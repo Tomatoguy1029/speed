@@ -23,6 +23,9 @@ static var _saved_pos := Vector2(-1, -1)
 
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var bridge: RefCounted
+var _cpp_previous := {}
+var _cpp_window := {}
 var view: RunPresentation
 var mode := Mode.HIDDEN
 var _label: RichTextLabel
@@ -96,9 +99,11 @@ func _set_mode(m: Mode) -> void:
 	mode = m
 	visible = mode != Mode.HIDDEN
 	_graph.visible = mode == Mode.DETAIL
-	_view_label.visible = mode == Mode.DETAIL and view != null
+	_view_label.visible = mode == Mode.DETAIL and view != null and bridge==null
 	_label.custom_minimum_size = Vector2(380.0 if mode == Mode.DETAIL else 0.0, 0.0)
-	if mode == Mode.DETAIL:
+	if bridge!=null:
+		_cpp_previous = view.metrics_snapshot() if view!=null else bridge.read_metrics().value
+	elif mode == Mode.DETAIL:
 		_sim_rec = run.perf.open(&"overlay")
 		if view != null:
 			_view_rec = view.perf.open(&"overlay")
@@ -155,6 +160,10 @@ func _process(delta: float) -> void:
 	if _acc < REFRESH:
 		return
 	_acc = 0.0
+	if bridge!=null:
+		var current: Dictionary = view.metrics_snapshot() if view!=null else bridge.read_metrics().value
+		_cpp_window = preload("res://scripts/runtime/run_metrics.gd").window(current,_cpp_previous,_frame_n,int(_frame_sum*1000.0))
+		_cpp_previous = current
 	_label.text = _text()
 	if _view_label.visible:
 		_view_label.text = "\n".join(_view_lines())
@@ -169,6 +178,7 @@ func _reset_window() -> void:
 	_steps_max = 0
 
 func _text() -> String:
+	if bridge!=null: return _cpp_text()
 	var lines: Array[String] = []
 	var avg := _frame_sum / maxi(1, _frame_n)
 	var fps := 1000.0 / maxf(avg, 0.001)
@@ -343,3 +353,23 @@ func _draw_graph() -> void:
 		if v > 25.0:
 			_graph.draw_line(Vector2(k * w, s.y), Vector2(k * w, y), WARN, 2.0)
 	_graph.draw_polyline(pts, OK, 1.0)
+
+func _cpp_text() -> String:
+	var lines: Array[String] = []
+	var avg := _frame_sum/maxi(1,_frame_n)
+	lines.append("FPS [b]%.0f[/b]   フレーム %.1fms（最大 %s）" % [1000.0/maxf(avg,0.001),avg,_ms(_frame_max,25.0)])
+	var result: Dictionary = bridge.read_metrics()
+	if not result.ok: return "C++の性能を取得できません"
+	var current: Dictionary = result.value
+	var pools: Dictionary = current.attack_pools
+	lines.append("敵 %d  敵弾 %d  味方弾 %d  範囲 %d" % [current.enemies,pools.get("1",0),pools.get("0",0),pools.get("2",0)])
+	if mode==Mode.DETAIL:
+		lines.append(HEAD % "処理時間（ms/フレーム）")
+		var names := {"sim":"ゲーム更新","output_build":"C++の出力構築","bridge_copy":"窓口の受け渡し","view_update":"表示の更新","view_draw":"描画命令の構築","resource_wait":"資源待ち","engine_gpu_wait":"描画エンジン・GPU・待ち（未分離）"}
+		for key in names:
+			var sample: Variant = _cpp_window.get("timings",{}).get(key)
+			lines.append("%s：%s" % [names[key],"未取得" if sample==null else "%.3f" % sample.ms_per_frame])
+		lines.append("Packed配列の論理量：%.0f bytes/frame" % _cpp_window.get("packed_bytes_per_frame",0.0))
+		lines.append("GPU単独時間：未取得")
+		lines.append("固定更新 累計%d回  通知 累計%d件" % [current.fixed_steps,current.events_emitted])
+	return "\n".join(lines)

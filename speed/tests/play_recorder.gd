@@ -23,6 +23,13 @@ func check(ok: bool, label: String) -> void:
 		push_error("[play_recorder] " + label)
 
 func _ready() -> void:
+	if "--cpp-perf" in OS.get_cmdline_user_args() or "--cpp-perf-bytes-fixes" in OS.get_cmdline_user_args():
+		var finished: bool = await verify_cpp_perf()
+		check(finished,"C++のF3と同時録画の確認を最後まで実施する")
+		print("[cpp_perf] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
+
 	await verify_recording_shortcuts()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
@@ -88,7 +95,7 @@ func verify_mid_run_start() -> void:
 	add_child(scene)
 	if scene.sim.state == null: await scene.started
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
-	var run := scene.sim as RunSimulation
+	var run: RunSimulation = scene.sim as RunSimulation
 	await get_tree().process_frame
 	run.state.time = 42.0
 	run.state.level = 3
@@ -169,7 +176,7 @@ func verify_start_routes() -> void:
 			if not delayed:
 				rec._set_armed(true)
 			var scene := RunManager.create_run() as Node
-			var run := scene.sim as RunSimulation
+			var run: RunSimulation = scene.sim as RunSimulation
 			run.options = {"seed": 932}
 			add_child(scene)
 			if scene.sim.state == null: await scene.started
@@ -437,7 +444,7 @@ func measurement_scenario(recording: bool) -> Dictionary:
 	if recording: rec._set_armed(true)
 	var scene := RunManager.create_session(self, {"seed": 704, "config": config, "profile": ProfileManager.compute({})}, false)
 	scene.auto_step = false
-	var run := scene.sim
+	var run: RunSimulation = scene.sim
 	var s := run.state
 	var pk := run.pickups
 	await get_tree().process_frame
@@ -548,7 +555,7 @@ func verify_live_tuning(during_run: bool) -> void:
 	stage.enemy_tuning = {}
 	var scene := RunManager.create_session(self, {"stage": stage, "seed": 819, "stage_index": 4}, false)
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
-	var run := scene.sim
+	var run: RunSimulation = scene.sim
 	var state := run.state
 	var hp := run.enemies.def_of(&"telescope").base_hp(run.cfg)
 	var initial := {"telescope": {"hp": hp * 1.5}}
@@ -618,3 +625,120 @@ func verify_live_tuning(during_run: bool) -> void:
 	rec.queue_free()
 	scene.queue_free()
 	await get_tree().process_frame
+
+func verify_cpp_perf() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 89
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_perf"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"F3と同時録画の累積差分".sha256_text())!=OK: return false
+	var path := output.path_join("stage_89.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":350},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if session.bridge==null: session.free(); return false
+	var overlay := session.view.get_node_or_null("Hud/PerfOverlay")
+	check(overlay!=null,"C++の通常表示へF3の性能表示を接続する")
+	if overlay==null: session.free(); return false
+	if "--cpp-perf-bytes-fixes" in OS.get_cmdline_user_args(): return await verify_cpp_perf_bytes(session,overlay)
+	var action := InputEventAction.new()
+	action.action = &"debug_perf"
+	action.pressed = true
+	overlay._unhandled_input(action)
+	check(overlay.mode==PerfOverlay.Mode.COMPACT,"F3で簡易表示を開く")
+	overlay._unhandled_input(action)
+	check(overlay.mode==PerfOverlay.Mode.DETAIL,"F3で詳細表示へ進む")
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	var key := InputEventKey.new()
+	key.keycode = KEY_F9
+	key.ctrl_pressed = true
+	key.pressed = true
+	rec._input(key)
+	check(rec._cpp_session_id==session.id and rec._file!=null,"Ctrl+F9で同じC++ランを同時に記録する")
+	if rec._file==null: rec.free();session.free();return false
+	var recording := rec._file.get_path()
+	var bridge = session.bridge
+	var before: Dictionary = bridge.read_metrics().value
+	bridge.command("dev_spawn",{"definition_id":"drifter","position":bridge.read_frame().value.ui.ship.ship_pos+Vector2(50,0)})
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for frame in 4:
+		check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)}).ok,"通常窓口から固定更新する")
+		presentation._present_cpp(0.0)
+		rec._cpp_perf_tick(Time.get_ticks_usec())
+		await get_tree().process_frame
+	var cumulative: Dictionary = presentation.metrics_snapshot()
+	check(cumulative.timings.sim[1]>=before.timings.sim[1]+4 and cumulative.timings.output_build[0]>0,"C++内部の更新と出力構築を別の累積値で測る")
+	overlay._acc = PerfOverlay.REFRESH
+	overlay._process(0.01)
+	var label: String = overlay._label.text
+	for name in ["ゲーム更新","C++の出力構築","窓口の受け渡し","表示の更新","描画命令の構築","資源待ち","未分離","bytes/frame","GPU単独時間：未取得"]:
+		check(label.contains(name),"F3で%sを区別する" % name)
+	check(not label.contains("処理ごと（世界側") and not label.contains("結晶 0"),"存在しない旧Systemを0表示しない")
+	check(overlay._cpp_window.packed_bytes_per_frame>0.0,"Packed配列の論理量をbytes/frameで表示する")
+	check(cumulative.timings.resource_wait[0]>0,"開始時の資源待ちを独立して記録する")
+	rec._flush_cpp_performance()
+	var after: Dictionary = bridge.read_metrics().value
+	check(after.timings.sim[0]>=cumulative.timings.sim[0] and after.timings.sim[1]==cumulative.timings.sim[1],"F3と録画の読み取りで共有の累積値をresetしない")
+	var first: Dictionary = bridge.read_metrics().value
+	var second: Dictionary = bridge.read_metrics().value
+	check(first==second,"更新なしの複数読み取りで累積値を変えない")
+	overlay._unhandled_input(action)
+	check(overlay.mode==PerfOverlay.Mode.HIDDEN,"F3で非表示へ戻す")
+	rec._input(key)
+	check(rec._file==null and not rec.armed,"Ctrl+F9で記録を終了する")
+	var records: Array = []
+	var file := FileAccess.open(recording,FileAccess.READ)
+	while not file.eof_reached():
+		var line := file.get_line()
+		if not line.is_empty(): records.append(JSON.parse_string(line))
+	file.close()
+	check(records.any(func(row): return row.type=="performance" and row.profile.timings.sim.count>=4 and row.profile.packed_bytes_per_frame>0),"同時録画にもC++の処理時間とPacked論理量を残す")
+	rec.free()
+	session.free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return true
+
+func verify_cpp_perf_bytes(session: RunSession, overlay: PerfOverlay) -> bool:
+	overlay._set_mode(PerfOverlay.Mode.DETAIL)
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	rec._set_armed(true)
+	if rec._file==null: rec.free();session.free();return false
+	var recording := rec._file.get_path()
+	var bridge = session.bridge
+	var at: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
+	if not bridge.command("dev_spawn",{"definition_id":"drifter","position":at+Vector2(100,0)}).ok: return false
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for frame in 4:
+		bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+		presentation._present_cpp(0.0)
+		rec._cpp_perf_tick(Time.get_ticks_usec())
+		await get_tree().process_frame
+	overlay._acc = PerfOverlay.REFRESH
+	overlay._process(0.01)
+	check(overlay._cpp_window.packed_bytes_per_frame>0.0,"実際に敵を表示するPacked配列の論理量をbytes/frameで表示する")
+	rec._flush_cpp_performance()
+	rec._set_armed(false)
+	var records: Array = []
+	var file := FileAccess.open(recording,FileAccess.READ)
+	while not file.eof_reached():
+		var line := file.get_line()
+		if not line.is_empty(): records.append(JSON.parse_string(line))
+	file.close()
+	check(records.any(func(row): return row.type=="performance" and row.profile.timings.sim.count>=4 and row.profile.packed_bytes_per_frame>0),"同時録画にもC++の処理時間とPacked論理量を残す")
+	rec.free()
+	session.free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return true
