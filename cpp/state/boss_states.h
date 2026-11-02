@@ -71,8 +71,11 @@ struct CanisStreamState {uint32_t definition=0;bool sent=false;double started=0,
 struct CanisFlameAimState {double age=0;bool fired=false,done=false;};
 struct CanisHuntState {CanisStreamState stream;CanisFlameAimState aim;bool aiming=false,combo_pending=true;};
 struct CanisHuntPounceState {CanisStreamState stream;CanisPounceState jump;bool jumping=false,combo_pending=true;};
+struct CanisNovaPair {EnemyHandle actor;uint32_t group=0;double angle=0,side=1;bool stationed=false;};
+struct CanisNovaShadow {double angle=0,half=0,near=0;};
+struct CanisNovaState {double started=0;std::vector<CanisNovaPair> pairs;std::vector<CanisNovaShadow> shadows;std::vector<bool> ring_hit;bool flashed=false,released=false;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;
@@ -123,6 +126,7 @@ struct CanisHoundRef {EnemyHandle actor;double base_hp=0;godot::Color color;};
 struct CanisRingMember {EnemyHandle actor;double angle=0;};
 struct CanisBurningHound {EnemyHandle actor;uint32_t definition=0,technique=0;double base_hp=0,age=0,blink_age=-1;godot::Color color;};
 struct CanisBodyState {
+    TechniqueHandle nova;
     std::vector<CanisBurningHound> burning;
     std::vector<CanisRingMember> ring;
     godot::Vector2 ring_center;

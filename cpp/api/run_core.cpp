@@ -1,4 +1,5 @@
 #include "../bosses/canis_major/body.h"
+#include "../bosses/canis_major/nova.h"
 #include "../bosses/canis_major/flames.h"
 #include "../bosses/canis_major/blaze.h"
 #include "../bosses/canis_major/hound_lunge.h"
@@ -336,7 +337,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         speed::MonocerosHornWave::advance_waves(runtime,delta);
         speed::PhaseController::step(runtime,delta);
         speed::FlowRunner::step(runtime,delta);
-        for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);speed::CanisHowl::ring_tick(runtime,body);if (body.mode!=speed::BossMode::Final) {speed::CanisBlaze::burning_tick(runtime,body,delta);speed::CanisFlames::step(runtime,body,delta);}}
+        for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);speed::CanisHowl::ring_tick(runtime,body);if (body.mode!=speed::BossMode::Final) {speed::CanisNova::effect_tick(runtime,body,delta);speed::CanisBlaze::burning_tick(runtime,body,delta);speed::CanisFlames::step(runtime,body,delta);}}
     }
 }
 

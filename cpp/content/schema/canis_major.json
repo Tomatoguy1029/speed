@@ -855,6 +855,117 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisNovaDefinition",
+      "section": 351,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "min_hounds",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "rings",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "pair_dist",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pair_side",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "gather_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "body_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_band",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_end",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "after",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrive",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "decel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "face_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_fast",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_switch",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

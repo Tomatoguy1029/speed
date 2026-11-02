@@ -23,6 +23,9 @@ func _ready() -> void:
 	if "--cpp-hydra-swim" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_swim")
 		return
+	if "--cpp-canis-nova" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_nova")
+		return
 	if "--cpp-canis-hunt-pounce" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_hunt_pounce")
 		return
@@ -3813,4 +3816,99 @@ func native_canis_hunt_residue() -> void:
 	bridge.dispose();c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_hunt_residue] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 実位置から作る影と、技の自然終了後も続く輪を同じ制作入口で確かめる。
+func native_canis_nova() -> void:
+	var c := canis_move_case("nova",{"warn":0.2,"after":0.1,"recover":0.02,"ring_speed":200.0,"ring_end":1000.0,"ring_gap":0.2,"ring_band":1.0,"body_radius":30.0,"gather_speed":0.0},false,{"pack_size":6,"lead_max":6},false,0.5)
+	check(not c.is_empty(),"閃光の編集Resource・本体・正式表示を同じ制作入口から読む")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = []
+	bridge.subscribe("閃光の記録",func(packet): events.append_array(packet.events);return true)
+	var records: Dictionary = c.package.records
+	check(c.move.make_runner()==null and records.CanisNovaDefinition.size()==2 and records.BossTechniqueStage.is_empty() and records.CanisNovaDefinition[0].arrive==load("res://data/bosses/canis_major_moves/bay.tres").arrive,"全編集値とBayから借りる操舵を二形態分生成し、method trackを残さない")
+	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(ticket.ok,"閃光を単独発動する")
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.kind==49 and t.pairs.size()==6 and t.ring_hit==[false,false] and not t.flashed,"抽選した6体を3組へ分け、輪ごとの命中を初期化する")
+	for k in 6:
+		check(t.pairs[k].group==k/2 and t.pairs[k].side==(1.0 if k%2==0 else -1.0) and is_equal_approx(float(t.pairs[k].angle)-float(t.pairs[0].angle),float(k/2)*TAU/3.0),"組の固定角と左右を保持する")
+	var initial: Dictionary = bridge.checkpoint()
+	var facing: float = bridge.command("dev_boss_body_state").value[0].facing
+	bridge.command("dev_ship_motion",{"position":Vector2(0,2000),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(0,2000),Vector2(0,2000),Vector2(3000,2000))
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	check(not t.flashed and t.stage==0 and is_equal_approx(t.age,0.1) and bridge.command("dev_boss_body_state").value[0].facing==facing,"予告は本体clockで進み、本体の向きと組の角度を固定する")
+	var warning: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.01)
+	var continuation: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(bridge.restore(warning.value).ok,"組・影・乱数と本体clockへ復帰する")
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_body_state").value[0]==continuation,"復帰後も組の操舵と実位置の影を一致させる")
+	bridge._core.step(0.1)
+	bridge._core.step(0.7)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.flashed and t.released and t.stage==2,"予告後に発光し、warn+afterで組を解放して硬直へ進む")
+	bridge._core.step(0.03)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==5 and not bridge.command("dev_boss_body_state").value[0].nova.is_empty(),"自然終了後も輪の判定を本体に保持する")
+	for pair: Dictionary in t.pairs:
+		var u := Vector2.from_angle(float(pair.angle))
+		bridge.command("dev_relocate",{"entity_id":pair.actor,"position":t.source+u*100.0+u.orthogonal()*float(pair.side)*10.0})
+	bridge._core.step(0.001)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.shadows.size()==3 and float(t.shadows[0].near)<110.0,"影を予定の持ち場から作らず、そのtickの猟犬の実位置から作る")
+	var retained: Dictionary = bridge.checkpoint()
+	var radius := 30.0+200.0*(float(t.age)+0.001-0.2)
+	var protected: Vector2 = t.source+Vector2.from_angle(float(t.shadows[0].angle))*radius
+	bridge.command("dev_ship_motion",{"position":protected,"velocity":Vector2.ZERO})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp==hp and not bridge.command("dev_boss_state").value[0].ring_hit[0],"機体半径を含めて影に収まると輪の帯に触れても被弾しない")
+	t = bridge.command("dev_boss_state").value[0]
+	var open_angle := float(t.shadows[0].angle)+PI/3.0
+	radius = 30.0+200.0*(float(t.age)+0.001-0.2)
+	bridge.command("dev_ship_motion",{"position":t.source+Vector2.from_angle(open_angle)*radius,"velocity":Vector2.ZERO})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp<hp and bridge.command("dev_boss_state").value[0].ring_hit[0],"影を外れると自然終了後の輪でも実際の機体HPが減る")
+	bridge.command("set_ui_overlay",{"active":false})
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="nova" and e.payload.technique=="nova"),"閃光の原因と技名を記録へ届ける")
+	hp = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp==hp,"輪ごとの命中を保持し、同じ輪で繰り返しHPを減らさない")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var display = c.view._boss_body_displays.values()[0]
+	check(not display._nova.is_empty() and display._nova_layer!=null,"自然終了後の輪と影も正式表示へ渡す")
+	await get_tree().process_frame
+	bridge.restore(retained.value)
+	t = bridge.command("dev_boss_state").value[0]
+	var finish_age := 0.2+0.2+(1000.0-30.0)/200.0
+	bridge._core.step(finish_age-float(t.age)-0.001)
+	check(not bridge.command("dev_boss_body_state").value[0].nova.is_empty(),"輪の最終半径の直前まで保持する")
+	bridge._core.step(0.002)
+	check(bridge.command("dev_boss_body_state").value[0].nova.is_empty(),"厳密な終了期限を越えると輪の参照を解放する")
+	bridge.restore(initial.value)
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].nova.is_empty(),"取消では自然終了と違って輪も直ちに消す")
+	bridge.restore(warning.value)
+	t = bridge.command("dev_boss_state").value[0]
+	bridge.command("dev_remove",{"entity_id":t.pairs[0].actor})
+	bridge._core.step(0.001)
+	check(bridge.command("dev_boss_state").value[0].pairs[0].actor==0 and bridge.checkpoint().ok,"猟犬が消失しても古い行を影へ使わず、保持復帰を続ける")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].nova.is_empty(),"本体消失では残留する輪も回収する")
+	for checkpoint in [initial,warning,retained]: bridge.release_checkpoint(checkpoint.value)
+	bridge.dispose();c.view.queue_free()
+	c = canis_move_case("nova",{},true,{"pack_size":5,"lead_max":5});bridge=c.bridge
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value.is_empty(),"通常フローは必要な6体がそろわないと閃光を選ばない")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_nova] failures=",failed)
 	get_tree().quit(1 if failed else 0)

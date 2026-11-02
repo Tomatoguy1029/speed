@@ -76,11 +76,11 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## 号令の実効値と、旧method trackに対応する段階を生成する。
 static func canis_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius",&"bay",&"blaze",&"stream",&"hunt",&"hunt_pounce"]: return {}
+	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius",&"bay",&"blaze",&"stream",&"hunt",&"hunt_pounce",&"nova"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"canis_major","kind":2,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[],"CanisBayDefinition":[],"CanisBlazeDefinition":[],"CanisStreamDefinition":[],"CanisHuntDefinition":[],"CanisHuntPounceDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[],"CanisBayDefinition":[],"CanisBlazeDefinition":[],"CanisStreamDefinition":[],"CanisHuntDefinition":[],"CanisHuntPounceDefinition":[],"CanisNovaDefinition":[]}
 	for phase in [1,2]:
 		var values: Dictionary = source.values().duplicate(true)
 		if phase==2:
@@ -90,9 +90,17 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43 if move.technique==&"sirius" else 44 if move.technique==&"bay" else 45 if move.technique==&"blaze" else 46 if move.technique==&"stream" else 47 if move.technique==&"hunt" else 48,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43 if move.technique==&"sirius" else 44 if move.technique==&"bay" else 45 if move.technique==&"blaze" else 46 if move.technique==&"stream" else 47 if move.technique==&"hunt" else 48 if move.technique==&"hunt_pounce" else 49,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage"]: row[key] = float(values.get(key,0.0))
-		if move.technique==&"hunt_pounce":
+		if move.technique==&"nova":
+			row.active = maxf(0.001,float(values.after))
+			records.BossTechniqueDefinition.append(row)
+			var detail := {"id":phase,"technique":phase}
+			for key in ["count","min_hounds","rings","pair_dist","pair_side","gather_speed","body_radius","ring_gap","ring_speed","ring_band","ring_end","after"]: detail[key] = int(values[key]) if key in ["count","min_hounds","rings"] else float(values[key])
+			var steering: Dictionary = load("res://data/bosses/canis_major_moves/bay.tres").values()
+			for key in ["arrive","decel","face_turn","turn_slow","turn_fast","turn_switch","accel"]: detail[key] = float(steering[key])
+			records.CanisNovaDefinition.append(detail)
+		elif move.technique==&"hunt_pounce":
 			row.active = 0.001
 			records.BossTechniqueDefinition.append(row)
 			records.CanisHuntPounceDefinition.append({"id":phase,"technique":phase,"stream":phase+2,"pounce":phase+4,"gap":float(values.gap)})

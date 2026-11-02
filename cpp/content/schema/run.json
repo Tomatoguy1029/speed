@@ -1515,6 +1515,10 @@
       {
         "name": "Bite",
         "value": "bite"
+      },
+      {
+        "name": "Nova",
+        "value": "nova"
       }
     ],
     "VisualRole": [
