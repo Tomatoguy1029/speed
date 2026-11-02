@@ -5,6 +5,8 @@ var intro: Node
 var hint: Label
 var motive: Label
 var draw_button: Button
+var _top_bar: ColorRect
+var _bottom_bar: ColorRect
 
 func _ready() -> void:
 	layer = 80
@@ -12,6 +14,12 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_top_bar = ColorRect.new()
+	_bottom_bar = ColorRect.new()
+	for bar in [_top_bar,_bottom_bar]:
+		bar.color = Color.BLACK
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(bar)
 	var skip := Button.new()
 	skip.name = "SkipIntro"
 	skip.text = tr("intro.skip")
@@ -34,7 +42,7 @@ func _ready() -> void:
 	draw_button.offset_right = -24
 	draw_button.offset_top = -160
 	draw_button.offset_bottom = -104
-	draw_button.pressed.connect(func(): RunManager.command(intro.session.id, &"draw_button"))
+	draw_button.pressed.connect(func(): intro.run.input.press_draw_button())
 	draw_button.hide()
 	var panel := PanelContainer.new()
 	panel.name = "Pause"
@@ -73,3 +81,11 @@ func _label(root: Control, font_size: int, top: float, bottom: float) -> Label:
 	label.offset_bottom = bottom
 	label.hide()
 	return label
+
+func _process(_delta: float) -> void:
+	if intro.run==null: return
+	var size := get_viewport().get_visible_rect().size
+	var height: float = size.y*0.1*intro.run.state.cinematic_bars
+	_top_bar.size = Vector2(size.x,height)
+	_bottom_bar.size = Vector2(size.x,height)
+	_bottom_bar.position = Vector2(0,size.y-height)

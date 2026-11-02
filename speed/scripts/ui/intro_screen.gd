@@ -72,7 +72,7 @@ func _on_beat_changed(next: int) -> void:
 	if next == Beat.RESTORE:
 		run.input.process_mode = Node.PROCESS_MODE_DISABLED
 		var renderer: RunPresentation = session.view.get_node("RunPresentation")
-		renderer._layers.pickups.hide()
+		if renderer.frame_view!=null: renderer.frame_view._layer(6).hide()
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for event in events:
@@ -101,14 +101,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _pause() -> void:
 	if run != null:
-		RunManager.command(session.id, &"pause")
+		sequence.command("pause",{"paused":true})
+		run.input.cancel_gesture()
 		run.input.process_mode = Node.PROCESS_MODE_DISABLED
 		_hud.get_node("Pause").show()
 		_hud.get_node("Pause").get_child(0).get_child(0).grab_focus()
 
 func _resume() -> void:
 	_hud.get_node("Pause").hide()
-	RunManager.command(session.id, &"resume")
+	sequence.command("pause",{"paused":false})
 	run.input.process_mode = Node.PROCESS_MODE_INHERIT if beat in [Beat.FLIGHT,Beat.PRACTICE] else Node.PROCESS_MODE_DISABLED
 
 func _exit_tree() -> void:

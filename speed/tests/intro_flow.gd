@@ -31,6 +31,9 @@ func _ready() -> void:
 	SaveManager.set_script(MemorySave)
 	SaveManager.settings = settings
 	TranslationServer.set_locale("ja")
+	if "--cpp-isolation-only" in OS.get_cmdline_user_args():
+		await _test_cpp_isolation()
+		return
 	if OS.get_cmdline_user_args().has("--replay-only"):
 		await _test_replay_only()
 		return
@@ -180,7 +183,7 @@ func _test_practice(intro: Node) -> void:
 	intro.get_window().focus_exited.disconnect(Callable(intro, "_pause"))
 	intro._resume()
 	var run: RefCounted = intro.run
-	_check(not intro.session.view.has_node("Hud") and run.state.lab_mode and run.loadout.weapon_behaviors.is_empty(), "練習は通常ランの記録・装備から独立")
+	_check(not intro.session.view.has_node("Hud") and run.state.lab_mode and run.state.weapons.is_empty(), "練習は通常ランの記録・装備から独立")
 	_check(intro.sequence.get("opening_complete") != null, "北極星喪失の導入を持つ")
 	if intro.sequence.get("opening_complete") != null:
 		_check(not intro.sequence.opening_complete and intro.run.state.cinematic_bars>0.0, "チュートリアル前にシネマスコープで星空を映す")
@@ -254,7 +257,7 @@ func _test_practice(intro: Node) -> void:
 	_check(run.state.tracing, "再クリックで本番の突進を開始")
 	for i in 360:
 		_elapse(intro, 1.0 / 120.0)
-		run.flush_events()
+		intro.sequence.bridge.collect_frame()
 		if intro.beat == intro.Beat.RESTORE:
 			break
 	_check(intro.beat == intro.Beat.RESTORE, "突進で倒したら星の復帰へ進む")
@@ -406,3 +409,37 @@ func _frame_ready() -> void:
 		var intro: Node = app_under_test._current
 		if not is_instance_valid(intro) or (intro.get("run")!=null and intro.get("visual")!=null and intro.get("_hud")!=null): break
 		await get_tree().process_frame
+
+func _test_cpp_isolation() -> void:
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
+	GameManager.boot_request = Callable()
+	var app: Node = load("res://scenes/app/main.tscn").instantiate()
+	app_under_test = app
+	app.set_meta("skip_stage_launch",true)
+	add_child(app)
+	await _frame_ready()
+	GameManager.replay_intro()
+	await _frame_ready()
+	var intro: Node = app._current
+	var id: int = intro.session.id
+	_check(not intro.session.is_in_group("recordable_runs") and RunManager.current_id==-1 and not intro.run.state.stage.boss_enabled,"導入は録画・通常ラン・ボス進行から独立")
+	_check(intro.session.runtime_kind=="cpp" and intro.session._sim==null,"導入は旧RunSimulationを生成しない")
+	_check(intro.sequence.bridge.read_frame().ok and intro.sequence.bridge.collect_frame().ok and intro.sequence.bridge.delivery_error.get("ok",false),"導入の読取・回収・通知配信が成功する")
+	intro._pause()
+	_check(intro._paused,"導入を停止してからスキップを受け付ける")
+	await _shot("paused_intro")
+	intro.find_child("SkipIntro",true,false).pressed.emit()
+	await _frame_ready()
+	_check(GameManager.screen==GameManager.Screen.STAGE_SELECT and RunManager.session(id)==null and SaveManager.writes==0,"ポーズ中のスキップで専用ランを解放し既存進行を変えない")
+	GameManager.reset_to_main_menu()
+	await _frame_ready()
+	GameManager.replay_intro()
+	await _frame_ready()
+	intro = app._current
+	_check(intro.session.id!=id and not intro.run.state.drawing and not intro.run.state.tracing and not intro.run.input._press,"停止中スキップ後も新しいC++練習ランへ入り直せる")
+	app.queue_free()
+	await _frame_ready()
+	_check(RunManager._sessions.is_empty(),"入り直した練習ランも画面破棄で解放する")
+	print("[cpp_intro_isolation] failed=%d" % failed)
+	get_tree().quit(1 if failed else 0)
