@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 3
+          "max": 4
         },
         {
           "name": "phase",
@@ -293,9 +293,44 @@
           "name": "shatter_time",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "passes",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "overshoot",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "brake_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "brake_speed_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_lead",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 4
+      "version": 5
     },
     {
       "name": "BossTechniqueStage",

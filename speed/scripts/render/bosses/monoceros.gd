@@ -157,7 +157,7 @@ func _sync_horn(_dt: float, body_scale: float, tint: Color) -> void:
 	for key in ["painted","paint"]: (horn.material as ShaderMaterial).set_shader_parameter(key,source.get_shader_parameter(key))
 
 func _horn_glow() -> float:
-	if technique.get("technique","")=="lance": return float(technique.get("glow",0.0)) if _mode() in [&"windup",&"active"] else 0.0
+	if technique.get("technique","") in ["lance","return_charge"]: return float(technique.get("glow",0.0)) if _mode() in [&"windup",&"active"] else 0.0
 	if technique.get("technique","")=="kick": return 0.0
 	if _mode()==&"active": return 1.0
 	return float(state.charge) if _mode()==&"windup" else 0.0

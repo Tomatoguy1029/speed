@@ -3,6 +3,7 @@
 #include "../monoceros/kick.h"
 #include "../monoceros/sweep.h"
 #include "../monoceros/lance.h"
+#include "../monoceros/return_charge.h"
 #include "phase_controller.h"
 #include "../../systems/attack_system.h"
 #include <algorithm>
@@ -12,10 +13,10 @@ namespace {
 bool live(TechniqueStage stage) {return stage<TechniqueStage::Finished;}
 bool kick(const RunRuntime &r,const TechniqueState &t) {return r.content->boss_techniques[t.definition-1].kind==1;}
 void command(RunRuntime &r,TechniqueState &t,TechniqueCommand c) {if (kick(r,t)) MonocerosKick::command(r,t,c);else MonocerosCharge::command(r,t,c);}
-godot::PackedVector2Array shape(const RunRuntime &r,const TechniqueState &t,bool warning=false) {return r.content->boss_techniques[t.definition-1].kind==3?MonocerosLance::horn(r,t):r.content->boss_techniques[t.definition-1].kind==2?MonocerosSweep::horn(r,t):kick(r,t)?MonocerosKick::horn(r,t,warning):MonocerosCharge::horn(r,t,warning);}
+godot::PackedVector2Array shape(const RunRuntime &r,const TechniqueState &t,bool warning=false) {return r.content->boss_techniques[t.definition-1].kind==4?MonocerosReturn::horn(r,t,warning):r.content->boss_techniques[t.definition-1].kind==3?MonocerosLance::horn(r,t):r.content->boss_techniques[t.definition-1].kind==2?MonocerosSweep::horn(r,t):kick(r,t)?MonocerosKick::horn(r,t,warning):MonocerosCharge::horn(r,t,warning);}
 }
-bool TechniqueRunner::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return definition && definition<=r.content->boss_techniques.size() && (r.content->boss_techniques[definition-1].kind==3?MonocerosLance::ready(r,actor,definition):r.content->boss_techniques[definition-1].kind==2?MonocerosSweep::ready(r,actor,definition):r.content->boss_techniques[definition-1].kind==1?MonocerosKick::ready(r,actor,definition):MonocerosCharge::ready(r,actor,definition));}
-double TechniqueRunner::attack_length(const BossTechniqueDefinition &p) {return p.kind==3?p.warn+p.distance/std::max(p.speed,0.001)+p.stop_time:p.kind==2?p.approach_max+p.stop_time+p.active+p.hold+p.return_time:p.warn+p.active;}
+bool TechniqueRunner::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return definition && definition<=r.content->boss_techniques.size() && (r.content->boss_techniques[definition-1].kind==4?MonocerosReturn::ready(r,actor,definition):r.content->boss_techniques[definition-1].kind==3?MonocerosLance::ready(r,actor,definition):r.content->boss_techniques[definition-1].kind==2?MonocerosSweep::ready(r,actor,definition):r.content->boss_techniques[definition-1].kind==1?MonocerosKick::ready(r,actor,definition):MonocerosCharge::ready(r,actor,definition));}
+double TechniqueRunner::attack_length(const BossTechniqueDefinition &p) {return p.kind==4?p.warn+p.passes*p.active+(p.passes-1)*(p.brake_time+p.turn_time):p.kind==3?p.warn+p.distance/std::max(p.speed,0.001)+p.stop_time:p.kind==2?p.approach_max+p.stop_time+p.active+p.hold+p.return_time:p.warn+p.active;}
 bool TechniqueRunner::owns(const RunRuntime &run,EnemyHandle actor) {
     for (const auto &technique:run.state.bosses.techniques) if (same_handle(technique.actor,actor)) return true;
     return false;
@@ -38,7 +39,7 @@ TechniqueHandle TechniqueRunner::begin(RunRuntime &run,EnemyHandle actor,uint32_
     else s.bosses.handles.release(s.bosses.handles.at(uint32_t(row)));
     auto &technique=s.bosses.techniques[row];technique={};technique.id=s.bosses.next_id++;technique.actor=actor;technique.definition=definition;
     const auto handle=s.bosses.handles.attach(uint32_t(row),technique.id);
-    if (run.content->boss_techniques[technique.definition-1].kind==3) MonocerosLance::begin(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==2) MonocerosSweep::begin(run,technique);else if (kick(run,technique)) MonocerosKick::begin(run,technique);else MonocerosCharge::begin(run,technique);
+    if (run.content->boss_techniques[technique.definition-1].kind==4) MonocerosReturn::begin(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==3) MonocerosLance::begin(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==2) MonocerosSweep::begin(run,technique);else if (kick(run,technique)) MonocerosKick::begin(run,technique);else MonocerosCharge::begin(run,technique);
     s.enemies[actor.slot].mode=EnemyMode::Windup;
     // advance(0)と同じく、時刻0の命令だけは開始時に実行する。
     for (const auto &stage:run.content->boss_stages) if (stage.technique==definition && stage.at==0) {
@@ -61,7 +62,7 @@ void TechniqueRunner::step(RunRuntime &run,double dt) {
         const auto handle=s.bosses.handles.at(row);
         if (!s.enemy_handles.contains(technique.actor) || s.enemies[technique.actor.slot].dead) {cancel(run,handle);continue;}
         const auto before=technique.stage;
-        if (run.content->boss_techniques[technique.definition-1].kind==3) MonocerosLance::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==2) MonocerosSweep::step(run,technique,dt);else if (kick(run,technique)) MonocerosKick::step(run,technique,dt);else MonocerosCharge::step(run,technique,dt);
+        if (run.content->boss_techniques[technique.definition-1].kind==4) MonocerosReturn::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==3) MonocerosLance::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==2) MonocerosSweep::step(run,technique,dt);else if (kick(run,technique)) MonocerosKick::step(run,technique,dt);else MonocerosCharge::step(run,technique,dt);
         if ((before==TechniqueStage::Windup || before==TechniqueStage::Active) && (technique.stage==TechniqueStage::Windup || technique.stage==TechniqueStage::Active)) {
             technique.elapsed+=dt;uint32_t cursor=0;
             for (const auto &stage:run.content->boss_stages) if (stage.technique==technique.definition) {
@@ -72,7 +73,7 @@ void TechniqueRunner::step(RunRuntime &run,double dt) {
             }
         }
         const auto &p=run.content->boss_techniques[technique.definition-1];auto &e=s.enemies[technique.actor.slot];
-        e.charge=p.kind==3?std::get<MonocerosLanceState>(technique.detail).glow:p.kind==2 && (technique.stage==TechniqueStage::Windup || technique.stage==TechniqueStage::Active)?std::get<MonocerosSweepState>(technique.detail).glow:technique.stage==TechniqueStage::Windup?std::clamp(technique.elapsed/std::max(0.001,p.warn),0.0,1.0):0;
+        e.charge=p.kind==4?std::get<MonocerosReturnState>(technique.detail).glow:p.kind==3?std::get<MonocerosLanceState>(technique.detail).glow:p.kind==2 && (technique.stage==TechniqueStage::Windup || technique.stage==TechniqueStage::Active)?std::get<MonocerosSweepState>(technique.detail).glow:technique.stage==TechniqueStage::Windup?std::clamp(technique.elapsed/std::max(0.001,p.warn),0.0,1.0):0;
         e.mode=technique.stage==TechniqueStage::Windup?EnemyMode::Windup:technique.stage==TechniqueStage::Active?EnemyMode::Dash:live(technique.stage)?EnemyMode::Recover:EnemyMode::Move;
         technique.previous_ship=s.ship_pos;
         if (!live(technique.stage)) AttackSystem::end_technique(s,handle,technique.stage!=TechniqueStage::Finished);
@@ -83,7 +84,7 @@ bool TechniqueRunner::validate(const godot::RunState &s,const ContentBundle &con
     for (uint32_t row=0;row<s.bosses.techniques.size();++row) {
         const auto &t=s.bosses.techniques[row];
         if (t.id<=0 || t.id>=s.bosses.next_id || s.bosses.handles.entity_id(s.bosses.handles.at(row))!=t.id || !t.definition || t.definition>content.boss_techniques.size() || t.stage>TechniqueStage::Cancelled || t.command_cursor>3 || !t.aim.is_finite() || !t.direction.is_finite() || !t.previous_ship.is_finite() || !t.stuck_offset.is_finite() || !t.reposition_direction.is_finite()) return false;
-        if (content.boss_techniques[t.definition-1].kind==3?!MonocerosLance::validate(t):content.boss_techniques[t.definition-1].kind==2?!MonocerosSweep::validate(t):!std::holds_alternative<std::monostate>(t.detail)) return false;
+        if (content.boss_techniques[t.definition-1].kind==4?!MonocerosReturn::validate(t):content.boss_techniques[t.definition-1].kind==3?!MonocerosLance::validate(t):content.boss_techniques[t.definition-1].kind==2?!MonocerosSweep::validate(t):!std::holds_alternative<std::monostate>(t.detail)) return false;
         for (double value:{t.elapsed,t.remaining,t.reposition}) if (!std::isfinite(value) || value<0) return false;
         if (live(t.stage)) {
             if (!s.enemy_handles.contains(t.actor) || s.enemies[t.actor.slot].dead || std::find(actors.begin(),actors.end(),handle_key(t.actor))!=actors.end()) return false;
@@ -102,6 +103,7 @@ godot::Array TechniqueRunner::snapshot(const RunRuntime &run) {
         item["windup_progress"]=std::clamp(t.elapsed/std::max(0.001,p.warn),0.0,1.0);item["active_progress"]=std::clamp((t.elapsed-p.warn)/std::max(0.001,p.active*0.4),0.0,1.0);item["settle_progress"]=t.stage==TechniqueStage::Recovery?(back>0?std::clamp((back+p.recover-t.remaining)/back,0.0,1.0):1.0):0.0;
         if (p.kind==2) {const auto &v=std::get<MonocerosSweepState>(t.detail);item["stop_progress"]=std::clamp(v.elapsed/std::max(p.stop_time,0.001),0.0,1.0);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["side"]=v.side;item["speed"]=v.speed;item["glow"]=v.glow;item["booster"]=v.stage==MonocerosSweepState::Stage::Approach?0.55+1.95*v.speed/std::max(p.approach_speed_max,0.001):v.stage==MonocerosSweepState::Stage::Stop?0.3:0.55;}
         if (p.kind==3) {const auto &v=std::get<MonocerosLanceState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["form"]=v.form;item["glow"]=v.glow;item["traveled"]=v.traveled;item["boom_time"]=v.boom_time;item["speed"]=v.speed;item["head_length"]=p.head_length;item["booster"]=v.stage==MonocerosLanceState::Stage::Gather?0.55+0.45*v.form:v.stage==MonocerosLanceState::Stage::Run?3.5:1.0;}
+        if (p.kind==4) {const auto &v=std::get<MonocerosReturnState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["travel"]=v.travel;item["traveled"]=v.traveled;item["completed"]=v.completed;item["brake_progress"]=std::clamp(v.elapsed/std::max(p.brake_time,0.001),0.0,1.0);item["booster"]=v.stage==MonocerosReturnState::Stage::Aim?0.55+0.45*v.glow:v.stage==MonocerosReturnState::Stage::Run?2.5:0.55;}
         item["elapsed"]=t.elapsed;item["remaining"]=t.remaining;item["cursor"]=t.command_cursor;item["locked"]=t.locked;item["hit"]=t.hit;item["aim"]=t.aim;item["direction"]=t.direction;item["reposition"]=t.reposition;
         if (run.state.enemy_handles.contains(t.actor)) {item["facing"]=run.state.enemies[t.actor.slot].facing;item["radius"]=run.state.enemies[t.actor.slot].radius;item["width"]=p.kind==3?p.width:run.content->bosses[p.boss-1].horn_width;item["position"]=run.state.enemies[t.actor.slot].pos;item["horn"]=shape(run,t);item["warning"]=shape(run,t,true);}
         out.push_back(item);

@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-return" in OS.get_cmdline_user_args():
+		call_deferred("native_return")
+		return
 	if "--cpp-combo-tail" in OS.get_cmdline_user_args() or "--cpp-combo-cancel" in OS.get_cmdline_user_args():
 		call_deferred("native_combo_tail")
 		return
@@ -445,7 +448,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	if planet_x==500.0 or moon or name in ["kick","sweep","lance"]: cfg.character_scale = 1.0
+	if planet_x==500.0 or moon or name in ["kick","sweep","lance","return_charge"]: cfg.character_scale = 1.0
 	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.approach_speed = 0.0
@@ -463,6 +466,17 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		move.reach = 240.0
 		move.hold = 0.1
 		move.return_speed = TAU
+	if name=="return_charge":
+		move.warn = 0.2
+		move.distance = 600.0 if planet_x==500.0 else 200.0
+		move.passes = 2
+		move.passes_p2 = 3
+		move.overshoot = 50.0
+		move.brake_time = 0.1
+		move.brake_speed_ratio = 0.5
+		move.turn_time = 0.2
+		move.turn_lock = 0.1
+		move.head_lead = 0.4
 	if name=="lance":
 		move.warn = 0.2
 		move.lock_time = 0.05
@@ -506,7 +520,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		rules.graph_nodes = {}
 		var program = load("res://scripts/data_types/boss_flow_def.gd").new()
 		program.maximum_stamina = 10.0
-		program.sections = [{"request":"major" if name=="lance" else "normal","weights":({"major":1.0} if name=="lance" else {"single":1.0}),"cap":1.0,"action_count":1,"next":0}]
+		program.sections = [{"request":"major" if name=="lance" else "normal","weights":({"major":1.0} if name=="lance" else {"combo":1.0} if name=="return_charge" else {"single":1.0}),"cap":1.0,"action_count":1,"next":0}]
 		var flows: Dictionary = builder.boss_flow_records(rules,program,records.BossTechniqueDefinition)
 		for key in flows: records[key] = flows[key]
 	if obstacle:
@@ -1012,4 +1026,78 @@ func native_combo_tail() -> void:
 		check(state.stage==7 and state.technique=="charge" and bridge.read_frame().ok,"参加者消失で後続の薙ぎを始めない" if disappear else "連撃の取消で後続の薙ぎを始めない")
 		bridge.dispose()
 	print("[cpp_monoceros_combo] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_return() -> void:
+	var f := charge_fixture(true,false,450.0,false,"return_charge")
+	check(not f.is_empty(),"往復突進の編集値と型付き段階を生成して読み込む")
+	if f.is_empty(): get_tree().quit(1); return
+	var bridge = f.bridge
+	check(f.records.BossTechniqueDefinition[0].kind==4 and f.records.BossTechniqueDefinition[0].passes==2 and f.records.BossTechniqueDefinition[1].passes==3 and f.records.BossTechniqueStage.is_empty(),"形態ごとの回数と速さを生成しmethod trackを残さない")
+	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
+	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.9) and legacy.reach_limit(100.0)==300.0,"PureDataを保ち通常入口の攻撃長と到達距離を解決する")
+	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].sequence_stage==0,"共通フローが往復突進を自然選択する")
+	bridge._core.step(0.2)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(state.stage==1 and state.sequence_stage==1 and state.travel==200.0 and state.traveled==0.0,"自機までの距離とovershootを上限距離で止めて発進する")
+	bridge._core.step(0.2)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.hit and state.sequence_stage==2 and state.completed==1 and state.position.is_equal_approx(Vector2(200,0)),"最初の突進は上限で止まり一回命中して減速へ進む")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.position.is_equal_approx(Vector2(212.5,0)) and is_equal_approx(state.brake_progress,0.5),"減速は速さの割合を線形に減らし前方の逆噴射へ接続する")
+	bridge._core.step(0.05)
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==3 and not state.locked and is_equal_approx(absf(state.facing),PI*0.5) and is_equal_approx(absf(state.angle-state.facing),0.4),"振り向きはsmoothstepで回り頭が最大head_leadだけ先に向く")
+	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
+	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
+	add_child(view)
+	view.apply_frame(bridge.command("dev_boss_body_state").value[0],state)
+	check(is_equal_approx(absf(view.parts.get_node("Head").rotation),0.4) and view.horn.self_modulate.r==1.0,"振り向き途中から作った表示も頭の先行角と角の光を復元する")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.05)
+	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(expected.locked and is_equal_approx(absf(expected.angle),PI),"次回のturn_lock秒前に振り向きと頭を固定する")
+	check(held.ok and bridge.restore(held.value).ok,"減速後の向き直り・完了回数・技時計を途中復帰する")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0]==expected,"復帰しても同じ方向と時刻で固定する")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==1 and not state.hit and state.travel==112.5,"二回目の突進は現在の自機から距離を決め直し命中済みを戻す")
+	bridge._core.step(0.12)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==2 and state.completed==2 and state.hit,"所定回数の最後も独立して命中し回復へ進む")
+	bridge._core.step(0.051)
+	bridge._core.step(0.01)
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value[0].id>state.id,"往復突進の自然終了後に次の行動へ進む")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"往復突進の命中と段階を共通配信へ渡す")
+	bridge.dispose()
+	for disappear in [false,true]:
+		f = charge_fixture(false,false,450.0,false,"return_charge")
+		bridge = f.bridge
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+		bridge._core.step(0.2)
+		if disappear: bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+		bridge._core.step(0.2)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and not state.hit and bridge.read_frame().ok,"参加者消失で往復突進を閉じる" if disappear else "往復突進の取消後に当たりと次の往復を残さない")
+		bridge.dispose()
+	f = charge_fixture(false,true,500.0,false,"return_charge")
+	bridge = f.bridge
+	bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+	bridge._core.step(0.2)
+	bridge._core.step(0.3)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==3 and state.completed==0,"往復突進も共有した角掃引で惑星へ刺さり次の往復を始めない")
+	bridge.dispose()
+	view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_monoceros_return] failures=",failed)
 	get_tree().quit(1 if failed else 0)
