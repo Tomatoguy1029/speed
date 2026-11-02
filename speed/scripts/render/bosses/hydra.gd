@@ -6,6 +6,10 @@ var state := {}
 var hit := 0.0
 var arena: Node2D
 var effects := {}
+var shot_scenes := {}
+func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
+	for entry in entries.values():
+		if entry.has("hydra_move"): shot_scenes[entry.hydra_move] = scope.resources.get(entry.path)
 var white: Texture2D
 func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	state = body
@@ -36,7 +40,8 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 				var image := Image.create(2,2,false,Image.FORMAT_RGBA8)
 				image.fill(Color.WHITE)
 				white = ImageTexture.create_from_image(image)
-			var line := preload("res://scenes/attacks/hydra_shape.tscn").instantiate()
+			var scene: PackedScene = shot_scenes.get(String(effect.get("technique","")),preload("res://scenes/attacks/hydra_shape.tscn"))
+			var line := scene.instantiate()
 			line.visual_profile_key = "boss/move/hydra/"+String(effect.get("technique","bite_thrust"))
 			line.visual_component = "shape"
 			add_child(line)

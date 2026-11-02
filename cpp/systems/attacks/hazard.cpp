@@ -28,6 +28,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
             if (!WaveSystem::act(run,handle,dt)) return true;
             EventBuilder::flush_combat(run);
         }
+        if (auto *shape=std::get_if<HydraShapeHazard>(&state.hazards[row].shape)) {shape->before=shape->last_points.empty()?shape->points:shape->last_points;if (time>=state.hazards[row].delay) for (auto &point:shape->points) point+=shape->velocity*dt;shape->last_points=shape->points;if (!shape->points.empty()) state.hazards[row].pos=shape->points.front();}
         if (!get(state,handle)) continue;
         if (time>=state.hazards[row].delay && !hazard_act(state,handle,dt)) return true;
         const auto &pending=state.hazards[row];
@@ -37,7 +38,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         if (!get(state,handle)) continue;
         auto &current=state.hazards[row];
         const auto *circle=std::get_if<CircleHazard>(&current.shape);
-        const ContactShape shape=std::holds_alternative<HydraShapeHazard>(current.shape)?ContactShape(Polyline{std::get<HydraShapeHazard>(current.shape).points,{},std::get<HydraShapeHazard>(current.shape).width*0.5}):circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
+        const ContactShape shape=std::holds_alternative<HydraShapeHazard>(current.shape)?ContactShape(Polyline{std::get<HydraShapeHazard>(current.shape).points,std::get<HydraShapeHazard>(current.shape).before,std::get<HydraShapeHazard>(current.shape).width*0.5}):circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
         if (circle) current.hit=true;
         const auto *contact=get(state,handle);if (!contact) continue;const auto &policy=contact->spec.contact;
         const auto previous=contact->ship_previous_ready?contact->ship_previous:state.ship.pos;

@@ -850,6 +850,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.set_script([preload("res://scripts/render/bosses/monoceros.gd"),preload("res://scripts/render/bosses/centaurus.gd"),preload("res://scripts/render/bosses/canis_major.gd"),preload("res://scripts/render/bosses/hydra.gd"),preload("res://scripts/render/bosses/draco.gd")][body.kind])
 			_pulser_parent.add_child(display)
 			if body.kind==2: display.setup_flames(_scope,visuals)
+			if body.kind==3: display.setup_effects(_scope,visuals)
 			_boss_body_displays[body.id] = display
 		var attack := {}
 		for value: Dictionary in frame.get("boss_techniques",[]):

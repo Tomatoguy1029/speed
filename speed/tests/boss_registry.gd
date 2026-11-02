@@ -8,6 +8,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-bolt" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_bolt")
+		return
 	if "--cpp-hydra-sweep" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_sweep")
 		return
@@ -4095,4 +4098,73 @@ func native_hydra_sweep() -> void:
 	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"本体取消も首の判定を残さない")
 	view.queue_free();bridge.dispose();await get_tree().process_frame
 	print("[cpp_hydra_sweep] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 既存の首技の正常・中断・表示のケースを移動するビーム弾へ接続する。
+func native_hydra_bolt() -> void:
+	var move = load("res://data/bosses/hydra_moves/beam_bolt.tres")
+	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"beam_bolt","ビーム弾は編集値と互換Runnerに分かれる")
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"bolt_length":150.0,"bolt_width":60.0,"bolt_speed":400.0,"bolt_life":2.0,"beam_dmg":7.0},"beam_bolt")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("ビーム弾の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*220,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==66,"ビームの首から共通フローが自然にビーム弾を選ぶ")
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[3].glow>0.9 and body.effects.is_empty(),"予告は頭の発光だけを出す")
+	bridge._core.step(0.011);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="bolt" and body.effects[0].points.size()==2 and body.effects[0].width==60.0,"発動時刻に固定方向の線分を1つ放つ")
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	var direction: Vector2 = (effect.points[1]-effect.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":effect.points[1]+direction*100,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step_hazards(0.3);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects[0].points[0].distance_to(effect.points[0]+direction*120)<0.001,"世界時間で等速移動し、前の点列から掃引する")
+	var expected: Dictionary = body.duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"移動弾の前後の点列・命中済みと時計を保持して戻す")
+	bridge._core.step_hazards(0.3);body=bridge.command("dev_boss_body_state").value[0]
+	check(body==expected,"復帰後も同じ移動と判定になる");bridge.release_checkpoint(held.value)
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bolt")
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale) and hits.size()==2 and hits[-1].payload.technique==&"beam_bolt" and hits[-1].payload.source==&"hydra","掃引で実HPへ倍率を一度だけ掛け、bolt・技・所有元を記録する")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"生成したshot_visualの正式素材でビーム弾を表示する")
+	await get_tree().process_frame
+	bridge._core.step(0.3);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[3].mode=="idle" and body.effects.size()==1,"自然終了でも発射済みの弾が残る")
+	var first_id: int = actions[0].id
+	for tick in 20: bridge._core.step(0.025)
+	check(bridge.command("dev_boss_state").value.any(func(t): return t.kind==66 and t.id>first_id),"首の待ち後に次のビーム弾を選ぶ")
+	bridge.command("dev_cancel_flow",{"entity_id":c.id});body=bridge.command("dev_boss_body_state").value[0]
+	var count: int = body.effects.size()
+	check(count>0,"技の取消でも発射済みの弾を残す")
+	bridge.command("dev_damage",{"entity_id":body.necks[3].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[3].alive and body.effects.size()==count and not body.boss_dead,"参加首が消失しても発射済みの弾は寿命まで残る")
+	bridge._core.step_hazards(2.1);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty(),"寿命で弾を回収する")
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*220,"velocity":Vector2.ZERO})
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1})
+	check(started.ok,"分離後も同じビーム弾の実装を開始する")
+	bridge._core.step(0.16);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.necks[3].normal_phase==2 and body.necks[3].glow==0.0,"分離後は固定した視線方向へ放ち、その場でholdへ入る")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"本体の退場では弾を全て消す")
+	view.queue_free();bridge.dispose();await get_tree().process_frame
+	print("[cpp_hydra_bolt] failures=",failed)
 	get_tree().quit(1 if failed else 0)

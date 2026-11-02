@@ -74,6 +74,7 @@ struct ContentBundle {
     std::vector<HydraRegrowDefinition> hydra_regrow;
     std::vector<HydraNormalDefinition> hydra_normals;
     std::vector<HydraSweepDefinition> hydra_sweeps;
+    std::vector<HydraBoltDefinition> hydra_bolts;
     std::vector<HydraNormalGate> hydra_normal_gates;
     std::vector<HydraSwimDefinition> hydra_swim;
     std::vector<HydraSquadDefinition> hydra_squad;

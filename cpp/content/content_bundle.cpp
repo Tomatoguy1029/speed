@@ -129,7 +129,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_filters=records.BossFlowFilter_rows;
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
-    bundle->hydra_sweeps=records.HydraSweepDefinition_rows;bundle->hydra_bodies=records.HydraBodyDefinition_rows;bundle->hydra_regrow=records.HydraRegrowDefinition_rows;bundle->hydra_normals=records.HydraNormalDefinition_rows;bundle->hydra_normal_gates=records.HydraNormalGate_rows;bundle->hydra_swim=records.HydraSwimDefinition_rows;bundle->hydra_squad=records.HydraSquadDefinition_rows;
+    bundle->hydra_bolts=records.HydraBoltDefinition_rows;bundle->hydra_sweeps=records.HydraSweepDefinition_rows;bundle->hydra_bodies=records.HydraBodyDefinition_rows;bundle->hydra_regrow=records.HydraRegrowDefinition_rows;bundle->hydra_normals=records.HydraNormalDefinition_rows;bundle->hydra_normal_gates=records.HydraNormalGate_rows;bundle->hydra_swim=records.HydraSwimDefinition_rows;bundle->hydra_squad=records.HydraSquadDefinition_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
     bundle->draco_bodies=records.DracoBodyDefinition_rows;
     bundle->draco_cycles=records.DracoCycleDefinition_rows;
@@ -164,7 +164,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
-        if (p.id!=i+1 || (p.kind>16 && p.kind!=40 && p.kind!=41 && p.kind!=42 && p.kind!=43 && p.kind!=44 && p.kind!=45 && p.kind!=46 && p.kind!=47 && p.kind!=48 && p.kind!=49 && p.kind!=50 && p.kind!=64 && p.kind!=65) || (p.active<=0 && p.kind!=13 && p.kind!=14) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.kind==15?"sail_run":p.kind==40?"command":p.kind==41?"howl":p.kind==42?"pounce":p.kind==43?"sirius":p.kind==44?"bay":p.kind==45?"blaze":p.kind==46?"stream":p.kind==47?"hunt":p.kind==48?"hunt_pounce":p.kind==49?"nova":p.kind==50?"relay":p.kind==64?"bite_thrust":p.kind==65?"bite_sweep":p.external_id)) return {};
+        if (p.id!=i+1 || (p.kind>16 && p.kind!=40 && p.kind!=41 && p.kind!=42 && p.kind!=43 && p.kind!=44 && p.kind!=45 && p.kind!=46 && p.kind!=47 && p.kind!=48 && p.kind!=49 && p.kind!=50 && p.kind!=64 && p.kind!=65 && p.kind!=66) || (p.active<=0 && p.kind!=13 && p.kind!=14 && p.kind!=66) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.kind==15?"sail_run":p.kind==40?"command":p.kind==41?"howl":p.kind==42?"pounce":p.kind==43?"sirius":p.kind==44?"bay":p.kind==45?"blaze":p.kind==46?"stream":p.kind==47?"hunt":p.kind==48?"hunt_pounce":p.kind==49?"nova":p.kind==50?"relay":p.kind==64?"bite_thrust":p.kind==65?"bite_sweep":p.kind==66?"beam_bolt":p.external_id)) return {};
         std::vector<BossTechniqueStage> stages;
         for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
         if (p.kind==16) {
@@ -172,9 +172,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             if (combo==bundle->centaurus_combos.end() || bundle->bosses[p.boss-1].kind!=1 || (p.external_id!="combo_rain_volley" && p.external_id!="combo_shower_shot") || !stages.empty()) return {};
             const auto &a=bundle->boss_techniques[combo->first-1],&b=bundle->boss_techniques[combo->second-1];
             if ((p.external_id=="combo_rain_volley"?(a.kind!=10 || b.kind!=8):(a.kind!=14 || a.external_id!="shower_chase" || b.kind!=11)) || a.boss!=p.boss || b.boss!=p.boss || a.phase!=p.phase || b.phase!=p.phase) return {};continue;
-        if (p.kind>=64 && p.kind<=65) {
+        if (p.kind>=64 && p.kind<=66) {
             const auto v=std::find_if(bundle->hydra_normals.begin(),bundle->hydra_normals.end(),[&](const auto &v){return v.technique==p.id;});
-            if (v==bundle->hydra_normals.end() || p.external_id!=(p.kind==64?"bite_thrust":"bite_sweep") || bundle->bosses[p.boss-1].kind!=3 || !stages.empty() || p.active<=0 || (p.kind==65 && std::none_of(bundle->hydra_sweeps.begin(),bundle->hydra_sweeps.end(),[&](const auto &x){return x.technique==p.id;}))) return {};continue;
+            if (v==bundle->hydra_normals.end() || p.external_id!=(p.kind==64?"bite_thrust":p.kind==65?"bite_sweep":"beam_bolt") || bundle->bosses[p.boss-1].kind!=3 || !stages.empty() || (p.active<=0 && p.kind!=66) || (p.kind==66 && std::none_of(bundle->hydra_bolts.begin(),bundle->hydra_bolts.end(),[&](const auto &x){return x.technique==p.id;})) || (p.kind==65 && std::none_of(bundle->hydra_sweeps.begin(),bundle->hydra_sweeps.end(),[&](const auto &x){return x.technique==p.id;}))) return {};continue;
         }
         if (p.kind==15) {
             const auto sail=std::find_if(bundle->centaurus_sails.begin(),bundle->centaurus_sails.end(),[&](const auto &v){return v.technique==p.id;});
@@ -856,9 +856,10 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     if (bundle->hydra_swim.size()!=bundle->hydra_bodies.size() || bundle->hydra_squad.size()!=bundle->hydra_bodies.size()) return {};
     for (size_t i=0;i<bundle->hydra_squad.size();++i) {const auto &p=bundle->hydra_squad[i];if (p.id!=i+1 || p.boss!=bundle->hydra_bodies[i].boss || p.separation_tau<=0 || p.arrival<=0 || p.front_radius_x<=0 || p.pick_rest<=0 || p.body_step<=0 || p.flee_candidates<1 || p.wave_candidates<1) return {};}
     for (size_t i=0;i<bundle->hydra_swim.size();++i) {const auto &p=bundle->hydra_swim[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || bundle->definitions[p.immortal-1].kind!=EnemyDefinition::Kind::Part || p.immortal_hp<=0 || p.snake_speed<=0 || p.snake_turn<=0) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_swim[j].boss==p.boss) return {};}
+    for (size_t i=0;i<bundle->hydra_bolts.size();++i) {const auto &p=bundle->hydra_bolts[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=66 || p.life<=0 || p.width<=0) return {};}
     for (size_t i=0;i<bundle->hydra_sweeps.size();++i) {const auto &p=bundle->hydra_sweeps[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=65 || p.reach<=0) return {};}
-    for (size_t i=0;i<bundle->hydra_normals.size();++i) {const auto &p=bundle->hydra_normals[i];if (p.id!=i+1 || (bundle->boss_techniques[p.technique-1].kind<64 || bundle->boss_techniques[p.technique-1].kind>65) || p.bite_radius<=0) return {};}
-    for (size_t i=0;i<bundle->hydra_normal_gates.size();++i) {const auto &p=bundle->hydra_normal_gates[i];if (p.id!=i+1 || (bundle->boss_techniques[p.technique-1].kind<64 || bundle->boss_techniques[p.technique-1].kind>65) || p.minimum>p.maximum || p.half_angle<0 || p.half_angle>3.141592653589793) return {};}
+    for (size_t i=0;i<bundle->hydra_normals.size();++i) {const auto &p=bundle->hydra_normals[i];if (p.id!=i+1 || (bundle->boss_techniques[p.technique-1].kind<64 || bundle->boss_techniques[p.technique-1].kind>66) || (bundle->boss_techniques[p.technique-1].kind<=65 && p.bite_radius<=0)) return {};}
+    for (size_t i=0;i<bundle->hydra_normal_gates.size();++i) {const auto &p=bundle->hydra_normal_gates[i];if (p.id!=i+1 || (bundle->boss_techniques[p.technique-1].kind<64 || bundle->boss_techniques[p.technique-1].kind>66) || p.minimum>p.maximum || p.half_angle<0 || p.half_angle>3.141592653589793) return {};}
     if (bundle->hydra_regrow.size()!=bundle->hydra_bodies.size()) return {};
     for (size_t i=0;i<bundle->hydra_regrow.size();++i) {const auto &p=bundle->hydra_regrow[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || p.growth_first>=1 || p.growth_first<=p.growth_second || p.growth_second<=0) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_regrow[j].boss==p.boss) return {};}
 
