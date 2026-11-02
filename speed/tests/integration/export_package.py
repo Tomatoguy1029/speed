@@ -77,7 +77,7 @@ def inspect(path: Path, runtime_package=False) -> dict:
     return files
 
 
-def package(path: Path, platform: str, runtime: bool, script: Path, rendered=False, loading=False) -> None:
+def package(path: Path, platform: str, runtime: bool, script: Path, rendered=False, loading=False, final_runtime=False) -> None:
     packs = list(path.rglob("*.pck"))
     assert len(packs) == 1, "配布物にはPCKが1つ必要"
     files = inspect(packs[0], True)
@@ -100,7 +100,7 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         wrappers = list(path.glob("*console.exe"))
         if wrappers: engine = wrappers[0]
     print(f"[export_package] {platform} 拡張・生成物・ライセンス OK")
-    if not runtime:
+    if not runtime and not final_runtime:
         return
     environment = os.environ.copy()
     executable = str(engine)
@@ -108,6 +108,13 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         executable = shutil.which("godot-bg")
         assert executable, "描画付きの確認にはgodot-bgが必要"
         environment["GODOT"] = str(engine)
+    if final_runtime:
+        command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "final-runtime.log"), "--", "--package-final-runtime"]
+        result = subprocess.run(command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
+        print(result.stdout)
+        assert result.returncode == 0 and "[package_final_runtime] OK" in result.stdout, "撤去後の通常出撃から自然な結果保存・戻るまでを確認する"
+    if not runtime:
+        return
     command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "runtime.log"), "--"]
     result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
     print(result.stdout)
@@ -136,13 +143,16 @@ if __name__ == "__main__":
     parser.add_argument("--runtime", action="store_true")
     parser.add_argument("--rendered", action="store_true")
     parser.add_argument("--loading", action="store_true")
+    parser.add_argument("--final-runtime", action="store_true")
     parser.add_argument("--script", type=Path, default=Path(__file__).resolve().parents[1] / "content/check_rules.gd")
     args = parser.parse_args()
-    if args.rendered and (args.platform != "macos" or not args.runtime):
-        parser.error("--rendered はMacの --runtime と合わせて指定してください")
-    if args.loading and not args.rendered:
+    if args.rendered and (args.platform != "macos" or not (args.runtime or args.final_runtime)):
+        parser.error("--rendered はMacの --runtime または --final-runtime と合わせて指定してください")
+    if args.loading and not (args.rendered and args.runtime):
         parser.error("--loading はMacの --runtime --rendered と合わせて指定してください")
+    if args.final_runtime and not args.platform:
+        parser.error("--final-runtime は --platform と合わせて指定してください")
     if args.platform:
-        package(args.path.resolve(), args.platform, args.runtime, args.script, args.rendered, args.loading)
+        package(args.path.resolve(), args.platform, args.runtime, args.script, args.rendered, args.loading, args.final_runtime)
     else:
         inspect(args.path)

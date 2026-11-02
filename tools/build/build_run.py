@@ -46,7 +46,9 @@ def prepare_verification(root, project):
     ready = 'func _ready() -> void:\n'
     if ready not in text or 'func _package_runtime(' in text:
         raise ValueError('確認用の起動Scriptを安全に準備できません')
-    hook = ('\tif "--package-loading" in OS.get_cmdline_user_args():\n'
+    hook = ('\tif "--package-final-runtime" in OS.get_cmdline_user_args():\n'
+            '\t\tcall_deferred("_package_final_runtime")\n'
+            '\telif "--package-loading" in OS.get_cmdline_user_args():\n'
             '\t\tcall_deferred("_package_loading")\n'
             '\telif "--package-runtime" in OS.get_cmdline_user_args() or "--package-missing-runtime" in OS.get_cmdline_user_args():\n'
             '\t\tcall_deferred("_package_runtime")\n\t\treturn\n')
@@ -82,7 +84,8 @@ def package(root, lock, args):
             raise ValueError('保存先の隔離対象を確認できません: ' + key)
         source = source.replace(before, f'const {key} := {json.dumps(str(destination / filename))}', 1)
     save.write_text(source)
-    if args.verify:
+    verification = args.verify or args.verify_final
+    if verification:
         prepare_verification(root, project)
     libraries = project / 'extensions/run/bin'
     libraries.mkdir(parents=True, exist_ok=True)
@@ -106,13 +109,13 @@ def package(root, lock, args):
     presets = project / 'export_presets.cfg'
     config = presets.read_text()
     section = '[preset.0.options]' if args.platform == 'macos' else '[preset.1.options]'
-    config = config.replace(section, section + '\n\ncustom_template/release=' + json.dumps(str(template)) + ('\ndebug/export_console_wrapper=2' if args.platform == 'windows' and args.verify else ''), 1)
+    config = config.replace(section, section + '\n\ncustom_template/release=' + json.dumps(str(template)) + ('\ndebug/export_console_wrapper=2' if args.platform == 'windows' and verification else ''), 1)
     presets.write_text(config)
     engine = [args.godot, '--headless', '--path', project]
     # importで型・資源索引を準備してから、正規の共通生成へ渡す。
     run([*engine, '--editor', '--import', '--log-file', destination / 'import.log'])
     run([*engine, '--script', 'res://tools/content/build_all.gd', '--log-file', destination / 'generate.log', '--', '--force'])
-    if not args.verify:
+    if not verification:
         save.write_text(original_save)
     output = destination / 'export'
     output.mkdir(exist_ok=True)
@@ -126,7 +129,8 @@ def package(root, lock, args):
             executable.chmod(executable.stat().st_mode | 0o111)
     run([sys.executable, root / 'speed/tests/integration/export_package.py', output, '--platform', args.platform,
          *(['--runtime'] if args.verify else []), *(['--rendered'] if args.rendered else []),
-         *(['--loading'] if args.verify_loading else []), '--script', root / 'speed/tests/content/check_rules.gd'])
+         *(['--loading'] if args.verify_loading else []), *(['--final-runtime'] if args.verify_final else []),
+         '--script', root / 'speed/tests/content/check_rules.gd'])
     print('配布物: ' + str(artifact))
 
 
@@ -146,12 +150,15 @@ def main():
     parser.add_argument('--verify', action='store_true', help='配布エンジンで最小ランとライブラリ欠落時の失敗を確認する')
     parser.add_argument('--rendered', action='store_true', help='Macの配布確認をgodot-bgで描画付き起動する')
     parser.add_argument('--verify-loading', action='store_true', help='Mac配布版で初回・再出撃・装備準備・取消・戻るの時間と回収を確認する')
+    parser.add_argument('--verify-final', action='store_true', help='撤去後の配布版で通常出撃から自然な終了・結果保存・戻るを1回確認する')
     parser.add_argument('--jobs', type=int, default=4)
     args = parser.parse_args()
-    if args.rendered and (args.platform != 'macos' or not args.verify):
-        parser.error('--rendered はMacの --verify と合わせて指定してください')
+    if args.rendered and (args.platform != 'macos' or not (args.verify or args.verify_final)):
+        parser.error('--rendered はMacの --verify または --verify-final と合わせて指定してください')
     if args.verify_loading and not (args.package_dir and args.verify and args.rendered):
         parser.error('--verify-loading はMac配布の --verify --rendered と合わせて指定してください')
+    if args.verify_final and not args.package_dir:
+        parser.error('--verify-final は --package-dir と合わせて指定してください')
     if args.platform == 'windows' and args.arch not in (None, 'x86_64'):
         parser.error('Windowsの対象はx86_64です')
     if not args.sdk.is_dir():

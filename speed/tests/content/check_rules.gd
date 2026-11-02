@@ -273,3 +273,91 @@ func _package_release(session: RunSession, label: String, normal_return: bool) -
 		released = scope.cancelled and scope.resources.is_empty() and scope.pending.is_empty() and scope.warm_materials.is_empty() and released
 	_package_measure(label+"から戻る",{"command_ms":command_ms,"cleanup_elapsed_ms":(Time.get_ticks_usec()-began)/1000.0,"scopes":scopes.size(),"released":released,"normal_return":normal_return})
 	return released
+
+## 撤去後の既定起動→通常出撃→自然なDeath→結果保存。開発命令・状態上書きは使わない。
+func _package_final_runtime() -> void:
+	if OS.has_feature("editor") or SaveManager.SAVE_PATH.begins_with("user://") or SaveManager.SETTINGS_PATH.begins_with("user://"):
+		push_error("最終配布確認には隔離した保存先と配布エンジンが必要です")
+		quit(1)
+		return
+	var save_path: String = SaveManager.SAVE_PATH
+	var before_hash := FileAccess.get_sha256(save_path) if FileAccess.file_exists(save_path) else ""
+	var before_runs := int(SaveManager.data.best.runs)
+	var observed := {"results":0,"saves":0,"result":{}}
+	var on_save := func(): observed.saves += 1
+	SaveManager.save_changed.connect(on_save)
+	GameManager.start_run(1)
+	var session: RunSession = RunManager.current()
+	if session==null or not await _package_ready(session):
+		push_error("最終配布確認の通常出撃を開始できません")
+		quit(1)
+		return
+	var id := session.id
+	# 通常configureのmode=0を保ち、同じランの本番結果通知だけを観測する。
+	var normal_mode: bool = int(session.bridge.recording_origin.options.mode)==0
+	session.cpp_finished.connect(func(result: Dictionary):
+		observed.results += 1
+		observed.result = result.duplicate(true))
+	var ok := await _package_initial_equipment(session,"最終通常出撃") and normal_mode
+	var began := Time.get_ticks_usec()
+	var ticks := 0
+	while ticks<120*180 and Time.get_ticks_usec()-began<150000000 and observed.results==0 and ok:
+		if not is_instance_valid(session) or session.bridge==null:
+			ok = false
+			break
+		var current: Dictionary = session.bridge.read_frame()
+		if not current.ok:
+			ok = false
+			break
+		var cards: Dictionary = current.value.ui.cards
+		if int(cards.get("offer_id",0))>0 and int(cards.get("selected_id",0))==0:
+			if cards.candidates.is_empty():
+				ok = false
+				break
+			var first: Dictionary = cards.candidates[0]
+			var payload := {"offer_id":cards.offer_id,"candidate_id":first.candidate_id}
+			var command := "choose_card"
+			if not str(cards.get("swap_pick","")).is_empty():
+				command = "choose_swap"
+				payload.replace_weapon_id = str(first.id)
+			ok = session.bridge.command(command,payload).ok
+		if not ok: break
+		session.cpp_choices.poll()
+		ok = _package_step(session)
+		ticks += 1
+		# 状態だけを早送りせず、本番の資源準備・表示・結果flushにもフレームを渡す。
+		if ticks%16==0: await process_frame
+	# 自然な結果が出ない場合は、強制終了や時刻の上書きで成立させない。
+	var natural_death: bool = observed.results==1 and observed.result.get("kind","")=="Death"
+	_package_measure("撤去後の自然な終了",{"ticks":ticks,"step_budget_seconds":180,"elapsed_ms":(Time.get_ticks_usec()-began)/1000.0,"normal_mode":normal_mode,"result_count":observed.results,"kind":observed.result.get("kind","")})
+	ok = natural_death and ok
+	if not ok:
+		push_error("最終配布確認は上限内の自然なDeathと結果通知が未成立です")
+		quit(1)
+		return
+	for frame in range(600):
+		await process_frame
+		if not GameManager.screen_transition_active and RunManager.session(id)==null: break
+	var app := root.get_node_or_null("Main")
+	var result_view: Node = app.get("_current") if app!=null else null
+	var result_visible: bool = GameManager.screen==GameManager.Screen.RESULT and is_instance_valid(result_view) and result_view.get_script()==load("res://scripts/ui/result_screen.gd")
+	var saved_hash := FileAccess.get_sha256(save_path) if FileAccess.file_exists(save_path) else ""
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(save_path)) if not saved_hash.is_empty() else null
+	var saved_once: bool = observed.saves==1 and int(SaveManager.data.best.runs)==before_runs+1 and not saved_hash.is_empty() and saved_hash!=before_hash
+	saved_once = saved is Dictionary and int(saved.best.runs)==before_runs+1 and saved==JSON.parse_string(JSON.stringify(SaveManager.data)) and saved_once
+	var last_result: Dictionary = GameManager.last_result.duplicate(true)
+	# 実際に受け取った同じ結果の再通知を入口へ渡し、二重保存を拒否する。
+	GameManager.finish_cpp_run(observed.result)
+	var duplicate_rejected: bool = not SaveManager.record_run(last_result) and observed.saves==1 and FileAccess.get_sha256(save_path)==saved_hash
+	GameManager.reset_to_main_menu()
+	for frame in range(600):
+		await process_frame
+		if not GameManager.screen_transition_active and RunManager.get("_sessions").is_empty() and ContentManager.pending_resources()==0: break
+	var returned: bool = GameManager.screen==GameManager.Screen.MAIN_MENU and RunManager.get("_sessions").is_empty() and ContentManager.pending_resources()==0
+	var unchanged: bool = observed.results==1 and observed.saves==1 and GameManager.last_result==last_result and FileAccess.get_sha256(save_path)==saved_hash
+	SaveManager.save_changed.disconnect(on_save)
+	_package_measure("撤去後の結果保存と戻る",{"result_screen":result_visible,"saved_once":saved_once,"duplicate_rejected":duplicate_rejected,"save_signals":observed.saves,"returned_without_sessions":returned,"result_and_save_unchanged":unchanged})
+	ok = result_visible and saved_once and duplicate_rejected and returned and unchanged
+	if ok: print("[package_final_runtime] OK cpu="+Engine.get_architecture_name())
+	else: push_error("最終配布確認の結果保存・重複拒否・戻るが未成立です")
+	quit(0 if ok else 1)
