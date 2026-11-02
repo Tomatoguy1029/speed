@@ -79,7 +79,7 @@ void TechniqueRunner::begin_part(RunRuntime &run,TechniqueState &technique,uint3
 }
 void TechniqueRunner::cancel(RunRuntime &run,TechniqueHandle handle) {
     if (!running(run,handle)) return;
-    auto &technique=run.state.bosses.techniques[handle.slot];if (run.content->boss_techniques[technique.definition-1].kind==44) CanisBay::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==41) CanisHowl::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==40) CanisCommand::cancel(run,technique);technique.stage=TechniqueStage::Cancelled;
+    auto &technique=run.state.bosses.techniques[handle.slot];if (run.content->boss_techniques[technique.definition-1].kind==46) CanisStream::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==44) CanisBay::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==41) CanisHowl::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==40) CanisCommand::cancel(run,technique);technique.stage=TechniqueStage::Cancelled;
     CentaurusSail::release(run,technique);
     if (auto *rain=std::get_if<CentaurusRainState>(&technique.detail)) *rain={};
     if (auto *shower=std::get_if<CentaurusShowerState>(&technique.detail)) shower->marks.clear();

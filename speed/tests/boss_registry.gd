@@ -8,6 +8,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-canis-stream-cancel" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_stream_cancel")
+		return
 	if "--cpp-draco-pose" in OS.get_cmdline_user_args() or "--cpp-draco-pose-contact" in OS.get_cmdline_user_args():
 		call_deferred("native_draco_pose")
 		return
@@ -3199,4 +3202,20 @@ func native_canis_stream_end() -> void:
 	bridge.dispose();c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_stream_end] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_canis_stream_cancel() -> void:
+	var c := canis_move_case("stream",{"warn":0.1,"interval":0.05,"each_warn":0.1,"lunge_time":0.08,"recover":0.04,"min_hounds":1},false,{"pack_size":3,"lead_max":3})
+	if c.is_empty(): check(false,"予告取消の入力を生成する");get_tree().quit(1);return
+	var bridge = c.bridge
+	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.101)
+	var before: Array = bridge.read_render(Rect2(-3000,-2000,6000,4000)).value.batches
+	check(before.any(func(b): return b.has("glows")),"個別予告の発光を先に確定する")
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	var after: Array = bridge.read_render(Rect2(-3000,-2000,6000,4000)).value.batches
+	check(not after.any(func(b): return b.has("glows")),"取消で猟犬の予告の発光と指示を解除する")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_stream_cancel] failures=",failed)
 	get_tree().quit(1 if failed else 0)
