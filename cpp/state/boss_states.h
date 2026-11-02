@@ -14,6 +14,7 @@ struct CentaurusShowerState {std::vector<CentaurusShowerMark> marks;uint32_t pla
 struct CentaurusRainTrace {godot::Vector2 start,direction;double started=0,next_drop=0,landed=0;int32_t turn=1;bool hit=false;};
 struct CentaurusRainState {std::vector<CentaurusRainTrace> traces;uint32_t left=0;double next_at=0,expire_at=0;};
 struct CentaurusPowerState {godot::Vector2 origin;double angle=0;uint32_t released=0;bool alerting=false;};
+struct CentaurusSailState {godot::Vector2 center;double radius=0,angle=0;int32_t side=1;uint32_t fired=0;bool boosted=false;};
 struct CentaurusVolleyState {uint32_t released=0;};
 struct MonocerosSweepState {
     enum class Stage : uint8_t { Approach,Stop,Swing,Hold,Return };
@@ -59,7 +60,7 @@ struct CanisSequenceItem {EnemyHandle actor;double mark=0,launch=0;bool marked=f
 struct CanisHowlState {bool formed=false;double last_launch=0;std::vector<CanisSequenceItem> sequence;};
 struct CanisCommandState {std::vector<EnemyHandle> warned;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CanisCommandState,CanisHowlState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;

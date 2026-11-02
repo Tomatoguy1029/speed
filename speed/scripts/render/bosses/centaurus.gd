@@ -77,6 +77,7 @@ func _mode() -> StringName:
 	if state.mode==3: return &"final"
 	if state.mode>=4: return &"defeated"
 	if state.get("leaping",false): return &"leap"
+	if technique.get("technique","")=="sail_run" and int(technique.get("stage",5))==1: return &"sail"
 	if technique.get("technique","") in ["rain","shower_chase","shower_wall","shower_path"] and int(technique.get("stage",5))==1: return &"rain"
 	if technique.get("technique","") in ["rear_attack","stomp"] and int(technique.get("stage",5))==1: return &"strike"
 	return [&"windup",&"shooting",&"recovery",&"idle",&"idle",&"idle",&"idle",&"idle"][int(technique.get("stage",5))]

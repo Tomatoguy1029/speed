@@ -92,13 +92,13 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot",&"stomp",&"fan_volley",&"shower_chase",&"shower_wall",&"shower_path"]: return {}
+	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot",&"stomp",&"fan_volley",&"sail_run",&"shower_chase",&"shower_wall",&"shower_path"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusShowerDefinition":[],"CentaurusFanDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusShowerDefinition":[],"CentaurusFanDefinition":[],"CentaurusSailDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
 	var boss := {"id":1,"external_id":"centaurus","kind":1,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
 	records.BossDefinition = [boss]
-	if move.technique in [&"volley",&"rain",&"power_shot",&"fan_volley",&"shower_chase",&"shower_wall",&"shower_path"]:
+	if move.technique in [&"volley",&"rain",&"power_shot",&"fan_volley",&"sail_run",&"shower_chase",&"shower_wall",&"shower_path"]:
 		var scene: PackedScene = source.get("shot_visual")
 		if scene==null: scene = load("res://data/bosses/centaurus_moves/fan_volley.tres").shot_visual
 		var visual: AttackVisual = scene.instantiate()
@@ -121,7 +121,7 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9 if move.technique==&"rear_attack" else 10 if move.technique==&"rain" else 11 if move.technique==&"power_shot" else 12 if move.technique==&"stomp" else 13 if move.technique==&"fan_volley" else 14,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9 if move.technique==&"rear_attack" else 10 if move.technique==&"rain" else 11 if move.technique==&"power_shot" else 12 if move.technique==&"stomp" else 13 if move.technique==&"fan_volley" else 15 if move.technique==&"sail_run" else 14,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage","speed"]: row[key] = float(values.get(key,0.0))
 		if move.technique in [&"shower_chase",&"shower_wall",&"shower_path"]:
 			var pattern: int = ["chase","wall","path"].find(str(values.pattern))
@@ -135,6 +135,13 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 			shower.arrow_radius = fan.radius
 			shower.arrow_length = fan.length
 			records.CentaurusShowerDefinition.append(shower)
+		elif move.technique==&"sail_run":
+			row.active = maxf(0.001,float(values.duration))
+			records.BossTechniqueDefinition.append(row)
+			var sail := {"id":phase,"technique":phase,"projectile":1}
+			for key in ["approach_speed","radius_min","radius_max","duration","interval","radius","length","travel"]: sail[key] = float(values[key])
+			sail.arc = deg_to_rad(float(values.arc))
+			records.CentaurusSailDefinition.append(sail)
 		elif move.technique==&"fan_volley":
 			row.active = (int(values.shots)-1)*float(values.interval)
 			records.BossTechniqueDefinition.append(row)
@@ -211,6 +218,7 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 	for rain in records.CentaurusRainDefinition: rain.projectile += offset
 	for power in records.CentaurusPowerDefinition: power.projectile += offset
 	for fan in records.CentaurusFanDefinition: fan.projectile += offset
+	for sail in records.CentaurusSailDefinition: sail.projectile += offset
 	for shower in records.CentaurusShowerDefinition: shower.projectile += offset
 	for key in records:
 		if key!="LightArrowDefinition": package.records[key] = records[key]

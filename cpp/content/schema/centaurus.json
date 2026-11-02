@@ -636,6 +636,72 @@
           "ref": "LightArrowDefinition"
         }
       ]
+    },
+    {
+      "name": "CentaurusSailDefinition",
+      "section": 329,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "approach_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "travel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
     }
   ],
   "enums": {}
