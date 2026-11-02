@@ -5,13 +5,13 @@
 namespace speed {
 AttackHandle BlastSystem::emit(RunRuntime &run,const BlastParams &p) {
     auto &state=run.state;
-    if (p.source_id<0 || p.source_definition>run.content->definitions.size() || !state.started || state.closed || !p.position.is_finite() || (p.source.generation && !state.enemy_handles.contains(p.source)) || p.duration<=0) return {};
+    if ((p.technique.generation && !state.bosses.handles.contains(p.technique)) || p.source_id<0 || p.source_definition>run.content->definitions.size() || !state.started || state.closed || !p.position.is_finite() || (p.source.generation && !state.enemy_handles.contains(p.source)) || p.duration<=0) return {};
     for (double value:{p.radius,p.damage,p.duration,p.delay}) if (!std::isfinite(value) || value<0) return {};
     for (double value:{p.radius,p.duration,p.delay}) if (!std::isfinite(float(value))) return {};
     for (float channel:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(channel)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.shape=CircleHazard{float(p.radius),CircleHazardKind::Blast};
     hazard.delay=p.delay;hazard.duration=p.duration;hazard.damage=p.damage;hazard.color=p.color;
-    AttackSpec spec;spec.cause=Cause::Blast;spec.owner.live_source=p.source;spec.owner.attached=p.attached && p.source.generation>0;spec.owner.budget=p.budget;spec.owner.source_id=p.source_id;spec.owner.source_definition=p.source_definition;
+    AttackSpec spec;spec.technique=p.technique;if (state.bosses.handles.contains(p.technique)) spec.source_technique=state.bosses.techniques[p.technique.slot].definition;spec.cause=Cause::Blast;spec.owner.live_source=p.source;spec.owner.attached=p.attached && p.source.generation>0;spec.owner.budget=p.budget;spec.owner.source_id=p.source_id;spec.owner.source_definition=p.source_definition;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (spec.owner.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);
     if (!AttackSystem::configure_contact(*run.content,p.contact,spec)) return {};

@@ -131,6 +131,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
     bundle->hydra_fixed_beams=records.HydraFixedBeamDefinition_rows;bundle->hydra_bolts=records.HydraBoltDefinition_rows;bundle->hydra_sweeps=records.HydraSweepDefinition_rows;bundle->hydra_bodies=records.HydraBodyDefinition_rows;bundle->hydra_regrow=records.HydraRegrowDefinition_rows;bundle->hydra_normals=records.HydraNormalDefinition_rows;bundle->hydra_normal_gates=records.HydraNormalGate_rows;bundle->hydra_swim=records.HydraSwimDefinition_rows;bundle->hydra_squad=records.HydraSquadDefinition_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
+    bundle->draco_tail_slams=records.DracoTailSlamDefinition_rows;
     bundle->draco_leaps=records.DracoLeapDefinition_rows;
     bundle->draco_charges=records.DracoChargeDefinition_rows;
     bundle->draco_breaths=records.DracoBreathDefinition_rows;
@@ -168,10 +169,13 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
-        if (p.id!=i+1 || (p.kind>16 && p.kind!=40 && p.kind!=41 && p.kind!=42 && p.kind!=43 && p.kind!=44 && p.kind!=45 && p.kind!=46 && p.kind!=47 && p.kind!=48 && p.kind!=49 && p.kind!=50 && p.kind!=64 && p.kind!=65 && p.kind!=66 && p.kind!=67 && p.kind!=96 && p.kind!=97 && p.kind!=98 && p.kind!=51 && p.kind!=99) || (p.active<=0 && p.kind!=13 && p.kind!=14 && p.kind!=66) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.kind==15?"sail_run":p.kind==40?"command":p.kind==41?"howl":p.kind==42?"pounce":p.kind==43?"sirius":p.kind==44?"bay":p.kind==45?"blaze":p.kind==46?"stream":p.kind==47?"hunt":p.kind==48?"hunt_pounce":p.kind==49?"nova":p.kind==50?"relay":p.kind==51?"sirius_flame":p.kind==64?"bite_thrust":p.kind==65?"bite_sweep":p.kind==66?"beam_bolt":p.kind==67?"beam_fixed":p.kind==96?"bite":p.kind==97?"breath":p.kind==98?"charge":p.kind==99?"leap":p.external_id)) return {};
+        if (p.id!=i+1 || (p.kind>16 && p.kind!=40 && p.kind!=41 && p.kind!=42 && p.kind!=43 && p.kind!=44 && p.kind!=45 && p.kind!=46 && p.kind!=47 && p.kind!=48 && p.kind!=49 && p.kind!=50 && p.kind!=64 && p.kind!=65 && p.kind!=66 && p.kind!=67 && p.kind!=96 && p.kind!=97 && p.kind!=98 && p.kind!=51 && p.kind!=99 && p.kind!=100) || (p.active<=0 && p.kind!=13 && p.kind!=14 && p.kind!=66) || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":p.kind==9?"rear_attack":p.kind==10?"rain":p.kind==11?"power_shot":p.kind==12?"stomp":p.kind==13?"fan_volley":p.kind==15?"sail_run":p.kind==40?"command":p.kind==41?"howl":p.kind==42?"pounce":p.kind==43?"sirius":p.kind==44?"bay":p.kind==45?"blaze":p.kind==46?"stream":p.kind==47?"hunt":p.kind==48?"hunt_pounce":p.kind==49?"nova":p.kind==50?"relay":p.kind==51?"sirius_flame":p.kind==64?"bite_thrust":p.kind==65?"bite_sweep":p.kind==66?"beam_bolt":p.kind==67?"beam_fixed":p.kind==96?"bite":p.kind==97?"breath":p.kind==98?"charge":p.kind==99?"leap":p.kind==100?"tail_slam":p.external_id)) return {};
         if (p.phase<1 || p.phase>(bundle->bosses[p.boss-1].kind==4?3u:2u)) return {};
         std::vector<BossTechniqueStage> stages;
         for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
+        if (p.kind==100) {
+            if (bundle->bosses[p.boss-1].kind!=4 || std::count_if(bundle->draco_tail_slams.begin(),bundle->draco_tail_slams.end(),[&](const auto &v){return v.technique==p.id;})!=1 || !stages.empty() || records.ZoneDefinition_rows.empty() || records.WaveDefinition_rows.empty()) return {};continue;
+        }
         if (p.kind==99) {
             if (bundle->bosses[p.boss-1].kind!=4 || std::count_if(bundle->draco_leaps.begin(),bundle->draco_leaps.end(),[&](const auto &v){return v.technique==p.id;})!=1 || !stages.empty()) return {};continue;
         }
@@ -885,6 +889,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
 
 
     for (size_t i=0;i<bundle->draco_breaths.size();++i) {const auto &p=bundle->draco_breaths[i];const auto &d=bundle->definitions[p.rock_enemy-1];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=97 || d.kind!=EnemyDefinition::Kind::Meteor || d.xp_rewards[0] || d.xp_rewards[1] || d.xp_rewards[2] || d.gold_eligible) return {};}
+    for (size_t i=0;i<bundle->draco_tail_slams.size();++i) {const auto &p=bundle->draco_tail_slams[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=100 || std::none_of(bundle->zones.begin(),bundle->zones.end(),[](const auto &d){return d.style==uint32_t(ZoneStyle::Plain);}) || bundle->waves.empty()) return {};}
     for (size_t i=0;i<bundle->draco_leaps.size();++i) {const auto &p=bundle->draco_leaps[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=99) return {};}
     for (size_t i=0;i<bundle->draco_charges.size();++i) {const auto &p=bundle->draco_charges[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=98) return {};}
     for (size_t i=0;i<bundle->draco_bites.size();++i) {const auto &p=bundle->draco_bites[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=96) return {};}

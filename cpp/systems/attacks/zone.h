@@ -10,6 +10,7 @@ struct ZoneParams {
     bool attached=false;
     BudgetToken budget;
     int64_t source_id=0;uint32_t source_definition=0;
+    TechniqueHandle technique;
 };
 class ZoneSystem {
 public:

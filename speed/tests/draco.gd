@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-tail-slam" in OS.get_cmdline_user_args():
+		call_deferred("native_tail_slam")
+		return
 	if "--cpp-draco-leap" in OS.get_cmdline_user_args():
 		call_deferred("native_leap")
 		return
@@ -353,7 +356,7 @@ func native_draco_move_flow(move: BossTechnique) -> void:
 	var rules=load("res://scripts/data_types/boss_action_rules.gd").new()
 	rules.adapter=&"draco";rules.techniques.assign([move]);rules.conditions={str(move.technique):{}}
 	var flow=load("res://scripts/data_types/boss_flow_def.gd").new()
-	flow.sections=[{"request":"major","cap":2.0,"weights":{"major":100.0},"next":0,"action_count":1}]
+	flow.sections=[{"request":"major" if move.category==&"major" else "normal","cap":2.0,"weights":{"major":100.0} if move.category==&"major" else {"single":100.0},"next":0,"action_count":1}]
 	var builder=load("res://tools/content/build_run_content.gd")
 	var fixture:=breath_fixture(move)
 	var bridge=fixture.bridge
@@ -380,6 +383,121 @@ func native_draco_move_flow(move: BossTechnique) -> void:
 	bridge.dispose()
 	print("[cpp_draco_%s] failures="%move.technique,failed)
 	get_tree().quit(1 if failed else 0)
+
+## 既存の尾の着弾・小さな波・中断を同じSourceへ照合する。
+func native_tail_slam() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/tail_slam.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	check(fixture.package.records.DracoTailSlamDefinition.size()==3,"尾の叩きつけの実効値を3形態へ生成する")
+	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
+	stage.boss_enabled=false
+	var session:=RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":105},false)
+	session.auto_step=false
+	var sim: RunSimulation=session.sim
+	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
+	var a=sim.bosses.actor
+	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
+	sim.state.ship_pos=Vector2(700,0);sim.state.enemy_aim=Vector2(700,0);sim.state.ship_vel=Vector2.ZERO;sim.state.ship_invuln=0.0
+	check(a.start_attack(&"tail_slam") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で尾の叩きつけを開始する")
+	var shape_error:=0.0
+	var ring_error:=0.0
+	var times_equal:=true
+	var hazard_equal:=true
+	var saved: Array=[]
+	var shown: Array=[]
+	var landed:=false
+	for frame in 300:
+		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and is_equal_approx(attack.stage_time,a.elapsed)
+		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked and attack.fired==a._runner.fired
+		var points: PackedVector2Array=a.body_points()
+		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
+		if a.telegraph_paths.size()==attack.telegraph_paths.size():
+			for path in a.telegraph_paths.size():
+				if a.telegraph_paths[path].size()!=attack.telegraph_paths[path].size():ring_error=INF
+				else:
+					for j in a.telegraph_paths[path].size():ring_error=maxf(ring_error,a.telegraph_paths[path][j].distance_to(attack.telegraph_paths[path][j]))
+		else:ring_error=INF
+		var hazards: Array=bridge._core.hazards_snapshot()
+		var source_hazards: Array=[]
+		for j in sim.projectiles.hazard_alive.size():
+			if sim.projectiles.hazard_alive[j]!=0:source_hazards.append(j)
+		hazard_equal=hazard_equal and hazards.size()==source_hazards.size()
+		for h: Dictionary in hazards:
+			var found:=false
+			for j: int in source_hazards:
+				if h.kind!=int(sim.projectiles.hazard_kind[j]):continue
+				found=h.pos.distance_to(sim.projectiles.hazard_pos[j])<0.01 and is_equal_approx(h.damage,sim.projectiles.hazard_dmg[j]) and is_equal_approx(h.delay,sim.projectiles.hazard_delay[j]) and is_equal_approx(h.active,sim.projectiles.hazard_active[j])
+				if h.kind==1:found=found and is_equal_approx(h.radius,sim.projectiles.hazard_len[j])
+				if h.kind==2:found=found and is_equal_approx(h.length,sim.projectiles.hazard_len[j]) and is_equal_approx(h.radius,sim.projectiles.wave_radius(j)) and is_equal_approx(h.half_width*2,sim.projectiles.hazard_width[j])
+				hazard_equal=hazard_equal and found
+		if attack.stage not in saved and attack.stage<3:
+			saved.append(attack.stage)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"尾の予告・実行・回復の途中を値型で保持する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_body: Array=bridge.command("dev_boss_body_state").value
+			var future_hazards: Array=bridge._core.hazards_snapshot()
+			check(bridge.restore(held.value).ok,"尾の叩きつけの途中へ復帰する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body and bridge._core.hazards_snapshot()==future_hazards,"復帰後の尾の姿勢・段階・攻撃が同じになる")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		var key: int=3 if attack.fired and not landed else attack.stage
+		if key in [0,3,2] and key not in shown:
+			shown.append(key)
+			var appearance: Dictionary={}
+			for visual: Dictionary in fixture.package.visuals:
+				if visual.get("boss","")=="draco":appearance=visual.appearance
+			var display=load("res://scripts/render/bosses/draco.gd").new()
+			add_child(display);display.apply_frame(body,attack,appearance);await get_tree().process_frame
+			check(display._parts.visible,"尾の予告円・着弾・回復を状態から描く")
+			if key==3:
+				var rendered: Dictionary=bridge.read_render(Rect2(-500,-500,2200,1000)).value
+				check(body.impacts.size()==1 and rendered.shapes.any(func(shape):return shape.kind==2) and rendered.shapes.any(func(shape):return shape.kind==7),"着弾の表示とzone・waveの形を通常の描画出力へ渡す")
+				landed=true
+			display.free()
+		if attack.stage==5 and a.mode==&"idle":break
+	check(times_equal,"Sourceと予告・固定・着弾1回・回復・終了のtickが一致する")
+	check(shape_error<0.1 and ring_error<0.1,"尾のベジェ・両端固定・49点の予告円がSourceと一致する: %s/%s"%[shape_error,ring_error])
+	check(hazard_equal and bridge._core.hazards_snapshot().is_empty(),"zoneとwaveの生成時刻・形・ダメージ・自然寿命がSourceと一致する")
+	check(saved.size()==3 and shown.size()==3,"予告から自然終了までの状態と表示を通る")
+	check(fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.accepted and event.payload.cause==&"blast" and event.payload.source==&"draco" and event.payload.technique==&"tail_slam"),"着地円の実HPと原因・出所・技名を記録する")
+	for target in [0,1,2]:
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 300:
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			if bridge.command("dev_boss_state").value[0].stage==target:break
+		check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"尾の予告・実行・回復で取り消す")
+		check(bridge.command("dev_boss_state").value[0].telegraph_paths.is_empty(),"取消は尾の予告を消す")
+		bridge._core.step_hazards(1.0)
+	bridge.dispose();session.free()
+	# 着地円の外に避け、取消・本体消失後にも波だけを受ける既存の残留攻撃ケース。
+	for operation in ["dev_cancel_technique","dev_cancel_boss","outside"]:
+		fixture=breath_fixture(move);bridge=fixture.bridge
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 40:bridge._core.step(1.0/120.0);bridge.command("dev_boss_state")
+		bridge.command("dev_ship_motion",{"position":Vector2(860 if operation!="outside" else 940,0),"velocity":Vector2.ZERO})
+		for frame in 150:
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0);bridge.command("dev_boss_state")
+			if bridge.command("dev_boss_state").value[0].fired:break
+		check(bridge._core.hazards_snapshot().size()==2,"着弾は一度だけzoneとwaveを出す")
+		if operation=="dev_cancel_technique":bridge.command(operation,{"ticket":started.value})
+		elif operation=="dev_cancel_boss":bridge.command(operation,{"entity_id":fixture.boss})
+		if operation!="outside":check(bridge._core.hazards_snapshot().size()==2,"生成済みの着弾と波は技取消・本体消失で消さない")
+		for frame in 75:
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0);bridge.command("dev_boss_state")
+		var hits: Array=fixture.captured.filter(func(event):return event.type==&"combat_player_damage" and event.payload.accepted)
+		check(hits.is_empty() if operation=="outside" else hits.size()==1 and hits[0].payload.cause==&"wave" and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"tail_slam","着地円の外は波だけに当たり、波の外まで避ければ当たらない")
+		check(bridge._core.hazards_snapshot().is_empty(),"残る波も自然寿命で終わる")
+		bridge.dispose()
+	native_draco_move_flow(move)
 
 func native_breath() -> void:
 	var rays_only := "--cpp-draco-breath-rays" in OS.get_cmdline_user_args()

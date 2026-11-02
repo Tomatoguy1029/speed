@@ -9,6 +9,7 @@ struct WaveParams {
     WaveStyle style=WaveStyle::Plain;
     EnemyHandle owner;
     BudgetToken budget;
+    TechniqueHandle technique;
 };
 class WaveSystem {
 public:
