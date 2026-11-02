@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-selection" in OS.get_cmdline_user_args():
+		await check_semantics_selection()
+		print("[semantics_selection] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-seeds" in OS.get_cmdline_user_args():
 		await check_semantics_seeds()
 		print("[semantics_seeds] failed=%d" % failed)
@@ -582,3 +587,73 @@ func check_semantics_seeds() -> void:
 	semantics_distribution("黄色ドロップ抽選",gold[0],gold[1])
 	check(xp[0]>0 and absf(xp[0]-xp[1])<=xp[0]*0.1,"取得XP平均の差10%以内")
 	print("SEMANTICS_SEEDS ",JSON.stringify({"seeds":[0,63],"world_seconds":6,"population_sums":populations,"spawned":spawned,"cards":cards,"gold":gold,"xp_sums":xp,"replay_ticks_per_seed":120,"failed":failed}))
+
+# 技の実行時間に左右されない、同じ制作フローの選択だけを両版へ渡す。
+# 待機ノードは制作形式の正規ノードで、ゲームの技や数値は変更しない。
+func check_semantics_selection() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg: GameConfig=ContentManager.base.duplicate(true)
+	cfg.planet_radius=0;cfg.moon_count=0;cfg.meteor_count=0;cfg.iron_count=0;cfg.saw_count=0
+	var definition: BossDef=load("res://data/bosses/monoceros.tres").duplicate(true)
+	definition.speed=0;definition.params.initial_wait=0.0
+	var rules=load("res://data/bosses/ai/monoceros_action_rules.tres").duplicate(true)
+	rules.techniques.assign([load("res://data/bosses/monoceros_moves/charge.tres")])
+	rules.graph_nodes={"charge":{"hidden":true}}
+	rules.combos={}
+	rules.conditions={}
+	rules.costs={}
+	rules.selection_bias={"normal_a":3.0,"normal_b":1.0,"combo":1.0,"major":1.0}
+	rules.condition_groups={"choose_normal":{"category":"normal","nodes":["normal_a","normal_b"]},"choose_combo":{"category":"combo","nodes":["combo"]},"choose_major":{"category":"major","nodes":["major"]}}
+	var candidates: Array=[]
+	for id in ["normal_a","normal_b","combo","major"]:
+		rules.combos[id]={"type":"wait","seconds":0.0}
+		rules.costs[id]=1.0
+		candidates.append({"id":id,"category":"single" if id.begins_with("normal") else id,"cost":1.0,"parts":[0],"exclusive":true})
+	var section={"request":"any","weights":{"single":5.0,"combo":3.0,"major":2.0},"cap":1.0,"action_count":1,"next":0,"avoid_repeat":true,"technique_weights":rules.selection_bias}
+	var flow=load("res://scripts/data_types/boss_flow_def.gd").new()
+	flow.maximum_stamina=100000.0;flow.partial_rest=0;flow.empty_rest=0;flow.sections=[section]
+	var package: Dictionary=builder.boss_package(definition,cfg,null,{"rules":rules,"flow":flow})
+	if package.is_empty():check(false,"選択条件だけを正規制作形式から生成する");return
+	var bytes: PackedByteArray=builder.Schema.write_content(package.records,"1".repeat(64).hex_decode())
+	var counts := [{},{}]
+	for seed_value in 64:
+		var selector=load("res://scripts/bosses/flow/selector.gd").new()
+		selector.random.seed=seed_value
+		var last: Array=[]
+		for opportunity in 64:
+			last=selector.choose(candidates,section,last)
+			semantics_histogram(last,"id",counts[0])
+		var bridge=semantics_bridge(bytes,seed_value)
+		var twin=semantics_bridge(bytes,seed_value)
+		if bridge==null or twin==null:check(false,"選択のC++ランを開始する");return
+		for native_bridge in [bridge,twin]:
+			check(native_bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).ok,"制作フローを本体へ接続する")
+		var selected:=0
+		var active:=false
+		var held:=0
+		var replay_start:=0
+		var future: Array=[]
+		var end_tick:=0
+		for tick in 4096:
+			for native_bridge in [bridge,twin]: native_bridge.step(1.0/120.0,native_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+			var rows: Array=bridge.command("dev_boss_flow_state").value
+			var second_rows: Array=twin.command("dev_boss_flow_state").value
+			check(rows==second_rows and bridge._core.inspect().rng_state==twin._core.inspect().rng_state,"同seedの技選択・フロー・乱数 seed%d tick%d"%[seed_value,tick])
+			if rows.is_empty():check(false,"選択フローが存在する");break
+			if rows[0].active and not active:
+				for id in rows[0].last:counts[1][id]=int(counts[1].get(id,0))+1
+				selected+=1
+			active=rows[0].active
+			if held>0:future.append({"flow":rows,"rng":bridge._core.inspect().rng_state})
+			if selected==32 and held==0:held=bridge.checkpoint().value;replay_start=tick+1
+			if selected==64:end_tick=tick+1;break
+		check(selected==64,"両版で同じ64回の技選択機会を通す seed%d"%seed_value)
+		check(bridge.restore(held).ok,"選択履歴の途中へ復帰 seed%d"%seed_value)
+		for tick in range(replay_start,end_tick):
+			bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+			var expected: Dictionary=future[tick-replay_start]
+			check(bridge.command("dev_boss_flow_state").value==expected.flow and bridge._core.inspect().rng_state==expected.rng,"復帰後も同じ技選択履歴へ進む seed%d tick%d"%[seed_value,tick])
+		bridge.release_checkpoint(held);bridge.dispose();twin.dispose()
+		if failed:break
+	semantics_distribution("技選択",counts[0],counts[1])
+	print("SEMANTICS_SELECTION ",JSON.stringify({"seeds":[0,63],"opportunities_per_seed":64,"counts":counts,"failed":failed}))
