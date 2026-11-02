@@ -2,6 +2,7 @@
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/defender.h"
 #include "../behaviors/enemies/crab.h"
+#include "../behaviors/enemies/crow.h"
 #include "attack_system.h"
 #include "attack_budget.h"
 #include "group_system.h"
@@ -27,6 +28,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Clock) enemy.behavior_state=ClockState{};
     if (def.kind==EnemyDefinition::Kind::Reticle) enemy.behavior_state=ReticleState{};
     if (def.kind==EnemyDefinition::Kind::Split) enemy.behavior_state=SplitState{};
+    if (def.kind==EnemyDefinition::Kind::Crow) enemy.behavior_state=CrowState{};
     if (def.kind==EnemyDefinition::Kind::Defender) {enemy.behavior_state=DefenderState{};run.workspace.defender_posts_tick=-1;}
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
@@ -52,6 +54,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     enemy.fire_t=def.fire_interval*(0.5+state.control.rng.randf()*0.5);enemy.alive=true;
     insert(state,uint32_t(row),enemy);state.rows_by_id[enemy.id]=row;
     if (def.kind==EnemyDefinition::Kind::Crab && !p.has_facing) CrabBehavior::steer(run,uint32_t(row));
+    if (def.kind==EnemyDefinition::Kind::Crow) CrowBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)),p.flock_member);
     return enemy.id;
 }
 void EnemySystem::flush_spawns(RunRuntime &run) {

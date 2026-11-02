@@ -6,6 +6,7 @@ var failed := 0
 var mute_checks := false
 var split_finished := false
 var defender_finished := false
+var crow_finished := false
 
 func check(ok: bool, label: String) -> void:
 	if mute_checks: return
@@ -15,6 +16,14 @@ func check(ok: bool, label: String) -> void:
 		push_error("[enemy_generated_spawns] " + label)
 
 func _ready() -> void:
+	if "--cpp-crow" in OS.get_cmdline_user_args():
+		mute_checks = "--cpp-crow-gather" in OS.get_cmdline_user_args()
+		await check_cpp_crow()
+		mute_checks = false
+		check(crow_finished,"からす座の確認本体が最後まで進んだ")
+		print("[cpp_crow] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-defender" in OS.get_cmdline_user_args():
 		await check_cpp_defender()
 		check(defender_finished,"守る雑魚の確認本体が最後まで進んだ")
@@ -518,4 +527,145 @@ func check_cpp_defender() -> void:
 	check(not split_entity(core,fresh,true).boost_active and split_entity(core,fresh,true).guard_target_id==0,"死亡した行を再利用しても速度指示と持ち場を残さない")
 	bridge.release_checkpoint(saved.value)
 	defender_finished = true
+	session.free()
+
+func crow_gem(bridge,at: Vector2,kind: int) -> int:
+	var result: Dictionary = bridge.command("dev_drop_crystal",{"position":at,"kind":kind})
+	check(result.ok,"からす座の回収対象の結晶を供給する")
+	return int(result.value)
+
+func crow_ground(core,id: int) -> Dictionary:
+	for gem: Dictionary in core.pickups_snapshot().gems:
+		if gem.id==id: return gem
+	return {}
+
+func check_cpp_crow() -> void:
+	var cfg := ContentManager.base.duplicate(true) as GameConfig
+	cfg.start_radius = 1200.0
+	cfg.planet_radius = 0.0
+	cfg.world_tick_div = 1
+	cfg.gem_max = 100
+	cfg.strong_gold_chance = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var definition := load("res://data/enemies/crow.tres").duplicate(true) as EnemyDef
+	definition.params.aim_spread = 0.0
+	definition.xp_reward_counts = PackedInt32Array([1,0,0])
+	var stage := RuntimeStage.new()
+	stage.index = 96
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["crow"])
+	var output := "res://.content/dev/run_crow"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"からす座の群れと結晶運搬".sha256_text(),{&"crow":definition})
+	check(built==OK,"群れ・回収・退場の編集値と資源を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_96.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":966},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"からす座の本体と束の通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	defender_step(bridge)
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	var at := target-Vector2(500,0)
+	var leader: int = core.spawn_enemy(&"crow",at,{"facing":0.0,"attack_priority":4.0})
+	var flock: Array = core.enemies_snapshot().filter(func(e): return e.type=="crow")
+	var offsets := [Vector2.ZERO,Vector2(-1,-1.1),Vector2(-1.1,1),Vector2(-2.1,0.2)]
+	check(flock.size()==4,"通常の生成入口から四羽の群れを作る")
+	for k in flock.size():
+		var e: Dictionary = flock[k]
+		check(Vector2(e.pos[0],e.pos[1]).is_equal_approx(at+offsets[k]*56.0) and e.facing==0.0 and split_entity(core,e.id,true).mode==2 and split_entity(core,e.id,true).attack_priority==4.0,"四つの星の配置と同じ向き・優先度を子へ引き継ぐ")
+	bridge.command("dev_retreat",{"entity_id":leader})
+	core.step(0.1)
+	check(core.attack_budget_snapshot().waiting.is_empty() and core.enemies_snapshot().filter(func(e): return e.type=="crow" and not e.dead).size()==3,"先頭を先に消しても仲間は攻撃枠を待たず独立して横断する")
+	for e: Dictionary in flock.slice(1):
+		var actual := split_entity(core,e.id)
+		check(Vector2(actual.pos[0],actual.pos[1]).is_equal_approx(Vector2(e.pos[0],e.pos[1])+Vector2(15,0)),"群れの横断を機体の追跡へ変えない")
+		bridge.command("dev_retreat",{"entity_id":e.id})
+	at = target+Vector2(300,0)
+	var carrier: int = core.spawn_enemy(&"crow",at,{"facing":0.0,"flock_member":true})
+	var radius: float = split_entity(core,carrier).radius
+	bridge.command("dev_pickup_rates",{"ship":0.0,"run":0.0})
+	var pickup_ui: Dictionary = bridge.read_frame().value.ui
+	var pulled_pos := target-Vector2(200,0)
+	var pulled: int = crow_gem(bridge,pulled_pos,0)
+	var separation: float = (pickup_ui.ship_radius+14.0+pickup_ui.xp_pickup_radius)*0.5
+	bridge.command("dev_ship_motion",{"position":pulled_pos-Vector2(separation,0),"velocity":Vector2.ZERO})
+	core.step_pickups(0.001)
+	check(not crow_ground(core,pulled).is_empty() and crow_ground(core,pulled).pulled,"機体が吸い寄せ始めた結晶を用意する")
+	var pulled_at: Vector2 = crow_ground(core,pulled).pos
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	bridge.command("dev_relocate",{"entity_id":carrier,"position":pulled_at+Vector2(radius*0.62,0)})
+	core.set_enemy_motion(carrier,{"facing":0.0})
+	core.step_pickups(0.001)
+	check(not crow_ground(core,pulled).is_empty() and core.pickups_snapshot().cargo.is_empty(),"機体が吸い寄せている結晶は足元でも横取りしない")
+	bridge.command("dev_collect_gems",{})
+	bridge.command("dev_relocate",{"entity_id":carrier,"position":at})
+	core.set_enemy_motion(carrier,{"facing":0.0})
+	var feet := at-Vector2(radius*0.62,0)
+	var ids: Array[int] = []
+	for kind in 3: ids.append(crow_gem(bridge,feet+Vector2(-kind*10,(kind-1)*10),kind))
+	var front: int = crow_gem(bridge,at+Vector2(radius*0.3+20,0),0)
+	var side: int = crow_gem(bridge,at+Vector2(0,100),0)
+	var behind: int = crow_gem(bridge,at-Vector2(140,0),0)
+	var supplied: Dictionary = core.pickups_snapshot()
+	var originals: Array = supplied.gems.filter(func(gem): return gem.id in ids)
+	core.step_pickups(0.1)
+	var carried: Dictionary = core.pickups_snapshot()
+	var muted_before := mute_checks
+	mute_checks = false
+	check(carried.cargo.size()==1 and carried.cargo[0].crystals.size()==3 and carried.cargo[0].crystals.map(func(gem): return gem.id)==ids,"横から後ろの結晶を保存した個体IDごと運搬へ移す")
+	check(not crow_ground(core,front).is_empty() and not crow_ground(core,side).is_empty() and not crow_ground(core,behind).is_empty(),"前方・横幅外・後ろの範囲外を回収しない")
+	mute_checks = muted_before
+	for original: Dictionary in originals:
+		var stored: Dictionary = carried.cargo[0].crystals.filter(func(gem): return gem.id==original.id)[0]
+		check(stored.kind==original.kind and stored.base_xp==original.base_xp and stored.origin==original.origin,"色・実保持経験値・出所を保存し直さず保つ")
+	check(carried.xp_statistics.supplied==supplied.xp_statistics.supplied,"運搬を新しい経験値の供給へ数えない")
+	var moving: int = crow_gem(bridge,at+Vector2(-90,65),0)
+	var from: Vector2 = crow_ground(core,moving).pos
+	core.step_pickups(0.01)
+	check(is_equal_approx(crow_ground(core,moving).pos.distance_to(from),9.0),"回収まで離れた結晶は設定速度で足元へ進める")
+	var held_gem: int = crow_gem(bridge,feet,0)
+	core.set_enemy_motion(carrier,{"held":true})
+	core.step_pickups(0.02)
+	mute_checks = false
+	check(crow_ground(core,held_gem).is_empty() and split_entity(core,carrier,true).buds==4,"保持中も現行と同じ順で結晶の回収を続ける")
+	mute_checks = muted_before
+	core.set_enemy_motion(carrier,{"held":false})
+	var render: Dictionary = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(render.crows.values.size()==6 and render.crows.values[5]==4.0 and render.crows.time==core.inspect().world_time and presentation.frame_view.apply_frame(render),"運搬表から束の量と個数を求め共通描画へ渡す")
+	await get_tree().process_frame
+	var saved: Dictionary = bridge.checkpoint()
+	var pending: Dictionary = core.pickups_snapshot()
+	bridge.command("dev_kill",{"entity_id":carrier,"cause":"bullet"})
+	var dropped: Dictionary = core.pickups_snapshot()
+	check(dropped.cargo.is_empty(),"撃破時は運搬表を一度だけ空にする")
+	for original: Dictionary in pending.cargo[0].crystals:
+		var returned := crow_ground(core,original.id)
+		check(not returned.is_empty() and returned.kind==original.kind and returned.base_xp==original.base_xp and returned.origin==original.origin,"撃破で保存した結晶を同じ意味のまま地面へ戻す")
+	check(bridge.restore(saved.value).ok and core.pickups_snapshot()==pending,"運搬途中の全結晶と個体の状態へ値から復帰する")
+	core.set_motion_context(target,target,Vector2(640,360))
+	bridge.command("dev_relocate",{"entity_id":carrier,"position":target+Vector2(1160,0)})
+	core.set_enemy_motion(carrier,{"facing":PI})
+	core.step(0.01)
+	check(not split_entity(core,carrier).dead,"画面外でも内側へ進むからす座を退場させない")
+	core.set_enemy_motion(carrier,{"facing":0.0})
+	var kills: int = bridge.read_frame().value.ui.kills
+	var ground: Array = core.pickups_snapshot().gems
+	core.step(0.01)
+	check(split_entity(core,carrier).dead and bridge.read_frame().value.ui.kills==kills and core.pickups_snapshot().gems==ground and core.pickups_snapshot().cargo.is_empty(),"画面外へ離れると運搬分を失い撃破報酬を出さず退場する")
+	var lost: Array = core.pickups_snapshot().xp_statistics.lost
+	check(lost.reduce(func(sum,kind): return sum+kind.count,0)==4,"退場で運搬していた四個だけを損失へ数える")
+	bridge.command("dev_retreat",{"entity_id":carrier})
+	var fresh: int = core.spawn_enemy(&"crow",at,{"facing":0.0,"flock_member":true})
+	check(split_entity(core,fresh,true).carry==0.0 and split_entity(core,fresh,true).buds==0,"行を再利用しても運搬量と個数を持ち越さない")
+	bridge.release_checkpoint(saved.value)
+	crow_finished = true
 	session.free()

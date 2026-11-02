@@ -18,6 +18,7 @@
 #include "../behaviors/enemies/aquila.h"
 #include "../behaviors/enemies/split.h"
 #include "../behaviors/enemies/crab.h"
+#include "../behaviors/enemies/crow.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -222,7 +223,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = def.kind!=speed::EnemyDefinition::Kind::Aquila && def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Split) {
+            if (def.kind==speed::EnemyDefinition::Kind::Crow) {
+                speed::CrowBehavior::step(runtime,uint32_t(row));
+            } else if (def.kind==speed::EnemyDefinition::Kind::Split) {
                 speed::SplitBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Lynx) {
                 speed::LynxBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
@@ -513,9 +516,9 @@ int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Diction
     for (const auto &key:options.keys()) {
         if (key.get_type()!=Variant::STRING && key.get_type()!=Variant::STRING_NAME) return -1;
         const String name=key;const Variant value=options[key];
-        if (name=="elite" || name=="is_boss" || name=="attack_managed") {
+        if (name=="elite" || name=="is_boss" || name=="attack_managed" || name=="flock_member") {
             if (value.get_type()!=Variant::BOOL) return -1;
-            if (name=="elite") params.elite=value;else if (name=="is_boss") params.is_boss=value;else {params.has_managed=true;params.managed=value;}
+            if (name=="flock_member") params.flock_member=value;else if (name=="elite") params.elite=value;else if (name=="is_boss") params.is_boss=value;else {params.has_managed=true;params.managed=value;}
         } else if (name=="vel") {if (value.get_type()!=Variant::VECTOR2 || !Vector2(value).is_finite()) return -1;params.velocity=value;}
         else if (name=="attack_group" || name=="hound_pack") {
             if (value.get_type()!=Variant::INT || (name=="attack_group" && int64_t(value)<0)) return -1;

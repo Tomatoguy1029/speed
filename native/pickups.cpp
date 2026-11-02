@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/progression.h"
 #include "../cpp/systems/pickup_system.h"
+#include "../cpp/behaviors/enemies/crow.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -102,6 +103,7 @@ bool SpeedRunCore::step_pickups(double world_dt) {
     const double step = (700.0 + runtime.state.ship.vel.length() * 1.2) * runtime.state.pickup_config.speed_mult * world_dt;
     const double far = std::max(gem_radius, reach), far_sq = far * far;
     for (auto &gem:runtime.state.pickups.gems) if (gem.alive && gem.wait>0) {gem.pos+=gem.velocity*world_dt;gem.velocity*=std::exp(-world_dt*5.0);gem.wait=speed::remaining_time(gem.wait,world_dt);}
+    speed::CrowBehavior::gather(runtime,world_dt);
     for (size_t row = 0; row < runtime.state.pickups.gems.size(); ++row) {
         auto &gem = runtime.state.pickups.gems[row];
         if (!gem.alive) continue;

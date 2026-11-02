@@ -44,6 +44,8 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _crows := {}
+var _crow_canvas: DrawLayer
 var _comets := {}
 var _capsules := {}
 var _comet_canvas: DrawLayer
@@ -169,6 +171,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		for effect: Dictionary in _shield_transfers:
 			preload("res://scripts/render/shield_visual.gd").transfer(canvas,effect,_ship_visual_position)
 
+	_crow_canvas = DrawLayer.new()
+	_crow_canvas.draw_fn = func(canvas: CanvasItem):
+		var values: PackedFloat32Array = _crows.get("values",PackedFloat32Array())
+		for n in range(0,values.size(),6): preload("res://scripts/render/enemies/crow.gd").draw_bundle(canvas,Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],int(values[n+5]),_crows.time,_pixel)
+	_layer(9).add_child(_crow_canvas)
 	_comet_canvas = DrawLayer.new()
 	_comet_canvas.draw_fn = func(canvas: CanvasItem):
 		var values: PackedFloat32Array = _comets.get("values",PackedFloat32Array())
@@ -292,10 +299,10 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
-	for key in ["comets","capsules"]:
+	for key in ["comets","capsules","crows"]:
 		if frame.has(key):
 			var data = frame[key]
-			if not data is Dictionary or not data.get("values") is PackedFloat32Array or data.values.size()%(6 if key=="comets" else 3)!=0 or not (data.get("time") is float or data.get("time") is int) or not is_finite(data.time): return false
+			if not data is Dictionary or not data.get("values") is PackedFloat32Array or data.values.size()%(3 if key=="capsules" else 6)!=0 or not (data.get("time") is float or data.get("time") is int) or not is_finite(data.time): return false
 			for value: float in data.values:
 				if not is_finite(value): return false
 	if frame.has("warp"):
@@ -655,6 +662,9 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Dictionary in _shape_displays.values():
 		display.node.visible = display.used
 		if display.circles!=display.previous_circles: display.node.queue_redraw()
+	if frame.has("crows") and frame.crows!=_crows:
+		_crows = frame.crows
+		_crow_canvas.queue_redraw()
 	if frame.has("comets") and frame.comets!=_comets:
 		_comets = frame.comets
 		_comet_canvas.queue_redraw()

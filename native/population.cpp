@@ -78,7 +78,7 @@ double SpeedRunCore::survey_population(double target) {
         if (p.maximum[enemy.definition] > 0) ++p.type_counts[enemy.definition];
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const double x = std::abs(relative.x), y = std::abs(relative.y);
-        if (x > limit.x || y > limit.y) { if (entering.find(row) == entering.end()) p.far_rows.push_back(row); continue; }
+        if (x > limit.x || y > limit.y) { if (runtime.content->definitions[enemy.definition].kind!=speed::EnemyDefinition::Kind::Crow && entering.find(row) == entering.end()) p.far_rows.push_back(row); continue; }
         int region = 4;
         if (x >= center_x || y >= center_y) {
             region = x * runtime.state.view_half.y > y * runtime.state.view_half.x ? (relative.x < 0 ? 0 : 1) : (relative.y < 0 ? 2 : 3);

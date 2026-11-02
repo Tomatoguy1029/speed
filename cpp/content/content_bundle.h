@@ -39,6 +39,7 @@ struct ContentBundle {
     std::vector<ReticleDefinition> reticles;
     std::vector<SplitDefinition> splits;
     std::vector<DefenderDefinition> defenders;
+    std::vector<CrowDefinition> crows;
     std::vector<ClockDefinition> clocks;
     std::vector<AurigaDefinition> aurigas;
     std::vector<SoldierDefinition> soldiers;

@@ -1352,6 +1352,48 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CrowDefinition",
+      "section": 140,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "flock",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "name": "aim_spread",
+          "type": "f64"
+        },
+        {
+          "name": "flock_gap",
+          "type": "f64"
+        },
+        {
+          "name": "gather_width",
+          "type": "f64"
+        },
+        {
+          "name": "gather_behind",
+          "type": "f64"
+        },
+        {
+          "name": "gather_speed",
+          "type": "f64"
+        },
+        {
+          "name": "exit_margin",
+          "type": "f64"
+        }
+      ]
     }
   ],
   "enums": {}

@@ -11,9 +11,9 @@ struct EnemyDefinition {
     enum class Gate {None,Solid,Membrane,Ghost,Immortal,Claw,Back,Guard} gate=Gate::None;
     double gate_arc=1.6;
     godot::StringName id;
-    uint32_t reflected_definition=0,gunner_definition=0,beamer_definition=0,missile_definition=0,rocket_definition=0,drift_definition=0,dash_definition=0,battleship_definition=0,sniper_definition=0,marlin_definition=0,pulser_definition=0,dolphin_definition=0,lynx_definition=0,soldier_definition=0,auriga_definition=0,clock_definition=0,reticle_definition=0,aquarius_definition=0,cross_definition=0,bomber_definition=0,phoenix_definition=0,aquila_definition=0,split_definition=0,defender_definition=0,crab_definition=0;
+    uint32_t reflected_definition=0,gunner_definition=0,beamer_definition=0,missile_definition=0,rocket_definition=0,drift_definition=0,dash_definition=0,battleship_definition=0,sniper_definition=0,marlin_definition=0,pulser_definition=0,dolphin_definition=0,lynx_definition=0,soldier_definition=0,auriga_definition=0,clock_definition=0,reticle_definition=0,aquarius_definition=0,cross_definition=0,bomber_definition=0,phoenix_definition=0,aquila_definition=0,split_definition=0,defender_definition=0,crab_definition=0,crow_definition=0;
     uint32_t visual_id=0;double sprite_scale=1,sprite_angle=0;bool polygon_visual=false,ram_guard=false;
-    enum class Kind { Chase, Shield, Biter, Hound, Meteor, Obstacle, Saw, Gunner, Beamer, Missile, Rocket, Drift, Part, Dash, Battleship, Sniper, Marlin, Pulser, Dolphin, Lynx, Soldier, Auriga, Clock, Reticle, Aquarius, Cross=25, Bomber=28, Phoenix=29, Aquila=30, Split=26, Defender=27, Crab=34 } kind = Kind::Chase;
+    enum class Kind { Chase, Shield, Biter, Hound, Meteor, Obstacle, Saw, Gunner, Beamer, Missile, Rocket, Drift, Part, Dash, Battleship, Sniper, Marlin, Pulser, Dolphin, Lynx, Soldier, Auriga, Clock, Reticle, Aquarius, Cross=25, Bomber=28, Phoenix=29, Aquila=30, Split=26, Defender=27, Crab=34, Crow=37 } kind = Kind::Chase;
     struct Bite { double reach = 0, telegraph = 0, rest = 0, radius = 0, damage = 0; } bite;
     struct Pack { int64_t count = 1; double gap = 0, reach = 1, alignment = 0, cohesion = 0, separation = 0; } pack;
     bool spawn_ready = false, size_var = false;

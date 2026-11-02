@@ -12,6 +12,7 @@ struct CrabState {int32_t buds=1;AttackHandle sweep;};
 struct AquilaState {Vector2 anchor;double bud_t=0;};
 struct PhoenixState {Vector2 anchor;};
 struct PendingEnemySpawn {uint32_t definition=0;Vector2 position,velocity;double facing=0,hit_cd=0,guard=0,knock=0,priority=0;};
+struct CrowState {};
 struct DefenderBoost {bool active=false;double speed=0,wobble=0,until=0,phase=0;};
 struct DefenderState {DefenderBoost boost;};
 struct SplitState {double bud_t=0;uint32_t buds=0;};
@@ -24,7 +25,7 @@ struct LynxState {int32_t buds=0;};
 struct MarlinState {godot::Vector2 anchor;};
 struct SniperState {std::vector<float> rays;};
 struct Enemy {
-    std::variant<std::monostate,SniperState,MarlinState,LynxState,SoldierState,AurigaState,ClockState,ReticleState,PhoenixState,AquilaState,SplitState,DefenderState,CrabState> behavior_state;
+    std::variant<std::monostate,SniperState,MarlinState,LynxState,SoldierState,AurigaState,ClockState,ReticleState,PhoenixState,AquilaState,SplitState,DefenderState,CrabState,CrowState> behavior_state;
     int64_t id = 0;
     int64_t attack_group = 0;
     double attack_value = 1, attack_priority = 0;
