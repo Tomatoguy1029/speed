@@ -32,8 +32,14 @@ struct MonocerosHornWaveState {
     int32_t direction=1;
     bool released=false;
 };
+struct MonocerosDanceState {
+    enum class Stage : uint8_t { Aim,Run,Circle,End };
+    Stage stage=Stage::Aim;
+    double elapsed=0,angle=0,glow=0,run_speed=0,travel=0,traveled=0,heading=0,speed=0;
+    uint32_t completed=0;
+};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;

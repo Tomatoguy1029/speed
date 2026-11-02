@@ -32,12 +32,12 @@ godot::Vector2 strike_aim(const RunRuntime &r,const TechniqueState &t,double lea
 void recovery(RunRuntime &r,TechniqueState &t) {t.stage=TechniqueStage::Recovery;t.remaining=rule(r,t).recover;r.state.enemies[t.actor.slot].vel={};}
 }
 godot::Vector2 MonocerosCharge::aim(const RunRuntime &r,const TechniqueState &t) {return strike_aim(r,t);}
-bool MonocerosCharge::advance(RunRuntime &r,TechniqueState &t,double dt,const godot::PackedVector2Array &before,godot::Vector2 step) {
+bool MonocerosCharge::advance(RunRuntime &r,TechniqueState &t,double dt,const godot::PackedVector2Array &before,godot::Vector2 step,bool recover_on_block) {
     auto &e=r.state.enemies[t.actor.slot];const auto &b=boss(r,t);const auto from=e.pos,to=from+step;
     const auto horn_from=from+t.direction*horn_length(r,t);const auto horn_hit=FieldSystem::first_body_hit(r,horn_from,horn_from+step,b.horn_width*0.5);const auto body_hit=FieldSystem::first_body_hit(r,from,to,e.radius);
     const auto damage=[&]() {godot::PackedVector2Array next;next.push_back(before[0]+e.pos-from);next.push_back(before[1]+e.pos-from);MonocerosStrike::damage(r,t,before,next,b.horn_width);};
     if (horn_hit && !r.state.field.bodies[horn_hit->body].moon && (!body_hit || horn_hit->t<=body_hit->t)) {e.pos=from.lerp(to,horn_hit->t);damage();t.stuck_body=horn_hit->body;t.stuck_offset=e.pos-r.state.field.bodies[t.stuck_body].position;t.stage=TechniqueStage::Stuck;t.remaining=b.stuck_time;e.vel={};return false;}
-    if (body_hit) {e.pos=from.lerp(to,body_hit->t);damage();recovery(r,t);return false;}
+    if (body_hit) {e.pos=from.lerp(to,body_hit->t);damage();if (recover_on_block) recovery(r,t);return false;}
     e.pos=to;e.vel=step/dt;damage();return true;
 }
 bool MonocerosCharge::in_reach(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {

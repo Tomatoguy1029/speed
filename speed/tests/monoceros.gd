@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-dance" in OS.get_cmdline_user_args():
+		call_deferred("native_dance")
+		return
 	if "--cpp-wave" in OS.get_cmdline_user_args():
 		call_deferred("native_wave")
 		return
@@ -447,11 +450,11 @@ func capture() -> void:
 	get_tree().quit()
 
 ## B00で確認済みの時刻・掃引・取消・復帰は繰り返さず、本体と技の残る接続を確認する。
-func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0, moon := false, name := "charge") -> Dictionary:
+func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0, moon := false, name := "charge", dance_timeout := false) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	if planet_x==500.0 or moon or name in ["kick","sweep","lance","return_charge","horn_wave"]: cfg.character_scale = 1.0
+	if planet_x==500.0 or moon or name in ["kick","sweep","lance","return_charge","horn_wave","horn_dance"]: cfg.character_scale = 1.0
 	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.approach_speed = 0.0
@@ -469,6 +472,26 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		move.reach = 240.0
 		move.hold = 0.1
 		move.return_speed = TAU
+	if name=="horn_dance":
+		move.aim_time = 0.1
+		move.aim_lock = 0.05
+		move.passes = 2
+		move.speed = 1000.0
+		move.min_run = 200.0
+		move.overshoot = 50.0
+		move.circle_turn = 2.0
+		move.circle_speed = 400.0
+		move.circle_late_time = 0.1
+		move.circle_speed_late = 200.0
+		move.circle_decel = 2000.0
+		move.circle_accel = 1000.0
+		move.align_angle = PI
+		move.align_min_distance = 100000.0 if dance_timeout else 0.0
+		move.align_min_time = 0.05
+		move.circle_max_time = 0.2
+		move.head_lead = 0.4
+		move.end_time = 0.1
+		move.end_decay = 10.0
 	if name=="horn_wave":
 		move.windup = 0.1
 		move.swing_time = 0.1
@@ -535,7 +558,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		rules.graph_nodes = {}
 		var program = load("res://scripts/data_types/boss_flow_def.gd").new()
 		program.maximum_stamina = 10.0
-		program.sections = [{"request":"major" if name=="lance" else "normal","weights":({"major":1.0} if name=="lance" else {"combo":1.0} if name=="return_charge" else {"single":1.0}),"cap":1.0,"action_count":1,"next":0}]
+		program.sections = [{"request":"major" if name in ["lance","horn_dance"] else "normal","weights":({"major":1.0} if name in ["lance","horn_dance"] else {"combo":1.0} if name=="return_charge" else {"single":1.0}),"cap":1.0,"action_count":1,"next":0}]
 		var flows: Dictionary = builder.boss_flow_records(rules,program,records.BossTechniqueDefinition)
 		for key in flows: records[key] = flows[key]
 	if obstacle:
@@ -1196,4 +1219,88 @@ func native_wave() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_monoceros_wave] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_dance() -> void:
+	var f := charge_fixture(true,false,450.0,false,"horn_dance")
+	check(not f.is_empty(),"光角の乱舞の制作値を型付き状態へ生成して単独発動する")
+	if f.is_empty(): get_tree().quit(1); return
+	var bridge = f.bridge
+	var definition: Dictionary = f.records.BossTechniqueDefinition[0]
+	check(definition.kind==6 and definition.passes==2 and definition.warn==0.1 and definition.min_run==200.0 and f.records.BossTechniqueStage.is_empty(),"乱舞の全固有値と見積り時計を生成しmethod trackを残さない")
+	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
+	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),1.5) and is_inf(legacy.reach_limit(100.0)),"PureDataを保ち旧入口の攻撃長と無制限の到達距離を解決する")
+	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	bridge._core.step(0.05)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(state.stage==0 and state.locked and is_equal_approx(state.glow,0.5),"最初の照準はaim_lock前に固定し同じ時計で角を光らせる")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==1 and state.sequence_stage==1 and state.travel==200.0 and state.run_speed==1000.0,"初回の突進はmin_runと現在の自機までの距離で決める")
+	bridge._core.step(0.2)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.hit and state.completed==1 and state.sequence_stage==2 and state.position.is_equal_approx(Vector2(200,0)),"各回の突進は共有した掃引で命中し所定距離で左旋回へ進む")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==2 and is_equal_approx(state.heading,-0.1) and state.speed==900.0 and is_equal_approx(state.angle,-0.5) and state.booster==1.2,"旋回は左回りで減速し最短時間と同値では発進せず頭だけ先に向く")
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
+	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
+	add_child(view)
+	view.apply_frame(body,state)
+	check(is_equal_approx(view.parts.get_node("Head").rotation,-0.4) and view.booster_strength()==1.2,"途中から作った表示も旋回中の頭の先行角と噴射へ合わせる")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.05)
+	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(expected.sequence_stage==1 and not expected.hit and expected.run_speed==1000.0 and expected.travel==200.0,"向き・距離・最短時間を満たすと現在の自機へ即時に向き直して再発進する")
+	check(held.ok and bridge.restore(held.value).ok,"旋回の向き・速さ・完了回数と命中済みを途中復帰する")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0]==expected,"復帰後も同じ旋回位置から再発進する")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.2)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.completed==2 and state.sequence_stage==3 and state.hit,"最後の突進も独立して命中し角を掲げる段階へ進む")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(is_equal_approx(state.speed,1000.0*exp(-0.5)) and is_equal_approx(state.glow,0.1),"終了段階は指数減速し角の光を時間で戻す")
+	bridge._core.step(0.05)
+	bridge._core.step(0.051)
+	check(bridge.command("dev_boss_state").value[0].stage==5,"掲げる時間と回復が終わったら自然終了する")
+	check(f.events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"horn" and e.payload.source==&"monoceros" and e.payload.technique==&"horn_dance"),"乱舞の命中を原因・出所・技付きで記録へ渡す")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"乱舞の段階と命中を共通配信へ渡す")
+	bridge.dispose()
+	view.queue_free()
+	for disappear in [false,true]:
+		f = charge_fixture(false,false,450.0,false,"horn_dance")
+		bridge = f.bridge
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+		bridge._core.step(0.1)
+		if disappear: bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+		bridge._core.step(0.2)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and not state.hit and bridge.read_frame().ok,"参加者消失で乱舞を閉じる" if disappear else "取消後に乱舞の当たりと旋回を残さない")
+		bridge.dispose()
+	f = charge_fixture(false,false,450.0,false,"horn_dance",true)
+	bridge = f.bridge
+	bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+	bridge._core.step(0.1)
+	bridge._core.step(0.35)
+	bridge._core.step(0.2)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==2 and state.speed==600.0,"遅れた旋回はlate速度へ減速し最大時間と同値では打ち切らない")
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].sequence_stage==3,"旋回最大時間を越えたら乱舞を終える")
+	bridge.dispose()
+	f = charge_fixture(false,true,500.0,false,"horn_dance")
+	bridge = f.bridge
+	bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+	bridge._core.step(0.1)
+	bridge._core.step(0.3)
+	check(bridge.command("dev_boss_state").value[0].stage==3,"乱舞の突進も惑星へ角が刺さると旋回へ進まない")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_monoceros_dance] failures=",failed)
 	get_tree().quit(1 if failed else 0)

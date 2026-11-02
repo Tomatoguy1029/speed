@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 5
+          "max": 6
         },
         {
           "name": "phase",
@@ -383,9 +383,84 @@
           "name": "wave_width",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "aim_lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "min_run",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_late_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_speed_late",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_decel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_min_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_min_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_max_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "glow_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "end_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "end_decay",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 6
+      "version": 7
     },
     {
       "name": "BossTechniqueStage",
