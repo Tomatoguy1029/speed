@@ -5,8 +5,12 @@
 #include <godot_cpp/variant/dictionary.hpp>
 namespace speed {
 class RunRuntime;
+struct CrystalState;
 class EventBuilder {
 public:
+    static void crystal_drop(RunRuntime &,const CrystalState &);
+    static void crystal_gold_roll(RunRuntime &,const Corpse &,bool won);
+    static void crystal_burst(RunRuntime &,const Corpse &);
     static void budget_started(RunRuntime &,const std::string &owner,int64_t id,uint32_t row,const std::vector<AttackCategory> &,int64_t token);
     static void budget_ended(RunRuntime &,const std::string &owner,int64_t token);
     static void enemy_damage(RunRuntime &,const DamageRequest &,const DamageResult &);

@@ -324,6 +324,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			if _rings.size()>80: _rings.pop_front()
 			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":duration,"max":duration})
+		if event.type==&"gem_burst":
+			if _rings.size()>80: _rings.pop_front()
+			var duration: float = 0.3*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
+			_rings.append({"pos":event.pos,"radius":event.r*2.4,"color":Color("#ffe27a"),"life":duration,"max":duration})
+			_burst(event.pos,Color("#ffd23f"),14,360.0)
 		if event.type==&"ship_explode": _death_burst(event.pos)
 		if equipped_forward: preload("res://scripts/render/equipment/forward.gd").frame_event(_flashes,event)
 	_queued_events.clear()
@@ -381,14 +386,17 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		sprite.visible = ui.phase==0 or ui.phase==4
 
 func _death_burst(at: Vector2) -> void:
+	_burst(at,Color("#9fe8ff"),60,500.0)
+
+func _burst(at: Vector2,color: Color,count: int,speed: float) -> void:
 	if pipeline!=null and pipeline.sparks.available():
-		pipeline.sparks.burst(at,Color("#9fe8ff"),120,Vector2.ZERO,500.0,0.7,5.0)
+		pipeline.sparks.burst(at,color,count*2,Vector2.ZERO,speed,0.7,5.0)
 		return
 	if _particles.size()>500: return
-	for i in 8:
+	for i in mini(count,8):
 		var angle := randf()*TAU
-		var speed := 500.0*(0.3+randf())
-		_particles.append({"pos":at,"vel":Vector2.from_angle(angle)*speed*0.6,"life":0.5+randf()*0.4,"max":0.9,"color":Color("#9fe8ff"),"size":2.0+randf()*4.0})
+		var velocity := speed*(0.3+randf())
+		_particles.append({"pos":at,"vel":Vector2.from_angle(angle)*velocity*0.6,"life":0.5+randf()*0.4,"max":0.9,"color":color,"size":2.0+randf()*4.0})
 
 func _timed_shape(canvas: CanvasItem, original: Callable) -> void:
 	var began := Time.get_ticks_usec() if perf.active else 0

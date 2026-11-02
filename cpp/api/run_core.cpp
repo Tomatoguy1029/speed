@@ -145,7 +145,7 @@ bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) 
     if (runtime.state.frame_ready && (!runtime.state.ship_ready || !runtime.state.draw_ready || !runtime.state.combat_ready || !runtime.state.pickups_ready)) return false;
     for (const auto &def : runtime.content->definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) && (!runtime.state.ship_ready || !runtime.state.bite_zone_config.ready)) return false;
     runtime.state.next_id = first_id;
-    runtime.state.next_gem_seq = first_gem_seq;
+    runtime.state.pickups.next_gem_seq = first_gem_seq;
     runtime.state.control.rng.set_seed(seed);
     runtime.state.started = true;
     return true;
@@ -234,7 +234,7 @@ void SpeedRunCore::close() {
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.hazards.clear(); runtime.state.free_hazards.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;
-    runtime.state.gems.clear(); runtime.state.coins.clear();runtime.state.capsules.clear(); runtime.state.free_gems.clear(); runtime.state.free_coins.clear(); runtime.state.gem_queue.clear(); runtime.state.collections.clear();
+    runtime.state.pickups.gems.clear(); runtime.state.pickups.coins.clear();runtime.state.pickups.capsules.clear(); runtime.state.pickups.free_gems.clear(); runtime.state.pickups.free_coins.clear(); runtime.state.pickups.gem_queue.clear(); runtime.state.collections.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {
@@ -428,9 +428,9 @@ int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Diction
     for (const auto &key:options.keys()) {
         if (key.get_type()!=Variant::STRING && key.get_type()!=Variant::STRING_NAME) return -1;
         const String name=key;const Variant value=options[key];
-        if (name=="elite" || name=="attack_managed") {
+        if (name=="elite" || name=="is_boss" || name=="attack_managed") {
             if (value.get_type()!=Variant::BOOL) return -1;
-            if (name=="elite") params.elite=value;else {params.has_managed=true;params.managed=value;}
+            if (name=="elite") params.elite=value;else if (name=="is_boss") params.is_boss=value;else {params.has_managed=true;params.managed=value;}
         } else if (name=="vel") {if (value.get_type()!=Variant::VECTOR2 || !Vector2(value).is_finite()) return -1;params.velocity=value;}
         else if (name=="attack_group" || name=="hound_pack") {
             if (value.get_type()!=Variant::INT || (name=="attack_group" && int64_t(value)<0)) return -1;

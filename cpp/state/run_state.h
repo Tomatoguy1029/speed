@@ -6,6 +6,7 @@
 #include "attack_state.h"
 #include "world_state.h"
 #include "loadout_state.h"
+#include "pickup_state.h"
 #include "group_state.h"
 #include "lifecycle_state.h"
 #include "field_state.h"
@@ -131,20 +132,12 @@ struct RunState {
         double xp_radius = 0, coin_radius = 0, speed_mult = 1;
         std::vector<double> xp, start_weights, end_weights;
     } pickup_config;
-    struct Gem { Vector2 pos; double value = 0; int64_t seq = 0; bool alive = false, pulled = false; uint8_t kind=0; };
-    struct Coin { Vector2 pos; bool alive = true, pulled = false; };
-    std::vector<Gem> gems;
-    std::vector<Coin> coins;
-    enum class CapsuleKind {Heal,Magnet,CometWeapon};
-    struct Capsule {Vector2 pos;double age=0;CapsuleKind kind=CapsuleKind::Heal;uint32_t weapon=0;bool drop=true;};
-    std::vector<Capsule> capsules;
-    std::vector<size_t> free_gems, free_coins;
+    using Gem=speed::CrystalState;
+    using Coin=speed::CoinState;
+    using CapsuleKind=speed::CapsuleKind;
+    using Capsule=speed::CapsuleState;
+    speed::PickupState pickups;
     Array collections;
-    std::vector<std::pair<size_t, int64_t>> gem_queue;
-    size_t gem_queue_head = 0;
-    int64_t next_gem_seq = 0, live_gems = 0;
-    double xp_dropped = 0;
-    int64_t gem_absorber=-1,gem_absorber_seq=-1;
     bool pickups_ready = false;
     struct Friendly {
         uint32_t definition=0;

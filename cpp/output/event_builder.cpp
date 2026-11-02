@@ -122,4 +122,20 @@ godot::Dictionary EventBuilder::ship_result(const ShipDamageResult &result) {
     godot::Dictionary out;out["accepted"]=result.accepted;out["reason"]=combat_reason_name(result.reason);
     out["hp_before"]=result.hp_before;out["hp_after"]=result.hp_after;out["amount"]=result.amount;return out;
 }
+void EventBuilder::crystal_drop(RunRuntime &run,const CrystalState &gem) {
+    godot::Dictionary event;event["id"]=int64_t(gem.id);event["kind"]=godot::StringName(gem.kind==0?"low":gem.kind==1?"mid":"high");
+    const auto &origin=gem.origin;
+    event["base_xp"]=gem.value;event["source"]=godot::StringName(origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
+    event["enemy"]=definition_name(run,origin.definition);event["enemy_id"]=origin.enemy_id;
+    event["spawn_t"]=origin.run_time;event["spawn_world_t"]=origin.world_time;event["pos"]=gem.pos;event["new_supply"]=true;event["ground_count"]=run.state.pickups.live_gems;
+    FrameBuilder::append(run,"xp_drop",event);
+}
+void EventBuilder::crystal_gold_roll(RunRuntime &run,const Corpse &enemy,bool won) {
+    godot::Dictionary event;event["enemy"]=definition_name(run,enemy.definition);event["enemy_id"]=enemy.id;event["chance"]=run.state.pickup_config.strong_gold_chance;event["won"]=won;
+    FrameBuilder::append(run,"xp_gold_roll",event);
+}
+void EventBuilder::crystal_burst(RunRuntime &run,const Corpse &enemy) {
+    godot::Dictionary event;event["pos"]=enemy.pos;event["r"]=enemy.radius;FrameBuilder::append(run,"gem_burst",event);
+}
+
 }

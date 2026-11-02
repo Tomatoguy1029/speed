@@ -32,7 +32,7 @@ struct EnemyDefinition {
     double fire_interval = 0.0;
     double xp = 0.0, knockback = 0.0, hitstop_multiplier = 0.0;
     std::array<uint32_t,3> xp_rewards{};
-    bool gold_eligible=false;
+    bool gold_eligible=false,reward_scattered=false,reward_burst=false;
     godot::Color color;
 };
 struct SpawnTimeline {

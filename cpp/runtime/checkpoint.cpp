@@ -79,6 +79,11 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
         }
     }
+    for (const auto &gem:state.pickups.gems) if (gem.alive) {
+        if (!gem.id || gem.id>=state.pickups.next_id || gem.kind>2 || !std::isfinite(gem.value) || gem.value<0 ||
+            !gem.pos.is_finite() || !gem.velocity.is_finite() || !std::isfinite(gem.wait) || gem.wait<0 ||
+            gem.origin.definition>content.definitions.size()) return false;
+    }
     if (!FieldSystem::validate(state,content)) return false;
     if (!GroupSystem::validate(state)) return false;
     return AttackSystem::rebuild(state);

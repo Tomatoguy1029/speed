@@ -96,10 +96,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     const Color crystal_colors[]={Color::html("08deff"),Color::html("945cff"),Color::html("ffb609")};
     const double pixel=1.82*config.character_scale;
-    for (const auto &gem:state.gems) if (gem.alive && view.grow(60).has_point(gem.pos))
-        batch(config.crystal_visual,6,0).add(gem.seq,gem.pos,0,std::max(5.0,pixel*4.0)*1.4,crystal_colors[gem.kind]);
-    for (size_t i=0;i<state.coins.size();++i) {
-        const auto &coin=state.coins[i];if (coin.alive && view.grow(60).has_point(coin.pos))
+    for (const auto &gem:state.pickups.gems) if (gem.alive && view.grow(60).has_point(gem.pos))
+        batch(config.crystal_visual,6,0).add(int64_t(gem.id),gem.pos,0,std::max(5.0,pixel*4.0)*1.4,crystal_colors[gem.kind]);
+    for (size_t i=0;i<state.pickups.coins.size();++i) {
+        const auto &coin=state.pickups.coins[i];if (coin.alive && view.grow(60).has_point(coin.pos))
             batch(config.coin_visual,6,-1).add(int64_t(i+1),coin.pos,0,std::max(6.0,pixel*3.5),Color::html("ffd24a"));
     }
     Array batches;for (auto &group:groups) if (!group.second.instances.empty()) batches.push_back(group.second.value());

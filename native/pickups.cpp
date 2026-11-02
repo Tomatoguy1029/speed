@@ -44,15 +44,26 @@ bool SpeedRunCore::configure_pickups(const Dictionary &config, const Dictionary 
 
 Dictionary SpeedRunCore::pickups_snapshot() const {
     Array visible_gems, visible_coins;
-    for (const auto &gem : runtime.state.gems) if (gem.alive) {
+    for (const auto &gem : runtime.state.pickups.gems) if (gem.alive) {
         Dictionary row; row["pos"] = gem.pos; row["value"] = gem.value; row["seq"] = gem.seq; row["pulled"] = gem.pulled;
+        if (runtime.state.pickup_config.fixed_rewards) {
+            row["id"]=int64_t(gem.id);row["kind"]=int(gem.kind);row["base_xp"]=gem.value;row["velocity"]=gem.velocity;row["wait"]=gem.wait;
+            Dictionary origin;origin["source"]=gem.origin.source==speed::CrystalSource::Enemy?"enemy":gem.origin.source==speed::CrystalSource::StrongGold?"strong_gold":"direct";
+            origin["enemy"]=gem.origin.definition?runtime.content->definitions[gem.origin.definition-1].id:StringName();origin["enemy_id"]=gem.origin.enemy_id;
+            origin["spawn_t"]=gem.origin.run_time;origin["spawn_world_t"]=gem.origin.world_time;row["origin"]=origin;
+        }
         visible_gems.append(row);
     }
-    for (const auto &coin : runtime.state.coins) if (coin.alive) {
+    for (const auto &coin : runtime.state.pickups.coins) if (coin.alive) {
         Dictionary row; row["pos"] = coin.pos; row["pulled"] = coin.pulled; visible_coins.append(row);
     }
-    Array capsules;for (const auto &capsule:runtime.state.capsules) {Dictionary row;row["kind"]=int(capsule.kind);row["pos"]=capsule.pos;row["age"]=capsule.age;row["weapon"]=capsule.weapon;row["drop"]=capsule.drop;capsules.push_back(row);}
-    Dictionary out;out["capsules"]=capsules;out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.xp_dropped;
+    Array capsules;for (const auto &capsule:runtime.state.pickups.capsules) {Dictionary row;row["kind"]=int(capsule.kind);row["pos"]=capsule.pos;row["age"]=capsule.age;row["weapon"]=capsule.weapon;row["drop"]=capsule.drop;capsules.push_back(row);}
+    Dictionary out;out["capsules"]=capsules;out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.pickups.xp_dropped;
+    if (runtime.state.pickup_config.fixed_rewards) {
+        Dictionary stats;Array supplied;
+        for (const auto &total:runtime.state.pickups.supplied) {Dictionary value;value["count"]=int64_t(total.count);value["base_xp"]=total.base_xp;supplied.push_back(value);}
+        stats["supplied"]=supplied;stats["gold_rolls"]=int64_t(runtime.state.pickups.gold_rolls);stats["gold_won"]=int64_t(runtime.state.pickups.gold_won);out["xp_statistics"]=stats;
+    }
     return out;
 }
 
@@ -74,9 +85,10 @@ bool SpeedRunCore::step_pickups(double world_dt) {
     const double gem_radius = runtime.state.pickup_config.xp_radius;
     const double step = (700.0 + runtime.state.ship.vel.length() * 1.2) * runtime.state.pickup_config.speed_mult * world_dt;
     const double far = std::max(gem_radius, reach), far_sq = far * far;
-    for (size_t row = 0; row < runtime.state.gems.size(); ++row) {
-        auto &gem = runtime.state.gems[row];
+    for (size_t row = 0; row < runtime.state.pickups.gems.size(); ++row) {
+        auto &gem = runtime.state.pickups.gems[row];
         if (!gem.alive) continue;
+        if (gem.wait>0) {gem.pos+=gem.velocity*world_dt;gem.velocity*=std::exp(-world_dt*5.0);gem.wait=speed::remaining_time(gem.wait,world_dt);continue;}
         if (!gem.pulled && runtime.state.ship.pos.distance_squared_to(gem.pos) >= far_sq) continue;
         const Vector2 p = gem.pos, d = runtime.state.ship.pos - p;
         const double distance = d.length();
@@ -87,15 +99,15 @@ bool SpeedRunCore::step_pickups(double world_dt) {
         if (distance < reach) {
             collect_pickup("gem", gem.value);
             gem.alive = false;
-            runtime.state.free_gems.push_back(row);
-            --runtime.state.live_gems;
+            runtime.state.pickups.free_gems.push_back(row);
+            --runtime.state.pickups.live_gems;
         }
     }
     const double coin_radius = runtime.state.pickup_config.coin_radius * 1.3;
     const double coin_step = (700.0 + runtime.state.ship.vel.length() * 1.2) * world_dt;
     const double coin_far = std::max(coin_radius, reach), coin_far_sq = coin_far * coin_far;
-    for (size_t row = 0; row < runtime.state.coins.size(); ++row) {
-        auto &coin = runtime.state.coins[row];
+    for (size_t row = 0; row < runtime.state.pickups.coins.size(); ++row) {
+        auto &coin = runtime.state.pickups.coins[row];
         if (!coin.alive) continue;
         if (!coin.pulled && runtime.state.ship.pos.distance_squared_to(coin.pos) >= coin_far_sq) continue;
         const Vector2 p = coin.pos, d = runtime.state.ship.pos - p;
@@ -107,7 +119,7 @@ bool SpeedRunCore::step_pickups(double world_dt) {
         if (distance < reach) {
             collect_pickup("coin");
             coin.alive = false;
-            runtime.state.free_coins.push_back(row);
+            runtime.state.pickups.free_coins.push_back(row);
         }
     }
     return true;
@@ -119,8 +131,8 @@ PackedFloat32Array SpeedRunCore::pickup_buffer(StringName kind, double size, Col
     const bool is_gem = kind == StringName("gem");
     if (!is_gem && kind != StringName("coin")) return buffer;
     int64_t count = 0;
-    if (is_gem) { for (const auto &gem : runtime.state.gems) if (gem.alive && view.has_point(gem.pos)) ++count; }
-    else { for (const auto &coin : runtime.state.coins) if (coin.alive && view.has_point(coin.pos)) ++count; }
+    if (is_gem) { for (const auto &gem : runtime.state.pickups.gems) if (gem.alive && view.has_point(gem.pos)) ++count; }
+    else { for (const auto &coin : runtime.state.pickups.coins) if (coin.alive && view.has_point(coin.pos)) ++count; }
     buffer.resize(count * 12);
     float *out = buffer.ptrw();
     int64_t index = 0;
@@ -130,8 +142,8 @@ PackedFloat32Array SpeedRunCore::pickup_buffer(StringName kind, double size, Col
         out[index++] = color.r; out[index++] = color.g; out[index++] = color.b; out[index++] = color.a;
     };
     if (is_gem) {
-        for (const auto &gem : runtime.state.gems) if (gem.alive && view.has_point(gem.pos))
+        for (const auto &gem : runtime.state.pickups.gems) if (gem.alive && view.has_point(gem.pos))
             append(gem.pos, size * (gem.value <= 1.0 ? 1.0 : std::min(std::pow(gem.value, 0.2), 3.0)));
-    } else { for (const auto &coin : runtime.state.coins) if (coin.alive && view.has_point(coin.pos)) append(coin.pos, size); }
+    } else { for (const auto &coin : runtime.state.pickups.coins) if (coin.alive && view.has_point(coin.pos)) append(coin.pos, size); }
     return buffer;
 }

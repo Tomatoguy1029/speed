@@ -24,6 +24,8 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	if reward.is_empty() or config.xp_crystal_values.size()!=3: return {}
 	for i in range(3): row[["reward_low","reward_mid","reward_high"][i]] = int(reward.counts[i])
 	row.gold_eligible = reward.gold_eligible
+	row.reward_scattered = int(definition.params.get("gem_count",1))>1
+	row.reward_burst = row.reward_scattered and definition.id!=&"splitter"
 	row.visual_id = 6
 	row.sprite_scale = 1.0/definition.visual_value("collision_scale",1.0)
 	row.sprite_angle = PI/2.0 if definition.id in EnemyDef.NATIVE_SPRITES else -PI/2.0

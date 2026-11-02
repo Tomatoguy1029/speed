@@ -324,6 +324,8 @@ struct EnemyRecord {
     double sprite_angle{};
     uint32_t kind{};
     double turn{};
+    bool reward_scattered{};
+    bool reward_burst{};
 };
 inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (!input.read_u32(out.id)) return false;
@@ -388,6 +390,8 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.kind > 8) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
+    if (!input.read_bool(out.reward_scattered)) return false;
+    if (!input.read_bool(out.reward_burst)) return false;
     return true;
 }
 struct LoadoutDefinition {
@@ -1028,8 +1032,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 7) return false;
-        if (count > input.remaining()/236) return false;
+        if (version != 8) return false;
+        if (count > input.remaining()/238) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -1412,6 +1416,8 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.sprite_scale=row.sprite_scale;
     out.sprite_angle=row.sprite_angle;
     out.turn=row.turn;
+    out.reward_scattered=row.reward_scattered;
+    out.reward_burst=row.reward_burst;
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }

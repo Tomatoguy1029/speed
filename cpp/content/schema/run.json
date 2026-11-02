@@ -853,9 +853,19 @@
           "type": "f64",
           "min": 0,
           "native": "turn"
+        },
+        {
+          "name": "reward_scattered",
+          "type": "bool",
+          "native": "reward_scattered"
+        },
+        {
+          "name": "reward_burst",
+          "type": "bool",
+          "native": "reward_burst"
         }
       ],
-      "version": 7
+      "version": 8
     },
     {
       "name": "LoadoutDefinition",
@@ -1518,6 +1528,18 @@
       {
         "name": "EnemyLaserCancel",
         "value": "enemy_laser_cancel"
+      },
+      {
+        "name": "CrystalDrop",
+        "value": "xp_drop"
+      },
+      {
+        "name": "CrystalGoldRoll",
+        "value": "xp_gold_roll"
+      },
+      {
+        "name": "GemBurst",
+        "value": "gem_burst"
       }
     ],
     "ResultKind": [
@@ -1795,6 +1817,29 @@
     ],
     "enemy_laser_cancel": [
       "id"
+    ],
+    "xp_drop": [
+      "id",
+      "kind",
+      "base_xp",
+      "source",
+      "enemy",
+      "enemy_id",
+      "spawn_t",
+      "spawn_world_t",
+      "pos",
+      "new_supply",
+      "ground_count"
+    ],
+    "xp_gold_roll": [
+      "enemy",
+      "enemy_id",
+      "chance",
+      "won"
+    ],
+    "gem_burst": [
+      "pos",
+      "r"
     ]
   },
   "includes": [
