@@ -5,6 +5,8 @@ const REFILL_FRAMES := 15
 const FLAGS := ["gpu", "hitstop", "levels", "bonus", "keep", "normal-drops", "rewards"]
 const NUMBERS := ["stage", "time", "seconds", "warmup", "seed", "hz", "fps", "draw", "stroke", "mixed_target", "boss_hp"]
 const TEXT := ["size", "drive", "weapons", "meta", "mix", "revision", "out", "vsync", "condition", "require", "mode"]
+const EVENT_ACTIVATIONS := {"space_quake":"W04","barrier_hit":"W05","barrier_restore":"W05","escort_deploy":"W26","escort_slash":"W26","sonic_push":"W08","sonic_impact":"W08","bolt":"W17","contact_bolt":"W17","critical_lance":"T06","chain_shock":"T05","end_hole":"T03","flash_slash":"W28","anchor_fire":"W21","bipolar_charge":"W22"}
+const CAUSE_ACTIVATIONS := {"mine":"W07","endBlast":"W29","afterimage":"W27","barrier":"W05","contactWave":"W04","sonic":"W08","contactArc":"W17","dashRangeDrone":"W26","killSonic":"T05","critBeam":"T06","vortex":"T03","interceptor":"W25"}
 var options := {}
 var session: RunSession
 var bridge: RefCounted
@@ -186,6 +188,8 @@ func _ready() -> void:
 	var bundle: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(session.cpp_index_path))
 	metadata = {"runtime":"cpp","entry":"RunManager.create_run → RunSession → RunBridge","options":options,"actual_equipment":_equipment(start_recording),"process_id":OS.get_process_id(),"profile":ProfileManager.for_cpp(false),"bundle":bundle,"recording_identity":bridge.recording_origin,"engine":Engine.get_version_info(),"revision":options.revision,"library_sha256":FileAccess.get_sha256("res://extensions/run/bin/libspeed_runtime.macos.template_release.arm64.dylib"),"renderer":RenderingServer.get_current_rendering_method(),"adapter":RenderingServer.get_video_adapter_name(),"processor":OS.get_processor_name(),"window":str(DisplayServer.window_get_size()),"logical_size":str(get_viewport().get_visible_rect().size),"texture_size":str(get_viewport().get_texture().get_size()),"measurement_seconds":measurement_seconds,"physics_hz":Engine.physics_ticks_per_second,"max_fps":Engine.max_fps,"vsync":DisplayServer.window_get_vsync_mode(),"gpu_measurement":true,"loading_timings":session.loading_timings,"ready_ms":(ready_us-startup_us)/1000.0,"copy_bytes_scope":"Packed配列の論理転送量。物理メモリコピー量ではない","timing_scope":"sim/output_buildはC++内部区間、bridge_copyはGodotの明示複製、engine_gpu_waitは未分離残差。観測費用を重ねて合算しない","source_generation_during_measurement":false,"ship_survival":"開発計測だけ致死を防ぐ。接触・バリア・ダメージは通常経路","boss_hp_hold":options.get("boss_hp","無効"),"normal_drops":true,"input_clock":"120Hz固定tick。描線時刻はsim_timeに対応する入力tick"}
 	metadata["actual_start"]={"run_clock":start_recording.t,"world_clock":start_recording.world_t,"tick":start_metrics.tick,"enemy_types":start_metrics.enemy_types,"enemies":start_metrics.enemies,"bonus_remaining":bridge.latest_frame().value.ui.bonus_remaining,"boss_bodies":bridge.latest_frame().value.ui.boss_bodies}
+	var effective: Dictionary = bridge.read_lab().value
+	metadata["effective"]={"attack_power":effective.attack_power,"max_speed":effective.max_speed,"capacity":effective.capacity,"length_mult":effective.length_mult,"xp_profile_factor":effective.xp_profile_factor}
 	metadata["source_sha256"]={"profile":FileAccess.get_sha256("res://tools/profiling/profile_run.gd"),"bridge":FileAccess.get_sha256("res://scripts/runtime/run_bridge.gd"),"manager":FileAccess.get_sha256("res://scripts/managers/run_manager.gd")}
 	if _equipment(start_recording)!=expected_equipment:
 		_fail("指定Lvと実際の装備が一致しません")
@@ -199,6 +203,8 @@ func _ready() -> void:
 	activated.clear()
 	boss_actions.clear()
 	maintenance_us=0
+	last_metrics=bridge.read_metrics().value
+	last_packed_bytes=int(last_metrics.packed_bytes)
 	start_us=Time.get_ticks_usec()
 	previous_us=start_us
 	measuring=true
@@ -231,7 +237,9 @@ func _input() -> Intent:
 		input_ticks+=1
 		if draw.drawing: drawing_ticks+=1
 		if draw.tracing: traced_ticks+=1
-	if not seek_warp and stroke_time<0 and clock>=next_draw and not draw.drawing and not draw.tracing and draw.gauge>0.0:
+	# 満タンの通常入力でギアアップも発動させる。充填時間や容量は変更しない。
+	var charge_ready: bool = draw.gauge>=1.0 if expected_equipment.has("T04") or packet.ui.get("full_burst",false) else draw.gauge*packet.ui.capacity>=packet.ui.min_charge
+	if not seek_warp and stroke_time<0 and clock>=next_draw and not draw.drawing and not draw.tracing and charge_ready:
 		stroke.clear()
 		var heading: Vector2 = ship.ship_heading
 		var side := heading.orthogonal()
@@ -258,12 +266,10 @@ func _receive(frame: Dictionary) -> bool:
 		var payload: Dictionary = event.payload
 		event_counts[type]=int(event_counts.get(type,0))+1
 		if type=="weapon_fire": activated[str(payload.id)]=int(activated.get(str(payload.id),0))+1
-		var activation_events := {"space_quake":"W04","barrier_hit":"W05","barrier_restore":"W05","escort_deploy":"W26","escort_slash":"W26","sonic_push":"W08","sonic_impact":"W08","contact_bolt":"W17","critical_lance":"T06","chain_shock":"T05","end_hole":"T03","flash_slash":"W28","anchor_fire":"W21","bipolar_charge":"W22"}
-		if activation_events.has(type): activated[activation_events[type]]=int(activated.get(activation_events[type],0))+1
+		if EVENT_ACTIVATIONS.has(type): activated[EVENT_ACTIVATIONS[type]]=int(activated.get(EVENT_ACTIVATIONS[type],0))+1
 		if type=="combat_damage":
-			var causes := {"mine":"W07","endBlast":"W29","afterimage":"W27","barrier":"W05","contactWave":"W04","sonic":"W08","contactArc":"W17","dashRangeDrone":"W26","killSonic":"T05","critBeam":"T06","vortex":"T03"}
 			var cause: String = str(payload.get("cause",""))
-			if causes.has(cause): activated[causes[cause]]=int(activated.get(causes[cause],0))+1
+			if CAUSE_ACTIVATIONS.has(cause): activated[CAUSE_ACTIVATIONS[cause]]=int(activated.get(CAUSE_ACTIVATIONS[cause],0))+1
 		if type=="boss_action" and payload.get("step","")=="execute": boss_actions[str(payload.action)]=int(boss_actions.get(str(payload.action),0))+1
 		if type=="bonus":
 			if payload.get("enter",false): bonus_entries+=1
@@ -311,8 +317,13 @@ func _process(_delta: float) -> void:
 	if not measuring or finished: return
 	var before := Time.get_ticks_usec()
 	var metrics: Dictionary = bridge.read_metrics().value
-	for item in [["mines","items","W07"],["afterimage","echoes","W27"],["end_blast","visuals","W29"],["barrier","waves","W05"]]:
+	for item in [["mines","items","W07"],["afterimage","echoes","W27"],["end_blast","visuals","W29"],["barrier","waves","W05"],["knockback","visuals","W03"]]:
 		if not packet.ui.get(item[0],{}).get(item[1],[]).is_empty(): activated[item[2]]=int(activated.get(item[2],0))+1
+	for drone: Dictionary in packet.ui.get("interceptor",{}).get("drones",[]):
+		if float(drone.get("flash",0.0))>0: activated["W25"]=int(activated.get("W25",0))+1
+	if packet.ui.get("full_burst_active",false): activated["T36"]=int(activated.get("T36",0))+1
+	if packet.ui.draw.tracing and float(packet.ui.get("full_charge",{}).get("burst_power",1.0))>1.0:
+		activated["T04"]=int(activated.get("T04",0))+1
 	var timings := {}
 	for key in ["sim","output_build","bridge_copy","resource_wait"]:
 		var current: Array = metrics.timings.get(key,[0,0,0])
@@ -387,7 +398,7 @@ func _finish() -> void:
 	if options.mode=="natural" and (bonus_entries==0 or bonus_exits==0): invalid_reasons.append("通常進行でボーナス開始と終了後を観測できない")
 	if input_ticks==0 or traced_ticks==0: invalid_reasons.append("通常入力からの描線・突進が未発動")
 	for id: String in (actual if options.mode=="natural" else expected_equipment):
-		if id.begins_with("W") and int(activated.get(id,0))==0: invalid_reasons.append(id+"の発動を確認できない")
+		if (id.begins_with("W") or id in ["T03","T04","T05","T06","T36"]) and int(activated.get(id,0))==0: invalid_reasons.append(id+"の発動を確認できない")
 	if options.has("stroke") and float(options.stroke)>0 and drawing_ticks==0: invalid_reasons.append("指定された描線期間が未発動")
 	if options.has("boss_hp") and boss_actions.is_empty(): invalid_reasons.append("対象ボス技が未発動")
 	if options.get("bonus","")=="on" and not event_counts.has("bonus"): invalid_reasons.append("ボーナス終了を観測できない")
