@@ -79,6 +79,7 @@ struct ContentBundle {
     std::vector<HydraSwimDefinition> hydra_swim;
     std::vector<HydraSquadDefinition> hydra_squad;
     std::vector<CanisBodyDefinition> canis_bodies;
+    std::vector<DracoChargeDefinition> draco_charges;
     std::vector<DracoBreathDefinition> draco_breaths;
     std::vector<DracoBiteDefinition> draco_bites;
     std::vector<DracoBodyDefinition> draco_bodies;

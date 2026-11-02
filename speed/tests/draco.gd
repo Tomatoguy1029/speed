@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-charge" in OS.get_cmdline_user_args():
+		call_deferred("native_charge")
+		return
 	if "--cpp-draco-breath" in OS.get_cmdline_user_args() or "--cpp-draco-breath-rays" in OS.get_cmdline_user_args():
 		call_deferred("native_breath")
 		return
@@ -239,6 +242,130 @@ func breath_fixture(move: BossTechnique, flow_enabled := false) -> Dictionary:
 	bridge._core.set_motion_context(Vector2(700,0),Vector2(700,0),Vector2(800,450))
 	var boss: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
 	return {"bridge":bridge,"boss":boss,"package":package,"captured":captured}
+
+## 既存の移動攻撃・中断ケースへ突進の状態と表示を接続する。
+func native_charge() -> void:
+	var motion_only:= "--cpp-draco-charge-motion" in OS.get_cmdline_user_args()
+	var move: BossTechnique=load("res://data/bosses/draco_moves/charge.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	check(fixture.package.records.DracoChargeDefinition.size()==3,"突進の実効値を3形態へ生成する")
+	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
+	stage.boss_enabled=false
+	var session:=RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":105},false)
+	session.auto_step=false
+	var sim: RunSimulation=session.sim
+	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
+	var a=sim.bosses.actor
+	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
+	sim.state.ship_pos=Vector2(700,0);sim.state.enemy_aim=Vector2(700,0);sim.state.ship_vel=Vector2.ZERO
+	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
+	check(a.start_attack(&"charge") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++の突進を開始する")
+	# SourceのGodot RNGとC++ PCGの抽選値は異なるため、選ばれた左右を同じにして動作を照合する。
+	a._runner.staging.side=bridge.command("dev_boss_state").value[0].staging_side
+	var position_error:=0.0
+	var shape_error:=0.0
+	var warning_error:=0.0
+	var attack_error:=0.0
+	var times_equal:=true
+	var saved: Array=[]
+	var rendered: Array=[]
+	for frame in 900:
+		a.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		position_error=maxf(position_error,body.position.distance_to(a.table.pos[a.body]))
+		var points: PackedVector2Array=a.body_points()
+		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and is_equal_approx(attack.stage_time,a.elapsed)
+		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked
+		if attack.attack_points.size()==a.attack_points.size():
+			for j in a.attack_points.size():attack_error=maxf(attack_error,attack.attack_points[j].distance_to(a.attack_points[j]))
+		else:attack_error=INF
+		if not a.telegraph_paths.is_empty():
+			if not motion_only:check(attack.warning.size()==2,"予告の線分を出す")
+			if attack.warning.size()==2:
+				for j in 2:warning_error=maxf(warning_error,attack.warning[j].distance_to(a.telegraph_paths[0][j]))
+		var key: int=4 if attack.stage==0 and not attack.staging_ready else attack.stage
+		if not motion_only and key not in saved and key<5:
+			saved.append(key)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"退場・予告・実行・回復の値型を保持する")
+			bridge._core.step(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_body: Array=bridge.command("dev_boss_body_state").value
+			check(bridge.restore(held.value).ok,"突進の途中へ復帰する")
+			bridge._core.step(1.0/120.0)
+			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body,"復帰後の段階・固定照準・全身点列が一致する")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if not motion_only and key not in rendered and key in [0,1,2]:
+			rendered.append(key)
+			var appearance: Dictionary={}
+			for visual: Dictionary in fixture.package.visuals:
+				if visual.get("boss","")=="draco":appearance=visual.appearance
+			var display=load("res://scripts/render/bosses/draco.gd").new()
+			add_child(display);display.apply_frame(body,attack,appearance);await get_tree().process_frame
+			check(display._parts.visible,"同じ突進状態から予告・攻撃軌跡・回復を描画する")
+			display.free()
+		if attack.stage==5 and a.mode==&"idle":break
+	check(times_equal,"Sourceと退場中の時計0・予告・実行・回復の切替tickが一致する")
+	check(position_error<0.1 and shape_error<0.1 and warning_error<0.1 and attack_error<0.1,"突進の頭・全身・予告・口線分がSourceと一致する: %s/%s/%s/%s"%[position_error,shape_error,warning_error,attack_error])
+	if motion_only:
+		bridge.dispose();session.free()
+		native_charge_flow(move)
+		return
+	check(saved.size()==4 and rendered.size()==3,"退場から自然終了までの各段階を通る")
+	var hits: Array=fixture.captured.filter(func(event):return event.type==&"combat_player_damage" and event.payload.accepted and event.payload.cause==&"charge" and event.payload.source==&"draco" and event.payload.technique==&"charge")
+	check(hits.size()==1,"無敵を切った静止対象へ原因・出所・技名を持って1回命中する")
+	for target in [4,0,1,2]:
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 900:
+			bridge._core.step(1.0/120.0)
+			var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+			if (target==4 and not attack.staging_ready) or (target==attack.stage and attack.staging_ready):break
+		var at: Vector2=bridge.command("dev_boss_body_state").value[-1].position
+		check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"退場・予告・実行・回復の途中で取り消す")
+		check(bridge.command("dev_boss_state").value[0].warning.is_empty() and bridge.command("dev_boss_state").value[0].attack_points.is_empty() and bridge.command("dev_boss_body_state").value[-1].position.is_equal_approx(at),"取消は移動先を保ち予告・攻撃線を消す")
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
+	check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失で突進を取り消す")
+	bridge.dispose();session.free()
+	native_charge_flow(move)
+
+func native_charge_flow(move: BossTechnique) -> void:
+	# 既存の候補選択→自然終了→次技ケースへ接続する。
+	var rules=load("res://scripts/data_types/boss_action_rules.gd").new()
+	rules.adapter=&"draco";rules.techniques.assign([move]);rules.conditions={"charge":{}}
+	var flow=load("res://scripts/data_types/boss_flow_def.gd").new()
+	flow.sections=[{"request":"major","cap":2.0,"weights":{"major":100.0},"next":0,"action_count":1}]
+	var builder=load("res://tools/content/build_run_content.gd")
+	var fixture:=breath_fixture(move)
+	var bridge=fixture.bridge
+	var package: Dictionary=fixture.package
+	bridge.dispose()
+	var compiled: Dictionary=builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+	for k in compiled:package.records[k]=compiled[k]
+	bridge=load("res://scripts/runtime/run_bridge.gd").new()
+	check(bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":195,"mode":1,"stage_id":"B_draco_charge","profile":{},"settings":{"hitstop":false}}).ok,"突進の候補フローを読む")
+	bridge.start(105,{"position":Vector2(700,0),"lab_mode":true})
+	bridge.subscribe("確認",func(_frame):return true)
+	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"position":Vector2(700,0),"invincible":false}})
+	bridge._core.set_motion_context(Vector2(700,0),Vector2(700,0),Vector2(800,450))
+	bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false})
+	var first: int=-1
+	var second:=false
+	for frame in 1200:
+		bridge._core.step(1.0/120.0)
+		var active: Array=bridge.command("dev_boss_state").value
+		if not active.is_empty():
+			if first<0:first=active[0].id
+			elif active.any(func(t):return t.id!=first and t.stage==0):second=true;break
+	check(first>0 and second,"突進を選択して自然終了後に次の行動へ進む")
+	bridge.dispose()
+	print("[cpp_draco_charge] failures=",failed)
+	get_tree().quit(1 if failed else 0)
 
 func native_breath() -> void:
 	var rays_only := "--cpp-draco-breath-rays" in OS.get_cmdline_user_args()

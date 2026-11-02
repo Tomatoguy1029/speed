@@ -1523,6 +1523,10 @@
       {
         "name": "Breath",
         "value": "breath"
+      },
+      {
+        "name": "Charge",
+        "value": "charge"
       }
     ],
     "VisualRole": [
