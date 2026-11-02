@@ -208,7 +208,7 @@
     },
     {
       "name": "ScatterDefinition",
-      "section": 38,
+      "section": 40,
       "fields": [
         {
           "name": "id",
@@ -260,7 +260,7 @@
     },
     {
       "name": "ScatterPostDefinition",
-      "section": 39,
+      "section": 41,
       "fields": [
         {
           "name": "id",

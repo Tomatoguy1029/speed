@@ -207,7 +207,7 @@
     },
     {
       "name": "MissileEnemyDefinition",
-      "section": 38,
+      "section": 39,
       "fields": [
         {
           "name": "id",
