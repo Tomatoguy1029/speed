@@ -5,7 +5,7 @@ extends RefCounted
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: StageDef = null) -> Dictionary:
-	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga"]:
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -73,6 +73,13 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 			row.auriga[pair[0]] = float(definition.params[pair[1]])
 		for value in row.auriga.values():
 			if not is_finite(value) or value<0.0: return {}
+	if definition.behavior == &"clock":
+		row.clock = {"accel":definition.accel if definition.accel>0.0 else 2.0}
+		for pair in [["warn","telegraph"],["hand_long","hand_long"],["hand_short","hand_short"],["hand_width","hand_width"],["long_speed","long_speed"],["short_speed","short_speed"],["damage","bullet_dmg"]]:
+			if not definition.params.has(pair[1]): return {}
+			row.clock[pair[0]] = float(definition.params[pair[1]])
+		for key in row.clock:
+			if not is_finite(row.clock[key]) or (key not in ["long_speed","short_speed"] and row.clock[key]<0.0): return {}
 	if definition.behavior == &"dolphin":
 		row.dolphin = {"accel":definition.accel if definition.accel>0.0 else 2.0}
 		for pair in [["keep","keep"],["warn","telegraph"],["aim_turn","aim_turn"],["arc","wave_arc"],["radius","wave_radius"],["speed","wave_speed"],["width","wave_width"],["damage","bullet_dmg"],["enemy_damage","enemy_dmg"]]:

@@ -16,6 +16,11 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-clock" in OS.get_cmdline_user_args():
+		await check_cpp_clock()
+		print("[cpp_clock] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-auriga" in OS.get_cmdline_user_args():
 		await check_cpp_auriga()
 		print("[cpp_auriga] failed=%d" % failed)
@@ -1318,5 +1323,87 @@ func check_cpp_auriga() -> void:
 	core.configure_attack_budget({"enabled":false,"budget":1.0,"jitter":0.0})
 	core.step(0.1)
 	check(dolphin_enemy(core,replacement).vel[0]!=0.0 or dolphin_enemy(core,replacement).vel[1]!=0.0,"参照相手が先に消えても古い行を追わず走る")
+	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func clock_shapes(bridge, target: Vector2) -> Array:
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,400),Vector2(1600,800))).value
+	return frame.shapes.filter(func(shape): return shape.kind==0 and shape.layer==10)
+
+func check_cpp_clock() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 81
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["clock","drifter"])
+	stage.enemy_tuning = {"clock":{"speed":0.0,"params.telegraph":0.25,"params.hand_long":60.0,"params.hand_short":30.0,"params.hand_width":8.0,"params.bullet_dmg":5.0}}
+	var output := "res://.content/dev/run_clock"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"とけい座の二本の針".sha256_text())
+	check(built==OK,"とけい座の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_81.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":819},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"とけい座のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var position := target-Vector2(400,0)
+	var id: int = core.spawn_enemy(&"clock",position,{})
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.step(0.1)
+	check(core.hazards_snapshot().is_empty() and pulse_motion(core,id).spin==0.0,"予算0では針と回転時計を開始しない")
+	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	core.step(0.2)
+	check(core.hazards_snapshot().size()==2 and is_equal_approx(pulse_motion(core,id).spin,0.2) and core.attack_snapshot().filter(func(item): return item.pool==2).all(func(item): return item.attached and item.source_id==id),"許可後に本体へ二本の針を付けて回転を始める")
+	var shapes := clock_shapes(bridge,target)
+	check(shapes.size()==2 and shapes[0].points[0]==position and shapes[0].points[1].distance_to(position+Vector2.from_angle(0.2*1.6)*60.0)<0.01 and shapes[1].points[1].distance_to(position+Vector2.from_angle(0.2*-0.7+PI)*30.0)<0.01,"長針と短針の長さと符号の違う回転速度を保持する")
+	core.step_hazards(0.1)
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,400),Vector2(1600,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(presentation.frame_view.apply_frame(frame) and core.hazards_snapshot()[0].time<core.hazards_snapshot()[0].delay,"予告中の二本の針を通常画面へ表示する")
+	await get_tree().process_frame
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	core.step(0.1)
+	var future: Array = core.enemy_motion_snapshot()
+	var future_shapes := clock_shapes(bridge,target)
+	bridge.command("dev_ship_motion",{"position":position+Vector2.from_angle(0.3*1.6)*40.0,"velocity":Vector2.ZERO})
+	var hp: float = core.ship_snapshot().ship_hp
+	core.step_hazards(0.15)
+	check(is_equal_approx(core.ship_snapshot().ship_hp,hp-5.0),"予告が終わった針だけが編集値のダメージを与える")
+	core.advance_attack_budget(2.0)
+	check(not core.attack_budget_snapshot().groups[0].members[0].closed,"針が付いている間は予算の初期期限を越えて保持する")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"回転時計と二本の攻撃Handleを値から復帰する")
+	core.step(0.1)
+	check(core.enemy_motion_snapshot()==future and clock_shapes(bridge,target)==future_shapes,"復帰後も同じ向きへ針を動かし保持元を変更しない")
+	bridge.command("dev_clear_hostile",{})
+	check(core.hazards_snapshot().is_empty(),"共通の攻撃消去で二本の針が終了する")
+	var old_hands: PackedInt64Array = pulse_motion(core,id).hands
+	core.step(0.1)
+	check(core.hazards_snapshot().size()==2 and pulse_motion(core,id).hands!=old_hands,"消された針を古いHandleへ接続せず二本とも作り直す")
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step(0.2)
+	check(core.hazards_snapshot().is_empty(),"本体の途中撃破で付いている針を終了して作り直さない")
+	core.remove_enemy(id)
+	var replacement: int = core.spawn_enemy(&"clock",position,{})
+	check(replacement!=id and pulse_motion(core,replacement).spin==0.0 and pulse_motion(core,replacement).hands==PackedInt64Array([0,0]),"行の再利用で時計と古い針を引き継がない")
+	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	core.set_enemy_motion(replacement,{"pump_owner":owner})
+	core.remove_enemy(owner)
+	core.configure_attack_budget({"enabled":false,"budget":1.0,"jitter":0.0})
+	core.step(0.1)
+	check(core.hazards_snapshot().size()==2,"参照相手が先に消えても古い行を追わず針を出す")
 	bridge.release_checkpoint(pending.value)
 	session.free()

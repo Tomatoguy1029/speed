@@ -815,6 +815,56 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "ClockDefinition",
+      "section": 70,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hand_long",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hand_short",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hand_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "long_speed",
+          "type": "f64"
+        },
+        {
+          "name": "short_speed",
+          "type": "f64"
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}
