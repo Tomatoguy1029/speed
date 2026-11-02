@@ -46,6 +46,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     if (!std::isfinite(state.control.world_real_accum) || !std::isfinite(state.control.world_dt_accum) ||
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
+    for (const auto &v:state.loadout.kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
     if (!std::isfinite(state.loadout.contact_arc.ready_at)) return false;
     for (const auto &v:state.loadout.contact_arc.visuals) {if (!std::isfinite(v.age) || v.age<0 || v.segments.size()%2) return false;for (auto p:v.segments) if (!p.is_finite()) return false;}
     for (const auto &f:state.loadout.sonic.frames) if (!f.pos.is_finite() || !std::isfinite(f.age) || f.age<0) return false;

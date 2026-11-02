@@ -1,5 +1,7 @@
 #include "equipment.h"
 #include "../behaviors/weapons/forward.h"
+#include "../behaviors/traits/killSonic.h"
+#include "../behaviors/traits/rampage.h"
 #include "../behaviors/weapons/contactWave.h"
 #include "../behaviors/weapons/sonic.h"
 #include "../behaviors/weapons/contactArc.h"
@@ -23,6 +25,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
     run.state.loadout.full_charge_maximum=1;
     run.state.loadout.full_burst_owned=false;
+    bool kill_sonic_owned=false;
     bool rampage_owned=false,run_up_owned=false,vortex_owned=false,crit_beam_owned=false;
     run.state.loadout.duplicator={};
     effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0,attack_bonus=0,pickup_bonus=0,length_bonus=0,glide_bonus=0;
@@ -30,6 +33,9 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
         if (run.content->equipment[owned.definition-1].external_id=="T36") run.state.loadout.full_burst_owned=true;
         for (const auto &level:run.content->duplicator_levels) if (level.equipment==owned.definition && level.level==owned.level) {
             auto &d=run.state.loadout.duplicator;d.ready=true;d.chance=level.chance;d.damage=level.damage;d.maximum=level.maximum;d.angle_min=level.angle_min;d.angle_max=level.angle_max;
+        }
+        for (const auto &level:run.content->kill_sonic_levels) if (level.equipment==owned.definition && level.level==owned.level) {
+            auto &w=run.state.loadout.kill_sonic;w.ready=true;w.definition=owned.definition;w.every=level.kills;w.limit=level.limit;w.radius=level.radius;w.damage=level.damage;w.radius_decay=level.radius_decay;w.damage_decay=level.damage_decay;w.knock=level.knock;w.life=level.life;kill_sonic_owned=true;
         }
         for (const auto &level:run.content->crit_beam_levels) if (level.equipment==owned.definition && level.level==owned.level) {
             auto &c=run.state.loadout.crit_beam;c.ready=true;c.cooldown=level.cooldown;c.damage=level.damage;c.length=level.length;c.width=level.width;c.knock=level.knock;crit_beam_owned=true;
@@ -49,6 +55,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
         }
     }
     if (!run.state.loadout.full_burst_owned) run.state.loadout.full_burst_active=false;
+    if (!kill_sonic_owned) run.state.loadout.kill_sonic={};
     if (!crit_beam_owned) run.state.loadout.crit_beam={};
     if (!vortex_owned) run.state.loadout.vortex={};
     if (!run_up_owned) run.state.loadout.run_up={};
@@ -139,6 +146,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
         } else return false;
     } else if (d.external_id=="T37") {
         if (std::none_of(run.content->duplicator_levels.begin(),run.content->duplicator_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
+    } else if (d.external_id=="T05") {
+        if (std::none_of(run.content->kill_sonic_levels.begin(),run.content->kill_sonic_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
     } else if (d.external_id=="T06") {
         if (std::none_of(run.content->crit_beam_levels.begin(),run.content->crit_beam_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
     } else if (d.external_id=="T03") {
@@ -154,6 +163,9 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
     refresh_effects(run);
     if (std::find(run.state.lifecycle.obtained.begin(),run.state.lifecycle.obtained.end(),id)==run.state.lifecycle.obtained.end()) run.state.lifecycle.obtained.push_back(id);
     return true;
+}
+void EquipmentSystem::trait_kill(RunRuntime &r,const DeathContext &death) {
+    for (const auto &v:r.state.loadout.traits) {const auto &id=r.content->equipment[v.definition-1].external_id;if (id=="T33") RampageBehavior::kill(r,death);else if (id=="T05") KillSonicBehavior::kill(r,death);}
 }
 bool EquipmentSystem::remove_trait(RunRuntime &run,uint32_t id) {
     auto &owned=run.state.loadout.traits;const auto found=std::find_if(owned.begin(),owned.end(),[&](const auto &item){return item.definition==id;});

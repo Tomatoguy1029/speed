@@ -101,6 +101,8 @@ struct ContactWaveState {
     std::vector<ContactWaveInstance> waves;
     std::vector<ContactWaveRipple> ripples;
 };
+struct KillSonicWave {godot::Vector2 pos;uint64_t id=0;int64_t generation=0;double radius=0,damage=0,age=0,born=0,life=0;std::unordered_set<int64_t> hits;};
+struct KillSonicState {bool ready=false,active=false;uint32_t definition=0;int64_t every=0,limit=0,chains=0,kills=0,next=0;uint64_t next_id=1;double radius=0,damage=0,radius_decay=0,damage_decay=0,knock=0,life=0;std::vector<KillSonicWave> waves;};
 struct CritBeamState {bool ready=false;double next_time=0,cooldown=0,damage=0,length=0,width=0,knock=0;};
 struct VortexInstance {
     godot::Vector2 pos;
@@ -153,6 +155,7 @@ struct LoadoutState {
     ContactWaveState contact_wave;
     SonicState sonic;
     ContactArcState contact_arc;
+    KillSonicState kill_sonic;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;

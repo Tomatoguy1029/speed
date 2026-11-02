@@ -4,14 +4,30 @@ extends WeaponVisual
 
 var waves: Array[Dictionary] = []
 var _rings: PixelShapes
+func _effect_key() -> String: return "trait/killSonic"
+var _frame_time := 0.0
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+	_rings = PixelShapes.new()
+	_rings.setup(pixel,PixelShapes.Shape.THICK_RING,false)
+	parent.add_child(_rings)
+func sync_frame(values: Array, world_time: float) -> void:
+	_frame_time = world_time
+	waves.clear()
+	for value: Dictionary in values:
+		if value.visual_age<value.life: waves.append({"pos":value.pos,"radius":value.radius,"life":value.life,"g":value.generation,"age":value.visual_age})
 
 func on_event(ev: Dictionary) -> void:
 	if ev.type == &"chain_shock":
 		waves.append({"pos": ev.pos, "radius": float(ev.radius), "life": float(ev.life), "g": int(ev.get("generation", 0)), "age": 0.0})
 
 func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+	frame_tick(world_dt())
+
+func frame_tick(dt: float) -> void:
+	var p: PixelPainter = _painter if rm==null else painter()
 	if _rings == null:
 		_rings = PixelShapes.new()
 		_rings.setup(p.px, PixelShapes.Shape.THICK_RING, false)
@@ -30,7 +46,7 @@ func tick(_dt: float) -> void:
 		if k < 0.08: p.disk(w.pos, 10.0 - g, Color.WHITE)
 		if radius > 6.0:
 			var n := ceili(radius * 6.0)
-			var phase := int(state.world_time * 50.0)
+			var phase := int((_frame_time if rm==null else state.world_time) * 50.0)
 			for i in n:
 				if (i + phase) % 3 != 0: continue
 				var a := float(i) / n * TAU

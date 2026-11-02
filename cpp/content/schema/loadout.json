@@ -1178,6 +1178,66 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "KillSonicDefinition",
+      "section": 240,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "kills",
+          "type": "i64"
+        },
+        {
+          "name": "limit",
+          "type": "i64"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

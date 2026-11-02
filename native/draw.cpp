@@ -2,6 +2,7 @@
 #include "../cpp/systems/field.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
 #include "../cpp/behaviors/traits/rampage.h"
+#include "../cpp/behaviors/traits/killSonic.h"
 #include "../cpp/behaviors/traits/runUp.h"
 #include "../cpp/behaviors/traits/vortex.h"
 #include "../cpp/behaviors/weapons/sonic.h"
@@ -118,6 +119,7 @@ void SpeedRunCore::commit_draw() {
     speed::FullChargeBehavior::launch(runtime);
     speed::RampageBehavior::launch(runtime);
     speed::SonicBehavior::launch(runtime);
+    speed::KillSonicBehavior::launch(runtime);
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;
     Dictionary launch; launch["pos"] = runtime.state.ship.pos; launch["dir"] = dir; launch["gauge"] = runtime.state.draw.amount;
     emit_event("launch", launch);
@@ -161,7 +163,8 @@ void SpeedRunCore::end_trace(bool completed) {
     for (const auto &owned:runtime.state.loadout.traits) {
         if (runtime.state.phase!=RunState::Phase::Play) break;
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
-        if (id=="T33") speed::RampageBehavior::end(runtime);
+        if (id=="T05") speed::KillSonicBehavior::end(runtime);
+        else if (id=="T33") speed::RampageBehavior::end(runtime);
         else if (id=="T03") speed::VortexBehavior::end(runtime);
     }
     speed::FullChargeBehavior::end(runtime);

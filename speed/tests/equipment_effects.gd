@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t05" in OS.get_cmdline_user_args():
+		await check_cpp_t05()
+		print("[cpp_t05] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w04-clock" in OS.get_cmdline_user_args():
 		await check_cpp_w04_clock()
 		print("[cpp_w04_clock] failed=%d" % failures)
@@ -3212,3 +3217,82 @@ func check_cpp_w04_clock() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"独立した歪み表示の確認に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_t05() -> void:
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	var session = await trait_test_session("T05",config,605)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T05","levels":1}).ok,"チェインショックをカードと同じ取得入口で得る")
+	check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":1}).ok,"同時に撃破を読む特性を取得する")
+	var definition: TraitDef = ContentManager.definition(&"traits",&"T05")
+	var every: int = int(definition.params.kills_base+definition.params.kills_per)
+	var cues: Array = []
+	bridge.subscribe("t05",func(frame: Dictionary):
+		for event: Dictionary in frame.events:
+			if event.type==&"chain_shock": cues.append(event.payload)
+		return true)
+	trait_kill_fixture(bridge)
+	check(bridge._ui.kill_sonic.kills==0 and cues.is_empty(),"発進する前の撃破を連鎖へ数えない")
+	trait_start_trace(bridge,400.0)
+	for i in every-1: trait_kill_fixture(bridge)
+	check(bridge._ui.kill_sonic.kills==every-1 and bridge._ui.kill_sonic.waves.is_empty(),"必要な撃破数の直前では波を出さない")
+	trait_kill_fixture(bridge)
+	check(bridge._ui.kill_sonic.chains==1 and cues.size()==1,"境界の撃破で一度だけ最初の波を出す")
+	var wave: Dictionary = bridge._ui.kill_sonic.waves[0]
+	check(is_equal_approx(wave.radius,definition.params.radius_base+definition.params.radius_per) and wave.generation==0 and wave.age==0.0,"生成値の半径と最初の世代・未更新の時計を保持する")
+	var before: Dictionary = bridge._ui.kill_sonic.duplicate(true)
+	bridge.command("pause",{"paused":true})
+	bridge.step(0.05,idle,viewport)
+	check(bridge._ui.kill_sonic==before,"ポーズでは波と連鎖の時計を止める")
+	bridge.command("pause",{"paused":false})
+	# 同じ波の命中が次の波を追加する場面。次の波を同じ回で進めない。
+	for i in every*3:
+		var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":wave.pos+Vector2(5.0,0.0)})
+		check(spawned.ok,"連鎖の相手を同じ生成入口で配置する")
+	var saved: Dictionary = bridge.checkpoint()
+	check(saved.ok,"波の命中前を保持する")
+	bridge.step(1.0/120.0,idle,viewport)
+	var after: Dictionary = bridge._ui.kill_sonic.duplicate(true)
+	check(after.chains==definition.params.limit_by_level[0] and cues.size()==after.chains,"波の撃破から連鎖し、同じ発進の上限で止める")
+	check(after.waves.size()>1 and after.waves[1].age==0.0 and after.waves[0].age>0.0,"命中中に追加した波は次の更新から進める")
+	if after.waves.size()>1:
+		check(is_equal_approx(after.waves[1].radius,wave.radius*definition.params.radius_decay) and is_equal_approx(after.waves[1].damage,wave.damage*definition.params.damage_decay),"連鎖する半径と威力を元の割合で減らす")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.01)
+	check(presentation.frame_view._kill_sonic_visual!=null and not presentation.frame_view._kill_sonic_visual.waves.is_empty() and presentation.frame_view._kill_sonic_visual._rings.multimesh.visible_instance_count>0,"連鎖した波の世代と輪の形を通常表示へ渡す")
+	check(bridge.read_frame().ok and bridge.delivery_error.ok,"波の通知を公開契約と購読へ正常に届ける")
+	var expected_enemies: Array = core.enemies_snapshot()
+	check(bridge.restore(saved.value).ok,"命中前へ復帰する")
+	bridge.collect_frame()
+	cues.clear()
+	bridge.step(1.0/120.0,idle,viewport)
+	check(bridge._ui.kill_sonic==after and core.enemies_snapshot()==expected_enemies,"復帰後の命中履歴と波の追加順を再現する")
+	bridge.release_checkpoint(saved.value)
+	for tick in 120:
+		bridge.step(1.0/120.0,idle,viewport)
+		if not bridge._ui.draw.tracing: break
+	check(not bridge._ui.kill_sonic.active,"なぞり終了で新しい連鎖の受付を止める")
+	var chains: int = bridge._ui.kill_sonic.chains
+	trait_kill_fixture(bridge)
+	check(bridge._ui.kill_sonic.chains==chains,"終了後の撃破で連鎖を追加しない")
+	trait_start_trace(bridge,400.0)
+	check(bridge._ui.kill_sonic.active and bridge._ui.kill_sonic.kills==0 and bridge._ui.kill_sonic.chains==0,"次の発進で撃破数と上限を初期化する")
+	check(bridge.command("dev_remove_trait",{"id":"T05"}).ok and not bridge._ui.kill_sonic.ready and bridge._ui.kill_sonic.waves.is_empty(),"解除で波と受付を終了する")
+	presentation._present_cpp(0.01)
+	check(presentation.frame_view._kill_sonic_visual==null,"解除した連鎖の表示を回収する")
+	bridge.unsubscribe("t05")
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"チェインショックの状態・命中・表示に実行エラーがない: %s" % [capture.messages()])

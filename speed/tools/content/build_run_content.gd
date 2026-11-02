@@ -455,6 +455,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.LoadoutDefinition.append({"id":gear_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T04","comet_only":false})
 	for level in range(1,config.trait_max_stacks+1):
 		data.FullChargeDefinition.append({"id":level,"equipment":gear_id,"level":level,"multiplier":float(gear.params.mult_base)+float(gear.params.mult_per)*level})
+	var kill_sonic := load("res://data/traits/T05_killSonic.tres") as TraitDef
+	if kill_sonic==null: return {}
+	var kill_sonic_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":kill_sonic_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T05","comet_only":false})
+	for level in range(1,config.trait_max_stacks+1):
+		data.KillSonicDefinition.append({"id":level,"equipment":kill_sonic_id,"level":level,"kills":int(kill_sonic.params.kills_base+kill_sonic.params.kills_per*level),"limit":int(kill_sonic.params.limit_by_level[level-1]),"radius":float(kill_sonic.params.radius_base+kill_sonic.params.radius_per*level),"damage":float(kill_sonic.params.damage_base+kill_sonic.params.damage_per*level),"radius_decay":float(kill_sonic.params.radius_decay),"damage_decay":float(kill_sonic.params.damage_decay),"knock":float(kill_sonic.params.knock),"life":0.4})
 	var crit_beam := load("res://data/traits/T06_critBeam.tres") as TraitDef
 	if crit_beam==null: return {}
 	var crit_beam_id: int = data.LoadoutDefinition.size()+1
@@ -662,6 +668,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":gear_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":gear_id,"asset":key})
+	var kill_sonic_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T05")
+	if kill_sonic_entry==null: return {}
+	for path in kill_sonic_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":kill_sonic_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":kill_sonic_id,"asset":key})
 	var crit_beam_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T06")
 	if crit_beam_entry==null: return {}
 	for path in crit_beam_entry.resources:
@@ -986,6 +999,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.BarrierDefinition = resolved.BarrierDefinition
 			data.BarrierPostDefinition = resolved.BarrierPostDefinition
 			data.FullChargeDefinition = resolved.FullChargeDefinition
+			data.KillSonicDefinition = resolved.KillSonicDefinition
 			data.CritBeamDefinition = resolved.CritBeamDefinition
 			data.VortexDefinition = resolved.VortexDefinition
 			data.RunUpDefinition = resolved.RunUpDefinition

@@ -206,6 +206,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->equipment_assets=records.LoadoutAsset_rows;
     bundle->numeric_traits=records.NumericTraitLevel_rows;
     bundle->full_charge_levels=records.FullChargeDefinition_rows;
+    bundle->kill_sonic_levels=records.KillSonicDefinition_rows;
     bundle->crit_beam_levels=records.CritBeamDefinition_rows;
     bundle->vortex_levels=records.VortexDefinition_rows;
     bundle->run_up_levels=records.RunUpDefinition_rows;
@@ -245,6 +246,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.external_id=="T37") {
             if (d.kind!=1 || d.maximum_level!=bundle->duplicator_levels.size()) return {};
             for (size_t i=0;i<bundle->duplicator_levels.size();++i) {const auto &level=bundle->duplicator_levels[i];if (level.equipment!=d.id || level.level!=i+1 || level.angle_min>level.angle_max) return {};}
+            continue;
+        }
+        if (d.external_id=="T05") {
+            if (d.kind!=1 || d.maximum_level!=bundle->kill_sonic_levels.size()) return {};
+            for (size_t i=0;i<bundle->kill_sonic_levels.size();++i) {const auto &v=bundle->kill_sonic_levels[i];if (v.equipment!=d.id || v.level!=i+1 || v.life<=0) return {};}
             continue;
         }
         if (d.external_id=="T06") {

@@ -1424,6 +1424,10 @@
       {
         "name": "ContactArc",
         "value": "contactArc"
+      },
+      {
+        "name": "KillSonic",
+        "value": "killSonic"
       }
     ],
     "VisualRole": [
@@ -1864,6 +1868,10 @@
       {
         "name": "LanceShatter",
         "value": "lance_shatter"
+      },
+      {
+        "name": "ChainShock",
+        "value": "chain_shock"
       }
     ],
     "ResultKind": [
@@ -2462,6 +2470,12 @@
       "direction",
       "horn",
       "head_length"
+    ],
+    "chain_shock": [
+      "pos",
+      "radius",
+      "life",
+      "generation"
     ]
   },
   "includes": [

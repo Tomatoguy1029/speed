@@ -8,6 +8,7 @@ public:
     static int64_t shot_count(RunRuntime &,int64_t base);
     static double weapon_damage_factor(const RunRuntime &,uint32_t definition);
     static bool grant(RunRuntime &,uint32_t definition,uint32_t levels=1);
+    static void trait_kill(RunRuntime &,const DeathContext &);
     static bool remove_trait(RunRuntime &,uint32_t definition);
     static bool remove_weapon(RunRuntime &,uint32_t definition);
     static void refresh_effects(RunRuntime &);
