@@ -113,17 +113,17 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         result = subprocess.run(command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
         print(result.stdout)
         assert result.returncode == 0 and "[package_final_runtime] OK" in result.stdout, "撤去後の通常出撃から自然な結果保存・戻るまでを確認する"
+    if loading:
+        loading_command = [executable, "--log-file", str(path.parent / "loading.log"), "--", "--package-loading"]
+        result = subprocess.run(loading_command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
+        print(result.stdout)
+        assert result.returncode == 0 and "[package_loading] OK" in result.stdout, "描画付き配布版で出撃準備と資源回収を確認する"
     if not runtime:
         return
     command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "runtime.log"), "--"]
     result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
     print(result.stdout)
     assert result.returncode == 0 and "[package_runtime] OK" in result.stdout, "通常ランの開始と最小更新を最後まで実施する"
-    if loading:
-        loading_command = [executable, "--log-file", str(path.parent / "loading.log"), "--", "--package-loading"]
-        result = subprocess.run(loading_command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
-        print(result.stdout)
-        assert result.returncode == 0 and "[package_loading] OK" in result.stdout, "描画付き配布版で出撃準備と資源回収を確認する"
     # 元の配布物を保ち、DLLを抜いた別コピーで旧実装へのfallbackがないことを確かめる。
     with tempfile.TemporaryDirectory(prefix="speed-package-missing-") as temporary:
         missing = Path(temporary) / "export"
@@ -148,8 +148,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.rendered and (args.platform != "macos" or not (args.runtime or args.final_runtime)):
         parser.error("--rendered はMacの --runtime または --final-runtime と合わせて指定してください")
-    if args.loading and not (args.rendered and args.runtime):
-        parser.error("--loading はMacの --runtime --rendered と合わせて指定してください")
+    if args.loading and not (args.rendered and (args.runtime or args.final_runtime)):
+        parser.error("--loading はMacの --rendered と --runtime または --final-runtime に合わせて指定してください")
     if args.final_runtime and not args.platform:
         parser.error("--final-runtime は --platform と合わせて指定してください")
     if args.platform:

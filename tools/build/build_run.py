@@ -155,8 +155,8 @@ def main():
     args = parser.parse_args()
     if args.rendered and (args.platform != 'macos' or not (args.verify or args.verify_final)):
         parser.error('--rendered はMacの --verify または --verify-final と合わせて指定してください')
-    if args.verify_loading and not (args.package_dir and args.verify and args.rendered):
-        parser.error('--verify-loading はMac配布の --verify --rendered と合わせて指定してください')
+    if args.verify_loading and not (args.package_dir and (args.verify or args.verify_final) and args.rendered):
+        parser.error('--verify-loading はMac配布の --rendered と --verify または --verify-final に合わせて指定してください')
     if args.verify_final and not args.package_dir:
         parser.error('--verify-final は --package-dir と合わせて指定してください')
     if args.platform == 'windows' and args.arch not in (None, 'x86_64'):

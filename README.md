@@ -61,7 +61,7 @@ godot-bg --editor --path speed
 python3 tools/build/build_run.py --sdk /tmp/speed-godot-cpp --scons /tmp/speed-build-python/bin/scons --platform macos --package-dir /tmp/speed-package --godot godot --templates /path/to/4.7.2.stable
 ```
 
-この入口はMacのarm64・x86_64拡張をuniversalへまとめ、独立コピーでimport・共通生成・export・配布構成の確認まで行います。Windowsは `--platform windows` を使います。`--verify` を付けると保存先を隔離した確認用パッケージで最小ランと拡張欠落時の拒否を確認し、Macでは `--rendered` を併用すると `godot-bg` で描画付きの確認を行います。配布構成と署名・公証の範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
+この入口はMacのarm64・x86_64拡張をuniversalへまとめ、独立コピーでimport・共通生成・export・配布構成の確認まで行います。Windowsは `--platform windows` を使います。`--verify` を付けると保存先を隔離した確認用パッケージで最小ランと拡張欠落時の拒否を確認し、Macでは `--rendered` を併用すると `godot-bg` で描画付きの確認を行います。`--verify-final` は隔離した保存先で通常出撃から自然な終了・結果保存・戻るを確認します。Macの出撃準備・初期装備・交換・取消の計測は `--verify-loading --verify-final --rendered` を使います。配布構成と署名・公証の範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
 検査は `/tmp` の独立コピーで、変更に関係する既存の入口だけ使います。C++の人数・出現の確認は `res://tests/runtime/run_population.tscn`、制作・生成・UI・配布は `speed/tests/` の各対象を参照します。検査を行う範囲は [AGENTS.md](AGENTS.md#検証) に従います。
 
