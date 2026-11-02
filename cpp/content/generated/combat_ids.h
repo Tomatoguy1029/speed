@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 namespace speed {
-enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Arrow=33,StarBolt=34,Barrier=35,Corpse=36,TowShot=37,Interceptor=38,EndBlast=39,Count};
+enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Arrow=33,StarBolt=34,Barrier=35,Corpse=36,TowShot=37,Interceptor=38,EndBlast=39,CritBeam=40,RunUp=41,Count};
 inline const char *symbol_name(Cause value) {
     switch(value) {
     case Cause::None: return "";
@@ -46,6 +46,8 @@ inline const char *symbol_name(Cause value) {
     case Cause::TowShot: return "towShot";
     case Cause::Interceptor: return "interceptor";
     case Cause::EndBlast: return "endBlast";
+    case Cause::CritBeam: return "critBeam";
+    case Cause::RunUp: return "runUp";
     default: return "";
     }
 }
@@ -90,6 +92,8 @@ inline bool parse_symbol(std::string_view value, Cause &out) {
     if (value=="towShot") {out=Cause::TowShot;return true;}
     if (value=="interceptor") {out=Cause::Interceptor;return true;}
     if (value=="endBlast") {out=Cause::EndBlast;return true;}
+    if (value=="critBeam") {out=Cause::CritBeam;return true;}
+    if (value=="runUp") {out=Cause::RunUp;return true;}
     return false;
 }
 enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,ReflectedShot=13,EnemyPolygon=14,StarBolt=15,Count};
@@ -133,7 +137,7 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="star_bolt") {out=VisualRole::StarBolt;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,FullBurstReady=65,FloodEnd=66,Beam=67,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,FullBurstReady=65,FloodEnd=66,Beam=67,CriticalLance=68,CriticalLanceHit=69,RockBreak=70,RunUpHit=71,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -204,6 +208,10 @@ inline const char *symbol_name(EventType value) {
     case EventType::FullBurstReady: return "full_burst_ready";
     case EventType::FloodEnd: return "flood_end";
     case EventType::Beam: return "beam";
+    case EventType::CriticalLance: return "critical_lance";
+    case EventType::CriticalLanceHit: return "critical_lance_hit";
+    case EventType::RockBreak: return "rock_break";
+    case EventType::RunUpHit: return "run_up_hit";
     default: return "";
     }
 }
@@ -276,6 +284,10 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="full_burst_ready") {out=EventType::FullBurstReady;return true;}
     if (value=="flood_end") {out=EventType::FloodEnd;return true;}
     if (value=="beam") {out=EventType::Beam;return true;}
+    if (value=="critical_lance") {out=EventType::CriticalLance;return true;}
+    if (value=="critical_lance_hit") {out=EventType::CriticalLanceHit;return true;}
+    if (value=="rock_break") {out=EventType::RockBreak;return true;}
+    if (value=="run_up_hit") {out=EventType::RunUpHit;return true;}
     return false;
 }
 enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
@@ -622,6 +634,10 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::FullBurstReady: return field=="pos";
     case EventType::FloodEnd: return field=="id" || field=="row" || field=="pos" || field=="angle" || field=="length" || field=="width" || field=="spread" || field=="age" || field=="tail" || field=="collapse" || field=="margin";
     case EventType::Beam: return field=="from" || field=="to" || field=="width" || field=="life" || field=="color" || field=="visual_key";
+    case EventType::CriticalLance: return field=="from" || field=="to" || field=="width";
+    case EventType::CriticalLanceHit: return field=="pos" || field=="radius" || field=="direction";
+    case EventType::RockBreak: return field=="pos" || field=="r" || field=="meteor_index" || field=="facing" || field=="dir" || field=="color";
+    case EventType::RunUpHit: return field=="pos" || field=="dir" || field=="strength";
     default: return false;
     }
 }
