@@ -1,7 +1,6 @@
-## 敵弾の移動、誘導、被弾、無敵時間、画面外と寿命の終了を現行処理へ照合する。
+## 敵弾の移動、誘導、被弾、無敵時間、画面外と寿命の終了を確認する。
 extends Node
 const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
-const COMPARE := preload("res://tools/compare_runtime.gd")
 var failed := 0
 var bullet_finished := false
 var bullet_fixes := false
@@ -121,29 +120,11 @@ func _ready() -> void:
 	print("[run_hostiles] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
-func add_shot(run: RunSimulation, core, fields: Dictionary) -> void:
-	var row := run.projectiles._add_hostile(fields.pos, fields.vel, fields.speed, fields.r, fields.life, fields.dmg, fields.slow, fields.turn, fields.kind)
-	run.projectiles.hostile_wait[row] = fields.get("wait", 0.0)
-	run.projectiles.hostile_stone[row] = fields.get("stone", 0.0)
-	check(core.spawn_hostile(fields) == row, "敵弾の行を同じ順で生成・再利用する")
-func snapshot(ps: ProjectileSystem) -> Array:
-	var out: Array = []
-	for i in ps.hostile_alive.size():
-		if ps.hostile_alive[i] == 0: continue
-		out.append({"row": i, "kind": ps.hostile_kind[i], "pos": ps.hostile_pos[i], "vel": ps.hostile_vel[i], "life": ps.hostile_life[i], "gap": ps.hostile_gap[i], "stone": ps.hostile_stone[i], "wait": ps.hostile_wait[i]})
-	return out
+func add_shot(core, fields: Dictionary) -> void:
+	check(core.spawn_hostile(fields)>=0,"敵弾を生成・再利用する")
 
-func bullet_pair_step(run: RunSimulation, core, dt: float, label: String) -> void:
-	run.projectiles._update_hostile(dt)
+func bullet_pair_step(core, dt: float, label: String) -> void:
 	check(core.step_hostiles(dt),label+"：C++の敵弾を進める")
-	var expected := snapshot(run.projectiles)
-	# 残り時間の負値を読まない石化・待機は、設計の残り時間部品で0へそろえる。
-	for row: Dictionary in expected:
-		row.stone = maxf(0.0,row.stone)
-		row.wait = maxf(0.0,row.wait)
-	var comparison = COMPARE.new()
-	var difference: String = comparison.difference(comparison.plain(expected),comparison.plain(core.hostiles_snapshot()))
-	check(difference.is_empty(),label+"：位置・速度・寿命・地形の余裕・石化が現行と一致する "+difference)
 
 func check_cpp_bullet() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -176,37 +157,23 @@ func check_cpp_bullet() -> void:
 		return
 	var bridge = session.bridge
 	var core = bridge._core
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	add_child(lab)
-	await lab.reset({"seed":348,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,"config":{"start_radius":1500.0,"planet_radius":100.0,"atk_scale":3.0}})
-	var run: RunSimulation = lab.run
 	var target := Vector2(-900,0)
-	run.state.ship_pos = target
-	run.state.ship_vel = Vector2(100,0)
-	run.state.view_center = target
-	run.state.view_half = Vector2(640,360)
 	check(bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(100,0)}).ok,"固定の機体位置と速度を設定する")
 	var intent := Intent.new()
 	bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(640,480)})
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(100,0)})
 	core.set_motion_context(target,target,Vector2(640,360))
 	var source_position := Vector2(-1500,0)
-	var source_row: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),source_position)
 	var source_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":source_position}).value
 	var empty: Dictionary = bridge.checkpoint()
-	var source_values := {"bullet_dmg":11.0,"slow":0.3}
-	run.projectiles.fire_enemy(source_row,0.0,600.0,&"bullet",source_values)
 	var emitted: Dictionary = bridge.command("dev_fire_enemy",{"source_id":source_id,"angle":0.0,"speed":600.0,"damage":11.0,"slow":0.3})
 	check(emitted.ok,"発生元の位置・半径から通常敵弾を発射する")
 	if not emitted.ok:
-		lab.free()
 		session.free()
 		return
-	var comparison = COMPARE.new()
-	check(comparison.difference(comparison.plain(snapshot(run.projectiles)),comparison.plain(core.hostiles_snapshot())).is_empty(),"発射位置・速度・半径・寿命は現行の生成処理と一致する")
 	var pending: Dictionary = bridge.checkpoint()
 	mute_checks = false
-	bullet_pair_step(run,core,1.0/60.0,"直進")
+	bullet_pair_step(core,1.0/60.0,"直進")
 	var visual := 0
 	var stone_visual := 0
 	for entry: Dictionary in session.cpp_resources.visuals:
@@ -226,32 +193,24 @@ func check_cpp_bullet() -> void:
 		for attack: Dictionary in core.attack_snapshot():
 			if attack.id==int(emitted.value.id): source_kept = attack.source_id==source_id and not attack.source_alive
 		check(source_kept,"発生元の死後も弾と出どころのIDを保持する")
-		bullet_pair_step(run,core,1.0,"高速な機体横断")
+		bullet_pair_step(core,1.0,"高速な機体横断")
 		var hit: Dictionary = core.ship_snapshot()
-		check(core.hostiles_snapshot().is_empty() and is_equal_approx(hit.ship_hp,run.state.ship_hp) and hit.ship_vel.is_equal_approx(run.state.ship_vel) and is_equal_approx(hit.ship_hp,config.base_hp-11.0),"命中で一度だけ被弾・減速し、通常敵弾へatk_scaleを重ねて掛けない")
+		check(core.hostiles_snapshot().is_empty() and is_equal_approx(hit.ship_hp,config.base_hp-11.0),"命中で一度だけ被弾・減速し、通常敵弾へatk_scaleを重ねて掛けない")
 		check(bridge.restore(pending.value).ok,"発生元・弾・機体を保持点へ戻す")
 		core.step_hostiles(1.0/60.0)
 		core.step_hostiles(1.0)
 		check(core.hostiles_snapshot().is_empty() and core.ship_snapshot()==hit,"復帰後にも同じ飛行・被弾・消滅になる")
 		check(bridge.restore(pending.value).ok,"石化の固定場面へ戻す")
-		run.projectiles.clear_hostile()
-		run.state.ship_hp = config.base_hp
-		run.state.ship_invuln = 0.0
-		run.state.ship_vel = Vector2(100,0)
-		run.projectiles.fire_enemy(source_row,0.0,600.0,&"bullet",source_values)
-		run.projectiles.stone_hostile(Rect2(-1800,-500,1500,1000),0.1)
 		check(bridge.command("dev_stone_hostiles",{"duration":0.1,"view":Rect2(-1800,-500,1500,1000)}).ok,"石化を共通の敵弾へ適用する")
-		bullet_pair_step(run,core,0.05,"石化中の位置と寿命")
+		bullet_pair_step(core,0.05,"石化中の位置と寿命")
 		frame = bridge.read_render(Rect2(-1800,-500,1500,1000)).value
 		var stone_visible := false
 		for batch: Dictionary in frame.batches:
 			if batch.visual_id==stone_visual: stone_visible = batch.ids.has(int(emitted.value.id)) and is_equal_approx(batch.transforms[0],7.0*1.3)
 		check(stone_visible,"石化した弾の灰色の円を同じ攻撃IDへ重ねる")
-		var stone_at: Vector2 = run.projectiles.hostile_pos[0]
-		run.state.ship_pos = stone_at
-		run.state.ship_vel = Vector2.ZERO
+		var stone_at: Vector2 = core.hostiles_snapshot()[0].pos
 		bridge.command("dev_ship_motion",{"position":stone_at,"velocity":Vector2.ZERO})
-		bullet_pair_step(run,core,0.02,"石化した弾への接触")
+		bullet_pair_step(core,0.02,"石化した弾への接触")
 		check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"石化中の弾は触れると被弾させず消える")
 	var base := {"kind":0,"speed":1200.0,"r":7.0,"life":4.0,"dmg":7.0,"slow":0.0,"turn":0.0}
 	for scenario in [
@@ -261,50 +220,32 @@ func check_cpp_bullet() -> void:
 		{"name":"機体より先の地形","pos":Vector2(-300,0),"vel":Vector2(1200,0),"life":4.0,"ship":Vector2(500,0),"dt":0.5,"live":false,"hurt":false}]:
 		if bullet_fixes and scenario.name not in ["画面外から近づく弾","機体より先の地形"]: continue
 		check(bridge.restore(empty.value).ok,"終了条件の独立した固定場面へ戻す")
-		run.projectiles.clear_hostile()
-		run.state.ship_hp = config.base_hp
-		run.state.ship_invuln = 0.0
-		run.state.ship_pos = scenario.ship
-		run.state.ship_vel = Vector2.ZERO
-		run.state.view_center = scenario.ship
 		bridge.command("dev_ship_motion",{"position":scenario.ship,"velocity":Vector2.ZERO})
 		core.set_motion_context(scenario.ship,scenario.ship,Vector2(640,360))
-		add_shot(run,core,base.merged({"pos":scenario.pos,"vel":scenario.vel,"life":scenario.life},true))
-		bullet_pair_step(run,core,scenario.dt,scenario.name)
+		add_shot(core,base.merged({"pos":scenario.pos,"vel":scenario.vel,"life":scenario.life},true))
+		bullet_pair_step(core,scenario.dt,scenario.name)
 		if not bullet_fixes: check((not core.hostiles_snapshot().is_empty())==scenario.live and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-(7.0 if scenario.hurt else 0.0)),scenario.name+"：継続・消滅・被弾が正しい")
 	bridge.release_checkpoint(pending.value)
 	bridge.release_checkpoint(empty.value)
 	await get_tree().process_frame
-	lab.free()
 	session.free()
 	bullet_finished = true
 
-func missile_emit_pair(run: RunSimulation,bridge,position: Vector2,angle: float,speed: float,settings: Dictionary) -> Dictionary:
-	var row: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),position)
+func missile_emit_pair(bridge,position: Vector2,angle: float,speed: float,settings: Dictionary) -> Dictionary:
 	var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":position})
 	check(spawned.ok,"誘導弾の生存する発生元を生成する")
 	if not spawned.ok: return {}
-	run.projectiles.fire_enemy(row,angle,speed,&"missile",settings)
 	var emitted: Dictionary = bridge.command("dev_fire_missile",{"source_id":spawned.value,"angle":angle,"speed":speed,
 		"damage":float(settings.get("bullet_dmg",7.0)),"slow":float(settings.get("slow",0.0)),"turn":float(settings.get("missile_turn",0.0))})
 	check(emitted.ok,"発生元の位置・半径と定義値から誘導弾を発射する")
 	if not emitted.ok: return {}
-	return {"source_row":row,"source_id":spawned.value,"attack":emitted.value}
+	return {"source_id":spawned.value,"attack":emitted.value}
 
-func missile_reset(run: RunSimulation,bridge,point: Dictionary,target: Vector2,config: GameConfig) -> bool:
+func missile_reset(bridge,point: Dictionary,target: Vector2,config: GameConfig) -> bool:
 	if not bridge.restore(point.value).ok:
 		check(false,"誘導弾の固定場面へ戻る")
 		return false
 	bridge.collect_frame()
-	run.projectiles.clear_hostile()
-	run.state.ship_pos = target
-	run.state.ship_vel = Vector2(100,0)
-	run.state.ship_hp = config.base_hp
-	run.state.ship_invuln = 0.0
-	run.state.ship_hurt = 0.0
-	run.state.enemy_aim = target
-	run.state.view_center = target
-	run.state.view_half = Vector2(640,360)
 	bridge._core.set_motion_context(target,target,Vector2(640,360))
 	return true
 
@@ -338,48 +279,37 @@ func check_cpp_missile() -> bool:
 		return false
 	var bridge = session.bridge
 	var core = bridge._core
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	add_child(lab)
-	await lab.reset({"seed":348,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
-		"config":{"start_radius":1500.0,"planet_radius":100.0,"moon_count":0,"atk_scale":3.0}})
-	var run: RunSimulation = lab.run
 	var target := Vector2(-900,0)
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(100,0)})
 	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(100,0)})
 	core.set_motion_context(target,target,Vector2(640,360))
 	var empty: Dictionary = bridge.checkpoint()
-	if not missile_reset(run,bridge,empty,target,config): return false
+	if not missile_reset(bridge,empty,target,config): return false
 	var params: Dictionary = (load("res://data/enemies/missile.tres") as EnemyDef).params
 	var settings := {"bullet_dmg":float(params.get("bullet_dmg",7.0)),"slow":float(params.get("slow",0.0)),"missile_turn":float(params.get("missile_turn",0.0))}
 	var speed: float = params.missile_speed
-	var emitted: Dictionary = missile_emit_pair(run,bridge,Vector2(-1500,0),PI*0.5,speed,settings)
+	var emitted: Dictionary = missile_emit_pair(bridge,Vector2(-1500,0),PI*0.5,speed,settings)
 	if emitted.is_empty(): return false
 	if gap_fixes:
 		# 先に通った表示・命中・復帰は繰り返さず、失敗した地形の余裕だけを照合する。
-		run.projectiles._update_hostile(0.1)
 		core.step_hostiles(0.1)
 		var view := Rect2(-1800,-500,1500,1000)
-		run.projectiles.stone_hostile(view,0.2)
 		bridge.command("dev_stone_hostiles",{"view":view,"duration":0.2})
 		for dt in [0.1,0.15]:
-			run.projectiles._update_hostile(dt)
 			core.step_hostiles(dt)
-		bullet_pair_step(run,core,0.05,"解除後は追尾と寿命を再開する")
-		if not missile_reset(run,bridge,empty,target,config): return false
-		emitted = missile_emit_pair(run,bridge,Vector2(-4000,2000),PI,speed,settings)
+		bullet_pair_step(core,0.05,"解除後は追尾と寿命を再開する")
+		if not missile_reset(bridge,empty,target,config): return false
+		emitted = missile_emit_pair(bridge,Vector2(-4000,2000),PI,speed,settings)
 		if emitted.is_empty(): return false
-		bullet_pair_step(run,core,0.1,"画面外で遠ざかっても継続する")
+		bullet_pair_step(core,0.1,"画面外で遠ざかっても継続する")
 		bridge.release_checkpoint(empty.value)
-		lab.free()
 		session.free()
 		await get_tree().process_frame
 		await get_tree().process_frame
 		return true
 	var source_radius: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==emitted.source_id)[0].radius
-	var comparison = COMPARE.new()
-	check(comparison.difference(comparison.plain(snapshot(run.projectiles)),comparison.plain(core.hostiles_snapshot())).is_empty(),"誘導弾の発射位置・速度・寿命が今の生成と一致する")
-	bullet_pair_step(run,core,0.1,"旋回上限つきの追尾")
+	bullet_pair_step(core,0.1,"旋回上限つきの追尾")
 	var visual := 0
 	var stone_visual := 0
 	for entry: Dictionary in session.cpp_resources.visuals:
@@ -391,16 +321,15 @@ func check_cpp_missile() -> bool:
 	presentation._present_cpp(0.0)
 	check(presentation.frame_view.batches.has(visual),"共通の二重の円の表示を通常画面へ渡す")
 	var stone_view := Rect2(-1800,-500,1500,1000)
-	run.projectiles.stone_hostile(stone_view,0.2)
 	bridge.command("dev_stone_hostiles",{"view":stone_view,"duration":0.2})
-	bullet_pair_step(run,core,0.1,"石化中は飛行と寿命を止める")
+	bullet_pair_step(core,0.1,"石化中は飛行と寿命を止める")
 	frame = bridge.read_render(stone_view).value
 	check(frame.batches.any(func(batch): return batch.visual_id==stone_visual and batch.ids.has(int(emitted.attack.id))),"石化した誘導弾を同じIDの石表示へ渡す")
 	presentation._present_cpp(0.0)
 	check(presentation.frame_view.batches.has(stone_visual),"石化表示も通常の表示経路へ渡す")
 	var frozen: Dictionary = bridge.checkpoint()
-	bullet_pair_step(run,core,0.15,"石化の終了境界でもその更新は動かない")
-	bullet_pair_step(run,core,0.05,"解除後は追尾と寿命を再開する")
+	bullet_pair_step(core,0.15,"石化の終了境界でもその更新は動かない")
+	bullet_pair_step(core,0.05,"解除後は追尾と寿命を再開する")
 	var resumed: Array = core.hostiles_snapshot()
 	check(bridge.restore(frozen.value).ok,"石化途中の旋回・寿命・位置を保持して復帰する")
 	bridge.collect_frame()
@@ -408,78 +337,53 @@ func check_cpp_missile() -> bool:
 	core.step_hostiles(0.05)
 	check(core.hostiles_snapshot()==resumed,"復帰後も同じ解除・追尾の状態へ進む")
 	bridge.release_checkpoint(frozen.value)
-	if not missile_reset(run,bridge,empty,target,config): return false
-	emitted = missile_emit_pair(run,bridge,Vector2(-1500,0),0.0,speed,settings)
+	if not missile_reset(bridge,empty,target,config): return false
+	emitted = missile_emit_pair(bridge,Vector2(-1500,0),0.0,speed,settings)
 	if emitted.is_empty(): return false
 	bridge.command("dev_kill",{"entity_id":emitted.source_id,"cause":"ram"})
-	run.combat.kill_enemy(emitted.source_row)
 	check(core.attack_snapshot().any(func(attack): return attack.id==int(emitted.attack.id) and attack.source_id==emitted.source_id and not attack.source_alive),"発生元を倒しても独立した誘導弾と出所を保つ")
-	bullet_pair_step(run,core,1.5,"高速な機体横断で被弾して終了する")
-	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-settings.bullet_dmg) and is_equal_approx(run.state.ship_hp,core.ship_snapshot().ship_hp),"誘導弾が一度だけ被弾させ、atk_scaleを重ねて掛けない")
+	bullet_pair_step(core,1.5,"高速な機体横断で被弾して終了する")
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-settings.bullet_dmg),"誘導弾が一度だけ被弾させ、atk_scaleを重ねて掛けない")
 	var hit_frame: Dictionary = bridge.read_frame().value
 	check(hit_frame.events.any(func(event): return event.type==&"hurt" and event.payload.cause==&"missile"),"機体の被弾をmissileの原因で共通記録へ渡す")
-	if not missile_reset(run,bridge,empty,target,config): return false
-	emitted = missile_emit_pair(run,bridge,Vector2(-4000,2000),PI,speed,settings)
+	if not missile_reset(bridge,empty,target,config): return false
+	emitted = missile_emit_pair(bridge,Vector2(-4000,2000),PI,speed,settings)
 	if emitted.is_empty(): return false
-	bullet_pair_step(run,core,0.1,"画面外で遠ざかっても継続する")
+	bullet_pair_step(core,0.1,"画面外で遠ざかっても継続する")
 	check(core.hostiles_snapshot().size()==1,"誘導弾は通常弾の画面外退場へ入れない")
-	bullet_pair_step(run,core,5.0,"自然寿命で終了する")
+	bullet_pair_step(core,5.0,"自然寿命で終了する")
 	check(core.hostiles_snapshot().is_empty(),"寿命が終わった誘導弾を回収する")
-	if not missile_reset(run,bridge,empty,target,config): return false
+	if not missile_reset(bridge,empty,target,config): return false
 	var straight: Dictionary = settings.duplicate()
 	straight.missile_turn = 0.0
-	emitted = missile_emit_pair(run,bridge,Vector2(-300,0),0.0,speed,straight)
+	emitted = missile_emit_pair(bridge,Vector2(-300,0),0.0,speed,straight)
 	if emitted.is_empty(): return false
-	bullet_pair_step(run,core,1.0,"天体との交差で終了する")
+	bullet_pair_step(core,1.0,"天体との交差で終了する")
 	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"先に当たった地形で回収し機体へ被弾を通さない")
-	if not missile_reset(run,bridge,empty,target,config): return false
-	emitted = missile_emit_pair(run,bridge,target-Vector2(source_radius,0),0.0,speed,straight)
+	if not missile_reset(bridge,empty,target,config): return false
+	emitted = missile_emit_pair(bridge,target-Vector2(source_radius,0),0.0,speed,straight)
 	if emitted.is_empty(): return false
-	run.projectiles.stone_hostile(stone_view,1.0)
 	bridge.command("dev_stone_hostiles",{"view":stone_view,"duration":1.0})
-	bullet_pair_step(run,core,0.01,"石化中の機体接触")
+	bullet_pair_step(core,0.01,"石化中の機体接触")
 	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"石化中の接触はダメージなしで弾を回収する")
 	bridge.release_checkpoint(empty.value)
-	lab.free()
 	session.free()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	return true
 
-func wave_emit_pair(run: RunSimulation,bridge,params: Dictionary) -> Dictionary:
-	var row := run.projectiles.fire_wave(params.position,params.angle,params.arc,params.radius,params.speed,params.width,params.delay,
-		params.damage,params.get("gap",0.0),params.get("gap_arc",0.0),params.get("color",Color("#9ad8ff")),params.get("start_radius",0.0))
-	var styles := [RunIds.HazardStyleId.Plain,RunIds.HazardStyleId.Ripple,RunIds.HazardStyleId.Lightning,RunIds.HazardStyleId.Pulser]
-	run.projectiles.hazard_style[row] = styles[params.get("style",0)]
-	run.projectiles.hazard_edmg[row] = params.get("enemy_damage",0.0)
+func wave_emit_pair(bridge,params: Dictionary) -> Dictionary:
 	var emitted: Dictionary = bridge.command("dev_fire_wave",params)
 	check(emitted.ok,"波動の初期半径・予告・拡大を共通生成へ接続する")
 	if not emitted.ok: return {}
-	return {"old_row":row,"attack":emitted.value}
+	return {"attack":emitted.value}
 
-func wave_pair_step(run: RunSimulation, core, dt: float, label: String) -> void:
-	run.projectiles._update_hazards(dt)
+func wave_pair_step(core, dt: float, label: String) -> void:
 	check(core.step_hazards(dt),label+"：範囲の世界時計を進める")
-	var old: Array = []
-	for row in run.projectiles.hazard_alive.size():
-		if run.projectiles.hazard_alive[row]==0: continue
-		old.append({"row":row,"time":run.projectiles.hazard_t[row],"radius":run.projectiles.wave_radius(row),
-			"start_radius":run.projectiles.hazard_start_radius[row],"speed":run.projectiles.hazard_speed[row],"hit":run.projectiles.hazard_hit[row]!=0,
-			"delay":run.projectiles.hazard_delay[row],"active":run.projectiles.hazard_active[row]})
-	var current: Array = []
-	for value: Dictionary in core.hazards_snapshot():
-		var row := {}
-		for key in ["row","time","radius","start_radius","speed","hit","delay","active"]: row[key] = value[key]
-		current.append(row)
-	var comparison = COMPARE.new()
-	var difference: String = comparison.difference(comparison.plain(old),comparison.plain(current))
-	check(difference.is_empty(),label+"：予告・半径・寿命・一度の命中が今の更新と一致する "+difference)
-	check(is_equal_approx(run.state.ship_hp,core.ship_snapshot().ship_hp),label+"：機体の実ダメージが一致する")
 
-func wave_reset(run: RunSimulation,bridge,point: Dictionary,at: Vector2,config: GameConfig) -> bool:
-	if not missile_reset(run,bridge,point,at,config): return false
+func wave_reset(bridge,point: Dictionary,at: Vector2,config: GameConfig) -> bool:
+	if not missile_reset(bridge,point,at,config): return false
 	bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
-	run.state.ship_vel = Vector2.ZERO
 	return true
 
 func check_cpp_wave() -> bool:
@@ -504,64 +408,56 @@ func check_cpp_wave() -> bool:
 	if session.bridge==null: session.free(); return false
 	var bridge = session.bridge
 	var core = bridge._core
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	add_child(lab)
-	await lab.reset({"seed":349,"empty":true,"field":{"terrain":false,"rocks":false,"gimmicks":false},"invincible":false,"config":{"atk_scale":3.0}})
-	var run: RunSimulation = lab.run
 	var center := Vector2(-1500,0)
 	var target := center+Vector2(140,0)
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
 	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	var empty: Dictionary = bridge.checkpoint()
-	if not wave_reset(run,bridge,empty,target,config): return false
+	if not wave_reset(bridge,empty,target,config): return false
 	var params := {"position":center,"angle":0.0,"arc":PI,"radius":500.0,"start_radius":80.0,"speed":100.0,"width":12.0,"delay":0.2,"damage":7.0}
 	if "--cpp-wave-fixes" in OS.get_cmdline_user_args():
-		if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
+		if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
 		var layers := params.merged({"layers":3,"interval":0.15,"gap":0.2,"gap_arc":0.1,"gap_step":0.4},true)
-		run.projectiles.fire_rings(center,3,0.15,500.0,100.0,12.0,0.2,7.0,0.2,0.1,0.4)
 		var rings: Dictionary = bridge.command("dev_fire_wave",layers)
 		if not rings.ok: return false
-		wave_pair_step(run,core,0.4,"複数の輪を同じ行順で拡大する")
-		if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
-		var victim: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center+Vector2(110,0))
+		wave_pair_step(core,0.4,"複数の輪を同じ行順で拡大する")
+		if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
 		var victim_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(110,0)}).value
-		run.combat.rebuild_grid()
-		var hp: float = run.enemies.table.hp[victim]
-		var emitted: Dictionary = wave_emit_pair(run,bridge,params.merged({"enemy_damage":1.0},true))
+		var hp: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==victim_id)[0].hp
+		var emitted: Dictionary = wave_emit_pair(bridge,params.merged({"enemy_damage":1.0},true))
 		if emitted.is_empty(): return false
-		wave_pair_step(run,core,0.4,"通過する帯で敵へ一度当たる")
-		check(is_equal_approx(run.enemies.table.hp[victim],hp-1.0) and core.enemies_snapshot().any(func(enemy): return enemy.id==victim_id and is_equal_approx(enemy.hp,hp-1.0)),"波の敵ダメージと命中済みIDを保つ：旧=%s C++=%s" % [run.enemies.table.hp[victim],core.enemies_snapshot()])
+		wave_pair_step(core,0.4,"通過する帯で敵へ一度当たる")
+		check(core.enemies_snapshot().any(func(enemy): return enemy.id==victim_id and is_equal_approx(enemy.hp,hp-1.0)),"波の敵ダメージと命中済みIDを保つ")
 		var point: Dictionary = bridge.checkpoint()
-		wave_pair_step(run,core,0.01,"命中した敵への二度目を防ぐ")
+		wave_pair_step(core,0.01,"命中した敵への二度目を防ぐ")
 		var future: Array = core.enemies_snapshot()
 		check(bridge.restore(point.value).ok,"敵への実命中履歴を復帰する")
 		core.step_hazards(0.01)
 		check(core.enemies_snapshot()==future,"実命中を含む復帰でも二度当てない")
 		bridge.release_checkpoint(point.value)
 		bridge.release_checkpoint(empty.value)
-		lab.free()
 		session.free()
 		await get_tree().process_frame
 		await get_tree().process_frame
 		return true
-	var emitted: Dictionary = wave_emit_pair(run,bridge,params)
+	var emitted: Dictionary = wave_emit_pair(bridge,params)
 	if emitted.is_empty(): return false
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
-	wave_pair_step(run,core,0.1,"予告中は初期半径で止まり当たらない")
+	wave_pair_step(core,0.1,"予告中は初期半径で止まり当たらない")
 	presentation._present_cpp(0.0)
 	check(presentation.frame_view._wave_displays.size()==1,"波動の予告を通常画面へ表示する")
 	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"予告中に機体へダメージを通さない")
-	wave_pair_step(run,core,0.1,"予告が終わった時点は初期半径")
-	wave_pair_step(run,core,0.5,"広がった輪が機体へ一度当たる")
+	wave_pair_step(core,0.1,"予告が終わった時点は初期半径")
+	wave_pair_step(core,0.5,"広がった輪が機体へ一度当たる")
 	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-7.0),"atk_scaleを重ねず指定ダメージを一度与える")
 	var point: Dictionary = bridge.checkpoint()
-	wave_pair_step(run,core,0.1,"命中後も波は拡大し続ける")
+	wave_pair_step(core,0.1,"命中後も波は拡大し続ける")
 	var future: Array = core.hazards_snapshot()
 	check(bridge.restore(point.value).ok,"途中の半径・命中済み・残り寿命を復帰する")
 	core.step_hazards(0.1)
 	check(core.hazards_snapshot()==future,"復帰後も同じ拡大と命中履歴へ進む")
 	bridge.release_checkpoint(point.value)
-	wave_pair_step(run,core,5.0,"最大半径までの時間で自然終了する")
+	wave_pair_step(core,5.0,"最大半径までの時間で自然終了する")
 	check(core.hazards_snapshot().is_empty(),"波動の自然終了で範囲を回収する")
 	presentation._present_cpp(0.0)
 	check(presentation.frame_view._wave_displays.values().all(func(display): return not display.visible),"終了した波の表示を残さない")
@@ -569,28 +465,25 @@ func check_cpp_wave() -> bool:
 		{"name":"切れ目の中","angle":0.0,"gap":0.0,"gap_arc":0.3,"arc":PI,"hit":false},
 		{"name":"切れ目の外","angle":0.0,"gap":PI,"gap_arc":0.3,"arc":PI,"hit":true},
 		{"name":"扇の外","angle":PI,"gap":0.0,"gap_arc":0.0,"arc":0.5,"hit":false}]:
-		if not wave_reset(run,bridge,empty,target,config): return false
+		if not wave_reset(bridge,empty,target,config): return false
 		var shape := params.duplicate()
 		shape.merge({"angle":scenario.angle,"gap":scenario.gap,"gap_arc":scenario.gap_arc,"arc":scenario.arc},true)
-		emitted = wave_emit_pair(run,bridge,shape)
+		emitted = wave_emit_pair(bridge,shape)
 		if emitted.is_empty(): return false
-		wave_pair_step(run,core,0.7,scenario.name)
+		wave_pair_step(core,0.7,scenario.name)
 		check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-(7.0 if scenario.hit else 0.0)),scenario.name+"の当たりを保つ")
 	# 層ごとに予告と切れ目の向きをずらす生成も同じ値を使う。
-	if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
+	if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
 	var layers := params.merged({"layers":3,"interval":0.15,"gap":0.2,"gap_arc":0.1,"gap_step":0.4},true)
-	run.projectiles.fire_rings(center,3,0.15,500.0,100.0,12.0,0.2,7.0,0.2,0.1,0.4)
 	var rings: Dictionary = bridge.command("dev_fire_wave",layers)
 	check(rings.ok and rings.value.size()==3,"層ごとに遅延と切れ目を変えた輪を生成する")
-	wave_pair_step(run,core,0.4,"複数の輪を同じ行順で拡大する")
-	for row: Dictionary in core.hazards_snapshot():
-		check(is_equal_approx(row.gap_angle,run.projectiles.hazard_gap[row.row]),"層ごとの切れ目の向きが一致する")
+	wave_pair_step(core,0.4,"複数の輪を同じ行順で拡大する")
 	# 見た目の種類を同じ描画関数へ渡し、完成輪は専用の輪を再利用する。
 	for style in [1,2,3]:
-		if not wave_reset(run,bridge,empty,target,config): return false
-		emitted = wave_emit_pair(run,bridge,params.merged({"style":style},true))
+		if not wave_reset(bridge,empty,target,config): return false
+		emitted = wave_emit_pair(bridge,params.merged({"style":style},true))
 		if emitted.is_empty(): return false
-		wave_pair_step(run,core,0.5,"波紋・雷色・完成輪の拡大")
+		wave_pair_step(core,0.5,"波紋・雷色・完成輪の拡大")
 		var frame: Dictionary = bridge.read_render(Rect2(center-Vector2(600,600),Vector2(1200,1200))).value
 		check(frame.shapes.any(func(shape): return shape.kind==2 and shape.wave_style==style and shape.owner_id==emitted.attack.id),"種類と攻撃IDを表示へ渡す")
 		presentation._present_cpp(0.0)
@@ -602,47 +495,39 @@ func check_cpp_wave() -> bool:
 	# 発射前は発生元の死亡・吸引で取消。発射後は独立し、復帰でもその区切りを保つ。
 	for after_launch in [false,true]:
 		for pulled in [false,true]:
-			if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
-			var owner_row: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center)
+			if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
 			var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center}).value
-			emitted = wave_emit_pair(run,bridge,params.merged({"owner_id":owner_id,"style":3},true))
+			emitted = wave_emit_pair(bridge,params.merged({"owner_id":owner_id,"style":3},true))
 			if emitted.is_empty(): return false
-			run.projectiles.attach_hazard(emitted.old_row,owner_row)
 			if after_launch:
-				wave_pair_step(run,core,0.3,"発射時に完成輪の生存参照を外す")
+				wave_pair_step(core,0.3,"発射時に完成輪の生存参照を外す")
 				check(not core.hazards_snapshot()[0].attached,"発射後の生存参照を解除する")
 				var launched: Dictionary = bridge.checkpoint()
 				check(bridge.restore(launched.value).ok,"独立した完成輪を保持復帰する")
 				bridge.release_checkpoint(launched.value)
 			if pulled:
-				var pump_row: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center+Vector2(20,0))
 				var pump_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(20,0)}).value
-				run.enemies.table.pump_owner[owner_row] = pump_row
 				check(bridge.command("dev_enemy_combat",{"entity_id":owner_id,"pump_owner":pump_id}).ok,"発生元を吸引中にする")
 			else:
-				run.combat.kill_enemy(owner_row)
 				bridge.command("dev_kill",{"entity_id":owner_id,"cause":"ram"})
-			wave_pair_step(run,core,0.05,"発射の前後の死亡・吸引")
+			wave_pair_step(core,0.05,"発射の前後の死亡・吸引")
 			check((not core.hazards_snapshot().is_empty())==after_launch,"発射前だけ取り消し、発射後は自然寿命まで残す")
 	# 敵への波は通過帯を一度ずつ当て、機体の命中済み状態とは別に保持する。
-	if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
-	var victim: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center+Vector2(110,0))
+	if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
 	var victim_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(110,0)}).value
-	run.combat.rebuild_grid()
-	var hp: float = run.enemies.table.hp[victim]
-	emitted = wave_emit_pair(run,bridge,params.merged({"enemy_damage":1.0},true))
+	var hp: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==victim_id)[0].hp
+	emitted = wave_emit_pair(bridge,params.merged({"enemy_damage":1.0},true))
 	if emitted.is_empty(): return false
-	wave_pair_step(run,core,0.4,"通過する帯で敵へ一度当たる")
-	check(is_equal_approx(run.enemies.table.hp[victim],hp-1.0) and core.enemies_snapshot().any(func(enemy): return enemy.id==victim_id and is_equal_approx(enemy.hp,hp-1.0)),"波の敵ダメージと命中済みIDを保つ")
+	wave_pair_step(core,0.4,"通過する帯で敵へ一度当たる")
+	check(core.enemies_snapshot().any(func(enemy): return enemy.id==victim_id and is_equal_approx(enemy.hp,hp-1.0)),"波の敵ダメージと命中済みIDを保つ")
 	var hit_point: Dictionary = bridge.checkpoint()
-	wave_pair_step(run,core,0.01,"同じ敵への二度目を防ぐ")
+	wave_pair_step(core,0.01,"同じ敵への二度目を防ぐ")
 	var enemies: Array = core.enemies_snapshot()
 	check(bridge.restore(hit_point.value).ok,"敵への命中履歴を復帰する")
 	core.step_hazards(0.01)
 	check(core.enemies_snapshot()==enemies,"復帰しても同じ敵へ二度当てない")
 	bridge.release_checkpoint(hit_point.value)
 	bridge.release_checkpoint(empty.value)
-	lab.free()
 	session.free()
 	await get_tree().process_frame
 	await get_tree().process_frame

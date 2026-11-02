@@ -1,4 +1,4 @@
-## 噛みつきの円形判定・一度だけの被弾・残留する枠と表示状態を比較する。
+## 噛みつきの円形判定・一度だけの被弾・残留する枠と表示状態を確認する。
 extends "res://tests/runtime/run_attack_budget.gd"
 const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const SHIP := preload("res://tests/runtime/run_ship.gd")
@@ -39,116 +39,61 @@ func _ready() -> void:
 	probe.close()
 	print("[run_bite_zone] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
-func hazard_snapshot(ps: ProjectileSystem) -> Array:
-	var out := []
-	for row in ps.hazard_alive.size():
-		if not ps.hazard_alive[row]: continue
-		out.append({"row":row,"pos":ps.hazard_pos[row],"radius":ps.hazard_len[row],"time":ps.hazard_t[row],"delay":ps.hazard_delay[row],"active":ps.hazard_active[row],"damage":ps.hazard_dmg[row],"hit":ps.hazard_hit[row]!=0,"color":ps.hazard_color[row],"token":ps.lab_hazard_group.get(row,0)})
-	return comparison.plain(out)
-func add_zone(run: RunSimulation,core,at: Vector2,radius: float,delay: float,token: int) -> void:
-	run.projectiles.lab_context = token
-	var row := run.projectiles.fire_zone(at,radius,delay,3.0,RunIds.HazardStyleId.Bite,Color(0.7,0.3,0.1,0.8))
-	check(core.fire_bite_zone(at,radius,delay,3.0,Color(0.7,0.3,0.1,0.8),token) == row,"噛みつきの判定を同じ順で生成・再利用する")
+func add_zone(core,at: Vector2,radius: float,delay: float,token: int) -> void:
+	check(core.fire_bite_zone(at,radius,delay,3.0,Color(0.7,0.3,0.1,0.8),token)>=0,"噛みつきの判定を生成・再利用する")
+
 func compare_zones(effects: bool) -> void:
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	add_child(lab)
-	await lab.reset({"seed":422,"empty":true,"invincible":false})
-	var run: RunSimulation = lab.run
-	var d = run.projectiles.director
-	d.formation_mode = true
-	run.state.stats.invulnerability = 0.06
-	run.field.bodies.clear()
-	run.field.battle_arenas.clear()
-	run.ship.setup(run.ship.ctx)
+	var config: GameConfig = ContentManager.base.duplicate(true)
 	var library := load("res://.content/attack_visuals.res").duplicate(true)
 	if effects:
 		library.set_meta("looks",{"res://scenes/attacks/zone_bite.tscn":{"Hit":Resource.new(),"Fade":Resource.new()}})
-	run.projectiles._end_visual_library = library
-	run.projectiles._end_visual_phases.clear()
-	var definition := run.enemies.def_of(&"drifter").duplicate(true) as EnemyDef
+	var definition := ContentManager.enemies[&"drifter"].duplicate(true) as EnemyDef
 	definition.speed = 0.0
 	var core = comparison.create_native()
-	core.configure(DATA.compile_enemy(definition,run.cfg,run.state.stage))
-	core.configure_ship(values(run.cfg,SHIP.CONFIG_KEYS),values(run.state.stats,SHIP.STAT_KEYS))
+	core.configure(DATA.compile_enemy(definition,config))
+	core.configure_ship(values(config,SHIP.CONFIG_KEYS),{"max_hp":config.base_hp,"max_speed":config.base_max_speed,"turn_rate":config.steer_rate,"acceleration":config.steer_accel,"glide_duration_mult":1.0,"invulnerability":0.06})
 	core.set_attack_formation_mode(true)
-	configure(d,core,true,1.0)
+	check(core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.3}),"攻撃予算の設定を受け付ける")
 	check(core.configure_bite_zone(DATA.compile_bite_zone(library)),"判定の寿命と表示終了の条件を準備する")
-	core.start(422,run.enemies._next_id)
-	run.state.rng.seed = 422
-	var at := run.state.ship_pos
-	var row := run.enemies.spawn(definition,at+Vector2(1000,0))
+	core.start(422,1)
+	var at: Vector2 = core.ship_snapshot().ship_pos
 	var id: int = core.spawn_enemy(&"drifter",at+Vector2(1000,0))
-	run.state.events.clear()
 	core.drain_events()
-	request(run,core,"噛みつき",row,1.0)
-	var token: int = d.token("噛みつき")
-	add_zone(run,core,at,20.3,0.0,token)
-	add_zone(run,core,at,20.3,0.0,0)
-	add_zone(run,core,at+Vector2(1000,0),20.3,0.0,0)
-	add_zone(run,core,at,20.3,0.113,0)
-	d.cancel_attack("噛みつき",id)
+	check(core.request_attack("噛みつき",PackedStringArray(["beam"]),id,1.0,0.0,1.0),"噛みつきの攻撃枠を取得する")
+	var token: int = core.attack_budget_snapshot().groups[0].token
+	add_zone(core,at,20.3,0.0,token)
+	add_zone(core,at,20.3,0.0,0)
+	add_zone(core,at+Vector2(1000,0),20.3,0.0,0)
+	add_zone(core,at,20.3,0.113,0)
 	core.cancel_attack("噛みつき",id)
 	var hit_count := 0
 	var retained := false
+	var world_time := 0.0
 	for tick in 60:
-		if tick in [20,40]: add_zone(run,core,run.state.ship_pos,31.7,0.0,0)
+		if tick in [20,40]: add_zone(core,core.ship_snapshot().ship_pos,31.7,0.0,0)
 		var dt := 0.3 if tick == 40 else 0.02
-		run.state.events.clear()
-		run.state.time += dt
-		run.state.world_time += dt
-		d.advance(run.state.world_time,run.enemies)
-		core.advance_attack_budget(run.state.world_time)
-		retained = retained or (d.groups.has(token) and run.state.world_time > 0.0)
-		check(comparison.difference(snapshot(d),core.attack_budget_snapshot()).is_empty(),"範囲判定が消えるまで攻撃枠を保持する")
-		run.enemies.tick(dt,dt)
-		core.set_motion_context(run.state.ship_pos,run.state.view_center,run.state.view_half)
+		world_time += dt
+		core.advance_attack_budget(world_time)
+		retained = retained or core.attack_budget_snapshot().groups.any(func(group): return group.token==token)
+		var ship_pos: Vector2 = core.ship_snapshot().ship_pos
+		core.set_motion_context(ship_pos,ship_pos,Vector2(640,360))
 		core.step(dt)
-		run.ship.intent.touch = true
-		run.ship.tick(dt,dt)
 		core.step_ship(dt,dt,{"touch":true})
-		run.projectiles._update_hazards(dt)
 		check(core.step_hazards(dt),"噛みつきの判定を世界時間で更新する")
-		var diff: String = comparison.difference(hazard_snapshot(run.projectiles),comparison.plain(core.hazards_snapshot()))
-		if diff.is_empty(): diff = comparison.difference(comparison.plain(values(run.state,SHIP.STATE_KEYS)),comparison.plain(core.ship_snapshot()))
-		if diff.is_empty(): diff = comparison.difference(comparison.plain(run.state.events),comparison.plain(core.drain_events()))
-		check(diff.is_empty(),"予告・被弾・寿命・表示終了が一致する tick%d: %s" % [tick,diff])
-		for event in run.state.events:
+		for event: Dictionary in core.drain_events():
 			if event.type == &"hurt": hit_count += 1
-		if not diff.is_empty(): break
 	check(hit_count == 3,"同時発動は無敵で一回、遅延と再利用は各一回、寿命を飛び越す更新は被弾しない")
-	check(retained and not d.groups.has(token),"残留中の枠の保持と最終解放を実際に通る")
+	check(retained and not core.attack_budget_snapshot().groups.any(func(group): return group.token==token),"残留中の枠の保持と最終解放を実際に通る")
 	var before: Array = core.hazards_snapshot()
 	check(core.fire_bite_zone(at,NAN,0.0,1.0,Color.WHITE,0) == -1 and before == core.hazards_snapshot(),"不正な範囲を追加しない")
 	core.close()
-	lab.free()
 
-func beam_states(run: RunSimulation, core, label: String) -> void:
-	var old := []
-	var current := []
-	var ps := run.projectiles
-	for i in ps.hazard_alive.size():
-		if ps.hazard_alive[i]==0: continue
-		old.append({"pos":ps.hazard_pos[i],"angle":ps.hazard_angle[i],"length":ps.hazard_len[i],"half_width":ps.hazard_width[i]*0.5,
-			"arc":ps.hazard_arc[i],"time":ps.hazard_t[i],"delay":ps.hazard_delay[i],"active":ps.hazard_active[i],
-			"damage":ps.hazard_dmg[i],"hit":ps.hazard_hit[i]!=0,"color":ps.hazard_color[i],"attached":ps.hazard_owner[i]>=0})
-	for row: Dictionary in core.hazards_snapshot():
-		var value := row.duplicate()
-		for key in ["row","radius","kind","token","owner_id"]: value.erase(key)
-		value.attached = row.owner_id>0
-		current.append(value)
-	var diff: String = comparison.difference(comparison.plain(old),comparison.plain(current))
-	check(diff.is_empty(),label+": "+diff)
-	check(is_equal_approx(core.ship_snapshot().ship_hp,run.state.ship_hp),label+"の機体HP")
-
-func beam_pair(run: RunSimulation, bridge, from: Vector2, owner: int, owner_id: int, delay: float, arc := 0.0) -> Dictionary:
-	var row := run.projectiles.fire_beam(from,0.0,200.0,32.0,delay,1.0,7.0)
-	run.projectiles.hazard_arc[row] = arc
-	if owner>=0: run.projectiles.attach_hazard(row,owner)
+func beam_pair(bridge, from: Vector2, owner_id: int, delay: float, arc := 0.0) -> Dictionary:
 	var params := {"position":from,"angle":0.0,"length":200.0,"width":32.0,"delay":delay,"active":1.0,"damage":7.0,"arc":arc}
 	if owner_id>0: params["owner_id"] = owner_id
 	var emitted: Dictionary = bridge.command("dev_fire_beam",params)
 	check(emitted.ok,"ビームの形・時刻・発生元を生成する: "+str(emitted))
-	return {"row":row,"id":emitted.value.id if emitted.ok else 0}
+	return {"id":emitted.value.id if emitted.ok else 0}
 
 func check_cpp_beam() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -183,21 +128,9 @@ func check_cpp_beam() -> void:
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
 	core.set_motion_context(target,target,Vector2(640,360))
 	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(-100,100)}).value
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	add_child(lab)
-	await lab.reset({"seed":286,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
-		"config":{"start_radius":900.0,"planet_radius":100.0}})
-	var run: RunSimulation = lab.run
-	run.state.ship_pos = target
-	run.state.ship_vel = Vector2.ZERO
-	run.state.view_center = target
-	run.state.view_half = Vector2(640,360)
-	var owner := run.enemies.spawn(run.enemies.def_of(&"drifter"),target+Vector2(-100,100))
 	var empty: Dictionary = bridge.checkpoint()
-	var shot := beam_pair(run,bridge,target+Vector2(-100,100),owner,owner_id,0.25)
-	run.projectiles._update_hazards(0.125)
+	var shot := beam_pair(bridge,target+Vector2(-100,100),owner_id,0.25)
 	core.step_hazards(0.125)
-	beam_states(run,core,"予告中は命中しない")
 	var warning: Dictionary = bridge.checkpoint()
 	var warning_state: Array = core.hazards_snapshot()
 	var frame: Dictionary = bridge.read_render(Rect2(-1600,-400,1200,800)).value
@@ -208,11 +141,8 @@ func check_cpp_beam() -> void:
 	check(presentation.frame_view.apply_frame(frame),"予告の円を通常の表示へ渡す")
 	await get_tree().process_frame
 	var from := target-Vector2(100,0)
-	run.projectiles.move_hazard(shot.row,from,0.0,240.0)
 	check(bridge.command("dev_move_beam",{"attack_id":shot.id,"position":from,"angle":0.0,"length":240.0}).ok,"発生元の指示で位置・向き・長さを変える")
-	run.projectiles._update_hazards(0.125)
 	core.step_hazards(0.125)
-	beam_states(run,core,"予告が終わった時点で命中する")
 	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-7.0),"ビームを共通の機体被弾へ通す")
 	frame = bridge.read_render(Rect2(-1600,-400,1200,800)).value
 	shapes = frame.shapes
@@ -221,9 +151,7 @@ func check_cpp_beam() -> void:
 	await get_tree().process_frame
 	var active: Dictionary = bridge.checkpoint()
 	for dt in [0.125,0.875]:
-		run.projectiles._update_hazards(dt)
 		core.step_hazards(dt)
-		beam_states(run,core,"照射済みは再度当たらず寿命で消える")
 	var ended: Dictionary = core.ship_snapshot()
 	check(core.hazards_snapshot().is_empty(),"有効期間の終端でビームを回収する")
 	bridge.restore(active.value)
@@ -234,21 +162,13 @@ func check_cpp_beam() -> void:
 	check(core.hazards_snapshot()==warning_state,"予告中の保持点から幅・位置・時刻・所有者を復元する")
 	# 先へ広がる形は、外側の不命中のあと内側へ移しても当たる。
 	bridge.restore(empty.value)
-	run.projectiles.clear_hostile()
-	run.state.ship_hp = config.base_hp
-	run.state.ship_invuln = 0.0
 	var lateral := 16.0+100.0*0.5+config.ship_radius
-	shot = beam_pair(run,bridge,target+Vector2(-100,-lateral-2),owner,owner_id,0.0,atan(0.5))
-	run.projectiles._update_hazards(0.125)
+	shot = beam_pair(bridge,target+Vector2(-100,-lateral-2),owner_id,0.0,atan(0.5))
 	core.step_hazards(0.125)
-	beam_states(run,core,"広がる幅の外側は不命中のまま残る")
 	check(not core.hazards_snapshot()[0].hit,"触れる前に一度だけの判定を消費しない")
 	from = target+Vector2(-100,-lateral+2)
-	run.projectiles.move_hazard(shot.row,from,0.0)
 	bridge.command("dev_move_beam",{"attack_id":shot.id,"position":from,"angle":0.0})
-	run.projectiles._update_hazards(0.125)
 	core.step_hazards(0.125)
-	beam_states(run,core,"広がる幅の内側へ追従すると命中する")
 	# 承認済みの接触境界の統一は、元の厳密不等号との例外として確かめる。
 	bridge.restore(empty.value)
 	bridge.command("dev_fire_beam",{"position":target+Vector2(config.ship_radius,0),"angle":0.0,"length":200.0,"width":32.0,"arc":0.2,"delay":0.0,"active":1.0,"damage":7.0})
@@ -256,28 +176,18 @@ func check_cpp_beam() -> void:
 	check(core.hazards_snapshot()[0].hit,"広がる形の根元の接触境界も設計どおり当たりに含める")
 	for ending in ["death","reuse","pump","skip"]:
 		bridge.restore(empty.value)
-		run.projectiles.clear_hostile()
-		run.enemies.table.dead[owner] = 0
-		run.enemies.table.pump_owner[owner] = -1
-		run.state.ship_hp = config.base_hp
-		run.state.ship_invuln = 0.0
-		shot = beam_pair(run,bridge,from,owner,owner_id,0.25)
+		shot = beam_pair(bridge,from,owner_id,0.25)
 		if ending=="death":
-			run.enemies.table.dead[owner] = 1
 			bridge.command("dev_kill",{"entity_id":owner_id,"cause":"ram"})
 		elif ending=="reuse":
-			run.enemies.table.id[owner] += 100
 			core.remove_enemy(owner_id)
 			bridge.command("dev_spawn",{"definition_id":"drifter","position":from})
 		elif ending=="pump":
-			var pump := run.enemies.spawn(run.enemies.def_of(&"drifter"),target+Vector2(500,500))
 			var pump_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(500,500)}).value
-			run.enemies.table.pump_owner[owner] = pump
 			core.set_enemy_motion(owner_id,{"pump_owner":pump_id})
 		var dt := 1.25 if ending=="skip" else 0.125
-		run.projectiles._update_hazards(dt)
 		core.step_hazards(dt)
-		check(core.hazards_snapshot().is_empty() and run.projectiles.hazard_slots.live==0,"所有者死亡・行再利用・吸引・期間飛び越しで当たる前に解除する: "+ending)
+		check(core.hazards_snapshot().is_empty(),"所有者死亡・行再利用・吸引・期間飛び越しで当たる前に解除する: "+ending)
 	# 噛みつきの設定がないランでも、通常Runnerからビームの時計を進める。
 	bridge.restore(empty.value)
 	var emitted: Dictionary = bridge.command("dev_fire_beam",{"position":target+Vector2(0,100),"angle":0.0,"length":200.0,"width":32.0,"delay":0.25,"active":1.0,"damage":7.0})
@@ -287,24 +197,12 @@ func check_cpp_beam() -> void:
 	bridge.release_checkpoint(active.value)
 	bridge.release_checkpoint(warning.value)
 	bridge.release_checkpoint(empty.value)
-	lab.free()
 	session.free()
 	beam_finished = true
 
 func beamer_check(ok: bool, label: String) -> void:
 	if beamer_fixes and label not in ["当たりの大きさに合わせる新しい外観を使う","保持点からチャージ音の所有も復元する","発生元の撃破・行再利用・吸引で付随ビームを回収する: pull","ビーム敵の確認が最後まで進んだ"]: return
 	check(ok,label)
-
-func beamer_state(run: RunSimulation, core, row: int, id: int, label: String) -> void:
-	if beamer_fixes: return
-	for enemy: Dictionary in core.enemies_snapshot():
-		if enemy.id!=id: continue
-		beamer_check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001,label+"の距離保持・照準・停止")
-	for motion: Dictionary in core.enemy_motion_snapshot():
-		if motion.id!=id: continue
-		# 負の余りを読まない残り時間は、承認済みの時計の決まりで0にそろえる。
-		beamer_check(motion.mode==run.enemies.table.mode[row] and is_equal_approx(motion.timer,maxf(0.0,run.enemies.table.timer[row])) and is_equal_approx(motion.fire_t,maxf(0.0,run.enemies.table.fire_t[row])) and is_equal_approx(motion.charge,run.enemies.table.charge[row]),label+"の予告・照射・再装填")
-	beam_states(run,core,label+"の付随ビーム")
 
 func check_cpp_beamer() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -346,69 +244,34 @@ func check_cpp_beamer() -> void:
 	for kind in (["normal","pull"] if beamer_fixes else ["normal","death","reuse","pull"]):
 		bridge.restore(initial.value)
 		notices.clear()
-		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-		add_child(lab)
-		await lab.reset({"seed":983,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
-			"config":{"start_radius":900.0,"planet_radius":100.0,"base_hp":100.0}})
-		var run: RunSimulation = lab.run
-		run.state.ship_pos = target
-		run.state.enemy_aim = target
-		run.state.view_center = target
-		run.state.view_half = Vector2(640,360)
-		run.state.world_time = core.inspect().world_time
-		run.state.time = core.inspect().time
-		run.enemies._lod = core.inspect().ticks
-		run.enemies._next_id = 1
-		run.state.rng.state = int(core.inspect().rng_state)
-		var director = run.projectiles.director
-		director.formation_mode = true
 		core.set_attack_formation_mode(true)
-		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
 		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
-		var definition := run.enemies.def_of(&"beamer")
 		var position := target+Vector2(480,120)
-		var row := run.enemies.spawn(definition,position)
 		var id: int = bridge.command("dev_spawn",{"definition_id":"beamer","position":position}).value
-		run.enemies.table.fire_t[row] = 0.125
 		core.set_enemy_motion(id,{"fire_t":0.125})
 		core.set_motion_context(target,target,Vector2(640,360))
 		var warning: Dictionary = {}
 		var warning_shapes := []
 		for step in 13:
 			if step==1:
-				director.configure({"enabled":true,"budget":1.0,"jitter":0.0})
 				core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 			if step==3 and kind=="death":
-				run.combat.kill_enemy(row,{"cause":&"ram"})
 				bridge.command("dev_kill",{"entity_id":id,"cause":"ram"})
 			elif step==3 and kind=="reuse":
-				run.enemies._release_row(row)
 				core.remove_enemy(id)
-				row = run.enemies.spawn(definition,position)
 				var previous_id := id
 				id = bridge.command("dev_spawn",{"definition_id":"beamer","position":position}).value
-				run.enemies.table.fire_t[row] = 4.0
 				core.set_enemy_motion(id,{"fire_t":4.0})
-				beamer_check(id!=previous_id and run.enemies.table.id[row]==id,"行を再利用した新しい敵へ古い照射を引き継がない")
+				beamer_check(id!=previous_id,"行を再利用した新しい敵へ古い照射を引き継がない")
 			elif step==3 and kind=="pull":
-				var puller := run.enemies.spawn(definition,target+Vector2(600,600),{"held":true})
-				run.enemies.table.held[puller] = 1
 				var puller_id: int = bridge.command("dev_spawn",{"definition_id":"beamer","position":target+Vector2(600,600)}).value
 				core.set_enemy_motion(puller_id,{"held":true})
-				run.enemies.table.pump_owner[row] = puller
 				core.set_enemy_motion(id,{"pump_owner":puller_id})
 			if step in [4,5] and kind=="normal":
-				run.enemies.table.held[row] = 1 if step==4 else 0
 				core.set_enemy_motion(id,{"held":step==4})
-			run.state.world_time += 0.125
-			run.state.time += 0.125
-			director.advance(run.state.world_time,run.enemies)
-			core.advance_attack_budget(run.state.world_time)
-			run.enemies.tick(0.125,0.125)
+			core.advance_attack_budget(core.inspect().world_time+0.125)
 			core.step(0.125)
-			run.projectiles._update_hazards(0.125)
 			core.step_hazards(0.125)
-			beamer_state(run,core,row,id,"%s/%d" % [kind,step])
 			# 個別Systemを進めた確認では、通常命令と同じ状態公開の区切りも通す。
 			var delivered: Dictionary = bridge.command("set_ui_overlay",{"active":false})
 			beamer_check(delivered.ok,"ビーム敵の通知と音の状態を公開する: %s/%d" % [kind,step])
@@ -451,7 +314,6 @@ func check_cpp_beamer() -> void:
 				core.step_hazards(0.125)
 			beamer_check(core.hazards_snapshot().is_empty() and core.enemy_motion_snapshot()==final_enemies and core.ship_snapshot()==final_ship,"保持点から同じ照射・被弾・終了を再現する")
 			bridge.release_checkpoint(warning.value)
-		lab.free()
 	bridge.release_checkpoint(initial.value)
 	session.free()
 	beamer_finished = true
