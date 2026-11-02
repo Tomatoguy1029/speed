@@ -450,6 +450,7 @@ func _process(delta: float) -> void:
 		_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
 		_update_speed_indicator(delta)
 		_update_cpp_finish()
+		_update_cpp_cinematic()
 		if not _cpp_ui.is_empty() and not _cpp_ui.get("presentation_frozen",true):
 			_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
 			_ring_flash_t = maxf(0.0,_ring_flash_t-delta)
@@ -479,6 +480,7 @@ func _update_cinematic_visibility() -> void:
 	_draw_button.visible = _can_show_draw_button(DisplayServer.is_touchscreen_available())
 
 func _can_show_draw_button(touchscreen: bool) -> bool:
+	if bridge!=null:return touchscreen and float(_cpp_ui.get("cinematic_bars",0.0))<=0.0 and _menu_overlay==null and not _rewards.is_active() and int(_cpp_ui.get("phase",-1))==RunState.Phase.PLAY
 	return touchscreen and run.state.cinematic_bars <= 0.0 and _menu_overlay == null and not _rewards.is_active() and run.state.phase == RunState.Phase.PLAY
 
 func _sync_combat_art_visibility() -> void:
@@ -1185,6 +1187,16 @@ func apply_snapshot(ui: Dictionary) -> void:
 
 
 func _ready_cpp() -> void:
+	_loadout_icons=Control.new()
+	_loadout_icons.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	add_child(_loadout_icons)
+	_entrance_skip=Button.new()
+	_entrance_skip.text=tr("hud.skip_entrance")
+	_entrance_skip.position=Vector2(24,24)
+	_entrance_skip.size=Vector2(190,38)
+	_entrance_skip.hide()
+	_entrance_skip.pressed.connect(func():bridge.command("skip_boss_entrance"))
+	add_child(_entrance_skip)
 	_prepare_cpp_finish()
 	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
 	_rewards.continuation_seconds = continuation_seconds
@@ -1265,7 +1277,7 @@ func _layout_cpp_art() -> void:
 	_cards_box.scale = Vector2.ONE*factor
 
 func _draw_cpp() -> void:
-	if _cpp_ui.is_empty() or not show_status: return
+	if _cpp_ui.is_empty() or not show_status or float(_cpp_ui.get("cinematic_bars",0.0))>0.0:return
 	if _cpp_ui.get("boss_finish",{}).get("active",false):
 		_draw_banner()
 		return
@@ -1436,3 +1448,28 @@ func _draw_cpp_hero_map(hero: Dictionary) -> void:
 		draw_circle(at,6.0*(0.7+0.3*sin(Time.get_ticks_msec()/200.0)),Color(gold,0.35))
 		draw_circle(at,3.0,gold if hero.captive else Color(gold,0.45))
 	draw_circle(MINIMAP_CENTER,2.0,Color.WHITE)
+
+func _update_cpp_cinematic() -> void:
+	if _cpp_ui.is_empty() or _loadout_icons==null:return
+	var bars: float=_cpp_ui.get("cinematic_bars",0.0)
+	var modules: Array=_cpp_ui.get("final_modules",[])
+	var active: bool=int(_cpp_ui.phase)==RunState.Phase.PLAY
+	_speed_indicator.visible=active and bars<=0.0
+	_loadout_icons.visible=active and not modules.is_empty()
+	_entrance_skip.visible=false
+	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
+		var intro: Dictionary=body.get("intro",{})
+		if intro.get("active",false) and float(intro.get("time",0.0))>=0.4:_entrance_skip.visible=true
+	var factor:=minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
+	_loadout_icons.position=(size-ART_SIZE*factor)*0.5
+	_loadout_icons.scale=Vector2.ONE*factor
+	var key:=str(modules)
+	if key==_loadout_key:return
+	_loadout_key=key
+	for child in _loadout_icons.get_children():child.queue_free()
+	for j in modules.size():
+		var icon=preload("res://scripts/ui/legendary_module_icon.gd").new()
+		icon.position=LOADOUT_WEAPON+Vector2(j*LOADOUT_STEP+2,2)
+		icon.size=Vector2(12,10)
+		icon.module_id=StringName(modules[j])
+		_loadout_icons.add_child(icon)

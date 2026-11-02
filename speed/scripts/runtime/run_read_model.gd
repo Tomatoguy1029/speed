@@ -55,6 +55,8 @@ func refresh(snapshot: Dictionary, ui: Dictionary) -> void:
 	values.merge(snapshot.draw,true)
 	values.merge({"phase":ui.phase,"time":snapshot.clock.time,"world_time":snapshot.clock.world_time,"camera_zoom":snapshot.camera_zoom,"cinematic_bars":snapshot.cinematic_bars,"view_half":snapshot.view_half,"view_center":snapshot.view_center,"stats":{"capacity":snapshot.capacity,"max_speed":snapshot.max_speed,"length_mult":snapshot.length_mult},"level":snapshot.loadout.level,"weapons":weapons,"traits":traits,"hero_power":StringName(snapshot.hero.power),"hero_active_t":snapshot.hero.active,"meta_override":meta,"lab_mode":snapshot.lab_mode},true)
 	values.merge({"post_max_stacks":snapshot.loadout.post_max_stacks,"pending_levels":snapshot.loadout.pending_levels,"cards":snapshot.loadout.cards.candidates},true)
+	values.final_modules=snapshot.get("final_modules",[])
+	values.draco_finish_done=snapshot.get("draco_finish_done",false)
 	values.stage = state.data.get("stage")
 	state.data = values
 	ship.data = {"invincible":snapshot.invincible}

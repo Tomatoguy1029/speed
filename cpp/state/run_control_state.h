@@ -1,6 +1,7 @@
 #pragma once
 #include "../runtime/run_random.h"
 #include <vector>
+#include <string>
 #include "../runtime/input_frame.h"
 #include <godot_cpp/variant/string_name.hpp>
 namespace speed {
