@@ -266,6 +266,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     if (state.loadout.comet_weapon && (state.loadout.comet_weapon>content.equipment.size() || !content.equipment[state.loadout.comet_weapon-1].comet_only || state.loadout.candidates.empty())) return false;
     for (auto weapon:state.loadout.pending_comet_weapons) if (!weapon || weapon>content.equipment.size() || !content.equipment[weapon-1].comet_only) return false;
     for (const auto &capsule:pickups.capsules) if (!capsule.pos.is_finite() || !std::isfinite(capsule.age) || capsule.age<0 || (capsule.kind==CapsuleKind::CometWeapon && (!capsule.weapon || capsule.weapon>content.equipment.size() || !content.equipment[capsule.weapon-1].comet_only))) return false;
+    for (const auto &a:state.attacks.records) if (a.alive && (a.spec.damage_source>content.definitions.size() || a.spec.damage_technique>content.boss_techniques.size())) return false;
     if (!BossFinish::validate(state) || !TechniqueRunner::validate(state,content) || !FlowRunner::validate(state,content) || !PhaseController::validate(state,content)) return false;
     if (!FieldSystem::validate(state,content)) return false;
     if (!GroupSystem::validate(state)) return false;

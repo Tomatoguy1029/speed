@@ -69,7 +69,7 @@ void EventBuilder::enemy_kill(RunRuntime &run,const DeathContext &death) {
 }
 void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &request,const ShipDamageResult &result) {
     if (auto *o=run.state.observations.find(request.observation_id)) o->applied+=std::max(0.0,result.hp_before-result.hp_after);
-    CombatEvent event;event.observation_id=request.observation_id;event.kind=CombatEventKind::ShipDamage;event.cause=request.cause;event.source=request.source;event.technique=request.technique;
+    CombatEvent event;event.observation_id=request.observation_id;event.kind=CombatEventKind::ShipDamage;event.cause=request.cause;event.source=request.source;event.source_is_explicit=request.source_is_explicit;event.technique=request.technique;
     event.pos=run.state.ship.pos;event.time=run.state.time;event.world_time=run.state.world_time;event.reason=result.reason;
     event.requested=request.amount;event.resolved=result.amount;event.hp_before=result.hp_before;event.hp_after=result.hp_after;event.accepted=result.accepted;
     if (result.accepted) {event.kind=CombatEventKind::Hurt;run.state.combat_events.push_back(event);event.kind=CombatEventKind::ShipDamage;}
@@ -116,7 +116,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             if (e.technique && e.technique<=run.content->boss_techniques.size()) {
                 const auto &technique=run.content->boss_techniques[e.technique-1];
                 d["technique"]=godot::StringName(technique.external_id.c_str());
-                d["source"]=godot::StringName(run.content->bosses[technique.boss-1].external_id.c_str());
+                if (!e.source_is_explicit) d["source"]=godot::StringName(run.content->bosses[technique.boss-1].external_id.c_str());
             }
             d["observation_id"]=e.observation_id;d["requested"]=e.requested;
             d["amount"]=e.resolved;d["accepted"]=e.accepted;d["reason"]=combat_reason_name(e.reason);d["hp_before"]=e.hp_before;

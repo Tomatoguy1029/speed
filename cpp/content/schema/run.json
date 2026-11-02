@@ -1563,6 +1563,10 @@
       {
         "name": "Spiral",
         "value": "spiral"
+      },
+      {
+        "name": "CloneLeap",
+        "value": "clone_leap"
       }
     ],
     "VisualRole": [

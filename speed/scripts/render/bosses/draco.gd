@@ -6,6 +6,13 @@ var attack := {}
 var _move_style := {}
 var _styles := {}
 var hit := 0.0
+var _clones := {}
+var _field: Node2D
+func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
+	if _field==null:
+		_field=preload("res://scripts/render/bosses/hydra.gd").new()
+		add_child(_field);_field.top_level=true
+	_field.setup_effects(scope,entries)
 var _parts: Node2D
 func _ready() -> void:
 	z_index = 1
@@ -27,6 +34,23 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	var points := PackedVector2Array()
 	for point: Vector2 in body.body_points: points.append(to_local(point))
 	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit)
+	var live := {}
+	for clone: Dictionary in body.get("clones",[]):
+		live[clone.id]=true
+		if not _clones.has(clone.id):
+			var parts: Node2D=preload("res://scripts/bosses/draco_parts.gd").new()
+			add_child(parts);parts.top_level=true
+			parts.material=ShaderMaterial.new();parts.material.shader=preload("res://shaders/picaro.gdshader")
+			_clones[clone.id]=parts
+		var parts: Node2D=_clones[clone.id]
+		parts.position=clone.position;parts.rotation=clone.angle
+		parts.visible=not body.get("cinematic_hide_enemies",false)
+		var posed := PackedVector2Array()
+		for point: Vector2 in clone.points:posed.append((point-clone.position).rotated(-float(clone.angle)))
+		parts.pose(posed,float(body.body_width),float(body.head_scale),1.0,true,0.0)
+	for id in _clones.keys():
+		if not live.has(id):_clones[id].queue_free();_clones.erase(id)
+	if _field!=null:_field.apply_frame(body)
 	queue_redraw()
 func _draw() -> void:
 	if state.is_empty() or not visible: return

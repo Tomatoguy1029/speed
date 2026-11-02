@@ -66,6 +66,7 @@ struct Enemy {
     double body_gap=-1,body_gap_time=0;
     Vector2 body_gap_pos;
     bool landmark = false;
+    bool clone_visual = false;
     bool held = false, slash_hold = false, shoved = false;
     int64_t group_id = 0;
     bool pursuit_ready = false;

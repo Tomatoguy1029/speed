@@ -5,6 +5,7 @@ const RUNNERS := {
 	"res://scripts/data_types/boss_techniques/hydra/swarm.gd":"res://scripts/bosses/hydra/techniques/swarm.gd",
 	"res://scripts/data_types/boss_techniques/hydra/sequence.gd":"res://scripts/bosses/hydra/techniques/sequence.gd",
 	"res://scripts/data_types/boss_techniques/hydra/north.gd":"res://scripts/bosses/hydra/techniques/north.gd",
+	"res://scripts/data_types/boss_techniques/draco/clones.gd":"res://scripts/bosses/draco/techniques/clones.gd",
 	"res://scripts/data_types/boss_techniques/hydra/wind_band.gd":"res://scripts/bosses/hydra/techniques/wind_band.gd",
 	"res://scripts/data_types/boss_techniques/hydra/thunder_headbutt.gd":"res://scripts/bosses/hydra/techniques/thunder_headbutt.gd",
 	"res://scripts/data_types/boss_techniques/hydra/debris_shatter.gd":"res://scripts/bosses/hydra/techniques/debris_shatter.gd",

@@ -31,7 +31,7 @@ ShipContactResult CombatResolver::attack_ship_damage(RunRuntime &run,AttackHandl
     if (!result.touching || (attack->ship_hit && policy.hit_policy!=HitPolicy::EveryTick)) return result;
     if (policy.hit_policy==HitPolicy::MarkBefore) AttackSystem::mark_ship_hit(run.state,handle);
     ShipDamageRequest request;request.observation_id=spec.observation_id;request.amount=amount;request.slow=slow;request.cause=spec.cause;
-    request.source=spec.owner.source_definition;request.technique=spec.source_technique;
+    request.source_is_explicit=spec.damage_source!=0;request.source=spec.damage_source?spec.damage_source:spec.owner.source_definition;request.technique=spec.damage_technique?spec.damage_technique:spec.source_technique;
     request.scale=policy.scale;request.hit_policy=policy.hit_policy;
     result.attempted=true;result.damage=ship_damage(run,request);
     if (policy.hit_policy==HitPolicy::MarkAfter || (policy.hit_policy==HitPolicy::MarkIfAccepted && result.damage.accepted)) AttackSystem::mark_ship_hit(run.state,handle);

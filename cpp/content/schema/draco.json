@@ -699,6 +699,76 @@
           "max": 2048
         }
       ]
+    },
+    {
+      "name": "DracoClonesDefinition",
+      "section": 442,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "clone_enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "part_enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "bite",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "wind",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "rubble",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "beam",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "thunder",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "clone_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clone_stars",
+          "type": "u32"
+        },
+        {
+          "name": "neck_rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hydra_source",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        }
+      ]
     }
   ],
   "enums": {}
