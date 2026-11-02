@@ -956,6 +956,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"rock_break":
 			_burst(event.pos,event.color,10,300.0,event.dir)
 			_rings.append({"pos":event.pos,"radius":event.r*1.2,"color":Color(1.0,0.95,0.6),"life":0.2,"max":0.2})
+		if event.type==&"cepheus_summon":
+			_rings.append({"pos":event.pos,"radius":70.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
 		if event.type==&"beam":
 			var life: float = event.get("life",0.4)*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_mutiny_beams.append({"from":event.from,"to":event.to,"width":event.width,"life":life,"max":life,"color":event.get("color",Color(1,0.95,0.6))})

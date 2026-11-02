@@ -16,6 +16,11 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-cepheus-notifications" in OS.get_cmdline_user_args():
+		await check_cpp_cepheus_notifications()
+		print("[cpp_cepheus_notifications] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-triangle-star" in OS.get_cmdline_user_args():
 		await check_cpp_triangle_star()
 		print("[cpp_triangle_star] failed=%d" % failed)
@@ -1705,4 +1710,49 @@ func check_cpp_triangle_star() -> void:
 	core.step(0.01)
 	check(dolphin_enemy(core,alone).dead and not pulse_motion(core,alone).has("parent_id"),"親のない単体の星は古い親参照を持たず正常に退場する")
 	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func check_cpp_cepheus_notifications() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius=900.0
+	cfg.planet_radius=0.0
+	cfg.world_tick_div=1
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index=93
+	stage.resources=StageResources.new()
+	stage.resources.enemy_ids=PackedStringArray(["cepheus"])
+	stage.enemy_tuning={"cepheus":{"speed":0.0,"params.summon_time":0.05}}
+	var output := "res://.content/dev/run_cepheus_notifications"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"ケフェウスの固定更新から通知を配信する".sha256_text())
+	if built!=OK:
+		check(false,"通知確認用の固定入力を生成できる")
+		return
+	var path := output.path_join("stage_93.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":931},true)
+	session.auto_step=false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if session.bridge==null:
+		check(false,"通知確認のランを準備できる")
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var events: Array=[]
+	bridge.subscribe("cepheus_notifications",func(frame: Dictionary) -> bool:
+		events.append_array(frame.events)
+		return true)
+	var target: Vector2=core.ship_snapshot().ship_pos
+	core.spawn_enemy(&"cepheus",target+Vector2(400,0),{})
+	var valid := true
+	for n in 12:
+		valid = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)}).ok and valid
+		valid = bridge.read_frame().ok and valid
+	check(valid,"召喚前後の固定更新とread_frameの通知封筒を受け取れる")
+	check(events.filter(func(event): return event.type==&"summon_mark").size()==3 and events.filter(func(event): return event.type==&"cepheus_summon").size()==1,"召喚予告3件と召喚1件を型付き通知で通常配信する")
+	await get_tree().process_frame
+	var presentation: RunPresentation=session.view.get_node("RunPresentation")
+	check(presentation.frame_view._rings.any(func(ring): return ring.radius==70.0),"召喚通知を元の半径70の光の輪として表示する")
 	session.free()

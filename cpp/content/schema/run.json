@@ -1779,6 +1779,14 @@
       {
         "name": "BomberExplode",
         "value": "bomber_explode"
+      },
+      {
+        "name": "SummonMark",
+        "value": "summon_mark"
+      },
+      {
+        "name": "CepheusSummon",
+        "value": "cepheus_summon"
       }
     ],
     "ResultKind": [
@@ -2289,6 +2297,16 @@
     ],
     "bomber_explode": [
       "pos"
+    ],
+    "summon_mark": [
+      "pos",
+      "king",
+      "life",
+      "color"
+    ],
+    "cepheus_summon": [
+      "pos",
+      "color"
     ]
   },
   "includes": [
