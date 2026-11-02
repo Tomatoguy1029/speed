@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../systems/field.h"
+#include "../behaviors/enemies/defender.h"
 #include <cmath>
 using namespace godot;
 namespace {
@@ -9,6 +10,14 @@ bool radius(const Dictionary &p) {if (!p.has("radius")) return false;const auto 
 }
 Dictionary SpeedRunCore::development_field_command(const String &kind,const Dictionary &p) {
     if (!runtime.api_development) return reply(false);
+    if (kind=="dev_defender_boost" || kind=="dev_defender_clear_boost") {
+        if (p.get("entity_id",Variant()).get_type()!=Variant::INT) return reply(false);const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return reply(false);const auto h=runtime.state.enemy_handles.at(uint32_t(found->second));
+        if (kind=="dev_defender_clear_boost") return reply(p.size()==1 && speed::DefenderBehavior::clear_boost(runtime,h));
+        if (p.size()!=4 && p.size()!=5) return reply(false);
+        for (const char *key:{"speed","wobble","until"}) {const auto v=p.get(key,Variant());if ((v.get_type()!=Variant::FLOAT && v.get_type()!=Variant::INT) || !std::isfinite(double(v))) return reply(false);}
+        const auto phase=p.get("phase",0.0);if ((phase.get_type()!=Variant::FLOAT && phase.get_type()!=Variant::INT) || !std::isfinite(double(phase)) || (p.size()==5 && !p.has("phase"))) return reply(false);
+        return reply(speed::DefenderBehavior::boost(runtime,h,p["speed"],p["wobble"],p["until"],phase));
+    }
     if (kind=="dev_spawn_comet" && p.size()==1 && p.has("rare") && p["rare"].get_type()==Variant::BOOL) {const auto h=speed::FieldSystem::spawn_comet(runtime,p["rare"]);return reply(runtime.state.field.rock_handles.contains(h),int64_t(h.slot)+1);}
     if (kind=="dev_comet_state") {
         const Variant remaining=p.get("remaining",Variant());if ((p.size()!=1 && p.size()!=2) || (remaining.get_type()!=Variant::FLOAT && remaining.get_type()!=Variant::INT) || !std::isfinite(double(remaining)) || (p.size()==2 && (!p.has("boss_spawned") || p["boss_spawned"].get_type()!=Variant::BOOL))) return reply(false);

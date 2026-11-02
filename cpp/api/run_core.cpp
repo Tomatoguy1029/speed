@@ -168,7 +168,7 @@ bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) 
     if (runtime.state.forward.ready && !runtime.state.combat_ready) return false;
     if ((runtime.state.draw_ready && !runtime.state.ship_ready) || (runtime.state.combat_ready && (!runtime.state.ship_ready || !runtime.state.pickups_ready))) return false;
     if (runtime.state.frame_ready && (!runtime.state.ship_ready || !runtime.state.draw_ready || !runtime.state.combat_ready || !runtime.state.pickups_ready)) return false;
-    for (const auto &def : runtime.content->definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) && (!runtime.state.ship_ready || !runtime.state.bite_zone_config.ready)) return false;
+    for (const auto &def : runtime.content->definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender) && (!runtime.state.ship_ready || !runtime.state.bite_zone_config.ready)) return false;
     runtime.state.next_id = first_id;
     runtime.state.pickups.next_ground_order = first_gem_seq;
     runtime.state.control.rng.set_seed(seed);
@@ -218,7 +218,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta);speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const bool far = def.kind!=speed::EnemyDefinition::Kind::Aquila && def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
-        if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
+        if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
             if (def.kind==speed::EnemyDefinition::Kind::Split) {
                 speed::SplitBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
@@ -292,7 +292,7 @@ void SpeedRunCore::close() {
     speed::PickupSystem::lose_all(runtime,speed::CargoLoss::Cleared);
     runtime.state.closed = true;
     runtime.state.control.rng = {};
-    runtime.combat_hooks=speed::CombatHooks();runtime.render_workspace={};
+    runtime.combat_hooks=speed::CombatHooks();runtime.render_workspace={};runtime.workspace={};
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
     runtime.state.legacy_progression = Progression();
     runtime.state.loadout={};runtime.state.lifecycle={};runtime.resource_workspace.requests.clear();

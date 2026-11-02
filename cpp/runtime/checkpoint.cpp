@@ -73,6 +73,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Auriga)!=std::holds_alternative<AurigaState>(enemy.behavior_state)) return false;
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Clock)!=std::holds_alternative<ClockState>(enemy.behavior_state)) return false;
         if (const auto *clock=std::get_if<ClockState>(&enemy.behavior_state)) for (auto hand:clock->hands) if (const auto *record=AttackSystem::get(state,hand)) {if (!record->spec.owner.attached || !same_handle(record->spec.owner.live_source,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;}
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Defender)!=std::holds_alternative<DefenderState>(enemy.behavior_state)) return false;
+        if (const auto *defender=std::get_if<DefenderState>(&enemy.behavior_state)) for (double value:{defender->boost.speed,defender->boost.wobble,defender->boost.until,defender->boost.phase}) if (!std::isfinite(value)) return false;
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Split)!=std::holds_alternative<SplitState>(enemy.behavior_state)) return false;
         if (const auto *split=std::get_if<SplitState>(&enemy.behavior_state)) if (!std::isfinite(split->bud_t) || split->bud_t<0) return false;
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Reticle)!=std::holds_alternative<ReticleState>(enemy.behavior_state)) return false;

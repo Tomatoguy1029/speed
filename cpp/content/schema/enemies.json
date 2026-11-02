@@ -1272,6 +1272,39 @@
           "max": 2147483647
         }
       ]
+    },
+    {
+      "name": "DefenderDefinition",
+      "section": 121,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_arrive",
+          "type": "f64"
+        },
+        {
+          "name": "guard_distance",
+          "type": "f64"
+        },
+        {
+          "name": "guard_radius",
+          "type": "f64"
+        },
+        {
+          "name": "guard_spacing",
+          "type": "f64"
+        }
+      ]
     }
   ],
   "enums": {}

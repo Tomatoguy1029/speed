@@ -79,6 +79,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->dolphins=records.DolphinDefinition_rows;
     bundle->reticles=records.ReticleDefinition_rows;bundle->aquarius=records.AquariusDefinition_rows;bundle->cross_enemies=records.CrossEnemyDefinition_rows;bundle->bombers=records.BomberDefinition_rows;bundle->phoenixes=records.PhoenixDefinition_rows;bundle->aquilas=records.AquilaDefinition_rows;
     bundle->splits=records.SplitDefinition_rows;
+    bundle->defenders=records.DefenderDefinition_rows;
     bundle->clocks=records.ClockDefinition_rows;
     bundle->aurigas=records.AurigaDefinition_rows;
     bundle->soldiers=records.SoldierDefinition_rows;
@@ -291,7 +292,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -302,7 +303,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             definition.reflected_definition=shield->reflected;definition.reflect_life=reflected.life;definition.reflect_damage=reflected.damage;
         } else if (shield!=records.ShieldDefinition_rows.end()) return {};
         const auto bite=std::find_if(bundle->bites.begin(),bundle->bites.end(),[&](const auto &b){return b.id==row.id;});
-        if (row.kind==2 || row.kind==3) {
+        if (row.kind==2 || row.kind==3 || row.kind==27) {
             if (bite==bundle->bites.end() || bite->warn<=0 || bite->duration<=0 || !bite->visual_key) return {};
             definition.bite={bite->reach,bite->warn,bite->rest,bite->radius,bite->damage};
         } else if (bite!=bundle->bites.end()) return {};
@@ -435,6 +436,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{aquarius->accel,aquarius->approach,aquarius->telegraph,aquarius->beam_time,aquarius->beam_length,aquarius->half_width,aquarius->spread,aquarius->rest,aquarius->damage,aquarius->admission_duration}) if (!std::isfinite(float(value))) return {};
             definition.aquarius_definition=uint32_t(aquarius-bundle->aquarius.begin()+1);definition.accel=aquarius->accel;
         } else if (aquarius!=bundle->aquarius.end()) return {};
+        const auto defender=std::find_if(bundle->defenders.begin(),bundle->defenders.end(),[&](const auto &p){return p.id==row.id;});
+        if (row.kind==27) {
+            if (defender==bundle->defenders.end()) return {};
+            definition.defender_definition=uint32_t(defender-bundle->defenders.begin()+1);definition.accel=defender->accel;
+        } else if (defender!=bundle->defenders.end()) return {};
         const auto split=std::find_if(bundle->splits.begin(),bundle->splits.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==26) {
             if (split==bundle->splits.end() || split->death_split>INT32_MAX-split->split_extra || split->child>records.EnemyRecord_rows.size() || records.EnemyRecord_rows[split->child-1].kind!=0) return {};

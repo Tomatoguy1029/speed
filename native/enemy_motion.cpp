@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/motion_math.h"
 #include "../cpp/systems/enemy_system.h"
+#include "../cpp/behaviors/enemies/defender.h"
 #include "../cpp/systems/attack_system.h"
 #include <algorithm>
 #include <cmath>
@@ -70,6 +71,11 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         if (const auto *reticle=std::get_if<speed::ReticleState>(&e->behavior_state)) {row["target_id"]=reticle->rock_id;row["target_alive"]=runtime.state.enemy_handles.contains(reticle->rock) && !runtime.state.enemies[reticle->rock.slot].dead;}
         if (const auto *clock=std::get_if<speed::ClockState>(&e->behavior_state)) {row["spin"]=e->spin;godot::PackedInt64Array hands;for (auto hand:clock->hands) {const auto *record=speed::AttackSystem::get(runtime.state,hand);hands.push_back(record?record->id:0);}row["hands"]=hands;}
         if (const auto *soldier=std::get_if<speed::SoldierState>(&e->behavior_state)) {row["king_id"]=soldier->king_id;row["slot"]=soldier->slot;row["formation_anchor"]=soldier->formation.anchor;}
+        if (const auto *defender=std::get_if<speed::DefenderState>(&e->behavior_state)) {
+            row["guard_target_id"]=0;row["guard_goal"]=Vector2();const auto handle=runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id)));
+            if (const auto *post=speed::DefenderBehavior::post(runtime,handle)) {row["guard_target_id"]=runtime.state.enemy_handles.entity_id(post->target);row["guard_goal"]=post->position;}
+            row["boost_active"]=defender->boost.active;row["boost_speed"]=defender->boost.speed;row["boost_wobble"]=defender->boost.wobble;row["boost_until"]=defender->boost.until;row["boost_phase"]=defender->boost.phase;
+        }
         if (const auto *split=std::get_if<speed::SplitState>(&e->behavior_state)) {row["buds"]=split->buds;row["bud_t"]=split->bud_t;}
         if (const auto *lynx=std::get_if<speed::LynxState>(&e->behavior_state)) row["buds"]=lynx->buds;
         if (const auto *aquila=std::get_if<speed::AquilaState>(&e->behavior_state)) {row["anchor"]=aquila->anchor;row["bud_t"]=aquila->bud_t;}

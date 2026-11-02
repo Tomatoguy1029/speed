@@ -5,6 +5,7 @@ var passed := 0
 var failed := 0
 var mute_checks := false
 var split_finished := false
+var defender_finished := false
 
 func check(ok: bool, label: String) -> void:
 	if mute_checks: return
@@ -14,6 +15,12 @@ func check(ok: bool, label: String) -> void:
 		push_error("[enemy_generated_spawns] " + label)
 
 func _ready() -> void:
+	if "--cpp-defender" in OS.get_cmdline_user_args():
+		await check_cpp_defender()
+		check(defender_finished,"守る雑魚の確認本体が最後まで進んだ")
+		print("[cpp_defender] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-split" in OS.get_cmdline_user_args():
 		mute_checks = "--cpp-split-priority" in OS.get_cmdline_user_args()
 		await check_cpp_split()
@@ -377,4 +384,138 @@ func check_cpp_split() -> void:
 	bridge.release_checkpoint(saved.value)
 	bridge.release_checkpoint(pending.value)
 	split_finished = true
+	session.free()
+
+func defender_step(bridge) -> void:
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)}).ok,"守る雑魚を通常Runnerで進める")
+
+func check_cpp_defender() -> void:
+	var cfg := ContentManager.base.duplicate(true) as GameConfig
+	cfg.start_radius = 1200.0
+	cfg.planet_radius = 0.0
+	cfg.world_tick_div = 1
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 97
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter","defender","hydra_bite"])
+	var strong := load("res://data/enemies/drifter.tres").duplicate(true) as EnemyDef
+	strong.rank = 3
+	strong.speed = 0.0
+	var part := load("res://data/enemies/hydra_bite.tres").duplicate(true) as EnemyDef
+	part.rank = 5
+	var output := "res://.content/dev/run_defender"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"守備の並びと相手の喪失".sha256_text(),{&"drifter":strong,&"hydra_bite":part})
+	check(built==OK,"守備と噛みつきの編集値・資源を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_97.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":977},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"守備と噛みつきのある通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	defender_step(bridge)
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var guarded: int = core.spawn_enemy(&"drifter",target+Vector2(400,0),{})
+	var held: int = core.spawn_enemy(&"drifter",target+Vector2(250,0),{})
+	core.set_enemy_motion(held,{"held":true})
+	var child: int = bridge.command("dev_spawn_part",{"parent_id":guarded,"definition_id":"hydra_bite","position":target+Vector2(230,0)}).value
+	var ids: Array[int] = []
+	for y in [-42,0,42]: ids.append(core.spawn_enemy(&"defender",target+Vector2(250,y),{"facing":PI}))
+	bridge.command("dev_retreat",{"entity_id":ids[1]})
+	var reused: int = core.spawn_enemy(&"defender",target+Vector2(250,0),{"facing":PI})
+	ids = [ids[0],ids[2],reused]
+	core.step(0.1)
+	var radius: float = split_entity(core,ids[0]).radius
+	var spacing := maxf(42.0,radius*2.0)
+	var offset := minf(split_entity(core,guarded).radius+radius+90.0,200.0)
+	for k in ids.size():
+		var actual := split_entity(core,ids[k],true)
+		var expected := target+Vector2(400.0-offset,-(k-1)*spacing)
+		check(actual.guard_target_id==guarded and actual.guard_goal.is_equal_approx(expected),"保持中の相手・部位を除き、再利用した行も個体ID順の列へ割り当てる")
+		check(actual.mode==0 and actual.timer==0.0 and actual.charge==0.0,"持ち場へ進む間は噛みつきを休む")
+	var boosted: int = ids[0]
+	var until: float = core.inspect().world_time+0.15
+	check(bridge.command("dev_defender_boost",{"entity_id":boosted,"speed":350.0,"wobble":20.0,"until":until,"phase":0.3}).ok,"個体へ世界秒の速度と揺れを指示する")
+	core.set_enemy_motion(boosted,{"vel":Vector2.ZERO})
+	var saved: Dictionary = bridge.checkpoint()
+	var before: Dictionary = split_entity(core,boosted)
+	var at := Vector2(before.pos[0],before.pos[1])
+	core.step(0.1)
+	var boosted_state := split_entity(core,boosted,true)
+	var now: float = core.inspect().world_time
+	var goal: Vector2 = boosted_state.guard_goal+Vector2(sin(now*1.3+0.3),cos(now*1.1+0.3))*20.0
+	var speed := 350.0*minf(at.distance_to(goal)/60.0,1.0)
+	var expected_velocity := (goal-at).normalized()*speed*0.25
+	var actual_body := split_entity(core,boosted)
+	check(Vector2(actual_body.vel[0],actual_body.vel[1]).is_equal_approx(expected_velocity) and boosted_state.boost_active,"世界時計の位相と編集値の加速で整列する")
+	var future: Array = core.enemies_snapshot()
+	check(bridge.restore(saved.value).ok,"整列途中と有効な速度指示を値から復帰する")
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.step(0.1)
+	check(core.enemies_snapshot()==future,"復帰後も持ち場を再構成して同じ位置へ進む")
+	core.step(0.1)
+	check(not split_entity(core,boosted,true).boost_active,"期限が過ぎた速度指示を外す")
+	core.set_enemy_motion(boosted,{"held":true})
+	var frozen: Dictionary = split_entity(core,boosted)
+	core.step(0.1)
+	check(split_entity(core,boosted)==frozen,"保持中の守る雑魚を整列で動かさない")
+	core.set_enemy_motion(boosted,{"held":false,"slash_hold":true})
+	core.step(0.1)
+	check(Vector2(split_entity(core,boosted).vel[0],split_entity(core,boosted).vel[1])==Vector2.ZERO,"斬撃保持中は整列の速度を止める")
+	core.set_enemy_motion(boosted,{"slash_hold":false})
+	check(bridge.command("dev_defender_clear_boost",{"entity_id":boosted}).ok,"ボス側から速度指示を明示解除できる")
+	bridge.command("dev_retreat",{"entity_id":guarded})
+	var replacement: int = core.spawn_enemy(&"drifter",target+Vector2(2000,0),{})
+	core.step(0.01)
+	check(split_entity(core,boosted,true).guard_target_id==0 and replacement!=guarded,"守る相手の行を再利用しても古い相手を守り続けない")
+	for id in ids.slice(1): bridge.command("dev_retreat",{"entity_id":id})
+	bridge.command("dev_relocate",{"entity_id":boosted,"position":target+Vector2(30,0)})
+	core.set_enemy_motion(boosted,{"facing":PI,"vel":Vector2.ZERO})
+	defender_step(bridge)
+	check(split_entity(core,boosted,true).mode==1,"守る相手がいないと通常Runnerで噛みつきの予告へ入る")
+	bridge.command("dev_kill",{"entity_id":boosted,"cause":"bullet"})
+	core.step(0.4)
+	check(core.hazards_snapshot().is_empty(),"予告の途中撃破では噛みつきを出さない")
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	var attacker: int = core.spawn_enemy(&"defender",target+Vector2(30,0),{"facing":PI,"attack_group":123,"attack_managed":true,"attack_value":1.0})
+	core.step(0.01)
+	check(split_entity(core,attacker,true).mode==0 and not core.attack_budget_snapshot().waiting.is_empty(),"相手がいないときの噛みつきは攻撃予算を待つ")
+	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	core.advance_attack_budget(core.inspect().world_time)
+	core.step(0.01)
+	core.step(0.15)
+	check(split_entity(core,attacker,true).mode==1 and is_equal_approx(split_entity(core,attacker,true).charge,0.5),"予算が空いたら編集値の予告を進める")
+	var render: Dictionary = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(render.batches.any(func(b): return b.ids.has(attacker) and b.get("gunner",PackedFloat32Array()).size()==5) and presentation.frame_view.apply_frame(render),"本体と噛みつきの予告光を通常表示へ渡す")
+	await get_tree().process_frame
+	core.step(0.15)
+	var bites: Array = core.hazards_snapshot()
+	check(bites.size()==1 and bites[0].kind==1 and bites[0].style==3 and bites[0].radius==26.0 and split_entity(core,attacker,true).mode==3,"編集値の噛みつきの円を一つ生成して回復へ入る")
+	render = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	check(render.shapes.any(func(shape): return shape.get("zone_style",-1)==3) and presentation.frame_view.apply_frame(render),"守る雑魚の噛みつきを共通のあごの輪で表示する")
+	await get_tree().process_frame
+	var hp: float = core.ship_snapshot().ship_hp
+	core.step_hazards(0.01)
+	var hurt: float = core.ship_snapshot().ship_hp
+	core.step_hazards(0.01)
+	check(hurt<hp and core.ship_snapshot().ship_hp==hurt,"噛みつきが機体に一度だけ命中する")
+	bridge.command("dev_kill",{"entity_id":attacker,"cause":"bullet"})
+	check(core.hazards_snapshot().size()==1,"発生後の噛みつきは発生元を失っても自然寿命まで残る")
+	core.step_hazards(0.3)
+	core.advance_attack_budget(core.inspect().world_time+2.0)
+	check(core.hazards_snapshot().is_empty() and core.attack_budget_snapshot().used==0.0,"自然終了で噛みつきと攻撃予算を解放する")
+	bridge.command("dev_retreat",{"entity_id":attacker})
+	var fresh: int = core.spawn_enemy(&"defender",target+Vector2(100,0),{})
+	check(not split_entity(core,fresh,true).boost_active and split_entity(core,fresh,true).guard_target_id==0,"死亡した行を再利用しても速度指示と持ち場を残さない")
+	bridge.release_checkpoint(saved.value)
+	defender_finished = true
 	session.free()

@@ -1,5 +1,6 @@
 #include "enemy_system.h"
 #include "../behaviors/enemies/phoenix.h"
+#include "../behaviors/enemies/defender.h"
 #include "attack_system.h"
 #include "attack_budget.h"
 #include "group_system.h"
@@ -24,6 +25,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Clock) enemy.behavior_state=ClockState{};
     if (def.kind==EnemyDefinition::Kind::Reticle) enemy.behavior_state=ReticleState{};
     if (def.kind==EnemyDefinition::Kind::Split) enemy.behavior_state=SplitState{};
+    if (def.kind==EnemyDefinition::Kind::Defender) {enemy.behavior_state=DefenderState{};run.workspace.defender_posts_tick=-1;}
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
@@ -127,7 +129,7 @@ void EnemySystem::clear_regular(RunRuntime &run) {
 }
 bool EnemySystem::mark_dead(RunRuntime &run,EnemyHandle handle) {
     auto &state=run.state;if (!state.enemy_handles.contains(handle) || state.enemies[handle.slot].dead) return false;
-    PhoenixBehavior::cancel(run,handle);state.enemies[handle.slot].dead=true;state.dead_rows.push_back(handle.slot);AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);leave_hound(state,handle.slot);return true;
+    PhoenixBehavior::cancel(run,handle);DefenderBehavior::gone(run,handle);state.enemies[handle.slot].dead=true;state.dead_rows.push_back(handle.slot);AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);leave_hound(state,handle.slot);return true;
 }
 bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason) {
     auto &state=run.state;
@@ -135,6 +137,7 @@ bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason)
     const size_t row=handle.slot;auto &enemy=state.enemies[row];
     if (!enemy.alive) return false;
     PhoenixBehavior::cancel(run,handle);
+    DefenderBehavior::gone(run,handle);
     PickupSystem::lose(run,enemy.id,reason==RetireReason::Outside?CargoLoss::Retreat:reason==RetireReason::BonusClear?CargoLoss::Cleared:CargoLoss::Released);
     AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);
     leave_hound(state,row);

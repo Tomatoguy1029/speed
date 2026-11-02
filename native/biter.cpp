@@ -6,6 +6,8 @@
 #include "geometry.h"
 #include "../cpp/behaviors/enemies/pursuit.h"
 #include "../cpp/behaviors/enemies/hound.h"
+#include "../cpp/behaviors/enemies/defender.h"
+#include "../cpp/systems/attacks/zone.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -31,6 +33,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     if (far && (enemy.id + runtime.state.ticks) % 3 != 0) { enemy.pos += enemy.vel * dt; return; }
     const double bdt = far ? dt * 3.0 : dt;
     const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
+    if (def.kind==speed::EnemyDefinition::Kind::Defender && speed::DefenderBehavior::move(runtime,runtime.state.enemy_handles.at(uint32_t(row)),bdt,policy)) {enemy.pos+=enemy.vel*dt;speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,dt);return;}
     if (def.kind==speed::EnemyDefinition::Kind::Hound && speed::HoundBehavior::ordered_move(runtime,uint32_t(row),bdt,policy)) {enemy.pos+=enemy.vel*dt;speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,dt);return;}
     if (enemy.mode == EnemyMode::Windup) {
         enemy.vel *= std::max(0.0, 1.0 - 8.0 * bdt);
@@ -39,7 +42,9 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         enemy.charge = 1.0 - std::max(0.0, enemy.timer) / def.bite.telegraph;
         if (enemy.timer <= 0) {
             const Vector2 at = from + Vector2::from_angle(enemy.facing) * (enemy.radius + def.bite.reach * 0.5);
-            if (runtime.state.bite_zone_config.ready) {
+            if (def.kind==speed::EnemyDefinition::Kind::Defender) {
+                speed::ZoneParams zone;zone.position=at;zone.radius=def.bite.radius;zone.damage=def.bite.damage;zone.style=speed::ZoneStyle::Bite;zone.color=def.color.lightened(0.4);zone.owner=runtime.state.enemy_handles.at(uint32_t(row));zone.budget.value=token;speed::ZoneSystem::emit(runtime,zone);
+            } else if (runtime.state.bite_zone_config.ready) {
                 BiteZone zone;zone.pos=at;zone.shape=speed::CircleHazard{float(def.bite.radius)};zone.damage=def.bite.damage;zone.color=def.color.lightened(0.4);
                 speed::AttackSpec spec;spec.owner.budget.value=token;spec.owner.live_source=runtime.state.enemy_handles.at(uint32_t(row));
                 spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;spec.cause=speed::Cause::Blast;
