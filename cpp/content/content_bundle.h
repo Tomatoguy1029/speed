@@ -41,6 +41,9 @@ struct ContentBundle {
     std::vector<SplitDefinition> splits;
     std::vector<DefenderDefinition> defenders;
     std::vector<CrowDefinition> crows;
+    std::vector<BossDefinition> bosses;
+    std::vector<BossTechniqueDefinition> boss_techniques;
+    std::vector<BossTechniqueStage> boss_stages;
     std::vector<ClockDefinition> clocks;
     std::vector<AurigaDefinition> aurigas;
     std::vector<SoldierDefinition> soldiers;

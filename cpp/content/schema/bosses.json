@@ -1,0 +1,176 @@
+{
+  "records": [
+    {
+      "name": "BossDefinition",
+      "section": 150,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 0
+        },
+        {
+          "name": "lock_lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "horn_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "horn_length_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "horn_length_ratio_p2",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "near_clearance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reposition_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stuck_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "extract_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "extract_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BossTechniqueDefinition",
+      "section": 151,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 0
+        },
+        {
+          "name": "phase",
+          "type": "u32",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "name": "track_during_warn",
+          "type": "bool"
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "active",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "post_gap",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BossTechniqueStage",
+      "section": 152,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "command",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "at",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

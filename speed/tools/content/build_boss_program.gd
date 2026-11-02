@@ -4,6 +4,29 @@ const PROGRAM := preload("res://scripts/data_types/boss_runtime_program.gd")
 const VERSION := 5
 static var generation_count := 0
 
+## Resourceの実効値から実行キーを作る。保存済みAnimationの時刻は参照しない。
+static func charge_stage_commands(move: BossTechnique, lock_lead: float) -> Array:
+	if move == null or move.get_script().resource_path != "res://scripts/bosses/monoceros/techniques/charge.gd": return []
+	var keys := [
+		{"at":maxf(0.01,float(move.warn)-lock_lead),"method":&"lock_aim","args":[]},
+		{"at":float(move.warn),"method":&"launch_strike","args":[]},
+		{"at":float(move.warn)+float(move.active),"method":&"end_strike","args":[]}]
+	keys.sort_custom(func(a,b): return a.at < b.at)
+	return registered_stage_commands(keys)
+
+## 戦闘に効くmethodは列挙した命令だけを許し、任意メソッドを実行しない。
+static func registered_stage_commands(keys: Array) -> Array:
+	var registry := {&"lock_aim":0,&"launch_strike":1,&"end_strike":2}
+	var commands := []
+	var prior := -1.0
+	for key in keys:
+		if not key is Dictionary or not registry.has(key.get("method")) or not key.get("args",[]).is_empty(): return []
+		var at := float(key.get("at",NAN))
+		if not is_finite(at) or at < 0.0 or at < prior: return []
+		commands.append({"command":registry[key.method],"at":at})
+		prior = at
+	return commands
+
 static func validate(source: Dictionary) -> PackedStringArray:
 	var errors := PackedStringArray()
 	var rules: Resource = source.get("rules")

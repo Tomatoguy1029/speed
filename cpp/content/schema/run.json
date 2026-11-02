@@ -1399,6 +1399,10 @@
       {
         "name": "Vortex",
         "value": "vortex"
+      },
+      {
+        "name": "Horn",
+        "value": "horn"
       }
     ],
     "VisualRole": [
@@ -2293,6 +2297,7 @@
     "progression.json",
     "enemies.json",
     "field.json",
-    "loadout.json"
+    "loadout.json",
+    "bosses.json"
   ]
 }

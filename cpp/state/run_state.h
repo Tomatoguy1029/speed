@@ -2,6 +2,7 @@
 #include "../../native/runtime_data.h"
 #include "entity_store.h"
 #include "enemy_states.h"
+#include "boss_states.h"
 #include "combat_types.h"
 #include "attack_state.h"
 #include "world_state.h"
@@ -31,6 +32,7 @@
 namespace godot {
 // ランの値状態。保持・複製は全フィールドをまとめてコピーする。
 struct RunState {
+    speed::BossStates bosses;
     speed::RunControlState control;
     speed::PreviousPoseState previous_poses;
     speed::AttackState attacks;

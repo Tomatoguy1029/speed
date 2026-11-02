@@ -3,6 +3,7 @@ extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 @export var pixel_size := 3.0
+var _frame: Array = []
 var actor: MonocerosBoss
 const WARNING := Color("#f2b567")
 const ENERGY := Color("#9fe8ff")
@@ -13,7 +14,24 @@ const ENERGY := Color("#9fe8ff")
 @export_range(0.0, 1.0, 0.05) var jet_opacity := 0.35
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_to(self)
+func apply_frame(values: Array) -> void:
+	if values==_frame: return
+	_frame = values
+	queue_redraw()
+
+func _draw_frame() -> void:
+	for row: Dictionary in _frame:
+		if row.stage==0:
+			draw_line(row.horn[0],row.warning[1],Color(WARNING,warning_opacity),telegraph_line_width,false)
+		elif row.stage==3:
+			var at: Vector2 = row.horn[1]
+			for j in 3:
+				draw_line(at+Vector2(-15,j*10-10),at+Vector2(15,j*10-10),WARNING,pixel_size,false)
+
 func _draw() -> void:
+	if actor==null:
+		_draw_frame()
+		return
 	if actor == null or not actor.has_body(): return
 	if actor.technique != technique_id: return
 	if technique_id == &"return_charge" and actor._runner != null and actor._runner.stage == &"brake":

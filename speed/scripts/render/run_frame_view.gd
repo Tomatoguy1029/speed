@@ -65,6 +65,7 @@ var _telescope_beams: Array[Dictionary] = []
 var _pulser_visual: EnemyVisual
 var _pulser_parent: Node2D
 var _phoenix_visual: EnemyVisual
+var _boss_technique_visual: Node2D
 var _marlin_visual: EnemyVisual
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
@@ -156,6 +157,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	add_child(marlin_layer)
 	var marlin_parent := Node2D.new()
 	marlin_layer.add_child(marlin_parent)
+	_boss_technique_visual = preload("res://scripts/bosses/monoceros/technique_visual.gd").new()
+	marlin_parent.add_child(_boss_technique_visual)
 	_marlin_visual = preload("res://scripts/render/enemies/marlin.gd").new()
 	_marlin_visual.setup_frame(marlin_parent)
 	_phoenix_visual = preload("res://scripts/render/enemies/phoenix.gd").new()
@@ -303,6 +306,16 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
+	if frame.has("boss_techniques"):
+		if not frame.boss_techniques is Array: return false
+		for row in frame.boss_techniques:
+			if not row is Dictionary or not row.get("stage") is int or row.stage<0 or row.stage>7: return false
+			if row.has("position"):
+				if not row.position is Vector2 or not row.position.is_finite(): return false
+				for key in ["horn","warning"]:
+					if not row.get(key) is PackedVector2Array or row[key].size()!=2: return false
+					for point: Vector2 in row[key]:
+						if not point.is_finite(): return false
 	for key in ["comets","capsules","crows"]:
 		if frame.has(key):
 			var data = frame[key]
@@ -688,6 +701,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	if frame.has("gravity") and frame.gravity!=_gravity:
 		_gravity = frame.gravity
 		_gravity_canvas.queue_redraw()
+	if frame.has("boss_techniques"): _boss_technique_visual.apply_frame(frame.boss_techniques)
 	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
 	var cepheus: Dictionary = frame.get("cepheus",{"values":PackedFloat64Array(),"marks":PackedFloat64Array()})
 	if cepheus!=_cepheus:

@@ -83,6 +83,28 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->defenders=records.DefenderDefinition_rows;
     bundle->crabs=records.CrabDefinition_rows;
     bundle->crows=records.CrowDefinition_rows;
+    bundle->bosses=records.BossDefinition_rows;
+    bundle->boss_techniques=records.BossTechniqueDefinition_rows;
+    bundle->boss_stages=records.BossTechniqueStage_rows;
+    for (size_t i=0;i<bundle->bosses.size();++i) {
+        const auto &p=bundle->bosses[i];
+        if (p.id!=i+1 || p.external_id!="monoceros" || p.kind!=0 || p.horn_length_ratio<=0 || p.horn_length_ratio_p2<=0) return {};
+    }
+    for (size_t i=0;i<bundle->boss_techniques.size();++i) {
+        const auto &p=bundle->boss_techniques[i];
+        if (p.id!=i+1 || p.kind!=0 || p.active<=0 || p.external_id!="charge") return {};
+        std::vector<BossTechniqueStage> stages;
+        for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
+        if (stages.size()!=3) return {};
+        const auto &boss=bundle->bosses[p.boss-1];
+        bool commands[3]={};double prior=-1;
+        for (const auto &stage:stages) {
+            const double expected=stage.command==0?std::max(0.01,p.warn-boss.lock_lead):stage.command==1?p.warn:p.warn+p.active;
+            if (commands[stage.command] || stage.at!=expected || stage.at<prior) return {};
+            commands[stage.command]=true;prior=stage.at;
+        }
+    }
+    for (size_t i=0;i<bundle->boss_stages.size();++i) if (bundle->boss_stages[i].id!=i+1) return {};
     bundle->clocks=records.ClockDefinition_rows;
     bundle->aurigas=records.AurigaDefinition_rows;
     bundle->soldiers=records.SoldierDefinition_rows;bundle->cepheus=records.CepheusDefinition_rows;

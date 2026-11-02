@@ -5,6 +5,36 @@ const Wave = preload("res://scripts/attacks/wave.gd")
 const Slash = preload("res://scripts/attacks/slash.gd")
 const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
+const BossProgram = preload("res://tools/content/build_boss_program.gd")
+
+## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
+static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if definition==null or definition.id!=&"monoceros" or move==null or move.technique!=&"charge": return {}
+	var source: BossTechnique = BossProgram.snapshot(move)
+	var boss := {"id":1,"external_id":String(definition.id),"kind":0,"turn":definition.turn,"speed":definition.speed}
+	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed"]:
+		if not definition.params.has(key): return {}
+		boss[key] = float(definition.params[key])
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[]}
+	for phase in [1,2]:
+		var values: Dictionary = source.values().duplicate(true)
+		if phase>=2:
+			for key: String in source.values():
+				if key.ends_with("_p2"): values[key.trim_suffix("_p2")] = source.values()[key]
+		var resolved: BossTechnique = source.duplicate(true)
+		var row := {"id":phase,"boss":1,"external_id":String(source.technique),"kind":0,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap}
+		for key in ["warn","active","recover","cd","damage","distance"]:
+			row[key] = float(values[key])
+			resolved.set(key,row[key])
+		if row.active<=0.0: return {}
+		var commands := BossProgram.charge_stage_commands(resolved,boss.lock_lead)
+		if commands.size()!=3: return {}
+		records.BossTechniqueDefinition.append(row)
+		for command in commands:
+			command.id = records.BossTechniqueStage.size()+1
+			command.technique = phase
+			records.BossTechniqueStage.append(command)
+	return records
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
 	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus"]: return {}
