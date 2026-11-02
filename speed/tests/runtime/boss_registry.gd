@@ -2897,10 +2897,11 @@ func native_canis_bay() -> void:
 	print("[cpp_canis_bay] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-func hydra_regrow_case(flowing := false, squad_changes := {}, move_changes := {}, selected_move := "bite_thrust") -> Dictionary:
+func hydra_regrow_case(flowing := false, squad_changes := {}, move_changes := {}, selected_move := "bite_thrust", config_changes := {}) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
+	for key in config_changes: cfg.set(key,config_changes[key])
 	var definition = load("res://data/bosses/hydra.tres").duplicate(true)
 	definition.speed = 0.0
 	definition.params.squad.merge(squad_changes,true)
@@ -3435,8 +3436,8 @@ func native_canis_stream_cancel() -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 再生・分離・通常技の既存ケースを同じC++窓口へ接続する。
-func hydra_normal_case(flowing := false, squad_changes := {}, move_changes := {}, selected_move := "bite_thrust") -> Dictionary:
-	var c := hydra_regrow_case(flowing,squad_changes,move_changes,selected_move)
+func hydra_normal_case(flowing := false, squad_changes := {}, move_changes := {}, selected_move := "bite_thrust", config_changes := {}) -> Dictionary:
+	var c := hydra_regrow_case(flowing,squad_changes,move_changes,selected_move,config_changes)
 	if c.is_empty(): return c
 	var bridge = c.bridge
 	bridge._core.set_motion_context(Vector2(1600,0),Vector2.ZERO,Vector2(2500,1800))
