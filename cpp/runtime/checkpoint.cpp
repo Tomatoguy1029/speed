@@ -78,6 +78,11 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.radius) || shot.radius<=0 ||
                 !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0) return false;
         } else if (shot.slash.definition) return false;
+        if (shot.kind==int64_t(HostileKind::Bolt)) {
+            if (!shot.bolt.definition || shot.bolt.definition>content.bolts.size() || !shot.pos.is_finite() || !shot.vel.is_finite() ||
+                !std::isfinite(shot.radius) || shot.radius<=0 || !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) ||
+                !std::isfinite(shot.damage) || shot.damage<0) return false;
+        } else if (shot.bolt.definition) return false;
     }
     for (const auto &hazard:state.hazards) if (hazard.alive) {
         if (!hazard.pos.is_finite() || !std::isfinite(hazard.time) || !std::isfinite(hazard.delay) || !std::isfinite(hazard.duration) || !std::isfinite(hazard.damage)) return false;

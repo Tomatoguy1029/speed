@@ -166,6 +166,7 @@ struct RunState {
     } projectile_config;
     struct Hostile {
         speed::SlashState slash;
+        speed::BoltState bolt;
         uint32_t definition=0;
         bool alive = true;
         int64_t kind = 0;

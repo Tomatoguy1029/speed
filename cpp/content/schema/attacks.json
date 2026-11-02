@@ -217,6 +217,54 @@
           "ref": "ContactDefinition"
         }
       ]
+    },
+    {
+      "name": "BoltDefinition",
+      "section": 40,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {
@@ -270,6 +318,10 @@
       {
         "name": "Slash",
         "value": "slash"
+      },
+      {
+        "name": "Bolt",
+        "value": "bolt"
       }
     ],
     "FriendKind": [

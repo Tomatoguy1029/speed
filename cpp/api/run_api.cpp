@@ -274,6 +274,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=removed?success():failure(5,"entity_id","対象がありません");
     } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat") response=development_combat_command(kind,payload);
     else if (kind=="dev_emit_attack" || kind=="dev_end_attack" || kind=="dev_attack_scope" || kind=="dev_clear_hostile" || kind=="dev_attack_update") response=development_attack_command(kind,payload);
+    else if (kind=="dev_fire_bolt") response=development_bolt_command(payload);
     else if (kind=="dev_fire_slash") response=development_slash_command(payload);
     else if (kind=="dev_fire_wall" || kind=="dev_move_wall") response=development_wall_command(kind,payload);
     else if (kind=="dev_fire_wave") response=development_wave_command(payload);

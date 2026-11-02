@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 namespace speed {
+struct BoltState {uint32_t definition=0;};
 struct SlashState {uint32_t definition=0;float side=1;};
 struct BudgetToken {int64_t value=0;};
 enum class EndPolicy : uint32_t { NaturalLifetime=1,CancelWithTechnique=2,EndWithTechnique=4,CancelWithParticipant=8,ClearWithBoss=16,ClearWithBonus=32 };

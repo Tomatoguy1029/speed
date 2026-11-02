@@ -58,6 +58,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		var points: PackedVector2Array = Slash.slash_local(claw)
 		for sample in points.size():
 			data.SlashDefinition.append({"id":data.SlashDefinition.size()+1,"claw":claw,"sample":sample,"x":points[sample].x,"y":points[sample].y,"thickness":Slash.SLASH_THICK,"contact":7})
+	var bolt_visual: AttackVisual = load("res://scenes/attacks/bolt.tscn").instantiate()
+	bolt_visual._apply_effect_settings()
+	var bolt_tint: Color = bolt_visual.effect_tint
+	data.BoltDefinition = [{"id":1,"radius":7.0,"life":4.0,"flight_scale":bolt_visual.flight_scale,"tint_r":bolt_tint.r,"tint_g":bolt_tint.g,"tint_b":bolt_tint.b,"tint_a":bolt_tint.a,"contact":1}]
+	bolt_visual.free()
 	data.FriendShotDefinition = [{"id":1,"contact":4}]
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
@@ -260,6 +265,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.WaveDefinition = resolved.WaveDefinition
 		data.WallDefinition = resolved.WallDefinition
 		data.SlashDefinition = resolved.SlashDefinition
+		data.BoltDefinition = resolved.BoltDefinition
 		data.FriendShotDefinition = resolved.FriendShotDefinition
 		data.BudgetPhase = resolved.BudgetPhase
 		if data.ResourceKey.is_empty():

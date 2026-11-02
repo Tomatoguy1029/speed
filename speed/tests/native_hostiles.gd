@@ -16,6 +16,13 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-bolt" in OS.get_cmdline_user_args() or "--cpp-bolt-tail-fix" in OS.get_cmdline_user_args():
+		mute_checks = "--cpp-bolt-tail-fix" in OS.get_cmdline_user_args()
+		var finished: bool = await check_cpp_bolt()
+		check(finished,"兵の光弾の確認を最後まで実施する")
+		print("[cpp_bolt] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-slash" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_slash()
 		check(finished,"斬撃の確認を最後まで実施する")
@@ -724,6 +731,106 @@ func check_cpp_slash() -> bool:
 	params.position = origin
 	params.size = 0.0
 	check(not bridge.command("dev_fire_slash",params).ok and core.hostiles_snapshot().is_empty(),"大きさ0の斬撃を状態を変えずに拒否する")
+	bridge.release_checkpoint(active.value)
+	bridge.release_checkpoint(empty.value)
+	session.free()
+	return true
+
+func check_cpp_bolt() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 89
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_bolt"
+	var builder = load("res://tools/content/build_run_content.gd")
+	if builder.build(stage,config,output,"兵の光弾の飛行・命中・終了".sha256_text())!=OK:
+		check(false,"兵の光弾の定義を生成する")
+		return false
+	var path := output.path_join("stage_89.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":289},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"兵の光弾を表示する通常のC++ランを準備する")
+	if session.bridge==null: session.free(); return false
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var origin := Vector2(-900,0)
+	bridge.command("dev_ship_motion",{"position":origin+Vector2(0,100),"velocity":Vector2.ZERO})
+	core.set_motion_context(origin+Vector2(0,100),origin,Vector2(640,360))
+	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(-300,300)}).value
+	var empty: Dictionary = bridge.checkpoint()
+	var params := {"position":origin,"angle":PI*0.5,"speed":100.0,"damage":9.0,"owner_id":owner_id}
+	if "--cpp-bolt-tail-fix" in OS.get_cmdline_user_args():
+		params.angle = 0.0
+		var tail: Dictionary = bridge.command("dev_fire_bolt",params)
+		bridge.command("dev_ship_motion",{"position":origin-Vector2(7.0+config.ship_radius+5.0,0),"velocity":Vector2.ZERO})
+		core.step_hostiles(0.1)
+		mute_checks = false
+		check(tail.ok and core.hostiles_snapshot().size()==1 and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"光弾の長い尾だけに重なっても半径7の判定外なら被弾しない")
+		bridge.release_checkpoint(empty.value)
+		session.free()
+		return true
+	var fired: Dictionary = bridge.command("dev_fire_bolt",params)
+	check(fired.ok,"発生源から兵の光弾を生成する")
+	if not fired.ok: session.free(); return false
+	core.step_hostiles(0.1)
+	var shot: Dictionary = core.hostiles_snapshot()[0]
+	check(shot.pos.distance_to(origin+Vector2(0,10))<0.001 and is_equal_approx(shot.life,3.9),"光弾が指定の方向へ直進して寿命を減らす")
+	var frame: Dictionary = bridge.read_render(Rect2(-1600,-500,1400,1000)).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(frame.shapes.size()==1 and frame.shapes[0].widths==PackedFloat32Array([14.0,6.0,2.5]),"光弾は元の幅で光・本体・芯の3本を表示する")
+	if frame.shapes.size()==1:
+		var points: PackedVector2Array = frame.shapes[0].points
+		check(points[0].distance_to(shot.pos-Vector2(0,34))<0.001 and points[1].distance_to(shot.pos+Vector2(0,6))<0.001,"細長い光弾の向きと前後の長さを保つ")
+	check(presentation.frame_view.apply_frame(frame),"飛んでいる光弾を通常の表示へ渡す")
+	await get_tree().process_frame
+	bridge.command("dev_remove",{"entity_id":owner_id})
+	check(core.attack_snapshot()[0].source_id==owner_id and not core.attack_snapshot()[0].source_alive,"発射元の退場後も元のIDで光弾が残る")
+	var active: Dictionary = bridge.checkpoint()
+	var state: Array = core.hostiles_snapshot()
+	check(active.ok,"飛行中の光弾を値で保持する")
+	core.step_hostiles(1.0)
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-9.0),"飛行区間で機体に当たり共通被弾へ通って消える")
+	var events: Array = bridge.read_frame().value.events
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"bolt"),"光弾の原因名を共通記録へ残す")
+	bridge.restore(active.value)
+	check(core.hostiles_snapshot()==state and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"光弾の速度・寿命・位置・未命中状態を保持点から復元する")
+	bridge.command("dev_ship_motion",{"position":origin-Vector2(0,300),"velocity":Vector2.ZERO})
+	core.step_hostiles(4.0)
+	check(core.hostiles_snapshot().is_empty(),"光弾は4秒の寿命で消える")
+	bridge.restore(empty.value)
+	params.position = Vector2(-300,0)
+	params.angle = 0.0
+	params.speed = 1000.0
+	check(bridge.command("dev_fire_bolt",params).ok,"天体へ向かう光弾を生成する")
+	bridge.command("dev_ship_motion",{"position":Vector2(50,0),"velocity":Vector2.ZERO})
+	core.step_hostiles(0.5)
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"機体より手前の天体に当たって光弾が消える")
+	bridge.restore(empty.value)
+	params.position = origin
+	params.speed = 100.0
+	check(bridge.command("dev_fire_bolt",params).ok,"判定幅を確認する光弾を生成する")
+	bridge.command("dev_ship_motion",{"position":origin+Vector2(10,7.0+config.ship_radius),"velocity":Vector2.ZERO})
+	core.step_hostiles(0.1)
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-9.0),"半径7と機体半径を足した境界で当たる")
+	bridge.restore(empty.value)
+	check(bridge.command("dev_fire_bolt",params).ok,"見た目の尾と当たりを分ける光弾を生成する")
+	bridge.command("dev_ship_motion",{"position":origin-Vector2(7.0+config.ship_radius+5.0,0),"velocity":Vector2.ZERO})
+	core.step_hostiles(0.1)
+	check(core.hostiles_snapshot().size()==1 and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"光弾の長い尾だけに重なっても半径7の判定外なら被弾しない")
+	bridge.restore(empty.value)
+	params.speed = -1.0
+	check(not bridge.command("dev_fire_bolt",params).ok and core.hostiles_snapshot().is_empty(),"負の速度の光弾を状態を変えずに拒否する")
 	bridge.release_checkpoint(active.value)
 	bridge.release_checkpoint(empty.value)
 	session.free()

@@ -66,6 +66,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->waves=records.WaveDefinition_rows;
     bundle->walls=records.WallDefinition_rows;
     bundle->slashes=records.SlashDefinition_rows;
+    bundle->bolts=records.BoltDefinition_rows;
+    for (size_t i=0;i<bundle->bolts.size();++i) {
+        const auto &bolt=bundle->bolts[i];
+        if (bolt.id!=i+1 || bolt.radius<=0 || bolt.life<=0 || bolt.flight_scale<=0 ||
+            !std::isfinite(float(bolt.radius)) || !std::isfinite(float(bolt.life)) || !std::isfinite(float(bolt.flight_scale))) return {};
+    }
     if (!bundle->slashes.empty()) {
         if (bundle->slashes.size()!=51) return {};
         for (size_t i=0;i<bundle->slashes.size();++i) {
