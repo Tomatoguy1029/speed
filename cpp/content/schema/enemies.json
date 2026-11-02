@@ -741,6 +741,38 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "SoldierDefinition",
+      "section": 71,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bolt_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mutiny_shot",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

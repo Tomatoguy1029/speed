@@ -74,6 +74,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->marlins=records.MarlinDefinition_rows;
     bundle->pulsers=records.PulserDefinition_rows;
     bundle->dolphins=records.DolphinDefinition_rows;
+    bundle->soldiers=records.SoldierDefinition_rows;
     bundle->lynxes=records.LynxDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
@@ -242,7 +243,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -338,6 +339,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{item_lynx->accel,item_lynx->keep,item_lynx->warn,item_lynx->slash_speed,item_lynx->slash_size,item_lynx->slash_range,item_lynx->damage}) if (!std::isfinite(float(value))) return {};
             definition.lynx_definition=uint32_t(item_lynx-bundle->lynxes.begin()+1);definition.accel=item_lynx->accel;
         } else if (item_lynx!=bundle->lynxes.end()) return {};
+        const auto item_soldier=std::find_if(bundle->soldiers.begin(),bundle->soldiers.end(),[&](const auto &p){return p.id==row.id;});
+        if (row.kind==20) {
+            if (item_soldier==bundle->soldiers.end()) return {};
+            for (double value:{item_soldier->accel,item_soldier->bolt_speed,item_soldier->damage,item_soldier->mutiny_shot}) if (!std::isfinite(float(value))) return {};
+            definition.soldier_definition=uint32_t(item_soldier-bundle->soldiers.begin()+1);definition.accel=item_soldier->accel;
+        } else if (item_soldier!=bundle->soldiers.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;

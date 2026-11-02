@@ -6,13 +6,18 @@ func setup(render: RunPresentation, behavior_name: StringName) -> void:
 	always_marked = true
 
 func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	super(c, t, i)
-	if t.mode[i] == EnemyTable.Mode.MOVE and t.charge[i] > 0.0:
-		var dir := Vector2.from_angle(t.facing[i])
-		var start := t.pos[i] + dir * t.r[i]
-		var glow := Color(1.0, 0.88, 0.48, 0.25 + 0.55 * t.charge[i])
-		c.draw_line(start, start + dir * 90.0, glow, _px(2.0))
-		c.draw_arc(t.pos[i], t.r[i] * 1.4, 0.0, TAU * t.charge[i], 24, glow, _px(2.0))
-	if t.mode[i] == EnemyTable.Mode.RECOVER:
-		var flick := 0.5 + 0.5 * sin(state.world_time * 30.0 + float(t.id[i]))
-		c.draw_arc(t.pos[i], t.r[i] * 1.3, 0, TAU, 20, Color(1.0, 0.3, 0.3, 0.4 + 0.4 * flick), _px(2.0))
+	draw_view(c,t.pos[i],t.r[i],t.facing[i],t.mode[i],t.charge[i],0.5+0.5*sin(state.world_time*30.0+float(t.id[i])),_px(1.0))
+
+static func draw_frame(c: CanvasItem, values: PackedFloat32Array, pixel: float) -> void:
+	for n in range(0,values.size(),7): draw_view(c,Vector2(values[n],values[n+1]),values[n+2],values[n+3],int(values[n+4]),values[n+5],values[n+6],pixel)
+
+static func draw_view(c: CanvasItem, p: Vector2, r: float, facing: float, mode: int, charge: float, flick: float, pixel: float) -> void:
+	if charge>0.0:
+		c.draw_circle(p+Vector2.from_angle(facing)*r,3.0*pixel+r*0.45*charge,Color(1.0,0.9,0.6,0.35+0.55*charge))
+	if mode==EnemyTable.Mode.MOVE and charge>0.0:
+		var direction := Vector2.from_angle(facing)
+		var start := p+direction*r
+		var glow := Color(1.0,0.88,0.48,0.25+0.55*charge)
+		c.draw_line(start,start+direction*90.0,glow,2.0*pixel)
+		c.draw_arc(p,r*1.4,0.0,TAU*charge,24,glow,2.0*pixel)
+	if mode==EnemyTable.Mode.RECOVER: c.draw_arc(p,r*1.3,0.0,TAU,20,Color(1.0,0.3,0.3,0.4+0.4*flick),2.0*pixel)

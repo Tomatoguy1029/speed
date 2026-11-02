@@ -7,11 +7,13 @@
 namespace speed {
 using godot::Vector2;
 enum class EnemyMode { Move, Windup, Dash, Recover };
+struct SoldierFormation {Vector2 anchor;double spacing=0,row_near=0,row_far=0,fan_radius=0,fan_step=0;uint32_t tier=1;};
+struct SoldierState {EnemyHandle king;int64_t king_id=0;uint32_t slot=0;SoldierFormation formation;};
 struct LynxState {int32_t buds=0;};
 struct MarlinState {godot::Vector2 anchor;};
 struct SniperState {std::vector<float> rays;};
 struct Enemy {
-    std::variant<std::monostate,SniperState,MarlinState,LynxState> behavior_state;
+    std::variant<std::monostate,SniperState,MarlinState,LynxState,SoldierState> behavior_state;
     int64_t id = 0;
     int64_t attack_group = 0;
     double attack_value = 1, attack_priority = 0;

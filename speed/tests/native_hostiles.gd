@@ -16,6 +16,12 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-soldier" in OS.get_cmdline_user_args():
+		mute_checks = "--cpp-soldier-tail" in OS.get_cmdline_user_args()
+		await check_cpp_soldier()
+		print("[cpp_soldier] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lynx" in OS.get_cmdline_user_args():
 		await check_cpp_lynx()
 		print("[cpp_lynx] failed=%d" % failed)
@@ -1133,5 +1139,98 @@ func check_cpp_lynx() -> void:
 	core.remove_enemy(owner)
 	core.step(0.1)
 	check(pulse_motion(core,replacement).buds==1 and core.hostiles_snapshot().size()==1,"参照相手が先に消えても古い行を追わず撃つ")
+	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func check_cpp_soldier() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 78
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["cepheus_soldier","drifter"])
+	stage.enemy_tuning = {"cepheus_soldier":{"armor":0.0},"drifter":{"speed":0.0}}
+	var output := "res://.content/dev/run_soldier"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"兵の隊列と王の消失".sha256_text())
+	check(built==OK,"兵の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_78.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":789},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"兵のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.configure_attack_budget({"enabled":false,"budget":4.0,"jitter":0.0})
+	var anchor := target-Vector2(500,0)
+	var king: int = core.spawn_enemy(&"drifter",anchor,{"facing":0.0})
+	core.set_enemy_motion(king,{"held":true})
+	var a_goal := anchor+Vector2(120,-60)
+	var b_goal := anchor+Vector2(120,60)
+	var a: int = core.spawn_enemy(&"cepheus_soldier",a_goal+Vector2(5,0),{})
+	var b: int = core.spawn_enemy(&"cepheus_soldier",b_goal+Vector2(5,0),{})
+	var formation := {"king_id":king,"tier":1,"anchor":anchor,"values":PackedFloat64Array([60,120,230,190,0.42])}
+	check(bridge.command("dev_soldier_formation",formation.merged({"entity_id":a,"slot":0})).ok and bridge.command("dev_soldier_formation",formation.merged({"entity_id":b,"slot":2})).ok,"王Handleと隊列の値を兵へ渡す")
+	core.step(0.01)
+	check(pulse_motion(core,a).mode==EnemyTable.Mode.MOVE and Vector2(dolphin_enemy(core,a).pos[0],dolphin_enemy(core,a).pos[1]).is_equal_approx(a_goal),"隊列へ移動し距離8未満で固定位置へ着く")
+	core.set_enemy_motion(a,{"charge":1.0})
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(900,400),Vector2(1800,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var visible := false
+	for batch: Dictionary in frame.batches:
+		if batch.has("soldier"): visible = batch.soldier.size()==14
+	check(visible and presentation.frame_view.apply_frame(frame),"通常の兵と射撃予告を共通表示へ渡す")
+	await get_tree().process_frame
+	check(bridge.command("dev_soldier_fire",{"entity_id":a}).ok and core.hostiles_snapshot().size()==1,"王からの射撃入口で編集値の光弾を生成する")
+	core.remove_enemy(king)
+	core.step(0.01)
+	check(pulse_motion(core,a).mode==EnemyTable.Mode.RECOVER and is_equal_approx(pulse_motion(core,a).timer,0.4),"王を先に消すと古い行を参照せず反乱を始める")
+	var hp: float = dolphin_enemy(core,b).hp
+	core.set_enemy_motion(a,{"fire_t":0.0})
+	core.set_enemy_motion(b,{"fire_t":0.0})
+	core.step(0.05)
+	check(is_equal_approx(dolphin_enemy(core,b).hp,hp*0.65),"反乱で最寄りの兵へ最大HPの35%を与える")
+	mute_checks = false
+	var output_frame: Dictionary = bridge.read_frame().value
+	check(output_frame.events.any(func(event): return event.type==&"beam"),"反乱の射撃を共通の光線イベントへ渡す")
+	presentation.frame_view.receive_frame(output_frame)
+	presentation.frame_view.update_effects(output_frame,0.0)
+	frame = bridge.read_render(Rect2(target-Vector2(900,400),Vector2(1800,800))).value
+	check(presentation.frame_view.apply_frame(frame) and not presentation.frame_view._mutiny_beams.is_empty(),"崩壊中の赤い点滅と兵同士の射撃を通常画面へ表示する")
+	await get_tree().process_frame
+	core.step(0.5)
+	check(dolphin_enemy(core,a).dead and dolphin_enemy(core,b).dead,"反乱の期限で兵を共通の撃破処理へ渡す")
+	core.step_hostiles(0.01)
+	check(core.hostiles_snapshot().size()==1,"兵の撃破後も発射済みの光弾が進む")
+	core.step_hostiles(8.0)
+	check(core.hostiles_snapshot().is_empty(),"光弾は自然終了する")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"王参照・隊列値・構えを値から復帰する")
+	core.remove_enemy(king)
+	core.step(0.01)
+	var future: Array = core.enemy_motion_snapshot()
+	bridge.restore(pending.value)
+	core.remove_enemy(king)
+	core.step(0.01)
+	check(core.enemy_motion_snapshot()==future,"復帰後も同じ反乱を始め保持元を変更しない")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":a,"cause":"bullet"})
+	check(not bridge.command("dev_soldier_fire",{"entity_id":a}).ok and core.hostiles_snapshot().is_empty(),"途中撃破された兵は新しい光弾を撃たない")
+	core.remove_enemy(a)
+	var replacement: int = core.spawn_enemy(&"cepheus_soldier",a_goal,{})
+	check(replacement!=a and pulse_motion(core,replacement).king_id==0 and pulse_motion(core,replacement).charge==0.0,"行の再利用で王と構えを引き継がない")
+	core.step(0.01)
+	core.step(0.5)
+	check(dolphin_enemy(core,replacement).dead,"王のない単体配置は反乱後に自然崩壊する")
 	bridge.release_checkpoint(pending.value)
 	session.free()

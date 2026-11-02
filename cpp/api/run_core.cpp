@@ -10,6 +10,7 @@
 #include "../behaviors/enemies/marlin.h"
 #include "../behaviors/enemies/pulser.h"
 #include "../behaviors/enemies/dolphin.h"
+#include "../behaviors/enemies/soldier.h"
 #include "../behaviors/enemies/lynx.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
@@ -212,6 +213,8 @@ void SpeedRunCore::advance_enemies(double delta) {
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
             if (def.kind==speed::EnemyDefinition::Kind::Lynx) {
                 speed::LynxBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Soldier) {
+                speed::SoldierBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Dolphin) {
                 speed::DolphinBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Pulser) {
@@ -243,14 +246,14 @@ void SpeedRunCore::advance_enemies(double delta) {
                 enemy.vel=speed::PursuitBehavior::velocity(enemy,runtime.state.ship_pos,def.turn,far?delta*3.0:delta,policy);
             }
         }
-        if (enemy.dead) continue;
+        if (!runtime.state.enemy_handles.contains(update_handles[row]) || runtime.state.enemies[row].dead) continue;
         if (def.kind==speed::EnemyDefinition::Kind::Marlin) {
             speed::MarlinBehavior::before_move(runtime,update_handles[row],delta);
             if (!runtime.state.enemy_handles.contains(update_handles[row]) || runtime.state.enemies[row].dead) continue;
             auto &moving=runtime.state.enemies[row];moving.pos+=moving.vel*delta;speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue;
         }
-        enemy.pos += enemy.vel * delta;
-        if (!far || (enemy.id+runtime.state.ticks)%3==0) speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);
+        auto &moving=runtime.state.enemies[row];moving.pos += moving.vel * delta;
+        if (!far || (moving.id+runtime.state.ticks)%3==0) speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);
       }
     }
     speed::MarlinBehavior::after_tick(runtime,marlins);

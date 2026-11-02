@@ -32,6 +32,8 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _soldier := PackedFloat32Array()
+var _mutiny_beams: Array[Dictionary] = []
 var _lynx := PackedFloat32Array()
 var _dolphin := PackedFloat32Array()
 var _sniper := PackedFloat32Array()
@@ -136,6 +138,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/soldier.gd").draw_frame(canvas,_soldier,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/lynx.gd").draw_frame(canvas,_lynx,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/dolphin.gd").draw_frame(canvas,_dolphin,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/sniper.gd").draw_frame(canvas,_sniper,_sniper_world_time,1.0/maxf(_zoom,0.01))
@@ -147,6 +150,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_particle_canvas = Node2D.new()
 	_layer(14).add_child(_particle_canvas)
 	_particle_canvas.draw.connect(func():
+		for beam: Dictionary in _mutiny_beams:
+			var k: float = beam.life/beam.max
+			var color: Color = EFFECT_SETTINGS.tinted("",beam.color)
+			_particle_canvas.draw_line(beam.from,beam.to,Color(color,0.7*k),beam.width)
+			_particle_canvas.draw_line(beam.from,beam.to,Color(1,1,1,k),beam.width*EFFECT_SETTINGS.number("","beam_core_ratio",0.3))
 		for beam: Dictionary in _telescope_beams:
 			var color := Color(1.0,0.3,0.22,beam.life/beam.max)
 			_particle_canvas.draw_line(beam.from,beam.to,color,beam.width)
@@ -244,6 +252,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.beamer is PackedFloat32Array or row.beamer.size()%10!=0: return false
 			for value: float in row.beamer:
 				if not is_finite(value): return false
+		if row.has("soldier"):
+			if not row.soldier is PackedFloat32Array or row.soldier.size()%7!=0: return false
+			for value: float in row.soldier:
+				if not is_finite(value): return false
 		if row.has("lynx"):
 			if not row.lynx is PackedFloat32Array or row.lynx.size()%6!=0: return false
 			for value: float in row.lynx:
@@ -327,6 +339,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	var previous_beamer := _beamer
 	var previous_missile := _missile
 	var previous_battleship := _battleship
+	var previous_soldier := _soldier
 	var previous_lynx := _lynx
 	var previous_dolphin := _dolphin
 	var previous_sniper := _sniper
@@ -334,6 +347,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	_beamer = PackedFloat32Array()
 	_missile = PackedFloat32Array()
 	_battleship = PackedFloat32Array()
+	_soldier = PackedFloat32Array()
 	_lynx = PackedFloat32Array()
 	_dolphin = PackedFloat32Array()
 	_sniper = PackedFloat32Array()
@@ -342,11 +356,12 @@ func apply_frame(frame: Dictionary) -> bool:
 		if row.has("beamer"): _beamer.append_array(row.beamer)
 		if row.has("missile"): _missile.append_array(row.missile)
 		if row.has("battleship"): _battleship.append_array(row.battleship)
+		if row.has("soldier"): _soldier.append_array(row.soldier)
 		if row.has("lynx"): _lynx.append_array(row.lynx)
 		if row.has("dolphin"): _dolphin.append_array(row.dolphin)
 		if row.has("sniper"): _sniper.append_array(row.sniper)
 	# 描画命令はCanvasItemが保持する。変わらない予告は再構築しない。
-	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin or _lynx!=previous_lynx: _gunner_marks.queue_redraw()
+	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin or _lynx!=previous_lynx or _soldier!=previous_soldier: _gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	var packed_bytes := 0
@@ -522,6 +537,7 @@ func receive_frame(frame: Dictionary) -> bool:
 	if frame.epoch!=_epoch:
 		_epoch = frame.epoch
 		_queued_events.clear()
+		_mutiny_beams.clear()
 		_flashes = ShotFlashes.new()
 		_forward_world_time = -1.0
 		_scatter_flashes = ShotFlashes.new()
@@ -651,6 +667,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 					var offset: Vector2 = (texture.get_meta("offset") as Vector2).rotated(event.facing)
 					_meteor_shards.append({"texture":texture,"pos":event.pos+offset*0.35,"vel":offset.normalized()*100.0+event.dir*60.0,
 						"angle":event.facing,"spin":-1.5 if i%2==0 else 1.5,"life":0.65})
+		if event.type==&"beam":
+			var life: float = event.get("life",0.4)*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
+			_mutiny_beams.append({"from":event.from,"to":event.to,"width":event.width,"life":life,"max":life,"color":event.get("color",Color(1,0.95,0.6))})
 		if event.type==&"telescope_charge": _rings.append({"pos":event.pos,"radius":30.0,"color":Color(1.0,0.4,0.3),"life":0.2,"max":0.2})
 		if event.type==&"telescope_fire":
 			var direction := Vector2.from_angle(event.angle)
@@ -743,6 +762,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		shard.angle += shard.spin*effect_dt
 		shard.life -= effect_dt
 	_meteor_shards = _meteor_shards.filter(func(shard: Dictionary): return shard.life>0.0)
+	for beam: Dictionary in _mutiny_beams: beam.life -= effect_dt
+	_mutiny_beams = _mutiny_beams.filter(func(beam: Dictionary): return beam.life>0.0)
 	for beam: Dictionary in _telescope_beams: beam.life -= effect_dt
 	_telescope_beams = _telescope_beams.filter(func(beam: Dictionary): return beam.life>0.0)
 	for ring: Dictionary in _rings: ring.life -= effect_dt

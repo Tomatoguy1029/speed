@@ -65,6 +65,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         if (e->parent_id) {row["parent_id"]=e->parent_id;row["parent_alive"]=runtime.state.enemy_handles.contains(e->parent) && !runtime.state.enemies[e->parent.slot].dead;}
         if (!e->parts.empty()) row["parts_alive"]=int64_t(speed::EnemySystem::parts_alive(runtime.state,runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id)))));
         if (const auto *sniper=std::get_if<speed::SniperState>(&e->behavior_state)) {PackedFloat32Array rays;for (float value:sniper->rays) rays.push_back(value);row["sight_rays"]=rays;}
+        if (const auto *soldier=std::get_if<speed::SoldierState>(&e->behavior_state)) {row["king_id"]=soldier->king_id;row["slot"]=soldier->slot;row["formation_anchor"]=soldier->formation.anchor;}
         if (const auto *lynx=std::get_if<speed::LynxState>(&e->behavior_state)) row["buds"]=lynx->buds;
         if (const auto *marlin=std::get_if<speed::MarlinState>(&e->behavior_state)) row["anchor"]=marlin->anchor;
         row["mode"] = int(e->mode); row["timer"] = e->timer; row["charge"] = e->charge; out.append(row);

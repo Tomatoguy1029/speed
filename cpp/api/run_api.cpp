@@ -1,4 +1,6 @@
 #include "run_core.h"
+#include "../behaviors/enemies/soldier.h"
+#include "../systems/attack_system.h"
 #include "../runtime/run_runner.h"
 #include "../runtime/lifecycle.h"
 #include "../output/event_builder.h"
@@ -265,6 +267,16 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],Dictionary());
         if (entity>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=entity>0?success(entity):failure(5,"definition_id","生成できる定義がありません");
+    } else if (kind=="dev_soldier_formation" && runtime.api_development && payload.size()==6 && is(payload,"entity_id",Variant::INT) && is(payload,"king_id",Variant::INT) && is(payload,"slot",Variant::INT) && is(payload,"tier",Variant::INT) && is(payload,"anchor",Variant::VECTOR2) && is(payload,"values",Variant::PACKED_FLOAT64_ARRAY)) {
+        const auto a=runtime.state.rows_by_id.find(int64_t(payload["entity_id"])),b=runtime.state.rows_by_id.find(int64_t(payload["king_id"]));const PackedFloat64Array values=payload["values"];bool ok=false;
+        if (a!=runtime.state.rows_by_id.end() && b!=runtime.state.rows_by_id.end() && values.size()==5 && int64_t(payload["slot"])>=0 && int64_t(payload["tier"])>=1 && int64_t(payload["tier"])<=3) {
+            speed::SoldierFormation f;f.anchor=payload["anchor"];f.spacing=values[0];f.row_near=values[1];f.row_far=values[2];f.fan_radius=values[3];f.fan_step=values[4];f.tier=int64_t(payload["tier"]);
+            ok=speed::SoldierBehavior::configure(runtime,runtime.state.enemy_handles.at(a->second),runtime.state.enemy_handles.at(b->second),int64_t(payload["slot"]),f,true);
+        }
+        response=ok?success():failure(5,"soldier","兵と王と隊列の指定が無効です");
+    } else if (kind=="dev_soldier_fire" && runtime.api_development && payload.size()==1 && is(payload,"entity_id",Variant::INT)) {
+        const auto found=runtime.state.rows_by_id.find(int64_t(payload["entity_id"]));const auto attack=found==runtime.state.rows_by_id.end()?speed::AttackHandle():speed::SoldierBehavior::fire(runtime,runtime.state.enemy_handles.at(found->second));
+        response=speed::AttackSystem::get(runtime.state,attack)?success():failure(5,"soldier","兵は射撃できる状態ではありません");
     } else if (kind=="dev_spawn_part" && runtime.api_development && payload.size()==3 && is(payload,"parent_id",Variant::INT) && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2)) {
         const auto parent=runtime.state.rows_by_id.find(int64_t(payload["parent_id"]));size_t definition=0;
         while (definition<runtime.content->definitions.size() && String(runtime.content->definitions[definition].id)!=String(payload["definition_id"])) ++definition;
