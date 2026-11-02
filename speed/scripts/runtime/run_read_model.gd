@@ -1,8 +1,18 @@
 ## C++の読取値だけから作る表示用の投影。ゲーム状態として書き戻さない。
 extends RefCounted
+const HazardKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.HazardKind
 signal frame_events(events: Array[Dictionary])
 var input_source: Callable
 class Values extends RefCounted:
+	const BEHAVIORS := {
+		"biter": ["zone"], "defender": ["zone"], "hound": ["zone"], "auriga": ["residue"],
+		"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
+		"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
+		"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
+		"lynx": ["aimed"], "triangle": ["residue"],
+		"phoenix": ["dash", "zone"], "crab": ["zone"], "marlin": ["dash", "aimed"],
+		"aquarius": ["beam"], "reticle": ["beam"], "corona": ["aimed"],
+		"aquila": ["dash", "zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 	var data := {}
 	func _get(key: StringName): return data.get(key)
 	func gauge_amount() -> float: return float(data.get("gauge",0.0))*float(data.get("stats",{}).get("capacity",1.0))
@@ -21,7 +31,7 @@ class Values extends RefCounted:
 	func def_of(id: StringName) -> EnemyDef: return data.get("definitions",{}).get(id)
 	func used_cost() -> float: return data.get("used",0.0)
 	func categories(behavior: StringName) -> Array:
-		return {&"shooter":["aimed"],&"beam":["beam"],&"missile":["homing"],&"dash":["dash"]}.get(behavior,[])
+		return BEHAVIORS.get(String(behavior),[])
 	func guard_active() -> bool: return data.get("guard_active",false)
 	func flood_half(i: int, distance: float) -> float: return data.hazard_width[i]*0.5+tan(data.hazard_arc[i])*distance
 	func wave_radius(i: int) -> float: return data.wave_radii.get(i,data.hazard_len[i])
@@ -89,7 +99,7 @@ func refresh(snapshot: Dictionary, ui: Dictionary) -> void:
 		p.hazard_t.append(hazard.time)
 		p.hazard_delay.append(hazard.delay)
 		p.hazard_pos.append(hazard.pos)
-		p.hazard_kind.append(hazard.get("kind",ProjectileSystem.HazardKind.ZONE))
+		p.hazard_kind.append(hazard.get("kind",HazardKind.Zone))
 		p.hazard_arc.append(hazard.get("arc",0.0))
 		p.hazard_angle.append(hazard.get("angle",0.0))
 		p.hazard_len.append(hazard.get("length",hazard.radius))

@@ -1,5 +1,6 @@
 ## 装備の実戦プレビュー。編集画面と実行時エラー検査で同じ発動手順を使う。
 extends RefCounted
+const GemKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.GemKind
 const PASSIVE_KEYS := ["trait/quickCharge","trait/capacity","trait/critRate","trait/speed","trait/attack","trait/pickup","trait/length","trait/glideDuration","trait/bigSwing","trait/multiShot"]
 
 static func play(session, key: String, use_sample_weapon := true, heading := Vector2.RIGHT) -> bool:
@@ -26,7 +27,7 @@ static func play(session, key: String, use_sample_weapon := true, heading := Vec
 		for offset in [Vector2(990,90),Vector2(1050,160),Vector2(1100,40)]: spawn(session,origin+offset.rotated(heading.angle()))
 	if key=="trait/pickup":
 		for pos in [Vector2(80,80),Vector2(160,80),Vector2(230,80)]:
-			if not session.perform("command",{"name":"dev_drop_crystal","args":{"position":origin+pos.rotated(heading.angle()),"kind":PickupSystem.GemKind.LOW}}): return false
+			if not session.perform("command",{"name":"dev_drop_crystal","args":{"position":origin+pos.rotated(heading.angle()),"kind":GemKind.Low}}): return false
 	if not session.perform("command",{"name":"dev_edit","args":{"kind":"equipment_preview","payload":{"id":String(id),"heading":heading,"targets":targets}}}): return false
 	if key in ["trait/killSonic","trait/rampage"]:
 		var seeded := {"done":false,"bridge":weakref(session.bridge)}

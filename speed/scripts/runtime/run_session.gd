@@ -24,8 +24,6 @@ var bridge: RefCounted
 var cpp_choices: RefCounted
 var cpp_laser_audio: Node
 var cpp_input_source: Callable
-## 開発用の録画条件。途中録画でもラン初期化時の実効値を保持する。
-var recording_initial: Dictionary = {}
 
 signal started
 signal cpp_finished(result: Dictionary)

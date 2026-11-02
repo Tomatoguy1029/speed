@@ -1,5 +1,6 @@
 ## 本番ランを固定更新で実行する実験セッション。共有セーブ・設定を編集しない。
 extends Node
+const GemKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.GemKind
 
 signal changed
 signal event_recorded(event: Dictionary)
@@ -299,7 +300,7 @@ func _add_field(kind: String, at: Vector2, radius: float) -> Dictionary:
 	if kind=="gem":
 		for k in 12:
 			var u := Vector2.from_angle(k*2.399963)*sqrt((k+0.5)/12.0)*radius
-			var result: Dictionary = bridge.command("dev_drop_crystal",{"position":at+u,"kind":PickupSystem.GemKind.LOW})
+			var result: Dictionary = bridge.command("dev_drop_crystal",{"position":at+u,"kind":GemKind.Low})
 			if not result.ok: return result
 		return {"ok":true}
 	if kind=="planet": return bridge.command("dev_edit",{"kind":"planet","payload":{"position":at,"radius":maxf(10.0,radius)}})

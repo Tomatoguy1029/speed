@@ -1,5 +1,6 @@
 ## 戦闘エフェクト画面に本番描画を映し、装備または選択技を試遊する。
 extends VBoxContainer
+const HazardKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.HazardKind
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 const ROOT := "res://scenes/bosses/"
@@ -600,13 +601,13 @@ func _update_preview_camera(render: RunPresentation) -> void:
 						_boss_frame = _boss_frame.merge(Rect2(effect.pos, Vector2.ZERO).grow(maxf(100.0, float(effect.get("radius", 0.0)))))
 					for point: Vector2 in effect.get("line", PackedVector2Array()):
 						_boss_frame = _boss_frame.merge(Rect2(point, Vector2.ZERO).grow(100.0))
-	var pr: ProjectileSystem = session.run.projectiles
+	var pr = session.run.projectiles
 	for row in pr.hazard_alive.size():
 		if pr.hazard_alive[row] == 0: continue
 		var start: Vector2 = pr.hazard_pos[row]
 		var end := start
 		var margin := maxf(80.0, float(pr.hazard_len[row]))
-		if pr.hazard_kind[row] in [ProjectileSystem.HazardKind.BEAM, ProjectileSystem.HazardKind.WALL]:
+		if pr.hazard_kind[row] in [HazardKind.Beam, HazardKind.Wall]:
 			end += Vector2.from_angle(pr.hazard_angle[row]) * pr.hazard_len[row]
 			margin = maxf(80.0, pr.flood_half(row, pr.hazard_len[row]))
 		_boss_frame = _boss_frame.merge(Rect2(start, Vector2.ZERO).expand(end).grow(margin))

@@ -335,7 +335,7 @@ func _change_tuning_arc(value: float, key: String, index: int, field: String) ->
 func _add_tuning_arc(key: String) -> void:
 	var draft: Dictionary = _drafts[key]
 	var arcs: Array = draft.arcs
-	var arc: Resource = preload("res://scripts/bosses/draco_exhale_arc.gd").new()
+	var arc: Resource = preload("res://scripts/data_types/boss_techniques/draco/exhale_arc.gd").new()
 	arcs.append({"offset_x": arc.offset.x, "offset_y": arc.offset.y,
 		"radius": arc.radius, "angle_degrees": arc.angle_degrees,
 		"spread_degrees": arc.spread_degrees, "count": arc.count})
@@ -373,7 +373,7 @@ func _move_with_draft(move: Resource, draft: Dictionary) -> Resource:
 			var previous: Array = values.get("arcs", [])
 			var arcs := []
 			for index in draft.arcs.size():
-				var arc: Resource = previous[index].duplicate(true) if index < previous.size() else preload("res://scripts/bosses/draco_exhale_arc.gd").new()
+				var arc: Resource = previous[index].duplicate(true) if index < previous.size() else preload("res://scripts/data_types/boss_techniques/draco/exhale_arc.gd").new()
 				var entry: Dictionary = draft.arcs[index]
 				arc.offset = Vector2(entry.offset_x, entry.offset_y)
 				for property in ["radius", "angle_degrees", "spread_degrees", "count"]: arc.set(property, entry[property])

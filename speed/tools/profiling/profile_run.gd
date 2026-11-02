@@ -1,5 +1,6 @@
 ## 通常の出撃・入力・Bridge・表示を使う最終計測。条件と結果はローカル専用へ保存する。
 extends Node
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 const DRIVE_RADIUS := 900.0
 const REFILL_FRAMES := 15
 const FLAGS := ["gpu", "hitstop", "levels", "bonus", "keep", "normal-drops", "rewards"]
@@ -148,7 +149,7 @@ func _ready() -> void:
 			_fail("通常出撃の準備が完了しません")
 			return
 		await get_tree().process_frame
-	if session.bridge==null or session.runtime_kind!="cpp":
+	if session.bridge==null:
 		_fail("通常出撃がC++ランを開始できません")
 		return
 	bridge = session.bridge
@@ -304,11 +305,11 @@ func _process(_delta: float) -> void:
 		_fail("通知の配信に失敗しました: "+str(bridge.delivery_error))
 		return
 	var packet: Dictionary = bridge.latest_frame().value
-	if packet.ui.phase==RunState.Phase.PAUSED:
+	if packet.ui.phase==Phase.Paused:
 		if not _command("pause",{"paused":false}): return
 	if options.get("rewards","off")=="off" and session.view.get_node("Hud/HudRoot")._rewards.is_active():
 		session.view.get_node("Hud/HudRoot")._rewards.cancel()
-	if options.levels=="on" and packet.ui.phase==RunState.Phase.LEVELUP:
+	if options.levels=="on" and packet.ui.phase==Phase.Levelup:
 		var cards: Dictionary = packet.ui.cards
 		if int(cards.selected_id)==0 and not cards.candidates.is_empty():
 			var chosen: Dictionary = cards.candidates[0]
@@ -345,7 +346,7 @@ func _process(_delta: float) -> void:
 	var draw := geometry+float(display.get("view_draw.attacks",0.0))+float(display.get("view_draw.enemy_decorations",0.0))
 	var viewport := get_viewport().get_viewport_rid()
 	var bonus := float(packet.ui.get("bonus_remaining",0.0))>0
-	var ui_paused: bool = packet.ui.phase in [RunState.Phase.PAUSED,RunState.Phase.LEVELUP] or session.view.get_node("Hud/HudRoot")._rewards.is_active()
+	var ui_paused: bool = packet.ui.phase in [Phase.Paused,Phase.Levelup] or session.view.get_node("Hud/HudRoot")._rewards.is_active()
 	var scene := "ui" if ui_paused else "bonus" if bonus else "boss" if not packet.ui.get("boss_bodies",[]).is_empty() else "normal"
 	var row := {"elapsed_ms":(now-start_us)/1000.0,"frame_ms":frame_ms,"tick":metrics.tick,"fixed_steps":metrics.fixed_steps,"enemies":metrics.enemies,"enemy_types":metrics.enemy_types,"attack_pools":metrics.attack_pools,"friendly":metrics.friendly_shots,"run_clock":packet.ui.run_time,"run_delta":float(packet.ui.run_time)-last_run_clock,"world_clock":packet.ui.world_time,"phase":packet.ui.phase,"scene":scene,"bonus_remaining":packet.ui.get("bonus_remaining",0.0),"hitstop":packet.ui.get("hitstop",0.0),"drawing":packet.ui.draw.drawing,"tracing":packet.ui.draw.tracing,"ship_position":str(packet.ui.ship.ship_pos),"boss_bodies":packet.ui.get("boss_bodies",[]),"sim":timings.sim,"output_build":timings.output_build,"bridge_copy":timings.bridge_copy,"resource_wait":timings.resource_wait,"bridge_bytes":int(metrics.packed_bytes)-last_packed_bytes,"view_update":update,"view_draw":draw,"view_detail":display,"observation_ms":(now-before)/1000.0,"keep_refill":maintenance_us/1000.0,"viewport_cpu_ms":RenderingServer.viewport_get_measured_render_time_cpu(viewport),"viewport_gpu_ms":RenderingServer.viewport_get_measured_render_time_gpu(viewport),"draw_calls":Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),"scope_resources":session.resources.resources.size(),"objects":Performance.get_monitor(Performance.OBJECT_COUNT),"nodes":Performance.get_monitor(Performance.OBJECT_NODE_COUNT),"static_mb":Performance.get_monitor(Performance.MEMORY_STATIC)/1048576.0}
 	row["sim_clock"]=metrics.clocks.sim_time

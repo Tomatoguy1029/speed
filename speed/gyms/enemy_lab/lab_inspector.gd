@@ -1,5 +1,6 @@
 ## 選んだ敵の姿、撃破可否とよく調整する数値を優先して表示する。
 extends VBoxContainer
+const EnemyMode := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.EnemyModeId
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 const ICON := preload("res://gyms/enemy_lab/lab_icon.gd")
 var session
@@ -98,7 +99,7 @@ func refresh(force := false) -> void:
 	_hp.text = tr("lab.ui.hp") % [t.hp[i], t.max_hp[i]]
 	var attack: float = session.run.combat.attack_power()
 	var pierce = attack >= t.armor[i]
-	var state = tr("lab.message_09a8e159ad") if t.charge[i] > 0 or t.mode[i] == EnemyTable.Mode.WINDUP else (tr("lab.status_active") if t.mode[i] == EnemyTable.Mode.DASH else (tr("lab.status_wait") if t.mode[i] == EnemyTable.Mode.RECOVER else tr("lab.message_d44a3e6526")))
+	var state = tr("lab.message_09a8e159ad") if t.charge[i] > 0 or t.mode[i] == EnemyMode.Windup else (tr("lab.status_active") if t.mode[i] == EnemyMode.Dash else (tr("lab.status_wait") if t.mode[i] == EnemyMode.Recover else tr("lab.message_d44a3e6526")))
 	_state.text = tr("lab.message_6fb30df6c1") if pierce else tr("lab.message_2c343fabe5")
 	_state.add_theme_color_override("font_color", UI.ACCENT if pierce else Color("#ffbf83"))
 	var live = tr("lab.message_6170cb0f1e") % [t.hp[i], t.max_hp[i], t.armor[i], attack, _state.text, state, t.pos[i].x, t.pos[i].y, rad_to_deg(t.facing[i])]

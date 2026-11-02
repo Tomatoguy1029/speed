@@ -1,6 +1,7 @@
 ## 本番のランの表示枠に重ねる、実験場の編集用の層。
 ## 敵・弾・地形・機体は本番の描画が描く。ここでは選択・射程・ID・線・配置の目印だけを描く。
 extends Control
+const HazardKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.HazardKind
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 
 signal picked(row: int)
@@ -450,7 +451,7 @@ func _draw_projectiles(p) -> void:
 		var color := Color("#e6b969") if charging else Color("#ff6b7a")
 		var pos := screen(p.hazard_pos[i])
 		var kind = p.hazard_kind[i]
-		if kind == ProjectileSystem.HazardKind.BEAM and p.hazard_arc[i] > 0.0:
+		if kind == HazardKind.Beam and p.hazard_arc[i] > 0.0:
 			# 先へ行くほど広がるビーム（みずがめ座）は、範囲の輪郭を描く
 			var u := Vector2.from_angle(p.hazard_angle[i])
 			var v := Vector2(-u.y, u.x)
@@ -460,11 +461,11 @@ func _draw_projectiles(p) -> void:
 			var outline := PackedVector2Array([pos + v * w0, tip + v * w1, tip - v * w1, pos - v * w0, pos + v * w0])
 			draw_colored_polygon(outline, Color(color, 0.06 if charging else 0.1))
 			draw_polyline(outline, color, 1.5, true)
-		elif kind == ProjectileSystem.HazardKind.BEAM or kind == ProjectileSystem.HazardKind.WALL:
+		elif kind == HazardKind.Beam or kind == HazardKind.Wall:
 			var end = pos + Vector2.from_angle(p.hazard_angle[i]) * p.hazard_len[i] * zoom
 			draw_line(pos, end, Color(color, 0.18 if charging else 0.55), maxf(2, p.hazard_width[i] * zoom), true)
 			draw_line(pos, end, color, 1.5, true)
-		elif kind == ProjectileSystem.HazardKind.ZONE:
+		elif kind == HazardKind.Zone:
 			draw_circle(pos, p.hazard_len[i] * zoom, Color(color, 0.13))
 			draw_arc(pos, p.hazard_len[i] * zoom, 0, TAU, 48, color, 2)
 		else:

@@ -105,16 +105,13 @@ func _open_boss_parts() -> void:
 		existing.grab_focus()
 		return
 	lab.session.playing = false
-	var owner: BossActor
-	for actor in lab.session.run.bosses.actors:
-		if actor.has_body() and actor.def.id == &"monoceros":
-			owner = actor
-			break
-	if owner == null:
-		var point: Vector2 = lab.session.run.state.ship_pos + Vector2(260, 0)
-		lab.session.perform("boss", {"type": "monoceros", "pos": [point.x, point.y]})
+	var table = lab.session.run.enemies.table
+	var row := table.type.find(&"monoceros")
+	if row < 0:
+		var point: Vector2 = lab.session.run.state.ship_pos + Vector2(260,0)
+		lab.session.perform("boss",{"type":"monoceros","pos":[point.x,point.y]})
 	else:
-		lab.session.selected = owner.body
+		lab.session.selected = row
 	_focus_appearance()
 	var editor := BOSS_PARTS.new()
 	editor.name = "BossPartsEditor"
@@ -500,7 +497,7 @@ func _attacks(box: Node) -> void:
 	# 通常敵の攻撃の重さ（種類ごと。正の値だけ予算管理へ入る）
 	var heavy = UI.fold(box, tr("lab.attack.danger"))
 	for def in ContentManager.sorted(ContentManager.enemies):
-		if preload("res://scripts/encounters/attack_director.gd").BEHAVIORS.has(String(def.behavior)):
+		if not lab.session.run.projectiles.director.categories(def.behavior).is_empty():
 			_number(heavy, "%s %s" % [def.display_name, def.id], def.attack_weight, 0, 20, 0.25,
 				func(value): lab.session.perform("parameter", {"type": String(def.id), "key": "attack_weight", "value": value}))
 	var meter = load("res://gyms/enemy_lab/lab_attack_meter.gd").new()
