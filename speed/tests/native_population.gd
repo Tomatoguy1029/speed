@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-shot-values" in OS.get_cmdline_user_args():
+		check_semantics_shot_values()
+		print("[semantics_shot_values] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-tracking" in OS.get_cmdline_user_args() or "--semantics-tracking-tail" in OS.get_cmdline_user_args() or "--semantics-tracking-rocket" in OS.get_cmdline_user_args() or "--semantics-tracking-extra" in OS.get_cmdline_user_args() or "--semantics-tracking-extra-tail" in OS.get_cmdline_user_args() or "--semantics-tracking-telescope-tail" in OS.get_cmdline_user_args():
 		await check_semantics_tracking()
 		print("[semantics_tracking] failed=%d" % failed)
@@ -822,3 +827,65 @@ func check_semantics_tracking() -> void:
 	OS.remove_logger(capture)
 	check(capture.count()==0,"追跡の両実装に実行時エラーがない")
 	print("SEMANTICS_TRACKING ",JSON.stringify({"cases":cases,"prior_successful_cases":10 if rocket_only else (5 if tail else 0),"extra":extra,"extra_tail":extra_tail,"telescope_tail":telescope_tail,"ticks_per_case":16 if not extra else "darter21/telescope64","numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+# 全Lvの発射・命中・復帰は既存成功を保持し、発射された数値の未証明の幅だけ採取する。
+func check_semantics_shot_values() -> void:
+	var config: GameConfig=ContentManager.base.duplicate(true)
+	config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	config.comet_interval_min=1e8;config.comet_interval_max=1e8;config.gravity_interval_min=1e8;config.gravity_interval_max=1e8
+	config.start_radius=900
+	var stage:=RuntimeStage.new()
+	stage.index=201;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter"])
+	var phase:=PhaseDef.new()
+	phase.id=&"射撃の数値";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0;stage.phases=[phase]
+	var output:="res://.content/dev/semantics_shot_values"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1射撃の不足値".sha256_text())!=OK:
+		check(false,"射撃のSource定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_201.json")))
+	var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new()
+	var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new()
+	OS.add_logger(capture)
+	var cases:=0
+	for id in [&"W01",&"W02",&"W23"]:
+		if "--semantics-shot-tail" in OS.get_cmdline_user_args() and id==&"W01":continue
+		var run:=semantics_legacy(config,stage,{},17)
+		var intent:=Intent.new()
+		intent.has_cursor=true;intent.cursor=Vector2(500,250)
+		run.input_source=func():return intent
+		run.view_size_source=func():return Vector2(1280,720)
+		var bridge=semantics_bridge(bytes,17)
+		if bridge==null:check(false,"射撃数値のC++ランを開始する");run.dispose();break
+		for level in range(1,config.weapon_max_level+1):
+			check(run.loadout.grant(&"weapon",id,1) and bridge.command("dev_grant_equipment",{"kind":"weapon","id":String(id),"levels":1}).ok,"数値を読む装備を同じ段へ進める")
+			var observed:=0
+			for tick in (170 if id==&"W02" else 110):
+				run._play_tick(1.0/120.0)
+				var stepped:Dictionary=bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+				if not stepped.ok or capture.count()>0:check(false,"射撃の数値採取中に実行エラー: "+str(capture.messages()));break
+				if "--semantics-shot-tail" in OS.get_cmdline_user_args() and id==&"W02" and level==1 and tick<64:continue
+				var expected: Array=[]
+				for row in run.projectiles.friend_alive.size():
+					if run.projectiles.friend_alive[row]:
+						expected.append({"pos":run.projectiles.friend_pos[row],"vel":run.projectiles.friend_vel[row],"radius":run.projectiles.friend_r[row],"damage":run.projectiles.friend_dmg[row],"life":run.projectiles.friend_life[row]})
+				var actual: Array=[]
+				for shot: Dictionary in bridge._core.projectiles_snapshot():actual.append({"pos":shot.pos,"vel":shot.vel,"radius":shot.radius,"damage":shot.damage,"life":shot.life})
+				var weapon=run.loadout.weapon_behaviors[id]
+				var timing: Dictionary=bridge._core.forward_snapshot() if id==&"W01" else bridge._core.scatter_snapshot() if id==&"W02" else bridge._core.rear_snapshot()
+				var source: Dictionary={"shots":expected,"elapsed":weapon._t,"recoil":weapon.recoil}
+				var native: Dictionary={"shots":actual,"elapsed":timing.elapsed,"recoil":timing.recoil}
+				if id==&"W23":
+					source.mount=weapon.mount_position();source.aim=weapon.aim_direction();native.mount=timing.mount;native.aim=timing.aim
+				var found: String=comparison.semantics_difference(source,native)
+				check(found.is_empty(),"射撃のf64/Vector2指定許容幅 %s Lv%d tick%d: %s"%[id,level,tick,found])
+				observed+=actual.size()
+				if failed:break
+			check(observed>0,"数値を読む実弾が存在する %s Lv%d"%[id,level])
+			cases+=1
+			print("SEMANTICS_SHOT_CASE ",id," Lv",level," failed=",failed)
+			if failed:break
+		run.dispose();bridge.dispose()
+		if failed:break
+	OS.remove_logger(capture)
+	check(capture.count()==0,"射撃の両実装に実行時エラーがない")
+	print("SEMANTICS_SHOT_VALUES ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
