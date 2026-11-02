@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-cosmic-arrow" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_cosmic_arrow()
+		check(finished,"コズミック矢の不足条件を最後まで確認する")
+		print("[cpp_cosmic_arrow] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-saw" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_saw()
 		check(finished,"丸鋸の不足条件を最後まで確認する")
@@ -876,6 +882,22 @@ func check_cpp_saw() -> bool:
 	cpp_core.step_projectiles(2.0)
 	check(cpp_core.projectiles_snapshot().is_empty(),"丸鋸の元と複製は指定の寿命で消える")
 	check(cpp_bridge.restore(held.value).ok and cpp_core.projectiles_snapshot()==moving,"丸鋸の回転・軌道・寿命・元情報を復元する")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()
+	return true
+
+func check_cpp_cosmic_arrow() -> bool:
+	if not await prepare_cpp_attack(105,"cosmic_arrow"): return false
+	var fired: Dictionary = cpp_bridge.command("dev_fire_light_arrow",{"position":cpp_origin,"angle":0.0,"speed":100.0,"radius":12.0,"travel":400.0,"damage":8.0,"cosmic":true,"length":100.0})
+	if not fired.ok: check(false,"コズミック矢を保持確認用に生成する"); cpp_session.free(); return false
+	cpp_core.step_hostiles(0.1)
+	var state: Array = cpp_core.hostiles_snapshot()
+	var held: Dictionary = cpp_bridge.checkpoint()
+	check(held.ok and state[0].kind==ENUMS.HostileKind.CosmicArrow,"コズミック矢の種類と長い尾を保持する")
+	cpp_core.step_hostiles(0.15)
+	check(cpp_bridge.restore(held.value).ok and cpp_core.hostiles_snapshot()==state,"コズミック矢の種類・尾・位置・速度・寿命へ復帰する")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	check(frame.shapes.size()==1 and frame.shapes[0].cosmic and frame.shapes[0].cosmic_color_a!=frame.shapes[0].cosmic_color_b and frame.shapes[0].cosmic_star_count>0,"復帰後もコズミック専用の配色と星を使う")
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_session.free()
 	return true
