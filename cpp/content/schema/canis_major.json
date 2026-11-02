@@ -769,6 +769,61 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisHuntDefinition",
+      "section": 349,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "stream",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "flame",
+          "type": "u32",
+          "ref": "CanisFlameDefinition"
+        },
+        {
+          "name": "min_hounds",
+          "type": "u32"
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

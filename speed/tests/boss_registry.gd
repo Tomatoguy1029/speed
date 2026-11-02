@@ -23,6 +23,9 @@ func _ready() -> void:
 	if "--cpp-hydra-swim" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_swim")
 		return
+	if "--cpp-canis-hunt" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_hunt")
+		return
 	if "--cpp-canis-stream-cancel" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_stream_cancel")
 		return
@@ -3582,4 +3585,96 @@ func native_hydra_bite_hit() -> void:
 	if failed: print("命中の状態: ",bridge._core.ship_snapshot()," 命中記録: ",hits)
 	bridge.dispose()
 	print("[cpp_hydra_bite_hit] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 猟犬の順番から狙撃へ渡す境界と、取消後の炎の寿命を照合する。
+func native_canis_hunt() -> void:
+	var c := canis_move_case("hunt",{"gap":0.05,"aim_warn":0.1,"aim_lock":0.04,"aim_lead":0.2,"aim_turn":3.0,"beam_time":0.1,"beam_length":300.0,"beam_width":20.0,"beam_particle_life":0.25,"recover":0.05},false,{"pack_size":3,"lead_max":3},false,0.5)
+	check(not c.is_empty(),"追い立てと狙撃と内包する順番の号令を同じ生成入口へ渡す")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var records: Dictionary = c.package.records
+	check(c.move.make_runner()==null and records.CanisHuntDefinition.size()==2 and records.CanisStreamDefinition.size()==2 and records.CanisHuntDefinition[1].stream==4 and records.BossTechniqueStage.is_empty() and records.CanisFlameDefinition[0].external_id=="hunt" and records.CanisFlameDefinition[0].trail_life==0.0,"全編集値と二形態・依存ID・狙撃専用の炎を生成する")
+	var events: Array = []
+	bridge.subscribe("記録確認",func(packet): events.append_array(packet.events);return true)
+	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(ticket.ok,"制作入口では通常フローの最低猟犬数と分けて単独発動する")
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	for k in 150:
+		if t.sent: break
+		bridge._core.step(1.0/120.0)
+		t = bridge.command("dev_boss_state").value[0]
+	check(t.sent and t.sequence.size()==3 and not t.aiming,"猟犬の全体予告を終えてから順番の個別予告を始める")
+	var sequence_checkpoint: Dictionary = bridge.checkpoint()
+	var absent: int = t.sequence[2].actor
+	for k in 150:
+		if t.aiming: break
+		bridge._core.step(1.0/120.0)
+		t = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(t.aiming and not t.combo_pending and is_equal_approx(t.aim_age,1.0/120.0) and body.clock>=t.last_launch+0.05 and not canis_lunges(bridge).is_empty(),"最後の発進とgapを過ぎたtickに狙撃を始め、猟犬の突進は並行して残す")
+	var aim_checkpoint: Dictionary = bridge.checkpoint()
+	check(aim_checkpoint.ok,"内側の順番・狙撃・乱数・本体時計を保持する")
+	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
+	bridge._core.set_motion_context(Vector2(300,300),Vector2(300,300),Vector2(3000,2000))
+	bridge._core.step(0.05)
+	t = bridge.command("dev_boss_state").value[0]
+	check(not t.locked and t.aim==Vector2(320,300),"狙撃は機体の速度を先読みし、加算前の予告時計で固定を判断する")
+	bridge._core.step(0.01)
+	check(not bridge.command("dev_boss_state").value[0].locked,"固定時刻へ到達したtickの照準更新を保持する")
+	bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	var facing: float = t.facing
+	check(t.locked,"次のtickで照準を固定する")
+	bridge.command("dev_ship_motion",{"position":Vector2(1800,-1000),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1800,-1000),Vector2(1800,-1000),Vector2(3000,2000))
+	bridge._core.step(0.03)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.fired and t.stage==1 and is_equal_approx(t.facing,facing) and canis_effects(bridge).any(func(v): return v.kind==0),"固定方向を保って噴射を始める")
+	var fired_checkpoint: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.04)
+	var continued: Dictionary = bridge.command("dev_boss_state").value[0].duplicate(true)
+	var flame_rows: Array = canis_effects(bridge).duplicate(true)
+	check(bridge.restore(fired_checkpoint.value).ok,"狙撃の発射後へ復帰する")
+	bridge._core.step(0.04)
+	check(bridge.command("dev_boss_state").value[0]==continued and canis_effects(bridge)==flame_rows,"復帰後も狙撃の時計・猟犬・戦闘粒を一致させる")
+	bridge._core.step(0.07)
+	check(bridge.command("dev_boss_state").value[0].stage==2,"放射時間が終わると外側の硬直へ進む")
+	bridge._core.step(0.06)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and not canis_effects(bridge).is_empty(),"自然終了後も発射した粒は寿命まで残る")
+	bridge.restore(fired_checkpoint.value)
+	var particles: Array = canis_effects(bridge).filter(func(v): return v.kind==1)
+	bridge.command("dev_ship_motion",{"position":particles[0].pos,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp<hp,"狙撃の粒で実際の機体HPを減らす")
+	bridge.command("set_ui_overlay",{"active":false})
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="flame_jet" and e.payload.technique=="hunt"),"原因は炎の噴射、技は追い立てと狙撃として別々に記録する")
+	bridge.restore(fired_checkpoint.value)
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	check(bridge.command("dev_boss_state").value[0].stage==7 and canis_lunges(bridge).is_empty() and not canis_effects(bridge).is_empty(),"取消では猟犬を解放し、発射済みの炎は残す")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(not c.view._boss_body_displays.values()[0].flames.displays.is_empty(),"残留炎を正式表示へ反映する")
+	bridge.restore(aim_checkpoint.value)
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(c.view._boss_body_displays.values()[0].technique.aiming,"狙撃の予告を正式な本体表示へ渡す")
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	check(canis_effects(bridge).is_empty() and canis_lunges(bridge).is_empty(),"発射前の取消は猟犬と照準だけを解放し炎を生成しない")
+	bridge.restore(sequence_checkpoint.value)
+	bridge.command("dev_remove",{"entity_id":absent})
+	for k in 150:
+		bridge._core.step(1.0/120.0)
+		t = bridge.command("dev_boss_state").value[0]
+		if t.aiming: break
+	check(not t.sequence[2].launched and t.aiming,"参加者が消失しても予定した最終時刻で狙撃へ進む")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(canis_lunges(bridge).is_empty() and canis_effects(bridge).is_empty(),"本体消失では技と残留攻撃を回収する")
+	for checkpoint in [sequence_checkpoint,aim_checkpoint,fired_checkpoint]: bridge.release_checkpoint(checkpoint.value)
+	bridge.dispose();c.view.queue_free()
+	c = canis_move_case("hunt",{},true,{"pack_size":3,"lead_max":3});bridge = c.bridge
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value.is_empty(),"通常フローは5体未満の猟犬で狙撃を選ばない")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_hunt] failures=",failed)
 	get_tree().quit(1 if failed else 0)

@@ -76,7 +76,7 @@ func _track_command(body: Dictionary, attack: Dictionary, dt: float) -> void:
 	_lunge_layer.queue_redraw()
 	queue_redraw()
 func _draw() -> void:
-	if technique.get("technique","")=="sirius" and int(technique.get("stage",5))==0:
+	if (technique.get("technique","")=="sirius" or (technique.get("technique","")=="hunt" and technique.get("aiming",false))) and int(technique.get("stage",5))==0:
 		var color := Color("#ff667d") if technique.locked else Color("#e8f6ff")
 		var alpha := 0.35 if technique.locked else lerpf(0.12,0.45,float(state.charge))
 		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))

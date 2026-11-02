@@ -9,5 +9,7 @@ namespace speed {class CanisStream {public:
     static void step(RunRuntime &,TechniqueState &,double);
     static void cancel(RunRuntime &,TechniqueState &);
     static bool validate(const TechniqueState &,const ContentBundle &);
+    static bool validate(const CanisStreamState &,const ContentBundle &);
     static godot::Dictionary snapshot(const RunRuntime &,const TechniqueState &);
+    static godot::Dictionary snapshot(const RunRuntime &,EnemyHandle,const CanisStreamState &);
 };}
