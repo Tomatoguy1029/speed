@@ -165,6 +165,7 @@ struct RunState {
         int64_t generations = 0, maximum = 0;
     } projectile_config;
     struct Hostile {
+        speed::SlashState slash;
         uint32_t definition=0;
         bool alive = true;
         int64_t kind = 0;

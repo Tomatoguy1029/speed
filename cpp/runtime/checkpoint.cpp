@@ -71,7 +71,14 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     }
     for (auto row:state.dead_rows) if (row>=state.enemies.size() || !state.enemies[row].alive || !state.enemies[row].dead) return false;
     for (const auto &shot:state.friends) if (shot.alive && shot.definition>content.friend_shots.size()) return false;
-    for (const auto &shot:state.hostiles) if (shot.alive && shot.definition>content.hostile_definitions.size()) return false;
+    for (const auto &shot:state.hostiles) if (shot.alive) {
+        if (shot.definition>content.hostile_definitions.size()) return false;
+        if (shot.kind==int64_t(HostileKind::Slash)) {
+            if (shot.slash.definition!=1 || content.slashes.empty() || (shot.slash.side!=1 && shot.slash.side!=-1) ||
+                !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.radius) || shot.radius<=0 ||
+                !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0) return false;
+        } else if (shot.slash.definition) return false;
+    }
     for (const auto &hazard:state.hazards) if (hazard.alive) {
         if (!hazard.pos.is_finite() || !std::isfinite(hazard.time) || !std::isfinite(hazard.delay) || !std::isfinite(hazard.duration) || !std::isfinite(hazard.damage)) return false;
         if (const auto *beam=std::get_if<BeamHazard>(&hazard.shape)) {

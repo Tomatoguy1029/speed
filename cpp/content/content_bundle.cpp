@@ -65,6 +65,15 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->beams=records.BeamDefinition_rows;
     bundle->waves=records.WaveDefinition_rows;
     bundle->walls=records.WallDefinition_rows;
+    bundle->slashes=records.SlashDefinition_rows;
+    if (!bundle->slashes.empty()) {
+        if (bundle->slashes.size()!=51) return {};
+        for (size_t i=0;i<bundle->slashes.size();++i) {
+            const auto &point=bundle->slashes[i];
+            if (point.id!=i+1 || point.claw!=i/17 || point.sample!=i%17 || point.thickness<=0 ||
+                point.contact!=bundle->slashes.front().contact || point.thickness!=bundle->slashes.front().thickness) return {};
+        }
+    }
     bundle->friend_shots=records.FriendShotDefinition_rows;
     for (const auto &shot:bundle->hostile_definitions) {
         if (shot.life<=0 || shot.radius<=0) return {};

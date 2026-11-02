@@ -16,6 +16,12 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-slash" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_slash()
+		check(finished,"斬撃の確認を最後まで実施する")
+		print("[cpp_slash] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-wave" in OS.get_cmdline_user_args() or "--cpp-wave-fixes" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_wave()
 		check(finished,"波動の確認を最後まで実施する")
@@ -627,4 +633,98 @@ func check_cpp_wave() -> bool:
 	session.free()
 	await get_tree().process_frame
 	await get_tree().process_frame
+	return true
+
+func check_cpp_slash() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 88
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_slash"
+	var builder = load("res://tools/content/build_run_content.gd")
+	if builder.build(stage,config,output,"斬撃の左右と3本の爪痕".sha256_text())!=OK:
+		check(false,"斬撃の生成済みの爪痕を準備する")
+		return false
+	var path := output.path_join("stage_88.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":288},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"斬撃を表示する通常のC++ランを準備する")
+	if session.bridge==null: session.free(); return false
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var origin := Vector2(-900,0)
+	bridge.command("dev_ship_motion",{"position":origin-Vector2(0,300),"velocity":Vector2.ZERO})
+	core.set_motion_context(origin-Vector2(0,300),origin,Vector2(640,360))
+	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(-300,300)}).value
+	var empty: Dictionary = bridge.checkpoint()
+	var params := {"position":origin,"angle":0.0,"speed":100.0,"size":60.0,"range":200.0,"damage":7.0,"side":1.0,"owner_id":owner_id}
+	var fired: Dictionary = bridge.command("dev_fire_slash",params)
+	check(fired.ok,"発生源から斬撃を生成する")
+	if not fired.ok: session.free(); return false
+	core.step_hostiles(0.1)
+	var shot: Dictionary = core.hostiles_snapshot()[0]
+	check(shot.pos==origin+Vector2(10,0) and shot.vel==Vector2(100,0) and is_equal_approx(shot.life,1.9),"斬撃が形を保って直進し寿命を減らす")
+	var shape = load("res://scripts/attacks/slash.gd")
+	var frame: Dictionary = bridge.read_render(Rect2(-1600,-500,1400,1000)).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(frame.shapes.size()==1 and frame.shapes[0].widths.size()==9,"左右3本の爪痕を光・本体・芯の9本で表示する")
+	if frame.shapes.size()==1:
+		var rendered: PackedVector2Array = frame.shapes[0].points.slice(0,17)
+		var expected: PackedVector2Array = shape.slash_points(shot.pos,0.0,60.0,1.0,0)
+		var equal := rendered.size()==expected.size()
+		for n in mini(rendered.size(),expected.size()): equal = equal and rendered[n].distance_to(expected[n])<0.001
+		check(equal,"生成した爪痕の表示点が現行の式と一致する")
+	check(presentation.frame_view.apply_frame(frame),"飛んでいる斬撃を通常の表示へ渡す")
+	await get_tree().process_frame
+	bridge.command("dev_remove",{"entity_id":owner_id})
+	check(core.attack_snapshot()[0].source_id==owner_id and not core.attack_snapshot()[0].source_alive,"発射元が退場しても斬撃は元のIDで飛び続ける")
+	var active: Dictionary = bridge.checkpoint()
+	var state: Array = core.hostiles_snapshot()
+	check(active.ok,"斬撃の位置・速度・寿命・左右を値で保持する")
+	core.step_hostiles(2.0)
+	check(core.hostiles_snapshot().is_empty(),"斬撃は届く距離を使い切ると消える")
+	bridge.restore(active.value)
+	check(core.hostiles_snapshot()==state,"飛行中の斬撃を保持点から復元する")
+	for side in [-1.0,1.0]:
+		for claw in 3:
+			bridge.restore(empty.value)
+			params.side = side
+			check(bridge.command("dev_fire_slash",params).ok,"左右の斬撃を生成する: %s/%d" % [side,claw])
+			var at: Vector2 = shape.slash_points(origin+Vector2(10,0),0.0,60.0,side,claw)[8]
+			check(shape.slash_touches(origin+Vector2(10,0),0.0,60.0,side,at,config.ship_radius),"現行の各爪痕の接触条件を通る")
+			bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+			core.step_hostiles(0.1)
+			check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-7.0),"左右の各爪痕が共通被弾へ通って消える: %s/%d" % [side,claw])
+			var events: Array = bridge.read_frame().value.events
+			check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"slash"),"斬撃の原因名を共通記録へ残す")
+	bridge.restore(empty.value)
+	params.side = 1.0
+	check(bridge.command("dev_fire_slash",params).ok,"爪痕の反対側を通る斬撃を生成する")
+	bridge.command("dev_ship_motion",{"position":origin+Vector2(10,-100),"velocity":Vector2.ZERO})
+	core.step_hostiles(0.1)
+	check(core.hostiles_snapshot().size()==1 and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"爪痕の反対側は大きな円として被弾させない")
+	bridge.restore(empty.value)
+	params.position = Vector2(-300,0)
+	params.speed = 2000.0
+	check(bridge.command("dev_fire_slash",params).ok,"天体へ飛ぶ斬撃を生成する")
+	core.step_hostiles(0.1)
+	check(core.hostiles_snapshot().is_empty(),"斬撃は天体との接触で消える")
+	bridge.restore(empty.value)
+	params.position = origin
+	params.size = 0.0
+	check(not bridge.command("dev_fire_slash",params).ok and core.hostiles_snapshot().is_empty(),"大きさ0の斬撃を状態を変えずに拒否する")
+	bridge.release_checkpoint(active.value)
+	bridge.release_checkpoint(empty.value)
+	session.free()
 	return true

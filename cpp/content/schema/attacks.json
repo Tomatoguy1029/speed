@@ -177,6 +177,46 @@
           "ref": "ContactDefinition"
         }
       ]
+    },
+    {
+      "name": "SlashDefinition",
+      "section": 39,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "claw",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "sample",
+          "type": "u32",
+          "max": 16
+        },
+        {
+          "name": "x",
+          "type": "f32"
+        },
+        {
+          "name": "y",
+          "type": "f32"
+        },
+        {
+          "name": "thickness",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {
@@ -226,6 +266,10 @@
       {
         "name": "Reflected",
         "value": "reflected"
+      },
+      {
+        "name": "Slash",
+        "value": "slash"
       }
     ],
     "FriendKind": [

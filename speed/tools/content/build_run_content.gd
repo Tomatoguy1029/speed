@@ -2,6 +2,7 @@
 extends RefCounted
 const Schema = preload("res://tools/content/generated/run_schema.gd")
 const Wave = preload("res://scripts/attacks/wave.gd")
+const Slash = preload("res://scripts/attacks/slash.gd")
 const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
@@ -52,6 +53,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.WaveDefinition = [{"id":1,"contact":5,"enemy_min_distance":Wave.ENEMY_MIN_DISTANCE,"enemy_knock":Wave.ENEMY_KNOCK}]
 	data.ContactDefinition.append({"id":6,"shape":1,"scale":0,"hit_policy":3,"add_ship_radius":true,"ship_sweep":false,"width":0.0})
 	data.WallDefinition = [{"id":1,"contact":6}]
+	data.ContactDefinition.append({"id":7,"shape":3,"scale":0,"hit_policy":1,"add_ship_radius":true,"ship_sweep":false,"width":0.0})
+	for claw in 3:
+		var points: PackedVector2Array = Slash.slash_local(claw)
+		for sample in points.size():
+			data.SlashDefinition.append({"id":data.SlashDefinition.size()+1,"claw":claw,"sample":sample,"x":points[sample].x,"y":points[sample].y,"thickness":Slash.SLASH_THICK,"contact":7})
 	data.FriendShotDefinition = [{"id":1,"contact":4}]
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
@@ -253,6 +259,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.BeamDefinition = resolved.BeamDefinition
 		data.WaveDefinition = resolved.WaveDefinition
 		data.WallDefinition = resolved.WallDefinition
+		data.SlashDefinition = resolved.SlashDefinition
 		data.FriendShotDefinition = resolved.FriendShotDefinition
 		data.BudgetPhase = resolved.BudgetPhase
 		if data.ResourceKey.is_empty():

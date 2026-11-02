@@ -27,6 +27,7 @@ struct ContentBundle {
     std::vector<BeamDefinition> beams;
     std::vector<WaveDefinition> waves;
     std::vector<WallDefinition> walls;
+    std::vector<SlashDefinition> slashes;
     std::vector<FriendShotDefinition> friend_shots;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;
