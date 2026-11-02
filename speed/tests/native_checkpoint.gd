@@ -53,6 +53,11 @@ func advance(core, tick: int) -> void:
 		if not state.cards.is_empty(): core.choose_card(0,state.revision)
 	core.step_frame(1.0/60.0,input,Vector2.ZERO,Vector2(640,360),1.0)
 func _ready() -> void:
+	if "--restore-heroes" in OS.get_cmdline_user_args():
+		check_restore_heroes()
+		print("[restore_heroes] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--restore-draco-final" in OS.get_cmdline_user_args():
 		check_restore_draco_final()
 		print("[restore_draco_final] failed=%d" % failed)
@@ -315,3 +320,66 @@ func check_restore_draco_final() -> void:
 		print("RESTORE_DRACO_STAGE ",stage," failed=",failed)
 		if failed:break
 	f.bridge.dispose();helper.free()
+
+func hero_restore_state(bridge) -> Dictionary:
+	return {"core":draco_restore_state(bridge),"hero":bridge.read_frame().value.ui.hero,"draw":bridge.read_frame().value.ui.draw}
+
+func restore_hero_point(bridge,fixture,behavior,label: String):
+	bridge.collect_frame()
+	var before: Dictionary=hero_restore_state(bridge)
+	var render: Array=restored_render(bridge)
+	var ui: Dictionary=bridge.read_frame().value.ui.duplicate(true)
+	var held: Dictionary=bridge.checkpoint()
+	if not held.ok:check(false,"英雄の重要状態を保持する: "+label);return bridge
+	fixture._cpp_events.clear()
+	for tick in 3:behavior._cpp_step(bridge)
+	var future: Dictionary=hero_restore_state(bridge)
+	var future_events: Array=fixture._cpp_events.duplicate(true)
+	bridge.dispose()
+	var restored=fixture._cpp_fixture(true,100000.0,100000.0)
+	var voices: int=AudioManager._next
+	if not restored.restore(held.value).ok:check(false,"元ラン破棄後に英雄を独立復元する: "+label);return restored
+	var actual: Dictionary=hero_restore_state(restored)
+	check(before==actual,"英雄の全状態を値として独立復元する: "+label+" "+COMPARE.new().difference(COMPARE.new().plain(before),COMPARE.new().plain(actual)))
+	check(restored_render(restored)==render,"英雄のPreviousPoseと表示補間を独立復元する: "+label)
+	var frame: Dictionary=restored.read_frame().value
+	check(restore_logical(frame.ui)==restore_logical(ui),"英雄の全UIを独立復元して再送する: "+label)
+	AudioManager.consume_cpp_frame(frame)
+	check(frame.events.is_empty() and frame.result==null and AudioManager._next==voices,"英雄の過去通知・結果・音を再送しない: "+label)
+	fixture._cpp_events.clear()
+	for tick in 3:behavior._cpp_step(restored)
+	check(hero_restore_state(restored)==future and fixture._cpp_events==future_events,"英雄の復元後の状態と論理通知を同じ入力で再現する: "+label)
+	restored.release_checkpoint(held.value)
+	print("RESTORE_HERO ",label," failed=",failed)
+	return restored
+
+func check_restore_heroes() -> void:
+	var fixture=load("res://tests/hero_guidance.gd").new()
+	var behavior=load("res://tests/hero_behaviors.gd").new()
+	for id in ["perseus","leo","gemini","hercules"]:
+		var bridge=fixture._cpp_fixture(true,100000.0,100000.0)
+		behavior._cpp_rescue(bridge,id)
+		bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO})
+		var enemy: int=bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)}).value
+		if id=="perseus":bridge.command("dev_fire_enemy",{"source_id":enemy,"angle":0.0,"speed":100.0})
+		var input:=Intent.new()
+		input.hero_press=true;behavior._cpp_step(bridge,input)
+		if id in ["leo","gemini"]:
+			behavior._cpp_draw(bridge)
+			bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+		bridge=restore_hero_point(bridge,fixture,behavior,id+"/発動中")
+		if id=="gemini" and not failed:
+			behavior._cpp_second_line(bridge)
+			bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+			bridge._core.step_draw(0.01)
+			bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+			check(bridge.read_frame().value.ui.hero.twin.tracing,"独立復元する双子が二本目を実際に進む")
+			bridge=restore_hero_point(bridge,fixture,behavior,"gemini/二本目の途中")
+		if id=="hercules" and not failed:
+			behavior._cpp_hero_tick(bridge,0.3,0.3);behavior._cpp_hero_tick(bridge,0.3,0.6)
+			check(not bridge.read_frame().value.ui.hero.hercules.falls.is_empty() and not bridge.read_frame().value.ui.hero.hercules.burns.is_empty(),"独立復元する落下と燃焼が同時に存在する")
+			bridge=restore_hero_point(bridge,fixture,behavior,"hercules/落下と燃焼")
+		bridge.dispose()
+		if failed:break
+	check(fixture.failed==0 and behavior.failed==0,"英雄の保持場面の既存準備入口が成功する")
+	fixture.free();behavior.free()
