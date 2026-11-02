@@ -613,9 +613,16 @@
           "min": 0,
           "config": "pickup_life",
           "runtime": "pickup_config.pickup_life"
+        },
+        {
+          "name": "trace_radius",
+          "type": "f64",
+          "min": 0,
+          "config": "trace_radius",
+          "runtime": "trace_radius"
         }
       ],
-      "version": 8
+      "version": 9
     },
     {
       "name": "StringEntry",

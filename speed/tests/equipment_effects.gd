@@ -66,6 +66,13 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t34" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t34()
+		check(finished,"大振りの確認を最後まで実施する")
+		print("[cpp_t34] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t31" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t31()
 		check(finished,"慣性航行の確認を最後まで実施する")
@@ -1070,4 +1077,78 @@ func check_cpp_t31() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"慣性航行の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func t34_sweep(bridge,config: GameConfig,offset: float) -> float:
+	var core = bridge._core
+	var start: Vector2 = core.ship_snapshot().ship_pos
+	var target: int = core.spawn_enemy(&"drifter",start+Vector2(config.draw_length*0.25,offset))
+	var before: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].hp
+	core.rebuild_enemy_grid(200.0)
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
+	core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0)
+	core.step_draw(10.0)
+	var after: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].hp
+	bridge.command("dev_remove",{"entity_id":target})
+	return before-after
+
+func check_cpp_t34() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.base_crit_chance = 0.0
+	var definition: TraitDef = load("res://data/traits/T34_bigSwing.tres")
+	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	enemy.hp = 1000000.0
+	enemy.armor = 0.0
+	var bridge = t07_bridge(config,{},enemy)
+	if bridge==null: return false
+	var core = bridge._core
+	check(bridge._ui.area_multiplier==1.0 and is_equal_approx(bridge._ui.trace_radius,config.trace_radius),"未取得でもtresの基礎突進半径を使う")
+	var probe: int = core.spawn_enemy(&"drifter",Vector2(-3000,1000))
+	var radius: float = core.enemies_snapshot().filter(func(item): return item.id==probe)[0].radius
+	bridge.command("dev_remove",{"entity_id":probe})
+	var initial: Dictionary = bridge.checkpoint()
+	var trained := 1.0+definition.stack_bonus(config.trait_max_stacks)
+	var offset := radius+config.trace_radius*(1.0+trained)*0.5
+	check(t34_sweep(bridge,config,offset)==0.0,"取得前は通常の突進半径の外の相手に当たらない")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.release_checkpoint(initial.value)
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":1}).ok,"T34を共通の取得入口で重ねる")
+		var area := 1.0+definition.stack_bonus(level)
+		check(is_equal_approx(bridge._ui.area_multiplier,area) and is_equal_approx(bridge._ui.trace_radius,config.trace_radius*area),"各段を共通範囲と突進半径へ一度だけ適用する")
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":1}).ok and is_equal_approx(bridge._ui.area_multiplier,trained),"上限を越えて範囲を増やさない")
+	bridge.command("dev_post_weapon_power",{"damage":2,"followup":3})
+	check(is_equal_approx(bridge._ui.area_multiplier,trained) and is_equal_approx(bridge._ui.trace_radius,config.trace_radius*trained),"別の最大段後の再計算でT34を二重に掛けない")
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	for _tick in range(240):
+		bridge.step(1.0/120.0,idle,{"logical_size":Vector2(640,480)})
+		if not core.projectiles_snapshot().is_empty(): break
+	var shots: Array = core.projectiles_snapshot()
+	check(shots.size()==1 and is_equal_approx(shots[0].radius,5.0*trained),"実際のW01の弾の半径へ同じ共通範囲が効く")
+	var saved: Dictionary = bridge.checkpoint()
+	var damage := t34_sweep(bridge,config,offset)
+	check(is_equal_approx(damage,config.base_attack*config.atk_scale),"取得後は同じ外側の相手へ実際の突進が届く")
+	bridge.command("dev_remove_trait",{"id":"T34"})
+	check(bridge._ui.area_multiplier==1.0 and is_equal_approx(bridge._ui.trace_radius,config.trace_radius),"解除で共通範囲と突進半径を基礎値へ戻す")
+	check(is_equal_approx(core.projectiles_snapshot()[0].radius,5.0*trained),"解除しても発射済みの弾の半径を変えない")
+	check(bridge.restore(saved.value).ok,"取得段と実効半径・発射済みの弾を保持して復帰する")
+	bridge.collect_frame()
+	check(is_equal_approx(bridge._ui.area_multiplier,trained) and is_equal_approx(bridge._ui.trace_radius,config.trace_radius*trained) and core.projectiles_snapshot()==shots,"復帰後も同じ範囲と弾の半径へ戻る")
+	bridge.release_checkpoint(saved.value)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(is_equal_approx(hud._cpp_ui.area_multiplier,trained) and hud._cpp_ui.trait_levels.any(func(item): return item.id=="T34" and item.level==config.trait_max_stacks),"HUDへ共通範囲と所持段を同じ状態から渡す")
+	hud.free()
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"大振りの状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true

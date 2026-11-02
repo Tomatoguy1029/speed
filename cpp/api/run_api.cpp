@@ -318,6 +318,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=control.ui_overlay || control.ui_reward || runtime.state.phase==Phase::Paused || runtime.state.phase==Phase::LevelUp || (runtime.state.phase==Phase::Dying && runtime.state.sequence_t<runtime.state.death_freeze);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;
+    ui["area_multiplier"]=runtime.state.loadout.effects.area;ui["trace_radius"]=runtime.state.trace_radius;
     ui["glide_duration_mult"]=runtime.state.ship_config.glide_duration_mult;
     ui["length_mult"]=runtime.state.draw_config.length_mult;
     ui["pickup_radius"]=runtime.state.pickup_config.coin_radius;ui["xp_pickup_radius"]=runtime.state.pickup_config.xp_radius;

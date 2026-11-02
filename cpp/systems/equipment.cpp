@@ -10,6 +10,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
             effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;capacity_bonus+=level.capacity_bonus;crit_bonus+=level.crit_bonus;speed_bonus+=level.speed_bonus;attack_bonus+=level.attack_bonus;pickup_bonus+=level.pickup_bonus;length_bonus+=level.length_bonus;glide_bonus+=level.glide_bonus;
         }
     }
+    run.state.trace_radius=run.content->config.trace_radius*effects.area;
     run.state.ship_config.glide_duration_mult=1.0+glide_bonus;
     run.state.draw_config.capacity=1.0+capacity_bonus;
     const auto &p=run.state.loadout;const auto &post=run.content->post_charge;
