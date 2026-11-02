@@ -26,6 +26,7 @@ struct ContentBundle {
     std::vector<MissileEnemyDefinition> missile_enemies;
     std::vector<RocketDefinition> rockets;
     std::vector<DriftDefinition> drifts;
+    std::vector<DashDefinition> dashes;
     std::vector<ContactDefinition> contacts;
     std::vector<HostileDefinition> hostile_definitions;
     std::vector<BeamDefinition> beams;

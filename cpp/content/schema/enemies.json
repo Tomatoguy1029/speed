@@ -342,6 +342,49 @@
           "ref": "EnemyRecord"
         }
       ]
+    },
+    {
+      "name": "DashDefinition",
+      "section": 42,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "windup"
+        },
+        {
+          "name": "dash_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "dash_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

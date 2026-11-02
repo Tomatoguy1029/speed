@@ -10,6 +10,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-dash-enemy" in OS.get_cmdline_user_args():
+		await check_cpp_dash()
+		print("[cpp_dash_enemy] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-part-enemy" in OS.get_cmdline_user_args():
 		await check_cpp_part()
 		print("[cpp_part_enemy] failed=%d" % failed)
@@ -580,4 +585,112 @@ func check_cpp_part() -> void:
 	var made: Dictionary = bridge.command("dev_spawn_part",{"parent_id":replacement,"definition_id":types[0],"position":target+Vector2(200,0)})
 	check(made.ok and int(made.value)!=int(ids[0]) and not core.valid_enemy_handle(old_part),"部位の行の再利用で古い親子IDを失効する")
 	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func check_cpp_dash() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: config.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 81
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["darter"])
+	var output := "res://.content/dev/run_dash"
+	var builder = load("res://tools/content/build_run_content.gd")
+	var built: Error = builder.build(stage,config,output,"突進する敵の予告と硬直".sha256_text())
+	check(built==OK,"突進する敵の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_81.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":980},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"突進する敵のランと表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	var initial: Dictionary = bridge.checkpoint()
+	var comparison = preload("res://tools/compare_runtime.gd").new()
+	var budget_probe = preload("res://tests/native_attack_budget.gd").new()
+	var cases := ["normal","death","reuse"]
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--cpp-dash-case="): cases = [argument.get_slice("=",1)]
+	for kind in cases:
+		bridge.restore(initial.value)
+		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+		add_child(lab)
+		await lab.reset({"seed":980,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"config":{"start_radius":900.0,"planet_radius":100.0}})
+		var run: RunSimulation = lab.run
+		run.state.ship_pos = target
+		run.state.enemy_aim = target
+		run.state.view_center = target
+		run.state.view_half = Vector2(640,360)
+		run.state.world_time = core.inspect().world_time
+		run.enemies._lod = core.inspect().ticks
+		run.state.rng.state = int(core.inspect().rng_state)
+		run.enemies._next_id = 1
+		core.set_motion_context(target,target,Vector2(640,360))
+		var definition := run.enemies.def_of(&"darter")
+		var position := target+Vector2(300,100)
+		var row := run.enemies.spawn(definition,position)
+		var id: int = core.spawn_enemy(&"darter",position,{})
+		var director = run.projectiles.director
+		director.formation_mode = true
+		core.set_attack_formation_mode(true)
+		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
+		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+		var modes := [EnemyTable.Mode.MOVE]
+		var pending: Dictionary = {}
+		var pending_state: Array = []
+		var next_state: Array = []
+		for tick in (21 if kind=="normal" else 5):
+			if tick==1:
+				director.configure({"enabled":true,"budget":1.0,"jitter":0.0})
+				core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+			if tick==3 and kind=="death":
+				run.combat.kill_enemy(row,{"cause":&"bullet"})
+				bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+			if tick==3 and kind=="reuse":
+				run.enemies._release_row(row)
+				core.remove_enemy(id)
+				var old_id := id
+				row = run.enemies.spawn(definition,position)
+				id = core.spawn_enemy(&"darter",position,{})
+				check(id!=old_id and not core.set_enemy_motion(old_id,{"facing":1.0}),"予告中の行を再利用しても旧突進のIDを受け付けない")
+			run.state.world_time += 0.125
+			director.advance(run.state.world_time,run.enemies)
+			core.advance_attack_budget(run.state.world_time)
+			run.enemies.tick(0.125,0.125)
+			core.step(0.125)
+			modes.append(run.enemies.table.mode[row])
+			var difference: String = comparison.difference(budget_probe.snapshot(director),core.attack_budget_snapshot())
+			check(difference.is_empty(),"突進する敵の予算・待機・解放が一致する: "+kind+" "+difference)
+			for enemy: Dictionary in core.enemies_snapshot():
+				if enemy.id==id: check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001 and enemy.dead==run.enemies.table.dead[row],"突進する敵の姿勢・移動・生死が一致する: %s/%d" % [kind,tick])
+			for item: Dictionary in core.enemy_motion_snapshot():
+				if item.id==id: check(item.mode==run.enemies.table.mode[row] and is_equal_approx(item.timer,run.enemies.table.timer[row]),"予告・突進・硬直の状態と時間が一致する: %s/%d" % [kind,tick])
+			if tick==0: check(run.enemies.table.mode[row]==EnemyTable.Mode.MOVE,"予算0では予告を始めず追跡する")
+			if tick==2 and kind=="normal":
+				pending = bridge.checkpoint()
+				pending_state = core.enemy_motion_snapshot()
+				var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
+				var presentation: RunPresentation = session.view.get_node("RunPresentation")
+				check(presentation.frame_view.apply_frame(frame) and not frame.batches.is_empty(),"予告中の姿勢を通常画面へ表示する")
+				await get_tree().process_frame
+			if tick==3 and kind=="normal": next_state = core.enemy_motion_snapshot()
+		if kind=="normal":
+			check(modes.has(EnemyTable.Mode.WINDUP) and modes.has(EnemyTable.Mode.DASH) and modes.has(EnemyTable.Mode.RECOVER) and modes[-1]==EnemyTable.Mode.MOVE,"追跡・予告・突進・硬直を一巡する")
+			check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==pending_state,"予告中の向きと残り時間を値で復帰する")
+			core.step(0.125)
+			check(core.enemy_motion_snapshot()==next_state,"予告中の復帰後に同じ突進へ進む")
+			bridge.release_checkpoint(pending.value)
+		elif kind=="death": check(core.enemies_snapshot()[0].dead!=0,"予告中に倒した敵は突進を再開しない")
+		lab.free()
+	budget_probe.free()
+	bridge.release_checkpoint(initial.value)
 	session.free()

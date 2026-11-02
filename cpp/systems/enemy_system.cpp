@@ -65,7 +65,9 @@ bool EnemySystem::attack_active(const godot::RunState &state,EnemyHandle handle)
 bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt) {
     if (!run.state.enemy_handles.contains(handle)) return false;
     const auto &enemy=run.state.enemies[handle.slot];
-    return enemy.fire_t<=run.content->definitions[enemy.definition].attack_telegraph+dt;
+    const auto &definition=run.content->definitions[enemy.definition];
+    if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
+    return enemy.fire_t<=definition.attack_telegraph+dt;
 }
 bool EnemySystem::relocate(RunRuntime &run,EnemyHandle handle,godot::Vector2 position) {
     auto &state=run.state;

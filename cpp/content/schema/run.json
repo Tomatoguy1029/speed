@@ -868,7 +868,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 12
+          "max": 13
         },
         {
           "name": "turn",
