@@ -2,7 +2,9 @@
 extends SceneTree
 var failed := 0
 func _initialize() -> void:
-	if "--cpp-hydra-tools-display" in OS.get_cmdline_user_args(): call_deferred("native_hydra_display")
+	if "--cpp-draco-tools-display" in OS.get_cmdline_user_args(): call_deferred("native_draco_display")
+	elif "--cpp-draco-tools" in OS.get_cmdline_user_args(): call_deferred("native_draco")
+	elif "--cpp-hydra-tools-display" in OS.get_cmdline_user_args(): call_deferred("native_hydra_display")
 	elif "--cpp-hydra-tools-retry" in OS.get_cmdline_user_args(): call_deferred("native_hydra_retry")
 	elif "--cpp-hydra-tools" in OS.get_cmdline_user_args(): call_deferred("native_hydra")
 	elif "--cpp-canis-tools-restore" in OS.get_cmdline_user_args(): call_deferred("native_canis_restore")
@@ -10,6 +12,7 @@ func _initialize() -> void:
 	else: call_deferred("native_tools")
 func native_check(ok: bool, label: String) -> void:
 	if "--cpp-boss-tools-tail" in OS.get_cmdline_user_args() and (label.ends_with("制作画面からC++ボスを配置する") or label.ends_with("本番のボス表示へ接続する")): return
+	if "--cpp-draco-tools" in OS.get_cmdline_user_args() or "--cpp-draco-tools-display" in OS.get_cmdline_user_args(): print("[cpp-draco-tools] ","成功: " if ok else "失敗: ",label)
 	if not ok: failed += 1; push_error(label)
 
 func native_tools() -> void:
@@ -158,7 +161,7 @@ func native_hydra() -> void:
 		await process_frame
 		if trial.manual!=null and not trial._switching:break
 	native_check(trial.manual!=null,"ヒドラ: 制作画面からC++ボスを配置する")
-	if trial.manual==null:print("ヒドラ起動失敗: ",trial.session.last_error," ",trial._manual_message.text);trial.queue_free();quit(1);return
+	if trial.manual==null:print("ヒドラ起動失敗: ",trial.session.last_error," ",trial._manual_message.text if trial._manual_message!=null else "制作UI未構築");trial.queue_free();quit(1);return
 	trial.session.playing=false
 	var body: Dictionary=trial.manual.state()
 	var original_phase: int=trial.manual._saved.get("phase",body.phase)
@@ -242,3 +245,81 @@ func native_hydra_display() -> void:
 	trial._return_to_ai()
 	trial.queue_free();await process_frame
 	print("[cpp-hydra-tools-display] failures=",failed);quit(1 if failed else 0)
+
+func native_draco() -> void:
+	var boss := "draco";var selected := "breath"
+	var built: Dictionary=load("res://tools/content/build_boss_program.gd").build_boss(boss,"res://.content/boss_draco.tres")
+	if "--cpp-draco-tools-pending" not in OS.get_cmdline_user_args(): native_check(built.get("error",FAILED)==OK,"りゅう座: 共通変換で制作プログラムを生成する")
+	var source_path := "res://data/bosses/draco_moves/breath.tres"
+	var source_hash := FileAccess.get_sha256(source_path)
+	var rules_hash := FileAccess.get_sha256("res://data/bosses/ai/draco_action_rules.tres")
+	var trial=load("res://gyms/boss_flow_trial.tscn").instantiate()
+	trial.set_meta("preview_request",{"boss":boss,"technique":selected});trial.set_meta("preview_program","res://.content/boss_draco.tres");root.add_child(trial)
+	for frame in 300:
+		await process_frame
+		if trial.manual!=null and not trial._switching:break
+	native_check(trial.manual!=null,"りゅう座: 制作画面から本番C++の単独ボスを配置する")
+	if trial.manual==null:print("制作起動失敗: ",trial.session.last_error," ",trial._manual_message.text if trial._manual_message!=null else "制作UI未構築");trial.queue_free();quit(1);return
+	trial.session.playing=false
+	var body: Dictionary=trial.manual.state()
+	var original_phase: int=trial.manual._saved.get("phase",body.phase)
+	native_check(trial._phase_picker.item_count==3 and trial.manual.moves().size()==13 and body.busy and not body.selection and trial.manual.requested==selected,"りゅう座: 3形態と全13技を制作画面で選択し、指定技だけを再生する")
+	var presentation=trial.session.scene.view.get_node("RunPresentation")
+	for frame in 2:await process_frame
+	var missing := []
+	for asset: Dictionary in trial.session.scene.cpp_resources.visuals:
+		if asset.get("boss","")==boss or asset.has("hydra_move"):
+			if not presentation.cpp_scope.resources.has(asset.path):missing.append(asset.path)
+	native_check(missing.is_empty() and not presentation.frame_view._boss_body_displays.is_empty(),"りゅう座: 本番Scopeで本体・全技・複製の素材を準備して正式表示する / "+str(missing))
+	var move: Resource=trial._selected_move();var original: float=move.warn
+	var key: String=trial._current_tuning_key();trial._drafts[key].warn=1.75;trial._apply_tuning_preview()
+	native_check(trial.manual.execute(selected,3),"りゅう座: 未保存の技値で第3形態を再実行する / "+trial.manual.message)
+	for tick in 30:trial.session.step()
+	var running: Array=trial.session.bridge.command("dev_boss_state").value
+	var active: Array=running.filter(func(t):return t.actor==trial.manual.entity_id and t.technique==selected and t.stage<5)
+	native_check(trial.manual.state().phase==3 and active.size()==1 and is_equal_approx(active[0].windup_progress,active[0].elapsed/1.75),"りゅう座: 変更した予告時間を本番の型付き技へ渡す")
+	var rock_actors: Array=active[0].rocks.map(func(rock):return rock.actor) if not active.is_empty() else []
+	for tick in 240:
+		trial.session.step()
+		if trial.session.bridge.command("dev_boss_state").value.any(func(t):return t.actor==trial.manual.entity_id and t.technique==selected and t.stage==1):break
+	native_check(trial.session.last_error.ok and trial.session.bridge.command("dev_boss_state").value.any(func(t):return t.actor==trial.manual.entity_id and t.technique==selected and t.stage==1),"りゅう座: 編集後の技を本番の発動段階まで進める")
+	trial._return_to_ai();body=trial.manual.state()
+	var lab: Dictionary=trial.session.bridge.read_lab().value
+	native_check(lab.hazards.is_empty() and lab.hostiles.is_empty() and not body.busy and body.phase==original_phase and body.selection and body.placed_meteors.is_empty() and not rock_actors.is_empty() and not lab.enemies.any(func(e):return e.id in rock_actors and not e.dead),"りゅう座: 停止時に残留攻撃と岩を消して元の形態・AIへ戻す")
+	native_check(is_equal_approx(trial._source_move(boss,selected).warn,original) and FileAccess.get_sha256(source_path)==source_hash and FileAccess.get_sha256("res://data/bosses/ai/draco_action_rules.tres")==rules_hash and not trial.session.spec.has("boss_programs"),"りゅう座: 未保存値をSourceと通常ランへ漏らさない")
+	trial._revert_tuning();trial._apply_tuning_preview()
+	native_check(is_equal_approx(trial._selected_move().warn,original),"りゅう座: 変更を破棄して保存済み技値を再読込する")
+	trial.manual.program.data.flow.maximum_stamina=23.0;trial.manual.program.data.flow.sections[0].cap=21.0;trial.manual.program.data.rules.costs[selected]=2.5
+	native_check(trial.manual.execute(selected,2),"りゅう座: 編集したフローと予算を共通生成で第2形態の試行へ適用する / "+trial.manual.message)
+	var flow: Array=trial.session.bridge.command("dev_boss_flow_state").value
+	native_check(flow.any(func(f):return f.actor==trial.manual.entity_id and is_equal_approx(f.stamina,23.0)),"りゅう座: 変更後の最大予算から試行を開始する")
+	var package: Dictionary=load("res://tools/content/build_run_content.gd").boss_package(root.get_node("ContentManager").bosses[&"draco"],trial.session._config,null,trial.manual.program.data)
+	native_check(package.records.BossFlowSection[0].cap==21.0 and package.records.BossFlowAction.any(func(c):return is_equal_approx(c.cost,2.5)),"りゅう座: 編集した区間上限と技の消費値を本番フローへ生成する")
+	trial._return_to_ai()
+	native_check(trial.manual.execute("clones",2),"りゅう座: 複製を再生して途中停止する / "+trial.manual.message)
+	var clone_actors: Array=trial.manual.state().clones.map(func(clone):return clone.id)
+	trial._return_to_ai();body=trial.manual.state();lab=trial.session.bridge.read_lab().value
+	native_check(not body.busy and body.picaro.is_empty() and body.closing_walls==0 and body.clones.is_empty() and clone_actors.size()==2 and not lab.enemies.any(func(e):return e.id in clone_actors and not e.dead),"りゅう座: 複製の取消で生まれたピカロも試行停止で回収する")
+	trial.queue_free();await process_frame
+	var roundtrip=load("res://tests/draco_editor_roundtrip.gd").new();var editor_failures: int=roundtrip.native_technique_roundtrip(root,boss);roundtrip.free()
+	native_check(editor_failures==0,"りゅう座: 全13技の編集画面と吸引の弧・渦の保存再読込を維持する");failed+=editor_failures
+	print("[cpp-draco-tools] failures=",failed);quit(1 if failed else 0)
+
+func native_draco_display() -> void:
+	load("res://tools/content/build_boss_program.gd").build_boss("draco","res://.content/boss_draco.tres")
+	var trial=load("res://gyms/boss_flow_trial.tscn").instantiate()
+	trial.set_meta("preview_request",{"boss":"draco","technique":"breath"});trial.set_meta("preview_program","res://.content/boss_draco.tres");root.add_child(trial)
+	for frame in 300:
+		await process_frame
+		if trial.manual!=null and not trial._switching:break
+	if trial.manual==null:push_error("表示確認の準備に失敗: "+str(trial.session.last_error));quit(1);return
+	trial.session.playing=false
+	var presentation=trial.session.scene.view.get_node("RunPresentation")
+	for frame in 2:await process_frame
+	var missing := []
+	for asset: Dictionary in trial.session.scene.cpp_resources.visuals:
+		if asset.get("boss","")=="draco" or asset.has("hydra_move"):
+			if not presentation.cpp_scope.resources.has(asset.path):missing.append(asset.path)
+	native_check(missing.is_empty() and not presentation.frame_view._boss_body_displays.is_empty(),"りゅう座: 本番Scopeで本体・全技・複製の素材を準備して正式表示する / "+str(missing))
+	trial._return_to_ai();trial.queue_free();await process_frame
+	print("[cpp-draco-tools-display] failures=",failed);quit(1 if failed else 0)

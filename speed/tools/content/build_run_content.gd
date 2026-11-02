@@ -2129,11 +2129,13 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 					if not target.is_empty() and target not in ["EnemyRecord","ResourceKey"] and not tables.has(target):
 						tables[target] = true
 						expanded = true
-		var maps := {"EnemyRecord":{}}
+		var maps := {"EnemyRecord":{},"ResourceKey":{}}
+		var added_enemies := {}
 		for body: Dictionary in source.BossBodyDefinition:
 			var enemy: Dictionary = source.EnemyRecord[body.enemy-1].duplicate(true)
 			var index: int = data.EnemyRecord.size()+1
 			maps.EnemyRecord[enemy.id] = index
+			maps.ResourceKey[enemy.visual_id] = data.EnemyRecord[0].visual_id
 			enemy.id = index
 			enemy.visual_id = data.EnemyRecord[0].visual_id
 			data.EnemyRecord.append(enemy)
@@ -2149,12 +2151,16 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			var enemy := original.duplicate(true)
 			var name: String = source.StringEntry[original.id-1].value
 			var found: Array = data.StringEntry.filter(func(row):return row.value==name)
-			if not found.is_empty(): maps.EnemyRecord[original.id]=found[0].id;continue
+			if not found.is_empty():
+				maps.EnemyRecord[original.id]=found[0].id
+				maps.ResourceKey[original.visual_id]=data.EnemyRecord[found[0].id-1].visual_id
+				continue
 			var visual: Dictionary = package.visuals[original.visual_id-1].duplicate(true)
 			visual.id=data.ResourceKey.size()+1
 			data.ResourceKey.append({"id":visual.id,"role":visual.role});visuals.append(visual)
+			maps.ResourceKey[original.visual_id]=visual.id
 			enemy.id=data.EnemyRecord.size()+1;enemy.visual_id=visual.id
-			maps.EnemyRecord[original.id]=enemy.id;data.EnemyRecord.append(enemy)
+			maps.EnemyRecord[original.id]=enemy.id;added_enemies[original.id]=true;data.EnemyRecord.append(enemy)
 			data.StringEntry.append({"id":enemy.id,"value":name});data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
 			for original_type: Dictionary in source.PopulationType:
 				if original_type.enemy!=original.id:continue
@@ -2162,13 +2168,52 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			for original_hull: Dictionary in source.FriendHullLook:
 				if original_hull.enemy!=original.id: continue
 				var hull := original_hull.duplicate(true);hull.id=data.FriendHullLook.size()+1;hull.enemy=enemy.id;data.FriendHullLook.append(hull)
+		# 技で追加する敵には、その敵の移動・接触などの型付き表も付ける。
+		for record: Dictionary in Schema.SCHEMA.records:
+			if tables.has(record.name) or record.name in ["EnemyRecord","DefinitionIndex","PopulationType","FriendHullLook"]: continue
+			var selected_rows := []
+			for row: Dictionary in source[record.name]:
+				for field: Dictionary in record.fields:
+					if field.get("ref","")=="EnemyRecord" and added_enemies.has(row[field.name]):
+						selected_rows.append(row);break
+			if not selected_rows.is_empty():
+				source[record.name] = selected_rows
+				tables[record.name] = true
+		expanded = true
+		while expanded:
+			expanded = false
+			for record: Dictionary in Schema.SCHEMA.records:
+				if not tables.has(record.name) or source[record.name].is_empty(): continue
+				for field: Dictionary in record.fields:
+					var target: String=field.get("ref","")
+					if not target.is_empty() and target not in ["EnemyRecord","ResourceKey"] and not tables.has(target):
+						tables[target]=true;expanded=true
+
 		for record: Dictionary in Schema.SCHEMA.records:
 			if not tables.has(record.name): continue
 			if record.name=="BossFinishDefinition" and not data[record.name].is_empty():
 				maps[record.name] = {1:1}
 				continue
 			maps[record.name] = {}
-			for row: Dictionary in source[record.name]: maps[record.name][row.id] = data[record.name].size()+maps[record.name].size()+1
+			for row: Dictionary in source[record.name]: maps[record.name][row.id] = maps.EnemyRecord[row.id] if record.fields[0].get("ref","")=="EnemyRecord" else data[record.name].size()+maps[record.name].size()+1
+		# 共通弾などが使う資源も、ボス固有素材と同じ番号変換を通す。
+		var resource_refs := {}
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not tables.has(record.name): continue
+			for field: Dictionary in record.fields:
+				if field.get("ref","")!="ResourceKey": continue
+				for row: Dictionary in source[record.name]: resource_refs[row[field.name]] = true
+
+		for original: Dictionary in package.visuals:
+			if not resource_refs.has(original.id) and not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish and not original.has("hydra_move") and not original.has("canis_flame") and not original.has("canis_burst") and not original.get("canis_burning",false) and not original.get("canis_trail",false): continue
+			if maps.ResourceKey.has(original.id): continue
+			var visual := original.duplicate(true)
+			if visual.has("canis_flame"): visual.canis_flame = maps.CanisFlameDefinition[visual.canis_flame]
+			if visual.has("canis_burst"): visual.canis_burst = maps.CanisBlazeDefinition[visual.canis_burst]
+			visual.id = data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":visual.id,"role":visual.role})
+			visuals.append(visual)
+			maps.ResourceKey[original.id] = visual.id
 		for record: Dictionary in Schema.SCHEMA.records:
 			if not tables.has(record.name): continue
 			if record.name=="BossFinishDefinition" and not data[record.name].is_empty(): continue
@@ -2176,19 +2221,11 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 				var row := original.duplicate(true)
 				row.id = maps[record.name][row.id]
 				for field: Dictionary in record.fields:
-					if field.has("ref"): row[field.name] = maps[field.ref][row[field.name]]
+					if field.has("ref"): row[field.name] = maps[field.ref][original[field.name]]
 				if record.name=="BossFlowNode":
 					if row.technique>0: row.technique = maps.BossTechniqueDefinition[row.technique]
 					if row.condition>0: row.condition = maps.BossFlowCondition[row.condition]
 				data[record.name].append(row)
-		for original: Dictionary in package.visuals:
-			if not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish and not original.has("hydra_move") and not original.has("canis_flame") and not original.has("canis_burst") and not original.get("canis_burning",false) and not original.get("canis_trail",false): continue
-			var visual := original.duplicate(true)
-			if visual.has("canis_flame"): visual.canis_flame = maps.CanisFlameDefinition[visual.canis_flame]
-			if visual.has("canis_burst"): visual.canis_burst = maps.CanisBlazeDefinition[visual.canis_burst]
-			visual.id = data.ResourceKey.size()+1
-			data.ResourceKey.append({"id":visual.id,"role":visual.role})
-			visuals.append(visual)
 	return OK
 
 static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}) -> Error:
@@ -2799,7 +2836,8 @@ static func append_draco_clones(package: Dictionary, move: BossTechnique, config
 		var source: Dictionary=chase_package(definition,config).records
 		var enemy: Dictionary=source.EnemyRecord[0].duplicate(true)
 		enemy.id=data.EnemyRecord.size()+1;enemy.visual_id=data.EnemyRecord[0].visual_id
-		data.EnemyRecord.append(enemy);data.StringEntry.append({"id":enemy.id,"value":name});data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
+		# 通常のヒドラ本体と一緒に生成しても、技内部の出所定義が同名にならないようにする。
+		data.EnemyRecord.append(enemy);data.StringEntry.append({"id":enemy.id,"value":"draco_clone_hydra" if name=="hydra" else name});data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
 		var drift: Dictionary=source.DriftDefinition[0].duplicate(true);drift.id=enemy.id;data.DriftDefinition.append(drift)
 		var population: Dictionary=source.PopulationType[0].duplicate(true);population.id=data.PopulationType.size()+1;population.enemy=enemy.id;data.PopulationType.append(population)
 		enemies[name]=enemy.id

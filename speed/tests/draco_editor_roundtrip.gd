@@ -3,8 +3,14 @@ var failures := 0
 func check(ok: bool,label: String) -> void:
 	if not ok: failures+=1;push_error(label)
 func _ready() -> void:
+	draco_roundtrip(self)
+	print("[draco_editor_roundtrip] failures=",failures)
+	get_tree().quit(1 if failures else 0)
+
+func draco_roundtrip(parent: Node) -> int:
+	var count := failures
 	var editor=load("res://tools/editor/boss_flow/editor.gd").new()
-	add_child(editor)
+	parent.add_child(editor)
 	editor.open_boss("res://data/bosses/ai/draco_action_rules.tres","res://data/bosses/ai/draco_flow.tres")
 	for move in editor.rules.techniques:
 		check(editor.open_technique(move.resource_path)==OK,"全技の設定を編集できる: "+String(move.technique))
@@ -40,11 +46,11 @@ func _ready() -> void:
 	check(is_equal_approx(spiral_reloaded.radius_factor,1.05) and is_equal_approx(spiral_reloaded.coil_time,0.8) and is_equal_approx(spiral_reloaded.head_offset,370.0),"渦半径・速度・頭終点が保存後の読み直しでも残る")
 	DirAccess.remove_absolute(spiral_path)
 	editor.free()
-	print("[draco_editor_roundtrip] failures=",failures)
-	get_tree().quit(1 if failures else 0)
+	return failures-count
 
 ## 既存の技編集・保存・再読込を、指定ボスのコピーだけで確認する。
 func native_technique_roundtrip(parent: Node, boss: String) -> int:
+	if boss=="draco": return draco_roundtrip(parent)
 	var editor = load("res://tools/editor/boss_flow/editor.gd").new()
 	parent.add_child(editor)
 	editor.open_boss("res://data/bosses/ai/%s_action_rules.tres" % boss,"res://data/bosses/ai/%s_flow.tres" % boss)
