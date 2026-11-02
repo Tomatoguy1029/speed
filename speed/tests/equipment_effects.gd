@@ -66,6 +66,13 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t35" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t35()
+		check(finished,"マルチショットの確認を最後まで実施する")
+		print("[cpp_t35] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t34" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t34()
 		check(finished,"大振りの確認を最後まで実施する")
@@ -1151,4 +1158,80 @@ func check_cpp_t34() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"大振りの状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func t35_volley(bridge) -> Dictionary:
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	for tick in range(240):
+		var before: String = core.inspect().rng_state
+		bridge.step(1.0/120.0,idle,{"logical_size":Vector2(640,480)})
+		var fresh: Array = core.projectiles_snapshot().filter(func(shot): return shot.age<0.009)
+		if not fresh.is_empty(): return {"count":fresh.size(),"ticks":tick+1,"rng_before":before,"rng":core.inspect().rng_state}
+	check(false,"実際のW01更新で次の発射へ進む")
+	return {"count":0,"ticks":240,"rng_before":"","rng":core.inspect().rng_state}
+
+func check_cpp_t35() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: TraitDef = load("res://data/traits/T35_multiShot.tres")
+	var bridge = t07_bridge(config,{})
+	if bridge==null: return false
+	var core = bridge._core
+	check(bridge._ui.shot_multiplier==1.0,"取得前は弾数倍率1を使う")
+	var initial: Dictionary = bridge.checkpoint()
+	var ordinary: Dictionary = t35_volley(bridge)
+	check(ordinary.count==1 and ordinary.rng_before!=ordinary.rng,"未取得の整数1発でも抽選を消費して実際に発射する")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T35","levels":1}).ok,"T35を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.shot_multiplier,1.0+definition.stack_bonus(level)),"各段のtresの増分を弾数倍率へ一度適用する")
+	var trained: float = bridge._ui.shot_multiplier
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T35","levels":1}).ok and bridge._ui.shot_multiplier==trained,"上限を越えて弾数を増やさない")
+	bridge.command("dev_post_weapon_power",{"damage":2,"followup":3})
+	check(bridge._ui.shot_multiplier==trained,"最大段後の再計算で弾数を二重に掛けない")
+	var integers: Array = []
+	for volley in range(16):
+		var fired: Dictionary = t35_volley(bridge)
+		integers.append(fired)
+		check(fired.count==int(trained) and fired.rng_before!=fired.rng,"整数の追加弾も抽選を1回使って発射する")
+	check(integers[0].rng==ordinary.rng and integers[0].ticks==ordinary.ticks,"1発と整数の増加後で発射時刻と乱数の進み方を変えない")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.release_checkpoint(initial.value)
+	var fractional_level := 2
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T35","levels":fractional_level})
+	var amount := 1.0+definition.stack_bonus(fractional_level)
+	var low := floori(amount)
+	var counts: Array[int] = []
+	for volley in range(16):
+		var fired: Dictionary = t35_volley(bridge)
+		counts.append(fired.count)
+		check(fired.count in [low,low+1] and fired.rng==integers[volley].rng and fired.ticks==integers[volley].ticks,"端数は追加1発を抽選し、整数時と同じ乱数消費と周期を保つ")
+	check(counts.has(low) and counts.has(low+1),"固定seedの実発射で端数の追加あり・なしを確認する")
+	var shots: Array = core.projectiles_snapshot()
+	var random: String = core.inspect().rng_state
+	var saved: Dictionary = bridge.checkpoint()
+	bridge.command("dev_remove_trait",{"id":"T35"})
+	check(bridge._ui.shot_multiplier==1.0 and core.projectiles_snapshot()==shots,"解除は今後の弾数だけを戻し、発射済みの弾を消さない")
+	check(t35_volley(bridge).count==1,"解除後の次の発射は元の1発へ戻る")
+	check(bridge.restore(saved.value).ok,"取得段と弾数倍率・発射済みの弾・乱数を保持して復帰する")
+	bridge.collect_frame()
+	check(is_equal_approx(bridge._ui.shot_multiplier,amount) and core.projectiles_snapshot()==shots and core.inspect().rng_state==random,"復帰後も同じ弾数倍率と抽選位置へ戻る")
+	bridge.release_checkpoint(saved.value)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(is_equal_approx(hud._cpp_ui.shot_multiplier,amount) and hud._cpp_ui.trait_levels.any(func(item): return item.id=="T35" and item.level==fractional_level),"HUDへ端数を含む弾数倍率と所持段を同じ状態から渡す")
+	hud.free()
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"マルチショットの状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true

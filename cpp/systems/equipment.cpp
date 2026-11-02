@@ -1,6 +1,7 @@
 #include "equipment.h"
 #include "../behaviors/weapons/forward.h"
 #include <algorithm>
+#include <cmath>
 namespace speed {
 void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
@@ -28,6 +29,12 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     const double cap=std::min(1.0,crit.trait_maximum),trained=std::min(cap,crit_base+crit.trained_bonus);
     const double reserve=std::max(0.0,cap-trained);
     run.state.combat_config.crit_chance=std::min(crit.trait_maximum,crit_base+crit_bonus)+std::min(reserve,crit.increment*double(p.post_crit_stacks));
+}
+int64_t EquipmentSystem::shot_count(RunRuntime &run,int64_t base) {
+    const double amount=double(base)*run.state.loadout.effects.shot_amount;
+    const auto whole=int64_t(std::floor(amount));
+    // 整数のときも1回抽選し、武器間で乱数の消費順をそろえる。
+    return whole+(run.state.control.rng.randf()<amount-double(whole)?1:0);
 }
 double EquipmentSystem::weapon_damage_factor(const RunRuntime &run,uint32_t id) {
     const auto &powers=run.state.loadout.weapon_damage_factors;return id && id<=powers.size()?powers[id-1]:1.0;

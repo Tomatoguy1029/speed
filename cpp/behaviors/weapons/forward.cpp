@@ -24,10 +24,7 @@ void ForwardBehavior::step(RunRuntime &run,double dt) {
     const double interval=forward.base_interval/rate;
     forward.fire.remaining+=interval-forward.interval;forward.interval=interval;
     if (!advance(forward,dt,state.draw.drawing || state.draw.tracing)) return;
-    const double amount=effects.shot_amount;
-    const int64_t whole=int64_t(std::floor(amount));
-    // 整数の弾数でも抽選を一度行う。武器の取得順と乱数の順を保つ。
-    const int64_t count=whole+(state.control.rng.randf()<amount-whole?1:0);
+    const int64_t count=EquipmentSystem::shot_count(run,1);
     const double angle=state.ship.heading.angle();
     const auto origin=state.ship.pos+state.ship.heading*16.0*1.82*forward.character_scale;
     for (int64_t i=0;i<count;++i) {
