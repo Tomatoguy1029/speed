@@ -1403,6 +1403,10 @@
       {
         "name": "Horn",
         "value": "horn"
+      },
+      {
+        "name": "CoronaThrow",
+        "value": "corona_throw"
       }
     ],
     "VisualRole": [
@@ -1811,6 +1815,10 @@
       {
         "name": "FinalStrike",
         "value": "final_strike"
+      },
+      {
+        "name": "Swallow",
+        "value": "swallow"
       }
     ],
     "ResultKind": [
@@ -2358,6 +2366,18 @@
     ],
     "final_strike": [
       "t"
+    ],
+    "swallow": [
+      "enemy_type",
+      "pos",
+      "r",
+      "facing",
+      "color",
+      "row",
+      "id",
+      "visual_id",
+      "sprite_radius",
+      "sprite_angle"
     ]
   },
   "includes": [
