@@ -5,6 +5,7 @@
 #include <memory>
 #include "generated/run_schema.h"
 #include "population_data.h"
+#include "encounter_data.h"
 
 namespace speed {
 // ランと保持したランで共有する読み取り専用の定義。
@@ -108,6 +109,9 @@ struct ContentBundle {
     WarpDefinition warp;
     CometDefinition comet;
     std::vector<DeathChainDefinition> death_chains;
+    EncounterDefinition encounter;
+    std::vector<EncounterPatternData> encounter_patterns;
+    std::vector<godot::StringName> encounter_phases;
     PopulationDefinition population;
     SpawnTimeline population_timeline;
     std::vector<PopulationFormation> formations;

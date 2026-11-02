@@ -440,6 +440,174 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "EncounterDefinition",
+      "section": 188,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "active",
+          "type": "bool"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "EncounterPattern",
+      "section": 189,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "attempts",
+          "type": "u32",
+          "min": 1,
+          "max": 32
+        },
+        {
+          "name": "min_fodder",
+          "type": "u32"
+        },
+        {
+          "name": "margin",
+          "type": "f64"
+        },
+        {
+          "name": "window",
+          "type": "f64"
+        },
+        {
+          "name": "draw_seconds",
+          "type": "f64"
+        },
+        {
+          "name": "exit_clearance",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        },
+        {
+          "name": "scale_min",
+          "type": "f64"
+        },
+        {
+          "name": "scale_max",
+          "type": "f64"
+        },
+        {
+          "name": "min_spacing",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "EncounterPoint",
+      "section": 190,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "pattern",
+          "type": "u32",
+          "min": 1,
+          "ref": "EncounterPattern"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "EncounterRegion",
+      "section": 191,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "pattern",
+          "type": "u32",
+          "min": 1,
+          "ref": "EncounterPattern"
+        },
+        {
+          "name": "enemy",
+          "type": "u32"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "angle",
+          "type": "f64"
+        },
+        {
+          "name": "jitter",
+          "type": "f64"
+        },
+        {
+          "name": "min_count",
+          "type": "u32",
+          "max": 100
+        },
+        {
+          "name": "max_count",
+          "type": "u32",
+          "max": 100
+        },
+        {
+          "name": "fodder",
+          "type": "bool"
+        },
+        {
+          "name": "elite",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "EncounterPhase",
+      "section": 192,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
     }
   ],
   "enums": {

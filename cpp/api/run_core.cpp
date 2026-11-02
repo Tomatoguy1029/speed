@@ -59,6 +59,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("ack_frame_run","epoch","sequence"), &SpeedRunCore::ack_frame_run);
     ClassDB::bind_method(D_METHOD("metrics_run"), &SpeedRunCore::metrics_run);
     ClassDB::bind_method(D_METHOD("recording_run","initial"), &SpeedRunCore::recording_run);
+    ClassDB::bind_method(D_METHOD("encounter_state_run"), &SpeedRunCore::encounter_state_run);
     ClassDB::bind_method(D_METHOD("query_route_run","points","parameters"), &SpeedRunCore::query_route_run);
     ClassDB::bind_method(D_METHOD("query_route_snapshot","snapshot","points","parameters"), &SpeedRunCore::query_route_snapshot);
     ClassDB::bind_method(D_METHOD("render_run","view","alpha"), &SpeedRunCore::render_run);
@@ -334,7 +335,7 @@ void SpeedRunCore::close() {
     runtime.workspace.avoidance_ids.clear(); runtime.workspace.avoidance_from.clear();
     runtime.state.legacy_progression = Progression();
     runtime.state.loadout={};runtime.state.lifecycle={};runtime.resource_workspace.requests.clear();
-    runtime.state.groups={};runtime.state.field={};
+    runtime.state.groups={};runtime.state.field={};runtime.state.encounter={};
     runtime.state.corona_members.clear();runtime.state.corona_serial=0;
     runtime.state.enemies.clear(); runtime.state.pending_enemies.clear(); runtime.state.enemy_handles = {};
     runtime.state.enemies.shrink_to_fit();
@@ -551,14 +552,14 @@ int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Diction
         if (name=="elite" || name=="is_boss" || name=="attack_managed" || name=="flock_member") {
             if (value.get_type()!=Variant::BOOL) return -1;
             if (name=="flock_member") params.flock_member=value;else if (name=="elite") params.elite=value;else if (name=="is_boss") params.is_boss=value;else {params.has_managed=true;params.managed=value;}
-        } else if (name=="vel") {if (value.get_type()!=Variant::VECTOR2 || !Vector2(value).is_finite()) return -1;params.velocity=value;}
+        } else if (name=="vel") {if (value.get_type()!=Variant::VECTOR2 || !Vector2(value).is_finite()) return -1;params.velocity=value;params.has_velocity=true;}
         else if (name=="spawn_origin") {
             if (value.get_type()!=Variant::INT || int64_t(value)<0 || int64_t(value)>=int64_t(speed::SpawnOrigin::Count)) return -1;
             params.origin=speed::SpawnOrigin(int64_t(value));
         }
         else if (name=="attack_group" || name=="hound_pack") {
             if (value.get_type()!=Variant::INT || (name=="attack_group" && int64_t(value)<0)) return -1;
-            if (name=="attack_group") params.group=value;else params.hound_pack=value;
+            if (name=="attack_group") params.group=value;else {params.hound_pack=value;params.has_hound_pack=true;}
         } else {
             if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value))) return -1;
             if (name=="size") {if (double(value)<=0) return -1;params.size=value;}
@@ -572,11 +573,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Diction
             else return -1;
         }
     }
-    const int64_t id=speed::EnemySystem::spawn_base(runtime,definition,params);if (id<0) return id;
-    const auto &def=runtime.content->definitions[definition];const auto row=runtime.state.rows_by_id.at(id);
-    if (def.kind==speed::EnemyDefinition::Kind::Hound) spawn_hounds(row,options);
-    if (def.rank>=3) {Dictionary event;event["id"]=id;event["enemy_type"]=def.id;emit_event("strong_spawn",event);}
-    return id;
+    return speed::EnemySystem::spawn(runtime,definition,params);
 }
 
 bool SpeedRunCore::remove_enemy(int64_t id) {

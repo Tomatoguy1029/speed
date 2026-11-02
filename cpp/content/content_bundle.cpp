@@ -576,6 +576,14 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (item_reticle!=bundle->reticles.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
+    if (records.EncounterDefinition_rows.size()!=1) return {};bundle->encounter=records.EncounterDefinition_rows.front();
+    for (const auto &row:records.EncounterPattern_rows) {
+        if (row.id!=bundle->encounter_patterns.size()+1) return {};EncounterPatternData p;
+        p.attempts=row.attempts;p.min_fodder=row.min_fodder;p.margin=row.margin;p.window=row.window;p.draw_seconds=row.draw_seconds;p.exit_clearance=row.exit_clearance;p.rotation=row.rotation;p.scale_min=row.scale_min;p.scale_max=row.scale_max;p.min_spacing=row.min_spacing;bundle->encounter_patterns.push_back(std::move(p));
+    }
+    for (const auto &row:records.EncounterPoint_rows) {const godot::Vector2 point(row.x,row.y);if (!point.is_finite()) return {};bundle->encounter_patterns[row.pattern-1].route.push_back(point);}
+    for (const auto &row:records.EncounterRegion_rows) {const godot::Vector2 point(row.x,row.y);if (!point.is_finite() || row.enemy>bundle->definitions.size() || row.max_count<row.min_count) return {};bundle->encounter_patterns[row.pattern-1].regions.push_back({row.enemy,row.min_count,row.max_count,point,row.angle,row.jitter,row.fodder,row.elite});}
+    for (const auto &row:records.EncounterPhase_rows) bundle->encounter_phases.push_back(godot::String::utf8(row.name.c_str()));
     bundle->death_chains=records.DeathChainDefinition_rows;
     for (size_t i=0;i<bundle->death_chains.size();++i) bundle->definitions[bundle->death_chains[i].id-1].death_chain_definition=uint32_t(i+1);
     if (records.PopulationDefinition_rows.size()!=1) return {};

@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../systems/route_constraints.h"
+#include "../systems/attack_budget.h"
 #include <cmath>
 using namespace godot;
 namespace {
@@ -8,7 +9,7 @@ bool scalar(const Dictionary &d,const char *key,double &out,bool infinity=false)
 bool integer(const Dictionary &d,const char *key,int64_t &out) {const auto v=d.get(key,Variant());if (v.get_type()!=Variant::INT) return false;out=v;return out>=0;}
 bool flag(const Dictionary &d,const char *key,bool &out) {const auto v=d.get(key,Variant());if (v.get_type()!=Variant::BOOL) return false;out=v;return true;}
 bool point(const Dictionary &d,const char *key,Vector2 &out) {const auto v=d.get(key,Variant());if (v.get_type()!=Variant::VECTOR2) return false;out=v;return out.is_finite();}
-Dictionary reply(bool ok,Variant value=Variant(),int code=1) {Dictionary d;d["ok"]=ok;d["code"]=ok?0:code;d["message"]=ok?"":"経路判定の入力・状態を確認してください";d["field"]=ok?"":"route";d["value"]=ok?value:Variant();return d;}
+Dictionary reply(bool ok,Variant value=Variant(),int code=1) {Dictionary d;d["ok"]=ok;d["code"]=ok?0:code;d["message"]=ok?String():String::utf8("経路判定の入力・状態を確認してください");d["field"]=ok?"":"route";d["value"]=ok?value:Variant();return d;}
 bool options(const Dictionary &d,speed::RouteOptions &out) {
     if (!keys(d,{"margin","window","draw_seconds","exit_clearance","scheduled","future_ticks"})) return false;
     for (auto item:{std::pair{"margin",&out.margin},{"window",&out.window},{"draw_seconds",&out.draw_seconds},{"exit_clearance",&out.exit_clearance}}) if (d.has(item.first) && !scalar(d,item.first,*item.second)) return false;
@@ -25,10 +26,11 @@ const char *reason_key(speed::RouteReason reason) {
 }
 Dictionary obstacle(const speed::RouteObstacle &v) {
     Dictionary d;d["code"]=int64_t(v.reason);d["reason_key"]=reason_key(v.reason);d["pos"]=v.position;if (v.id) d["id"]=v.id;
+    d["enemy"]=v.reason==speed::RouteReason::MovingEnemy;
     using R=speed::RouteReason;switch(v.reason) {
-    case R::MovingEnemy:d["reason"]="動く敵や特殊な敵";d["id"]=v.id;break;case R::MovingTerrain:d["reason"]="動く地形や配置済みの岩";break;
-    case R::FutureCommands:d["reason"]="この先の記録済み命令";break;case R::HomingBullet:d["reason"]="追尾する弾";break;case R::AttachedHazard:d["reason"]="敵に付いた攻撃";break;
-    case R::AutoSpawn:d["reason"]="自動の補充";break;case R::Scheduled:d["reason"]="予定された命令";break;default:break;
+    case R::MovingEnemy:d["reason"]=String::utf8("動く敵や特殊な敵");d["id"]=v.id;break;case R::MovingTerrain:d["reason"]=String::utf8("動く地形や配置済みの岩");break;
+    case R::FutureCommands:d["reason"]=String::utf8("この先の記録済み命令");break;case R::HomingBullet:d["reason"]=String::utf8("追尾する弾");break;case R::AttachedHazard:d["reason"]=String::utf8("敵に付いた攻撃");break;
+    case R::AutoSpawn:d["reason"]=String::utf8("自動の補充");break;case R::Scheduled:d["reason"]=String::utf8("予定された命令");break;default:break;
     }return d;
 }
 Dictionary result(const speed::RouteResult &r,const speed::RouteOptions &o,int64_t tick) {
@@ -71,4 +73,10 @@ Dictionary SpeedRunCore::query_route_run(const PackedVector2Array &points,const 
 Dictionary SpeedRunCore::query_route_snapshot(const Dictionary &snapshot,const PackedVector2Array &points,const Dictionary &parameters) const {
     speed::RouteOptions o;speed::RouteContext c;std::vector<Vector2> path;if (!options(parameters,o) || !path_points(points,path) || !context(snapshot,c)) return reply(false);
     return reply(true,result(speed::RouteConstraints::validate(c,path,o),o,c.tick));
+}
+
+Dictionary SpeedRunCore::encounter_state_run() const {
+    if (runtime.busy) return reply(false,Variant(),7);if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return reply(false,Variant(),4);
+    const auto &s=runtime.state.encounter;Dictionary out;out["next"]=s.next;out["start"]=s.start;out["window"]=s.window;out["margin"]=s.margin;out["available"]=s.opportunity;out["guard_active"]=speed::AttackBudgetSystem::guard_active(runtime.state);
+    PackedVector2Array route;for (auto point:s.route) route.push_back(point);out["route"]=route;out["status"]=s.window>0?"window":"static";return reply(true,out);
 }

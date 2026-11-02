@@ -58,6 +58,7 @@ struct RunState {
     };
     std::vector<Clip> clips;
     bool clips_ready = false;
+    struct Encounter {double next=0,start=0,window=0,margin=0;bool opportunity=false;std::vector<Vector2> route;} encounter;
     std::vector<speed::EnemyDefinition::Kind> behavior_kinds;
     std::vector<std::vector<size_t>> behavior_rows;
     std::vector<size_t> free_rows, dead_rows;

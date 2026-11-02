@@ -20,6 +20,7 @@
 #include "../systems/progression.h"
 #include "../systems/field.h"
 #include "../systems/enemy_system.h"
+#include "../systems/encounters.h"
 #include "../systems/pickup_system.h"
 #include "../api/run_core.h"
 #include <algorithm>
@@ -39,6 +40,7 @@ void RunRunner::camera(godot::SpeedRunCore &core,double dt,godot::Vector2 size) 
     }
     control.logical_size=size;
     state.view_center=control.camera_center;state.view_half=size/2.0/control.camera_zoom;
+    if (!state.motion_ready) state.enemy_aim=state.ship_pos;state.motion_ready=true;
 }
 bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &raw_input,godot::Vector2 size) {
     auto &state=core.runtime.state;auto &control=state.control;
@@ -75,7 +77,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (world_step) {
         control.world_real_accum=control.world_dt_accum=0;control.world_steps=0;
         control.last_world_real_dt=wr;control.last_world_dt=wd;++control.world_updates;
-        if (state.world.attack_budget.frame_enabled) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
+        if (state.world.attack_budget.frame_enabled || core.runtime.content->encounter.active) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
         FieldSystem::update(core.runtime);
         FieldSystem::step_comets(core.runtime,wd);
         FieldSystem::stream_rocks(core.runtime,wd);
@@ -129,6 +131,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     for (size_t row:dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);
     if (state.pickups_ready) PickupSystem::prune(core.runtime);
     if (world_step) {
+        if (!EncounterSystem::advance(core.runtime)) return false;
         if (state.population.frame_enabled && !state.population.blocked && !core.attack_guard_active() && !core.step_population(wd,control.bonus_remaining>0)) return false;
         if (state.pickups_ready && !core.step_pickups(wd)) return false;
     }

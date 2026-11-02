@@ -67,6 +67,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         for (auto formation:clip.formations) if (formation>=state.formations.size()) return false;
         for (const auto &group:clip.groups) for (const auto &[row,id]:group.members) if (row>=state.enemies.size() || id<=0 || id>=state.next_id) return false;
     }
+    if (!std::isfinite(state.encounter.next) || !std::isfinite(state.encounter.start) || !std::isfinite(state.encounter.window) || !std::isfinite(state.encounter.margin)) return false;
+    for (auto point:state.encounter.route) if (!point.is_finite()) return false;
     state.rows_by_id.clear();
     std::unordered_set<size_t> visited,free;
     for (size_t group=0;group<state.behavior_rows.size();++group) {

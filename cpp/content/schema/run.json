@@ -1896,6 +1896,14 @@
       {
         "name": "BipolarCharge",
         "value": "bipolar_charge"
+      },
+      {
+        "name": "RouteOpportunity",
+        "value": "route_opportunity"
+      },
+      {
+        "name": "EncounterDeferred",
+        "value": "encounter_deferred"
       }
     ],
     "ResultKind": [
@@ -2518,6 +2526,16 @@
     "bipolar_charge": [
       "from",
       "to"
+    ],
+    "route_opportunity": [
+      "route",
+      "status",
+      "start",
+      "window",
+      "margin"
+    ],
+    "encounter_deferred": [
+      "reason"
     ]
   },
   "includes": [

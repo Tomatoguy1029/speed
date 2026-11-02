@@ -7,6 +7,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-encounter" in OS.get_cmdline_user_args():
+		check(await check_cpp_encounter(),"採用した配置規則の指定確認を最後まで行う")
+		print("[cpp_encounter] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-route" in OS.get_cmdline_user_args(): check(await check_cpp_route(),"C++の経路判定と通常表示を最後まで確認する")
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
@@ -128,4 +133,93 @@ func check_cpp_route() -> bool:
 	check(canvas.result==low and canvas.result.blockers.all(func(row): return not row.reason.is_empty()),"実験場の経路と阻害位置・理由へ同じ返答を渡す")
 	canvas.free()
 	lab.free()
+	return true
+
+func encounter_ticks(bridge, count: int) -> bool:
+	for tick in count:
+		var stepped: Dictionary = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+		if not stepped.ok:
+			push_error("配置更新の失敗: "+str(stepped))
+			return false
+		var frame: Dictionary = bridge.read_frame()
+		var collected: Dictionary = bridge.collect_frame()
+		if not frame.ok or not collected.ok or not bridge.delivery_error.get("ok",false):
+			push_error("配置通知の失敗: "+str([frame,collected,bridge.delivery_error]))
+			return false
+	return true
+
+func check_cpp_encounter() -> bool:
+	for mode in (["window"] if "--cpp-encounter-window-fix" in OS.get_cmdline_user_args() else ["window","deferred","pack"]):
+		var config: GameConfig = ContentManager.base.duplicate(true)
+		config.start_radius = 900.0
+		config.planet_radius = 100.0
+		config.moon_count = 0
+		config.meteor_count = 0
+		config.iron_count = 0
+		config.saw_count = 0
+		config.draw_length = 1000.0
+		config.world_tick_div = 1
+		var stage := RuntimeStage.new()
+		stage.index = 182
+		stage.resources = StageResources.new()
+		# 規則だけに登場する種類も生成対象へ引き継ぐ。
+		stage.resources.enemy_ids = PackedStringArray(["drifter"])
+		stage.enemy_tuning = {"drifter":{"hp":1.0,"armor":0.0,"speed":0.0}}
+		var phase := PhaseDef.new()
+		phase.id = &"配置確認"
+		phase.pop_from = 4.0
+		phase.pop_to = 4.0
+		phase.rate = 1200.0
+		phase.attack_budget = 1
+		phase.mix = {"drifter":1.0}
+		stage.phases = [phase]
+		var region := {"type":"hound" if mode=="pack" else "drifter","pos":[0.0,250.0] if mode=="pack" else [0.0,0.0],"angle":0.0,"jitter":0.0,"role":"fodder" if mode=="window" else "avoid"}
+		var pattern := {"route":[[-200.0,0.0],[200.0,0.0]],"regions":[region],"rotation":0.0,"scale_min":1.0,"scale_max":1.0,"margin":0.0,"window":0.05 if mode=="window" else 0.0,"attempts":2,"min_fodder":0 if mode=="pack" else 1}
+		stage.encounter_profile = {"enabled":true,"interval":0.5,"phases":["配置確認"],"patterns":[pattern]}
+		var builder = load("res://tools/content/build_run_content.gd")
+		var output: String = "res://.content/dev/cpp_encounter_"+String(mode)
+		if builder.build(stage,config,output,("採用配置"+mode).sha256_text())!=OK: return false
+		var index_path: String = output.path_join("stage_182.json")
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+		var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":194},true)
+		session.auto_step = false
+		while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+		if session.bridge==null: session.free(); return false
+		var bridge = session.bridge
+		var core = bridge._core
+		bridge.command("dev_remove_weapon",{"id":"W01"})
+		bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":10.0})
+		var events: Array = []
+		bridge.subscribe("配置確認",func(frame: Dictionary) -> bool:
+			events.append_array(frame.events)
+			return true)
+		if mode=="window": core.set_population_mode(true,false,false)
+		check(encounter_ticks(bridge,1),"候補の生成から固定更新・通知配信まで成功する: "+mode)
+		var opportunity: Dictionary = bridge.read_encounter().value
+		if mode=="deferred":
+			check(core.enemies_snapshot().is_empty() and not opportunity.available and events.any(func(event): return event.type==&"encounter_deferred"),"不成立の候補を出現させず、見送りだけを通知する")
+		else:
+			var enemies: Array = core.enemies_snapshot()
+			check(opportunity.available and opportunity.route.size()==2 and events.any(func(event): return event.type==&"route_opportunity"),"採用した規則の経路と成立を通知する: "+mode)
+			check(core.enemy_motion_snapshot().all(func(row): return row.spawn_origin==preload("res://tools/content/generated/run_schema.gd").ENUMS.SpawnOrigin.Summon),"遭遇と群れの随伴をSummon由来で記録する: "+mode)
+			var presentation: RunPresentation = session.view.get_node("RunPresentation")
+			var frame: Dictionary = bridge.read_render(Rect2(-1600,-500,1500,1200))
+			check(frame.ok and presentation.frame_view.apply_frame(frame.value) and frame.value.batches.any(func(batch): return not batch.ids.is_empty()),"採用規則から出た実際の敵を通常画面で表示する: "+mode)
+			await get_tree().process_frame
+			if mode=="pack":
+				check(enemies.size()==int(ContentManager.enemies[&"hound"].params.pack_count) and core.hound_snapshot().packs.size()==1,"規則で追加した猟犬から型付き共通入口で随伴も生成する")
+			else:
+				check(opportunity.guard_active and enemies.size()==1,"時間幅の間は既存guardが追加補充を止める")
+				var held: Dictionary = bridge.checkpoint()
+				check(encounter_ticks(bridge,5) and bridge.read_encounter().value.guard_active and core.enemy_motion_snapshot().all(func(row): return row.spawn_origin!=preload("res://tools/content/generated/run_schema.gd").ENUMS.SpawnOrigin.Refill),"期限前は経路保護と補充停止を保つ")
+				check(encounter_ticks(bridge,2) and not bridge.read_encounter().value.guard_active and core.enemies_snapshot().size()>1,"期限を過ぎると保護を解き、通常の補充へ戻す")
+				check(encounter_ticks(bridge,57),"次の候補の抽選まで進める")
+				var after: Array = core.enemies_snapshot()
+				var after_opportunity: Dictionary = bridge.read_encounter().value
+				var after_rng: String = core.inspect().rng_state
+				check(bridge.restore(held.value).ok and bridge.read_encounter().value==opportunity,"次回時刻・成立経路・保護期限を値で保持から戻す")
+				check(encounter_ticks(bridge,64) and core.enemies_snapshot()==after and bridge.read_encounter().value==after_opportunity and core.inspect().rng_state==after_rng,"復帰後も候補抽選・出現・保護・RunRandomが一致する")
+				bridge.release_checkpoint(held.value)
+		bridge.unsubscribe("配置確認")
+		session.free()
 	return true

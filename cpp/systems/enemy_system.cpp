@@ -13,9 +13,23 @@
 #include "pickup_system.h"
 #include "tracking_policy.h"
 #include "../runtime/run_runtime.h"
+#include "../output/frame_builder.h"
+#include "../output/event_builder.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
+int64_t EnemySystem::spawn(RunRuntime &run,size_t definition,const EnemySpawn &p) {
+    const auto id=spawn_base(run,definition,p);if (id<0) return id;auto &s=run.state;const auto &d=run.content->definitions[definition];const auto row=s.rows_by_id.at(id);
+    if (d.kind==EnemyDefinition::Kind::Hound) {
+        const int64_t pack=p.has_hound_pack?p.hound_pack:id;GroupSystem::join(s,s.enemy_handles.at(uint32_t(row)),pack);
+        if (!p.has_velocity) {auto &e=s.enemies[row];const TrackingPolicy tracking{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)};e.vel=tracking.velocity(e.vel,e.facing,(s.ship_pos-e.pos).normalized()*e.speed);if (!tracking.locked()) e.facing=e.vel.angle();}
+        if (!p.has_hound_pack) {
+            const auto parent=s.enemies[row];const auto direction=godot::Vector2::from_angle(parent.facing),side=direction.orthogonal();const double gap=std::max(0.0,d.pack.gap);
+            for (int64_t k=1;k<d.pack.count;++k) {auto child=p;child.position=parent.pos-direction*gap*double((k+1)/2)+side*gap*(k%2?0.5:-0.5);child.origin=parent.origin;child.hound_pack=pack;child.has_hound_pack=true;child.facing=parent.facing;child.has_facing=true;child.group=parent.attack_group;child.value=parent.attack_value;child.priority=parent.attack_priority;child.has_value=child.has_priority=true;spawn(run,definition,child);}
+        }
+    }
+    if (d.rank>=3) {godot::Dictionary event;event["id"]=id;event["enemy_type"]=d.id;EventBuilder::flush_combat(run);FrameBuilder::append(run,"strong_spawn",event);}return id;
+}
 int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpawn &p) {
     auto &state=run.state;
     if (!state.started || state.closed || definition>=run.content->definitions.size() || state.next_id==INT64_MAX || !p.position.is_finite() || !p.velocity.is_finite() ||

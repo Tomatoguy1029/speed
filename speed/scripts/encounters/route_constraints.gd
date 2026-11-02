@@ -34,7 +34,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		row.reason = TranslationServer.translate(row.reason_key)
 	var unsupported := []
 	for row: Dictionary in result.unsupported:
-		unsupported.append(row.id if row.has("id") and row.get("reason")=="動く敵や特殊な敵" else TranslationServer.translate(row.reason_key) if not row.reason_key.is_empty() else row.reason)
+		unsupported.append(row.id if row.has("id") and row.get("enemy",false) else TranslationServer.translate(row.reason_key) if not row.reason_key.is_empty() else row.reason)
 	result.unsupported = unsupported
 	if session.has_method("digest"): result.digest = session.digest()
 	return result

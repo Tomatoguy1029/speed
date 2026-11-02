@@ -212,6 +212,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	data.PopulationDefinition = [{"id":1,"active":false,"density":config.density_mult,"bonus_pop":config.bonus_pop,"boss_start":0.0,"recycle_scale":config.spawn_recycle_scale,"region_cap":config.spawn_region_cap,"margin":config.spawn_margin,"field_radius":config.field_radius,"planet_radius":config.planet_radius,"total_cap":config.spawn_total_cap,"refill_time":config.spawn_refill_time}]
+	data.EncounterDefinition = [{"id":1,"active":false,"interval":5.0}]
 	data.CometDefinition = [{"id":1,"interval_min":config.comet_interval_min,"interval_max":config.comet_interval_max,"speed":config.comet_speed,"rare_chance":config.rare_comet_chance,"rare_after":config.rare_comet_after,"rare_hp_mult":config.rare_comet_hp_mult,"warp_chance":config.warp_chance}]
 	data.WarpDefinition = [{"id":1,"radius":config.warp_radius,"life":config.warp_life,"bonus_time":config.bonus_time}]
 	data.GravityDefinition = [{"id":1,"life":config.gravity_life,"radius":config.gravity_radius,"pull":config.gravity_pull}]
@@ -840,6 +841,26 @@ static func compile_chase(definition: EnemyDef, config: GameConfig, input_sha256
 	return Schema.write_content(chase_records(definition,config),input_sha256)
 
 ## 同じRuntimeStageから生成し、検査済みの版へ索引を最後に切り替える。
+static func encounter_records(data: Dictionary, profile: Dictionary, enemy_ids: PackedStringArray) -> Error:
+	data.EncounterDefinition = [{"id":1,"active":bool(profile.get("enabled",false)),"interval":maxf(0.5,float(profile.get("interval",5.0)))}]
+	if not data.EncounterDefinition[0].active: return OK
+	for phase in profile.get("phases",[]): data.EncounterPhase.append({"id":data.EncounterPhase.size()+1,"name":String(phase)})
+	for source in profile.get("patterns",[]):
+		if not source is Dictionary: return ERR_INVALID_DATA
+		var row := {"id":data.EncounterPattern.size()+1,"attempts":clampi(int(source.get("attempts",8)),1,32),"min_fodder":maxi(0,int(source.get("min_fodder",0)))}
+		for pair in [["margin",20.0],["window",0.0],["draw_seconds",0.5],["exit_clearance",0.0],["rotation",PI],["scale_min",0.8],["scale_max",1.0],["min_spacing",0.0]]: row[pair[0]] = float(source.get(pair[0],pair[1]))
+		data.EncounterPattern.append(row)
+		for point in source.get("route",[]):
+			if not point is Array or point.size()!=2: return ERR_INVALID_DATA
+			data.EncounterPoint.append({"id":data.EncounterPoint.size()+1,"pattern":row.id,"x":float(point[0]),"y":float(point[1])})
+		for region in source.get("regions",[]):
+			if not region is Dictionary or not region.get("pos",[]) is Array or region.pos.size()!=2: return ERR_INVALID_DATA
+			var type := String(region.get("type",""))
+			if not ContentManager.enemies.has(StringName(type)) and not ContentManager.bosses.has(StringName(type)): return ERR_INVALID_DATA
+			var minimum := clampi(int(region.get("min_count",1)),0,100)
+			data.EncounterRegion.append({"id":data.EncounterRegion.size()+1,"pattern":row.id,"enemy":enemy_ids.find(type)+1,"x":float(region.pos[0]),"y":float(region.pos[1]),"angle":float(region.get("angle",0.0)),"jitter":float(region.get("jitter",0.0)),"min_count":minimum,"max_count":clampi(int(region.get("max_count",1)),minimum,100),"fodder":region.get("role","avoid")=="fodder","elite":bool(region.get("elite",false))})
+	return OK
+
 static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
@@ -850,6 +871,20 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var attack_visuals: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	var enemy_ids := stage.resources.enemy_ids.duplicate()
+	var encounter_profile: Dictionary = stage.encounter_profile.duplicate(true)
+	if encounter_profile.get("enabled",false):
+		for path in encounter_profile.get("baseline",{}):
+			if String(path).begins_with("res://data/stages/"): continue
+			if not (String(path).begins_with("res://data/") or String(path).begins_with("res://scripts/") or String(path).begins_with("res://gyms/enemy_lab/")) or FileAccess.get_sha256(path)!=encounter_profile.baseline[path]:
+				encounter_profile.enabled = false
+				push_warning("採用した配置規則の基準が変わったため、既存の扱いに合わせて無効にします。")
+				break
+	if encounter_profile.get("enabled",false):
+		for pattern in encounter_profile.get("patterns",[]):
+			for region in pattern.get("regions",[]):
+				var type := String(region.get("type",""))
+				if ContentManager.enemies.has(StringName(type)) and not enemy_ids.has(type): enemy_ids.append(type)
+
 	for terrain in ["meteor","iron","saw"]:
 		if not terrain in enemy_ids: enemy_ids.append(terrain)
 	for candidate_id: String in enemy_ids.duplicate():
@@ -1186,6 +1221,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for formation in clip.formations:
 			data.PopulationClipFormation.append({"id":data.PopulationClipFormation.size()+1,"clip":clip_id,"formation":formation+1})
 
+	var encounter_error := encounter_records(data,encounter_profile,enemy_ids)
+	if encounter_error!=OK: return encounter_error
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")

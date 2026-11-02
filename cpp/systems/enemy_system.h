@@ -6,13 +6,14 @@ struct EnemySpawn {
     godot::Vector2 position,velocity;
     double facing=0,size=0,knock=0,value=1,priority=0,spin=0,guard=0,hit_cd=0;
     int64_t group=0,hound_pack=-1;
-    bool flock_member=false,elite=false,is_boss=false,has_facing=false,has_value=false,has_priority=false,has_managed=false,managed=false;
+    bool has_velocity=false,has_hound_pack=false,flock_member=false,elite=false,is_boss=false,has_facing=false,has_value=false,has_priority=false,has_managed=false,managed=false;
     SpawnOrigin origin=SpawnOrigin::Normal;
     RockHandle rock;
 };
 class EnemySystem {
 public:
     static void flush_spawns(RunRuntime &);
+    static int64_t spawn(RunRuntime &,size_t definition,const EnemySpawn &);
     static int64_t spawn_base(RunRuntime &,size_t definition,const EnemySpawn &);
     static int64_t spawn_part(RunRuntime &,EnemyHandle parent,size_t definition,godot::Vector2 position);
     static bool move_part(RunRuntime &,EnemyHandle part,EnemyHandle parent,godot::Vector2 position,double facing);
