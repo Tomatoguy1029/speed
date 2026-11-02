@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-enemy-interactions" in OS.get_cmdline_user_args():
+		check_semantics_enemy_interactions()
+		print("[semantics_enemy_interactions] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-enemy-support" in OS.get_cmdline_user_args():
 		check_semantics_enemy_support()
 		print("[semantics_enemy_support] failed=%d" % failed)
@@ -1823,3 +1828,97 @@ func check_semantics_enemy_support() -> void:
 		if failed:break
 	OS.remove_logger(capture);check(capture.count()==0,"支援と反乱のSource/C++に実行エラーがない")
 	print("SEMANTICS_ENEMY_SUPPORT ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+func check_semantics_enemy_interactions() -> void:
+	var probe=COMPARE.new().create_native()
+	if probe==null:check(false,"敵相互作用のC++拡張を読む");return
+	probe.close()
+	var config:GameConfig=ContentManager.base.duplicate(true)
+	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	var kinds:=["defender","pump","corona","corona_throw"]
+	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
+	var from_kind:="";var first_tick:=0;var cases:=0
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-interaction-from="):
+			var parts:=arg.trim_prefix("--semantics-interaction-from=").split(":");from_kind=parts[0];first_tick=int(parts[1])
+	for kind:String in kinds:
+		if not from_kind.is_empty() and kinds.find(kind)<kinds.find(from_kind):continue
+		var stage:=RuntimeStage.new();stage.boss_enabled=false;stage.index=209;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["defender","pump","corona","drifter","swarm"])
+		var definitions:={}
+		for id in [&"defender",&"pump",&"corona",&"drifter",&"swarm"]:definitions[id]=ContentManager.enemies[id].duplicate(true);definitions[id].size_var=false
+		definitions[&"drifter"].speed=0;definitions[&"swarm"].speed=0
+		if kind=="defender":definitions[&"drifter"].rank=3
+		if kind=="pump":definitions[&"swarm"].rank=1
+		stage.enemy_tuning={"pump":{"speed":0.0,"turn":100.0,"params.store_max":2,"params.pull_radius":300.0,"params.pull":200.0,"params.swallow_reach":0.0,"params.swallow_interval":0.1,"params.telegraph":0.3,"params.lock_time":0.1,"params.shell_speed":300.0,"params.shell_r":12.0,"params.shell_range":600.0,"params.burst_radius":80.0,"params.bullet_dmg":7.0,"params.recover":0.2},"corona":{"speed":0.0,"params.capture_max":1 if kind=="corona_throw" else 2,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":1000.0 if kind=="corona_throw" else 100.0,"params.ring":80.0,"params.spin":1.0,"params.telegraph":0.1,"params.align_angle":PI,"params.fire_interval":0.3 if kind=="corona_throw" else 100.0,"params.throw_speed":300.0,"params.throw_life":1.0,"params.throw_damage_swarm":8.0,"params.throw_effect_scale":1.6}}
+		var output:="res://.content/dev/semantics_enemy_interactions"
+		if load("res://tools/content/build_run_content.gd").build(stage,config,output,("設計15.1敵相互作用"+kind).sha256_text(),definitions)!=OK:check(false,"敵相互作用の定義を生成する");break
+		var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_209.json")));var bytes:=FileAccess.get_file_as_bytes(index.binary)
+		var run:=semantics_legacy(config,stage,definitions,89)
+		run.enemies.update_stage_tuning(stage.enemy_tuning)
+		run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies();run.enemies._next_id=1;run.state.enemy_aim=run.state.ship_pos
+		var bridge=semantics_bridge(bytes,89)
+		if bridge==null:check(false,"敵相互作用のC++ランを開始する");run.dispose();break
+		var core=bridge._core;core.configure_attack_budget({"enabled":false})
+		# Sourceの列初期化が先に登録した追跡の更新順を、C++の固定場面にも揃える。
+		if kind!="defender":
+			var warm_id:int=core.spawn_enemy(&"drifter",Vector2(1e6,1e6),{})
+			core.remove_enemy(warm_id);run.enemies._next_id=warm_id+1
+		var origin:=run.state.ship_pos;var body_type:=&"corona" if kind.begins_with("corona") else StringName(kind)
+		var at:=origin-Vector2(500,0) if kind.begins_with("corona") else origin+Vector2(400,0)
+		var owner:=-1;var native_owner:=-1;var boosted:=-1;var native_boosted:=-1
+		if kind=="defender":
+			owner=run.enemies.spawn(run.enemies.def_of(&"drifter"),at,{"facing":PI});native_owner=core.spawn_enemy(&"drifter",at,{"facing":PI})
+			for y in [-42,0,42]:
+				var row:=run.enemies.spawn(run.enemies.def_of(&"defender"),origin+Vector2(250,y),{"facing":PI});var id:int=core.spawn_enemy(&"defender",origin+Vector2(250,y),{"facing":PI})
+				if boosted<0:boosted=row;native_boosted=id
+		else:
+			owner=run.enemies.spawn(run.enemies.def_of(body_type),at,{"facing":0.0});native_owner=core.spawn_enemy(body_type,at,{"facing":0.0})
+			var offsets:=[Vector2(0,-80)] if kind=="corona_throw" else [Vector2(80,0),Vector2(0,100)]
+			for offset:Vector2 in offsets:
+				run.enemies.spawn(run.enemies.def_of(&"swarm"),at+offset,{"facing":0.0,"vel":Vector2.ZERO});core.spawn_enemy(&"swarm",at+offset,{"facing":0.0,"vel":Vector2.ZERO})
+			run.enemies.table.fire_t[owner]=0.0 if kind=="corona_throw" else 100.0;core.set_enemy_motion(native_owner,{"fire_t":0.0 if kind=="corona_throw" else 100.0})
+		run.combat.rebuild_grid();core.rebuild_enemy_grid(config.grid_cell)
+		var active:=false
+		for tick in 64:
+			if kind=="defender" and tick==2:
+				run.enemies.behavior(&"defender").boost(boosted,350.0,20.0,run.state.world_time+0.15,0.3)
+				bridge.command("dev_defender_boost",{"entity_id":native_boosted,"speed":350.0,"wobble":20.0,"until":run.state.world_time+0.15,"phase":0.3})
+			var dt:=0.06 if kind=="corona_throw" and tick==1 else 0.05
+			run.state.time+=dt;run.state.world_time+=dt;run.enemies.tick(dt,dt);core.step(dt)
+			run.combat.rebuild_grid();core.rebuild_enemy_grid(config.grid_cell)
+			if kind==from_kind and tick<first_tick:continue
+			if capture.count()>0:check(false,"敵相互作用の更新エラー %s tick%d: %s"%[kind,tick,capture.messages()]);break
+			var values:=semantics_enemy_values(run,core);var expected:={"enemies":values[0]};var actual:={"enemies":values[1]}
+			var table:=run.enemies.table;var motions:Array=core.enemy_motion_snapshot()
+			if kind=="defender":
+				var posts:=[];var native_posts:=[];var behavior=run.enemies.behavior(&"defender")
+				for row in behavior._posts:posts.append({"id":table.id[row],"goal":behavior._posts[row]})
+				for motion:Dictionary in motions:
+					if motion.has("guard_goal"):native_posts.append({"id":motion.id,"goal":motion.guard_goal})
+				posts.sort_custom(func(a,b):return a.id<b.id);native_posts.sort_custom(func(a,b):return a.id<b.id)
+				expected.posts=posts;actual.posts=native_posts;active=active or posts.size()>0
+			elif kind=="pump":
+				var motion:Dictionary=motions.filter(func(v):return v.id==native_owner)[0]
+				expected.pump={"radius":table.r[owner],"bud_t":table.bud_t[owner],"stock":Array(run.enemies.behavior(&"pump")._stored_types.get(table.id[owner],PackedStringArray()))}
+				var enemy:Dictionary=core.enemies_snapshot().filter(func(v):return v.id==native_owner)[0]
+				actual.pump={"radius":enemy.radius,"bud_t":motion.bud_t,"stock":Array(motion.stored_types)};active=active or table.buds[owner]>0
+			else:
+				var vortex=run.enemies.behavior(&"corona").vortex;var source_members:=[];var native_members:=[]
+				for row in vortex.members:
+					var value:Dictionary=vortex.members[row]
+					source_members.append({"id":table.id[row],"angle":value.angle,"radius":value.radius,"life":value.life,"damage":value.damage,"effect":value.effect,"release":value.release_fraction})
+					active=active or value.thrown if kind=="corona_throw" else true
+				for motion:Dictionary in motions:
+					if motion.has("corona_owner"):native_members.append({"id":motion.id,"angle":motion.corona_angle,"radius":motion.corona_radius,"life":motion.corona_life,"damage":motion.corona_damage,"effect":motion.corona_effect,"release":motion.corona_release_fraction})
+				source_members.sort_custom(func(a,b):return a.id<b.id);native_members.sort_custom(func(a,b):return a.id<b.id)
+				expected.members=source_members;actual.members=native_members
+				expected.ship_velocity=run.state.ship_vel;actual.ship_velocity=core.ship_snapshot().ship_vel
+			var found:String=comparison.semantics_difference(expected,actual)
+			if not found.is_empty():print("INTERACTION_DIAGNOSTIC ",var_to_str(expected)," ACTUAL ",var_to_str(actual))
+			check(found.is_empty(),"敵相互作用の指定許容幅 %s tick%d: %s"%[kind,tick,found])
+			if not found.is_empty():break
+		check(active,"護衛・収納・周回・投擲の実際の数値を採取する: "+kind)
+		cases+=1;print("SEMANTICS_INTERACTION_CASE %s failed=%d"%[kind,failed]);run.dispose();bridge.dispose()
+		if failed:break
+	OS.remove_logger(capture);check(capture.count()==0,"敵相互作用のSource/C++に実行エラーがない")
+	print("SEMANTICS_ENEMY_INTERACTIONS ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
