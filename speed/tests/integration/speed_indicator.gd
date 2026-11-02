@@ -36,15 +36,10 @@ func _ready() -> void:
 		check(cpp_hud._speed_indicator.position.x<extent.x and cpp_hud._speed_indicator.position.y<extent.y,"C++の速度計もサイズ変更後の右下へ配置する")
 	cpp_hud.free()
 	var hud = preload("res://scripts/ui/hud.gd").new()
-	hud.run = RunSimulation.new()
-	hud.run.state = RunState.new()
-	hud.run.cfg = GameConfig.new()
-	hud.run.cfg.steer_cruise = 0.3
-	hud._speed_indicator = INDICATOR.new()
-	var state := hud.run.state as RunState
-	state.stats = ShipStats.new()
-	state.stats.max_speed = 100.0
-	state.ship_vel = Vector2(30, 0)
+	hud.bridge = RefCounted.new()
+	hud._ready_cpp()
+	var state := {"phase":RunIds.Phase.Play,"input_enabled":true,"tracing":false,"ship_boost_t":0.0,"glide":false,"ship_vel":Vector2(30,0),"max_speed":100.0,"steer_cruise":0.3}
+	hud.apply_snapshot(state)
 	check(hud._speed_indicator_mode() == INDICATOR.NORMAL, "巡航速度では通常表示")
 	state.ship_vel = Vector2(60, 0)
 	check(hud._speed_indicator_mode() == INDICATOR.FAST, "巡航速度を超えたら高速表示")
@@ -110,11 +105,11 @@ func _ready() -> void:
 	hud._update_speed_indicator(1.0)
 	check(indicator.value == value_before_pause and indicator.fill_color == before_color, "ポーズ中は針と内部色を保つ")
 	state.phase = RunIds.Phase.Play
-	hud.run.ui_overlay_active = true
+	state.input_enabled = false
 	hud._update_speed_indicator(1.0)
 	check(indicator.value == value_before_pause, "メニュー中は揺れの時計も止める")
-	hud.run.ui_overlay_active = false
-	hud.run.ui_reward_active = true
+	state.input_enabled = true
+	state.input_enabled = false
 	hud._update_speed_indicator(1.0)
 	check(indicator.value == value_before_pause, "報酬画面中も表示時計を止める")
 
