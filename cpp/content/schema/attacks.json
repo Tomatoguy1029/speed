@@ -747,6 +747,38 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "FloodDefinition",
+      "section": 70,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "beam",
+          "type": "u32",
+          "min": 1,
+          "ref": "BeamDefinition"
+        },
+        {
+          "name": "tail",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "collapse",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "margin",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {
@@ -844,6 +876,10 @@
       {
         "name": "Telescope",
         "value": "telescope"
+      },
+      {
+        "name": "Flood",
+        "value": "flood"
       }
     ],
     "WaveStyle": [

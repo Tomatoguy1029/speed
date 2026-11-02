@@ -49,7 +49,7 @@ Array SpeedRunCore::hazards_snapshot() const {
         if (zone.zone_definition) {row["kind"]=1;row["zone_definition"]=zone.zone_definition;row["style"]=runtime.content->zones[zone.zone_definition-1].style;row["enemy_damage"]=zone.enemy_damage;}
         row["time"] = zone.time; row["delay"] = zone.delay; row["active"] = zone.duration;
         if (const auto *beam=std::get_if<speed::BeamHazard>(&zone.shape)) {
-            row["kind"]=0;row["angle"]=beam->angle;row["length"]=beam->length;row["half_width"]=beam->half_width;row["arc"]=beam->arc;
+            row["kind"]=0;row["style"]=beam->style;row["angle"]=beam->angle;row["length"]=beam->length;row["half_width"]=beam->half_width;row["arc"]=beam->arc;
             const auto *record=speed::AttackSystem::get(runtime.state,zone.attack);row["owner_id"]=record?record->spec.owner.source_id:0;
         }
         if (const auto *wall=std::get_if<speed::WallHazard>(&zone.shape)) {

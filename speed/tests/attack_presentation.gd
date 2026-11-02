@@ -23,6 +23,11 @@ func _ready() -> void:
 		return
 
 
+	if "--cpp-flood" in OS.get_cmdline_user_args():
+		await check_cpp_flood()
+		print("[cpp_flood] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-cross" in OS.get_cmdline_user_args():
 		await check_cpp_cross()
 		print("[cpp_cross] failed=%d" % failed)
@@ -607,5 +612,65 @@ func check_cpp_cross() -> void:
 	check(cpp_core.hazards_snapshot().is_empty(),"有効時間の終わりに十字の4辺を掃除する")
 	cpp_core.advance_attack_budget(2.0)
 	check(cpp_core.attack_budget_snapshot().groups.is_empty(),"4辺の残留枠をすべて解放する")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()
+
+func check_cpp_flood() -> void:
+	if not await prepare_cpp_attack(99,"flood"): return
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(300,0)}).value
+	var token: int = cpp_core.passive_attack("flood_owner",source)
+	var params := {"position":cpp_origin,"angle":0.0,"length":280.0,"width":20.0,"spread":0.25,"delay":0.2,"active":0.4,"damage":8.0,"owner_id":source,"budget":token}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_flood",params)
+	check(fired.ok,"発生元から広がる水流を生成する")
+	if not fired.ok: cpp_session.free(); return
+
+	cpp_core.step_hazards(0.1)
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.shapes.size()==1 and frame.shapes[0].kind==ENUMS.RenderShapeKind.Flood and frame.shapes[0].time<frame.shapes[0].delay and presentation.frame_view.apply_frame(frame),"水流の広がる予告を通常画面で描く")
+	var water: Dictionary = presentation.frame_view._flood_displays.values()[0]
+	var material: ShaderMaterial = water.node.material
+	check(is_equal_approx(material.get_shader_parameter("half0"),params.width*0.5) and is_equal_approx(material.get_shader_parameter("slope"),tan(params.spread)) and is_equal_approx(material.get_shader_parameter("beam_len"),params.length),"予告の根元の片側幅・広がり・長さを実判定と同じ値にする")
+	await get_tree().process_frame
+	var saved: Array = cpp_core.hazards_snapshot()
+	var held: Dictionary = cpp_bridge.checkpoint()
+	var ship_radius: float = cpp_bridge.read_frame().value.ui.ship_radius
+	var reach: float = params.width*0.5+180.0*tan(params.spread)+ship_radius
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(180,reach+0.1),"velocity":Vector2.ZERO})
+	cpp_core.step_hazards(0.15)
+	check(not cpp_core.hazards_snapshot()[0].hit and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp),"水流の広がる幅の外は命中を消費しない")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(180,reach-0.1),"velocity":Vector2.ZERO})
+	cpp_core.step_hazards(0.05)
+	check(cpp_core.hazards_snapshot()[0].hit and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"水流の広がる幅の内へ入ると命中する")
+	frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	check(frame.shapes.size()==1 and frame.shapes[0].time>=frame.shapes[0].delay and presentation.frame_view.apply_frame(frame),"命中後も有効時間の水流を描き続ける")
+	await get_tree().process_frame
+	cpp_core.step_hazards(0.05)
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"水流は命中後に重ねて機体へ当てない")
+	cpp_bridge.restore(held.value)
+	check(cpp_core.hazards_snapshot()==saved,"水流の広がり・時刻・所有者・未命中状態を復元する")
+	for along: float in [-ship_radius,params.length+ship_radius]:
+		cpp_bridge.restore(held.value)
+		cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(along,0),"velocity":Vector2.ZERO})
+		cpp_core.step_hazards(0.15)
+		check(cpp_core.hazards_snapshot()[0].hit,"採用済みの接触境界を水流にも適用する: %s" % along)
+	cpp_bridge.restore(held.value)
+	cpp_bridge.command("dev_remove",{"entity_id":source})
+	check(cpp_core.hazards_snapshot().is_empty() and cpp_bridge.latest_frame().value.events.all(func(e): return e.type!=&"flood_end"),"予告中に発生元が退場すると霧を出さず掃除する")
+	cpp_bridge.restore(held.value)
+	cpp_core.step_hazards(0.6)
+	check(cpp_core.hazards_snapshot().is_empty(),"水流は有効期間の終わりに当たりを消す")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view._flood_tails.size()==1 and is_equal_approx(presentation.frame_view._flood_tails[0].life,1.4),"当たりが消えた後に独立した1.4秒の霧を描く")
+	var tail: Dictionary = presentation.frame_view._flood_tails[0]
+	check(is_equal_approx(tail.node.material.get_shader_parameter("half0"),params.width*0.5) and is_equal_approx(tail.node.material.get_shader_parameter("slope"),tan(params.spread)),"終わりの水と霧にも同じ広がりを渡す")
+	await get_tree().process_frame
+	var later: Dictionary = cpp_bridge.latest_frame().value.duplicate(true)
+	later.ui.world_time += 1.5
+	presentation.frame_view.update_effects(later,0.0)
+	check(presentation.frame_view._flood_tails.is_empty(),"霧は表示寿命で消える")
+	cpp_core.advance_attack_budget(2.0)
+	check(cpp_core.attack_budget_snapshot().groups.is_empty(),"水流の終了で所有枠を解放する")
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_session.free()

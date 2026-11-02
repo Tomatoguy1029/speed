@@ -15,6 +15,9 @@ var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
 var _arrow_displays: Dictionary = {}
 var _debris_displays: Dictionary = {}
+var _flood_displays: Dictionary = {}
+var _flood_tails: Array[Dictionary] = []
+var _flood_world_time := -1.0
 var _zone_displays: Dictionary = {}
 var _zone_bursts: Dictionary = {}
 var _zone_seen: Dictionary = {}
@@ -272,9 +275,13 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull,SHAPE_KIND.Zone] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull,SHAPE_KIND.Zone,SHAPE_KIND.Flood] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
+		if row.kind==SHAPE_KIND.Flood:
+			if row.points.size()!=1 or row.widths.size()!=1: return false
+			for key in ["time","delay","active","angle","length","spread","margin"]:
+				if not row.get(key) is float or not is_finite(row[key]): return false
 		if row.kind==SHAPE_KIND.Zone:
 			if row.points.size()!=1 or row.widths.size()!=1 or row.get("zone_style") not in range(8) or not row.get("tint") is Color or not row.get("arm_count") is int: return false
 			for key in ["time","delay","active","glow_opacity","ring_opacity","ring_width","lightning_reach","lightning_width"]:
@@ -380,10 +387,27 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in _debris_displays.values(): display.hide()
 	for display: Node in _hull_displays.values(): display.hide()
 	for display: Node in _zone_displays.values(): display.hide()
+	for display: Dictionary in _flood_displays.values(): display.node.hide()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
+		if row.kind==SHAPE_KIND.Flood:
+			var key := int(row.order)
+			if not _flood_displays.has(key):
+				var water: Dictionary = preload("res://scripts/render/attacks/flood.gd").frame_create(_scope)
+				parent.add_child(water.node)
+				if pipeline!=null and not pipeline.rich: water.node.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+				_flood_displays[key] = water
+			var water: Dictionary = _flood_displays[key]
+			if water.row.get("owner_id",0)!=row.owner_id: water.fired = false
+			preload("res://scripts/render/attacks/flood.gd").frame_apply(water,row)
+			water.node.show()
+			if row.time>=row.delay and not water.fired:
+				water.fired = true
+				if pipeline!=null: pipeline.add_wave(row.points[0],800.0,0.7)
+				_burst(row.points[0],row.colors[0].lightened(0.3),36,760.0)
+			continue
 		if row.kind==SHAPE_KIND.Zone:
 			var key := int(row.order)
 			if not _zone_displays.has(key):
@@ -525,6 +549,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		_debris_trails.clear()
 		_attack_ends.clear()
 		_zone_seen.clear()
+		_flood_world_time = -1.0
+		for tail: Dictionary in _flood_tails: tail.node.queue_free()
+		_flood_tails.clear()
 		_zone_world_time = -1.0
 		for bursts: Node in _zone_bursts.values(): bursts.queue_free()
 		_zone_bursts.clear()
@@ -631,6 +658,16 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":40.0,"color":Color(1.0,0.75,0.6),"life":0.22,"max":0.22})
 			_burst(event.pos,Color(1.0,0.5,0.35),10,500.0,direction)
 
+		if event.type==&"flood_end":
+			var tail: Dictionary = preload("res://scripts/render/attacks/flood.gd").frame_create(_scope)
+			_layer(11).add_child(tail.node)
+			if pipeline!=null and not pipeline.rich: tail.node.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+			preload("res://scripts/render/attacks/flood.gd").frame_apply(tail,{"points":PackedVector2Array([event.pos]),"widths":PackedFloat32Array([event.width]),"angle":event.angle,"length":event.length,"spread":event.spread,"order":event.row,"margin":event.margin})
+			tail.tail = true
+			tail.age = event.age
+			tail.life = event.tail
+			tail.collapse = event.collapse
+			_flood_tails.append(tail)
 		if event.type==&"attack_visual_end":
 			var library: Resource = _scope.resources.get("res://.content/attack_visuals.res")
 			if library!=null:
@@ -665,6 +702,13 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	var flood_dt: float = 0.0 if _flood_world_time<0.0 else maxf(0.0,ui.world_time-_flood_world_time)
+	_flood_world_time = ui.world_time
+	for tail: Dictionary in _flood_tails:
+		tail.age += flood_dt
+		tail.node.queue_redraw()
+		if tail.age>=tail.life: tail.node.queue_free()
+	_flood_tails = _flood_tails.filter(func(tail: Dictionary): return tail.age<tail.life)
 	var zone_dt: float = 0.0 if _zone_world_time<0.0 else maxf(0.0,ui.world_time-_zone_world_time)
 	_zone_world_time = ui.world_time
 	for bursts: BlastBursts in _zone_bursts.values(): bursts.step(zone_dt)

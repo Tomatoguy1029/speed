@@ -1303,8 +1303,14 @@
         "name": "Barrier",
         "value": "barrier"
       },
-      {"name": "Corpse", "value": "corpse"},
-      {"name": "TowShot", "value": "towShot"},
+      {
+        "name": "Corpse",
+        "value": "corpse"
+      },
+      {
+        "name": "TowShot",
+        "value": "towShot"
+      },
       {
         "name": "Interceptor",
         "value": "interceptor"
@@ -1640,6 +1646,10 @@
       {
         "name": "FullBurstReady",
         "value": "full_burst_ready"
+      },
+      {
+        "name": "FloodEnd",
+        "value": "flood_end"
       }
     ],
     "ResultKind": [
@@ -1677,11 +1687,21 @@
         "name": "LightArrow",
         "value": "light_arrow"
       },
-      {"name": "FriendDebris", "value": "friend_debris"},
-      {"name": "FriendHull", "value": "friend_hull"},
+      {
+        "name": "FriendDebris",
+        "value": "friend_debris"
+      },
+      {
+        "name": "FriendHull",
+        "value": "friend_hull"
+      },
       {
         "name": "Zone",
         "value": "zone"
+      },
+      {
+        "name": "Flood",
+        "value": "flood"
       }
     ]
   },
@@ -2061,6 +2081,19 @@
     ],
     "full_burst_ready": [
       "pos"
+    ],
+    "flood_end": [
+      "id",
+      "row",
+      "pos",
+      "angle",
+      "length",
+      "width",
+      "spread",
+      "age",
+      "tail",
+      "collapse",
+      "margin"
     ]
   },
   "includes": [

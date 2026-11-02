@@ -31,7 +31,7 @@ ContactShape BeamSystem::geometry(const HazardState &hazard) {
 }
 void BeamSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,godot::Array &shapes) {
     using namespace godot;
-    const auto &hazard=run.state.hazards[row];const auto *beam=std::get_if<BeamHazard>(&hazard.shape);if (!hazard.alive || !beam) return;
+    const auto &hazard=run.state.hazards[row];const auto *beam=std::get_if<BeamHazard>(&hazard.shape);if (!hazard.alive || !beam || beam->style==uint32_t(BeamStyle::Flood)) return;
     const auto *record=AttackSystem::get(run.state,hazard.attack);if (!record) return;
     const double zoom=std::max(0.01,run.state.control.camera_zoom);const bool charging=hazard.time<hazard.delay;
     if (!charging && !view.grow(beam->length).has_point(hazard.pos)) return;

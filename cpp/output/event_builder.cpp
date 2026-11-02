@@ -1,5 +1,6 @@
 #include "event_builder.h"
 #include "../systems/attacks/zone.h"
+#include "../systems/attacks/flood.h"
 #include "../systems/pickup_system.h"
 #include "../runtime/run_runtime.h"
 #include <algorithm>
@@ -81,6 +82,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             static const char *reasons[]={"lifetime","technique_cancel","technique_end","participant_end","boss_clear","bonus_clear","hit","relocate","barrier"};
             d["id"]=e.target_id;d["source_id"]=e.source_entity_id;d["reason"]=reasons[uint8_t(e.attack_end_reason)];
             d["t"]=e.time;d["world_t"]=e.world_time;append(run,"attack_retired",d);
+            if (e.flood.ready) FloodSystem::end_visual(run,e.flood,e.target_id);
             if (e.zone_definition && (e.attack_end_reason==AttackEndReason::Lifetime || e.attack_end_reason==AttackEndReason::ParticipantEnd || e.attack_end_reason==AttackEndReason::TechniqueCancel || e.attack_end_reason==AttackEndReason::TechniqueEnd)) ZoneSystem::end_visual(run,e.zone_definition,false,e.pos);
             if (e.circle_hazard && run.state.bite_zone_config.fade &&
                 (e.attack_end_reason==AttackEndReason::Lifetime || e.attack_end_reason==AttackEndReason::ParticipantEnd || e.attack_end_reason==AttackEndReason::TechniqueCancel || e.attack_end_reason==AttackEndReason::TechniqueEnd)) {

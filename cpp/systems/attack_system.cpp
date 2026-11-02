@@ -122,7 +122,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     const auto *entry=get(state,handle);if (!entry) return false;
     const auto record=*entry;auto &all=state.attacks;
     all.records[handle.slot].alive=false;
-    godot::Vector2 pos;bool circle=false;uint32_t zone_definition=0;
+    godot::Vector2 pos;bool circle=false;uint32_t zone_definition=0;FloodTailState flood;
     switch(record.pool) {
     case AttackPool::Friendly: {
         auto &value=state.friends[record.row];pos=value.pos;
@@ -136,6 +136,10 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     }
     case AttackPool::Hazard: {
         auto &value=state.hazards[record.row];pos=value.pos;zone_definition=value.zone_definition;circle=std::holds_alternative<CircleHazard>(value.shape) && std::get<CircleHazard>(value.shape).kind!=CircleHazardKind::Blast;
+        if (const auto *beam=std::get_if<BeamHazard>(&value.shape);beam && beam->style==uint32_t(BeamStyle::Flood) && value.time>=value.delay) {
+            flood.ready=true;flood.row=record.row;flood.pos=value.pos;flood.angle=beam->angle;flood.length=beam->length;flood.width=beam->half_width*2.0;flood.spread=beam->arc;
+            flood.age=reason==AttackEndReason::Lifetime?std::max(0.0,double(value.time)-value.delay-value.duration):0.0;
+        }
         if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hazards.push_back(record.row);}break;
     }
     }
@@ -147,7 +151,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     all.handles.release(handle);if (all.handles.reusable(handle.slot)) all.free_records.push_back(handle.slot);
     CombatEvent event;event.kind=CombatEventKind::AttackRetired;event.target_id=record.id;event.source_entity_id=s.owner.source_id;
     event.source=s.owner.source_definition;event.attack_pool=record.pool;event.attack_end_reason=reason;event.pos=pos;event.circle_hazard=circle;
-    event.zone_definition=zone_definition;event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);return true;
+    event.flood=flood;event.zone_definition=zone_definition;event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);return true;
 }
 void AttackSystem::source_ended(State &state,EnemyHandle source,AttackEndReason reason) {
     const auto id=state.enemy_handles.entity_id(source);auto found=state.attacks.by_source.find(id);
