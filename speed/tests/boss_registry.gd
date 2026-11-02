@@ -2586,7 +2586,6 @@ func native_hydra_body() -> void:
 	print("[cpp_hydra_body] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-<<<<<<< HEAD
 ## 連射の照準固定・間隔と、取消後に残る炎を同じ制作入口で確認する。
 func native_canis_sirius() -> void:
 	var c := canis_move_case("sirius",{"shots":2,"warn":0.1,"lock":0.04,"lead":0.2,"aim_turn":3.0,"beam_time":0.1,"beam_length":300.0,"beam_width":20.0,"beam_particle_life":0.2,"shot_gap":0.05,"recover":0.05,"trail_delay":0.1,"trail_time":1.0})
@@ -2723,10 +2722,7 @@ func native_canis_bay() -> void:
 	print("[cpp_canis_bay] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-func hydra_regrow_case(flowing := false, squad_changes := {}) -> Dictionary:
-=======
 func hydra_regrow_case(flowing := false, squad_changes := {}, move_changes := {}) -> Dictionary:
->>>>>>> 7592b9a0 (feat: ヒドラの噛みつきを編集値と共通実行へ分離)
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
