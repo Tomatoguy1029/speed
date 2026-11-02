@@ -16,6 +16,13 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-wave" in OS.get_cmdline_user_args() or "--cpp-wave-fixes" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_wave()
+		check(finished,"波動の確認を最後まで実施する")
+		print("[cpp_wave] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
 	if "--cpp-missile" in OS.get_cmdline_user_args() or "--cpp-missile-gap-fixes" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_missile()
 		check(finished,"誘導弾の確認を最後まで実施する")
@@ -413,6 +420,208 @@ func check_cpp_missile() -> bool:
 	bridge.command("dev_stone_hostiles",{"view":stone_view,"duration":1.0})
 	bullet_pair_step(run,core,0.01,"石化中の機体接触")
 	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"石化中の接触はダメージなしで弾を回収する")
+	bridge.release_checkpoint(empty.value)
+	lab.free()
+	session.free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	return true
+
+func wave_emit_pair(run: RunSimulation,bridge,params: Dictionary) -> Dictionary:
+	var row := run.projectiles.fire_wave(params.position,params.angle,params.arc,params.radius,params.speed,params.width,params.delay,
+		params.damage,params.get("gap",0.0),params.get("gap_arc",0.0),params.get("color",Color("#9ad8ff")),params.get("start_radius",0.0))
+	var styles := [ProjectileSystem.HazardStyle.PLAIN,ProjectileSystem.HazardStyle.RIPPLE,ProjectileSystem.HazardStyle.LIGHTNING,ProjectileSystem.HazardStyle.PULSER]
+	run.projectiles.hazard_style[row] = styles[params.get("style",0)]
+	run.projectiles.hazard_edmg[row] = params.get("enemy_damage",0.0)
+	var emitted: Dictionary = bridge.command("dev_fire_wave",params)
+	check(emitted.ok,"波動の初期半径・予告・拡大を共通生成へ接続する")
+	if not emitted.ok: return {}
+	return {"old_row":row,"attack":emitted.value}
+
+func wave_pair_step(run: RunSimulation, core, dt: float, label: String) -> void:
+	run.projectiles._update_hazards(dt)
+	check(core.step_hazards(dt),label+"：範囲の世界時計を進める")
+	var old: Array = []
+	for row in run.projectiles.hazard_alive.size():
+		if run.projectiles.hazard_alive[row]==0: continue
+		old.append({"row":row,"time":run.projectiles.hazard_t[row],"radius":run.projectiles.wave_radius(row),
+			"start_radius":run.projectiles.hazard_start_radius[row],"speed":run.projectiles.hazard_speed[row],"hit":run.projectiles.hazard_hit[row]!=0,
+			"delay":run.projectiles.hazard_delay[row],"active":run.projectiles.hazard_active[row]})
+	var current: Array = []
+	for value: Dictionary in core.hazards_snapshot():
+		var row := {}
+		for key in ["row","time","radius","start_radius","speed","hit","delay","active"]: row[key] = value[key]
+		current.append(row)
+	var comparison = COMPARE.new()
+	var difference: String = comparison.difference(comparison.plain(old),comparison.plain(current))
+	check(difference.is_empty(),label+"：予告・半径・寿命・一度の命中が今の更新と一致する "+difference)
+	check(is_equal_approx(run.state.ship_hp,core.ship_snapshot().ship_hp),label+"：機体の実ダメージが一致する")
+
+func wave_reset(run: RunSimulation,bridge,point: Dictionary,at: Vector2,config: GameConfig) -> bool:
+	if not missile_reset(run,bridge,point,at,config): return false
+	bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+	run.state.ship_vel = Vector2.ZERO
+	return true
+
+func check_cpp_wave() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	config.atk_scale = 3.0
+	var stage := RuntimeStage.new()
+	stage.index = 88
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var builder = load("res://tools/content/build_run_content.gd")
+	var output := "res://.content/dev/run_wave"
+	if builder.build(stage,config,output,"波動の予告・拡大・切れ目・命中・終了".sha256_text())!=OK: return false
+	var path := output.path_join("stage_88.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":349},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if session.bridge==null: session.free(); return false
+	var bridge = session.bridge
+	var core = bridge._core
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed":349,"empty":true,"field":{"terrain":false,"rocks":false,"gimmicks":false},"invincible":false,"config":{"atk_scale":3.0}})
+	var run: RunSimulation = lab.run
+	var center := Vector2(-1500,0)
+	var target := center+Vector2(140,0)
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var empty: Dictionary = bridge.checkpoint()
+	if not wave_reset(run,bridge,empty,target,config): return false
+	var params := {"position":center,"angle":0.0,"arc":PI,"radius":500.0,"start_radius":80.0,"speed":100.0,"width":12.0,"delay":0.2,"damage":7.0}
+	if "--cpp-wave-fixes" in OS.get_cmdline_user_args():
+		if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
+		var layers := params.merged({"layers":3,"interval":0.15,"gap":0.2,"gap_arc":0.1,"gap_step":0.4},true)
+		run.projectiles.fire_rings(center,3,0.15,500.0,100.0,12.0,0.2,7.0,0.2,0.1,0.4)
+		var rings: Dictionary = bridge.command("dev_fire_wave",layers)
+		if not rings.ok: return false
+		wave_pair_step(run,core,0.4,"複数の輪を同じ行順で拡大する")
+		if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
+		var victim: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center+Vector2(110,0))
+		var victim_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(110,0)}).value
+		run.combat.rebuild_grid()
+		var hp: float = run.enemies.table.hp[victim]
+		var emitted: Dictionary = wave_emit_pair(run,bridge,params.merged({"enemy_damage":1.0},true))
+		if emitted.is_empty(): return false
+		wave_pair_step(run,core,0.4,"通過する帯で敵へ一度当たる")
+		check(is_equal_approx(run.enemies.table.hp[victim],hp-1.0) and core.enemies_snapshot().any(func(enemy): return enemy.id==victim_id and is_equal_approx(enemy.hp,hp-1.0)),"波の敵ダメージと命中済みIDを保つ：旧=%s C++=%s" % [run.enemies.table.hp[victim],core.enemies_snapshot()])
+		var point: Dictionary = bridge.checkpoint()
+		wave_pair_step(run,core,0.01,"命中した敵への二度目を防ぐ")
+		var future: Array = core.enemies_snapshot()
+		check(bridge.restore(point.value).ok,"敵への実命中履歴を復帰する")
+		core.step_hazards(0.01)
+		check(core.enemies_snapshot()==future,"実命中を含む復帰でも二度当てない")
+		bridge.release_checkpoint(point.value)
+		bridge.release_checkpoint(empty.value)
+		lab.free()
+		session.free()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		return true
+	var emitted: Dictionary = wave_emit_pair(run,bridge,params)
+	if emitted.is_empty(): return false
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	wave_pair_step(run,core,0.1,"予告中は初期半径で止まり当たらない")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view._wave_displays.size()==1,"波動の予告を通常画面へ表示する")
+	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"予告中に機体へダメージを通さない")
+	wave_pair_step(run,core,0.1,"予告が終わった時点は初期半径")
+	wave_pair_step(run,core,0.5,"広がった輪が機体へ一度当たる")
+	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-7.0),"atk_scaleを重ねず指定ダメージを一度与える")
+	var point: Dictionary = bridge.checkpoint()
+	wave_pair_step(run,core,0.1,"命中後も波は拡大し続ける")
+	var future: Array = core.hazards_snapshot()
+	check(bridge.restore(point.value).ok,"途中の半径・命中済み・残り寿命を復帰する")
+	core.step_hazards(0.1)
+	check(core.hazards_snapshot()==future,"復帰後も同じ拡大と命中履歴へ進む")
+	bridge.release_checkpoint(point.value)
+	wave_pair_step(run,core,5.0,"最大半径までの時間で自然終了する")
+	check(core.hazards_snapshot().is_empty(),"波動の自然終了で範囲を回収する")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view._wave_displays.values().all(func(display): return not display.visible),"終了した波の表示を残さない")
+	for scenario in [
+		{"name":"切れ目の中","angle":0.0,"gap":0.0,"gap_arc":0.3,"arc":PI,"hit":false},
+		{"name":"切れ目の外","angle":0.0,"gap":PI,"gap_arc":0.3,"arc":PI,"hit":true},
+		{"name":"扇の外","angle":PI,"gap":0.0,"gap_arc":0.0,"arc":0.5,"hit":false}]:
+		if not wave_reset(run,bridge,empty,target,config): return false
+		var shape := params.duplicate()
+		shape.merge({"angle":scenario.angle,"gap":scenario.gap,"gap_arc":scenario.gap_arc,"arc":scenario.arc},true)
+		emitted = wave_emit_pair(run,bridge,shape)
+		if emitted.is_empty(): return false
+		wave_pair_step(run,core,0.7,scenario.name)
+		check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-(7.0 if scenario.hit else 0.0)),scenario.name+"の当たりを保つ")
+	# 層ごとに予告と切れ目の向きをずらす生成も同じ値を使う。
+	if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
+	var layers := params.merged({"layers":3,"interval":0.15,"gap":0.2,"gap_arc":0.1,"gap_step":0.4},true)
+	run.projectiles.fire_rings(center,3,0.15,500.0,100.0,12.0,0.2,7.0,0.2,0.1,0.4)
+	var rings: Dictionary = bridge.command("dev_fire_wave",layers)
+	check(rings.ok and rings.value.size()==3,"層ごとに遅延と切れ目を変えた輪を生成する")
+	wave_pair_step(run,core,0.4,"複数の輪を同じ行順で拡大する")
+	for row: Dictionary in core.hazards_snapshot():
+		check(is_equal_approx(row.gap_angle,run.projectiles.hazard_gap[row.row]),"層ごとの切れ目の向きが一致する")
+	# 見た目の種類を同じ描画関数へ渡し、完成輪は専用の輪を再利用する。
+	for style in [1,2,3]:
+		if not wave_reset(run,bridge,empty,target,config): return false
+		emitted = wave_emit_pair(run,bridge,params.merged({"style":style},true))
+		if emitted.is_empty(): return false
+		wave_pair_step(run,core,0.5,"波紋・雷色・完成輪の拡大")
+		var frame: Dictionary = bridge.read_render(Rect2(center-Vector2(600,600),Vector2(1200,1200))).value
+		check(frame.shapes.any(func(shape): return shape.kind==2 and shape.wave_style==style and shape.owner_id==emitted.attack.id),"種類と攻撃IDを表示へ渡す")
+		presentation._present_cpp(0.0)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		check(presentation.frame_view._wave_displays.values().any(func(display): return display.visible and display._cpp_values.style==[0,6,2,14][style]),"各種の波動を通常画面へ表示する")
+		if style==3:
+			check(presentation.frame_view._wave_displays.values().any(func(display): return display.visible and not display._rings.is_empty() and display._rings[0].visible),"完成輪の専用描画を再利用する")
+	# 発射前は発生元の死亡・吸引で取消。発射後は独立し、復帰でもその区切りを保つ。
+	for after_launch in [false,true]:
+		for pulled in [false,true]:
+			if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
+			var owner_row: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center)
+			var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center}).value
+			emitted = wave_emit_pair(run,bridge,params.merged({"owner_id":owner_id,"style":3},true))
+			if emitted.is_empty(): return false
+			run.projectiles.attach_hazard(emitted.old_row,owner_row)
+			if after_launch:
+				wave_pair_step(run,core,0.3,"発射時に完成輪の生存参照を外す")
+				check(not core.hazards_snapshot()[0].attached,"発射後の生存参照を解除する")
+				var launched: Dictionary = bridge.checkpoint()
+				check(bridge.restore(launched.value).ok,"独立した完成輪を保持復帰する")
+				bridge.release_checkpoint(launched.value)
+			if pulled:
+				var pump_row: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center+Vector2(20,0))
+				var pump_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(20,0)}).value
+				run.enemies.table.pump_owner[owner_row] = pump_row
+				check(bridge.command("dev_enemy_combat",{"entity_id":owner_id,"pump_owner":pump_id}).ok,"発生元を吸引中にする")
+			else:
+				run.combat.kill_enemy(owner_row)
+				bridge.command("dev_kill",{"entity_id":owner_id,"cause":"ram"})
+			wave_pair_step(run,core,0.05,"発射の前後の死亡・吸引")
+			check((not core.hazards_snapshot().is_empty())==after_launch,"発射前だけ取り消し、発射後は自然寿命まで残す")
+	# 敵への波は通過帯を一度ずつ当て、機体の命中済み状態とは別に保持する。
+	if not wave_reset(run,bridge,empty,center+Vector2(1000,0),config): return false
+	var victim: int = run.enemies.spawn(run.enemies.def_of(&"drifter"),center+Vector2(110,0))
+	var victim_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(110,0)}).value
+	run.combat.rebuild_grid()
+	var hp: float = run.enemies.table.hp[victim]
+	emitted = wave_emit_pair(run,bridge,params.merged({"enemy_damage":1.0},true))
+	if emitted.is_empty(): return false
+	wave_pair_step(run,core,0.4,"通過する帯で敵へ一度当たる")
+	check(is_equal_approx(run.enemies.table.hp[victim],hp-1.0) and core.enemies_snapshot().any(func(enemy): return enemy.id==victim_id and is_equal_approx(enemy.hp,hp-1.0)),"波の敵ダメージと命中済みIDを保つ")
+	var hit_point: Dictionary = bridge.checkpoint()
+	wave_pair_step(run,core,0.01,"同じ敵への二度目を防ぐ")
+	var enemies: Array = core.enemies_snapshot()
+	check(bridge.restore(hit_point.value).ok,"敵への命中履歴を復帰する")
+	core.step_hazards(0.01)
+	check(core.enemies_snapshot()==enemies,"復帰しても同じ敵へ二度当てない")
+	bridge.release_checkpoint(hit_point.value)
 	bridge.release_checkpoint(empty.value)
 	lab.free()
 	session.free()

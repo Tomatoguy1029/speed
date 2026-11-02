@@ -9,6 +9,7 @@ var enemy_frames: Dictionary = {}
 var _layers: Dictionary = {}
 var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
+var _wave_displays: Dictionary = {}
 var _scope: ContentResourceScope
 var _pixel := 1.82
 var _shot_transforms: Dictionary = {}
@@ -157,9 +158,13 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [0,1] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [0,1,2] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
+		if row.kind==2:
+			if row.points.size()!=1 or row.widths.size()!=1 or row.get("wave_style") not in [0,1,2,3]: return false
+			for key in ["radius","max_radius","angle","arc","gap","gap_arc","time","delay"]:
+				if not row.get(key) is float or not is_finite(row[key]): return false
 		for i in range(1,row.offsets.size()):
 			if row.offsets[i]<row.offsets[i-1]: return false
 	for row in frame.poses:
@@ -225,10 +230,22 @@ func apply_frame(frame: Dictionary) -> bool:
 		display.used = false
 		display.previous_circles = display.circles.duplicate()
 		display.circles.clear()
+	for display: Node in _wave_displays.values(): display.hide()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
+		if row.kind==2:
+			var key := "%d:%d" % [row.layer,row.order]
+			if not _wave_displays.has(key):
+				var wave := preload("res://scripts/render/attacks/wave.gd").new()
+				parent.add_child(wave)
+				_wave_displays[key] = wave
+			var wave: Node2D = _wave_displays[key]
+			parent.move_child(wave,-1)
+			wave.apply_frame(row,1.0/maxf(_zoom,0.01))
+			wave.show()
+			continue
 		var display: Dictionary = {}
 		if int(row.owner_id)>0 or row.kind==1:
 			var key := "%d:%d" % [row.layer,row.order]

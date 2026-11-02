@@ -1606,6 +1606,10 @@
       {
         "name": "Circle",
         "value": "circle"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
       }
     ]
   },

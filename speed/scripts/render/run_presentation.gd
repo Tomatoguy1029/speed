@@ -1343,35 +1343,7 @@ func _draw_round_beam(c: CanvasItem, a: Vector2, b: Vector2, color: Color, width
 ## 帯を短い四角形に区切り、凹んだ輪郭の自動分割による塗りの欠けを避ける。
 func _draw_round_arc(c: CanvasItem, center: Vector2, radius: float, start: float, end: float,
 		segments: int, color: Color, width: float) -> void:
-	var half := minf(width * 0.5, radius * 0.9)
-	if half <= 0.0:
-		return
-	var fillet := half * 0.5
-	var points := PackedVector2Array()
-	var indices := PackedInt32Array()
-	for n in segments:
-		var direction := Vector2.from_angle(lerpf(start, end, float(n) / (segments - 1)))
-		points.append(center + direction * (radius + half))
-		points.append(center + direction * (radius - half))
-		if n > 0:
-			var i := n * 2
-			indices.append_array(PackedInt32Array([i - 2, i - 1, i, i, i - 1, i + 1]))
-	for cap_index in 2:
-		var direction := Vector2.from_angle(end if cap_index == 0 else start)
-		var tangent := Vector2(-direction.y, direction.x) * (1.0 if cap_index == 0 else -1.0)
-		var cap := center + direction * radius
-		var pivot := points.size()
-		points.append(cap)
-		# 外角と内角を1/4円でつなぎ、端の中央には短い平面を残す。
-		for corner in 2:
-			var offset := (half - fillet) * (1.0 if corner == 0 else -1.0)
-			for n in 7:
-				var angle := (corner + float(n) / 6.0) * PI * 0.5
-				points.append(cap + direction * (offset + cos(angle) * fillet) + tangent * sin(angle) * fillet)
-				var i := points.size() - 1
-				if i > pivot + 1:
-					indices.append_array(PackedInt32Array([pivot, i - 1, i]))
-	RenderingServer.canvas_item_add_triangle_array(c.get_canvas_item(), indices, points, PackedColorArray([color]))
+	preload("res://scripts/render/attacks/wave.gd").draw_round_arc(c,center,radius,start,end,segments,color,width)
 
 func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)

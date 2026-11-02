@@ -651,6 +651,23 @@ inline bool read(BinaryReader &input, FriendShotDefinition &out) {
     if (out.contact < 1) return false;
     return true;
 }
+struct WaveDefinition {
+    uint32_t id{};
+    uint32_t contact{};
+    double enemy_min_distance{};
+    double enemy_knock{};
+};
+inline bool read(BinaryReader &input, WaveDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.contact)) return false;
+    if (out.contact < 1) return false;
+    if (!input.read_f64(out.enemy_min_distance)) return false;
+    if (out.enemy_min_distance < 0) return false;
+    if (!input.read_f64(out.enemy_knock)) return false;
+    if (out.enemy_knock < 0) return false;
+    return true;
+}
 struct BudgetPhase {
     uint32_t id{};
     double start{};
@@ -1118,6 +1135,7 @@ struct ContentRecords {
     std::vector<HostileDefinition> HostileDefinition_rows;
     std::vector<BeamDefinition> BeamDefinition_rows;
     std::vector<FriendShotDefinition> FriendShotDefinition_rows;
+    std::vector<WaveDefinition> WaveDefinition_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
@@ -1256,6 +1274,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { FriendShotDefinition row; if (!read(input,row)) return false; out.FriendShotDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 37: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { WaveDefinition row; if (!read(input,row)) return false; out.WaveDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 16: {
@@ -1402,6 +1426,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BeamDefinition_rows) if (!BeamDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FriendShotDefinition_ids;
     for (const auto &row:data.FriendShotDefinition_rows) if (!FriendShotDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> WaveDefinition_ids;
+    for (const auto &row:data.WaveDefinition_rows) if (!WaveDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
@@ -1453,6 +1479,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HostileDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.BeamDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.FriendShotDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
+    for (const auto &row:data.WaveDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -1598,5 +1625,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=36;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=37;
 }

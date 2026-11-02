@@ -105,7 +105,7 @@ bool CollisionQuery::touches(const ContactShape &shape,const ShipMotion &ship,Co
             return radial_sweep(before,now,value.center,{outer},{value.angle-value.arc,value.angle+value.arc},contains);
         } else if constexpr (std::is_same_v<T,RingBand>) {
             const double inner=std::max(0.0,value.radius-value.half_width-radius),outer=value.radius+value.half_width+radius;
-            const auto contains=[&](Point p){const auto rel=p-value.center;const double dist=rel.length();return dist>=inner && dist<=outer && std::abs(angle_difference(rel.angle()-value.angle))<=value.arc && (value.gap_arc<=0 || std::abs(angle_difference(rel.angle()-value.gap_angle))>=value.gap_arc);};
+            const auto contains=[&](Point p){const auto rel=p-value.center;const double dist=rel.length();return dist>=inner && dist<=outer && std::abs(angle_difference(rel.angle()-value.angle))<=value.arc && (value.gap_arc<=0 || std::abs(angle_difference(rel.angle()-value.gap_angle))>value.gap_arc);};
             return radial_sweep(before,now,value.center,{inner,outer},{value.angle-value.arc,value.angle+value.arc,value.gap_angle-value.gap_arc,value.gap_angle+value.gap_arc},contains);
         } else if constexpr (std::is_same_v<T,ContactRect>) {
             const Point a=(before-value.center).rotated(-value.angle),b=(now-value.center).rotated(-value.angle),half=value.half+Point(radius,radius);

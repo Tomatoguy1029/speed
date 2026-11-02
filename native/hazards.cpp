@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/attacks/wave.h"
 #include "../cpp/systems/attack_system.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/output/event_builder.h"
@@ -49,6 +50,13 @@ Array SpeedRunCore::hazards_snapshot() const {
         if (const auto *beam=std::get_if<speed::BeamHazard>(&zone.shape)) {
             row["kind"]=0;row["angle"]=beam->angle;row["length"]=beam->length;row["half_width"]=beam->half_width;row["arc"]=beam->arc;
             const auto *record=speed::AttackSystem::get(runtime.state,zone.attack);row["owner_id"]=record?record->spec.owner.source_id:0;
+        }
+        if (const auto *wave=std::get_if<speed::WaveHazard>(&zone.shape)) {
+            row["kind"]=2;row["angle"]=wave->angle;row["length"]=wave->radius;row["half_width"]=wave->half_width;row["arc"]=wave->arc;
+            row["radius"]=speed::WaveSystem::radius(zone);row["start_radius"]=wave->start_radius;row["speed"]=wave->speed;
+            row["gap_angle"]=wave->gap;row["gap_arc"]=wave->gap_arc;row["style"]=wave->style;row["enemy_damage"]=wave->enemy_damage;
+            PackedInt64Array hits;for (auto id:wave->enemy_hits) hits.push_back(id);row["enemy_hits"]=hits;
+            const auto *attack=speed::AttackSystem::get(runtime.state,zone.attack);row["attached"]=attack && attack->spec.owner.attached;
         }
         row["damage"] = zone.damage; row["color"] = zone.color; row["hit"] = zone.hit; const auto *record=speed::AttackSystem::get(runtime.state,zone.attack);row["token"]=record?record->spec.owner.budget.value:0; out.append(row);
     }

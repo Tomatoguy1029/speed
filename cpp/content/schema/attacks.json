@@ -133,6 +133,33 @@
           "ref": "ContactDefinition"
         }
       ]
+    },
+    {
+      "name": "WaveDefinition",
+      "section": 37,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "enemy_min_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "enemy_knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {
@@ -206,6 +233,24 @@
       {
         "name": "Guide",
         "value": "guide"
+      }
+    ],
+    "WaveStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Ripple",
+        "value": "ripple"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      },
+      {
+        "name": "Pulser",
+        "value": "pulser"
       }
     ]
   }

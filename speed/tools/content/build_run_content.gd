@@ -1,6 +1,7 @@
 ## Resourceの実効値を解決し、共通スキーマの書込へ渡す。
 extends RefCounted
 const Schema = preload("res://tools/content/generated/run_schema.gd")
+const Wave = preload("res://scripts/attacks/wave.gd")
 const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
@@ -47,6 +48,8 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		{"id":3,"shape":7,"scale":0,"hit_policy":0,"add_ship_radius":true,"ship_sweep":false,"width":0.0},
 		{"id":4,"shape":1,"scale":0,"hit_policy":0,"add_ship_radius":false,"ship_sweep":false,"width":0.0}]
 	data.BeamDefinition = [{"id":1,"contact":3}]
+	data.ContactDefinition.append({"id":5,"shape":5,"scale":0,"hit_policy":0,"add_ship_radius":true,"ship_sweep":false,"width":0.0})
+	data.WaveDefinition = [{"id":1,"contact":5,"enemy_min_distance":Wave.ENEMY_MIN_DISTANCE,"enemy_knock":Wave.ENEMY_KNOCK}]
 	data.FriendShotDefinition = [{"id":1,"contact":4}]
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
@@ -223,6 +226,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.RunConfig = resolved.RunConfig
 		data.ContactDefinition = resolved.ContactDefinition
 		data.BeamDefinition = resolved.BeamDefinition
+		data.WaveDefinition = resolved.WaveDefinition
 		data.FriendShotDefinition = resolved.FriendShotDefinition
 		data.BudgetPhase = resolved.BudgetPhase
 		if data.ResourceKey.is_empty():

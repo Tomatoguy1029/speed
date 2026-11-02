@@ -1,6 +1,8 @@
 ## 広がる輪・扇：angle の向きを中心に左右 arc の角度、速さ speed で半径 len まで広がる。gap_w があれば切れ目を空ける。
 ## 敵へのダメージ（edmg）があれば、先頭が通り過ぎた敵に1回ずつ当たる（いるか座の波動）。
 extends HazardShape
+const ENEMY_MIN_DISTANCE := 30.0
+const ENEMY_KNOCK := 300.0
 
 func touches(ps: ProjectileSystem, i: int, ship_pos: Vector2, R: float) -> bool:
 	var d := ship_pos - ps.hazard_pos[i]
@@ -19,7 +21,7 @@ func act(ps: ProjectileSystem, i: int, dt: float) -> bool:
 	var now := ps.wave_radius(i)
 	var before := minf(ps.hazard_len[i], ps.hazard_start_radius[i] + maxf(0.0, ps.hazard_t[i] - dt - ps.hazard_delay[i]) * ps.hazard_speed[i])
 	var half := ps.hazard_width[i] * 0.5
-	var lo := maxf(before - half, 30.0)
+	var lo := maxf(before - half, ENEMY_MIN_DISTANCE)
 	var rows := PackedInt32Array()
 	ps.combat.nearby(ps.hazard_pos[i], now + half, rows)
 	for j in rows:
@@ -35,7 +37,7 @@ func act(ps: ProjectileSystem, i: int, dt: float) -> bool:
 		if absf(Geom.angle_diff(d.angle(), ps.hazard_angle[i])) > ps.hazard_arc[i] + t.r[j] / maxf(dist, 1.0):
 			continue
 		ps.hazard_enemy_hit[i][enemy_id] = true
-		ps.combat.damage_enemy(j, ps.hazard_edmg[i], {"cause": &"wave", "dir": d / maxf(dist, 1.0), "knock": 300.0, "no_crit": true})
+		ps.combat.damage_enemy(j, ps.hazard_edmg[i], {"cause": &"wave", "dir": d / maxf(dist, 1.0), "knock": ENEMY_KNOCK, "no_crit": true})
 		if ps.state.phase != RunState.Phase.PLAY:
 			return false
 	return true

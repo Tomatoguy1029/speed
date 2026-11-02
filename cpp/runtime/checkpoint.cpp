@@ -78,6 +78,12 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             if (beam->style>=uint32_t(BeamStyle::Count) || !beam->definition || beam->definition>content.beams.size() || !std::isfinite(beam->angle) || !std::isfinite(beam->length) || beam->length<0 ||
                 !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
         }
+        if (const auto *wave=std::get_if<WaveHazard>(&hazard.shape)) {
+            if (!wave->definition || wave->definition>content.waves.size() || wave->style>=uint32_t(WaveStyle::Count) || !std::isfinite(wave->enemy_damage) || wave->enemy_damage<0) return false;
+            for (double value:{wave->radius,wave->start_radius,wave->speed,wave->half_width,wave->gap_arc,wave->arc}) if (!std::isfinite(value) || value<0) return false;
+            if (wave->start_radius>wave->radius || !std::isfinite(wave->angle) || !std::isfinite(wave->gap)) return false;
+            std::unordered_set<int64_t> hits;for (auto id:wave->enemy_hits) if (id<=0 || !hits.insert(id).second) return false;
+        }
     }
     std::unordered_set<uint64_t> crystal_ids,ground_orders;
     int64_t live_crystals=0;

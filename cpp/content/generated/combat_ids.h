@@ -255,17 +255,19 @@ inline bool parse_symbol(std::string_view value, ResultKind &out) {
     if (value=="Abort") {out=ResultKind::Abort;return true;}
     return false;
 }
-enum class RenderShapeKind : uint32_t {Polyline=0,Circle=1,Count};
+enum class RenderShapeKind : uint32_t {Polyline=0,Circle=1,Wave=2,Count};
 inline const char *symbol_name(RenderShapeKind value) {
     switch(value) {
     case RenderShapeKind::Polyline: return "polyline";
     case RenderShapeKind::Circle: return "circle";
+    case RenderShapeKind::Wave: return "wave";
     default: return "";
     }
 }
 inline bool parse_symbol(std::string_view value, RenderShapeKind &out) {
     if (value=="polyline") {out=RenderShapeKind::Polyline;return true;}
     if (value=="circle") {out=RenderShapeKind::Circle;return true;}
+    if (value=="wave") {out=RenderShapeKind::Wave;return true;}
     return false;
 }
 enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,TaperedBeam=7,Count};
@@ -334,6 +336,23 @@ inline const char *symbol_name(BeamStyle value) {
 inline bool parse_symbol(std::string_view value, BeamStyle &out) {
     if (value=="plain") {out=BeamStyle::Plain;return true;}
     if (value=="guide") {out=BeamStyle::Guide;return true;}
+    return false;
+}
+enum class WaveStyle : uint32_t {Plain=0,Ripple=1,Lightning=2,Pulser=3,Count};
+inline const char *symbol_name(WaveStyle value) {
+    switch(value) {
+    case WaveStyle::Plain: return "plain";
+    case WaveStyle::Ripple: return "ripple";
+    case WaveStyle::Lightning: return "lightning";
+    case WaveStyle::Pulser: return "pulser";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, WaveStyle &out) {
+    if (value=="plain") {out=WaveStyle::Plain;return true;}
+    if (value=="ripple") {out=WaveStyle::Ripple;return true;}
+    if (value=="lightning") {out=WaveStyle::Lightning;return true;}
+    if (value=="pulser") {out=WaveStyle::Pulser;return true;}
     return false;
 }
 enum class AttackCategory : uint32_t {Aimed=0,Homing=1,Dash=2,Beam=3,Zone=4,Wave=5,Residue=6,Count};
