@@ -14,10 +14,17 @@ var message := ""
 var requested := ""
 var _saved := {}
 var _origin := Vector2.ZERO
+var _pending_start := false
 
-func bind(value, id: String, source: Resource) -> bool:
-	if not OS.is_debug_build() or StringName(id) not in BOSSES or source == null: return false
+func bind(value, id: String, source: Resource = null) -> bool:
+	if not OS.is_debug_build() or StringName(id) not in BOSSES: return false
 	if value == null or value.bridge == null: return false
+	if source == null:
+		var path: String = value._output.path_join("boss_%s.tres" % id)
+		var built: Dictionary = PROGRAM.build_boss(id,path)
+		if built.get("error",ERR_INVALID_DATA)!=OK: return false
+		source = ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if source == null or source.get("data") is not Dictionary or source.data.get("rules")==null: return false
 	session = value
 	boss = id
 	entity_id = session._selected_id
@@ -33,6 +40,33 @@ func state() -> Dictionary:
 	if session == null or session.bridge == null: return {}
 	var result: Dictionary = session.bridge.boss_trial(entity_id,"state")
 	return result.value if result.ok else {}
+
+## 読取値は決着中も表示に使う。制御命令の可否はC++側で判定する。
+func body_snapshot() -> Dictionary:
+	if session == null or session.bridge == null: return {}
+	var result: Dictionary = session.bridge.command("dev_boss_body_state",{})
+	if result.ok:
+		for body: Dictionary in result.value:
+			if body.actor == entity_id: return body
+	return {}
+
+func action(id: String, fields: Dictionary = {}) -> bool:
+	if session == null or session.bridge == null: return false
+	var result: Dictionary = session.bridge.boss_trial(entity_id,id,fields)
+	if not result.ok: message = result.message
+	session._refresh_projection()
+	return result.ok
+
+func advance() -> void:
+	if not _pending_start: return
+	var body := state()
+	if body.is_empty() or float(body.get("separation_left",0.0))>0: return
+	_pending_start = not action("start",{"technique":requested})
+
+func repeat() -> bool:
+	if requested.is_empty() or attack_playing(): return false
+	if _pending_start: return false
+	return action("restart") if action_rules.combos.has(requested) else action("start",{"technique":requested})
 
 func moves() -> Array:
 	return action_rules.techniques if action_rules != null else []
@@ -63,7 +97,7 @@ func _first_action(node: Dictionary) -> String:
 		if not id.is_empty(): return id
 	return ""
 
-func _prepare(phase: int, point: Vector2, selection: bool, guard: float, steering: bool) -> bool:
+func prepare(phase: int, point: Vector2, selection: bool, guard: float, steering: bool) -> bool:
 	var fields := {"phase":phase,"origin":_origin,"target":point,"selection":selection,"guard":guard,"steering_locked":steering}
 	if boss in ["hydra","draco"]: fields.logical_size=session.scene.view.get_viewport().get_visible_rect().size
 	var result: Dictionary = session.bridge.boss_trial(entity_id,"prepare",fields)
@@ -71,7 +105,7 @@ func _prepare(phase: int, point: Vector2, selection: bool, guard: float, steerin
 	session._refresh_projection()
 	return result.ok
 
-func execute(id: String, phase: int) -> bool:
+func execute(id: String, phase: int, animate_split := false) -> bool:
 	message = unavailable(id,phase)
 	if not message.is_empty(): return false
 	if not active: _saved = state()
@@ -88,7 +122,8 @@ func execute(id: String, phase: int) -> bool:
 		return false
 	phase = clampi(phase,maxi(int(gate.get("min_phase",1)),int(outer.get("min_phase",1))),4 if boss=="hydra" else 3 if boss=="draco" else 2)
 	var point := _origin + Vector2.from_angle(deg_to_rad(float(gate.get("angle",0.0)))) * (minimum + maxf(minimum,minf(1400.0,maximum))) * 0.5
-	if not _prepare(phase,point,false,0.0,_saved.steering_locked): return false
+	var prepared_phase := 3 if animate_split and boss=="hydra" and phase==4 else phase
+	if not prepare(prepared_phase,point,false,0.0,_saved.steering_locked): return false
 	active = true
 	if combo:
 		for node in rules.node_ids():
@@ -103,10 +138,12 @@ func execute(id: String, phase: int) -> bool:
 	if not replaced.get("ok",false):
 		message = replaced.get("message","試行の定義を生成できません。")
 		return false
-	if not _prepare(phase,point,combo,0.0,_saved.steering_locked): return false
+	if not prepare(prepared_phase,point,combo,0.0,_saved.steering_locked): return false
+	if animate_split and boss=="hydra" and phase==4 and not action("separate"): return false
 	requested = id
 	session._apply("pin",{"value":combo,"pos":point})
-	if not combo:
+	_pending_start = animate_split and boss=="hydra" and phase==4 and not combo
+	if not combo and not _pending_start:
 		var result: Dictionary = session.bridge.boss_trial(entity_id,"start",{"technique":id})
 		if not result.ok:
 			message = "開始できませんでした: " + id
@@ -118,11 +155,12 @@ func finish() -> void:
 	if not active: return
 	if has_body():
 		var point: Vector2 = session.run.state.ship_pos
-		if _prepare(_saved.phase,point,false,_saved.guard,_saved.steering_locked):
+		if prepare(_saved.phase,point,false,_saved.guard,_saved.steering_locked):
 			var restored: Dictionary = session.set_boss_program(boss,program.data)
-			if restored.ok: _prepare(_saved.phase,point,_saved.selection,_saved.guard,_saved.steering_locked)
+			if restored.ok: prepare(_saved.phase,point,_saved.selection,_saved.guard,_saved.steering_locked)
 	session._apply("pin",{"value":_saved.get("pinned",false),"pos":_saved.get("pin",Vector2.ZERO)})
 	active = false
+	_pending_start = false
 	_saved.clear()
 	requested = ""
 	message = "手動実行終了・通常AI"

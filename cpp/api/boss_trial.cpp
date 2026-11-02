@@ -5,6 +5,8 @@
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/canis_major/body.h"
 #include "../bosses/hydra/body.h"
+#include "../bosses/hydra/swim.h"
+#include "../bosses/centaurus/finish.h"
 #include "../bosses/hydra/normal_attack.h"
 #include "../bosses/draco/body.h"
 #include "../systems/attack_system.h"
@@ -30,10 +32,16 @@ Dictionary SpeedRunCore::development_boss_trial_command(const Dictionary &p) {
     if (action=="state" && p.size()==2) {
         Dictionary value;for (const auto &item:speed::PhaseController::snapshot(runtime)) {const Dictionary row=item;if (int64_t(row["actor"])==int64_t(p["entity_id"])) value=row;}
         value["pinned"]=runtime.state.control.lab_pinned;value["pin"]=runtime.state.control.lab_pin;value["selection"]=flow->selection_enabled;value["flow_index"]=flow->index;value["flow_active"]=flow->active;value["guard"]=runtime.state.enemies[actor.slot].guard;value["steering_locked"]=runtime.state.steering_locked;
-        bool busy=!flow->roots.empty();String technique;
+        bool busy=!flow->roots.empty() || body->mode!=speed::BossMode::Idle || body->phase_pending || body->centaurus.leaping || body->canis.barking || body->canis.calling || (hydra && (body->hydra.growth_left>0 || body->hydra.separation_left>0));String technique;
         for (const auto &t:runtime.state.bosses.techniques) if ((speed::same_handle(t.actor,actor) || (hydra && speed::HydraNormalAttack::body(runtime,t.actor)==body)) && t.stage<speed::TechniqueStage::Finished) {busy=true;technique=String::utf8(runtime.content->boss_techniques[t.definition-1].external_id.c_str());}
         if (hydra) value["phase"]=body->hydra.separated?4:body->hydra.necks.size()>=8?3:body->hydra.necks.size()>=5?2:1;
         value["busy"]=busy;value["technique"]=technique;return reply(true,value);
+    }
+    if (action=="phase_two" && p.size()==2 && !hydra && !draco && body->phase==1) {body->phase_pending=true;return reply(true);}
+    if (action=="separate" && p.size()==2 && hydra && body->hydra.necks.size()==8 && !body->hydra.separated) return reply(speed::HydraSwim::begin(runtime,*body));
+    if (action=="leap" && p.size()==2 && runtime.content->bosses[boss-1].kind==1 && !flow->selection_enabled && speed::PhaseController::can_start(runtime,actor)) {speed::CentaurusFinish::leap(runtime,*body);return reply(true);}
+    if (action=="restart" && p.size()==2 && flow->roots.empty() && speed::PhaseController::can_start(runtime,actor)) {
+        const auto definition=flow->definition,phase=flow->phase;const auto participants=flow->participants;*flow={};flow->actor=actor;flow->definition=definition;flow->participants=participants;flow->phase=phase;flow->selection_enabled=true;flow->stamina=runtime.content->boss_flows[definition-1].maximum_stamina;return reply(true);
     }
     if (action=="start" && p.size()==3 && p.get("technique",Variant()).get_type()==Variant::STRING) {
         const String name=p["technique"];
