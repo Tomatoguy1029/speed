@@ -190,6 +190,7 @@ func _ready() -> void:
 	metadata["actual_start"]={"run_clock":start_recording.t,"world_clock":start_recording.world_t,"tick":start_metrics.tick,"enemy_types":start_metrics.enemy_types,"enemies":start_metrics.enemies,"bonus_remaining":bridge.latest_frame().value.ui.bonus_remaining,"boss_bodies":bridge.latest_frame().value.ui.boss_bodies}
 	var effective: Dictionary = bridge.read_lab().value
 	metadata["effective"]={"attack_power":effective.attack_power,"max_speed":effective.max_speed,"capacity":effective.capacity,"length_mult":effective.length_mult,"xp_profile_factor":effective.xp_profile_factor}
+	metadata["clocks"]=start_metrics.clocks
 	metadata["source_sha256"]={"profile":FileAccess.get_sha256("res://tools/profiling/profile_run.gd"),"bridge":FileAccess.get_sha256("res://scripts/runtime/run_bridge.gd"),"manager":FileAccess.get_sha256("res://scripts/managers/run_manager.gd")}
 	if _equipment(start_recording)!=expected_equipment:
 		_fail("指定Lvと実際の装備が一致しません")
@@ -345,6 +346,12 @@ func _process(_delta: float) -> void:
 	var ui_paused: bool = packet.ui.phase in [RunState.Phase.PAUSED,RunState.Phase.LEVELUP] or session.view.get_node("Hud/HudRoot")._rewards.is_active()
 	var scene := "ui" if ui_paused else "bonus" if bonus else "boss" if not packet.ui.get("boss_bodies",[]).is_empty() else "normal"
 	var row := {"elapsed_ms":(now-start_us)/1000.0,"frame_ms":frame_ms,"tick":metrics.tick,"fixed_steps":metrics.fixed_steps,"enemies":metrics.enemies,"enemy_types":metrics.enemy_types,"attack_pools":metrics.attack_pools,"friendly":metrics.friendly_shots,"run_clock":packet.ui.run_time,"run_delta":float(packet.ui.run_time)-last_run_clock,"world_clock":packet.ui.world_time,"phase":packet.ui.phase,"scene":scene,"bonus_remaining":packet.ui.get("bonus_remaining",0.0),"hitstop":packet.ui.get("hitstop",0.0),"drawing":packet.ui.draw.drawing,"tracing":packet.ui.draw.tracing,"ship_position":str(packet.ui.ship.ship_pos),"boss_bodies":packet.ui.get("boss_bodies",[]),"sim":timings.sim,"output_build":timings.output_build,"bridge_copy":timings.bridge_copy,"resource_wait":timings.resource_wait,"bridge_bytes":int(metrics.packed_bytes)-last_packed_bytes,"view_update":update,"view_draw":draw,"view_detail":display,"observation_ms":(now-before)/1000.0,"keep_refill":maintenance_us/1000.0,"viewport_cpu_ms":RenderingServer.viewport_get_measured_render_time_cpu(viewport),"viewport_gpu_ms":RenderingServer.viewport_get_measured_render_time_gpu(viewport),"draw_calls":Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),"scope_resources":session.resources.resources.size(),"objects":Performance.get_monitor(Performance.OBJECT_COUNT),"nodes":Performance.get_monitor(Performance.OBJECT_NODE_COUNT),"static_mb":Performance.get_monitor(Performance.MEMORY_STATIC)/1048576.0}
+	row["sim_clock"]=metrics.clocks.sim_time
+	row["world_updates"]=metrics.clocks.world_updates
+	row["world_real_accum"]=metrics.clocks.world_real_accum
+	row["world_dt_accum"]=metrics.clocks.world_dt_accum
+	row["ship_x"]=packet.ui.ship.ship_pos.x
+	row["ship_y"]=packet.ui.ship.ship_pos.y
 	row.engine_gpu_wait=maxf(0.0,frame_ms-timings.sim-timings.output_build-timings.bridge_copy-timings.resource_wait-update-draw-row.keep_refill)
 	last_run_clock=float(packet.ui.run_time)
 	last_metrics=metrics
