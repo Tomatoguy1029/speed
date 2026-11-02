@@ -397,7 +397,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 24) return false;
+    if (out.kind > 30) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -1896,6 +1896,200 @@ inline bool read(BinaryReader &input, AquariusDefinition &out) {
     if (out.beams < 1) return false;
     return true;
 }
+struct CrossEnemyDefinition {
+    uint32_t id{};
+    double accel{};
+    double stand_off{};
+    double align_tol{};
+    double beam_length{};
+    double beam_time{};
+    double telegraph{};
+    double rest{};
+    double damage{};
+    double admission_duration{};
+    double half_width{};
+};
+inline bool read(BinaryReader &input, CrossEnemyDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.stand_off)) return false;
+    if (out.stand_off < 0) return false;
+    if (!input.read_f64(out.align_tol)) return false;
+    if (out.align_tol < 0) return false;
+    if (!input.read_f64(out.beam_length)) return false;
+    if (out.beam_length < 0) return false;
+    if (!input.read_f64(out.beam_time)) return false;
+    if (out.beam_time < 0) return false;
+    if (!input.read_f64(out.telegraph)) return false;
+    if (out.telegraph < 0) return false;
+    if (!input.read_f64(out.rest)) return false;
+    if (out.rest < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    if (!input.read_f64(out.half_width)) return false;
+    if (out.half_width < 0) return false;
+    return true;
+}
+struct BomberDefinition {
+    uint32_t id{};
+    double accel{};
+    double trigger{};
+    double rush{};
+    double blast_delay{};
+    double blast_radius{};
+    double blast_damage{};
+    double admission_duration{};
+};
+inline bool read(BinaryReader &input, BomberDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.trigger)) return false;
+    if (out.trigger < 0) return false;
+    if (!input.read_f64(out.rush)) return false;
+    if (out.rush < 0) return false;
+    if (!input.read_f64(out.blast_delay)) return false;
+    if (out.blast_delay < 0) return false;
+    if (!input.read_f64(out.blast_radius)) return false;
+    if (out.blast_radius < 0) return false;
+    if (!input.read_f64(out.blast_damage)) return false;
+    if (out.blast_damage < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    return true;
+}
+struct PhoenixDefinition {
+    uint32_t id{};
+    double retreat_distance{};
+    double retreat_time{};
+    double telegraph{};
+    double dive_time{};
+    double impact_radius{};
+    double impact_time{};
+    double impact_damage{};
+    double recover_time{};
+    double admission_duration{};
+};
+inline bool read(BinaryReader &input, PhoenixDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.retreat_distance)) return false;
+    if (out.retreat_distance < 0) return false;
+    if (!input.read_f64(out.retreat_time)) return false;
+    if (out.retreat_time < 0) return false;
+    if (!input.read_f64(out.telegraph)) return false;
+    if (out.telegraph < 0) return false;
+    if (!input.read_f64(out.dive_time)) return false;
+    if (out.dive_time < 0) return false;
+    if (!input.read_f64(out.impact_radius)) return false;
+    if (out.impact_radius < 0) return false;
+    if (!input.read_f64(out.impact_time)) return false;
+    if (out.impact_time < 0) return false;
+    if (!input.read_f64(out.impact_damage)) return false;
+    if (out.impact_damage < 0) return false;
+    if (!input.read_f64(out.recover_time)) return false;
+    if (out.recover_time < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    return true;
+}
+struct AquilaDefinition {
+    uint32_t id{};
+    double keep{};
+    double aim_time{};
+    double lock_time{};
+    double dash_speed{};
+    double dash_time{};
+    double drop_step{};
+    double blast_radius{};
+    double blast_delay{};
+    double damage{};
+    double recover{};
+    double admission_duration{};
+};
+inline bool read(BinaryReader &input, AquilaDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.aim_time)) return false;
+    if (out.aim_time < 0) return false;
+    if (!input.read_f64(out.lock_time)) return false;
+    if (out.lock_time < 1e-06) return false;
+    if (!input.read_f64(out.dash_speed)) return false;
+    if (out.dash_speed < 1e-06) return false;
+    if (!input.read_f64(out.dash_time)) return false;
+    if (out.dash_time < 0) return false;
+    if (!input.read_f64(out.drop_step)) return false;
+    if (out.drop_step < 1e-06) return false;
+    if (!input.read_f64(out.blast_radius)) return false;
+    if (out.blast_radius < 0) return false;
+    if (!input.read_f64(out.blast_delay)) return false;
+    if (out.blast_delay < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.recover)) return false;
+    if (out.recover < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    return true;
+}
+struct SplitDefinition {
+    uint32_t id{};
+    uint32_t child{};
+    double bud_interval{};
+    double split_speed{};
+    double split_guard{};
+    uint32_t max_buds{};
+    uint32_t death_split{};
+    uint32_t split_extra{};
+};
+inline bool read(BinaryReader &input, SplitDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.child)) return false;
+    if (out.child < 1) return false;
+    if (!input.read_f64(out.bud_interval)) return false;
+    if (out.bud_interval < 0) return false;
+    if (!input.read_f64(out.split_speed)) return false;
+    if (out.split_speed < 0) return false;
+    if (!input.read_f64(out.split_guard)) return false;
+    if (out.split_guard < 0) return false;
+    if (!input.read_u32(out.max_buds)) return false;
+    if (out.max_buds < 0) return false;
+    if (out.max_buds > 2147483647) return false;
+    if (!input.read_u32(out.death_split)) return false;
+    if (out.death_split < 0) return false;
+    if (out.death_split > 2147483647) return false;
+    if (!input.read_u32(out.split_extra)) return false;
+    if (out.split_extra < 0) return false;
+    if (out.split_extra > 2147483647) return false;
+    return true;
+}
+struct DefenderDefinition {
+    uint32_t id{};
+    double accel{};
+    double guard_arrive{};
+    double guard_distance{};
+    double guard_radius{};
+    double guard_spacing{};
+};
+inline bool read(BinaryReader &input, DefenderDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.guard_arrive)) return false;
+    if (!input.read_f64(out.guard_distance)) return false;
+    if (!input.read_f64(out.guard_radius)) return false;
+    if (!input.read_f64(out.guard_spacing)) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -2047,6 +2241,35 @@ inline bool read(BinaryReader &input, WarpDefinition &out) {
     if (out.life < 0) return false;
     if (!input.read_f64(out.bonus_time)) return false;
     if (out.bonus_time < 0) return false;
+    return true;
+}
+struct CometDefinition {
+    uint32_t id{};
+    double interval_min{};
+    double interval_max{};
+    double speed{};
+    double rare_chance{};
+    double rare_after{};
+    double rare_hp_mult{};
+    double warp_chance{};
+};
+inline bool read(BinaryReader &input, CometDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.interval_min)) return false;
+    if (out.interval_min < 0) return false;
+    if (!input.read_f64(out.interval_max)) return false;
+    if (out.interval_max < 0) return false;
+    if (!input.read_f64(out.speed)) return false;
+    if (out.speed < 0) return false;
+    if (!input.read_f64(out.rare_chance)) return false;
+    if (out.rare_chance < 0) return false;
+    if (!input.read_f64(out.rare_after)) return false;
+    if (out.rare_after < 0) return false;
+    if (!input.read_f64(out.rare_hp_mult)) return false;
+    if (out.rare_hp_mult < 0) return false;
+    if (!input.read_f64(out.warp_chance)) return false;
+    if (out.warp_chance < 0) return false;
     return true;
 }
 struct NumericTraitLevel {
@@ -2670,11 +2893,18 @@ struct ContentRecords {
     std::vector<ClockDefinition> ClockDefinition_rows;
     std::vector<ReticleDefinition> ReticleDefinition_rows;
     std::vector<AquariusDefinition> AquariusDefinition_rows;
+    std::vector<CrossEnemyDefinition> CrossEnemyDefinition_rows;
+    std::vector<BomberDefinition> BomberDefinition_rows;
+    std::vector<PhoenixDefinition> PhoenixDefinition_rows;
+    std::vector<AquilaDefinition> AquilaDefinition_rows;
+    std::vector<SplitDefinition> SplitDefinition_rows;
+    std::vector<DefenderDefinition> DefenderDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
     std::vector<GravityDefinition> GravityDefinition_rows;
     std::vector<WarpDefinition> WarpDefinition_rows;
+    std::vector<CometDefinition> CometDefinition_rows;
     std::vector<NumericTraitLevel> NumericTraitLevel_rows;
     std::vector<PostMaxChargeDefinition> PostMaxChargeDefinition_rows;
     std::vector<PostMaxCritDefinition> PostMaxCritDefinition_rows;
@@ -3094,6 +3324,42 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { AquariusDefinition row; if (!read(input,row)) return false; out.AquariusDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 100: {
+        if (version != 1) return false;
+        if (count > input.remaining()/84) return false;
+        for (uint32_t i=0; i<count; ++i) { CrossEnemyDefinition row; if (!read(input,row)) return false; out.CrossEnemyDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 101: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { BomberDefinition row; if (!read(input,row)) return false; out.BomberDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 102: {
+        if (version != 1) return false;
+        if (count > input.remaining()/76) return false;
+        for (uint32_t i=0; i<count; ++i) { PhoenixDefinition row; if (!read(input,row)) return false; out.PhoenixDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 103: {
+        if (version != 1) return false;
+        if (count > input.remaining()/92) return false;
+        for (uint32_t i=0; i<count; ++i) { AquilaDefinition row; if (!read(input,row)) return false; out.AquilaDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 120: {
+        if (version != 1) return false;
+        if (count > input.remaining()/44) return false;
+        for (uint32_t i=0; i<count; ++i) { SplitDefinition row; if (!read(input,row)) return false; out.SplitDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 121: {
+        if (version != 1) return false;
+        if (count > input.remaining()/44) return false;
+        for (uint32_t i=0; i<count; ++i) { DefenderDefinition row; if (!read(input,row)) return false; out.DefenderDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -3122,6 +3388,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/28) return false;
         for (uint32_t i=0; i<count; ++i) { WarpDefinition row; if (!read(input,row)) return false; out.WarpDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 90: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { CometDefinition row; if (!read(input,row)) return false; out.CometDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 30: {
@@ -3384,6 +3656,18 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ReticleDefinition_rows) if (!ReticleDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> AquariusDefinition_ids;
     for (const auto &row:data.AquariusDefinition_rows) if (!AquariusDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CrossEnemyDefinition_ids;
+    for (const auto &row:data.CrossEnemyDefinition_rows) if (!CrossEnemyDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BomberDefinition_ids;
+    for (const auto &row:data.BomberDefinition_rows) if (!BomberDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PhoenixDefinition_ids;
+    for (const auto &row:data.PhoenixDefinition_rows) if (!PhoenixDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> AquilaDefinition_ids;
+    for (const auto &row:data.AquilaDefinition_rows) if (!AquilaDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> SplitDefinition_ids;
+    for (const auto &row:data.SplitDefinition_rows) if (!SplitDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DefenderDefinition_ids;
+    for (const auto &row:data.DefenderDefinition_rows) if (!DefenderDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -3394,6 +3678,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.GravityDefinition_rows) if (!GravityDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> WarpDefinition_ids;
     for (const auto &row:data.WarpDefinition_rows) if (!WarpDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CometDefinition_ids;
+    for (const auto &row:data.CometDefinition_rows) if (!CometDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> NumericTraitLevel_ids;
     for (const auto &row:data.NumericTraitLevel_rows) if (!NumericTraitLevel_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PostMaxChargeDefinition_ids;
@@ -3499,6 +3785,13 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ClockDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ReticleDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.AquariusDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.CrossEnemyDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.BomberDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.PhoenixDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.AquilaDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.SplitDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.SplitDefinition_rows) if (!EnemyRecord_ids.count(row.child)) return false;
+    for (const auto &row:data.DefenderDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -3648,5 +3941,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=91;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=98;
 }
