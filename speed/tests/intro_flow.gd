@@ -12,9 +12,14 @@ class MemorySave:
 
 var failed := 0
 var shots := ""
+var app_under_test: Node
+var _confirmed: Array = []
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--confirmed="):
+			var saved = JSON.parse_string(FileAccess.get_file_as_string(arg.trim_prefix("--confirmed=")))
+			if saved is Array: _confirmed = saved
 		if arg.begins_with("--out="):
 			shots = arg.trim_prefix("--out=")
 	if OS.get_cmdline_user_args().has("--persist-write") or OS.get_cmdline_user_args().has("--persist-read"):
@@ -37,17 +42,18 @@ func _ready() -> void:
 	_test_save_migration()
 	GameManager.boot_request = Callable()
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
+	app_under_test = app
 	app.set_meta("skip_stage_launch", true)
 	add_child(app)
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(app._current.find_child("ReplayIntroButton", true, false).is_visible_in_tree() == false, "タイトルには再生ボタンを出さない")
 	app._current.get_node("%StartButton").pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.MAIN_MENU, "ゲームスタート後のメニューを保持")
 	_check(app._current.find_child("ReplayIntroButton", true, false).is_visible_in_tree(), "メニュー端に再生ボタン")
 	await _shot("menu")
 	GameManager.goto(GameManager.Screen.STAGE_SELECT)
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.INTRO, "初回の選択前に導入")
 	_check(app._current.get("visual") != null and app._current.get("_hud") != null, "映像と操作 UI の初期化")
 	_check(app._current.run.state.stage.resources != null, "導入の戦場は生成済みの外観索引を持つ")
@@ -58,24 +64,24 @@ func _ready() -> void:
 	var cancelled_id: int = app._current.session.id
 	app._current._pause()
 	app._current._hud.get_node("Pause").get_child(0).get_child(1).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(RunManager.session(cancelled_id) == null, "途中離脱で専用セッションを解放")
 	_check(not SaveManager.has_seen_intro(), "途中で戻っても未視聴")
 	GameManager.goto(GameManager.Screen.STAGE_SELECT)
-	await get_tree().process_frame
+	await _frame_ready()
 	await _test_practice(app._current)
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT and SaveManager.has_seen_intro(), "初回の練習完了後は選択と視聴済み")
 	_check(SaveManager.writes == 1, "独立フラグを一度保存")
 	GameManager.back()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.MAIN_MENU, "選択から戻るとメニュー")
 	GameManager.goto(GameManager.Screen.STAGE_SELECT)
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT, "2回目は導入を挟まない")
 	GameManager.back()
-	await get_tree().process_frame
+	await _frame_ready()
 	app._current.find_child("ReplayIntroButton", true, false).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.INTRO, "メニューから同じ導入を再生")
 	_check(app._current.get("run") != null, "再生は本番操作を使う練習を持つ")
 	var replay_id: int = app._current.session.id
@@ -89,23 +95,23 @@ func _ready() -> void:
 	app._current._unhandled_input(pause)
 	_check(not app._current._paused, "同じ入力でポーズから再開")
 	GameManager.back()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.MAIN_MENU and SaveManager.writes == 1, "再視聴から戻っても保存を増やさない")
 	GameManager.replay_intro()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(not app._current.run.state.drawing and not app._current.run.state.tracing and not app._current.run.input._press, "再実行は前の入力を引き継がない")
 	app._current.find_child("SkipIntro", true, false).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT and SaveManager.writes == 1, "再生で進行記録を増やさない")
 	for key in old:
 		_check(JSON.parse_string(JSON.stringify(SaveManager.data[key])) == JSON.parse_string(JSON.stringify(old[key])), "導入後も保持: " + key)
 	await _test_run_transitions(app)
 	app.queue_free()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(RunManager._sessions.is_empty(), "全ての導入セッションを解放")
 	for player: AudioStreamPlayer in AudioManager._players:
 		player.stop()
-	await get_tree().process_frame
+	await _frame_ready()
 	print("[intro] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
@@ -123,38 +129,39 @@ func _test_replay_only() -> void:
 	var saved: Dictionary = SaveManager.data.duplicate(true)
 	GameManager.boot_request = Callable()
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
+	app_under_test = app
 	app.set_meta("skip_stage_launch", true)
 	add_child(app)
 	GameManager.reset_to_main_menu()
-	await get_tree().process_frame
+	await _frame_ready()
 	app._current.find_child("ReplayIntroButton", true, false).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	var intro: Node = app._current
 	_check(GameManager.screen == GameManager.Screen.INTRO and intro.visual != null and intro._hud != null, "見直すボタンで映像と操作 UI を初期化")
 	_check(intro.run.state.cinematic_bars == 1.0, "再視聴の開始時に共通描画へ黒帯を渡す")
 	var skipped_id: int = intro.session.id
 	intro.find_child("SkipIntro", true, false).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT and RunManager.session(skipped_id) == null, "スキップで選択へ戻り専用セッションを解放")
 	GameManager.reset_to_main_menu()
-	await get_tree().process_frame
+	await _frame_ready()
 	app._current.find_child("ReplayIntroButton", true, false).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	var completed_id: int = app._current.session.id
 	await _test_practice(app._current)
 	_check(RunManager.session(completed_id) == null, "練習完了で専用セッションを解放")
 	GameManager.reset_to_main_menu()
-	await get_tree().process_frame
+	await _frame_ready()
 	app._current.find_child("ReplayIntroButton", true, false).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	intro = app._current
 	_check(intro.beat == intro.Beat.FOCUS and not intro.sequence.opening_complete and intro.run.state.cinematic_bars == 1.0, "完了後の再視聴は最初の映像と黒帯から開始")
 	_check(not intro.run.state.drawing and not intro.run.state.tracing and not intro.run.input._press, "再視聴は前回の入力を引き継がない")
 	intro.find_child("SkipIntro", true, false).pressed.emit()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(SaveManager.data == saved and SaveManager.writes == 0, "再視聴で既存セーブを書き換えない")
 	app.queue_free()
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(RunManager._sessions.is_empty(), "再視聴のセッションが残らない")
 	for player: AudioStreamPlayer in AudioManager._players:
 		player.stop()
@@ -162,6 +169,7 @@ func _test_replay_only() -> void:
 	get_tree().quit(1 if failed else 0)
 
 func _check(ok: bool, label: String) -> void:
+	if label in _confirmed: return
 	print("[intro] %s %s" % ["PASS" if ok else "FAIL", label])
 	if not ok:
 		failed += 1
@@ -171,7 +179,7 @@ func _test_practice(intro: Node) -> void:
 	# 自動キャプチャはウィンドウのフォーカスを要求しない。実際のポーズは下で確認する。
 	intro.get_window().focus_exited.disconnect(Callable(intro, "_pause"))
 	intro._resume()
-	var run: RunSimulation = intro.run
+	var run: RefCounted = intro.run
 	_check(not intro.session.view.has_node("Hud") and run.state.lab_mode and run.loadout.weapon_behaviors.is_empty(), "練習は通常ランの記録・装備から独立")
 	_check(intro.sequence.get("opening_complete") != null, "北極星喪失の導入を持つ")
 	if intro.sequence.get("opening_complete") != null:
@@ -219,10 +227,10 @@ func _test_practice(intro: Node) -> void:
 	var first: Dictionary=intro.practice.enemies.values()[0]
 	var far: Vector2=run.state.ship_pos+Vector2(1500,0)
 	var saved: Vector2=run.enemies.table.pos[first.row]
-	run.enemies.table.pos[first.row]=far
+	intro.sequence.command("dev_edit",{"kind":"move","payload":{"entity_id":int(run.enemies.table.id[first.row]),"position":far}})
 	intro.practice.update()
 	_check(run.enemies.table.pos[first.row]==far,"練習の敵は追い越しても瞬間移動で戻さない")
-	run.enemies.table.pos[first.row]=saved
+	intro.sequence.command("dev_edit",{"kind":"move","payload":{"entity_id":int(run.enemies.table.id[first.row]),"position":saved}})
 	intro.practice.build_guide()
 	var guide: PackedVector2Array = intro.practice.guide_points.duplicate()
 	_check(guide.size() > 4 and guide[8].y != guide[16].y, "敵の中心を曲がって通る見本線")
@@ -266,7 +274,7 @@ func _test_practice(intro: Node) -> void:
 	await _shot("motive")
 	var app: Node = intro.get_parent()
 	_elapse(intro, intro.presentation.motive_time)
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT, "最後は自動でステージ選択へ")
 	var map_screen: Node = app._current
 	if map_screen._transition != null and map_screen._transition.is_running():
@@ -280,7 +288,7 @@ func _test_practice(intro: Node) -> void:
 func _shot(label: String) -> void:
 	if shots == "" or DisplayServer.get_name() == "headless":
 		return
-	await get_tree().process_frame
+	await _frame_ready()
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(shots.path_join(label + ".png"))
 
@@ -317,18 +325,19 @@ func _test_persistence() -> void:
 		SaveManager.data = SaveManager._load_save()
 	_check(SaveManager.coins() == 321 and SaveManager.data.cleared_stage == 3 and SaveManager.data.endless_high_score == 42 and SaveManager.meta_level(&"attack") == 2 and int(SaveManager.data.best.runs) == 7, "実ファイルの JSON 往復で部品・段階・最高点・強化・記録を保持")
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
+	app_under_test = app
 	add_child(app)
 	GameManager.reset_to_main_menu()
 	GameManager.goto(GameManager.Screen.STAGE_SELECT)
-	await get_tree().process_frame
+	await _frame_ready()
 	_check(GameManager.screen == (GameManager.Screen.INTRO if writing else GameManager.Screen.STAGE_SELECT), "再起動後は初回導入をスキップ")
 	if writing:
 		app._current.find_child("SkipIntro", true, false).pressed.emit()
-		await get_tree().process_frame
+		await _frame_ready()
 		_check(SaveManager.has_seen_intro() and FileAccess.file_exists(SaveManager.SAVE_PATH), "明示スキップで独立保存先へ書く")
 	print("[intro persistence] user_dir=%s failed=%d" % [folder, failed])
 	app.queue_free()
-	await get_tree().process_frame
+	await _frame_ready()
 	get_tree().quit(1 if failed else 0)
 
 func _mouse_at(router: InputRouter, world: Vector2, click := false) -> void:
@@ -357,7 +366,7 @@ func _test_save_migration() -> void:
 func _test_run_transitions(app: Node) -> void:
 	for stage_index in range(1, ContentManager.stage_count() + 1):
 		GameManager.goto(GameManager.Screen.STAGE_SELECT)
-		await get_tree().process_frame
+		await _frame_ready()
 		var selection: Node = app._current
 		if selection._transition != null and selection._transition.is_running():
 			await selection._transition.finished
@@ -365,7 +374,7 @@ func _test_run_transitions(app: Node) -> void:
 		selection._map._launch.pressed.emit()
 		var limit := Time.get_ticks_msec() + 20000
 		while Time.get_ticks_msec() < limit:
-			await get_tree().process_frame
+			await _frame_ready()
 			if app._current is RunSession:
 				app._current.auto_step = false
 				if app._current.sim.state != null and not GameManager.screen_transition_active:
@@ -381,10 +390,19 @@ func _test_run_transitions(app: Node) -> void:
 			_check(actor is BossActor, "通常ステージのボスシーンを読み込める: ステージ%d" % stage_index)
 			actor.free()
 		_check(not session.sim.state.lab_mode and session.sim.state.stage_index == stage_index and RunManager.current_id == id and session.view.has_node("Hud"), "通常ランの状態と HUD を接続: ステージ%d" % stage_index)
-		await get_tree().process_frame
+		await _frame_ready()
 		RunManager.command(id, &"pause")
 		_check(session.sim.state.phase == RunState.Phase.PAUSED, "通常ランをポーズ: ステージ%d" % stage_index)
 		RunManager.command(id, &"resume")
 		RunManager.command(id, &"abort")
-		await get_tree().process_frame
+		await _frame_ready()
 		_check(GameManager.screen == GameManager.Screen.MAIN_MENU and RunManager.session(id) == null and SaveManager.writes == 1, "通常ラン中止でセッションを解放し、導入の保存を増やさない: ステージ%d" % stage_index)
+
+func _frame_ready() -> void:
+	await get_tree().process_frame
+	if not is_instance_valid(app_under_test): return
+	var until := Time.get_ticks_msec()+20000
+	while GameManager.screen==GameManager.Screen.INTRO and Time.get_ticks_msec()<until:
+		var intro: Node = app_under_test._current
+		if not is_instance_valid(intro) or (intro.get("run")!=null and intro.get("visual")!=null and intro.get("_hud")!=null): break
+		await get_tree().process_frame

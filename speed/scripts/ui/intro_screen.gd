@@ -10,7 +10,7 @@ const Beat = SEQUENCE.Beat
 var sequence := SEQUENCE.new()
 var session: RunSession:
 	get: return sequence.session
-var run: RunSimulation:
+var run: RefCounted:
 	get: return sequence.run
 var practice: RefCounted:
 	get: return sequence.practice
@@ -32,7 +32,8 @@ var _touch := false
 func _ready() -> void:
 	sequence.beat_changed.connect(_on_beat_changed)
 	sequence.completed.connect(GameManager.finish_intro)
-	sequence.setup(self, presentation)
+	await sequence.setup(self,presentation)
+	if run==null: return
 	run.input.process_mode = Node.PROCESS_MODE_DISABLED
 	run.frame_events.connect(_on_events)
 	visual = preload("res://scripts/render/intro_visual.gd").new()

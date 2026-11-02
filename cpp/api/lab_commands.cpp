@@ -9,7 +9,7 @@
 #include <algorithm>
 using namespace godot;
 namespace {
-Dictionary reply(bool ok,Variant value=Variant()) {Dictionary r;r["ok"]=ok;r["code"]=ok?0:1;r["field"]=ok?"":"scenario";r["message"]=ok?"":"実験の命令の種類・入力・対象を確認してください";r["value"]=value;return r;}
+Dictionary reply(bool ok,Variant value=Variant()) {Dictionary r;r["ok"]=ok;r["code"]=ok?0:1;r["field"]=ok?"":"scenario";r["message"]=ok?String():String::utf8("実験の命令の種類・入力・対象を確認してください");r["value"]=value;return r;}
 bool keys(const Dictionary &d,std::initializer_list<const char *> names) {for (auto key:d.keys()) {bool found=false;for (auto name:names) if (String(key)==name) found=true;if (!found) return false;}return true;}
 bool scalar(const Dictionary &d,const char *key,double fallback,double &value) {const Variant v=d.get(key,fallback);if (v.get_type()!=Variant::FLOAT && v.get_type()!=Variant::INT) return false;value=v;return std::isfinite(value);}
 bool point(const Dictionary &d,const char *key,Vector2 &out) {const Variant v=d.get(key,Variant());if (v.get_type()!=Variant::VECTOR2) return false;out=v;return out.is_finite();}
@@ -19,7 +19,7 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
     const String kind=envelope["kind"];const char *body=command=="dev_set_scenario"?"params":"payload";
     if (envelope.get(body,Variant()).get_type()!=Variant::DICTIONARY) return reply(false);
     const Dictionary p=envelope[body];auto &s=runtime.state;auto &c=s.control;
-    if (command=="dev_set_scenario" && kind=="lab") {
+    if (command=="dev_set_scenario" && (kind=="lab" || kind=="intro")) {
         if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty"})) return reply(false);
         for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);
         Vector2 at=s.ship.pos;if (p.has("position") && !point(p,"position",at)) return reply(false);
@@ -30,6 +30,19 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         return reply(true);
     }
     if (command!="dev_edit") return reply(false);
+    if (kind=="camera") {
+        Vector2 center,size;double zoom,bars;
+        if (p.size()!=4 || !point(p,"center",center) || !point(p,"size",size) || size.x<=0 || size.y<=0 || !scalar(p,"zoom",1,zoom) || zoom<=0 || !scalar(p,"bars",0,bars) || bars<0 || bars>1) return reply(false);
+        c.camera_center=s.view_center=center;c.camera_zoom=zoom;c.logical_size=size;s.view_half=size/(2.0*zoom);c.camera_ready=true;c.cinematic_bars=bars;return reply(true);
+    }
+    if (kind=="finish_input" && p.is_empty()) {
+        s.hitstop=0;c.world_scale=1;s.draw.drawing=s.draw.tracing=false;s.ship.vel=Vector2();c.world_real_accum=c.world_dt_accum=0;c.world_steps=0;return reply(true);
+    }
+    if (kind=="enemy_motion") {
+        if (p.size()!=2 || p.get("entity_id",Variant()).get_type()!=Variant::INT) return reply(false);
+        double speed;if (!scalar(p,"speed",0,speed) || speed<0) return reply(false);
+        const auto row=s.rows_by_id.find(int64_t(p["entity_id"]));if (row==s.rows_by_id.end()) return reply(false);s.enemies[row->second].speed=speed;return reply(true);
+    }
     if (kind=="planet") {
         Vector2 at;double radius;if (p.size()!=2 || !point(p,"position",at) || !scalar(p,"radius",0,radius) || radius<10 || runtime.content->field_bodies.empty()) return reply(false);
         speed::FieldBody body;body.position=at;body.radius=radius;s.field.bodies.push_back(body);
@@ -112,5 +125,5 @@ Dictionary SpeedRunCore::lab_state_run() const {
     for (const auto &e:s.enemies) if (e.alive) {
         Dictionary row;row["id"]=e.id;row["type"]=runtime.content->definitions[e.definition].id;row["pos"]=e.pos;row["vel"]=e.vel;row["hp"]=e.hp;row["max_hp"]=e.max_hp;row["armor"]=e.armor;row["speed"]=e.speed;row["r"]=e.radius;row["facing"]=e.facing;row["dead"]=e.dead;row["elite"]=e.elite;row["gate"]=int(runtime.content->definitions[e.definition].gate);row["is_boss"]=e.is_boss;row["mode"]=int(e.mode);row["charge"]=e.charge;row["parent"]=s.enemy_handles.contains(e.parent)?s.enemy_handles.entity_id(e.parent):-1;enemies.push_back(row);
     }
-    value["camera_zoom"]=s.control.camera_zoom;value["view_center"]=s.view_center;value["capacity"]=s.draw_config.capacity;value["max_speed"]=s.ship_config.max_speed;value["length_mult"]=s.draw_config.length_mult;value["enemies"]=enemies;Array bodies;for (const auto &b:s.field.bodies) {Dictionary row;row["pos"]=b.position;row["r"]=b.radius;bodies.push_back(row);}value["bodies"]=bodies;value["hazards"]=hazards_snapshot();value["hostiles"]=hostiles_snapshot();return reply(true,value);
+    value["lab_mode"]=s.control.lab_mode;value["cinematic_bars"]=s.control.cinematic_bars;value["camera_zoom"]=s.control.camera_zoom;value["view_half"]=s.view_half;value["view_center"]=s.view_center;value["capacity"]=s.draw_config.capacity;value["max_speed"]=s.ship_config.max_speed;value["length_mult"]=s.draw_config.length_mult;value["enemies"]=enemies;Array bodies;for (const auto &b:s.field.bodies) {Dictionary row;row["pos"]=b.position;row["r"]=b.radius;bodies.push_back(row);}value["bodies"]=bodies;value["hazards"]=hazards_snapshot();value["hostiles"]=hostiles_snapshot();return reply(true,value);
 }

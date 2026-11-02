@@ -23,7 +23,7 @@ var _baseline_definitions := {}
 var _seek_view_mode := SubViewport.UPDATE_ALWAYS
 const BUILDER := preload("res://tools/content/build_run_content.gd")
 const LOADER := preload("res://scripts/runtime/run_content_loader.gd")
-const PROJECTION := preload("res://gyms/enemy_lab/lab_projection.gd")
+const PROJECTION := preload("res://scripts/runtime/run_read_model.gd")
 var baseline: Dictionary = {}
 var spec: Dictionary = {}
 var history: Array[Dictionary] = []
@@ -148,6 +148,7 @@ func _rebuild() -> void:
 	var index_path := _output.path_join("stage_%d.json" % _source.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
 	scene = RunManager.create_session(viewport if viewport!=null else self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":int(spec.get("seed",932)),"hud":true,"cpp_edit_source":{"stage":_source,"config":_config,"definitions":_definitions}},viewport!=null)
+	scene.remove_from_group("recordable_runs")
 	scene.auto_step = false
 	while is_instance_valid(scene) and scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
 	if not is_instance_valid(scene): return

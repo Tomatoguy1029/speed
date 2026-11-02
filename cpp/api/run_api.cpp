@@ -409,7 +409,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["rear"]=rear_snapshot();
     ui["barrier"]=barrier_snapshot();
     Dictionary gear;gear["distance"]=runtime.state.loadout.boost_distance;gear["maximum"]=runtime.state.loadout.full_charge_maximum;gear["burst_power"]=runtime.state.loadout.effects.burst_power;gear["ignore_armor"]=runtime.state.loadout.effects.ignore_armor;ui["full_charge"]=gear;ui["base_draw_length"]=runtime.state.draw_config.length;
-    ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
+    ui["cinematic_bars"]=runtime.state.control.cinematic_bars;ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=presentation_frozen(runtime);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;
     ui["shot_multiplier"]=runtime.state.loadout.effects.shot_amount;

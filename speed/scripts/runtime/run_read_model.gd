@@ -1,5 +1,7 @@
 ## C++の読取値だけから作る表示用の投影。ゲーム状態として書き戻さない。
 extends RefCounted
+signal frame_events(events: Array[Dictionary])
+var input_source: Callable
 class Values extends RefCounted:
 	var data := {}
 	func _get(key: StringName): return data.get(key)
@@ -30,12 +32,19 @@ var field := Values.new()
 var combat := Values.new()
 var draw := Values.new()
 var ship := Values.new()
+var loadout := Values.new()
 var bosses := {"definitions":{},"actors":[]}
 var cfg: GameConfig
 var input: InputRouter
 var view_size := Vector2(1280,720)
 var options := {"view_size":Vector2(1280,720)}
-func _base_zoom() -> float: return state.data.get("camera_zoom",1.0)
+func _base_zoom() -> float:
+	var size := _view_size()
+	var factor := pow(cfg.zoom_ref_speed/maxf(cfg.zoom_ref_speed,state.data.get("stats",{}).get("max_speed",cfg.base_max_speed)),cfg.zoom_exp)
+	return minf(size.x,size.y)/cfg.base_view*clampf(factor,cfg.zoom_min,1.0)
+func _view_size() -> Vector2:
+	return input.get_viewport().get_visible_rect().size if is_instance_valid(input) else view_size
+func flush_events() -> void: pass
 func refresh(snapshot: Dictionary, ui: Dictionary) -> void:
 	var weapons := {}
 	var traits := {}
@@ -43,9 +52,10 @@ func refresh(snapshot: Dictionary, ui: Dictionary) -> void:
 	for item: Dictionary in snapshot.loadout.trait_levels: traits[StringName(item.id)] = item.level
 	var values: Dictionary = snapshot.ship.duplicate(true)
 	values.merge(snapshot.draw,true)
-	values.merge({"phase":ui.phase,"time":snapshot.clock.time,"world_time":snapshot.clock.world_time,"camera_zoom":snapshot.camera_zoom,"view_center":snapshot.view_center,"stats":{"capacity":snapshot.capacity,"max_speed":snapshot.max_speed,"length_mult":snapshot.length_mult},"level":snapshot.loadout.level,"weapons":weapons,"traits":traits,"hero_power":&"","hero_active_t":0.0,"meta_override":{},"lab_mode":true},true)
+	values.merge({"phase":ui.phase,"time":snapshot.clock.time,"world_time":snapshot.clock.world_time,"camera_zoom":snapshot.camera_zoom,"cinematic_bars":snapshot.cinematic_bars,"view_half":snapshot.view_half,"view_center":snapshot.view_center,"stats":{"capacity":snapshot.capacity,"max_speed":snapshot.max_speed,"length_mult":snapshot.length_mult},"level":snapshot.loadout.level,"weapons":weapons,"traits":traits,"hero_power":&"","hero_active_t":0.0,"meta_override":{},"lab_mode":snapshot.lab_mode},true)
 	values.stage = state.data.get("stage")
 	state.data = values
+	loadout.data = {"weapon_behaviors":weapons}
 	ship.data = {"invincible":snapshot.invincible}
 	var table := {}
 	for key in ["id","type","pos","vel","hp","max_hp","armor","speed","r","facing","dead","elite","gate","mode","charge","parent","is_boss","alive","def","parts","links","attack_managed","attack_value","attack_priority"]: table[key] = []
