@@ -64,6 +64,7 @@ func _mode() -> StringName:
 	if state.mode==3: return &"final"
 	if state.mode>=4: return &"defeated"
 	if state.get("leaping",false): return &"leap"
+	if technique.get("technique","")=="rear_attack" and int(technique.get("stage",5))==1: return &"strike"
 	return [&"windup",&"shooting",&"recovery",&"idle",&"idle",&"idle",&"idle",&"idle"][int(technique.get("stage",5))]
 
 func _poly(points: Array, color: Color) -> void:
@@ -122,6 +123,9 @@ func _draw() -> void:
 	var k := r / 90.0
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	var tint := Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
+	if technique.get("technique","")=="rear_attack" and int(technique.get("stage",5))<2:
+		var blink := 1.0 if technique.stage==1 else 0.5+0.5*sin(float(state.clock)*TAU*6.0)
+		tint = Color.WHITE.lerp(REAR_GLOW,blink)
 	if technique.get("tint", Color.WHITE) != Color.WHITE: tint = technique.tint
 	modulate = tint
 	_draw_sail(sail_fraction())

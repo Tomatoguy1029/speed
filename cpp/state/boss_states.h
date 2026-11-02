@@ -6,7 +6,7 @@
 #include <unordered_map>
 namespace speed {
 enum class TechniqueStage : uint8_t { Windup,Active,Recovery,Stuck,Extract,Finished,Failed,Cancelled };
-enum class TechniqueCommand : uint8_t { LockAim,LaunchStrike,EndStrike,ReleaseArrow,FinishVolley };
+enum class TechniqueCommand : uint8_t { LockAim,LaunchStrike,EndStrike,ReleaseArrow,FinishVolley,StrikeRear };
 struct CentaurusVolleyState {uint32_t released=0;};
 struct MonocerosSweepState {
     enum class Stage : uint8_t { Approach,Stop,Swing,Hold,Return };

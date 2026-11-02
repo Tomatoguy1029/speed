@@ -196,6 +196,32 @@
           "ref": "LightArrowDefinition"
         }
       ]
+    },
+    {
+      "name": "CentaurusRearDefinition",
+      "section": 322,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "back_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

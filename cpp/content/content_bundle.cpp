@@ -132,6 +132,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->boss_bodies=records.BossBodyDefinition_rows;
     bundle->centaurus_bodies=records.CentaurusBodyDefinition_rows;
     bundle->centaurus_volleys=records.CentaurusVolleyDefinition_rows;
+    bundle->centaurus_rears=records.CentaurusRearDefinition_rows;
     bundle->boss_finish=records.BossFinishDefinition_rows;
     if (bundle->boss_finish.size()>1 || (!bundle->boss_finish.empty() && (bundle->boss_finish.front().id!=1 || bundle->boss_finish.front().zoom<=0))) return {};
     bundle->bosses=records.BossDefinition_rows;
@@ -143,9 +144,14 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
-        if (p.id!=i+1 || p.kind>8 || p.active<=0 || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":"volley")) return {};
+        if (p.id!=i+1 || p.kind>9 || p.active<=0 || p.external_id!=(p.kind==0?"charge":p.kind==1?"kick":p.kind==2?"sweep":p.kind==3?"lance":p.kind==4?"return_charge":p.kind==5?"horn_wave":p.kind==6?"horn_dance":p.kind==7?"sword_flash":p.kind==8?"volley":"rear_attack")) return {};
         std::vector<BossTechniqueStage> stages;
         for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
+        if (p.kind==9) {
+            const auto rear=std::find_if(bundle->centaurus_rears.begin(),bundle->centaurus_rears.end(),[&](const auto &v){return v.technique==p.id;});
+            if (rear==bundle->centaurus_rears.end() || bundle->bosses[p.boss-1].kind!=1 || stages.size()!=2 || stages[0].command!=5 || stages[0].at!=p.warn || stages[1].command!=4 || stages[1].at!=p.warn+p.active+0.05) return {};
+            continue;
+        }
         if (p.kind==8) {
             const auto volley=std::find_if(bundle->centaurus_volleys.begin(),bundle->centaurus_volleys.end(),[&](const auto &v){return v.technique==p.id;});
             if (volley==bundle->centaurus_volleys.end() || bundle->bosses[p.boss-1].kind!=1 || p.speed<=0 || volley->radius<=0 || volley->travel<=0 || stages.size()!=volley->count+1 || p.active!=volley->interval*(volley->count-1)+0.05) return {};
@@ -161,6 +167,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             commands[stage.command]=true;prior=stage.at;
         }
     }
+    for (size_t i=0;i<bundle->centaurus_rears.size();++i) if (bundle->centaurus_rears[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_rears[i].technique-1].kind!=9) return {};
     for (size_t i=0;i<bundle->centaurus_volleys.size();++i) if (bundle->centaurus_volleys[i].id!=i+1 || bundle->boss_techniques[bundle->centaurus_volleys[i].technique-1].kind!=8) return {};
     for (size_t i=0;i<bundle->boss_stages.size();++i) if (bundle->boss_stages[i].id!=i+1) return {};
     bundle->pumps=records.PumpDefinition_rows;

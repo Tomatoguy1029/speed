@@ -1491,6 +1491,10 @@
       {
         "name": "FlashSlash",
         "value": "flashSlash"
+      },
+      {
+        "name": "RearAttack",
+        "value": "rear_attack"
       }
     ],
     "VisualRole": [
