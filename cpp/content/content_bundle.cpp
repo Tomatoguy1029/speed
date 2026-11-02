@@ -178,7 +178,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -230,6 +230,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             if (drift==bundle->drifts.end()) return {};
             definition.drift_definition=uint32_t(drift-bundle->drifts.begin()+1);definition.ram_guard=drift->ram_guard;
         } else if (drift!=bundle->drifts.end()) return {};
+        const auto part=std::find_if(records.PartDefinition_rows.begin(),records.PartDefinition_rows.end(),[&](const auto &p){return p.id==row.id;});
+        if ((row.kind==12)!=(part!=records.PartDefinition_rows.end())) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;

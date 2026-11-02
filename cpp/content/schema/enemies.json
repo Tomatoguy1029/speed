@@ -330,6 +330,18 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "PartDefinition",
+      "section": 41,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
     }
   ],
   "enums": {}

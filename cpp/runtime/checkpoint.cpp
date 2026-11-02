@@ -65,6 +65,14 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             !std::isfinite(enemy.hp) || !std::isfinite(enemy.max_hp) || !std::isfinite(enemy.radius) || enemy.radius<=0 ||
             !state.rows_by_id.emplace(enemy.id,row).second) return false;
     }
+    for (const auto &enemy:state.enemies) if (enemy.alive) {
+        if (state.enemy_handles.contains(enemy.parent) && state.enemy_handles.entity_id(enemy.parent)!=enemy.parent_id) return false;
+        std::unordered_set<uint64_t> parts;
+        for (auto part:enemy.parts) {
+            if (!parts.insert(handle_key(part)).second) return false;
+            if (state.enemy_handles.contains(part) && (state.enemies[part.slot].parent_id!=enemy.id || !same_handle(state.enemies[part.slot].parent,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id)))))) return false;
+        }
+    }
     for (auto row:state.free_rows) {
         if (row>=state.enemies.size() || state.enemies[row].alive || !free.insert(row).second ||
             !state.enemy_handles.reusable(uint32_t(row))) return false;

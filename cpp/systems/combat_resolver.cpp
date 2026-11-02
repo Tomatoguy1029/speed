@@ -110,7 +110,7 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     if (state.enemies[result.target.slot].hp<=0) result.killed=kill_enemy(run,request,result.resolved>=state.enemies[result.target.slot].max_hp*0.8).killed;
     else {
         const auto &def=run.content->definitions[definition];auto &enemy=state.enemies[result.target.slot];
-        if (def.knockback>0) enemy.vel+=request.direction*request.knock*def.knockback/std::max(1.0,enemy.radius/20.0);
+        if (def.knockback>0 && !(state.enemy_handles.contains(enemy.parent) && state.enemies[enemy.parent.slot].is_boss)) enemy.vel+=request.direction*request.knock*def.knockback/std::max(1.0,enemy.radius/20.0);
     }
     if (request.crit && !request.no_crit) run.combat_hooks.critical(run,request,result);
     return result;

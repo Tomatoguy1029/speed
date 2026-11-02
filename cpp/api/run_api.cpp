@@ -263,6 +263,17 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],Dictionary());
         if (entity>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=entity>0?success(entity):failure(5,"definition_id","生成できる定義がありません");
+    } else if (kind=="dev_spawn_part" && runtime.api_development && payload.size()==3 && is(payload,"parent_id",Variant::INT) && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2)) {
+        const auto parent=runtime.state.rows_by_id.find(int64_t(payload["parent_id"]));size_t definition=0;
+        while (definition<runtime.content->definitions.size() && String(runtime.content->definitions[definition].id)!=String(payload["definition_id"])) ++definition;
+        const int64_t id=parent==runtime.state.rows_by_id.end()?-1:speed::EnemySystem::spawn_part(runtime,runtime.state.enemy_handles.at(uint32_t(parent->second)),definition,payload["position"]);
+        if (id>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
+        response=id>0?success(id):failure(5,"part","親または部位の定義が無効です");
+    } else if (kind=="dev_move_part" && runtime.api_development && payload.size()==4 && is(payload,"parent_id",Variant::INT) && is(payload,"entity_id",Variant::INT) && is(payload,"position",Variant::VECTOR2) && is(payload,"facing",Variant::FLOAT)) {
+        const auto parent=runtime.state.rows_by_id.find(int64_t(payload["parent_id"])),part=runtime.state.rows_by_id.find(int64_t(payload["entity_id"]));
+        const bool moved=parent!=runtime.state.rows_by_id.end() && part!=runtime.state.rows_by_id.end() && speed::EnemySystem::move_part(runtime,runtime.state.enemy_handles.at(uint32_t(part->second)),runtime.state.enemy_handles.at(uint32_t(parent->second)),payload["position"],payload["facing"]);
+        if (moved) rebuild_enemy_grid(runtime.state.frame_grid_cell);
+        response=moved?success():failure(5,"part","親子の参照が無効です");
     } else if (kind=="dev_relocate" && runtime.api_development && payload.size()==2 && is(payload,"entity_id",Variant::INT) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite()) {
         const auto found=runtime.state.rows_by_id.find(int64_t(payload["entity_id"]));
         const bool moved=found!=runtime.state.rows_by_id.end() && speed::EnemySystem::relocate(runtime,runtime.state.enemy_handles.at(uint32_t(found->second)),payload["position"]);

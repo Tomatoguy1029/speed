@@ -12,6 +12,9 @@ struct EnemySpawn {
 class EnemySystem {
 public:
     static int64_t spawn_base(RunRuntime &,size_t definition,const EnemySpawn &);
+    static int64_t spawn_part(RunRuntime &,EnemyHandle parent,size_t definition,godot::Vector2 position);
+    static bool move_part(RunRuntime &,EnemyHandle part,EnemyHandle parent,godot::Vector2 position,double facing);
+    static size_t parts_alive(const godot::RunState &,EnemyHandle parent);
     static bool relocate(RunRuntime &,EnemyHandle,godot::Vector2);
     static bool attack_active(const godot::RunState &,EnemyHandle);
     static bool attack_due(const RunRuntime &,EnemyHandle,double dt);

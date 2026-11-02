@@ -36,6 +36,27 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     insert(state,uint32_t(row),enemy);state.rows_by_id[enemy.id]=row;
     return enemy.id;
 }
+int64_t EnemySystem::spawn_part(RunRuntime &run,EnemyHandle parent,size_t definition,godot::Vector2 position) {
+    auto &state=run.state;
+    if (!state.enemy_handles.contains(parent) || state.enemies[parent.slot].dead || definition>=run.content->definitions.size() || run.content->definitions[definition].kind!=EnemyDefinition::Kind::Part) return -1;
+    const auto parent_id=state.enemies[parent.slot].id;const bool held=state.enemies[parent.slot].held;
+    EnemySpawn options;options.position=position;options.group=state.enemies[parent.slot].attack_group;
+    options.value=state.enemies[parent.slot].attack_value;options.priority=state.enemies[parent.slot].attack_priority;options.has_value=options.has_priority=true;
+    const auto id=spawn_base(run,definition,options);if (id<0) return id;
+    const auto row=state.rows_by_id.at(id);auto &part=state.enemies[row];part.parent=parent;part.parent_id=parent_id;part.held=held;
+    state.enemies[parent.slot].parts.push_back(state.enemy_handles.at(uint32_t(row)));return id;
+}
+bool EnemySystem::move_part(RunRuntime &run,EnemyHandle part,EnemyHandle parent,godot::Vector2 position,double facing) {
+    auto &state=run.state;
+    if (!state.enemy_handles.contains(part) || !state.enemy_handles.contains(parent) || state.enemies[part.slot].dead || state.enemies[parent.slot].dead ||
+        !same_handle(state.enemies[part.slot].parent,parent) || !position.is_finite() || !std::isfinite(float(facing))) return false;
+    auto &enemy=state.enemies[part.slot];enemy.pos=position;enemy.facing=float(facing);return true;
+}
+size_t EnemySystem::parts_alive(const godot::RunState &state,EnemyHandle parent) {
+    if (!state.enemy_handles.contains(parent)) return 0;
+    size_t count=0;for (auto part:state.enemies[parent.slot].parts) if (state.enemy_handles.contains(part) && !state.enemies[part.slot].dead) ++count;
+    return count;
+}
 bool EnemySystem::attack_active(const godot::RunState &state,EnemyHandle handle) {
     if (!state.enemy_handles.contains(handle)) return false;
     const auto &enemy=state.enemies[handle.slot];

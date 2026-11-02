@@ -10,6 +10,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-part-enemy" in OS.get_cmdline_user_args():
+		await check_cpp_part()
+		print("[cpp_part_enemy] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-drift-enemy" in OS.get_cmdline_user_args():
 		await check_cpp_drift()
 		print("[cpp_drift_enemy] failed=%d" % failed)
@@ -484,4 +489,95 @@ func check_cpp_drift() -> void:
 	check(replacement!=id and not core.valid_enemy_handle(old) and core.enemy_motion_snapshot()[0].spin==0.0 and core.enemy_motion_snapshot()[0].age==0.0,"再利用時に古い回転・寿命・外力を引き継がない")
 	bridge.release_checkpoint(pending.value)
 	lab.free()
+	session.free()
+
+func check_cpp_part() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: config.set(key,0)
+	var types := ["hydra_bite","hydra_beam","hydra_thunder","hydra_debris","hydra_vortex","hydra_immortal"]
+	var stage := RuntimeStage.new()
+	stage.index = 82
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"]+types)
+	var output := "res://.content/dev/run_part"
+	var builder = load("res://tools/content/build_run_content.gd")
+	var built: Error = builder.build(stage,config,output,"親に従う部位の生成と解放".sha256_text())
+	check(built==OK,"親と6種類の部位の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_82.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":979},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"部位の通常のランと表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var parent: int = core.spawn_enemy(&"drifter",target+Vector2(500,0),{"is_boss":true,"attack_group":7,"attack_value":2.0,"attack_priority":3.0})
+	core.set_enemy_motion(parent,{"held":true})
+	var ids := PackedInt64Array()
+	for i in types.size():
+		var made: Dictionary = bridge.command("dev_spawn_part",{"parent_id":parent,"definition_id":types[i],"position":target+Vector2(200,i*50-150)})
+		check(made.ok,"親から部位を生成する: "+types[i])
+		if not made.ok:
+			session.free()
+			return
+		ids.append(made.value)
+		for item: Dictionary in core.enemy_motion_snapshot():
+			if item.id==int(made.value): check(item.parent_id==parent and item.held==1,"部位は親のIDと保持状態を受け取る")
+	core.set_enemy_motion(parent,{"held":false})
+	for id in ids: core.set_enemy_motion(id,{"held":false,"vel":Vector2(120,30)})
+	var moved := target+Vector2(240,-150)
+	check(bridge.command("dev_move_part",{"parent_id":parent,"entity_id":int(ids[0]),"position":moved,"facing":0.7}).ok,"親から部位の位置と向きを更新する")
+	core.step(0.05)
+	var stopped := true
+	for enemy: Dictionary in core.enemies_snapshot():
+		if ids.has(enemy.id): stopped = stopped and Vector2(enemy.vel[0],enemy.vel[1])==Vector2.ZERO
+	check(stopped,"部位は自分では移動せず速度を止める")
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
+	var visible := PackedInt64Array()
+	for batch: Dictionary in frame.batches:
+		for id in batch.ids:
+			if ids.has(id): visible.append(id)
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(visible.size()==types.size() and presentation.frame_view.apply_frame(frame),"親から配置した6種類の部位を通常画面へ表示する")
+	await get_tree().process_frame
+	var pending: Dictionary = bridge.checkpoint()
+	var enemies: Array = core.enemies_snapshot()
+	var motion: Array = core.enemy_motion_snapshot()
+	var damage: Dictionary = bridge.command("dev_damage",{"entity_id":int(ids[0]),"amount":1.0,"cause":"bullet","direction":Vector2.RIGHT,"knock":1000.0})
+	check(damage.ok and damage.value.applied==1.0,"部位に独立したHPでダメージを与える")
+	for enemy: Dictionary in core.enemies_snapshot():
+		if enemy.id==int(ids[0]): check(Vector2(enemy.vel[0],enemy.vel[1])==Vector2.ZERO,"ボス部位に武器のノックバックを掛けない")
+	check(bridge.command("dev_kill",{"entity_id":int(ids[0]),"cause":"bullet"}).value.killed,"部位だけを途中で破壊する")
+	check(core.enemy_motion_snapshot()[0].parts_alive==5,"親の生きている部位数から壊れた部位を除く")
+	check(bridge.restore(pending.value).ok and core.enemies_snapshot()==enemies and core.enemy_motion_snapshot()==motion,"親子ID・保持・HP・部位の並びを値から復帰する")
+	check(bridge.command("dev_kill",{"entity_id":parent,"cause":"bullet"}).value.killed,"部位より先に親を倒す")
+	core.step(0.05)
+	var all_dead := true
+	for enemy: Dictionary in core.enemies_snapshot():
+		if ids.has(enemy.id): all_dead = all_dead and enemy.dead!=0
+	check(all_dead,"親の死亡後に全ての部位へ死亡印を付ける")
+	check(bridge.restore(pending.value).ok,"親の退場と行の再利用の場面へ戻す")
+	var old_parent: PackedInt64Array = core.enemy_handle(parent)
+	core.remove_enemy(parent)
+	var replacement: int = core.spawn_enemy(&"drifter",target+Vector2(500,0),{})
+	check(not core.valid_enemy_handle(old_parent) and not bridge.command("dev_move_part",{"parent_id":replacement,"entity_id":int(ids[0]),"position":target,"facing":0.0}).ok,"親の行を再利用しても旧部位を新しい親へ結び直さない")
+	core.step(0.05)
+	all_dead = true
+	for enemy: Dictionary in core.enemies_snapshot():
+		if ids.has(enemy.id): all_dead = all_dead and enemy.dead!=0
+	check(all_dead,"先に退場した親を参照する部位を終了する")
+	var old_part: PackedInt64Array = core.enemy_handle(int(ids[0]))
+	core.remove_enemy(int(ids[0]))
+	var made: Dictionary = bridge.command("dev_spawn_part",{"parent_id":replacement,"definition_id":types[0],"position":target+Vector2(200,0)})
+	check(made.ok and int(made.value)!=int(ids[0]) and not core.valid_enemy_handle(old_part),"部位の行の再利用で古い親子IDを失効する")
+	bridge.release_checkpoint(pending.value)
 	session.free()

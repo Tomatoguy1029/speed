@@ -2,6 +2,7 @@
 #include "entity_store.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <cstddef>
+#include <vector>
 namespace speed {
 using godot::Vector2;
 enum class EnemyMode { Move, Windup, Dash, Recover };
@@ -19,6 +20,9 @@ struct Enemy {
     bool alive = false, dead = false, elite = false, is_boss = false, hull_scattered = false;
     double guard = 0;
     speed::EnemyHandle damage_target;
+    speed::EnemyHandle parent;
+    int64_t parent_id=0;
+    std::vector<speed::EnemyHandle> parts;
     speed::RockHandle rock;
     speed::EnemyHandle pump_owner;
     double hit_cd = 0, flash = 0;

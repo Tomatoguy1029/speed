@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/systems/motion_math.h"
+#include "../cpp/systems/enemy_system.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -62,6 +63,8 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         row["held"] = int(e->held); row["slash_hold"] = int(e->slash_hold); row["shoved"] = int(e->shoved);
         row["age"] = e->age; row["fire_t"] = e->fire_t;
         if (runtime.content->definitions[e->definition].kind==speed::EnemyDefinition::Kind::Drift) row["spin"]=e->spin;
+        if (e->parent_id) {row["parent_id"]=e->parent_id;row["parent_alive"]=runtime.state.enemy_handles.contains(e->parent) && !runtime.state.enemies[e->parent.slot].dead;}
+        if (!e->parts.empty()) row["parts_alive"]=int64_t(speed::EnemySystem::parts_alive(runtime.state,runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id)))));
         row["mode"] = int(e->mode); row["timer"] = e->timer; row["charge"] = e->charge; out.append(row);
     }
     return out;
