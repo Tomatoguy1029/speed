@@ -1218,10 +1218,15 @@ func _test_cpp_stage(stage: int) -> void:
 	SaveManager.data.intro_seen = true
 	var definition: StageDef = load("res://data/stages/stage_%d.tres" % stage)
 	print("[S%d 定義] boss_enabled=%s boss_id=%s boss_start=%s time_limit=%s" % [stage,definition.boss_enabled,definition.boss_id,definition.boss_start(ContentManager.cfg),definition.time_limit])
+	if "--cpp-diagnostic-only" not in OS.get_cmdline_user_args(): await _test_cpp_natural(stage,definition)
+	if "--cpp-natural-only" not in OS.get_cmdline_user_args(): await _test_cpp_diagnostic(stage,definition)
+	print("[S%d] passed=%d failed=%d" % [stage,passed,failed])
+	get_tree().quit(1 if failed else 0)
+
+func _test_cpp_natural(stage: int, definition: StageDef) -> void:
 	var owner := await _cpp_open(stage)
 	if owner.bridge==null:
 		owner.free()
-		get_tree().quit(1)
 		return
 	var saw := {"early":false,"growth":false,"late":false,"boss":false,"fired":false,"ended":false}
 	var event_counts := {}
@@ -1230,6 +1235,7 @@ func _test_cpp_stage(stage: int) -> void:
 			var kind := str(event.type)
 			event_counts[kind] = int(event_counts.get(kind,0))+1
 			if kind=="boss_spawn": saw.boss = true
+			if kind in ["weapon_fire","barrier_hit","barrier_restore","anchor_fire","bipolar_charge","escort_deploy","escort_slash","sonic_push","sonic_impact","bolt"]: saw.fired = true
 		return true)
 	var initial: Dictionary = owner.bridge.read_frame().value
 	_check(initial.ui.cards.initial and initial.ui.run_time==0.0,"通常出撃は0秒の武器選択から始まる")
@@ -1257,7 +1263,7 @@ func _test_cpp_stage(stage: int) -> void:
 		saw.early = saw.early or frame.ui.run_time>=10.0
 		saw.growth = saw.growth or frame.ui.level>1
 		saw.late = saw.late or frame.ui.run_time>=definition.boss_start(ContentManager.cfg)-1.0
-		saw.fired = saw.fired or owner.bridge.read_metrics().value.friendly_shots>0
+		saw.fired = saw.fired or owner.bridge.read_metrics().value.friendly_shots>0 or not frame.ui.mines.items.is_empty() or not frame.ui.afterimage.echoes.is_empty()
 		if frame.result is Dictionary:
 			saw.ended = true
 			break
@@ -1268,10 +1274,12 @@ func _test_cpp_stage(stage: int) -> void:
 	_check(saw.fired,"S%d 通常取得装備が発動する" % stage)
 	owner.free()
 	await get_tree().process_frame
+
+func _test_cpp_diagnostic(stage: int, definition: StageDef) -> void:
 	# 自然通しの失敗で、独立した後半と終了の接続確認を飛ばさない。
-	owner = await _cpp_open(stage)
+	var owner := await _cpp_open(stage)
 	if owner.bridge!=null:
-		frame = owner.bridge.read_frame().value
+		var frame: Dictionary = owner.bridge.read_frame().value
 		_cpp_choose(owner,frame)
 		for i in 1000:
 			owner.cpp_choices.poll()
@@ -1297,8 +1305,6 @@ func _test_cpp_stage(stage: int) -> void:
 		_check(not definition.boss_enabled or not frame.ui.boss_bodies.is_empty() or frame.result is Dictionary,"設定済みボスの自動出現を維持する")
 		_check(frame.result is Dictionary,"時間短縮診断の終了へ接続する")
 	owner.free()
-	print("[S%d] passed=%d failed=%d" % [stage,passed,failed])
-	get_tree().quit(1 if failed else 0)
 
 func _test_cpp_entries() -> void:
 	SaveManager.data = SaveManager.default_data()
@@ -1329,6 +1335,29 @@ func _test_cpp_entries() -> void:
 			GameManager.abort_run()
 			await _settle_screen()
 			_check(GameManager.screen==GameManager.Screen.MAIN_MENU and RunManager.session(identity)==null,"ステージ%dから戻るとセッションを解放する" % stage)
+	GameManager.goto(GameManager.Screen.RESULT,false)
+	await _settle_screen()
+	app._current.get_node("%RetryButton").pressed.emit()
+	await _settle_screen()
+	var retry := app._current as RunSession
+	if retry!=null:
+		for i in 4000:
+			if retry.bridge!=null or retry.cpp_error!=OK: break
+			await get_tree().process_frame
+	_check(retry!=null and retry.bridge!=null and retry._sim==null,"結果画面の再出撃もC++だけを生成する")
+	GameManager.abort_run()
+	await _settle_screen()
+	GameManager.replay_intro()
+	await _settle_screen()
+	var introduction = app._current
+	for i in 4000:
+		if introduction.session!=null and introduction.session.bridge!=null: break
+		await get_tree().process_frame
+	_check(introduction.session!=null and introduction.session.bridge!=null and introduction.session._sim==null,"導入の画面出撃もC++だけを生成する")
+	var intro_id: int = introduction.session.id if introduction.session!=null else -1
+	GameManager.reset_to_main_menu()
+	await _settle_screen()
+	_check(RunManager.session(intro_id)==null,"導入から戻るとセッションを解放する")
 	GameManager.goto(GameManager.Screen.ENEMY_LAB)
 	await _settle_screen()
 	var laboratory = app._current.session
@@ -1342,10 +1371,6 @@ func _test_cpp_entries() -> void:
 	_check(RunManager.session(lab_id)==null,"実験場から戻るとセッションを解放する")
 	app.free()
 	await get_tree().process_frame
-	var intro := preload("res://scripts/runtime/intro_sequence.gd").new()
-	await intro.setup(self,load("res://data/visuals/intro_presentation.tres"))
-	_check(intro.bridge!=null and intro.session._sim==null,"導入の出撃もC++だけを生成する")
-	intro.dispose()
 	# タイムラインが保存した索引から途中再生する。
 	var path := "res://.content/run/stage_1.json"
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
