@@ -6,12 +6,23 @@
 #include "../bosses/centaurus/body.h"
 #include "../bosses/canis_major/body.h"
 #include "../bosses/canis_major/flames.h"
+#include "../bosses/canis_major/hound_lunge.h"
 #include "../systems/attack_system.h"
 #include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dictionary &p) {
     const auto result=[](bool ok,Variant value=Variant()){Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"boss";out["message"]=ok?"":"ボス技の命令が不正です";out["value"]=value;return out;};
     if (!runtime.api_development) return result(false);
+    if (kind=="dev_canis_lunge" || kind=="dev_cancel_canis_lunge") {
+        if (p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("action",Variant()).get_type()!=Variant::INT || int64_t(p["action"])<=0) return result(false);
+        const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=2 || body->mode>=speed::BossMode::Defeated) return result(false);
+        if (kind=="dev_cancel_canis_lunge") {if (p.size()!=2) return result(false);speed::CanisHoundLunge::end_action(runtime,*body,p["action"],true);return result(true);}
+        if (p.size()!=11 || p.get("target",Variant()).get_type()!=Variant::INT) return result(false);const auto target=runtime.state.rows_by_id.find(int64_t(p["target"]));if (target==runtime.state.rows_by_id.end()) return result(false);
+        speed::HoundLungeSettings settings;for (const char *key:{"speed","duration","damage"}) {const auto x=p.get(key,Variant());if ((x.get_type()!=Variant::FLOAT && x.get_type()!=Variant::INT) || !std::isfinite(double(x)) || double(x)<0) return result(false);}
+        for (const char *key:{"sweep","shared_hit","overwrite","release","defer"}) if (p.get(key,Variant()).get_type()!=Variant::BOOL) return result(false);
+        settings.speed=p["speed"];settings.duration=p["duration"];settings.damage=p["damage"];settings.sweep=p["sweep"];settings.shared_hit=p["shared_hit"];settings.overwrite_velocity=p["overwrite"];settings.quiet=settings.overwrite_velocity;settings.release_on_cancel=settings.release_on_end=p["release"];settings.defer_first_contact=p["defer"];
+        const auto handle=speed::CanisHoundLunge::begin(runtime,*body,runtime.state.enemy_handles.at(target->second),p["action"],settings);const auto *record=speed::AttackSystem::get(runtime.state,handle);return result(record!=nullptr,record?record->id:0);
+    }
     if (kind=="dev_canis_flame") {
         if (p.size()!=4 || p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("definition",Variant()).get_type()!=Variant::INT || p.get("target",Variant()).get_type()!=Variant::INT || p.get("observation",Variant()).get_type()!=Variant::INT) return result(false);
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));const auto target=runtime.state.rows_by_id.find(int64_t(p["target"]));const int64_t definition=p["definition"],observation=p["observation"];if (found==runtime.state.rows_by_id.end() || definition<=0 || uint64_t(definition)>runtime.content->canis_flames.size() || observation<0) return result(false);

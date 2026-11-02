@@ -15,7 +15,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
     const int64_t cutoff=state.attacks.next_id;
     for (size_t row=0;row<state.hazards.size();++row) {
         auto &hazard=state.hazards[row];
-        if (!hazard.alive || (std::holds_alternative<MonocerosWaveHazard>(hazard.shape) || std::holds_alternative<CanisFlameHazard>(hazard.shape))) continue;const auto handle=hazard.attack;const auto *record=get(state,handle);if (!record || record->id>=cutoff) continue;
+        if (!hazard.alive || (std::holds_alternative<MonocerosWaveHazard>(hazard.shape) || std::holds_alternative<CanisFlameHazard>(hazard.shape) || std::holds_alternative<CanisHoundLungeHazard>(hazard.shape))) continue;const auto handle=hazard.attack;const auto *record=get(state,handle);if (!record || record->id>=cutoff) continue;
         const double time=double(hazard.time)+dt;hazard.time=time;
         const auto owner=record->spec.owner.live_source;
         const bool owner_ended=record->spec.owner.attached && (!state.enemy_handles.contains(owner) || state.enemies[owner.slot].dead || state.enemy_handles.contains(state.enemies[owner.slot].pump_owner));

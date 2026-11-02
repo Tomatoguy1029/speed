@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-canis-lunge" in OS.get_cmdline_user_args() or "--cpp-canis-lunge-tail" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_lunge")
+		return
 	if "--cpp-centaurus-stomp" in OS.get_cmdline_user_args() or "--cpp-centaurus-stomp-runtime" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_stomp")
 		return
@@ -1122,4 +1125,83 @@ func native_centaurus_stomp() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_stomp] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func begin_canis_lunge(c: Dictionary, target: int, action: int, changes := {}) -> Dictionary:
+	var p := {"entity_id":c.id,"target":target,"action":action,"speed":500.0,"duration":0.5,"damage":2.0,"sweep":true,"shared_hit":false,"overwrite":true,"release":true,"defer":false}
+	p.merge(changes,true)
+	return c.bridge.command("dev_canis_lunge",p)
+
+func canis_lunges(bridge) -> Array:
+	return bridge.command("dev_boss_body_state").value[0].lunges
+
+func enemy_velocity(core, id: int) -> Vector2:
+	for enemy: Dictionary in core.enemies_snapshot():
+		if enemy.id==id: return Vector2(enemy.vel[0],enemy.vel[1])
+	return Vector2(INF,INF)
+
+func native_canis_lunge() -> void:
+	var c := canis_flame_case()
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge._core.set_motion_context(Vector2(2000,0),Vector2(1000,0),Vector2(3000,2000))
+	var initial: Dictionary = bridge.checkpoint()
+	var led: Array = bridge.command("dev_boss_body_state").value[0].led
+	var target: int = led[0].id
+	var held := {}
+	if "--cpp-canis-lunge-tail" not in OS.get_cmdline_user_args():
+		bridge.command("dev_relocate",{"entity_id":target,"position":Vector2(500,0)})
+		check(begin_canis_lunge(c,target,11).ok,"共通の部品から猟犬単位の突進を始める")
+		bridge.command("dev_hound_order",{"entity_id":target,"action":"quiet","until":10.0,"velocity":Vector2(0,40)})
+		bridge._core.step(0.1)
+		var first: Dictionary = canis_lunges(bridge)[0]
+		check(first.position.is_equal_approx(Vector2(500,4)) and first.from==first.position,"通常敵の移動を終えた位置からボスの掃引を更新する")
+		check(enemy_velocity(bridge._core,target).is_equal_approx(Vector2(500,0)),"並行した移動指示の後に必要な型だけ固定速度を書き戻す")
+		held = bridge.checkpoint()
+		check(held.ok,"突進と並行指示の途中状態を保持する")
+		bridge._core.step(0.1)
+		var after: Array = canis_lunges(bridge)
+		var after_velocity := enemy_velocity(bridge._core,target)
+		check(bridge.restore(held.value).ok,"猟犬の世代・指示・前の位置・命中旗を復帰する")
+		bridge._core.step(0.1)
+		check(canis_lunges(bridge)==after and enemy_velocity(bridge._core,target)==after_velocity,"復帰後の突進と速度上書きが一致する")
+		bridge.command("dev_cancel_canis_lunge",{"entity_id":c.id,"action":11})
+		check(canis_lunges(bridge).is_empty() and not bridge._core.hound_snapshot().follows.any(func(f): return f.id==target),"猟犬単位の取消でfollowとquietの指示を解く")
+	bridge.restore(initial.value)
+	bridge.command("dev_relocate",{"entity_id":target,"position":Vector2(800,0)})
+	bridge.command("dev_ship_motion",{"position":Vector2(800,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(800,0),Vector2(800,0),Vector2(640,360))
+	for i in 2:
+		bridge.command("dev_relocate",{"entity_id":led[i].id,"position":Vector2(800,0)})
+		check(begin_canis_lunge(c,led[i].id,12,{"speed":0.0,"sweep":false,"shared_hit":true,"overwrite":false,"release":false}).ok,"号令用の点判定と行動全体の1回制限を設定する")
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.01)
+	var hits: Array = canis_lunges(bridge)
+	var scale: float = c.package.records.RunConfig[0].combat_atk_scale
+	check(hits.size()==2 and hits.all(func(h): return h.hit) and is_equal_approx(bridge._core.ship_snapshot().ship_hp,hp-2.0*scale),"複数の猟犬が同時に触れても行動全体で1回だけ当てる")
+	bridge.command("dev_hound_order",{"entity_id":target,"action":"quiet","until":10.0,"velocity":Vector2(0,40)})
+	bridge._core.step(0.01)
+	check(enemy_velocity(bridge._core,target).is_equal_approx(Vector2(0,40)),"号令用の型は毎tickの固定速度上書きを行わない")
+	bridge.command("dev_cancel_canis_lunge",{"entity_id":c.id,"action":12})
+	check(canis_lunges(bridge).is_empty() and bridge._core.hound_snapshot().follows.any(func(f): return f.id==target),"号令用の取消は当たりだけを終えfollowをその場で解除しない")
+	bridge.restore(initial.value)
+	begin_canis_lunge(c,target,13)
+	bridge.command("dev_kill",{"entity_id":target,"cause":"debug"})
+	bridge._core.step(0.01)
+	check(canis_lunges(bridge).is_empty() and not bridge.command("dev_boss_body_state").value[0].boss_dead,"猟犬が消えたらその突進だけを閉じ本体を倒さない")
+	bridge.restore(initial.value)
+	begin_canis_lunge(c,target,14,{"duration":0.1})
+	bridge._core.step(0.11)
+	check(canis_lunges(bridge).is_empty(),"突進が自然に終わったら当たりと残留所有を閉じる")
+	bridge.restore(initial.value)
+	begin_canis_lunge(c,target,15)
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(canis_lunges(bridge).is_empty(),"本体取消で並行中の猟犬突進もBossClearする")
+	for hold in [initial,held]:
+		if not hold.is_empty(): bridge.release_checkpoint(hold.value)
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"突進の命中と終了を共通の通知配信へ渡す")
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_lunge] failures=",failed)
 	get_tree().quit(1 if failed else 0)

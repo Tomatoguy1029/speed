@@ -3,6 +3,7 @@
 #include "../centaurus/body.h"
 #include "../canis_major/body.h"
 #include "../canis_major/flames.h"
+#include "../canis_major/hound_lunge.h"
 #include "../monoceros/horn_wave.h"
 #include "flow_runner.h"
 #include "technique_runner.h"
@@ -97,7 +98,7 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
 }
 godot::Array PhaseController::snapshot(const RunRuntime &r) {
     godot::Array out;for (const auto &b:r.state.bosses.bodies) {godot::Dictionary p;p["id"]=b.id;p["definition"]=b.definition;p["actor"]=r.state.enemy_handles.entity_id(b.actor);p["mode"]=int(b.mode);p["phase"]=b.phase;p["pending"]=b.phase_pending;p["clock"]=b.clock;p["initial_wait"]=b.initial_wait;p["phase_remaining"]=b.phase_remaining;p["final_elapsed"]=b.final_elapsed;p["final_landed"]=b.final_landed;p["final_to"]=b.final_to;p["final_width"]=b.final_width;p["boss_spawned"]=r.state.world.boss_spawned;p["boss_dead"]=r.state.boss_dead;
-        const auto &definition=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1];p["kind"]=int(definition.kind);if (definition.kind==2) {CanisMajorBody::snapshot(r,b,p);p["flames"]=CanisFlames::snapshot(r,b);}p["phase_progress"]=b.phase>=2?(b.mode==BossMode::Phase?1.0-b.phase_remaining/std::max(0.001,r.content->boss_bodies[b.definition-1].phase_time):1.0):0.0;
+        const auto &definition=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1];p["kind"]=int(definition.kind);if (definition.kind==2) {CanisMajorBody::snapshot(r,b,p);p["flames"]=CanisFlames::snapshot(r,b);p["lunges"]=CanisHoundLunge::snapshot(r,b);}p["phase_progress"]=b.phase>=2?(b.mode==BossMode::Phase?1.0-b.phase_remaining/std::max(0.001,r.content->boss_bodies[b.definition-1].phase_time):1.0):0.0;
         godot::Array participants;for (const auto &part:b.participants) {godot::Dictionary v;v["id"]=part.id;v["health_target"]=part.id;v["is_body"]=part.is_body;v["active"]=part.active;participants.push_back(v);}p["participants"]=participants;
         if (definition.kind==1) {const auto &v=b.centaurus;p["guard_point"]=v.guard_point;p["has_guard_point"]=v.has_guard_point;p["guard_scan"]=v.guard_scan;p["guard_refill"]=v.guard_refill;p["path_hold"]=v.path_hold;p["turn_motion"]=v.turn_motion;p["leaping"]=v.leaping;p["leap_elapsed"]=v.leap_elapsed;godot::Array guards;for (const auto &g:v.guards) {godot::Dictionary q;q["id"]=r.state.enemy_handles.entity_id(g.actor);q["scale"]=g.scale;q["phase"]=g.phase;guards.push_back(q);}p["guards"]=guards;}
         if (r.state.enemy_handles.contains(b.actor)) {const auto &e=r.state.enemies[b.actor.slot];p["velocity"]=e.vel;p["flash"]=e.flash;p["horn_length"]=e.radius*(definition.horn_length_ratio+(definition.horn_length_ratio_p2-definition.horn_length_ratio)*double(p["phase_progress"]));p["position"]=e.pos;p["facing"]=e.facing;p["radius"]=e.radius;p["hp"]=e.hp;p["max_hp"]=e.max_hp;p["charge"]=e.charge;p["horn_waves"]=MonocerosHornWave::waves(r,b.actor);godot::PackedVector2Array slash;if (b.has_slash) {slash.push_back(b.slash_from);slash.push_back(b.slash_to);}p["last_slash"]=slash;}out.push_back(p);

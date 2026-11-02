@@ -29,6 +29,13 @@ struct CanisFlameHazard {
     EnemyHandle target;
     AttackHandle jet,trail;
 };
+struct CanisHoundLungeHazard {
+    EnemyHandle actor;
+    godot::Vector2 previous,velocity;
+    int64_t action=0;
+    double until=0,last_world_time=-1;
+    bool sweep=true,shared_hit=false,overwrite_velocity=true,release_on_cancel=true,release_on_end=true,defer_first_contact=false;
+};
 struct HazardState {
     godot::Vector2 pos;
     float time=0,delay=0,duration=0;
@@ -38,6 +45,6 @@ struct HazardState {
     uint32_t zone_definition=0;
     double enemy_damage=0;
     bool alive=true,hit=false;
-    std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard,MonocerosWaveHazard,CanisFlameHazard> shape=CircleHazard{};
+    std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard,MonocerosWaveHazard,CanisFlameHazard,CanisHoundLungeHazard> shape=CircleHazard{};
 };
 }

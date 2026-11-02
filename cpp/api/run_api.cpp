@@ -314,7 +314,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_fire_enemy" || kind=="dev_fire_missile" || kind=="dev_stone_hostiles") response=development_hostile_command(kind,payload);
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
     else if (kind=="dev_defender_boost" || kind=="dev_defender_clear_boost" || kind=="dev_spawn_comet" || kind=="dev_comet_state" || kind=="dev_spawn_warp" || kind=="dev_set_warp" || kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
-    else if (kind=="dev_canis_flame" || kind=="dev_boss_technique" || kind=="dev_boss_state" || kind=="dev_cancel_technique" || kind=="dev_boss_flow" || kind=="dev_boss_flow_state" || kind=="dev_cancel_flow" || kind=="dev_spawn_boss" || kind=="dev_boss_body_state" || kind=="dev_cancel_boss" || kind=="dev_boss_final") response=development_boss_command(kind,payload);
+    else if (kind=="dev_canis_lunge" || kind=="dev_cancel_canis_lunge" || kind=="dev_canis_flame" || kind=="dev_boss_technique" || kind=="dev_boss_state" || kind=="dev_cancel_technique" || kind=="dev_boss_flow" || kind=="dev_boss_flow_state" || kind=="dev_cancel_flow" || kind=="dev_spawn_boss" || kind=="dev_boss_body_state" || kind=="dev_cancel_boss" || kind=="dev_boss_final") response=development_boss_command(kind,payload);
     else if (kind=="dev_contact") response=development_contact_command(payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);

@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <unordered_map>
+#include <unordered_set>
 namespace speed {
 enum class TechniqueStage : uint8_t { Windup,Active,Recovery,Stuck,Extract,Finished,Failed,Cancelled };
 enum class TechniqueCommand : uint8_t { LockAim,LaunchStrike,EndStrike,ReleaseArrow,FinishVolley,StrikeRear,BeginRain,AlertPower };
@@ -100,6 +101,7 @@ struct CanisHoundRef {EnemyHandle actor;double base_hp=0;godot::Color color;};
 struct CanisBodyState {
     bool pack_spawned=false,barking=false,calling=false;
     double call_left=0,call_ready_at=0,lead_scan=0,turn_motion=0;
+    std::unordered_set<int64_t> lunge_hits;
     std::vector<CanisHoundRef> led;
     std::vector<EnemyHandle> lunging;
 };

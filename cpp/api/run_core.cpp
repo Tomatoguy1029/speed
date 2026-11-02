@@ -1,5 +1,6 @@
 #include "../bosses/canis_major/body.h"
 #include "../bosses/canis_major/flames.h"
+#include "../bosses/canis_major/hound_lunge.h"
 #include "run_core.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
@@ -206,16 +207,6 @@ bool SpeedRunCore::step(double delta) {
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
-    if (runtime.state.heroes.boss_stun>0) {
-        const double real_dt=runtime.state.control.last_world_real_dt>0?runtime.state.control.last_world_real_dt:delta;
-        runtime.state.heroes.boss_stun=std::max(0.0,runtime.state.heroes.boss_stun-real_dt);
-        for (const auto &body:runtime.state.bosses.bodies) if (runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) runtime.state.enemies[body.actor.slot].vel=Vector2();
-    } else {
-        speed::MonocerosHornWave::advance_waves(runtime,delta);
-        speed::PhaseController::step(runtime,delta);
-        speed::FlowRunner::step(runtime,delta);
-        for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisMajorBody::lead(runtime,body,delta);if (body.mode!=speed::BossMode::Final) speed::CanisFlames::step(runtime,body,delta);}
-    }
     capture_avoidance();
     ++runtime.state.ticks;
     if (runtime.state.aim_ready && !runtime.state.draw.tracing) {
@@ -335,6 +326,16 @@ void SpeedRunCore::advance_enemies(double delta) {
     if (!runtime.content->pumps.empty()) speed::PumpBehavior::after_tick(runtime);
     speed::CoronaVortex::tick(runtime,delta,coronas);
     speed::EnemySystem::flush_spawns(runtime);
+    if (runtime.state.heroes.boss_stun>0) {
+        const double real_dt=runtime.state.control.last_world_real_dt>0?runtime.state.control.last_world_real_dt:delta;
+        runtime.state.heroes.boss_stun-=real_dt;
+        for (const auto &body:runtime.state.bosses.bodies) if (runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) runtime.state.enemies[body.actor.slot].vel=Vector2();
+    } else {
+        speed::MonocerosHornWave::advance_waves(runtime,delta);
+        speed::PhaseController::step(runtime,delta);
+        speed::FlowRunner::step(runtime,delta);
+        for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);if (body.mode!=speed::BossMode::Final) speed::CanisFlames::step(runtime,body,delta);}
+    }
 }
 
 void SpeedRunCore::close() {
