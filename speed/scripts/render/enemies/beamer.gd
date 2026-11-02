@@ -1,18 +1,11 @@
 ## ビームの敵の見た目。
 extends EnemyVisual
-
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super(render, behavior_name)
-	always_marked = true
-
-## ビームの敵：構えると、周りの光の粒が砲口へ吸い込まれて集まり、撃つ瞬間に砲口が白く光る。
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	draw_warning(c,t.pos[i],t.r[i],t.facing[i],t.mode[i],t.charge[i],t.color[i],_px(1.0))
+const EnemyMode := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.EnemyModeId
 
 static func draw_warning(c: CanvasItem, p: Vector2, r: float, angle: float, mode: int, k: float, color: Color, pixel: float) -> void:
 	var muzzle := p + Vector2.from_angle(angle) * r * 0.9
 	var col := color.lightened(0.35)
-	if mode != EnemyTable.Mode.WINDUP:
+	if mode != EnemyMode.Windup:
 		c.draw_circle(muzzle, maxf(pixel*1.5, r * 0.1), Color(col, 0.6))
 		return
 	if k < 1.0:

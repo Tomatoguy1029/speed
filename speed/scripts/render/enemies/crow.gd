@@ -3,19 +3,6 @@ extends EnemyVisual
 
 const CARGO_COLOR := Color("#b8a0ff")
 
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super(render, behavior_name)
-	always_marked = true
-
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	super(c, t, i)
-	if t.carry[i] > 0.0:
-		_draw_crow_bundle(c, t, i)
-
-## からす座が足に抱えた経験値の結晶の束（尾の側の足元）。運んでいる量が多いほど大きく、明るく光る。
-func _draw_crow_bundle(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	draw_bundle(c,t.pos[i],t.r[i],t.facing[i],t.carry[i],t.buds[i],state.world_time,_px(1.0))
-
 static func draw_bundle(c: CanvasItem,p: Vector2,r: float,facing: float,carry: float,buds: int,now: float,pixel: float) -> void:
 	var n := clampi(buds, 1, 12)
 	var amount := clampf(sqrt(carry) / 8.0, 0.0, 1.0)

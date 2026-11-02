@@ -1,9 +1,6 @@
 ## 射撃型の予告。通常表示とC++の表示用の値で同じ砲口の光を使う。
 extends EnemyVisual
 
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	draw_warning(c,t.pos[i],t.facing[i],t.r[i],t.charge[i],_px(1.0))
-
 static func draw_warning(c: CanvasItem, position: Vector2, angle: float, radius: float, charge: float, pixel: float) -> void:
 	if charge<=0.0: return
 	var muzzle := position+Vector2.from_angle(angle)*radius

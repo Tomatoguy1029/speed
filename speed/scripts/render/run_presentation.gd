@@ -1,6 +1,7 @@
 ## C++の出力と資源一覧だけを読み、画面・音・HUDへ渡す。
 class_name RunPresentation
 extends Node
+const PickupKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.PickupKind
 
 const MAGNET_COLOR := Color("#b8a0ff")
 const COIN_COLOR := Color("#ffd24a")
@@ -54,16 +55,16 @@ static func draw_gravity(c: CanvasItem, position: Vector2, born: float, life: fl
 
 static func draw_capsule_values(c: CanvasItem, at: Vector2, kind: int, now: float) -> void:
 	match kind:
-		Pickup.Kind.HEAL:
+		PickupKind.Heal:
 			c.draw_rect(Rect2(at-Vector2(14,11),Vector2(28,22)),Color.WHITE)
 			c.draw_rect(Rect2(at-Vector2(3,8),Vector2(6,16)),Color("#e8434f"))
 			c.draw_rect(Rect2(at-Vector2(8,3),Vector2(16,6)),Color("#e8434f"))
-		Pickup.Kind.COMET_WEAPON:
+		PickupKind.CometWeapon:
 			var pulse := 0.5+0.5*sin(now*5.0)
 			c.draw_circle(at,30.0+pulse*6.0,Color(1.0,0.75,0.25,0.25))
 			c.draw_colored_polygon(PackedVector2Array([at+Vector2(0,-22),at+Vector2(18,0),at+Vector2(0,22),at+Vector2(-18,0)]),Color("#efcb70"))
 			c.draw_circle(at,7.0,Color("#fff1bf"))
-		Pickup.Kind.MAGNET:
+		PickupKind.Magnet:
 			c.draw_arc(at,14.0,PI,TAU,16,MAGNET_COLOR,6.0)
 			c.draw_rect(Rect2(at+Vector2(-17,0),Vector2(6,10)),Color.WHITE)
 			c.draw_rect(Rect2(at+Vector2(11,0),Vector2(6,10)),Color.WHITE)

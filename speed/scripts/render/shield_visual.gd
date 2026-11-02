@@ -28,27 +28,6 @@ static func plate(c: CanvasItem, p: Vector2, facing: float, r: float, arc: float
 	var u := Vector2.from_angle(facing)
 	c.draw_circle(p + u * r * 0.95, r * 0.12, Color.WHITE if flash > 0.0 else GUARD)
 
-static func enemy(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	plate(c, t.pos[i], t.facing[i], t.r[i], float(t.def[i].params.front_arc), minf(1.0, t.flash[i] * 10.0))
-
-static func equipped(c: CanvasItem, render: RunPresentation, ship_radius: float, scale: float, visual_pos := Vector2.INF) -> void:
-	var state := render.state
-	var values := {"remaining":state.ship_shield_t,"position":state.ship_pos if visual_pos==Vector2.INF else visual_pos,
-		"angle":state.ship_heading.angle(),"clock":state.world_time,"ship_radius":ship_radius,"scale":scale,
-		"layer":(render._lit_enemy_marks.get_parent() as CanvasLayer).layer+1}
-	if state.ship_shield_t>0.0:
-		var source := render.shield_source_type
-		render._ensure_enemy_batch(source)
-		var definition := render.run.enemies.def_of(source)
-		var painted := render._armor_batches[source].texture as CanvasTexture
-		var material := render._armor_batches[source].material as ShaderMaterial
-		values.paint = painted.diffuse_texture
-		values.settings = {}
-		for key in ["brightness","ambient","normal_strength"]: values.settings[key] = material.get_shader_parameter(key)
-		for key in ["key_energy","fill_energy","key_angle","fill_angle","height"]: values.settings[key] = definition.visual_value(key,render.lighting_settings.get(key))
-	equipped_frame(c,values)
-
-## 生成済みの塗装・照明と表示用の値だけで、機体の盾を描く。
 static func equipped_frame(c: CanvasItem, values: Dictionary) -> void:
 	var scale: float = values.scale
 	var ship_radius: float = values.ship_radius

@@ -1,5 +1,6 @@
 ## 停止→キラン→直進。停止時に固定した進路を、画面外からの進入も含めて示す。
 extends EnemyVisual
+const EnemyMode := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.EnemyModeId
 
 const WARNING_SHADER := preload("res://shaders/marlin_warning.gdshader")
 const THRUST_SHADER := preload("res://shaders/marlin_thrust.gdshader")
@@ -13,10 +14,6 @@ var _warning_count := 0
 var _thrust_mesh: ArrayMesh
 var _thrusts: Array[MeshInstance2D] = []
 var _thrust_count := 0
-
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super.setup(render, behavior_name)
-	_prepare_meshes()
 
 var _frame_parent: CanvasItem
 
@@ -46,45 +43,8 @@ func _prepare_meshes() -> void:
 	_thrust_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
 ## 本体の可視判定とは独立して描く。装甲付きの外観でも予告を省略しない。
-func draw_marks(_c: CanvasItem, _t: EnemyTable, _i: int) -> void:
-	pass
-
-func draw_layer(c: CanvasItem, _view: Rect2) -> void:
-	_warning_count = 0
-	_thrust_count = 0
-	if state.cinematic_hide_enemies:
-		_hide_unused_warnings()
-		_hide_unused_thrusts()
-		return
-	var t := run.enemies.table
-	var view := rm.view_rect().grow(-_px(48.0))
-	for i in behavior.rows():
-		if t.dead[i] != 0 or t.held[i] != 0 or t.stone[i] > 0.0:
-			continue
-		if t.mode[i] == EnemyTable.Mode.DASH:
-			if _view.grow(sprite_radius(t, i) * 4.0).has_point(t.pos[i]): _draw_thrust(t, i)
-			continue
-		if t.mode[i] != EnemyTable.Mode.WINDUP: continue
-		var dir := Vector2.from_angle(t.facing[i])
-		var from := t.pos[i] + dir * t.r[i]
-		var p: Dictionary = t.def[i].params
-		var to := t.pos[i] + dir * float(p.dash_speed) * float(p.dash_time)
-		var terrain_hit = run.field.first_body_hit(t.pos[i], to, t.r[i])
-		if terrain_hit != null:
-			to = t.pos[i].lerp(to, float(terrain_hit.t))
-		var path := clip_warning(from, to, view)
-		if path.is_empty(): continue
-		_draw_warning(c, path[0], path[1], from, to, t.charge[i], t.id[i])
-	_hide_unused_warnings()
-	_hide_unused_thrusts()
-
 func _hide_unused_thrusts() -> void:
 	for n in range(_thrust_count, _thrusts.size()): _thrusts[n].visible = false
-
-func _draw_thrust(t: EnemyTable, i: int) -> void:
-	var scale_px := sprite_radius(t,i)/32.0
-	var angle := rm._enemy_sprite_angle(t.type[i],t.facing[i])
-	_draw_thrust_values(rm._lit_enemy_marks,t.pos[i]+(HORN_OFFSET*scale_px).rotated(angle),angle,scale_px,maxf(0.0,float(t.def[i].params.dash_time)-t.timer[i]),t.timer[i])
 
 func _draw_thrust_values(parent: CanvasItem, position: Vector2, angle: float, scale_px: float, elapsed: float, remaining: float) -> void:
 	if _thrust_count==_thrusts.size():
@@ -127,9 +87,6 @@ static func clip_warning(from: Vector2, to: Vector2, view: Rect2) -> PackedVecto
 	return PackedVector2Array([from.lerp(to, enter), from.lerp(to, leave)])
 
 ## 予兆の同時表示数だけ表示ノードを確保し、メッシュ・マテリアルを次の予兆でも再利用する。
-func _draw_warning(c: CanvasItem, from: Vector2, to: Vector2, origin: Vector2, end: Vector2, charge: float, id: int) -> void:
-	_draw_warning_values(c,from,to,origin,end,charge,id,_px(maxf(1.0,rm.get_viewport().get_visible_rect().size.y/REFERENCE_HEIGHT)),state.world_time)
-
 func _draw_warning_values(c: CanvasItem, from: Vector2, to: Vector2, origin: Vector2, end: Vector2, charge: float, id: int, pixel: float, world_time: float) -> void:
 	var distance := from.distance_to(to)
 	if distance <= 0.001: return
@@ -169,11 +126,11 @@ func apply_frame(data: Dictionary, world_time: float, zoom: float) -> void:
 		var n := row*14
 		var position := Vector2(values[n],values[n+1])
 		var mode := int(values[n+6])
-		if mode==EnemyTable.Mode.DASH:
+		if mode==EnemyMode.Dash:
 			if data.view.grow(values[n+4]*4.0).has_point(position):
 				var scale_px := values[n+4]/32.0
 				_draw_thrust_values(_frame_parent,position+(HORN_OFFSET*scale_px).rotated(values[n+5]),values[n+5],scale_px,maxf(0.0,values[n+9]-values[n+8]),values[n+8])
-		elif mode==EnemyTable.Mode.WINDUP:
+		elif mode==EnemyMode.Windup:
 			var origin := Vector2(values[n+10],values[n+11])
 			var end := Vector2(values[n+12],values[n+13])
 			var path := clip_warning(origin,end,view)

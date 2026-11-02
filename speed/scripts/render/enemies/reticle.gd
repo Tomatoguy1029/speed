@@ -1,16 +1,6 @@
 ## レチクル座の見た目。
 extends EnemyVisual
 
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super(render, behavior_name)
-	always_marked = true
-
-## レチクル座：狙っている岩の周りに照準の四隅が縮みながら回り込み、本体から岩へ細い照準線が伸びる。
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var rock := t.target[i]
-	var valid := t.mode[i]==EnemyTable.Mode.WINDUP and run.enemies.is_same(rock,t.target_id[i])
-	draw_view(c,t.pos[i],t.r[i],t.facing[i],t.charge[i],t.color[i].lightened(0.2),valid,t.pos[rock] if valid else Vector2.ZERO,t.r[rock] if valid else 0.0,_px(1.0))
-
 static func draw_frame(c: CanvasItem, values: PackedFloat32Array, pixel: float) -> void:
 	for n in range(0,values.size(),12): draw_view(c,Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],Color(values[n+5],values[n+6],values[n+7]),values[n+8]>0,Vector2(values[n+9],values[n+10]),values[n+11],pixel)
 

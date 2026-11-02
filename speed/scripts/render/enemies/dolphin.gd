@@ -1,16 +1,6 @@
 ## いるか座の見た目。
 extends EnemyVisual
 
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super(render, behavior_name)
-	always_marked = true
-
-## いるか座：構えている間、撃つ向きへ扇の輪郭と数層の弧が伸びていき、撃つ向きを予告する。
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		return
-	draw_view(c,t.pos[i],t.r[i],t.charge[i],t.facing[i],float(t.def[i].params.wave_arc),_px(1.0))
-
 static func draw_frame(c: CanvasItem, values: PackedFloat32Array, pixel: float) -> void:
 	for n in range(0,values.size(),6): draw_view(c,Vector2(values[n],values[n+1]),values[n+2],values[n+4],values[n+3],values[n+5],pixel)
 

@@ -1,5 +1,6 @@
 ## ミラージュの本体と、実際に通った位置へ残す市松の残光をまとめて描く。
 extends Node2D
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 const SHIP := preload("res://assets/pixel/airship.png")
 const SHADER := preload("res://shaders/afterimage.gdshader")
 const SETTINGS := preload("res://data/visuals/effect_settings.tres")
@@ -21,9 +22,6 @@ func _batch(ghost: bool) -> InstanceBatch:
 	batch.material = mat
 	add_child(batch)
 	return batch
-func step(dt: float, state: RunState, cfg: GameConfig, weapon) -> void:
-	if state.phase!=RunState.Phase.PLAY or state.hitstop>0.0: dt=0.0
-	step_frame(dt,cfg.character_scale,weapon.echoes if weapon!=null else [])
 func step_frame(dt: float, character_scale: float, echoes: Array) -> void:
 	_clock+=dt
 	var duration := 0.3 * SETTINGS.number("weapon/afterimage","duration_scale",1.0)

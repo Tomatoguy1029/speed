@@ -1,5 +1,6 @@
 ## 捕捉と投擲の値だけを、冠の輪・予告・尾へ変換する。
 extends RefCounted
+const EnemyMode := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.EnemyModeId
 const ATTACK := Color("#ff3b3b")
 const CORE := Color("#ffb36b")
 static func draw_frame(c: CanvasItem, owners: PackedFloat64Array, members: PackedFloat64Array) -> void:
@@ -8,7 +9,7 @@ static func draw_frame(c: CanvasItem, owners: PackedFloat64Array, members: Packe
 		for k in 3:
 			var angle := owners[i+3]+k*TAU/3.0
 			c.draw_arc(at,owners[i+2]*(0.72+k*0.14),angle,angle+1.8,20,Color("#b6a2db",0.3),3.0,true)
-		if int(owners[i+5])==EnemyTable.Mode.WINDUP:
+		if int(owners[i+5])==EnemyMode.Windup:
 			c.draw_arc(at,owners[i+4]*1.2,-PI/2.0,-PI/2.0+maxf(0.02,owners[i+6])*TAU,32,ATTACK,4.0,true)
 	for i in range(0,members.size(),10):
 		var at := Vector2(members[i],members[i+1])

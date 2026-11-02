@@ -1,17 +1,6 @@
 ## ぼうえんきょう座の見た目。
 extends EnemyVisual
-
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super(render, behavior_name)
-	always_marked = true
-
-## ぼうえんきょう座：レンズから伸びるサーチライトの帯。狙いが溜まるほど細く赤くなり、本体の周りの輪が狙いの溜まり具合を示す。
-## 光は隕石・惑星・月で遮られ、その裏には描かない（光線の束の届く長さで形を作る）。
-## 機体が光の中にいる間は帯が明るくなる。撃ったあとの休みの間は暗い。
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	if not behavior.telescope_aiming(i):
-		return
-	draw_view(c,t.pos[i],t.r[i],t.facing[i],t.mode[i],t.charge[i],t.timer[i],float(t.def[i].params.laser_charge),behavior.telescope_half(i),float(t.def[i].params.band_len),behavior.telescope_rays(i),behavior.telescope_sight(i,state.ship_pos)==1,state.world_time,_px(1.0))
+const EnemyMode := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.EnemyModeId
 
 static func draw_frame(c: CanvasItem, values: PackedFloat32Array, world_time: float, pixel: float) -> void:
 	for i in range(0,values.size(),59):
@@ -20,7 +9,7 @@ static func draw_frame(c: CanvasItem, values: PackedFloat32Array, world_time: fl
 static func draw_view(c: CanvasItem, p: Vector2, r: float, f: float, mode: int, k: float, timer: float, laser_charge: float, half: float, length: float, rays: PackedFloat32Array, seen: bool, world_time: float, pixel: float) -> void:
 	var lens := p+Vector2.from_angle(f)*r*0.9
 	var col := Color(0.62,0.9,1.0).lerp(Color(1.0,0.22,0.2),k)
-	var resting := mode==EnemyTable.Mode.RECOVER
+	var resting := mode==EnemyMode.Recover
 	var a0 := (0.06 if resting else 0.16+0.22*k)+(0.08 if seen else 0.0)
 	var count := rays.size()
 	if count<2: return
@@ -30,7 +19,7 @@ static func draw_view(c: CanvasItem, p: Vector2, r: float, f: float, mode: int, 
 		var reach := rays[n]
 		pts.append(lens+Vector2.from_angle(f-half+2.0*half*n/float(count-1))*reach)
 		cols.append(Color(col,a0*(1.0-reach/length)))
-	if mode==EnemyTable.Mode.WINDUP:
+	if mode==EnemyMode.Windup:
 		var w := 1.0-clampf(timer/laser_charge,0.0,1.0)
 		var reach := lerpf(rays[23],rays[24],0.5)
 		var pulse := 0.5+0.5*sin(world_time*(30.0+40.0*w))

@@ -1,14 +1,6 @@
 ## やまねこ座の見た目。
 extends EnemyVisual
 
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super(render, behavior_name)
-	always_marked = true
-
-## やまねこ座：構えると、次に斬撃を伸ばす側の前足に、爪痕の光が強まる。
-func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	draw_view(c,t.pos[i],t.r[i],t.facing[i],t.charge[i],behavior.lynx_side(i),_px(1.0))
-
 static func draw_frame(c: CanvasItem, values: PackedFloat32Array, pixel: float) -> void:
 	for n in range(0,values.size(),6): draw_view(c,Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],values[n+5],pixel)
 
