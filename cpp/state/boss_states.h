@@ -217,13 +217,13 @@ struct HydraNeckState {
     godot::Vector2 aim_target,free_pos,velocity,strike_from,strike_pos,target;
     double look_angle=0,elapsed=0,glow=0,turn=0,hit_left=0,sweep=0;
     AttackHandle emission;
-    uint32_t normal=0,normal_phase=0;
+    uint32_t normal=0,normal_phase=0,step=0;
     bool locked=false,extension=false,lunge_done=false;
     std::vector<godot::Vector2> trail;
     double weights[6]={};
     std::vector<godot::Vector2> points;
 };
-struct HydraBodyState {HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
+struct HydraBodyState {HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false,attack_field_advance=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
     HydraBodyState hydra;
     DracoBodyState draco;

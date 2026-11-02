@@ -210,6 +210,7 @@ bool SpeedRunCore::step(double delta) {
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
+    for (auto &body:runtime.state.bosses.bodies) body.hydra.attack_field_advance=false;
     capture_avoidance();
     ++runtime.state.ticks;
     if (runtime.state.aim_ready && !runtime.state.draw.tracing) {

@@ -8,6 +8,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-blades-origin" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_blades_origin")
+		return
+	if "--cpp-hydra-blades" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_blades")
+		return
 	if "--cpp-hydra-fixed-retry" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_fixed_interrupt")
 		return
@@ -4405,4 +4411,132 @@ func native_canis_sirius_flame_flow() -> void:
 		bridge.dispose();c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_new_flow] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 既存の首技の正常・中断ケースを3枚の風刃と持続形状の世界時計へ接続する。
+func native_hydra_blades() -> void:
+	var edits := {"normal_charge":0.15,"blade_interval":0.08,"normal_hold":0.2,"attack_cd":0.05,"blade_size":60.0,"blade_width":40.0,"blade_speed":300.0,"blade_life":3.0,"blade_spread":1.0,"bite_dmg":7.0}
+	var move = load("res://data/bosses/hydra_moves/wind_blades.tres")
+	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"wind_blades","風刃は編集値と互換Runnerに分かれる")
+	var c := hydra_normal_case(true,{},edits,"wind_blades")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("風刃の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(body.facing+TAU/8)*400,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==68,"渦の首から共通フローが自然に風刃を選ぶ")
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[1].glow>0.9 and body.effects.is_empty(),"予告中は発光と狙いの動きだけを出す")
+	bridge._core.step(0.011);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="wind_blade" and body.effects[0].points.size()==13,"発動時刻に半楕円の13点の刃を1枚放つ")
+	if body.effects.is_empty(): bridge.dispose();get_tree().quit(1);return
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	var origin: Vector2 = (effect.points[0]+effect.points[12])*0.5
+	var direction: Vector2 = (effect.points[6]-origin).normalized()
+	bridge.command("dev_ship_motion",{"position":effect.points[6]+direction*35,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step_hazards(0.2);body=bridge.command("dev_boss_body_state").value[0]
+	var expected: Dictionary = body.duplicate(true)
+	check(body.effects[0].points[6].distance_to(effect.points[6]+direction*60)<0.001,"世界時間で刃全体を等速移動させる")
+	check(held.ok and bridge.restore(held.value).ok,"13点・移動前後の点列・命中と時計を保持して戻す")
+	bridge._core.step_hazards(0.2);body=bridge.command("dev_boss_body_state").value[0]
+	check(body==expected,"復帰後も同じ移動の掃引判定になる");bridge.release_checkpoint(held.value)
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="wind_blade")
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale) and hits.size()==2 and hits[-1].payload.technique==&"wind_blades" and hits[-1].payload.source==&"hydra","掃引した折れ線が実HPへ一度倍率を掛け、風刃・技・所有元を記録する")
+	bridge._core.step_hazards(0.0);check(bridge.command("dev_boss_body_state").value[0]==body,"世界dt0では点列と時計を止める")
+	bridge._core.step(0.081);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==2 and ((body.effects[1].points[0]+body.effects[1].points[12])*0.5).distance_to(origin)<0.001,"間隔ごとに1枚だけ放ち、分離前は開始位置を固定する")
+	bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==3 and body.effects.all(func(e): return e.points.size()==13),"最後の間隔で3枚目を放つ")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"風刃の正式shot_visualへ13点の形を渡す")
+	await get_tree().process_frame
+	bridge._core.step(0.22);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[1].mode=="idle" and body.effects.size()==3,"自然終了でも発射した3枚の刃を残す")
+	var first_id: int = actions[0].id
+	bridge.command("dev_ship_motion",{"position":body.necks[1].position+Vector2.from_angle(body.facing+TAU/8)*400,"velocity":Vector2.ZERO})
+	for tick in 20: bridge._core.step(0.025)
+	check(bridge.command("dev_boss_state").value.any(func(t): return t.kind==68 and t.id>first_id),"首の待ち後に次の風刃を選ぶ")
+	bridge.command("dev_cancel_flow",{"entity_id":c.id});body=bridge.command("dev_boss_body_state").value[0]
+	var count: int = body.effects.size()
+	check(count>=3,"技の取消でも放った刃を残す")
+	bridge.command("dev_damage",{"entity_id":body.necks[1].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[1].alive and body.effects.size()==count and not body.boss_dead,"参加首の消失でも刃を寿命まで残す")
+	bridge._core.step_hazards(3.1);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty(),"刃の寿命で点列と残留所有を回収する")
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	bridge._core.set_attack_formation_mode(true)
+	body=bridge.command("dev_boss_body_state").value[0]
+	if body.necks[1].cd>0: bridge._core.step(body.necks[1].cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*400,"velocity":Vector2.ZERO})
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1})
+	check(started.ok,"分離後も同じ風刃の実装を開始する")
+	if not started.ok: bridge.dispose();get_tree().quit(1);return
+	events.clear();bridge._core.step(0.16);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and ((body.effects[0].points[0]+body.effects[0].points[12])*0.5).distance_to(body.necks[1].position)<0.001,"分離後の1枚目は今の頭から放つ")
+	bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==2 and ((body.effects[1].points[0]+body.effects[1].points[12])*0.5).distance_to(body.necks[1].position)<0.001,"分離後の2枚目も動いた頭を起点にする")
+	bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==3 and body.necks[1].normal_phase==2,"分離後は3枚目を出す時点でholdへ入り刃は残る")
+	check(events.filter(func(e): return e.type=="hydra_cue" and e.payload.cue=="attack_started" and e.payload.technique=="wind_blades").size()==1,"分離後の開始cueは3枚で1回だけ出す")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"本体取消では風刃も全て消す")
+	view.queue_free();bridge.dispose();await get_tree().process_frame
+	# 同じ持続形状は、Sourceの成長中の早期returnでは時計も止まる。
+	c=hydra_regrow_case(false,{},edits,"wind_blades");bridge=c.bridge
+	bridge._core.set_attack_formation_mode(true);bridge._core.set_motion_context(Vector2(1600,0),Vector2.ZERO,Vector2(2500,1800));bridge._core.step(4.0)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(body.facing+TAU/3)*400,"velocity":Vector2.ZERO})
+	started=bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1});check(started.ok,"成長前の3首の風刃を開始する")
+	if started.ok:
+		bridge._core.step(0.16);body=bridge.command("dev_boss_body_state").value[0]
+		var prior: Dictionary = body.effects[0].duplicate(true)
+		bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp*(1.0-c.package.records.HydraRegrowDefinition[0].growth_first+0.01),"cause":"shot"})
+		bridge._core.step(0.01);bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
+		check(body.growth_left>0 and body.effects.size()==1 and body.effects[0]==prior,"成長中の早期returnでは発射済みの刃の点列と時計を止める")
+		bridge._core.step(0.11);bridge._core.step(0.01);bridge._core.step_hazards(0.01);body=bridge.command("dev_boss_body_state").value[0]
+		check(body.effects.size()==1 and is_equal_approx(body.effects[0].age,0.01),"成長後の通常更新から同じ世界時計を再開する")
+	bridge.dispose()
+	print("[cpp_hydra_blades] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 未成立だった分離後の起点だけを、空き行再利用がある実経路で確認する。
+func native_hydra_blades_origin() -> void:
+	var c := hydra_normal_case(false,{}, {"normal_charge":0.15,"blade_interval":0.08,"normal_hold":0.2,"attack_cd":0.05,"blade_size":60.0,"blade_width":40.0,"blade_speed":300.0,"blade_life":3.0,"blade_spread":1.0,"bite_dmg":7.0},"wind_blades")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_attack_formation_mode(true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(body.facing+TAU/8)*400,"velocity":Vector2.ZERO})
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1})
+	if not started.ok: print("開始前: ",head," 開始結果: ",started);bridge.dispose();get_tree().quit(1);return
+	bridge._core.step(0.16);bridge._core.step(0.08);bridge._core.step(0.08)
+	bridge.command("dev_cancel_technique",{"ticket":started.value});bridge._core.step_hazards(3.1)
+	body=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	body=bridge.command("dev_boss_body_state").value[0]
+	if body.necks[1].cd>0: bridge._core.step(body.necks[1].cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*400,"velocity":Vector2.ZERO})
+	started=bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1})
+	if not started.ok: print("分離後: ",head," 開始結果: ",started);bridge.dispose();get_tree().quit(1);return
+	bridge._core.step(0.16);bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==2 and body.effects[0].id<body.effects[1].id and ((body.effects[1].points[0]+body.effects[1].points[12])*0.5).distance_to(body.necks[1].position)<0.001,"空き行の再利用後も2枚目を生成順に出力し、現在の頭を起点にする")
+	bridge.dispose();print("[cpp_hydra_blades_origin] failures=",failed)
 	get_tree().quit(1 if failed else 0)

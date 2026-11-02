@@ -7,20 +7,29 @@
 #include "wall.h"
 #include "zone.h"
 #include <cmath>
+#include <algorithm>
 namespace speed {
 bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
     auto &state=run.state;
     if (!state.started || state.closed || !state.ship_ready || !std::isfinite(dt) || dt<0) return false;
     if (dt==0) return true;
     const int64_t cutoff=state.attacks.next_id;
-    for (size_t row=0;row<state.hazards.size();++row) {
+    // Hydraのeffectsは生成順。空き行の再利用によって刃の順序を入れ替えない。
+    std::vector<size_t> order,hydra_positions,hydra_rows;order.reserve(state.hazards.size());
+    for (size_t row=0;row<state.hazards.size();++row) {order.push_back(row);if (state.hazards[row].alive && std::holds_alternative<HydraShapeHazard>(state.hazards[row].shape) && get(state,state.hazards[row].attack)) {hydra_positions.push_back(row);hydra_rows.push_back(row);}}
+    std::sort(hydra_rows.begin(),hydra_rows.end(),[&](size_t a,size_t b){return get(state,state.hazards[a].attack)->id<get(state,state.hazards[b].attack)->id;});
+    for (size_t i=0;i<hydra_rows.size();++i) order[hydra_positions[i]]=hydra_rows[i];
+    for (const size_t row:order) {
+        if (row>=state.hazards.size()) continue;
         auto &hazard=state.hazards[row];
         if (!hazard.alive || (std::holds_alternative<MonocerosWaveHazard>(hazard.shape) || std::holds_alternative<CanisFlameHazard>(hazard.shape) || std::holds_alternative<CanisHoundLungeHazard>(hazard.shape))) continue;const auto handle=hazard.attack;const auto *record=get(state,handle);if (!record || record->id>=cutoff) continue;
-        const double time=double(hazard.time)+dt;hazard.time=time;
+        auto *hydra=std::get_if<HydraShapeHazard>(&hazard.shape);
+        if (hydra && state.bosses.body_handles.contains(record->spec.boss) && !state.bosses.bodies[record->spec.boss.slot].hydra.attack_field_advance) continue;
+        const double time=hydra?(hydra->age+=dt):double(hazard.time)+dt,delay=hydra?hydra->delay:hazard.delay,life=hydra?hydra->life:hazard.duration;hazard.time=time;
         const auto owner=record->spec.owner.live_source;
         const bool owner_ended=record->spec.owner.attached && (!state.enemy_handles.contains(owner) || state.enemies[owner.slot].dead || state.enemy_handles.contains(state.enemies[owner.slot].pump_owner));
-        if (time>=double(hazard.delay)+double(hazard.duration) || owner_ended) {end(state,handle,owner_ended?AttackEndReason::ParticipantEnd:AttackEndReason::Lifetime);EventBuilder::flush_combat(run);continue;}
-        if (time>=hazard.delay && std::holds_alternative<WaveHazard>(hazard.shape)) {
+        if (time>=delay+life || owner_ended) {end(state,handle,owner_ended?AttackEndReason::ParticipantEnd:AttackEndReason::Lifetime);EventBuilder::flush_combat(run);continue;}
+        if (time>=delay && std::holds_alternative<WaveHazard>(hazard.shape)) {
             if (owner.generation && std::get<WaveHazard>(hazard.shape).style==uint32_t(WaveStyle::Pulser)) {
                 auto &spec=state.attacks.records[handle.slot].spec;spec.owner.live_source={};spec.owner.attached=false;
                 spec.policies&=~policy(EndPolicy::CancelWithParticipant);
@@ -28,11 +37,11 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
             if (!WaveSystem::act(run,handle,dt)) return true;
             EventBuilder::flush_combat(run);
         }
-        if (auto *shape=std::get_if<HydraShapeHazard>(&state.hazards[row].shape)) {shape->before=shape->last_points.empty()?shape->points:shape->last_points;if (time>=state.hazards[row].delay) for (auto &point:shape->points) point+=shape->velocity*dt;shape->last_points=shape->points;if (!shape->points.empty()) state.hazards[row].pos=shape->points.front();}
+        if (auto *shape=std::get_if<HydraShapeHazard>(&state.hazards[row].shape)) {shape->before=shape->last_points.empty()?shape->points:shape->last_points;if (time>=delay) for (auto &point:shape->points) point+=shape->velocity*dt;shape->last_points=shape->points;if (!shape->points.empty()) state.hazards[row].pos=shape->points.front();}
         if (!get(state,handle)) continue;
-        if (time>=state.hazards[row].delay && !hazard_act(state,handle,dt)) return true;
+        if (time>=delay && !hazard_act(state,handle,dt)) return true;
         const auto &pending=state.hazards[row];
-        if (time<pending.delay || pending.hit) {if (std::holds_alternative<HydraShapeHazard>(pending.shape)) record_ship_position(state,handle);continue;}
+        if (time<delay || pending.hit) {if (std::holds_alternative<HydraShapeHazard>(pending.shape)) record_ship_position(state,handle);continue;}
         if (!hazard_before_touch(state,handle)) return true;
         if (pending.zone_definition && !ZoneSystem::activate(run,handle)) {EventBuilder::flush_combat(run);return true;}
         if (!get(state,handle)) continue;

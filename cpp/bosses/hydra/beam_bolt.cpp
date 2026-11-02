@@ -15,7 +15,7 @@ void HydraNormalAttack::step_bolt(RunRuntime &r,TechniqueState &t,double dt) {
     if (time<p.warn) {aim(r,*b,n,(n.target-from).angle(),dt);n.glow=time/std::max(p.warn,0.001);}
     else if (!n.locked) {
         n.locked=true;n.strike_pos=n.strike_from=from;n.sweep=free?n.look_angle:n.angle;const auto direction=godot::Vector2::from_angle(n.sweep);
-        HazardState h;h.pos=from;h.duration=bolt.life;h.damage=p.damage;HydraShapeHazard shape;shape.points={from,from+direction*bolt.length};shape.width=bolt.width;shape.velocity=direction*bolt.speed;h.shape=shape;
+        HazardState h;h.pos=from;h.duration=bolt.life;h.damage=p.damage;HydraShapeHazard shape;shape.points={from,from+direction*bolt.length};shape.life=bolt.life;shape.width=bolt.width;shape.velocity=direction*bolt.speed;h.shape=shape;
         AttackSpec spec;spec.owner.live_source=t.actor;spec.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));spec.boss=r.state.bosses.body_handles.at(uint32_t(b-r.state.bosses.bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Bolt;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=AttackSystem::emit_hazard(r.state,h,spec);if (AttackSystem::get(r.state,handle)) r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;
         cue(r,*b,n,"attack_started",t.definition);
     }

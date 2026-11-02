@@ -1531,6 +1531,10 @@
       {
         "name": "Leap",
         "value": "leap"
+      },
+      {
+        "name": "WindBlade",
+        "value": "wind_blade"
       }
     ],
     "VisualRole": [
