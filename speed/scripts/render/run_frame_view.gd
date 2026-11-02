@@ -35,6 +35,8 @@ var _barrier_armor: Sprite2D
 var _barrier_world_time := -1.0
 var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
+var _rampage_visual: RefCounted
+var _rampage_world_time := -1.0
 var _scatter_world_time := -1.0
 var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
@@ -384,6 +386,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _full_charge_visual!=null: _full_charge_visual.dispose()
 		_full_charge_visual = null
 		_full_charge_world_time = -1.0
+		if _rampage_visual!=null: _rampage_visual.dispose()
+		_rampage_visual = null
+		_rampage_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_meteor_shards.clear()
@@ -439,6 +444,15 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_full_charge_visual.dispose()
 		_full_charge_visual = null
 		_full_charge_world_time = -1.0
+	var equipped_rampage: bool = frame.ui.get("trait_levels",[]).any(func(item): return item.id=="T33")
+	if equipped_rampage and _rampage_visual==null:
+		_rampage_visual = preload("res://scripts/render/equipment/rampage.gd").new()
+		_rampage_visual.setup_frame(_layer(18))
+		_rampage_visual._aura.z_index = 1
+	if not equipped_rampage and _rampage_visual!=null:
+		_rampage_visual.dispose()
+		_rampage_visual = null
+		_rampage_world_time = -1.0
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
 		if event.type==&"shield_stolen":
@@ -516,6 +530,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var rampage_dt: float = 0.0 if _rampage_world_time<0.0 else maxf(0.0,ui.world_time-_rampage_world_time)
+	_rampage_world_time = ui.world_time if equipped_rampage else -1.0
+	if _rampage_visual!=null: _rampage_visual.frame_tick(rampage_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.character_scale,ui.draw.tracing,ui.rampage,ui.world_time,_ship_visible)
 	var full_charge_dt: float = 0.0 if _full_charge_world_time<0.0 else maxf(0.0,ui.world_time-_full_charge_world_time)
 	_full_charge_world_time = ui.world_time if equipped_full_charge else -1.0
 	if _full_charge_visual!=null: _full_charge_visual.frame_tick(full_charge_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.full_charge.distance/ui.base_draw_length,ui.draw.tracing and _ship_visible)

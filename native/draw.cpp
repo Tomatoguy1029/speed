@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../cpp/systems/field.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
+#include "../cpp/behaviors/traits/rampage.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -109,6 +110,7 @@ void SpeedRunCore::commit_draw() {
     runtime.state.draw.drawing = false;
     runtime.state.draw.tracing = true;
     speed::FullChargeBehavior::launch(runtime);
+    speed::RampageBehavior::launch(runtime);
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;
     Dictionary launch; launch["pos"] = runtime.state.ship.pos; launch["dir"] = dir; launch["gauge"] = runtime.state.draw.amount;
     emit_event("launch", launch);
@@ -144,6 +146,7 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
 
 void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
+    speed::RampageBehavior::end(runtime);
     speed::FullChargeBehavior::end(runtime);
     const double speed = std::max(double(runtime.state.ship.vel.length()), runtime.state.draw.before_speed);
     const Vector2 direction = runtime.state.ship.vel.is_zero_approx() ? runtime.state.ship.heading : runtime.state.ship.vel.normalized();

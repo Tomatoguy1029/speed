@@ -36,6 +36,11 @@ struct BarrierWeaponState {
     double durability=-1,restore=0,maximum=0,revive=0,radius=0,damage=0,shell_radius=0,knock=0;
     std::vector<BarrierWaveState> waves;
 };
+struct RampageState {
+    bool ready=false;
+    uint64_t kills=0;
+    double strength=0,pop=0,bonus=0,half_life=1,target_kills=1;
+};
 struct EquipmentLevel {uint32_t definition=0,level=0;};
 struct CardCandidate {int64_t id=0;CardKind kind=CardKind::Weapon;uint32_t definition=0,level=0;};
 // 数値特性は取得の境界で畳み、武器の更新中には定義を探索しない。
@@ -46,6 +51,7 @@ struct EquipmentEffects {
 };
 struct LoadoutState {
     EquipmentEffects effects;
+    RampageState rampage;
     double boost_distance=0,full_charge_maximum=1;
     ScatterWeaponState scatter;
     RearWeaponState rear;

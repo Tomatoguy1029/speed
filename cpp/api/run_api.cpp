@@ -341,6 +341,7 @@ Dictionary SpeedRunCore::frame_run() {
         }
     }
     ui["laser_voices"]=voices;
+    const auto &rampage=runtime.state.loadout.rampage;Dictionary aura;aura["equipped"]=rampage.ready;aura["kills"]=int64_t(rampage.kills);aura["strength"]=rampage.strength;aura["pop"]=rampage.pop;aura["bonus"]=rampage.bonus;aura["target_kills"]=rampage.target_kills;aura["half_life"]=rampage.half_life;aura["multiplier"]=runtime.state.loadout.effects.damage_multiplier;ui["rampage"]=aura;
     ui["rear"]=rear_snapshot();
     ui["barrier"]=barrier_snapshot();
     Dictionary gear;gear["distance"]=runtime.state.loadout.boost_distance;gear["maximum"]=runtime.state.loadout.full_charge_maximum;gear["burst_power"]=runtime.state.loadout.effects.burst_power;gear["ignore_armor"]=runtime.state.loadout.effects.ignore_armor;ui["full_charge"]=gear;ui["base_draw_length"]=runtime.state.draw_config.length;

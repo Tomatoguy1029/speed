@@ -6,7 +6,7 @@
 
 | No. | 名称 | 発動・効果 | ルートへの影響 | 参照先 | 未決事項 |
 |---|---|---|---|---|---|
-| No.01 | 快進撃 | 1回のブーストで倒した数が多いほど、次のブーストまですべての攻撃の威力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T33_rampage.tres`、`scripts/traits/rampage.gd` | 英語・素材・見た目は確認待ち |
+| No.01 | 快進撃 | 1回のブーストで倒した数が多いほど、次のブーストまですべての攻撃の威力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T33_rampage.tres`、`scripts/traits/rampage.gd`。C++ランは `cpp/behaviors/traits/rampage.cpp` が撃破数・終了後の倍率と減衰・復帰を扱い、表示は `scripts/render/equipment/rampage.gd` が受け持つ | 英語・素材・見た目は確認待ち |
 | No.02 | チェインショック | ブースト中に一定数倒すたびに、倒した敵から衝撃波が出て連鎖する。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T05_killSonic.tres`、`scripts/traits/killSonic.gd` | 英語・素材・見た目は確認待ち |
 | No.03 | 大容量チャージ | ゲージの容量が増え、1回で描ける長さと勢いが伸びる。 | 能力値を伸ばす | `data/traits/T08_capacity.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.04 | 軌跡延長 | 描ける線の長さが伸びる。 | 能力値を伸ばす | `data/traits/T14_length.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |

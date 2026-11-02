@@ -3,6 +3,7 @@
 #include "../behaviors/weapons/scatter.h"
 #include "../behaviors/weapons/rear.h"
 #include "../behaviors/weapons/barrier.h"
+#include "../behaviors/traits/rampage.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
 #include "../systems/pickup_system.h"
@@ -82,6 +83,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
                 if (state.phase!=Phase::Play) break;
             }
         } else if (state.forward.ready) core.step_forward(world_dt);
+        if (state.phase==Phase::Play) RampageBehavior::step(core.runtime,world_dt);
     }
     if (world_step && state.phase==Phase::Play) {
         if (state.projectile_config.ready && !core.step_projectiles(wd)) return false;

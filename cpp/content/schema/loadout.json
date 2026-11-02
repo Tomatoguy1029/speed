@@ -519,6 +519,43 @@
           "min": 1
         }
       ]
+    },
+    {
+      "name": "RampageDefinition",
+      "section": 45,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "kills",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "half_life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

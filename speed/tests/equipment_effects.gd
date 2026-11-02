@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t33" in OS.get_cmdline_user_args() or "--cpp-t33-launch" in OS.get_cmdline_user_args():
+		await check_cpp_t33()
+		print("[cpp_t33] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t04" in OS.get_cmdline_user_args():
 		await check_cpp_t04()
 		print("[cpp_t04] failed=%d" % failures)
@@ -1668,7 +1674,8 @@ func trait_start_trace(bridge, length: float, direction: Vector2 = Vector2.RIGHT
 	input.pen = pos+direction*length
 	input.pen_release = true
 	check(bridge._core.handle_draw(input,1010,1.0),"実際の描線を確定して発進する")
-	bridge.collect_frame()
+	# 個別の既存入口を通した状態も公開の更新番号へ反映する。
+	bridge.command("set_ui_overlay",{"active":false})
 	return pos
 
 func trait_select_upgrade(session, id: String, config: GameConfig, idle: Dictionary, viewport: Dictionary) -> void:
@@ -1798,3 +1805,123 @@ func check_cpp_t04() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"ギアアップの発動・同期・表示に実行エラーがない: %s" % [capture.messages()])
+
+func trait_kill_fixture(bridge, cause: String = "shot") -> void:
+	var pos: Vector2 = bridge._core.ship_snapshot().ship_pos+Vector2(0,3000)
+	var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":pos})
+	check(created.ok,"撃破の対象を通常の生成入口から配置する")
+	if created.ok:
+		var killed: Dictionary = bridge.command("dev_kill",{"entity_id":created.value,"cause":cause})
+		check(killed.ok and killed.value.killed,"撃破を共通の同期処理へ通す")
+
+func check_cpp_t33() -> void:
+	var retry_launch := "--cpp-t33-launch" in OS.get_cmdline_user_args()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	var session = await trait_test_session("T33",config,633)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	var initial: Dictionary = bridge.checkpoint()
+	var lab = SESSION.new()
+	add_child(lab)
+	await lab.reset({"seed":633,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
+	var run: RunSimulation = lab.run
+	run.loadout.grant(&"trait",&"T33",5)
+	run.loadout.grant(&"trait",&"T04",5)
+	var rampage = run.loadout.trait_behaviors[&"T33"]
+	var gear = run.loadout.trait_behaviors[&"T04"]
+	for level in (range(1,config.trait_max_stacks+1) if not retry_launch else []):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		rampage.n = level
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":level}).ok,"快進撃を各段まで取得する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
+		trait_kill_fixture(bridge)
+		check(bridge._ui.rampage.kills==0 and bridge._ui.rampage.strength==0.0,"なぞりの外で倒しても撃破数を蓄積しない")
+		trait_start_trace(bridge,config.draw_length)
+		run.state.tracing = true
+		rampage.on_launch(true)
+		for killed in 13:
+			trait_kill_fixture(bridge)
+			rampage.on_kill(&"shot")
+		check(bridge._ui.rampage.kills==13 and bridge._ui.rampage.strength==0.0 and bridge._ui.rampage.multiplier==1.0 and bridge._ui.rampage.pop==1.0,"なぞり中は撃破数と光だけを更新して攻撃倍率を1に保つ")
+		var was_tracing := true
+		for tick in 80:
+			bridge.step(1.0/120.0,idle,viewport)
+			run.state.tracing = bridge._ui.draw.tracing
+			if was_tracing and not run.state.tracing: rampage.on_end()
+			was_tracing = run.state.tracing
+			rampage.tick((1.0/120.0)*bridge._ui.world_scale,false)
+			var expected_gear: float = gear.multiplier(bridge._ui.full_charge.distance) if run.state.tracing else 1.0
+			check(is_equal_approx(bridge._ui.rampage.strength,rampage.strength) and is_equal_approx(bridge._ui.rampage.pop,rampage.pop) and is_equal_approx(bridge._ui.rampage.multiplier,rampage.multiplier()),"各段の終了時の上限・半減曲線・光の減衰が現行と一致する")
+			check(is_equal_approx(bridge._ui.full_charge.burst_power,expected_gear) and is_equal_approx(bridge._ui.attack_power,config.base_attack*expected_gear*rampage.multiplier()),"ギアアップと快進撃が別々の係数を保って全攻撃力で合成される")
+		check(not bridge._ui.draw.tracing and bridge._ui.rampage.strength>0.0,"終了後にだけ撃破数から攻撃倍率を有効にする")
+		if failures: break
+	if not retry_launch:
+		var saved: Dictionary = bridge.checkpoint()
+		var before: Dictionary = bridge._ui.rampage.duplicate()
+		var presentation: RunPresentation = session.view.get_node("RunPresentation")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._rampage_visual!=null and presentation.frame_view._rampage_visual._aura.visible and presentation.frame_view._rampage_visual._level>0.0,"終了後の強さを通常のオーラ表示へ渡す")
+		var clock: float = presentation.frame_view._rampage_visual._aura.material.get_shader_parameter("clock")
+		bridge.command("pause",{"paused":true})
+		for tick in 4: bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.1)
+		check(bridge._ui.rampage==before and presentation.frame_view._rampage_visual._aura.material.get_shader_parameter("clock")==clock,"停止中は強さ・光・オーラの時計を進めない")
+		bridge.command("pause",{"paused":false})
+		for tick in roundi(float(bridge._ui.rampage.half_life)*120.0): bridge.step(1.0/120.0,idle,viewport)
+		check(is_equal_approx(bridge._ui.rampage.strength,before.strength*0.5),"半減期を世界時計で一度だけ掛ける")
+		var expected: Dictionary = bridge._ui.rampage.duplicate()
+		var expected_shots: Array = core.projectiles_snapshot()
+		check(bridge.restore(saved.value).ok,"撃破数・強さ・光と同期倍率へ復帰する")
+		bridge.collect_frame()
+		for tick in roundi(float(bridge._ui.rampage.half_life)*120.0): bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.rampage==expected and core.projectiles_snapshot()==expected_shots,"復帰後も弱まる速度と武器の発射・命中状態を再現する")
+		bridge.release_checkpoint(saved.value)
+		var fresh: Array = []
+		for tick in 70:
+			bridge.step(1.0/120.0,idle,viewport)
+			fresh = core.projectiles_snapshot().filter(func(shot): return shot.age<0.009)
+			if not fresh.is_empty(): break
+		check(not fresh.is_empty(),"快進撃中に実際のW01を発射する")
+		if not fresh.is_empty():
+			var definition: WeaponDef = ContentManager.definition(&"weapons",&"W01")
+			var prior: float = bridge._ui.rampage.strength/pow(0.5,(1.0/120.0)/bridge._ui.rampage.half_life)
+			check(is_equal_approx(fresh[0].damage,config.base_attack*float(definition.params.damage_by_level[0])*(1.0+bridge._ui.rampage.bonus*prior)),"武器の発射後に同じ更新の強さを減らす現行の順を保つ")
+		check(bridge.command("dev_remove_trait",{"id":"T33"}).ok and bridge._ui.rampage.multiplier==1.0,"解除で快進撃の倍率だけを戻す")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._rampage_visual==null,"解除したオーラ表示を片付ける")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":5})
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
+	var origin: Vector2 = core.ship_snapshot().ship_pos
+	for distance in [200.0,500.0,800.0]:
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
+		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+	trait_start_trace(bridge,config.draw_length)
+	trait_kill_fixture(bridge,"afterimage")
+	if not retry_launch: check(bridge._ui.rampage.kills==0,"残像による撃破は共通の除外順に従って数えない")
+	for tick in 70: bridge.step(1.0/120.0,idle,viewport)
+	if not retry_launch: check(bridge._ui.rampage.kills==3 and bridge._ui.rampage.strength>0.0 and bridge._ui.rampage.strength<0.25,"実際の連続した体当たり撃破を終了後の強さへ反映する")
+	for tick in ceili(config.dash_charge_time*config.draw_min_charge*120.0)+2: bridge.step(1.0/120.0,idle,viewport)
+	trait_start_trace(bridge,config.draw_length*0.5)
+	check(bridge._ui.rampage.kills==0 and bridge._ui.rampage.strength==0.0 and bridge._ui.rampage.multiplier==1.0,"次の発進で撃破数と強さを戻す")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":1})
+	if not retry_launch: await trait_select_upgrade(session,"T33",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	lab.free()
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"快進撃の同期・倍率・表示に実行エラーがない: %s" % [capture.messages()])

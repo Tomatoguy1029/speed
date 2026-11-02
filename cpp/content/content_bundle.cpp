@@ -129,6 +129,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->equipment_assets=records.LoadoutAsset_rows;
     bundle->numeric_traits=records.NumericTraitLevel_rows;
     bundle->full_charge_levels=records.FullChargeDefinition_rows;
+    bundle->rampage_levels=records.RampageDefinition_rows;
     if (records.PostMaxChargeDefinition_rows.size()!=1) return {};
     bundle->post_charge=records.PostMaxChargeDefinition_rows.front();
     if (records.PostMaxCritDefinition_rows.size()!=1) return {};
@@ -160,6 +161,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto &d=bundle->equipment[index];
         if (d.id!=index+1 || !equipment_names.insert(d.external_id).second) return {};
         if (d.id==1) continue;
+        if (d.external_id=="T33") {
+            if (d.kind!=1 || d.maximum_level!=bundle->rampage_levels.size()) return {};
+            for (size_t i=0;i<bundle->rampage_levels.size();++i) if (bundle->rampage_levels[i].equipment!=d.id || bundle->rampage_levels[i].level!=i+1 || bundle->rampage_levels[i].half_life<=0) return {};
+            continue;
+        }
         if (d.external_id=="T04") {
             if (d.kind!=1 || d.maximum_level!=bundle->full_charge_levels.size()) return {};
             for (size_t i=0;i<bundle->full_charge_levels.size();++i) if (bundle->full_charge_levels[i].equipment!=d.id || bundle->full_charge_levels[i].level!=i+1) return {};
@@ -201,6 +207,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     if (std::count_if(bundle->equipment.begin(),bundle->equipment.end(),[](const auto &d){return d.external_id=="W23";})!=1) return {};
     if (std::count_if(bundle->equipment.begin(),bundle->equipment.end(),[](const auto &d){return d.external_id=="W05";})!=1) return {};
     if (std::count_if(bundle->equipment.begin(),bundle->equipment.end(),[](const auto &d){return d.external_id=="T04";})!=1) return {};
+    if (std::count_if(bundle->equipment.begin(),bundle->equipment.end(),[](const auto &d){return d.external_id=="T33";})!=1) return {};
     for (const auto &v:bundle->numeric_traits) {
         const auto &d=bundle->equipment[v.equipment-1];
         if (d.kind!=1 || v.level>d.maximum_level) return {};
