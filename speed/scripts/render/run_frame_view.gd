@@ -814,20 +814,20 @@ func apply_frame(frame: Dictionary) -> bool:
 		_boss_sword_visual.apply_frame(float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
 	var body_seen := {}
 	for body: Dictionary in frame.get("boss_bodies",[]):
-		if body.kind!=0: continue
+		if body.kind not in [0,1]: continue
 		body_seen[body.id] = true
 		if body.mode>=4:
 			if _boss_body_displays.has(body.id): _boss_body_displays[body.id].hide()
 			continue
 		var entry := {}
 		for asset in visuals.values():
-			if asset.get("boss","")=="monoceros": entry = asset; break
+			if asset.get("boss","")==["monoceros","centaurus"][body.kind]: entry = asset; break
 		if entry.is_empty(): continue
 		if not _boss_body_displays.has(body.id):
 			var scene: PackedScene = _scope.resources.get(entry.path)
 			if scene==null: continue
 			var display = scene.instantiate()
-			display.set_script(preload("res://scripts/render/bosses/monoceros.gd"))
+			display.set_script(preload("res://scripts/render/bosses/monoceros.gd") if body.kind==0 else preload("res://scripts/render/bosses/centaurus.gd"))
 			_pulser_parent.add_child(display)
 			_boss_body_displays[body.id] = display
 		var attack := {}

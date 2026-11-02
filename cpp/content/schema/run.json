@@ -2748,6 +2748,7 @@
     "loadout.json",
     "bosses.json",
     "boss_flow.json",
-    "heroes.json"
+    "heroes.json",
+    "centaurus.json"
   ]
 }

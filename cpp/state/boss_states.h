@@ -77,13 +77,22 @@ struct BossFlowState {
     std::unordered_map<uint64_t,double> cooldowns;
 };
 enum class BossMode : uint8_t { Entrance,Idle,Phase,Final,Defeated,Cancelled };
-// 一角獣は単体。本体が唯一の参加者で、HPの参照先・寿命も同じHandle。
+// 単体のボスは本体が唯一の参加者。独立した護衛は敵として別に寿命を持つ。
 struct ParticipantState {
     EnemyHandle actor,health_target;
     int64_t id=0;
     bool is_body=true,active=true;
 };
+struct CentaurusGuardState {EnemyHandle actor;double scale=1,phase=0;};
+struct CentaurusBodyState {
+    std::vector<CentaurusGuardState> guards;
+    godot::Vector2 guard_point,leap_from,leap_to;
+    bool has_guard_point=false,leaping=false;
+    double guard_scan=0,guard_refill=0,path_hold=0,turn_motion=0,leap_ready_at=0,leap_elapsed=0,retreat_ready_at=0;
+    int32_t path_side=1,sail_side=1;
+};
 struct BossBodyState {
+    CentaurusBodyState centaurus;
     std::vector<ParticipantState> participants;
     int64_t id=0;
     uint32_t definition=0,phase=1;

@@ -1,5 +1,6 @@
 #include "phase_controller.h"
 #include "../monoceros/body.h"
+#include "../centaurus/body.h"
 #include "../monoceros/horn_wave.h"
 #include "flow_runner.h"
 #include "technique_runner.h"
@@ -30,8 +31,9 @@ EnemyHandle PhaseController::spawn(RunRuntime &r,uint32_t definition,godot::Vect
     const auto &p=r.content->boss_bodies[definition-1];EnemySpawn options;options.position=at;options.facing=(s.ship_pos-at).angle();options.has_facing=true;options.is_boss=true;
     const auto id=EnemySystem::spawn_base(r,p.enemy-1,options);if (id<0) return {};const auto actor=s.enemy_handles.at(s.rows_by_id.at(id));
     BossBodyState body;body.id=s.bosses.next_body_id++;body.definition=definition;body.actor=actor;body.initial_wait=p.initial_wait;body.entrance_target=at;body.participants.push_back({actor,actor,id,true,true});
-    if (entrance) {body.mode=BossMode::Entrance;body.entrance_from=at-godot::Vector2(std::max(1000.0,double(s.view_half.x)*2.0),0);s.enemies[actor.slot].pos=body.entrance_from;s.enemies[actor.slot].facing=0;}
     s.bosses.body_handles.attach(s.bosses.bodies.size(),body.id);s.bosses.bodies.push_back(body);
+    if (r.content->bosses[p.boss-1].kind==1) CentaurusBody::spawned(r,s.bosses.bodies.back());
+    if (entrance) {auto &created=s.bosses.bodies.back();created.mode=BossMode::Entrance;created.entrance_from=at-godot::Vector2(std::max(1000.0,double(s.view_half.x)*2.0),0);s.enemies[actor.slot].pos=created.entrance_from;s.enemies[actor.slot].facing=0;}
     for (const auto &flow:r.content->boss_flows) if (flow.boss==p.boss) {FlowRunner::attach(r,actor,flow.id);s.bosses.flows.back().suspended=entrance || p.initial_wait>0;break;}
     // 登場を確定した入口だけで立てる。撃破や取消では戻さない。
     s.world.boss_spawned=true;godot::Dictionary e;e["pos"]=at;FrameBuilder::append(r,"boss_spawn",e);return actor;
@@ -58,6 +60,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
         if (b.mode==BossMode::Defeated || b.mode==BossMode::Cancelled) continue;
         if (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead) {cancel(r,b.actor);continue;}
         auto &e=s.enemies[b.actor.slot];const auto &p=r.content->boss_bodies[b.definition-1];const auto &definition=r.content->bosses[p.boss-1];b.clock+=dt;
+        if (definition.kind==1) CentaurusBody::pre_step(r,b,dt);
         e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);bool suspend=true;
         if (b.mode==BossMode::Entrance) {
             b.entrance_elapsed+=dt;const double progress=std::clamp(b.entrance_elapsed/std::max(0.05,p.entrance_time),0.0,1.0);const auto prior=e.pos;e.pos=b.entrance_from.lerp(b.entrance_target,1.0-std::pow(1.0-progress,3.0));e.vel=(e.pos-prior)/dt;
@@ -73,7 +76,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
             if (!b.final_landed && b.final_elapsed>=b.final_charge) {b.final_landed=true;s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;request.source=e.definition+1;CombatResolver::ship_damage(r,request);}
         } else if (!busy(r,b.actor)) {
             if (b.phase_pending) {b.phase_pending=false;b.phase=2;b.mode=BossMode::Phase;b.phase_remaining=p.phase_time;event(r,"boss_phase",b);}
-            else {b.initial_wait=std::max(0.0,b.initial_wait-dt);suspend=b.initial_wait>0;if (definition.kind==0) MonocerosBody::step(r,b,dt);}
+            else {b.initial_wait=std::max(0.0,b.initial_wait-dt);suspend=b.initial_wait>0;if (definition.kind==0) MonocerosBody::step(r,b,dt);else CentaurusBody::step(r,b,dt);}
         } else suspend=false;
         for (auto &f:s.bosses.flows) if (same_handle(f.actor,b.actor)) {f.phase=b.phase;f.suspended=suspend;}
     }
@@ -82,6 +85,7 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
     for (uint32_t row=0;row<s.bosses.bodies.size();++row) {const auto &b=s.bosses.bodies[row];if (b.id<=0 || b.id>=s.bosses.next_body_id || s.bosses.body_handles.entity_id(s.bosses.body_handles.at(row))!=b.id || !b.definition || b.definition>c.boss_bodies.size() || b.mode>BossMode::Cancelled || b.phase<1 || b.phase>2 || !b.entrance_from.is_finite() || !b.entrance_target.is_finite() || !b.final_to.is_finite() || !b.slash_from.is_finite() || !b.slash_to.is_finite()) return false;
         if ((b.sweep_side!=1 && b.sweep_side!=-1) || b.participants.size()!=1 || b.participants[0].id<=0 || !same_handle(b.participants[0].actor,b.actor) || !same_handle(b.participants[0].health_target,b.actor) || !b.participants[0].is_body || b.participants[0].active!=(b.mode<BossMode::Defeated)) return false;
         for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width}) if (!std::isfinite(value) || value<0) return false;
+        if (!CentaurusBody::validate(s,c,b)) return false;
         if (!std::isfinite(b.final_started) || (b.mode<BossMode::Defeated && (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead))) return false;
     }return true;
 }
@@ -89,6 +93,7 @@ godot::Array PhaseController::snapshot(const RunRuntime &r) {
     godot::Array out;for (const auto &b:r.state.bosses.bodies) {godot::Dictionary p;p["id"]=b.id;p["definition"]=b.definition;p["actor"]=r.state.enemy_handles.entity_id(b.actor);p["mode"]=int(b.mode);p["phase"]=b.phase;p["pending"]=b.phase_pending;p["clock"]=b.clock;p["initial_wait"]=b.initial_wait;p["phase_remaining"]=b.phase_remaining;p["final_elapsed"]=b.final_elapsed;p["final_landed"]=b.final_landed;p["final_to"]=b.final_to;p["final_width"]=b.final_width;p["boss_spawned"]=r.state.world.boss_spawned;p["boss_dead"]=r.state.boss_dead;
         const auto &definition=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1];p["kind"]=int(definition.kind);p["phase_progress"]=b.phase>=2?(b.mode==BossMode::Phase?1.0-b.phase_remaining/std::max(0.001,r.content->boss_bodies[b.definition-1].phase_time):1.0):0.0;
         godot::Array participants;for (const auto &part:b.participants) {godot::Dictionary v;v["id"]=part.id;v["health_target"]=part.id;v["is_body"]=part.is_body;v["active"]=part.active;participants.push_back(v);}p["participants"]=participants;
+        if (definition.kind==1) {const auto &v=b.centaurus;p["guard_point"]=v.guard_point;p["has_guard_point"]=v.has_guard_point;p["guard_scan"]=v.guard_scan;p["guard_refill"]=v.guard_refill;p["path_hold"]=v.path_hold;p["turn_motion"]=v.turn_motion;p["leaping"]=v.leaping;p["leap_elapsed"]=v.leap_elapsed;godot::Array guards;for (const auto &g:v.guards) {godot::Dictionary q;q["id"]=r.state.enemy_handles.entity_id(g.actor);q["scale"]=g.scale;q["phase"]=g.phase;guards.push_back(q);}p["guards"]=guards;}
         if (r.state.enemy_handles.contains(b.actor)) {const auto &e=r.state.enemies[b.actor.slot];p["velocity"]=e.vel;p["flash"]=e.flash;p["horn_length"]=e.radius*(definition.horn_length_ratio+(definition.horn_length_ratio_p2-definition.horn_length_ratio)*double(p["phase_progress"]));p["position"]=e.pos;p["facing"]=e.facing;p["radius"]=e.radius;p["hp"]=e.hp;p["max_hp"]=e.max_hp;p["charge"]=e.charge;p["horn_waves"]=MonocerosHornWave::waves(r,b.actor);godot::PackedVector2Array slash;if (b.has_slash) {slash.push_back(b.slash_from);slash.push_back(b.slash_to);}p["last_slash"]=slash;}out.push_back(p);
     }return out;
 }

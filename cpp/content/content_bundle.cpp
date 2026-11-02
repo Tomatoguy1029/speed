@@ -130,6 +130,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
     bundle->boss_bodies=records.BossBodyDefinition_rows;
+    bundle->centaurus_bodies=records.CentaurusBodyDefinition_rows;
     bundle->boss_finish=records.BossFinishDefinition_rows;
     if (bundle->boss_finish.size()>1 || (!bundle->boss_finish.empty() && (bundle->boss_finish.front().id!=1 || bundle->boss_finish.front().zoom<=0))) return {};
     bundle->bosses=records.BossDefinition_rows;
@@ -703,8 +704,14 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto target=std::find_if(bundle->definitions.begin(),bundle->definitions.end(),[&](const auto &d){return godot::String(d.id).utf8().get_data()==row.name;});
         if (target!=bundle->definitions.end()) bundle->corona_ammunition[owner.corona_definition-1].push_back({uint32_t(target-bundle->definitions.begin()),row.weight,row.damage});
     }
+    for (size_t i=0;i<bundle->centaurus_bodies.size();++i) {
+        const auto &p=bundle->centaurus_bodies[i];
+        if (p.id!=i+1 || bundle->bosses[bundle->boss_bodies[p.body-1].boss-1].kind!=1 || bundle->definitions[p.guard-1].kind!=EnemyDefinition::Kind::Defender || p.keep_max<p.keep_min || p.guard_min>p.guard_count || p.sail_guard_max<p.sail_guard_min || p.leap_time<=0) return {};
+        for (size_t j=0;j<i;++j) if (bundle->centaurus_bodies[j].body==p.body) return {};
+    }
     for (size_t i=0;i<bundle->boss_bodies.size();++i) {
         const auto &body=bundle->boss_bodies[i];const auto &boss=bundle->bosses[body.boss-1];
+        if (boss.kind==1 && std::none_of(bundle->centaurus_bodies.begin(),bundle->centaurus_bodies.end(),[&](const auto &p){return p.body==body.id;})) return {};
         if (body.id!=i+1 || body.phase_threshold<=0 || body.phase_threshold>=1 || body.final_widen_time<=0 || bundle->definitions[body.enemy-1].kind!=(boss.kind==0?EnemyDefinition::Kind::Monoceros:EnemyDefinition::Kind::Centaurus)) return {};
     }
     std::unordered_set<std::string> tuning_keys;

@@ -1,0 +1,161 @@
+{
+  "records": [
+    {
+      "name": "CentaurusBodyDefinition",
+      "section": 320,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "body",
+          "type": "u32",
+          "ref": "BossBodyDefinition"
+        },
+        {
+          "name": "guard",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "keep_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_refill",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_search",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_scan",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_wobble",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bow_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_cos",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_hold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_trigger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_far",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_trigger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "run_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "run_speed_p2",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "guard_min",
+          "type": "u32",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

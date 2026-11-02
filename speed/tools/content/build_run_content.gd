@@ -72,10 +72,17 @@ static func boss_technique_set_records(definition: BossDef, moves: Array) -> Dic
 static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}
 	# 機体・装備・接触など共通セクションの生成を既存の入口へそろえる。
-	var package := chase_package(load("res://data/enemies/drifter.tres"),config)
+	var package := chase_package(load("res://data/enemies/defender.tres" if definition.id==&"centaurus" else "res://data/enemies/drifter.tres"),config)
 	if package.is_empty(): return {}
 	var data: Dictionary = package.records
 	var row: Dictionary = data.EnemyRecord[0]
+	if definition.id==&"centaurus":
+		row = row.duplicate(true)
+		row.id = 2
+		data.EnemyRecord.append(row)
+		data.StringEntry.append({"id":2,"value":"centaurus"})
+		data.DefinitionIndex.append({"id":2,"enemy":2})
+		data.PopulationType.append({"id":2,"enemy":2,"rank":5,"maximum":1,"ranged":false})
 	var hp: float = definition.hp if definition.use_def_stats else config.boss_hp
 	var armor: float = definition.armor if definition.use_def_stats else config.boss_armor
 	row.kind = 39 if definition.id==&"monoceros" else 40
@@ -96,19 +103,34 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	row.fixed_sprite = true
 	row.knockback = 0.0
 	row.gate = 0
-	data.StringEntry[0].value = String(definition.id)
+	data.StringEntry[row.id-1].value = String(definition.id)
 	var boss := {"id":1,"external_id":String(definition.id),"kind":0 if definition.id==&"monoceros" else 1,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = float(definition.params.get(key,0.0))
 	data.BossDefinition = [boss]
-	var body := {"id":1,"boss":1,"enemy":1,"hp_floor_enabled":false}
+	var body := {"id":1,"boss":1,"enemy":row.id,"hp_floor_enabled":false}
 	for key in ["entrance_time","initial_wait","phase_threshold","phase_time","final_beam_width","final_reach","final_warn_width","final_widen_time"]:
 		if not definition.params.has(key): return {}
 		body[key] = float(definition.params[key])
 	data.BossBodyDefinition = [body]
-	if definition.id==&"monoceros":
-		var key: int = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":key,"role":7})
-		package.visuals.append({"id":key,"role":7,"path":"res://scenes/bosses/monoceros_presentation.tscn","boss":"monoceros","appearance":definition.part_appearance.duplicate(true)})
+	if definition.id==&"centaurus":
+		var centaurus := {"id":1,"body":1,"guard":1}
+		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="CentaurusBodyDefinition")[0].fields:
+			if field.name in ["id","body","guard"]: continue
+			if not definition.params.has(field.name): return {}
+			centaurus[field.name] = definition.params[field.name]
+		data.CentaurusBodyDefinition = [centaurus]
+		# 守る雑魚にも通常ステージと同じ塗装・照明の生成済み参照を渡す。
+		var guard: EnemyDef = load("res://data/enemies/defender.tres")
+		var guard_visual: Dictionary = package.visuals[5]
+		if guard_visual.role==6:
+			var look: EnemyLook = load(guard_visual.path)
+			var lighting: Resource = load("res://data/visuals/enemy_lighting.tres")
+			var settings := {}
+			for name in ["key_energy","fill_energy","key_angle","fill_angle","height","ambient","normal_strength"]: settings[name] = guard.visual_value(name,lighting.get(name))
+			guard_visual.merge({"settings":settings,"paint":look.colors_key(guard.armor_colors),"hull_preview":look.preview_key(guard.armor_colors),"biting":false,"pump":false,"biter_parts":""})
+	var key: int = data.ResourceKey.size()+1
+	data.ResourceKey.append({"id":key,"role":7})
+	package.visuals.append({"id":key,"role":7,"path":"res://scenes/bosses/%s_presentation.tscn" % definition.id,"boss":String(definition.id),"appearance":definition.part_appearance.duplicate(true)})
 	return package
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
