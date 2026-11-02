@@ -1563,6 +1563,10 @@
       {
         "name": "Spiral",
         "value": "spiral"
+      },
+      {
+        "name": "DracoFinale",
+        "value": "draco_finale"
       }
     ],
     "VisualRole": [
@@ -2131,6 +2135,10 @@
       {
         "name": "BossAction",
         "value": "boss_action"
+      },
+      {
+        "name": "DracoCue",
+        "value": "draco_cue"
       }
     ],
     "ResultKind": [
@@ -2891,6 +2899,12 @@
       "applied",
       "outcome",
       "reason"
+    ],
+    "draco_cue": [
+      "cue",
+      "pos",
+      "radius",
+      "boss"
     ]
   },
   "includes": [

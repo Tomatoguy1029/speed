@@ -205,7 +205,21 @@ struct DracoCycleState {
 };
 struct DracoImpact {godot::Vector2 position;double time=0,radius=0;uint32_t technique=0;};
 struct DracoClosingWall {AttackHandle attack;godot::Vector2 from;double time=0.3,duration=0.3,delay=0,length=0,half_width=0,angle=0;};
+enum class DracoFinaleStage : uint8_t {None,Release,Combine,Pose,Input,Strikes,Last,Sight,Split,Explode};
+struct DracoFinaleTrail {std::vector<godot::Vector2> points;double time=0;};
+struct DracoFinaleState {
+    DracoCinematicState saved;
+    DracoFinaleStage stage=DracoFinaleStage::None;
+    bool active=false,completed=false,began=false,finish_before=false;
+    std::vector<std::string> modules_before;
+    double time=0,zoom=1,assembly_zoom=1,dim=0,split=0,radius=0,combine=0,original_angle=0,original_guard=0;
+    int32_t last_strike=-1;
+    godot::Vector2 center,core,core_from,camera_from,assembly_camera,original_pos,original_ship,original_velocity;
+    std::vector<godot::Vector2> guide,strokes,line,pose_from,pose;
+    std::vector<DracoFinaleTrail> trails;
+};
 struct DracoBodyState {
+    DracoFinaleState finale;
     uint32_t lab_inhale_stars=12;
     std::vector<DracoClosingWall> closing_walls;
     std::vector<RockHandle> placed_meteors;

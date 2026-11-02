@@ -11,6 +11,7 @@ namespace speed {
 // ランと保持したランで共有する読み取り専用の定義。
 struct CoronaAmmunition {uint32_t definition=0;double weight=0,damage=0;};
 struct ContentBundle {
+    std::vector<DracoFinaleDefinition> draco_finales;
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};
     RunConfig config;
     HeroConfig hero_config;

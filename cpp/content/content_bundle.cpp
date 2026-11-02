@@ -158,7 +158,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->draco_charges=records.DracoChargeDefinition_rows;
     bundle->draco_breaths=records.DracoBreathDefinition_rows;
     bundle->draco_bites=records.DracoBiteDefinition_rows;
-    bundle->draco_bodies=records.DracoBodyDefinition_rows;
+    bundle->draco_bodies=records.DracoBodyDefinition_rows;bundle->draco_finales=records.DracoFinaleDefinition_rows;
     bundle->draco_cycles=records.DracoCycleDefinition_rows;
     bundle->draco_cycle_candidates=records.DracoCycleCandidate_rows;
     bundle->canis_commands=records.CanisCommandDefinition_rows;
@@ -955,6 +955,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (size_t i=0;i<bundle->hydra_regrow.size();++i) {const auto &p=bundle->hydra_regrow[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || p.growth_first>=1 || p.growth_first<=p.growth_second || p.growth_second<=0) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_regrow[j].boss==p.boss) return {};}
 
 
+    for (size_t i=0;i<bundle->draco_finales.size();++i) {const auto &p=bundle->draco_finales[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=4) return {};}
     for (size_t i=0;i<bundle->draco_breaths.size();++i) {const auto &p=bundle->draco_breaths[i];const auto &d=bundle->definitions[p.rock_enemy-1];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=97 || d.kind!=EnemyDefinition::Kind::Meteor || d.xp_rewards[0] || d.xp_rewards[1] || d.xp_rewards[2] || d.gold_eligible) return {};}
     for (size_t i=0;i<bundle->draco_picaro_walls.size();++i) {const auto &p=bundle->draco_picaro_walls[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=106 || p.impact_warn<=0 || std::none_of(bundle->draco_picaro_wall_candidates.begin(),bundle->draco_picaro_wall_candidates.end(),[&](const auto &v){return v.technique==p.technique;})) return {};}
     for (size_t i=0;i<bundle->draco_picaro_wall_candidates.size();++i) {const auto &p=bundle->draco_picaro_wall_candidates[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=106) return {};}

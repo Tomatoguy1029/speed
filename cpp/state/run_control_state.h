@@ -14,6 +14,8 @@ struct RunControlState {
     double last_world_real_dt=0, last_world_dt=0, bonus_remaining=0, time_limit=-1;
     int64_t world_steps=0, world_tick_div=1, world_updates=0;
     bool lab_mode=false;
+    bool draco_finish_done=false;
+    std::vector<std::string> final_modules;
     bool ui_overlay=false, ui_reward=false, time_limit_reached=false;
     godot::Vector2 camera_center, logical_size;
     double cinematic_bars=0;

@@ -381,6 +381,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["rear"]=rear_snapshot();
     ui["barrier"]=barrier_snapshot();
     Dictionary gear;gear["distance"]=runtime.state.loadout.boost_distance;gear["maximum"]=runtime.state.loadout.full_charge_maximum;gear["burst_power"]=runtime.state.loadout.effects.burst_power;gear["ignore_armor"]=runtime.state.loadout.effects.ignore_armor;ui["full_charge"]=gear;ui["base_draw_length"]=runtime.state.draw_config.length;
+    godot::Array final_modules;for (const auto &id:control.final_modules) final_modules.push_back(godot::String(id.c_str()));ui["final_modules"]=final_modules;ui["draco_finish_done"]=control.draco_finish_done;
     ui["controls_locked"]=runtime.state.controls_locked;ui["encounter_protected"]=runtime.state.encounter_protected;ui["cinematic_camera"]=control.cinematic_camera;ui["cinematic_hide_enemies"]=control.cinematic_hide_enemies;ui["cinematic_bars"]=runtime.state.control.cinematic_bars;ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=presentation_frozen(runtime);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;

@@ -4,6 +4,7 @@
 #include "../behaviors/weapons/dashRangeDrone.h"
 #include "../behaviors/weapons/massTow.h"
 #include "run_runner.h"
+#include "../bosses/draco/finale.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
 #include "../behaviors/enemies/corona_vortex.h"
@@ -58,6 +59,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.phase==Phase::Finishing) {BossFinish::step(core.runtime,dt);return true;}
     if (state.phase==Phase::Dying) {core.step_death(dt);return true;}
     if (state.phase!=Phase::Play) return true;
+    if (DracoFinale::tick(core.runtime,dt,raw_input,size)) {core.check_run_end();return true;}
     if (state.controls_locked || state.encounter_protected) state.hitstop=0;
     // 制作側に乱数や出現判断を置かず、同じ固定tickで予定配置を実行する。
     if (control.lab_mode && !core.attack_guard_active()) for (const auto &entry:control.lab_schedule) {
