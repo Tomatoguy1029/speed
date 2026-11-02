@@ -6,7 +6,8 @@
 #include <unordered_map>
 namespace speed {
 enum class TechniqueStage : uint8_t { Windup,Active,Recovery,Stuck,Extract,Finished,Failed,Cancelled };
-enum class TechniqueCommand : uint8_t { LockAim,LaunchStrike,EndStrike };
+enum class TechniqueCommand : uint8_t { LockAim,LaunchStrike,EndStrike,ReleaseArrow,FinishVolley };
+struct CentaurusVolleyState {uint32_t released=0;};
 struct MonocerosSweepState {
     enum class Stage : uint8_t { Approach,Stop,Swing,Hold,Return };
     Stage stage=Stage::Approach;
@@ -48,7 +49,7 @@ struct MonocerosSwordState {
     godot::Vector2 target;
 };
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;

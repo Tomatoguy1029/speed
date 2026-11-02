@@ -9,6 +9,7 @@ const BossProgram = preload("res://tools/content/build_boss_program.gd")
 
 ## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
 static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if definition!=null and definition.id==&"centaurus": return centaurus_technique_records(definition,move)
 	if definition==null or definition.id!=&"monoceros" or move==null or move.technique not in [&"charge",&"kick",&"sweep",&"lance",&"return_charge",&"horn_wave",&"horn_dance",&"sword_flash"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":String(definition.id),"kind":0,"turn":definition.turn,"speed":definition.speed}
@@ -47,6 +48,60 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			command.technique = phase
 			records.BossTechniqueStage.append(command)
 	return records
+
+## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
+static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if move==null or move.technique!=&"volley": return {}
+	var source: BossTechnique = BossProgram.snapshot(move)
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"LightArrowDefinition":[]}
+	var boss := {"id":1,"external_id":"centaurus","kind":1,"turn":definition.turn,"speed":definition.speed}
+	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
+	records.BossDefinition = [boss]
+	var visual: AttackVisual = source.shot_visual.instantiate()
+	visual._apply_effect_settings()
+	var style := {"id":1,"cosmic":false,"contact":1,"flight_scale":visual.flight_scale}
+	for key in ["shot_length_scale","shot_width_scale","core_width","cosmic_speed","cosmic_star_count"]: style[key] = visual.get(key)
+	for color_pair in [["arrow",visual.get("arrow_color")],["cosmic_a",visual.get("cosmic_color_a")],["cosmic_b",visual.get("cosmic_color_b")],["tint",visual.effect_tint]]:
+		for channel in ["r","g","b","a"]: style[color_pair[0]+"_"+channel] = color_pair[1][channel]
+	visual.free()
+	records.LightArrowDefinition = [style]
+	for phase in [1,2]:
+		var values: Dictionary = source.values().duplicate(true)
+		if phase==2:
+			for key: String in source.values():
+				if key.ends_with("_p2"): values[key.trim_suffix("_p2")] = source.values()[key]
+		var row := {}
+		for record in Schema.SCHEMA.records:
+			if record.name!="BossTechniqueDefinition": continue
+			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
+		row.merge({"id":phase,"boss":1,"external_id":"volley","kind":8,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		for key in ["warn","recover","cd","damage","speed"]: row[key] = float(values[key])
+		var count: int = int(values.count)
+		row.active = float(values.interval)*float(count-1)+0.05
+		records.BossTechniqueDefinition.append(row)
+		records.CentaurusVolleyDefinition.append({"id":phase,"technique":phase,"count":count,"interval":float(values.interval),"radius":float(values.radius),"travel":float(values.travel),"projectile":1})
+		for k in count: records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":3,"at":row.warn+float(values.interval)*k})
+		records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":4,"at":row.warn+row.active})
+	return records
+
+## 個別移行済みの技を、共通本体と同じ制作入口へまとめる。
+static func centaurus_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
+	var package := boss_body_package(definition,config)
+	var records := centaurus_technique_records(definition,move)
+	if package.is_empty() or records.is_empty(): return {}
+	var offset: int = package.records.LightArrowDefinition.size()
+	for style in records.LightArrowDefinition:
+		style.id += offset
+		package.records.LightArrowDefinition.append(style)
+	for volley in records.CentaurusVolleyDefinition: volley.projectile += offset
+	for key in records:
+		if key!="LightArrowDefinition": package.records[key] = records[key]
+	for scene: PackedScene in [move.shot_visual,move.visual]:
+		if scene==null: continue
+		var asset: int = package.records.ResourceKey.size()+1
+		package.records.ResourceKey.append({"id":asset,"role":7})
+		package.visuals.append({"id":asset,"role":7,"path":scene.resource_path})
+	return package
 
 ## 複数の技を同じボスの定義表へまとめる。実行は既存の型付きフローへ任せる。
 static func boss_technique_set_records(definition: BossDef, moves: Array) -> Dictionary:

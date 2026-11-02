@@ -10,6 +10,8 @@ var _parts: Node2D
 var state := {}
 var technique := {}
 var _world_clock := -1.0
+var _technique_id := 0
+var _released := 0
 var hit := 0.0
 var pulse := 0.0
 var leap_ring := 0.0
@@ -31,6 +33,9 @@ func _ready() -> void:
 func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	var dt := maxf(0.0,float(body.clock)-_world_clock) if _world_clock>=0.0 else 0.0
 	state = body
+	if _technique_id!=int(attack.get("id",0)):
+		_technique_id = int(attack.get("id",0))
+		_released = 0
 	technique = attack
 	_world_clock = float(body.clock)
 	position = body.position
@@ -44,6 +49,9 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	hit = float(body.flash)
 	leap_ring = maxf(0.0,leap_ring-dt)
 	pulse = maxf(0.0,pulse-dt)
+	if int(attack.get("released",0))>_released:
+		_parts.release_bow(float(attack.get("interval",0.4)))
+		_released = int(attack.released)
 	_parts.visible = visible
 	_parts.scale = Vector2.ONE*float(body.radius)/135.0
 	_parts.position = Vector2.ZERO
@@ -127,4 +135,7 @@ func _draw() -> void:
 		draw_arc(Vector2(-14, 0), 60.0 + grow * 90.0, 0.0, TAU, 32, Color(sail_star_color, 0.8 * (1.0 - grow)), pixel_size * 2.0)
 	if pulse > 0.0:
 		draw_arc(Vector2(62, 0), 30.0 + (0.3 - pulse) * 80.0, 0.0, TAU, 20, Color(STRING, pulse * 2.5), pixel_size)
+	if _mode()==&"windup" and technique.get("technique","")=="volley":
+		var pull := Vector2(62.0+cos(1.1)*26.0-float(state.charge)*34.0,0.0)
+		draw_line(pull,pull+Vector2(56.0,0.0),WARNING,pixel_size*1.5)
 	draw_set_transform(Vector2.ZERO)

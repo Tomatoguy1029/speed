@@ -20,11 +20,15 @@ uint32_t phase_technique(const RunRuntime &r,const BossFlowState &f,uint32_t id)
 }
 std::vector<uint32_t> children(const ContentBundle &c,uint32_t parent) {std::vector<uint32_t> out;for (const auto &p:c.flow_children) if (p.parent==parent) out.push_back(p.child);return out;}
 std::vector<uint32_t> sections(const ContentBundle &c,uint32_t flow) {std::vector<uint32_t> out;for (const auto &p:c.flow_sections) if (p.flow==flow) out.push_back(p.id);return out;}
+bool filtered_target(const ContentBundle &c,const BossFlowNode &node) {
+    if (node.kind!=1) return true;const auto &t=c.boss_techniques[node.technique-1];
+    return c.bosses[t.boss-1].kind==1 && t.external_id!="rear_attack" && t.external_id!="stomp";
+}
 bool available(const RunRuntime &r,const BossFlowState &f,uint32_t id,unsigned depth=0) {
     if (!id || id>r.content->flow_nodes.size() || depth>24) return false;const auto &p=r.content->flow_nodes[id-1];const auto list=children(*r.content,id);
     if (p.kind==0) return true;
     if (p.kind==1) {
-        const auto actor=participant(f,p.participant);const auto cool=f.cooldowns.find(uint64_t(p.participant)<<32|p.technique);return PhaseController::can_start(r,actor) && !actor_busy(r,actor) && (cool==f.cooldowns.end() || f.clock>=cool->second) && FlowRunner::condition(r,f,p.condition,false,p.participant) && TechniqueRunner::ready(r,actor,phase_technique(r,f,p.technique));
+        const auto actor=participant(f,p.participant);const auto cool=f.cooldowns.find(uint64_t(p.participant)<<32|p.technique);return PhaseController::can_start(r,actor) && !actor_busy(r,actor) && (cool==f.cooldowns.end() || f.clock>=cool->second) && FlowRunner::condition(r,f,p.condition,filtered_target(*r.content,p),p.participant) && TechniqueRunner::ready(r,actor,phase_technique(r,f,p.technique));
     }
     if (list.empty()) return false;
     if (p.kind==2) return available(r,f,list.front(),depth+1);
@@ -128,7 +132,7 @@ void tick_flow(RunRuntime &r,BossFlowState &f,double dt) {
     if (f.waiting) {f.no_candidate_elapsed+=dt;if (section.has_timeout && f.no_candidate_elapsed>=section.timeout) {advance(f,section,true);return;}}
     f.retry=std::max(0.0,f.retry-dt);if (f.retry>0) return;f.retry=0.15;
     std::vector<uint32_t> candidates,within;const double cap=std::min(section.cap,p.maximum_stamina),budget=section.has_budget?std::max(0.0,section.budget-f.section_spent):1e300;
-    for (const auto &a:c.flow_actions) if (a.flow==f.definition && filter(c,section,a) && FlowRunner::condition(r,f,a.condition,c.flow_nodes[a.node-1].kind!=1) && available(r,f,a.node)) {if (a.cost<=cap && a.cost<=budget) {within.push_back(a.id);if (a.cost<=f.stamina) candidates.push_back(a.id);}}
+    for (const auto &a:c.flow_actions) if (a.flow==f.definition && filter(c,section,a) && FlowRunner::condition(r,f,a.condition,filtered_target(c,c.flow_nodes[a.node-1])) && available(r,f,a.node)) {if (a.cost<=cap && a.cost<=budget) {within.push_back(a.id);if (a.cost<=f.stamina) candidates.push_back(a.id);}}
     if (candidates.empty()) {if (!within.empty()) rest(f,p,f.index);else wait_candidate(f,section);return;}
     const auto actions=choose(r,f,section,candidates,std::min({cap,budget,f.stamina}));if (actions.empty()) {wait_candidate(f,section);return;}
     f.nodes.clear();f.roots.clear();for (auto id:actions) {const auto &a=c.flow_actions[id-1];f.roots.push_back(new_node(f,a.node));}

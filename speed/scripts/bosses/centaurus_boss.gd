@@ -297,7 +297,7 @@ func _begin_technique(attack: StringName) -> void:
 	combat_trace.finish()
 	combat_trace.begin(attack, combat_origin)
 	technique = attack
-	_runner = _moves[attack].make_runner()
+	_runner = preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[attack])
 	_support_runners[attack] = _runner
 	var prior_observer := ctx.bosses.recording_actor
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
@@ -344,7 +344,7 @@ func _attack_length(attack: StringName, r: Dictionary) -> float:
 	var parts := _combo_parts(attack)
 	if not parts.is_empty():
 		return _attack_length(parts[0], _rules[parts[0]]) + float(r.gap) + _attack_length(parts[1], _rules[parts[1]]) + float(_rules[parts[1]].recover)
-	var kind: StringName = _moves[attack].make_runner().kind()
+	var kind: StringName = preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[attack]).kind()
 	if kind == &"arrow_shower":
 		var placement := maxi(0, int(r.count) - 1) * float(r.interval) if r.pattern == "chase" else maxi(0, int(r.count) - 1) * 0.5 * float(r.step)
 		if r.pattern == "path": placement = maxi(0, int(r.count) - 1) * float(r.step)
@@ -352,9 +352,9 @@ func _attack_length(attack: StringName, r: Dictionary) -> float:
 	if kind == &"sail_run": return float(r.warn) + float(r.duration)
 	if kind == &"stomp": return float(r.warn) + float(r.active)
 	if kind == &"fan_volley": return float(r.warn) + maxi(0, int(r.shots) - 1) * float(r.interval)
-	if _moves[attack].make_runner().kind() == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
-	if _moves[attack].make_runner().kind() == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
-	if _moves[attack].make_runner().kind() == &"rain":
+	if preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[attack]).kind() == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
+	if preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[attack]).kind() == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
+	if preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[attack]).kind() == &"rain":
 		var traces := int(r.traces)
 		return float(r.warn) + traces * _trace_duration(r) + maxi(traces - 1, 0) * float(r.trace_gap) + float(r.get("drop_delay", 0.0)) + float(r.fall) + float(r.linger) + 0.3
 	return float(r.warn) + 0.05
@@ -524,7 +524,7 @@ func _runner_for() -> RefCounted:
 
 func _runner_id(id: StringName) -> RefCounted:
 	if _runner != null and _runner.kind() == id: return _runner
-	if not _support_runners.has(id): _support_runners[id] = _moves[id].make_runner()
+	if not _support_runners.has(id): _support_runners[id] = preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[id])
 	return _support_runners[id]
 
 func _sync_technique_visuals() -> void:

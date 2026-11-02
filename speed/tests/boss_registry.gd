@@ -6,6 +6,15 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-centaurus-volley-owner" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_volley_owner")
+		return
+	if "--cpp-centaurus-volley-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_volley_retry")
+		return
+	if "--cpp-centaurus-volley" in OS.get_cmdline_user_args() or "--cpp-centaurus-volley-tail" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_volley")
+		return
 	if "--cpp-centaurus-body-view" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_body_view")
 		return
@@ -161,4 +170,184 @@ func native_centaurus_body_view() -> void:
 	view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_centaurus_body_view] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func centaurus_volley_case(flow_enabled := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	var definition = load("res://data/bosses/centaurus.tres").duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.guard_count = 0
+	definition.params.guard_min = 0
+	definition.speed = 0.0
+	var move = load("res://data/bosses/centaurus_moves/volley.tres").duplicate(true)
+	move.warn = 0.1
+	move.count = 3
+	move.count_p2 = 4
+	move.interval = 0.05
+	move.recover = 0.05
+	move.cd = 0.0
+	var package: Dictionary = builder.centaurus_technique_package(definition,move,cfg)
+	if flow_enabled:
+		var rules = load("res://data/bosses/ai/centaurus_action_rules.tres").duplicate(true)
+		rules.techniques.assign([move])
+		rules.combos = {}
+		rules.conditions = {"volley":{"min":0.0,"max":500.0}}
+		rules.costs = {"volley":1.0}
+		rules.selection_bias = {}
+		rules.condition_groups = {}
+		rules.graph_nodes = {}
+		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
+		flow.maximum_stamina = 10.0
+		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		for key in records: package.records[key] = records[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":159,"mode":1,"stage_id":"B_centaurus_volley","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(159,{"position":Vector2(300,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge._core.set_motion_context(Vector2(300,0),Vector2(300,0),Vector2(640,360))
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	return {"bridge":bridge,"id":id,"package":package,"events":events}
+
+## 速射の開始・発射間隔・命中・自然終了と中断を既存ボス検査から確認する。
+func native_centaurus_volley() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var definition = load("res://data/bosses/centaurus.tres")
+	var move = load("res://data/bosses/centaurus_moves/volley.tres")
+	var records: Dictionary = builder.boss_technique_records(definition,move)
+	if "--cpp-centaurus-volley-tail" not in OS.get_cmdline_user_args():
+		check(records.CentaurusVolleyDefinition[0].count==5 and records.CentaurusVolleyDefinition[1].count==8 and records.BossTechniqueDefinition[0].warn==move.warn,"制作Resourceの全値と形態ごとの弾数を生成する")
+		check(records.BossTechniqueStage.size()==15 and records.BossTechniqueStage[0].at==move.warn and is_equal_approx(records.BossTechniqueStage[5].at,move.warn+move.interval*4.0+0.05),"発射と終了のキー時刻を実効値から生成する")
+		var timeline: AnimationLibrary = load("res://scenes/bosses/centaurus_boss_timeline.tres")
+		check(timeline.get_animation(&"attack").track_get_key_count(0)==0,"保存済みの戦闘methodキーを残さない")
+	var c := centaurus_volley_case(true)
+	if "--cpp-centaurus-volley-tail" not in OS.get_cmdline_user_args(): check(not c.is_empty(),"技・矢の固有外観・フローと本体を同じ生成形式で読む")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(900,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(900,0),Vector2(900,0),Vector2(640,360))
+	bridge._core.step(0.001)
+	var attacks: Array = bridge.command("dev_boss_state").value
+	if "--cpp-centaurus-volley-tail" not in OS.get_cmdline_user_args(): check(attacks.size()==1 and attacks[0].stage==0,"速射は遅延照準の距離条件から共通フローで選ぶ")
+	if attacks.is_empty(): bridge.dispose(); get_tree().quit(1); return
+	var first: Dictionary = attacks[0]
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(300,0),Vector2(300,0),Vector2(640,360))
+	if "--cpp-centaurus-volley-tail" not in OS.get_cmdline_user_args(): check(bridge._core.hostiles_snapshot().is_empty(),"予告の開始時は矢を撃たない")
+	bridge._core.step(0.1)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.stage==1 and t.released==1 and bridge._core.hostiles_snapshot().size()==1,"予告時刻に最初の矢を1本だけ撃つ")
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var shot: Dictionary = bridge._core.hostiles_snapshot()[0]
+	check(shot.pos.is_equal_approx(body.position+Vector2.from_angle(body.facing)*body.radius*definition.params.bow_reach) and is_equal_approx(shot.life,move.travel/move.speed),"弓口から射程÷速さの寿命で長さ0の矢を出す")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,1.0)
+	var render: Dictionary = bridge.read_render(Rect2(-2000,-2000,4000,4000)).value
+	check(view.apply_frame(render) and view._boss_body_displays.values()[0]._parts._clip=="shot_release" and render.shapes.any(func(shape): return shape.kind==builder.Schema.ENUMS.RenderShapeKind.LightArrow and shape.length==0.0),"発射段階から弓の解放姿勢と矢じりを正式表示する")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.05)
+	bridge._core.step(0.05)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.released==3 and bridge._core.hostiles_snapshot().size()==3,"指定間隔ごとに残りの矢を撃つ")
+	var after: Dictionary = t.duplicate(true)
+	check(bridge.restore(held.value).ok,"速射の途中状態・次の発射キーと飛行中の矢を復帰する")
+	bridge._core.step(0.05)
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0]==after,"復帰後の残りの速射が同じ時刻と状態へ進む")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and bridge._core.hostiles_snapshot().size()==3,"最後の発射から0.05秒後に硬直へ移り矢を残す")
+	bridge._core.step(0.05)
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.15)
+	bridge._core.step(0.15)
+	check(bridge.command("dev_boss_state").value[0].id>first.id,"硬直が終わるとフローから次の行動へ進む")
+	bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hostiles(0.5)
+	check(bridge._core.ship_snapshot().ship_hp<hp,"矢じりの飛行区間が機体へ命中し実ダメージを与える")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"速射の出来事と命中を公開更新・配信・記録の入口へ渡す")
+	check(c.events.any(func(event): return event.type=="centaurus_cue" and event.payload.cue=="released"),"役者内の発射cueを専用の通知種別で記録する")
+	bridge.dispose()
+	view.queue_free()
+	c = centaurus_volley_case()
+	bridge = c.bridge
+	var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
+	bridge._core.step(0.1)
+	check(bridge.command("dev_cancel_technique",{"ticket":ticket}).ok and bridge._core.hostiles_snapshot().size()==1,"速射の取消で発射済みの矢を消さない")
+	bridge.command("dev_remove",{"entity_id":c.id})
+	check(bridge._core.hostiles_snapshot().size()==1,"発射元が消えても矢を寿命まで残す")
+	bridge._core.step_hostiles(2.0)
+	check(bridge._core.hostiles_snapshot().is_empty(),"残った矢は射程の寿命で消える")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"取消と参加者消失の通知を配信する")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_volley] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 速射で未成立だった表示と次行動だけを確認する。
+func native_centaurus_volley_retry() -> void:
+	var c := centaurus_volley_case()
+	var bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.1)
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,1.0)
+	var render: Dictionary = bridge.read_render(Rect2(-2000,-2000,4000,4000)).value
+	var accepted: bool = view.apply_frame(render)
+	var clip: String = view._boss_body_displays.values()[0]._parts._clip
+	var arrows: Array = render.shapes.filter(func(shape): return shape.kind==load("res://tools/content/generated/run_schema.gd").ENUMS.RenderShapeKind.LightArrow and shape.length==0.0)
+	if not accepted or clip!="shot_release" or arrows.is_empty(): print("表示の未成立: ",accepted," ",clip," ",render.shapes)
+	check(accepted and clip=="shot_release" and not arrows.is_empty(),"発射段階から弓の解放姿勢と長さ0の矢じりを正式表示する")
+	bridge.dispose()
+	view.queue_free()
+	c = centaurus_volley_case(true)
+	bridge = c.bridge
+	bridge._core.step(0.001)
+	var first: int = bridge.command("dev_boss_state").value[0].id
+	bridge._core.step(0.25)
+	bridge._core.step(0.05)
+	bridge._core.step(0.15)
+	bridge._core.step(0.15)
+	check(bridge.command("dev_boss_state").value[0].id>first,"硬直とフローの区切りを終えて次の速射へ進む")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"未成立条件の公開更新と通知配信を終える")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_volley_retry] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 取消前に発射元が消えた場合の停止だけを確認する。
+func native_centaurus_volley_owner() -> void:
+	var c := centaurus_volley_case()
+	var bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.1)
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge._core.hostiles_snapshot().size()==1,"発射元の消失で残りの速射を止め、発射済みの矢は残す")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"発射元消失の通知を配信する")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_volley_owner] failures=",failed)
 	get_tree().quit(1 if failed else 0)

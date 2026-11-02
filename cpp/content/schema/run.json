@@ -2035,6 +2035,10 @@
       {
         "name": "TwinFirst",
         "value": "twin_first"
+      },
+      {
+        "name": "CentaurusCue",
+        "value": "centaurus_cue"
       }
     ],
     "ResultKind": [
@@ -2737,7 +2741,15 @@
     "landmark": [
       "pos"
     ],
-    "twin_first": []
+    "twin_first": [],
+    "centaurus_cue": [
+      "id",
+      "technique",
+      "cue",
+      "position",
+      "angle",
+      "world_time"
+    ]
   },
   "includes": [
     "attacks.json",
