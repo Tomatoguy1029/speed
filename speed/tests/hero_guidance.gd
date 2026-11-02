@@ -101,13 +101,14 @@ func _cpp_check_frame(bridge) -> Dictionary:
 	_check(delivered.ok and bridge.delivery_error.get("ok",true),"英雄通知を全購読先へ届ける")
 	return frame.value.ui.hero if frame.ok else {}
 
-func _cpp_fixture(lab := false,armor := -1.0):
+func _cpp_fixture(lab := false,armor := -1.0,hp := -1.0):
 	var cfg: GameConfig = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
 	cfg.landmark_first_window = Vector2(0,1)
 	cfg.landmark_second_window = Vector2(0,1)
 	var actor: EnemyDef = load("res://data/enemies/drifter.tres").duplicate(true)
 	if armor>=0.0: actor.armor = armor
+	if hp>0.0: actor.stage_hp = hp
 	actor.rank = 2
 	actor.max_alive = 2
 	actor.speed = 0.0

@@ -170,6 +170,52 @@
           "ref": "HeroDefinition"
         }
       ]
+    },
+    {
+      "name": "HerculesDefinition",
+      "section": 286,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fall_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burn_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burn_power",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

@@ -106,6 +106,7 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     if (request.cause!=Cause::Ram && request.cause!=Cause::Bump && !allows_hit(run,result.target,request)) {
         result.reason=CombatReason::DamageGate;EventBuilder::enemy_damage(run,request,result);return result;
     }
+    if (request.cause==Cause::Fire) state.enemies[result.target.slot].fire_hit=state.world_time;
     const auto definition=state.enemies[result.target.slot].definition;
     const auto policy=run.combat_hooks.enemy_policy(run.content->definitions[definition].kind);
     result.resolved=request.cause==Cause::Ram?ram_damage(run,result.target,request.amount):request.amount;

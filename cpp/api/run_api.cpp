@@ -224,7 +224,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=speed::ProgressionSystem::complete(runtime,payload["request_id"],payload["status"])?success():failure(5,"request_id/status","未処理の資源要求と一致しません");
     } else if (kind=="retry_resources" && payload.size()==1 && is(payload,"request_id",Variant::INT)) {
         response=speed::ProgressionSystem::retry(runtime,payload["request_id"])?success():failure(5,"request_id","再試行できる失敗要求がありません");
-    } else if (kind=="dev_hero_place" || kind=="dev_hero_pass" || kind=="dev_tick_heroes" || kind=="dev_hero_activate") {
+    } else if (kind=="dev_set_hero" || kind=="dev_hero_place" || kind=="dev_hero_pass" || kind=="dev_tick_heroes" || kind=="dev_hero_activate") {
         response=development_hero_command(kind,payload);
     } else if ((kind=="dev_grant_equipment" || kind=="dev_remove_weapon" || kind=="dev_remove_trait") && runtime.api_development && is(payload,"id",Variant::STRING)) {
         const String external=payload["id"];bool changed=false;

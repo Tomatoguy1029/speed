@@ -9,6 +9,10 @@ bool point(const Dictionary &p,const char *key) {return p.has(key) && p[key].get
 }
 Dictionary SpeedRunCore::development_hero_command(const String &kind,const Dictionary &p) {
     if (!runtime.api_development) return result(false);
+    if (kind=="dev_set_hero" && p.size()==1 && p.get("id",Variant()).get_type()==Variant::STRING) {
+        if (String(p["id"]).is_empty()) {speed::HeroesSystem::select_power(runtime,0);return result(true);}
+        for (const auto &hero:runtime.content->heroes) if (String::utf8(hero.definition.external_id.c_str())==String(p["id"])) {speed::HeroesSystem::select_power(runtime,hero.definition.id);return result(true);}return result(false);
+    }
     if (kind=="dev_hero_place" && p.size()==1 && p.get("id",Variant()).get_type()==Variant::STRING) {
         for (const auto &hero:runtime.content->heroes) if (String::utf8(hero.definition.external_id.c_str())==String(p["id"])) {speed::HeroesSystem::place(runtime,hero.definition.id);return result(true);}return result(false);
     }

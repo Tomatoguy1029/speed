@@ -106,7 +106,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (!enemy.alive) { if (state.enemy_handles.contains(handle)) return false;continue; }
         if (!visited.count(row) || enemy.id<=0 || enemy.id>=state.next_id ||
             state.enemy_handles.entity_id(handle)!=enemy.id || !enemy.pos.is_finite() || !enemy.vel.is_finite() ||
-            !std::isfinite(enemy.hp) || !std::isfinite(enemy.max_hp) || !std::isfinite(enemy.radius) || enemy.radius<=0 ||
+            !std::isfinite(enemy.fire_hit) || !std::isfinite(enemy.hp) || !std::isfinite(enemy.max_hp) || !std::isfinite(enemy.radius) || enemy.radius<=0 ||
             !state.rows_by_id.emplace(enemy.id,row).second) return false;
     }
     for (const auto &enemy:state.enemies) if (enemy.alive) {

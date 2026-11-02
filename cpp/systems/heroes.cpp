@@ -1,3 +1,4 @@
+#include "../behaviors/heroes/hercules.h"
 #include "../behaviors/heroes/leo.h"
 #include "../behaviors/heroes/perseus.h"
 #include "heroes.h"
@@ -95,6 +96,7 @@ void HeroesSystem::step(RunRuntime &run,double real_dt,double world_dt) {
     h.cooldown=std::max(0.0,h.cooldown-real_dt);
     if (h.active>0) {h.active=std::max(0.0,h.active-real_dt);if (h.active<=0) {Dictionary data;data["id"]=name(run,h.power);emit(run,"hero_power_end",data);}}
     if (h.next>=0) {h.next-=real_dt;if (h.next<0) place(run,random_hero(run,h.power));}
+    HerculesBehavior::step(run,real_dt);
     const auto from=h.previous;h.previous=s.ship.pos;if (!captive(run)) return;
     if (!h.guarded && s.ship.pos.distance_squared_to(h.center)<cfg.guard_range*cfg.guard_range) guards(run);
     if (s.ship.pos.distance_squared_to(h.center)<cfg.glow_range*cfg.glow_range) h.seen=true;
@@ -120,12 +122,14 @@ void HeroesSystem::recovered(RunRuntime &run,EnemyHandle enemy) {
     h.landmarks.push_back(run.state.enemies[enemy.slot].pos);Dictionary data;data["pos"]=run.state.enemies[enemy.slot].pos;emit(run,"landmark",data);
     for (size_t i=0;i<2;++i) if (same_handle(h.carriers[i],enemy) && valid_carrier(run,i)) h.done[i]=true;
 }
+void HeroesSystem::select_power(RunRuntime &run,uint32_t id) {run.state.heroes.power=id;run.state.heroes.active=0;}
 void HeroesSystem::activate(RunRuntime &run) {
     auto &h=run.state.heroes;if (!h.power || h.cooldown>0) return;const auto &d=run.content->heroes[h.power-1].definition;h.cooldown=d.cooldown;h.active=d.duration;Dictionary data;data["id"]=name(run,h.power);data["pos"]=run.state.ship.pos;emit(run,"hero_power",data);
     if (d.external_id=="perseus") PerseusBehavior::activate(run,d.duration);
 }
 Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
     const auto &h=run.state.heroes;Dictionary out;out["trace_width"]=trace_width(run);out["trace_radius"]=run.state.trace_radius*trace_width(run);out["boss_stun"]=h.boss_stun;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;
+    Dictionary fire;godot::PackedFloat64Array falls,burns;for (const auto &v:h.hercules.falls) {falls.push_back(v.position.x);falls.push_back(v.position.y);falls.push_back(v.remaining);}for (const auto &v:h.hercules.burns) {burns.push_back(v.position.x);burns.push_back(v.position.y);burns.push_back(v.remaining);}fire["falls"]=falls;fire["burns"]=burns;fire["fire_time"]=h.hercules.fire_time;fire["burn_tick"]=h.hercules.burn_tick;out["hercules"]=fire;
     Dictionary twin;godot::PackedVector2Array first,path;for (auto p:h.twin.first) first.push_back(p);for (auto p:h.twin.path) path.push_back(p);
     twin["first"]=first;twin["path"]=path;twin["position"]=h.twin.position;twin["tracing"]=h.twin.tracing;twin["rate"]=h.twin.rate;twin["segment"]=int64_t(h.twin.segment);twin["segment_position"]=h.twin.segment_position;out["twin"]=twin;
     godot::PackedVector2Array stars,landmarks;godot::PackedByteArray lit,done;godot::PackedInt32Array links;godot::PackedInt64Array ids;godot::PackedFloat64Array times;
@@ -137,6 +141,8 @@ Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
 bool HeroesSystem::validate(const godot::RunState &s,const ContentBundle &c) {
     const auto &h=s.heroes;if (h.hero>c.heroes.size() || h.power>c.heroes.size() || !h.center.is_finite() || !h.previous.is_finite() || !std::isfinite(h.cooldown) || !std::isfinite(h.active) || !std::isfinite(h.next) || !std::isfinite(h.boss_stun) || h.boss_stun<0 || h.cooldown<0 || h.active<0 || h.landmarks.size()>2) return false;
     if (h.hero && (h.stars.size()!=c.heroes[h.hero-1].stars.size() || h.lit.size()!=c.heroes[h.hero-1].links.size())) return false;
+    if (!std::isfinite(h.hercules.fire_time) || !std::isfinite(h.hercules.burn_tick)) return false;
+    for (const auto *items:{&h.hercules.falls,&h.hercules.burns}) for (const auto &v:*items) if (!v.position.is_finite() || !std::isfinite(v.remaining) || v.remaining<0) return false;
     const auto &t=h.twin;if (!t.position.is_finite() || !std::isfinite(t.rate) || t.rate<0 || !std::isfinite(t.segment_position) || t.segment_position<0 || (t.tracing && (t.path.size()<2 || t.segment>=t.path.size()-1))) return false;
     for (auto p:t.first) if (!p.is_finite()) return false;for (auto p:t.path) if (!p.is_finite()) return false;for (auto id:t.inside) if (id<=0) return false;
     for (auto p:h.stars) if (!p.is_finite()) return false;for (auto p:h.landmarks) if (!p.is_finite()) return false;for (auto v:h.lit) if (v>1) return false;

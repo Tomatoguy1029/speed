@@ -63,7 +63,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         row["shove_time"] = e->shove_time; row["shove_vel"] = e->shove_vel; row["shove_from"] = e->shove_from;
         row["turn_locked"]=runtime.state.draw.tracing && !e->held && !runtime.state.enemy_handles.contains(e->pump_owner);
         row["held"] = int(e->held); row["slash_hold"] = int(e->slash_hold); row["shoved"] = int(e->shoved);
-        row["age"] = e->age; row["fire_t"] = e->fire_t;
+        row["fire_hit"]=e->fire_hit;row["age"] = e->age; row["fire_t"] = e->fire_t;
         row["guard"]=e->guard;row["hit_cd"]=e->hit_cd;row["attack_priority"]=e->attack_priority;
         if (runtime.content->definitions[e->definition].kind==speed::EnemyDefinition::Kind::Drift) row["spin"]=e->spin;
         if (e->parent_id) {row["parent_id"]=e->parent_id;row["parent_alive"]=runtime.state.enemy_handles.contains(e->parent) && !runtime.state.enemies[e->parent.slot].dead;}

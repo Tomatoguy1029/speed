@@ -22,6 +22,7 @@ var ruler_shake:=0.0
 var _ruler:=PackedFloat64Array()
 var _triangle_star := PackedFloat64Array()
 var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
+var _hero_fire_canvas: DrawLayer
 var _hero_power_visual: Node2D
 var _hero_canvas: DrawLayer
 var _hero_frame := {}
@@ -168,6 +169,9 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
 	_hero_power_visual = preload("res://scripts/render/equipment/heroes.gd").new()
 	_layer(9).add_child(_hero_power_visual)
+	_hero_fire_canvas = DrawLayer.new()
+	_hero_fire_canvas.draw_fn = _hero_power_visual.draw_fire
+	_layer(2).add_child(_hero_fire_canvas)
 	_hero_canvas = DrawLayer.new()
 	_hero_canvas.draw_fn = _draw_hero_values
 	_layer(2).add_child(_hero_canvas)
@@ -993,6 +997,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rear_flashes = ShotFlashes.new()
 		_rear_shells.clear()
 		_rear_world_time = -1.0
+	_hero_power_visual.fire = frame.ui.get("hero",{}).get("hercules",{})
+	_hero_power_visual.world_time = float(frame.ui.world_time)
+	_hero_fire_canvas.queue_redraw()
 	_hero_power_visual.unit = 1.0/maxf(0.01,float(frame.camera.zoom))
 	_hero_frame = frame.ui.duplicate()
 	_hero_frame.camera_zoom = frame.camera.zoom

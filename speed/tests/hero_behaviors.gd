@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hercules" in OS.get_cmdline_user_args():
+		_cpp_hercules()
+		return
 	if "--cpp-gemini" in OS.get_cmdline_user_args():
 		_cpp_gemini()
 		return
@@ -264,4 +267,68 @@ func _cpp_gemini() -> void:
 	failed += fixture.failed
 	fixture.free()
 	print("[cpp_H_gemini] failed=%d" % failed)
+	get_tree().quit(1 if failed else 0)
+
+func _cpp_hero_tick(bridge,dt: float,time: float) -> Dictionary:
+	check(bridge.command("dev_tick_heroes",{"dt":dt,"run_time":time}).ok,"英雄を指定の実秒だけ進める")
+	return _cpp_read(bridge)
+
+func _cpp_hercules() -> void:
+	var fixture = load("res://tests/hero_guidance.gd").new()
+	var bridge = fixture._cpp_fixture(true,100000.0,100000.0)
+	_cpp_rescue(bridge,"hercules")
+	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
+	var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)}).value
+	var input := Intent.new()
+	input.hero_press = true
+	var frame := _cpp_step(bridge,input)
+	var fire: Dictionary = frame.ui.hero.hercules
+	check(frame.ui.hero.active>9.0 and fire.falls.size()==3 and fire.burns.is_empty(),"救出して発動すると敵を狙う火の隕石を出す")
+	var at := Vector2(fire.falls[0],fire.falls[1])
+	check(at.distance_to(Vector2(120,0))<=40.00001 and is_equal_approx(fire.falls[2],0.6-1.0/120.0),"敵の近くをRunRandomで狙い落下時間を実秒で減らす")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"落下中の残り時間と乱数を保持する")
+	_cpp_hero_tick(bridge,0.3,0.3)
+	frame = _cpp_hero_tick(bridge,0.3,0.6)
+	fire = frame.ui.hero.hercules
+	check(fire.falls.size()==3 and fire.burns.size()==3 and is_equal_approx(fire.burns[2],2.7),"着弾後は次の落下と燃える跡を独立して保持する")
+	var first_fire: Array = fixture._cpp_events.filter(func(e): return e.type=="combat_damage" and e.payload.target_id==enemy and e.payload.cause=="fire" and e.payload.applied>0.0)
+	check(first_fire.size()==2 and is_equal_approx(first_fire[1].payload.applied/first_fire[0].payload.applied,0.3),"着弾と炎の周期命中は装甲を無視して定義の倍率を使う")
+	check(_cpp_enemy(bridge,enemy).fire_hit==frame.ui.world_time,"実際に当たった世界時刻を敵の焼却判定へ残す")
+	check(fixture._cpp_events.any(func(e): return e.type=="explode" and e.payload.cause=="fire"),"着弾の爆発を既存の表示通知へ渡す")
+	var current_cd: float = frame.ui.hero.cooldown
+	check(not bridge.command("dev_set_hero",{"id":"未登録"}).ok,"未登録の英雄選択を拒否する")
+	check(bridge.command("dev_set_hero",{"id":""}).ok,"実験場の正式入口で英雄の力を外す")
+	var cleared := _cpp_read(bridge)
+	check(cleared.ui.hero.power==&"" and cleared.ui.hero.active==0.0 and cleared.ui.hero.cooldown==current_cd and cleared.ui.hero.hercules==fire,"選択解除はCDと発射済みの隕石・炎を維持する")
+	check(bridge.command("dev_set_hero",{"id":"leo"}).ok,"実験場の正式入口で別の英雄を選ぶ")
+	var selected := _cpp_read(bridge)
+	check(selected.ui.hero.power==&"leo" and selected.ui.hero.active==0.0 and selected.ui.hero.cooldown==current_cd,"英雄の選択は旧Labと同じ項目だけを変更する")
+	check(bridge.restore(held.value).ok,"選択試行前の落下途中へ戻す")
+	_cpp_hero_tick(bridge,0.3,0.3)
+	frame = _cpp_hero_tick(bridge,0.3,0.6)
+	fire = frame.ui.hero.hercules
+	var expected: Dictionary = fire.duplicate(true)
+	var expected_random: int = bridge._core.random_state()
+	check(bridge.restore(held.value).ok,"落下の途中へ戻す")
+	_cpp_hero_tick(bridge,0.3,0.3)
+	frame = _cpp_hero_tick(bridge,0.3,0.6)
+	check(frame.ui.hero.hercules==expected and bridge._core.random_state()==expected_random,"復帰で次の目標と落下・燃焼の残り時間が再現する")
+	var events_before: int = fixture._cpp_events.size()
+	_cpp_hero_tick(bridge,0.25,0.85)
+	var periodic: Array = fixture._cpp_events.slice(events_before).filter(func(e): return e.type=="combat_damage" and e.payload.target_id==enemy and e.payload.cause=="fire" and e.payload.applied>0.0)
+	check(periodic.size()==1,"世界時間を進めなくても0.25実秒で炎がもう一度当たる")
+	check(bridge.restore(held.value).ok,"効果終了付近の確認へ戻す")
+	_cpp_hero_tick(bridge,9.5,9.5)
+	_cpp_hero_tick(bridge,0.35,9.85)
+	frame = _cpp_hero_tick(bridge,0.15,10.0)
+	check(frame.ui.hero.active==0.0 and frame.ui.hero.hercules.falls.size()==3,"力が終わっても発射済みの隕石は落下を続ける")
+	frame = _cpp_hero_tick(bridge,0.11,10.11)
+	check(frame.ui.hero.hercules.falls.is_empty() and frame.ui.hero.hercules.burns.size()==3,"効果終了後も着弾して炎を残す")
+	frame = _cpp_hero_tick(bridge,3.0,13.11)
+	check(frame.ui.hero.hercules.falls.is_empty() and frame.ui.hero.hercules.burns.is_empty(),"燃焼の寿命で残った表示と命中を片付ける")
+	bridge.dispose()
+	failed += fixture.failed
+	fixture.free()
+	print("[cpp_H_hercules] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)

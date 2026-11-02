@@ -248,6 +248,10 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	for definition_hero: HeroDef in ContentManager.heroes.values():
 		var hero_id: int = data.HeroDefinition.size()+1
 		data.HeroDefinition.append({"id":hero_id,"external_id":String(definition_hero.id),"stage":definition_hero.stage,"cooldown":definition_hero.cooldown,"duration":definition_hero.duration})
+		if definition_hero.id==&"hercules":
+			var fire := {"id":data.HerculesDefinition.size()+1,"hero":hero_id}
+			for key in ["interval","fall_time","power","radius","burn_time","burn_power"]: fire[key] = float(definition_hero.params[key])
+			data.HerculesDefinition.append(fire)
 		if definition_hero.id==&"gemini": data.GeminiDefinition.append({"id":data.GeminiDefinition.size()+1,"hero":hero_id})
 		if definition_hero.id==&"leo": data.LeoDefinition.append({"id":data.LeoDefinition.size()+1,"hero":hero_id,"width_mult":float(definition_hero.params.width_mult)})
 		if definition_hero.id==&"perseus": data.PerseusDefinition.append({"id":data.PerseusDefinition.size()+1,"hero":hero_id,"boss_stun":float(definition_hero.params.boss_stun)})
@@ -1138,6 +1142,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.NumericTraitLevel = resolved.NumericTraitLevel
 		data.HeroConfig = resolved.HeroConfig
+		data.HerculesDefinition = resolved.HerculesDefinition
 		data.GeminiDefinition = resolved.GeminiDefinition
 		data.LeoDefinition = resolved.LeoDefinition
 		data.PerseusDefinition = resolved.PerseusDefinition

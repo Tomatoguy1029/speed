@@ -7,6 +7,8 @@
 namespace speed {
 // 星座、目印二枠、力をランと一緒に値で保持する。
 struct HeroState {
+    struct FirePosition {godot::Vector2 position;double remaining=0;};
+    struct Hercules {std::vector<FirePosition> falls,burns;double fire_time=0,burn_tick=0;} hercules;
     struct Twin {
         std::vector<godot::Vector2> first,path;
         godot::Vector2 position;
