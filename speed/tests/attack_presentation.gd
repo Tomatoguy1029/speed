@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-corona" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_corona()
+		check(finished,"かんむり座の指定確認を最後まで実施する")
+		print("[cpp_corona] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-pump" in OS.get_cmdline_user_args() or "--cpp-pump-fix2" in OS.get_cmdline_user_args() or "--cpp-pump-final" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_pump()
 		check(finished,"ポンプ座の指定確認を最後まで実施する")
@@ -1633,4 +1639,74 @@ func check_cpp_pump() -> bool:
 	check(next_owner!=owner and cpp_motion_for(next_owner).buds==0 and cpp_motion_for(next_owner).stored_types.is_empty() and cpp_motion_for(next_owner).bud_t==0.0,"Pumpの行を使い直した別個体へ収納種類を漏らさない")
 	cpp_session.free()
 	mute_checks = false
+	return true
+
+func check_cpp_corona() -> bool:
+	var gated := (load("res://data/enemies/drifter.tres") as EnemyDef).duplicate(true) as EnemyDef
+	gated.gate = &"solid"
+	var tuning := {"corona":{"speed":0.0,"params.capture_max":2,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":100.0,"params.ring":80.0,"params.spin":1.0,"params.fire_interval":100.0,"params.throw_weight_biter":0.0,"params.throw_effect_scale":1.4},"drifter":{"speed":0.0},"swarm":{"speed":0.0},"splitling":{"speed":0.0},"biter":{"speed":0.0}}
+	if not await prepare_cpp_attack(116,"corona",PackedStringArray(["corona","drifter","swarm","splitling","biter","hydra_bite"]),tuning,{&"drifter":gated}): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(500,0),"velocity":Vector2.ZERO})
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"corona","position":cpp_origin}).value
+	cpp_core.set_enemy_motion(owner,{"fire_t":100.0})
+	var first: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(80,0)}).value
+	var second: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(0,100)}).value
+	var original: Dictionary = cpp_enemy_for(first).duplicate()
+	var excluded: Array[int] = []
+	for id: String in ["drifter","biter"]: excluded.append(cpp_bridge.command("dev_spawn",{"definition_id":id,"position":cpp_origin+Vector2(-80,-20)}).value)
+	for flag: String in ["stone","knock_t","shove_time"]:
+		var id: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(-80,-20)}).value
+		cpp_core.set_enemy_motion(id,{flag:1.0})
+		excluded.append(id)
+	var boss: int = cpp_core.spawn_enemy(&"swarm",cpp_origin+Vector2(-80,-20),{"is_boss":true})
+	excluded.append(boss)
+	excluded.append(cpp_bridge.command("dev_spawn_part",{"parent_id":owner,"definition_id":"hydra_bite","position":cpp_origin+Vector2(-80,-20)}).value)
+	cpp_core.step(0.1)
+	check(cpp_motion_for(owner).corona_count==2 and cpp_motion_for(first).held==1 and cpp_motion_for(second).held==1 and cpp_motion_for(first).corona_owner==owner and excluded.all(func(id): return not cpp_motion_for(id).has("corona_owner")),"上限2体を同じ敵の個体IDで捕捉し、gate・重み0・石化・外力・ボス・部位を除外する")
+	check(cpp_enemy_for(first).hp==original.hp and cpp_enemy_for(first).armor==original.armor and cpp_enemy_for(first).type==original.type,"捕捉しても種類・HP・装甲・元の行を保つ")
+	var age: float = cpp_motion_for(first).age
+	cpp_core.step(0.1)
+	check(is_equal_approx(cpp_motion_for(first).corona_radius,80.0) and is_equal_approx(cpp_motion_for(second).corona_radius,80.0) and is_equal_approx(cpp_motion_for(first).age-age,0.1) and Vector2(cpp_enemy_for(first).pos[0],cpp_enemy_for(first).pos[1]).is_equal_approx(cpp_origin+Vector2.from_angle(0.2)*80.0),"保持中は通常AIを止め、編集した半径・回転・世界時間で周回する")
+	var held: Dictionary = cpp_bridge.checkpoint()
+	var state: Array = cpp_core.enemy_motion_snapshot()
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.corona.size()==7 and frame.corona_members.size()==20 and presentation.frame_view.apply_frame(frame) and presentation.frame_view._corona_members==frame.corona_members,"冠の渦と同じ個体の周回を通常画面で描く")
+	await get_tree().process_frame
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(200,0),"velocity":Vector2.ZERO})
+	cpp_core.step(0.1)
+	check(cpp_core.ship_snapshot().ship_vel.x<0.0,"低速の機体へ敵更新内で距離減衰した吸引を加える")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(200,0),"velocity":Vector2(3000,0)})
+	cpp_core.step(0.1)
+	check(cpp_core.ship_snapshot().ship_vel==Vector2(3000,0),"高速の機体には吸引を加えない")
+	cpp_bridge.restore(held.value)
+	var frozen: Array = cpp_core.enemies_snapshot()
+	cpp_core.set_enemy_motion(owner,{"stone":1.0})
+	cpp_core.step(0.05)
+	check(cpp_motion_for(first).held==1 and cpp_enemy_for(first).pos==frozen.filter(func(e): return e.id==first)[0].pos and cpp_motion_for(owner).charge==0.0,"冠が石になる間は周回を止めて予告を取消し所属は保つ")
+	for flag: String in ["stone","shove_time","knock_t"]:
+		cpp_bridge.restore(held.value)
+		cpp_core.set_enemy_motion(first,{flag:1.0})
+		cpp_core.step(0.01)
+		check(cpp_motion_for(first).held==0 and not cpp_motion_for(first).has("corona_owner") and cpp_motion_for(owner).corona_count==1,"捕捉相手の%sで所属を解除し通常の敵へ戻す" % flag)
+	check(cpp_bridge.restore(held.value).ok and cpp_core.enemy_motion_snapshot()==state,"種類別の所属列・周回角・半径・通し番号・所有参照を保持から復元する")
+	cpp_bridge.command("dev_kill",{"entity_id":first,"cause":"debug"})
+	cpp_bridge.command("dev_remove",{"entity_id":first})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(500,0)}).value
+	check(replacement!=first and not cpp_motion_for(replacement).has("corona_owner") and cpp_motion_for(replacement).held==0 and cpp_motion_for(owner).corona_count==1,"相手を先に解放し行を使い直しても別個体へ所属を漏らさない")
+	cpp_bridge.restore(held.value)
+	cpp_bridge.command("dev_relocate",{"entity_id":owner,"position":cpp_origin+Vector2(-100,0)})
+	check(cpp_motion_for(first).held==0 and cpp_motion_for(second).held==0 and cpp_motion_for(owner).corona_count==0,"冠の再配置は捕捉した相手をすべて解放する")
+	cpp_bridge.restore(held.value)
+	cpp_bridge.command("dev_kill",{"entity_id":owner,"cause":"debug"})
+	check(cpp_motion_for(first).held==0 and cpp_motion_for(second).held==0 and cpp_motion_for(first).timer==0.0 and cpp_motion_for(first).mode==EnemyTable.Mode.MOVE,"冠の途中撃破で相手の保持と攻撃状態を解除する")
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	var next_owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"corona","position":cpp_origin}).value
+	check(next_owner!=owner and cpp_motion_for(next_owner).corona_count==0 and cpp_motion_for(next_owner).corona_selected==0,"冠の行を使い直した別個体へ所属と選択を漏らさない")
+	cpp_bridge.restore(held.value)
+	cpp_bridge.step(1.0/120.0,cpp_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var delivered: Dictionary = cpp_bridge.collect_frame()
+	check(delivered.ok and cpp_bridge.delivery_error.get("ok",false) and cpp_bridge.read_frame().ok,"通常固定更新の通知配信と状態読取まで成功する")
+	cpp_session.free()
 	return true

@@ -89,6 +89,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (soldier && (!soldier->formation.anchor.is_finite() || soldier->formation.tier<1 || soldier->formation.tier>3 || (state.enemy_handles.contains(soldier->king) && state.enemy_handles.entity_id(soldier->king)!=soldier->king_id))) return false;
         const auto *lynx=std::get_if<LynxState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr)) return false;
+        const auto *corona=std::get_if<CoronaState>(&enemy.behavior_state);
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Corona)!=(corona!=nullptr)) return false;
+        if (corona) {if (!std::isfinite(corona->wait) || !std::isfinite(corona->capture_t) || !corona->center.is_finite()) return false;uint32_t count=0;for (const auto &bucket:corona->types) {if (bucket.definition>=content.definitions.size() || bucket.items.empty()) return false;for (uint32_t slot=0;slot<bucket.items.size();++slot) {const auto h=bucket.items[slot];if (!state.enemy_handles.contains(h)) return false;const auto &member=state.enemies[h.slot].corona;if (!member || member->thrown || member->slot!=slot || member->definition!=bucket.definition || !same_handle(member->owner,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;++count;}}if (count!=corona->count) return false;}
+        if (enemy.corona) {const auto &c=*enemy.corona;if (!enemy.held || !c.serial || c.serial>state.corona_serial || !state.enemy_handles.contains(c.owner) || !std::holds_alternative<CoronaState>(state.enemies[c.owner.slot].behavior_state) || c.definition!=enemy.definition || !c.from.is_finite() || !c.ship_from.is_finite()) return false;for (double x:{c.angle,c.radius,c.life,c.release_fraction,c.damage,c.effect}) if (!std::isfinite(x)) return false;if (c.radius<0 || c.release_fraction<0 || c.release_fraction>1 || c.damage<0 || c.effect<0 || c.attack_token<0) return false;}
         const auto *pump=std::get_if<PumpState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Pump)!=(pump!=nullptr)) return false;
         if (pump) {if (!std::isfinite(pump->bud_t) || pump->contents.size()>content.pumps[content.definitions[enemy.definition].pump_definition-1].store_max) return false;for (auto id:pump->contents) if (!id || id>content.definitions.size()) return false;}
@@ -107,6 +111,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             if (state.enemy_handles.contains(part) && (state.enemies[part.slot].parent_id!=enemy.id || !same_handle(state.enemies[part.slot].parent,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id)))))) return false;
         }
     }
+    std::unordered_set<uint64_t> corona_live;
+    state.corona_members.erase(std::remove_if(state.corona_members.begin(),state.corona_members.end(),[&](const auto &ref){return !state.enemy_handles.contains(ref.target) || !state.enemies[ref.target.slot].corona || state.enemies[ref.target.slot].corona->serial!=ref.serial;}),state.corona_members.end());
+    for (const auto &ref:state.corona_members) if (!corona_live.insert(handle_key(ref.target)).second) return false;
+    for (uint32_t row=0;row<state.enemies.size();++row) if (state.enemies[row].alive && state.enemies[row].corona && !corona_live.count(handle_key(state.enemy_handles.at(row)))) return false;
     for (auto row:state.free_rows) {
         if (row>=state.enemies.size() || state.enemies[row].alive || !free.insert(row).second ||
             !state.enemy_handles.reusable(uint32_t(row))) return false;

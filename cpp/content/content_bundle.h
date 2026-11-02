@@ -7,6 +7,7 @@
 
 namespace speed {
 // ランと保持したランで共有する読み取り専用の定義。
+struct CoronaAmmunition {uint32_t definition=0;double weight=0,damage=0;};
 struct ContentBundle {
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};
     RunConfig config;
@@ -80,6 +81,8 @@ struct ContentBundle {
     std::vector<AquilaDefinition> aquilas;
     std::vector<CrabDefinition> crabs;
     std::vector<PumpDefinition> pumps;
+    std::vector<CoronaDefinition> coronas;
+    std::vector<std::vector<CoronaAmmunition>> corona_ammunition;
     std::vector<ShellSource> shell_sources;
     std::vector<FriendHullLook> hull_looks;
     std::vector<FriendSawPoint> saw_points;

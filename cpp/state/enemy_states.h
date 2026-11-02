@@ -5,9 +5,14 @@
 #include <vector>
 #include <array>
 #include <variant>
+#include <optional>
 namespace speed {
 using godot::Vector2;
 enum class EnemyMode { Move, Windup, Dash, Recover };
+struct CoronaBucket {uint32_t definition=0;std::vector<EnemyHandle> items;};
+struct CoronaState {std::vector<CoronaBucket> types;uint32_t count=0;double capture_t=0,wait=0;EnemyHandle selected;Vector2 center;bool ready=false;};
+struct CoronaMember {EnemyHandle owner;uint32_t definition=0,slot=0;uint64_t serial=0;double angle=0,radius=0,life=0,release_fraction=0,damage=0,effect=0;Vector2 from,ship_from;int64_t attack_token=0;bool settled=false,thrown=false;};
+struct CoronaMemberRef {EnemyHandle target;uint64_t serial=0;};
 struct PumpState {std::vector<uint32_t> contents;double bud_t=0;};
 struct CrabState {int32_t buds=1;AttackHandle sweep;};
 struct AquilaState {Vector2 anchor;double bud_t=0;};
@@ -27,7 +32,8 @@ struct LynxState {int32_t buds=0;};
 struct MarlinState {godot::Vector2 anchor;};
 struct SniperState {std::vector<float> rays;};
 struct Enemy {
-    std::variant<std::monostate,CepheusState,SniperState,MarlinState,LynxState,SoldierState,AurigaState,ClockState,ReticleState,PhoenixState,AquilaState,SplitState,DefenderState,CrabState,CrowState,PumpState> behavior_state;
+    std::variant<std::monostate,CepheusState,SniperState,MarlinState,LynxState,SoldierState,AurigaState,ClockState,ReticleState,PhoenixState,AquilaState,SplitState,DefenderState,CrabState,CrowState,PumpState,CoronaState> behavior_state;
+    std::optional<CoronaMember> corona;
     int64_t id = 0;
     int64_t attack_group = 0;
     double attack_value = 1, attack_priority = 0;

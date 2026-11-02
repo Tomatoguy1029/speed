@@ -1601,6 +1601,108 @@
           "ref": "EnemyRecord"
         }
       ]
+    },
+    {
+      "name": "CoronaDefinition",
+      "section": 132,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "capture_max",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "capture_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spin",
+          "type": "f64"
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "throw_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "throw_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "effect",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CoronaType",
+      "section": 133,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "owner",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

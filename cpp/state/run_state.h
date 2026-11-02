@@ -42,6 +42,8 @@ struct RunState {
     std::vector<speed::PendingEnemySpawn> pending_enemies;
     speed::EntityStore<speed::EnemyTag> enemy_handles;
     speed::GroupState groups;
+    std::vector<speed::CoronaMemberRef> corona_members;
+    uint64_t corona_serial=0;
     using AttackBudget=speed::AttackBudgetState;
     speed::WorldState world;
     speed::FieldState field;

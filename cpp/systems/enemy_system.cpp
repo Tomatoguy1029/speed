@@ -4,6 +4,7 @@
 #include "../behaviors/enemies/crab.h"
 #include "../behaviors/enemies/crow.h"
 #include "../behaviors/enemies/pump.h"
+#include "../behaviors/enemies/corona_vortex.h"
 #include "attack_system.h"
 #include "attack_budget.h"
 #include "group_system.h"
@@ -24,6 +25,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Aquila) enemy.behavior_state=AquilaState{};
     if (def.kind==EnemyDefinition::Kind::Crab) enemy.behavior_state=CrabState{};
     if (def.kind==EnemyDefinition::Kind::Pump) enemy.behavior_state=PumpState{};
+    if (def.kind==EnemyDefinition::Kind::Corona) enemy.behavior_state=CoronaState{};
     if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
     if (def.kind==EnemyDefinition::Kind::Cepheus) enemy.behavior_state=CepheusState{};
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
@@ -105,6 +107,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle || definition.kind==EnemyDefinition::Kind::Phoenix || definition.kind==EnemyDefinition::Kind::Crab) return true;
     if (definition.kind==EnemyDefinition::Kind::Dolphin || definition.kind==EnemyDefinition::Kind::Aquarius || definition.kind==EnemyDefinition::Kind::Cross) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Cepheus) return std::get<CepheusState>(enemy.behavior_state).tier>0 && enemy.mode==EnemyMode::Move && enemy.timer<=dt;
+    if (definition.kind==EnemyDefinition::Kind::Corona) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Pump) return std::get<PumpState>(enemy.behavior_state).contents.size()>=run.content->pumps[definition.pump_definition-1].store_max;
     if (definition.kind==EnemyDefinition::Kind::Bomber) return enemy.pos.distance_to(run.state.ship_pos)<=run.content->bombers[definition.bomber_definition-1].trigger;
     if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
@@ -114,7 +117,7 @@ bool EnemySystem::relocate(RunRuntime &run,EnemyHandle handle,godot::Vector2 pos
     auto &state=run.state;
     if (!state.enemy_handles.contains(handle) || !position.is_finite()) return false;
     auto &enemy=state.enemies[handle.slot];if (enemy.dead || enemy.held) return false;
-    PumpBehavior::gone(run,handle,false);
+    CoronaVortex::release(run,handle);PumpBehavior::gone(run,handle,false);
     AttackSystem::source_ended(state,handle,AttackEndReason::Relocate);
     enemy.pos=position;
     const auto toward=(state.ship_pos-position).normalized();
@@ -141,7 +144,7 @@ void EnemySystem::clear_regular(RunRuntime &run) {
 }
 bool EnemySystem::mark_dead(RunRuntime &run,EnemyHandle handle) {
     auto &state=run.state;if (!state.enemy_handles.contains(handle) || state.enemies[handle.slot].dead) return false;
-    PhoenixBehavior::cancel(run,handle);DefenderBehavior::gone(run,handle);state.enemies[handle.slot].dead=true;state.dead_rows.push_back(handle.slot);PumpBehavior::gone(run,handle,true);AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);leave_hound(state,handle.slot);return true;
+    PhoenixBehavior::cancel(run,handle);DefenderBehavior::gone(run,handle);state.enemies[handle.slot].dead=true;state.dead_rows.push_back(handle.slot);CoronaVortex::release(run,handle);PumpBehavior::gone(run,handle,true);AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);leave_hound(state,handle.slot);return true;
 }
 bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason) {
     auto &state=run.state;
@@ -152,6 +155,7 @@ bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason)
     DefenderBehavior::gone(run,handle);
     CrabBehavior::clear(run,handle);
     PumpBehavior::gone(run,handle,true);
+    CoronaVortex::release(run,handle);
     PickupSystem::lose(run,enemy.id,reason==RetireReason::Outside?CargoLoss::Retreat:reason==RetireReason::BonusClear?CargoLoss::Cleared:CargoLoss::Released);
     AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);
     leave_hound(state,row);

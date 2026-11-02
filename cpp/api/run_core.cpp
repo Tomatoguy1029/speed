@@ -22,6 +22,8 @@
 #include "../behaviors/enemies/crab.h"
 #include "../behaviors/enemies/crow.h"
 #include "../behaviors/enemies/pump.h"
+#include "../behaviors/enemies/corona.h"
+#include "../behaviors/enemies/corona_vortex.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -207,8 +209,8 @@ void SpeedRunCore::advance_enemies(double delta) {
     }
     const Vector2 limit = runtime.state.view_half * 1.25 + Vector2(300, 300);
     const auto update_rows=runtime.state.behavior_rows;const auto update_kinds=runtime.state.behavior_kinds;
-    std::vector<speed::EnemyHandle> update_handles,marlins;update_handles.reserve(runtime.state.enemies.size());
-    for (uint32_t row=0;row<runtime.state.enemies.size();++row) {const auto handle=runtime.state.enemy_handles.at(row);update_handles.push_back(handle);if (runtime.state.enemies[row].alive && runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Marlin) marlins.push_back(handle);}
+    std::vector<speed::EnemyHandle> update_handles,marlins,coronas;update_handles.reserve(runtime.state.enemies.size());
+    for (uint32_t row=0;row<runtime.state.enemies.size();++row) {const auto handle=runtime.state.enemy_handles.at(row);update_handles.push_back(handle);if (runtime.state.enemies[row].alive && runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Marlin) marlins.push_back(handle);if (runtime.state.enemies[row].alive && runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Corona) coronas.push_back(handle);}
     for (size_t group = 0; group < update_rows.size(); ++group) {
       std::vector<size_t> rows;for (auto row:update_rows[group]) if (runtime.state.enemy_handles.contains(update_handles[row])) rows.push_back(row);
       if (update_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
@@ -245,6 +247,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::AurigaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Clock) {
                 speed::ClockBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Corona) {
+                speed::CoronaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Pump) {
                 speed::PumpBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Crab) {
@@ -305,6 +309,7 @@ void SpeedRunCore::advance_enemies(double delta) {
     }
     speed::MarlinBehavior::after_tick(runtime,marlins);
     if (!runtime.content->pumps.empty()) speed::PumpBehavior::after_tick(runtime);
+    speed::CoronaVortex::tick(runtime,delta,coronas);
     speed::EnemySystem::flush_spawns(runtime);
 }
 
@@ -317,6 +322,7 @@ void SpeedRunCore::close() {
     runtime.state.legacy_progression = Progression();
     runtime.state.loadout={};runtime.state.lifecycle={};runtime.resource_workspace.requests.clear();
     runtime.state.groups={};runtime.state.field={};
+    runtime.state.corona_members.clear();runtime.state.corona_serial=0;
     runtime.state.enemies.clear(); runtime.state.pending_enemies.clear(); runtime.state.enemy_handles = {};
     runtime.state.enemies.shrink_to_fit();
     runtime.state.free_rows.clear();

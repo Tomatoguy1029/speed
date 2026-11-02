@@ -1,4 +1,5 @@
 #include "run_runner.h"
+#include "../behaviors/enemies/corona_vortex.h"
 #include "../systems/attack_system.h"
 #include "../behaviors/weapons/scatter.h"
 #include "../behaviors/weapons/rear.h"
@@ -106,6 +107,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         }
     }
     if (world_step && state.phase==Phase::Play) {
+        if (!CoronaVortex::hit_thrown(core.runtime)) return true;
         if (state.projectile_config.ready && !core.step_projectiles(wd)) return false;
         if (core.check_run_end()) return true;
         if (!state.hostiles.empty() && !core.step_hostiles(wd)) return false;
