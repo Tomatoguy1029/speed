@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 namespace speed {
-enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Arrow=33,StarBolt=34,Barrier=35,Corpse=36,TowShot=37,Interceptor=38,EndBlast=39,CritBeam=40,RunUp=41,Mine=42,Vortex=43,Horn=44,CoronaThrow=45,ContactWave=46,Sonic=47,ContactArc=48,KillSonic=49,HornWave=50,Bipolar=51,Count};
+enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Arrow=33,StarBolt=34,Barrier=35,Corpse=36,TowShot=37,Interceptor=38,EndBlast=39,CritBeam=40,RunUp=41,Mine=42,Vortex=43,Horn=44,CoronaThrow=45,ContactWave=46,Sonic=47,ContactArc=48,KillSonic=49,HornWave=50,Bipolar=51,DashRangeDrone=52,Finale=53,Count};
 inline const char *symbol_name(Cause value) {
     switch(value) {
     case Cause::None: return "";
@@ -58,6 +58,8 @@ inline const char *symbol_name(Cause value) {
     case Cause::KillSonic: return "killSonic";
     case Cause::HornWave: return "horn_wave";
     case Cause::Bipolar: return "bipolar";
+    case Cause::DashRangeDrone: return "dashRangeDrone";
+    case Cause::Finale: return "finale";
     default: return "";
     }
 }
@@ -114,9 +116,11 @@ inline bool parse_symbol(std::string_view value, Cause &out) {
     if (value=="killSonic") {out=Cause::KillSonic;return true;}
     if (value=="horn_wave") {out=Cause::HornWave;return true;}
     if (value=="bipolar") {out=Cause::Bipolar;return true;}
+    if (value=="dashRangeDrone") {out=Cause::DashRangeDrone;return true;}
+    if (value=="finale") {out=Cause::Finale;return true;}
     return false;
 }
-enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,ReflectedShot=13,EnemyPolygon=14,StarBolt=15,Count};
+enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,ReflectedShot=13,EnemyPolygon=14,StarBolt=15,BossFinish=16,Count};
 inline const char *symbol_name(VisualRole value) {
     switch(value) {
     case VisualRole::EnemySprite: return "enemy_sprite";
@@ -135,6 +139,7 @@ inline const char *symbol_name(VisualRole value) {
     case VisualRole::ReflectedShot: return "reflected_shot";
     case VisualRole::EnemyPolygon: return "enemy_polygon";
     case VisualRole::StarBolt: return "star_bolt";
+    case VisualRole::BossFinish: return "boss_finish";
     default: return "";
     }
 }
@@ -155,9 +160,10 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="reflected_shot") {out=VisualRole::ReflectedShot;return true;}
     if (value=="enemy_polygon") {out=VisualRole::EnemyPolygon;return true;}
     if (value=="star_bolt") {out=VisualRole::StarBolt;return true;}
+    if (value=="boss_finish") {out=VisualRole::BossFinish;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,FullBurstReady=65,FloodEnd=66,Beam=67,CriticalLance=68,CriticalLanceHit=69,RockBreak=70,RunUpHit=71,EndHole=72,HoleCapture=73,HoleRecover=74,AquariusAim=75,BomberExplode=76,SummonMark=77,CepheusSummon=78,RulerSplit=79,BossSpawn=80,BossPhase=81,BossDefeated=82,BossCancelled=83,FinalStrike=84,Swallow=85,SpaceQuake=86,SonicPush=87,SonicImpact=88,ContactBolt=89,LanceLaunch=90,SonicBoom=91,LanceShatter=92,ChainShock=93,WaveRelease=94,AnchorCapture=95,AnchorFire=96,BipolarCharge=97,RouteOpportunity=98,EncounterDeferred=99,SlashRelease=100,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,FullBurstReady=65,FloodEnd=66,Beam=67,CriticalLance=68,CriticalLanceHit=69,RockBreak=70,RunUpHit=71,EndHole=72,HoleCapture=73,HoleRecover=74,AquariusAim=75,BomberExplode=76,SummonMark=77,CepheusSummon=78,RulerSplit=79,BossSpawn=80,BossPhase=81,BossDefeated=82,BossCancelled=83,FinalStrike=84,Swallow=85,SpaceQuake=86,SonicPush=87,SonicImpact=88,ContactBolt=89,LanceLaunch=90,SonicBoom=91,LanceShatter=92,ChainShock=93,WaveRelease=94,AnchorCapture=95,AnchorFire=96,BipolarCharge=97,RouteOpportunity=98,EncounterDeferred=99,SlashRelease=100,EscortDeploy=101,EscortSlash=102,EnemyTuningChanged=103,EnemyTuningSaved=104,BossFinish=105,BossExplode=106,ClearBanner=107,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -261,6 +267,13 @@ inline const char *symbol_name(EventType value) {
     case EventType::RouteOpportunity: return "route_opportunity";
     case EventType::EncounterDeferred: return "encounter_deferred";
     case EventType::SlashRelease: return "slash_release";
+    case EventType::EscortDeploy: return "escort_deploy";
+    case EventType::EscortSlash: return "escort_slash";
+    case EventType::EnemyTuningChanged: return "enemy_tuning_changed";
+    case EventType::EnemyTuningSaved: return "enemy_tuning_saved";
+    case EventType::BossFinish: return "boss_finish";
+    case EventType::BossExplode: return "boss_explode";
+    case EventType::ClearBanner: return "clear_banner";
     default: return "";
     }
 }
@@ -366,6 +379,13 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="route_opportunity") {out=EventType::RouteOpportunity;return true;}
     if (value=="encounter_deferred") {out=EventType::EncounterDeferred;return true;}
     if (value=="slash_release") {out=EventType::SlashRelease;return true;}
+    if (value=="escort_deploy") {out=EventType::EscortDeploy;return true;}
+    if (value=="escort_slash") {out=EventType::EscortSlash;return true;}
+    if (value=="enemy_tuning_changed") {out=EventType::EnemyTuningChanged;return true;}
+    if (value=="enemy_tuning_saved") {out=EventType::EnemyTuningSaved;return true;}
+    if (value=="boss_finish") {out=EventType::BossFinish;return true;}
+    if (value=="boss_explode") {out=EventType::BossExplode;return true;}
+    if (value=="clear_banner") {out=EventType::ClearBanner;return true;}
     return false;
 }
 enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
@@ -725,7 +745,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::ShotHit: return field=="pos" || field=="dir" || field=="visual_key" || field=="kind";
     case EventType::StrongSpawn: return field=="id" || field=="enemy_type";
     case EventType::Text: return field=="pos" || field=="text" || field=="color" || field=="size";
-    case EventType::TimeLimitReached: return false;
+    case EventType::TimeLimitReached: return field=="t";
     case EventType::TraceEnd: return field=="completed";
     case EventType::Upgrade: return field=="card";
     case EventType::Wave: return false;
@@ -789,6 +809,13 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::RouteOpportunity: return field=="route" || field=="status" || field=="start" || field=="window" || field=="margin";
     case EventType::EncounterDeferred: return field=="reason";
     case EventType::SlashRelease: return field=="line" || field=="width";
+    case EventType::EscortDeploy: return field=="pos" || field=="targets";
+    case EventType::EscortSlash: return field=="pos" || field=="dir";
+    case EventType::EnemyTuningChanged: return field=="values";
+    case EventType::EnemyTuningSaved: return field=="path" || field=="values";
+    case EventType::BossFinish: return field=="pos";
+    case EventType::BossExplode: return field=="pos";
+    case EventType::ClearBanner: return false;
     default: return false;
     }
 }

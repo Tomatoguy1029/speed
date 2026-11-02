@@ -519,7 +519,7 @@ inline bool read(BinaryReader &input, ResourceKey &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.role)) return false;
-    if (out.role > 15) return false;
+    if (out.role > 16) return false;
     return true;
 }
 struct ForwardDefinition {
@@ -609,6 +609,21 @@ inline bool read(BinaryReader &input, LifecycleDefinition &out) {
     if (!input.read_f64(out.death_world_dim)) return false;
     if (out.death_world_dim < 0) return false;
     if (out.death_world_dim > 1) return false;
+    return true;
+}
+struct EnemyTuningValue {
+    uint32_t id{};
+    uint32_t enemy{};
+    std::string key{};
+    double value{};
+};
+inline bool read(BinaryReader &input, EnemyTuningValue &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (out.enemy < 1) return false;
+    if (!input.read_string(out.key)) return false;
+    if (!input.read_f64(out.value)) return false;
     return true;
 }
 struct ContactDefinition {
@@ -3791,6 +3806,71 @@ inline bool read(BinaryReader &input, InterceptorDefinition &out) {
     if (!input.read_u32(out.color)) return false;
     return true;
 }
+struct DashRangeDroneDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    uint32_t count{};
+    double damage{};
+    double tail{};
+    double hit_radius{};
+    double deploy_distance{};
+    double idle_spacing{};
+    double idle_back{};
+    double return_rate{};
+    double area_increment{};
+};
+inline bool read(BinaryReader &input, DashRangeDroneDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count < 2) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.tail)) return false;
+    if (out.tail < 0) return false;
+    if (!input.read_f64(out.hit_radius)) return false;
+    if (out.hit_radius < 0) return false;
+    if (!input.read_f64(out.deploy_distance)) return false;
+    if (out.deploy_distance < 0) return false;
+    if (!input.read_f64(out.idle_spacing)) return false;
+    if (out.idle_spacing < 0) return false;
+    if (!input.read_f64(out.idle_back)) return false;
+    if (out.idle_back < 0) return false;
+    if (!input.read_f64(out.return_rate)) return false;
+    if (out.return_rate < 0) return false;
+    if (!input.read_f64(out.area_increment)) return false;
+    if (out.area_increment < 0) return false;
+    return true;
+}
+struct AfterimageDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    uint32_t count{};
+    double total{};
+    double delay{};
+};
+inline bool read(BinaryReader &input, AfterimageDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count < 1) return false;
+    if (out.count > 8) return false;
+    if (!input.read_f64(out.total)) return false;
+    if (out.total < 0) return false;
+    if (!input.read_f64(out.delay)) return false;
+    if (out.delay < 0.02) return false;
+    if (out.delay > 0.5) return false;
+    return true;
+}
 struct BossDefinition {
     uint32_t id{};
     std::string external_id{};
@@ -4155,6 +4235,41 @@ inline bool read(BinaryReader &input, BossBodyDefinition &out) {
     if (out.final_widen_time < 0) return false;
     return true;
 }
+struct BossFinishDefinition {
+    uint32_t id{};
+    double replay_window{};
+    double slow_time{};
+    double zoom{};
+    double blast_time{};
+    double relic_appear_time{};
+    double relic_hold_time{};
+    double relic_collect_time{};
+    double clear_time{};
+    double time_up_charge_time{};
+};
+inline bool read(BinaryReader &input, BossFinishDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.replay_window)) return false;
+    if (out.replay_window < 0) return false;
+    if (!input.read_f64(out.slow_time)) return false;
+    if (out.slow_time < 0) return false;
+    if (!input.read_f64(out.zoom)) return false;
+    if (out.zoom < 0) return false;
+    if (!input.read_f64(out.blast_time)) return false;
+    if (out.blast_time < 0) return false;
+    if (!input.read_f64(out.relic_appear_time)) return false;
+    if (out.relic_appear_time < 0) return false;
+    if (!input.read_f64(out.relic_hold_time)) return false;
+    if (out.relic_hold_time < 0) return false;
+    if (!input.read_f64(out.relic_collect_time)) return false;
+    if (out.relic_collect_time < 0) return false;
+    if (!input.read_f64(out.clear_time)) return false;
+    if (out.clear_time < 0) return false;
+    if (!input.read_f64(out.time_up_charge_time)) return false;
+    if (out.time_up_charge_time < 0) return false;
+    return true;
+}
 struct BossFlowProgram {
     uint32_t id{};
     uint32_t boss{};
@@ -4384,6 +4499,7 @@ struct ContentRecords {
     std::vector<ForwardDefinition> ForwardDefinition_rows;
     std::vector<BiteDefinition> BiteDefinition_rows;
     std::vector<LifecycleDefinition> LifecycleDefinition_rows;
+    std::vector<EnemyTuningValue> EnemyTuningValue_rows;
     std::vector<ContactDefinition> ContactDefinition_rows;
     std::vector<HostileDefinition> HostileDefinition_rows;
     std::vector<BeamDefinition> BeamDefinition_rows;
@@ -4497,10 +4613,13 @@ struct ContentRecords {
     std::vector<MassTowDefinition> MassTowDefinition_rows;
     std::vector<BipolarDefinition> BipolarDefinition_rows;
     std::vector<InterceptorDefinition> InterceptorDefinition_rows;
+    std::vector<DashRangeDroneDefinition> DashRangeDroneDefinition_rows;
+    std::vector<AfterimageDefinition> AfterimageDefinition_rows;
     std::vector<BossDefinition> BossDefinition_rows;
     std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
     std::vector<BossTechniqueStage> BossTechniqueStage_rows;
     std::vector<BossBodyDefinition> BossBodyDefinition_rows;
+    std::vector<BossFinishDefinition> BossFinishDefinition_rows;
     std::vector<BossFlowProgram> BossFlowProgram_rows;
     std::vector<BossFlowSection> BossFlowSection_rows;
     std::vector<BossFlowCondition> BossFlowCondition_rows;
@@ -4584,7 +4703,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 12: {
-        if (version != 11) return false;
+        if (version != 12) return false;
         if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { ResourceKey row; if (!read(input,row)) return false; out.ResourceKey_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -4605,6 +4724,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/44) return false;
         for (uint32_t i=0; i<count; ++i) { LifecycleDefinition row; if (!read(input,row)) return false; out.LifecycleDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 250: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { EnemyTuningValue row; if (!read(input,row)) return false; out.EnemyTuningValue_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 15: {
@@ -5285,6 +5410,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { InterceptorDefinition row; if (!read(input,row)) return false; out.InterceptorDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 206: {
+        if (version != 2) return false;
+        if (count > input.remaining()/80) return false;
+        for (uint32_t i=0; i<count; ++i) { DashRangeDroneDefinition row; if (!read(input,row)) return false; out.DashRangeDroneDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 207: {
+        if (version != 1) return false;
+        if (count > input.remaining()/32) return false;
+        for (uint32_t i=0; i<count; ++i) { AfterimageDefinition row; if (!read(input,row)) return false; out.AfterimageDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 150: {
         if (version != 2) return false;
         if (count > input.remaining()/124) return false;
@@ -5307,6 +5444,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/77) return false;
         for (uint32_t i=0; i<count; ++i) { BossBodyDefinition row; if (!read(input,row)) return false; out.BossBodyDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 163: {
+        if (version != 1) return false;
+        if (count > input.remaining()/76) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFinishDefinition row; if (!read(input,row)) return false; out.BossFinishDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 153: {
@@ -5397,6 +5540,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BiteDefinition_rows) if (!BiteDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LifecycleDefinition_ids;
     for (const auto &row:data.LifecycleDefinition_rows) if (!LifecycleDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> EnemyTuningValue_ids;
+    for (const auto &row:data.EnemyTuningValue_rows) if (!EnemyTuningValue_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ContactDefinition_ids;
     for (const auto &row:data.ContactDefinition_rows) if (!ContactDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HostileDefinition_ids;
@@ -5623,6 +5768,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BipolarDefinition_rows) if (!BipolarDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> InterceptorDefinition_ids;
     for (const auto &row:data.InterceptorDefinition_rows) if (!InterceptorDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DashRangeDroneDefinition_ids;
+    for (const auto &row:data.DashRangeDroneDefinition_rows) if (!DashRangeDroneDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> AfterimageDefinition_ids;
+    for (const auto &row:data.AfterimageDefinition_rows) if (!AfterimageDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossDefinition_ids;
     for (const auto &row:data.BossDefinition_rows) if (!BossDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossTechniqueDefinition_ids;
@@ -5631,6 +5780,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueStage_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossBodyDefinition_ids;
     for (const auto &row:data.BossBodyDefinition_rows) if (!BossBodyDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFinishDefinition_ids;
+    for (const auto &row:data.BossFinishDefinition_rows) if (!BossFinishDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossFlowProgram_ids;
     for (const auto &row:data.BossFlowProgram_rows) if (!BossFlowProgram_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossFlowSection_ids;
@@ -5661,6 +5812,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ForwardDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BiteDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.BiteDefinition_rows) if (!ResourceKey_ids.count(row.visual_key)) return false;
+    for (const auto &row:data.EnemyTuningValue_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.HostileDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.HostileDefinition_rows) if (!ResourceKey_ids.count(row.stone_visual)) return false;
     for (const auto &row:data.HostileDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
@@ -5776,6 +5928,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.MassTowDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BipolarDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.InterceptorDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.DashRangeDroneDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.AfterimageDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.BossBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -5917,5 +6071,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=141;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=145;
 }
