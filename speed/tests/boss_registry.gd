@@ -23,6 +23,9 @@ func _ready() -> void:
 	if "--cpp-centaurus-sail" in OS.get_cmdline_user_args() or "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_sail")
 		return
+	if "--cpp-canis-bay" in OS.get_cmdline_user_args():
+		await native_canis_bay()
+		return
 	if "--cpp-canis-sirius" in OS.get_cmdline_user_args():
 		await native_canis_sirius()
 		return
@@ -2611,4 +2614,70 @@ func native_canis_sirius() -> void:
 	c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_sirius] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 囲みの参加者・個別の噛み・本体の跳躍と解除を照合する。
+func native_canis_bay() -> void:
+	var c := canis_move_case("bay",{"warn":0.05,"count":4,"min_hounds":2,"pounce_at":4.0,"nip_warn":0.1,"nip_time":0.2,"nip_max":1,"back_angle":0.0,"front_angle":180.0,"nip_speed":100.0,"orbit":0.0,"max_speed":0.0,"accel":0.0,"recover":9.0},false,{"pack_size":4})
+	check(not c.is_empty(),"吠え立てと依存する飛びかかりを同じ制作形式へ生成する")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	check(c.move.make_runner()==null and c.package.records.CanisBayDefinition.size()==2 and c.package.records.CanisPounceDefinition.size()==2 and c.package.records.BossTechniqueDefinition.size()==4 and is_equal_approx(c.package.records.CanisBayDefinition[0].front_angle,PI),"全編集値・形態別の跳躍・角度の単位を型付き定義へ渡す")
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(started.ok,"囲みを制作入口から単独発動する")
+	var first: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(first.members.size()==4 and first.members.all(func(m): return m.cool>=0.6 and m.cool<=1.4 and m.warn==-1.0),"近い猟犬を選び角度・揺れ・噛み待ち・吠え待ちを個別に初期化する")
+	bridge._core.step(0.05)
+	bridge._core.step(1.41)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	var marked: Array = t.members.filter(func(m): return m.warn>=0.0)
+	check(t.stage==1 and not t.jumping and marked.size()==1,"背後の猟犬は同時噛み数の上限まで予告する")
+	check(bridge._core.hound_snapshot().follows.is_empty() and t.members.size()==4,"囲みの追従を通常隊形のfollowで上書きしない")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"囲みの参加者・個別タイマー・指示を保持する")
+	bridge._core.step(0.11)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.members.filter(func(m): return m.nipping).size()==1 and canis_lunges(bridge).size()==1,"個別予告の期限で共通の猟犬突進を発動する")
+	var after: Dictionary = t.duplicate(true)
+	var lunges: Array = canis_lunges(bridge).duplicate(true)
+	check(bridge.restore(held.value).ok,"囲みの予告途中へ復帰する")
+	bridge._core.step(0.11)
+	check(bridge.command("dev_boss_state").value[0]==after and canis_lunges(bridge)==lunges,"復帰後も個別噛みの順序・向き・期限を一致させる")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(c.view._boss_body_displays.values()[0].technique.technique=="bay" and not c.view._boss_body_displays.values()[0]._trails.is_empty(),"正式表示へ囲みの技と噛みの軌跡を渡す")
+	bridge._core.step(0.21)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.members.any(func(m): return m.actor==marked[0].actor and not m.nipping and m.cool>0.0),"噛み終えた猟犬を個別の再使用待ちへ戻す")
+	bridge.command("dev_remove",{"entity_id":t.members[0].actor})
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].members.size()==3,"参加猟犬の消失だけを囲みから除外する")
+	bridge.command("dev_cancel_technique",{"ticket":started.value})
+	check(bridge.command("dev_boss_state").value[0].members.is_empty() and canis_lunges(bridge).is_empty(),"取消で全参加者の囲みと噛みの指示を解除する")
+	bridge.restore(held.value)
+	bridge._core.step(3.0)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.jumping and t.stage==1 and t.jump_age==0.0,"囲みの期限で本体の飛びかかりを1回だけ始める")
+	bridge._core.step(0.45)
+	t = bridge.command("dev_boss_state").value[0]
+	var jump = load("res://data/bosses/canis_major_moves/pounce.tres")
+	check(t.stage==2 and t.jump_done and t.members.is_empty() and is_equal_approx(t.remaining,jump.recover),"飛びかかりの終了で猟犬を解除し、bayのrecoverではなくpounceの硬直を使う")
+	bridge._core.step(jump.recover)
+	check(bridge.command("dev_boss_state").value[0].stage==5,"硬直が終わると囲み技の完了を返す")
+	bridge.restore(held.value)
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and canis_lunges(bridge).is_empty(),"本体消失では囲み技と個別噛みを取り消す")
+	bridge.release_checkpoint(held.value)
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"吠え立ての出来事を共通配信へ届ける")
+	bridge.dispose()
+	c.view.queue_free()
+	var gated := canis_move_case("bay",{"min_hounds":2},true,{"pack_size":1})
+	check(not gated.is_empty(),"猟犬が不足する通常選択の入口を生成する")
+	if not gated.is_empty():
+		gated.bridge._core.step(0.01)
+		check(gated.bridge.command("dev_boss_state").value.is_empty(),"必要な猟犬の数に足りないと共通フローで囲みを選ばない")
+		gated.bridge.dispose()
+		gated.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_bay] failures=",failed)
 	get_tree().quit(1 if failed else 0)

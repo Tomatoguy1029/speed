@@ -63,7 +63,7 @@ func _track_command(body: Dictionary, attack: Dictionary, dt: float) -> void:
 		_lunge_layer.draw.connect(_draw_command_lunges)
 		add_child(_lunge_layer)
 	var live := {}
-	if attack.get("technique","")=="command" and int(attack.get("stage",5))==1:
+	if attack.get("technique","") in ["command","bay"] and int(attack.get("stage",5)) in [0,1]:
 		for lunge: Dictionary in body.get("lunges",[]):
 			live[lunge.actor] = true
 			var trail: Dictionary = _trails.get(lunge.actor,{"points":PackedVector2Array(),"radius":lunge.radius})
@@ -82,12 +82,12 @@ func _draw() -> void:
 		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))
 		var mouth := Vector2(float(state.radius)*0.84,0.0)
 		draw_line(mouth,mouth+Vector2(float(technique.beam_length),0.0),Color(color,alpha),width)
-	if technique.get("technique","")=="pounce" and int(technique.get("stage",5))==0:
+	if (technique.get("technique","")=="pounce" or (technique.get("technique","")=="bay" and technique.get("jumping",false))) and int(technique.get("stage",5))==0:
 		var reach := position.distance_to(technique.aim)
 		var color := Color("#ff667d") if technique.locked else Color("#f2b567")
 		draw_line(Vector2(float(state.radius),0.0),Vector2(maxf(float(state.radius),reach),0.0),Color(color,0.35+float(state.charge)*0.4),6.0 if technique.locked else 3.0)
 		draw_arc(Vector2(reach,0.0),float(state.radius)*0.5,0.0,TAU,24,Color(color,0.6),3.0)
-	if technique.get("technique","")!="command" or int(technique.get("stage",5))!=0: return
+	if technique.get("technique","") not in ["command","bay"] or int(technique.get("stage",5))!=0: return
 	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE*float(state.radius)/100.0)
 	for ring in 2:
 		var grow := fmod(float(state.clock)*2.5+ring*0.5,1.0)

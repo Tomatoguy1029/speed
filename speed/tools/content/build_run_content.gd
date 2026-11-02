@@ -52,11 +52,11 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## 号令の実効値と、旧method trackに対応する段階を生成する。
 static func canis_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius"]: return {}
+	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius",&"bay"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"canis_major","kind":2,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[],"CanisBayDefinition":[]}
 	for phase in [1,2]:
 		var values: Dictionary = source.values().duplicate(true)
 		if phase==2:
@@ -66,9 +66,18 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
-		for key in ["warn","recover","cd","damage"]: row[key] = float(values[key])
-		if move.technique==&"sirius":
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43 if move.technique==&"sirius" else 44,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		for key in ["warn","recover","cd","damage"]: row[key] = float(values.get(key,0.0))
+		if move.technique==&"bay":
+			row.active = maxf(0.001,float(values.pounce_at))
+			records.BossTechniqueDefinition.append(row)
+			var detail := {"id":phase,"technique":phase,"pounce":phase+2}
+			for field in Schema.SCHEMA.records.filter(func(v): return v.name=="CanisBayDefinition")[0].fields:
+				if field.name in ["id","technique","pounce"]: continue
+				detail[field.name] = int(values[field.name]) if field.type=="u32" else float(values[field.name])
+			for key in ["front_angle","back_angle"]: detail[key] = deg_to_rad(detail[key])
+			records.CanisBayDefinition.append(detail)
+		elif move.technique==&"sirius":
 			row.active = float(values.beam_time)
 			records.BossTechniqueDefinition.append(row)
 			var detail := {"id":phase,"technique":phase,"flame":phase}
@@ -95,6 +104,14 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 			records.BossTechniqueDefinition.append(row)
 			records.CanisCommandDefinition.append({"id":phase,"technique":phase,"lunge_speed":float(values.lunge_speed),"lunge_time":float(values.lunge_time),"min_hounds":int(values.min_hounds)})
 			for stage in [{"command":1,"at":row.warn},{"command":2,"at":row.warn+float(values.lunge_time)+0.05}]: records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":stage.command,"at":stage.at})
+	if move.technique==&"bay":
+		var jump := canis_technique_records(definition,load("res://data/bosses/canis_major_moves/pounce.tres"))
+		for row: Dictionary in jump.BossTechniqueDefinition:
+			row.id += 2
+			records.BossTechniqueDefinition.append(row)
+		for row: Dictionary in jump.CanisPounceDefinition:
+			row.technique += 2
+			records.CanisPounceDefinition.append(row)
 	return records
 
 static func canis_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:

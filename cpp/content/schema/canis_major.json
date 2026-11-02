@@ -466,6 +466,167 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisBayDefinition",
+      "section": 346,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "pounce",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "min_hounds",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "pounce_at",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_stop",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "orbit",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "r_front",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "r_side",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "r_back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "front_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "back_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wobble",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "max_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_fast",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_switch",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "decel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrive",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "face_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bark_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bark_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nip_max",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "nip_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nip_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nip_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nip_after_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nip_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nip_damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

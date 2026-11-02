@@ -1,4 +1,5 @@
 #include "hound_lunge.h"
+#include "bay.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/combat_resolver.h"
 #include "../../systems/group_system.h"
@@ -21,7 +22,7 @@ AttackHandle CanisHoundLunge::begin(RunRuntime &r,BossBodyState &b,EnemyHandle a
 }
 bool CanisHoundLunge::action_hit(const BossBodyState &b,int64_t action) {return b.canis.lunge_hits.count(action);}
 void CanisHoundLunge::step(RunRuntime &r,BossBodyState &b,int64_t action) {
-    auto &s=r.state;const auto active=handles(r,b);auto &led=b.canis.lunging;led.erase(std::remove_if(led.begin(),led.end(),[&](auto actor){return std::none_of(active.begin(),active.end(),[&](auto handle){const auto *a=AttackSystem::get(s,handle);return a && same_handle(std::get<CanisHoundLungeHazard>(s.hazards[a->row].shape).actor,actor);});}),led.end());
+    auto &s=r.state;const auto active=handles(r,b);auto &led=b.canis.lunging;led.erase(std::remove_if(led.begin(),led.end(),[&](auto actor){return !CanisBay::owns(r,b,actor) && std::none_of(active.begin(),active.end(),[&](auto handle){const auto *a=AttackSystem::get(s,handle);return a && same_handle(std::get<CanisHoundLungeHazard>(s.hazards[a->row].shape).actor,actor);});}),led.end());
     for (auto handle:handles(r,b,action)) {const auto *entry=AttackSystem::get(s,handle);if (!entry) continue;const auto record=*entry;auto &h=s.hazards[record.row];auto &v=std::get<CanisHoundLungeHazard>(h.shape);const auto actor=v.actor;
         if (!s.enemy_handles.contains(actor) || s.enemies[actor.slot].dead) {AttackSystem::end(s,handle,AttackEndReason::ParticipantEnd);remove_lunging(r,b,actor);continue;}if (v.last_world_time==s.world_time) continue;v.last_world_time=s.world_time;auto &e=s.enemies[actor.slot];h.pos=e.pos;
         const bool defer=v.defer_first_contact;v.defer_first_contact=false;const bool hit=v.shared_hit?action_hit(b,v.action):record.ship_hit;const double reach=e.radius+s.ship_config.ship_radius;const auto previous=record.ship_previous_ready?record.ship_previous:s.ship_pos;const bool touches=distance(s.ship_pos,v.sweep?v.previous:e.pos,e.pos)<=reach || distance(e.pos,previous,s.ship_pos)<=reach;
