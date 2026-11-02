@@ -90,6 +90,10 @@ func _decorate_cpp(reference: WeakRef) -> void:
 	if session==null or session.view==null: return
 	var hud := session.view.get_node_or_null("Hud")
 	if hud==null: return
+	var tuning := ENEMY_TUNING.new()
+	tuning.name = "StageEnemyTuning"
+	tuning.cpp_session = session
+	hud.add_child(tuning)
 	var overlay := PERF_OVERLAY.new()
 	overlay.name = "PerfOverlay"
 	overlay.bridge = session.bridge

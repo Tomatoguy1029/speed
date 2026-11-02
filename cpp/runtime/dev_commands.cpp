@@ -1,6 +1,7 @@
 #include "dev_commands.h"
 #include "checkpoint.h"
 #include "../systems/equipment.h"
+#include "../output/frame_builder.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -50,6 +51,12 @@ godot::Dictionary DevCommands::replace_definition(RunRuntime &run,const godot::D
     if (!rebuild_state_indexes(candidate.state,*next)) return reply(false,2,"現在の状態を変換できないため再開始してください");
     // 検査が全て成功してから公開する。旧ContentBundleは保持点が所有し続ける。
     run.state=std::move(candidate.state);run.content=std::move(next);run.workspace.defender_posts_tick=-1;run.full_output_dirty=true;
+    godot::Dictionary values;
+    for (const auto &v:run.content->enemy_tuning) {
+        const auto id=run.content->definitions[v.enemy-1].id;
+        godot::Dictionary fields=values.get(id,godot::Dictionary());fields[godot::String::utf8(v.key.c_str())]=v.value;values[id]=fields;
+    }
+    godot::Dictionary changed;changed["values"]=values;FrameBuilder::append(run,"enemy_tuning_changed",changed);
     return reply(true);
 }
 }

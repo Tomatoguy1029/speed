@@ -42,6 +42,11 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="): output = arg.trim_prefix("--out=")
 	if not output.is_empty(): DirAccess.make_dir_recursive_absolute(output)
+	if "--cpp-live" in OS.get_cmdline_user_args():
+		check(await cpp_live(), "C++ランのF4指定確認を最後まで行う")
+		print("[cpp_live] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	get_window().title = "SPEED — 敵調整UI確認"
 	get_window().content_scale_size = Vector2i.ZERO
 	get_window().size = Vector2i(1180, 740)
@@ -143,14 +148,14 @@ func _ready() -> void:
 	check(not spin.visible and not panel.values.get("telescope", {}).has("params.bullet_dmg"), "チェックOFFで上書きを解除して共通値へ戻る")
 	enabled.button_pressed = true
 	spin.value = 27.0
-	var events := session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed")
+	var events: Array = session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed")
 	check(not events.is_empty() and events[-1].values.telescope["params.bullet_dmg"] == 27.0 and events[-1].has("t"), "録画用の時刻・上書き辞書の変更イベントを維持する")
 	await frames()
 	await capture("override-enabled")
 	spin.get_line_edit().grab_focus()
 	await frames()
 	for key in [KEY_P, KEY_1, KEY_Q, KEY_SPACE]:
-		var phase := session.sim.state.phase
+		var phase: int = session.sim.state.phase
 		var event := InputEventKey.new()
 		event.keycode = key
 		event.physical_keycode = key
@@ -224,3 +229,73 @@ func _ready() -> void:
 	await get_tree().process_frame
 	print("[stage_enemy_ui] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)
+
+func cpp_live() -> bool:
+	var source := RuntimeStage.new()
+	source.index = 198
+	source.resources = StageResources.new()
+	source.resources.enemy_ids = PackedStringArray(["drifter"])
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var builder = load("res://tools/content/build_run_content.gd")
+	var folder := "res://.content/dev/cpp_live"
+	if builder.build(source,config,folder,"F4の確認".sha256_text())!=OK: return false
+	var path := folder.path_join("stage_198.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var first: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":42,"cpp_edit_source":{"stage":source,"config":config}},true)
+	var second: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":42,"cpp_edit_source":{"stage":source,"config":config}},false)
+	for session: RunSession in [first,second]:
+		session.auto_step = false
+		while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+		if session.bridge==null: return false
+		if not session.bridge.command("dev_remove_weapon",{"id":"W01"}).ok or not session.bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-600,250)}).ok: return false
+	var bridge = first.bridge
+	var old: Dictionary = bridge._core.enemies_snapshot()[0]
+	if not bridge.command("dev_damage",{"entity_id":old.id,"amount":1.0,"cause":"shot","no_crit":true}).ok: return false
+	old = bridge._core.enemies_snapshot()[0]
+	var held: Dictionary = bridge.checkpoint()
+	if not held.ok: return false
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	overlay = load("res://scripts/dev/stage_enemy_overlay.gd").new()
+	overlay.cpp_session = first
+	layer.add_child(overlay)
+	overlay.show()
+	await frames()
+	if overlay.panel==null: return false
+	var panel: Control = overlay.panel
+	panel._select_enemy("drifter")
+	panel._category = "すべて"
+	panel._refresh_rows()
+	var base: float = ContentManager.enemies[&"drifter"].base_hp(config)
+	panel._edit_value(base*2.0,"hp",base)
+	var after: Dictionary = bridge._core.enemies_snapshot()[0]
+	check(after.id==old.id and after.max_hp>old.max_hp and is_equal_approx(after.hp/after.max_hp,old.hp/old.max_hp),"F4の一時編集が生存個体のIDとHP割合を維持する")
+	check(source.enemy_tuning.is_empty() and second.bridge._core.enemies_snapshot()[0].max_hp==old.max_hp,"保存元と同居する別ランへ変更を広げない")
+	panel._edit_value(3.0,"rank",1.0)
+	panel._edit_value(4.0,"xp_reward_counts.mid",0.0)
+	var recording: Dictionary = bridge.read_recording(true)
+	check(recording.ok and recording.value.xp_config.enemy_rewards.drifter.rank==3 and recording.value.xp_config.enemy_rewards.drifter.counts[1]==4,"星と結晶の数を編集境界で解決し録画用定義へ渡す")
+	if not bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-300,250)}).ok: return false
+	check(bridge._core.enemies_snapshot()[1].max_hp==bridge._core.enemies_snapshot()[0].max_hp,"次の出現も同じ編集定義を使う")
+	panel.values.clear()
+	panel._changed()
+	check(is_equal_approx(bridge._core.enemies_snapshot()[0].hp/bridge._core.enemies_snapshot()[0].max_hp,old.hp/old.max_hp) and bridge._core.enemies_snapshot()[0].max_hp==old.max_hp,"未保存の変更を取り消して基準へ戻せる")
+	check(bridge.restore(held.value).ok,"編集後の保持点から旧Bundleへ戻せる")
+	await frames()
+	check(panel.values.is_empty() and overlay.content_edit.values.is_empty() and bridge._core.enemies_snapshot()[0]==old,"復帰後のF4表示も旧定義の値へ戻す")
+	var presentation: RunPresentation = first.view.get_node("RunPresentation")
+	var rendered: Dictionary = bridge.read_render(Rect2(-1200,-500,1800,1000))
+	check(rendered.ok and presentation.frame_view.apply_frame(rendered.value),"編集した実際の敵を通常描画へ渡す")
+	await frames()
+	await capture("cpp-live")
+	for session: RunSession in [first,second]:
+		check(session.bridge.read_frame().ok and session.bridge.collect_frame().ok and session.bridge.delivery_error.get("ok",false),"F4編集後のフレーム回収と通知配信が成功する")
+	bridge.release_checkpoint(held.value)
+	layer.free()
+	first.free()
+	second.free()
+	return true

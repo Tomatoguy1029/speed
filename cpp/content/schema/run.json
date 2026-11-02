@@ -1225,6 +1225,31 @@
           "max": 1
         }
       ]
+    },
+    {
+      "name": "EnemyTuningValue",
+      "section": 250,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "type": "f64"
+        }
+      ]
     }
   ],
   "enums": {
@@ -1920,6 +1945,14 @@
       {
         "name": "EscortSlash",
         "value": "escort_slash"
+      },
+      {
+        "name": "EnemyTuningChanged",
+        "value": "enemy_tuning_changed"
+      },
+      {
+        "name": "EnemyTuningSaved",
+        "value": "enemy_tuning_saved"
       }
     ],
     "ResultKind": [
@@ -2564,6 +2597,13 @@
     "escort_slash": [
       "pos",
       "dir"
+    ],
+    "enemy_tuning_changed": [
+      "values"
+    ],
+    "enemy_tuning_saved": [
+      "path",
+      "values"
     ]
   },
   "includes": [

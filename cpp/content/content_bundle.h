@@ -16,6 +16,7 @@ struct ContentBundle {
     std::array<double,3> crystal_values{};
     double aim_lag=0, aim_speed=0;
     std::vector<EnemyDefinition> definitions;
+    std::vector<EnemyTuningValue> enemy_tuning;
     std::vector<ResourceKey> visuals;
     std::vector<ForwardDefinition> forward_levels;
     std::vector<ScatterDefinition> scatter_levels;

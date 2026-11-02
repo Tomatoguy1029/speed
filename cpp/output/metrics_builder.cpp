@@ -51,9 +51,12 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
     }
     Dictionary population;population["origins"]=origins;population["roles"]=roles;population["raw"]=s.population.raw;population["accumulator"]=s.population.accumulator;out["population"]=population;
     if (initial) {
+        Dictionary tuning;
+        for (const auto &v:c.enemy_tuning) {const auto id=c.definitions[v.enemy-1].id;Dictionary values=tuning.get(id,Dictionary());values[String::utf8(v.key.c_str())]=v.value;tuning[id]=values;}
+        out["enemy_tuning"]=tuning;
         Dictionary existing;existing["ground"]=existing_ground;existing["carried"]=existing_cargo;existing["cap"]=cap;out["existing"]=existing;
         Dictionary values,rewards;for (size_t i=0;i<3;++i) values[names[i]]=c.crystal_values[i];
-        for (const auto &d:c.definitions) {Array counts;for (auto n:d.xp_rewards) counts.push_back(int64_t(n));Dictionary reward;reward["counts"]=counts;reward["strong_gold"]=d.gold_eligible;rewards[d.id]=reward;}
+        for (const auto &d:c.definitions) {Array counts;for (auto n:d.xp_rewards) counts.push_back(int64_t(n));Dictionary reward;reward["rank"]=d.rank;reward["counts"]=counts;reward["strong_gold"]=d.gold_eligible;rewards[d.id]=reward;}
         Dictionary config;config["xp_reward_version"]=2;config["xp_crystal_values"]=values;config["enemy_rewards"]=rewards;config["strong_gold_chance"]=s.pickup_config.strong_gold_chance;Dictionary limit=cap.duplicate();limit.erase("absorber_id");config["cap"]=limit;
         config["ship_multiplier"]=s.pickup_config.xp_mult;config["run_multiplier"]=s.loadout.xp_gain_mult;config["collection_multiplier"]=s.pickup_config.xp_mult*s.loadout.xp_gain_mult;config["multiplier_application"]="collection_once";
         config["xp_base"]=c.progression.xp_base;config["xp_growth"]=c.progression.xp_growth;config["xp_curve"]=c.progression.xp_curve;out["xp_config"]=config;

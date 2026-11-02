@@ -18,6 +18,9 @@ var sim: RefCounted:
 var _pending_cpp: Dictionary = {}
 var _pending_cpp_bridge: RefCounted
 var cpp_error: Error = OK
+var cpp_index_path := ""
+## 明示した開発試行だけが保持する制作元。通常ランは最初にF4を開くときに参照する。
+var cpp_edit_source: Dictionary = {}
 var cpp_prepare: Callable
 signal loading_failed(error: Error)
 ## 表示（表示のない試行では null）
@@ -221,6 +224,8 @@ var cpp_resources: Resource
 func start_cpp_content(index_path: String, input_sha256: String, seed_value: int, with_view := false, options := {}) -> Error:
 	if cpp_core != null or not _pending_cpp.is_empty() or (_sim!=null and _sim.state != null): return ERR_ALREADY_IN_USE
 	runtime_kind = "cpp"
+	cpp_index_path = index_path
+	cpp_edit_source = options.get("cpp_edit_source",{}).duplicate(true)
 	cpp_error = OK
 	_warm_started_us = 0
 	var prepared := preload("res://scripts/runtime/run_content_loader.gd").read_bundle(index_path,input_sha256)

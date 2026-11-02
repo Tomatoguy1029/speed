@@ -953,6 +953,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if definition == null or String(definition.id)!=id: return ERR_INVALID_DATA
 		var tuning: Dictionary = stage.enemy_tuning.get(id,{})
 		if not StageEnemyTuning.error_for(definition,tuning).is_empty(): return ERR_INVALID_DATA
+		for key: String in tuning:
+			data.EnemyTuningValue.append({"id":data.EnemyTuningValue.size()+1,"enemy":i+1,"key":key,"value":float(tuning[key])})
 		definition = StageEnemyTuning.resolve(definition,tuning)
 		var package := chase_package(definition,config,stage)
 		if package.is_empty(): return ERR_UNAVAILABLE

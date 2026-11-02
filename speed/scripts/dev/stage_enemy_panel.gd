@@ -46,6 +46,7 @@ var _reset_enemy: Button
 var _stages: Array[String] = []
 var _row_controls: Dictionary = {}
 var _live := false
+var definition_source: Callable
 
 func _ready() -> void:
 	var toolbar := HFlowContainer.new()
@@ -250,7 +251,7 @@ func _select_enemy(id: String) -> void:
 	if index >= 0:
 		_enemy_list.select(index)
 		_enemy_list.ensure_current_is_visible()
-	if not _definitions.has(id): _definitions[id] = IO.definition(id)
+	if not _definitions.has(id): _definitions[id] = definition_source.call(id) if definition_source.is_valid() else IO.definition(id)
 	_enemy = _definitions[id]
 	_refresh_tree()
 	_queue_rows()
@@ -337,7 +338,7 @@ func _refresh_rows() -> void:
 			for key in groups[category]:
 				var base := StageEnemyTuning.base_value(_enemy, key, _cfg)
 				var value := float(values.get(_id, {}).get(key, base))
-				var integer: bool = key.begins_with("params.") and _enemy.params[key.trim_prefix("params.")] is int
+				var integer: bool = key=="rank" or key.begins_with("xp_reward_counts.") or (key.begins_with("params.") and _enemy.params[key.trim_prefix("params.")] is int)
 				_row_controls[key] = FIELDS.row(content, key, base, value, integer, _wide, _edit_value.bind(key, base), _reset_key, _toggle_override.bind(key, base), func(text): _hint.text = text)
 				_refresh_difference(key, value, base)
 

@@ -672,6 +672,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto &body=bundle->boss_bodies[i];const auto &boss=bundle->bosses[body.boss-1];
         if (body.id!=i+1 || body.phase_threshold<=0 || body.phase_threshold>=1 || body.final_widen_time<=0 || bundle->definitions[body.enemy-1].kind!=(boss.kind==0?EnemyDefinition::Kind::Monoceros:EnemyDefinition::Kind::Centaurus)) return {};
     }
+    std::unordered_set<std::string> tuning_keys;
+    for (const auto &row:records.EnemyTuningValue_rows) {
+        if (row.id!=bundle->enemy_tuning.size()+1 || row.key.empty() || row.key.size()>128 || !std::isfinite(row.value) || !tuning_keys.insert(std::to_string(row.enemy)+":"+row.key).second) return {};
+        bundle->enemy_tuning.push_back(row);
+    }
     return bundle;
 }
 }
