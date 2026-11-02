@@ -2,10 +2,6 @@
 extends Node
 const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
-var sim: RunSimulation
-var actor: MonocerosBoss
-var session: Node
-var events: Array[StringName] = []
 const DT := 1.0 / 120.0
 func check(ok: bool, label: String) -> void:
 	if semantics_strict():return
@@ -83,84 +79,14 @@ func _ready() -> void:
 	if "--cpp-kick" in OS.get_cmdline_user_args():
 		call_deferred("native_kick")
 		return
-	if "--cpp-data-legacy" in OS.get_cmdline_user_args() or "--cpp-data-legacy-retry" in OS.get_cmdline_user_args():
-		call_deferred("native_data_legacy")
-		return
 	if "--cpp-charge-terrain" in OS.get_cmdline_user_args():
 		call_deferred("native_charge_terrain")
 		return
 	if "--cpp-charge" in OS.get_cmdline_user_args():
 		call_deferred("native_charge")
 		return
-	var stage := load("res://tools/content/build_runtime_stage.gd").compile(ContentManager.stage(1)) as RuntimeStage
-	session = RunManager.create_session(self, {"lab": true, "stage": stage, "stage_index": 1, "seed": 42}, "--capture" in OS.get_cmdline_user_args())
-	session.auto_step = false
-	sim = session.sim
-	if "--capture" in OS.get_cmdline_user_args():
-		await capture()
-		return
 	call_deferred("native_charge")
 
-func fresh() -> void:
-	sim.bosses.remove_boss()
-	sim.enemies.clear_all()
-	sim.projectiles.clear_hostile()
-	sim.projectiles.director.configure({"enabled": false})
-	sim.field.bodies.clear()
-	sim.field.rocks.clear()
-	sim.field.moons.clear()
-	sim.field.battle_arenas.clear()
-	sim.field._build_moon_bands()
-	sim.field.refresh_bodies()
-	sim.state.phase = RunIds.Phase.Play
-	sim.state.boss_dead = false
-	sim.state.lab_mode = true
-	sim.state.ship_pos = Vector2(600, 0)
-	sim.state.ship_vel = Vector2.ZERO
-	sim.state.enemy_aim = sim.state.ship_pos
-	sim.state.ship_hp = sim.state.stats.max_hp
-	sim.state.ship_invuln = 0.0
-	sim.ship.invincible = false
-	sim.bosses.spawn(load("res://data/bosses/monoceros.tres"),Vector2.ZERO)
-	actor = sim.bosses.actor as MonocerosBoss
-	actor._cooldown = 1000.0
-	actor.table.facing[actor.body] = 0.0
-
-func step(seconds: float) -> void:
-	for frame in ceili(seconds / DT):
-		sim.state.world_time += DT
-		sim.state.time += DT
-		actor.sim_tick(DT,DT)
-
-func capture() -> void:
-	fresh()
-	var render := session.view.get_node("RunPresentation") as RunPresentation
-	render.view_override = {"center": Vector2(350, 0), "zoom": 0.65}
-	var layer := CanvasLayer.new()
-	add_child(layer)
-	var label := Label.new()
-	label.position = Vector2(24,130)
-	label.add_theme_font_size_override("font_size",24)
-	layer.add_child(label)
-	var stage_names := [&"charge",&"sweep",&"kick",&"return_charge",&"lance",&"horn_wave",&"sword_flash",&"horn_dance"]
-	for tech in stage_names:
-		fresh()
-		actor.phase = 2 if tech in [&"lance", &"sword_flash", &"horn_dance"] else 1
-		actor._apply_phase()
-		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech in [&"sweep", &"sword_flash"] else Vector2(600,0)
-		sim.state.enemy_aim = sim.state.ship_pos
-		actor.start_attack(tech)
-		for frame in 170:
-			step(1.0/60.0)
-			label.text = "いっかくじゅう座（仮） %s / %s" % [tech,actor.mode]
-			await get_tree().process_frame
-			if frame in [35,75]:
-				await RenderingServer.frame_post_draw
-				get_viewport().get_texture().get_image().save_png("/tmp/speed-monoceros-%s-%d.png"%[tech,frame])
-	session.free()
-	get_tree().quit()
-
-## B00で確認済みの時刻・掃引・取消・復帰は繰り返さず、本体と技の残る接続を確認する。
 func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0, moon := false, name := "charge", dance_timeout := false) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
@@ -387,26 +313,6 @@ func native_charge_terrain() -> void:
 	print("[cpp_monoceros_charge_terrain] failures=",failed)
 
 ## PureDataを旧生成・通常のActorへ渡す、残っていた互換条件だけ確認する。
-func native_data_legacy() -> void:
-	var compiler = load("res://tools/content/build_boss_program.gd")
-	var result: Dictionary = {"error":OK,"program":load("res://.content/tests/monoceros_pure_data.tres")} if "--cpp-data-legacy-retry" in OS.get_cmdline_user_args() else compiler.build_boss("monoceros","res://.content/tests/monoceros_pure_data.tres")
-	if "--cpp-data-legacy-retry" not in OS.get_cmdline_user_args(): check(result.error==OK,"分離した編集値から通常のボス生成を完了する")
-	if result.error!=OK:
-		get_tree().quit(1)
-		return
-	var owner := MonocerosBoss.new()
-	owner.def = load("res://data/bosses/monoceros.tres")
-	var ctx := RunContext.new()
-	ctx.state = RunState.new()
-	owner.ctx = ctx
-	owner.configure_flow(result.program)
-	var move: BossTechnique = result.program.data.rules.techniques.filter(func(value): return value.technique==&"charge")[0]
-	var runner = preload("res://scripts/bosses/legacy_technique_runners.gd").make(move)
-	check(move.make_runner()==null and owner._move_kinds[&"charge"]==&"charge" and runner.kind()==&"charge","Resourceに実行コードを戻さず通常Actorの設定と実行Runnerを解決する")
-	owner.free()
-	print("[cpp_monoceros_data_legacy] failures=",failed)
-	get_tree().quit(1 if failed else 0)
-
 func kick_fixture(automatic := false, front := false) -> Dictionary:
 	var f := charge_fixture(automatic,false,450.0,false,"kick")
 	var bridge = f.bridge
@@ -529,8 +435,6 @@ func native_sweep() -> void:
 	var bridge = fixture.bridge
 	var definition: Dictionary = fixture.records.BossTechniqueDefinition[0]
 	check(definition.kind==2 and definition.approach_accel==1000.0 and definition.arc==1.6 and fixture.records.BossTechniqueStage.is_empty(),"薙ぎの固有値を生成し戦闘method trackを使わない")
-	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(fixture.move)
-	check(is_equal_approx(legacy.attack_length(),0.9) and is_equal_approx(legacy.reach_limit(177.6),232.6) and fixture.move.make_runner()==null,"PureDataを保ち旧入口の攻撃長と加速積分の到達距離を解決する")
 	bridge._core.step(0.01)
 	var state: Dictionary = bridge.command("dev_boss_state").value[0]
 	check(state.stage==0 and state.sequence_stage==0 and state.side==1,"本体フローから最初の方向の踏み込みを自然選択する")
@@ -593,14 +497,6 @@ func native_sweep() -> void:
 	var compiler = load("res://tools/content/build_boss_program.gd")
 	var program: Dictionary = compiler.build_boss("monoceros","res://.content/tests/monoceros_sweep_pure_data.tres")
 	check(program.error==OK,"薙ぎのPureDataを含む既存の通常生成を完了する")
-	if program.error==OK:
-		var owner := MonocerosBoss.new()
-		owner.def = load("res://data/bosses/monoceros.tres")
-		owner.ctx = RunContext.new()
-		owner.ctx.state = RunState.new()
-		owner.configure_flow(program.program)
-		check(owner._move_kinds[&"sweep"]==&"sweep" and owner._attack_length(&"sweep")>0.0,"通常Actorの設定と攻撃長も分離した薙ぎへ接続する")
-		owner.free()
 	await get_tree().process_frame
 	print("[cpp_monoceros_sweep] failures=",failed)
 	get_tree().quit(1 if failed else 0)
@@ -612,8 +508,6 @@ func native_lance() -> void:
 	var bridge = fixture.bridge
 	var definition: Dictionary = fixture.records.BossTechniqueDefinition[0]
 	if "--cpp-lance-retry" not in OS.get_cmdline_user_args(): check(definition.kind==3 and definition.active==0.2 and definition.width==48.0 and definition.head_length==60.0 and fixture.records.BossTechniqueStage.is_empty(),"光の槍の実効値と段階時計を生成しmethod trackを残さない")
-	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(fixture.move)
-	if "--cpp-lance-retry" not in OS.get_cmdline_user_args(): check(fixture.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.6) and legacy.reach_limit(100.0)==360.0,"光の槍をPureDataへ分離し通常入口のRunnerと到達距離を保つ")
 	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
 	bridge._core.step(0.01)
@@ -800,8 +694,6 @@ func native_return() -> void:
 	if f.is_empty(): get_tree().quit(1); return
 	var bridge = f.bridge
 	check(f.records.BossTechniqueDefinition[0].kind==4 and f.records.BossTechniqueDefinition[0].passes==2 and f.records.BossTechniqueDefinition[1].passes==3 and f.records.BossTechniqueStage.is_empty(),"形態ごとの回数と速さを生成しmethod trackを残さない")
-	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
-	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.9) and legacy.reach_limit(100.0)==300.0,"PureDataを保ち通常入口の攻撃長と到達距離を解決する")
 	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
 	bridge._core.step(0.01)
@@ -878,8 +770,6 @@ func native_wave() -> void:
 	var bridge = f.bridge
 	var definition: Dictionary = f.records.BossTechniqueDefinition[0]
 	check(definition.kind==5 and definition.warn==0.1 and definition.wave_width==20.0 and definition.wave_half_angle==0.2 and f.records.BossTechniqueStage.is_empty(),"windupをwarnへ変換し波の実効値を生成してmethod trackを残さない")
-	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
-	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.5) and legacy.reach_limit(100.0)==300.0,"衝撃波をPureDataへ分離し旧入口の攻撃長と到達距離を保つ")
 	bridge._core.step(0.01)
 	check(bridge.command("dev_boss_state").value[0].stage==0,"制作値から共通フローで角の衝撃波を単独選択する")
 	bridge._core.step(0.1)
@@ -956,8 +846,6 @@ func native_dance() -> void:
 	var bridge = f.bridge
 	var definition: Dictionary = f.records.BossTechniqueDefinition[0]
 	check(definition.kind==6 and definition.passes==2 and definition.warn==0.1 and definition.min_run==200.0 and f.records.BossTechniqueStage.is_empty(),"乱舞の全固有値と見積り時計を生成しmethod trackを残さない")
-	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
-	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),1.5) and is_inf(legacy.reach_limit(100.0)),"PureDataを保ち旧入口の攻撃長と無制限の到達距離を解決する")
 	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
 	bridge._core.step(0.01)
@@ -1040,8 +928,6 @@ func native_sword() -> void:
 	var bridge = f.bridge
 	var definition: Dictionary = f.records.BossTechniqueDefinition[0]
 	check(definition.kind==7 and definition.cuts==2 and definition.first_windup==0.1 and definition.warn==0.05 and definition.slash_width==20.0 and f.records.BossTechniqueStage.is_empty(),"初回と次回の溜め・斬撃の固有値を生成しmethod trackを残さない")
-	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
-	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.55) and legacy.reach_limit(100.0)==300.0,"PureDataを保ち旧入口の攻撃長と到達距離を解決する")
 	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
 	bridge._core.step(0.01)

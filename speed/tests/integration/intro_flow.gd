@@ -121,13 +121,6 @@ func _ready() -> void:
 
 ## 再視聴の開始・スキップ・完了・再実行だけを確認し、通常ステージは起動しない。
 func _test_replay_only() -> void:
-	var state := RunState.new()
-	_check(state.get("cinematic_bars") is float, "読み込んだ RunState は共通の演出状態を持つ")
-	if failed:
-		get_tree().quit(1)
-		return
-	state.cinematic_bars = 1.0
-	_check(state.cinematic_bars == 1.0, "読み込んだ RunState へ演出状態を代入できる")
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.data.intro_seen = true
 	var saved: Dictionary = SaveManager.data.duplicate(true)
@@ -381,24 +374,23 @@ func _test_run_transitions(app: Node) -> void:
 			await _frame_ready()
 			if app._current is RunSession:
 				app._current.auto_step = false
-				if app._current.sim.state != null and not GameManager.screen_transition_active:
+				if app._current.bridge != null and not GameManager.screen_transition_active:
 					break
 		var session: RunSession = app._current as RunSession
-		_check(session != null and session.sim.state != null, "通常の出撃を初期化: ステージ%d" % stage_index)
-		if session == null or session.sim.state == null:
+		_check(session != null and session.bridge != null, "通常の出撃を初期化: ステージ%d" % stage_index)
+		if session == null or session.bridge == null:
 			return
 		var id := session.id
-		var boss: BossDef = ContentManager.definition(&"bosses", session.sim.state.stage.boss_id)
-		if boss != null:
-			var actor: Node = (load(boss.scene_path) as PackedScene).instantiate()
-			_check(actor is BossActor, "通常ステージのボスシーンを読み込める: ステージ%d" % stage_index)
-			actor.free()
-		_check(not session.sim.state.lab_mode and session.sim.state.stage_index == stage_index and RunManager.current_id == id and session.view.has_node("Hud"), "通常ランの状態と HUD を接続: ステージ%d" % stage_index)
+		var stage: StageDef = ContentManager.stage(stage_index)
+		var boss: BossDef = ContentManager.definition(&"bosses",stage.boss_id)
+		_check(boss!=null and boss.id==stage.boss_id,"通常ステージのボス定義を読み込める: ステージ%d" % stage_index)
+		var lab: Dictionary = session.bridge.read_lab().value
+		_check(not lab.lab_mode and session.cpp_index_path.ends_with("stage_%d.json" % stage_index) and RunManager.current_id==id and session.view.has_node("Hud"),"通常ランの状態とHUDを接続: ステージ%d" % stage_index)
 		await _frame_ready()
-		RunManager.command(id, &"pause")
-		_check(session.sim.state.phase == RunIds.Phase.Paused, "通常ランをポーズ: ステージ%d" % stage_index)
-		RunManager.command(id, &"resume")
-		RunManager.command(id, &"abort")
+		RunManager.command(id, &"pause", {"paused":true})
+		_check(session.bridge.read_frame().value.ui.phase == RunIds.Phase.Paused, "通常ランをポーズ: ステージ%d" % stage_index)
+		RunManager.command(id, &"pause", {"paused":false})
+		GameManager.abort_run()
 		await _frame_ready()
 		_check(GameManager.screen == GameManager.Screen.MAIN_MENU and RunManager.session(id) == null and SaveManager.writes == 1, "通常ラン中止でセッションを解放し、導入の保存を増やさない: ステージ%d" % stage_index)
 
@@ -425,7 +417,7 @@ func _test_cpp_isolation() -> void:
 	var intro: Node = app._current
 	var id: int = intro.session.id
 	_check(not intro.session.is_in_group("recordable_runs") and RunManager.current_id==-1 and not intro.run.state.stage.boss_enabled,"導入は録画・通常ラン・ボス進行から独立")
-	_check(intro.session.runtime_kind=="cpp" and intro.session._sim==null,"導入は旧RunSimulationを生成しない")
+	_check(intro.session.bridge==intro.sequence.bridge and not ("_sim" in intro.session),"導入は旧RunSimulationを生成しない")
 	_check(intro.sequence.bridge.read_frame().ok and intro.sequence.bridge.collect_frame().ok and intro.sequence.bridge.delivery_error.get("ok",false),"導入の読取・回収・通知配信が成功する")
 	intro._pause()
 	_check(intro._paused,"導入を停止してからスキップを受け付ける")
