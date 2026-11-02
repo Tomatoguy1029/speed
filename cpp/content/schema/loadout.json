@@ -59,9 +59,14 @@
           "name": "attack_bonus",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "pickup_bonus",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 6
+      "version": 7
     },
     {
       "name": "PostMaxChargeDefinition",
@@ -154,6 +159,22 @@
         },
         {
           "name": "followup_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxPickupDefinition",
+      "section": 35,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "xp_radius_increment",
           "type": "f64",
           "min": 0
         }

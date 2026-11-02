@@ -66,6 +66,13 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t12" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t12()
+		check(finished,"広域回収の確認を最後まで実施する")
+		print("[cpp_t12] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t11-ram" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t11_ram()
 		check(finished,"攻撃力の体当たり経路を最後まで照合する")
@@ -840,4 +847,65 @@ func check_cpp_t11_ram() -> bool:
 	var contacts: Array = t09_contact_hits(bridge,config,1).filter(func(event): return event.type==&"hit" and event.payload.cause==&"ram")
 	check(contacts.size()==1 and is_equal_approx(contacts[0].payload.dmg,attack),"体当たりへ武器限定の倍率を混ぜない: expected=%s actual=%s" % [attack,contacts])
 	bridge.dispose()
+	return true
+
+func check_cpp_t12() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: TraitDef = load("res://data/traits/T12_pickup.tres")
+	var factor := 1.1
+	var bridge = t07_bridge(config,{"mult":{"pickup":factor}})
+	if bridge==null: return false
+	var core = bridge._core
+	var base := config.pickup_radius*factor
+	check(is_equal_approx(bridge._ui.pickup_radius,base) and bridge._ui.xp_pickup_radius==bridge._ui.pickup_radius,"未取得時は永続強化までの回収半径を使う")
+	var position := Vector2(-3000,0)
+	var trained := base*(1.0+definition.stack_bonus(config.trait_max_stacks))
+	var placed: Dictionary = bridge.command("dev_drop_crystal",{"kind":0,"position":position+Vector2((base+trained)*0.5,0)})
+	check(placed.ok,"通常と強化後の半径の間へ結晶を置く")
+	core.step_pickups(0.001)
+	check(not core.pickups_snapshot().gems[0].pulled,"取得前は半径の外の結晶を吸い寄せない")
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T12","levels":1}).ok,"T12を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.pickup_radius,base*(1.0+definition.stack_bonus(level))) and bridge._ui.xp_pickup_radius==bridge._ui.pickup_radius,"各段の増分を通常回収と結晶の半径へ一度適用する")
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T12","levels":1}).ok and is_equal_approx(bridge._ui.pickup_radius,trained),"上限を越えて回収範囲を広げない")
+	core.step_pickups(0.001)
+	check(core.pickups_snapshot().gems[0].pulled,"取得後は同じ結晶を実際の共通回収で吸い寄せる")
+	var retained: Dictionary = core.pickups_snapshot()
+	var saved: Dictionary = bridge.checkpoint()
+	var increment: float = config.post_max.increments.get("pickup_radius",0.0)
+	var stacks: int = ceili(1.0/increment)
+	bridge.command("dev_post_pickup",{"stacks":stacks})
+	var xp_radius := trained*config.post_max.factor(&"pickup_radius",{&"pickup_radius":stacks})
+	check(is_equal_approx(bridge._ui.pickup_radius,trained) and is_equal_approx(bridge._ui.xp_pickup_radius,xp_radius),"最大段後は結晶の半径だけを広げる")
+	var far := position+Vector2((xp_radius+trained*1.6)*0.5,0)
+	var extra: Dictionary = bridge.command("dev_drop_crystal",{"kind":0,"position":far})
+	bridge.command("dev_spawn_pickup",{"kind":"coin","position":far})
+	bridge.command("dev_spawn_pickup",{"kind":"magnet","position":far})
+	core.step_pickups(0.001)
+	var snapshot: Dictionary = core.pickups_snapshot()
+	var gem: Dictionary = snapshot.gems.filter(func(item): return item.id==extra.value)[0]
+	check(gem.pulled and not snapshot.coins[0].pulled and snapshot.capsules[0].pos==far,"結晶だけの追加範囲ではコイン・カプセルを吸い寄せない")
+	bridge.command("dev_remove_trait",{"id":"T12"})
+	check(is_equal_approx(bridge._ui.pickup_radius,base) and is_equal_approx(bridge._ui.xp_pickup_radius,base*config.post_max.factor(&"pickup_radius",{&"pickup_radius":stacks})),"解除で特性分だけを外し、永続倍率と結晶の追加範囲を保つ")
+	bridge.command("dev_post_pickup",{"stacks":0})
+	check(is_equal_approx(bridge._ui.xp_pickup_radius,base),"最大段後の追加も外すと元の結晶半径へ戻る")
+	check(bridge.restore(saved.value).ok,"取得段と半径・吸引中の結晶を保持して復帰する")
+	bridge.collect_frame()
+	check(core.pickups_snapshot()==retained and is_equal_approx(bridge._ui.pickup_radius,trained) and bridge._ui.xp_pickup_radius==bridge._ui.pickup_radius,"復帰後も同じ回収範囲と吸引状態へ戻る")
+	bridge.release_checkpoint(saved.value)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(is_equal_approx(hud._cpp_ui.pickup_radius,trained) and hud._cpp_ui.trait_levels.any(func(item): return item.id=="T12" and item.level==config.trait_max_stacks),"HUDへ回収範囲と所持段を同じ状態から渡す")
+	hud.free()
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"広域回収の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true

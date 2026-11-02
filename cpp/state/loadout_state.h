@@ -21,8 +21,8 @@ struct EquipmentEffects {
 struct LoadoutState {
     EquipmentEffects effects;
 
-    double charge_profile_factor=1,speed_profile_factor=1,attack_profile_factor=1;
-    uint64_t post_charge_stacks=0,post_crit_stacks=0,post_max_speed_stacks=0,post_weapon_damage_stacks=0,post_followup_stacks=0;
+    double charge_profile_factor=1,speed_profile_factor=1,attack_profile_factor=1,pickup_profile_factor=1;
+    uint64_t post_charge_stacks=0,post_crit_stacks=0,post_max_speed_stacks=0,post_weapon_damage_stacks=0,post_followup_stacks=0,post_xp_pickup_stacks=0;
     std::vector<double> weapon_damage_factors;
     bool ready=false,initial_offer=false;
     int64_t level=0,pending_levels=0,rerolls=0,next_offer_id=1,offer_id=0,selected_id=0;

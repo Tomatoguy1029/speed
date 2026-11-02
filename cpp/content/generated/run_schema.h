@@ -975,6 +975,7 @@ struct NumericTraitLevel {
     double crit_bonus{};
     double speed_bonus{};
     double attack_bonus{};
+    double pickup_bonus{};
 };
 inline bool read(BinaryReader &input, NumericTraitLevel &out) {
     if (!input.read_u32(out.id)) return false;
@@ -999,6 +1000,8 @@ inline bool read(BinaryReader &input, NumericTraitLevel &out) {
     if (out.speed_bonus < 0) return false;
     if (!input.read_f64(out.attack_bonus)) return false;
     if (out.attack_bonus < 0) return false;
+    if (!input.read_f64(out.pickup_bonus)) return false;
+    if (out.pickup_bonus < 0) return false;
     return true;
 }
 struct PostMaxChargeDefinition {
@@ -1064,6 +1067,17 @@ inline bool read(BinaryReader &input, PostMaxWeaponPowerDefinition &out) {
     if (out.followup_increment < 0) return false;
     return true;
 }
+struct PostMaxPickupDefinition {
+    uint32_t id{};
+    double xp_radius_increment{};
+};
+inline bool read(BinaryReader &input, PostMaxPickupDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.xp_radius_increment)) return false;
+    if (out.xp_radius_increment < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -1099,6 +1113,7 @@ struct ContentRecords {
     std::vector<PostMaxCritDefinition> PostMaxCritDefinition_rows;
     std::vector<PostMaxMotionDefinition> PostMaxMotionDefinition_rows;
     std::vector<PostMaxWeaponPowerDefinition> PostMaxWeaponPowerDefinition_rows;
+    std::vector<PostMaxPickupDefinition> PostMaxPickupDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -1283,8 +1298,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 30: {
-        if (version != 6) return false;
-        if (count > input.remaining()/76) return false;
+        if (version != 7) return false;
+        if (count > input.remaining()/84) return false;
         for (uint32_t i=0; i<count; ++i) { NumericTraitLevel row; if (!read(input,row)) return false; out.NumericTraitLevel_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -1310,6 +1325,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/24) return false;
         for (uint32_t i=0; i<count; ++i) { PostMaxWeaponPowerDefinition row; if (!read(input,row)) return false; out.PostMaxWeaponPowerDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 35: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { PostMaxPickupDefinition row; if (!read(input,row)) return false; out.PostMaxPickupDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -1384,6 +1405,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PostMaxMotionDefinition_rows) if (!PostMaxMotionDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PostMaxWeaponPowerDefinition_ids;
     for (const auto &row:data.PostMaxWeaponPowerDefinition_rows) if (!PostMaxWeaponPowerDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PostMaxPickupDefinition_ids;
+    for (const auto &row:data.PostMaxPickupDefinition_rows) if (!PostMaxPickupDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -1545,5 +1568,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=34;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=35;
 }
