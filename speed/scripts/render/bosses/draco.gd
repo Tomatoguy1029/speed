@@ -25,6 +25,12 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 func _draw() -> void:
 	if state.is_empty() or not visible: return
 	_draw_rift()
+	var cycle: Dictionary = state.get("cycle",{})
+	if cycle.get("stage",0)==2:
+		for j in 16:
+			var k := fmod(float(cycle.time)*0.5+j/16.0,1.0)
+			var at := Vector2.from_angle(j*2.399963)*450.0*(1.0-k)
+			draw_circle(at,4.0,Color(0.8,0.9,1.0,k))
 	var intro: Dictionary = state.get("intro",{})
 	var glow: float = float(intro.chest_glow) if intro.get("active",false) else 1.0
 	var depth := float(state.perspective_scale)

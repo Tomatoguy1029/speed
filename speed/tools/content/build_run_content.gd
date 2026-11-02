@@ -493,8 +493,28 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	package.visuals.append({"id":key,"role":7,"path":("res://scenes/bosses/hydra_frame.tscn" if definition.id==&"hydra" else "res://scenes/bosses/%s_presentation.tscn" % definition.id),"boss":String(definition.id),"appearance":definition.part_appearance.duplicate(true)})
 	return package
 
+## 候補の順序と重複を保ち、生成済みの敵定義へ結ぶ。資源は既存のdraco用一覧を使う。
+static func draco_cycle_candidates(definition: BossDef) -> Array:
+	var choices: Array = definition.params.get("picaro_candidates",[]).duplicate()
+	if choices.is_empty():
+		for id in ContentManager.catalog.table(&"enemies"):
+			var entry: ContentEntry = ContentManager.catalog.find(&"enemies",id)
+			var source := load(entry.path) as EnemyDef
+			if source!=null and source.rank>0 and source.gate not in [&"solid",&"immortal"]: choices.append(id)
+	return choices if not choices.is_empty() else [&"biter"]
+
+static func append_draco_cycle(data: Dictionary, definition: BossDef, boss: int) -> Error:
+	var cycle: int = data.DracoCycleDefinition.size()+1
+	data.DracoCycleDefinition.append({"id":cycle,"boss":boss,"collect_time":float(definition.params.get("collect_time",12.0)),"count":int(definition.params.get("picaro_count",3))})
+	for id in draco_cycle_candidates(definition):
+		var found: Array = data.StringEntry.filter(func(row):return row.value==String(id))
+		if found.size()!=1: return ERR_INVALID_DATA
+		data.DracoCycleCandidate.append({"id":data.DracoCycleCandidate.size()+1,"cycle":cycle,"enemy":found[0].id,"excluded":StringName(id) in definition.params.get("picaro_excluded",[])})
+	return OK
+
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
+	if definition!=null and definition.id==&"draco": return boss_body_package(definition,config)
 	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
@@ -1468,6 +1488,13 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var attack_visuals: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	var enemy_ids := stage.resources.enemy_ids.duplicate()
+	var cycle_source: BossDef = boss_definitions.get(&"draco",boss_definitions.get("draco"))
+	if cycle_source==null and stage.boss_id==&"draco": cycle_source = load("res://data/bosses/draco.tres")
+	var cycle_dependencies: Array = []
+	if cycle_source!=null:
+		cycle_dependencies = draco_cycle_candidates(cycle_source)
+		for id in cycle_dependencies:
+			if not String(id) in enemy_ids: enemy_ids.append(String(id))
 	var encounter_profile: Dictionary = stage.encounter_profile.duplicate(true)
 	if encounter_profile.get("enabled",false):
 		for path in encounter_profile.get("baseline",{}):
@@ -1836,8 +1863,14 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 
 	var encounter_error := encounter_records(data,encounter_profile,enemy_ids)
 	if encounter_error!=OK: return encounter_error
-	var bosses_error := append_bosses(data,visuals,boss_definitions,config,stage,boss_programs)
+	var resolved_bosses: Dictionary = boss_definitions.duplicate()
+	if stage.boss_id==&"draco" and not resolved_bosses.has(&"draco"): resolved_bosses[&"draco"] = load("res://data/bosses/draco.tres")
+	var bosses_error := append_bosses(data,visuals,resolved_bosses,config,stage,boss_programs)
 	if bosses_error!=OK: return bosses_error
+	for boss: Dictionary in data.BossDefinition:
+		if boss.external_id!="draco": continue
+		var source: BossDef = resolved_bosses.get(&"draco",resolved_bosses.get("draco"))
+		if source==null or append_draco_cycle(data,source,boss.id)!=OK: return ERR_INVALID_DATA
 	# 開発中の追加定義は既存の装備・保留要求の資源番号を維持する。
 	if previous_resources!=null:
 		var remap := {}
@@ -1876,6 +1909,10 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.ResourceKey.sort_custom(func(a,b): return a.id<b.id)
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
+	for id in cycle_dependencies:
+		var entry: ContentEntry = ContentManager.catalog.find(&"enemies",StringName(id))
+		if entry==null: return ERR_INVALID_DATA
+		if not entry.path in paths: paths.append(entry.path)
 	paths.append("res://.content/meteor_pieces.res")
 	if not paths.has("res://.content/hero_aura.res"): paths.append("res://.content/hero_aura.res")
 	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png","res://.content/attack_visuals.res","res://scripts/render/attacks/zone.gd","res://scripts/render/fx/blast_bursts.gd","res://scripts/render/attacks/flood.gd","res://shaders/water_flood.gdshader","res://assets/fx/water_noise.png","res://scripts/render/light_lance.gd","res://scripts/render/equipment/critBeam.gd","res://scripts/render/attacks/shell_frame.gd","res://shaders/pump_shell_runtime.gdshader"]:

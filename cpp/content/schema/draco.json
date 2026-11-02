@@ -81,6 +81,57 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DracoCycleDefinition",
+      "section": 431,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "collect_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        }
+      ]
+    },
+    {
+      "name": "DracoCycleCandidate",
+      "section": 432,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "cycle",
+          "type": "u32",
+          "ref": "DracoCycleDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "excluded",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "enums": {}

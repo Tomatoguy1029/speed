@@ -5,6 +5,9 @@ func check(value: bool, message: String) -> void:
 		failures += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-draco-cycle" in OS.get_cmdline_user_args():
+		call_deferred("native_cycle")
+		return
 	if "--cpp-draco-intro" in OS.get_cmdline_user_args() or "--cpp-draco-intro-position" in OS.get_cmdline_user_args():
 		call_deferred("native_intro")
 		return
@@ -260,4 +263,90 @@ func native_intro() -> void:
 	check(not bridge.command("dev_boss_body_state").value[-1].intro.active and bridge.command("dev_boss_body_state").value[-1].mode==1,"登場は自然終了で戦闘へ渡す")
 	view.free();bridge.dispose()
 	print("[B_draco_intro] failures=",failures)
+	get_tree().quit(1 if failures else 0)
+
+## 同じ論理画面と既存の初回生成・通常採集・中断でSourceと照合する。
+func native_cycle() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	var definition: BossDef = load("res://data/bosses/draco.tres").duplicate(true)
+	definition.params.picaro_candidates = [&"biter"]
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	var source: Dictionary = builder.chase_package(load("res://data/enemies/biter.tres"),cfg)
+	var row: Dictionary = source.records.EnemyRecord[0].duplicate(true)
+	row.id=2;row.visual_id=package.records.ResourceKey.size()+1
+	package.records.EnemyRecord.append(row)
+	package.records.StringEntry.append({"id":2,"value":"biter"})
+	package.records.DefinitionIndex.append({"id":2,"enemy":2})
+	package.records.PopulationType.append({"id":2,"enemy":2,"rank":1,"maximum":10,"ranged":false})
+	for record: Dictionary in builder.Schema.SCHEMA.records:
+		if record.fields[0].get("ref","")!="EnemyRecord": continue
+		for original: Dictionary in source.records[record.name]:
+			var item := original.duplicate(true);item.id=2;package.records[record.name].append(item)
+	var hull: Dictionary = source.records.FriendHullLook[0].duplicate(true)
+	hull.id=2;hull.enemy=2;package.records.FriendHullLook.append(hull)
+	var visual: Dictionary = source.visuals[5].duplicate(true)
+	visual.id=row.visual_id
+	package.visuals.append(visual);package.records.ResourceKey.append({"id":visual.id,"role":visual.role})
+	check(builder.append_draco_cycle(package.records,definition,1)==OK,"通常生成と同じ候補の順序・敵参照を作る")
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":189,"mode":1,"stage_id":"B_draco_cycle","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"採集・再生成の型付き編集値を読む")
+	if not configured.ok: print(configured);get_tree().quit(1);return
+	bridge.start(1605,{"position":Vector2(180,260),"lab_mode":true})
+	bridge.subscribe("確認",func(_frame):return true)
+	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"level":1,"position":Vector2(180,260)}})
+	bridge._core.set_motion_context(Vector2(180,260),Vector2(60,180),Vector2(800,450))
+	bridge.command("dev_edit",{"kind":"camera","payload":{"center":Vector2(60,180),"size":Vector2(960,540),"zoom":0.6,"bars":0.0}})
+	var boss: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-500,-100),"entrance":false}).value
+	var stage: RuntimeStage = ContentManager.runtime_stage(5).duplicate(true);stage.boss_enabled=false
+	var session := RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":1605},false)
+	session.auto_step=false
+	var sim: RunSimulation = session.sim
+	sim.field.bodies.clear();sim.state.ship_pos=Vector2(180,260);sim.state.view_center=Vector2(60,180);sim.state.camera_zoom=0.6;sim.state.view_half=Vector2(800,450)
+	sim.ctx.options.view_size=Vector2(960,540)
+	sim.bosses.spawn(definition,Vector2(-500,-100))
+	var actor = sim.bosses.actor;actor.selection_enabled=false;actor.phase=2
+	actor.cycle.begin_initial()
+	check(bridge.command("dev_draco_cycle",{"entity_id":boss,"operation":"initial"}).ok,"初回生成を始める")
+	var matched := true
+	for frame in 1000:
+		actor.cycle.tick(1.0/60.0);bridge._core.step(1.0/60.0)
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+		var names := ["","roar","collect","wait_beams","return","generate"]
+		if String(actor.cycle.stage)!=names[body.cycle.stage] or not body.position.is_equal_approx(actor.table.pos[actor.body]) or absf(body.perspective_scale-actor.perspective_scale)>0.00001 or absf(body.cycle.time-actor.cycle.time)>0.00001: matched=false
+		if actor.cycle.stage==&"": break
+	check(matched,"初回生成はSourceと同じ段階・時刻・位置・命中半径の遠近で進む")
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.cycle.stage==0 and body.mode==1 and body.guard==0.0 and body.picaro.size()==3,"初回生成で3体を作り本体戦へ戻る")
+	var frame: Dictionary = bridge.read_frame().value
+	check(not frame.ui.controls_locked and not frame.ui.cinematic_camera and not frame.ui.encounter_protected,"初回のロックと保護を全て解放する")
+	actor.cycle.begin_deep();bridge.command("dev_draco_cycle",{"entity_id":boss,"operation":"deep"})
+	check(not bridge.read_frame().value.ui.controls_locked and bridge.read_frame().value.ui.cinematic_bars==0.0,"通常採集では操作を止めない")
+	for tick in 90: actor.cycle.tick(1.0/60.0);bridge._core.step(1.0/60.0)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.position.is_equal_approx(actor.table.pos[actor.body]) and absf(body.perspective_scale-actor.perspective_scale)<0.00001,"同じ画面サイズで通常採集の位置と命中半径を保つ")
+	var held: Dictionary = bridge.checkpoint();check(held.ok,"採集中の段階・遠近・所有を保持する")
+	bridge._core.step(0.4)
+	var expected: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(bridge.restore(held.value).ok,"採集中を復元する")
+	bridge._core.step(0.4)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"復元後の位置・判定・時刻を保つ")
+	bridge.release_checkpoint(held.value)
+	actor.cycle.cancel();bridge.command("dev_draco_cycle",{"entity_id":boss,"operation":"cancel"})
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.perspective_scale==1.0 and body.alpha==1.0 and body.guard==0.0 and body.cycle.stage==0,"採集中断は遠近・透明度・保護を残さない")
+	var scope := ContentResourceScope.new()
+	for item: Dictionary in package.visuals:
+		if not item.path.is_empty(): scope.provide(item.path,load(item.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary]=[];entries.assign(package.visuals);view.setup(scope,entries,cfg.character_scale)
+	bridge.command("dev_draco_cycle",{"entity_id":boss,"operation":"deep"});bridge._core.step(0.5)
+	check(view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value),"採集粒と遠近はGodotが状態を読むだけで表示する")
+	await get_tree().process_frame
+	bridge.command("dev_cancel_boss",{"entity_id":boss})
+	check(not bridge.read_frame().value.ui.cinematic_camera and not bridge.read_frame().value.ui.controls_locked,"本体中断は演出の所有状態を返す")
+	view.free();bridge.dispose();session.free()
+	print("[B_draco_cycle] failures=",failures)
 	get_tree().quit(1 if failures else 0)

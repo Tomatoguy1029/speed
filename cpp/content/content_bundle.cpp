@@ -132,6 +132,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->hydra_bodies=records.HydraBodyDefinition_rows;bundle->hydra_regrow=records.HydraRegrowDefinition_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
     bundle->draco_bodies=records.DracoBodyDefinition_rows;
+    bundle->draco_cycles=records.DracoCycleDefinition_rows;
+    bundle->draco_cycle_candidates=records.DracoCycleCandidate_rows;
     bundle->canis_commands=records.CanisCommandDefinition_rows;
     bundle->canis_howls=records.CanisHowlDefinition_rows;
     bundle->canis_pounces=records.CanisPounceDefinition_rows;
@@ -844,6 +846,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (size_t i=0;i<bundle->hydra_regrow.size();++i) {const auto &p=bundle->hydra_regrow[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || p.growth_first>=1 || p.growth_first<=p.growth_second || p.growth_second<=0) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_regrow[j].boss==p.boss) return {};}
 
 
+    for (size_t i=0;i<bundle->draco_cycles.size();++i) {const auto &p=bundle->draco_cycles[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=4 || std::none_of(bundle->draco_cycle_candidates.begin(),bundle->draco_cycle_candidates.end(),[&](const auto &v){return v.cycle==p.id;})) return {};}
     for (size_t i=0;i<bundle->draco_bodies.size();++i) {const auto &p=bundle->draco_bodies[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=4 || p.body_length<=0 || p.body_width<=0 || p.head_scale<=0 || p.head_radius<=0 || p.part_hp<=0 || p.threshold_2<=0 || p.threshold_1>=1 || p.threshold_2>=p.threshold_1) return {};}
     for (size_t i=0;i<bundle->canis_bodies.size();++i) {const auto &p=bundle->canis_bodies[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=2 || bundle->definitions[p.hound-1].kind!=EnemyDefinition::Kind::Hound || p.lead_scan<=0) return {};}
     std::unordered_set<std::string> tuning_keys;

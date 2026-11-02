@@ -7,6 +7,7 @@
 #include "../hydra/regrow.h"
 #include "../draco/body.h"
 #include "../draco/intro.h"
+#include "../draco/cycle.h"
 #include "../draco/picaro.h"
 #include "../canis_major/flames.h"
 #include "../canis_major/hound_lunge.h"
@@ -36,7 +37,7 @@ void end_actions(RunRuntime &r,BossBodyState &b) {
 }
 BossBodyState *PhaseController::find(RunRuntime &r,EnemyHandle actor) {for (auto &b:r.state.bosses.bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
 const BossBodyState *PhaseController::find(const RunRuntime &r,EnemyHandle actor) {for (const auto &b:r.state.bosses.bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
-bool PhaseController::can_start(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,actor) && t.reposition>0) return false;const auto *body=find(r,actor);return !body || (body->mode==BossMode::Idle && body->initial_wait<=0 && (!body->phase_pending || r.content->bosses[r.content->boss_bodies[body->definition-1].boss-1].kind==1) && !body->centaurus.leaping);}
+bool PhaseController::can_start(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,actor) && t.reposition>0) return false;const auto *body=find(r,actor);return !body || (body->mode==BossMode::Idle && body->draco.cycle.stage==DracoCycleStage::None && body->initial_wait<=0 && (!body->phase_pending || r.content->bosses[r.content->boss_bodies[body->definition-1].boss-1].kind==1) && !body->centaurus.leaping);}
 EnemyHandle PhaseController::spawn(RunRuntime &r,uint32_t definition,godot::Vector2 at,bool entrance) {
     auto &s=r.state;if (!definition || definition>r.content->boss_bodies.size() || !at.is_finite() || s.bosses.next_body_id==INT64_MAX) return {};
     const auto &p=r.content->boss_bodies[definition-1];EnemySpawn options;options.position=at;options.facing=(s.ship_pos-at).angle();options.has_facing=true;options.is_boss=true;
@@ -76,6 +77,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
         if (definition.kind==1) CentaurusBody::pre_step(r,b,dt);
         e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);bool suspend=true;
         if (definition.kind==4 && b.draco.intro.active) {DracoIntro::tick(r,b,dt);
+        } else if (definition.kind==4 && DracoCycle::tick(r,b,dt)) {
         } else if (b.mode==BossMode::Entrance) {
             b.entrance_elapsed+=dt;const double progress=std::clamp(b.entrance_elapsed/std::max(0.05,p.entrance_time),0.0,1.0);const auto prior=e.pos;e.pos=b.entrance_from.lerp(b.entrance_target,1.0-std::pow(1.0-progress,3.0));e.vel=(e.pos-prior)/dt;
             if (progress>=1) {b.mode=BossMode::Idle;e.vel={};if (definition.kind==2) {b.canis.barking=true;b.canis.call_left=CanisMajorBody::rule(r,b).entrance_bark;}}

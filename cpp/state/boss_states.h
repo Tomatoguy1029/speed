@@ -150,7 +150,17 @@ struct DracoIntroState {
     BossMode mode=BossMode::Idle;
     godot::Vector2 origin,ship,camera,center,rift_center;
 };
+enum class DracoCycleStage : uint8_t { None,Roar,Collect,WaitBeams,Return,Generate };
+struct DracoCycleState {
+    DracoCinematicState saved;
+    DracoCycleStage stage=DracoCycleStage::None;
+    bool first=false;
+    uint32_t generated=0;
+    double time=0,next_cycle=12,zoom=1,return_depth=1,return_alpha=1,return_angle=0;
+    godot::Vector2 home,from,return_from;
+};
 struct DracoBodyState {
+    DracoCycleState cycle;
     DracoIntroState intro;
     std::vector<DracoPicaroMember> picaro;
     std::vector<EnemyHandle> picaro_pending;
