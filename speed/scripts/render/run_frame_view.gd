@@ -27,6 +27,8 @@ var _battleship := PackedFloat32Array()
 var _sniper := PackedFloat32Array()
 var _sniper_world_time := 0.0
 var _telescope_beams: Array[Dictionary] = []
+var _pulser_visual: EnemyVisual
+var _pulser_parent: Node2D
 var _marlin_visual: EnemyVisual
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
@@ -99,6 +101,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	marlin_layer.add_child(marlin_parent)
 	_marlin_visual = preload("res://scripts/render/enemies/marlin.gd").new()
 	_marlin_visual.setup_frame(marlin_parent)
+	_pulser_parent = marlin_parent
+	_pulser_visual = preload("res://scripts/render/enemies/pulser.gd").new()
 	_shield_holder = Node2D.new()
 	_layer(18).add_child(_shield_holder)
 	var transfer_layer := CanvasLayer.new()
@@ -198,6 +202,10 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
+	if frame.has("pulser"):
+		if not frame.pulser is PackedFloat64Array or frame.pulser.size()%6!=0: return false
+		for value in frame.pulser:
+			if not is_finite(value): return false
 	if frame.has("marlin"):
 		var data = frame.marlin
 		if not data is Dictionary or not data.get("ids") is PackedInt64Array or not data.get("values") is PackedFloat64Array or not data.get("view") is Rect2 or data.values.size()!=data.ids.size()*14: return false
@@ -413,6 +421,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Dictionary in _shape_displays.values():
 		display.node.visible = display.used
 		if display.circles!=display.previous_circles: display.node.queue_redraw()
+	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
 	if frame.has("marlin"): _marlin_visual.apply_frame(frame.marlin,_sniper_world_time,_zoom)
 	for row: Dictionary in frame.poses:
 		var key := "%d:%d" % [row.participant_id,row.part_key]

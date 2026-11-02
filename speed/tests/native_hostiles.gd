@@ -29,6 +29,11 @@ func _ready() -> void:
 		print("[cpp_slash] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
+	if "--cpp-pulser" in OS.get_cmdline_user_args():
+		await check_cpp_pulser()
+		print("[cpp_pulser] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-wave" in OS.get_cmdline_user_args() or "--cpp-wave-fixes" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_wave()
 		check(finished,"波動の確認を最後まで実施する")
@@ -835,3 +840,93 @@ func check_cpp_bolt() -> bool:
 	bridge.release_checkpoint(empty.value)
 	session.free()
 	return true
+		get_tree().quit(1 if failed else 0)
+		return
+func pulse_motion(core, id: int) -> Dictionary:
+	for item: Dictionary in core.enemy_motion_snapshot():
+		if item.id==id: return item
+	return {}
+
+func check_cpp_pulser() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 74
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["pulser","drifter"])
+	stage.enemy_tuning = {"pulser":{"speed":0.0,"params.telegraph":0.25,"params.fire_interval":1.0,"params.wave_radius":300.0,"params.wave_speed":100.0}}
+	var output := "res://.content/dev/run_pulser"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"波動の敵の予告と発射".sha256_text())
+	check(built==OK,"波動の敵の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_74.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":749},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"波動の敵のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var position := target-Vector2(400,0)
+	var id: int = core.spawn_enemy(&"pulser",position,{"size":1.0})
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.set_enemy_motion(id,{"fire_t":0.0})
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and core.hazards_snapshot().is_empty(),"予算0では予告と波を開始しない")
+	core.configure_attack_budget({"enabled":true,"budget":2.0,"jitter":0.0})
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.WINDUP and is_equal_approx(pulse_motion(core,id).timer,0.25),"予算取得後に編集値の予告へ入る")
+	core.step(0.1)
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	var frame: Dictionary = bridge.read_render(Rect2(position-Vector2(200,200),Vector2(1000,400))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(frame.pulser.size()==6 and is_equal_approx(frame.pulser[4],0.4) and presentation.frame_view.apply_frame(frame),"停止予告の輪と84本の光筋を通常画面へ表示する")
+	await get_tree().process_frame
+	core.step(0.2)
+	check(core.hazards_snapshot().size()==1 and pulse_motion(core,id).mode==EnemyTable.Mode.MOVE,"予告終了で一つの波を生成して待機へ戻る")
+	var wave: Dictionary = core.hazards_snapshot()[0]
+	var expected: float = frame.pulser[2]
+	check(is_equal_approx(wave.start_radius,expected) and is_equal_approx(wave.time,-0.15) and wave.attached,"完成輪の初期半径と端数時間を持ち発射直前まで所有する")
+	core.step_hazards(0.2)
+	wave = core.hazards_snapshot()[0]
+	check(is_equal_approx(wave.radius,expected+5.0) and not wave.attached,"同じ更新の端数0.05秒だけ拡大して所有参照を解除する")
+	frame = bridge.read_render(Rect2(position-Vector2(200,200),Vector2(1000,400))).value
+	check(frame.pulser.is_empty() and not frame.shapes.is_empty() and presentation.frame_view.apply_frame(frame),"予告を消し発射済みの輪を共通表示へ渡す")
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step_hazards(0.1)
+	check(core.hazards_snapshot().size()==1,"飛び始めた後に本体を倒しても波が残る")
+	core.step_hazards(4.0)
+	check(core.hazards_snapshot().is_empty(),"波は最大半径で自然終了する")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"予告の時計と予算を値から復帰する")
+	core.step(0.2)
+	var future: Array = core.hazards_snapshot()
+	bridge.restore(pending.value)
+	core.step(0.2)
+	check(core.hazards_snapshot()==future,"復帰後の発射が一致し保持元を変更しない")
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step_hazards(0.2)
+	check(core.hazards_snapshot().is_empty(),"同じ更新の本体撃破で発射前の波を取り消す")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step(0.3)
+	check(core.hazards_snapshot().is_empty(),"予告中の撃破では遅延した波を残さない")
+	core.remove_enemy(id)
+	var replacement: int = core.spawn_enemy(&"pulser",position,{})
+	check(replacement!=id and pulse_motion(core,replacement).mode==EnemyTable.Mode.MOVE and pulse_motion(core,replacement).charge==0.0,"行の再利用で予告を引き継がない")
+	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.0})
+	core.remove_enemy(owner)
+	core.step(0.1)
+	check(pulse_motion(core,replacement).mode==EnemyTable.Mode.WINDUP,"参照相手が先に消えても古い行へ接続しない")
+	bridge.release_checkpoint(pending.value)
+	session.free()

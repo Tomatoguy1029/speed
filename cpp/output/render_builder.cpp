@@ -15,6 +15,7 @@
 #include "../systems/motion_math.h"
 #include "../systems/group_system.h"
 #include "../behaviors/enemies/sniper.h"
+#include "../behaviors/enemies/pulser.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
@@ -134,6 +135,14 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto &coin=state.pickups.coins[i];if (coin.alive && view.grow(60).has_point(coin.pos))
             batch(config.coin_visual,6,-1).add(int64_t(i+1),coin.pos,0,std::max(6.0,pixel*3.5),Color::html("ffd24a"));
     }
+    PackedFloat64Array pulser;
+    for (uint32_t i=0;i<state.enemies.size();++i) {
+        const auto &e=state.enemies[i];if (!e.alive || e.dead || e.held || e.stone>0 || state.enemy_handles.contains(e.pump_owner) || e.mode!=EnemyMode::Windup) continue;
+        const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Pulser) continue;
+        const auto &p=run.content->pulsers[d.pulser_definition-1];const double radius=PulserBehavior::ring_radius(run,i);
+        if (!view.grow(radius+p.width*26).has_point(e.pos)) continue;
+        for (double value:{double(e.pos.x),double(e.pos.y),radius,p.width,1.0-std::clamp(e.timer/std::max(p.warn,0.001),0.0,1.0),double(e.id%4093)}) pulser.push_back(value);
+    }
     Dictionary marlin;PackedInt64Array marlin_ids;PackedFloat64Array marlin_values;
     for (size_t i=0;i<state.enemies.size();++i) {
         const auto &e=state.enemies[i];if (!e.alive || e.dead || e.held || e.stone>0) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Marlin) continue;
@@ -169,6 +178,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;return out;
+    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;return out;
 }
 }

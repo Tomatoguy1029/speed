@@ -34,3 +34,15 @@ func draw_layer(_c: CanvasItem, view: Rect2) -> void:
 			_count += 1
 	for i in range(_count, _rings.size()):
 		_rings[i].visible = false
+
+## 値型フレームからも同じ輪と光筋を再利用する。
+func apply_frame(parent: CanvasItem, values: PackedFloat64Array) -> void:
+	_count = 0
+	for n in range(0,values.size(),6):
+		if _count==_rings.size():
+			var ring: LASER = LASER.new()
+			ring.setup(parent)
+			_rings.append(ring)
+		_rings[_count].show_ring(Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],int(values[n+5]))
+		_count += 1
+	for i in range(_count,_rings.size()): _rings[i].visible = false

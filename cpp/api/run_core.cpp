@@ -8,6 +8,7 @@
 #include "../behaviors/enemies/battleship.h"
 #include "../behaviors/enemies/sniper.h"
 #include "../behaviors/enemies/marlin.h"
+#include "../behaviors/enemies/pulser.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
@@ -204,10 +205,12 @@ void SpeedRunCore::advance_enemies(double delta) {
         const Vector2 from=enemy.pos;
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta);speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
-        const bool far = def.kind!=speed::EnemyDefinition::Kind::Marlin && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
+        const bool far = def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Marlin) {
+            if (def.kind==speed::EnemyDefinition::Kind::Pulser) {
+                speed::PulserBehavior::step(runtime,uint32_t(row),delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Marlin) {
                 speed::MarlinBehavior::step(runtime,uint32_t(row),delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Sniper) {
                 speed::SniperBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
