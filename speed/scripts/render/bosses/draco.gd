@@ -34,6 +34,7 @@ func _draw() -> void:
 	_draw_technique()
 	_draw_impacts()
 	_draw_rift_walls()
+	_draw_arrow_impacts()
 	var cycle: Dictionary = state.get("cycle",{})
 	if cycle.get("stage",0)==2:
 		for j in 16:
@@ -163,3 +164,12 @@ func _draw_rift_walls() -> void:
 		draw_polyline(left,Color("#8770cb"),3.0,false)
 		draw_polyline(right,Color("#40315f"),3.0,false)
 		for j in range(0,count,3):draw_line(left[j].lerp(right[j],0.25),left[j+1],Color(0.68,0.74,1.0,0.45),2.0,false)
+
+func _draw_arrow_impacts() -> void:
+	for impact: Dictionary in attack.get("arrow_impacts",[]):
+		if not impact.locked: continue
+		var progress:=clampf((float(impact.age)-float(impact.wait))/float(impact.warn),0.0,1.0)
+		var at:=to_local(impact.position)
+		var radius: float=attack.get("impact_radius",85.0)
+		draw_arc(at,radius*(1.8-progress*0.8),0,TAU,48,Color("#baa8ff"),3.0,false)
+		draw_line(to_local(impact.position+Vector2.UP*1200.0*(1.0-progress)),at,Color(0.6,0.75,1.0,progress*0.6),4.0)

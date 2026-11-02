@@ -437,6 +437,73 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DracoPicaroWallDefinition",
+      "section": 443,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "arrows",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoPicaroWallCandidate",
+      "section": 446,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        }
+      ]
     }
   ],
   "enums": {}

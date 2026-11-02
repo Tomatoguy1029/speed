@@ -98,6 +98,8 @@ struct ContentBundle {
     std::vector<DracoStarFanDefinition> draco_star_fans;
     std::vector<DracoMeteorDefinition> draco_meteors;
     std::vector<DracoRiftsDefinition> draco_rifts;
+    std::vector<DracoPicaroWallDefinition> draco_picaro_walls;
+    std::vector<DracoPicaroWallCandidate> draco_picaro_wall_candidates;
     std::vector<DracoLeapDefinition> draco_leaps;
     std::vector<DracoChargeDefinition> draco_charges;
     std::vector<DracoBreathDefinition> draco_breaths;

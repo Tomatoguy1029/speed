@@ -85,7 +85,9 @@ struct DracoTailSlamState {godot::Vector2 origin,target;std::vector<godot::Vecto
 struct DracoTailSweepState {godot::Vector2 origin;double facing=0;std::vector<godot::Vector2> base,last,prior,area;};
 struct DracoStarFanState {std::vector<godot::Vector2> positions;std::vector<double> angles;bool fired=false;};
 struct DracoRiftsState {DracoStagingState staging;std::vector<std::vector<godot::Vector2>> paths;std::vector<AttackHandle> walls,slashes;godot::Vector2 center;uint32_t claws=3,sides=0;bool ended=false;};
-struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState> move;};
+struct DracoArrowImpact {godot::Vector2 position;double wait=0,warn=0,age=0;bool locked=false;};
+struct DracoPicaroWallState {uint32_t shots=0;std::vector<DracoArrowImpact> impacts;};
+struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState,DracoPicaroWallState> move;};
 struct CanisSiriusFlameState {double age=0,emit_left=0;bool started=false;};
 struct HydraShatterStone {EnemyHandle actor;godot::Vector2 from,to;bool shattered=false;};
 struct HydraShatterState {bool initialized=false;double aim=0;std::vector<HydraShatterStone> rubble;};

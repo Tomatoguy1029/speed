@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-picaro-wall" in OS.get_cmdline_user_args() or "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args():
+		call_deferred("native_picaro_wall")
+		return
 	if "--cpp-draco-rifts" in OS.get_cmdline_user_args():
 		call_deferred("native_rifts")
 		return
@@ -1003,3 +1006,88 @@ func native_rifts() -> void:
 	check(bridge._core.hazards_snapshot().is_empty() and bridge.command("dev_boss_body_state").value[-1].closing_walls==0,"本体消失は付属する爪と壁を解放する")
 	bridge.dispose()
 	native_draco_move_flow(move)
+
+## 既存の光の矢・着弾・取消ケースで隊列技を確認する。
+func native_picaro_wall() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/picaro_wall.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	var sim: RunSimulation=source.sim
+	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
+	check(a.start_attack(&"picaro_wall") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++でピカロ隊列と光の矢を開始する")
+	var times_equal:=true
+	var impacts_equal:=true
+	var members_equal:=true
+	var member_diagnostic:=false
+	var remaining_only:= "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args()
+	var saved: Array=[]
+	var shown:=false
+	for frame in 1050:
+		sim.enemies.tick(1.0/120.0,1.0/120.0);a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or is_equal_approx(attack.stage_time,a.elapsed))
+		if a._runner!=null:
+			times_equal=times_equal and attack.shots==a._runner.shots
+			impacts_equal=impacts_equal and attack.arrow_impacts.size()==a._runner.impacts.size()
+			if attack.arrow_impacts.size()==a._runner.impacts.size():
+				for j in attack.arrow_impacts.size():
+					var native: Dictionary=attack.arrow_impacts[j]
+					var old: Dictionary=a._runner.impacts[j]
+					impacts_equal=impacts_equal and is_equal_approx(native.age,old.age) and is_equal_approx(native.wait,old.wait) and native.locked==(old.pos!=Vector2.INF) and (not native.locked or native.position.distance_to(old.pos)<0.01)
+		members_equal=members_equal and body.picaro.size()==a.picaro.alive().size()
+		for j in mini(body.picaro.size(),a.picaro.alive().size()):
+			var m: Dictionary=a.picaro.alive()[j]
+			var match_member: bool=body.picaro[j].position.distance_to(a.table.pos[m.row])<0.1 and body.picaro[j].held==(a.table.held[m.row]!=0)
+			if not match_member and not member_diagnostic:
+				member_diagnostic=true;print("隊列差 frame=",frame," native=",body.picaro[j]," source_position=",a.table.pos[m.row]," held=",a.table.held[m.row]," clock=",a.clock)
+			members_equal=members_equal and match_member
+		var key: int=3 if attack.arrow_impacts.any(func(i):return i.locked) else attack.stage
+		if not remaining_only and key not in saved and attack.stage<3:
+			saved.append(key)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"隊列・矢の待機・着弾予告・回復を値型で保持する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_body: Array=bridge.command("dev_boss_body_state").value
+			check(bridge.restore(held.value).ok,"光の矢の途中へ復帰する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			check(future==bridge.command("dev_boss_state").value and future_body==bridge.command("dev_boss_body_state").value,"復帰後の着弾予定とピカロが同じになる")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if not remaining_only and key==3 and not shown:
+			shown=true
+			await show_native_draco(fixture,body,attack)
+		if attack.stage==5:break
+	if not remaining_only:check(times_equal and impacts_equal,"Sourceと予告・発射・画面上端による待ち・照準固定・着弾・終了のtickが一致する")
+	check(members_equal and (remaining_only or saved.size()==4 and shown),"隊列の配置・生成保護・停止と全段階の保持復帰・表示を通る")
+
+	bridge.dispose();source.session.free()
+	for operation in ([] if remaining_only else ["windup","pending","locked","dev_cancel_boss"]):
+		fixture=breath_fixture(move);bridge=fixture.bridge
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 420:
+			bridge._core.step(1.0/120.0);bridge.command("dev_boss_state")
+			var state: Dictionary=bridge.command("dev_boss_state").value[0]
+			if operation=="windup" or operation=="pending" and state.shots>0 or operation in ["locked","dev_cancel_boss"] and state.arrow_impacts.any(func(i):return i.locked):break
+		if operation=="dev_cancel_boss":bridge.command(operation,{"entity_id":fixture.boss})
+		else:bridge.command("dev_cancel_technique",{"ticket":started.value})
+		check(bridge.command("dev_boss_state").value[0].arrow_impacts.is_empty(),"取消・本体消失で未着弾の予定を破棄する")
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		check(body.picaro.is_empty() if operation=="dev_cancel_boss" else body.picaro.size()==3 and body.picaro.all(func(p):return p.held),"取消ではピカロを止めて残し、本体消失では解放する")
+		bridge.dispose()
+	# 隊列の通常攻撃と着弾の実HPを独立させる既存の着弾ケース。
+	var isolated: BossTechnique=move.duplicate(true)
+	isolated.count=0
+	fixture=breath_fixture(isolated);bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	for frame in 400:
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0);bridge.command("dev_boss_state")
+	check(fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"blast" and e.payload.source==&"draco" and e.payload.technique==&"picaro_wall" and is_equal_approx(e.payload.hp_before-e.payload.hp_after,28.0)),"着弾の実HPと原因・出所・技名を記録する")
+	bridge.dispose()
+	if remaining_only:
+		print("[cpp_draco_picaro_wall_remaining] failures=",failed);get_tree().quit(1 if failed else 0)
+	else:native_draco_move_flow(move)
