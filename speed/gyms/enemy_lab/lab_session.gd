@@ -652,27 +652,29 @@ func _inverse_edit(kind: String, args: Dictionary) -> Array:
 
 func _restore_edit(source: Array[Dictionary], target: Array[Dictionary]) -> void:
 	if source.is_empty() or seeking or not is_instance_valid(run): return
-	var item: Dictionary = source.pop_back()
-	target.append({"history": history.duplicate(true), "end": furthest, "tick": tick,
-		"commands": item.get("opposite", []), "opposite": item.get("commands", [])})
-	var commands: Array = item.get("commands", [])
+	var item: Dictionary = source.back()
+	var commands: Array = item.get("commands",[])
 	if not commands.is_empty():
-		# 過去を見ている場合は、新しい編集と同じように分岐する。
-		if tick < furthest:
-			branches.append({"name": current_branch, "history": history.duplicate(true), "end": furthest})
+		# 逆命令が拒否されたときは履歴・分岐・undo列もそのまま残す。
+		for command: Dictionary in commands:
+			if not _apply(command.kind,command.args): return
+		source.pop_back()
+		target.append({"history":history.duplicate(true),"end":furthest,"tick":tick,"commands":item.get("opposite",[]),"opposite":commands})
+		if tick<furthest:
+			branches.append({"name":current_branch,"history":history.duplicate(true),"end":furthest})
 			branch_serial += 1
 			current_branch = tr("lab.message_549e9c3c03") % branch_serial
-			history = history.filter(func(e): return int(e.tick) <= tick)
+			history = history.filter(func(e): return int(e.tick)<=tick)
 			furthest = tick
 		for command: Dictionary in commands:
-			history.append({"tick": tick, "kind": command.kind, "args": command.args.duplicate(true)})
-			_apply(command.kind, command.args)
+			history.append({"tick":tick,"kind":command.kind,"args":command.args.duplicate(true)})
 		_cursor = history.size()
 		_state_key = _checkpoint_key(tick)
 		revision += 1
-		_refresh_projection()
 		changed.emit()
 		return
+	source.pop_back()
+	target.append({"history":history.duplicate(true),"end":furthest,"tick":tick,"commands":item.get("opposite",[]),"opposite":commands})
 	# 配置・削除などは同じ時刻まで非表示で復元し、編集時刻には戻さない。
 	var at := tick
 	var end := furthest

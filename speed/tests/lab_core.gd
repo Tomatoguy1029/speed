@@ -11,6 +11,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-history" in OS.get_cmdline_user_args():
+		await cpp_lab_history()
+		print("[cpp_lab_history] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab" in OS.get_cmdline_user_args():
 		await cpp_lab()
 		print("[cpp_lab_core] passed=%d failed=%d" % [passed,failed])
@@ -152,4 +157,37 @@ func cpp_lab() -> void:
 	check(lab.run.enemies.count()==1,"予定配置をC++の時計と乱数で実行する")
 	print("[cpp_lab_core] 未実施: うみへびの首を含む再生（該当種類の移行待ち）")
 	lab.queue_free()
+	await get_tree().process_frame
+
+func cpp_lab_history() -> void:
+	var script := load("res://gyms/enemy_lab/lab_session.gd")
+	var first = script.new()
+	var second = script.new()
+	add_child(first)
+	add_child(second)
+	for lab in [first,second]:
+		await lab.reset({"empty":true,"overrides":{"drifter":{"armor":0.0,"speed":0.0}}})
+		check(lab.perform("spawn",{"type":"drifter","pos":[500,300]}),"編集確認の個体を正式入口で配置する")
+	for n in 24: first.step()
+	var before: Dictionary = first.bridge.read_lab().value.enemies[0].duplicate(true)
+	var id: int = before.id
+	var tick: int = first.tick
+	check(first.perform("parameter",{"type":"drifter","key":"armor","value":7.0}),"Labの現在tickで旧値0の装甲を編集する")
+	check(first.run.enemies.table.armor[first.row_for_id(id)]>0.0 and first.tick==tick,"装甲を再算出しIDと現在tickを維持する")
+	await first.undo_edit()
+	check(first.run.enemies.table.armor[first.row_for_id(id)]==0.0 and first.tick==tick,"値のundoは同じtickの逆命令で戻す")
+	await first.redo_edit()
+	check(first.run.enemies.table.armor[first.row_for_id(id)]>0.0 and first.tick==tick,"値のredoも同じtickに適用する")
+	check(first.perform("parameter",{"type":"drifter","key":"speed","value":20.0}),"Labの旧値0の速度を編集する")
+	var after: Dictionary = first.bridge.read_lab().value.enemies[0].duplicate(true)
+	check(after.speed==20.0 and after.id==id and is_equal_approx(after.hp/after.max_hp,before.hp/before.max_hp),"速度編集でもIDとHP割合を維持する")
+	var count: int = first.history.size()
+	check(not first.perform("parameter",{"type":"unknown","key":"speed","value":1.0}) and first.bridge.read_lab().value.enemies[0]==after and first.history.size()==count,"失敗は状態と履歴を部分変更しない")
+	check(second.bridge.read_lab().value.enemies[0].speed==0.0 and second.bridge.read_lab().value.enemies[0].armor==0.0,"別Sessionへ編集値を漏らさない")
+	check(first.history.slice(-3).all(func(command): return command.tick==tick),"適用した逆命令を同じtickの履歴へ保存する")
+	await first.seek(12)
+	check(first.perform("time",{"value":3.0}) and first.branches.size()==1 and first.furthest==12,"過去表示中の値編集は履歴を分岐する")
+	for lab in [first,second]:
+		check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"履歴編集後の読取・回収・通知配信が成功する")
+		lab.queue_free()
 	await get_tree().process_frame
