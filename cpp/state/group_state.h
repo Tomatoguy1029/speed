@@ -20,5 +20,11 @@ struct Group {
     OrderedValues<int64_t,GroupMember> members;
 };
 struct CepheusMark {Vector2 pos,king;godot::Color color;double age=0,life=0;};
-struct GroupState {OrderedValues<int64_t,Group> groups;std::vector<CepheusMark> summon_marks;};
+struct DefenderPost {EnemyHandle actor,target;godot::Vector2 position;};
+struct GroupState {
+    OrderedValues<int64_t,Group> groups;
+    std::vector<CepheusMark> summon_marks;
+    int64_t defender_posts_tick=-1;
+    std::vector<DefenderPost> defender_posts;
+};
 }

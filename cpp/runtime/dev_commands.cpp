@@ -55,7 +55,7 @@ godot::Dictionary DevCommands::replace_definition(RunRuntime &run,const godot::D
     EquipmentSystem::refresh_effects(candidate);
     if (!rebuild_state_indexes(candidate.state,*next)) return reply(false,2,"現在の状態を変換できないため再開始してください");
     // 検査が全て成功してから公開する。旧ContentBundleは保持点が所有し続ける。
-    run.state=std::move(candidate.state);run.content=std::move(next);run.workspace.defender_posts_tick=-1;run.full_output_dirty=true;
+    run.state=std::move(candidate.state);run.content=std::move(next);run.state.groups.defender_posts_tick=-1;run.full_output_dirty=true;
     godot::Dictionary changed;changed["values"]=tuning_values(*run.content);FrameBuilder::append(run,"enemy_tuning_changed",changed);
     return reply(true);
 }

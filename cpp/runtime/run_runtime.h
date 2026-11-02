@@ -8,10 +8,7 @@
 #include "../systems/combat_hooks.h"
 
 namespace speed {
-struct DefenderPost {EnemyHandle actor,target;godot::Vector2 position;};
 struct RunWorkspace {
-    int64_t defender_posts_tick=-1;
-    std::vector<DefenderPost> defender_posts;
     std::vector<std::vector<AttackHandle>> friend_birth_batches;
     std::vector<int64_t> avoidance_ids;
     std::vector<godot::Vector2> avoidance_from;
