@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-star-fan" in OS.get_cmdline_user_args():
+		call_deferred("native_star_fan")
+		return
 	if "--cpp-draco-tail-sweep" in OS.get_cmdline_user_args():
 		call_deferred("native_tail_sweep")
 		return
@@ -691,4 +694,115 @@ func native_tail_sweep() -> void:
 	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
 	check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失で尾の薙ぎ払いを取り消す")
 	bridge.dispose();session.free()
+	native_draco_move_flow(move)
+
+func source_draco_fixture(target: Vector2) -> Dictionary:
+	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
+	stage.boss_enabled=false
+	var session:=RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":105},false)
+	session.auto_step=false
+	var sim: RunSimulation=session.sim
+	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
+	var actor=sim.bosses.actor
+	actor.selection_enabled=false;actor.cycle.cancel();actor.cancel_attack();actor.clock=0.0;actor.table.facing[actor.body]=0.0;actor.body_trail.clear();actor.body_pose.clear();actor.body_override.clear();actor.reset_pose()
+	sim.state.ship_pos=target;sim.state.enemy_aim=target;sim.state.ship_vel=Vector2.ZERO;sim.state.ship_invuln=0.0
+	return {"session":session,"sim":sim,"actor":actor}
+
+func show_native_draco(fixture: Dictionary, body: Dictionary, attack: Dictionary) -> void:
+	var appearance: Dictionary={}
+	for visual: Dictionary in fixture.package.visuals:
+		if visual.get("boss","")=="draco":appearance=visual.appearance
+	var display=load("res://scripts/render/bosses/draco.gd").new()
+	add_child(display);display.apply_frame(body,attack,appearance);await get_tree().process_frame
+	check(display._parts.visible,"技の予告・攻撃・回復を状態から描く")
+	display.free()
+
+func native_star_fan() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/star_fan.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	check(fixture.package.records.DracoStarFanDefinition.size()==3,"星弾の扇の実効値を3形態へ生成する")
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	var sim: RunSimulation=source.sim
+	check(a.start_attack(&"star_fan") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で星弾の扇を開始する")
+	var shape_error:=0.0
+	var warning_error:=0.0
+	var shot_error:=0.0
+	var times_equal:=true
+	var saved: Array=[]
+	var shown: Array=[]
+	for frame in 300:
+		if frame==10:
+			sim.state.ship_pos=Vector2(700,100);sim.state.enemy_aim=sim.state.ship_pos
+			bridge.command("dev_ship_motion",{"position":sim.state.ship_pos,"velocity":Vector2.ZERO})
+		a.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and is_equal_approx(attack.stage_time,a.elapsed)
+		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked and attack.fired==a._runner.fired
+		var points: PackedVector2Array=a.body_points()
+		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
+		if a.telegraph_paths.size()!=attack.telegraph_paths.size():warning_error=INF
+		else:
+			for j in a.telegraph_paths.size():
+				for k in 2:warning_error=maxf(warning_error,a.telegraph_paths[j][k].distance_to(attack.telegraph_paths[j][k]))
+		var shots: Array=bridge._core.hostiles_snapshot()
+		var source_shots: Array=[]
+		for row in sim.projectiles.hostile_alive.size():
+			if sim.projectiles.hostile_alive[row]!=0:source_shots.append(row)
+		if shots.size()!=source_shots.size():shot_error=INF
+		else:
+			for j in shots.size():
+				var row: int=source_shots[j]
+				shot_error=maxf(shot_error,shots[j].pos.distance_to(sim.projectiles.hostile_pos[row]))
+				shot_error=maxf(shot_error,shots[j].vel.distance_to(sim.projectiles.hostile_vel[row]))
+		if attack.stage not in saved and attack.stage<3:
+			saved.append(attack.stage)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"星弾の予告・実行・回復を値型で保持する")
+			bridge._core.step(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_shots: Array=bridge._core.hostiles_snapshot()
+			check(bridge.restore(held.value).ok,"星弾の扇の途中へ復帰する")
+			bridge._core.step(1.0/120.0)
+			check(bridge.command("dev_boss_state").value==future and bridge._core.hostiles_snapshot()==future_shots,"復帰後の照準・発射済み・弾が一致する")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if attack.stage not in shown and attack.stage<3:
+			shown.append(attack.stage);await show_native_draco(fixture,body,attack)
+		if attack.stage==5 and a.mode==&"idle":break
+	check(times_equal and shape_error<0.1 and warning_error<0.1 and shot_error<0.1,"照準・段階・全身・予告線・9弾の位置と速度がSourceと一致する: %s/%s/%s"%[shape_error,warning_error,shot_error])
+	check(saved.size()==3 and shown.size()==3 and bridge._core.hostiles_snapshot().size()==9,"星弾は予告後の最初の実行tickで一度だけ9発出る")
+	var star_rule: Dictionary=fixture.package.records.StarBoltDefinition[fixture.package.records.DracoStarFanDefinition[0].projectile-1]
+	var visual: Dictionary=fixture.package.visuals[star_rule.visual-1]
+	var rendered: Dictionary=bridge.read_render(Rect2(-2000,-2000,4000,4000)).value
+	var stars: Array=rendered.batches.filter(func(batch):return batch.visual_id==star_rule.visual)
+	var batch:=InstanceBatch.new()
+	add_child(batch)
+	load("res://scripts/render/attacks/star_bolt.gd").setup_batch(batch,load(visual.path),visual.scene)
+	check(stars.size()==1 and stars[0].ids.size()==9 and batch.multimesh.mesh!=null,"技専用の星と芯の保存済みメッシュへ9発の描画出力を渡す")
+	if not stars.is_empty():batch.apply_frame(stars[0].transforms,stars[0].colors)
+	await get_tree().process_frame
+	batch.free()
+	bridge.dispose();source.session.free()
+	for operation in ["before","dev_cancel_technique","dev_cancel_boss","outside"]:
+		fixture=breath_fixture(move);bridge=fixture.bridge
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 150:
+			bridge._core.step(1.0/120.0)
+			if bridge.command("dev_boss_state").value[0].fired:break
+			if operation=="before" and frame==10:break
+		if operation=="dev_cancel_boss":bridge.command(operation,{"entity_id":fixture.boss})
+		else:bridge.command("dev_cancel_technique",{"ticket":started.value})
+		check(bridge._core.hostiles_snapshot().size()==(0 if operation=="before" else 9),"発射前取消は弾を出さず、発射後は取消・本体消失でも弾を残す")
+		if operation=="outside":bridge.command("dev_ship_motion",{"position":Vector2(700,1000),"velocity":Vector2.ZERO})
+		for frame in 100:
+			bridge._core.step_hostiles(1.0/120.0);bridge.command("dev_boss_state")
+		var hits: Array=fixture.captured.filter(func(event):return event.type==&"combat_player_damage" and event.payload.accepted and event.payload.cause==&"star_bolt" and event.payload.source==&"draco" and event.payload.technique==&"star_fan")
+		check(hits.is_empty() if operation in ["before","outside"] else hits.size()==1,"発射後の星弾が実HP・原因・出所・技名へ届き、扇の外なら避けられる")
+		bridge._core.step_hostiles(6.0)
+		check(bridge._core.hostiles_snapshot().is_empty(),"残る星弾も自然寿命で終わる")
+		bridge.dispose()
 	native_draco_move_flow(move)

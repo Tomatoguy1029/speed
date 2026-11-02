@@ -299,6 +299,52 @@
           "max": 3.141592653589793
         }
       ]
+    },
+    {
+      "name": "DracoStarFanDefinition",
+      "section": 439,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "StarBoltDefinition"
+        },
+        {
+          "name": "lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

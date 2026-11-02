@@ -2,6 +2,7 @@
 ## C++の状態や技実行へは渡さない。
 extends RefCounted
 const RUNNERS := {
+	"res://scripts/data_types/boss_techniques/draco/star_fan.gd":"res://scripts/bosses/draco/techniques/star_fan.gd",
 	"res://scripts/data_types/boss_techniques/draco/tail_sweep.gd":"res://scripts/bosses/draco/techniques/tail_sweep.gd",
 	"res://scripts/data_types/boss_techniques/draco/tail_slam.gd":"res://scripts/bosses/draco/techniques/tail_slam.gd",
 	"res://scripts/data_types/boss_techniques/draco/leap.gd":"res://scripts/bosses/draco/techniques/leap.gd",

@@ -6,9 +6,9 @@ namespace speed {
 AttackHandle StarBoltSystem::emit(RunRuntime &run,const StarBoltParams &p) {
     if (!run.state.started || run.state.closed || run.content->star_bolts.empty() || !p.position.is_finite() || !std::isfinite(p.angle) ||
         !std::isfinite(float(p.speed)) || p.speed<0 || !std::isfinite(p.damage) || p.damage<0 || (p.owner.generation && !run.state.enemy_handles.contains(p.owner))) return {};
-    const auto &d=run.content->star_bolts.front();godot::RunState::Hostile shot;shot.kind=int64_t(HostileKind::StarBolt);shot.star_bolt.definition=1;
+    if (p.definition>run.content->star_bolts.size()) return {};const uint32_t definition=p.definition?p.definition:1;const auto &d=run.content->star_bolts[definition-1];godot::RunState::Hostile shot;shot.kind=int64_t(HostileKind::StarBolt);shot.star_bolt.definition=definition;
     shot.pos=p.position;shot.vel=godot::Vector2::from_angle(p.angle)*p.speed;shot.speed=p.speed;shot.radius=d.radius;shot.life=d.life;shot.damage=p.damage;
-    AttackSpec spec;spec.cause=Cause::StarBolt;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
+    AttackSpec spec;spec.cause=Cause::StarBolt;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (!AttackSystem::configure_contact(*run.content,d.contact,spec)) return {};
     return AttackSystem::emit_hostile(run.state,shot,spec);
 }

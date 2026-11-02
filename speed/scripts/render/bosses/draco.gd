@@ -100,6 +100,9 @@ func _draw_technique() -> void:
 		preload("res://scripts/bosses/draco_form.gd").star(self,path[-1],10.0,Color(1.0,0.86,0.6,0.7))
 	for target: Vector2 in attack.get("telegraph_points",PackedVector2Array()):
 		var at: Vector2 = to_local(target)
+		if attack.get("technique","")=="star_fan":
+			preload("res://scripts/bosses/draco_form.gd").star(self,at,8.0+progress*4.0,Color(1.0,0.78,0.48,0.85))
+			continue
 		var radius: float = attack.get("telegraph_radius",attack.warning_width)
 		draw_arc(at,radius,0,TAU,48,Color(1.0,0.7,0.35,0.8),float(_move_style.telegraph_line_width),false)
 		draw_arc(at,radius*(1.7-progress*0.7),-PI*0.5,TAU-PI*0.5,48,Color(1.0,0.77,0.5,0.8),4.0,false)

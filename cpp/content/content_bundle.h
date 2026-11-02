@@ -83,6 +83,7 @@ struct ContentBundle {
     std::vector<CanisBodyDefinition> canis_bodies;
     std::vector<DracoTailSlamDefinition> draco_tail_slams;
     std::vector<DracoTailSweepDefinition> draco_tail_sweeps;
+    std::vector<DracoStarFanDefinition> draco_star_fans;
     std::vector<DracoLeapDefinition> draco_leaps;
     std::vector<DracoChargeDefinition> draco_charges;
     std::vector<DracoBreathDefinition> draco_breaths;
