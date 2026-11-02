@@ -6,10 +6,12 @@ namespace speed {
 void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
     run.state.loadout.full_charge_maximum=1;
+    run.state.loadout.full_burst_owned=false;
     bool rampage_owned=false;
     run.state.loadout.duplicator={};
     effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0,attack_bonus=0,pickup_bonus=0,length_bonus=0,glide_bonus=0;
     for (const auto &owned:run.state.loadout.traits) {
+        if (run.content->equipment[owned.definition-1].external_id=="T36") run.state.loadout.full_burst_owned=true;
         for (const auto &level:run.content->duplicator_levels) if (level.equipment==owned.definition && level.level==owned.level) {
             auto &d=run.state.loadout.duplicator;d.ready=true;d.chance=level.chance;d.damage=level.damage;d.maximum=level.maximum;d.angle_min=level.angle_min;d.angle_max=level.angle_max;
         }
@@ -21,6 +23,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
             effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;capacity_bonus+=level.capacity_bonus;crit_bonus+=level.crit_bonus;speed_bonus+=level.speed_bonus;attack_bonus+=level.attack_bonus;pickup_bonus+=level.pickup_bonus;length_bonus+=level.length_bonus;glide_bonus+=level.glide_bonus;
         }
     }
+    if (!run.state.loadout.full_burst_owned) run.state.loadout.full_burst_active=false;
     if (!rampage_owned) run.state.loadout.rampage={};
     effects.damage_multiplier=1+run.state.loadout.rampage.bonus*run.state.loadout.rampage.strength;
     if (run.state.loadout.full_charge_maximum==1) {effects.burst_power=1;effects.ignore_armor=false;}

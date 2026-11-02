@@ -1636,6 +1636,10 @@
       {
         "name": "Explode",
         "value": "explode"
+      },
+      {
+        "name": "FullBurstReady",
+        "value": "full_burst_ready"
       }
     ],
     "ResultKind": [
@@ -2054,6 +2058,9 @@
       "cause",
       "color",
       "life"
+    ],
+    "full_burst_ready": [
+      "pos"
     ]
   },
   "includes": [

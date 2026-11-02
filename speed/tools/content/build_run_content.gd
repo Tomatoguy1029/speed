@@ -302,6 +302,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":duplicator_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":duplicator_id,"asset":key})
+	var full_burst_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T36")
+	if full_burst_entry==null: return {}
+	var full_burst_id: int = data.LoadoutDefinition.filter(func(row: Dictionary): return row.external_id=="T36")[0].id
+	for path in full_burst_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":full_burst_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":full_burst_id,"asset":key})
 	if config.planet_radius>0.0:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":9})

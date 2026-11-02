@@ -359,7 +359,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["pickup_radius"]=runtime.state.pickup_config.coin_radius;ui["xp_pickup_radius"]=runtime.state.pickup_config.xp_radius;
     ui["attack_mult"]=runtime.state.combat_config.attack_mult;ui["attack_power"]=speed::CombatResolver::attack_power(runtime);
     ui["crit_chance"]=runtime.state.combat_config.crit_chance;ui["crit_mult"]=runtime.state.combat_config.crit_mult;
-    ui["capacity"]=runtime.state.draw_config.capacity;ui["charge_time"]=runtime.state.draw_config.charge_time;ui["min_charge"]=runtime.state.draw_config.min_charge;ui["full_burst"]=runtime.state.loadout.effects.full_gauge_rate>0;
+    ui["capacity"]=runtime.state.draw_config.capacity;ui["charge_time"]=runtime.state.draw_config.charge_time;ui["min_charge"]=runtime.state.draw_config.min_charge;ui["full_burst"]=runtime.state.loadout.full_burst_owned;ui["full_burst_active"]=runtime.state.loadout.full_burst_active;ui["shooting_rate"]=runtime.state.draw.gauge<1.0?1.0:1.0+runtime.state.loadout.effects.full_gauge_rate*runtime.state.draw.gauge;
     ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);value["ui"]=speed::FrameBuilder::ui_delta(runtime,ui);
     value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=speed::ProgressionSystem::requests(runtime);value["result"]=speed::Lifecycle::result(runtime);return success(value);
 }

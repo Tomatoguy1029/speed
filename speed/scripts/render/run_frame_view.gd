@@ -53,6 +53,8 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+var _full_burst_visual: RefCounted
+var _full_burst_world_time := -1.0
 var _duplicator_visual: RefCounted
 var _duplicator_world_time := -1.0
 var _scatter_world_time := -1.0
@@ -515,6 +517,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _duplicator_visual!=null: _duplicator_visual.dispose()
 		_duplicator_visual = null
 		_duplicator_world_time = -1.0
+		if _full_burst_visual!=null: _full_burst_visual.dispose()
+		_full_burst_visual = null
+		_full_burst_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_debris_trails.clear()
@@ -585,6 +590,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rampage_visual.dispose()
 		_rampage_visual = null
 		_rampage_world_time = -1.0
+	var equipped_full_burst: bool = frame.ui.get("full_burst",false)
+	if equipped_full_burst and _full_burst_visual==null:
+		_full_burst_visual = preload("res://scripts/render/equipment/fullBurst.gd").new()
+		_full_burst_visual.setup_frame(_layer(18),_pixel)
+	if not equipped_full_burst and _full_burst_visual!=null:
+		_full_burst_visual.dispose()
+		_full_burst_visual = null
+		_full_burst_world_time = -1.0
 	var equipped_duplicator: bool = frame.ui.get("trait_levels",[]).any(func(item): return item.id=="T37")
 	if equipped_duplicator and _duplicator_visual==null:
 		_duplicator_visual = preload("res://scripts/render/equipment/duplicator.gd").new()
@@ -639,6 +652,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*2.4,"color":Color("#ffe27a"),"life":duration,"max":duration})
 			_burst(event.pos,Color("#ffd23f"),14,360.0)
 		if event.type==&"ship_explode": _death_burst(event.pos)
+		if equipped_full_burst: _full_burst_visual.frame_event(event,frame.ui.ship.ship_pos,frame.ui.ship.ship_heading,frame.ui.character_scale)
 		if equipped_duplicator and event.type==&"duplicate": _duplicator_visual.on_event(event)
 		if equipped_barrier and not barrier_from_state and event.type in [&"barrier_hit",&"barrier_restore"]: _barrier_visual.on_event(event)
 		if equipped_rear: preload("res://scripts/render/equipment/rear.gd").frame_event(_rear_flashes,_rear_shells,event,frame.ui.ship.ship_heading,frame.ui.rear.mount)
@@ -700,6 +714,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var full_burst_dt: float = 0.0 if _full_burst_world_time<0.0 else maxf(0.0,ui.world_time-_full_burst_world_time)
+	_full_burst_world_time = ui.world_time if equipped_full_burst else -1.0
+	if _full_burst_visual!=null: _full_burst_visual.frame_tick(full_burst_dt,ui.ship.ship_pos+ui.ship.ship_heading*16.0*1.82*ui.character_scale,ui.full_burst_active,ui.world_time,_ship_visible)
 	var duplicator_dt: float = 0.0 if _duplicator_world_time<0.0 else maxf(0.0,ui.world_time-_duplicator_world_time)
 	_duplicator_world_time = ui.world_time if equipped_duplicator else -1.0
 	if _duplicator_visual!=null: _duplicator_visual.frame_tick(duplicator_dt)

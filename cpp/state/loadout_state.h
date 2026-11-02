@@ -56,6 +56,7 @@ struct EquipmentEffects {
 };
 struct LoadoutState {
     EquipmentEffects effects;
+    bool full_burst_owned=false,full_burst_active=false;
     RampageState rampage;
     DuplicatorState duplicator;
     double boost_distance=0,full_charge_maximum=1;

@@ -20,7 +20,7 @@
 | No.12 | 最高速度 | 最高速度が上がる。 | 能力値を伸ばす | `data/traits/T10_speed.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.13 | 慣性航行 | ブーストのあとの高速と減速の時間が延びる。 | 能力値を伸ばす | `data/traits/T31_glideDuration.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.14 | マルチショット | すべての射撃の弾数が増える。 | 能力値を伸ばす | `data/traits/T35_multiShot.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
-| No.15 | フルバースト | ゲージが満タンの間、射撃の連射が上がる。 | 能力値を伸ばす | `data/traits/T36_fullBurst.tres`、`scripts/traits/fullBurst.gd` | 英語・素材・見た目は確認待ち |
+| No.15 | フルバースト | ゲージが満タンの間、射撃の連射が上がる。 | 能力値を伸ばす | `data/traits/T36_fullBurst.tres`、`scripts/traits/fullBurst.gd`。C++ランは `cpp/behaviors/traits/fullBurst.cpp` が満充填への移行を保持し、共通の射撃倍率と表示へ渡す | 英語・素材・見た目は確認待ち |
 | No.16 | 攻撃力 | すべての攻撃の威力が上がる。 | 能力値を伸ばす | `data/traits/T11_attack.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.17 | 広域回収 | アイテムを拾える範囲が広がる。 | 能力値を伸ばす | `data/traits/T12_pickup.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.18 | デュプリケーター | 弾・破片・光の槍の生成時に、元の攻撃ごとに確率で複製を2つ加える。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T37_duplicator.tres`、`scripts/runtime/systems/loadout_system.gd`、`scripts/runtime/systems/projectile_system.gd`、`scripts/attacks/light_lances.gd`、`scripts/render/equipment/duplicator.gd`。C++ランは `cpp/behaviors/traits/duplicator.cpp` が通常の味方攻撃の出生列・複製情報・予約上限を扱う | 英語・素材・見た目は確認待ち |

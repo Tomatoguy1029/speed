@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t36" in OS.get_cmdline_user_args() or "--cpp-t36-fixes" in OS.get_cmdline_user_args() or "--cpp-t36-interval" in OS.get_cmdline_user_args():
+		await check_cpp_t36()
+		print("[cpp_t36] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t33" in OS.get_cmdline_user_args() or "--cpp-t33-launch" in OS.get_cmdline_user_args():
 		await check_cpp_t33()
 		print("[cpp_t33] failed=%d" % failures)
@@ -1925,3 +1931,97 @@ func check_cpp_t33() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"快進撃の同期・倍率・表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_t36() -> void:
+	var interval_only: bool = "--cpp-t36-interval" in OS.get_cmdline_user_args()
+	var retry: bool = interval_only or "--cpp-t36-fixes" in OS.get_cmdline_user_args()
+	var capture := ErrorCapture.new()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.base_attack = 100.0
+	config.xp_base = 100000.0
+	# 通常候補は固定seed 637の2回目の引き直しでT36を含む。
+	var seed_value := 637
+	var session = await trait_test_session("T36",config,seed_value)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	var initial: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("t36",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var definition: TraitDef = ContentManager.definition(&"traits",&"T36")
+	for level in range(1,config.trait_max_stacks+1):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T36","levels":level}).ok,"フルバーストを全段取得する")
+		bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W02","levels":1})
+		events.clear()
+		bridge.step(1.0/120.0,idle,viewport)
+		var rate: float = 1.0+definition.params.rate_base+definition.params.rate_per*level
+		if not retry or level>1: check(is_equal_approx(bridge._ui.shooting_rate,rate) and bridge._ui.full_burst_active,"全段で満充填時の射撃倍率を生成値から適用する")
+		if not retry or level>1: check(events.filter(func(event): return event.type==&"full_burst_ready").size()==1,"満充填への移行を一度通知する")
+		var fired: Array = events.filter(func(event): return event.type==&"weapon_fire" and event.payload.id==&"W02")
+		var ticks := 0
+		var first_tick := -1
+		while fired.size()<2 and ticks<240:
+			bridge.step(1.0/120.0,idle,viewport)
+			ticks += 1
+			fired = events.filter(func(event): return event.type==&"weapon_fire" and event.payload.id==&"W02")
+			if first_tick<0 and not fired.is_empty(): first_tick = ticks
+		check(fired.size()>=2 and absf(float(ticks-first_tick)/120.0-0.9/rate)<=1.0/120.0,"実際の散弾の連射間隔へ全段の倍率を適用する")
+		if not retry or level>1: check(events.filter(func(event): return event.type==&"full_burst_ready").size()==1,"満充填中に通知を繰り返さない")
+		if failures: break
+	if not retry:
+		var presentation: RunPresentation = session.view.get_node("RunPresentation")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._full_burst_visual!=null,"通常の表示へ満充填の光を接続する")
+		var saved: Dictionary = bridge.checkpoint()
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		events.clear()
+		bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.01)
+		check(bridge._ui.full_burst_active and events.all(func(event): return event.type!=&"full_burst_ready") and presentation.frame_view._full_burst_visual!=null,"値型復帰で満充填表示を作り直し通知を重複しない")
+		trait_start_trace(bridge,16.0)
+		bridge.step(1.0/120.0,idle,viewport)
+		check(not bridge._ui.full_burst_active and bridge._ui.shooting_rate==1.0,"発進で1未満になった瞬間に通常連射へ戻す")
+		var before: Dictionary = bridge._ui.duplicate(true)
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.draw.gauge==before.draw.gauge and bridge._ui.full_burst_active==before.full_burst_active,"停止中は充填と移行を進めない")
+		bridge.command("pause",{"paused":false})
+		events.clear()
+		for tick in 100:
+			bridge.step(1.0/120.0,idle,viewport)
+			if bridge._ui.full_burst_active: break
+		check(bridge._ui.full_burst_active and events.filter(func(event): return event.type==&"full_burst_ready").size()==1,"復帰後の再充填で光と連射を一度有効にする")
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		for distance in [80.0,180.0]:
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
+			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+		var kills := 0
+		for tick in 160: bridge.step(1.0/120.0,idle,viewport)
+		for event: Dictionary in events:
+			if event.type==&"kill": kills += 1
+		check(kills>=2 and bridge._ui.full_burst_active,"実際の連続撃破後も満充填の効果を維持する")
+		bridge.command("dev_remove_trait",{"id":"T36"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.full_burst and not bridge._ui.full_burst_active and bridge._ui.shooting_rate==1.0 and presentation.frame_view._full_burst_visual==null,"解除で倍率・状態・光を片付ける")
+		bridge.release_checkpoint(saved.value)
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T36","levels":1})
+	if not interval_only: await trait_select_upgrade(session,"T36",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"フルバーストの状態と表示に実行エラーがない: %s" % [capture.messages()])

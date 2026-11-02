@@ -4,6 +4,7 @@
 #include "../behaviors/weapons/rear.h"
 #include "../behaviors/weapons/barrier.h"
 #include "../behaviors/traits/rampage.h"
+#include "../behaviors/traits/fullBurst.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
 #include "../systems/pickup_system.h"
@@ -83,7 +84,11 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
                 if (state.phase!=Phase::Play) break;
             }
         } else if (state.forward.ready) core.step_forward(world_dt);
-        if (state.phase==Phase::Play) RampageBehavior::step(core.runtime,world_dt);
+        if (state.phase==Phase::Play) for (const auto &owned:state.loadout.traits) {
+            const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
+            if (id=="T33") RampageBehavior::step(core.runtime,world_dt);
+            else if (id=="T36") FullBurstBehavior::step(core.runtime);
+        }
     }
     if (world_step && state.phase==Phase::Play) {
         if (state.projectile_config.ready && !core.step_projectiles(wd)) return false;
