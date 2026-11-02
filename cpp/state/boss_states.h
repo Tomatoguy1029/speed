@@ -38,8 +38,17 @@ struct MonocerosDanceState {
     double elapsed=0,angle=0,glow=0,run_speed=0,travel=0,traveled=0,heading=0,speed=0;
     uint32_t completed=0;
 };
+struct MonocerosSwordState {
+    enum class Stage : uint8_t { Aim,Swing,Gap,Return };
+    Stage stage=Stage::Aim;
+    double elapsed=0,angle=0,glow=0,base=0,speed=0,released_at=0;
+    uint32_t cut=0;
+    int32_t side=1;
+    bool released=false;
+    godot::Vector2 target;
+};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;
@@ -81,7 +90,8 @@ struct BossBodyState {
     int32_t sweep_side=1;
     EnemyHandle actor;
     BossMode mode=BossMode::Idle;
-    bool phase_pending=false,final_landed=false;
+    bool phase_pending=false,final_landed=false,has_slash=false;
+    godot::Vector2 slash_from,slash_to;
     double clock=0,initial_wait=0,entrance_elapsed=0,phase_remaining=0,final_started=-1,final_elapsed=0,final_charge=0;
     godot::Vector2 entrance_from,entrance_target,final_to;
     double final_width=0;

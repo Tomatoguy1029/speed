@@ -74,6 +74,7 @@ var _boss_body_displays := {}
 var _boss_technique_visual: Node2D
 var _boss_lance_visual: Node2D
 var _boss_wave_visual: Node2D
+var _boss_sword_visual: Node2D
 var _marlin_visual: EnemyVisual
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
@@ -91,13 +92,10 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
-<<<<<<< HEAD
 var _kill_sonic_visual: RefCounted
-=======
 var _interceptor_world_time := -1.0
 var _interceptor_visual: RefCounted
 var _bipolar_world_time := -1.0
->>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 var _bipolar_visual: RefCounted
 var _mass_tow_world_time := -1.0
 var _mass_tow_visual: RefCounted
@@ -186,6 +184,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	marlin_parent.add_child(_boss_lance_visual)
 	_boss_wave_visual = preload("res://scripts/bosses/monoceros/horn_wave_visual.gd").new()
 	marlin_parent.add_child(_boss_wave_visual)
+	_boss_sword_visual = preload("res://scripts/bosses/monoceros/sword_flash_visual.gd").new()
+	marlin_parent.add_child(_boss_sword_visual)
 	_marlin_visual = preload("res://scripts/render/enemies/marlin.gd").new()
 	_marlin_visual.setup_frame(marlin_parent)
 	_phoenix_visual = preload("res://scripts/render/enemies/phoenix.gd").new()
@@ -772,6 +772,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		var waves: Array = []
 		for body: Dictionary in frame.boss_bodies: waves.append_array(body.get("horn_waves",[]))
 		_boss_wave_visual.apply_frame(waves,float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
+		_boss_sword_visual.apply_frame(float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
 	var body_seen := {}
 	for body: Dictionary in frame.get("boss_bodies",[]):
 		if body.kind!=0: continue
@@ -851,6 +852,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_queued_events.clear()
 		if _boss_lance_visual!=null: _boss_lance_visual.reset_frame()
 		if _boss_wave_visual!=null: _boss_wave_visual.reset_frame()
+		if _boss_sword_visual!=null: _boss_sword_visual.reset_frame()
 		_mutiny_beams.clear()
 		_flashes = ShotFlashes.new()
 		_forward_world_time = -1.0
@@ -886,14 +888,11 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _vortex_visual!=null: _vortex_visual.dispose()
 		_vortex_visual = null
 		_vortex_world_time = -1.0
-<<<<<<< HEAD
 		if _kill_sonic_visual!=null: _kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
-=======
 		if _interceptor_visual!=null: _interceptor_visual.dispose()
 		_interceptor_visual = null
 		_interceptor_world_time = -1.0
->>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 		if _bipolar_visual!=null: _bipolar_visual.dispose()
 		_bipolar_visual = null
 		_bipolar_world_time = -1.0
@@ -954,7 +953,6 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_rear_canvas.visible = equipped_rear and _ship_visible
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
 	_rear_canvas.queue_redraw()
-<<<<<<< HEAD
 	var equipped_kill_sonic: bool = frame.ui.get("kill_sonic",{}).get("ready",false)
 	if equipped_kill_sonic and _kill_sonic_visual==null:
 		_kill_sonic_visual = preload("res://scripts/render/equipment/killSonic.gd").new()
@@ -962,7 +960,6 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_kill_sonic and _kill_sonic_visual!=null:
 		_kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
-=======
 	var equipped_interceptor: bool = frame.ui.get("interceptor",{}).get("ready",false)
 	if equipped_interceptor and _interceptor_visual==null:
 		_interceptor_visual = preload("res://scripts/render/equipment/interceptor.gd").new()
@@ -971,7 +968,6 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_interceptor_visual.dispose()
 		_interceptor_visual = null
 		_interceptor_world_time = -1.0
->>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 	var equipped_bipolar: bool = frame.ui.get("bipolar",{}).get("ready",false)
 	if equipped_bipolar and _bipolar_visual==null:
 		_bipolar_visual = preload("res://scripts/render/equipment/bipolar.gd").new()
@@ -1113,16 +1109,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	for event: Dictionary in _queued_events:
 		_boss_lance_visual.frame_event(event)
-<<<<<<< HEAD
 		_boss_wave_visual.frame_event(event)
-=======
 		if _interceptor_visual!=null: _interceptor_visual.on_event(event)
->>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 		if _bipolar_visual!=null: _bipolar_visual.frame_event(event)
 		if event.type==&"beam" and event.get("visual_key","")=="weapon/bipolar": ruler_shake = maxf(ruler_shake,5.0)
 		if _mass_tow_visual!=null and (event.type in [&"anchor_capture",&"anchor_fire"] or event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow"): _mass_tow_visual.frame_event(event)
 		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
 		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
+		_boss_sword_visual.frame_event(event)
 		if event.type==&"shield_stolen":
 			_shield_transfers.append({"pos":event.pos,"facing":event.facing,"r":event.r,"arc":event.arc,"life":0.3,"max":0.3})
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})
@@ -1285,17 +1279,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
-<<<<<<< HEAD
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
-=======
 	var interceptor_dt: float = 0.0 if _interceptor_world_time<0.0 else maxf(0.0,ui.world_time-_interceptor_world_time)
 	_interceptor_world_time = ui.world_time if equipped_interceptor else -1.0
 	if _interceptor_visual!=null: _interceptor_visual.frame_tick(ui.interceptor.drones,interceptor_dt)
 	var bipolar_dt: float = 0.0 if _bipolar_world_time<0.0 else maxf(0.0,ui.world_time-_bipolar_world_time)
 	_bipolar_world_time = ui.world_time if equipped_bipolar else -1.0
->>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 	if _bipolar_visual!=null:
 		_bipolar_visual.sync_frame(ui.bipolar,ui.ship,ui.world_time,_dim_rect)
 		_bipolar_visual.frame_tick(bipolar_dt)

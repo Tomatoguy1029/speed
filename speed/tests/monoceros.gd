@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-sword" in OS.get_cmdline_user_args():
+		call_deferred("native_sword")
+		return
 	if "--cpp-dance" in OS.get_cmdline_user_args():
 		call_deferred("native_dance")
 		return
@@ -454,7 +457,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	if planet_x==500.0 or moon or name in ["kick","sweep","lance","return_charge","horn_wave","horn_dance"]: cfg.character_scale = 1.0
+	if planet_x==500.0 or moon or name in ["kick","sweep","lance","return_charge","horn_wave","horn_dance","sword_flash"]: cfg.character_scale = 1.0
 	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.approach_speed = 0.0
@@ -472,6 +475,23 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		move.reach = 240.0
 		move.hold = 0.1
 		move.return_speed = TAU
+	if name=="sword_flash":
+		move.cuts = 2
+		move.first_windup = 0.1
+		move.windup = 0.05
+		move.lock_time = 0.05
+		move.pull = 0.6
+		move.swing_time = 0.1
+		move.lunge_speed = 100.0
+		move.lunge_decay = 10.0
+		move.slash_min = 80.0
+		move.slash_max = 200.0
+		move.slash_length = 200.0
+		move.slash_angle = PI*0.5
+		move.slash_width = 20.0
+		move.slash_hit_time = 0.05
+		move.cut_gap = 0.05
+		move.return_time = 0.1
 	if name=="horn_dance":
 		move.aim_time = 0.1
 		move.aim_lock = 0.05
@@ -1303,4 +1323,71 @@ func native_dance() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_monoceros_dance] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_sword() -> void:
+	var f := charge_fixture(true,false,450.0,false,"sword_flash")
+	check(not f.is_empty(),"光の剣の連撃の編集値を型付き状態へ生成して単独発動する")
+	if f.is_empty(): get_tree().quit(1); return
+	var bridge = f.bridge
+	var definition: Dictionary = f.records.BossTechniqueDefinition[0]
+	check(definition.kind==7 and definition.cuts==2 and definition.first_windup==0.1 and definition.warn==0.05 and definition.slash_width==20.0 and f.records.BossTechniqueStage.is_empty(),"初回と次回の溜め・斬撃の固有値を生成しmethod trackを残さない")
+	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
+	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.55) and legacy.reach_limit(100.0)==300.0,"PureDataを保ち旧入口の攻撃長と到達距離を解決する")
+	bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	bridge._core.step(0.05)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(state.stage==0 and state.locked and is_equal_approx(state.angle,-0.45) and state.target==Vector2(150,0),"初回の溜めは現在の位置を固定し首を引く")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].sequence_stage==1,"初回の溜め時間で振り抜きへ進む")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(state.released and state.hit and is_equal_approx(state.speed,100.0*exp(-0.5)) and is_equal_approx(state.position.x,100.0*exp(-0.5)*0.05),"前進を指数減速し振り抜きの半分で斬撃を一回放つ")
+	check(body.last_slash[0].is_equal_approx(Vector2(150,-100)) and body.last_slash[1].is_equal_approx(Vector2(150,100)),"固定した対象までの距離を使い斜めの有限線分を生成する")
+	check(f.events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"sword_flash" and e.payload.source==&"monoceros" and e.payload.technique==&"sword_flash"),"斬撃の原因をsword_flashへ分けて記録へ渡す")
+	var visual = load("res://scripts/bosses/monoceros/sword_flash_visual.gd").new()
+	add_child(visual)
+	var releases: Array = f.events.filter(func(e): return e.type==&"slash_release")
+	check(releases.size()==1,"斬撃の線と幅を登録済み通知で一回配信する")
+	visual.frame_event({"type":&"slash_release","line":releases[0].payload.line,"width":releases[0].payload.width})
+	visual.apply_frame(0.15)
+	check(visual.effects.size()==8 and visual.effects[0].line==body.last_slash and visual.effects[0].width==20.0,"表示乱数の針と斬撃は通知の判定線から作り戦闘へ書き戻さない")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.05)
+	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(expected.sequence_stage==2 and not expected.locked,"振り抜きと命中時間の終了後は次の斬りの間へ進む")
+	check(held.ok and bridge.restore(held.value).ok,"放出した線分・命中済み・放出時刻を途中復帰する")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0]==expected and bridge.command("dev_boss_body_state").value[0].last_slash==body.last_slash,"復帰後も同じ線分を保持して次の斬りへ進む")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==1 and state.sequence_stage==0 and state.cut==1 and state.side==-1,"二回目の溜めはactiveのまま反対側から始める")
+	bridge._core.step(0.05)
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.cut==1 and state.released and state.hit and bridge.command("dev_boss_body_state").value[0].last_slash[0].y>0.0,"次の斬撃では命中済みを戻し線の向きを反転する")
+	bridge._core.step(0.05)
+	bridge._core.step(0.1)
+	bridge._core.step(0.051)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].last_slash.size()==2,"首を戻して自然終了し最後の線は値として保持する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"光の剣の通知を共通配信へ渡す")
+	bridge.dispose()
+	visual.queue_free()
+	for disappear in [false,true]:
+		f = charge_fixture(false,false,450.0,false,"sword_flash")
+		bridge = f.bridge
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+		bridge._core.step(0.1)
+		if disappear: bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+		bridge._core.step(0.2)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and not state.hit and not f.events.any(func(e): return e.type==&"slash_release") and bridge.read_frame().ok,"参加者消失で斬撃を放たない" if disappear else "取消後に斬撃の当たりを残さない")
+		bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_monoceros_sword] failures=",failed)
 	get_tree().quit(1 if failed else 0)

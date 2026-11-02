@@ -21,7 +21,7 @@ func apply_frame(values: Array) -> void:
 
 func _draw_frame() -> void:
 	for row: Dictionary in _frame:
-		if row.get("technique","") in ["horn_wave","horn_dance"]: continue
+		if row.get("technique","") in ["horn_wave","horn_dance","sword_flash"]: continue
 		if row.get("technique","")=="return_charge" and row.stage==1 and row.sequence_stage==2:
 			var forward := Vector2.from_angle(float(row.facing))
 			var at: Vector2 = row.position+forward*float(row.radius)*0.65

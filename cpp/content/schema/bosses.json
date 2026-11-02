@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 6
+          "max": 7
         },
         {
           "name": "phase",
@@ -458,9 +458,64 @@
           "name": "end_decay",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "cuts",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "first_windup",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_hit_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cut_gap",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 7
+      "version": 8
     },
     {
       "name": "BossTechniqueStage",

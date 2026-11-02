@@ -1904,6 +1904,10 @@
       {
         "name": "EncounterDeferred",
         "value": "encounter_deferred"
+      },
+      {
+        "name": "SlashRelease",
+        "value": "slash_release"
       }
     ],
     "ResultKind": [
@@ -2536,6 +2540,10 @@
     ],
     "encounter_deferred": [
       "reason"
+    ],
+    "slash_release": [
+      "line",
+      "width"
     ]
   },
   "includes": [
