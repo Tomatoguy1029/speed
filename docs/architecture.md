@@ -1,6 +1,6 @@
 # SPEED 設計書
 
-- demo のコードは引き継がない。ゲームの挙動は仕様書を正とし、ここでは Godot での正式な開発に向けて設計し直す。
+- demo のコードは引き継がない。ゲームの挙動は仕様書を正とし、ここでは C++ のラン処理と Godot の制作・表示の構成を定める。
 - Godot プロジェクトは `speed/`（`res://`）。`.godot/` などの生成キャッシュはコミットしない。
 
 ステージ制作の入口は[制作ガイド](dev/stage-production.md)、編集先と記録分析の進め方は[AI向け参照](dev/stage-production-ai.md)、ステージ4の制作要件は[個別仕様](game/stages/stage-4.md)を参照する。本書はツールの詳細な編集契約と記録形式を定義する。
@@ -32,8 +32,8 @@
 
 | 項目 | 構成 |
 |---|---|
-| エンジン | Godot 4.6（`speed/project.godot`） |
-| 言語 | GDScript。大量処理（敵の移動・格子・当たり判定など）は、GDExtension（C++）へ差し替えられる境界を保つ |
+| エンジン | Godot 4.7.2（`speed/project.godot`） |
+| 言語 | C++（GDExtension）がランの状態と更新を持ち、GDScriptが制作・入力・資源・表示・UI・端末保存を持つ |
 | レンダラ | 本番プロジェクトは Forward+。描画処理は Forward+・Mobile の HDR 経路と、Compatibility の簡易経路を持つ（10章）。ブラウザは Compatibility を使う |
 | 物理エンジン | プロジェクトの3D設定は Jolt。敵・弾の2D当たり判定は7章の自前処理を使う |
 
@@ -41,57 +41,52 @@
 
 ## 3. フォルダ構成
 
-種類ごとに分ける。シーンは人が一番よく触るところなのでまとめておく。スクリプトは人が触る頻度が低く、主に AI が書く。データはまとめて取り込むことが多く、一括で管理したい。スクリプトはアプリ全体の窓口、ランの処理、種類ごとの振る舞い、表示に分ける。
+パスはリポジトリの根を基準とする。Godotの `res://` は `speed/` を指す。
 
 ```
+cpp/
+  api/                    SpeedRunCoreのGodot公開窓口と値の検証
+  runtime/                RunRuntime、RunRunner、時計、開始・終了、保持点
+  content/                戦闘バイナリの読込と不変のContentBundle
+    generated/            共通スキーマから生成する型とID
+  state/                  ランの値状態、種類別状態、世代付きHandle
+  systems/                戦闘、移動、出現、成長、回収、地形
+    attacks/              攻撃種類ごとの更新
+  behaviors/              敵・武器・特性・英雄の種類別処理
+  bosses/                 共通フローと5体の形態・技・部位・決着
+  output/                 UI、描画、出来事、資源要求、録画、計測の出力
+  SConstruct              固定SDKによる拡張のビルド
+  dependencies.json       SDK・API・Godot・export templateの固定版
 speed/                    res://
   project.godot
-  addons/                 編集用の道具、実行用拡張、ゲーム専用の生成（4.1）
-    content_build/        実行用データの生成とexport
-    spawn_timeline/       出現タイムライン（14.2）
-    speed_data_editor/    データ編集ツール（8.4）
-    stage_launcher/       ステージの直接起動（14.1）
-  scenes/                 シーン（.tscn）。人が一番よく触る
-    app/                  Main、タイトル、設定、メインメニュー、ステージ選択、強化、図鑑、結果
-    run/                  ランの土台と、報酬演出の差し替えシーン（ULT・伝説モジュール）
-    bosses/               中ボス・ラスボス（部位、タイムライン、AI）
-    fx/                   演出のシーン
-    stages/               ステージごとのフィールドの配置（今は空の仮シーン）
-    gimmicks/             フィールドの仕掛け（未作成）
-    ship/  render/  ui/   （未作成）
-  scripts/                スクリプト（.gd）。主に AI が書く
+  extensions/run/         拡張の登録とCPU別共有ライブラリ
+  addons/                 編集機能、起動前の生成、export
+  scenes/                 アプリ・ラン・ボス表示・攻撃表示・ステージ
+  scripts/
     managers/             アプリ全体の窓口（4.3）
-    runtime/              RunSimulation・RunSession・RunContext・systems/
-    dev/                  開発用の起動・命令・調整・性能表示・録画
-    actors/               機体の見た目、ボスの役者の共通部分
-    bosses/               ボスごとの行動と共通フロー
-    enemies/              EnemyBehavior・EnemyMotion・種類別の行動・被弾条件
-    attacks/              攻撃の生成・移動・接触の種類別処理
-    heroes/  gimmicks/    英雄の力とフィールドの仕掛け
-    pickups/              回収時の効果
-    encounters/           強敵の群れ・フォーメーション・攻撃の予算（11.3・11.7）
-    weapons/              武器ごとの発動
-    traits/               特性ごとの発動
-    render/               描画の層と段
-    input/                機器ごとの変換（9章）
-    ui/
-    data_types/           定義データのクラス（8.1の WeaponDef など）
-    common/               複数の場所で使う関数
-  shaders/                compute/ はコンピュートの演出
-  data/                   定義データ（.tres）。数値の正（8.1）
-    config.tres
-    phases/ weapons/ traits/ enemies/ stages/ bosses/ heroes/ legendary_modules/ meta_upgrades/
-    formations/           敵の組み合わせのシーン（.tscn、8.1）
-    legendary_aura_bakes/ visuals/ text/ lab/
-  assets/                 画像、音、フォント（pixel/ ui/ fx/ placeholders/）
-  gyms/                   実験用。規約なしで試せる。製品の書き出しから除外する
-  .content/               実行用ステージ・音・開発用の名前対応表（生成物）
-  tests/
-  tools/                  素材の切り出し・アート確認・性能計測
-    editor/               SPEED専用のボスAI・ステージ敵調整の編集機能
+    runtime/              RunSession・RunBridge・読込・表示用読取モデル
+    data_types/           編集元Resourceと実行時資源の型
+      generated/run_ids.gd 実行時に使う共通ID
+    bosses/               技・フローの編集元Resource
+    encounters/           編成の制作シーンと経路の制作支援
+    render/               描画の層・バッチ・表示専用状態
+    input/  ui/           入力変換と画面
+    dev/                  調整・録画・開発用表示
+  data/                   パラメータの正となる.tres、編成.tscn
+  assets/  shaders/       画像・音・フォントと描画処理
+  gyms/                   制作・試遊用。製品の書き出しから除外
+  tools/content/          編集元から実行用データへの生成
+    generated/            共通スキーマの生成・書込用コード
+  tools/editor/           SPEED専用の編集画面
+  tools/profiling/        性能計測の入口
+  tests/                  runtime・integration・content・editorの検査
+  .content/               実行用データと制作中間データ（生成物）
+    run/                  戦闘バイナリ・索引・RunResources
+    dev/                  開発用の名前対応表・一時生成物
+tools/build/              共通スキーマ生成と拡張・配布ビルド
 ```
 
-ステージは、人が配置を触るシーン（`scenes/stages/`）と、数値の `StageDef`（`data/stages/`）に分ける。配置のシーンは今は空の仮シーンで、ステージの直接起動（14.1）の対象として使う。
+ステージは数値の `StageDef`（`data/stages/`）と配置シーン（`scenes/stages/`）で制作する。実行時の戦闘定義と表示資源への変換は[8.1](#81-定義データresource)に示す。
 
 ## 4. 全体の構成
 
@@ -99,113 +94,87 @@ speed/                    res://
 
 | 層 | 中身 | 依存と役割 |
 |---|---|---|
-| 道具 | `addons/` の編集機能 | 再利用する道具は Godot 本体に依存する。`content_build/` はゲーム専用の生成処理を接続する |
-| アプリの窓口 | `scripts/managers/` | 画面、保存、定義の索引、資源の読み込み、音、ランの寿命を扱う |
-| ランの処理 | `scripts/runtime/` と種類別の振る舞い | RunContext からそのランの状態・設定・System・資源を読む |
-| 表示とUI | `scripts/render/`・`scripts/ui/` | 状態と出来事を読み、操作を命令として渡す |
-| コンテンツ | 定義Resource、ボスの役者、見た目 | 共通の契約に従ってランの処理や表示へ接続する |
-| 開発用 | `scripts/dev/`・`gyms/`・`tests/`・`tools/` | 同じランを利用し、起動時に調整・記録・実験用の入口を加える |
+| 制作・生成 | GodotのResource・制作シーン・`tools/content/`・編集用addon | 編集元を検証し、C++用の値とGodot用の資源参照を生成する |
+| アプリの窓口 | `speed/scripts/managers/` | 画面、保存、索引、資源読込、音、セッションの寿命を扱う |
+| Godotのラン接続 | `RunSession`・`RunBridge` | 入力と命令を渡し、値の出力を購読者と資源読込へ配信する |
+| C++のラン | `cpp/runtime/`・`state/`・`systems/`・`behaviors/`・`bosses/` | 不変の戦闘定義を読み、同じランの状態・時計・乱数と更新順を所有する |
+| 表示とUI | `speed/scripts/render/`・`ui/` | UIと描画出力・出来事から表示を作り、操作を命令として渡す |
+| 開発用 | `scripts/dev/`・`gyms/`・`tests/`・`tools/` | 通常出撃と同じC++ランへ、制作・記録・計測の入口を接続する |
 
 ### 4.2 混合方式
 
-敵・弾・破片・経験値は表の列として持ち、まとめて更新・描画する。敵の個別処理は種類ごとの EnemyBehavior が、その種類の行番号をまとめて処理する。機体は RunState の数値、ボスは Node の役者と表の当たり判定で構成する。英雄・仕掛け・回収効果は、それぞれの種類別の処理を System から呼ぶ。
+戦闘の可変状態はC++の `RunRuntime.state`（`RunState`）に集める。機体・線・敵・攻撃・ドロップ・成長・英雄・地形・ボスの状態は値として保持し、種類固有の状態は型付きの構造体へ分ける。`WorldState` はその一部として攻撃予算などの世界共通状態を持つ。Godotのノードは表示・UI・入力・資源の寿命を持つ。ボスの部位と技もC++で更新し、表示ノードは描画出力の位置・姿勢・出来事を反映する。
 
 ### 4.3 アプリの窓口とラン
 
-アプリ全体の窓口を Autoload にする。
+アプリ全体の窓口をAutoloadにする。
 
 | 窓口 | 担当 |
 |---|---|
-| ContentManager | 調整値の実行時の複製、ContentCatalog、定義の取得、資源の読み込み（8章） |
+| ContentManager | ContentCatalog、制作定義、生成済み表示資源の取得と読込要求の共有（8章） |
 | SaveManager | セーブ、図鑑、伝説のモジュール、ハイスコア、機体強化（11章） |
-| ProfileManager | 保存された強化からランへ渡す能力値の倍率・加算・軽減を計算する |
-| AudioManager | 生成済みの音源の再生（13章） |
-| GameManager | 画面、モード、ステージ進行、結果保存の入口 |
-| RunManager | id ごとの RunSession の作成・検索・命令の振り分け・登録解除 |
-| DevBootstrap | 開発版の起動。デバッグ命令・調整表示・録画・実験場・直接起動予約を接続する |
+| ProfileManager | 保存された強化からC++へ渡す倍率・加算・軽減の値を計算する |
+| AudioManager | 生成済み音源とC++の出来事に基づく再生（13章） |
+| GameManager | 画面、モード、ステージ選択、結果保存の入口 |
+| RunManager | IDごとのRunSessionの作成・検索・命令の振り分け・登録解除 |
+| DevBootstrap | 開発版の調整表示・録画・実験場・直接起動予約を接続する |
 
-RunSession（Node）が RunSimulation（RefCounted）と任意の表示を所有する。RunSimulation が RunState・RunContext・各Systemを組み立て、更新の順番、時計、勝敗、終了演出を進める。RunContext は状態・設定・System・強化値の写し・資源の参照を持つ。System は RefCounted の RunSystem を土台にする。
+通常出撃は `RunManager.create_run()` → `RunSession` → `RunBridge` → `SpeedRunCore` → `RunRunner` の順に接続する。`SpeedRunCore` はGDExtensionのRefCounted窓口で、`RunRuntime` を所有する。`RunRuntime` は不変の `ContentBundle`、ランの値状態、更新・出力の作業領域を持つ。`RunRunner` が固定更新の順番、時計、進行を実行し、各Systemと種類別処理が同じランを使う。
 
-| System | 担当 |
-|---|---|
-| ShipSystem | 機体の移動とHP |
-| DrawSystem | ゲージ、描画、なぞり、勢い |
-| CombatSystem | 当たり判定の格子、ダメージ、ヒットストップ |
-| EnemySystem | 敵の表、生成・解放、EnemyBehaviorと被弾条件の呼び出し |
-| SpawnSystem | 時間帯、目標数、補充、再配置、生成済みクリップとフォーメーション |
-| BossSystem | 同じランのボス役者の登録、部位通知、撃破 |
-| ProjectileSystem | 弾・攻撃形状の共通の列と更新、種類別処理の呼び出し |
-| LoadoutSystem | 経験値、レベル、候補、武器・特性、リロール |
-| PickupSystem | ドロップと回収効果 |
-| HeroSystem | 英雄の星座、特別な枠の力、目印の星 |
-| FieldSystem | 地形、天体、隕石、フィールドの仕掛け |
+| 処理 | C++の入口 | 担当 |
+|---|---|---|
+| 機体・線 | `systems/ship.cpp`・`draw.cpp` | 移動、HP、ゲージ、描画、なぞり、勢い |
+| 戦闘 | `systems/combat*.cpp`・`collision_query.cpp` | 格子、掃引判定、命中先、ダメージ、ヒットストップ |
+| 敵 | `systems/enemy_system.cpp`・`enemy_update.cpp`・`behaviors/enemies/` | 生成・解放、種類別の移動・判断・被弾条件 |
+| 出現 | `systems/population_system.cpp`・`spawn_timeline.cpp`・`formations.cpp`・`clips.cpp` | 時間帯、目標数、補充、再配置、クリップと編成 |
+| ボス | `bosses/flow/`と各ボスのフォルダ | 形態、部位、技、共有スタミナ、決着 |
+| 攻撃 | `systems/attack_system.cpp`・`systems/attacks/` | 発生・移動・接触・残留・終了 |
+| 成長・装備 | `systems/progression.cpp`・`equipment.cpp`・`behaviors/weapons/`・`behaviors/traits/` | XP、候補、カード、武器・特性、リロール |
+| 回収・英雄・地形 | `systems/pickup_system.cpp`・`heroes.cpp`・`field*.cpp` | ドロップ、回収、星座の力、天体、隕石、重力、ワープ |
 
-**更新の順番**は `scripts/runtime/run_simulation.gd` の `_play_tick` が持つ。
+**更新の順番**は [RunRunner::step_play](../cpp/runtime/run_runner.cpp) が持つ。
 
-1. 入力と描画の操作を受け、ヒットストップを判定する。
-2. 戦闘の準備と描画・なぞりを更新し、実秒と世界秒を計算する。
-3. 世界側の更新回に攻撃の予算、フィールド、敵、ボス、戦闘の格子を更新する。
-4. 機体、英雄、武器・特性を更新し、世界側の更新回に弾・攻撃を進める。
-5. 撃破済みの行を解放し、世界側の更新回に出現と回収を進める。
+1. UI停止・選択・死亡・決着の位相を判定し、入力と描画操作を受ける。
+2. ヒットストップと線を更新し、実秒・世界秒を進める。
+3. 世界側の更新回に攻撃予算、地形、敵・ボス、回避、戦闘格子を更新する。
+4. 機体・英雄・装備を更新し、世界側の更新回に弾・攻撃形状を進める。
+5. 撃破済みの行を解放し、世界側の更新回に遭遇・補充・回収を進める。
 6. ワープ、カメラ、勝敗、保留中のカード選択を扱う。
 
-表示のあるランは RunPresentation・HUD・InputRouter を接続する。表示のない実験は、同じシミュレーションと非表示の役者用Nodeを作る。シグナルはレベルアップや勝敗などに使い、命中・撃破などは更新ごとの出来事の列へ積む。UI と入力はセッションの命令の入口を使う。
+入力・UIは `RunBridge.command()` と `poll_and_step()` を使う。命令の封筒はランID・epoch・単調な命令番号・種類・payloadを持ち、C++側が版・値・実行可能状態を検証する。公開窓口は更新中の再入を拒否する。出力はUI差分・出来事・資源要求・描画・記録・計測の値として読む。出来事はsequenceを持ち、RunBridgeが購読者へ同じ列を渡してから受領を通知する。
 
 #### ランの所有と参照
 
-黒いひし形はランの寿命に合わせて保持・解放する関係、通常の矢印は参照、破線は呼び出しを表す。RunManagerはIDでセッションを登録し、シーンの親がRunSessionを木に保持する。RunViewは `scenes/run/run.tscn` の根を表し、表示を使うランに接続する。
+黒いひし形は寿命に合わせて保持・解放する関係、通常の矢印は参照を表す。RunManagerはIDで登録し、シーンの親がRunSessionを木に保持する。
 
 ```mermaid
 classDiagram
-  class RunManager {
-    create_run()
-    create_session(parent, options, with_view)
-    command(id, name, args)
-  }
-  class RunSession {
-    start_loading(options)
-    start(options, with_view)
-  }
-  class RunSimulation {
-    setup()
-    physics_step(delta)
-    command(name, args)
-    dispose()
-  }
-  class RunSystem {
-    setup(context)
-    tick(real_dt, world_dt)
-    dispose()
-  }
-  class RunView {
-    <<Scene>>
-  }
   RunManager --> "0..*" RunSession : IDで登録
-  RunSession *-- "1" RunSimulation : sim
+  RunSession *-- RunBridge
   RunSession *-- "0..1" RunView : view
-  RunSession *-- "0..1" ContentResourceScope : resources
-  RunView *-- RunPresentation : 子ノード
-  RunSimulation *-- RunContext : ctx
-  RunSimulation *-- RunState : state
-  RunSimulation ..> RunSystem : setup / tick / dispose
-  RunContext *-- "11" RunSystem : 各System
-  RunContext --> RunState : state
-  RunContext --> ContentResourceScope : resources
-  RunSystem --> RunContext : ctx
-  RunPresentation --> RunSimulation : run
+  RunSession *-- ContentResourceScope : resources
+  RunSession --> RunResources : 生成済み資源表
+  RunBridge *-- SpeedRunCore
+  SpeedRunCore *-- RunRuntime
+  RunRuntime *-- RunState : 値状態
+  RunRuntime --> ContentBundle : 不変定義
+  RunRuntime *-- FrameWorkspace : 配信待ち
+  RunView *-- RunPresentation
+  RunPresentation --> RunBridge : 出力の読取
+  RunPresentation --> ContentResourceScope : 表示資源
 ```
 
-実装の入口は [RunSession](../speed/scripts/runtime/run_session.gd)、[RunSimulation](../cpp/runtime/run_runner.cpp)、[RunContext](../cpp/runtime/run_runner.h)。種類別の処理との接続は [6.1](#61-敵とボスの-ai)、資源の準備と解放は [8.1](#81-定義データresource) に示す。
+実装の入口は [RunSession](../speed/scripts/runtime/run_session.gd)、[RunBridge](../speed/scripts/runtime/run_bridge.gd)、[SpeedRunCore](../cpp/api/run_core.h)、[RunRuntime](../cpp/runtime/run_runtime.h)。種類別処理との接続は[6.1](#61-敵とボスの-ai)、資源の準備と解放は[8.1](#81-定義データresource)に示す。
 
 ### 4.4 守る決まり
 
-1. 各Systemの責任を仕様のまとまりに対応させる。
-2. RunSimulation が RunContext に各Systemを入れ、種類別の振る舞いも同じContextを受け取る。
-3. 状態をRunStateと各Systemの列に持ち、処理と表示を分ける。
-4. 種類固有の分岐は、敵・攻撃・武器・特性・英雄・仕掛け・回収の各スクリプトに置く。
-5. セッションの終了時に、通知・コールバック・役者・資源の参照を解放する。実験ごとの設定・乱数・状態の参照を分ける。
-6. `tests/content/check_rules.gd` がAutoload、Managerのコンテンツ参照、再利用する道具、UIの状態代入、開発用の依存を確認する。
-7. 処理の実行時期は[ビルドと実行時の境界](#151-ビルドと実行時の境界)に従う。設計・レビューで生成元から利用・解放までを照合する。
+1. ランの時計・乱数・状態・戦闘判断・更新順をC++へ集め、Godotから入力と命令で操作する。
+2. 各ランが状態と作業領域を所有し、固定の戦闘定義を不変のContentBundleとして参照する。
+3. 種類固有の処理は `behaviors/`・`systems/attacks/`・`bosses/` へ分ける。
+4. Godotは出力値を表示へ変換し、資源参照・入力機器・音再生・端末保存を所有する。
+5. 終了時は命令受付を止め、録画終端を届け、資源・表示・C++実体・登録を解放する。
+6. `tests/content/check_rules.gd` で依存と配布の機械的な規約を確認する。
+7. 生成から利用・解放までは[15.1](#151-ビルドと実行時の境界)に従ってレビューする。
 
 ### 4.5 シーンの木
 
@@ -217,7 +186,7 @@ Main (Node)
       ├─ World (Node2D)
       │  ├─ InputRouter
       │  ├─ Camera2D
-      │  └─ 描画の層・ボスの役者
+      │  └─ 描画の層・ボスの表示
       └─ Hud (CanvasLayer)
          └─ HudRoot
 ```
@@ -228,10 +197,10 @@ Main (Node)
 
 **仕様から来る条件**：実秒と世界秒の2つの時間がある。描画中は世界が0.1倍、なぞり中は「260 ÷ 突進の速さ」倍、ヒットストップでは止まる。ランの時計・ゲージ・なぞりの0.5秒は実秒。ポーズと3択ではすべて止まる。
 
-- `RunSession._physics_process()` が固定更新ごとに `RunSimulation.physics_step()` を呼ぶ。
-- `RunSimulation` が毎回 `real_dt` と `world_dt`（＝ `real_dt` × `DrawSystem.world_scale()`）を計算し、各システムに渡す。各数値をどちらの時間で数えるかは仕様書に従う。
+- `RunSession._physics_process()` が固定更新ごとに `RunBridge.poll_and_step()` を呼ぶ。
+- C++の `RunRunner` が毎回 `real_dt` と `world_dt`（＝ `real_dt` × `SpeedRunCore::world_scale()`）を計算し、各システムに渡す。各数値をどちらの時間で数えるかは仕様書に従う。
 - `Engine.time_scale` は使わない。UI や実秒で動くものまで一緒に遅くなり、2つの時間を分けられないため。
-- ポーズはRunSimulationがランの位相を切り替えて実現する。`get_tree().paused` は UI の扱いが複雑になるので使わない。
+- ポーズ命令はC++のランの位相を切り替える。`get_tree().paused` は UI の扱いが複雑になるので使わない。
 - 表示補間の方式は[未決](#18-未決事項)。
 
 - ラスボス戦の締め（仕様書 12.4）の「止まった世界で描く」段階は、世界の速さを0にして実現する。描画と UI は実秒で動くので、この仕組みのまま扱える。自動の演出（叩き込む段階）は実秒で進める。
@@ -246,213 +215,87 @@ Main (Node)
 
 **実装**
 
-- 敵・弾・破片・経験値の結晶・部品は、項目ごとの数値の列（`PackedVector2Array`・`PackedFloat64Array` など）で持つ。1行が1つの物で、i 番目の物は各列の i 番目。ほかの処理から読むときは、ループの前に列を手元の変数へ取り出す。
-- 生きている物は、消えるまで同じ行にいる。消えた行は空きになり、次に加える物が使い回す（`scripts/common/row_slots.gd`）。毎回の更新では、その回に変わる列だけを書く。使用中かどうかは `alive` の列で表し、ループは使用中の行だけを処理する。空きが尽きたら全部の列をまとめて伸ばす。
-- 行を加える・空きに戻す・列を伸ばすのは、その列を持つSystemの関数。1組の列は、名前の頭（`hostile_`・`friend_`・`gem_`・`coin_`）か、列だけを持つクラス（`EnemyTable`）でまとめる。デバッグ版では次を確かめ、確かめる列は名前の頭やクラスから自動で集める（`scripts/common/columns.gd`）。
-  - 列を伸ばしたとき、全部の列の長さがそろっているか。
-  - ラン開始時、追加の関数が使い回す行の全部の列を書き直すか。書き忘れた列があれば、その名前を出して止まる。
-- 敵は敵の表（6.2）の1行。隕石とボスの当たり判定も同じ表に入る。撃破した敵は撃破済みの印を付け、その回の終わりに行を空きへ戻す。何フレームもまたいで敵を覚えるときは、行番号と id の組で覚え、`EnemySystem.is_same` で確かめる。行動する雑魚は行動の種類ごとの行番号の一覧に入り、更新は種類ごとにその一覧を回す。追跡の更新は関数を呼ばずにループの中で計算する。追跡と噛みつきの更新は、天体までの余裕を持つ列もループの先頭で読み、移動後の同じ距離条件で衝突を確かめる。攻撃枠の取得は強敵以上に対して行う。種類ごとの更新は、その種類の行があるときに進める。画面から遠い敵は、判断（向きを変える・攻撃の時間を進めるなど）を3回に1回だけ、まとめた時間で行い、間の回は今の速度で進むだけにする。さらに速さが要るときは、ここを GDExtension に移す。
-- 経験値は `PickupSystem` の `gem_` 列に持つ。`gem_kind` は0・1・2の種類、`gem_value` は倍率適用前の保持基準XP、`gem_seq` は行の再利用から独立した安定IDを表す。地面の個数を `config.gem_max` 内に保ちながら、超過分を指定黄色へ加える。指定先の行とIDを照合し、指定がないときだけ最古の黄色、次いで最古の結晶を選ぶ。[取得・集約の規則](spec.md#102-取得と集約)に従い、変色時も元の保持量を引き継ぐ。
-- 運搬中の結晶は `PickupSystem` が敵の安定IDごとに `{row, crystals}` で保持する。結晶ごとに `id`・`kind`・`base_xp`・`origin` を持ち、指定解除・再ドロップ・持ち去りを同じ個体へ結び付ける。敵表の `carry`・`buds` は既存の運搬表示用合計として扱い、再ドロップの基準量は結晶ごとの保持値から読む。
-- 当たり判定の格子（`SpatialGrid`）は `PackedInt32Array` の先頭・次の表で持ち、探索の結果は敵の表の行番号。
-- 出現調査は世界側の更新ごと。全体数・四辺の偏り・遠方の再配置は毎回調べ、種類別数は出現上限を使う戦艦とタイタンだけ集計する。四辺の分類では個体ごとの正規化除算を交差乗算に置き換える。
-- 描画は `MultiMesh` にまとめて描く（`scripts/render/instance_batch.gd`）。Compatibility では `custom_aabb` の設定が要る。
-- 機体とボスは1体ずつなので、ノードにする。ボスは部位（首など）を子として持ち、部位ごとに当たり判定・HP・攻撃を持てるようにする。当たり判定は7章の自前の判定に部位の円を登録する。
+- 敵はC++の `RunState.enemies` にある `Enemy` の行で持つ。弾・攻撃・回収物もC++の型付き状態でまとめて更新する。可変の行とその索引はランの寿命で保持する。
+- 敵の空き行は再利用する。行番号の参照は世代付きHandle、外部への個体識別は安定IDを使い、行を使い回した別個体への命中・所有・親子関係を防ぐ。敵の行の詳細は[6.2](#62-敵の表の列)に示す。
+- 敵の更新は種類ごとの行の一覧を使う。遠方で間引ける判断と、毎更新必要な移動区間・接触を種類別処理で分ける。地形までの余裕を保持し、十分な余裕がある間は近傍判定を省く。
+- 経験値の結晶は種類・基準XP・安定IDを持つ。地面の上限と指定黄色への集約、運搬中の結晶の保持・再ドロップはC++の回収処理が所有し、[取得・集約の規則](spec.md#102-取得と集約)に従う。
+- 空間格子は敵の行を候補として返し、命中先と生存を戦闘処理で再確認する。出現は世界側の更新で目標数・四辺の偏り・再配置・クリップを調べる。
+- 表示は描画出力の配列を `MultiMesh` 等へまとめる（`scripts/render/instance_batch.gd`）。Compatibilityでは `custom_aabb` を設定する。ボスの表示ノードも同じ描画出力から部位の位置・姿勢を反映する。
 
 ### 6.1 敵とボスの AI
 
-`EnemyBehavior`が出現・更新・被弾・死亡・解放の入口を持ち、`EnemyMotion`が操舵と移動の補助、`enemies/gates/`が被弾条件を持つ。敵の表は共通の列を保持し、その種類だけが使う状態はBehaviorに置く。行番号をまたいで個体を覚えるときはIDも照合する。
+通常敵の行動・被弾条件は `cpp/behaviors/enemies/`、共通の生成・更新は `cpp/systems/enemy_system.cpp`・`enemy_update.cpp` が持つ。生成時に敵定義のkindと値を型へ解決し、各個体の段階・待ち時間・狙い・所有関係をラン状態へ保持する。武器・特性・英雄は同じランのイベントと更新順から `cpp/behaviors/` の種類別処理を呼ぶ。
 
-弾と攻撃は `scripts/attacks/` のAttackKindが生成し、形状・移動・接触の入口を種類ごとに実装する。ProjectileSystemは列の割り当て・更新・解放と共通の命中を扱う。味方弾の特殊な命中は武器側のコールバックへ渡し、行の解放時に参照を消す。
-
-**System・Behavior・Visualの接続**
-
-敵と装備を例に、種類別の処理と表示の境界を示す。EnemyBehaviorはEnemySystemを経由して表とContext内のSystemを参照し、WeaponBehavior・TraitBehaviorはContextを直接参照する。白いひし形は保持する複数のインスタンス、三角の矢印は継承を表す。
-
-```mermaid
-classDiagram
-  RunSystem <|-- EnemySystem
-  RunSystem <|-- LoadoutSystem
-  RunSystem --> RunContext : ctx
-  EnemySystem *-- EnemyTable : table
-  EnemySystem o-- "0..*" EnemyBehavior : behaviors
-  EnemyBehavior --> EnemySystem : m
-  LoadoutSystem o-- "0..*" WeaponBehavior : weapon_behaviors
-  LoadoutSystem o-- "0..*" TraitBehavior : trait_behaviors
-  WeaponBehavior --> RunContext : ctx
-  TraitBehavior --> RunContext : ctx
-  RunPresentation o-- "0..*" EnemyVisual : 行動・外観の種類別
-  RunPresentation o-- "0..*" WeaponVisual : 装備のインスタンス別
-  EnemyVisual --> EnemyBehavior : behaviorで問い合わせ
-  WeaponVisual --> WeaponBehavior : behavior
-  WeaponVisual --> TraitBehavior : behavior
-```
-
-EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../cpp/systems/enemy_system.cpp)、[WeaponBehavior](../cpp/systems/equipment.cpp)、[TraitBehavior](../cpp/systems/equipment.cpp)、[EnemyVisual](../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../speed/scripts/render/equipment/weapon_visual.gd) にある。
-
-EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時間を受け取り、高速突進の移動区間を判定する。`full_rate` が有効な種類は、画面外でも行動と区間判定を毎回進める。石化・外力による移動は共通の前処理で扱う。
-
-| 対象 | 層 | 方式 |
+| 対象 | 戦闘の所有者 | 表示の入口 |
 |---|---|---|
-| 雑魚 | 行動 | 種類ごとの単純なステートマシン（例：ダーターの予告 → 突進 → 回復） |
-| ヒュドラ | 形態（首増加・合体・分離） | 役者が専用状態を管理する |
-| いっかくじゅう座 | 形態 | 役者がHP閾値と移行予約を管理する |
-| 実装済みのボス | 判断 | 共通の区間フローと、個別処理が返す実行可能候補 |
-| 中ボス・ラスボス | 攻撃（1つ1つの動き・弾・予告の振り付け） | タイムライン（エディタで人が調整する） |
-
-- 共通フローの編集画面はGodotのEditorPluginで実装する。`single_actor_adapter.gd`が一体のボス、`hydra_flow_adapter.gd`が複数の首の実行を共通選択器へ接続する。
-- ボスの判断の層から、自機の状態（線を描いているか、描かれた線、ゲージの溜まり具合、位置）・フィールドの仕掛けとの位置関係・ボス自身と部位の HP を読めるようにする。何を判断に使うかは、ボスごとの仕様で決める。
+| 通常敵 | Enemyの共通値・種類別状態と種類別処理 | `run_frame_view.gd` と `render/enemies/` |
+| 5体のボス | `state/boss_states.h` と `cpp/bosses/<ボス>/` | 同じ描画出力から体・部位・技シーンを更新する |
+| 区間フロー | `cpp/bosses/flow/flow_runner.cpp` | GodotのボスAI編集画面 |
+| 技とコンボ | `technique_runner.cpp` とボス固有の技処理 | 技ごとの予告・実行・回復の表示 |
+| 形態・登場・決着 | `phase_controller.cpp` とボス固有のbody・finish | 出来事と位置・姿勢・演出位相 |
 
 **ボスの技と見た目の編集元**
 
-5体のボスは `BossTechnique` を継承した技スクリプトを使う。技のデータは表示名・分類・技後の隙・予告中の追尾を持ち、技固有の値を `@export` で公開する。編集欄は公開プロパティの型・`@export_range` の範囲と単位・直前の `##` の説明から組み立てる。角度は `radians_as_degrees` を持つ欄で度へ変換する。実行状態はRunnerが持ち、ボスの役者が戦闘時間に合わせて呼ぶ。複数の首は首ごとの状態を渡す。
+5体のボスは `BossTechnique` 派生Resourceを編集元に使う。共通値は表示名・分類・技後の隙・予告中の追尾、技固有値は各スクリプトの `@export` で公開する。編集欄は型・`@export_range` の範囲と単位・直前の `##` の説明から組み立て、`radians_as_degrees` の欄は度で表示する。
 
 | 編集元 | 役割 |
 |---|---|
-| `scripts/bosses/<ボス>/techniques/<技ID>.gd` | 技が使う値と実行処理。予告・姿勢・攻撃の点列・発射時期を決める |
-| `data/bosses/<ボス>_moves/<技ID>.tres` | 技のスクリプトに設定した値と表示名・見た目の参照 |
-| `scenes/bosses/<ボス>/<技ID>_visual.tscn` | ボス中心を原点、正面を+Xにする技の予告・エフェクト。`Telegraph` を形の編集口とする |
-| `scenes/attacks/*.tscn` | 飛ぶ弾や首から放つ攻撃の見た目。ボスと雑魚で共用し、専用コピーも選べる |
-| `scenes/bosses/*_presentation.tscn` | 体の表示と共通の被弾・登場・決着。技が決めた姿勢を反映する |
-| `data/bosses/ai/*_action_rules.tres`・`*_flow.tres` | 技の参照・発動条件・消費・コンボ・区間の流れ |
+| `scripts/bosses/<ボス>/techniques/<技ID>.gd` | 公開する性能値の型・範囲・説明。C++への生成入力 |
+| `data/bosses/<ボス>_moves/<技ID>.tres` | 技の値、表示名、見た目への参照 |
+| `scenes/bosses/<ボス>/<技ID>_visual.tscn` | 中心原点・正面+Xの予告とエフェクト。`Telegraph` が形の編集口 |
+| `scenes/attacks/*.tscn` | 弾・攻撃の見た目。既定と専用シーンを選べる |
+| `scenes/bosses/*_presentation.tscn` | 体、被弾、登場、決着の表示 |
+| `data/bosses/ai/*_action_rules.tres`・`*_flow.tres` | 技参照、発動条件、消費、コンボ、区間の接続 |
 
-`technique_visuals.gd` が役者の子として技シーンを所有し、予告・実行・回復の進行に `AnimationPlayer` を合わせる。標準のアニメーション名は `windup`・`active`・`recover`・`hit`。1秒のアニメーションを技の時間へ伸縮する。毎更新で変わる図形はシーンのスクリプトが戦闘の点列から描く。残る亀裂・矢・着弾は元の戦闘寿命で表示する。
+`tools/editor/boss_flow/` が上段の区間グラフ、下段の技グラフ、右側の編集欄を提供する。Godotへの登録は `addons/boss_flow/`、操作は[制作ガイド](dev/stage-production.md#55-ボスaiを調整する)に示す。通常技を複製すると性能Resourceを共有し、発動条件と接続を別に持つ。条件選択の接続・非表示・図配置は `graph_nodes` に保存する。
 
-`build_attack_visuals.gd` が既定の弾と技・敵が参照する専用シーンの `Flight`・`Hit`・`Fade` のPolygon2D・Sprite2Dを `.content/attack_visuals.res` へ生成し、共通の生成入口とステージの依存資源へ登録する。シーンと依存画像・import設定を更新判定へ含める。実行時は生成したMeshと画像を読み、弾の行と同じ位置でまとめて描く。動的な光線・水流・首の攻撃はシーンのスクリプトが点列・幅・世界時間を読み、専用の表示を更新する。発射ごとに見た目の参照先を保存し、空き行の再利用時にも上書きする。セッションのScopeが生成物を保持し、表示用ノードとバッチは表示側が所有する。
+生成は `build_boss_program.gd` が検証したスナップショットを `build_run_content.gd` へ渡し、フロー・技・コンボ・形態の値を戦闘バイナリへ含める。図配置と実行条件を分け、意味的署名と形式の版で更新する。ノード移動・値入力・通常の保存は編集元だけを更新する。試遊と正規ビルドは生成済みの値で同じC++ランを動かす。
 
-**全身と独立した複製の命中先**
+共通フローは区間・履歴・スタミナ・休息・遷移を保持し、具体的な参加者と技の成立を個別処理が返す。開始時に参加者・距離方向・再使用待ち・予算を再確認し、成功した分だけ消費する。接続された同じ技の条件はORで評価し、技IDの組で直前の選択を識別する。コンボは順次・並列・待機・分岐を持ち、並列の失敗では実行中の枝を取り消す。ボスの判断は現在の自機・線・地形・部位・HPを読み、使う条件は各ボスの仕様に従う。
 
-`CombatSystem.damage_target()` が衝突した行を論理的なHP対象へ解決し、接触・なぞり・味方弾の同じ一撃内の記録もその対象IDで共有する。`BossActor.damage_target()` は全身の部位を本体へ対応させる。独立HPを持つ追加対象は `contains_additional_target()` で部位を含む内外を判定し、通過中の重複命中を防ぐ。対応表は行番号と個体IDの両方を照合して、解放後の行の再利用を区別する。ボスを持たない軽量なコンテキストでは、通常敵の行をそのまま対象とする。
+**部位・命中先・決着**
 
-竜の生成・技のRunner・複製の残留攻撃は役者が所有し、HP移行では継続ビームと発射済みの弾をそれぞれの寿命へ渡す。`RunState` の操作保護とカメラの専用制御を演出の入口・終了・役者破棄で切り替える。HP0以後は専用進行を実秒で進め、最後に共通の勝利通知・結果保存へ一度だけ接続する。具体的な戦闘と演出は[りゅう座仕様](game/bosses/draco.md)を参照する。
+`Enemy.damage_target` と親子のHandleで、部位へ当たった攻撃を論理的なHP対象へ解決する。接触・なぞり・味方弾の同じ一撃内の記録もその対象で共有する。独立HPの複製は独立した命中先を持つ。形態境界のHP補正・実減少量・捨てた量をC++の戦闘処理で確定し、表示はその結果を読む。
 
-**うみへび座の編集と役割**
+りゅう座の複製・ピカロ・残留攻撃は `cpp/bosses/draco/` と攻撃状態で寿命を管理する。操作保護・専用カメラ・HP0後の実秒進行・最後の入力をC++が扱い、決着結果を一度だけGodotの結果保存へ渡す。詳細は[りゅう座仕様](game/bosses/draco.md)に従う。
 
-`EnemySystem.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatSystem.damage_enemy()` と震空・ソニックブームはこの判定を使い、役者が管理する移動速度と外力を分ける。
+**うみへび座の戦闘と表示**
 
-ゲームの決まりは [ヒュドラ専用仕様](game/bosses/hydra.md)、採用・実装状況は [敵一覧](game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
+`cpp/bosses/hydra/` が中央HP、首の増加・再生・合体・分離、部位、技、最終決着を管理する。`squad.cpp`・`squad_tactics.cpp` は分離後の戦術・陣形・攻め手・迎撃・割り込み、`swim.cpp` は移動と視線、`grid.cpp` は領域と配置、`normal_attack.cpp` と技別ファイルは攻撃を担当する。群れは現在の位置・速度・生存部位・残量で判断し、各部位の位置と姿勢を戦闘値として確定する。頭の通過点列を胴体がたどり、技の伸長・発射・持続判定と同じ軌道を表示へ出す。
 
-`tools/editor/boss_flow/`が「ボスAI」画面を提供する。SPEED専用の編集機能は`tools/editor/`に置き、`addons/boss_flow/`と`addons/stage_enemy_tuning/`にはGodotへ登録する`plugin.cfg`だけを置く。上段に区間ノードのグラフ、下段に通常技・コンボ・大技の分類ごとの技グラフ、右側に選択したノードの編集欄を置く。操作は[制作ガイド](dev/stage-production.md#55-ボスaiを調整する)を参照する。
+攻撃形状は点列・幅・時刻・寿命をC++に持ち、機体と形状の移動区間を掃引する。世界停止では形を保ち、残留攻撃は所有者の技終了と区別して寿命を進める。戦闘エリアの外周は機体・線・弾・地形で共有する。ゲームの決まりは[ヒュドラ仕様](game/bosses/hydra.md)、実装項目は[敵一覧](game/catalog/enemies.md)を参照する。
 
-`data/bosses/ai/hydra_flow.tres`が区間の要求種別・確率・消費上限・使用可能な技参照・同時攻撃の禁止・共有スタミナ・二種類の休息を持つ。`hydra_action_rules.tres`が技参照・距離方向条件・消費量・コンボ内部を持ち、技の性能は参照先の`hydra_moves/*.tres`が持つ。`BossTechnique`は共通の技データ、`HydraTechnique`は必要な首の種類を追加する型である。`graph_nodes`は図のノードから技への参照と接続・非表示状態を持つ。通常技の複製は同じ性能を参照し、個別の条件を持つ。実行側は接続された同じ技の条件をORで評価し、ノード数によって抽選頻度を増やさない。
+Godotの共通実験場からHydraを選び、停止・巻き戻し・機体固定・技指定で試せる。単独の `gyms/hydra_trial.tscn` とボスAIの試遊もRunSession・RunBridgeで同じC++を動かす。ヒットストップの試遊値は実験内で保持し、恒久保存は編集元への明示保存で行う。
 
-`flow/runner.gd`は区間・履歴・消費・休息を管理し、`selector.gd`は実行可能候補から一つまたは複数を選ぶ。`hydra_flow_adapter.gd`は現在の位置・形態・生存部位から具体的参加者付きの候補を返し、開始時に参加者を再検証する。個別側の入力は現在状況と要求種別で、区間の構造と区間ごとの候補絞り込み・禁止ペアは共通側に保持する。区間の有向接続は右から左へのループも保存し、1更新で1回だけ遷移を処理する。条件評価は読み取りとし、開始に成功した選択分だけ消費する。技のID集合で直前の組み合わせを識別し、休息後も履歴を保持して別候補があれば連発を避ける。成立する候補が一つの場合は、その技を実行できる。
+本体・首・羅針盤・頭・瓦礫・技の素材はボスの表示シーンと生成済みのRunResourcesから取得する。`hydra_tornado.tscn`・`hydra_tornado.gdshader` は瓦礫竜巻の表示を持つ。体と技の表示は描画出力の位置・姿勢・点列・時間を読み、表示用のNode・material・被弾パルスを表示の寿命で持つ。判定・部位の生存とHPはC++が所有する。素材の契約は[ボス仕様](game/bosses/hydra.md)を参照する。
 
-`CombatSystem.damage_enemy()`は、役者によるHP閾値補正後の実減少量だけを`BossSystem.damage_applied()`へ渡す。`BossActor.hit_feedback`は有効な命中先の個体IDごとに短い表示用パルスを持ち、`RunSession._process()`の実時間で減衰する。決着やヒットストップで世界更新が止まっても、白色化と微振動は残り続けない。描画側は専用materialと`sample()`の白さ・位置・角度を表示ノードだけへ適用し、物理行・本体Actor・照準へ書き戻さない。独立HPの複製は`owns_damage_target()`で所有を照合する。
-
-`build_boss_program.gd`が編集元から`.content/boss_hydra.tres`を作る。技の数値と条件を独立したスナップショットにし、画面配置を除いた署名と形式の版を検査する。数値入力・ノード移動・保存は編集元と表示だけを更新する。生成は試遊・export・明示操作時に行い、意味のある変更がない場合は生成済みデータを再利用する。通常の起動前生成とexportは同じ変換を呼び、exportは試遊専用の`boss_preview.tres`を除外する。
-
-コンボ内部は`combo_runner.gd`が順次・並列・待機・技間分岐を進める。並列は全枝の完了を待ち、枝の失敗時は実行中の枝を取り消す。照準と技固有の欠員処理は既存の実行部が担当する。範囲確認は指定した残量・生存部位・基準姿勢に対して条件と到達上限を重ね、サンプル上の未カバーを示す。実行時も同じ距離方向の計算と通常技の到達上限を判定する。配置成立と、予告中・実行中に動く機体への命中は個別の実行条件で扱う。
-
-`hydra/techniques/` の技スクリプトは通常技・大技・コンボを持ち、`hydra/technique_runner.gd` は共通の配置待ちと進行を支える。`hydra_grid.gd` は領域判定・優先枠・一筆経路の検証を担当する。`Timeline` と `hydra_boss_timeline.tres` のメソッドキーを世界秒で手動更新する。同時噛みつきは捕捉→固定→伸長→到達、ほかの大技は配置→予告→実行→全体硬直を進める。配置の移動中はタイムラインを待たせる。参加者の喪失は個別仕様に従って中断か欠員として扱う。
-
-合体中の首は `hydra_neck.gd` が固定根元から頭までをFABRIKで解き、胴体の外側に保つ。分離後は役者が所有する `hydra/squad_commander.gd` が戦術・陣形・攻め手の予約・割り込みを管理し、`hydra_snake_motion.gd` が全員の力を確定してから操舵する。頭の通過点列を胴体がたどり、移動方向と視線を別に持つ。`hydra/normal_swim.gd` が分離した通常の蛇の泳ぐ位置と技の伸長・発射・持続判定を接続する。迎撃は共通フローの即時開始入口で同じスタミナを使う。速度・旋回・被弾・構え・攻撃・攻撃後の隙の重みを世界秒で連続的に混ぜる。群れの判断は現在の位置・速度・生存部位・残量から実行時に更新し、役者の寿命で保持する。頭の位置と姿勢は戦闘値として保持し、描画だけで移動を作る構成を避ける。
-
-通常技の捕捉位置は `start_normal()` で保持し、待機中の狙いは更新間隔を持たせる。`aim_neck()` が角速度と加速度を制御する。全ての攻撃位置が確定した後に頭の向きと胴の骨組みを一度だけ更新する。中央本体と分離後の不死の蛇は、役者の生成時に装甲を通過可能な値へ設定する。
-
-`hydra_attack_field.gd` は表示と判定で同じ点列・幅・開始時刻・寿命を使う。機体と形状の移動区間を掃引し、世界時間停止時は形を保つ。描画ノードはID別に持ち、戦闘状態の辞書に解放済みノードを残さず、実験場の巻き戻し比較を保つ。
-
-`hydra_arena.gd` は固定瓦礫の描画と戦闘エリアを所有し、ボスの行IDで `FieldSystem.battle_arenas` へ矩形を登録する。地形の掃引判定・機体の跳ね返り・線描画・弾の地形判定で同じ外周を使う。通常の蛇の操舵は胴の長さを考慮して内側を狙い、大技は画面とエリアの共通部分へ配置する。最終撃破と役者の解放で登録を解除する。
-
-**Hydraの試遊と素材差し替え**
-
-Godotの「プロジェクト → ツール → 実験場」でHydraを選ぶと、通常敵や他のボスと共通の実験場で試遊できる。停止・巻き戻し・機体固定・技の即実行を使える。ヒットストップの試遊値は実験内に留まり、明示した保存操作だけがボス定義へ書き込む。従来の `gyms/hydra_trial.tscn` は開発中の直接起動用シーンとして残るが、独立したメニュー項目は設けない。
-
-HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首の節・羅針盤の差し替え口。頭は既存の敵素材経路 `assets/pixel/hydra_<種類>.png` とステージの素材指定を使う。`energy_shader` は実判定に沿う光線・風・雷・瓦礫のマテリアルを差し替える。判定は点列・幅・時間のまま保持する。
-
-瓦礫竜巻は `tornado_scene` の `hydra_tornado.tscn` で差し替える。`hydra_tornado.gd` は `update_effect(effect, world_time)` で攻撃点列・幅・投入位置を受け取り、`hydra_tornado.gdshader` の渦と既存の岩素材を重ねる。演出ノードは攻撃辞書の外に保管し、判定と寿命は `hydra_attack_field.gd` が所有する。
-
-絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBossの `presentation_scene` に指定する。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取る。`VisualTimeline` は装飾用、`burst_shader` は衝撃・破壊・増加・分離のピクセル表現用。イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。添字は本体-1、不死の蛇-2、通常首0以上。取り付け位置は `presentation_anchor()`、状態は `presentation_state()`、同時噛みつきの実際の到達点は `presentation_targets()` で読む。`hit` は実HP減少に伴い実ダメージを渡す。
-
-描画確認用の起動引数は `--hydra-inspect --hydra-attack=<通常技ID>` または `--hydra-inspect --hydra-tech=<大技・コンボID>`。指定した技を1回再現する。`--hydra-split` で分離状態から試遊できる。撮影は `--hydra-capture=/tmp/任意名.png --hydra-capture-at=<秒>` を併用する。`--hydra-inspect --hydra-review` は確認用の攻撃力で線入力から一戦を自動再現する。確認モードの機体固定と自動進行は起動引数のある実行だけに適用する。
-
-`--hydra-arena-edge` は固定バリケードの角付近へ機体を固定し、外周を描画確認する。
+Hydra単独試遊の描画確認は `--hydra-inspect --hydra-attack=<通常技ID>` または `--hydra-inspect --hydra-tech=<大技・コンボID>` で指定する。`--hydra-split` は分離状態、`--hydra-capture=/tmp/<任意名>.png --hydra-capture-at=<実秒>` は撮影時刻を指定する。`--hydra-inspect --hydra-review` は確認用の攻撃力と線入力で増加・分離・決着を進める。`--hydra-arena-edge` は外周の角付近へ機体を固定する。これらの自動進行と機体固定は開発用の起動引数がある実行で使う。
 
 **みなみのかんむり座の渦**
 
-望遠鏡とレチクルの遮蔽物探索は、世界更新ごとの岩の行番号を共用し、移動後の位置と撃破状態を読む。岩の追加と表のクリアはキャッシュを無効化する。光線は扇と交わる円に候補を絞り、攻撃許可前は機体への補間に使う2本、描画時は48本を計算する。
+`cpp/behaviors/enemies/corona_vortex.cpp` が種類別の捕捉一覧、所有者と個体のHandle、旋回位置、投擲の時刻を持つ。捕捉は戦闘格子で候補を取り、死亡・解放・再配置で所有を外す。抽選は保持中の種類と重みを使い、その種類から予告後に最も早く機体の方を向く個体を選ぶ。
 
-冠のEnemyBehavior（`scripts/enemies/corona.gd`）は、冠ごとの種類別の保持配列と、個体の行番号・ID・所有する冠の行番号・ID・配列内位置を持つ。捕捉時は既存の戦闘格子で近傍を調べ、死亡・解放時は配列の末尾交換で除く。抽選は保持中の種類とその重みだけを走査し、選んだ種類の配列から、予告のあと最も早く機体の方を向く1体を選ぶ（旋回半径に乗った個体を先に選ぶ）。個体ごとの旋回更新は通常 AI の代わりに毎世界更新で行い、通常のダメージ・撃破処理は敵の表に対して続ける。実験場の比較値には渦の状態も含め、巻き戻しは同じシーン全体を保持する方式を使う。
-
-可視速度は「冠が前の世界更新から実際に動いた速度＋円の接線速度」と定義する。吸い込み中は半径を連続的に縮め、円に着いた個体だけを発射する。予告終了後、機体への方向と可視速度の角度誤差をフレームの両端で調べる。許容差 `align_angle` に入るか、±π の折り返しを除いた符号の変化で一致点をまたいだら発射できる。通過時は二分探索で更新内の時刻を求め、その位置から接線の向きを保って残り時間だけ直進する。渦から外すのはこの同じ個体で、複製や射出口への位置補正は行わない。
-
-短距離の吸い込みは、うみへび座も使う `FieldSystem._well_pull` の距離減衰を使う。投擲の当たり判定は機体と個体の相対線分で調べ、通常の戦闘のあと `ProjectileSystem.tick()` から既存の `ShipSystem.damage()` へ渡す。死亡・行解放・冠の再配置で所有関係を解放し、保持中の個体自身の再配置を止める。ゲームの決まりと調整値は [敵一覧](game/catalog/enemies.md#みなみのかんむり座) に従う。
+可視速度は冠の実移動速度と円の接線速度の和。吸い込みでは半径を連続的に縮め、円へ着いた個体だけを発射する。機体方向との角度を更新の両端で調べ、許容差か折り返しを除いた符号変化で一致点を検出する。更新内の時刻を求め、同じ個体をその位置から接線方向へ残り時間だけ直進させる。投擲の接触は機体との相対線分で判定する。詳細は[敵一覧](game/catalog/enemies.md#みなみのかんむり座)に従う。
 
 ### 6.2 敵の表の列
 
-`scripts/data_types/enemy_table.gd` の列。「使う敵」は、その列を読み書きする敵。type IDと行動スクリプトの対応は各EnemyDefの `behavior` が持つ。追跡は `chase`、みなみじゅうじ座は `cross`、いるか座は `dolphin` を使い、隕石・丸鋸・鉄塊はそれぞれ `meteor`・`saw`・`obstacle` を使う。部位の位置は親のBehaviorかボスの役者が決める。
+実体は [enemy_states.h](../cpp/state/enemy_states.h) の `Enemy` と [run_state.h](../cpp/state/run_state.h) の `enemies`。1個体の行に共通値を集め、種類固有の値を `behavior_state` のvariantへ持つ。
 
-| 列 | 使う敵 | 中身 |
+| まとまり | 主なフィールド | 役割 |
 |---|---|---|
-| `alive` | 全部 | 使用中の行か |
-| `id` | 全部 | 通し番号。使い回した行にも新しい番号が付く |
-| `def` | 雑魚・隕石 | 敵の定義（`data/enemies/<type ID>.tres`） |
-| `type` | 全部 | type ID（ボスはボスの ID） |
-| `beh` | 雑魚 | 行動の種類の番号（`EnemySystem.behaviors` の位置。その戦いで出た順に振る） |
-| `beh_slot` | 雑魚 | 行動の種類ごとの行番号の一覧の中での位置 |
-| `is_boss` | ボス | ボスの当たり判定の行か |
-| `meteor_index` | 隕石・鉄のがれき・回る丸鋸 | `FieldSystem` の配置の通し番号（それ以外は -1）。0 以上なら固い障害物として扱う |
-| `attack_group` | 強敵 | 共有override群れの通し番号。個体ごとに消費する場合は0 |
-| `attack_value` | 通常敵 | 個体の攻撃value、またはoverride群れが共有するvalue（小数） |
-| `attack_managed` | 通常敵 | 予算管理の対象か。生成済みの設定、または実験場の編集値から解決する |
-| `attack_priority` | 強敵とその派生個体 | 出現元から引き継ぐ攻撃待ちの優先度。クリップの値を優先し、クリップ以外は種類別の値を出現時に確定する |
-| `dead` | 全部 | 撃破済みか（その回の終わりに空きへ戻る） |
-| `elite` | 雑魚 | エリートか |
-| `pos` | 全部 | 位置 |
-| `vel` | 全部 | 速度 |
-| `facing` | 全部 | 向き |
-| `r` | 全部 | 当たり判定の半径 |
-| `hp` | 全部 | HP |
-| `max_hp` | 全部 | 最大 HP |
-| `armor` | 全部 | 装甲 |
-| `xp` | 全部 | 互換用。通常生成は0。報酬は解決済みの種類別個数を使う |
-| `gate` | 特殊な倒し方を持つ敵 | 倒し方の種類（`EnemyTable.Gate`） |
-| `weak_arc` | `armored`・`battleship`・ボス | 背面の弱点の半角 |
-| `color` | 全部 | 色（撃破の演出・破片） |
-| `hit_cd` | 全部 | 同じ敵に続けて当たらない時間 |
-| `guard` | 分裂体 | 生まれてから攻撃を受けない残り時間（親を倒した攻撃で一緒に倒れないように） |
-| `flash` | 全部 | 被弾の光の残り時間 |
-| `age` | 雑魚 | 出てからの時間 |
-| `hull_scattered` | 大型の雑魚 | 撃破で破片を飛ばし終えたか |
-| `speed` | 雑魚・ボス | 速さ |
-| `accel` | 雑魚 | 加速 |
-| `turn` | 雑魚 | 旋回の速さ |
-| `body_gap` | 雑魚 | 前回確かめたときの、天体の表面までの距離（7章） |
-| `body_gap_pos` | 雑魚 | `body_gap` を確かめた位置 |
-| `body_gap_time` | 雑魚 | `body_gap` を確かめた世界時刻 |
-| `mode` | `darter`・`rocket`・`biter`・`defender`・`hound`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`MOVE` が横歩き、`WINDUP` が薙ぎの予告、`RECOVER` が薙いだあとの停止）・`marlin`・`phoenix`（`MOVE` が離脱、`WINDUP` が着地点予告、`DASH` が飛び込み、`RECOVER` が着地後の停止）・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
-| `timer` | `mode` を使う敵 | 段階の残り時間 |
-| `fire_t` | 撃つ敵 | 次の射撃までの時間 |
-| `charge` | `biter`・`defender`・`hound`・`gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`crab`・`phoenix`・`aquarius`・`cepheus`・ボス | 攻撃の予告の溜め（0〜1） |
-| `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次のしぶき、ポンプ座は次の吸い込み |
-| `buds` | `splitter`・`pump`・`crow`・`crab` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数、かに座は進む向き（体の右が1、左が-1） |
-| `carry` | `crow` | 運搬表示用の保持基準XP合計。結晶ごとの実額はPickupSystemが保持 |
-| `target` | `reticle`・`soldier` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号 |
-| `target_id` | `reticle`・`soldier` | 狙っている岩の id。ケフェウス座の兵は仕える王の id |
-| `anchor` | `cepheus`・`phoenix` | ケフェウス座の隊列の基準位置。ほうおう座の離脱先・着地点 |
-| `spin` | 漂流（`drift`）の雑魚、`clock` | 回転の速さ。とけい座は針の経過時間 |
-| `links` | とけい座・みなみのさんかく座・かに座 | 付いて動く攻撃の形の行番号（`ProjectileSystem` の `hazard_` の行） |
-| `parent` | 部位（みなみのさんかく座の星など） | 親の敵の行番号（部位でなければ -1） |
-| `parent_id` | 部位 | 親の敵の id |
-| `parts` | 部位を持つ敵（みなみのさんかく座） | 部位の行番号と id を交互に並べた一覧 |
-| `landmark` | 強めの敵（星2〜5） | 1 なら目印の星を持つ（`HeroSystem` が選ぶ） |
-| `fire_hit` | ヘルクレス座の火で焼かれた敵 | 最後に火でダメージを受けた世界時刻（うみへび座の頭が火で落ちたかの判定に使う） |
-| `stone` | ペルセウス座の力で石になった敵 | 石になっている残り時間（世界秒） |
-| `slash_hold` | 閃光斬の印による停止 | 印が付いた通常敵の自力移動を止め、ほかの攻撃を受けられる状態を保つ |
-| `held` | みなみのかんむり座の渦に捕まった敵 | 1 ならほかの敵に抱えられている。抱えている側が動かし、自分の行動は止まる |
-| `pump_owner` | ポンプ座に吸引中の敵 | 最初に確保したポンプ座の行。未所有は -1。吸引停止・範囲外・撃破・再配置で解放する |
-| `pump_owner_id` | ポンプ座に吸引中の敵 | 所有者の id。行の再利用を識別する |
-| `knock_t` | 強い攻撃で吹き飛ばされた雑魚 | 追跡を止めている残り時間 |
-| `shove_time` | 敵のギミックで押し出された敵 | 押し出しの残り時間 |
-| `shove_vel` | 同上 | 押し出しの速度 |
-| `shove_dmg` | 同上 | ぶつかった敵へのダメージ |
-| `shove_hits` | 同上 | 押し出し中に当てた敵（id → true） |
-| `shove_from` | 同上 | この更新の押し出しの始点 |
-| `shoved` | 同上 | この更新で押し出されたか |
-| `dash_seen` | なぞりで当たった敵 | 最初に触れた突進の番号 |
-| `dash_fresh` | なぞりで当たった敵 | その突進で最初に触れたとき HP が満タンだったか（仕様書 7.4） |
+| 識別と生存 | `id`・`alive`・`dead`・`definition` | 安定ID、生存、固定定義の索引 |
+| 更新の分類 | `behavior_group`・`behavior_slot`・`origin`・`role` | 種類別更新の所属、出現元と役割 |
+| 移動と戦闘 | `pos`・`vel`・`facing`・`radius`・`hp`・`max_hp`・`armor`・`speed` | 位置・姿勢・接触・能力値 |
+| 行動 | `mode`・`timer`・`charge`・`fire_t`・`age`・`behavior_state` | 共通段階と種類別状態 |
+| 所有と命中先 | `parent`・`parts`・`damage_target`・`pump_owner`・`picaro_owner`・`corona` | 部位、論理HP対象、捕捉・所有関係 |
+| 攻撃予算 | `attack_group`・`attack_value`・`attack_priority`・`attack_managed` | 群れと個体の開始許可 |
+| 状態効果 | `stone`・`knock_t`・`shove_time`・`slash_hold`・`held`・`guard` | 石化・外力・停止・保護 |
+| 接触と表示の観測 | `hit_cd`・`flash`・`fire_hit`・`dash_seen`・`dash_fresh`・`landmark`・`elite` | 連続命中、演出値、最初の突進接触、目印 |
+| 地形の余裕 | `body_gap`・`body_gap_pos`・`body_gap_time`・`rock` | 近傍判定の省略条件と配置岩への参照 |
 
-列を足す・消すときは、同じ作業でこの表も直す。`tools/check_docs.py` がこの表とコードの列を照合する。
+世代付きHandleは [EntityStore](../cpp/state/entity_store.h) が管理する。`slot` と `generation` の両方が一致する使用中の行だけを有効とし、解放で世代を進める。Enemy・Attack・Boss等のタグを型で分ける。外部の命令・出来事は安定IDを使い、内部へ戻すときに現在の個体へ解決する。
+
+追加・解放は敵Systemが種類別一覧・ID索引・Handleをまとめて更新する。行と種類別状態を変更するときは、生成・解放・保持点コピー・出力・既存命令の参照範囲を照合する。
 
 ## 7. 当たり判定と空間分割
 
@@ -464,7 +307,7 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 - 地形の詳細判定は線分と円で調べる。天体の範囲を512単位の格子へ毎更新登録し、短い移動区間では線分の太さを含む矩形に重なるセルから候補を取る。長い区間や格子外では全天体を調べる。敵の近傍確認では、月を軌道の半径帯に登録して候補を絞る。雑魚は、前回確かめたときの天体の表面までの距離・位置・世界時刻を持ち、その距離からその後に動いた距離と月が動けた距離を引いても余裕が残る間は、近傍確認を省く。敵の弾は等速なので、いちばん近い天体の表面までの距離を弾ごとに持ち、弾の移動量と月の公転の速さの上限で毎回減らす。この余裕が残る間は天体の判定を省く。月の軌道半径・大きさがラン中固定であることを利用し、周回位置は毎更新の実位置で判定する。惑星の判定と近傍の条件は維持する。
 - フィールドの仕掛けの作りは、それぞれの仕掛けを実装するときに考える。
 
-隕石・彗星・鉄のがれき・丸鋸は配置情報を保持し、カメラ近傍で敵の表へ登録する。範囲を離れると表の行を解放し、破壊済み状態はラン中維持する。惑星と月は `FieldSystem` の障害物データと空間索引で管理し、月の位置は世界時間から更新する。重力とワープホールは世界時間と寿命で管理する。各仕掛けの挙動は[仕様書13.1](spec.md#131-フィールドの要素)に従う。
+隕石・彗星・鉄のがれき・丸鋸は配置情報を保持し、カメラ近傍で敵の表へ登録する。範囲を離れると表の行を解放し、破壊済み状態はラン中維持する。惑星と月はC++の地形状態と空間索引で管理し、月の位置は世界時間から更新する。重力とワープホールは世界時間と寿命で管理する。各仕掛けの挙動は[仕様書13.1](spec.md#131-フィールドの要素)に従う。
 
 ## 8. データ構造
 
@@ -486,96 +329,74 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `HeroDef` | 英雄の星座の ID、名前、捕らわれているステージ、星の位置と星座線、クールダウン、効いている時間、力の値 | 仕様書 8.1・13.1 |
 | `LegendaryModuleDef` | 伝説のモジュールの名前と対応する中ボス、図鑑用の任意画像 `preview_texture`。能力値は持たない | 仕様書 2.3 |
 
-- 敵の組み合わせ（フォーメーション。`data/formations/*.tscn`）は、置ける種類（`types`）を持つ根の `EnemyFormation` の下に、配置の `FormationLayout`（子に敵1体ずつの `FormationMarker`）と出現位置の `FormationEntry` を何種類かずつ置くシーン。エディターでは、機体・止まっているときの画面の枠・回しても画面に入らない目安の円を描き、選んだ配置を出現位置に重ねて見せ、円の内側に入る敵や、置ける種類にない敵があれば警告する。置き場所の敵の種類は、置ける種類の中から選ぶ。出現位置の向きは自動で機体の方を向く。生成時にシーンから位置と向きの一覧を取り出し、実行時はRuntimeClipの `prepared` を使う。
+- 敵の組み合わせ（フォーメーション。`data/formations/*.tscn`）は、置ける種類（`types`）を持つ根の `EnemyFormation` の下に、配置の `FormationLayout`（子に敵1体ずつの `FormationMarker`）と出現位置の `FormationEntry` を何種類かずつ置くシーン。エディターでは、機体・止まっているときの画面の枠・回しても画面に入らない目安の円を描き、選んだ配置を出現位置に重ねて見せ、円の内側に入る敵や、置ける種類にない敵があれば警告する。置き場所の敵の種類は、置ける種類の中から選ぶ。出現位置の向きは自動で機体の方を向く。生成時にシーンから位置と向きの一覧を取り出し、生成時に解決した編成とクリップの値をC++の出現処理で使う。
 - ステージの敵の見た目（`StageDef.enemy_looks`）は、全ステージ共通の雑魚の絵をステージごとに替える（type ID → `assets/pixel/<絵の名前>.png`）。
-- 敵の局所調整は `StageDef.enemy_tuning` に敵ID → 項目名 → 数値の疎な辞書として保存する。`StageEnemyTuning` が編集可能な数値を定義し、生成時に検証する。RuntimeStageは上書きを引き継ぎ、EnemySystemがラン専用の複製へ解決する。`hp` は星から計算した標準HPを上書きし、`params.*` は該当する敵の行動値を上書きする。未指定項目は共通値を使う。実験場は `options.enemies` の定義を使う。
+- 敵の局所調整は `StageDef.enemy_tuning` に敵ID → 項目名 → 数値の疎な辞書として保存する。`StageEnemyTuning` が編集可能な数値を定義し、生成時に検証する。生成時に共通定義と上書きからラン用の実効値を解決し、戦闘バイナリへ書く。`hp` は星から計算した標準HPを上書きし、`params.*` は該当する敵の行動値を上書きする。未指定項目は共通値を使う。実験場は複製した定義から同じ生成処理へ渡す。
 - 管理 ID は一覧と同じものを使う。一覧からデータへ、データから一覧へ、ID で行き来できるようにする。
-- 武器・特性の効果は、一定間隔・高速の接触・なぞった跡・線の終点・撃破・被弾などの入口を持つBehaviorにする。LoadoutSystemがRunContextを渡し、実秒・世界秒と位相変更を通知する。付着攻撃も共通の更新へ登録する。
+- 武器・特性はC++の種類別処理が一定間隔・高速接触・なぞった跡・線の終点・撃破・被弾などへ接続する。実秒・世界秒と位相は同じランから読み、付着攻撃も共通の攻撃状態へ登録する。
 
 **編集元と実行用データ**
 
-`data/content_catalog.tres` のContentCatalogは、ID・表示文言のキー・並び順・費用・素材パスなどの小さな索引を持つ。タイトル、図鑑、強化画面、選択候補は索引を読み、個別の定義と画像は使うときに取得する。
+`data/content_catalog.tres` のContentCatalogは、ID・表示文言のキー・並び順・費用・素材パスなどの小さな索引を持つ。タイトル・図鑑・強化画面は索引を読み、必要な表示資源を取得する。
 
-StageDef・SpawnClip・フォーメーションのシーンを編集元とする。`tools/content/build_all.gd` が `.content/stage_<番号>.tres` のRuntimeStage・RuntimeClipとStageResourcesを生成する。実行用のクリップは配置・種類フィルター・攻撃valueを解決した辞書を持つ。トラック名・表示ラベルは `.content/dev/` の名前対応表へ保存し、記録の表示名に使う。実験場も同じコンパイラーで編集元を組み立て、`options.enemies` の個別定義の差し替えを維持する。
+StageDef・SpawnClip・編成シーン・敵と装備の定義・ボスの技とフローを編集元とする。共通生成はRuntimeStage・RuntimeClipを制作中間データへ展開し、`build_run_content.gd` が戦闘で使う実効値を型付きレコードへ解決する。`build_run_resources.gd` が表示・音・shaderとその依存を収集する。
 
 **編集元から実行用データへの生成**
 
-RuntimeStageとRuntimeClipは編集元の型を継承し、戦闘で使う値と展開済みの配置を保持する。図中のStageCompilerは [build_runtime_stage.gd](../speed/tools/content/build_runtime_stage.gd) を表す。破線は生成処理への入力・出力、通常の矢印は保持する参照を示す。
-
 ```mermaid
-classDiagram
-  class StageCompiler {
-    <<Script>>
-    compile(source)
-    clip(source)
-    formation(scene)
-    build_all(output)
-  }
-  class RuntimeClip {
-    Array~Dictionary~ prepared
-  }
-  class StageResources {
-    PackedStringArray paths
-    PackedStringArray enemy_ids
-    PackedStringArray shader_paths
-    PackedStringArray look_names
-    Dictionary look_paths
-  }
-  StageDef <|-- RuntimeStage
-  SpawnClip <|-- RuntimeClip
-  StageDef --> "0..*" SpawnClip : clips
-  SpawnClip --> "0..*" EnemyFormation : formationsのPackedScene
-  StageCompiler ..> StageDef : compileの入力
-  StageCompiler ..> EnemyFormation : 一時生成してto_data
-  StageCompiler ..> RuntimeStage : compileの出力
-  StageCompiler ..> RuntimeClip : clipの出力
-  RuntimeStage --> "0..*" RuntimeClip : clipsの実体
-  RuntimeStage *-- StageResources : resources
+flowchart LR
+  Source[StageDef・敵・装備・技・編成] --> Prepare[制作中間データへ展開・検証]
+  Prepare --> Build[build_run_content.gd]
+  Schema[共通スキーマ] --> Build
+  Build --> Binary[content.bin]
+  Build --> Index[stage_番号.json]
+  Build --> Resources[run_resources.tres]
+  Assets[画像・シーン・shader・音] --> Collect[build_run_resources.gd]
+  Collect --> Resources
+  Binary --> Core[C++ ContentBundle]
+  Index --> Loader[run_content_loader.gd]
+  Resources --> Loader
+  Loader --> Session[RunSession]
 ```
 
-[共通の生成入口](../speed/addons/content_build/builder.gd) がStageCompilerの `build_all()` を呼び、生成結果を `.content/stage_<番号>.tres` へ保存する。StageResourcesは [build_stage_resources.gd](../speed/tools/content/build_stage_resources.gd) が定義・行動・見た目・音・shaderなどのパスを集めて作る。
+`tools/build/generate_run_schema.py` は共通スキーマからC++の型とID、生成側の書込コード、Godot実行時の `scripts/data_types/generated/run_ids.gd` を作る。生成・書込用の `tools/content/generated/` は制作側で使う。
+
+`.content/run/stage_<番号>.json` は入力署名・payload署名・戦闘バイナリと資源表のパス・資源表ハッシュを持つ。署名で分けたフォルダへ `content.bin` と `run_resources.tres` を保存し、読込検証を通してから索引を置換する。`RunResources` は資源キー・パス・依存署名・装備ごとの依存・背景・表示設定を持つ。C++は検証したバイナリから不変のContentBundleを作り、Godotの資源キーを値として扱う。
+
+実装は [共通生成](../speed/addons/content_build/builder.gd)、[戦闘定義生成](../speed/tools/content/build_run_content.gd)、[資源収集](../speed/tools/content/build_run_resources.gd)、[読込検証](../speed/scripts/runtime/run_content_loader.gd)を参照する。開発用のトラック名・表示ラベルなどは `.content/dev/` に分ける。
 
 **資源の寿命**
 
-出撃後、RunSessionはロード表示と戻る操作を出してStageResourcesを準備する。ContentResourceScopeが参照を所有し、ContentManagerが重複する要求をまとめて読み込む。セッション終了・出撃取り消しで参照を解放する。タイトルへ戻ったあとも残るものは索引とアプリ共通の資源とする。
+RunSessionがRunResourcesの起動時パスと署名をContentManagerへ渡し、ContentResourceScopeが取得した参照を保持する。ContentManagerは同じ依存署名の要求を共有する。セッション終了・出撃取り消しでScopeを取り消し、遅れて届いた結果と未使用資源を回収する。タイトルへ戻ったあとも残るものは索引とアプリ共通の資源とする。
 
-カードの候補を出すときは、候補ごとの定義・振る舞い・見た目・画像を別のScopeで準備する。選択した候補の準備とshaderの描画準備が終わると装備へ参照を渡し、ほかの候補を解放して戦闘へ戻る。装備解除・ラン終了でも対応する参照を解放する。
+C++のカード候補と装備は資源要求のキー・revisionを出す。`run_choice_resources.gd` が候補の定義・見た目・画像を別Scopeへ用意し、shaderの準備完了を命令で通知する。C++は対応する選択と資源revisionが有効なときに装備へ反映する。候補破棄・装備解除・終了では対応する参照を解放する。
 
 **通常出撃のロードと開始**
-
-生成済みのステージを取得して暗転中から資源を読み込み、明転中も読み込みとshaderの描画準備を進める。資源と描画の準備を完了させてシミュレーションと表示を接続し、画面遷移の入力抑止が終わると戦闘の時計を進める。図は表示のある通常出撃の成功経路を示す。ContentManagerは読み込み要求をまとめ、完了した資源を各Scopeへ渡す。
 
 ```mermaid
 sequenceDiagram
   participant RM as RunManager
-  participant CM as ContentManager
   participant S as RunSession
-  participant R as ContentResourceScope
+  participant L as RunContentLoader
+  participant B as RunBridge / SpeedRunCore
+  participant CM as ContentManager / Scope
   participant P as RunPresentation
-  participant Sim as RunSimulation
-  RM->>CM: runtime_stage(index)
-  CM-->>RM: .contentのRuntimeStage
-  RM->>S: new() / ID登録
   RM->>S: start_loading(options)
-  Note over RM,S: 画面の暗転と資源読み込みを並行し<br/>呼び出し側がシーンの木へ追加
-  S->>CM: prepare_resources<br/>(stage.resources.paths)
-  CM->>R: new()
-  CM-->>S: Scope
-  loop 資源の読み込みが完了するまで
-    CM->>R: provide(path, resource)
-    S->>R: is_ready()
+  S->>L: read_bundle(index, signature)
+  L-->>S: bytes / RunResources
+  S->>B: configure(bytes, options)
+  S->>CM: prepare_resources(paths, signatures)
+  loop 資源と描画の準備
+    S->>CM: is_ready()
+    S->>P: warm_resources(self, scope)
   end
-  S->>P: warm_resources(self, resources)
-  Note over R,P: shader_warmup.gdが描画を準備<br/>warmup_completeを立てる
-  S->>S: start(options, true)
-  Note over S,Sim: ctx.resources・options<br/>入力・役者の親を渡す
-  S->>Sim: setup()
-  Note over S,P: viewを木へ追加<br/>RunPresentationの_ready()を実行
-  P->>Sim: frame_events.connect<br/>(_on_events)
+  S->>B: start(seed, start_options)
+  S->>P: bridge / resources / scopeを接続
+  S->>S: 表示・入力・HUD・購読者を接続
   S->>S: started.emit()
 ```
 
-セッション終了時は [RunSessionの破棄処理](../speed/scripts/runtime/run_session.gd) がScopeを `cancel()` し、RunSimulationの `dispose()` がSystem・役者・通知の参照を外す。[ContentResourceScope](../speed/scripts/data_types/content_resource_scope.gd) は取り消し後に届いた資源を解放する。
+バイナリ・索引・資源表の整合が取れず、拡張や必須資源が欠けている場合は開始を拒否する。資源とshaderの準備中はC++を開始前の状態で保持する。画面遷移の入力抑止もランへ通知し、戦闘の時計と入力消費を止める。セッション終了は受付を止め、録画終端の通知、Scope、表示、C++、RunManager登録を順に解放する。
 
 ### 8.2 ラン中の状態
 
@@ -597,12 +418,12 @@ sequenceDiagram
 ステージごとにランの状態を作り直す。武器・特性などプレイ中に手に入れたものは持ち越さない。ステージをまたいで残るのは、セーブデータ（11章）だけ。
 
 
-武器と特性の通常育成完了後の追加選択は `LoadoutSystem` が既存の候補と同じカード経路で処理し、`PostMaxProgression` が適格性・実効値・表示内容を求める。固定の調整値と武器ID別適用先は `GameConfig.post_max` のResourceをロード時に保持する。現在の装備・HP・選択回数に依存する抽選と能力値計算はラン中に行う。選択回数は `RunState.post_max_stacks` に保持し、`refresh_stats()` は毎回基礎・特性・永続強化の基準から合計を計算する。終了時はランとともに解放し、永続のプロフィールとSaveManagerへ書き込む経路を分ける。
+武器と特性の通常育成完了後の追加選択は、C++の成長処理が同じカード・資源要求経路で扱う。固定の調整値と武器ID別適用先は `GameConfig.post_max` を生成時に解決する。現在の装備・HP・選択回数に応じた抽選と能力値計算をラン中に行い、選択回数はロードアウト状態に保持する。能力値は基礎・特性・永続強化から計算する。ラン中の成長は終了時に解放し、永続のプロフィールと端末保存はGodotが扱う。
 
 ### 8.3 調整できる数値
 
 - demo の `config.js` にあたる数値を、1つの `GameConfig`（`data/config.tres`）にまとめる。
-- ラン中は ContentManager が持つ複製を読む。調整パネルは複製だけを書き換え、元のファイルは書き換えない。
+- 戦闘用の固定値は生成時に解決する。開発用の調整パネルは公開命令でラン専用の実効値を変え、元ファイルへの保存は明示操作で行う。
 - 調整パネルは開発版でだけ使えるようにし、配布版には含めない。
 
 ### 8.4 データ編集ツール
@@ -625,56 +446,48 @@ Godot エディタの拡張の専用画面で、`.tres` のデータをまとめ
 | 移動：進みたい向きと強さ | カーソルの向き（強さは一定） | 仮想スティックの向きと倒し具合 |
 | ペン先：描く位置と押した瞬間 | カーソルの位置とクリック | 指の位置と「描く」ボタン |
 
-- 移動とペン先のほかに、描画の補助（`alt_press`）と英雄の星座の力の発動（`hero_press`）を、押した瞬間の意図として渡す。`RunSimulation` が `hero_press` を受けて `HeroSystem.activate()` を呼ぶ。
+- 移動とペン先のほかに、描画の補助（`alt_press`）と英雄の星座の力の発動（`hero_press`）を、押した瞬間の意図として渡す。C++のRunRunnerが `hero_press` を受けて `HeroesSystem::activate()` を呼ぶ。
 - ゲームのシステムは変換された意図を読む。機器を足すときは、変換するところだけを足す。
 - キー操作は Godot の InputMap で定義する。設定画面で変えたキーの割り当ては、設定のファイルに保存し、起動時に InputMap へ反映する。
 
 ## 10. 描画と演出
 
-RunPresentationがランの状態と出来事を受け取り、2Dの層とシェーダーの段を組み立てる。敵はEnemyVisual、攻撃はAttackVisual、装備は種類ごとのVisualへ表示を渡す。ShipVisual・BodyVisual・MeteorVisualが機体・天体・隕石を描く。
+RunPresentationがRunBridgeの出力を受け取り、2Dの層とシェーダーの段を組み立てる。`run_frame_view.gd` が敵・攻撃・装備・地形・ボスの描画値を各表示部品へ渡す。表示用の読取モデルは出力の写しを持ち、戦闘の可変状態はC++が所有する。
 
 ### 10.1 出来事と状態から描画まで
 
-固定更新で積んだ出来事は、RunSessionのフレーム更新から表示へ渡す。RunPresentationは出来事から演出を作り、継続する位置・HP・攻撃形状はRunStateと各Systemの列から読む。図中のSystem・Behaviorと種類別Visualは、該当する処理をまとめた参加者を表す。
+固定更新で積んだ出来事は `FrameBuilder` の配信列に保持し、RunBridgeがUI差分・資源要求と一緒に購読者へ渡す。位置・線・攻撃形状は `read_render(view, alpha)` で取得し、表示側がバッチ・技シーン・演出を更新する。
 
 ```mermaid
 sequenceDiagram
   participant S as RunSession
-  participant Sim as RunSimulation
-  participant Logic as System / Behavior
-  participant State as RunState
+  participant B as RunBridge
+  participant C as SpeedRunCore / RunRunner
+  participant O as FrameBuilder / RenderBuilder
   participant P as RunPresentation
-  participant V as 種類別Visual
-  participant Pipe as RenderPipeline
-  participant L as DrawLayer
-  S->>Sim: physics_step(delta)
-  Sim->>Logic: _play_tick内の<br/>決まった順番で更新
-  Logic->>State: emit(type, data)
-  State->>State: eventsへ追加
-  Note over S,State: 固定更新の出来事をフレーム単位でまとめる
-  S->>Sim: _processからflush_events()
-  Sim->>State: eventsを取り出し空の列へ差し替え
-  Sim-->>P: frame_events(events) / _on_events
-  P->>V: on_event(ev)
-  Note over P,V: 購読したEnemyVisualと<br/>装備のWeaponVisualへ通知
-  P->>P: 共通の演出を追加
-  Note over P,L: RunPresentationの_process(delta)と描画
-  P->>V: update(dt) / tick(dt)
-  P->>Pipe: step(dt, camera_pos, zoom)
-  P->>L: queue_redraw()
-  L->>P: _draw()からdraw_fn.call(self)
-  P->>State: 位置・線・位相などを読む
-  P->>Logic: 敵・弾・ドロップの列を読む
-  P->>V: draw_marks / draw_objects<br/>draw_shotなど
+  participant V as RunFrameView / 表示部品
+  S->>B: poll_and_step(delta, input_source, size)
+  B->>C: step_run(dt, intent, viewport)
+  C->>C: 同じランの値を順に更新
+  C->>O: 出来事・UI・資源要求を用意
+  B->>C: frame_run()
+  C-->>B: frame / events / UI差分
+  B->>P: 同じframeを各購読者へ配信
+  B->>C: ack_frame_run(epoch, sequence)
+  P->>B: read_render(view, alpha)
+  B->>O: render_run(view, alpha)
+  O-->>P: 配列と描画値
+  P->>V: 描画出力・出来事・資源参照
+  V->>V: バッチ・シーン・shaderを更新
 ```
 
-AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisualは状態と種類別の演出を描く。実装の入口は [RunState.emit](../cpp/state/run_state.h)、[RunSimulation.flush_events](../cpp/runtime/run_runner.cpp)、[RunPresentation](../speed/scripts/render/run_presentation.gd)、[DrawLayer](../speed/scripts/render/draw_layer.gd)。HUDも `frame_events` を購読し、カード候補と位相の変更は `cards_changed`・`phase_changed` で受け取る。
+UIは同じ出力の位相・カード・HP等を表示し、入力結果を命令として返す。表示と音と録画が同じ出来事をそれぞれ購読する。出来事の受領状況は戦闘状態の保持点と分け、復元後のepochで古い命令と通知を区別する。入口は [FrameBuilder](../cpp/output/frame_builder.h)、[RunBridge](../speed/scripts/runtime/run_bridge.gd)、[RunPresentation](../speed/scripts/render/run_presentation.gd)、[RunFrameView](../speed/scripts/render/run_frame_view.gd)。
 
 ### 10.2 層・資源・画面効果
 
-体当たりのクリティカルは `critical_hit` イベントから専用の短い表示へ渡す。`tools/art/critical_hit_source.mjs` を編集元とし、制作時の `bake_critical_hit.mjs` が固定版pixelfxの描画部品から `assets/effects/critical_hit/critical_hit.png` と `data/visuals/critical_hit.tres` を書き出す。コマ・文字・火花の合成は制作工程に置く。PNGは専用アート素材として保持し、通常の画像importとResource依存で配布する。Resourceは原点・寸法・再生値・入力と画像のハッシュ・MITのLICENSEとNOTICEを持つ。StageResourcesはRunPresentationの依存から素材を準備し、表示開始時に専用の再生処理がResourceを取得して表示の寿命で保持する。実行時は上限付きの出来事ごとに経過時間・位置・向きを保持し、既存の前面層でコマを描き、寿命が尽きた出来事を解放する。ポーズ・選択中は既存の演出時計とともに停止する。
+体当たりのクリティカルは `critical_hit` イベントから専用の短い表示へ渡す。`tools/art/critical_hit_source.mjs` を編集元とし、制作時の `bake_critical_hit.mjs` が固定版pixelfxの描画部品から `assets/effects/critical_hit/critical_hit.png` と `data/visuals/critical_hit.tres` を書き出す。コマ・文字・火花の合成は制作工程に置く。PNGは専用アート素材として保持し、通常の画像importとResource依存で配布する。Resourceは原点・寸法・再生値・入力と画像のハッシュ・MITのLICENSEとNOTICEを持つ。RunResourcesはRunPresentationの依存から素材を準備し、表示開始時に専用の再生処理がResourceを取得して表示の寿命で保持する。実行時は上限付きの出来事ごとに経過時間・位置・向きを保持し、既存の前面層でコマを描き、寿命が尽きた出来事を解放する。ポーズ・選択中は既存の演出時計とともに停止する。
 
-ビルドの攻撃は、装備ごとの WeaponVisual（`scripts/render/equipment/<code_id>.gd`）が演出の試作と同じドット単位の規則で描く。共通部品は `scripts/render/fx/` にあり、`PixelPainter` が円・輪・線・光弾・砲口などを1ドットの格子にそろえて MultiMesh へまとめ、`PixelSparks` が火花、`FireBursts` がノイズで縁の崩れるピクセル炎、`BlastBursts` がピクセル炎と同じ4段の色で閃光・火球・衝撃波の輪・煙・燃えかす・火の粉をまとめた爆発を描く。数の多い輪・針・太い輪・六角形は `PixelShapes` が同じドットの規則を shader で判定し、1つの図形を1枚の四角として GPU でまとめて描く。武器・特性の演出は途中で手に入るので、出撃前の shader の準備（`build_stage_resources.gd`）は `scripts/render/equipment`・`friendly`・`fx` が使う shader をすべて含める。重力レンズ・帯状のビームなど面の大きい演出は装備専用の shader を使う。WeaponVisual は描く出来事を `claims` で示し、`RunPresentation` はその出来事の既定の描画（死亡の破片・輪・ビーム）を行わない。ギアアップの炎は共通ピクセル炎を後ろ向きに置いた `GearFire` で描く。表示の上書きは `effect_settings.tres` の装備キーで保持する。shader の調整値は各 shader の `group_uniforms tuning;` にまとめ、`ShaderTuning` が装備キーの `shader/<shader名>/<uniform名>` の値を material へ当てる。
+ビルドの攻撃は、RunFrameViewが装備ごとの表示部品（`scripts/render/equipment/<code_id>.gd`）へ出力を渡し、演出の試作と同じドット単位の規則で描く。共通部品は `scripts/render/fx/` にあり、`PixelPainter` が円・輪・線・光弾・砲口などを1ドットの格子にそろえて MultiMesh へまとめ、`PixelSparks` が火花、`FireBursts` がノイズで縁の崩れるピクセル炎、`BlastBursts` がピクセル炎と同じ4段の色で閃光・火球・衝撃波の輪・煙・燃えかす・火の粉をまとめた爆発を描く。数の多い輪・針・太い輪・六角形は `PixelShapes` が同じドットの規則を shader で判定し、1つの図形を1枚の四角として GPU でまとめて描く。武器・特性の演出は途中で手に入るので、出撃前の shader の準備（`build_run_resources.gd`）は `scripts/render/equipment`・`friendly`・`fx` が使う shader をすべて含める。重力レンズ・帯状のビームなど面の大きい演出は装備専用の shader を使う。RunFrameViewは装備IDと出来事の種類に応じて表示部品へ通知し、同じ攻撃の表示を重複させない。ギアアップの炎は共通ピクセル炎を後ろ向きに置いた `GearFire` で描く。表示の上書きは `effect_settings.tres` の装備キーで保持する。shader の調整値は各 shader の `group_uniforms tuning;` にまとめ、`ShaderTuning` が装備キーの `shader/<shader名>/<uniform名>` の値を material へ当てる。
 
 共通の `PixelSparks` と `ShotFlashes` は、粒子と命中閃光の配列を表示順のまま再利用し、更新中に期限切れを整理する。命中閃光は種類ごとの描画時間と共通の保持期限を持つ。
 
@@ -687,19 +500,19 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 出撃とカード選択では、資源準備に続いて `scripts/render/shader_warmup.gd` が小さなSubViewportで使うマテリアルと描画形式を準備する。準備済みのマテリアルはScopeが保持する。
 
-英雄星座の光雲は、共通生成で曲面関数の一次元表と単位四角形を保存する。StageResourcesが準備対象へ含め、SessionのScopeが保持し、ロード中にshaderを事前描画する。表示は生成済みの表から星座の回転後の範囲・カメラ倍率に応じた格子を参照し、呼吸の明るさだけ時刻から更新する。表示固有のmaterialはランごとに持ち、固定の表と形状は共有する。
+英雄星座の光雲は、共通生成で曲面関数の一次元表と単位四角形を保存する。RunResourcesが準備対象へ含め、SessionのScopeが保持し、ロード中にshaderを事前描画する。表示は生成済みの表から星座の回転後の範囲・カメラ倍率に応じた格子を参照し、呼吸の明るさだけ時刻から更新する。表示固有のmaterialはランごとに持ち、固定の表と形状は共有する。
 
-目印の敵の輪郭は、制作時の `tools/art/bake_landmark_masks.py` が本体・装甲・装飾のアルファから距離場を作り、`assets/effects/landmark/masks.tres` とPNGへ保存する。画像空間の距離をRへ8段階/画素で符号化し、32画素の余白・元寸法・入力ハッシュ・サイズ観測値を素材に持つ。サイズは画像へ焼かず、本体と同じ個体半径・表示倍率で描く。塗装のRGBは同じマスクを共有する。固定素材の入力・出力・候補と外観差替えの整合を共通生成の `build_visuals.gd` が確認する。通常の依存収集がマスク・ノイズ・実行用materialとshaderをStageResourcesへ登録し、SessionのScopeがラン開始時から保持する。表示は開始時に用意した少数のSpriteとランごとに1つの共有materialを再利用する。時刻は変化したフレームに1度、マスク寸法・余白・ポンプの有無は対象切替時、膨張量は変化時にだけ送り、位置と向きは本体へ追従する。部位ごとの寸法と変形はinstance uniformで保持する。じょうぎ座は上下と合体のマスクを選び、見えない三角の中心は生存する星へ表示する。ポンプ座はG/Bの前後別距離場と、本体と共有する後部の逆変形を使う。
+目印の敵の輪郭は、制作時の `tools/art/bake_landmark_masks.py` が本体・装甲・装飾のアルファから距離場を作り、`assets/effects/landmark/masks.tres` とPNGへ保存する。画像空間の距離をRへ8段階/画素で符号化し、32画素の余白・元寸法・入力ハッシュ・サイズ観測値を素材に持つ。サイズは画像へ焼かず、本体と同じ個体半径・表示倍率で描く。塗装のRGBは同じマスクを共有する。固定素材の入力・出力・候補と外観差替えの整合を共通生成の `build_visuals.gd` が確認する。通常の依存収集がマスク・ノイズ・実行用materialとshaderをRunResourcesへ登録し、SessionのScopeがラン開始時から保持する。表示は開始時に用意した少数のSpriteとランごとに1つの共有materialを再利用する。時刻は変化したフレームに1度、マスク寸法・余白・ポンプの有無は対象切替時、膨張量は変化時にだけ送り、位置と向きは本体へ追従する。部位ごとの寸法と変形はinstance uniformで保持する。じょうぎ座は上下と合体のマスクを選び、見えない三角の中心は生存する星へ表示する。ポンプ座はG/Bの前後別距離場と、本体と共有する後部の逆変形を使う。
 
 目印の調整値は `landmark_mark.tres` を編集元に持つ。制作時の `tools/art/bake_landmark_aura.py` は共通の `build_aura.gdshader` から38項目を定数化した専用shaderとノイズ参照のmaterialを保存し、入力と出力のハッシュを記録する。HDR用の線形色とCompatibility用のsRGB色も固定値として持ち、開始時に描画方式を選ぶ。実行用materialの可変値は時刻・ノイズ参照・描画方式だけとし、shaderとノイズはScopeの参照を共有する。編集画面は共通shaderへ未保存の調整値を適用する。更新手順は[ビジュアル編集ツール](dev/tools/visual-editor.md)に定義する。機体オーラは共通shaderの機体用の寸法・原点・色を使う。
 
-エリートの接点・近隣の接点組・枝分かれ経路は `bake_landmark_masks.py` と `elite_contacts.py` が共有距離場と可動部位の区分から制作時に保存する。`elite_contacts.tres` は画像・import設定・生成コードの入力ハッシュとマスクへの参照を持つ。`bake_elite_crackle.py` は `elite_mark.tres` と設定の既定値から色・濃さを定数化した `elite_crackle_runtime.gdshader` と、発生間隔・本数を固定した `elite_runtime.tres` を保存する。入力と出力のハッシュを共通生成で照合する。StageResourcesが接点と生成済み実行用設定を準備し、SessionのScopeがランの寿命で共有する。`elite_crackle.gd` は画面内のエリートごとに独立した発生時刻と最大4件の短いイベントだけを保持し、保存済みの経路を選ぶ。退出した個体の状態を回収し、時刻の巻き戻しで初期化する。黒い縁と赤い芯はラン内で共有する2つのMultiMeshへ送り、最大8192区間のバッファを再利用する。shaderは元画像の画素格子へ区間を量子化する。位置・回転・倍率と波動変形は本体と共有し、噛みつく雑魚の顎は同じ支点と姿勢、ポンプは同じ前後の変形へ接点を合わせる。本番shaderの可変値は描画方式と縁・芯の描画パスだけとし、区間の位置・濃さ・個体ごとの時刻はインスタンスから渡す。ビジュアル編集だけが同じ描画へ元の可変shaderと未保存の設定を渡す。
+エリートの接点・近隣の接点組・枝分かれ経路は `bake_landmark_masks.py` と `elite_contacts.py` が共有距離場と可動部位の区分から制作時に保存する。`elite_contacts.tres` は画像・import設定・生成コードの入力ハッシュとマスクへの参照を持つ。`bake_elite_crackle.py` は `elite_mark.tres` と設定の既定値から色・濃さを定数化した `elite_crackle_runtime.gdshader` と、発生間隔・本数を固定した `elite_runtime.tres` を保存する。入力と出力のハッシュを共通生成で照合する。RunResourcesが接点と生成済み実行用設定を準備し、SessionのScopeがランの寿命で共有する。`elite_crackle.gd` は画面内のエリートごとに独立した発生時刻と最大4件の短いイベントだけを保持し、保存済みの経路を選ぶ。退出した個体の状態を回収し、時刻の巻き戻しで初期化する。黒い縁と赤い芯はラン内で共有する2つのMultiMeshへ送り、最大8192区間のバッファを再利用する。shaderは元画像の画素格子へ区間を量子化する。位置・回転・倍率と波動変形は本体と共有し、噛みつく雑魚の顎は同じ支点と姿勢、ポンプは同じ前後の変形へ接点を合わせる。本番shaderの可変値は描画方式と縁・芯の描画パスだけとし、区間の位置・濃さ・個体ごとの時刻はインスタンスから渡す。ビジュアル編集だけが同じ描画へ元の可変shaderと未保存の設定を渡す。
 
-経験値は、固定の面マスク `assets/pixel/xp_crystal_facets.tres` をScopeから取得し、3色共通の単一MultiMeshで描く。面マスクはImageを内包するImageTextureとし、実行時は `gem_kind` から指定色を渡す。共通寸法は通常の基準結晶の高さを維持し、表示倍率に応じた下限を共用する。`pickups` のz=6、通常敵の図形と `BossActor`・ヒュドラ・りゅう座の分身の基準z=7を使い、結晶を敵の背後へ置く。法線付きの通常敵も既存の上位CanvasLayerへ描く。
+経験値は、固定の面マスク `assets/pixel/xp_crystal_facets.tres` をScopeから取得し、3色共通の単一MultiMeshで描く。面マスクはImageを内包するImageTextureとし、実行時は `gem_kind` から指定色を渡す。共通寸法は通常の基準結晶の高さを維持し、表示倍率に応じた下限を共用する。`pickups` のz=6、通常敵の図形と ボス・ヒュドラ・りゅう座の複製の表示の基準z=7を使い、結晶を敵の背後へ置く。法線付きの通常敵も既存の上位CanvasLayerへ描く。
 
 敵の表示半径は、そのランの定義と生成済み外観の数値を種類ごとに1描画パスだけ共有する。共有値は衝突倍率・画像寸法・基準半径などの数値だけとし、個体の半径をその場で反映する。パス終了時に破棄し、次の描画でライブ編集後の値を読む。Resourceの所有は既存のSessionとScopeに保つ。
 
-噛みつく雑魚の本体・左右の顎は、制作時の `tools/art/bake_biter_parts.py` が保存済みの領域マスクでBase・Armor・Normalを分割する。共通キャンバスと回転支点・入力と出力のハッシュは `data/visuals/biter_parts.tres` に持ち、共通生成で整合を確認する。StageResourcesの依存収集が分割素材・shaderを登録し、SessionのScopeが保持する。表示は種類内で部位ごとのMultiMeshとmaterialを共用し、確定塗装のRGBへ部位のアルファを重ね、顎の回転と同じ基底で法線を回す。構え・回復の時計から姿勢を求め、噛み閉鎖時の火花は活動中の個体だけを共通の四角形バッチへ追加する。専用shaderが6本の筋と伸縮・濃淡を描く。`biter` の攻撃は表示だけを専用シーンへ渡し、共通の範囲判定を維持する。蛇の外観は同じ火花と元の船体を使う。
+噛みつく雑魚の本体・左右の顎は、制作時の `tools/art/bake_biter_parts.py` が保存済みの領域マスクでBase・Armor・Normalを分割する。共通キャンバスと回転支点・入力と出力のハッシュは `data/visuals/biter_parts.tres` に持ち、共通生成で整合を確認する。RunResourcesの依存収集が分割素材・shaderを登録し、SessionのScopeが保持する。表示は種類内で部位ごとのMultiMeshとmaterialを共用し、確定塗装のRGBへ部位のアルファを重ね、顎の回転と同じ基底で法線を回す。構え・回復の時計から姿勢を求め、噛み閉鎖時の火花は活動中の個体だけを共通の四角形バッチへ追加する。専用shaderが6本の筋と伸縮・濃淡を描く。`biter` の攻撃は表示だけを専用シーンへ渡し、共通の範囲判定を維持する。蛇の外観は同じ火花と元の船体を使う。
 
 - 背景・敵・演出を描画の層に分ける。Forward+・Mobile ではメインViewportの2D HDRとグローを使う。Compatibility では発光対象に `visibility_layer` を設定し、メインViewportと同じ `World2D` を共有する半解像度のSubViewportを `canvas_cull_mask` で絞り込み、ぼかして加算合成する。
 - 各段は、PC・スマホ用（HDR・コンピュートシェーダーを使える）とブラウザ用の簡易版に差し替えられるようにする。
@@ -709,7 +522,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - ゲームの処理と描画は完全に分ける。ゲームの処理は「何がどこにあるか」だけを持ち、描画側が層ごとに描き分ける。
 - スクリプトで描いている図形（`_draw` の円・矩形・弧など）は、すべてスプライトに置き換える。大量に出る物はすべて MultiMesh でまとめて描く。
 - Godot の Compositor は3D専用なので使わない。
-- 演出にはシェーダーを使う。コンピュートシェーダーは演出（破片、光の跡、背景、光のにじみ、波動の歪みなど）に積極的に使う（PC・スマホ。ブラウザの Compatibility では使えないので簡易版で代える）。敵の移動・当たり判定などのゲーム処理はGDScriptで計算する。性能目標に届かない場合の代替方式は未決。
+- 演出にはシェーダーを使う。コンピュートシェーダーは演出（破片、光の跡、背景、光のにじみ、波動の歪みなど）に積極的に使う（PC・スマホ。ブラウザの Compatibility では使えないので簡易版で代える）。敵の移動・当たり判定などのゲーム処理はC++で計算する。描画込みの性能目標の合格は計測結果で判定する。
 
 - 描いている線・なぞった跡は、線の点の列から描く。
 - 破片・火花・炎などの大量の演出は、6章と同じく配列とまとめた描画で扱う。スマホの性能を考えて、GPU のパーティクルに頼り切らない。
@@ -722,6 +535,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - `user://` に保存する。中身は仕様書 14 のとおり（ストーリーの進み具合、伝説のモジュール、ハイスコア、図鑑の獲得状況を含む）。
 - データに版の番号を持たせ、版が変わったら古いデータを新しい形に変換する。読めないデータは壊さずに初期値で始める。
 - 設定（音量、画面モード、言語、キー設定）は、セーブとは別のファイルに保存する。
+- C++の結果通知をRunSessionが一度だけGameManagerへ渡し、SaveManagerが進行・獲得・ハイスコアを端末へ保存する。ランの保持点は開発用の値状態としてラン内に持ち、端末の進行保存と分ける。
 - 導入の視聴済み状態を `intro_seen` として保存する。不足するセーブ項目は `SaveManager._migrate()` が初期値で補う。
 
 ## 12. UI
@@ -730,7 +544,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - 色と文字の大きさは1つのテーマにまとめる。強化段階の色（仕様書 8）もテーマで管理する。
 - 3択・ポーズ・結果は、ラン中の状態を表示するだけにする。選んだ結果は RunManager に命令として渡す（4.2）。
 - 導入は `GameManager.Screen.INTRO` と `scenes/app/intro.tscn` が持つ。`scripts/runtime/intro_sequence.gd` が場面進行と操作待ち、`intro_practice.gd` が星・練習相手・見本線を管理する。`scripts/ui/intro_screen.gd` は状態を表示してセッションへ命令を渡し、`scripts/render/intro_visual.gd` が差し替え用の仮演出を描く。
-- 導入は独立した `RunSession` の `RunSimulation` と、本番の `run.tscn` の World・Camera・入力・描画を使う。複製した共通設定と専用の `RuntimeStage` を渡し、`lab_mode` の状態を導入シーケンスから既存の更新処理で進める。`hud` オプションで専用の最小 UI に替え、リリース版でも同じ操作を使う。
+- 導入の練習は独立したRunSession・RunBridgeと本番の `run.tscn` を使う。専用に生成した `.content/run/intro/` を読み、導入シーケンスが練習用命令と固定更新を進める。場面の表示と操作待ちはGodot、練習相手・線・機体の戦闘状態はC++が持つ。`hud` オプションで最小UIに替え、配布版も生成済み定義を使う。
 
 速度計はHUDがランの突進・ブースト保持・滑走と巡航速度超過を読み、`scripts/ui/speed_indicator.gd`へ表示状態を渡す。表示専用の乱数で時間間隔を持つ目標を選び、実秒の固定刻みで針の慣性と内部色を更新する。HUDが位相とオーバーレイに応じて更新を止め、速度計のNode・独立したShaderMaterial・画像参照をHUDの寿命で保持する。固定の画像とshaderは依存参照から取得し、shaderが元画像の内部色だけを現在の表示色へ置換する。輪郭とマスクは既存画像を使い、実行時の入力は表示状態・経過時間・表示用の乱数とする。
 
@@ -740,6 +554,8 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 AudioManagerは要求中の曲と実際に再生中の曲を分け、停止時に `menu`・`stage_select` の音源参照・再生位置・離脱要求時刻をメモリへ保持する。[再開の時間窓](spec.md#18-音)は `Time.get_ticks_msec()` で判定する。同じ音源なら停止位置をループ範囲へ整えて再開し、音源が変わった場合は既定の開始位置を使う。切り替え要求番号とTweenの取り消しで古い再生予約を無効化し、再生開始に至らなかった曲の記憶は維持する。保持した音源参照は再開時に解放する。
 
+C++の音に関わる出来事はRunBridgeからAudioManagerと敵レーザーの音処理へ配信する。再生口・音源参照・音量・バス・端末の時刻はGodotが所有する。
+
 - 音の再生口を使い回し、同時に鳴る数に上限を設ける。
 - バスを「全体」「効果音」「エンジン音」に分ける。
 - 方向性は未決（仕様書 18）。
@@ -748,7 +564,7 @@ AudioManagerは要求中の曲と実際に再生中の曲を分け、停止時�
 
 - 乱数の種を指定できるようにし、同じランを再現できるようにする。
 - 開発版では、fps・敵の数・各システムの処理時間を画面に表示できるようにする。
-- 処理時間は `PerfLog`（`scripts/runtime/perf_log.gd`）に記録する。`RunSimulation.perf` が世界側の更新と出来事の受け渡し、`RunPresentation.perf` が表示側、`RunPresentation.perf_rows` が敵の描画1回あたりの行の数を持つ。F3 の表示・ラン処理・描画ベンチ・プレイの記録は、それぞれ自分の名前で記録を開き、読み終えた区間を自分の記録だけ空にする。時間を取るのは、記録を開いている読む側があるときだけとする。項目名の「.」の後ろは内訳で、敵の行動の種類（`enemies.<行動>`）、武器・特性（`build.<ID>`）、弾（`projectiles.friend` など）、結晶・部品（`pickups.gems` など）、避け合いの走査と補正（`enemy_avoidance.scan`・`.rows`）、出現の数え直し（`spawner.survey`）、表示側の層の中（`draw_enemies.rows` など）を分ける。
+- 処理時間はC++の計測出力とGodotの `PerfLog`（`scripts/runtime/perf_log.gd`）から読む。`RunBridge.perf` は入力・更新・出力構築、`RunPresentation` と `RunFrameView` は描画準備と表示の区間を記録する。`run_metrics.gd` がフレーム数・実時間と累計値から区間値を求め、F3・性能計測・プレイ記録へ渡す。計測項目と利用可能な内訳は `read_metrics()` の実出力を使う。描画フレーム時間とC++更新時間を分け、性能目標の合格を個別処理の短さだけで判断しない。
 - 自動テストと長時間の自動プレイは、依頼があるときだけ行う（AGENTS.md）。
 
 ### 14.1 ステージ・実験場を直接起動するエディタ拡張
@@ -781,11 +597,11 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 ### 14.3 プレイの記録
 
-**決定**：ステージの調整に使うため、遊んだランのデータをファイルに書き出す。戦闘・経験値は出来事と区間の数を記録し、性能は実時間の窓で集約する。記録を読む側（AI など）が対応づけて分析する。
+ステージの調整に使うため、遊んだランのデータをファイルに書き出す。戦闘・経験値は出来事と区間の数を記録し、性能は実時間の窓で集約する。記録を読む側（AI など）が対応づけて分析する。
 
 - 開発用の起動処理が作る記録ノード（`scripts/dev/play_recorder.gd`）。Ctrl+F9 で記録・待機を入・切し、有効な間は Ctrl+F10 で記録のフォルダを開く。プレイ中の Ctrl+F9 は、その場の時計・成長・装備を保って記録を始める。タイムラインの再生、ポーズ、カード選択中も同じ操作を使う。待機中は画面の右下に小さく「● REC 待機」、記録中は「● REC」とランの時計を出し、記録を閉じたら保存したファイル名を数秒出す。
 - 待機中に始めたランは初期化直後から、プレイ中に有効にしたランはその時点から、終わる（クリア・やられた・やめた）か Ctrl+F9 で停止するまで1つのファイルに書く。待機は Ctrl+F9 で切るまで続き、次のランと停止後の再開は別のファイルになる。記録対象は本番のランとし、実験場は専用の記録を使う。
-- 置き場所は書類フォルダの `SPEED/recordings/stage<番号>_<日時>.jsonl`（Mac は `~/Documents/SPEED/recordings/`。書類フォルダが分からなければ `user://recordings/`）。同名ファイルがあれば連番を足して保存する。ほかの開発者もこのファイルを送って共有する。1行に1つの記録（JSON）。書いたそばからファイルへ出し、メモリにためない。
+- 置き場所は書類フォルダの `SPEED/recordings/cpp_run<ランID>_<日時>.jsonl`（Mac は `~/Documents/SPEED/recordings/`。書類フォルダが分からなければ `user://recordings/`）。同名ファイルがあれば連番を足して保存する。ほかの開発者もこのファイルを送って共有する。1行に1つの記録（JSON）。書いたそばからファイルへ出し、メモリにためない。
 - 記録の種類（`type`）：
   - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`、追加計測は `measurement_version=3`）、Godot の版、報酬・メニューでの停止を性能集計から除く識別子（`perf_excludes_ui_pause=true`）、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_reward_version=2`、`xp_config`。色別基準XP、星数別既定個数、解決済みの敵別報酬、黄色確率、上限方式、必要経験値の係数と取得倍率）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
   - `sample`：3秒（ランの時計）ごとのラン秒・世界秒とまとめ。取得した実XP・供給した基準XP・フィールドに残る基準XP、レベル、HP、敵の数（星ごと・画面の中）、種類ごとの撃破数、倒した原因ごとの撃破数（`kills_by`）、与えたダメージの原因ごとの合計（`dealt`。倒しきった余りも含む）、攻撃の種類ごとの被弾（撃った敵が分かる攻撃は「攻撃/敵の種類」）、攻撃の予算の使用量の最大。`measurement_version=3` では命中を武器ID・敵種・敵級・エリート・原因で集約した `effective_damage` に解決後の量・実際のHP減少・超過分・形態境界などで捨てた量と命中回数、`enemy_life` に敵種・敵級・エリート別の出現時最大HPの合計と件数、出現・撃破・退場・生存終了数、観測できた出現から死亡・初被弾から死亡までの世界秒の合計と件数、`enemy_contacts` に機体への幾何接触の原因・判定結果別件数とバリアが受け止めた敵弾数を置く。未観測の出現と退場を撃破時間へ含めない。`enemy_contacts` は攻撃の発動数ではない。
@@ -807,7 +623,7 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 #### 経験値の区間集計
 
-`PickupSystem.xp_summary()` は、種類別の `supplied`・`collected`・`lost` に個数 `count` と基準量 `base_xp` を持ち、`collected` は実取得量 `actual_xp` も持つ。`gold_rolls` は適格な実撃破の抽選数 `eligible` と当選数 `won`、`collected_actual_xp` は実取得の合計を表す。`ground`・`carried` は現在の残存、`cap` は `mode=oldest_high_absorber`・`limit`・`absorber_id` を持つ。
+C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` に個数 `count` と基準量 `base_xp` を持ち、`collected` は実取得量 `actual_xp` も持つ。`gold_rolls` は適格な実撃破の抽選数 `eligible` と当選数 `won`、`collected_actual_xp` は実取得の合計を表す。`ground`・`carried` は現在の残存、`cap` は `mode=oldest_high_absorber`・`limit`・`absorber_id` を持つ。
 
 供給の種類は元の新規報酬、地面・運搬中・回収の種類は現在の結晶種を表す。変色と吸収で色別個数が変わるため、収支は変色・吸収の前後明細と基準XP総額で照合する。
 
@@ -819,7 +635,7 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 #### ボス戦闘の診断
 
-既存のschema 4へ `combat_version=1` の出来事を追加する。Ctrl+F9の記録中にMonocerosとDracoの判断と、全5ボスの動作・判定・機体へのダメージを観測する。Hydraの通常攻撃は首ごとの行動IDで区別し、録画停止・役者の解放では並行する観測も閉じる。`start.combat_config` は適用した詳細度と上限を持つ。起動時の `SPEED_COMBAT_LOG_LEVEL` は `0`（戦闘診断停止）、`1`（動作・判定・ダメージ）、`2`（候補理由も含む。既定値）を指定する。既存の成長・被弾・性能記録は同じファイルへ保存する。
+既存のschema 4へ `combat_version=1` の出来事を追加する。Ctrl+F9の記録中にMonocerosとDracoの判断と、全5ボスの動作・判定・機体へのダメージを観測する。Hydraの通常攻撃は首ごとの行動IDで区別し、録画停止・ボスの解放では並行する観測も閉じる。`start.combat_config` は適用した詳細度と上限を持つ。起動時の `SPEED_COMBAT_LOG_LEVEL` は `0`（戦闘診断停止）、`1`（動作・判定・ダメージ）、`2`（候補理由も含む。既定値）を指定する。既存の成長・被弾・性能記録は同じファイルへ保存する。
 
 戦闘行はラン内で共通の `run_id`、録画区間の `recording_id`、ステージ、発生ラン秒 `t`・世界秒 `world_t`、書き込み実秒 `real_t`、通し番号 `sequence` を持つ。ボス由来が分かる行には種類・`body_id`・表の行番号・形態を付ける。座標と速度はワールド座標の `[x,y]` とする。
 
@@ -837,19 +653,17 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 #### 実行条件の識別
 
-`RunSession` は開発版のラン初期化直後に条件を複製し、録画の有無によらず保持する。`run_start.conditions` に実効GameConfig、永続強化係数（`profile`）、機体能力値、機体強化段、強化上書きの有無、無敵・ヒットストップ設定と物理更新頻度を保存する。`recording_start.conditions` は録画開始時の実効GameConfig・永続強化係数・機体能力値・無敵・ヒットストップ設定を保存し、途中開始時の変更と区別する。ステージ別の敵調整があるランは `enemy_tuning` に各時点の実効上書きを保存する。両時点の乱数seed・状態は、JSONの数値精度を保つ文字列 `rng_seed`・`rng_state` として保存する。
+現在の録画は `format=cpp_events_v2`・`version=2` を持つ。`schema_version=4`・`measurement_version=3` はXP・成長の集計形式も識別する。形式名と実在項目を一緒に確認する。
 
-`run_start.conditions.identity` は初期化時点のコード・設定を照合する。`code_files_sha256` は `scripts/`・`addons/` の `.gd` と `project.godot`、`data_files_sha256` は `data/` の `.tres` のファイル別ハッシュを持ち、それぞれの一覧を `code_sha256`・`data_sha256` で照合する。読み込み済みのScript本文は `loaded_script_sources_sha256`、読み込み済みのデータの実効プロパティは `loaded_data_sha256`、実行中GameConfig・RuntimeStage・敵定義差し替え辞書は `config_sha256`・`runtime_stage_sha256`・`enemy_definitions_sha256` に持つ。カタログの署名は `catalog_signature`、起動環境が `SPEED_BUILD_REVISION` を指定したときはその値を `build_revision` に置く。バイト列を含む資源の実効値は、バイト数と内容のSHA-256へ変換してから照合する。この形式を `resource_digest_version: 2` で示し、異なる形式の実効値ハッシュは形式を揃えて比較する。
+`start.identity` はC++の `read_recording(true)` が返す戦闘定義・API・状態スキーマ等の識別子に、recorderが `implementation_revision`（`SPEED_BUILD_REVISION`）、`implementation_version`、XP設定ハッシュを足す。`start.run_start` はRunBridgeが保持するconfigureのoptions・payloadハッシュ・seed・start options、`start.recording_start` は録画開始時のC++状態を持つ。seedは文字列で保持する。`run_id`・`epoch`・`tick`・`event_sequence_at_start` でランと通知の開始境界を識別する。
 
-`start.git_state` は録画開始時にディスク上の Godot プロジェクトについて Git HEAD と作業ツリーの変更有無を調べ、`revision`・`dirty`・`scope` を保存する。Gitが使えない場合の `dirty=null` は不明を表す。初期化済みランが参照するスクリプト・資源の内容は `run_start.conditions.identity` と照合し、録画開始時のディスク状態を実行中の全内容と同一視しない。
+出来事はC++の共通封筒の `epoch`・`sequence`・`tick`・`t`・`world_t`・`type` とpayloadを保存する。録画は他の購読者と同じ通知を読み、既に記録したsequenceを除いて書く。途中開始は `missing_prefix=true` とし、既に存在する結晶等を `xp_existing` の `origin=unobserved` で記録する。
 
-ライブ調整の区間は `recording_start.conditions.enemy_tuning` から始め、`enemy_tuning_changed.values` で全体を置き換えて追う。適用境界には `event_t`・`event_world_t` を使い、同じラン秒では行順と世界秒を併用する。`sample` が境界をまたぐ場合は設定が混在する区間として扱う。保存通知は適用履歴から分ける。録画前の変更は前半欠測のまま保持する。
-
-ファイルのハッシュは初期化時点のディスク内容、読み込み済みScriptのハッシュはその時点の実行本文として区別する。資源の後読み込み・実行中のコードや設定の変更・入力の再生まで含む再現性は、対応する観測範囲を明示する。ソースを同梱しないビルドは `source_files_available` と一覧の欠落を確認し、空のリビジョンや未観測の条件を不明として扱う。
+旧形式の `conditions.identity`・ファイル別ハッシュ・`git_state` 等は、その録画に項目が存在する範囲で読む。現在のpayload識別とディスクのGit状態・未保存のResource・全入力再生を同一視しない。コード版が空、対応する設定が欠落、変更命令の観測が不足する場合は不明として扱う。ライブ調整の区間は記録済みの定義変更イベントと時刻・revisionから分け、通知がない前半を補完しない。
 
 #### 開始条件と分析の読み方
 
-ランの開始と録画の開始を、`start` 行の別々の項目で表す。RunSimulationは録画が無効な間も初期化時の状態を保持する。
+ランの開始と録画の開始を `start.run_start`・`recording_start` で分ける。現在のC++形式はstart optionsのscenario（通常開始・timeline等）と録画開始時の状態を使う。以下の `source`・`trigger` を持つ旧形式はその値で分類し、形式間で欠けた項目を補わない。
 
 | 項目 | 意味 |
 |---|---|
@@ -884,7 +698,7 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 生成処理は共通のビルド入口とexportへ接続する。入力・生成条件・形式の版・出力一覧を更新判定へ含め、入力変更や出力欠落で再生成する。依存画像を追加する変換では画像とimport設定も入力として追跡する。生成物は実行用の依存一覧と配布対象へ登録する。実行中の再生成・再読込では既存利用者の参照を保ち、新しい利用者へ更新済みの参照を渡す。取り消した要求の結果と未使用資源は所有者が回収する。
 
-ビルドで確定する処理の配置と、残る資源準備の開始時期・ロード表示は別の設計判断として扱う。現在の通常出撃は[8.1のロード経路](#81-定義データresource)を使う。ステージ選択中の先読みと、準備・UIの分離の方式は未決・未実装である。
+ビルドで確定する処理の配置と、残る資源準備の開始時期・ロード表示は別の設計判断として扱う。現在の通常出撃は[8.1のロード経路](#81-定義データresource)でC++定義とGodot資源を準備する。ステージ選択中の先読みと、準備・UIの分離の方式は未決・未実装である。
 
 #### 固定データ処理の生成と参照
 
@@ -892,41 +706,42 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 | 対象 | 現在の実装 | 維持する契約 |
 |---|---|---|
-| 経験値の結晶の面 | 固定の `xp_crystal_facets.tres` とshaderをStageResourcesの依存へ登録し、通常ランはSessionのScopeから取得する | 表示開始時に共通バッチへ面マスクを設定し、表示中は位置・種類の色だけを渡す。実験場は同じ固定素材を明示的にScopeへ提供する |
-| 経験値の固定報酬 | `EnemySystem` が敵定義を準備するときに星数と `xp_reward_counts` から確定個数と黄色抽選対象を解決し、`reward_of(definition)` で取得する | 撃破時は解決済みの個数と必要な抽選だけを使う。ライブ編集後は定義の変更を照合して解決し直す。取得倍率は回収入口で一度だけ適用する |
-| 背景の透明余白 | `prepare_background.gd` が使用範囲を生成し、RuntimeStageは範囲と画像パスを持つ。表示はSessionのScopeから画像を取得する | 背景エディターは同じ変換を明示的に呼ぶ。原点・寸法・重なり・透明部分・明るさを維持する |
+| 経験値の結晶の面 | 固定の `xp_crystal_facets.tres` とshaderをRunResourcesの依存へ登録し、通常ランはSessionのScopeから取得する | 表示開始時に共通バッチへ面マスクを設定し、表示中は位置・種類の色だけを渡す。実験場は同じ固定素材を明示的にScopeへ提供する |
+| 経験値の固定報酬 | `build_run_content.gd` が星数と `xp_reward_counts` から報酬の実効値を解決し、戦闘バイナリへ保存する | 撃破時は解決済みの個数と必要な抽選だけを使う。ライブ編集後は定義の変更を照合して解決し直す。取得倍率は回収入口で一度だけ適用する |
+| 背景の透明余白 | `prepare_background.gd` が使用範囲を生成し、RunResourcesは範囲と画像パスを持つ。表示はSessionのScopeから画像を取得する | 背景エディターは同じ変換を明示的に呼ぶ。原点・寸法・重なり・透明部分・明るさを維持する |
 | 固定の敵外観 | `build_visuals.gd` が `.content/look_<外観名>.res` へ本体・塗装・合成画像を保存し、ステージの依存一覧へ登録する。表示はScope内のEnemyLookを使う | 戦闘・サムネイル・牽引船体で同じ結果を使い、分離する外観との対応も維持する。対になる装甲の塗装キーと領域対応はEnemyLookに持ち、生成とライブ編集は同じ解決済みの色を使う。画像を生成するときに対応元のマスクと領域の存在を確認する |
 | 装甲の領域と塗装 | `visual_transforms.gd` が透過の連結領域と任意の `<装甲画像名>.regions.json` から塗装領域を求め、濃淡を保って確定塗装を生成する。領域データは `.content/dev/armor_<外観名>.res` へ保存する | 部位キーと保存済み塗装の対応・濃淡・アルファを維持する。明示した分割領域は元の領域の塗装を継承する。実験場は `live_visuals` で同じ変換を明示的に接続し、塗装変更を表示へ反映する。解析用スクリプトと領域データは配布から除外する |
-| 外観の索引 | `.content/visual_index.tres` の外観名と生成物パスをStageResourcesへ引き継ぎ、照明はその順序を使う | 外観の差し替え・追加・削除、照明の層順とHUDとの関係を維持し、資源は必要な種類の利用範囲で保持する |
+| 外観の索引 | `.content/visual_index.tres` の外観名と生成物パスをRunResourcesへ引き継ぎ、照明はその順序を使う | 外観の差し替え・追加・削除、照明の層順とHUDとの関係を維持し、資源は必要な種類の利用範囲で保持する |
 | 機雷・ポンプ着弾・自爆敵の爆発と圧縮弾 | `bake_burst_profiles.py`・`bake_pump_shell.py` が保存profileと可変shaderから専用shader・素材・時間や倍率の定数を生成する。共通ビルドは対象profileと入力・出力のハッシュを照合する。BlastBurstsと圧縮弾の表示スクリプトの依存参照から実行用資源を取得し、配布にも含める | 通常ゲームは固定値と必要な動的時刻・位置・種・収納物を使う。編集用プレビューは可変shaderと作業コピーを使い、寿命・到達域・粒の順番・色空間を共有する。制作時の反映手順は[ビジュアル編集](dev/tools/visual-editor.md#戦闘エフェクトの調整項目)に置く |
 | 爆発のノイズ | `tools/art/bake_burst_noise.py` が既存の格子点を `assets/effects/build/burst_noise_volume.png` に保存し、8×8のスライスとして64×64×64のTexture3Dへ取り込む。`burst_noise.tres` は版・入力と出力のハッシュ・画像参照を持ち、共通ビルドが照合する | L8・可逆圧縮・mipmapなしで格子値を保持する。`burst_noise.gdshaderinc` は周期64とsmoothstepの補間座標を使い、linear・repeatの1回の参照で読む。時刻・位置・seedによる動きとプラズマの3オクターブを保つ。BlastBurstsとPlasmaBurstsが同じ資源を依存として取得する |
 
 共通生成の署名は画像とimport設定も含め、外観・領域データの欠落を出力一覧から検出する。外観の索引が指す生成物を配布し、開発用の領域データを分ける。実験場のランの外観・塗装はSessionの表示で保持・解放し、一覧の合成画像は実験場画面の上限付きキャッシュで保持する。
 
-一角獣のパーツ画像は制作工程で `tools/art/export_monoceros.lua` をAsepriteのbatch実行へ渡して書き出す。切り出し範囲、BaseとArmorの重なり、法線への参照は `monoceros_parts.tscn` と `monoceros_gait.tres` に保存する。実行時はシーンの依存として画像とシェーダーを取得し、役者の寿命で保持する。回転に合わせた法線の照明と色の置換はGPUで処理し、色と位置補正は `BossDef.part_appearance` から表示へ反映する。敵実験所は同じ表示シーンを使い、独立したプレビューと実験所の定義へ編集を適用する。
+一角獣のパーツ画像は制作工程で `tools/art/export_monoceros.lua` をAsepriteのbatch実行へ渡して書き出す。切り出し範囲、BaseとArmorの重なり、法線への参照は `monoceros_parts.tscn` と `monoceros_gait.tres` に保存する。実行時はシーンの依存として画像とシェーダーを取得し、表示ノードの寿命で保持する。回転に合わせた法線の照明と色の置換はGPUで処理し、色と位置補正は `BossDef.part_appearance` から表示へ反映する。敵実験所は同じ表示シーンを使い、独立したプレビューと実験所の定義へ編集を適用する。
 
-ケンタウルスのパーツ制作画面は `data/visuals/centaurus_animation.tres` に基礎ポーズ・コマ・追加パーツの画像参照を保存する。固定の切り出し範囲と法線参照はパーツシーンに保持する。戦闘表示は同じResourceをシーンの依存として取得し、役者の寿命で保持する。実行時は攻撃状態と経過時間に応じて保存済みの姿勢を選び、指定された変形だけを補間する。画像の解析・合成を再実行せず、法線の照明はGPUで処理する。制作画面はResourceを複製して編集し、明示保存で全ポーズとコマを反映する。部位の固定回転支点は同Resourceの `part_pivots` で共用し、コマは親座標系の支点位置を保存する。支点設定時は保存済み変形から支点位置を更新して絵の配置を保ち、実行時は補間した支点位置と変形から部位の位置を求める。腕の接続点は `arm_joints` で共用し、コマは接続状態・肩の支点・弓の手からの相対姿勢を持つ。手先IKは制作画面の操作時に実行して姿勢を保存する。戦闘中は補間した姿勢の接続点と握り位置だけを補正し、手先を追うIKを再計算する処理は制作画面に置く。
+ケンタウルスのパーツ制作画面は `data/visuals/centaurus_animation.tres` に基礎ポーズ・コマ・追加パーツの画像参照を保存する。固定の切り出し範囲と法線参照はパーツシーンに保持する。戦闘表示は同じResourceをシーンの依存として取得し、表示ノードの寿命で保持する。実行時は攻撃状態と経過時間に応じて保存済みの姿勢を選び、指定された変形だけを補間する。画像の解析・合成を再実行せず、法線の照明はGPUで処理する。制作画面はResourceを複製して編集し、明示保存で全ポーズとコマを反映する。部位の固定回転支点は同Resourceの `part_pivots` で共用し、コマは親座標系の支点位置を保存する。支点設定時は保存済み変形から支点位置を更新して絵の配置を保ち、実行時は補間した支点位置と変形から部位の位置を求める。腕の接続点は `arm_joints` で共用し、コマは接続状態・肩の支点・弓の手からの相対姿勢を持つ。手先IKは制作画面の操作時に実行して姿勢を保存する。戦闘中は補間した姿勢の接続点と握り位置だけを補正し、手先を追うIKを再計算する処理は制作画面に置く。
 
 りゅう座のパーツ画像と法線は `tools/art/export_draco.lua` がAsepriteから制作時に書き出す。`draco_parts.gd` が画像を依存として取得し、本体・全身複製の表示寿命で保持する。実行時は既存の背骨から節の位置・向きを更新し、少数色の法線照明をGPUで処理する。画像の切り出し・合成は制作工程で完了する。
 
 ### 15.2 背景の配置
 
-画面全体の地色は `StageDef.background_color` に保存し、制作時に RuntimeStage へ引き継ぐ。通常時の描画はその色、ボーナス中は専用色を使う。背景エディターは地色を配置と同じ履歴・未保存判定で扱う。星は `background_star_field.gd` と `background_stars.gdshader` を本番とプレビューで共有する。メッシュと固定乱数の星データを表示開始時にGPUへ送り、表示中心・範囲・倍率だけを更新する。プレビューは開始地点からの座標を本番のカメラ座標へ変換し、地色・星・背景素材・ガイドの順に描く。星の表示切替は編集画面内で保持する。
+画面全体の地色は `StageDef.background_color` に保存し、制作時にRunResourcesへ引き継ぐ。通常時の描画はその色、ボーナス中は専用色を使う。背景エディターは地色を配置と同じ履歴・未保存判定で扱う。星は `background_star_field.gd` と `background_stars.gdshader` を本番とプレビューで共有する。メッシュと固定乱数の星データを表示開始時にGPUへ送り、表示中心・範囲・倍率だけを更新する。プレビューは開始地点からの座標を本番のカメラ座標へ変換し、地色・星・背景素材・ガイドの順に描く。星の表示切替は編集画面内で保持する。
 
 ステージの背景は `StageDef.backgrounds` の `BackgroundPlacement` 配列へ保存する。画像・開始地点からの位置・倍率・回転・色と明るさ・移動倍率 `parallax` を持ち、配列の後ろほど手前へ描く。`tint` のRGBを色、Aを明るさとして保存し、`display_tint()` がRGBへ明るさを掛けて描画用のAを1に保つ。元画像のアルファは画像の穴・輪郭に使う。`position_at()` が開始地点からのカメラ移動量に応じた表示位置を計算し、本番と背景エディターの視差プレビューで共有する。実行用の `texture_path` と `used_rect` は生成時に解決し、`bounds()` は生成済み範囲を返す。`RunPresentation` と開発用の `gyms/background_lab/` が同じ原点と寸法で描く。背景エディターは保存時にステージを読み直して地色と背景配列を書き換え、外部変更はファイルのハッシュで検出する。実行用の依存資源にも背景画像を含める。
 
-共通炎の固定配置は `StageDef.fire_uses` に用途名・設定パス・開始地点からの位置・倍率を保存する。背景に付く炎は `BackgroundPlacement.fire_preset_path` と位置・倍率を使う。どちらも指定した設定だけを RuntimeStage の依存資源へ登録し、表示開始時に PixelFire を作る。
+共通炎の固定配置は `StageDef.fire_uses` に用途名・設定パス・開始地点からの位置・倍率を保存する。背景に付く炎は `BackgroundPlacement.fire_preset_path` と位置・倍率を使う。どちらも指定した設定だけを RunResourcesの依存資源へ登録し、表示開始時に PixelFire を作る。
 
 ### 15.3 生成と配布の入口
 
-`addons/content_build/builder.gd` の共通生成処理を、エディターの実行前、タイムライン保存、CLI、exportから呼ぶ。編集元のハッシュと出力一覧をstampに持ち、実行用ステージ・音源・名前対応表の欠落を検出する。エディターでの実行は、Autoloadの初期化で音源を読む前と、各ステージを開始する前にも生成物を確認し、不足・更新があれば共通生成処理で作り直す。実験場で保存してから同じ実行中にステージへ進む場合も、新しい生成物を読み直す。配布版は生成済みデータを使う。生成物は `.content/` に置き、Gitの対象外とする。
+Godot本体・API・SDK・export template・SCons・精度は `cpp/dependencies.json` で固定する。拡張は `cpp/SConstruct` が完全コミット・追跡ファイルの変更・APIハッシュを検査してビルドする。手順は[README](../README.md#godot-で開発する)に示す。
 
-```bash
-godot --headless --path speed --script res://tools/content/build_all.gd -- --force
-godot --headless --path speed --export-release macOS /tmp/SPEED.app
-```
+`addons/content_build/builder.gd` は実行前・CLI・exportの共通生成入口で、編集元の署名と出力一覧をstampに持つ。ボスプログラム、外観、攻撃表示、星座、図鑑、音、制作中間データ、各ステージと導入の戦闘バイナリ・索引・RunResourcesを生成する。エディター内の不足・更新検出は開発用の生成経路として使う。配布版は生成済みの定義と資源を読み、必須データの不整合と欠落を拒否する。`.content/` と共有ライブラリは生成物としてGit管理から外す。
 
-`speed/export_presets.cfg` のmacOS設定はローカル確認用の署名・公証なしのアプリを生成する。`gyms/`・`tests/`・`tools/`・`scripts/dev/`・編集用addon・開発用の名前対応表とAutoloadを除外し、生成済みの実行用データを含める。PCKの検査は `python3 speed/tests/integration/export_package.py <PCKのパス>` を使う。製品の署名・公証・ストア公開の設定は未決。
+`tools/build/build_run.py` は固定SDKでの拡張ビルドを担当する。`--package-dir` を指定するとソース外の新しい独立コピーで、import・共通生成・export・配布構成の検査を順に行う。Macはarm64・x86_64を作ってuniversalへまとめ、Windowsはx86_64を作る。公式godot-cppのLICENSEと依存固定情報を `licenses/run/` へ含める。
+
+`--verify` は隔離した保存先を持つ確認用パッケージで、配布エンジンによる最小ランとライブラリ欠落時の拒否を確認する。Macの `--rendered` は `--verify` と併用し、`godot-bg` で描画付きの起動を行う。性能や全種類の意味的な照合は別の確認範囲とする。
+
+`speed/export_presets.cfg` は通常ラン・導入に必要なC++拡張、`.content/run/`、Godotの表示・入力・UI・保存・音を含める。制作元の戦闘定義・生成器・生成用スキーマ・`gyms/`・`tests/`・開発用計測・編集用addon・`.content/dev/` を除外し、実行時の共通IDは含める。配布検査の入口は `speed/tests/integration/export_package.py`。製品の署名・公証・ストア公開の設定は未決。
 
 ## 16. demo との対応
 
@@ -935,27 +750,27 @@ demo のどのファイルが、仕様書のどこにあたり、本番のどこ
 | demo のファイル | 仕様書 | 本番の担当 |
 |---|---|---|
 | `config.js` | 全体 | `data/config.tres`、ContentManager |
-| `spawner.js` | 2.3、9.2、9.3 | EnemySystem、`data/phases/` |
-| `enemies.js` | 9 | EnemySystem、`data/enemies/` |
+| `spawner.js` | 2.3、9.2、9.3 | C++の出現処理、`data/phases/` |
+| `enemies.js` | 9 | `cpp/behaviors/enemies/`、`data/enemies/` |
 | `controls.js`、`input.js` | 3.1、17 | `scripts/input/`、ShipSystem |
-| `world.js` | 3、4、5 | RunSimulation、ShipSystem、DrawSystem、CombatSystem |
-| `combat.js`、`hits.js` | 5、8、9.5 | CombatSystem、PickupSystem、ProjectileSystem |
-| `run-build.js`、`run-weapons.js`、`modules.js`、`effects.js` | 6、7 | LoadoutSystem、`scripts/weapons/`、`scripts/traits/`、`data/weapons/`、`data/traits/` |
-| `progression.js` | 7.1、12 | LoadoutSystem、SaveManager、`data/meta_upgrades/` |
-| `field.js`、`meteor-field.js`、`gravity.js` | 11 | FieldSystem |
-| `finale.js` | 14 | RunSimulation、RunPresentation |
-| `debris.js`、`impact-fx.js` | 9.5、14 | ProjectileSystem、RunPresentation |
+| `world.js` | 3、4、5 | RunRunner、C++の機体・線・戦闘処理 |
+| `combat.js`、`hits.js` | 5、8、9.5 | C++の戦闘・回収・攻撃処理 |
+| `run-build.js`、`run-weapons.js`、`modules.js`、`effects.js` | 6、7 | C++の成長・装備処理、`cpp/behaviors/weapons/`、`cpp/behaviors/traits/`、`data/weapons/`、`data/traits/` |
+| `progression.js` | 7.1、12 | C++の成長処理、SaveManager、`data/meta_upgrades/` |
+| `field.js`、`meteor-field.js`、`gravity.js` | 11 | `cpp/systems/field*.cpp` |
+| `finale.js` | 14 | RunRunner、RunPresentation |
+| `debris.js`、`impact-fx.js` | 9.5、14 | C++の攻撃処理、RunPresentation |
 | `render.js`、`ui.js` | 13、14、15 | RunPresentation、`scenes/ui/`、`scripts/ui/` |
-| `debug.js` | 18 | `scenes/ui/`、`scripts/debug/`（調整パネル） |
-| `grid.js` | — | CombatSystem（7章の空間分割） |
+| `debug.js` | 18 | `scenes/ui/`、`scripts/dev/`（調整パネル） |
+| `grid.js` | — | C++の戦闘格子（7章の空間分割） |
 | `portals.js`、`portal-loops.js`、`experimental-weapons.js`、`parts.js`、`stages.js` | — | 移さない（描画版の仕様に含まれない。demo の `stages.js` は速度の段階の演出で、本番のステージとは別物） |
-| （なし） | 20〜24 | GameManager、BossSystem、FieldSystem、RunSimulation、`scenes/stages/`、`scenes/bosses/`、`scenes/gimmicks/`、`data/stages/`、`data/bosses/`。demo に対応する実装はない |
+| （なし） | 20〜24 | GameManager、C++のボス・地形処理、RunRunner、`scenes/stages/`、`scenes/bosses/`、`scenes/gimmicks/`、`data/stages/`、`data/bosses/`。demo に対応する実装はない |
 
 ## 17. システムの限界
 
 | 項目 | 管理方法と参照先 |
 |---|---|
-| 敵 | `SpawnSystem` が通常補充・波状出現の数とクリップの制限を管理する。`EnemySystem.spawn()`・`spawn_part()` は行を生成し、`spawn_later()` は行動が確定した生成を更新末尾に実行する。各行動が固有数・間隔を制限し、`RowSlots` が空き行を再利用・拡張する。予約は確定時の定義・位置・指定をラン内で保持し、実行後または全消去時に解放する。[生成の共通規則](spec.md#113-出現と補充) |
+| 敵 | C++の出現処理が通常補充・波状出現・クリップの上限を管理する。敵Systemが通常敵と部位の行・Handle・ID索引を追加・解放し、`pending_enemies` で確定済みの派生生成を更新末尾へ渡す。予約はラン内で保持し、実行後・全消去・終了時に回収する。[生成の共通規則](spec.md#113-出現と補充) |
 | 経験値の結晶 | 地面の全色合計を `config.gem_max` 内に保つ。空き枠ぶんを生成し、余剰基準XPを指定黄色へ加える。[取得と集約](spec.md#102-取得と集約) |
 | 機雷 | [W07_mines.tres](../speed/data/weapons/W07_mines.tres) の `params.max` まで追加する |
 | 破片の光の跡 | 1つの破片につき `config.corpse_trail_points` 点まで保持し、超えた最古点を除く。[仕様書16章](spec.md#16-演出) |
@@ -966,20 +781,18 @@ demo のどのファイルが、仕様書のどこにあたり、本番のどこ
 
 | 項目 | 章 |
 |---|---|
-| GDScriptでの性能目標の達成と、届かない場合の代替方式 | 2、6、10 |
+| 通常ランの描画込み性能目標の最終合格と、未達箇所の改善 | 2、6、10、14 |
 | PC・スマホで使うレンダラの最終選択 | 2 |
 | 表示補間の方式 | 5 |
 
 ## 19. 敵・ルート実験場
 
-`gyms/enemy_lab/` がデバッグ専用画面と編集・記録・隔離試行を担当する。`LabSession` はRunManagerから独立したRunSessionを作り、共有データから複製した設定、seed、定義、入力元をセッションのoptionsへ渡す。表示あり・なしで同じRunSimulationを使う。通常ランは既定の参照と保存先を使う。実験ランは外部から固定 tick を進め、結果保存の代わりに実験イベントを受け取る。閲覧用キャンバスは本番の敵表と攻撃表を読み、変更を命令としてセッションへ渡す。
+`gyms/enemy_lab/` が開発用の編集・記録・隔離試行を持つ。LabSessionは複製した編集元から通常と同じ生成器で戦闘バイナリを作り、独立したRunSession・RunBridgeでC++ランを開始する。seed・初期条件・tick付き命令履歴を保持し、外部から固定tickを進める。表示あり・なしでも同じ戦闘を使い、実験結果は通常ランの保存先と分ける。
 
-実験場上部の種類別ヒットストップ調整は `LabSession.perform()` の敵・ボス定義変更として命令履歴へ加える。実行中の同種の敵定義とボス役者、以後の出現に反映し、選択した種類の定義または現在のステージ上書き値へ戻せる。実験場のリセットは試遊値を破棄する。編集元リソースへの保存はデータ編集またはステージ敵調整が担当する。
+閲覧用の読取モデルは出力値の写しを持つ。編集は現在のstate revisionを照合し、通常生成器で検証したreplacementを `dev_edit`・`dev_set_scenario` 等の公開命令へ渡す。変更した定義はラン専用に保持し、保存済みの共通定義と区別する。種類別ヒットストップの変更・元に戻す操作も命令履歴へ加える。実験リセットは試遊値を破棄し、恒久保存はデータ編集・ステージ敵調整の明示操作で行う。
 
-再現の基準は初期条件と tick 付き命令履歴の再実行。ContentManager は読み込んだ定義のハッシュを持ち、セッションがその基準を保持する。明示的なデータ再読込は敵・ボス・時間帯・ステージ・共通値を新しい参照として公開し、既存の実験が持つ参照を保つ。実験用の描画時計は `RunState.sim_time`、ボスの戦闘乱数は `RunState.rng` を使う。手動更新するボスのタイムラインはメソッドをその更新内で実行する。巻き戻しの高速化は、停止したランシーンを上限付きで保持する方式で、HSM・BT の内部状態も同じ実体で復元する。チェックポイントの鍵は適用済みの初期条件・命令列。履歴を差し替えた場合は実行済みの鍵との一致を検査する。
+巻き戻しはC++の値状態と不変定義を保持点へコピーし、復元後にepochを進める。戦闘の時計・乱数・部位・技・残留攻撃を同じラン状態から復元し、通知の配信待ち・表示・資源要求の世代は再接続する。実験場は初期条件・命令履歴に対応する保持点を上限付きで管理する。
 
-`route_trial.gd` は独立したセッションで DrawSystem の描画・なぞりと各Systemの本番判定を実行する。`scripts/encounters/route_constraints.gd` は戦闘の別実装を持たず、静止形状と保守的な時間包絡の検査を担当する。成立区分と操作の正は [仕様書20.1](spec.md#201-敵ルート実験場)。
+敵・ルート実験場、ボスAIの試遊、Hydraの単独試遊、導入の練習は同じC++ランを使う。`route_trial.gd` は独立ランへ本番の入力と経路問い合わせを渡す。静止形状と時間包絡の検査はC++の `systems/route_constraints.cpp`、攻撃の要求・待機・開始・残留・終了は `systems/attack_budget.cpp` と攻撃状態が担当する。形状のHandleと発生元・攻撃グループを区別し、行の再利用と所有者の終了を照合する。
 
-`scripts/encounters/attack_director.gd` は要求・分類の同時取得・待機・開始・残留・終了を管理する。通常敵の行動中は個体の行番号とIDから同じ枠を維持し、行動終了後は生成済み判定のグループだけを保持する。ProjectileSystem の行番号から攻撃グループを引き、行の再利用時に対応を上書きする。独立して動く敵の判定は同じグループへ登録し、終了時に解除する。付着範囲の所有者と、発生元・攻撃グループを区別する。EnemySystem の発動境界とボスの判断から予告前に許可を取り、攻撃のない追跡は既存の処理で進める。同じランの複数ボスは1つのBossSystemのactorsへ登録し、部位通知と撃破を対応する行・IDへ送る。役者と各部位はRunContextを受け取る。
-
-`encounter_coordinator.gd` はルートと配置領域から候補を構成する共通境界を持つ。採用された `StageDef.encounter_profile` が有効なランで攻撃管理と出現へ接続し、時間帯と基準ハッシュを検査する。本番での候補採用は標準サイズ・レベル1の通常敵を対象とし、特殊な条件は実験の隔離再生で確認する。通常設定が空なら追加の検査器と攻撃管理を生成しない。
+`systems/encounters.cpp` は採用されたencounter profileのランで配置候補・攻撃管理・出現を接続する。時間帯と生成済み設定を読み、通常の敵更新と同じ時計・乱数・判定を使う。成立区分と操作は[仕様書20.1](spec.md#201-敵ルート実験場)を参照する。

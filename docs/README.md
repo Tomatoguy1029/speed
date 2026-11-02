@@ -80,7 +80,6 @@ python3 tools/check_docs.py
 - 個人の作業ログのファイル
 - リポジトリの `tasks/`・`docs/proposals/`・`docs/logs/`
 - `docs/` と `AGENTS.md`・`README.md` の切れたリンク
-- [設計書](architecture.md) 6.2 の敵の列の一覧と、`speed/scripts/data_types/enemy_table.gd` の列の食い違い
 
 処理の実行時期と生成・利用・解放の関係は、[設計書15.1](architecture.md#151-ビルドと実行時の境界)を正とし、[AI向けの確認手順](dev/stage-production-ai.md#処理の実行時期を設計レビューする)でレビューする。上記の自動チェックは、この意味的な適合判定を代行しない。
 
