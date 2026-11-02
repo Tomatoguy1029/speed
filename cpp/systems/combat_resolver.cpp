@@ -1,6 +1,8 @@
 #include "combat_resolver.h"
 #include "../behaviors/enemies/defender.h"
 #include "combat_hooks.h"
+#include "../behaviors/enemies/shield.h"
+#include "motion_math.h"
 #include "attack_system.h"
 #include "enemy_system.h"
 #include "pickup_system.h"
@@ -65,11 +67,28 @@ EnemyHandle CombatResolver::damage_target(const RunRuntime &run,EnemyHandle stru
     }
     return {};
 }
-bool CombatResolver::allows_hit(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {
-    if (!run.state.enemy_handles.contains(target)) return false;
-    const auto &enemy=run.state.enemies[target.slot];
-    const auto &policy=run.combat_hooks.enemy_policy(run.content->definitions[enemy.definition].kind);
-    return !policy.allows || policy.allows(run,target,request);
+GateResult CombatResolver::gate(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {
+    const auto &s=run.state;if (!s.enemy_handles.contains(target)) return GateResult::Pass;
+    const auto &e=s.enemies[target.slot];const auto &d=run.content->definitions[e.definition];const bool ram=request.cause==Cause::Ram;
+    if (d.kind==EnemyDefinition::Kind::Shield) return ShieldBehavior::blocks_front(run,target,request.has_impact?request.impact:e.pos,request.direction)?(ram?GateResult::Bounce:GateResult::Pass):GateResult::Allow;
+    switch (d.gate) {
+    case EnemyDefinition::Gate::Solid:return ram?GateResult::Bounce:GateResult::Allow;
+    case EnemyDefinition::Gate::Membrane:return e.mode==EnemyMode::Recover?GateResult::Allow:GateResult::Pass;
+    case EnemyDefinition::Gate::Ghost:case EnemyDefinition::Gate::Guard:return GateResult::Pass;
+    case EnemyDefinition::Gate::Immortal:return ram?GateResult::Allow:GateResult::Pass;
+    case EnemyDefinition::Gate::Claw:if (e.mode==EnemyMode::Recover) return GateResult::Allow;[[fallthrough]];
+    case EnemyDefinition::Gate::Back:
+        if (request.direction!=godot::Vector2() && std::abs(angle_difference(double(request.direction.angle())-e.facing))<3.141592653589793-d.gate_arc) return GateResult::Allow;
+        return ram?GateResult::Bounce:GateResult::Pass;
+    default:break;
+    }
+    const auto &p=run.combat_hooks.enemy_policy(d.kind);return !p.allows || p.allows(run,target,request)?GateResult::Allow:GateResult::Pass;
+}
+bool CombatResolver::allows_hit(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {return gate(run,target,request)==GateResult::Allow;}
+double CombatResolver::ram_damage(const RunRuntime &run,EnemyHandle target,double amount) {
+    if (!run.state.enemy_handles.contains(target)) return amount;const auto &e=run.state.enemies[target.slot];const auto &d=run.content->definitions[e.definition];
+    if (d.gate==EnemyDefinition::Gate::Immortal) return std::max(amount,e.hp);
+    const auto &p=run.combat_hooks.enemy_policy(d.kind);return p.ram_damage?p.ram_damage(run,target,amount):amount;
 }
 DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &request) {
     CombatHooks::Dispatch dispatch(run.combat_hooks);
@@ -85,7 +104,7 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     }
     const auto definition=state.enemies[result.target.slot].definition;
     const auto policy=run.combat_hooks.enemy_policy(run.content->definitions[definition].kind);
-    result.resolved=request.cause==Cause::Ram && policy.ram_damage?policy.ram_damage(run,result.target,request.amount):request.amount;
+    result.resolved=request.cause==Cause::Ram?ram_damage(run,result.target,request.amount):request.amount;
     if (!std::isfinite(result.resolved) || result.resolved<0) {result.reason=CombatReason::Invalid;EventBuilder::enemy_damage(run,request,result);return result;}
     bool fresh=state.enemies[result.target.slot].hp>=state.enemies[result.target.slot].max_hp-1e-6;
     if (state.draw.tracing) {

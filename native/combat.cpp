@@ -61,9 +61,8 @@ static double angle_difference(double target, double current) {
 }
 
 bool SpeedRunCore::blocks_front(size_t row, Vector2 hit, Vector2 direction) const {
-    speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(row));
-    request.impact=hit;request.has_impact=true;request.direction=direction;
-    return !speed::CombatResolver::allows_hit(runtime,request.struck,request);
+    const auto handle=runtime.state.enemy_handles.at(uint32_t(row));
+    return runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Shield && speed::ShieldBehavior::blocks_front(runtime,handle,hit,direction);
 }
 
 void SpeedRunCore::damage_enemy(size_t row,double amount,StringName cause,bool crit,Vector2 direction,double knock,const Vector2 *impact) {
@@ -108,7 +107,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (runtime.state.draw.tracing) speed::FullChargeBehavior::prepare(runtime,from.distance_to(position));
         const double attack = speed::CombatResolver::attack_power(runtime)*speed::RunUpBehavior::multiplier(runtime,from.distance_to(position));
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
-        const bool front = blocks_front(hit.row, position, direction) || (fast && def.ram_guard);
+        const bool front = blocks_front(hit.row, position, direction);
         if (front && (!fast || (!runtime.state.draw.tracing && enemy.hit_cd > 0))) {
             Vector2 normal = position - enemy.pos;
             normal = normal.length_squared() > 0 ? normal.normalized() : -direction;
@@ -151,7 +150,10 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction, 160.0, &position);
             continue;
         }
-        if (!front && (runtime.state.loadout.effects.ignore_armor || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
+        speed::DamageRequest gate_request;gate_request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));gate_request.cause=speed::Cause::Ram;gate_request.direction=direction;gate_request.impact=position;gate_request.has_impact=true;
+        const auto gate=speed::CombatResolver::gate(runtime,gate_request.struck,gate_request);
+        if (gate==speed::GateResult::Pass) {enemy.hit_cd=c.contact_cooldown;if (runtime.state.draw.tracing) runtime.state.draw.inside[enemy.id]=hit.row;continue;}
+        if (gate==speed::GateResult::Allow && (runtime.state.loadout.effects.ignore_armor || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
             double damage = attack * (crit ? c.crit_mult : 1.0);
             if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
                 speed::ShieldBehavior::steal(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));
@@ -188,7 +190,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         runtime.state.ship.vel *= c.bounce_keep;
         if (runtime.state.ship.vel.length() < c.bounce_min_speed) runtime.state.ship.vel = normal * c.bounce_min_speed;
         runtime.state.ship.boost_t = 0;
-        if (!front) damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
+        if (gate==speed::GateResult::Allow) damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
         enemy.hit_cd = 0.25;
         speed::RunUpBehavior::contact(runtime,position,direction,0);
         Dictionary bounce; bounce["pos"] = runtime.state.ship.pos; emit_event("bounce", bounce);

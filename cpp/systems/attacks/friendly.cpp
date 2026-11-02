@@ -55,7 +55,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
             DamageRequest request;request.struck=struck;request.amount=shot.damage;request.direction=speed>0?vel/speed:Vector2();request.knock=shot.knock;
             request.impact=impact;request.has_impact=true;request.no_crit=shot.no_crit;request.shatter_depth=shot.shatter_depth;
             if (const auto *record=get(runtime.state,processing_handle)) {request.cause=record->spec.cause;request.weapon_id=record->spec.weapon;}else break;
-            if (shot.kind==int64_t(FriendKind::Shot) && !CombatResolver::allows_hit(runtime,struck,request)) {
+            if (shot.kind==int64_t(FriendKind::Shot) && runtime.content->definitions[enemy.definition].kind==EnemyDefinition::Kind::Shield && !CombatResolver::allows_hit(runtime,struck,request)) {
                 speed::ReflectedSystem::reflect(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),impact,vel,shot.radius);
                 position = impact;life = 0;body_hit.reset();end_reason=speed::AttackEndReason::Hit;break;
             }

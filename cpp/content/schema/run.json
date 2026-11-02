@@ -885,9 +885,20 @@
           "name": "reward_burst",
           "type": "bool",
           "native": "reward_burst"
+        },
+        {
+          "name": "gate",
+          "type": "u32",
+          "max": 7
+        },
+        {
+          "name": "gate_arc",
+          "type": "f64",
+          "min": 0,
+          "native": "gate_arc"
         }
       ],
-      "version": 8
+      "version": 9
     },
     {
       "name": "LoadoutDefinition",

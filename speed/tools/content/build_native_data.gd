@@ -16,6 +16,11 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		"color": [definition.color.r, definition.color.g, definition.color.b, definition.color.a],
 		"xp": definition.xp, "knockback": definition.knockback_scale(config),
 		"hitstop_multiplier": definition.hitstop_multiplier}
+	var gates := {&"":0,&"none":0,&"solid":1,&"membrane":2,&"ghost":3,&"immortal":4,&"claw":5,&"back":6,&"guard":7}
+	if not gates.has(definition.gate): return {}
+	row.gate = gates[definition.gate]
+	row.gate_arc = float(definition.params.get("front_arc",1.6))
+	if not is_finite(row.gate_arc) or row.gate_arc<0.0: return {}
 	var attack_value := stage.enemy_attack_value(definition.id) if stage != null else 1.0
 	row.attack = {"value": attack_value, "priority": stage.enemy_attack_priority(definition.id) if stage != null else 0.0,
 		"telegraph": float(definition.params.get("telegraph",0.0)), "weight": definition.attack_weight, "managed": bool(stage.attack_managed_by_type.get(String(definition.id),true)) if stage is RuntimeStage else attack_value > 0.0}
@@ -204,7 +209,6 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		for value in row.dash.values():
 			if not is_finite(value) or value<0.0: return {}
 	if definition.behavior == &"drift":
-		if definition.gate not in [&"",&"guard"]: return {}
 		row.drift = {"has_life":definition.params.has("life"),"life":float(definition.params.get("life",0.0)),"ram_guard":definition.gate==&"guard"}
 		if not is_finite(row.drift.life) or row.drift.life<0.0: return {}
 	if definition.behavior == &"rocket":

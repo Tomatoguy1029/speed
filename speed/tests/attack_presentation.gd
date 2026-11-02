@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-gates" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_gates()
+		check(finished,"判定ゲートの指定確認を最後まで実施する")
+		print("[cpp_gates] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-crab" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_crab()
 		check(finished,"かに座の指定確認を最後まで実施する")
@@ -219,7 +225,7 @@ var cpp_bridge
 var cpp_core
 var cpp_config: GameConfig
 var cpp_origin := Vector2(-900,0)
-func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStringArray(["drifter"]), tuning: Dictionary = {}) -> bool:
+func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStringArray(["drifter"]), tuning: Dictionary = {}, definitions: Dictionary = {}) -> bool:
 	cpp_config = ContentManager.base.duplicate(true)
 	cpp_config.start_radius = 900.0
 	cpp_config.planet_radius = 100.0
@@ -234,7 +240,7 @@ func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStri
 	stage.enemy_tuning = tuning
 	var output := "res://.content/dev/"+name
 	var builder = load("res://tools/content/build_run_content.gd")
-	if builder.build(stage,cpp_config,output,name.sha256_text())!=OK:
+	if builder.build(stage,cpp_config,output,name.sha256_text(),definitions)!=OK:
 		check(false,"攻撃の定義を生成する: "+name)
 		return false
 	var path := output.path_join("stage_%d.json" % index_number)
@@ -1440,5 +1446,75 @@ func check_cpp_crab() -> bool:
 	cpp_core.step(0.11)
 	cpp_bridge.command("dev_remove",{"entity_id":actor})
 	check(cpp_core.hazards_snapshot().is_empty(),"参照する発生元を先に解放しても薙ぎを残さない")
+	cpp_session.free()
+	return true
+
+func check_cpp_gates() -> bool:
+	var cases := {"drifter":"none","bomber":"solid","crab":"membrane","aquila":"ghost","phoenix":"immortal","cross":"claw","aquarius":"back","reticle":"guard"}
+	var definitions := {}
+	var tuning := {}
+	var ids := PackedStringArray()
+	for id: String in cases:
+		var definition := (load("res://data/enemies/%s.tres" % id) as EnemyDef).duplicate(true) as EnemyDef
+		definition.gate = StringName(cases[id])
+		definitions[StringName(id)] = definition
+		tuning[id] = {"hp":100.0,"armor":0.0,"speed":0.0,"weak_arc":0.0}
+		ids.append(id)
+	ids.append("shield")
+	tuning.shield = {"hp":100.0,"armor":0.0,"speed":0.0}
+	if not await prepare_cpp_attack(114,"gates",ids,tuning,definitions): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	for id: String in cases:
+		cpp_bridge.restore(empty.value)
+		var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":id,"position":cpp_origin}).value
+		var spawned: Dictionary = cpp_bridge.checkpoint()
+		var hp: float = cpp_core.enemies_snapshot()[0].hp
+		var gate_name: String = cases[id]
+		var shot_allowed := gate_name in ["none","solid","claw","back"]
+		check(cpp_core.fire_shot(cpp_origin-Vector2(100,0),0.0,5.0,{"speed":1000.0,"r":2.0,"life":1.0,"knock":0.0}),"%sの射撃を生成する" % gate_name)
+		cpp_core.step_projectiles(0.2)
+		check(is_equal_approx(cpp_core.enemies_snapshot()[0].hp,hp-(5.0 if shot_allowed else 0.0)) and cpp_core.hostiles_snapshot().is_empty(),"%sは射撃の可否を守り、盾以外では反射しない" % gate_name)
+		cpp_bridge.restore(spawned.value)
+		cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(80,0),"velocity":Vector2(3000,0)})
+		var bounced: bool = cpp_core.collide_ship(cpp_origin-Vector2(80,0),cpp_config.ship_radius)
+		var after: Dictionary = cpp_core.enemies_snapshot()[0]
+		var ram_allowed := gate_name in ["none","immortal","claw","back"]
+		check(bounced==(gate_name=="solid") and (after.hp<hp)==ram_allowed,"%sは高速接触の貫通・すり抜け・反発を区別する" % gate_name)
+		if gate_name=="immortal": check(after.dead==1,"不死ゲートは通った体当たりで残りHP以上を与える")
+		cpp_bridge.restore(spawned.value)
+		cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(80,0),"velocity":Vector2(50,0)})
+		check(not cpp_core.collide_ship(cpp_origin-Vector2(80,0),cpp_config.ship_radius) and (cpp_core.enemies_snapshot()[0].hp<hp)==shot_allowed,"%sは低速接触を通常攻撃と同じ可否で扱う" % gate_name)
+		if gate_name in ["claw","back"]:
+			cpp_bridge.restore(spawned.value)
+			var front: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":actor,"amount":5.0,"cause":"shot","direction":Vector2.LEFT}).value
+			check(front.reason=="damage_gate","%sの閉じた正面は射撃が通らない" % gate_name)
+			cpp_bridge.command("dev_ship_motion",{"position":cpp_origin-Vector2(80,0),"velocity":Vector2(-3000,0)})
+			check(cpp_core.collide_ship(cpp_origin+Vector2(80,0),cpp_config.ship_radius) and cpp_core.enemies_snapshot()[0].hp==hp,"%sの閉じた正面の体当たりは弾く" % gate_name)
+		if gate_name in ["membrane","claw"]:
+			cpp_bridge.restore(spawned.value)
+			check(cpp_bridge.command("dev_enemy_combat",{"entity_id":actor,"mode":EnemyTable.Mode.RECOVER}).ok,"%sの開いた状態を構成する" % gate_name)
+			var opened: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":actor,"amount":5.0,"cause":"shot","direction":Vector2.LEFT}).value
+			check(opened.reason=="applied" and opened.applied==5.0,"%sは開いている間に正面からも攻撃が通る" % gate_name)
+	cpp_bridge.restore(empty.value)
+	var normal: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	cpp_bridge.command("dev_enemy_combat",{"entity_id":normal,"guard":1.0})
+	check(cpp_bridge.command("dev_damage",{"entity_id":normal,"amount":5.0,"cause":"shot"}).value.reason=="guard" and cpp_bridge.command("dev_damage",{"entity_id":normal,"amount":5.0,"cause":"ram"}).value.reason=="guard","個体の無敵は射撃と体当たりの両方を拒否する")
+	cpp_bridge.restore(empty.value)
+	var shield: int = cpp_bridge.command("dev_spawn",{"definition_id":"shield","position":cpp_origin}).value
+	var point: Dictionary = cpp_bridge.checkpoint()
+	var shield_hp: float = cpp_core.enemies_snapshot()[0].hp
+	var front: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":shield,"amount":5.0,"cause":"shot","impact":cpp_origin+Vector2(30,0),"direction":Vector2.LEFT}).value
+	var rear: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":shield,"amount":5.0,"cause":"shot","impact":cpp_origin-Vector2(30,0),"direction":Vector2.RIGHT}).value
+	check(front.reason=="damage_gate" and rear.applied==5.0,"盾の前面拒否と背面許可を共通判定へ接続する")
+	cpp_bridge.restore(point.value)
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin-Vector2(80,0),"velocity":Vector2(-3000,0)})
+	check(cpp_core.collide_ship(cpp_origin+Vector2(80,0),cpp_config.ship_radius) and cpp_core.enemies_snapshot()[0].hp==shield_hp,"盾の正面の高速接触を弾く")
+	cpp_bridge.restore(point.value)
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin-Vector2(80,0),"velocity":Vector2(-50,0)})
+	check(cpp_core.collide_ship(cpp_origin+Vector2(80,0),cpp_config.ship_radius) and cpp_core.enemies_snapshot()[0].hp==shield_hp,"盾の正面の低速接触も押し戻す")
+	cpp_bridge.restore(point.value)
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(80,0),"velocity":Vector2(3000,0)})
+	check(not cpp_core.collide_ship(cpp_origin-Vector2(80,0),cpp_config.ship_radius) and cpp_core.enemies_snapshot()[0].dead==1,"盾の背後の高速接触は盾を奪って倒す")
 	cpp_session.free()
 	return true

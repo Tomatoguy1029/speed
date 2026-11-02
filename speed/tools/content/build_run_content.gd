@@ -12,7 +12,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
 	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9,&"rocket":10,&"drift":11,&"part":12,&"dash":13,&"battleship":14,&"sniper":15,&"marlin":16,&"pulser":17,&"dolphin":18,&"lynx":19,&"soldier":20,&"auriga":21,&"clock":22,&"reticle":23,&"aquarius":24,&"cross":25,&"bomber":28,&"phoenix":29,&"aquila":30,&"split":26,&"defender":27,&"crab":34}[definition.behavior],"turn":source.turn}
-	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
+	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier","gate","gate_arc"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
 		row[pair[0]] = source.attack[pair[1]]

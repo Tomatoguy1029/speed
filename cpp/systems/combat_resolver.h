@@ -3,10 +3,13 @@
 #include "collision_query.h"
 namespace speed {
 class RunRuntime;
+enum class GateResult {Allow,Pass,Bounce};
 class CombatResolver {
 public:
     static double attack_power(const RunRuntime &);
     static EnemyHandle damage_target(const RunRuntime &,EnemyHandle);
+    static GateResult gate(const RunRuntime &,EnemyHandle,const DamageRequest &);
+    static double ram_damage(const RunRuntime &,EnemyHandle,double);
     static bool allows_hit(const RunRuntime &,EnemyHandle,const DamageRequest &);
     static DamageResult damage_enemy(RunRuntime &,const DamageRequest &);
     static KillResult kill_enemy(RunRuntime &,const DamageRequest &,bool one_shot=false);
