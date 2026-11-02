@@ -66,6 +66,13 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t14" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t14()
+		check(finished,"軌跡延長の確認を最後まで実施する")
+		print("[cpp_t14] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t12" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t12()
 		check(finished,"広域回収の確認を最後まで実施する")
@@ -908,4 +915,60 @@ func check_cpp_t12() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"広域回収の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func check_cpp_t14() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: TraitDef = load("res://data/traits/T14_length.tres")
+	var factor := 1.1
+	var speed_factor := 1.2
+	var bridge = t07_bridge(config,{"mult":{"length":factor,"max_speed":speed_factor}})
+	if bridge==null: return false
+	var core = bridge._core
+	check(is_equal_approx(bridge._ui.length_mult,factor),"未取得時は永続強化の描線倍率を使う")
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T14","levels":1}).ok,"T14を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.length_mult,factor*(1.0+definition.stack_bonus(level))),"tresの各段を永続強化へ一度掛ける")
+	var trained: float = bridge._ui.length_mult
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T14","levels":1}).ok and bridge._ui.length_mult==trained,"上限を越えて描線倍率を増やさない")
+	bridge.command("dev_post_length",{"stacks":3})
+	var expected := trained*config.post_max.factor(&"line_length",{&"line_length":3})
+	check(is_equal_approx(bridge._ui.length_mult,expected),"最大段後の延長は通常の育成後へ掛ける")
+	var start := Vector2(-3000,0)
+	check(core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0),"実際の描線入力を開始する")
+	var limit := config.draw_length*expected*speed_factor
+	check(is_equal_approx(core.draw_snapshot().draw_limit,limit),"速度の倍率・充填量・延長倍率を含む距離上限を開始時に決める")
+	check(core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(limit*0.25,0)},10,1.0),"延長された距離の途中まで描く")
+	var partial: Dictionary = core.draw_snapshot()
+	check(partial.drawing and is_equal_approx(partial.draw_length,limit*0.25),"途中の長さを同じ距離単位で保持する")
+	bridge.command("set_ui_overlay",{"active":false})
+	var saved: Dictionary = bridge.checkpoint()
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(is_equal_approx(hud._cpp_ui.length_mult,expected) and is_equal_approx(hud._cpp_ui.draw.draw_limit,limit) and is_equal_approx(hud._cpp_ui.draw.draw_length/limit,0.25),"HUDへ同じ延長倍率と描き途中のゲージ消費率を渡す")
+	check(core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(limit*2.0,0)},20,1.0),"上限を越える入力も実際の描線へ通す")
+	var committed: Dictionary = core.draw_snapshot()
+	check(committed.tracing and not committed.drawing and is_equal_approx(committed.trace_total,limit) and committed.gauge<0.00001,"上限で線を止めて発進し、上限相当のゲージを消費する")
+	bridge.command("dev_remove_trait",{"id":"T14"})
+	check(is_equal_approx(bridge._ui.length_mult,factor*config.post_max.factor(&"line_length",{&"line_length":3})) and core.draw_snapshot().trace_total==committed.trace_total,"解除で特性分だけを外し、開始済みの線を縮めない")
+	bridge.command("dev_post_length",{"stacks":0})
+	check(is_equal_approx(bridge._ui.length_mult,factor),"最大段後の延長も外すと永続強化までの倍率へ戻る")
+	check(bridge.restore(saved.value).ok,"所持段・倍率・描き途中の点列と距離上限を保持して復帰する")
+	bridge.collect_frame()
+	check(core.draw_snapshot()==partial and is_equal_approx(bridge._ui.length_mult,expected),"復帰後も同じ点列と実効距離へ戻る")
+	bridge.release_checkpoint(saved.value)
+	core.handle_draw({"touch":true,"pen_release":true},30,1.0)
+	check(core.draw_snapshot().tracing and is_equal_approx(core.draw_snapshot().gauge,0.75),"復帰した途中の線を発進すると実際に描いた分だけ消費する")
+	hud.free()
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"軌跡延長の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true

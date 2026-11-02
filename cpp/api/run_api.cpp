@@ -55,7 +55,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     double speed_factor=1;
     if (profile.has("mult")) {
         const Dictionary mult=profile["mult"];
-        if (!keys(mult,{"max_speed","attack","pickup"})) return failure(1,"profile.mult","未登録の永続強化です");
+        if (!keys(mult,{"max_speed","attack","pickup","length"})) return failure(1,"profile.mult","未登録の永続強化です");
         if (mult.has("max_speed")) {
             const Variant value=mult["max_speed"];
             if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<=0) return failure(1,"profile.mult.max_speed","速度倍率は有限の正数にしてください");
@@ -80,6 +80,15 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
             pickup_factor=value;
         }
     }
+    double length_factor=1;
+    if (profile.has("mult")) {
+        const Dictionary mult=profile["mult"];
+        if (mult.has("length")) {
+            const Variant value=mult["length"];
+            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<=0) return failure(1,"profile.mult.length","描線倍率は有限の正数にしてください");
+            length_factor=value;
+        }
+    }
     if (bytes.size()<88 || std::memcmp(bytes.ptr(),"SPDRUN01",8)) return failure(1,"bundle","生成物の形式が不正です");
     if (bytes.decode_u32(8)!=speed::FORMAT_VERSION || bytes.decode_u32(12)!=speed::ABI_VERSION) return failure(2,"bundle","生成物の版が一致しません");
     Ref<SpeedRunCore> candidate;candidate.instantiate();
@@ -93,7 +102,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     state.forward.base_interval=state.forward.interval=forward.interval;state.forward.fire.remaining=forward.interval;state.forward.damage=forward.damage;
     state.forward.life=forward.life;state.forward.spread=forward.spread;state.forward.knock=forward.knock;state.forward.pierce=forward.pierce;
     state.forward.character_scale=candidate->runtime.content->config.character_scale;state.forward.ready=true;
-    state.hitstop_enabled=settings.get("hitstop",true);state.loadout.charge_profile_factor=charge_factor;state.loadout.speed_profile_factor=speed_factor;state.loadout.attack_profile_factor=attack_factor;state.loadout.pickup_profile_factor=pickup_factor;
+    state.hitstop_enabled=settings.get("hitstop",true);state.loadout.charge_profile_factor=charge_factor;state.loadout.speed_profile_factor=speed_factor;state.loadout.attack_profile_factor=attack_factor;state.loadout.pickup_profile_factor=pickup_factor;state.loadout.length_profile_factor=length_factor;
     const auto &lifecycle=candidate->runtime.content->lifecycle;
     state.lifecycle_ready=true;state.death_freeze=lifecycle.death_freeze_time;state.death_explosion=lifecycle.death_explosion_time;state.death_game_over=lifecycle.death_game_over_time;
     if (!candidate->runtime.content->budget_phases.empty()) {
@@ -193,6 +202,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
                 changed=speed::EquipmentSystem::grant(runtime,d.id,uint32_t(int64_t(payload["levels"])));
         }
         response=changed?success():failure(5,"equipment","装備を変更できません");
+    } else if (kind=="dev_post_length" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
+        runtime.state.loadout.post_line_length_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
     } else if (kind=="dev_post_pickup" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
         runtime.state.loadout.post_xp_pickup_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
     } else if (kind=="dev_post_weapon_power" && runtime.api_development && payload.size()==2 && is(payload,"damage",Variant::INT) && is(payload,"followup",Variant::INT) && int64_t(payload["damage"])>=0 && int64_t(payload["followup"])>=0) {
@@ -307,6 +318,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=control.ui_overlay || control.ui_reward || runtime.state.phase==Phase::Paused || runtime.state.phase==Phase::LevelUp || (runtime.state.phase==Phase::Dying && runtime.state.sequence_t<runtime.state.death_freeze);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;
+    ui["length_mult"]=runtime.state.draw_config.length_mult;
     ui["pickup_radius"]=runtime.state.pickup_config.coin_radius;ui["xp_pickup_radius"]=runtime.state.pickup_config.xp_radius;
     ui["attack_mult"]=runtime.state.combat_config.attack_mult;ui["attack_power"]=speed::CombatResolver::attack_power(runtime);
     ui["crit_chance"]=runtime.state.combat_config.crit_chance;ui["crit_mult"]=runtime.state.combat_config.crit_mult;

@@ -64,9 +64,14 @@
           "name": "pickup_bonus",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "length_bonus",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 7
+      "version": 8
     },
     {
       "name": "PostMaxChargeDefinition",
@@ -175,6 +180,22 @@
         },
         {
           "name": "xp_radius_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxDrawDefinition",
+      "section": 36,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "line_length_increment",
           "type": "f64",
           "min": 0
         }
