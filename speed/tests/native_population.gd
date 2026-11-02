@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-hero-values" in OS.get_cmdline_user_args():
+		check_semantics_hero_values()
+		print("[semantics_hero_values] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-shot-values" in OS.get_cmdline_user_args():
 		check_semantics_shot_values()
 		print("[semantics_shot_values] failed=%d" % failed)
@@ -889,3 +894,48 @@ func check_semantics_shot_values() -> void:
 	OS.remove_logger(capture)
 	check(capture.count()==0,"射撃の両実装に実行時エラーがない")
 	print("SEMANTICS_SHOT_VALUES ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+func check_semantics_hero_values() -> void:
+	var config: GameConfig=ContentManager.base.duplicate(true)
+	config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	config.comet_interval_min=1e8;config.comet_interval_max=1e8;config.gravity_interval_min=1e8;config.gravity_interval_max=1e8
+	config.start_radius=900
+	var stage:=RuntimeStage.new()
+	stage.index=202;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter"])
+	var phase:=PhaseDef.new()
+	phase.id=&"英雄の時計";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0;stage.phases=[phase]
+	var output:="res://.content/dev/semantics_hero_values"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1英雄の不足値".sha256_text())!=OK:
+		check(false,"英雄のSource定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_202.json")))
+	var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new()
+	var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new()
+	OS.add_logger(capture)
+	for id in [&"perseus",&"leo",&"gemini",&"hercules"]:
+		var run:=semantics_legacy(config,stage,{},17)
+		var intent:=Intent.new()
+		run.input_source=func():return intent
+		run.view_size_source=func():return Vector2(1280,720)
+		run.loadout.reset_loadout()
+		run.state.hero_power=id
+		var bridge=semantics_bridge(bytes,17)
+		if bridge==null:check(false,"英雄数値のC++ランを開始する");run.dispose();break
+		bridge.command("dev_set_hero",{"id":String(id)})
+		for tick in 64:
+			intent.hero_press=tick==0
+			run._play_tick(1.0/120.0)
+			var stepped:Dictionary=bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+			if not stepped.ok or capture.count()>0:check(false,"英雄の数値採取中に実行エラー: "+str(capture.messages()));break
+			var hero: Dictionary=bridge.read_frame().value.ui.hero
+			var source: Dictionary={"active":run.state.hero_active_t,"cooldown":run.state.hero_cd,"boss_stun":run.state.boss_stun,"width":run.heroes.trace_width()}
+			var native: Dictionary={"active":hero.active,"cooldown":hero.cooldown,"boss_stun":hero.boss_stun,"width":hero.trace_width}
+			var found: String=comparison.semantics_difference(source,native)
+			check(found.is_empty(),"英雄のf64指定許容幅 %s tick%d: %s"%[id,tick,found])
+			if failed:break
+		run.dispose();bridge.dispose()
+		print("SEMANTICS_HERO_CASE ",id," failed=",failed)
+		if failed:break
+	OS.remove_logger(capture)
+	check(capture.count()==0,"英雄の両実装に実行時エラーがない")
+	print("SEMANTICS_HERO_VALUES ",JSON.stringify({"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"failed":failed,"scope":"全4英雄の実秒持続時間/CD/ボス停止/実効描線幅。乱数座標と固有攻撃は含めない"}))
