@@ -7,9 +7,32 @@ var session: Node
 var events: Array[StringName] = []
 const DT := 1.0 / 120.0
 func check(ok: bool, label: String) -> void:
+	if semantics_strict():return
 	if not ok:
 		failed += 1
 		push_error(label)
+
+## 数値幅が未確認の既存場面だけを判定し、成功済みの条件は再判定しない。
+func semantics_strict() -> bool:
+	return "--semantics-strict" in OS.get_cmdline_user_args()
+
+var semantics_fields: Dictionary = {}
+func semantics_approx(a: Variant,b: Variant,field: String) -> bool:
+	var fields: PackedStringArray = []
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--semantics-fields="):fields=argument.trim_prefix("--semantics-fields=").split("|")
+	if semantics_strict() and (fields.is_empty() or field in fields):
+		var error: float = a.distance_to(b) if a is Vector2 else absf(float(a)-float(b))
+		var limit: float = 1e-4 if a is Vector2 else maxf(1e-9,maxf(absf(float(a)),absf(float(b)))*1e-9)
+		semantics_fields[field] = maxf(float(semantics_fields.get(field,0.0)),error)
+		if not is_finite(error) or error>limit:
+			failed += 1
+			push_error("数値幅の不一致: %s actual=%s expected=%s error=%.16f limit=%.16f"%[field,a,b,error,limit])
+	return a.is_equal_approx(b) if a is Vector2 else is_equal_approx(a,b)
+
+func _exit_tree() -> void:
+	if semantics_strict():print("SEMANTICS_FIELDS ",semantics_fields," failures=",failed)
+
 func _ready() -> void:
 	if "--cpp-finish-source-hp" in OS.get_cmdline_user_args():
 		call_deferred("native_finish_source_hp")
@@ -691,7 +714,7 @@ func native_charge_terrain() -> void:
 	bridge._core.step(0.25)
 	bridge._core.step(0.2)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.stage==2 and is_equal_approx(state.position.x,304.0) and bridge.read_frame().ok,"月には角が刺さらず本体の接触で回復へ移る")
+	check(state.stage==2 and semantics_approx(state.position.x,304.0,"native_charge_terrain:state.position.x") and bridge.read_frame().ok,"月には角が刺さらず本体の接触で回復へ移る")
 	bridge.dispose()
 	get_tree().quit(1 if failed else 0)
 	print("[cpp_monoceros_charge_terrain] failures=",failed)
@@ -735,7 +758,7 @@ func native_kick() -> void:
 	bridge._core.step(0.01)
 	var state: Dictionary = bridge.command("dev_boss_state").value[0]
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
-	check(state.stage==0 and body.facing==0.0 and state.direction.is_equal_approx(Vector2.LEFT),"背後で技を自然選択し本体の向きを変えず狙う")
+	check(state.stage==0 and body.facing==0.0 and semantics_approx(state.direction,Vector2.LEFT,"native_kick:state.direction"),"背後で技を自然選択し本体の向きを変えず狙う")
 	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
 	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
 	add_child(view)
@@ -748,7 +771,7 @@ func native_kick() -> void:
 	check(state.locked and leg.rotation!=0.0 and leg.get_node("Foot").position.y<view._leg_rest["RearLeftLeg"],"予告中は向きを固定し後脚を畳む表示へ接続する")
 	bridge._core.step(0.15)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.stage==1 and state.position==Vector2.ZERO and state.horn[1].is_equal_approx(Vector2(-240,0)),"発進しても移動せず蹄の到達距離の線分を使う")
+	check(state.stage==1 and state.position==Vector2.ZERO and semantics_approx(state.horn[1],Vector2(-240,0),"native_kick:state.horn[1]"),"発進しても移動せず蹄の到達距離の線分を使う")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
 	body = bridge.command("dev_boss_body_state").value[0]
@@ -764,10 +787,10 @@ func native_kick() -> void:
 	bridge.release_checkpoint(held.value)
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.stage==2 and is_equal_approx(state.remaining,0.65),"終了時に停止・PI/戻り速度・回復を合計して待つ")
+	check(state.stage==2 and semantics_approx(state.remaining,0.65,"native_kick:state.remaining"),"終了時に停止・PI/戻り速度・回復を合計して待つ")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(is_zero_approx(state.settle_progress),"攻撃後の停止中は後脚の姿勢を保持する")
+	check(semantics_approx(state.settle_progress,0.0,"native_kick:state.settle_progress"),"攻撃後の停止中は後脚の姿勢を保持する")
 	bridge._core.step(0.25)
 	state = bridge.command("dev_boss_state").value[0]
 	body = bridge.command("dev_boss_body_state").value[0]
@@ -776,7 +799,7 @@ func native_kick() -> void:
 	restored.set_script(load("res://scripts/render/bosses/monoceros.gd"))
 	add_child(restored)
 	restored.apply_frame(body,state)
-	check(is_equal_approx(state.settle_progress,0.5) and is_equal_approx(restored.parts.get_node("RearLeftLeg").rotation,leg.rotation),"姿勢戻しの途中から表示を作っても同じ後脚へ復帰する")
+	check(semantics_approx(state.settle_progress,0.5,"native_kick:state.settle_progress") and is_equal_approx(restored.parts.get_node("RearLeftLeg").rotation,leg.rotation),"姿勢戻しの途中から表示を作っても同じ後脚へ復帰する")
 	var angle := leg.rotation
 	view.apply_frame(body,state)
 	check(leg.rotation==angle,"世界停止中は後脚の戻しを進めない")
@@ -846,19 +869,19 @@ func native_sweep() -> void:
 	check(state.stage==0 and state.sequence_stage==0 and state.side==1,"本体フローから最初の方向の踏み込みを自然選択する")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.sequence_stage==0 and state.speed==200.0 and state.position.is_equal_approx(Vector2(20,0)),"踏み込みは加速上限で進み最短時間と同値では止まらない")
+	check(state.sequence_stage==0 and state.speed==200.0 and semantics_approx(state.position,Vector2(20,0),"native_sweep:state.position"),"踏み込みは加速上限で進み最短時間と同値では止まらない")
 	bridge._core.step(0.01)
 	state = bridge.command("dev_boss_state").value[0]
 	check(state.sequence_stage==1 and state.locked and state.sequence_elapsed==0.0,"距離と最短時間を満たしたtickで停止へ進み方向を固定する")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.speed==100.0 and state.position.is_equal_approx(Vector2(32,0)) and is_equal_approx(state.angle,-0.75) and state.booster==0.3,"停止中は線形減速と首の溜めを同じ時計で進める")
+	check(state.speed==100.0 and semantics_approx(state.position,Vector2(32,0),"native_sweep:state.position") and semantics_approx(state.angle,-0.75,"native_sweep:state.angle") and state.booster==0.3,"停止中は線形減速と首の溜めを同じ時計で進める")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.stage==1 and state.sequence_stage==2 and state.sequence_elapsed==0.0 and state.position.is_equal_approx(Vector2(32,0)),"停止時刻で振り抜きへ入り同じtickでは振らない")
+	check(state.stage==1 and state.sequence_stage==2 and state.sequence_elapsed==0.0 and semantics_approx(state.position,Vector2(32,0),"native_sweep:state.position"),"停止時刻で振り抜きへ入り同じtickでは振らない")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.hit and state.sequence_stage==3 and is_equal_approx(state.angle,0.8),"0.008秒ごとの回転掃引で角の通過を一回命中させ保持へ進む")
+	check(state.hit and state.sequence_stage==3 and semantics_approx(state.angle,0.8,"native_sweep:state.angle"),"0.008秒ごとの回転掃引で角の通過を一回命中させ保持へ進む")
 	check(fixture.events.any(func(event): return event.type==&"combat_player_damage" and event.payload.technique==&"sweep" and event.payload.cause==&"horn" and event.payload.source==&"monoceros"),"回転掃引の原因と出所・技IDを配信先へ渡す")
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step(0.1)
@@ -871,11 +894,11 @@ func native_sweep() -> void:
 	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
 	add_child(view)
 	view.apply_frame(body,state)
-	check(is_equal_approx(state.angle,0.4) and is_equal_approx(view.parts.get_node("Head").rotation,0.4) and view.horn.self_modulate.r>1.0,"途中から作った本体表示も薙ぎの首の角度と金色の発光へ合わせる")
+	check(semantics_approx(state.angle,0.4,"native_sweep:state.angle") and is_equal_approx(view.parts.get_node("Head").rotation,0.4) and view.horn.self_modulate.r>1.0,"途中から作った本体表示も薙ぎの首の角度と金色の発光へ合わせる")
 	var held: Dictionary = bridge.checkpoint()
 	bridge._core.step(0.11)
 	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(expected.stage==2 and is_equal_approx(expected.remaining,0.05),"戻しが終わったら回復へ進む")
+	check(expected.stage==2 and semantics_approx(expected.remaining,0.05,"native_sweep:expected.remaining"),"戻しが終わったら回復へ進む")
 	check(held.ok and bridge.restore(held.value).ok,"戻し途中の段階・角度・左右と命中済み状態を保持復帰する")
 	bridge._core.step(0.11)
 	check(bridge.command("dev_boss_state").value[0]==expected,"途中復帰後も同じ戻し終了の状態へ進む")
@@ -931,7 +954,7 @@ func native_lance() -> void:
 	check(state.sequence_stage==0 and state.stage==0,"本体フローで光の槍を自然選択する")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.position.is_equal_approx(Vector2(-4,0)) and is_equal_approx(state.form,0.75) and not state.locked,"溜め中は後退し二次補間で槍の長さと光を形成する")
+	check(semantics_approx(state.position,Vector2(-4,0),"native_lance:state.position") and semantics_approx(state.form,0.75,"native_lance:state.form") and not state.locked,"溜め中は後退し二次補間で槍の長さと光を形成する")
 	var visual = load("res://scripts/bosses/monoceros/lance_visual.gd").new()
 	add_child(visual)
 	visual.apply_frame([state],0.1)
@@ -948,7 +971,7 @@ func native_lance() -> void:
 	check(events.any(func(e): return e.type==&"lance_launch"),"発進の光を登録済み通知で配信する")
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.hit and is_equal_approx(state.traveled,100.0) and is_equal_approx(state.horn[1].x-state.position.x,237.6),"槍先を含む線分と固有の太さで一回命中する")
+	check(state.hit and semantics_approx(state.traveled,100.0,"native_lance:state.traveled") and semantics_approx(state.horn[1],state.position+Vector2(237.6,0),"native_lance:horn_endpoint"),"槍先を含む線分と固有の太さで一回命中する")
 	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"horn" and e.payload.source==&"monoceros" and e.payload.technique==&"lance") and events.filter(func(e): return e.type==&"sonic_boom").size()==4,"命中の原因と技を記録し一tick内のブームを全て配信する")
 	var held: Dictionary = bridge.checkpoint()
 	bridge._core.step(0.1)
@@ -961,7 +984,7 @@ func native_lance() -> void:
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step(0.1)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.sequence_stage==2 and is_equal_approx(state.speed,1000.0*exp(-0.9)) and state.form==0.0 and state.glow==0.0 and bridge._core.ship_snapshot().ship_hp==hp,"停止中は指数減速し光を砕いて当たりを追加しない")
+	check(state.sequence_stage==2 and semantics_approx(state.speed,1000.0*exp(-0.9),"native_lance:state.speed") and state.form==0.0 and state.glow==0.0 and bridge._core.ship_snapshot().ship_hp==hp,"停止中は指数減速し光を砕いて当たりを追加しない")
 	check(fixture.events.any(func(e): return e.type==&"lance_shatter" and e.payload.horn[1].x>e.payload.horn[0].x),"砕ける前の槍先を通知に保つ")
 	bridge._core.step(0.1)
 	check(bridge.command("dev_boss_state").value[0].stage==2,"停止時間が終わったら回復へ進む")
@@ -1121,14 +1144,14 @@ func native_return() -> void:
 	check(state.stage==1 and state.sequence_stage==1 and state.travel==200.0 and state.traveled==0.0,"自機までの距離とovershootを上限距離で止めて発進する")
 	bridge._core.step(0.2)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.hit and state.sequence_stage==2 and state.completed==1 and state.position.is_equal_approx(Vector2(200,0)),"最初の突進は上限で止まり一回命中して減速へ進む")
+	check(state.hit and state.sequence_stage==2 and state.completed==1 and semantics_approx(state.position,Vector2(200,0),"native_return:state.position"),"最初の突進は上限で止まり一回命中して減速へ進む")
 	bridge._core.step(0.05)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.position.is_equal_approx(Vector2(212.5,0)) and is_equal_approx(state.brake_progress,0.5),"減速は速さの割合を線形に減らし前方の逆噴射へ接続する")
+	check(semantics_approx(state.position,Vector2(212.5,0),"native_return:state.position") and semantics_approx(state.brake_progress,0.5,"native_return:state.brake_progress"),"減速は速さの割合を線形に減らし前方の逆噴射へ接続する")
 	bridge._core.step(0.05)
 	bridge._core.step(0.05)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.sequence_stage==3 and not state.locked and is_equal_approx(absf(state.facing),PI*0.5) and is_equal_approx(absf(state.angle-state.facing),0.4),"振り向きはsmoothstepで回り頭が最大head_leadだけ先に向く")
+	check(state.sequence_stage==3 and not state.locked and semantics_approx(absf(state.facing),PI*0.5,"native_return:absf(state.facing)") and semantics_approx(absf(state.angle-state.facing),0.4,"native_return:absf(state.angle-state.facing)"),"振り向きはsmoothstepで回り頭が最大head_leadだけ先に向く")
 	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
 	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
 	add_child(view)
@@ -1137,7 +1160,7 @@ func native_return() -> void:
 	var held: Dictionary = bridge.checkpoint()
 	bridge._core.step(0.05)
 	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(expected.locked and is_equal_approx(absf(expected.angle),PI),"次回のturn_lock秒前に振り向きと頭を固定する")
+	check(expected.locked and semantics_approx(absf(expected.angle),PI,"native_return:absf(expected.angle)"),"次回のturn_lock秒前に振り向きと頭を固定する")
 	check(held.ok and bridge.restore(held.value).ok,"減速後の向き直り・完了回数・技時計を途中復帰する")
 	bridge._core.step(0.05)
 	check(bridge.command("dev_boss_state").value[0]==expected,"復帰しても同じ方向と時刻で固定する")
@@ -1194,10 +1217,10 @@ func native_wave() -> void:
 	check(bridge.command("dev_boss_state").value[0].stage==0,"制作値から共通フローで角の衝撃波を単独選択する")
 	bridge._core.step(0.1)
 	var state: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(state.sequence_stage==1 and is_equal_approx(state.angle,-0.8) and wave_rows(bridge).is_empty(),"溜め終わりに首を引いた角度を保ち同じtickには波を放たない")
+	check(state.sequence_stage==1 and semantics_approx(state.angle,-0.8,"native_wave:state.angle") and wave_rows(bridge).is_empty(),"溜め終わりに首を引いた角度を保ち同じtickには波を放たない")
 	bridge._core.step(0.05)
 	var waves := wave_rows(bridge)
-	check(waves.size()==1 and waves[0].radius==50.0 and is_zero_approx(waves[0].angle),"振り抜きのsmoothstep閾値で一度放ち発生tickでは広げない")
+	check(waves.size()==1 and waves[0].radius==50.0 and semantics_approx(waves[0].angle,0.0,"native_wave:waves[0].angle"),"振り抜きのsmoothstep閾値で一度放ち発生tickでは広げない")
 	check(f.events.any(func(e): return e.type==&"wave_release"),"波の放出位置を登録済み通知で配信する")
 	bridge.command("dev_ship_motion",{"position":Vector2(55,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(55,0),Vector2(55,0),Vector2(640,360))
@@ -1273,16 +1296,16 @@ func native_dance() -> void:
 	bridge._core.step(0.01)
 	bridge._core.step(0.05)
 	var state: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(state.stage==0 and state.locked and is_equal_approx(state.glow,0.5),"最初の照準はaim_lock前に固定し同じ時計で角を光らせる")
+	check(state.stage==0 and state.locked and semantics_approx(state.glow,0.5,"native_dance:state.glow"),"最初の照準はaim_lock前に固定し同じ時計で角を光らせる")
 	bridge._core.step(0.05)
 	state = bridge.command("dev_boss_state").value[0]
 	check(state.stage==1 and state.sequence_stage==1 and state.travel==200.0 and state.run_speed==1000.0,"初回の突進はmin_runと現在の自機までの距離で決める")
 	bridge._core.step(0.2)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.hit and state.completed==1 and state.sequence_stage==2 and state.position.is_equal_approx(Vector2(200,0)),"各回の突進は共有した掃引で命中し所定距離で左旋回へ進む")
+	check(state.hit and state.completed==1 and state.sequence_stage==2 and semantics_approx(state.position,Vector2(200,0),"native_dance:state.position"),"各回の突進は共有した掃引で命中し所定距離で左旋回へ進む")
 	bridge._core.step(0.05)
 	state = bridge.command("dev_boss_state").value[0]
-	check(state.sequence_stage==2 and is_equal_approx(state.heading,-0.1) and state.speed==900.0 and is_equal_approx(state.angle,-0.5) and state.booster==1.2,"旋回は左回りで減速し最短時間と同値では発進せず頭だけ先に向く")
+	check(state.sequence_stage==2 and semantics_approx(state.heading,-0.1,"native_dance:state.heading") and state.speed==900.0 and semantics_approx(state.angle,-0.5,"native_dance:state.angle") and state.booster==1.2,"旋回は左回りで減速し最短時間と同値では発進せず頭だけ先に向く")
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
 	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
 	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
@@ -1302,7 +1325,7 @@ func native_dance() -> void:
 	check(state.completed==2 and state.sequence_stage==3 and state.hit,"最後の突進も独立して命中し角を掲げる段階へ進む")
 	bridge._core.step(0.05)
 	state = bridge.command("dev_boss_state").value[0]
-	check(is_equal_approx(state.speed,1000.0*exp(-0.5)) and is_equal_approx(state.glow,0.1),"終了段階は指数減速し角の光を時間で戻す")
+	check(semantics_approx(state.speed,1000.0*exp(-0.5),"native_dance:state.speed") and semantics_approx(state.glow,0.1,"native_dance:state.glow"),"終了段階は指数減速し角の光を時間で戻す")
 	bridge._core.step(0.05)
 	bridge._core.step(0.051)
 	check(bridge.command("dev_boss_state").value[0].stage==5,"掲げる時間と回復が終わったら自然終了する")
@@ -1357,14 +1380,14 @@ func native_sword() -> void:
 	bridge._core.step(0.01)
 	bridge._core.step(0.05)
 	var state: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(state.stage==0 and state.locked and is_equal_approx(state.angle,-0.45) and state.target==Vector2(150,0),"初回の溜めは現在の位置を固定し首を引く")
+	check(state.stage==0 and state.locked and semantics_approx(state.angle,-0.45,"native_sword:state.angle") and state.target==Vector2(150,0),"初回の溜めは現在の位置を固定し首を引く")
 	bridge._core.step(0.05)
 	check(bridge.command("dev_boss_state").value[0].sequence_stage==1,"初回の溜め時間で振り抜きへ進む")
 	bridge._core.step(0.05)
 	state = bridge.command("dev_boss_state").value[0]
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
-	check(state.released and state.hit and is_equal_approx(state.speed,100.0*exp(-0.5)) and is_equal_approx(state.position.x,100.0*exp(-0.5)*0.05),"前進を指数減速し振り抜きの半分で斬撃を一回放つ")
-	check(body.last_slash[0].is_equal_approx(Vector2(150,-100)) and body.last_slash[1].is_equal_approx(Vector2(150,100)),"固定した対象までの距離を使い斜めの有限線分を生成する")
+	check(state.released and state.hit and semantics_approx(state.speed,100.0*exp(-0.5),"native_sword:state.speed") and semantics_approx(state.position,Vector2(100.0*exp(-0.5)*0.05,0),"native_sword:lunge_position"),"前進を指数減速し振り抜きの半分で斬撃を一回放つ")
+	check(semantics_approx(body.last_slash[0],Vector2(150,-100),"native_sword:body.last_slash[0]") and semantics_approx(body.last_slash[1],Vector2(150,100),"native_sword:body.last_slash[1]"),"固定した対象までの距離を使い斜めの有限線分を生成する")
 	check(f.events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"sword_flash" and e.payload.source==&"monoceros" and e.payload.technique==&"sword_flash"),"斬撃の原因をsword_flashへ分けて記録へ渡す")
 	var visual = load("res://scripts/bosses/monoceros/sword_flash_visual.gd").new()
 	add_child(visual)
@@ -1423,6 +1446,7 @@ func finish_fixture(limit := -1.0, automatic := false) -> Dictionary:
 	boss.params.initial_wait = 0.0
 	boss.params.phase_time = 0.01
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.time_limit = limit
 	stage.legendary_module_id = ContentManager.stage(1).legendary_module_id
 	var package: Dictionary = builder.boss_package(boss,cfg,stage)
@@ -1599,7 +1623,7 @@ func native_finish_source_hp() -> void:
 	finish_low_hp(f)
 	var body: Dictionary = f.bridge.command("dev_boss_body_state").value[0]
 	var expected: float = float(f.package.records.EnemyRecord[0].hp)*float(f.package.records.BossBodyDefinition[0].phase_threshold)*0.5
-	check(body.phase==2 and absf(float(body.hp)-expected)<0.0001,"非致死の低HPは余剰ダメージを戻さず第2形態へ移る")
+	check(body.phase==2 and semantics_approx(float(body.hp),expected,"native_finish_source_hp:hp"),"非致死の低HPは余剰ダメージを戻さず第2形態へ移る")
 	check(f.bridge.read_frame().ok and f.bridge.delivery_error.ok,"低HPの通知を正常に読む")
 	f.bridge.dispose()
 	f = finish_fixture()

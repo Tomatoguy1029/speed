@@ -1,6 +1,7 @@
 extends Node
 var failed := 0
 func check(ok: bool, label: String) -> void:
+	if semantics_strict():return
 	if not ok:
 		failed += 1
 		push_error(label)
@@ -11,6 +12,28 @@ func aligned(actor: MonocerosBoss) -> bool:
 	var root := actor.to_local(horn.global_position)
 	var tip := actor.to_local(horn.to_global(Vector2.DOWN * lengths[horn.frame]))
 	return absf(tip.dot((tip - root).normalized()) - actor.horn_length()) < 0.01
+
+## 数値幅が未確認の既存場面だけを判定し、成功済みの条件は再判定しない。
+func semantics_strict() -> bool:
+	return "--semantics-strict" in OS.get_cmdline_user_args()
+
+var semantics_fields: Dictionary = {}
+func semantics_approx(a: Variant,b: Variant,field: String) -> bool:
+	var fields: PackedStringArray = []
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--semantics-fields="):fields=argument.trim_prefix("--semantics-fields=").split("|")
+	if semantics_strict() and (fields.is_empty() or field in fields):
+		var error: float = a.distance_to(b) if a is Vector2 else absf(float(a)-float(b))
+		var limit: float = 1e-4 if a is Vector2 else maxf(1e-9,maxf(absf(float(a)),absf(float(b)))*1e-9)
+		semantics_fields[field] = maxf(float(semantics_fields.get(field,0.0)),error)
+		if not is_finite(error) or error>limit:
+			failed += 1
+			push_error("数値幅の不一致: %s actual=%s expected=%s error=%.16f limit=%.16f"%[field,a,b,error,limit])
+	return a.is_equal_approx(b) if a is Vector2 else is_equal_approx(a,b)
+
+func _exit_tree() -> void:
+	if semantics_strict():print("SEMANTICS_FIELDS ",semantics_fields," failures=",failed)
+
 
 func _ready() -> void:
 	if "--cpp-body-hud" in OS.get_cmdline_user_args() or "--cpp-body-view-retry" in OS.get_cmdline_user_args():
@@ -97,12 +120,14 @@ func native_body() -> void:
 	check(view.horn.texture.normal_texture!=null and view.horn.material.get_shader_parameter("use_normal"),"準備済み角アトラスの色と法線・メタデータを使う")
 	bridge._core.step(0.1)
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.position.is_equal_approx(Vector2(45,0)) and body.velocity.is_equal_approx(Vector2(450,0)),"初回待ち中も通常の接近速度で前進する")
+	check(semantics_approx(body.position,Vector2(45,0),"native_body:position") and semantics_approx(body.velocity,Vector2(450,0),"native_body:velocity"),"初回待ち中も通常の接近速度で前進する")
 	var before: Vector2 = body.velocity
 	for cause in ["ram","touch","wave"]:
 		bridge.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":cause,"direction":Vector2.RIGHT,"knock":1500.0})
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.velocity==before and is_equal_approx(body.hp,body.max_hp-3.0),"被弾はHPへ通し外力で自力移動を変えない")
+	check(body.velocity==before and semantics_approx(body.hp,body.max_hp-3.0,"native_body:hp"),"被弾はHPへ通し外力で自力移動を変えない")
+	if semantics_strict():
+		bridge.dispose();view.queue_free();get_tree().quit(1 if failed else 0);return
 	view.apply_frame(body,{},definition.part_appearance)
 	check(view.parts.modulate.r>1.0,"被弾の表示値を本体へ反映する")
 	bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp*0.6,"cause":"bullet"})
@@ -163,7 +188,7 @@ func native_body_retry() -> void:
 	for cause in ["ram","touch","wave"]:
 		check(bridge.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":cause,"direction":Vector2.RIGHT,"knock":1500.0}).ok,"被弾の原因を登録済みIDで渡す")
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.velocity==before and is_equal_approx(body.hp,body.max_hp-3.0),"被弾はHPへ通し外力で自力移動を変えない")
+	check(body.velocity==before and semantics_approx(body.hp,body.max_hp-3.0,"native_body:hp"),"被弾はHPへ通し外力で自力移動を変えない")
 	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
 	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
 	add_child(view)

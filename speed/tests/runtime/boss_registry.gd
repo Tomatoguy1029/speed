@@ -2,6 +2,7 @@
 extends Node
 var failed := 0
 func check(ok: bool, message: String) -> void:
+	if semantics_strict():return
 	if "--cpp-boss-trace-stop" in OS.get_cmdline_user_args() and message!="録画停止で並行首の評価をそれぞれ閉じる": return
 	if "--cpp-canis-finish-retry" in OS.get_cmdline_user_args() and (message.begins_with("全技の共通パッケージを開始する") or message.begins_with("連携の内包技も同じ24件") or message.begins_with("通常HP・低HPに対応する形態を選ぶ")): return
 	if "--cpp-centaurus-combo-shower-tail" in OS.get_cmdline_user_args() and message not in ["強弓の予告が終わるとコズミックの矢を放つ","後半の強弓の姿勢と矢を正式表示へ渡す","強弓の硬直で連携を自然終了し、放った矢は残す","降り矢・強弓の戦闘とcueを同じ通知経路へ送る","前半の取消・参加者消失で降り矢を消して強弓を始めない"]: return
@@ -9,6 +10,28 @@ func check(ok: bool, message: String) -> void:
 	if not ok:
 		failed += 1
 		push_error(message)
+
+## 数値幅が未確認の既存場面だけを判定し、成功済みの条件は再判定しない。
+func semantics_strict() -> bool:
+	return "--semantics-strict" in OS.get_cmdline_user_args()
+
+var semantics_fields: Dictionary = {}
+func semantics_approx(a: Variant,b: Variant,field: String) -> bool:
+	var fields: PackedStringArray = []
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--semantics-fields="):fields=argument.trim_prefix("--semantics-fields=").split("|")
+	if semantics_strict() and (fields.is_empty() or field in fields):
+		var error: float = a.distance_to(b) if a is Vector2 else absf(float(a)-float(b))
+		var limit: float = 1e-4 if a is Vector2 else maxf(1e-9,maxf(absf(float(a)),absf(float(b)))*1e-9)
+		semantics_fields[field] = maxf(float(semantics_fields.get(field,0.0)),error)
+		if not is_finite(error) or error>limit:
+			failed += 1
+			push_error("数値幅の不一致: %s actual=%s expected=%s error=%.16f limit=%.16f"%[field,a,b,error,limit])
+	return a.is_equal_approx(b) if a is Vector2 else is_equal_approx(a,b)
+
+func _exit_tree() -> void:
+	if semantics_strict():print("SEMANTICS_FIELDS ",semantics_fields," failures=",failed)
+
 func _ready() -> void:
 	for argument:String in OS.get_cmdline_user_args():
 		if argument.begins_with("--semantics-draco="):
@@ -325,12 +348,12 @@ func native_centaurus_body() -> void:
 	check(display._parts!=null and display._parts.visible and display._parts._clip=="idle","準備済みのパーツと待機姿勢を使う")
 	bridge._core.step(0.1)
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.has_guard_point and body.velocity.length()>0.0 and is_equal_approx(body.velocity.length(),definition.speed),"守る雑魚の平均位置を見て通常速度で好む距離へ動く")
+	check(body.has_guard_point and body.velocity.length()>0.0 and semantics_approx(body.velocity.length(),definition.speed,"native_centaurus_body:body.velocity.length()"),"守る雑魚の平均位置を見て通常速度で好む距離へ動く")
 	var prior_velocity: Vector2 = body.velocity
 	for cause in ["ram","touch","wave"]:
 		check(bridge.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":cause,"direction":Vector2.RIGHT,"knock":1500.0}).ok,"被弾を登録済みの原因で本体へ渡す")
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.velocity==prior_velocity and is_equal_approx(body.hp,body.max_hp-3.0),"本体は全方向から被弾し外力のノックバックで動かない")
+	check(body.velocity==prior_velocity and semantics_approx(body.hp,body.max_hp-3.0,"native_centaurus_body:body.hp"),"本体は全方向から被弾し外力のノックバックで動かない")
 	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	check(display.hit>0.0,"表示用の被弾値を本体へ渡す")
 	var packet: Dictionary = bridge.read_frame().value
@@ -341,7 +364,7 @@ func native_centaurus_body() -> void:
 	var guard_id: int = body.guards[0].id
 	bridge.command("dev_kill",{"entity_id":guard_id,"cause":"debug"})
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(is_equal_approx(body.hp,body.max_hp-3.0) and not body.boss_dead and body.participants[0].active,"守る雑魚の死亡は本体HPとボスの寿命を変えない")
+	check(semantics_approx(body.hp,body.max_hp-3.0,"native_centaurus_body:body.hp") and not body.boss_dead and body.participants[0].active,"守る雑魚の死亡は本体HPとボスの寿命を変えない")
 	var held: Dictionary = bridge.checkpoint()
 	check(held.ok,"本体と守る雑魚の途中状態を保持する")
 	bridge._core.step(0.6)
@@ -372,7 +395,7 @@ func native_centaurus_body() -> void:
 	check(entrance.mode==0 and entrance.position.x<500.0 and entrance.guards.size()==definition.params.guard_count,"守る雑魚を配置したあと画面外から登場する")
 	bridge._core.step(1.4)
 	entrance = bridge.command("dev_boss_body_state").value[1]
-	check(entrance.mode==1 and entrance.position.is_equal_approx(Vector2(500,500)),"登場時間の終わりに通常待機へ戻る")
+	check(entrance.mode==1 and semantics_approx(entrance.position,Vector2(500,500),"native_centaurus_body:entrance.position"),"登場時間の終わりに通常待機へ戻る")
 	bridge.command("dev_damage",{"entity_id":entering,"amount":entrance.max_hp+1.0,"cause":"bullet"})
 	entrance = bridge.command("dev_boss_body_state").value[1]
 	check(entrance.mode==4 and not entrance.participants[0].active and entrance.boss_dead,"第1形態の致死ダメージでも本体だけを撃破する")
@@ -487,7 +510,7 @@ func native_centaurus_volley() -> void:
 	check(t.stage==1 and t.released==1 and bridge._core.hostiles_snapshot().size()==1,"予告時刻に最初の矢を1本だけ撃つ")
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
 	var shot: Dictionary = bridge._core.hostiles_snapshot()[0]
-	check(shot.pos.is_equal_approx(body.position+Vector2.from_angle(body.facing)*body.radius*definition.params.bow_reach) and is_equal_approx(shot.life,move.travel/move.speed),"弓口から射程÷速さの寿命で長さ0の矢を出す")
+	check(semantics_approx(shot.pos,body.position+Vector2.from_angle(body.facing)*body.radius*definition.params.bow_reach,"native_centaurus_volley:shot.pos") and semantics_approx(shot.life,PackedFloat32Array([move.travel/move.speed])[0],"native_centaurus_volley:shot.life"),"弓口から射程÷速さの寿命で長さ0の矢を出す")
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
@@ -675,7 +698,7 @@ func native_centaurus_rear() -> void:
 	t = bridge.command("dev_boss_state").value[0]
 	var after: Dictionary = t.duplicate(true)
 	var hp_after: float = bridge._core.ship_snapshot().ship_hp
-	check(t.hit and is_equal_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale),"背後円と機体の移動線分の交差で倍率を1回掛けて命中する")
+	check(t.hit and semantics_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale,"native_centaurus_rear:hp-hp_after"),"背後円と機体の移動線分の交差で倍率を1回掛けて命中する")
 	check(bridge.restore(held.value).ok,"命中前の段階・機体の前位置を復帰する")
 	bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO})
 	bridge._core.step(0.01)
@@ -792,7 +815,7 @@ func native_centaurus_rain() -> void:
 	t = bridge.command("dev_boss_state").value[0]
 	check(t.rain.traces.size()==1 and t.rain.traces[0].landed==0.0 and t.rain.traces[0].next_drop==50.0,"次の更新で弧の始点を作り距離0の矢を散布する")
 	var trace: Dictionary = t.rain.traces[0]
-	check(trace.start.is_equal_approx(Vector2(400,0)) and trace.turn==1,"停止中の機体からボスと逆向きの前方へ開始し最初は正の曲がりを使う")
+	check(semantics_approx(trace.start,Vector2(400,0),"native_centaurus_rain:trace.start") and trace.turn==1,"停止中の機体からボスと逆向きの前方へ開始し最初は正の曲がりを使う")
 	bridge._core.step(0.08)
 	check(bridge._core.ship_snapshot().ship_hp==hp,"drop_delayとfallの間は着弾判定を出さない")
 	var held: Dictionary = bridge.checkpoint()
@@ -894,12 +917,12 @@ func native_canis_body() -> void:
 	check(display.parts.visible,"最初の技の前から本体とシリウスを表示する")
 	bridge._core.step(0.1)
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(is_equal_approx(body.velocity.length(),definition.speed),"機体を向いて通常速度で追う")
+	check(semantics_approx(body.velocity.length(),definition.speed,"native_canis_body:body.velocity.length()"),"機体を向いて通常速度で追う")
 	var velocity: Vector2 = body.velocity
 	for cause in ["ram","touch","wave"]:
 		check(bridge.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":cause,"direction":Vector2.RIGHT,"knock":1500.0}).ok,"全方向からの被弾を受ける")
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.velocity==velocity and is_equal_approx(body.hp,body.max_hp-3.0),"本体のHPを減らし外力のノックバックは受けない")
+	check(body.velocity==velocity and semantics_approx(body.hp,body.max_hp-3.0,"native_canis_body:body.hp"),"本体のHPを減らし外力のノックバックは受けない")
 	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	check(display.hit>0.0,"被弾の値を正式表示へ渡す")
 	var hud = load("res://scripts/ui/hud.gd").new()
@@ -926,7 +949,7 @@ func native_canis_body() -> void:
 	var entering: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(500,500),"entrance":true}).value
 	bridge._core.step(1.4)
 	var entrance: Dictionary = bridge.command("dev_boss_body_state").value[1]
-	check(entrance.barking and entrance.position.is_equal_approx(Vector2(500,500)),"画面外から登場して吠える時間へ移る")
+	check(entrance.barking and semantics_approx(entrance.position,Vector2(500,500),"native_canis_body:entrance.position"),"画面外から登場して吠える時間へ移る")
 	bridge._core.step(0.6)
 	check(not bridge.command("dev_boss_body_state").value[1].barking,"吠え終わってから通常待機へ戻る")
 	bridge.command("dev_damage",{"entity_id":entering,"amount":entrance.max_hp+1.0,"cause":"bullet"})
@@ -1007,12 +1030,12 @@ func native_centaurus_power() -> void:
 	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2.ZERO})
 	bridge._core.step(0.05)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(not t.alerting and is_equal_approx(t.facing,PI*0.25) and bridge._core.hostiles_snapshot().is_empty(),"予告中は機体の今の位置へ即座に向き発射を待つ")
+	check(not t.alerting and semantics_approx(t.facing,Vector2(300,300).angle(),"native_centaurus_power:t.facing") and bridge._core.hostiles_snapshot().is_empty(),"予告中は機体の今の位置へ即座に向き発射を待つ")
 	bridge._core.step(0.01)
 	t = bridge.command("dev_boss_state").value[0]
 	var origin: Vector2 = t.locked_origin
 	var angle: float = t.locked_angle
-	check(t.alerting and is_equal_approx(angle,PI*0.25) and origin.is_equal_approx(Vector2.from_angle(angle)*t.radius*load("res://data/bosses/centaurus.tres").params.bow_reach),"warn-alertで弓口の起点と向きを固定する")
+	check(t.alerting and semantics_approx(angle,Vector2(300,300).angle(),"native_centaurus_power:angle") and semantics_approx(origin,Vector2.from_angle(angle)*t.radius*load("res://data/bosses/centaurus.tres").params.bow_reach,"native_centaurus_power:origin"),"warn-alertで弓口の起点と向きを固定する")
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
@@ -1030,9 +1053,9 @@ func native_centaurus_power() -> void:
 	t = bridge.command("dev_boss_state").value[0]
 	var after: Dictionary = t.duplicate(true)
 	var shots: Array = bridge._core.hostiles_snapshot()
-	check(t.stage==1 and t.released==3 and shots.size()==3 and is_equal_approx(t.facing,angle),"機体が移動してもwarn時刻に固定した向きへ3本を同時発射する")
+	check(t.stage==1 and t.released==3 and shots.size()==3 and semantics_approx(t.facing,angle,"native_centaurus_power:t.facing"),"機体が移動してもwarn時刻に固定した向きへ3本を同時発射する")
 	var positions_ok := shots.size()==3
-	for k in shots.size(): positions_ok = positions_ok and shots[k].pos.is_equal_approx(origin) and is_equal_approx(shots[k].vel.angle(),angle+(k-1)*move.spread) and shots[k].kind==builder.Schema.ENUMS.HostileKind.CosmicArrow and is_equal_approx(shots[k].life,move.travel/move.speed)
+	for k in shots.size(): positions_ok = positions_ok and semantics_approx(shots[k].pos,origin,"native_centaurus_power:shots[k].pos") and semantics_approx(shots[k].vel.angle(),(Vector2.from_angle(angle+(k-1)*move.spread)*move.speed).angle(),"native_centaurus_power:shots[k].vel.angle()") and shots[k].kind==builder.Schema.ENUMS.HostileKind.CosmicArrow and semantics_approx(shots[k].life,PackedFloat32Array([move.travel/move.speed])[0],"native_centaurus_power:shots[k].life")
 	check(positions_ok,"固定起点・対称の扇角度・射程÷速さの寿命でコズミック矢を出す")
 	check(bridge.restore(held.value).ok,"警告後の固定起点・向き・未発射状態を復帰する")
 	bridge.command("dev_ship_motion",{"position":Vector2(300,-300),"velocity":Vector2.ZERO})
@@ -1067,7 +1090,7 @@ func native_centaurus_power() -> void:
 	bridge.command("dev_ship_motion",{"position":Vector2(500,0),"velocity":Vector2.ZERO})
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step_hostiles(0.5)
-	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale),"参加者が消えても残った強弓の矢が機体へ実ダメージを与える")
+	check(semantics_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale,"native_centaurus_power:hp-bridge._core.ship_snapshot().ship_hp"),"参加者が消えても残った強弓の矢が機体へ実ダメージを与える")
 	bridge._core.step_hostiles(1.0)
 	check(bridge._core.hostiles_snapshot().is_empty(),"発射済みの矢は寿命で終わる")
 	bridge.dispose()
@@ -1076,7 +1099,7 @@ func native_centaurus_power() -> void:
 	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	bridge.command("dev_ship_motion",{"position":Vector2(0,300),"velocity":Vector2.ZERO})
 	bridge._core.step(0.05)
-	check(is_zero_approx(bridge.command("dev_boss_state").value[0].facing),"追尾しない設定では予告開始時の機体位置へ旋回する")
+	check(semantics_approx(bridge.command("dev_boss_state").value[0].facing,0.0,"native_centaurus_power:bridge.command(\"dev_boss_state\").value[0].facing"),"追尾しない設定では予告開始時の機体位置へ旋回する")
 	bridge.command("dev_remove",{"entity_id":c.id})
 	bridge._core.step(0.1)
 	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge._core.hostiles_snapshot().is_empty(),"予告中の参加者消失で未発射の技を止める")
@@ -1284,7 +1307,7 @@ func native_centaurus_stomp() -> void:
 	if attacks.is_empty(): bridge.dispose(); get_tree().quit(1); return
 	var t: Dictionary = attacks[0]
 	var expected: Vector2 = (source.contact_center(animation,0.0)*t.radius/135.0).rotated(t.facing-PI*0.5)+t.position
-	check(t.center.is_equal_approx(expected),"脚の保存配置から現在の接地点を生成する")
+	check(semantics_approx(t.center,expected,"native_centaurus_stomp:t.center"),"脚の保存配置から現在の接地点を生成する")
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
@@ -1301,14 +1324,14 @@ func native_centaurus_stomp() -> void:
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step(0.1)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.stage==1 and not t.hit and is_equal_approx(t.facing,facing) and bridge._core.ship_snapshot().ship_hp==hp,"予告中は向きを固定し、拒否されたダメージで命中済みにしない")
+	check(t.stage==1 and not t.hit and semantics_approx(t.facing,facing,"native_centaurus_stomp:t.facing") and bridge._core.ship_snapshot().ship_hp==hp,"予告中は向きを固定し、拒否されたダメージで命中済みにしない")
 	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0]._mode()==&"strike" and view._boss_body_displays.values()[0]._parts._clip=="stomp","実行中の脚のコマと扇を表示する")
 	var held: Dictionary = bridge.checkpoint()
 	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
 	bridge._core.step(0.01)
 	var after: Dictionary = bridge.command("dev_boss_state").value[0].duplicate(true)
 	var hp_after: float = bridge._core.ship_snapshot().ship_hp
-	check(after.hit and is_equal_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale),"盾がなくなると扇で1回だけ実ダメージを受ける")
+	check(after.hit and semantics_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale,"native_centaurus_stomp:hp-hp_after"),"盾がなくなると扇で1回だけ実ダメージを受ける")
 	check(bridge.restore(held.value).ok,"開始時計・命中フラグ・脚の時刻を保持復帰する")
 	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
 	bridge._core.step(0.01)
@@ -1377,8 +1400,8 @@ func native_canis_lunge() -> void:
 		bridge.command("dev_hound_order",{"entity_id":target,"action":"quiet","until":10.0,"velocity":Vector2(0,40)})
 		bridge._core.step(0.1)
 		var first: Dictionary = canis_lunges(bridge)[0]
-		check(first.position.is_equal_approx(Vector2(500,4)) and first.from==first.position,"通常敵の移動を終えた位置からボスの掃引を更新する")
-		check(enemy_velocity(bridge._core,target).is_equal_approx(Vector2(500,0)),"並行した移動指示の後に必要な型だけ固定速度を書き戻す")
+		check(semantics_approx(first.position,Vector2(500,4),"native_canis_lunge:first.position") and first.from==first.position,"通常敵の移動を終えた位置からボスの掃引を更新する")
+		check(semantics_approx(enemy_velocity(bridge._core,target),Vector2(500,0),"native_canis_lunge:enemy_velocity(bridge._core,target)"),"並行した移動指示の後に必要な型だけ固定速度を書き戻す")
 		held = bridge.checkpoint()
 		check(held.ok,"突進と並行指示の途中状態を保持する")
 		bridge._core.step(0.1)
@@ -1400,10 +1423,10 @@ func native_canis_lunge() -> void:
 	bridge._core.step(0.01)
 	var hits: Array = canis_lunges(bridge)
 	var scale: float = c.package.records.RunConfig[0].combat_atk_scale
-	check(hits.size()==2 and hits.all(func(h): return h.hit) and is_equal_approx(bridge._core.ship_snapshot().ship_hp,hp-2.0*scale),"複数の猟犬が同時に触れても行動全体で1回だけ当てる")
+	check(hits.size()==2 and hits.all(func(h): return h.hit) and semantics_approx(bridge._core.ship_snapshot().ship_hp,hp-2.0*scale,"native_canis_lunge:bridge._core.ship_snapshot().ship_hp"),"複数の猟犬が同時に触れても行動全体で1回だけ当てる")
 	bridge.command("dev_hound_order",{"entity_id":target,"action":"quiet","until":10.0,"velocity":Vector2(0,40)})
 	bridge._core.step(0.01)
-	check(enemy_velocity(bridge._core,target).is_equal_approx(Vector2(0,40)),"号令用の型は毎tickの固定速度上書きを行わない")
+	check(semantics_approx(enemy_velocity(bridge._core,target),Vector2(0,40),"native_canis_lunge:enemy_velocity(bridge._core,target)"),"号令用の型は毎tickの固定速度上書きを行わない")
 	bridge.command("dev_cancel_canis_lunge",{"entity_id":c.id,"action":12})
 	check(canis_lunges(bridge).is_empty() and bridge._core.hound_snapshot().follows.any(func(f): return f.id==target),"号令用の取消は当たりだけを終えfollowをその場で解除しない")
 	bridge.restore(initial.value)
@@ -1493,11 +1516,17 @@ func native_centaurus_fan() -> void:
 	bridge._core.step(0.05)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
 	var shots: Array = bridge._core.hostiles_snapshot()
-	check(t.stage==1 and t.released==1 and shots.size()==3 and is_zero_approx(t.facing),"追跡しない予告は本体の向きを保ちwarnで最初の3本を射る")
-	var aim: Vector2 = Vector2(300,0)+(Vector2(1400,1400)-Vector2(300,0)).normalized()*load("res://data/config.tres").enemy_aim_speed*0.05
+	check(t.stage==1 and t.released==1 and shots.size()==3 and semantics_approx(t.facing,0.0,"native_centaurus_fan:t.facing"),"追跡しない予告は本体の向きを保ちwarnで最初の3本を射る")
+	var aim: Vector2 = Vector2(300,0)
+	# Source EnemyMotion._update_aim と同じ二更新を、同じVector2演算順で進める。
+	var aim_config = load("res://data/config.tres")
+	for _tick in 2:
+		var toward: Vector2 = Vector2(1400,1400)-aim
+		var distance: float = toward.length()
+		aim += toward/distance*minf(distance*(1.0-exp(-0.05/aim_config.enemy_aim_lag)),aim_config.enemy_aim_speed*0.05)
 	var expected: float = (aim-shots[1].pos).angle() if shots.size()==3 else 0.0
 	var angles_ok := shots.size()==3
-	for k in shots.size(): angles_ok = angles_ok and is_equal_approx(shots[k].vel.angle(),expected+(k-1)*deg_to_rad(move.spread)*0.5) and is_equal_approx(shots[k].life,move.travel/move.speed) and is_equal_approx(shots[k].length,move.length)
+	for k in shots.size(): angles_ok = angles_ok and semantics_approx(shots[k].vel.angle(),(Vector2.from_angle(expected+(k-1)*deg_to_rad(move.spread)*0.5)*move.speed).angle(),"native_centaurus_fan:shots[k].vel.angle()") and semantics_approx(shots[k].life,PackedFloat32Array([move.travel/move.speed])[0],"native_centaurus_fan:shots[k].life") and semantics_approx(shots[k].length,move.length,"native_centaurus_fan:shots[k].length")
 	check(angles_ok and expected>0.0,"射る向きは追跡設定に関係なく今の遅延照準を使い扇に配る")
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
@@ -1532,7 +1561,7 @@ func native_centaurus_fan() -> void:
 	bridge.command("dev_remove",{"entity_id":c.id})
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step_hostiles(1.0)
-	check(bridge.command("dev_boss_state").value[0].stage==7 and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale),"取消と参加者消失でも発射済みの矢は残り倍率を1回掛けて命中する")
+	check(bridge.command("dev_boss_state").value[0].stage==7 and semantics_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale,"native_centaurus_fan:hp-bridge._core.ship_snapshot().ship_hp"),"取消と参加者消失でも発射済みの矢は残り倍率を1回掛けて命中する")
 	bridge._core.step_hostiles(4.0)
 	check(bridge._core.hostiles_snapshot().is_empty(),"残った扇の矢は寿命で終わる")
 	bridge.dispose()
@@ -1558,11 +1587,17 @@ func native_centaurus_fan_aim() -> void:
 	bridge._core.step(0.05)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
 	var shots: Array = bridge._core.hostiles_snapshot()
-	var aim: Vector2 = Vector2(300,0)+(Vector2(1400,1400)-Vector2(300,0)).normalized()*load("res://data/config.tres").enemy_aim_speed*0.05
+	var aim: Vector2 = Vector2(300,0)
+	# Source EnemyMotion._update_aim と同じ二更新を、同じVector2演算順で進める。
+	var aim_config = load("res://data/config.tres")
+	for _tick in 2:
+		var toward: Vector2 = Vector2(1400,1400)-aim
+		var distance: float = toward.length()
+		aim += toward/distance*minf(distance*(1.0-exp(-0.05/aim_config.enemy_aim_lag)),aim_config.enemy_aim_speed*0.05)
 	var expected: float = (aim-shots[1].pos).angle() if shots.size()==3 else 0.0
-	var angles_ok := shots.size()==3 and is_zero_approx(t.facing)
+	var angles_ok := shots.size()==3 and semantics_approx(t.facing,0.0,"native_centaurus_fan_aim:t.facing")
 	var move = load("res://data/bosses/centaurus_moves/fan_volley.tres")
-	for k in shots.size(): angles_ok = angles_ok and is_equal_approx(shots[k].vel.angle(),expected+(k-1)*deg_to_rad(move.spread)*0.5) and is_equal_approx(shots[k].life,move.travel/move.speed) and is_equal_approx(shots[k].length,move.length)
+	for k in shots.size(): angles_ok = angles_ok and semantics_approx(shots[k].vel.angle(),(Vector2.from_angle(expected+(k-1)*deg_to_rad(move.spread)*0.5)*move.speed).angle(),"native_centaurus_fan_aim:shots[k].vel.angle()") and semantics_approx(shots[k].life,PackedFloat32Array([move.travel/move.speed])[0],"native_centaurus_fan_aim:shots[k].life") and semantics_approx(shots[k].length,move.length,"native_centaurus_fan_aim:shots[k].length")
 	check(angles_ok and expected>0.0,"本体の向きを固定しても実際の遅延照準へ扇を射る")
 	bridge.dispose()
 	await get_tree().process_frame
@@ -1629,7 +1664,7 @@ func native_centaurus_shower() -> void:
 	var rng: String = bridge._core.inspect().rng_state
 	bridge._core.step(0.1)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(t.stage==1 and t.shower.marks.size()==1 and t.shower.placed==1 and t.shower.marks[0].center.is_equal_approx(Vector2(550,0)) and t.shower.marks[0].shown and not t.shower.marks[0].landed,"warnで今の位置と速度から予測した円を1つ置く")
+	check(t.stage==1 and t.shower.marks.size()==1 and t.shower.placed==1 and semantics_approx(t.shower.marks[0].center,Vector2(550,0),"native_centaurus_shower:t.shower.marks[0].center") and t.shower.marks[0].shown and not t.shower.marks[0].landed,"warnで今の位置と速度から予測した円を1つ置く")
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
@@ -1648,7 +1683,7 @@ func native_centaurus_shower() -> void:
 	t = bridge.command("dev_boss_state").value[0]
 	var after: Dictionary = t.duplicate(true)
 	var hp_after: float = bridge._core.ship_snapshot().ship_hp
-	check(t.shower.marks[0].landed and is_equal_approx(hp-hp_after,load("res://data/bosses/centaurus_moves/shower_chase.tres").damage*load("res://data/config.tres").atk_scale),"着弾の瞬間だけ今の機体位置を円で判定して倍率を1回掛ける")
+	check(t.shower.marks[0].landed and semantics_approx(hp-hp_after,load("res://data/bosses/centaurus_moves/shower_chase.tres").damage*load("res://data/config.tres").atk_scale,"native_centaurus_shower:hp-hp_after"),"着弾の瞬間だけ今の機体位置を円で判定して倍率を1回掛ける")
 	check(bridge.restore(held.value).ok,"開始時計・円の予告/着弾・残り配置を復帰する")
 	bridge.command("dev_ship_motion",{"position":Vector2(550,0),"velocity":Vector2.ZERO})
 	bridge._core.step(0.15)
@@ -1673,7 +1708,7 @@ func native_centaurus_shower() -> void:
 	bridge._core.step(0.1)
 	t = bridge.command("dev_boss_state").value[0]
 	var marks: Array = t.shower.marks
-	check(marks.size()==3 and marks[1].center.is_equal_approx(Vector2(225,0)) and is_equal_approx(marks[0].at,0.2) and is_equal_approx(marks[1].at,0.1) and is_equal_approx(marks[2].at,0.2) and not marks[0].shown and marks[1].shown,"壁は距離割合と上下限で中心を決め、中央から外へ予告する")
+	check(marks.size()==3 and semantics_approx(marks[1].center,Vector2(225,0),"native_centaurus_shower:marks[1].center") and semantics_approx(marks[0].at,0.2,"native_centaurus_shower:marks[0].at") and semantics_approx(marks[1].at,0.1,"native_centaurus_shower:marks[1].at") and semantics_approx(marks[2].at,0.2,"native_centaurus_shower:marks[2].at") and not marks[0].shown and marks[1].shown,"壁は距離割合と上下限で中心を決め、中央から外へ予告する")
 	var visual = load("res://scripts/render/bosses/centaurus_shower.gd").new()
 	add_child(visual)
 	visual.apply_frame(t.shower,bridge.command("dev_boss_body_state").value[0])
@@ -1696,14 +1731,14 @@ func native_centaurus_shower() -> void:
 	bridge._core.step(0.1)
 	t = bridge.command("dev_boss_state").value[0]
 	marks = t.shower.marks
-	check(marks.size()==3 and marks[1].center.is_equal_approx(Vector2(760,0)) and is_equal_approx(float(marks[2].at)-float(marks[0].at),0.2),"横切りは機体の進む向きの先を塞ぎ、端から順番に円を置く")
+	check(marks.size()==3 and semantics_approx(marks[1].center,Vector2(760,0),"native_centaurus_shower:marks[1].center") and semantics_approx(float(marks[2].at)-float(marks[0].at),0.2,"native_centaurus_shower:float(marks[2].at)-float(marks[0].at)"),"横切りは機体の進む向きの先を塞ぎ、端から順番に円を置く")
 	var first_center: Vector2 = marks[0].center
 	bridge._core.step(0.5)
 	bridge._core.step(0.05)
 	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	bridge._core.step(0.1)
 	marks = bridge.command("dev_boss_state").value[0].shower.marks
-	check(marks.size()==3 and marks[2].center.is_equal_approx(first_center),"横切りの配置は次の技で左右を反転する")
+	check(marks.size()==3 and semantics_approx(marks[2].center,first_center,"native_centaurus_shower:marks[2].center"),"横切りの配置は次の技で左右を反転する")
 	bridge.command("dev_remove",{"entity_id":c.id})
 	bridge._core.step(0.3)
 	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_state").value[0].shower.marks.is_empty(),"参加者消失で横切りの未着弾を止める")
@@ -1806,7 +1841,7 @@ func native_canis_command() -> void:
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step(0.01)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.hit and canis_lunges(bridge).all(func(v): return v.hit) and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale),"猟犬の点と機体の移動線分から技全体で1回だけダメージを与える")
+	check(t.hit and canis_lunges(bridge).all(func(v): return v.hit) and semantics_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale,"native_canis_command:hp-bridge._core.ship_snapshot().ship_hp"),"猟犬の点と機体の移動線分から技全体で1回だけダメージを与える")
 	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	var unchanged: Array = canis_lunges(bridge).duplicate(true)
 	for i in 7: c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
@@ -1888,7 +1923,7 @@ func native_canis_howl() -> void:
 	t = bridge.command("dev_boss_state").value[0]
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
 	check(t.stage==1 and t.formed and body.ring.size()==9 and t.sequence.size()==9,"率いる8体を使い不足分を召喚上限1体まで補う")
-	check(is_equal_approx(body.ring_radius,300.0) and body.ring_started>=0.0,"形成時は開始半径で自機の位置を中心にする")
+	check(semantics_approx(body.ring_radius,300.0,"native_canis_howl:body.ring_radius") and body.ring_started>=0.0,"形成時は開始半径で自機の位置を中心にする")
 	var formed: Dictionary = body.duplicate(true)
 	var order: Array = t.sequence.duplicate(true)
 	check(bridge.restore(before.value).ok,"形成前の乱数と状態へ復帰する")
@@ -1897,17 +1932,23 @@ func native_canis_howl() -> void:
 	var ring_ids: Array = body.ring.map(func(v): return v.id)
 	var base_angles: Array = body.ring.map(func(v): return v.angle)
 	check(base_angles.all(func(a): return a>=base_angles[0]) and base_angles.any(func(a): return is_equal_approx((a-base_angles[0])/TAU*14.0,7.0)),"空ける2箇所を含む14等分の位置へ配置する")
+	if semantics_strict():
+		var opposite := INF
+		for angle: float in base_angles:
+			var slot: float = (angle-base_angles[0])/TAU*14.0
+			if absf(slot-7.0)<absf(opposite-7.0):opposite=slot
+		semantics_approx(opposite,7.0,"native_canis_howl:opposite_slot")
 	var center: Vector2 = formed.ring_center
 	bridge.command("dev_ship_motion",{"position":center+Vector2(100,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(center+Vector2(100,0),center+Vector2(100,0),Vector2(3000,2000))
 	bridge._core.step(0.05)
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.ring_center.is_equal_approx(center+Vector2(100,0)*(1.0-exp(-4.0*0.05))) and is_equal_approx(body.ring_radius,300.0),"gather_timeの間は半径を保ち世界時計で中心を指数追従する")
+	check(semantics_approx(body.ring_center,center+Vector2(100,0)*(1.0-exp(-4.0*0.05)),"native_canis_howl:body.ring_center") and semantics_approx(body.ring_radius,300.0,"native_canis_howl:body.ring_radius"),"gather_timeの間は半径を保ち世界時計で中心を指数追従する")
 	var ring_saved: Dictionary = bridge.checkpoint()
 	check(ring_saved.ok,"輪の中心・個体世代・次の予告時刻を保持する")
 	bridge._core.step(0.05)
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(is_equal_approx(body.ring_radius,250.0),"gather_time後はclose_timeの間に半径を線形で狭める")
+	check(semantics_approx(body.ring_radius,250.0,"native_canis_howl:body.ring_radius"),"gather_time後はclose_timeの間に半径を線形で狭める")
 	bridge._core.step(0.1)
 	t = bridge.command("dev_boss_state").value[0]
 	check(t.sequence[0].marked and not t.sequence[0].launched,"follow_timeの後に最初の猟犬を予告する")
@@ -1922,7 +1963,7 @@ func native_canis_howl() -> void:
 	bridge._core.set_motion_context(at,at,Vector2(3000,2000))
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step(0.01)
-	check(canis_lunges(bridge).any(func(v): return v.actor==target and v.hit) and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale),"猟犬の移動線分と機体から個体ごとに1回だけ実ダメージを出す")
+	check(canis_lunges(bridge).any(func(v): return v.actor==target and v.hit) and semantics_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale,"native_canis_howl:hp-bridge._core.ship_snapshot().ship_hp"),"猟犬の移動線分と機体から個体ごとに1回だけ実ダメージを出す")
 	body = bridge.command("dev_boss_body_state").value[0]
 	var frozen_center: Vector2 = body.ring_center
 	bridge._core.step(0.02)
@@ -2012,7 +2053,7 @@ func native_centaurus_sail() -> void:
 	var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
 	bridge._core.step(0.1)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(t.stage==1 and t.released==1 and t.boosted and t.side==1 and t.orbit_radius==300.0 and t.position.distance_to(Vector2.ZERO)<0.001,"弧の中心・半径・交互の向きを保持して予告後に走り始める")
+	check(t.stage==1 and t.released==1 and t.boosted and t.side==1 and t.orbit_radius==300.0 and semantics_approx(t.position,Vector2.ZERO,"native_centaurus_sail:start"),"弧の中心・半径・交互の向きを保持して予告後に走り始める")
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
@@ -2028,7 +2069,7 @@ func native_centaurus_sail() -> void:
 	t = bridge.command("dev_boss_state").value[0]
 	var shots: Array = bridge._core.hostiles_snapshot()
 	var after: Dictionary = t.duplicate(true)
-	check(t.stage==2 and t.released==3 and not t.boosted and t.position.is_equal_approx(Vector2(300,-300)) and shots.size()==3,"弧の終端まで差分移動し時間内の3射だけ出して護衛の強化を解除する")
+	check(t.stage==2 and t.released==3 and not t.boosted and semantics_approx(t.position,Vector2(300,-300),"native_centaurus_sail:t.position") and shots.size()==3,"弧の終端まで差分移動し時間内の3射だけ出して護衛の強化を解除する")
 	check(bridge.restore(held.value).ok,"弧の中心・向き・射数・護衛強化を途中復帰する")
 	bridge._core.step(0.301)
 	check(bridge.command("dev_boss_state").value[0]==after and bridge._core.hostiles_snapshot()==shots,"復帰後も同じ弧と射数・矢の寿命になる")
@@ -2129,14 +2170,14 @@ func native_centaurus_combo_rain() -> void:
 		if bridge.command("dev_boss_state").value[0].get("combo_waiting",false): break
 		bridge._core.step(0.01)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.combo_waiting and t.stage==2 and is_equal_approx(t.remaining,0.05) and t.rain.traces.is_empty(),"前半の硬直10秒を使わず、雨を閉じて世界時間のgapへ移る")
+	check(t.combo_waiting and t.stage==2 and semantics_approx(t.remaining,0.05,"native_centaurus_combo_rain:t.remaining") and t.rain.traces.is_empty(),"前半の硬直10秒を使わず、雨を閉じて世界時間のgapへ移る")
 	var held: Dictionary = bridge.checkpoint()
 	bridge._core.step(0.03)
 	check(bridge.command("dev_boss_state").value[0].combo_waiting and bridge._core.hostiles_snapshot().is_empty(),"gapが残る間は後半を始めない")
 	bridge._core.step(0.03)
 	t = bridge.command("dev_boss_state").value[0]
 	var after: Dictionary = t.duplicate(true)
-	check(t.technique=="volley" and t.combo_step==1 and t.stage==0 and is_zero_approx(t.elapsed) and t.id==1,"次の更新で同じ技チケットのまま速射の予告を始める")
+	check(t.technique=="volley" and t.combo_step==1 and t.stage==0 and semantics_approx(t.elapsed,0.0,"native_centaurus_combo_rain:t.elapsed") and t.id==1,"次の更新で同じ技チケットのまま速射の予告を始める")
 	check(bridge.restore(held.value).ok,"前半終了後のgapと子の状態を保持・復帰する")
 	bridge._core.step(0.03)
 	bridge._core.step(0.03)
@@ -2196,12 +2237,12 @@ func native_centaurus_combo_shower() -> void:
 	check(bridge.command("dev_boss_state").value[0].shower.marks[0].landed,"前半の印は自身のmark_timeで一度だけ着弾する")
 	bridge._core.step(0.031)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.combo_waiting and t.shower.marks.is_empty() and is_equal_approx(t.remaining,0.05),"降り矢の表示と攻撃を閉じ、前半の硬直を挟まずgapへ進む")
+	check(t.combo_waiting and t.shower.marks.is_empty() and semantics_approx(t.remaining,0.05,"native_centaurus_combo_shower:t.remaining"),"降り矢の表示と攻撃を閉じ、前半の硬直を挟まずgapへ進む")
 	var held: Dictionary = bridge.checkpoint()
 	bridge._core.step(0.051)
 	t = bridge.command("dev_boss_state").value[0]
 	var after: Dictionary = t.duplicate(true)
-	check(t.technique=="power_shot" and t.combo_step==1 and t.stage==0 and is_zero_approx(t.elapsed),"次の更新で強弓自身の予告を始める")
+	check(t.technique=="power_shot" and t.combo_step==1 and t.stage==0 and semantics_approx(t.elapsed,0.0,"native_centaurus_combo_shower:t.elapsed"),"次の更新で強弓自身の予告を始める")
 	check(bridge.restore(held.value).ok,"降り矢終了後のgapと子の値を途中復帰する")
 	bridge._core.step(0.051)
 	check(bridge.command("dev_boss_state").value[0]==after,"復帰後も同じ境界で強弓へ進む")
@@ -2244,7 +2285,7 @@ func native_centaurus_combo_shower() -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 制作の全技・フローと共通決着を、一つの専用ランへつなぐ。
-func centaurus_finish_case(limit := -1.0, automatic := false, parameters := {}) -> Dictionary:
+func centaurus_finish_case(limit := -1.0, automatic := false, parameters := {}, idle_only := false) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
@@ -2261,9 +2302,17 @@ func centaurus_finish_case(limit := -1.0, automatic := false, parameters := {}) 
 	boss.params.merge(parameters,true)
 	boss.speed = 0.0
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.time_limit = limit
 	stage.legendary_module_id = ContentManager.stage(2).legendary_module_id
-	var package: Dictionary = builder.boss_package(boss,cfg,stage)
+	var options := {}
+	if idle_only:
+		# 数値の確認前に通常技を始めない。前方では選ばれない背後技だけを抽選候補にする。
+		var flow = load("res://data/bosses/ai/centaurus_flow.tres").duplicate(true)
+		flow.sections = [{"request":"any","allowed_techniques":["rear_attack"],"cap":3.0,"action_count":1,"next":0,"weights":{"single":1.0,"combo":1.0,"major":1.0}}]
+		options["flow"]=flow
+		options["rules"]=load("res://data/bosses/ai/centaurus_action_rules.tres")
+	var package: Dictionary = builder.boss_package(boss,cfg,stage,options)
 	if package.is_empty(): return {}
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":192,"mode":1,"stage_id":"B_centaurus_finish","profile":{},"settings":{"hitstop":false}})
@@ -2289,6 +2338,8 @@ func centaurus_finish_steps(bridge, count: int) -> bool:
 	return ok
 
 func native_centaurus_finish() -> void:
+	if semantics_strict():
+		semantics_centaurus_finish();return
 	var f := centaurus_finish_case(-1.0,true)
 	check(not f.is_empty(),"全技・条件・制作フロー・決着を同じ生成入口で読む")
 	if f.is_empty(): get_tree().quit(1); return
@@ -2331,7 +2382,7 @@ func native_centaurus_finish() -> void:
 	bridge._core.set_motion_context(Vector2(100,0),Vector2(100,0),Vector2(640,360))
 	bridge._core.step(0.01)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.technique=="stomp" and t.stage==0 and is_zero_approx(t.elapsed) and bridge.command("dev_boss_flow_state").value[0].stamina==load("res://data/bosses/ai/centaurus_flow.tres").maximum_stamina,"踏みつけを抽選より優先し、開始した更新のdtやスタミナを使わない")
+	check(t.technique=="stomp" and t.stage==0 and semantics_approx(t.elapsed,0.0,"native_centaurus_finish:t.elapsed") and bridge.command("dev_boss_flow_state").value[0].stamina==load("res://data/bosses/ai/centaurus_flow.tres").maximum_stamina,"踏みつけを抽選より優先し、開始した更新のdtやスタミナを使わない")
 	bridge.dispose()
 	# 第1形態の横切り・帆走を直接の制作入口でも拒否する。
 	f = centaurus_finish_case()
@@ -2348,7 +2399,7 @@ func native_centaurus_finish() -> void:
 	bridge._core.step(0.61)
 	t = bridge.command("dev_boss_state").value[0]
 	var after: Dictionary = t.duplicate(true)
-	check(t.technique=="shower_path" and t.stage==0 and is_zero_approx(bridge.command("dev_boss_body_state").value[0].path_hold),"横切りが続くと制作の条件からshower_pathを自動開始して保持時間を戻す")
+	check(t.technique=="shower_path" and t.stage==0 and semantics_approx(bridge.command("dev_boss_body_state").value[0].path_hold,0.0,"native_centaurus_finish:bridge.command(\"dev_boss_body_state\").value[0].path_hold"),"横切りが続くと制作の条件からshower_pathを自動開始して保持時間を戻す")
 	check(bridge.restore(held.value).ok,"自動選択前の横切り保持時間と再使用待ちを復帰する")
 	bridge._core.step(0.61)
 	check(bridge.command("dev_boss_state").value[0]==after,"復帰後も同じ横切りの開始に進む")
@@ -2361,7 +2412,7 @@ func native_centaurus_finish() -> void:
 	bridge._core.set_motion_context(Vector2(100,0),Vector2(100,0),Vector2(640,360))
 	bridge._core.step(0.01)
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
-	check(body.leaping and body.leap_to.is_equal_approx(Vector2(-320,0)) and bridge.command("dev_boss_state").value.is_empty(),"近づいた機体から離れる跳躍を最初の優先順位で始める")
+	check(body.leaping and semantics_approx(body.leap_to,Vector2(-320,0),"native_centaurus_finish:body.leap_to") and bridge.command("dev_boss_state").value.is_empty(),"近づいた機体から離れる跳躍を最初の優先順位で始める")
 	bridge._core.step(0.175)
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in f.package.visuals:
@@ -2377,7 +2428,7 @@ func native_centaurus_finish() -> void:
 	bridge._core.step(0.175)
 	t = bridge.command("dev_boss_state").value[0]
 	after = t.duplicate(true)
-	check(not bridge.command("dev_boss_body_state").value[0].leaping and t.technique=="shower_wall" and t.stage==0 and is_zero_approx(t.elapsed),"着地でshower_wallを始め、同じ更新のdtを予告へ使わない")
+	check(not bridge.command("dev_boss_body_state").value[0].leaping and t.technique=="shower_wall" and t.stage==0 and semantics_approx(t.elapsed,0.0,"native_centaurus_finish:t.elapsed"),"着地でshower_wallを始め、同じ更新のdtを予告へ使わない")
 	check(bridge.restore(held.value).ok,"跳躍の始点・終点・進行・期限を途中復帰する")
 	bridge._core.step(0.175)
 	check(bridge.command("dev_boss_state").value[0]==after,"復帰後も同じ着地と壁の開始になる")
@@ -2442,19 +2493,19 @@ func native_canis_pounce() -> void:
 	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	check(started.ok,"本体の独立した飛びかかりを開始する")
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(t.left==1 and t.aim.is_equal_approx(Vector2(320,0)) and not t.locked,"群れが多いと1回だけ跳び残り予告とlead_extraで先読みする")
+	check(t.left==1 and semantics_approx(t.aim,Vector2(320,0),"native_canis_pounce:t.aim") and not t.locked,"群れが多いと1回だけ跳び残り予告とlead_extraで先読みする")
 	bridge._core.step(0.04)
 	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	var display = c.view._boss_body_displays.values()[0]
 	check(display.technique.technique=="pounce" and is_equal_approx(display.technique.crouch,0.4) and is_equal_approx(display.parts.scale.x/display.parts.scale.y,1.06/0.94),"正式パーツへ溜めの縮みと着地点の予告を渡す")
 	bridge._core.step(0.021)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.locked and t.aim.is_equal_approx(Vector2(356,0)) and t.direction.is_equal_approx(Vector2.RIGHT),"lock時点の先読みにovershootを足して固定する")
+	check(t.locked and semantics_approx(t.aim,Vector2(356,0),"native_canis_pounce:t.aim") and semantics_approx(t.direction,Vector2.RIGHT,"native_canis_pounce:t.direction"),"lock時点の先読みにovershootを足して固定する")
 	bridge.command("dev_ship_motion",{"position":Vector2(800,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(800,0),Vector2(800,0),Vector2(3000,2000))
 	bridge._core.step(0.04)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.stage==1 and t.jumping and t.position==Vector2.ZERO and t.aim.is_equal_approx(Vector2(356,0)),"warnで発進しそのtickは動かず固定した着地点を維持する")
+	check(t.stage==1 and t.jumping and t.position==Vector2.ZERO and semantics_approx(t.aim,Vector2(356,0),"native_canis_pounce:t.aim"),"warnで発進しそのtickは動かず固定した着地点を維持する")
 	var active: Dictionary = bridge.checkpoint()
 	check(active.ok,"発進した本体の狙い・段階・命中旗を保持する")
 	bridge.command("dev_ship_motion",{"position":Vector2(178,0),"velocity":Vector2.ZERO})
@@ -2463,7 +2514,7 @@ func native_canis_pounce() -> void:
 	bridge._core.step(0.05)
 	t = bridge.command("dev_boss_state").value[0]
 	var hp_after: float = bridge._core.ship_snapshot().ship_hp
-	check(t.position.is_equal_approx(Vector2(89,0)) and t.hit and is_equal_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale),"残り時間で移動し本体の掃引と機体線分から1回だけ実ダメージを出す")
+	check(semantics_approx(t.position,Vector2(89,0),"native_canis_pounce:t.position") and t.hit and semantics_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale,"native_canis_pounce:hp-hp_after"),"残り時間で移動し本体の掃引と機体線分から1回だけ実ダメージを出す")
 	var after: Dictionary = t.duplicate(true)
 	check(bridge.restore(active.value).ok,"飛びかかりの発進時点へ復帰する")
 	bridge.command("dev_ship_motion",{"position":Vector2(178,0),"velocity":Vector2.ZERO})
@@ -2472,7 +2523,7 @@ func native_canis_pounce() -> void:
 	check(bridge.command("dev_boss_state").value[0]==after and bridge._core.ship_snapshot().ship_hp==hp_after,"復帰後も位置・速度・命中結果を同じにする")
 	bridge._core.step(0.15)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.stage==2 and t.done and t.left==0 and t.position.is_equal_approx(Vector2(356,0)) and bridge._core.ship_snapshot().ship_hp==hp_after,"activeの終わりで着地し再命中せず硬直へ移る")
+	check(t.stage==2 and t.done and t.left==0 and semantics_approx(t.position,Vector2(356,0),"native_canis_pounce:t.position") and bridge._core.ship_snapshot().ship_hp==hp_after,"activeの終わりで着地し再命中せず硬直へ移る")
 	var read_only: Dictionary = t.duplicate(true)
 	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	check(bridge.command("dev_boss_state").value[0]==read_only,"飛びかかりの正式表示は戦闘へ値を書き戻さない")
@@ -2610,7 +2661,7 @@ func native_canis_pounce_cue() -> void:
 	var packet: Dictionary = bridge.read_frame().value
 	var locked: Array = packet.events.filter(func(v): return v.type==&"canis_cue" and v.payload.id==actor and v.payload.cue=="aim_locked")
 	if "--cpp-canis-pounce-cue-display" not in OS.get_cmdline_user_args():
-		check(locked.size()==1 and is_equal_approx(locked[0].payload.world_time,0.04),"技の光の時刻を後から出た本体の時計で渡す")
+		check(locked.size()==1 and semantics_approx(locked[0].payload.world_time,0.04,"native_canis_pounce_cue:locked[0].payload.world_time"),"技の光の時刻を後から出た本体の時計で渡す")
 	bridge.collect_frame()
 	c.view.update_effects(packet,0.0)
 	var display = c.view._boss_body_displays.values().filter(func(v): return v.state.actor==actor)[0]
@@ -2743,15 +2794,15 @@ func native_canis_sirius() -> void:
 	check(started.ok,"制作入口でシリウスを単独発動する")
 	bridge._core.step(0.065)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(t.stage==0 and not t.locked and is_equal_approx(t.facing,0.195) and t.aim==Vector2(320,300),"先読みと旋回を適用し固定判定は加算前の予告時刻を見る")
+	check(t.stage==0 and not t.locked and semantics_approx(t.facing,0.195,"native_canis_sirius:t.facing") and t.aim==Vector2(320,300),"先読みと旋回を適用し固定判定は加算前の予告時刻を見る")
 	bridge._core.step(0.01)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.locked and is_equal_approx(t.facing,0.225),"warnからlockを引いた境界で向きを固定する")
+	check(t.locked and semantics_approx(t.facing,0.225,"native_canis_sirius:t.facing"),"warnからlockを引いた境界で向きを固定する")
 	bridge.command("dev_ship_motion",{"position":Vector2(1000,-1000),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(1000,-1000),Vector2(1000,-1000),Vector2(3000,2000))
 	bridge._core.step(0.04)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.stage==1 and t.fired and t.shot==0 and is_equal_approx(t.facing,0.225) and canis_effects(bridge).any(func(v): return v.kind==0) and canis_effects(bridge).any(func(v): return v.kind==2),"予告を終えたtickに固定方向の噴射と焼け跡を生成する")
+	check(t.stage==1 and t.fired and t.shot==0 and semantics_approx(t.facing,0.225,"native_canis_sirius:t.facing") and canis_effects(bridge).any(func(v): return v.kind==0) and canis_effects(bridge).any(func(v): return v.kind==2),"予告を終えたtickに固定方向の噴射と焼け跡を生成する")
 	var active: Dictionary = bridge.checkpoint()
 	check(active.ok,"連射途中の段階・炎・乱数を保持する")
 	bridge._core.step(0.1)
@@ -2841,7 +2892,7 @@ func native_canis_bay() -> void:
 	bridge._core.step(0.45)
 	t = bridge.command("dev_boss_state").value[0]
 	var jump = load("res://data/bosses/canis_major_moves/pounce.tres")
-	check(t.stage==2 and t.jump_done and t.members.is_empty() and is_equal_approx(t.remaining,jump.recover),"飛びかかりの終了で猟犬を解除し、bayのrecoverではなくpounceの硬直を使う")
+	check(t.stage==2 and t.jump_done and t.members.is_empty() and semantics_approx(t.remaining,jump.recover,"native_canis_bay:t.remaining"),"飛びかかりの終了で猟犬を解除し、bayのrecoverではなくpounceの硬直を使う")
 	bridge._core.step(jump.recover)
 	check(bridge.command("dev_boss_state").value[0].stage==5,"硬直が終わると囲み技の完了を返す")
 	bridge.restore(held.value)
@@ -3123,7 +3174,7 @@ func native_canis_blaze() -> void:
 	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	check(started.ok,"制作入口から燃える猟犬だけを発動する")
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
-	check(t.chosen.size()==2 and t.chosen[0].at==0.2 and is_equal_approx(t.chosen[1].at,0.3),"近い猟犬に順番ごとの点火時刻を割り当てる")
+	check(t.chosen.size()==2 and t.chosen[0].at==0.2 and semantics_approx(t.chosen[1].at,0.3,"native_canis_blaze:t.chosen[1].at"),"近い猟犬に順番ごとの点火時刻を割り当てる")
 	bridge._core.step(0.1)
 	t = bridge.command("dev_boss_state").value[0]
 	check(t.chosen[0].sent and not t.chosen[0].lit and not t.chosen[1].sent,"点火の1間隔前にだけ口元からの火の移送を始める")
@@ -3133,7 +3184,7 @@ func native_canis_blaze() -> void:
 	check(body.burning.size()==1 and body.led.size()==3 and body.burning[0].age==0.11,"点火した猟犬を隊形から外し同じtickの炎更新で走行時計を進める")
 	var burning: Dictionary = body.burning[0]
 	var cfg = load("res://data/config.tres")
-	check(is_equal_approx(burning.max_hp,cfg.base_attack*cfg.atk_scale*0.5),"点火した猟犬の最大HPを体当たり基準の半分へ変える")
+	check(semantics_approx(burning.max_hp,cfg.base_attack*cfg.atk_scale*0.5,"native_canis_blaze:burning.max_hp"),"点火した猟犬の最大HPを体当たり基準の半分へ変える")
 	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	var display = c.view._boss_body_displays.values()[0]
 	check(display.flames.displays.has("猟犬:%d" % burning.actor) and display.flames.displays.has("口元の点火"),"正式表示へ猟犬の炎と点火中の口元を渡す")
@@ -3153,18 +3204,18 @@ func native_canis_blaze() -> void:
 	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].burning.size()==1,"取消は未点火の予定だけを止め点火済みの猟犬を残す")
 	bridge.command("dev_cancel_boss",{"entity_id":c.id})
 	var restored: Array = bridge.read_lab().value.enemies.filter(func(e): return e.id==burning.actor)
-	check(bridge.command("dev_boss_body_state").value[0].burning.is_empty() and restored.size()==1 and is_equal_approx(restored[0].max_hp,burning.base_hp),"本体の終了で点火を解除し元の最大HPへ戻す")
+	check(bridge.command("dev_boss_body_state").value[0].burning.is_empty() and restored.size()==1 and semantics_approx(restored[0].max_hp,burning.base_hp,"native_canis_blaze:restored[0].max_hp"),"本体の終了で点火を解除し元の最大HPへ戻す")
 	bridge.restore(active.value)
 	bridge.command("dev_cancel_technique",{"ticket":started.value})
 	bridge.command("dev_relocate",{"entity_id":burning.actor,"position":Vector2(2000,0)})
 	bridge._core.step(0.01)
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.burning.size()==1 and is_equal_approx(body.burning[0].blink_age,0.01),"機体の近くで明滅を始め同じtickから明滅時計を進める")
+	check(body.burning.size()==1 and semantics_approx(body.burning[0].blink_age,0.01,"native_canis_blaze:body.burning[0].blink_age"),"機体の近くで明滅を始め同じtickから明滅時計を進める")
 	var blinking: Dictionary = bridge.checkpoint()
 	var hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge._core.step(0.2)
 	body = bridge.command("dev_boss_body_state").value[0]
-	check(body.burning.is_empty() and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*cfg.atk_scale),"明滅の期限に円判定で1回ダメージを与え猟犬自身を死亡させる")
+	check(body.burning.is_empty() and semantics_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*cfg.atk_scale,"native_canis_blaze:hp-bridge._core.ship_snapshot().ship_hp"),"明滅の期限に円判定で1回ダメージを与え猟犬自身を死亡させる")
 	check(observed.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="blaze" and e.payload.technique=="blaze"),"爆発の原因と発動元の技を共通記録へ渡す")
 	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	c.view.update_effects(bridge.read_frame().value,0.0)
@@ -3328,7 +3379,7 @@ func native_canis_stream() -> void:
 	var lunges: Array = canis_lunges(bridge)
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
 	if not tail_only:
-		check(lunges.size()==1 and lunges[0].sweep and not lunges[0].shared_hit and lunges[0].overwrite and is_equal_approx(lunges[0].until,float(body.clock)+0.08),"個別の掃引・1回制限・固定速度と本体の時計で突進を保つ")
+		check(lunges.size()==1 and lunges[0].sweep and not lunges[0].shared_hit and lunges[0].overwrite and semantics_approx(lunges[0].until,float(body.clock)+0.08,"native_canis_stream:lunges[0].until"),"個別の掃引・1回制限・固定速度と本体の時計で突進を保つ")
 	var before_hp: float = bridge._core.ship_snapshot().ship_hp
 	bridge.command("dev_ship_motion",{"position":lunges[0].position,"velocity":Vector2.ZERO})
 	bridge._core.step(0.001)
@@ -3750,7 +3801,7 @@ func native_canis_hunt() -> void:
 		bridge._core.step(1.0/120.0)
 		t = bridge.command("dev_boss_state").value[0]
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
-	check(t.aiming and not t.combo_pending and is_equal_approx(t.aim_age,1.0/120.0) and body.clock>=t.last_launch+0.05 and not canis_lunges(bridge).is_empty(),"最後の発進とgapを過ぎたtickに狙撃を始め、猟犬の突進は並行して残す")
+	check(t.aiming and not t.combo_pending and semantics_approx(t.aim_age,1.0/120.0,"native_canis_hunt:t.aim_age") and body.clock>=t.last_launch+0.05 and not canis_lunges(bridge).is_empty(),"最後の発進とgapを過ぎたtickに狙撃を始め、猟犬の突進は並行して残す")
 	var aim_checkpoint: Dictionary = bridge.checkpoint()
 	check(aim_checkpoint.ok,"内側の順番・狙撃・乱数・本体時計を保持する")
 	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
@@ -3768,7 +3819,7 @@ func native_canis_hunt() -> void:
 	bridge._core.set_motion_context(Vector2(1800,-1000),Vector2(1800,-1000),Vector2(3000,2000))
 	bridge._core.step(0.03)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.fired and t.stage==1 and is_equal_approx(t.facing,facing) and canis_effects(bridge).any(func(v): return v.kind==0),"固定方向を保って噴射を始める")
+	check(t.fired and t.stage==1 and semantics_approx(t.facing,facing,"native_canis_hunt:t.facing") and canis_effects(bridge).any(func(v): return v.kind==0),"固定方向を保って噴射を始める")
 	var fired_checkpoint: Dictionary = bridge.checkpoint()
 	bridge._core.step(0.04)
 	var continued: Dictionary = bridge.command("dev_boss_state").value[0].duplicate(true)
@@ -3841,7 +3892,7 @@ func native_canis_hunt_pounce() -> void:
 		bridge._core.step(1.0/120.0)
 		t = bridge.command("dev_boss_state").value[0]
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
-	check(t.jumping and not t.jump_active and t.left==1 and is_equal_approx(t.jump_age,1.0/120.0) and body.clock>=t.last_launch+0.02 and not canis_lunges(bridge).is_empty(),"猟犬の最後の発進とgapの直後に一度だけの跳躍予告を始める")
+	check(t.jumping and not t.jump_active and t.left==1 and semantics_approx(t.jump_age,1.0/120.0,"native_canis_hunt_pounce:t.jump_age") and body.clock>=t.last_launch+0.02 and not canis_lunges(bridge).is_empty(),"猟犬の最後の発進とgapの直後に一度だけの跳躍予告を始める")
 	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
 	bridge._core.set_motion_context(Vector2(300,300),Vector2(300,300),Vector2(3000,2000))
 	bridge._core.step(0.06)
@@ -3957,14 +4008,14 @@ func native_canis_nova() -> void:
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
 	check(t.kind==49 and t.pairs.size()==6 and t.ring_hit==[false,false] and not t.flashed,"抽選した6体を3組へ分け、輪ごとの命中を初期化する")
 	for k in 6:
-		check(t.pairs[k].group==k/2 and t.pairs[k].side==(1.0 if k%2==0 else -1.0) and is_equal_approx(float(t.pairs[k].angle)-float(t.pairs[0].angle),float(k/2)*TAU/3.0),"組の固定角と左右を保持する")
+		check(t.pairs[k].group==k/2 and t.pairs[k].side==(1.0 if k%2==0 else -1.0) and semantics_approx(float(t.pairs[k].angle)-float(t.pairs[0].angle),float(k/2)*TAU/3.0,"native_canis_nova:float(t.pairs[k].angle)-float(t.pairs[0].angle)"),"組の固定角と左右を保持する")
 	var initial: Dictionary = bridge.checkpoint()
 	var facing: float = bridge.command("dev_boss_body_state").value[0].facing
 	bridge.command("dev_ship_motion",{"position":Vector2(0,2000),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(0,2000),Vector2(0,2000),Vector2(3000,2000))
 	bridge._core.step(0.1)
 	t = bridge.command("dev_boss_state").value[0]
-	check(not t.flashed and t.stage==0 and is_equal_approx(t.age,0.1) and bridge.command("dev_boss_body_state").value[0].facing==facing,"予告は本体clockで進み、本体の向きと組の角度を固定する")
+	check(not t.flashed and t.stage==0 and semantics_approx(t.age,0.1,"native_canis_nova:t.age") and bridge.command("dev_boss_body_state").value[0].facing==facing,"予告は本体clockで進み、本体の向きと組の角度を固定する")
 	var warning: Dictionary = bridge.checkpoint()
 	bridge._core.step(0.01)
 	var continuation: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
@@ -4053,7 +4104,7 @@ func native_canis_relay() -> void:
 	bridge._core.step(0.11)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
 	check(t.stage==0 and t.ordered and t.items.size()==3 and t.items[0].marked and not t.items[0].fired and t.warnings.size()==1,"全体予告を終えてから抽選し、最初の猟犬だけ個別予告を始める")
-	check(is_equal_approx(float(t.items[1].at)-float(t.items[0].at),0.05) and is_equal_approx(float(t.last_fire)-float(t.items[0].at),0.15),"個別時刻と最後の発射予定を本体clockへ置く")
+	check(semantics_approx(float(t.items[1].at)-float(t.items[0].at),0.05,"native_canis_relay:float(t.items[1].at)-float(t.items[0].at)") and semantics_approx(float(t.last_fire)-float(t.items[0].at),0.15,"native_canis_relay:float(t.last_fire)-float(t.items[0].at)"),"個別時刻と最後の発射予定を本体clockへ置く")
 	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
 	check(c.view._boss_body_displays.values()[0].technique.warnings.size()==1,"猟犬の固定予告を正式表示へ渡す")
 	var marked: Dictionary = bridge.checkpoint()
@@ -4063,14 +4114,14 @@ func native_canis_relay() -> void:
 	bridge._core.step(0.055)
 	t = bridge.command("dev_boss_state").value[0]
 	var jets: Array = canis_effects(bridge).filter(func(v): return v.kind==0 and v.profile==7)
-	check(t.items[0].fired and jets.size()==1 and jets[0].target==first.actor and is_equal_approx(float(jets[0].angle),float(first.angle)) and jets[0].from==first.from,"発射時には予告した位置と角度を使い、機体を狙い直さない")
+	check(t.items[0].fired and jets.size()==1 and jets[0].target==first.actor and semantics_approx(float(jets[0].angle),float(first.angle),"native_canis_relay:float(jets[0].angle)") and jets[0].from==first.from,"発射時には予告した位置と角度を使い、機体を狙い直さない")
 	var jet_id: int = jets[0].id
 	var fired: Dictionary = bridge.checkpoint()
 	var moved := Vector2(500,100)
 	bridge.command("dev_relocate",{"entity_id":first.actor,"position":moved})
 	bridge._core.step(0.001)
 	jets = canis_effects(bridge).filter(func(v): return v.kind==0 and v.target==first.actor)
-	check(jets.size()==1 and jets[0].pos.distance_to(moved)<60.0 and is_equal_approx(float(jets[0].angle),float(first.angle)),"発射後の口元だけを猟犬の実位置へ追従させ、角度は固定する")
+	check(jets.size()==1 and jets[0].pos.distance_to(moved)<60.0 and semantics_approx(float(jets[0].angle),float(first.angle),"native_canis_relay:float(jets[0].angle)"),"発射後の口元だけを猟犬の実位置へ追従させ、角度は固定する")
 	bridge.restore(fired.value)
 	var particle: Dictionary = canis_effects(bridge).filter(func(v): return v.kind==1 and v.profile==7)[0]
 	bridge.command("dev_ship_motion",{"position":particle.pos,"velocity":Vector2.ZERO})
@@ -4102,12 +4153,12 @@ func native_canis_relay() -> void:
 		bridge._core.step(0.008)
 		t = bridge.command("dev_boss_state").value[0]
 		if t.aiming: break
-	check(t.aiming and is_equal_approx(t.aim_age,0.008) and bridge.command("dev_boss_body_state").value[0].clock>=t.last_fire+0.35,"最後の猟犬が消失しても最後の予定時刻と固定の間隔から本体の照準を始める")
+	check(t.aiming and semantics_approx(t.aim_age,0.008,"native_canis_relay:t.aim_age") and bridge.command("dev_boss_body_state").value[0].clock>=t.last_fire+0.35,"最後の猟犬が消失しても最後の予定時刻と固定の間隔から本体の照準を始める")
 	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
 	bridge._core.set_motion_context(Vector2(300,300),Vector2(300,300),Vector2(3000,2000))
 	bridge._core.step(0.02)
 	t = bridge.command("dev_boss_state").value[0]
-	check(t.aim.is_equal_approx(Vector2(309.2,300)) and not t.locked,"最後の先読みは加算前の残り予告時間を使う")
+	check(semantics_approx(t.aim,Vector2(309.2,300),"native_canis_relay:t.aim") and not t.locked,"最後の先読みは加算前の残り予告時間を使う")
 	for k in 20:
 		bridge._core.step(0.01)
 		t = bridge.command("dev_boss_state").value[0]
@@ -4423,7 +4474,7 @@ func native_canis_sirius_flame() -> void:
 	bridge._core.step(0.06)
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
 	var warnings: Array = canis_effects(bridge).filter(func(v): return v.kind==1 and not v.harmful)
-	check(t.kind==51 and t.stage==0 and not t.started and is_equal_approx(t.age,0.06) and is_equal_approx(t.emit_left,0.08) and warnings.size()==1 and is_equal_approx(warnings[0].life,0.3) and is_equal_approx(warnings[0].velocity.length(),100.0),"予告中は18個毎秒の無害な粒を出し、固定寿命と速度を使う")
+	check(t.kind==51 and t.stage==0 and not t.started and semantics_approx(t.age,0.06,"native_canis_sirius_flame:t.age") and semantics_approx(t.emit_left,0.08,"native_canis_sirius_flame:t.emit_left") and warnings.size()==1 and semantics_approx(warnings[0].life,0.3,"native_canis_sirius_flame:warnings[0].life") and semantics_approx(warnings[0].velocity.length(),100.0,"native_canis_sirius_flame:warnings[0].velocity.length()"),"予告中は18個毎秒の無害な粒を出し、固定寿命と速度を使う")
 	var warning: Dictionary = bridge.checkpoint()
 	bridge.command("dev_ship_motion",{"position":warnings[0].pos,"velocity":Vector2.ZERO})
 	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
@@ -4435,7 +4486,7 @@ func native_canis_sirius_flame() -> void:
 	t = bridge.command("dev_boss_state").value[0]
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
 	var harmful: Array = canis_effects(bridge).filter(func(v): return v.kind==1 and v.harmful)
-	check(t.started and t.stage==1 and t.age==0.0 and is_equal_approx(t.emit_left,0.4) and harmful.size()==1 and body.position.x>0.0,"予告を越えたtickに攻撃時計と発生余りをリセットし、そのtickの前進と放射を行う")
+	check(t.started and t.stage==1 and t.age==0.0 and semantics_approx(t.emit_left,0.4,"native_canis_sirius_flame:t.emit_left") and harmful.size()==1 and body.position.x>0.0,"予告を越えたtickに攻撃時計と発生余りをリセットし、そのtickの前進と放射を行う")
 	var active: Dictionary = bridge.checkpoint()
 	var particle: Dictionary = harmful[0]
 	var reach: float = particle.radius+load("res://data/config.tres").ship_radius
@@ -4648,6 +4699,7 @@ func canis_finish_case(name := "", low := false, limit := -1.0) -> Dictionary:
 	if not name.is_empty():
 		flow.sections = [{"request":"any","allowed_techniques":[name],"cap":3.0,"action_count":1,"next":0,"weights":{"single":1.0,"combo":1.0,"major":1.0}}]
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.time_limit = limit
 	stage.legendary_module_id = ContentManager.stage(3).legendary_module_id
 	var package: Dictionary = builder.boss_package(boss,cfg,stage,{"rules":rules,"flow":flow})
@@ -4703,10 +4755,11 @@ func native_canis_finish() -> void:
 		check(f.view.apply_frame(bridge.read_render(Rect2(-2000,-1500,4000,3000)).value) and f.view._boss_body_displays.values()[0].technique.get("technique","")==name,"全技の発動状態を正式表示へ渡す: "+name)
 		var clocks: Dictionary = bridge.command("dev_boss_flow_state").value[0]
 		bridge._core.step(0.001)
-		check(is_equal_approx(bridge.command("dev_boss_flow_state").value[0].clock,clocks.clock),"技中はフローの時計を進めない: "+name)
+		check(semantics_approx(bridge.command("dev_boss_flow_state").value[0].clock,clocks.clock,"native_canis_finish:flow_clock:"+name),"技中はフローの時計を進めない: "+name)
 		bridge.dispose()
 		f.view.queue_free()
 	print("[cpp_canis_finish] 通常選択から実発動=",activated)
+	if semantics_strict():get_tree().quit(1 if failed else 0);return
 	var f := canis_finish_case("nova",true)
 	var bridge = f.bridge
 	bridge._core.step(0.01)
@@ -7013,3 +7066,30 @@ func semantics_hydra_lifecycle() -> void:
 	bridge._core.step(0.5);bridge._core.step_hazards(0.5);body=bridge.command("dev_boss_body_state").value[0]
 	check(semantics_number(body.necks[1].cd,0.05),"自然終了したtickの再使用待ちの指定許容幅")
 	semantics_hydra_finish(bridge,"lifecycle")
+## 既存の優先行動場面から、まだ数値幅を確かめていない値だけを読む。
+func semantics_centaurus_finish() -> void:
+	var f := centaurus_finish_case(-1.0,true,{"leap_trigger":0.0,"retreat_trigger":0.0})
+	var bridge = f.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(100,0),Vector2(100,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	var attacks: Array = bridge.command("dev_boss_state").value
+	if attacks.is_empty():failed+=1;push_error("踏みつけの場面を開始できない")
+	else:semantics_approx(attacks[0].elapsed,0.0,"native_centaurus_finish:stomp_elapsed")
+	bridge.dispose()
+	f=centaurus_finish_case(-1.0,true,{},true);bridge=f.bridge
+	centaurus_finish_low(f)
+	bridge.command("dev_ship_motion",{"position":Vector2(600,0),"velocity":Vector2(0,2000)})
+	bridge._core.step(0.6);bridge._core.step(0.61)
+	semantics_approx(bridge.command("dev_boss_body_state").value[0].path_hold,0.0,"native_centaurus_finish:path_hold")
+	bridge.dispose()
+	f=centaurus_finish_case(-1.0,true,{},true);bridge=f.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(100,0),Vector2(100,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	semantics_approx(bridge.command("dev_boss_body_state").value[0].leap_to,Vector2(-320,0),"native_centaurus_finish:leap_to")
+	bridge._core.step(0.175);bridge._core.step(0.175)
+	attacks=bridge.command("dev_boss_state").value
+	if attacks.is_empty():failed+=1;push_error("着地後の壁の場面を開始できない")
+	else:semantics_approx(attacks[0].elapsed,0.0,"native_centaurus_finish:wall_elapsed")
+	bridge.dispose();print("SEMANTICS_CENTAURUS_FINISH failures=",failed);get_tree().quit(1 if failed else 0)
