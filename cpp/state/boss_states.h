@@ -96,7 +96,14 @@ struct BossBodyState {
     godot::Vector2 entrance_from,entrance_target,final_to;
     double final_width=0;
 };
+struct BossFinishState {
+    bool active=false,blasted=false,banner=false,final_started=false;
+    double elapsed=0;
+    godot::Vector2 origin;
+    std::vector<godot::Vector2> approach,replay;
+};
 struct BossStates {
+    BossFinishState finish;
     std::vector<BossBodyState> bodies;
     EntityStore<BossTag> body_handles;
     int64_t next_body_id=1;

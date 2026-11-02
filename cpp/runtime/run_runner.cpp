@@ -5,6 +5,7 @@
 #include "run_runner.h"
 #include "../behaviors/weapons/afterimage.h"
 #include "../behaviors/enemies/corona_vortex.h"
+#include "../bosses/monoceros/finish.h"
 #include "../systems/attack_system.h"
 #include "../behaviors/weapons/scatter.h"
 #include "../behaviors/weapons/rear.h"
@@ -51,6 +52,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     // UIの入口判定を通過するまで、入力も時計も消費しない。
     if (control.ui_overlay || (control.ui_reward && state.phase!=Phase::Finishing)) return true;
     if (state.phase==Phase::LevelUp) {ProgressionSystem::poll(core);return true;}
+    if (state.phase==Phase::Finishing) {BossFinish::step(core.runtime,dt);return true;}
     if (state.phase==Phase::Dying) {core.step_death(dt);return true;}
     if (state.phase!=Phase::Play) return true;
     if (state.controls_locked || state.encounter_protected) state.hitstop=0;
@@ -92,6 +94,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (!core.rebuild_enemy_grid(state.frame_grid_cell)) return false;
     }
     if (!core.step_ship_input(dt,world_dt,input)) return false;
+    BossFinish::record_approach(core.runtime);
     if (state.phase==Phase::Play && !state.controls_locked) {
         LightLancesSystem::step(core.runtime,world_dt);
         for (const auto &owned:state.loadout.weapons) {

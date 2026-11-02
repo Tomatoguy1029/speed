@@ -128,6 +128,9 @@ var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
 var _epoch := 0
 var _jet_time := 0.0
+var finish_settings := {}
+var finish_shake := 0.0
+var finish_flash := 0.0
 var pipeline: RenderPipeline
 var _particles: Array[Dictionary] = []
 var _rings: Array[Dictionary] = []
@@ -293,7 +296,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_dim = Node2D.new()
 	_layer(16).add_child(_dim)
 	_dim.draw.connect(func():
-		if _dim_strength>0.0: _dim.draw_rect(_dim_rect.grow(400.0),Color(0,0,0,_dim_strength)))
+		if _dim_strength>0.0: _dim.draw_rect(_dim_rect.grow(400.0),Color(0,0,0,_dim_strength))
+		if finish_flash>0.0: _dim.draw_rect(_dim_rect.grow(400.0),Color(1,1,1,finish_flash*0.5)))
 	_flame = _exhaust("res://assets/pixel/airship_flame.png",character_scale)
 	_spark = _exhaust("res://assets/pixel/airship_spark.png",character_scale)
 	_spark.modulate.a = 0.65
@@ -1217,6 +1221,16 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			var duration: float = 0.3*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_rings.append({"pos":event.pos,"radius":event.r*2.4,"color":Color("#ffe27a"),"life":duration,"max":duration})
 			_burst(event.pos,Color("#ffd23f"),14,360.0)
+		if event.type==&"boss_explode":
+			finish_flash = float(finish_settings.get("flash",0.2))
+			finish_shake = float(finish_settings.get("shake",6.0))
+			var scene: PackedScene = finish_settings.get("effect")
+			if scene!=null:
+				var effect: Node2D = scene.instantiate()
+				effect.position = event.pos
+				add_child(effect)
+			else: _burst(event.pos,finish_settings.get("color",Color("#e2b96b")),int(finish_settings.get("particles",80)),700.0)
+			if pipeline!=null: pipeline.add_wave(event.pos,1600.0,float(finish_settings.get("wave_seconds",0.8)))
 		if event.type==&"ship_explode": _death_burst(event.pos)
 		if equipped_end_blast: _end_blast_visual.frame_event(event,frame.ui.end_blast.radius,frame.ui.end_blast.secondary)
 		if equipped_full_burst: _full_burst_visual.frame_event(event,frame.ui.ship.ship_pos,frame.ui.ship.ship_heading,frame.ui.character_scale)
@@ -1240,6 +1254,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	finish_flash = maxf(0.0,finish_flash-effect_dt*2.0)
 	if ui.has("light_lances"):
 		if not ui.light_lances.is_empty() and not is_instance_valid(_critical_lances):
 			_critical_lances = preload("res://scripts/render/light_lance.gd").new()

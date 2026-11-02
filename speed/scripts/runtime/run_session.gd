@@ -304,7 +304,11 @@ func _poll_cpp_loading() -> void:
 		presentation.bridge = bridge
 		presentation.cpp_resources = cpp_resources
 		presentation.cpp_scope = resources
-		if options.get("hud",true): view.get_node("Hud/HudRoot").bridge = bridge
+		if options.get("hud",true):
+			var hud: Node = view.get_node("Hud/HudRoot")
+			hud.bridge = bridge
+			hud.cpp_scope = resources
+			hud.cpp_resources = cpp_resources
 		else: view.get_node("Hud").free()
 		cpp_input_source = view.get_node("World/InputRouter").poll
 		add_child(view)

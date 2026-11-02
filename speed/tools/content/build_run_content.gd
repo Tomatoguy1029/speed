@@ -111,6 +111,36 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		package.visuals.append({"id":key,"role":7,"path":"res://scenes/bosses/monoceros_presentation.tscn","boss":"monoceros","appearance":definition.part_appearance.duplicate(true)})
 	return package
 
+## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
+static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
+	if definition==null or definition.id!=&"monoceros": return {}
+	var package := boss_body_package(definition,config)
+	if package.is_empty(): return {}
+	var rules = load("res://data/bosses/ai/monoceros_action_rules.tres")
+	var flow = load("res://data/bosses/ai/monoceros_flow.tres")
+	var techniques := boss_technique_set_records(definition,rules.techniques)
+	if techniques.is_empty(): return {}
+	for key in techniques: package.records[key] = techniques[key]
+	var compiled := boss_flow_records(rules,flow,techniques.BossTechniqueDefinition)
+	if compiled.is_empty(): return {}
+	for key in compiled: package.records[key] = compiled[key]
+	package.records.BossBodyDefinition[0].hp_floor_enabled = true
+	package.records.RunConfig[0].time_limit = stage.time_limit if stage!=null else -1.0
+	package.records.LifecycleDefinition[0].legendary = String(stage.legendary_module_id) if stage!=null else ""
+	var finish := {"id":1,"time_up_charge_time":config.time_up_charge_time}
+	for key in ["replay_window","slow_time","zoom","blast_time","relic_appear_time","relic_hold_time","relic_collect_time","clear_time"]: finish[key] = config.get("boss_finish_"+key)
+	package.records.BossFinishDefinition = [finish]
+	if stage!=null and not stage.legendary_module_id.is_empty():
+		var definition_resource = ContentManager.definition(&"legendary_modules",stage.legendary_module_id)
+		if definition_resource==null: return {}
+		for value in [{"path":"res://scenes/run/legendary_reveal.tscn","purpose":"reveal"},{"path":definition_resource.resource_path,"purpose":"legendary"}]:
+			var key: int = package.records.ResourceKey.size()+1
+			package.records.ResourceKey.append({"id":key,"role":Schema.ENUMS.VisualRole.BossFinish})
+			value.id = key
+			value.role = Schema.ENUMS.VisualRole.BossFinish
+			package.visuals.append(value)
+	return package
+
 static func _flow_condition(records: Dictionary, gate: Dictionary) -> int:
 	for key in gate:
 		if key not in ["min","max","angle","half_angle","min_phase"]: return 0

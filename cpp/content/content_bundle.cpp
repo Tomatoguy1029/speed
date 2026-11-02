@@ -102,6 +102,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
     bundle->boss_bodies=records.BossBodyDefinition_rows;
+    bundle->boss_finish=records.BossFinishDefinition_rows;
+    if (bundle->boss_finish.size()>1 || (!bundle->boss_finish.empty() && (bundle->boss_finish.front().id!=1 || bundle->boss_finish.front().zoom<=0))) return {};
     bundle->bosses=records.BossDefinition_rows;
     bundle->boss_techniques=records.BossTechniqueDefinition_rows;
     bundle->boss_stages=records.BossTechniqueStage_rows;

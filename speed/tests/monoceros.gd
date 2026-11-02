@@ -11,6 +11,21 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-finish-fallback" in OS.get_cmdline_user_args():
+		call_deferred("native_finish_fallback")
+		return
+	if "--cpp-finish-cleanup" in OS.get_cmdline_user_args():
+		call_deferred("native_finish_cleanup")
+		return
+	if "--cpp-finish-timeout" in OS.get_cmdline_user_args():
+		call_deferred("native_finish_timeout")
+		return
+	if "--cpp-finish-tail" in OS.get_cmdline_user_args():
+		call_deferred("native_finish_tail",true)
+		return
+	if "--cpp-finish" in OS.get_cmdline_user_args():
+		call_deferred("native_finish")
+		return
 	if "--cpp-sword" in OS.get_cmdline_user_args():
 		call_deferred("native_sword")
 		return
@@ -1390,4 +1405,183 @@ func native_sword() -> void:
 		bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_monoceros_sword] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func finish_fixture(limit := -1.0, automatic := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
+	cfg.death_freeze_time = 0.01
+	cfg.death_explosion_time = 0.01
+	cfg.death_game_over_time = 0.01
+	var boss = load("res://data/bosses/monoceros.tres").duplicate(true)
+	boss.params.initial_wait = 0.0
+	boss.params.phase_time = 0.01
+	var stage := RuntimeStage.new()
+	stage.time_limit = limit
+	stage.legendary_module_id = ContentManager.stage(1).legendary_module_id
+	var package: Dictionary = builder.boss_package(boss,cfg,stage)
+	if package.is_empty(): return {}
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	if not bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":192,"mode":1,"stage_id":"B_monoceros_finish","profile":{},"settings":{"hitstop":false}}).ok: return {}
+	bridge.start(192,{"position":Vector2(600,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(600,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(600,0),Vector2(600,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	if not automatic: bridge.command("dev_cancel_flow",{"entity_id":id})
+	return {"bridge":bridge,"id":id,"package":package,"events":events,"cfg":cfg}
+
+func finish_low_hp(f: Dictionary) -> void:
+	f.bridge.command("dev_damage",{"entity_id":f.id,"amount":100000.0,"cause":"debug","no_crit":true})
+	f.bridge._core.step(0.01)
+	f.bridge._core.step(0.01)
+
+func finish_steps(bridge, count: int) -> void:
+	for i in count: check(bridge.step(DT,bridge.pack_intent(Intent.new()), {"logical_size":Vector2(640,360)}).ok,"決着を公開APIの固定更新で進める")
+
+func native_finish() -> void:
+	var f := finish_fixture(-1.0,true)
+	check(not f.is_empty(),"実制作の全技・条件・フロー・形態・決着を一つの生成入口で読み込む")
+	if f.is_empty(): get_tree().quit(1); return
+	var bridge = f.bridge
+	var records: Dictionary = f.package.records
+	check(records.BossTechniqueDefinition.size()==16 and records.BossFlowAction.size()==8 and records.BossFinishDefinition.size()==1,"全8技の2形態と制作フローを生成し決着の実効値を取り込む")
+	var dance: Dictionary = records.BossFlowAction.filter(func(row): return row.external_id=="horn_dance")[0]
+	check(dance.cost==4.0 and records.BossFlowSection[2].cap==3.0,"通常制作フローでは消費4の乱舞が大技上限3を越える現行の制約を保つ")
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].definition%2==1,"通常HPでは制作フローが第1形態の技を選ぶ")
+	bridge.dispose()
+	f = finish_fixture(-1.0,true)
+	bridge = f.bridge
+	finish_low_hp(f)
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].phase==2 and bridge.command("dev_boss_state").value[0].definition%2==0,"低HPでは制作フローが第2形態の値へ切り替わる")
+	bridge.dispose()
+	var activated: Array[String] = []
+	for name in ["charge","kick","sweep","return_charge","horn_wave","lance","horn_dance","sword_flash"]:
+		f = finish_fixture()
+		bridge = f.bridge
+		if name in ["lance","horn_dance","sword_flash"]: finish_low_hp(f)
+		var target := Vector2(-180,0) if name=="kick" else Vector2(600,0)
+		bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+		bridge._core.set_motion_context(target,target,Vector2(640,360))
+		bridge._core.set_enemy_motion(f.id,{"facing":0.0})
+		var rule: Dictionary = f.package.records.BossTechniqueDefinition.filter(func(row): return row.external_id==name and row.phase==1)[0]
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":rule.id})
+		if name=="sweep":
+			bridge._core.step(rule.approach_max+0.01)
+			bridge._core.step(rule.stop_time)
+		elif name=="sword_flash": bridge._core.step(rule.first_windup)
+		else: bridge._core.step(rule.warn)
+		bridge._core.step(rule.swing_time*0.75 if name=="horn_wave" else rule.swing_time*0.5 if name=="sword_flash" else 0.01)
+		var state: Dictionary = bridge.command("dev_boss_state").value[0]
+		var emitted: bool = not bridge.command("dev_boss_body_state").value[0].horn_waves.is_empty() if name=="horn_wave" else bridge.command("dev_boss_body_state").value[0].last_slash.size()==2 if name=="sword_flash" else state.stage==1
+		check(ticket.ok and state.technique==name and emitted,"制作データで実際の攻撃まで発動する: "+name)
+		if emitted: activated.append(name)
+		bridge.dispose()
+	print("[cpp_monoceros_finish] 実発動=",activated)
+	await native_finish_tail()
+
+func native_finish_tail(retry := false) -> void:
+	var f := finish_fixture()
+	var bridge = f.bridge
+	finish_low_hp(f)
+	bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+	finish_steps(bridge,1)
+	var frame: Dictionary = bridge.read_frame().value
+	check(frame.ui.phase==RunState.Phase.FINISHING and frame.ui.boss_finish.active and frame.result==null,"実撃破のboss_deadから報酬を確定せずクリア演出へ入る")
+	var scope := ContentResourceScope.new()
+	for entry: Dictionary in f.package.visuals:
+		if entry.get("purpose","") in ["legendary","reveal"]: scope.provide(entry.path,load(entry.path))
+	var resources = load("res://tools/content/run_resources.gd").new()
+	resources.visuals.assign(f.package.visuals)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.cpp_scope = scope
+	hud.cpp_resources = resources
+	add_child(hud)
+	hud.size = Vector2(640,360)
+	if not retry: check(hud._legendary_reveal!=null,"報酬表示は開始前に準備した同じ資源Scopeから作る")
+	var held: Dictionary = bridge.checkpoint()
+	finish_steps(bridge,3)
+	var expected: Dictionary = bridge.read_frame().value.ui.boss_finish
+	check(expected.blasted and f.events.filter(func(e): return e.type==&"boss_explode").size()==1,"スロー再生の時間後にボスと残る敵弾を一度消す")
+	check(held.ok and bridge.restore(held.value).ok,"決着途中の再生位置・演出時計・消滅済みを復帰する")
+	finish_steps(bridge,3)
+	check(bridge.read_frame().value.ui.boss_finish==expected,"復帰後も同じ決着の段階へ進む")
+	bridge.release_checkpoint(held.value)
+	finish_steps(bridge,3)
+	hud.apply_snapshot(bridge.read_frame().value.ui)
+	hud._update_cpp_finish()
+	check(hud._legendary_reveal.visible,"消滅後は伝説の姿と名前の既存表示へ進む")
+	finish_steps(bridge,10)
+	frame = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Clear" and frame.result.legendary=="legendary_stern" and f.events.any(func(e): return e.type==&"clear_banner"),"報酬表示とCLEARの後に共通Lifecycleへ一度だけ勝利を確定する")
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"決着と結果の通知を表示・記録へ配信する")
+	hud.queue_free()
+	bridge.dispose()
+	f = finish_fixture(0.01)
+	bridge = f.bridge
+	finish_steps(bridge,2)
+	check(bridge.command("dev_boss_body_state").value[0].mode==3 and f.events.any(func(e): return e.type==&"time_limit_reached"),"実制限時間から一角獣の最終攻撃へ進む")
+	finish_steps(bridge,22)
+	frame = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Death" and frame.result.last_damage.cause==&"final_strike","時間切れの一撃から既存の敗北出口へ進む")
+	bridge.dispose()
+	f = finish_fixture()
+	bridge = f.bridge
+	if not retry: check(bridge.command("abort",{"reason":0}).ok and bridge.read_frame().value.result.kind=="Abort" and bridge.command("dev_boss_body_state").value[0].mode==5,"途中中断はボスを取消しクリア報酬を付けず共通Abortへ進む")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_monoceros_finish] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_finish_timeout() -> void:
+	var f := finish_fixture(0.01)
+	var bridge = f.bridge
+	# 時間切れの発動は成功済み。既存共通の最短溜め0.1秒と敗北待ちを含む未成立の出口だけ確認する。
+	finish_steps(bridge,24)
+	var frame: Dictionary = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Death" and frame.result.last_damage.cause==&"final_strike","時間切れの一撃から既存の敗北出口へ進む")
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"時間切れの決着と敗北を共通配信へ渡す")
+	bridge.dispose()
+	print("[cpp_monoceros_finish_timeout] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 決着の差分レビューで補った、消滅時の行回収とスキップ出口だけを確認する。
+func native_finish_cleanup() -> void:
+	var f := finish_fixture()
+	var bridge = f.bridge
+	var regular: int = bridge.command("dev_spawn",{"definition_id":"monoceros","position":Vector2(100,100)}).value
+	finish_low_hp(f)
+	bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+	finish_steps(bridge,1)
+	var kills: int = bridge.read_frame().value.ui.kills
+	check(bridge.command("skip_finish").ok,"決着のスキップも消滅とCLEARの共通出口を通る")
+	check(not bridge.command("dev_enemy_combat",{"entity_id":regular,"guard":1.0}).ok and f.events.any(func(e): return e.type==&"kill" and e.payload.id==regular and e.payload.silent and e.payload.has("color") and e.payload.has("facing") and e.payload.has("meteor_index")),"消滅で残る通常行を回収し表示に必要な固定値を通知へ残す")
+	finish_steps(bridge,3)
+	var frame: Dictionary = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Clear" and frame.result.kills==kills,"消滅した通常行を撃破数やドロップへ重複加算しない")
+	var before: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(not bridge.command("abort",{"reason":0}).ok and bridge.command("dev_boss_body_state").value[0]==before,"結果確定後の中断要求はボスの状態を変えず拒否する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"スキップと消滅の通知を共通配信へ渡す")
+	bridge.dispose()
+	print("[cpp_monoceros_finish_cleanup] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_finish_fallback() -> void:
+	var f := finish_fixture(0.01)
+	var bridge = f.bridge
+	finish_steps(bridge,2)
+	bridge.command("dev_remove",{"entity_id":f.id})
+	finish_steps(bridge,10)
+	var frame: Dictionary = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Death" and frame.result.last_damage.cause==&"final_strike","溜め中に参加者が消失しても既存の制限時間の期限から敗北へ進む")
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"参加者消失後の最終攻撃も記録へ配信する")
+	bridge.dispose()
+	print("[cpp_monoceros_finish_fallback] failures=",failed)
 	get_tree().quit(1 if failed else 0)

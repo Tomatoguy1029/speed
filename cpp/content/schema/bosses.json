@@ -607,6 +607,62 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "BossFinishDefinition",
+      "section": 163,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "replay_window",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "zoom",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "relic_appear_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "relic_hold_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "relic_collect_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clear_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time_up_charge_time",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

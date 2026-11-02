@@ -1566,6 +1566,7 @@ func _ready_cpp() -> void:
 	frame_view = load("res://scripts/render/run_frame_view.gd").new()
 	get_node(world_path).add_child(frame_view)
 	frame_view.setup(cpp_scope,cpp_resources.visuals,float(snapshot.value.ui.character_scale))
+	frame_view.finish_settings = {"flash":finish_flash,"shake":finish_shake,"effect":finish_effect_scene,"color":finish_color,"particles":finish_particles,"wave_seconds":finish_wave_seconds}
 	cpp_background = preload("res://scripts/render/run_stage_background.gd").new()
 	cpp_background.z_index = -10
 	frame_view.add_child(cpp_background)
@@ -1603,6 +1604,9 @@ func _present_cpp(delta: float) -> void:
 	frame_view.update_effects(frame,delta)
 	shake=maxf(shake,frame_view.ruler_shake)
 	frame_view.ruler_shake=0.0
+	if frame_view.finish_shake>0.0:
+		shake = maxf(shake,frame_view.finish_shake)
+		frame_view.finish_shake = 0.0
 	if frame_view._end_blast_visual!=null:
 		shake = maxf(shake,frame_view._end_blast_visual.frame_shake)
 		frame_view._end_blast_visual.frame_shake = 0.0

@@ -76,6 +76,8 @@ var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var bridge: RefCounted
 var _cpp_ui: Dictionary = {}
+var cpp_scope: ContentResourceScope
+var cpp_resources: Resource
 var run: RunSimulation
 var _laser_audio: Node
 var _font: Font
@@ -443,6 +445,7 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if bridge!=null:
 		_update_speed_indicator(delta)
+		_update_cpp_finish()
 		if not _cpp_ui.is_empty() and not _cpp_ui.get("presentation_frozen",true):
 			_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
 			_ring_flash_t = maxf(0.0,_ring_flash_t-delta)
@@ -1176,6 +1179,7 @@ func apply_snapshot(ui: Dictionary) -> void:
 
 
 func _ready_cpp() -> void:
+	_prepare_cpp_finish()
 	bridge.subscribe("hud",_receive_cpp_frame)
 	_font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -1202,6 +1206,43 @@ func _ready_cpp() -> void:
 	resized.connect(_layout_cpp_art)
 	_layout_cpp_art()
 
+func _prepare_cpp_finish() -> void:
+	_finish_skip = Button.new()
+	_finish_skip.text = tr("hud.skip_finish")
+	_finish_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_finish_skip.position = Vector2(-210,-58)
+	_finish_skip.size = Vector2(190,38)
+	_finish_skip.hide()
+	_finish_skip.pressed.connect(func(): bridge.command("skip_finish"))
+	add_child(_finish_skip)
+	if cpp_scope==null or cpp_resources==null: return
+	var scene: PackedScene
+	var definition: LegendaryModuleDef
+	for entry: Dictionary in cpp_resources.visuals:
+		if entry.get("purpose","")=="reveal": scene = cpp_scope.resources.get(entry.path)
+		if entry.get("purpose","")=="legendary": definition = cpp_scope.resources.get(entry.path)
+	if scene==null or definition==null: return
+	_legendary_reveal = scene.instantiate() as Control
+	_legendary_reveal.setup(definition)
+	add_child(_legendary_reveal)
+	_legendary_reveal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_legendary_reveal.hide()
+	move_child(_finish_skip,-1)
+
+func _update_cpp_finish() -> void:
+	var value: Dictionary = _cpp_ui.get("boss_finish",{})
+	var active: bool = value.get("active",false)
+	if not value.is_empty(): AudioManager.set_slow_motion(active and value.elapsed<value.slow_time and not _cpp_ui.get("presentation_frozen",false))
+	_finish_skip.visible = active and value.elapsed>=0.35 and value.elapsed<value.reveal_start+value.reveal_duration
+	if _speed_indicator!=null: _speed_indicator.visible = not active
+	if _legendary_reveal==null: return
+	_legendary_reveal.visible = active and value.reveal_duration>0.0 and value.elapsed>=value.reveal_start and value.elapsed<value.reveal_start+value.reveal_duration
+	if not _legendary_reveal.visible: return
+	_legendary_reveal.set_timing(value.appear_time,value.hold_time,value.collect_time)
+	var zoom: float = size.x/maxf(1.0,_cpp_ui.view_half.x*2.0)
+	_legendary_reveal.set_endpoints((value.origin-_cpp_ui.view_center)*zoom+size*0.5,(_cpp_ui.ship.ship_pos-_cpp_ui.view_center)*zoom+size*0.5)
+	_legendary_reveal.set_progress(clampf((value.elapsed-value.reveal_start)/maxf(0.001,value.reveal_duration),0.0,1.0))
+
 func _layout_cpp_art() -> void:
 	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
 	_speed_indicator.position = (size-(SPEED_INDICATOR.METER.get_size()+Vector2.ONE*8.0)*factor).round()
@@ -1211,6 +1252,9 @@ func _layout_cpp_art() -> void:
 
 func _draw_cpp() -> void:
 	if _cpp_ui.is_empty() or not show_status: return
+	if _cpp_ui.get("boss_finish",{}).get("active",false):
+		_draw_banner()
+		return
 	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
 	draw_set_transform((size-ART_SIZE*factor)*0.5,0.0,Vector2.ONE*factor)
 	var hp := clampf(float(_cpp_ui.hp)/maxf(1.0,float(_cpp_ui.max_hp)),0.0,1.0)

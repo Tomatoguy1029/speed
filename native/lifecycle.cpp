@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../cpp/behaviors/weapons/afterimage.h"
 #include "../cpp/runtime/lifecycle.h"
+#include "../cpp/bosses/monoceros/finish.h"
 #include <cmath>
 using namespace godot;
 
@@ -21,6 +22,7 @@ bool SpeedRunCore::configure_lifecycle(const Dictionary &config) {
 }
 
 bool SpeedRunCore::check_run_end() {
+    if (runtime.api_configured) speed::BossFinish::check(runtime);
     // 部品単位の比較では、実験場と同様にHPが尽きても更新を続ける。
     if (runtime.state.lifecycle_ready && runtime.state.phase == Phase::Play && runtime.state.ship.hp <= 0) {
         runtime.state.sequence_t = 0;

@@ -1073,10 +1073,10 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 15
+          "max": 16
         }
       ],
-      "version": 11
+      "version": 12
     },
     {
       "name": "ForwardDefinition",
@@ -1465,6 +1465,10 @@
       {
         "name": "DashRangeDrone",
         "value": "dashRangeDrone"
+      },
+      {
+        "name": "Finale",
+        "value": "finale"
       }
     ],
     "VisualRole": [
@@ -1531,6 +1535,10 @@
       {
         "name": "StarBolt",
         "value": "star_bolt"
+      },
+      {
+        "name": "BossFinish",
+        "value": "boss_finish"
       }
     ],
     "EventType": [
@@ -1953,6 +1961,18 @@
       {
         "name": "EnemyTuningSaved",
         "value": "enemy_tuning_saved"
+      },
+      {
+        "name": "BossFinish",
+        "value": "boss_finish"
+      },
+      {
+        "name": "BossExplode",
+        "value": "boss_explode"
+      },
+      {
+        "name": "ClearBanner",
+        "value": "clear_banner"
       }
     ],
     "ResultKind": [
@@ -2210,7 +2230,9 @@
       "color",
       "size"
     ],
-    "time_limit_reached": [],
+    "time_limit_reached": [
+      "t"
+    ],
     "trace_end": [
       "completed"
     ],
@@ -2604,7 +2626,14 @@
     "enemy_tuning_saved": [
       "path",
       "values"
-    ]
+    ],
+    "boss_finish": [
+      "pos"
+    ],
+    "boss_explode": [
+      "pos"
+    ],
+    "clear_banner": []
   },
   "includes": [
     "attacks.json",
