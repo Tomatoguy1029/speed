@@ -2,6 +2,7 @@
 ## C++の状態や技実行へは渡さない。
 extends RefCounted
 const RUNNERS := {
+	"res://scripts/data_types/boss_techniques/hydra/thunder_headbutt.gd":"res://scripts/bosses/hydra/techniques/thunder_headbutt.gd",
 	"res://scripts/data_types/boss_techniques/hydra/debris_shatter.gd":"res://scripts/bosses/hydra/techniques/debris_shatter.gd",
 	"res://scripts/data_types/boss_techniques/hydra/tornado.gd":"res://scripts/bosses/hydra/techniques/tornado.gd",
 	"res://scripts/data_types/boss_techniques/draco/rifts.gd":"res://scripts/bosses/draco/techniques/rifts.gd",

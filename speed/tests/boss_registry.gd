@@ -9,6 +9,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-headbutt-loss" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_headbutt_loss")
+		return
+	if "--cpp-hydra-headbutt" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_headbutt")
+		return
 	if "--cpp-hydra-pincer" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_pincer")
 		return
@@ -5331,3 +5337,91 @@ func native_hydra_thunder_hit() -> void:
 	print("落雷命中値 ",{"before":hp,"after":b._core.ship_snapshot().ship_hp,"scale":c.cfg.atk_scale,"hits":hits,"damage_events":events.filter(func(e):return e.type=="combat_player_damage")})
 	check(hits.size()==1 and hits[0].payload.technique==&"thunder_drop" and hits[0].payload.source==&"hydra","落雷の命中記録を同じtickで受け取る")
 	b.dispose();print("[cpp_hydra_thunder_hit] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func hydra_headbutt_case(flowing := false) -> Dictionary:
+	return hydra_normal_case(flowing,{}, {"normal_charge":0.1,"normal_lunge":0.12,"normal_hold":0.1,"attack_cd":0.03,"bite_radius":10.0,"bite_dmg":3.0,"thunder_radius":120.0,"thunder_flash":0.08,"beam_dmg":7.0},"thunder_headbutt")
+
+func native_hydra_headbutt() -> void:
+	var c:=hydra_headbutt_case(true)
+	if c.is_empty():get_tree().quit(1);return
+	var b=c.bridge;var state:Dictionary=b.command("dev_boss_body_state").value[0];var n:Dictionary=state.necks[4]
+	var target:Vector2=n.position+Vector2.from_angle(n.angle)*450
+	b.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	for tick in 200:
+		hydra_thunder_tick(b,0.01)
+		if not b.command("dev_boss_state").value.is_empty():break
+	var acts:Array=b.command("dev_boss_state").value
+	check(not acts.is_empty() and acts[0].kind==92,"雷の首が通常フローから頭突きを選ぶ")
+	if acts.is_empty():b.dispose();get_tree().quit(1);return
+	for tick in 10:hydra_thunder_tick(b,0.01)
+	var held:Dictionary=b.checkpoint()
+	for tick in 5:hydra_thunder_tick(b,0.01)
+	state=b.command("dev_boss_body_state").value[0]
+	check(state.effects.any(func(e):return e.kind=="bite" and e.width==10.0) and not state.effects.any(func(e):return e.kind=="lightning"),"噛みつき部品が踏み込み線分を作り、落雷はまだ出さない")
+	var expected:Dictionary=state.duplicate(true)
+	check(held.ok and b.restore(held.value).ok,"踏み込みと落雷設定を値型で復帰する")
+	for tick in 5:hydra_thunder_tick(b,0.01)
+	check(b.command("dev_boss_body_state").value[0]==expected,"同じ踏み込み点列へ戻る");b.release_checkpoint(held.value)
+	b.command("dev_ship_motion",{"position":target+Vector2(0,80),"velocity":Vector2.ZERO});b._core.set_run_guards({"invincible":false})
+	var events:Array=[];b.subscribe("頭突きの落雷記録",func(packet):events.append_array(packet.events);return true)
+	var hp:float=b._core.ship_snapshot().ship_hp
+	for tick in 9:hydra_thunder_tick(b,0.01)
+	state=b.command("dev_boss_body_state").value[0]
+	var light:Array=state.effects.filter(func(e):return e.kind=="lightning")
+	var hits:Array=events.filter(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="lightning")
+	check(light.size()==1 and light[0].points[0].distance_to(target)<0.001 and light[0].width==240.0,"踏み込みの終了に狙った位置へ一度だけ落雷する")
+	check(is_equal_approx(hp-b._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale) and hits.size()==1 and hits[0].payload.technique==&"thunder_headbutt" and hits[0].payload.source==&"hydra","噛みつきの外側へ落雷だけが命中し、倍率・原因・技を記録する")
+	var scope:=ContentResourceScope.new()
+	for asset:Dictionary in c.package.visuals:
+		if not asset.path.is_empty():scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]:scope.provide(path,load(path))
+	var view=load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries:Array[Dictionary]=[];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(b.read_render(Rect2(-2500,-1800,5000,3600)).value),"踏み込みと落雷を正式表示へ渡す")
+	await get_tree().process_frame
+	for tick in 50:hydra_thunder_tick(b,0.01)
+	check(b.command("dev_boss_state").value.any(func(t):return t.kind==92 and t.id>acts[0].id),"頭突き自然終了後に次の行動へ進む")
+	b.dispose();view.queue_free()
+	for cancel_at in [0.04,0.16,0.24]:
+		var q:=hydra_headbutt_case()
+		if q.is_empty():continue
+		var qb=q.bridge;var x:Dictionary=qb.command("dev_boss_body_state").value[0];var head:Dictionary=x.necks[4]
+		qb.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*450,"velocity":Vector2.ZERO})
+		var start:Dictionary=qb.command("dev_boss_technique",{"entity_id":head.id,"definition":1})
+		check(start.ok,"各段階の取消用に頭突きを開始する")
+		if start.ok:
+			for tick in int(round(cancel_at/0.01)):hydra_thunder_tick(qb,0.01)
+			var saved:Dictionary=qb.checkpoint();check(saved.ok and qb.restore(saved.value).ok,"予告・踏み込み・落雷の各段階を保持復帰する");qb.release_checkpoint(saved.value)
+			check(qb.command("dev_cancel_technique",{"ticket":start.value}).ok and qb.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で首所有の噛みつきと雷を回収する")
+		qb.dispose()
+	var free:=hydra_headbutt_case()
+	if not free.is_empty():
+		var fb=free.bridge;var x:Dictionary=fb.command("dev_boss_body_state").value[0]
+		fb.command("dev_damage",{"entity_id":free.id,"amount":x.max_hp+1,"cause":"shot"});fb._core.step(0.001);fb._core.step(1.21)
+		x=fb.command("dev_boss_body_state").value[0];var head:Dictionary=x.necks[4]
+		fb.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*450,"velocity":Vector2.ZERO})
+		check(fb.command("dev_boss_technique",{"entity_id":head.id,"definition":1}).ok,"分離後も同じ噛みつき部品へ落雷設定を渡す")
+		for tick in 24:hydra_thunder_tick(fb,0.01)
+		x=fb.command("dev_boss_body_state").value[0]
+		check(x.necks[4].normal_phase==1 and x.effects.any(func(e):return e.kind=="lightning"),"分離後は踏み込み終点へ雷を出し、閃光時間までactiveを保つ")
+		for tick in 7:hydra_thunder_tick(fb,0.01)
+		x=fb.command("dev_boss_body_state").value[0]
+		check(x.necks[4].normal_phase==2 and x.effects.is_empty(),"分離後はflash後にholdへ入り、首の判定を回収する")
+		fb.command("dev_cancel_boss",{"entity_id":free.id});check(fb.command("dev_boss_body_state").value[0].effects.is_empty(),"本体終了で頭突きと落雷を解放する");fb.dispose()
+	await get_tree().process_frame
+	print("[cpp_hydra_headbutt] failures=",failed);get_tree().quit(1 if failed else 0)
+
+
+func native_hydra_headbutt_loss() -> void:
+	for at in [0.15,0.24]:
+		var c:=hydra_headbutt_case()
+		if c.is_empty():continue
+		var b=c.bridge;var state:Dictionary=b.command("dev_boss_body_state").value[0];var n:Dictionary=state.necks[4]
+		b.command("dev_ship_motion",{"position":n.position+Vector2.from_angle(n.angle)*450,"velocity":Vector2.ZERO})
+		var start:Dictionary=b.command("dev_boss_technique",{"entity_id":n.id,"definition":1})
+		if not start.ok:check(false,"首消失の確認用の頭突きを開始する");b.dispose();continue
+		for tick in int(round(at/0.01)):hydra_thunder_tick(b,0.01)
+		b.command("dev_remove",{"entity_id":n.id});hydra_thunder_tick(b,0.01)
+		check(b.command("dev_boss_body_state").value[0].effects.is_empty(),"踏み込み中と落雷後の参加首消失で首所有の判定を回収する")
+		b.dispose()
+	print("[cpp_hydra_headbutt_loss] failures=",failed);get_tree().quit(1 if failed else 0)
