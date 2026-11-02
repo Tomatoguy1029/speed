@@ -4,6 +4,7 @@
 #include "../content/generated/combat_ids.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
+#include <string>
 #include <vector>
 #include <variant>
 #include <unordered_map>
