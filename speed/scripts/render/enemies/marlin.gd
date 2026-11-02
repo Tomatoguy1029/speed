@@ -16,6 +16,16 @@ var _thrust_count := 0
 
 func setup(render: RunPresentation, behavior_name: StringName) -> void:
 	super.setup(render, behavior_name)
+	_prepare_meshes()
+
+var _frame_parent: CanvasItem
+
+func setup_frame(parent: CanvasItem) -> void:
+	_frame_parent = parent
+	_prepare_meshes()
+
+func _prepare_meshes() -> void:
+	if _warning_mesh!=null: return
 	_warning_mesh = QuadMesh.new()
 	_warning_mesh.size = Vector2.ONE
 	# 筋ごとの四角形を一度だけ用意し、伸縮・明滅は頂点シェーダーへ任せる。
@@ -72,28 +82,29 @@ func _hide_unused_thrusts() -> void:
 	for n in range(_thrust_count, _thrusts.size()): _thrusts[n].visible = false
 
 func _draw_thrust(t: EnemyTable, i: int) -> void:
-	if _thrust_count == _thrusts.size():
+	var scale_px := sprite_radius(t,i)/32.0
+	var angle := rm._enemy_sprite_angle(t.type[i],t.facing[i])
+	_draw_thrust_values(rm._lit_enemy_marks,t.pos[i]+(HORN_OFFSET*scale_px).rotated(angle),angle,scale_px,maxf(0.0,float(t.def[i].params.dash_time)-t.timer[i]),t.timer[i])
+
+func _draw_thrust_values(parent: CanvasItem, position: Vector2, angle: float, scale_px: float, elapsed: float, remaining: float) -> void:
+	if _thrust_count==_thrusts.size():
 		var node := MeshInstance2D.new()
 		node.name = "MarlinThrust%d" % _thrust_count
 		node.mesh = _thrust_mesh
-		var thrust_material := ShaderMaterial.new()
-		thrust_material.shader = THRUST_SHADER
-		node.material = thrust_material
-		# 装甲の専用CanvasLayerより前面。後方へ開く方向とは独立した描画順。
-		rm._lit_enemy_marks.add_child(node)
+		var material := ShaderMaterial.new()
+		material.shader = THRUST_SHADER
+		node.material = material
+		parent.add_child(node)
 		_thrusts.append(node)
 	var thrust := _thrusts[_thrust_count]
 	_thrust_count += 1
-	var scale_px := sprite_radius(t, i) / 32.0
-	var angle := rm._enemy_sprite_angle(t.type[i], t.facing[i])
-	thrust.position = t.pos[i] + (HORN_OFFSET * scale_px).rotated(angle)
-	thrust.rotation = angle + PI * 0.5
-	thrust.scale = Vector2.ONE * scale_px
+	thrust.position = position
+	thrust.rotation = angle+PI*0.5
+	thrust.scale = Vector2.ONE*scale_px
 	thrust.visible = true
 	var mat := thrust.material as ShaderMaterial
-	var elapsed := maxf(0.0, float(t.def[i].params.dash_time) - t.timer[i])
-	mat.set_shader_parameter("clock", elapsed)
-	mat.set_shader_parameter("strength", minf(1.0, minf(elapsed, maxf(0.0, t.timer[i])) / 0.08))
+	mat.set_shader_parameter("clock",elapsed)
+	mat.set_shader_parameter("strength",minf(1.0,minf(elapsed,maxf(0.0,remaining))/0.08))
 
 func _hide_unused_warnings() -> void:
 	for n in range(_warning_count, _warnings.size()): _warnings[n].visible = false
@@ -117,6 +128,9 @@ static func clip_warning(from: Vector2, to: Vector2, view: Rect2) -> PackedVecto
 
 ## 予兆の同時表示数だけ表示ノードを確保し、メッシュ・マテリアルを次の予兆でも再利用する。
 func _draw_warning(c: CanvasItem, from: Vector2, to: Vector2, origin: Vector2, end: Vector2, charge: float, id: int) -> void:
+	_draw_warning_values(c,from,to,origin,end,charge,id,_px(maxf(1.0,rm.get_viewport().get_visible_rect().size.y/REFERENCE_HEIGHT)),state.world_time)
+
+func _draw_warning_values(c: CanvasItem, from: Vector2, to: Vector2, origin: Vector2, end: Vector2, charge: float, id: int, pixel: float, world_time: float) -> void:
 	var distance := from.distance_to(to)
 	if distance <= 0.001: return
 	if _warning_count == _warnings.size():
@@ -131,7 +145,6 @@ func _draw_warning(c: CanvasItem, from: Vector2, to: Vector2, origin: Vector2, e
 		_warnings.append(node)
 	var warning := _warnings[_warning_count]
 	_warning_count += 1
-	var pixel := _px(maxf(1.0, rm.get_viewport().get_visible_rect().size.y / REFERENCE_HEIGHT))
 	warning.position = (from + to) * 0.5
 	warning.rotation = (to - from).angle()
 	warning.scale = Vector2(distance, WARNING_HALF_HEIGHT * 2.0 * pixel)
@@ -142,5 +155,30 @@ func _draw_warning(c: CanvasItem, from: Vector2, to: Vector2, origin: Vector2, e
 	material.set_shader_parameter("path_offset", origin.distance_to(from) / pixel)
 	material.set_shader_parameter("charge", charge)
 	material.set_shader_parameter("seed", float(id % 4093))
-	material.set_shader_parameter("clock", fmod(state.world_time, 4.0))
+	material.set_shader_parameter("clock", fmod(world_time, 4.0))
 	material.set_shader_parameter("linear_output", c.get_viewport().use_hdr_2d)
+
+func apply_frame(data: Dictionary, world_time: float, zoom: float) -> void:
+	_warning_count = 0
+	_thrust_count = 0
+	var pixel := 1.0/maxf(zoom,0.01)
+	var view: Rect2 = data.view.grow(-48.0*pixel)
+	var ids: PackedInt64Array = data.ids
+	var values: PackedFloat64Array = data.values
+	for row in ids.size():
+		var n := row*14
+		var position := Vector2(values[n],values[n+1])
+		var mode := int(values[n+6])
+		if mode==EnemyTable.Mode.DASH:
+			if data.view.grow(values[n+4]*4.0).has_point(position):
+				var scale_px := values[n+4]/32.0
+				_draw_thrust_values(_frame_parent,position+(HORN_OFFSET*scale_px).rotated(values[n+5]),values[n+5],scale_px,maxf(0.0,values[n+9]-values[n+8]),values[n+8])
+		elif mode==EnemyTable.Mode.WINDUP:
+			var origin := Vector2(values[n+10],values[n+11])
+			var end := Vector2(values[n+12],values[n+13])
+			var path := clip_warning(origin,end,view)
+			if path.is_empty(): continue
+			var mark_pixel := pixel*maxf(1.0,_frame_parent.get_viewport().get_visible_rect().size.y/REFERENCE_HEIGHT)
+			_draw_warning_values(_frame_parent,path[0],path[1],origin,end,values[n+7],ids[row],mark_pixel,world_time)
+	_hide_unused_warnings()
+	_hide_unused_thrusts()

@@ -537,6 +537,49 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "MarlinDefinition",
+      "section": 64,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "telegraph"
+        },
+        {
+          "name": "dash_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "dash_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

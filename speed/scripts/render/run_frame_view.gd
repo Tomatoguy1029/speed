@@ -27,6 +27,7 @@ var _battleship := PackedFloat32Array()
 var _sniper := PackedFloat32Array()
 var _sniper_world_time := 0.0
 var _telescope_beams: Array[Dictionary] = []
+var _marlin_visual: EnemyVisual
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
@@ -90,6 +91,14 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		var color := Color("#ff6b5a") if ui.ship.ship_hurt>0.0 else Color.WHITE
 		if ui.ship.ship_invuln>0.0 and fmod(ui.world_time*20.0,2.0)<1.0: color.a = 0.5
 		preload("res://scripts/render/equipment/rear.gd").frame_extra(canvas,_scope.resources.get("res://assets/pixel/airship_turret_base.png"),_scope.resources.get("res://assets/pixel/airship_turret.png"),_ship_visual_position,ui.ship.ship_pos,ui.ship.ship_heading,ui.rear.mount,ui.rear.aim,ui.rear.recoil,ui.character_scale,color)
+	var marlin_layer := CanvasLayer.new()
+	marlin_layer.layer = _shield_layer+1
+	marlin_layer.follow_viewport_enabled = true
+	add_child(marlin_layer)
+	var marlin_parent := Node2D.new()
+	marlin_layer.add_child(marlin_parent)
+	_marlin_visual = preload("res://scripts/render/enemies/marlin.gd").new()
+	_marlin_visual.setup_frame(marlin_parent)
 	_shield_holder = Node2D.new()
 	_layer(18).add_child(_shield_holder)
 	var transfer_layer := CanvasLayer.new()
@@ -189,6 +198,11 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
+	if frame.has("marlin"):
+		var data = frame.marlin
+		if not data is Dictionary or not data.get("ids") is PackedInt64Array or not data.get("values") is PackedFloat64Array or not data.get("view") is Rect2 or data.values.size()!=data.ids.size()*14: return false
+		for value: float in data.values:
+			if not is_finite(value): return false
 	for row in frame.batches:
 		if not row is Dictionary or not visuals.has(row.get("visual_id")) or not row.get("ids") is PackedInt64Array or not row.get("transforms") is PackedFloat32Array or not row.get("colors") is PackedColorArray or not row.get("flags") is PackedInt32Array: return false
 		var count: int = row.ids.size()
@@ -399,6 +413,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Dictionary in _shape_displays.values():
 		display.node.visible = display.used
 		if display.circles!=display.previous_circles: display.node.queue_redraw()
+	if frame.has("marlin"): _marlin_visual.apply_frame(frame.marlin,_sniper_world_time,_zoom)
 	for row: Dictionary in frame.poses:
 		var key := "%d:%d" % [row.participant_id,row.part_key]
 		if not parts.has(key):

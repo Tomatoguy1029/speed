@@ -13,7 +13,9 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
         !std::isfinite(p.size) || p.size<0 || !std::isfinite(p.spin) || !std::isfinite(p.guard) || !std::isfinite(p.hit_cd) || !std::isfinite(p.facing) || !std::isfinite(p.knock) || !std::isfinite(p.value) || !std::isfinite(p.priority) || p.group<0) return -1;
     const auto &def=run.content->definitions[definition];godot::RunState::Enemy enemy;
     if (def.kind==EnemyDefinition::Kind::Sniper) enemy.behavior_state=SniperState{};
+    if (def.kind==EnemyDefinition::Kind::Marlin) enemy.behavior_state=MarlinState{};
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
+    if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
     enemy.attack_group=p.group;enemy.attack_priority=p.has_priority?p.priority:def.attack_priority;
     enemy.attack_value=p.group>0?(p.has_value?p.value:1.0):def.attack_value;

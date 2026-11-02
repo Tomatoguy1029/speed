@@ -17,6 +17,7 @@
 #include "../behaviors/enemies/sniper.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
 #include <map>
 #include <cmath>
 namespace speed {
@@ -133,6 +134,14 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto &coin=state.pickups.coins[i];if (coin.alive && view.grow(60).has_point(coin.pos))
             batch(config.coin_visual,6,-1).add(int64_t(i+1),coin.pos,0,std::max(6.0,pixel*3.5),Color::html("ffd24a"));
     }
+    Dictionary marlin;PackedInt64Array marlin_ids;PackedFloat64Array marlin_values;
+    for (size_t i=0;i<state.enemies.size();++i) {
+        const auto &e=state.enemies[i];if (!e.alive || e.dead || e.held || e.stone>0) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Marlin) continue;
+        const auto &p=run.content->marlins[d.marlin_definition-1];const auto direction=Vector2::from_angle(e.facing),from=e.pos+direction*e.radius;auto to=e.pos+direction*p.dash_speed*p.dash_time;
+        if (const auto hit=FieldSystem::first_body_hit(run,e.pos,to,e.radius)) to=e.pos.lerp(to,hit->t);
+        marlin_ids.push_back(e.id);for (double v:{double(e.pos.x),double(e.pos.y),e.facing,e.radius,e.radius*d.sprite_scale,d.sprite_angle+e.facing,double(e.mode),e.charge,e.timer,p.dash_time,double(from.x),double(from.y),double(to.x),double(to.y)}) marlin_values.push_back(v);
+    }
+    marlin["ids"]=marlin_ids;marlin["values"]=marlin_values;marlin["view"]=view;
     Array batches;for (auto &group:groups) if (!group.second.instances.empty()) batches.push_back(group.second.value());
     Array shapes;
     for (uint32_t row=0;row<state.friends.size();++row) {FriendDebrisSystem::render(run,row,view,shapes,alpha);FriendHullSystem::render(run,row,view,shapes,alpha);}
@@ -160,6 +169,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;return out;
+    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;return out;
 }
 }

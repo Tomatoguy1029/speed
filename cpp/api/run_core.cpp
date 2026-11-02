@@ -7,6 +7,7 @@
 #include "../behaviors/enemies/dash.h"
 #include "../behaviors/enemies/battleship.h"
 #include "../behaviors/enemies/sniper.h"
+#include "../behaviors/enemies/marlin.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
@@ -183,10 +184,14 @@ void SpeedRunCore::advance_enemies(double delta) {
         }
     }
     const Vector2 limit = runtime.state.view_half * 1.25 + Vector2(300, 300);
-    for (size_t group = 0; group < runtime.state.behavior_rows.size(); ++group) {
-      const auto &rows = runtime.state.behavior_rows[group];
-      if (runtime.state.behavior_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
+    const auto update_rows=runtime.state.behavior_rows;const auto update_kinds=runtime.state.behavior_kinds;
+    std::vector<speed::EnemyHandle> update_handles,marlins;update_handles.reserve(runtime.state.enemies.size());
+    for (uint32_t row=0;row<runtime.state.enemies.size();++row) {const auto handle=runtime.state.enemy_handles.at(row);update_handles.push_back(handle);if (runtime.state.enemies[row].alive && runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Marlin) marlins.push_back(handle);}
+    for (size_t group = 0; group < update_rows.size(); ++group) {
+      std::vector<size_t> rows;for (auto row:update_rows[group]) if (runtime.state.enemy_handles.contains(update_handles[row])) rows.push_back(row);
+      if (update_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
       for (size_t row : rows) {
+        if (!runtime.state.enemy_handles.contains(update_handles[row])) continue;
         auto &enemy = runtime.state.enemies[row];
         if (enemy.dead || enemy.held || runtime.state.field.rock_handles.contains(enemy.rock)) continue;
         if (enemy.stone > 0) { enemy.stone=speed::remaining_time(enemy.stone,delta); enemy.vel = Vector2(); continue; }
@@ -199,10 +204,12 @@ void SpeedRunCore::advance_enemies(double delta) {
         const Vector2 from=enemy.pos;
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta);speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
-        const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
+        const bool far = def.kind!=speed::EnemyDefinition::Kind::Marlin && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Sniper) {
+            if (def.kind==speed::EnemyDefinition::Kind::Marlin) {
+                speed::MarlinBehavior::step(runtime,uint32_t(row),delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Sniper) {
                 speed::SniperBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Battleship) {
                 speed::BattleshipBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
@@ -228,10 +235,16 @@ void SpeedRunCore::advance_enemies(double delta) {
             }
         }
         if (enemy.dead) continue;
+        if (def.kind==speed::EnemyDefinition::Kind::Marlin) {
+            speed::MarlinBehavior::before_move(runtime,update_handles[row],delta);
+            if (!runtime.state.enemy_handles.contains(update_handles[row]) || runtime.state.enemies[row].dead) continue;
+            auto &moving=runtime.state.enemies[row];moving.pos+=moving.vel*delta;speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue;
+        }
         enemy.pos += enemy.vel * delta;
         if (!far || (enemy.id+runtime.state.ticks)%3==0) speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);
       }
     }
+    speed::MarlinBehavior::after_tick(runtime,marlins);
 }
 
 void SpeedRunCore::close() {
@@ -465,7 +478,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Diction
         } else {
             if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value))) return -1;
             if (name=="size") {if (double(value)<=0) return -1;params.size=value;}
-            else if (name=="facing") params.facing=value;
+            else if (name=="facing") {params.facing=value;params.has_facing=true;}
             else if (name=="spin") params.spin=value;
             else if (name=="guard") params.guard=value;
             else if (name=="hit_cd") params.hit_cd=value;

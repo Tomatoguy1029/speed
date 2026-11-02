@@ -7,9 +7,10 @@
 namespace speed {
 using godot::Vector2;
 enum class EnemyMode { Move, Windup, Dash, Recover };
+struct MarlinState {godot::Vector2 anchor;};
 struct SniperState {std::vector<float> rays;};
 struct Enemy {
-    std::variant<std::monostate,SniperState> behavior_state;
+    std::variant<std::monostate,SniperState,MarlinState> behavior_state;
     int64_t id = 0;
     int64_t attack_group = 0;
     double attack_value = 1, attack_priority = 0;
