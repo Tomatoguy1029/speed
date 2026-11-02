@@ -198,6 +198,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             if (!wall->definition || wall->definition>content.walls.size() || wall->style>=uint32_t(WallStyle::Count) ||
                 !std::isfinite(wall->angle) || !std::isfinite(wall->length) || wall->length<0 || !std::isfinite(wall->half_width) || wall->half_width<0) return false;
         }
+        if (const auto *wave=std::get_if<MonocerosWaveHazard>(&hazard.shape)) {
+            for (double value:{wave->radius,wave->maximum,wave->speed,wave->half_angle,wave->width}) if (!std::isfinite(value) || value<0) return false;
+            if (!std::isfinite(wave->angle)) return false;
+        }
         if (const auto *wave=std::get_if<WaveHazard>(&hazard.shape)) {
             if (!wave->definition || wave->definition>content.waves.size() || wave->style>=uint32_t(WaveStyle::Count) || !std::isfinite(wave->enemy_damage) || wave->enemy_damage<0) return false;
             for (double value:{wave->radius,wave->start_radius,wave->speed,wave->half_width,wave->gap_arc,wave->arc}) if (!std::isfinite(value) || value<0) return false;

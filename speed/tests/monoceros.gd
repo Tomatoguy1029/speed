@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-wave" in OS.get_cmdline_user_args():
+		call_deferred("native_wave")
+		return
 	if "--cpp-return" in OS.get_cmdline_user_args():
 		call_deferred("native_return")
 		return
@@ -448,7 +451,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	if planet_x==500.0 or moon or name in ["kick","sweep","lance","return_charge"]: cfg.character_scale = 1.0
+	if planet_x==500.0 or moon or name in ["kick","sweep","lance","return_charge","horn_wave"]: cfg.character_scale = 1.0
 	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.approach_speed = 0.0
@@ -466,6 +469,18 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		move.reach = 240.0
 		move.hold = 0.1
 		move.return_speed = TAU
+	if name=="horn_wave":
+		move.windup = 0.1
+		move.swing_time = 0.1
+		move.recharge = 0.1
+		move.return_time = 0.1
+		move.pull = 0.8
+		move.release_offset = 0.0
+		move.wave_start = 50.0
+		move.wave_speed = 100.0
+		move.wave_max = 300.0
+		move.wave_half_angle = 0.2
+		move.wave_width = 20.0
 	if name=="return_charge":
 		move.warn = 0.2
 		move.distance = 600.0 if planet_x==500.0 else 200.0
@@ -1100,4 +1115,85 @@ func native_return() -> void:
 	view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_monoceros_return] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func wave_rows(bridge) -> Array:
+	return bridge.command("dev_boss_body_state").value[0].horn_waves
+
+func native_wave() -> void:
+	var f := charge_fixture(true,false,450.0,false,"horn_wave")
+	check(not f.is_empty(),"角の衝撃波の編集値と型付き状態を読み込む")
+	if f.is_empty(): get_tree().quit(1); return
+	var bridge = f.bridge
+	var definition: Dictionary = f.records.BossTechniqueDefinition[0]
+	check(definition.kind==5 and definition.warn==0.1 and definition.wave_width==20.0 and definition.wave_half_angle==0.2 and f.records.BossTechniqueStage.is_empty(),"windupをwarnへ変換し波の実効値を生成してmethod trackを残さない")
+	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(f.move)
+	check(f.move.make_runner()==null and is_equal_approx(legacy.attack_length(),0.5) and legacy.reach_limit(100.0)==300.0,"衝撃波をPureDataへ分離し旧入口の攻撃長と到達距離を保つ")
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==0,"制作値から共通フローで角の衝撃波を単独選択する")
+	bridge._core.step(0.1)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==1 and is_equal_approx(state.angle,-0.8) and wave_rows(bridge).is_empty(),"溜め終わりに首を引いた角度を保ち同じtickには波を放たない")
+	bridge._core.step(0.05)
+	var waves := wave_rows(bridge)
+	check(waves.size()==1 and waves[0].radius==50.0 and is_zero_approx(waves[0].angle),"振り抜きのsmoothstep閾値で一度放ち発生tickでは広げない")
+	check(f.events.any(func(e): return e.type==&"wave_release"),"波の放出位置を登録済み通知で配信する")
+	bridge.command("dev_ship_motion",{"position":Vector2(55,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(55,0),Vector2(55,0),Vector2(640,360))
+	bridge._core.step(0.05)
+	waves = wave_rows(bridge)
+	check(waves[0].radius==55.0 and waves[0].hit,"次tickから等速で広げ点の自機と扇形帯で一回命中する")
+	check(f.events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"horn_wave" and e.payload.source==&"monoceros" and e.payload.technique==&"horn_wave"),"衝撃波の原因・出所・技を共通の戦闘記録へ渡す")
+	var view = load("res://scripts/bosses/monoceros/horn_wave_visual.gd").new()
+	add_child(view)
+	view.apply_frame(waves,0.2)
+	check(view.retained and view.frame_waves[0].radius==55.0 and view.frame_waves[0].half==0.2,"残留波の表示も当たりと同じ半径・弧・幅を読む")
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.1)
+	bridge._core.step(0.05)
+	var expected := wave_rows(bridge)
+	check(expected.size()==2 and expected[0].radius==70.0 and expected[1].radius==50.0,"溜め直して反対方向の振り抜きから二発目を放つ")
+	check(held.ok and bridge.restore(held.value).ok,"残留波の所有・半径・命中済みと再充填途中の技を復帰する")
+	bridge._core.step(0.1)
+	bridge._core.step(0.05)
+	check(wave_rows(bridge)==expected and bridge._core.ship_snapshot().ship_hp==hp,"復帰後も同じ二つの波へ進み最初の波で再被弾しない")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.05)
+	bridge._core.step(0.1)
+	bridge._core.step(0.051)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==5 and wave_rows(bridge).size()==2,"技の自然終了後も放った波は残る")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"衝撃波の通知を共通配信へ渡す")
+	bridge.dispose()
+	view.queue_free()
+	for disappear in [false,true]:
+		f = charge_fixture(false,false,450.0,false,"horn_wave")
+		bridge = f.bridge
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+		bridge._core.step(0.1)
+		bridge._core.step(0.05)
+		if disappear: bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+		bridge._core.step(0.1)
+		check(wave_rows(bridge).is_empty() if disappear else wave_rows(bridge).size()==1 and wave_rows(bridge)[0].radius==60.0,"参加者の撃破で残留波を消す" if disappear else "技の取消では放った波が残り次tickから進む")
+		if not disappear:
+			bridge.command("dev_cancel_boss",{"entity_id":f.id})
+			check(wave_rows(bridge).is_empty(),"ボス取消ではClearWithBossで残留波を終了する")
+		bridge.dispose()
+	f = charge_fixture(false,false,450.0,false,"horn_wave")
+	bridge = f.bridge
+	bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":1})
+	bridge._core.step(0.1)
+	bridge._core.step(0.05)
+	var outside := Vector2.from_angle(0.25)*55.0
+	bridge.command("dev_ship_motion",{"position":outside,"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(outside,outside,Vector2(640,360))
+	bridge._core.step(0.05)
+	check(not wave_rows(bridge)[0].hit,"角度の境界には自機半径を足さず弧の外側を避けられる")
+	bridge._core.step(2.45)
+	check(wave_rows(bridge).is_empty(),"自然寿命の最大半径で波を回収する")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_monoceros_wave] failures=",failed)
 	get_tree().quit(1 if failed else 0)

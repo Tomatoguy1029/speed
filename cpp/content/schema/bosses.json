@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 4
+          "max": 5
         },
         {
           "name": "phase",
@@ -328,9 +328,64 @@
           "name": "head_lead",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "windup_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swing_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swing_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recharge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_half_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_width",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 5
+      "version": 6
     },
     {
       "name": "BossTechniqueStage",

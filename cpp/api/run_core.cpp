@@ -2,6 +2,7 @@
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
 #include "../bosses/flow/phase_controller.h"
+#include "../bosses/monoceros/horn_wave.h"
 #include "../behaviors/enemies/gunner.h"
 #include "../behaviors/enemies/missile.h"
 #include "../behaviors/enemies/rocket.h"
@@ -201,6 +202,7 @@ bool SpeedRunCore::step(double delta) {
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
+    speed::MonocerosHornWave::advance_waves(runtime,delta);
     speed::PhaseController::step(runtime,delta);
     speed::FlowRunner::step(runtime,delta);
     capture_avoidance();

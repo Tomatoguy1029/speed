@@ -15,6 +15,9 @@ struct WaveHazard {
     uint32_t definition=0,style=0;
     std::vector<int64_t> enemy_hits;
 };
+struct MonocerosWaveHazard {
+    double radius=0,maximum=0,speed=0,angle=0,half_angle=0,width=0;
+};
 struct HazardState {
     godot::Vector2 pos;
     float time=0,delay=0,duration=0;
@@ -24,6 +27,6 @@ struct HazardState {
     uint32_t zone_definition=0;
     double enemy_damage=0;
     bool alive=true,hit=false;
-    std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard> shape=CircleHazard{};
+    std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard,MonocerosWaveHazard> shape=CircleHazard{};
 };
 }

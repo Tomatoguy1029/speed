@@ -157,7 +157,7 @@ func _sync_horn(_dt: float, body_scale: float, tint: Color) -> void:
 	for key in ["painted","paint"]: (horn.material as ShaderMaterial).set_shader_parameter(key,source.get_shader_parameter(key))
 
 func _horn_glow() -> float:
-	if technique.get("technique","") in ["lance","return_charge"]: return float(technique.get("glow",0.0)) if _mode() in [&"windup",&"active"] else 0.0
+	if technique.get("technique","") in ["lance","return_charge","horn_wave"]: return float(technique.get("glow",0.0)) if _mode() in [&"windup",&"active"] else 0.0
 	if technique.get("technique","")=="kick": return 0.0
 	if _mode()==&"active": return 1.0
 	return float(state.charge) if _mode()==&"windup" else 0.0
@@ -165,7 +165,7 @@ func _horn_glow() -> float:
 func _update_turn(dt: float) -> void:
 	var target := float(state.facing)
 	var attacking := _mode() == &"active" or _mode() == &"stuck" or (_mode() == &"windup" and bool(technique.get("locked",false)))
-	var sweeping: bool = StringName(technique.get("technique","")) == &"sweep" and _mode() in [&"windup", &"active"]
+	var sweeping: bool = StringName(technique.get("technique","")) in [&"sweep",&"horn_wave"] and _mode() in [&"windup", &"active"]
 	_body_facing = _follow_angle(_body_facing, target, dt, body_follow_seconds * (0.3 if attacking else 1.0))
 	_body_facing = _limit_angle(target, _body_facing, body_lag_degrees)
 	if attacking or sweeping:

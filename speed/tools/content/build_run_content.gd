@@ -9,7 +9,7 @@ const BossProgram = preload("res://tools/content/build_boss_program.gd")
 
 ## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
 static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"monoceros" or move==null or move.technique not in [&"charge",&"kick",&"sweep",&"lance",&"return_charge"]: return {}
+	if definition==null or definition.id!=&"monoceros" or move==null or move.technique not in [&"charge",&"kick",&"sweep",&"lance",&"return_charge",&"horn_wave"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":String(definition.id),"kind":0,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]:
@@ -22,12 +22,15 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			for key: String in source.values():
 				if key.ends_with("_p2"): values[key.trim_suffix("_p2")] = source.values()[key]
 		var resolved: BossTechnique = source.duplicate(true)
-		var row := {"id":phase,"boss":1,"external_id":String(source.technique),"kind":[&"charge",&"kick",&"sweep",&"lance",&"return_charge"].find(source.technique),"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap}
-		for key in ["warn","active","recover","cd","damage","distance","reach","hold","return_speed","approach_speed_start","approach_accel","approach_speed_max","approach_turn","approach_min","approach_max","stop_range","twist_time","twist","stop_time","stop_decel","windup_twist","arc","return_time","lock_time","aim_turn","back_speed","head_length","width","speed","boom_interval","boom_ahead","stop_decay","shatter_time","overshoot","brake_time","brake_speed_ratio","turn_time","turn_lock","head_lead"]:
+		var row := {"id":phase,"boss":1,"external_id":String(source.technique),"kind":[&"charge",&"kick",&"sweep",&"lance",&"return_charge",&"horn_wave"].find(source.technique),"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap}
+		for key in ["warn","active","recover","cd","damage","distance","reach","hold","return_speed","approach_speed_start","approach_accel","approach_speed_max","approach_turn","approach_min","approach_max","stop_range","twist_time","twist","stop_time","stop_decel","windup_twist","arc","return_time","lock_time","aim_turn","back_speed","head_length","width","speed","boom_interval","boom_ahead","stop_decay","shatter_time","overshoot","brake_time","brake_speed_ratio","turn_time","turn_lock","head_lead","windup_turn","pull","swing_time","swing_turn","release_offset","recharge","wave_speed","wave_start","wave_max","wave_half_angle","wave_width"]:
 			row[key] = float(values.get(key,0.0))
 			if key in values: resolved.set(key,row[key])
 		row.passes = int(values.get("passes",1))
 		if row.kind==3: row.active = row.distance/maxf(row.speed,0.001)
+		if row.kind==5:
+			row.warn = float(values.windup)
+			row.active = row.swing_time*2.0+row.recharge+row.return_time
 		if row.active<=0.0: return {}
 		var commands: Array = [] if row.kind>=2 else BossProgram.charge_stage_commands(resolved,boss.lock_lead)
 		if row.kind<2 and commands.size()!=3: return {}
