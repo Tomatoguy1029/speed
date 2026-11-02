@@ -1601,7 +1601,7 @@ func _sync_cpp_picaro(bodies: Array) -> void:
 func _sync_cpp_boss_final_beams(bodies: Array) -> void:
 	var seen := {}
 	for body: Dictionary in bodies:
-		if int(body.mode)!=3 or float(body.get("final_alpha",0.0))<=0.0: continue
+		if int(body.mode)!=3 or int(body.kind)==3 or float(body.get("final_alpha",0.0))<=0.0: continue
 		seen[body.id] = true
 		if not _boss_final_beams.has(body.id):
 			var line: Line2D = BOSS_FINAL_BEAM.instantiate()

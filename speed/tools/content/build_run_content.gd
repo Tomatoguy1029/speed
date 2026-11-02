@@ -1056,16 +1056,16 @@ static func append_draco_cycle(data: Dictionary, definition: BossDef, boss: int)
 		data.DracoCycleCandidate.append({"id":data.DracoCycleCandidate.size()+1,"cycle":cycle,"enemy":found[0].id,"excluded":StringName(id) in definition.params.get("picaro_excluded",[])})
 	return OK
 ## 首の通常技の編集値を、分離前後で使う同じ型付き定義へ変換する。
-static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Dictionary:
+static func hydra_normal_records(definition: BossDef, bite: BossTechnique, action_rules: Resource = null) -> Dictionary:
 	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique not in [&"bite_thrust",&"bite_sweep",&"beam_bolt",&"beam_fixed",&"wind_blades",&"rubble_lump",&"rubble_fan",&"thunder_drop",&"thunder_headbutt",&"wind_band"] or bite.head_kind not in [&"bite",&"beam",&"vortex",&"debris",&"thunder"]: return {}
 	var records := {}
+	if action_rules==null: action_rules = load("res://data/bosses/ai/hydra_action_rules.tres")
 	var values: Dictionary = definition.params.merged(bite.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
 	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64 if bite.technique==&"bite_thrust" else 65 if bite.technique==&"bite_sweep" else 66 if bite.technique==&"beam_bolt" else 67 if bite.technique==&"beam_fixed" else 81 if bite.technique==&"rubble_fan" else 80 if bite.technique==&"rubble_lump" else 68 if bite.technique==&"wind_blades" else 91 if bite.technique==&"thunder_drop" else 92 if bite.technique==&"thunder_headbutt" else 75,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge if bite.technique in [&"bite_thrust",&"thunder_headbutt"] else values.sweep_time if bite.technique==&"bite_sweep" else values.beam_time if bite.technique==&"beam_fixed" else 2.0*float(values.blade_interval) if bite.technique==&"wind_blades" else values.thunder_flash if bite.technique==&"thunder_drop" else values.wind_time if bite.technique==&"wind_band" else 0.0),"hold":float(values.normal_hold),"damage":0.0 if bite.technique==&"wind_band" else float(values.beam_dmg if bite.head_kind==&"beam" or bite.technique==&"thunder_drop" else values.lump_dmg if bite.head_kind==&"debris" else values.bite_dmg),"passes":1,"cuts":1},true)
 	records.BossTechniqueDefinition = [normal]
-	records.HydraNormalDefinition = [{"id":1,"technique":1,"head_kind":[&"bite",&"vortex",&"debris",&"beam",&"thunder"].find(bite.head_kind),"aim_tracking":float(values.get("aim_tracking",0.0)),"attack_cd":float(values.attack_cd),"bite_radius":float(values.get("bite_radius",0.0)),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(bite.technique)])}]
-	var action_rules: Resource = load("res://data/bosses/ai/hydra_action_rules.tres")
+	records.HydraNormalDefinition = [{"id":1,"technique":1,"head_kind":[&"bite",&"vortex",&"debris",&"beam",&"thunder"].find(bite.head_kind),"aim_tracking":float(values.get("aim_tracking",0.0)),"attack_cd":float(values.attack_cd),"bite_radius":float(values.get("bite_radius",0.0)),"cost":float(action_rules.costs.get(String(bite.technique),1.0))}]
 	if bite.technique==&"bite_sweep": records.HydraSweepDefinition = [{"id":1,"technique":1,"arc":float(values.sweep_arc),"reach":float(values.sweep_reach)}]
 	if bite.technique==&"beam_bolt": records.HydraBoltDefinition = [{"id":1,"technique":1,"length":float(values.bolt_length),"width":float(values.bolt_width),"speed":float(values.bolt_speed),"life":float(values.bolt_life)}]
 	if bite.technique==&"beam_fixed": records.HydraFixedBeamDefinition = [{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width)}]
@@ -1077,13 +1077,14 @@ static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Di
 		records.HydraNormalGate.append({"id":records.HydraNormalGate.size()+1,"technique":1,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",1.7976931348623157e308)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"distance_origin":int(gate.get("distance_origin",0)),"angle_origin":int(gate.get("angle_origin",0)),"ignore_when_separated":bool(gate.get("ignore_when_separated",false))})
 	return records
 
-static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+static func hydra_major_records(definition: BossDef, move: BossTechnique, action_rules: Resource = null) -> Dictionary:
 	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north",&"sequence",&"swarm"]: return {}
+	if action_rules==null: action_rules = load("res://data/bosses/ai/hydra_action_rules.tres")
 	var values: Dictionary = definition.params.merged(move.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
 	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":90 if move.technique==&"swarm" else 89 if move.technique==&"sequence" else 88 if move.technique==&"north" else 83 if move.technique==&"debris_shatter" else 82 if move.technique==&"tornado" else 72 if move.technique==&"curve" else 73 if move.technique==&"grid" else 74,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":maxf(float(values.performance_time),float(values.get("north_flight",0.0))),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.bite_dmg if move.technique in [&"north",&"sequence",&"swarm"] else values.lump_dmg if move.technique==&"tornado" else values.beam_dmg),"passes":1,"cuts":1},true)
-	var records := {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(move.technique)]),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal]}
+	var records := {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(action_rules.costs.get(String(move.technique),1.0)),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal]}
 	if move.technique==&"curve": records.HydraCurveDefinition = [{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.curve_delay),"time":float(values.curve_time),"lag":float(values.curve_lag),"turn":float(values.curve_turn)}]
 
 	if move.technique==&"swarm":
@@ -1120,8 +1121,8 @@ static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dic
 				records.HydraGridPath.append({"id":records.HydraGridPath.size()+1,"layout":id,"order":index,"x":float(point.x),"y":float(point.y)})
 	return records
 
-static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north",&"sequence",&"swarm"] else hydra_normal_records(definition,move)
+static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, action_rules: Resource = null) -> Dictionary:
+	var records := hydra_major_records(definition,move,action_rules) if move.technique in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north",&"sequence",&"swarm"] else hydra_normal_records(definition,move,action_rules)
 	if records.is_empty(): return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
@@ -1150,20 +1151,59 @@ static func hydra_technique_package(definition: BossDef, move: BossTechnique, co
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
 
+static func hydra_set_package(definition: BossDef, rules: Resource, config: GameConfig) -> Dictionary:
+	var package := boss_body_package(definition,config)
+	if package.is_empty(): return {}
+	var tables := {"BossTechniqueDefinition":true}
+	var changed := true
+	while changed:
+		changed=false
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not String(record.name).begins_with("Hydra") or tables.has(record.name): continue
+			for field: Dictionary in record.fields:
+				if tables.has(field.get("ref","")): tables[record.name]=true;changed=true;break
+	for name in tables: package.records[name]=[]
+	for move: BossTechnique in rules.techniques:
+		var part := hydra_technique_package(definition,move,config,rules)
+		if part.is_empty(): return {}
+		var maps := {}
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not tables.has(record.name): continue
+			maps[record.name]={}
+			for row: Dictionary in part.records[record.name]: maps[record.name][row.id]=package.records[record.name].size()+maps[record.name].size()+1
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not tables.has(record.name): continue
+			for original: Dictionary in part.records[record.name]:
+				var row: Dictionary=original.duplicate(true);row.id=maps[record.name][row.id]
+				for field: Dictionary in record.fields:
+					if maps.has(field.get("ref","")): row[field.name]=maps[field.ref][row[field.name]]
+				package.records[record.name].append(row)
+		for original: Dictionary in part.visuals:
+			if not original.has("hydra_move"): continue
+			var visual: Dictionary=original.duplicate(true);visual.id=package.records.ResourceKey.size()+1
+			package.records.ResourceKey.append({"id":visual.id,"role":visual.role});package.visuals.append(visual)
+	return package
+
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
-	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"draco"]: return {}
+	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"hydra",&"draco"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
 	var source: Dictionary = BossProgram.snapshot(program) if not program.is_empty() else {"rules":load("res://data/bosses/ai/"+str(definition.id)+"_action_rules.tres"),"flow":load("res://data/bosses/ai/"+str(definition.id)+"_flow.tres")}
 	var rules: Resource = source.get("rules")
 	var flow: Resource = source.get("flow")
 	if rules==null or flow==null or not BossProgram.validate(source).is_empty(): return {}
+	if definition.id==&"hydra" and rules.adapter==&"":
+		rules=rules.duplicate(true)
+		rules.adapter=&"hydra"
 	if String(rules.adapter)!=String(definition.id): return {}
+	if definition.id==&"hydra":
+		package = hydra_set_package(definition,rules,config)
+		if package.is_empty(): return {}
 	if definition.id==&"canis_major":
 		package = canis_set_package(definition,rules.techniques,config)
 		if package.is_empty(): return {}
-	var techniques: Dictionary = {} if definition.id==&"canis_major" else boss_technique_set_records(definition,rules.techniques)
-	if techniques.is_empty() and definition.id!=&"canis_major": return {}
+	var techniques: Dictionary = {} if definition.id in [&"canis_major",&"hydra"] else boss_technique_set_records(definition,rules.techniques)
+	if techniques.is_empty() and definition.id not in [&"canis_major",&"hydra"]: return {}
 	if definition.id==&"centaurus": merge_centaurus_records(package.records,techniques)
 	else:
 		for key in techniques: package.records[key] = techniques[key]
@@ -1211,9 +1251,9 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 			package.visuals.append(value)
 	return package
 
-static func _flow_condition(records: Dictionary, gate: Dictionary) -> int:
+static func _flow_condition(records: Dictionary, gate: Dictionary, hydra := false) -> int:
 	for key in gate:
-		if key not in ["min","max","angle","half_angle","min_phase"]: return 0
+		if key not in ["min","max","angle","half_angle","min_phase"] and not (hydra and key in ["distance_origin","angle_origin","ignore_when_separated"]): return 0
 	var id: int = records.BossFlowCondition.size()+1
 	records.BossFlowCondition.append({"id":id,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",100000.0)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"minimum_phase":int(gate.get("min_phase",1))})
 	return id
@@ -1225,8 +1265,8 @@ static func _flow_node(records: Dictionary, node: Dictionary, rules: Resource, t
 	if node.type=="action":
 		if not techniques.has(String(node.get("id",""))): return 0
 		row.technique = techniques[String(node.id)]
-		row.condition = _flow_condition(records,rules.conditions.get(String(node.id),{}))
-	elif node.type=="branch": row.condition = _flow_condition(records,node.get("condition",{}))
+		row.condition = _flow_condition(records,rules.conditions.get(String(node.id),{}),rules.adapter==&"hydra")
+	elif node.type=="branch": row.condition = _flow_condition(records,node.get("condition",{}),rules.adapter==&"hydra")
 	if node.type in ["action","branch"] and row.condition==0: return 0
 	records.BossFlowNode.append(row)
 	var children: Array = node.get("children",[])
@@ -1258,7 +1298,7 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 			for candidate in rules.techniques:
 				if String(candidate.technique)==source: move = candidate
 		for entry in rules.active_gate_entries_for(source):
-			var gate: int = _flow_condition(records,entry.gate)
+			var gate: int = _flow_condition(records,entry.gate,rules.adapter==&"hydra")
 			if gate==0: return {}
 			var node := _flow_node(records,rules.combos[source] if combo else {"type":"action","id":source},rules,ids)
 			if node==0: return {}
@@ -1266,6 +1306,18 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 			var category: int = ["normal","combo","major"].find(entry.category)
 			if category<0: return {}
 			records.BossFlowAction.append({"id":records.BossFlowAction.size()+1,"flow":1,"external_id":source,"node":node,"condition":gate,"category":category,"label":category,"group":entry.group,"cost":float(rules.costs.get(source,2.0 if combo else 1.0)),"weight":float(rules.selection_bias.get(source,1.0)),"post_gap":0.0 if combo else move.post_gap,"exclusive":true})
+	if rules.adapter==&"hydra":
+		var original: Array=records.BossFlowAction.duplicate(true)
+		records.BossFlowAction.clear()
+		for action: Dictionary in original:
+			var node: Dictionary=records.BossFlowNode[action.node-1]
+			var normal: bool=node.kind==1 and techniques[node.technique-1].kind in [64,65,66,67,68,75,80,81,91,92]
+			for neck in (8 if normal else 1):
+				var next: Dictionary=action.duplicate(true);next.id=records.BossFlowAction.size()+1
+				if normal:
+					var child: Dictionary=node.duplicate(true);child.id=records.BossFlowNode.size()+1;child.participant=neck+1
+					records.BossFlowNode.append(child);next.node=child.id;next.exclusive=false
+				records.BossFlowAction.append(next)
 	for i in flow.sections.size():
 		var section: Dictionary = flow.sections[i]
 		var id: int = i+1
@@ -2128,7 +2180,7 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 					if row.condition>0: row.condition = maps.BossFlowCondition[row.condition]
 				data[record.name].append(row)
 		for original: Dictionary in package.visuals:
-			if not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish and not original.has("canis_flame") and not original.has("canis_burst") and not original.get("canis_burning",false) and not original.get("canis_trail",false): continue
+			if not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish and not original.has("hydra_move") and not original.has("canis_flame") and not original.has("canis_burst") and not original.get("canis_burning",false) and not original.get("canis_trail",false): continue
 			var visual := original.duplicate(true)
 			if visual.has("canis_flame"): visual.canis_flame = maps.CanisFlameDefinition[visual.canis_flame]
 			if visual.has("canis_burst"): visual.canis_burst = maps.CanisBlazeDefinition[visual.canis_burst]

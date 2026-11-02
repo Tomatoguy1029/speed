@@ -51,6 +51,7 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 			line.configure(self,StringName(effect.kind),effect.points,white)
 			effects[effect.id] = line
 		effects[effect.id].update_effect(effect,float(body.clock))
+		if effect.get("final",false): effects[effect.id].modulate.a=float(body.get("final_alpha",1.0))
 	for id in effects.keys():
 		if not live.has(id): effects[id].queue_free();effects.erase(id)
 

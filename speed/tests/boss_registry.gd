@@ -10,6 +10,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-finish-pending" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_finish_pending")
+		return
+	if "--cpp-hydra-finish" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_finish")
+		return
 	if "--cpp-hydra-debris-separated" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_debris_separated")
 		return
@@ -6033,3 +6039,136 @@ func native_boss_trace() -> void:
 	await get_tree().process_frame
 	print("[cpp_boss_trace] failures=",failed)
 	get_tree().quit(1 if failed else 0)
+
+func hydra_finish_case(name := "", count := 3, limit := -1.0) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true);cfg.planet_radius=0.0
+	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time"]:cfg.set(key,0.02)
+	cfg.time_up_charge_time=0.3
+	for key in ["death_freeze_time","death_explosion_time","death_game_over_time"]:cfg.set(key,0.01)
+	var boss = load("res://data/bosses/hydra.tres").duplicate(true);boss.speed=0.0;boss.params.growth_time=0.1
+	var rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
+	var flow = load("res://data/bosses/ai/hydra_flow.tres").duplicate(true)
+	if not name.is_empty():
+		var selected: Resource=rules.techniques.filter(func(move):return String(move.technique)==name)[0]
+		flow.sections=flow.sections.slice(2,3) if selected.category==&"major" else flow.sections.slice(0,1)
+		flow.sections[0].next=0;flow.sections[0].fallback=0;flow.sections[0].allowed_techniques=[name]
+	var stage := RuntimeStage.new();stage.time_limit=limit+(1.541 if count==9 else 0.22 if count>=8 else 0.11 if count>=5 else 0.0) if limit>=0.0 else -1.0
+	var package: Dictionary=builder.boss_package(boss,cfg,stage,{"rules":rules,"flow":flow})
+	if package.is_empty():print("生成不可: ",name);return {}
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary=bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":374,"mode":1,"stage_id":"B_hydra_finish","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok:print("読込不可: ",name," ",configured);return {}
+	bridge.start(374,{"position":Vector2(800,0)});bridge._core.set_run_guards({"invincible":true})
+	var events: Array=[];bridge.subscribe("全技の記録",func(packet):events.append_array(packet.events);return true)
+	bridge.command("set_recording",{"active":true})
+	bridge._core.set_motion_context(Vector2(800,0),Vector2.ZERO,Vector2(1400,1000))
+	var id: int=bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var c := {"bridge":bridge,"id":id,"package":package,"cfg":cfg,"events":events}
+	if count>=5:
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+		bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp*0.4,"cause":"shot"});bridge._core.step(0.11)
+	if count>=8:
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+		bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp*0.3,"cause":"shot"});bridge._core.step(0.11)
+	if count==9:hydra_grid_separate(c)
+	if not name.is_empty():
+		var rows: Array=package.records.HydraNormalDefinition.filter(func(row):return package.records.BossTechniqueDefinition[row.technique-1].external_id==name)
+		if not rows.is_empty():
+			var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+			var kinds := ["bite","vortex","debris","beam","thunder"]
+			var neck: Dictionary=body.necks.filter(func(n):return n.kind==kinds[rows[0].head_kind])[0]
+			var gate: Dictionary=package.records.HydraNormalGate.filter(func(g):return g.technique==rows[0].technique)[0]
+			var origin: Vector2=neck.position if gate.distance_origin==1 else neck.points[0] if gate.distance_origin==2 else body.position
+			var angle: float=body.facing+(TAU*body.necks.find(neck)/body.necks.size() if gate.angle_origin==1 else 0.0)+gate.angle
+			var distance: float=lerpf(gate.minimum,gate.maximum,0.25) if name=="thunder_drop" else (gate.minimum+gate.maximum)*0.5
+			var point: Vector2=origin+Vector2.from_angle(angle)*distance
+			bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2.ZERO});bridge._core.set_motion_context(point,Vector2.ZERO,Vector2(1400,1000))
+	return c
+
+func native_hydra_finish() -> void:
+	var stages := {"bite_thrust":3,"bite_sweep":3,"wind_band":3,"wind_blades":3,"rubble_lump":3,"rubble_fan":3,"beam_fixed":5,"beam_bolt":5,"thunder_headbutt":5,"thunder_drop":5,"north":5,"sequence":5,"curve":5,"tornado":3,"debris_shatter":5,"beam_pincer":8,"swarm":9,"grid":9}
+	var activated: Array[String]=[]
+	for name: String in stages:
+		var c := hydra_finish_case(name,stages[name])
+		check(not c.is_empty(),"全18技を持つ通常生成パッケージを開始する: "+name)
+		if c.is_empty():continue
+		var bridge=c.bridge
+		check(c.package.records.BossTechniqueDefinition.size()==18 and c.package.records.HydraNormalDefinition.size()==10 and c.package.records.HydraMajorDefinition.size()==8,"全通常技と全大技の定義を同じパッケージで保持する: "+name)
+		var emitted := false
+		for tick in 2000:
+			bridge._core.step(0.02);bridge._core.step_hazards(0.02);bridge.command("dev_boss_body_state")
+			emitted=c.events.any(func(event):return event.type=="boss_action" and event.payload.action==name and event.payload.step=="execute")
+			if emitted:break
+		check(emitted,"元の条件・フロー・予算から選び、全技の実発動を共通IDで記録する: "+name)
+		if emitted:activated.append(name)
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+		check(body.count==(8 if stages[name]>=8 else stages[name]) and body.separated==(stages[name]==9),"通常HP・低HP・分離後に対応する首構成で選ぶ: "+name)
+		var view=hydra_move_view(c)
+		check(not view._boss_body_displays.is_empty() and view._boss_body_displays.values()[0].state.necks.size()==body.necks.size(),"全技の本体・首と発動状態を正式表示へ渡す: "+name)
+		bridge.dispose();view.queue_free()
+	print("[cpp_hydra_finish] 通常選択から実発動=",activated)
+	var c := hydra_finish_case("swarm",9)
+	if c.is_empty():check(false,"撃破確認の全技生成を開始する");get_tree().quit(1);return
+	var bridge=c.bridge
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":body.bearer.id,"amount":body.bearer.hp+1.0,"cause":"shot"});bridge._core.step(0.01)
+	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunState.Phase.FINISHING,"不死首の撃破から共通の決着へ進む")
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.mode==4 and body.effects.is_empty() and not body.has("arena") and body.necks.all(func(n):return not n.alive),"撃破で全首・残留攻撃・闘技場を回収する")
+	centaurus_finish_steps(bridge,30)
+	var frame: Dictionary=bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Clear" and c.events.filter(func(e):return e.type=="boss_defeated").size()==1 and c.events.filter(func(e):return e.type=="clear_banner").size()==1,"撃破とCLEAR・勝利通知を一度だけ確定する")
+	bridge.dispose()
+	for count in [3,9]:
+		c=hydra_finish_case("",count,0.01);bridge=c.bridge
+		for tick in 30:
+			centaurus_finish_steps(bridge,1)
+			var current: Dictionary=bridge.command("dev_boss_body_state").value[0]
+			if current.mode==3 and current.effects.any(func(e):return e.get("final",false)):break
+		body=bridge.command("dev_boss_body_state").value[0]
+		var beams: Array=body.effects.filter(func(e):return e.get("final",false))
+		check(body.mode==3 and beams.size()==(9 if count==9 else 3),"時間切れは全生存首から最終ビームを出す: %d"%count)
+		check(beams.all(func(e):return e.technique=="final_strike" and is_equal_approx(e.width,body.final_width) and is_equal_approx(e.points[0].distance_to(e.points[1]),Vector2(c.package.records.HydraBodyDefinition[0].arena_x,c.package.records.HydraBodyDefinition[0].arena_y).length()*1.5)),"最終ビームの幅・射程はSourceの式と同じ: %d"%count)
+		var view=hydra_move_view(c)
+		check(view._boss_final_beams.is_empty() and view._boss_body_displays.values()[0].effects.size()==beams.size(),"ヒドラの首別ビームだけを正式表示し、本体ビームを重複させない: %d"%count)
+		var held: Dictionary=bridge.checkpoint();centaurus_finish_steps(bridge,2);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+		check(held.ok and bridge.restore(held.value).ok,"最終ビームの首・時計・所有を途中保持して戻す: %d"%count);centaurus_finish_steps(bridge,2)
+		check(bridge.command("dev_boss_body_state").value[0]==expected,"復帰後も同じ首別ビームと幅へ進む: %d"%count)
+		centaurus_finish_steps(bridge,50);frame=bridge.read_frame().value
+		check(frame.result!=null and frame.result.kind=="Death" and frame.result.last_damage.cause=="final_strike","時間切れの最終攻撃から敗北へ進む: %d"%count)
+		bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free()
+	c=hydra_finish_case("curve",5);bridge=c.bridge
+	for tick in 50:
+		bridge._core.step(0.02)
+		if not bridge.command("dev_boss_body_state").value[0].effects.is_empty():break
+	check(bridge.command("abort",{"reason":0}).ok and bridge.read_frame().value.result.kind=="Abort" and bridge.command("dev_boss_body_state").value[0].mode==5,"途中中断は勝利を付けず全技の本体を取り消す")
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and not bridge.command("dev_boss_body_state").value[0].has("arena"),"途中中断で持続攻撃と闘技場を回収する");bridge.dispose()
+	await get_tree().process_frame;print("[cpp_hydra_finish] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_finish_pending() -> void:
+	var c := hydra_finish_case("thunder_drop",5)
+	if c.is_empty():check(false,"落雷の全技パッケージを開始する");get_tree().quit(1);return
+	var bridge=c.bridge
+	for tick in 2000:
+		bridge._core.step(0.02);bridge._core.step_hazards(0.02);bridge.command("dev_boss_body_state")
+		if c.events.any(func(e):return e.type=="boss_action" and e.payload.action=="thunder_drop" and e.payload.step=="execute"):break
+	check(c.events.any(func(e):return e.type=="boss_action" and e.payload.action=="thunder_drop" and e.payload.step=="execute"),"元の条件・フロー・予算から選び、全技の実発動を共通IDで記録する: thunder_drop")
+	print("[cpp_hydra_finish_pending] 実発動=thunder_drop")
+	bridge.dispose()
+	for count in [3,9]:
+		c=hydra_finish_case("",count,0.01);bridge=c.bridge
+		var body: Dictionary
+		for tick in 30:
+			centaurus_finish_steps(bridge,1);body=bridge.command("dev_boss_body_state").value[0]
+			if body.mode==3 and body.effects.any(func(e):return e.get("final",false)):break
+		var beams: Array=body.effects.filter(func(e):return e.get("final",false))
+		check(body.mode==3 and beams.size()==(9 if count==9 else 3),"時間切れは全生存首から最終ビームを出す: %d"%count)
+		check(not beams.is_empty() and beams.all(func(e):return e.technique=="final_strike" and is_equal_approx(e.width,body.final_width) and is_equal_approx(e.points[0].distance_to(e.points[1]),Vector2(c.package.records.HydraBodyDefinition[0].arena_x,c.package.records.HydraBodyDefinition[0].arena_y).length()*1.5)),"最終ビームの幅・射程はSourceの式と同じ: %d"%count)
+		var view=hydra_move_view(c)
+		check(not beams.is_empty() and view._boss_final_beams.is_empty() and view._boss_body_displays.values()[0].effects.size()==beams.size(),"ヒドラの首別ビームだけを正式表示し、本体ビームを重複させない: %d"%count)
+		var held: Dictionary=bridge.checkpoint();centaurus_finish_steps(bridge,2);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+		check(held.ok and bridge.restore(held.value).ok,"最終ビームの首・時計・所有を途中保持して戻す: %d"%count);centaurus_finish_steps(bridge,2)
+		check(bridge.command("dev_boss_body_state").value[0]==expected,"復帰後も同じ首別ビームと幅へ進む: %d"%count)
+		bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free()
+	await get_tree().process_frame;print("[cpp_hydra_finish_pending] failures=",failed);get_tree().quit(1 if failed else 0)
