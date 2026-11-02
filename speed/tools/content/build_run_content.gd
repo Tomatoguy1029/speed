@@ -277,6 +277,7 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 
 ## 複数の技を同じボスの定義表へまとめる。実行は既存の型付きフローへ任せる。
 static func boss_technique_set_records(definition: BossDef, moves: Array) -> Dictionary:
+	if definition!=null and definition.id==&"centaurus": return centaurus_set_records(definition,moves)
 	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[]}
 	var seen := {}
 	for move: BossTechnique in moves:
@@ -293,6 +294,31 @@ static func boss_technique_set_records(definition: BossDef, moves: Array) -> Dic
 			row.id = records.BossTechniqueStage.size()+1
 			row.technique += offset
 			records.BossTechniqueStage.append(row)
+	return records
+
+## 子の技は一度だけ登録し、連携は同じ形態の定義を参照する。
+static func centaurus_set_records(definition: BossDef, moves: Array) -> Dictionary:
+	var records := {}
+	var seen := {}
+	for move: BossTechnique in moves:
+		if move==null or seen.has(move.technique): return {}
+		seen[move.technique] = true
+		if move.technique in [&"combo_rain_volley",&"combo_shower_shot"]: continue
+		var source := centaurus_technique_records(definition,move)
+		if source.is_empty(): return {}
+		merge_centaurus_records(records,source)
+	if records.is_empty(): return {}
+	for move: BossTechnique in moves:
+		if move.technique not in [&"combo_rain_volley",&"combo_shower_shot"]: continue
+		var names: Array = ["rain","volley"] if move.technique==&"combo_rain_volley" else ["shower_chase","power_shot"]
+		for phase in [1,2]:
+			var first: Array = records.BossTechniqueDefinition.filter(func(row): return row.external_id==names[0] and row.phase==phase)
+			var last: Array = records.BossTechniqueDefinition.filter(func(row): return row.external_id==names[1] and row.phase==phase)
+			if first.size()!=1 or last.size()!=1: return {}
+			var row: Dictionary = first[0].duplicate(true)
+			row.merge({"id":records.BossTechniqueDefinition.size()+1,"external_id":str(move.technique),"kind":16,"warn":0.0,"active":first[0].warn+first[0].active+float(move.gap)+last[0].warn+last[0].active+last[0].recover,"recover":0.0,"cd":float(move.cd),"track_during_warn":move.track_during_warn,"post_gap":move.post_gap},true)
+			records.BossTechniqueDefinition.append(row)
+			records.CentaurusComboDefinition.append({"id":records.CentaurusComboDefinition.size()+1,"technique":row.id,"first":first[0].id,"second":last[0].id,"gap":float(move.gap)})
 	return records
 
 ## 共通本体の生成入力。技の登録は各ボスの移植経路が追加する。
@@ -399,16 +425,35 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition==null or definition.id!=&"monoceros": return {}
+	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
-	var rules = load("res://data/bosses/ai/monoceros_action_rules.tres")
-	var flow = load("res://data/bosses/ai/monoceros_flow.tres")
+	var rules = load("res://data/bosses/ai/"+str(definition.id)+"_action_rules.tres")
+	var flow = load("res://data/bosses/ai/"+str(definition.id)+"_flow.tres")
 	var techniques := boss_technique_set_records(definition,rules.techniques)
 	if techniques.is_empty(): return {}
-	for key in techniques: package.records[key] = techniques[key]
-	var compiled := boss_flow_records(rules,flow,techniques.BossTechniqueDefinition)
+	if definition.id==&"centaurus": merge_centaurus_records(package.records,techniques)
+	else:
+		for key in techniques: package.records[key] = techniques[key]
+	var compiled := boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 	if compiled.is_empty(): return {}
+	if definition.id==&"centaurus":
+		# 直接反応する技にも、制作の条件そのものを生成する。
+		for move in rules.techniques:
+			var rows: Array = package.records.BossTechniqueDefinition.filter(func(row): return row.external_id==str(move.technique) and row.phase==1)
+			var gate := _flow_condition(compiled,rules.conditions.get(str(move.technique),{}))
+			if rows.size()!=1 or gate==0: return {}
+			compiled.BossFlowNode.append({"id":compiled.BossFlowNode.size()+1,"flow":1,"kind":1,"seconds":0.0,"technique":rows[0].id,"condition":gate,"participant":0})
+		var paths := {}
+		for move in rules.techniques:
+			var shot: PackedScene = move.get("shot_visual")
+			if shot==null and str(move.technique).begins_with("shower_"): shot = load("res://data/bosses/centaurus_moves/fan_volley.tres").shot_visual
+			for scene: PackedScene in [shot,move.visual]:
+				if scene==null or paths.has(scene.resource_path): continue
+				paths[scene.resource_path] = true
+				var key: int = package.records.ResourceKey.size()+1
+				package.records.ResourceKey.append({"id":key,"role":7})
+				package.visuals.append({"id":key,"role":7,"path":scene.resource_path})
 	for key in compiled: package.records[key] = compiled[key]
 	package.records.RunConfig[0].time_limit = stage.time_limit if stage!=null else -1.0
 	package.records.LifecycleDefinition[0].legendary = String(stage.legendary_module_id) if stage!=null else ""

@@ -11,7 +11,7 @@ namespace {
 const CentaurusShowerDefinition &rule(const ContentBundle &c,const TechniqueState &t) {return *std::find_if(c.centaurus_showers.begin(),c.centaurus_showers.end(),[&](const auto &v){return v.technique==t.definition;});}
 void cue(RunRuntime &r,const TechniqueState &t,const char *name,const godot::Vector2 *at=nullptr) {const auto &e=r.state.enemies[t.actor.slot];godot::Dictionary p;p["id"]=e.id;p["technique"]=t.definition;p["cue"]=name;p["position"]=at?*at:e.pos;p["angle"]=e.facing;p["world_time"]=r.state.world_time;FrameBuilder::append(r,"centaurus_cue",p);}
 }
-bool CentaurusShower::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return definition && definition<=r.content->boss_techniques.size() && PhaseController::find(r,actor) && r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;}
+bool CentaurusShower::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return definition && definition<=r.content->boss_techniques.size() && PhaseController::find(r,actor) && r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead && (std::find_if(r.content->centaurus_showers.begin(),r.content->centaurus_showers.end(),[&](const auto &v){return v.technique==definition;})->pattern!=2 || PhaseController::find(r,actor)->phase>=2);}
 void CentaurusShower::begin(RunRuntime &r,TechniqueState &t) {t.detail=CentaurusShowerState{};t.started_at=PhaseController::find(r,t.actor)->clock;r.state.enemies[t.actor.slot].vel={};cue(r,t,"telegraph");}
 void CentaurusShower::step(RunRuntime &r,TechniqueState &t,double dt) {
     auto &e=r.state.enemies[t.actor.slot];e.vel={};const auto &p=r.content->boss_techniques[t.definition-1];

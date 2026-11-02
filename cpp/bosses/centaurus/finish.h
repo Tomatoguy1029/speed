@@ -1,0 +1,6 @@
+#pragma once
+#include "../../runtime/run_runtime.h"
+namespace speed {class CentaurusFinish {public:
+    static bool idle(RunRuntime &,BossBodyState &);
+    static void leap_tick(RunRuntime &,BossBodyState &,double);
+};}

@@ -15,6 +15,9 @@ var _world_clock := -1.0
 var _technique_id := 0
 var _released := 0
 var _alerting := false
+var _leaping := false
+var _phase := 1
+var _raining := false
 var hit := 0.0
 var pulse := 0.0
 var leap_ring := 0.0
@@ -35,6 +38,13 @@ func _ready() -> void:
 ## 表示用の値だけを読み、敵表や役者を参照しない。
 func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	var dt := maxf(0.0,float(body.clock)-_world_clock) if _world_clock>=0.0 else 0.0
+	if _leaping and not bool(body.get("leaping",false)): leap_ring = 0.3
+	_leaping = bool(body.get("leaping",false))
+	if int(body.phase)>_phase: pulse = 0.3
+	_phase = int(body.phase)
+	var raining: bool = attack.get("technique","")=="rain" and int(attack.get("stage",5))==1
+	if raining and not _raining: pulse = 0.3
+	_raining = raining
 	state = body
 	if _technique_id!=int(attack.get("id",0)):
 		_technique_id = int(attack.get("id",0))
@@ -64,10 +74,15 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	pulse = maxf(0.0,pulse-dt)
 	if int(attack.get("released",0))>_released:
 		_parts.release_bow(float(attack.get("interval",0.4)))
+		if attack.get("technique","")=="volley" or attack.get("technique","")=="power_shot": pulse = 0.3
 		_released = int(attack.released)
 	_parts.visible = visible
 	_parts.scale = Vector2.ONE*float(body.radius)/135.0
 	_parts.position = Vector2.ZERO
+	if bool(body.get("leaping",false)):
+		var height := sin(PI*float(body.get("leap_progress",0.0)))
+		_parts.scale *= 1.0+0.12*height
+		_parts.position = Vector2(0.0,-65.0*height).rotated(-global_rotation)
 	_parts.set_bow_pose(StringName(technique.get("technique","")),_mode(),float(body.charge),dt,float(technique.get("pose_time",-1.0)))
 	queue_redraw()
 

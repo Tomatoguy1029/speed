@@ -29,7 +29,7 @@ void CentaurusRain::step(RunRuntime &r,TechniqueState &t,double dt) {
     const auto &p=rule(*r.content,t);const auto &base=r.content->boss_techniques[t.definition-1];auto &v=std::get<CentaurusRainState>(t.detail);auto &e=r.state.enemies[t.actor.slot];auto *body=PhaseController::find(r,t.actor);const double now=body->clock;
     if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
     if (t.stage==TechniqueStage::Windup) {e.vel={};const auto aim=base.track_during_warn?r.state.enemy_aim:t.aim;const auto &boss=r.content->bosses[base.boss-1];if (!TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked()) e.facing+=std::clamp(angle_difference((aim-e.pos).angle()-e.facing),-boss.turn*dt,boss.turn*dt);return;}
-    CentaurusBody::step(r,*body,dt);
+    CentaurusBody::position_tick(r,*body,dt);
     const double speed=std::max(1.0,p.trace_speed),length=p.trace_length,gap=std::max(1.0,p.arrow_gap);
     if (v.left && now>=v.next_at) {
         const auto ship=r.state.ship_pos;const auto heading=r.state.ship.vel.length()>60?r.state.ship.vel.normalized():(ship-r.state.enemies[t.actor.slot].pos).normalized();

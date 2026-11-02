@@ -8,6 +8,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-centaurus-finish" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_finish")
+		return
 	if "--cpp-centaurus-combo-shower" in OS.get_cmdline_user_args() or "--cpp-centaurus-combo-shower-tail" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_combo_shower")
 		return
@@ -2037,4 +2040,187 @@ func native_centaurus_combo_shower() -> void:
 		bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_combo_shower] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 制作の全技・フローと共通決着を、一つの専用ランへつなぐ。
+func centaurus_finish_case(limit := -1.0, automatic := false, parameters := {}) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
+	cfg.death_freeze_time = 0.01
+	cfg.death_explosion_time = 0.01
+	cfg.death_game_over_time = 0.01
+	var boss = load("res://data/bosses/centaurus.tres").duplicate(true)
+	boss.params.initial_wait = 0.0
+	boss.params.phase_time = 0.01
+	boss.params.guard_count = 0
+	boss.params.guard_min = 0
+	boss.params.merge(parameters,true)
+	boss.speed = 0.0
+	var stage := RuntimeStage.new()
+	stage.time_limit = limit
+	stage.legendary_module_id = ContentManager.stage(2).legendary_module_id
+	var package: Dictionary = builder.boss_package(boss,cfg,stage)
+	if package.is_empty(): return {}
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":192,"mode":1,"stage_id":"B_centaurus_finish","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(192,{"position":Vector2(600,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(600,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(600,0),Vector2(600,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	if not automatic: bridge.command("dev_cancel_flow",{"entity_id":id})
+	return {"bridge":bridge,"id":id,"package":package,"events":events,"boss":boss}
+
+func centaurus_finish_low(f: Dictionary) -> void:
+	var body: Dictionary = f.bridge.command("dev_boss_body_state").value[0]
+	f.bridge.command("dev_damage",{"entity_id":f.id,"amount":body.max_hp*0.6,"cause":"debug","no_crit":true})
+	f.bridge._core.step(0.01)
+	f.bridge._core.step(0.01)
+
+func centaurus_finish_steps(bridge, count: int) -> bool:
+	var ok := true
+	for i in count: ok = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and ok
+	return ok
+
+func native_centaurus_finish() -> void:
+	var f := centaurus_finish_case(-1.0,true)
+	check(not f.is_empty(),"全技・条件・制作フロー・決着を同じ生成入口で読む")
+	if f.is_empty(): get_tree().quit(1); return
+	var bridge = f.bridge
+	var records: Dictionary = f.package.records
+	check(records.BossTechniqueDefinition.size()==24 and records.CentaurusComboDefinition.size()==4 and records.BossFinishDefinition.size()==1 and not records.BossFlowAction.is_empty(),"全12技の2形態を重複登録せず、連携から同じ部品を参照する")
+	check(ContentManager.stage(2).boss_enabled==load("res://data/stages/stage_2.tres").boss_enabled and records.BossBodyDefinition[0].hp_floor_enabled==false,"ステージ2の実制作の出現設定と本体のHP下限なしを保つ")
+	bridge._core.step(0.01)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(records.BossTechniqueDefinition[t.definition-1].phase==1,"通常HPでは制作フローが第1形態の技を選ぶ")
+	bridge.dispose()
+	f = centaurus_finish_case(-1.0,true)
+	bridge = f.bridge
+	centaurus_finish_low(f)
+	bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	check(bridge.command("dev_boss_body_state").value[0].phase==2 and f.package.records.BossTechniqueDefinition[t.definition-1].phase==2,"低HPでは制作フローが第2形態の値を選ぶ")
+	bridge.dispose()
+	var activated: Array[String] = []
+	for name in ["volley","power_shot","rain","rear_attack","shower_chase","shower_wall","stomp","fan_volley","combo_shower_shot","combo_rain_volley","shower_path","sail_run"]:
+		f = centaurus_finish_case()
+		bridge = f.bridge
+		if name in ["shower_path","sail_run"]: centaurus_finish_low(f)
+		var rows: Array = f.package.records.BossTechniqueDefinition.filter(func(row): return row.external_id==name and row.phase==1)
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":rows[0].id})
+		var started: Dictionary = bridge.command("dev_boss_state").value[0]
+		var rule: Dictionary = f.package.records.BossTechniqueDefinition[started.definition-1]
+		bridge._core.step(rule.warn+0.001)
+		bridge._core.step(0.001)
+		t = bridge.command("dev_boss_state").value[0]
+		var emitted: bool = t.stage==1 and (t.get("combo",t.technique)==name)
+		check(ticket.ok and emitted,"実制作の値で攻撃まで発動する: "+name)
+		if emitted: activated.append(name)
+		bridge.dispose()
+	print("[cpp_centaurus_finish] 実発動=",activated)
+	# 近距離の踏みつけは通常抽選を通さない。
+	f = centaurus_finish_case(-1.0,true,{"leap_trigger":0.0,"retreat_trigger":0.0})
+	bridge = f.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(100,0),Vector2(100,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.technique=="stomp" and t.stage==0 and is_zero_approx(t.elapsed) and bridge.command("dev_boss_flow_state").value[0].stamina==load("res://data/bosses/ai/centaurus_flow.tres").maximum_stamina,"踏みつけを抽選より優先し、開始した更新のdtやスタミナを使わない")
+	bridge.dispose()
+	# 第1形態の横切り・帆走を直接の制作入口でも拒否する。
+	f = centaurus_finish_case()
+	bridge = f.bridge
+	var restricted: bool = true
+	for name in ["shower_path","sail_run"]:
+		var row: Dictionary = f.package.records.BossTechniqueDefinition.filter(func(item): return item.external_id==name and item.phase==1)[0]
+		restricted = not bridge.command("dev_boss_technique",{"entity_id":f.id,"definition":row.id}).ok and restricted
+	check(restricted,"第2形態だけの横切りと帆走を第1形態では始めない")
+	centaurus_finish_low(f)
+	bridge.command("dev_ship_motion",{"position":Vector2(600,0),"velocity":Vector2(0,2000)})
+	bridge._core.step(0.6)
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.61)
+	t = bridge.command("dev_boss_state").value[0]
+	var after: Dictionary = t.duplicate(true)
+	check(t.technique=="shower_path" and t.stage==0 and is_zero_approx(bridge.command("dev_boss_body_state").value[0].path_hold),"横切りが続くと制作の条件からshower_pathを自動開始して保持時間を戻す")
+	check(bridge.restore(held.value).ok,"自動選択前の横切り保持時間と再使用待ちを復帰する")
+	bridge._core.step(0.61)
+	check(bridge.command("dev_boss_state").value[0]==after,"復帰後も同じ横切りの開始に進む")
+	bridge.release_checkpoint(held.value)
+	bridge.dispose()
+	# 跳躍は差分移動し、着地した更新では壁の予告を進めない。
+	f = centaurus_finish_case()
+	bridge = f.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(100,0),Vector2(100,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.leaping and body.leap_to.is_equal_approx(Vector2(-320,0)) and bridge.command("dev_boss_state").value.is_empty(),"近づいた機体から離れる跳躍を最初の優先順位で始める")
+	bridge._core.step(0.175)
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in f.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(f.package.visuals)
+	view.setup(scope,entries,1.0)
+	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0]._mode()==&"leap" and view._boss_body_displays.values()[0]._parts.scale.x>body.radius/135.0,"跳躍の進行だけを読み、正式パーツを浮かせて拡大する")
+	held = bridge.checkpoint()
+	bridge._core.step(0.175)
+	t = bridge.command("dev_boss_state").value[0]
+	after = t.duplicate(true)
+	check(not bridge.command("dev_boss_body_state").value[0].leaping and t.technique=="shower_wall" and t.stage==0 and is_zero_approx(t.elapsed),"着地でshower_wallを始め、同じ更新のdtを予告へ使わない")
+	check(bridge.restore(held.value).ok,"跳躍の始点・終点・進行・期限を途中復帰する")
+	bridge._core.step(0.175)
+	check(bridge.command("dev_boss_state").value[0]==after,"復帰後も同じ着地と壁の開始になる")
+	bridge.release_checkpoint(held.value)
+	bridge.dispose()
+	view.queue_free()
+	f = centaurus_finish_case()
+	bridge = f.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(380,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(380,0),Vector2(380,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.leaping and body.retreat_ready_at>body.clock,"後退条件では同じ跳躍へ入り、後退の再使用期限も保存する")
+	bridge.dispose()
+	# 共通決着は本体撃破・制限時間・途中中断を別の結果へ送る。
+	f = centaurus_finish_case()
+	bridge = f.bridge
+	bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunState.Phase.FINISHING and bridge.read_frame().value.result==null,"第1形態の実撃破から報酬未確定の決着へ進む")
+	held = bridge.checkpoint()
+	centaurus_finish_steps(bridge,3)
+	var expected: Dictionary = bridge.read_frame().value.ui.boss_finish
+	check(expected.blasted and f.events.filter(func(event): return event.type==&"boss_explode").size()==1,"決着のスロー再生後に本体と残る敵弾を一度消す")
+	check(bridge.restore(held.value).ok,"決着途中の時計と消滅状態を復帰する")
+	centaurus_finish_steps(bridge,3)
+	check(bridge.read_frame().value.ui.boss_finish==expected,"復帰後も同じ決着の段階へ進む")
+	bridge.release_checkpoint(held.value)
+	centaurus_finish_steps(bridge,20)
+	var frame: Dictionary = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Clear" and frame.result.legendary=="legendary_sail" and f.events.any(func(event): return event.type==&"clear_banner"),"報酬とCLEARのあとにケンタウルスの勝利を一度確定する")
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"決着と勝利の通知を共通の表示・記録経路へ渡す")
+	bridge.dispose()
+	f = centaurus_finish_case(0.01)
+	bridge = f.bridge
+	centaurus_finish_steps(bridge,2)
+	check(bridge.command("dev_boss_body_state").value[0].mode==3 and f.events.any(func(event): return event.type==&"time_limit_reached"),"実制限時間からケンタウルスの最終攻撃へ進む")
+	centaurus_finish_steps(bridge,24)
+	frame = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Death" and frame.result.last_damage.cause==&"final_strike","時間切れの最終攻撃から共通の敗北へ進む")
+	bridge.dispose()
+	f = centaurus_finish_case()
+	bridge = f.bridge
+	check(bridge.command("abort",{"reason":0}).ok and bridge.read_frame().value.result.kind=="Abort" and bridge.command("dev_boss_body_state").value[0].mode==5,"途中中断は本体を取消し、クリア報酬を付けずに終える")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_finish] failures=",failed)
 	get_tree().quit(1 if failed else 0)
