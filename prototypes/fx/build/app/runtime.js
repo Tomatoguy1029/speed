@@ -11,7 +11,7 @@ const STD_PARAMS = [
 ];
 function paramDefs(d) { return [...STD_PARAMS.map(p => p.k === 'color' ? { ...p, def: d.color || '#ffffff' } : p), ...(d.params || [])]; }
 function P() { const out = {}; for (const p of paramDefs(demo)) out[p.k] = PARAMS[demo.id]?.[p.k] ?? p.def; return out; }
-function resetSim() { S = { t: 0, ev: [], ents: [], hz: [], fx: [], rng: mkRng(7) }; cam.x = demo.cam?.x ?? 0; cam.y = demo.cam?.y ?? 0; demo.setup(S); }
+function resetSim() { S = { t: 0, ev: [], ents: [], hz: [], fx: [], rng: mkRng(7) }; cam.x = demo.cam?.x ?? 0; cam.y = demo.cam?.y ?? 0; demo.setup(S); demo.step(S, 0); } // 最初のコマを描く前に状態を整える（t=0 で描画が落ちないように）
 function simTo(t) {
   if (!S || t < S.t - 1e-9) resetSim();
   let guard = 0;
@@ -127,7 +127,7 @@ function frame(now) {
     playT += real * speed;
     if (playT > demo.duration) { if (loop) playT = 0; else { playT = demo.duration; playing = false; syncPlay(); } }
   }
-  if (demo) { simTo(playT); render(); $('#scrub').value = playT; $('#time').textContent = `${playT.toFixed(2)} / ${demo.duration.toFixed(2)} s`; }
+  if (demo) { try { simTo(playT); render(); } catch (err) { g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#300'; g.fillRect(0, H - 40, W, 40); g.fillStyle = '#fff'; g.font = '14px system-ui'; g.fillText('描画エラー：' + err.message, 12, H - 15); console.error(err); } $('#scrub').value = playT; $('#time').textContent = `${playT.toFixed(2)} / ${demo.duration.toFixed(2)} s`; }
   requestAnimationFrame(frame);
 }
 function syncPlay() { $('#play').textContent = playing ? '停止' : '再生'; }
