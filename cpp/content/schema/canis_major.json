@@ -127,6 +127,112 @@
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "CanisFlameDefinition",
+      "section": 341,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "phase",
+          "type": "u32",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "particle_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "drag",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "r_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "r_end",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

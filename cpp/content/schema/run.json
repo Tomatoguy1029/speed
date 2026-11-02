@@ -1495,6 +1495,14 @@
       {
         "name": "RearAttack",
         "value": "rear_attack"
+      },
+      {
+        "name": "SiriusFlame",
+        "value": "sirius_flame"
+      },
+      {
+        "name": "SiriusTrail",
+        "value": "sirius_trail"
       }
     ],
     "VisualRole": [
@@ -2043,6 +2051,10 @@
       {
         "name": "CentaurusCue",
         "value": "centaurus_cue"
+      },
+      {
+        "name": "CanisIgniteArrived",
+        "value": "canis_ignite_arrived"
       }
     ],
     "ResultKind": [
@@ -2753,6 +2765,16 @@
       "position",
       "angle",
       "world_time"
+    ],
+    "canis_ignite_arrived": [
+      "id",
+      "boss_id",
+      "target",
+      "profile",
+      "pos",
+      "from",
+      "life",
+      "observation"
     ]
   },
   "includes": [

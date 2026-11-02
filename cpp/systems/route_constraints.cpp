@@ -23,12 +23,12 @@ RouteContext RouteConstraints::context(const RunRuntime &run) {
     for (uint32_t i=0;i<s.hazards.size();++i) {
         const auto &h=s.hazards[i];
         // 旧ボスの内部波は経路制約の対象外。時間幅の判定はボス自体を未対応とする。
-        if (!h.alive || std::holds_alternative<MonocerosWaveHazard>(h.shape)) continue;const auto *record=AttackSystem::get(s,h.attack);RouteContext::Hazard out;out.position=h.pos;out.id=i;out.attached=record && record->spec.owner.attached;
+        if (!h.alive || (std::holds_alternative<MonocerosWaveHazard>(h.shape) || std::holds_alternative<CanisFlameHazard>(h.shape))) continue;const auto *record=AttackSystem::get(s,h.attack);RouteContext::Hazard out;out.position=h.pos;out.id=i;out.attached=record && record->spec.owner.attached;
         std::visit([&](const auto &shape) {
             using T=std::decay_t<decltype(shape)>;
             if constexpr (std::is_same_v<T,CircleHazard>) out.radius=shape.radius;
             else if constexpr (std::is_same_v<T,WaveHazard>) out.radius=shape.radius+shape.half_width;
-            else if constexpr (std::is_same_v<T,MonocerosWaveHazard>) {}
+            else if constexpr (std::is_same_v<T,MonocerosWaveHazard> || std::is_same_v<T,CanisFlameHazard>) {}
             else {out.circle=false;out.end=h.pos+godot::Vector2::from_angle(shape.angle)*shape.length;out.radius=shape.half_width;
                 if constexpr (std::is_same_v<T,BeamHazard>) out.radius+=std::abs(std::tan(shape.arc))*shape.length;
             }

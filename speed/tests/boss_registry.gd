@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-canis-flame" in OS.get_cmdline_user_args() or "--cpp-canis-flame-tail" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_flame")
+		return
 	if "--cpp-centaurus-power-cancel" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_power_cancel")
 		return
@@ -876,4 +879,111 @@ func native_centaurus_power_cancel() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_power_cancel] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func canis_flame_case() -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.base_hp = 1000.0
+	var package: Dictionary = builder.boss_body_package(load("res://data/bosses/canis_major.tres"),cfg)
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	check(not bytes.is_empty(),"炎と点火の実効値を共通生成する")
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":153,"mode":1,"stage_id":"B_canis_flame","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"炎の型付き生成物を読む")
+	if not configured.ok: print(configured); return {}
+	bridge.start(153,{"position":Vector2(2000,0)})
+	bridge.command("dev_ship_motion",{"position":Vector2(2000,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(2000,0),Vector2(2000,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(package.visuals)
+	view.setup(scope,entries,cfg.character_scale)
+	bridge.subscribe("表示",view.receive_frame)
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	return {"bridge":bridge,"view":view,"id":id,"package":package,"scope":scope}
+
+func canis_effects(bridge) -> Array:
+	return bridge.command("dev_boss_body_state").value[0].flames
+
+func native_canis_flame() -> void:
+	var c := canis_flame_case()
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	var view = c.view
+	var display = view._boss_body_displays.values()[0].flames
+	var initial: Dictionary = bridge.checkpoint()
+	var held_jet := {}
+	if "--cpp-canis-flame-tail" not in OS.get_cmdline_user_args():
+		var profile: Dictionary = c.package.records.CanisFlameDefinition[0]
+		var move = load("res://data/bosses/canis_major_moves/sirius.tres")
+		check(is_equal_approx(profile.particle_life,move.beam_particle_life),"噴射の粒の寿命は技の実効値から生成する")
+		var emitted: Dictionary = bridge.command("dev_canis_flame",{"entity_id":c.id,"definition":1,"target":0,"observation":4294967301})
+		check(emitted.ok,"噴射・戦闘粒・焼け跡へ同じ64bit観測IDを渡す")
+		bridge._core.step(0.12)
+		var effects: Array = canis_effects(bridge)
+		check(effects.any(func(e): return e.kind==1) and effects.any(func(e): return e.kind==2 and e.length>0.0),"発生した戦闘粒から焼け跡の到達距離を伸ばす")
+		check(effects.all(func(e): return e.observation==4294967301),"別の技が始まっても生成時の観測IDを保持する")
+		held_jet = bridge.checkpoint()
+		check(held_jet.ok,"噴射中の親・粒・焼け跡を保持する")
+		bridge._core.step(0.11)
+		var after_jet: Array = canis_effects(bridge)
+		check(bridge.restore(held_jet.value).ok,"噴射中の値と乱数を復帰する")
+		bridge._core.step(0.11)
+		check(canis_effects(bridge)==after_jet,"復帰後の粒の位置・速度・命中旗が一致する")
+		view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+		check(display.displays.size()>0,"同じ戦闘粒をPixelFireの表示へ渡す")
+		var before_display: Array = canis_effects(bridge).duplicate(true)
+		display.presets[1] = display.presets[1].duplicate(true)
+		display.presets[1].lifetime = 10.0
+		display.apply_frame(before_display,0.23)
+		check(canis_effects(bridge)==before_display,"表示プリセットの寿命を戦闘へ戻さない")
+		bridge.command("dev_cancel_boss",{"entity_id":c.id})
+		check(canis_effects(bridge).is_empty(),"噴射中の本体終了で全ての炎をBossClearする")
+	check(bridge.restore(initial.value).ok,"点火前の独立状態へ戻る")
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var target: int = body.led[0].id
+	check(bridge.command("dev_canis_flame",{"entity_id":c.id,"definition":5,"target":target,"observation":83}).ok,"移送先を個体IDと世代で持つ")
+	bridge._core.step(0.07)
+	var held_transfer: Dictionary = bridge.checkpoint()
+	check(held_transfer.ok and canis_effects(bridge).any(func(e): return e.kind==3),"点火移送中の値を保持する")
+	bridge._core.step(0.09)
+	var packet: Dictionary = bridge.read_frame().value
+	var arrivals: Array = packet.events.filter(func(e): return e.type==&"canis_ignite_arrived")
+	check(canis_effects(bridge).is_empty() and arrivals.size()==1 and arrivals[0].payload.observation==83 and arrivals[0].payload.target==target,"表示の余韻を足さずignite_stepで点火の到着を確定する")
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	if not arrivals.is_empty(): display.frame_event(arrivals[0].payload.merged({"type":&"canis_ignite_arrived"}))
+	display.apply_frame([],0.16)
+	check(not display.fading.is_empty(),"到着後の点火の余韻は表示だけに残す")
+	check(bridge.restore(held_transfer.value).ok,"点火移送中へ復帰する")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(canis_effects(bridge).is_empty(),"移送中の本体終了で到着予定も回収する")
+	bridge.restore(initial.value)
+	bridge.command("dev_canis_flame",{"entity_id":c.id,"definition":1,"target":0,"observation":84})
+	bridge._core.step(1.1)
+	var trail: Array = canis_effects(bridge)
+	check(trail.size()==1 and trail[0].kind==2,"戦闘粒が消えた後も焼け跡を元の寿命まで残す")
+	var held_trail: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.1)
+	var after_trail: Array = canis_effects(bridge)
+	check(held_trail.ok and bridge.restore(held_trail.value).ok,"焼け跡中の時計と伸びた長さを復帰する")
+	bridge._core.step(0.1)
+	check(canis_effects(bridge)==after_trail,"復帰後の焼け跡が同じ時刻まで残る")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(canis_effects(bridge).is_empty() and display.displays.is_empty() and display.fading.is_empty(),"焼け跡中の本体終了で戦闘と表示を閉じる")
+	for held in [initial,held_jet,held_transfer,held_trail]:
+		if not held.is_empty(): bridge.release_checkpoint(held.value)
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"炎の通知を共通配信から届ける")
+	bridge.dispose()
+	view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_flame] failures=",failed)
 	get_tree().quit(1 if failed else 0)

@@ -4,6 +4,7 @@
 #include "../bosses/flow/flow_runner.h"
 #include "../bosses/flow/phase_controller.h"
 #include "../bosses/monoceros/finish.h"
+#include "../bosses/canis_major/flames.h"
 #include "../systems/attack_system.h"
 #include "../systems/group_system.h"
 #include "../systems/field.h"
@@ -212,6 +213,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         for (double value:{lance.length,lance.width,lance.damage,lance.knock,lance.life}) if (!std::isfinite(value) || value<0) return false;
         for (auto id:lance.hits) if (id<=0) return false;
     }
+    if (!CanisFlames::validate(state,content)) return false;
     for (const auto &hazard:state.hazards) if (hazard.alive) {
         if (!hazard.pos.is_finite() || !std::isfinite(hazard.time) || !std::isfinite(hazard.delay) || !std::isfinite(hazard.duration) || !std::isfinite(hazard.damage)) return false;
         if (hazard.zone_definition && (hazard.zone_definition>content.zones.size() || !std::holds_alternative<CircleHazard>(hazard.shape) || std::get<CircleHazard>(hazard.shape).kind!=CircleHazardKind::Blast || !std::isfinite(hazard.enemy_damage) || hazard.enemy_damage<0)) return false;

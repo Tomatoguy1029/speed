@@ -832,7 +832,9 @@ func apply_frame(frame: Dictionary) -> bool:
 		if body.kind not in [0,1,2]: continue
 		body_seen[body.id] = true
 		if body.mode>=4:
-			if _boss_body_displays.has(body.id): _boss_body_displays[body.id].hide()
+			if _boss_body_displays.has(body.id):
+				if body.kind==2: _boss_body_displays[body.id].clear_flames()
+				_boss_body_displays[body.id].hide()
 			continue
 		var entry := {}
 		for asset in visuals.values():
@@ -844,6 +846,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			var display = scene.instantiate()
 			display.set_script([preload("res://scripts/render/bosses/monoceros.gd"),preload("res://scripts/render/bosses/centaurus.gd"),preload("res://scripts/render/bosses/canis_major.gd")][body.kind])
 			_pulser_parent.add_child(display)
+			if body.kind==2: display.setup_flames(_scope,visuals)
 			_boss_body_displays[body.id] = display
 		var attack := {}
 		for value: Dictionary in frame.get("boss_techniques",[]):
@@ -904,6 +907,8 @@ func receive_frame(frame: Dictionary) -> bool:
 		_epoch = frame.epoch
 		ruler_shake=0.0
 		_queued_events.clear()
+		for display in _boss_body_displays.values():
+			if display.has_method("clear_flames"): display.clear_flames()
 		if _boss_lance_visual!=null: _boss_lance_visual.reset_frame()
 		if _boss_wave_visual!=null: _boss_wave_visual.reset_frame()
 		if _boss_sword_visual!=null: _boss_sword_visual.reset_frame()
@@ -1202,6 +1207,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_sniper_world_time = float(frame.ui.world_time)
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	for event: Dictionary in _queued_events:
+		if event.type==&"canis_ignite_arrived" and _boss_body_displays.has(event.boss_id): _boss_body_displays[event.boss_id].frame_event(event)
 		_boss_lance_visual.frame_event(event)
 		_boss_wave_visual.frame_event(event)
 		if _slash_visual!=null: _slash_visual.frame_event(event)

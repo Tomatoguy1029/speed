@@ -18,6 +18,17 @@ struct WaveHazard {
 struct MonocerosWaveHazard {
     double radius=0,maximum=0,speed=0,angle=0,half_angle=0,width=0;
 };
+struct CanisFlameHazard {
+    enum class Kind : uint8_t { Jet,Particle,Trail,Transfer };
+    Kind kind=Kind::Particle;
+    uint32_t definition=0;
+    int64_t observation=0;
+    godot::Vector2 origin,velocity;
+    double age=0,life=0,emit=0,angle=0,length=0,radius=0;
+    bool source_ended=false;
+    EnemyHandle target;
+    AttackHandle jet,trail;
+};
 struct HazardState {
     godot::Vector2 pos;
     float time=0,delay=0,duration=0;
@@ -27,6 +38,6 @@ struct HazardState {
     uint32_t zone_definition=0;
     double enemy_damage=0;
     bool alive=true,hit=false;
-    std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard,MonocerosWaveHazard> shape=CircleHazard{};
+    std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard,MonocerosWaveHazard,CanisFlameHazard> shape=CircleHazard{};
 };
 }

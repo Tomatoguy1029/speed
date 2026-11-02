@@ -23,8 +23,8 @@ void scan(RunRuntime &r,BossBodyState &b) {
     const double power=c.base_attack*c.attack_mult*c.atk_scale*burst;for (const auto &v:b.canis.led) {auto &e=s.enemies[v.actor.slot];resize(e,std::max(v.base_hp,power*(std::max(1.0,p.led_hits)-0.5)));}
 }
 void spawn_pack(RunRuntime &r,BossBodyState &b,bool call) {
-    const auto &p=CanisMajorBody::rule(r,b);const auto &e=r.state.enemies[b.actor.slot];const auto at=e.pos;const double facing=e.facing;const int count=call?std::max(0,int(p.call_to)-int(b.canis.led.size())):int(p.pack_size);
-    for (int k=0;k<count;++k) {EnemySpawn options;options.has_hound_pack=true;options.hound_pack=-r.state.enemy_handles.entity_id(b.actor);options.has_facing=true;options.facing=facing;options.position=call?at+godot::Vector2::from_angle(facing+3.141592653589793+r.state.control.rng.randf_range(-1,1))*120.0:at-godot::Vector2::from_angle(facing+(double(k)/std::max(1,count-1)-0.5)*2.2)*(e.radius+70);EnemySystem::spawn(r,p.hound-1,options);}
+    const auto &p=CanisMajorBody::rule(r,b);const auto &e=r.state.enemies[b.actor.slot];const auto at=e.pos;const double facing=e.facing,radius=e.radius;const int count=call?std::max(0,int(p.call_to)-int(b.canis.led.size())):int(p.pack_size);
+    for (int k=0;k<count;++k) {EnemySpawn options;options.has_hound_pack=true;options.hound_pack=-r.state.enemy_handles.entity_id(b.actor);options.has_facing=true;options.facing=facing;options.position=call?at+godot::Vector2::from_angle(facing+3.141592653589793+r.state.control.rng.randf_range(-1,1))*120.0:at-godot::Vector2::from_angle(facing+(double(k)/std::max(1,count-1)-0.5)*2.2)*(radius+70);EnemySystem::spawn(r,p.hound-1,options);}
     b.canis.pack_spawned=true;b.canis.lead_scan=0;if (!call) scan(r,b);
 }
 }

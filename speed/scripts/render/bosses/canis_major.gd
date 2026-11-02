@@ -6,13 +6,23 @@ var technique := {}
 var hit := 0.0
 var _clock := -1.0
 var gait := 0.0
+var flames: Node2D
 @onready var parts: Node2D = $Parts
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self,"boss/body/canis_major")
 	z_index = 1
+func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
+	flames = preload("res://scripts/render/bosses/canis_flames.gd").new()
+	flames.setup(scope,assets)
+	add_child(flames)
+func clear_flames() -> void:
+	if flames!=null: flames.clear()
+func frame_event(event: Dictionary) -> void:
+	if flames!=null: flames.frame_event(event)
 func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	var dt: float = maxf(0.0,float(body.clock)-_clock) if _clock>=0.0 else 0.0
 	if _clock>float(body.clock): gait = 0.0
+	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock))
 	state = body
 	technique = attack
 	_clock = float(body.clock)

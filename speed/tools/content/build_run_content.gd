@@ -218,6 +218,28 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		var color: Color = definition.params.led_color
 		canis.merge({"led_r":color.r,"led_g":color.g,"led_b":color.b,"led_a":color.a})
 		data.CanisBodyDefinition = [canis]
+		for name in ["sirius","sirius_flame","blaze"]:
+			var move: BossTechnique = load("res://data/bosses/canis_major_moves/%s.tres" % name)
+			for phase in [1,2]:
+				var values: Dictionary = move.values().duplicate(true)
+				if phase==2:
+					for field: String in move.values():
+						if field.ends_with("_p2"): values[field.trim_suffix("_p2")] = move.values()[field]
+				var profile := {"id":data.CanisFlameDefinition.size()+1,"boss":1,"external_id":name,"phase":phase,"kind":0 if name=="sirius" else 1 if name=="sirius_flame" else 2}
+				for field in ["particle_life","length","width","duration","damage","spread","speed","drag","r_start","r_end","hit_scale","trail_delay","trail_life","trail_width","trail_damage"]: profile[field] = 0.0
+				if name=="sirius":
+					profile.merge({"particle_life":float(values.get("beam_particle_life",0.65)),"length":float(values.beam_length),"width":float(values.beam_width),"duration":float(values.beam_time),"damage":float(values.damage),"trail_delay":float(values.trail_delay),"trail_life":float(values.trail_time),"trail_width":float(values.trail_width),"trail_damage":float(values.trail_damage)},true)
+				elif name=="sirius_flame":
+					for pair in [["particle_life","life"],["duration","duration"],["damage","damage"],["spread","spread"],["speed","particle_speed"],["drag","drag"],["r_start","r_start"],["r_end","r_end"],["hit_scale","hit_scale"]]: profile[pair[0]] = float(values[pair[1]])
+				else: profile.merge({"particle_life":float(values.ignite_step),"duration":float(values.ignite_step)},true)
+				data.CanisFlameDefinition.append(profile)
+				var preset: Resource = values.flame_settings if name=="sirius" else load("res://data/visuals/canis_fire_flame.tres" if name=="sirius_flame" else "res://data/visuals/canis_fire_ignite.tres")
+				var visual: int = data.ResourceKey.size()+1
+				data.ResourceKey.append({"id":visual,"role":7})
+				package.visuals.append({"id":visual,"role":7,"path":preset.resource_path,"canis_flame":profile.id})
+		var trail_visual: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":trail_visual,"role":7})
+		package.visuals.append({"id":trail_visual,"role":7,"path":"res://data/visuals/canis_fire_trail.tres","canis_trail":true})
 		var hound: EnemyDef = load("res://data/enemies/hound.tres")
 		var hound_visual: Dictionary = package.visuals[5]
 		if hound_visual.role==6:

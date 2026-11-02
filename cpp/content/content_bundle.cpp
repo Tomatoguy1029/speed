@@ -130,6 +130,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
+    bundle->canis_flames=records.CanisFlameDefinition_rows;
+    for (size_t i=0;i<bundle->canis_flames.size();++i) {const auto &p=bundle->canis_flames[i];if (p.id!=i+1 || records.BossDefinition_rows[p.boss-1].kind!=2 || p.particle_life<=0 || p.duration<=0) return {};}
     bundle->boss_bodies=records.BossBodyDefinition_rows;
     bundle->centaurus_bodies=records.CentaurusBodyDefinition_rows;
     bundle->centaurus_volleys=records.CentaurusVolleyDefinition_rows;

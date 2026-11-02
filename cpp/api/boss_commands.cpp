@@ -5,11 +5,19 @@
 #include "../bosses/monoceros/body.h"
 #include "../bosses/centaurus/body.h"
 #include "../bosses/canis_major/body.h"
+#include "../bosses/canis_major/flames.h"
+#include "../systems/attack_system.h"
 #include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dictionary &p) {
     const auto result=[](bool ok,Variant value=Variant()){Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"boss";out["message"]=ok?"":"ボス技の命令が不正です";out["value"]=value;return out;};
     if (!runtime.api_development) return result(false);
+    if (kind=="dev_canis_flame") {
+        if (p.size()!=4 || p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("definition",Variant()).get_type()!=Variant::INT || p.get("target",Variant()).get_type()!=Variant::INT || p.get("observation",Variant()).get_type()!=Variant::INT) return result(false);
+        const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));const auto target=runtime.state.rows_by_id.find(int64_t(p["target"]));const int64_t definition=p["definition"],observation=p["observation"];if (found==runtime.state.rows_by_id.end() || definition<=0 || uint64_t(definition)>runtime.content->canis_flames.size() || observation<0) return result(false);
+        auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=2 || body->mode>=speed::BossMode::Defeated) return result(false);
+        const auto handle=speed::CanisFlames::begin(runtime,*body,definition,target==runtime.state.rows_by_id.end()?speed::EnemyHandle{}:runtime.state.enemy_handles.at(target->second),observation);const auto *record=speed::AttackSystem::get(runtime.state,handle);return result(record!=nullptr,record?record->id:0);
+    }
     if (kind=="dev_boss_body_state") return result(p.is_empty(),speed::PhaseController::snapshot(runtime));
     if (kind=="dev_spawn_boss") {
         if (p.size()!=3 || p.get("definition",Variant()).get_type()!=Variant::INT || p.get("position",Variant()).get_type()!=Variant::VECTOR2 || p.get("entrance",Variant()).get_type()!=Variant::BOOL) return result(false);

@@ -1,3 +1,5 @@
+#include "../bosses/canis_major/body.h"
+#include "../bosses/canis_major/flames.h"
 #include "run_core.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
@@ -212,6 +214,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         speed::MonocerosHornWave::advance_waves(runtime,delta);
         speed::PhaseController::step(runtime,delta);
         speed::FlowRunner::step(runtime,delta);
+        for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisMajorBody::lead(runtime,body,delta);if (body.mode!=speed::BossMode::Final) speed::CanisFlames::step(runtime,body,delta);}
     }
     capture_avoidance();
     ++runtime.state.ticks;
