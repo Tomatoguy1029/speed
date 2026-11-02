@@ -6,6 +6,7 @@
 #include "../cpp/systems/attacks/wall.h"
 #include "../cpp/systems/attacks/slash.h"
 #include "../cpp/systems/attacks/light_arrow.h"
+#include "../cpp/systems/attacks/shell.h"
 #include "geometry.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/output/event_builder.h"
@@ -123,17 +124,21 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         const double ship_t=speed::CollisionQuery::segment_circle_t(from,to,runtime.state.ship.pos,double(shot.radius)+body_radius);
         const double reach = double(shot.radius) + body_radius + step;
         if (!long_arrow && shot.kind!=int64_t(speed::HostileKind::Slash) && (!body_hit || (ship_t>=0 && ship_t<body_hit->t)) && (record->spec.contact.ship_sweep || runtime.state.ship.pos.distance_squared_to(to) <= reach * reach)) {
-            const auto contact=speed::CombatResolver::attack_ship_damage(runtime,processing_handle,speed::SegmentCircle{from,to,double(shot.radius)},shot.damage,shot.slow);
-            speed::EventBuilder::flush_combat(runtime);
-            if (contact.touching) {
-                const double t=speed::CollisionQuery::segment_circle_t(from,to,runtime.state.ship.pos,double(shot.radius)+body_radius);
-                end_reason=speed::AttackEndReason::Hit;life=0;if (t>=0) to=from+(to-from)*t;
-                body_hit.reset();
+            if (shot.kind==int64_t(speed::HostileKind::Shell)) {
+                if (ship_t>=0) {end_reason=speed::AttackEndReason::Hit;life=0;to=from+(to-from)*ship_t;body_hit.reset();}
+            } else {
+                const auto contact=speed::CombatResolver::attack_ship_damage(runtime,processing_handle,speed::SegmentCircle{from,to,double(shot.radius)},shot.damage,shot.slow);
+                speed::EventBuilder::flush_combat(runtime);
+                if (contact.touching) {
+                    const double t=speed::CollisionQuery::segment_circle_t(from,to,runtime.state.ship.pos,double(shot.radius)+body_radius);
+                    end_reason=speed::AttackEndReason::Hit;life=0;if (t>=0) to=from+(to-from)*t;
+                    body_hit.reset();
+                }
             }
         }
         if (!speed::AttackSystem::get(runtime.state,processing_handle)) continue;
         if (body_hit) {to=body_hit->point;end_reason=speed::AttackEndReason::Hit;life=0;}
-        if (life <= 0) {shot.pos=to;release();}
+        if (life <= 0) {shot.pos=to;if (shot.shell.definition) speed::ShellSystem::burst(runtime,processing_handle,to);release();}
         else {
             shot.pos = to; shot.life = life;
             shot.gap = gap-step;
@@ -150,6 +155,7 @@ Array SpeedRunCore::hostiles_snapshot() const {
         Dictionary item;
         item["row"] = int64_t(row); item["kind"] = shot.kind; item["pos"] = shot.pos; item["vel"] = shot.vel;
         if (shot.star_bolt.definition) item["radius"]=shot.radius;
+        if (shot.shell.definition) {item["radius"]=shot.radius;item["burst"]=shot.shell.burst;item["mouth"]=shot.shell.mouth;item["full"]=shot.shell.full;PackedInt32Array contents;for (auto id:shot.shell.contents) contents.push_back(id);item["contents"]=contents;}
         if (shot.arrow.definition) item["length"]=shot.arrow.length;
         if (shot.slash.definition) {item["size"]=shot.radius;item["side"]=shot.slash.side;}
         item["life"] = shot.life; item["gap"] = shot.gap; item["stone"] = shot.stone; item["wait"] = shot.wait;

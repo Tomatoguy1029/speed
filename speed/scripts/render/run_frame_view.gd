@@ -18,6 +18,7 @@ var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
 var _lance_hits: Array = []
+var _shell_displays: Dictionary = {}
 var _flood_displays: Dictionary = {}
 var _flood_tails: Array[Dictionary] = []
 var _flood_world_time := -1.0
@@ -325,9 +326,15 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull,SHAPE_KIND.Zone,SHAPE_KIND.Flood] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull,SHAPE_KIND.Zone,SHAPE_KIND.Flood,SHAPE_KIND.Shell] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
+		if row.kind==SHAPE_KIND.Shell:
+			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("mouth") is Vector2 or not row.mouth.is_finite() or not row.get("contents") is PackedInt32Array: return false
+			for id: int in row.contents:
+				if not visuals.has(id): return false
+			for key in ["angle","clock","flight_scale","full","petrified_radius"]:
+				if not row.get(key) is float or not is_finite(row[key]): return false
 		if row.kind==SHAPE_KIND.Flood:
 			if row.points.size()!=1 or row.widths.size()!=1: return false
 			for key in ["time","delay","active","angle","length","spread","margin"]:
@@ -443,11 +450,22 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in _debris_displays.values(): display.hide()
 	for display: Node in _hull_displays.values(): display.hide()
 	for display: Node in _zone_displays.values(): display.hide()
+	for display: Node in _shell_displays.values(): display.hide()
 	for display: Dictionary in _flood_displays.values(): display.node.hide()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
+		if row.kind==SHAPE_KIND.Shell:
+			var key := int(row.order)
+			if not _shell_displays.has(key):
+				var shell := preload("res://scripts/render/attacks/shell_frame.gd").new()
+				parent.add_child(shell)
+				shell.setup(_scope,visuals)
+				_shell_displays[key] = shell
+			_shell_displays[key].apply_frame(row)
+			_shell_displays[key].show()
+			continue
 		if row.kind==SHAPE_KIND.Flood:
 			var key := int(row.order)
 			if not _flood_displays.has(key):

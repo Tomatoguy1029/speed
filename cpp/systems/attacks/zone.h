@@ -8,6 +8,7 @@ struct ZoneParams {
     ZoneStyle style=ZoneStyle::Plain;
     EnemyHandle owner;
     BudgetToken budget;
+    int64_t source_id=0;uint32_t source_definition=0;
 };
 class ZoneSystem {
 public:

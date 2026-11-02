@@ -412,6 +412,10 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		"tint_r":star.effect_tint.r,"tint_g":star.effect_tint.g,"tint_b":star.effect_tint.b,"tint_a":star.effect_tint.a,"visual":star_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	star.free()
 	data.LightLanceDefinition = [{"id":1,"life":0.5,"flight_time":0.18,"maximum":220}]
+	var shell_fixed: Dictionary = preload("res://data/visuals/pump_shell_runtime.tres").get_meta("values")
+	var shell_tint: Color = shell_fixed.effect_tint
+	data.ShellDefinition = [{"id":1,"contact":1,"flight_scale":shell_fixed.flight_scale,"tint_r":shell_tint.r,"tint_g":shell_tint.g,"tint_b":shell_tint.b,"tint_a":shell_tint.a}]
+	data.ShellSource = [{"id":1,"enemy":1,"mouth_radius":18.5*config.character_scale*definition.visual_value("scale",1.0),"store_max":maxi(1,int(definition.params.get("store_max",1)))}]
 	data.FloodDefinition = [{"id":1,"beam":1,"tail":1.4,"collapse":0.35,"margin":1.12}]
 	data.ZoneDefinition = []
 	var zone_names := ["zone","zone_reticle","zone_lightning","zone_bite","zone_aquila","zone_phoenix","zone_bomber","zone_pump"]
@@ -493,6 +497,10 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		hull_look.id = row.id
 		hull_look.enemy = row.id
 		data.FriendHullLook.append(hull_look)
+		var shell_source: Dictionary = resolved.ShellSource[0].duplicate()
+		shell_source.id = row.id
+		shell_source.enemy = row.id
+		data.ShellSource.append(shell_source)
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
@@ -571,6 +579,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ZoneDefinition = resolved.ZoneDefinition.duplicate(true)
 			data.FloodDefinition = resolved.FloodDefinition.duplicate(true)
 			data.LightLanceDefinition = resolved.LightLanceDefinition.duplicate(true)
+			data.ShellDefinition = resolved.ShellDefinition.duplicate(true)
 			data.FriendSawPoint = resolved.FriendSawPoint.duplicate(true)
 			data.FriendDebrisDefinition = resolved.FriendDebrisDefinition.duplicate(true)
 			data.LumpDefinition = resolved.LumpDefinition.duplicate(true)
@@ -677,7 +686,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")
-	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png","res://.content/attack_visuals.res","res://scripts/render/attacks/zone.gd","res://scripts/render/fx/blast_bursts.gd","res://scripts/render/attacks/flood.gd","res://shaders/water_flood.gdshader","res://assets/fx/water_noise.png","res://scripts/render/light_lance.gd","res://scripts/render/equipment/critBeam.gd"]:
+	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png","res://.content/attack_visuals.res","res://scripts/render/attacks/zone.gd","res://scripts/render/fx/blast_bursts.gd","res://scripts/render/attacks/flood.gd","res://shaders/water_flood.gdshader","res://assets/fx/water_noise.png","res://scripts/render/light_lance.gd","res://scripts/render/equipment/critBeam.gd","res://scripts/render/attacks/shell_frame.gd","res://shaders/pump_shell_runtime.gdshader"]:
 		if not paths.has(asset): paths.append(asset)
 	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")
 	for visual: Dictionary in visuals:

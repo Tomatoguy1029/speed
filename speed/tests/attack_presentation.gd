@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-shell" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_shell()
+		check(finished,"圧縮弾の指定確認を最後まで実施する")
+		print("[cpp_shell] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-rings" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_rings()
 		check(finished,"複数輪の不足条件を最後まで確認する")
@@ -930,5 +936,72 @@ func check_cpp_rings() -> bool:
 	check(cpp_core.hazards_snapshot().is_empty(),"最後の輪も自身の時刻で消える")
 	check(cpp_bridge.restore(held.value).ok and cpp_core.hazards_snapshot()==state,"複数輪の時刻・切れ目・独立した命中状態をまとめて復元する")
 	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()
+	return true
+
+func check_cpp_shell() -> bool:
+	if not await prepare_cpp_attack(107,"shell"): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var token: int = cpp_core.passive_attack("shell_owner",owner)
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var params := {"source_id":owner,"angle":0.0,"speed":100.0,"radius":12.0,"range":100.0,"burst":90.0,"damage":8.0,"budget":token,"contents":PackedStringArray(["drifter","meteor","drifter"])}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_shell",params)
+	check(fired.ok,"発生元から収納内容を持つ圧縮弾を生成する")
+	if not fired.ok: cpp_session.free(); return false
+	var initial: Dictionary = cpp_core.hostiles_snapshot()[0]
+	cpp_core.step_hostiles(0.2)
+	var state: Array = cpp_core.hostiles_snapshot()
+	check(state[0].pos.distance_to(initial.pos+Vector2(20,0))<0.001 and state[0].contents.size()==3 and state[0].full==1.0,"圧縮弾が直進し収納順と満杯の値を保つ")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.shapes.size()==1 and frame.shapes[0].kind==ENUMS.RenderShapeKind.Shell and presentation.frame_view.apply_frame(frame),"収納物を持つ圧縮弾を通常画面で描く")
+	await get_tree().process_frame
+	var display: Node = presentation.frame_view._shell_displays.values()[0]
+	check(display._mesh.material.get_shader_parameter("contents_count")>=2.0,"収納物の種類を制作済みの圧縮弾shaderへ渡す")
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	cpp_core.advance_attack_budget(1.0)
+	check(cpp_core.attack_budget_snapshot().groups.size()==1,"発射元の退場後も圧縮弾の残留枠を保つ")
+	var held: Dictionary = cpp_bridge.checkpoint()
+	cpp_core.step_hostiles(1.0)
+	check(cpp_core.hostiles_snapshot().is_empty() and cpp_core.hazards_snapshot().size()==1,"距離を飛びきると一度だけ破裂へ移す")
+	var burst: Dictionary = cpp_core.hazards_snapshot()[0]
+	check(burst.pos.distance_to(state[0].pos+Vector2(100,0))<0.001 and burst.style==ENUMS.ZoneStyle.Pump and burst.token==token,"破裂位置・ポンプの見た目・予算を引き継ぐ")
+	cpp_bridge.command("dev_ship_motion",{"position":burst.pos,"velocity":Vector2.ZERO})
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp),"圧縮弾そのものは機体へ直接ダメージを与えない")
+	cpp_core.step_hazards(0.01)
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"破裂した円だけが機体へダメージを与える")
+	var events: Array = cpp_bridge.read_frame().value.events
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.source=="drifter" and e.payload.cause==&"blast"),"発射元の退場後も破裂の発生元と原因名を記録する")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view._zone_bursts.has(ENUMS.ZoneStyle.Pump),"破裂を独立したポンプの爆発として通常画面で描く")
+	await get_tree().process_frame
+	cpp_core.step_hostiles(0.05)
+	check(cpp_core.hazards_snapshot().size()==1,"消えた圧縮弾から二度目の破裂を作らない")
+	cpp_core.step_hazards(0.3)
+	cpp_core.advance_attack_budget(2.0)
+	check(cpp_core.hazards_snapshot().is_empty() and cpp_core.attack_budget_snapshot().groups.is_empty(),"破裂の終了で最後の残留枠を解放する")
+	check(cpp_bridge.restore(held.value).ok and cpp_core.hostiles_snapshot()==state,"収納内容・満杯値・口の位置・飛行状態を復元する")
+	cpp_bridge.restore(empty.value)
+	params.speed = 1000.0
+	params.range = 1000.0
+	cpp_bridge.command("dev_fire_shell",params)
+	var start: Vector2 = cpp_core.hostiles_snapshot()[0].pos
+	cpp_bridge.command("dev_ship_motion",{"position":start+Vector2(180,0),"velocity":Vector2.ZERO})
+	cpp_core.step_hostiles(0.3)
+	check(cpp_core.hostiles_snapshot().is_empty() and cpp_core.hazards_snapshot().size()==1 and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp),"機体への衝突でも直接傷つけず一度だけ破裂する")
+	cpp_bridge.restore(empty.value)
+	cpp_bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W05","levels":1})
+	cpp_bridge.command("dev_fire_shell",params)
+	cpp_bridge.command("dev_ship_motion",{"position":start+Vector2(180,0),"velocity":Vector2.ZERO})
+	cpp_core.step_hostiles(0.3)
+	check(cpp_core.hostiles_snapshot().is_empty() and cpp_core.hazards_snapshot().is_empty() and cpp_bridge.read_frame().value.events.any(func(e): return e.type==&"barrier_hit"),"バリアに消された圧縮弾は破裂しない")
+	cpp_bridge.restore(empty.value)
+	cpp_bridge.command("dev_fire_shell",params)
+	cpp_bridge.command("dev_clear_hostile",{})
+	check(cpp_core.hostiles_snapshot().is_empty() and cpp_core.hazards_snapshot().is_empty(),"一括消去では圧縮弾と収納情報だけを消す")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_bridge.release_checkpoint(empty.value)
 	cpp_session.free()
 	return true

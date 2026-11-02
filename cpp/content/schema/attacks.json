@@ -805,6 +805,71 @@
           "min": 1
         }
       ]
+    },
+    {
+      "name": "ShellDefinition",
+      "section": 80,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "ShellSource",
+      "section": 81,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "mouth_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "store_max",
+          "type": "u32",
+          "min": 1
+        }
+      ]
     }
   ],
   "enums": {
@@ -874,6 +939,10 @@
       {
         "name": "StarBolt",
         "value": "star_bolt"
+      },
+      {
+        "name": "Shell",
+        "value": "shell"
       }
     ],
     "FriendKind": [

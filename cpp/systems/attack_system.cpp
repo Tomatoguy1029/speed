@@ -135,7 +135,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     }
     case AttackPool::Hostile: {
         auto &value=state.hostiles[record.row];pos=value.pos;
-        if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hostiles.push_back(record.row);}break;
+        if (value.alive && same_handle(value.attack,handle)) {value.alive=false;value.shell={};state.free_hostiles.push_back(record.row);}break;
     }
     case AttackPool::Hazard: {
         auto &value=state.hazards[record.row];pos=value.pos;zone_definition=value.zone_definition;circle=std::holds_alternative<CircleHazard>(value.shape) && std::get<CircleHazard>(value.shape).kind!=CircleHazardKind::Blast;

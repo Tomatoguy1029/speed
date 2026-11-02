@@ -107,6 +107,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     }
     for (const auto &shot:state.hostiles) if (shot.alive) {
         if (shot.definition>content.hostile_definitions.size()) return false;
+        if (shot.kind==int64_t(HostileKind::Shell)) {
+            if (!shot.shell.definition || shot.shell.definition>content.shells.size() || !shot.pos.is_finite() || !shot.vel.is_finite() || !shot.shell.mouth.is_finite() || !std::isfinite(shot.shell.burst) || shot.shell.burst<0 || !std::isfinite(shot.shell.full) || shot.shell.full<0 || shot.shell.full>1 || !std::isfinite(shot.radius) || shot.radius<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0) return false;
+            for (auto definition:shot.shell.contents) if (!definition || definition>content.definitions.size()) return false;
+        } else if (shot.shell.definition) return false;
         if (shot.kind==int64_t(HostileKind::Slash)) {
             if (shot.slash.definition!=1 || content.slashes.empty() || (shot.slash.side!=1 && shot.slash.side!=-1) ||
                 !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.radius) || shot.radius<=0 ||

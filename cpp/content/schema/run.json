@@ -1303,14 +1303,8 @@
         "name": "Barrier",
         "value": "barrier"
       },
-      {
-        "name": "Corpse",
-        "value": "corpse"
-      },
-      {
-        "name": "TowShot",
-        "value": "towShot"
-      },
+      {"name": "Corpse", "value": "corpse"},
+      {"name": "TowShot", "value": "towShot"},
       {
         "name": "Interceptor",
         "value": "interceptor"
@@ -1739,14 +1733,8 @@
         "name": "LightArrow",
         "value": "light_arrow"
       },
-      {
-        "name": "FriendDebris",
-        "value": "friend_debris"
-      },
-      {
-        "name": "FriendHull",
-        "value": "friend_hull"
-      },
+      {"name": "FriendDebris", "value": "friend_debris"},
+      {"name": "FriendHull", "value": "friend_hull"},
       {
         "name": "Zone",
         "value": "zone"
@@ -1754,6 +1742,10 @@
       {
         "name": "Flood",
         "value": "flood"
+      },
+      {
+        "name": "Shell",
+        "value": "shell"
       }
     ]
   },

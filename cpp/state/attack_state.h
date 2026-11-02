@@ -9,6 +9,7 @@ namespace speed {
 struct FriendHullState {uint32_t definition=0,source_definition=0;int64_t source_id=-1;bool saw=false;};
 struct FriendDebrisState {uint32_t definition=0;DebrisStyle style=DebrisStyle::Plain;};
 struct DebrisDeathFixture {uint32_t count=0;double speed=0,damage=0;};
+struct ShellState {uint32_t definition=0;double burst=0,full=0;godot::Vector2 mouth;std::vector<uint32_t> contents;};
 struct LightArrowState {uint32_t definition=0;float length=0;};
 struct StarBoltState {uint32_t definition=0;};
 struct BoltState {uint32_t definition=0;};

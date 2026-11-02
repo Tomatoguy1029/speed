@@ -91,6 +91,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->ring_holds=records.RingHoldDefinition_rows;
     bundle->lumps=records.LumpDefinition_rows;
     bundle->friend_debris=records.FriendDebrisDefinition_rows;
+    bundle->shells=records.ShellDefinition_rows;bundle->shell_sources=records.ShellSource_rows;
+    for (size_t i=0;i<bundle->shells.size();++i) if (bundle->shells[i].id!=i+1) return {};
     bundle->light_lances=records.LightLanceDefinition_rows;
     for (size_t i=0;i<bundle->light_lances.size();++i) {const auto &d=bundle->light_lances[i];if (d.id!=i+1 || d.life<=0 || d.flight_time<=0) return {};}
     bundle->zones=records.ZoneDefinition_rows;bundle->floods=records.FloodDefinition_rows;

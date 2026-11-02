@@ -7,7 +7,8 @@ struct BlastParams {
     EnemyHandle source;
     BudgetToken budget;
     double radius=0,damage=0,duration=0,delay=0;
-    uint32_t contact=0;
+    uint32_t contact=0,source_definition=0;
+    int64_t source_id=0;
 };
 class BlastSystem {
 public:

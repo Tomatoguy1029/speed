@@ -173,6 +173,7 @@ struct RunState {
         speed::BoltState bolt;
         speed::StarBoltState star_bolt;
         speed::LightArrowState arrow;
+        speed::ShellState shell;
         uint32_t definition=0;
         bool alive = true;
         int64_t kind = 0;
