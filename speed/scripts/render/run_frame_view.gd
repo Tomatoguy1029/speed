@@ -16,6 +16,7 @@ var _pixel := 1.82
 var _shot_transforms: Dictionary = {}
 var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
+var _missile := PackedFloat32Array()
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
@@ -68,6 +69,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		var began := Time.get_ticks_usec() if perf.active else 0
 		preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
+		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		perf.since(&"view_draw.attacks",began)
 	_layer(9).add_child(_gunner_marks)
 	_effects = PixelPainter.new()
@@ -149,6 +151,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.beamer is PackedFloat32Array or row.beamer.size()%10!=0: return false
 			for value: float in row.beamer:
 				if not is_finite(value): return false
+		if row.has("missile"):
+			if not row.missile is PackedFloat32Array or row.missile.size()%5!=0: return false
+			for value: float in row.missile:
+				if not is_finite(value): return false
 		if row.has("gunner"):
 			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
 			for value: float in row.gunner:
@@ -190,20 +196,23 @@ func apply_frame(frame: Dictionary) -> bool:
 	for line in _lines: line.hide()
 	var previous_gunner := _gunner
 	var previous_beamer := _beamer
+	var previous_missile := _missile
 	_gunner = PackedFloat32Array()
 	_beamer = PackedFloat32Array()
+	_missile = PackedFloat32Array()
 	for row: Dictionary in frame.batches:
 		if row.has("gunner"): _gunner.append_array(row.gunner)
 		if row.has("beamer"): _beamer.append_array(row.beamer)
+		if row.has("missile"): _missile.append_array(row.missile)
 	# 描画命令はCanvasItemが保持する。変わらない予告は再構築しない。
-	if _gunner!=previous_gunner or _beamer!=previous_beamer: _gunner_marks.queue_redraw()
+	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile: _gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	var packed_bytes := 0
 	for row: Dictionary in rows:
 		if perf.active:
 			packed_bytes+=row.ids.size()*8+row.transforms.size()*4+row.colors.size()*16+row.flags.size()*4
-			for key in ["gunner","beamer","glows"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
+			for key in ["gunner","beamer","missile","glows"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
 			if row.has("biter"):
 				for key in row.biter: packed_bytes+=row.biter[key].size()*4
 		if visuals[row.visual_id].role==6:

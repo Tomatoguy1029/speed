@@ -56,6 +56,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->hounds=records.HoundDefinition_rows;
     bundle->gunners=records.GunnerDefinition_rows;
     bundle->beamers=records.BeamerDefinition_rows;
+    bundle->missile_enemies=records.MissileEnemyDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
     bundle->beams=records.BeamDefinition_rows;
@@ -132,7 +133,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -164,6 +165,13 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{beamer->accel,beamer->keep,beamer->telegraph,beamer->beam_time,beamer->beam_length,beamer->half_width,beamer->admission_duration}) if (!std::isfinite(float(value))) return {};
             definition.beamer_definition=uint32_t(beamer-bundle->beamers.begin()+1);definition.accel=beamer->accel;
         } else if (beamer!=bundle->beamers.end()) return {};
+        const auto missile=std::find_if(bundle->missile_enemies.begin(),bundle->missile_enemies.end(),[&](const auto &m){return m.id==row.id;});
+        if (row.kind==9) {
+            if (missile==bundle->missile_enemies.end() || missile->warn<=0 || row.fire_interval<=0) return {};
+            for (double value:{missile->accel,missile->keep,missile->warn,missile->missile_speed,missile->missile_turn,missile->damage,missile->slow,missile->admission_duration}) if (!std::isfinite(float(value))) return {};
+            if (std::none_of(bundle->hostile_definitions.begin(),bundle->hostile_definitions.end(),[](const auto &h){return h.kind==uint32_t(HostileKind::Missile);})) return {};
+            definition.missile_definition=uint32_t(missile-bundle->missile_enemies.begin()+1);definition.accel=missile->accel;
+        } else if (missile!=bundle->missile_enemies.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;

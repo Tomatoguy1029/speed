@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../behaviors/enemies/gunner.h"
+#include "../behaviors/enemies/missile.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
@@ -192,7 +193,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Beamer) {
+            if (def.kind==speed::EnemyDefinition::Kind::Missile) {
+                speed::MissileBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Beamer) {
                 speed::BeamerBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Gunner) {
                 speed::GunnerBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);

@@ -234,7 +234,7 @@
 | `splitter` | 分裂型 | 採用 | 実装済み | 追跡し、撃破時に経験値を落として分裂体へ分かれる | 無双期以外 | `data/enemies/splitter.tres` |
 | `splitling` | 分裂体 | 採用 | 実装済み | 小型の追跡敵 | 分裂型から生まれる、無双期の通常出現 | `data/enemies/splitling.tres` |
 | `gunner` | 射撃型 | 採用 | 実装済み | 距離を保って回り込み、予告のあと弾を撃つ | 圧力期以降（無双期を除く）、危険地帯 | `data/enemies/gunner.tres` |
-| `missile` | ミサイル艇 | 採用 | 実装済み | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `data/enemies/missile.tres` |
+| `missile` | ミサイル艇 | 採用 | 実装済み（C++の生成・行動・表示・復帰に対応） | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `data/enemies/missile.tres` |
 | `titan` | タイタン | 採用 | 実装済み | 大型の追跡敵。生成時に大きさが変わる | 無双期以外。同時に出る数に上限 | `data/enemies/titan.tres` |
 | `battleship` | 戦艦 | 採用 | 実装済み | 追跡し、予告のあと本体の正面へ扇状に弾を撃つ。背面が弱点 | 緊張期・脱出期 | `data/enemies/battleship.tres` |
 

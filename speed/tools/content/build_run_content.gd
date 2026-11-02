@@ -6,11 +6,11 @@ const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -64,6 +64,10 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			"duration":ProjectileSystem.ZONE_FLASH,"visual_key":7,
 			"hit":visual.get_node_or_null("Hit")!=null,"fade":visual.get_node_or_null("Fade")!=null}]
 		visual.free()
+	if definition.behavior==&"missile":
+		var missile: Dictionary = source.missile.duplicate()
+		missile.id = 1
+		data.MissileEnemyDefinition = [missile]
 	if definition.behavior==&"beamer":
 		var beamer: Dictionary = source.beamer.duplicate()
 		beamer.id = 1
@@ -213,6 +217,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
+		for missile: Dictionary in resolved.MissileEnemyDefinition:
+			missile.id = row.id
+			data.MissileEnemyDefinition.append(missile)
 		for beamer: Dictionary in resolved.BeamerDefinition:
 			beamer.id = row.id
 			data.BeamerDefinition.append(beamer)

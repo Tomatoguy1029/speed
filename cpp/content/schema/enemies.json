@@ -204,6 +204,59 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "MissileEnemyDefinition",
+      "section": 38,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "telegraph"
+        },
+        {
+          "name": "missile_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "missile_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}
