@@ -1,5 +1,6 @@
 ## Sessionが所有するC++ランの窓口。個別Systemの更新は公開しない。
 extends RefCounted
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 var perf := PerfLog.new()
 var _core: RefCounted
 var _busy := false
@@ -158,7 +159,7 @@ func query_route(points: PackedVector2Array, parameters := {}) -> Dictionary:
 func replace_definition(definition_id: String, replacement: PackedByteArray, edit_kind := "parameter") -> Dictionary:
 	var frame := read_frame()
 	if not frame.ok: return frame
-	var was_paused: bool = frame.value.ui.phase==RunState.Phase.PAUSED
+	var was_paused: bool = frame.value.ui.phase==Phase.Paused
 	if not was_paused:
 		var paused := command("pause",{"paused":true})
 		if not paused.ok: return paused
@@ -173,7 +174,7 @@ func replace_definition(definition_id: String, replacement: PackedByteArray, edi
 func replace_scenario(kind: String, params: Dictionary, replacement: PackedByteArray) -> Dictionary:
 	var frame := read_frame()
 	if not frame.ok: return frame
-	var paused: bool = frame.value.ui.phase==RunState.Phase.PAUSED
+	var paused: bool = frame.value.ui.phase==Phase.Paused
 	if not paused:
 		var stopped := command("pause",{"paused":true})
 		if not stopped.ok: return stopped

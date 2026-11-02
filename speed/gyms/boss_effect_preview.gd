@@ -1,5 +1,6 @@
 ## 戦闘エフェクト画面に本番描画を映し、装備または選択技を試遊する。
 extends VBoxContainer
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 const ROOT := "res://scenes/bosses/"
 const BOSS_PROGRAM := preload("res://tools/content/build_boss_program.gd")
@@ -539,7 +540,7 @@ func _toggle_play() -> void:
 func _process(_delta: float) -> void:
 	if not is_instance_valid(session) or not is_instance_valid(session.run): return
 	if _final_preview and session.playing and is_instance_valid(actor) \
-			and session.run.state.phase == RunState.Phase.PLAY \
+			and session.run.state.phase == Phase.Play \
 			and actor.final_strike_t >= session.run.cfg.time_up_charge_time:
 		# 実験場では終了判定が止まるため、試遊セッションだけ同じ着弾・敗北表示へ進める。
 		session.run._land_final_strike()

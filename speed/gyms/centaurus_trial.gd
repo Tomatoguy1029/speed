@@ -1,5 +1,6 @@
 ## ケンタウルス座を置いた試遊用の実験場。共有ステージ・セーブ・本番の強さを変更しない。
 extends "res://gyms/enemy_lab/enemy_lab.gd"
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 @export var trial_ship_position := Vector2(900, 0)
 @export_range(1.0, 20.0) var trial_attack_multiplier := 6.0
@@ -42,7 +43,7 @@ func _process(delta: float) -> void:
 	_repeat_technique()
 	if capture_path.is_empty() or _capturing: return
 	session.playing = true
-	if session.run.state.phase == RunState.Phase.PAUSED: session.run.command(&"resume")
+	if session.run.state.phase == Phase.Paused: session.run.command(&"resume")
 	_clock += delta
 	if _clock < capture_at: return
 	_capturing = true
@@ -84,7 +85,7 @@ func _repeat_technique() -> void:
 	if _repeat_id.is_empty() or not session.playing or session.run == null: return
 	var actor := session.run.bosses.actor as CentaurusBoss
 	if actor == null or not actor.body_alive() or actor.mode != &"idle" or actor.phase_pending: return
-	if session.run.state.phase != RunState.Phase.PLAY: return
+	if session.run.state.phase != Phase.Play: return
 	if _repeat_id in [&"leap", &"stomp"]:
 		var distance := 250.0 if _repeat_id == &"leap" else 200.0
 		session.pinned = actor.table.pos[actor.body] + Vector2.from_angle(actor.table.facing[actor.body]) * distance

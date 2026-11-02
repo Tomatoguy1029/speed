@@ -3,7 +3,6 @@ extends PanelContainer
 
 const PANEL := preload("res://scripts/dev/stage_enemy_panel.gd")
 static var saved_rect := Rect2()
-var run: RunSimulation
 var cpp_session: RunSession
 var content_edit: RefCounted
 var _display_epoch := -1
@@ -74,15 +73,12 @@ func _ensure_contents() -> void:
 		panel.definition_source = func(id): return content_edit.definitions[StringName(id)] if content_edit.definitions.has(StringName(id)) else PANEL.IO.definition(id)
 		panel.generate_saved = content_edit.generate_saved
 		panel.bind_run(content_edit.source,content_edit.config,content_edit.values)
-	else: panel.bind_run(run.state.stage, run.cfg, run.enemies.stage_tuning)
 	box.add_child(panel)
 	panel.tuning_changed.connect(func(values):
 		if cpp_session!=null:
 			var applied: Dictionary = content_edit.apply(values)
 			if not applied.ok: panel._status.text = applied.message
-		else: run.enemies.update_stage_tuning(values))
-	panel.saved.connect(func(stage):
-		if cpp_session==null: run.state.emit(&"enemy_tuning_saved", {"path": panel.stage_path, "values": stage.enemy_tuning.duplicate(true)}))
+)
 	panel.generated.connect(func(_stage):
 		if cpp_session!=null:
 			var notified: Dictionary = content_edit.notify_saved(panel.stage_path)

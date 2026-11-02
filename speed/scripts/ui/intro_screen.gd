@@ -1,6 +1,7 @@
 ## 導入の画面。場面の状態を表示し、操作は既存のセッション命令へ渡す。
 ## 尺と差し替え用の仮素材は data/visuals/intro_presentation.tres。
 extends Node
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 const SEQUENCE := preload("res://scripts/runtime/intro_sequence.gd")
 const Beat = SEQUENCE.Beat
@@ -19,7 +20,7 @@ var beat: int:
 var beat_time: float:
 	get: return sequence.beat_time
 var _paused: bool:
-	get: return run != null and run.state.phase == RunState.Phase.PAUSED
+	get: return run != null and run.state.phase == Phase.Paused
 
 var visual: Node2D
 var sky: Node2D

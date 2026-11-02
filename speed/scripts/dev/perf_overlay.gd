@@ -22,7 +22,6 @@ static var saved_mode := Mode.HIDDEN
 static var _saved_pos := Vector2(-1, -1)
 
 ## RunSession が木に入れる前に入れる
-var run: RunSimulation
 var bridge: RefCounted
 var _cpp_previous := {}
 var _cpp_window := {}
@@ -88,7 +87,6 @@ func _exit_tree() -> void:
 	saved_mode = mode
 	if _placed:
 		_saved_pos = position
-	_close_records()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"debug_perf"):
@@ -99,18 +97,9 @@ func _set_mode(m: Mode) -> void:
 	mode = m
 	visible = mode != Mode.HIDDEN
 	_graph.visible = mode == Mode.DETAIL
-	_view_label.visible = mode == Mode.DETAIL and view != null and bridge==null
+	_view_label.visible = false
 	_label.custom_minimum_size = Vector2(380.0 if mode == Mode.DETAIL else 0.0, 0.0)
-	if bridge!=null:
-		_cpp_previous = view.metrics_snapshot() if view!=null else bridge.read_metrics().value
-	elif mode == Mode.DETAIL:
-		_sim_rec = run.perf.open(&"overlay")
-		if view != null:
-			_view_rec = view.perf.open(&"overlay")
-			_rows_rec = view.perf_rows.open(&"overlay")
-		_clear_records()
-	else:
-		_close_records()
+	_cpp_previous = view.metrics_snapshot() if view!=null else bridge.read_metrics().value
 	_reset_window()
 	_acc = REFRESH
 	reset_size()
@@ -165,9 +154,6 @@ func _process(delta: float) -> void:
 		_cpp_window = preload("res://scripts/runtime/run_metrics.gd").window(current,_cpp_previous,_frame_n,int(_frame_sum*1000.0))
 		_cpp_previous = current
 	_label.text = _text()
-	if _view_label.visible:
-		_view_label.text = "\n".join(_view_lines())
-	_clear_records()
 	_reset_window()
 
 func _reset_window() -> void:
@@ -178,145 +164,7 @@ func _reset_window() -> void:
 	_steps_max = 0
 
 func _text() -> String:
-	if bridge!=null: return _cpp_text()
-	var lines: Array[String] = []
-	var avg := _frame_sum / maxi(1, _frame_n)
-	var fps := 1000.0 / maxf(avg, 0.001)
-	lines.append("FPS [b]%.0f[/b]   フレーム %.1fms（最大 %s）" % [fps, avg, _ms(_frame_max, 25.0)])
-	var steps_avg := float(_steps_sum) / maxi(1, _frame_n)
-	var steps_text := "%d" % _steps_max
-	if _steps_max > 2:
-		steps_text = "[color=#%s]%d[/color]" % [WARN.to_html(false), _steps_max]
-	lines.append("物理更新 %.1f回/フレーム（最大 %s）" % [steps_avg, steps_text])
-	var en := run.enemies
-	var pr := run.projectiles
-	var pk := run.pickups
-	lines.append("敵 %d  敵弾 %d  味方弾 %d" % [en.count(), pr.hostile_count(), pr.friend_count()])
-	lines.append("結晶 %d  部品 %d" % [pk.gem_slots.live, pk.coin_slots.live])
-	if mode == Mode.DETAIL:
-		lines.append(HEAD % "処理時間")
-		# 描画時間の計測（viewport_set_measure_render_time）は描画の完了を待ってフレームを引き延ばすので使わない。
-		# ゲーム処理と表示側のスクリプトの時間をフレーム時間から引いた残りを、描画エンジン・GPU・待ちの目安にする。
-		var total: Array = _sim_rec.get(&"play_total", [0, 0, 0])
-		var game_ms: float = total[0] / 1000.0 / maxi(1, _frame_n)
-		var view_ms := _view_total_ms()
-		var events: Array = _sim_rec.get(&"events_out", [0, 0, 0])
-		var events_ms: float = events[0] / 1000.0 / maxi(1, _frame_n)
-		lines.append("ゲーム処理 %.2f  出来事の受け渡し %.2f  表示側 %.2f（ms/フレーム）" % [game_ms, events_ms, view_ms])
-		lines.append("残り（描画エンジン・GPU・待ち）%.2fms" % maxf(0.0, avg - game_ms - events_ms - view_ms))
-		lines.append("ゲーム更新 1回 平均 %.2fms 最大 %.2fms" % [total[0] / 1000.0 / maxi(1, total[1]), total[2] / 1000.0])
-		lines.append_array(_manager_lines())
-		lines.append(HEAD % "描画")
-		lines.append("描画命令 %d  オブジェクト %d  頂点・図形 %d" % [
-			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
-			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
-			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)])
-		var compiles := int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS)
-			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_MESH)
-			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE)
-			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)
-			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION))
-		var added := compiles - _compiles_prev if _compiles_prev >= 0 else 0
-		_compiles_prev = compiles
-		var added_text := "[color=#%s]+%d[/color]" % [WARN.to_html(false), added] if added > 0 else "+0"
-		lines.append("シェーダーのコンパイル 累計 %d（直近 %s）" % [compiles, added_text])
-		lines.append(HEAD % "メモリ")
-		lines.append("RAM %s  VRAM %s" % [_mb(Performance.get_monitor(Performance.MEMORY_STATIC)),
-			_mb(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED))])
-		lines.append("オブジェクト %d  ノード %d  つながっていないノード %d" % [
-			Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
-			Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)])
-		lines.append(HEAD % "表の行（使用中 / 空きを含む行数）")
-		lines.append("敵 %d/%d  敵弾 %d/%d  味方弾 %d/%d" % [en.count(), en.slots.capacity(),
-			pr.hostile_count(), pr.hostile_slots.capacity(), pr.friend_count(), pr.friend_slots.capacity()])
-		lines.append("結晶 %d/%d  部品 %d/%d" % [pk.gem_slots.live, pk.gem_slots.capacity(),
-			pk.coin_slots.live, pk.coin_slots.capacity()])
-		lines.append(HEAD % ("フレーム時間（直近 %d フレーム、線は 16.7ms と 33.3ms）" % GRAPH_FRAMES))
-	return "\n".join(lines)
-
-## 世界側の各処理の、1回あたりの平均と最大（多い順に8件）。内訳の項目は右の列に出す。
-func _manager_lines() -> Array[String]:
-	var out: Array[String] = []
-	if mode != Mode.DETAIL:
-		return out
-	var rows: Array = []
-	for key in _sim_rec:
-		var rec: Array = _sim_rec[key]
-		if key != &"play_total" and key != &"events_out" and not String(key).contains(".") and rec[1] > 0:
-			rows.append([String(key), rec[0] / 1000.0 / rec[1], rec[2] / 1000.0])
-	rows.sort_custom(func(a, b): return a[1] > b[1])
-	out.append("処理ごと（世界側の更新1回あたり 平均 / 最大）")
-	for r in rows.slice(0, 8):
-		out.append("  %-12s %.3f / %.3fms" % [r[0], r[1], r[2]])
-	return out
-
-## 表示側（RunPresentation の _process と各層の描く処理）の、1フレームあたりの合計（ms）。内訳の項目と、
-## 出来事の受け渡し（events_out）に含まれる出来事の処理（events）は数えない。
-func _view_total_ms() -> float:
-	if view == null or mode != Mode.DETAIL:
-		return 0.0
-	var us := 0
-	for key in _view_rec:
-		if not String(key).contains(".") and key != &"events":
-			us += _view_rec[key][0]
-	return us / 1000.0 / maxi(1, _frame_n)
-
-## 右の列：表示側の各処理の、1フレームあたりの平均と1回の最大（多い順。内訳は親の項目の下に1行でまとめる）と、
-## ゲーム側の内訳（敵の行動・武器・弾の種類ごと）の1フレームあたりの時間。
-func _view_lines() -> Array[String]:
-	var out: Array[String] = []
-	if view == null or mode != Mode.DETAIL:
-		return out
-	var frames := maxi(1, _frame_n)
-	var rows: Array = []
-	for key in _view_rec:
-		var rec: Array = _view_rec[key]
-		rows.append([String(key), rec[0] / 1000.0 / frames, rec[2] / 1000.0])
-	rows.sort_custom(func(a, b): return a[1] > b[1])
-	out.append(HEAD % "表示側（1フレームあたり 平均 / 1回の最大）")
-	for r in rows:
-		if r[0].contains("."):
-			continue
-		out.append("%-20s %.3f / %.3fms" % r)
-		var parts: Array[String] = []
-		for s in rows:
-			if s[0].begins_with(r[0] + "."):
-				parts.append("%s %.3f" % [s[0].get_slice(".", 1), s[1]])
-		if not parts.is_empty():
-			out.append("  └ " + "  ".join(parts))
-	var counts: Dictionary = _rows_rec
-	if counts.has(&"rows"):
-		var avg := func(key: StringName) -> String:
-			var rec: Array = counts.get(key, [0, 1, 0])
-			return "%.0f" % (float(rec[0]) / maxi(1, rec[1]))
-		out.append(HEAD % "敵の描画1回あたりの行（平均）")
-		out.append("見た行 %s  生存 %s" % [avg.call(&"rows"), avg.call(&"live")])
-		out.append("一括 %s  個別 %s  飾り %s" % [avg.call(&"batched"), avg.call(&"self_drawn"), avg.call(&"marked")])
-	var parts: Array = []
-	for key in _sim_rec:
-		if String(key).contains("."):
-			parts.append([String(key), _sim_rec[key][0] / 1000.0 / frames])
-	parts.sort_custom(func(a, b): return a[1] > b[1])
-	if not parts.is_empty():
-		out.append(HEAD % "ゲーム側の内訳（1フレームあたり、多い順に10件）")
-		for r in parts.slice(0, 10):
-			out.append("%-28s %.3fms" % r)
-	return out
-
-func _clear_records() -> void:
-	_sim_rec.clear()
-	_view_rec.clear()
-	_rows_rec.clear()
-
-func _close_records() -> void:
-	if run != null:
-		run.perf.close(&"overlay")
-	if is_instance_valid(view):
-		view.perf.close(&"overlay")
-		view.perf_rows.close(&"overlay")
-	_sim_rec = {}
-	_view_rec = {}
-	_rows_rec = {}
+	return _cpp_text()
 
 func _new_label() -> RichTextLabel:
 	var label := RichTextLabel.new()

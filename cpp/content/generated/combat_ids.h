@@ -508,6 +508,131 @@ inline bool parse_symbol(std::string_view value, RenderShapeKind &out) {
     if (value=="shell") {out=RenderShapeKind::Shell;return true;}
     return false;
 }
+enum class Phase : uint32_t {Play=0,Levelup=1,Paused=2,Dying=3,Finishing=4,Ended=5,Count};
+inline const char *symbol_name(Phase value) {
+    switch(value) {
+    case Phase::Play: return "play";
+    case Phase::Levelup: return "levelup";
+    case Phase::Paused: return "paused";
+    case Phase::Dying: return "dying";
+    case Phase::Finishing: return "finishing";
+    case Phase::Ended: return "ended";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, Phase &out) {
+    if (value=="play") {out=Phase::Play;return true;}
+    if (value=="levelup") {out=Phase::Levelup;return true;}
+    if (value=="paused") {out=Phase::Paused;return true;}
+    if (value=="dying") {out=Phase::Dying;return true;}
+    if (value=="finishing") {out=Phase::Finishing;return true;}
+    if (value=="ended") {out=Phase::Ended;return true;}
+    return false;
+}
+enum class HazardKind : uint32_t {Beam=0,Zone=1,Wave=2,Wall=3,Count};
+inline const char *symbol_name(HazardKind value) {
+    switch(value) {
+    case HazardKind::Beam: return "beam";
+    case HazardKind::Zone: return "zone";
+    case HazardKind::Wave: return "wave";
+    case HazardKind::Wall: return "wall";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, HazardKind &out) {
+    if (value=="beam") {out=HazardKind::Beam;return true;}
+    if (value=="zone") {out=HazardKind::Zone;return true;}
+    if (value=="wave") {out=HazardKind::Wave;return true;}
+    if (value=="wall") {out=HazardKind::Wall;return true;}
+    return false;
+}
+enum class GemKind : uint32_t {Low=0,Mid=1,High=2,Count};
+inline const char *symbol_name(GemKind value) {
+    switch(value) {
+    case GemKind::Low: return "low";
+    case GemKind::Mid: return "mid";
+    case GemKind::High: return "high";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, GemKind &out) {
+    if (value=="low") {out=GemKind::Low;return true;}
+    if (value=="mid") {out=GemKind::Mid;return true;}
+    if (value=="high") {out=GemKind::High;return true;}
+    return false;
+}
+enum class PickupKind : uint32_t {Heal=0,Magnet=1,CometWeapon=2,Count};
+inline const char *symbol_name(PickupKind value) {
+    switch(value) {
+    case PickupKind::Heal: return "heal";
+    case PickupKind::Magnet: return "magnet";
+    case PickupKind::CometWeapon: return "comet_weapon";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, PickupKind &out) {
+    if (value=="heal") {out=PickupKind::Heal;return true;}
+    if (value=="magnet") {out=PickupKind::Magnet;return true;}
+    if (value=="comet_weapon") {out=PickupKind::CometWeapon;return true;}
+    return false;
+}
+enum class EnemyGate : uint32_t {None=0,Back=1,Membrane=2,Claw=3,Guard=4,Solid=5,Ghost=6,Immortal=7,Count};
+inline const char *symbol_name(EnemyGate value) {
+    switch(value) {
+    case EnemyGate::None: return "none";
+    case EnemyGate::Back: return "back";
+    case EnemyGate::Membrane: return "membrane";
+    case EnemyGate::Claw: return "claw";
+    case EnemyGate::Guard: return "guard";
+    case EnemyGate::Solid: return "solid";
+    case EnemyGate::Ghost: return "ghost";
+    case EnemyGate::Immortal: return "immortal";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, EnemyGate &out) {
+    if (value=="none") {out=EnemyGate::None;return true;}
+    if (value=="back") {out=EnemyGate::Back;return true;}
+    if (value=="membrane") {out=EnemyGate::Membrane;return true;}
+    if (value=="claw") {out=EnemyGate::Claw;return true;}
+    if (value=="guard") {out=EnemyGate::Guard;return true;}
+    if (value=="solid") {out=EnemyGate::Solid;return true;}
+    if (value=="ghost") {out=EnemyGate::Ghost;return true;}
+    if (value=="immortal") {out=EnemyGate::Immortal;return true;}
+    return false;
+}
+enum class EnemyGateResult : uint32_t {Allow=0,Pass=1,Bounce=2,Count};
+inline const char *symbol_name(EnemyGateResult value) {
+    switch(value) {
+    case EnemyGateResult::Allow: return "allow";
+    case EnemyGateResult::Pass: return "pass";
+    case EnemyGateResult::Bounce: return "bounce";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, EnemyGateResult &out) {
+    if (value=="allow") {out=EnemyGateResult::Allow;return true;}
+    if (value=="pass") {out=EnemyGateResult::Pass;return true;}
+    if (value=="bounce") {out=EnemyGateResult::Bounce;return true;}
+    return false;
+}
+enum class EnemyModeId : uint32_t {Move=0,Windup=1,Dash=2,Recover=3,Count};
+inline const char *symbol_name(EnemyModeId value) {
+    switch(value) {
+    case EnemyModeId::Move: return "move";
+    case EnemyModeId::Windup: return "windup";
+    case EnemyModeId::Dash: return "dash";
+    case EnemyModeId::Recover: return "recover";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, EnemyModeId &out) {
+    if (value=="move") {out=EnemyModeId::Move;return true;}
+    if (value=="windup") {out=EnemyModeId::Windup;return true;}
+    if (value=="dash") {out=EnemyModeId::Dash;return true;}
+    if (value=="recover") {out=EnemyModeId::Recover;return true;}
+    return false;
+}
 enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,TaperedBeam=7,Count};
 inline const char *symbol_name(ContactShapeKind value) {
     switch(value) {

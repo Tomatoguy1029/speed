@@ -2200,6 +2200,144 @@
         "name": "Shell",
         "value": "shell"
       }
+    ],
+    "Phase": [
+      {
+        "name": "Play",
+        "value": "play"
+      },
+      {
+        "name": "Levelup",
+        "value": "levelup"
+      },
+      {
+        "name": "Paused",
+        "value": "paused"
+      },
+      {
+        "name": "Dying",
+        "value": "dying"
+      },
+      {
+        "name": "Finishing",
+        "value": "finishing"
+      },
+      {
+        "name": "Ended",
+        "value": "ended"
+      }
+    ],
+    "HazardKind": [
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "Zone",
+        "value": "zone"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "Wall",
+        "value": "wall"
+      }
+    ],
+    "GemKind": [
+      {
+        "name": "Low",
+        "value": "low"
+      },
+      {
+        "name": "Mid",
+        "value": "mid"
+      },
+      {
+        "name": "High",
+        "value": "high"
+      }
+    ],
+    "PickupKind": [
+      {
+        "name": "Heal",
+        "value": "heal"
+      },
+      {
+        "name": "Magnet",
+        "value": "magnet"
+      },
+      {
+        "name": "CometWeapon",
+        "value": "comet_weapon"
+      }
+    ],
+    "EnemyGate": [
+      {
+        "name": "None",
+        "value": "none"
+      },
+      {
+        "name": "Back",
+        "value": "back"
+      },
+      {
+        "name": "Membrane",
+        "value": "membrane"
+      },
+      {
+        "name": "Claw",
+        "value": "claw"
+      },
+      {
+        "name": "Guard",
+        "value": "guard"
+      },
+      {
+        "name": "Solid",
+        "value": "solid"
+      },
+      {
+        "name": "Ghost",
+        "value": "ghost"
+      },
+      {
+        "name": "Immortal",
+        "value": "immortal"
+      }
+    ],
+    "EnemyGateResult": [
+      {
+        "name": "Allow",
+        "value": "allow"
+      },
+      {
+        "name": "Pass",
+        "value": "pass"
+      },
+      {
+        "name": "Bounce",
+        "value": "bounce"
+      }
+    ],
+    "EnemyModeId": [
+      {
+        "name": "Move",
+        "value": "move"
+      },
+      {
+        "name": "Windup",
+        "value": "windup"
+      },
+      {
+        "name": "Dash",
+        "value": "dash"
+      },
+      {
+        "name": "Recover",
+        "value": "recover"
+      }
     ]
   },
   "event_fields": {

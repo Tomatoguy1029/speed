@@ -55,7 +55,6 @@ func command(id: int, name: StringName, args := {}) -> void:
 	var s: RunSession = _sessions.get(id)
 	if s != null:
 		if s.bridge != null: s.bridge.command(String(name),args)
-		else: s.sim.command(name, args)
 
 ## RunSession が木から出るときに呼ぶ。
 func unregister(s: RunSession) -> void:
@@ -65,8 +64,6 @@ func unregister(s: RunSession) -> void:
 		current_id = -1
 
 func _register(s: RunSession, options: Dictionary) -> RunSession:
-	s.runtime_kind = options.get("runtime","gdscript")
-	if options.get("runtime","")!="cpp": s.prepare_legacy(options)
 	s.id = _next_id
 	_next_id += 1
 	_sessions[s.id] = s

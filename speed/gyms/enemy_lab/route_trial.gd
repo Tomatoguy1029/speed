@@ -1,5 +1,6 @@
 ## 編集元から再構築した隔離ランで本番の描画・突進判定を実行する。
 extends Node
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 signal progress(value: float)
 const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 var cancelled := false
@@ -33,7 +34,7 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 	for n in clampi(start_offset, 0, roundi(60.0 / worker.DT)):
 		worker.step()
 	var run = worker.run
-	if run.state.tracing or run.state.phase != RunState.Phase.PLAY:
+	if run.state.tracing or run.state.phase != Phase.Play:
 		return await _finish({"status": "invalid", "reason": tr("lab.trace_in_progress")})
 	if run.state.gauge_amount() < run.cfg.draw_min_charge:
 		return await _finish({"status": "invalid", "reason": tr("lab.low_charge")})

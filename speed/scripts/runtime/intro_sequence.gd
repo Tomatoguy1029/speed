@@ -1,5 +1,6 @@
 ## 導入の場面進行と表示。練習のラン状態・固定更新はC++Sessionが所有する。
 extends RefCounted
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 enum Beat { FOCUS, DEVOUR, DEPART, FLIGHT, TRANSFORM, HANDOFF, PRACTICE, RESTORE, OMEN, MOTIVE }
 signal beat_changed(beat: Beat)
@@ -102,7 +103,7 @@ func _refresh() -> bool:
 	return true
 
 func advance(delta: float) -> void:
-	if run==null or _disposed or run.state.phase==RunState.Phase.PAUSED: return
+	if run==null or _disposed or run.state.phase==Phase.Paused: return
 	beat_time += delta
 	match beat:
 		Beat.FOCUS:

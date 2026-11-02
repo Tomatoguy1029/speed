@@ -1,5 +1,6 @@
 ## Hydra を置いた試遊用の実験場。共有ステージ・セーブ・本番の強さを変更しない。
 extends "res://gyms/enemy_lab/enemy_lab.gd"
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 @export var trial_ship_position := Vector2(400, 0)
 @export_range(1.0, 20.0) var trial_attack_multiplier := 6.0
@@ -73,7 +74,7 @@ func _process(delta: float)->void:
 	super._process(delta)
 	if capture_path!="" or reviewing:
 		session.playing=true
-		if session.run.state.phase==RunState.Phase.PAUSED:session.run.command(&"resume")
+		if session.run.state.phase==Phase.Paused:session.run.command(&"resume")
 		inspect_clock+=delta
 	if reviewing:
 		if not is_instance_valid(review_owner) or not review_owner.has_body():
