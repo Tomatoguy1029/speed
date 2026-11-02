@@ -290,6 +290,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_fire_light_arrow") response=development_light_arrow_command(payload);
     else if (kind=="dev_fire_star_bolt") response=development_star_bolt_command(payload);
     else if (kind=="dev_fire_ring_hold") response=development_ring_hold_command(payload);
+    else if (kind=="dev_fire_lump") response=development_lump_command(payload);
     else if (kind=="dev_fire_bolt") response=development_bolt_command(payload);
     else if (kind=="dev_fire_slash") response=development_slash_command(payload);
     else if (kind=="dev_fire_wall" || kind=="dev_move_wall") response=development_wall_command(kind,payload);

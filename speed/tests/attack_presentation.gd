@@ -2,6 +2,7 @@
 extends Node
 
 var failed := 0
+var lump_notification_only := false
 var arrow_fixes := false
 var mute_checks := false
 
@@ -21,6 +22,14 @@ func _ready() -> void:
 
 
 
+
+	if "--cpp-lump" in OS.get_cmdline_user_args() or "--cpp-lump-shoot-fix" in OS.get_cmdline_user_args():
+		lump_notification_only = "--cpp-lump-shoot-fix" in OS.get_cmdline_user_args()
+		mute_checks = lump_notification_only
+		await check_cpp_lump()
+		print("[cpp_lump] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-ring-hold" in OS.get_cmdline_user_args():
 		await check_cpp_ring_hold()
 		print("[cpp_ring_hold] failed=%d" % failed)
@@ -265,6 +274,62 @@ func check_cpp_ring_hold() -> void:
 	cpp_bridge.restore(empty.value)
 	params.wait = -1.0
 	check(not cpp_bridge.command("dev_fire_ring_hold",params).ok and cpp_core.hostiles_snapshot().is_empty(),"不正な待機時間は弾を追加せず拒否する")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_bridge.release_checkpoint(empty.value)
+	cpp_session.free()
+
+func check_cpp_lump() -> void:
+	if not await prepare_cpp_attack(93,"lump"): return
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var source: Dictionary = cpp_core.enemies_snapshot()[0]
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var params := {"source_id":owner,"angle":PI*0.5,"speed":100.0,"radius":18.0,"damage":10.0}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_lump",params)
+	check(fired.ok,"発生元から指定半径の塊の弾を生成する")
+	if not fired.ok: cpp_session.free(); return
+	var shot: Dictionary = cpp_core.hostiles_snapshot()[0]
+	var expected: Vector2 = cpp_origin+Vector2.from_angle(PI*0.5)*(float(source.radius)+18.0)
+	check(shot.pos.distance_to(expected)<0.001 and is_equal_approx(shot.life,4.0),"敵の位置と半径に弾半径を足した位置から寿命4秒で発射する")
+	var events: Array = cpp_bridge.latest_frame().value.events
+	if lump_notification_only: mute_checks = false
+	check(events.any(func(e): return e.type==&"shoot" and e.payload.kind==&"lump" and e.payload.pos==cpp_origin),"敵の中心からlumpの発射通知を出す")
+	if lump_notification_only:
+		cpp_bridge.release_checkpoint(empty.value)
+		cpp_session.free()
+		return
+	cpp_core.step_hostiles(0.1)
+	var state: Array = cpp_core.hostiles_snapshot()
+	check(state[0].pos.distance_to(expected+Vector2(0,10))<0.001 and is_equal_approx(state[0].life,3.9),"塊の弾が直進し寿命を減らす")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1600,-500,1400,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.apply_frame(frame),"塊の弾を通常画面へ渡す")
+	var bullets: Array = frame.batches.filter(func(b): return presentation.frame_view.visuals[b.visual_id].role==11)
+	check(bullets.size()==1 and is_equal_approx(bullets[0].transforms[0],18.0),"指定した弾の半径で通常弾を描く")
+	await get_tree().process_frame
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	var held: Dictionary = cpp_bridge.checkpoint()
+	check(held.ok and cpp_core.attack_snapshot()[0].source_id==owner,"発射元退場後も塊の弾を元のIDで保持する")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(0,150),"velocity":Vector2.ZERO})
+	cpp_core.step_hostiles(1.0)
+	check(cpp_core.hostiles_snapshot().is_empty() and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-10.0),"塊の弾が共通被弾へ通って消える")
+	cpp_bridge.restore(held.value)
+	check(cpp_core.hostiles_snapshot()==state,"塊の弾の位置・速度・寿命を保持点から復元する")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(300,0),"velocity":Vector2.ZERO})
+	cpp_core.step_hostiles(4.0)
+	check(cpp_core.hostiles_snapshot().is_empty(),"塊の弾が寿命で消える")
+	cpp_bridge.restore(empty.value)
+	var terrain_source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-300,0)}).value
+	params.source_id = terrain_source
+	params.angle = 0.0
+	params.speed = 1000.0
+	check(cpp_bridge.command("dev_fire_lump",params).ok,"天体へ向かう塊の弾を生成する")
+	cpp_core.step_hostiles(0.5)
+	check(cpp_core.hostiles_snapshot().is_empty(),"塊の弾は天体に当たって消える")
+	cpp_bridge.restore(empty.value)
+	params.source_id = owner
+	params.radius = -1.0
+	check(not cpp_bridge.command("dev_fire_lump",params).ok and cpp_core.hostiles_snapshot().is_empty(),"負の半径の塊の弾を追加せず拒否する")
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_bridge.release_checkpoint(empty.value)
 	cpp_session.free()

@@ -37,6 +37,7 @@ struct ContentBundle {
     std::vector<SlashDefinition> slashes;
     std::vector<BoltDefinition> bolts;
     std::vector<RingHoldDefinition> ring_holds;
+    std::vector<LumpDefinition> lumps;
     std::vector<StarBoltDefinition> star_bolts;
     std::vector<LightArrowDefinition> light_arrows;
     std::vector<FriendShotDefinition> friend_shots;

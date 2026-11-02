@@ -471,6 +471,28 @@
           "ref": "HostileDefinition"
         }
       ]
+    },
+    {
+      "name": "LumpDefinition",
+      "section": 44,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "min": 1,
+          "ref": "HostileDefinition"
+        }
+      ]
     }
   ],
   "enums": {
