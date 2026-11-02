@@ -1,0 +1,89 @@
+name: C++配布確認
+
+on:
+  push:
+    branches: [codex/native-runtime-optimization]
+    paths: [.github/workflows/cpp-runtime.yml]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: '確認する作業ブランチまたは完全コミット'
+        required: true
+        type: string
+
+env:
+  PYTHONUTF8: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: '${{ matrix.platform }} の固定依存ビルド・配布'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: macos
+          - os: windows-2022
+            platform: windows
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: 文書を確認
+        run: python tools/check_docs.py
+      - name: 固定SDK・SCons・Godot・export templateを準備
+        env:
+          SPEED_PLATFORM: ${{ matrix.platform }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, shutil, subprocess, sys, urllib.request, zipfile
+          lock = json.loads(pathlib.Path('cpp/dependencies.json').read_text())
+          temporary = pathlib.Path(os.environ['RUNNER_TEMP'])
+          sdk = temporary / 'godot-cpp'
+          subprocess.run(['git', 'init', str(sdk)], check=True)
+          subprocess.run(['git', '-C', str(sdk), 'remote', 'add', 'origin', lock['godot_cpp']['url']], check=True)
+          subprocess.run(['git', '-C', str(sdk), 'fetch', '--depth=1', 'origin', lock['godot_cpp']['commit']], check=True)
+          subprocess.run(['git', '-C', str(sdk), 'checkout', '--detach', 'FETCH_HEAD'], check=True)
+          subprocess.run([sys.executable, '-m', 'pip', 'install', 'scons==' + lock['scons']], check=True)
+          version = lock['engine']
+          base = f'https://github.com/godotengine/godot/releases/download/{version}-stable/'
+          suffix = 'macos.universal.zip' if os.environ['SPEED_PLATFORM'] == 'macos' else 'win64.exe.zip'
+          engine_name = f'Godot_v{version}-stable_{suffix}'
+          template_name = f'Godot_v{version}-stable_export_templates.tpz'
+          for name in [engine_name, template_name]:
+              archive = temporary / name
+              urllib.request.urlretrieve(base + name, archive)
+              with zipfile.ZipFile(archive) as package:
+                  package.extractall(temporary / 'godot')
+          directory = temporary / 'godot'
+          templates = directory / lock['export_templates']
+          shutil.move(directory / 'templates', templates)
+          if os.environ['SPEED_PLATFORM'] == 'macos':
+              engine = directory / 'Godot.app/Contents/MacOS/Godot'
+              engine.chmod(engine.stat().st_mode | 0o111)
+          else:
+              engine = directory / f'Godot_v{version}-stable_win64_console.exe'
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'SPEED_GODOT={engine}\nSPEED_TEMPLATES={templates}\n')
+          PY
+      - name: 対象CPUをビルド・共通生成・export・配布エンジンで最小ランを確認
+        run: |
+          python tools/build/build_run.py --sdk "$RUNNER_TEMP/godot-cpp" \
+            --platform '${{ matrix.platform }}' --godot "$SPEED_GODOT" --templates "$SPEED_TEMPLATES" \
+            --build-dir "$RUNNER_TEMP/run-objects" --package-dir "$RUNNER_TEMP/speed-package" --verify
+      - name: 配布物と確認ログを保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'speed-${{ matrix.platform }}-${{ github.run_id }}'
+          path: |
+            ${{ runner.temp }}/speed-package/export/
+            ${{ runner.temp }}/speed-package/*.log
+          if-no-files-found: warn
