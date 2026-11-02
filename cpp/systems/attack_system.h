@@ -10,6 +10,10 @@ public:
     static bool has_attached(const godot::RunState &,EnemyHandle);
     static void record_ship_position(godot::RunState &,AttackHandle);
     static bool configure_contact(const ContentBundle &,uint32_t definition,AttackSpec &);
+    static bool reserve_friendly(godot::RunState &,uint64_t count);
+    static bool release_friendly(godot::RunState &,uint64_t count);
+    static uint64_t flying_count(const godot::RunState &);
+    static AttackHandle emit_friendly(RunRuntime &,godot::RunState::Friendly,AttackSpec);
     static AttackHandle emit_friendly(godot::RunState &,godot::RunState::Friendly,AttackSpec);
     static AttackHandle emit_hostile(godot::RunState &,godot::RunState::Hostile,AttackSpec);
     static AttackHandle emit_hazard(godot::RunState &,godot::RunState::Hazard,AttackSpec);

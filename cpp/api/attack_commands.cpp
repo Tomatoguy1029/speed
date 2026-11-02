@@ -61,7 +61,7 @@ Dictionary SpeedRunCore::development_attack_command(const String &kind,const Dic
         if (d.has("cause") && (d["cause"].get_type()!=Variant::STRING || !speed::parse_symbol(String(d["cause"]).utf8().get_data(),cause))) return response(false);
         speed::AttackHandle emitted;const Vector2 pos=d["position"];
         switch(int64_t(d["pool"])) {
-        case 0: {Friendly shot;shot.pos=pos;shot.vel=velocity;shot.life=life;shot.radius=radius;shot.damage=damage;spec.cause=cause==speed::Cause::None?speed::Cause::Shot:cause;emitted=speed::AttackSystem::emit_friendly(state,shot,spec);break;}
+        case 0: {Friendly shot;shot.pos=pos;shot.vel=velocity;shot.life=life;shot.radius=radius;shot.damage=damage;spec.cause=cause==speed::Cause::None?speed::Cause::Shot:cause;emitted=speed::AttackSystem::emit_friendly(runtime,shot,spec);break;}
         case 1: {Hostile shot;shot.pos=pos;shot.vel=velocity;shot.speed=velocity.length();shot.life=life;shot.radius=radius;shot.damage=damage;spec.cause=cause==speed::Cause::None?speed::Cause::Bullet:cause;emitted=speed::AttackSystem::emit_hostile(state,shot,spec);break;}
         case 2: {if (!state.bite_zone_config.ready) return response(false);BiteZone zone;zone.pos=pos;zone.shape=speed::CircleHazard{float(radius)};zone.delay=delay;zone.duration=life;zone.damage=damage;spec.cause=cause==speed::Cause::None?speed::Cause::Blast:cause;emitted=speed::AttackSystem::emit_hazard(state,zone,spec);break;}
         }

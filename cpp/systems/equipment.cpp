@@ -7,8 +7,12 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
     run.state.loadout.full_charge_maximum=1;
     bool rampage_owned=false;
+    run.state.loadout.duplicator={};
     effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0,attack_bonus=0,pickup_bonus=0,length_bonus=0,glide_bonus=0;
     for (const auto &owned:run.state.loadout.traits) {
+        for (const auto &level:run.content->duplicator_levels) if (level.equipment==owned.definition && level.level==owned.level) {
+            auto &d=run.state.loadout.duplicator;d.ready=true;d.chance=level.chance;d.damage=level.damage;d.maximum=level.maximum;d.angle_min=level.angle_min;d.angle_max=level.angle_max;
+        }
         for (const auto &level:run.content->rampage_levels) if (level.equipment==owned.definition && level.level==owned.level) {
             auto &rampage=run.state.loadout.rampage;rampage.ready=true;rampage.bonus=level.bonus;rampage.target_kills=level.kills;rampage.half_life=level.half_life;rampage_owned=true;
         }
@@ -81,6 +85,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             scatter.base_interval=scatter.interval=level.interval;scatter.definition=id;scatter.shots=level.shots;
             scatter.damage=level.damage;scatter.life=level.life;scatter.spread=level.spread;scatter.knock=level.knock;scatter.ready=true;
         } else return false;
+    } else if (d.external_id=="T37") {
+        if (std::none_of(run.content->duplicator_levels.begin(),run.content->duplicator_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
     } else if (d.external_id=="T33") {
         if (std::none_of(run.content->rampage_levels.begin(),run.content->rampage_levels.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
     } else if (d.external_id=="T04") {

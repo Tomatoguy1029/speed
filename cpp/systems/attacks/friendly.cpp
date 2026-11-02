@@ -53,13 +53,14 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
             if (life<=0 || enemy.dead || !runtime.state.enemy_handles.contains(target) || shot.hit_ids.count(runtime.state.enemy_handles.entity_id(target))) continue;
             const Vector2 impact = from.lerp(to, hit.time);
             DamageRequest request;request.struck=struck;request.amount=shot.damage;request.direction=speed>0?vel/speed:Vector2();request.knock=shot.knock;
-            request.impact=impact;request.has_impact=true;request.no_crit=shot.no_crit;request.shatter_depth=shot.debris.shatter_depth;
+            request.impact=impact;request.has_impact=true;request.no_crit=shot.no_crit;request.shatter_depth=shot.shatter_depth;
             if (const auto *record=get(runtime.state,processing_handle)) {request.cause=record->spec.cause;request.weapon_id=record->spec.weapon;}else break;
             if (shot.kind==int64_t(FriendKind::Shot) && !CombatResolver::allows_hit(runtime,struck,request)) {
                 speed::ReflectedSystem::reflect(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),impact,vel,shot.radius);
                 position = impact;life = 0;body_hit.reset();end_reason=speed::AttackEndReason::Hit;break;
             }
             shot.hit_ids.insert(runtime.state.enemy_handles.entity_id(target));
+            if (shot.callback.kind==FriendHitKind::Interceptor) {request.cause=Cause::Interceptor;request.weapon_id=0;request.direction=Vector2();request.knock=shot.callback.knock;request.no_crit=shot.callback.no_crit;}
             CombatResolver::damage_enemy(runtime,request);EventBuilder::flush_combat(runtime);
             if (!speed::AttackSystem::get(runtime.state,processing_handle)) break;
             Dictionary event; event["pos"] = impact; event["dir"] = vel.normalized();

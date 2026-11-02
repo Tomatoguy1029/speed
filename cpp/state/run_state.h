@@ -145,8 +145,10 @@ struct RunState {
         speed::FriendHullState hull;
         uint32_t definition=0;
         bool alive = true, pierce = false, no_crit = false;
-        int64_t kind = 0, generation = 0, pierce_left = 0, id = 0;
+        int64_t kind = 0, pierce_left = 0, id = 0;
         speed::AttackHandle attack;
+        struct HitCallback {speed::FriendHitKind kind=speed::FriendHitKind::None;double knock=160;bool no_crit=true;} callback;
+        int32_t shatter_depth=0;
         Vector2 pos, vel;
         float radius = 5, life = 0.9f, age = 0, knock = 250, angle = 0, spin = 0;
         double damage = 0;

@@ -38,6 +38,7 @@ class SpeedRunCore : public RefCounted {
     Dictionary development_wave_command(const Dictionary &);
     Dictionary development_beam_command(const String &kind,const Dictionary &payload);
     Dictionary development_hostile_command(const String &kind,const Dictionary &payload);
+    Dictionary development_friend_command(const String &kind,const Dictionary &data);
     Dictionary development_attack_command(const String &kind,const Dictionary &payload);
     Dictionary development_contact_command(const Dictionary &payload);
     Dictionary development_field_command(const String &kind,const Dictionary &payload);
@@ -100,7 +101,6 @@ class SpeedRunCore : public RefCounted {
     bool blocks_front(size_t row, Vector2 hit, Vector2 direction) const;
     void collect_pickup(StringName kind, double value = 0);
     size_t add_friend(Friendly shot);
-    void duplicate_friend(size_t source, Vector2 impact);
     void end_bite_visual(bool hit, Vector2 at);
     size_t add_hostile(Hostile shot,speed::AttackSpec spec={});
     bool damage_ship(double amount, double slow, StringName cause, StringName source = StringName());

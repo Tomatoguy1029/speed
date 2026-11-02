@@ -10,9 +10,16 @@ func on_event(ev: Dictionary) -> void:
 	for v in ev.directions: sum += (v as Vector2).normalized()
 	splits.append({"pos": ev.pos, "angle": sum.angle(), "age": 0.0})
 
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+
 func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+	frame_tick(world_dt())
+
+func frame_tick(dt: float) -> void:
+	var p: PixelPainter = _painter if rm==null else painter()
 	p.begin()
 	for s in splits:
 		s.age += dt

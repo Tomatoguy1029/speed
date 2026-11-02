@@ -7,7 +7,11 @@ const COMBAT := preload("res://tests/native_combat.gd")
 var failed := 0
 var friend_finished := false
 var friend_retry := false
+var t37_retry := false
+var t37_state_only := false
 func check(ok: bool, label: String) -> void:
+	if t37_state_only and not ("出生順と抽選消費がPCG32" in label or "次の20回を消費" in label): return
+	if t37_retry and not ("PCG32" in label or "角度" in label or "速度" in label or "通常の元を生成順" in label or "初期化後の元" in label): return
 	if friend_retry and not ("の位置・寿命・命中済みID" in label or "の命中順と敵HP" in label or label=="味方弾の確認が最後まで進んだ"): return
 	if not ok:
 		failed += 1
@@ -17,6 +21,14 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-t37" in OS.get_cmdline_user_args() or "--cpp-t37-fixes" in OS.get_cmdline_user_args() or "--cpp-t37-state-format" in OS.get_cmdline_user_args():
+		t37_state_only = "--cpp-t37-state-format" in OS.get_cmdline_user_args()
+		t37_retry = t37_state_only or "--cpp-t37-fixes" in OS.get_cmdline_user_args()
+		await check_cpp_t37()
+		print("[cpp_t37] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
 	if "--cpp-friend-shot" in OS.get_cmdline_user_args() or "--cpp-friend-shot-fixes" in OS.get_cmdline_user_args():
 		friend_retry = "--cpp-friend-shot-fixes" in OS.get_cmdline_user_args()
 		await check_cpp_friend_shot()
@@ -134,7 +146,7 @@ func friend_states(run: RunSimulation, core, comparison, label: String, id_map: 
 		row.hit_ids = row.hit_ids.map(func(id): return id_map[id])
 	var current: Array = core.projectiles_snapshot()
 	for row: Dictionary in current:
-		for key in ["row","generation","cause","type","pierce"]: row.erase(key)
+		for key in ["row","generation","cause","type","pierce","knock","shatter_depth","callback","callback_knock","callback_no_crit"]: row.erase(key)
 	var diff: String = comparison.difference(comparison.plain(old_shots),comparison.plain(current))
 	if check_snapshot: check(diff.is_empty(),label+"の位置・寿命・命中済みID: "+diff)
 	var hp := []
@@ -279,3 +291,200 @@ func check_cpp_friend_shot() -> void:
 	bridge.release_checkpoint(initial.value)
 	session.free()
 	friend_finished = true
+
+class T37BirthFixture extends AttackKind:
+	func spawn(ps: ProjectileSystem, records: Array) -> void:
+		for data: Dictionary in records:
+			if data.has("nested"):
+				ps.emit_attack(&"scatter_hull",[data.nested])
+				continue
+			var row: int = ps._add_friend(data.get("kind",0),StringName(data.get("cause","shot")),data.position,data.velocity,data.get("radius",5.0),data.get("damage",1.0),data.get("life",1.0),data.get("pierce",false),data.get("pierce_left",0),Color.BLACK,data.get("no_crit",false),data.get("knock",250.0),0.0,0.0,-1,StringName(data.get("type","")),StringName(data.get("visual_key","weapon/forward")),StringName(data.get("weapon_id","")))
+			for id in data.get("hit_ids",PackedInt64Array()): ps.friend_hit[row][id] = true
+			ps.friend_shatter_depth[row] = data.get("shatter_depth",0)
+			ps.friend_age[row] = data.get("age",0.0)
+			if data.get("callback","none")=="interceptor":
+				ps.friend_on_hit[row] = func(enemy, damage, impact):
+					ps.combat.damage_enemy(enemy,damage,{"cause":&"interceptor","impact":impact,"no_crit":data.get("callback_no_crit",true),"knock":data.get("callback_knock",160.0)})
+			ps.friend_dmg[row] = data.get("post_damage",data.get("damage",1.0))
+
+func t37_compare(ps: ProjectileSystem, core, label: String) -> void:
+	var expected := []
+	for row in ps.friend_alive.size():
+		if not ps.friend_alive[row]: continue
+		var hits: Array = ps.friend_hit[row].keys()
+		hits.sort()
+		expected.append({"kind":ps.friend_kind[row],"pos":ps.friend_pos[row],"vel":ps.friend_vel[row],"radius":ps.friend_r[row],"damage":ps.friend_dmg[row],"life":ps.friend_life[row],"age":ps.friend_age[row],"pierce_left":ps.friend_pierce_left[row],"knock":ps.friend_knock[row],"hit_ids":hits,"shatter_depth":ps.friend_shatter_depth[row],"callback":"interceptor" if ps.friend_on_hit[row].is_valid() else "none"})
+	var actual: Array = core.projectiles_snapshot()
+	check(actual.size()==expected.size(),label+"の元と複製の件数が一致する")
+	if actual.size()!=expected.size(): return
+	for i in actual.size():
+		for key in expected[i]:
+			if key=="vel":
+				var velocity: Vector2 = actual[i][key]
+				var angle: float = absf(velocity.angle())
+				check(is_zero_approx(angle) or (angle>=deg_to_rad(15.0)-0.0001 and angle<=deg_to_rad(45.0)+0.0001 and velocity.length()>=270.0-0.002 and velocity.length()<=330.0+0.002),label+"の複製が角度と速度の範囲を保つ")
+			elif expected[i][key] is Vector2: check((expected[i][key] as Vector2).distance_to(actual[i][key])<0.002,label+"の位置が一致する")
+			elif expected[i][key] is float: check(is_equal_approx(expected[i][key],actual[i][key]),label+"の威力・寿命・経過と倍率が一致する")
+			else: check(expected[i][key]==actual[i][key],label+"の種類・命中集合・深さ・callbackが一致する")
+
+func t37_normal_contract(core, level: int, definition: TraitDef) -> void:
+	# 設計17.1のPCG32をseed737から進めた、通常生成16回の期待列。
+	var split_at: Array = [[0,3,8],[0,3,8,9],[0,3,8,9,10,14],[0,3,8,9,10,14],[0,3,8,9,10,14]][level-1]
+	var final_state: String = ["-3220606506977829253","3273026683270212063","-7467066158754631833","-7467066158754631833","-7467066158754631833"][level-1]
+	var shots: Array = core.projectiles_snapshot()
+	check(shots.size()==16+split_at.size()*2,"各段でPCG32の確率抽選に従って元と複製を出す")
+	var cursor := 0
+	for original in 16:
+		if cursor>=shots.size(): return
+		check(shots[cursor].pos==Vector2(original*20,0) and shots[cursor].damage==10.0,"通常の元を生成順に保持する")
+		cursor += 1
+		if not original in split_at: continue
+		for side in [-1.0,1.0]:
+			if cursor>=shots.size(): return
+			var shot: Dictionary = shots[cursor]
+			var angle: float = shot.vel.angle()*side
+			check(shot.pos==Vector2(original*20,0) and is_equal_approx(shot.damage,10.0*float(definition.params.damage_by_level[level-1])),"複製は初期化後の元から位置と各段の威力を引き継ぐ")
+			check(angle>=deg_to_rad(float(definition.params.angle_min))-0.0001 and angle<=deg_to_rad(float(definition.params.angle_max))+0.0001 and shot.vel.length()>=450.0-0.002 and shot.vel.length()<=550.0+0.002,"通常生成の左右の角度と速度が定義の範囲に収まる")
+			cursor += 1
+	check(core.inspect().rng_state==final_state,"各段の出生順と抽選消費がPCG32の期待列に一致する")
+
+func t37_fixture_bridge(config: GameConfig):
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var records: Dictionary = builder.chase_records(ContentManager.enemies[&"drifter"],config)
+	# 既存split検査と同じく、入れ子と上限は抽選成功を固定して境界だけを見る。
+	for row: Dictionary in records.DuplicatorDefinition: row.chance = 1.0
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	check(bridge.configure(schema.write_content(records,schema.sha256("複製の入れ子と上限".to_utf8_buffer())),{"api_version":1,"run_id":937,"mode":1,"stage_id":"T37","profile":{},"settings":{}}).ok,"入れ子と上限の固定場面を生成する")
+	check(bridge.start(737,{"position":Vector2(-900,0)}).ok,"複製の固定場面を始める")
+	bridge.collect_frame()
+	return bridge
+
+func check_cpp_t37() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	for field in ["planet_radius","moon_count","meteor_count","iron_count","saw_count"]: config.set(field,0)
+	config.start_radius = 900.0
+	config.base_crit_chance = 0.0
+	var stage := RuntimeStage.new()
+	stage.index = 87
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_T37"
+	var builder = load("res://tools/content/build_run_content.gd")
+	check(builder.build(stage,config,output,"複製の全段と表示".sha256_text())==OK,"複製の全段の実効値と資源を生成する")
+	var path := output.path_join("stage_87.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":737},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"複製の通常のランと表示を用意する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var initial: Dictionary = bridge.checkpoint()
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	for level in range(1,config.trait_max_stacks+1):
+		if t37_state_only and level==2: continue
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		await lab.reset({"seed":737,"empty":true,"config":{"planet_radius":0.0}})
+		var run: RunSimulation = lab.run
+		run.field.bodies.clear()
+		run.loadout.reset_loadout()
+		run.loadout.grant(&"trait",&"T37",level)
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":level}).ok,"生成した複製を各段で取得する")
+		run.state.rng.state = int(core.inspect().rng_state)
+		for n in 16:
+			var pos := Vector2(n*20,0)
+			var opts := {"speed":500.0,"life":1.0,"pierce_left":2,"knock":137.0,"weapon_id":"W01","visual_key":"weapon/forward"}
+			core.fire_shot(pos,0.0,10.0,opts)
+		t37_normal_contract(core,level,ContentManager.definition(&"traits",&"T37"))
+		if level==config.trait_max_stacks and not t37_retry:
+			bridge.command("set_ui_overlay",{"active":false})
+			var presentation: RunPresentation = session.view.get_node("RunPresentation")
+			presentation._present_cpp(0.01)
+			check(presentation.frame_view._duplicator_visual!=null and not presentation.frame_view._duplicator_visual.splits.is_empty(),"複製の光を実際の生成通知から通常の表示へ渡す")
+			var age: float = presentation.frame_view._duplicator_visual.splits[0].age
+			presentation.frame_view.update_effects(bridge.read_frame().value,0.2)
+			check(presentation.frame_view._duplicator_visual.splits[0].age==age,"世界時計が止まる間は複製の光も止める")
+			var before: Array = core.projectiles_snapshot()
+			bridge.command("dev_remove_trait",{"id":"T37"})
+			check(core.projectiles_snapshot()==before,"特性を外しても生成済みの複製は自然寿命まで残す")
+			presentation._present_cpp(0.01)
+			check(presentation.frame_view._duplicator_visual==null,"解除した複製の表示を片付ける")
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	var fixture = t37_fixture_bridge(config)
+	core = fixture._core
+	await lab.reset({"seed":737,"empty":true,"config":{"planet_radius":0.0}})
+	var run: RunSimulation = lab.run
+	run.field.bodies.clear()
+	run.loadout.reset_loadout()
+	var definition: TraitDef = ContentManager.definition(&"traits",&"T37").duplicate(true)
+	definition.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
+	run.state.traits[&"T37"] = 5
+	run.loadout._sync_behavior(false,&"T37",definition,5)
+	run.projectiles.register_attack(&"scatter_hull",T37BirthFixture.new())
+	fixture.command("dev_remove_weapon",{"id":"W01"})
+	fixture.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+	run.state.rng.state = int(core.inspect().rng_state)
+	var records := [{"position":Vector2(0,0),"velocity":Vector2(300,0),"damage":1.0,"post_damage":9.0,"life":0.8,"age":0.1,"hit_ids":PackedInt64Array([99]),"shatter_depth":3},
+		{"nested":[{"position":Vector2(100,0),"velocity":Vector2(300,0),"post_damage":7.0,"callback":"interceptor","callback_knock":173.0,"callback_no_crit":true},{"position":Vector2(200,0),"velocity":Vector2(300,0),"kind":2,"cause":"saw","pierce":true}]},
+		{"position":Vector2(300,0),"velocity":Vector2(300,0),"kind":1,"cause":"hullDebris","post_damage":11.0,"pierce":true}]
+	run.projectiles.emit_attack(&"scatter_hull",[records])
+	check(fixture.command("dev_friend_births",{"births":records}).ok,"入れ子の生成列を初期化してから完了する")
+	t37_compare(run.projectiles,core,"入れ子と初期化完了")
+	check(core.inspect().rng_state=="2861193922729689715","入れ子は内側2件→外側2件のPCG32抽選を消費する")
+	check(core.projectiles_snapshot().size()==12,"4件の元から各2件を複製し、複製を再び複製しない")
+	for shot: Dictionary in core.projectiles_snapshot():
+		if shot.callback=="interceptor": check(shot.callback_knock==173.0 and shot.callback_no_crit,"callbackの型と値を複製へ引き継ぐ")
+	var held: Dictionary = fixture.checkpoint()
+	var state: Array = core.projectiles_snapshot()
+	core.step_projectiles(0.1)
+	var advanced: Array = core.projectiles_snapshot()
+	check(fixture.restore(held.value).ok and core.projectiles_snapshot()==state,"命中集合・残り寿命・経過・深さ・callbackの値へ復帰する")
+	core.step_projectiles(0.1)
+	check(core.projectiles_snapshot()==advanced,"復帰後も元と複製が同じ飛行を再現する")
+	fixture.release_checkpoint(held.value)
+	core.step_projectiles(2.0)
+	run.projectiles._update_friendly(2.0)
+	run.state.rng.state = int(core.inspect().rng_state)
+	check(core.projectiles_snapshot().is_empty(),"寿命が来た元と複製をすべて回収する")
+	run.projectiles.emit_attack(&"scatter_hull",[records])
+	fixture.command("dev_friend_births",{"births":records})
+	t37_compare(run.projectiles,core,"回収後の行再利用")
+	check(core.inspect().rng_state=="-7467066158754631833","回収後も同じ出生順でPCG32の次の20回を消費する")
+	core.step_projectiles(2.0)
+	fixture.command("dev_remove_trait",{"id":"T37"})
+	var filling := []
+	for n in 217: filling.append({"position":Vector2(n,0),"velocity":Vector2.ZERO,"life":1.0})
+	check(fixture.command("dev_friend_births",{"births":filling}).ok,"通常の元の弾で上限直前まで埋める")
+	fixture.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+	check(fixture.command("dev_friend_reserve",{"count":1,"release":false}).ok,"未処理の飛ぶ攻撃を共通の上限へ予約する")
+	var random: String = core.inspect().rng_state
+	fixture.command("dev_friend_births",{"births":[{"position":Vector2.ZERO,"velocity":Vector2.RIGHT}]})
+	check(core.projectiles_snapshot().size()==218 and core.inspect().rng_state==random,"予約分を含めて残り1枠なら抽選せず複製を出さない")
+	check(fixture.command("dev_friend_reserve",{"count":1,"release":true}).ok,"処理済みの予約を一度だけ解放する")
+	core.step_projectiles(2.0)
+	fixture.command("dev_remove_trait",{"id":"T37"})
+	fixture.command("dev_friend_births",{"births":filling})
+	fixture.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+	fixture.command("dev_friend_births",{"births":[{"position":Vector2.ZERO,"velocity":Vector2.RIGHT}]})
+	check(core.projectiles_snapshot().size()==220,"残り2枠なら同じ生成で2件を複製する")
+	core.step_projectiles(2.0)
+	fixture.command("dev_remove_trait",{"id":"T37"})
+	var debris := []
+	for n in 198: debris.append({"position":Vector2(n,0),"velocity":Vector2.ZERO,"kind":1,"cause":"hullDebris"})
+	fixture.command("dev_friend_births",{"births":debris})
+	fixture.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+	fixture.command("dev_friend_births",{"births":[{"position":Vector2.ZERO,"velocity":Vector2.RIGHT,"kind":1,"cause":"hullDebris"}]})
+	check(core.projectiles_snapshot().size()==200,"星屑の残り1枠では複製中にも200件の上限を守る")
+	random = core.inspect().rng_state
+	fixture.command("dev_friend_births",{"births":[{"position":Vector2.ZERO,"velocity":Vector2.RIGHT,"kind":1,"cause":"hullDebris"}]})
+	check(core.projectiles_snapshot().size()==201 and core.inspect().rng_state==random,"星屑が満杯なら元の生成後も複製の抽選を使わない")
+	fixture.dispose()
+	lab.free()
+	await get_tree().process_frame

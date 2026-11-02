@@ -15,7 +15,7 @@ AttackHandle FriendHullSystem::emit(RunRuntime &run,const FriendHullParams &p) {
     s.type=p.saw?godot::StringName("saw"):run.content->definitions[p.source_definition-1].id;s.visual=p.saw?godot::StringName():godot::StringName("weapon/massTow");
     AttackSpec spec;spec.cause=p.saw?Cause::Saw:Cause::TowShot;spec.policies=policy(EndPolicy::NaturalLifetime);spec.owner.source_id=std::max(int64_t(0),p.source_id);spec.owner.source_definition=p.source_definition;
     if (!AttackSystem::configure_contact(*run.content,d.contact,spec)) return {};
-    return AttackSystem::emit_friendly(run.state,std::move(s),spec);
+    return AttackSystem::emit_friendly(run,std::move(s),spec);
 }
 void FriendHullSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,godot::Array &out,double alpha) {
     using namespace godot;const auto &s=run.state.friends[row];if (!s.alive || s.kind!=int64_t(FriendKind::Hull) || !view.grow(s.radius*2).has_point(s.pos)) return;

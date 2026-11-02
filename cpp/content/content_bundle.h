@@ -61,6 +61,7 @@ struct ContentBundle {
     std::vector<NumericTraitLevel> numeric_traits;
     std::vector<FullChargeDefinition> full_charge_levels;
     std::vector<RampageDefinition> rampage_levels;
+    std::vector<DuplicatorDefinition> duplicator_levels;
     PostMaxChargeDefinition post_charge;
     PostMaxCritDefinition post_crit;
     PostMaxMotionDefinition post_motion;

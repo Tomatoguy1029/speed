@@ -90,7 +90,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 shot.hull.source_id< -1 || !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.angle) || !std::isfinite(shot.spin)) return false;
         }
         if (shot.kind==int64_t(FriendKind::Debris)) {
-            if (!shot.debris.definition || shot.debris.definition>content.friend_debris.size() || shot.debris.style>=DebrisStyle::Count || shot.debris.shatter_depth<0 ||
+            if (!shot.debris.definition || shot.debris.definition>content.friend_debris.size() || shot.debris.style>=DebrisStyle::Count || shot.shatter_depth<0 ||
                 !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.angle) || !std::isfinite(shot.spin)) return false;
             for (auto point:shot.trail) if (!point.is_finite()) return false;
         }
@@ -165,6 +165,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     return AttackSystem::rebuild(state);
 }
 int64_t CheckpointStore::hold(const RunRuntime &runtime) {
+    if (!runtime.workspace.friend_birth_batches.empty()) return 0;
     if (runtime.state.attacks.hostile_updating || runtime.state.attacks.hostile_clear_pending || !runtime.content || next_checkpoint_id==INT64_MAX) return 0;
     const auto &progression=runtime.state.legacy_progression;
     if (!value_only(progression.data) || !value_only(progression.stats) || !value_only(progression.weapons) ||

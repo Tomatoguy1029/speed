@@ -41,6 +41,11 @@ struct RampageState {
     uint64_t kills=0;
     double strength=0,pop=0,bonus=0,half_life=1,target_kills=1;
 };
+struct DuplicatorState {
+    bool ready=false;
+    double chance=0,damage=1,angle_min=0,angle_max=0;
+    uint32_t maximum=0;
+};
 struct EquipmentLevel {uint32_t definition=0,level=0;};
 struct CardCandidate {int64_t id=0;CardKind kind=CardKind::Weapon;uint32_t definition=0,level=0;};
 // 数値特性は取得の境界で畳み、武器の更新中には定義を探索しない。
@@ -52,6 +57,7 @@ struct EquipmentEffects {
 struct LoadoutState {
     EquipmentEffects effects;
     RampageState rampage;
+    DuplicatorState duplicator;
     double boost_distance=0,full_charge_maximum=1;
     ScatterWeaponState scatter;
     RearWeaponState rear;

@@ -9,6 +9,7 @@
 
 namespace speed {
 struct RunWorkspace {
+    std::vector<std::vector<AttackHandle>> friend_birth_batches;
     std::vector<int64_t> avoidance_ids;
     std::vector<godot::Vector2> avoidance_from;
 };

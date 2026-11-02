@@ -556,7 +556,66 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DuplicatorDefinition",
+      "section": 67,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "chance",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "angle_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle_max",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
-  "enums": {}
+  "enums": {
+    "FriendHitKind": [
+      {
+        "name": "None",
+        "value": "none"
+      },
+      {
+        "name": "Interceptor",
+        "value": "interceptor"
+      }
+    ]
+  }
 }

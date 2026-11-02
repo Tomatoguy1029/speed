@@ -5,7 +5,7 @@
 #include <vector>
 namespace speed {
 struct FriendHullState {uint32_t definition=0,source_definition=0;int64_t source_id=-1;bool saw=false;};
-struct FriendDebrisState {uint32_t definition=0;DebrisStyle style=DebrisStyle::Plain;int32_t shatter_depth=0;};
+struct FriendDebrisState {uint32_t definition=0;DebrisStyle style=DebrisStyle::Plain;};
 struct DebrisDeathFixture {uint32_t count=0;double speed=0,damage=0;};
 struct LightArrowState {uint32_t definition=0;float length=0;};
 struct StarBoltState {uint32_t definition=0;};
@@ -54,6 +54,7 @@ struct AttackState {
     std::unordered_map<uint64_t,std::vector<AttackHandle>> by_technique,by_participant,by_boss,by_encounter;
     std::unordered_map<int64_t,DebrisDeathFixture> development_debris_sources;
     int64_t next_id=1;
+    uint64_t friendly_reservations=0;
     bool hostile_updating=false,hostile_clear_pending=false;
     AttackEndReason clear_reason=AttackEndReason::BossClear;
 };

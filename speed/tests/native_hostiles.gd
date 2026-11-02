@@ -845,8 +845,6 @@ func check_cpp_bolt() -> bool:
 	bridge.release_checkpoint(empty.value)
 	session.free()
 	return true
-		get_tree().quit(1 if failed else 0)
-		return
 func pulse_motion(core, id: int) -> Dictionary:
 	for item: Dictionary in core.enemy_motion_snapshot():
 		if item.id==id: return item

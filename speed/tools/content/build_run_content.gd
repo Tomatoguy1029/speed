@@ -200,6 +200,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.LoadoutDefinition.append({"id":rampage_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T33","comet_only":false})
 	for level in range(1,config.trait_max_stacks+1):
 		data.RampageDefinition.append({"id":level,"equipment":rampage_id,"level":level,"bonus":float(rampage.params.bonus_base)+float(rampage.params.bonus_per)*level,"kills":int(rampage.params.kills),"half_life":float(rampage.params.half_life)})
+	var duplicator := load("res://data/traits/T37_duplicator.tres") as TraitDef
+	if duplicator==null: return {}
+	var duplicator_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":duplicator_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T37","comet_only":false})
+	for level in range(1,config.trait_max_stacks+1):
+		data.DuplicatorDefinition.append({"id":level,"equipment":duplicator_id,"level":level,"chance":float(duplicator.params.chance_by_level[level-1]),"damage":float(duplicator.params.damage_by_level[level-1]),"maximum":int(duplicator.params.max),"angle_min":float(duplicator.params.angle_min),"angle_max":float(duplicator.params.angle_max)})
 	var scatter := load("res://data/weapons/W02_scatter.tres") as WeaponDef
 	if scatter==null: return {}
 	var scatter_id: int = data.LoadoutDefinition.size()+1
@@ -285,6 +291,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":rampage_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":rampage_id,"asset":key})
+	var duplicator_entry: ContentEntry = ContentManager.catalog.find(&"traits",duplicator.id)
+	if duplicator_entry==null: return {}
+	for path in duplicator_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":duplicator_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":duplicator_id,"asset":key})
 	if config.planet_radius>0.0:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":9})
@@ -453,6 +466,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.BarrierPostDefinition = resolved.BarrierPostDefinition
 			data.FullChargeDefinition = resolved.FullChargeDefinition
 			data.RampageDefinition = resolved.RampageDefinition
+			data.DuplicatorDefinition = resolved.DuplicatorDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
 			data.LifecycleDefinition = resolved.LifecycleDefinition
 			for section in ["PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:

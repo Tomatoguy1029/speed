@@ -14,7 +14,7 @@ size_t SpeedRunCore::add_friend(Friendly shot) {
     speed::AttackSpec spec;spec.policies=speed::policy(speed::EndPolicy::NaturalLifetime);
     if (shot.weapon_id==StringName("W01")) spec.weapon=1;
     if (!speed::parse_symbol(String(shot.cause).utf8().get_data(),spec.cause)) return SIZE_MAX;
-    const auto handle=speed::AttackSystem::emit_friendly(runtime.state,std::move(shot),spec);
+    const auto handle=speed::AttackSystem::emit_friendly(runtime,std::move(shot),spec);
     const auto *record=speed::AttackSystem::get(runtime.state,handle);return record?record->row:SIZE_MAX;
 }
 
@@ -72,10 +72,10 @@ Array SpeedRunCore::projectiles_snapshot() const {
         Array ids; for (int64_t id : sorted) ids.append(id);
         Dictionary item;
         if (runtime.api_configured && shot.kind==int64_t(speed::FriendKind::Hull)) {item["source_id"]=shot.hull.source_id;item["source_definition"]=shot.hull.source_definition;item["saw"]=shot.hull.saw;}
-        if (runtime.api_configured && shot.kind==int64_t(speed::FriendKind::Debris)) item["shatter_depth"]=shot.debris.shatter_depth;
-        item["row"] = int64_t(row); item["kind"] = shot.kind; item["generation"] = shot.generation; item["pos"] = shot.pos; item["vel"] = shot.vel;
+        item["row"] = int64_t(row); item["kind"] = shot.kind; item["pos"] = shot.pos; item["vel"] = shot.vel;
         item["radius"] = shot.radius; item["damage"] = shot.damage; item["life"] = shot.life; item["age"] = shot.age; item["knock"]=shot.knock;
         item["cause"]=shot.cause;item["type"]=shot.type;item["pierce"]=shot.pierce;item["pierce_left"] = shot.pierce_left; item["hit_ids"] = ids; item["angle"] = shot.angle; item["trail"] = shot.trail;
+        item["shatter_depth"]=shot.shatter_depth;item["callback"]=speed::symbol_name(shot.callback.kind);item["callback_knock"]=shot.callback.knock;item["callback_no_crit"]=shot.callback.no_crit;
         out.append(item);
     }
     return out;

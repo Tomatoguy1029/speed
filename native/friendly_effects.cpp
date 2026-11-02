@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../cpp/systems/attacks/friend_debris.h"
+#include "../cpp/behaviors/traits/duplicator.h"
 #include <cmath>
 using namespace godot;
 
@@ -41,27 +42,4 @@ bool SpeedRunCore::configure_projectiles(const Dictionary &config, const Diction
 bool SpeedRunCore::burst_debris(Vector2 position,int64_t count,double speed,double damage,Color color,int64_t source_id) {
     speed::DebrisBurstParams p;p.position=position;p.count=count;p.speed=speed;p.damage=damage;p.color=color;p.source_id=source_id;
     return speed::FriendDebrisSystem::burst(runtime,p);
-}
-
-void SpeedRunCore::duplicate_friend(size_t source, Vector2 impact) {
-    const auto &c = runtime.state.projectile_config;
-    const auto &parent = runtime.state.friends[source];
-    if (!c.split || parent.generation >= c.generations || int64_t(runtime.state.live_friends) + 2 > c.maximum) return;
-    if (runtime.state.control.rng.randf() >= c.chance) return;
-    Array directions;
-    constexpr double radians = 3.1415926535897932384626433832795 / 180.0;
-    for (double side : {-1.0, 1.0}) {
-        const double angle = double(runtime.state.control.rng.randf_range(c.angle_min, c.angle_max)) * radians * side;
-        directions.append(parent.vel.rotated(angle) * runtime.state.control.rng.randf_range(0.9, 1.1));
-    }
-    for (int i = 0; i < directions.size(); ++i) {
-        if (parent.kind == 1 && runtime.state.live_debris >= 200) break;
-        Friendly child = parent;
-        child.pos = impact; child.vel = directions[i]; child.damage *= c.damage;
-        child.angle = child.vel.angle(); child.generation = parent.generation + 1;
-        // 新しい破片の航跡だけは空で始める。命中IDと進んだ時間は引き継ぐ。
-        child.trail = PackedVector2Array();
-        add_friend(std::move(child));
-    }
-    Dictionary event; event["pos"] = impact; event["directions"] = directions; emit_event("duplicate", event);
 }

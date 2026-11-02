@@ -1,6 +1,7 @@
 #include "friend_debris.h"
 #include "../attack_system.h"
 #include "../motion_math.h"
+#include "../../behaviors/traits/duplicator.h"
 #include "../../output/frame_builder.h"
 #include <algorithm>
 #include <cmath>
@@ -13,7 +14,7 @@ FriendDebrisDefinition settings(const RunRuntime &run) {
 bool trails(const godot::RunState::Friendly &s) {return s.visual!=godot::StringName("weapon/knockback") && s.visual!=godot::StringName("enemy/pump_burst");}
 }
 AttackHandle FriendDebrisSystem::emit(RunRuntime &run,godot::RunState::Friendly shot,int64_t source_id) {
-    if (!run.state.started || run.state.closed || !run.state.combat_ready || !run.state.projectile_config.ready || !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.damage) || shot.damage<0 || shot.debris.shatter_depth<0) return {};
+    if (!run.state.started || run.state.closed || !run.state.combat_ready || !run.state.projectile_config.ready || !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.damage) || shot.damage<0 || shot.shatter_depth<0) return {};
     for (double v:{shot.radius,shot.life,shot.knock}) if (!std::isfinite(v) || v<0) return {};
     if (!std::isfinite(shot.angle) || !std::isfinite(shot.spin)) return {};
     shot.kind=int64_t(FriendKind::Debris);shot.pierce=true;
@@ -23,13 +24,13 @@ AttackHandle FriendDebrisSystem::emit(RunRuntime &run,godot::RunState::Friendly 
     for (const auto &weapon:run.content->equipment) if (weapon.kind==0 && shot.weapon_id==godot::StringName(weapon.external_id.c_str())) {spec.weapon=weapon.id;break;}
     if (!run.content->friend_debris.empty()) {shot.debris.definition=1;if (!AttackSystem::configure_contact(*run.content,run.content->friend_debris.front().contact,spec)) return {};}
     else if (run.api_configured) return {};
-    return AttackSystem::emit_friendly(run.state,std::move(shot),spec);
+    return AttackSystem::emit_friendly(run,std::move(shot),spec);
 }
 bool FriendDebrisSystem::burst(RunRuntime &run,const DebrisBurstParams &p) {
     if (!p.position.is_finite() || p.count<0 || p.count>INT32_MAX || !std::isfinite(float(p.speed)) || p.speed<0 || !std::isfinite(p.damage) || p.damage<0) return false;
     for (float v:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(v)) return false;
     if (!run.state.started || run.state.closed || !run.state.projectile_config.ready) return false;
-    const auto d=settings(run);
+    const auto d=settings(run);FriendlyBirthScope births(run);
     for (int64_t k=0;k<p.count;++k) {
         const auto u=godot::Vector2::from_angle(godot::Math::TAU*k/double(p.count)+run.state.control.rng.randf()*0.4);
         godot::RunState::Friendly s;s.cause="hullDebris";s.pos=p.position+u*10.0;s.vel=u*p.speed*(0.8+0.3*run.state.control.rng.randf());
@@ -46,12 +47,13 @@ bool FriendDebrisSystem::scatter(RunRuntime &run,const DebrisScatterParams &p) {
     auto &enemy=state.enemies[p.source.slot];const auto &definition=run.content->definitions[enemy.definition];if (enemy.is_boss || definition.kind==EnemyDefinition::Kind::Meteor) return false;
     enemy.hull_scattered=true;const auto d=settings(run);const int64_t count=std::min(std::min(int64_t(16),std::max(int64_t(2),definition.rank*2)),int64_t(d.maximum)-int64_t(state.live_debris));if (count<=0) return false;
     const bool directed=p.direction.length()>0.01;const double base=directed?p.direction.angle():enemy.facing,spread=directed?d.spread:godot::Math::TAU;
+    FriendlyBirthScope births(run);
     for (int64_t k=0;k<count;++k) {
         double angle=base+(directed?(count>1?double(k)/(count-1)-0.5:0.0):double(k)/count)*spread;angle+=(state.control.rng.randf()-0.5)*0.25;
         const auto u=godot::Vector2::from_angle(angle);const double speed=p.speed*(0.7+0.6*state.control.rng.randf());
         godot::RunState::Friendly s;s.cause="hullDebris";s.pos=enemy.pos+u*enemy.radius*0.3;s.vel=u*speed;s.radius=4.0*1.82*d.character_scale*p.radius_mult;
         s.life=d.life*p.life_mult;s.damage=p.damage;s.color=definition.color;s.no_crit=true;s.knock=p.knock<0?d.knock:p.knock;
-        s.angle=state.control.rng.randf()*godot::Math::TAU;s.spin=k%2==0?10:-10;s.hit_ids.insert(enemy.id);s.visual="weapon/knockback";s.weapon_id="W03";s.debris.shatter_depth=p.shatter_depth;
+        s.angle=state.control.rng.randf()*godot::Math::TAU;s.spin=k%2==0?10:-10;s.hit_ids.insert(enemy.id);s.visual="weapon/knockback";s.weapon_id="W03";s.shatter_depth=p.shatter_depth;
         if (!AttackSystem::get(state,emit(run,std::move(s),enemy.id))) return false;
     }
     godot::Dictionary event;event["pos"]=enemy.pos;event["count"]=count;if (run.api_configured) event["visual_key"]="weapon/knockback";FrameBuilder::append(run,"hull_scatter",event);return true;

@@ -1304,7 +1304,11 @@
         "value": "barrier"
       },
       {"name": "Corpse", "value": "corpse"},
-      {"name": "TowShot", "value": "towShot"}
+      {"name": "TowShot", "value": "towShot"},
+      {
+        "name": "Interceptor",
+        "value": "interceptor"
+      }
     ],
     "VisualRole": [
       {

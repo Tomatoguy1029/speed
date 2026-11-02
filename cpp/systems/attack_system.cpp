@@ -1,4 +1,6 @@
 #include "attack_system.h"
+#include "../behaviors/traits/duplicator.h"
+#include "../runtime/run_runtime.h"
 #include "attack_budget.h"
 #include "../content/content_bundle.h"
 #include <algorithm>
@@ -74,6 +76,21 @@ bool AttackSystem::has_attached(const State &state,EnemyHandle source) {
 void AttackSystem::record_ship_position(State &state,AttackHandle handle) {
     if (!get(state,handle)) return;
     auto &record=state.attacks.records[handle.slot];record.ship_previous=state.ship.pos;record.ship_previous_ready=true;
+}
+bool AttackSystem::reserve_friendly(State &state,uint64_t count) {
+    if (count>UINT64_MAX-flying_count(state)) return false;
+    state.attacks.friendly_reservations+=count;return true;
+}
+bool AttackSystem::release_friendly(State &state,uint64_t count) {
+    if (count>state.attacks.friendly_reservations) return false;
+    state.attacks.friendly_reservations-=count;return true;
+}
+uint64_t AttackSystem::flying_count(const State &state) {return state.attacks.friendly_reservations>UINT64_MAX-state.live_friends?UINT64_MAX:state.live_friends+state.attacks.friendly_reservations;}
+AttackHandle AttackSystem::emit_friendly(RunRuntime &run,State::Friendly value,AttackSpec spec) {
+    FriendlyBirthScope scope(run,run.workspace.friend_birth_batches.empty());
+    const auto handle=emit_friendly(run.state,std::move(value),spec);
+    if (get(run.state,handle)) run.workspace.friend_birth_batches.back().push_back(handle);
+    return handle;
 }
 AttackHandle AttackSystem::emit_friendly(State &state,State::Friendly value,AttackSpec spec) {
     const size_t row=state.free_friends.empty()?state.friends.size():state.free_friends.back();if (row>=UINT32_MAX) return {};
