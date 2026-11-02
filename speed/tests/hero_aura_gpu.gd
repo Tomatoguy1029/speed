@@ -2,6 +2,11 @@ extends Node
 var failed := 0
 var source: HeroAuraAssets
 func _ready() -> void:
+	if "--cpp-leo" in OS.get_cmdline_user_args():
+		await cpp_leo_display()
+		print("[cpp_H_leo_view] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if DisplayServer.get_name()=="headless":
 		push_error("hero_aura_gpu requires a real GPU")
 		get_tree().quit(1)
@@ -172,6 +177,54 @@ func cpp_perseus_display() -> void:
 	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.size()==3 and frame.ui.hero.active>5.0,"復帰で残り時間・石の円・使用中の枠が戻る")
 	await settle()
 	check(v.get_texture().get_image().save_png("/tmp/speed-heroes-perseus.png")==OK,"ペルセウスの実表示を保存する")
+	v.queue_free()
+	await get_tree().process_frame
+	bridge.dispose()
+	failed += guide.failed+behavior.failed
+	guide.free()
+	behavior.free()
+
+func cpp_leo_display() -> void:
+	var guide = load("res://tests/hero_guidance.gd").new()
+	var behavior = load("res://tests/hero_behaviors.gd").new()
+	var bridge = guide._cpp_fixture(true)
+	behavior._cpp_rescue(bridge,"leo")
+	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
+	var intent := Intent.new()
+	intent.hero_press = true
+	behavior._cpp_step(bridge,intent)
+	behavior._cpp_draw(bridge,false)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	var frame: Dictionary = behavior._cpp_read(bridge)
+	var held: Dictionary = bridge.checkpoint()
+	var v := viewport()
+	var camera := Camera2D.new()
+	v.add_child(camera)
+	var scope := ContentResourceScope.new()
+	for path in ["res://.content/hero_aura.res","res://.content/meteor_pieces.res","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]: scope.provide(path,load(path))
+	for visual: Dictionary in guide._cpp_visuals:
+		if not String(visual.get("path","")).is_empty(): scope.provide(visual.path,load(visual.path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	v.add_child(view)
+	view.setup(scope,guide._cpp_visuals,frame.ui.character_scale)
+	view.update_effects(frame,0.0)
+	var rect := Rect2(-512,-384,1024,768)
+	var render: Dictionary = bridge.read_render(rect,1.0)
+	var band: Dictionary = render.value.shapes.filter(func(shape): return shape.layer==3 and shape.kind==0)[0]
+	check(view.apply_frame(render.value) and band.widths[0]==360.0 and band.colors[0]==Color(1.0,0.85,0.45),"しし座のなぞりを定義と同じ幅の金色の帯で描く")
+	bridge.command("dev_tick_heroes",{"dt":14.0,"run_time":14.0})
+	frame = behavior._cpp_read(bridge)
+	view.update_effects(frame,0.0)
+	render = bridge.read_render(rect,1.0)
+	band = render.value.shapes.filter(func(shape): return shape.layer==3 and shape.kind==0)[0]
+	check(view.apply_frame(render.value) and band.widths[0]==90.0 and band.colors[0]==Color(0.55,0.9,1.0),"効果終了で元の幅と青い帯へ戻す")
+	check(bridge.restore(held.value).ok,"描き途中のしし座へ復帰する")
+	frame = behavior._cpp_read(bridge)
+	view.update_effects(frame,0.0)
+	render = bridge.read_render(rect,1.0)
+	check(view.apply_frame(render.value) and frame.ui.hero.trace_width==4.0 and frame.ui.hero.active>13.0,"復帰で金色の帯と残り時間を出し直す")
+	await settle()
+	check(v.get_texture().get_image().save_png("/tmp/speed-heroes-leo.png")==OK,"しし座の表示を保存する")
 	v.queue_free()
 	await get_tree().process_frame
 	bridge.dispose()

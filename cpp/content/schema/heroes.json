@@ -133,6 +133,27 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "LeoDefinition",
+      "section": 284,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "width_mult",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

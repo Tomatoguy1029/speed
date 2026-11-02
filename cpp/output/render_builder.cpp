@@ -1,3 +1,4 @@
+#include "../systems/heroes.h"
 #include "../behaviors/weapons/massTow.h"
 #include "render_builder.h"
 #include "../bosses/flow/technique_runner.h"
@@ -269,6 +270,14 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (uint32_t row=0;row<state.hostiles.size();++row) {SlashSystem::render(run,row,view,shapes);BoltSystem::render(run,row,view,shapes);LightArrowSystem::render(run,row,view,shapes);ShellSystem::render(run,row,view,shapes);}
     const auto &points=state.draw.drawing?state.draw.points:state.draw.path;
     if ((state.draw.drawing || state.draw.tracing) && points.size()>1) {
+        const double width=HeroesSystem::trace_width(run),radius=config.trace_radius*width;
+        Dictionary band;band["kind"]=int(RenderShapeKind::Polyline);band["layer"]=3;band["order"]=0;band["owner_id"]=0;band["points"]=points;band["rounded"]=true;
+        PackedInt32Array band_offsets;band_offsets.push_back(0);band_offsets.push_back(points.size());band["offsets"]=band_offsets;
+        PackedFloat32Array band_widths;band_widths.push_back(radius*2);band["widths"]=band_widths;
+        PackedColorArray band_colors;band_colors.push_back(width>1?Color(1.0,0.85,0.45):Color(0.55,0.9,1));band["colors"]=band_colors;shapes.push_back(band);
+        Dictionary joints;joints["kind"]=int(RenderShapeKind::Circle);joints["layer"]=3;joints["order"]=1;joints["owner_id"]=0;joints["points"]=points;
+        PackedInt32Array joint_offsets;PackedFloat32Array joint_radii;PackedColorArray joint_colors;
+        for (int64_t i=0;i<points.size();++i) {joint_offsets.push_back(i);joint_radii.push_back(radius);joint_colors.push_back(band_colors[0]);}joint_offsets.push_back(points.size());joints["offsets"]=joint_offsets;joints["widths"]=joint_radii;joints["colors"]=joint_colors;shapes.push_back(joints);
         Dictionary line;line["kind"]=0;line["layer"]=12;line["order"]=0;line["owner_id"]=0;line["points"]=points;
         PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(points.size());line["offsets"]=offsets;
         PackedFloat32Array widths;widths.push_back(pixel*2.0);line["widths"]=widths;

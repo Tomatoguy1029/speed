@@ -248,6 +248,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	for definition_hero: HeroDef in ContentManager.heroes.values():
 		var hero_id: int = data.HeroDefinition.size()+1
 		data.HeroDefinition.append({"id":hero_id,"external_id":String(definition_hero.id),"stage":definition_hero.stage,"cooldown":definition_hero.cooldown,"duration":definition_hero.duration})
+		if definition_hero.id==&"leo": data.LeoDefinition.append({"id":data.LeoDefinition.size()+1,"hero":hero_id,"width_mult":float(definition_hero.params.width_mult)})
 		if definition_hero.id==&"perseus": data.PerseusDefinition.append({"id":data.PerseusDefinition.size()+1,"hero":hero_id,"boss_stun":float(definition_hero.params.boss_stun)})
 		for star in definition_hero.stars: data.HeroStar.append({"id":data.HeroStar.size()+1,"hero":hero_id,"x":star.x,"y":star.y})
 		for link in range(0,definition_hero.links.size(),2): data.HeroLink.append({"id":data.HeroLink.size()+1,"hero":hero_id,"a":definition_hero.links[link],"b":definition_hero.links[link+1]})
@@ -1136,6 +1137,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.NumericTraitLevel = resolved.NumericTraitLevel
 		data.HeroConfig = resolved.HeroConfig
+		data.LeoDefinition = resolved.LeoDefinition
 		data.PerseusDefinition = resolved.PerseusDefinition
 		data.HeroDefinition = resolved.HeroDefinition
 		data.HeroStar = resolved.HeroStar

@@ -9,6 +9,7 @@ public:
     static void activate(RunRuntime &);
     static void recovered(RunRuntime &,EnemyHandle);
     static void pass_stars(RunRuntime &,godot::Vector2 from,godot::Vector2 to,int64_t dash);
+    static double trace_width(const RunRuntime &);
     static bool captive(const RunRuntime &);
     static godot::Dictionary snapshot(const RunRuntime &);
     static bool validate(const godot::RunState &,const ContentBundle &);

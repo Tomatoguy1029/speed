@@ -1,3 +1,4 @@
+#include "../cpp/systems/heroes.h"
 #include "run_core.h"
 #include "../cpp/systems/attacks/wall.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
@@ -155,7 +156,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         speed::DamageRequest gate_request;gate_request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));gate_request.cause=speed::Cause::Ram;gate_request.direction=direction;gate_request.impact=position;gate_request.has_impact=true;
         const auto gate=speed::CombatResolver::gate(runtime,gate_request.struck,gate_request);
         if (gate==speed::GateResult::Pass) {enemy.hit_cd=c.contact_cooldown;if (runtime.state.draw.tracing) runtime.state.draw.inside[enemy.id]=hit.row;continue;}
-        if (gate==speed::GateResult::Allow && (runtime.state.loadout.effects.ignore_armor || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
+        if (gate==speed::GateResult::Allow && (runtime.state.loadout.effects.ignore_armor || (runtime.state.draw.tracing && speed::HeroesSystem::trace_width(runtime)>1.0) || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
             double damage = attack * (crit ? c.crit_mult : 1.0);
             if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
                 speed::ShieldBehavior::steal(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));

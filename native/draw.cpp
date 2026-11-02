@@ -1,3 +1,4 @@
+#include "../cpp/systems/heroes.h"
 #include "../cpp/behaviors/weapons/bipolar.h"
 #include "../cpp/behaviors/weapons/dashRangeDrone.h"
 #include "../cpp/behaviors/weapons/massTow.h"
@@ -226,7 +227,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
         const Vector2 from = runtime.state.ship.pos;
         for (auto it = runtime.state.draw.inside.begin(); it != runtime.state.draw.inside.end();) {
             const auto &enemy = runtime.state.enemies[it->second];
-            const double radius = enemy.radius + runtime.state.trace_radius + 2.0;
+            const double radius = enemy.radius + runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime) + 2.0;
             if (!enemy.alive || enemy.dead || enemy.id != it->first || enemy.pos.distance_squared_to(from) > radius * radius) it = runtime.state.draw.inside.erase(it);
             else ++it;
         }
@@ -235,7 +236,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
         runtime.state.ship.pos = a + u * runtime.state.draw.seg_pos;
         runtime.state.ship.vel = u * runtime.state.draw.speed;
         runtime.state.ship.heading = u;
-        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) {trail(from);end_trace(false);return true;}
+        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime))) {trail(from);end_trace(false);return true;}
         trail(from);
         if (runtime.state.phase!=RunState::Phase::Play) return true;
         const double speed = runtime.state.ship.vel.length();

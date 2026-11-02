@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-leo" in OS.get_cmdline_user_args():
+		_cpp_leo()
+		return
 	if "--cpp-perseus-boss" in OS.get_cmdline_user_args():
 		_cpp_perseus_boss()
 		print("[cpp_H_perseus_boss] failed=%d" % failed)
@@ -154,3 +157,46 @@ func _cpp_perseus_boss() -> void:
 	bridge.dispose()
 	failed += fixture.failed
 	fixture.free()
+
+func _cpp_draw(bridge,launch := true) -> void:
+	check(bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO}).ok,"なぞりの開始位置を用意する")
+	check(bridge._core.handle_draw({"press":true,"pen":Vector2(-300,0)},0,1.0),"通常の入口で線を描き始める")
+	check(bridge._core.handle_draw({"has_cursor":true,"pen":Vector2(300,0)},1000,1.0),"通常の入口で線を伸ばす")
+	if launch: check(bridge._core.handle_draw({"has_cursor":true,"press":true,"pen":Vector2(300,0)},2000,1.0),"同じ線を確定して突進する")
+
+func _cpp_leo() -> void:
+	var fixture = load("res://tests/hero_guidance.gd").new()
+	var bridge = fixture._cpp_fixture(true,100000.0)
+	_cpp_rescue(bridge,"leo")
+	bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO})
+	var intent := Intent.new()
+	intent.hero_press = true
+	var frame := _cpp_step(bridge,intent)
+	check(frame.ui.hero.trace_width==4.0 and is_equal_approx(frame.ui.hero.active,14.0-1.0/120.0),"救出したしし座は発動中だけ定義の幅倍率を使う")
+	var wide: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(0,100)}).value
+	var armor: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2.ZERO}).value
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"しし座の残り時間と敵を保持する")
+	_cpp_draw(bridge)
+	check(bridge._core.draw_snapshot().tracing and bridge._core.step_draw(1.0),"広い当たりの突進を実際に進める")
+	_cpp_read(bridge)
+	check(fixture._cpp_events.any(func(e): return e.type=="combat_damage" and e.payload.target_id==wide and e.payload.applied>0.0),"通常の幅では届かない敵へなぞりが当たる")
+	check(fixture._cpp_events.any(func(e): return e.type=="combat_damage" and e.payload.target_id==armor and e.payload.cause=="ram" and e.payload.applied>0.0),"しし座のなぞりは高い装甲を無視する")
+	bridge.command("dev_tick_heroes",{"dt":14.0,"run_time":14.0})
+	frame = _cpp_read(bridge)
+	check(frame.ui.hero.active==0.0 and frame.ui.hero.trace_width==1.0,"実秒の期限で幅が元に戻る")
+	check(bridge.restore(held.value).ok,"しし座の効果途中へ戻す")
+	frame = _cpp_read(bridge)
+	check(frame.ui.hero.trace_width==4.0 and is_equal_approx(frame.ui.hero.active,14.0-1.0/120.0),"復帰で残り時間と実効幅が戻る")
+	bridge.command("dev_tick_heroes",{"dt":14.0,"run_time":14.0})
+	var event_start: int = fixture._cpp_events.size()
+	_cpp_draw(bridge)
+	bridge._core.step_draw(1.0)
+	_cpp_read(bridge)
+	var normal: Array = fixture._cpp_events.slice(event_start)
+	check(not normal.any(func(e): return e.type=="combat_damage" and e.payload.target_id==wide and e.payload.applied>0.0),"効果終了後は元の幅の外へ当たらない")
+	bridge.dispose()
+	failed += fixture.failed
+	fixture.free()
+	print("[cpp_H_leo] failed=%d" % failed)
+	get_tree().quit(1 if failed else 0)
