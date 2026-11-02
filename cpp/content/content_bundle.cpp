@@ -50,6 +50,22 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     std::copy(bytes.ptr()+24,bytes.ptr()+56,bundle->input_sha256.begin());
     std::copy(bytes.ptr()+56,bytes.ptr()+88,bundle->payload_sha256.begin());
     bundle->config=records.RunConfig_rows[0];
+    if (records.HeroConfig_rows.size()!=1) return {};
+    bundle->hero_config=records.HeroConfig_rows.front();
+    if (bundle->hero_config.first_max<bundle->hero_config.first_min || bundle->hero_config.second_max<bundle->hero_config.second_min) return {};
+    std::unordered_set<std::string> hero_names;
+    for (const auto &row:records.HeroDefinition_rows) {
+        if (row.id!=bundle->heroes.size()+1 || row.external_id.empty() || !hero_names.insert(row.external_id).second) return {};
+        bundle->heroes.push_back({row,{},{}});
+    }
+    for (const auto &row:records.HeroStar_rows) bundle->heroes[row.hero-1].stars.emplace_back(row.x,row.y);
+    for (const auto &row:records.HeroLink_rows) {
+        auto &hero=bundle->heroes[row.hero-1];
+        if (row.a>=hero.stars.size() || row.b>=hero.stars.size()) return {};
+        hero.links.emplace_back(row.a,row.b);
+    }
+    for (const auto &hero:bundle->heroes) if (hero.stars.empty() || hero.links.empty()) return {};
+
     bundle->aim_lag=records.RunConfig_rows[0].aim_lag;bundle->aim_speed=records.RunConfig_rows[0].aim_speed;
     bundle->crystal_values={records.RunConfig_rows[0].crystal_low,records.RunConfig_rows[0].crystal_mid,records.RunConfig_rows[0].crystal_high};
     bundle->visuals=records.ResourceKey_rows;

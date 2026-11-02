@@ -245,6 +245,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	row.sprite_angle = PI/2.0 if definition.id in EnemyDef.NATIVE_SPRITES else -PI/2.0
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
+	data.HeroConfig = [{"id":1,"scale":config.hero_scale,"glow_range":config.hero_glow_range,"guard_range":config.hero_guard_range,"star_radius":config.hero_star_radius,"next_time":config.hero_next_time,"spacing":config.landmark_spacing,"first_min":config.landmark_first_window.x,"first_max":config.landmark_first_window.y,"second_min":config.landmark_second_window.x,"second_max":config.landmark_second_window.y,"guards":config.hero_guards}]
+	for definition_hero: HeroDef in ContentManager.heroes.values():
+		var hero_id: int = data.HeroDefinition.size()+1
+		data.HeroDefinition.append({"id":hero_id,"external_id":String(definition_hero.id),"stage":definition_hero.stage,"cooldown":definition_hero.cooldown,"duration":definition_hero.duration})
+		for star in definition_hero.stars: data.HeroStar.append({"id":data.HeroStar.size()+1,"hero":hero_id,"x":star.x,"y":star.y})
+		for link in range(0,definition_hero.links.size(),2): data.HeroLink.append({"id":data.HeroLink.size()+1,"hero":hero_id,"a":definition_hero.links[link],"b":definition_hero.links[link+1]})
 	data.PopulationDefinition = [{"id":1,"active":false,"density":config.density_mult,"bonus_pop":config.bonus_pop,"boss_start":0.0,"recycle_scale":config.spawn_recycle_scale,"region_cap":config.spawn_region_cap,"margin":config.spawn_margin,"field_radius":config.field_radius,"planet_radius":config.planet_radius,"total_cap":config.spawn_total_cap,"refill_time":config.spawn_refill_time}]
 	data.EncounterDefinition = [{"id":1,"active":false,"interval":5.0}]
 	data.CometDefinition = [{"id":1,"interval_min":config.comet_interval_min,"interval_max":config.comet_interval_max,"speed":config.comet_speed,"rare_chance":config.rare_comet_chance,"rare_after":config.rare_comet_after,"rare_hp_mult":config.rare_comet_hp_mult,"warp_chance":config.warp_chance}]
@@ -1129,6 +1135,10 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.StringEntry.append({"id":i+1,"value":id})
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.NumericTraitLevel = resolved.NumericTraitLevel
+		data.HeroConfig = resolved.HeroConfig
+		data.HeroDefinition = resolved.HeroDefinition
+		data.HeroStar = resolved.HeroStar
+		data.HeroLink = resolved.HeroLink
 		data.RunConfig = resolved.RunConfig
 		data.ContactDefinition = resolved.ContactDefinition
 		data.BeamDefinition = resolved.BeamDefinition
@@ -1328,6 +1338,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")
+	if not paths.has("res://.content/hero_aura.res"): paths.append("res://.content/hero_aura.res")
 	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png","res://.content/attack_visuals.res","res://scripts/render/attacks/zone.gd","res://scripts/render/fx/blast_bursts.gd","res://scripts/render/attacks/flood.gd","res://shaders/water_flood.gdshader","res://assets/fx/water_noise.png","res://scripts/render/light_lance.gd","res://scripts/render/equipment/critBeam.gd","res://scripts/render/attacks/shell_frame.gd","res://shaders/pump_shell_runtime.gdshader"]:
 		if not paths.has(asset): paths.append(asset)
 	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")

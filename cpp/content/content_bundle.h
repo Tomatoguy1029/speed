@@ -13,6 +13,9 @@ struct CoronaAmmunition {uint32_t definition=0;double weight=0,damage=0;};
 struct ContentBundle {
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};
     RunConfig config;
+    HeroConfig hero_config;
+    struct Hero { HeroDefinition definition;std::vector<godot::Vector2> stars;std::vector<std::pair<uint32_t,uint32_t>> links; };
+    std::vector<Hero> heroes;
     std::array<double,3> crystal_values{};
     double aim_lag=0, aim_speed=0;
     std::vector<EnemyDefinition> definitions;

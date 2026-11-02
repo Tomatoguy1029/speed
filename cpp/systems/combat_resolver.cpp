@@ -1,3 +1,4 @@
+#include "heroes.h"
 #include "combat_resolver.h"
 #include "../behaviors/enemies/defender.h"
 #include "combat_hooks.h"
@@ -158,6 +159,7 @@ KillResult CombatResolver::kill_enemy(RunRuntime &run,const DamageRequest &reque
     AttackSystem::source_ended(state,result.target,AttackEndReason::ParticipantEnd);
     EnemySystem::leave_hound(state,result.target.slot);
     run.combat_hooks.death_marked(run,death);
+    HeroesSystem::recovered(run,result.target);
     EventBuilder::enemy_kill(run,death);result.killed=true;
     if (enemy.is_boss) {if (policy.boss_defeated) policy.boss_defeated(run,death);return result;}
     death.hull_used=request.cause==Cause::Afterimage || run.combat_hooks.capture(run,death);

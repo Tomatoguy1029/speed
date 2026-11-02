@@ -22,6 +22,10 @@ var ruler_shake:=0.0
 var _ruler:=PackedFloat64Array()
 var _triangle_star := PackedFloat64Array()
 var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
+var _hero_canvas: DrawLayer
+var _hero_frame := {}
+var _hero_aura: MeshInstance2D
+var _hero_material: ShaderMaterial
 var _corona := PackedFloat64Array()
 var _corona_members := PackedFloat64Array()
 var _aquila := PackedFloat64Array()
@@ -161,6 +165,18 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	for entry in entries: visuals[int(entry.id)] = entry
 	for entry: Dictionary in entries:
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
+	_hero_canvas = DrawLayer.new()
+	_hero_canvas.draw_fn = _draw_hero_values
+	_layer(2).add_child(_hero_canvas)
+	_hero_aura = MeshInstance2D.new()
+	_hero_aura.show_behind_parent = true
+	var hero_aura: HeroAuraAssets = _scope.resources.get("res://.content/hero_aura.res")
+	if hero_aura!=null:
+		_hero_aura.mesh = hero_aura.mesh
+		_hero_material = hero_aura.material.duplicate() as ShaderMaterial
+		_hero_aura.material = _hero_material
+	_layer(2).add_child(_hero_aura)
+
 	_barrier_armor = Sprite2D.new()
 	_barrier_armor.texture = _scope.resources.get("res://assets/pixel/airship_armor.png")
 	_barrier_armor.offset = Vector2(0.0,_barrier_armor.texture.get_height()*0.5-30.0) if _barrier_armor.texture!=null else Vector2.ZERO
@@ -968,6 +984,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rear_flashes = ShotFlashes.new()
 		_rear_shells.clear()
 		_rear_world_time = -1.0
+	_hero_frame = frame.ui.duplicate()
+	_hero_frame.camera_zoom = frame.camera.zoom
+	_hero_canvas.queue_redraw()
 	_rear_frame = frame.ui
 	_rear_canvas.visible = equipped_rear and _ship_visible
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
@@ -1465,3 +1484,8 @@ func _zone_burst(row: Dictionary) -> void:
 	var bursts: BlastBursts = _zone_bursts[style]
 	bursts.add(row.points[0],row.widths[0]/bursts.px*effect_scale,row.delay-row.time)
 	bursts.step(0.0)
+
+func _draw_hero_values(canvas: CanvasItem) -> void:
+	if _hero_frame.is_empty(): return
+	var half: Vector2 = _hero_frame.view_half
+	preload("res://scripts/render/hero_constellation.gd").draw(canvas,_hero_frame.get("hero",{}),1.0/maxf(0.01,float(_hero_frame.get("camera_zoom",1.0))),float(_hero_frame.world_time),Rect2(_hero_frame.view_center-half,half*2.0),_hero_aura,_hero_material)

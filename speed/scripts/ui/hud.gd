@@ -444,6 +444,7 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	if bridge!=null:
+		_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
 		_update_speed_indicator(delta)
 		_update_cpp_finish()
 		if not _cpp_ui.is_empty() and not _cpp_ui.get("presentation_frozen",true):
@@ -1029,11 +1030,13 @@ func _draw_loadout() -> void:
 	_draw_hero_slot(LOADOUT_HERO)
 
 func _draw_hero_slot(at: Vector2) -> void:
-	var s := run.state
-	if s.hero_power == &"":
+	_draw_hero_slot_values(at,run.state.hero_power,run.state.hero_active_t,run.state.hero_cd)
+
+func _draw_hero_slot_values(at: Vector2,power: StringName,active: float,cooldown: float) -> void:
+	if power == &"":
 		return
 	var rect := Rect2(at + Vector2(3, 3), Vector2(29, 29))
-	var definition: HeroDef = ContentManager.heroes.get(s.hero_power)
+	var definition: HeroDef = ContentManager.heroes.get(power)
 	var gold := Color("#ffe8a0")
 	if definition != null and not definition.stars.is_empty():
 		var bounds := Rect2(definition.stars[0], Vector2.ZERO)
@@ -1047,14 +1050,14 @@ func _draw_hero_slot(at: Vector2) -> void:
 			draw_line(a, b, gold, 1)
 		for point in definition.stars:
 			draw_circle(center + (point - bounds.get_center()) * factor, 1, gold)
-	if s.hero_active_t > 0.0:
+	if active > 0.0:
 		draw_rect(rect, Color(gold, 0.2 + 0.1 * sin(Time.get_ticks_msec() / 120.0)))
-	if s.hero_cd > 0.0 and definition != null and definition.cooldown > 0.0:
-		var k := clampf(s.hero_cd / definition.cooldown, 0, 1)
+	if cooldown > 0.0 and definition != null and definition.cooldown > 0.0:
+		var k := clampf(cooldown / definition.cooldown, 0, 1)
 		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1 - k)), Vector2(rect.size.x, rect.size.y * k)), Color(0, 0, 0, 0.65))
 	draw_string(_font, at + Vector2(24, 31), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
-	if s.hero_active_t > 0.0:
-		draw_string(_font, at + Vector2(35, 15), "%ds" % ceili(s.hero_active_t), HORIZONTAL_ALIGNMENT_LEFT, 32, 9, gold)
+	if active > 0.0:
+		draw_string(_font, at + Vector2(35, 15), "%ds" % ceili(active), HORIZONTAL_ALIGNMENT_LEFT, 32, 9, gold)
 
 func _draw_slot_row(origin: Vector2, weapon: bool, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()
@@ -1180,6 +1183,14 @@ func apply_snapshot(ui: Dictionary) -> void:
 
 func _ready_cpp() -> void:
 	_prepare_cpp_finish()
+	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
+	_rewards.continuation_seconds = continuation_seconds
+	_rewards.ult_cutin_seconds = ult_cutin_seconds
+	_rewards.ult_details_seconds = ult_details_seconds
+	_rewards.ult_cutin_scene = ult_cutin_scene
+	_rewards.add_module_icon = _add_icon
+	add_child(_rewards)
+	_rewards.active_changed.connect(func(active: bool): bridge.call_deferred("command","set_ui_reward",{"active":active}))
 	bridge.subscribe("hud",_receive_cpp_frame)
 	_font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -1265,7 +1276,15 @@ func _draw_cpp() -> void:
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
 		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
+	var hero: Dictionary = _cpp_ui.get("hero",{})
+	if not hero.is_empty():
+		_draw_hero_slot_values(LOADOUT_HERO,hero.power,float(hero.active),float(hero.cooldown))
+		if show_minimap: _draw_cpp_hero_map(hero)
 	draw_set_transform(Vector2.ZERO)
+	if not hero.is_empty() and hero.guidance and hero.revealed and hero.captive:
+		_draw_edge_arrow_values(hero.center,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
+	if _hero_notice_t>0.0 and hero.get("guidance",false):
+		draw_string(_font,Vector2(12,110),tr("hud.hero_discovered"),HORIZONTAL_ALIGNMENT_CENTER,size.x-24,18,Color(1.0,0.91,0.63,minf(1.0,_hero_notice_t/0.4)))
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		if body.mode>=4 or not body.has("hp"): continue
 		var width := minf(520.0,size.x*0.6)
@@ -1315,6 +1334,9 @@ func _input_cpp(event: InputEvent) -> void:
 		return
 	var id := _card_input_id(event)
 	if id=="": return
+	if _rewards.is_active():
+		get_viewport().set_input_as_handled()
+		return
 	var choosing := int(_cpp_ui.phase)==RunState.Phase.LEVELUP
 	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec()<_cards_accept_at)
 	if not event is InputEventScreenDrag:
@@ -1339,6 +1361,11 @@ func _input_cpp(event: InputEvent) -> void:
 func _receive_cpp_frame(frame: Dictionary) -> bool:
 	apply_snapshot(frame.ui)
 	for event: Dictionary in frame.events:
+		if event.type=="hero_discovered": _hero_notice_t = 1.8
+		if event.type=="hero_freed" and int(_cpp_ui.phase) not in [RunState.Phase.FINISHING,RunState.Phase.ENDED]:
+			var reward: Dictionary = event.payload.duplicate()
+			reward.type = &"hero_freed"
+			_rewards.enqueue_ult(reward)
 		if event.type=="game_over":
 			_banner = tr("hud.game_over")
 			_banner_color = Color("#ff6b5a")
@@ -1346,3 +1373,24 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			_banner = tr("hud.clear")
 			_banner_color = Color("#ffe46b")
 	return true
+
+func _draw_cpp_hero_map(hero: Dictionary) -> void:
+	var gold := Color("#ffe8a0")
+	var scale_factor := MINIMAP_R/maxf(1.0,float(hero.get("field_radius",1.0)))
+	var ship: Vector2 = _cpp_ui.ship.ship_pos
+	draw_texture(RADAR,Vector2.ZERO)
+	if hero.guidance and hero.captive:
+		for point: Vector2 in hero.landmarks:
+			var a := (point-ship)*scale_factor
+			var u: Vector2 = (hero.center-point).normalized()
+			var b := a.dot(u)
+			var disc := b*b-a.length_squared()+MINIMAP_R*MINIMAP_R
+			if disc>0.0 and hero.landmarks.size()<2:
+				var root := sqrt(disc)
+				draw_line(MINIMAP_CENTER+a+u*(-b-root),MINIMAP_CENTER+a+u*(-b+root),Color(gold,0.7),1.5)
+			draw_circle(MINIMAP_CENTER+a.limit_length(MINIMAP_R-3.0),3.0,gold)
+	if hero.guidance and hero.revealed:
+		var at: Vector2 = MINIMAP_CENTER+((hero.center-ship)*scale_factor).limit_length(MINIMAP_R-6.0)
+		draw_circle(at,6.0*(0.7+0.3*sin(Time.get_ticks_msec()/200.0)),Color(gold,0.35))
+		draw_circle(at,3.0,gold if hero.captive else Color(gold,0.45))
+	draw_circle(MINIMAP_CENTER,2.0,Color.WHITE)

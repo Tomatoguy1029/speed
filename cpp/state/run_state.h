@@ -17,6 +17,7 @@
 #include "../systems/timing.h"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include "run_control_state.h"
+#include "hero_state.h"
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
@@ -33,6 +34,7 @@
 namespace godot {
 // ランの値状態。保持・複製は全フィールドをまとめてコピーする。
 struct RunState {
+    speed::HeroState heroes;
     speed::BossStates bosses;
     speed::RunControlState control;
     speed::PreviousPoseState previous_poses;

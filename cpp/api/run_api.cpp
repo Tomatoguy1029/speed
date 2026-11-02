@@ -1,3 +1,4 @@
+#include "../systems/heroes.h"
 #include "run_core.h"
 #include "../bosses/flow/phase_controller.h"
 #include "../bosses/monoceros/finish.h"
@@ -141,7 +142,8 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
 Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options) {
     if (runtime.busy) return failure(7,"start","更新中は再入できません");Guard guard(runtime.busy);
     if (!runtime.api_configured || runtime.state.started || runtime.state.closed) return failure(4,"start","設定済みの新しいランだけを開始できます");
-    if (seed.get_type()!=Variant::INT || !keys(options,{"start_time","equipment","position","start_kind","scenario","endless"}) ||
+    if (seed.get_type()!=Variant::INT || !keys(options,{"start_time","equipment","position","start_kind","scenario","endless","lab_mode"}) ||
+        (options.has("lab_mode") && (!is(options,"lab_mode",Variant::BOOL) || (bool(options["lab_mode"]) && !runtime.api_development))) ||
         (options.has("endless") && !is(options,"endless",Variant::BOOL)) ||
         (options.has("position") && (!is(options,"position",Variant::VECTOR2) || !Vector2(options["position"]).is_finite()))) return failure(1,"start","開始入力が不正です");
     const Variant time=options.get("start_time",0.0);
@@ -154,10 +156,12 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.ship.vel=Vector2(0,-state.ship_config.base_max_speed*0.3);state.ship.hp=state.ship_config.max_hp;
     state.ship_ready=state.draw_ready=true;
     state.lifecycle.endless=options.get("endless",false);
+    state.control.lab_mode=options.get("lab_mode",false);
     state.frame_ready=true;
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
     if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
     speed::FieldSystem::initialize(runtime);
+    speed::HeroesSystem::initialize(runtime);
     speed::ProgressionSystem::initialize(runtime,options.has("equipment"));
     if (options.has("equipment")) speed::ProgressionSystem::open(*this,true);
     ++state.control.revision;return success(progress(runtime));
@@ -220,6 +224,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=speed::ProgressionSystem::complete(runtime,payload["request_id"],payload["status"])?success():failure(5,"request_id/status","未処理の資源要求と一致しません");
     } else if (kind=="retry_resources" && payload.size()==1 && is(payload,"request_id",Variant::INT)) {
         response=speed::ProgressionSystem::retry(runtime,payload["request_id"])?success():failure(5,"request_id","再試行できる失敗要求がありません");
+    } else if (kind=="dev_hero_place" || kind=="dev_hero_pass" || kind=="dev_tick_heroes" || kind=="dev_hero_activate") {
+        response=development_hero_command(kind,payload);
     } else if ((kind=="dev_grant_equipment" || kind=="dev_remove_weapon" || kind=="dev_remove_trait") && runtime.api_development && is(payload,"id",Variant::STRING)) {
         const String external=payload["id"];bool changed=false;
         for (const auto &d:runtime.content->equipment) if (external==String::utf8(d.external_id.c_str())) {
@@ -377,7 +383,7 @@ Dictionary SpeedRunCore::frame_run() {
     if (runtime.frame_workspace.invalid) return failure(8,"events","通知の型・項目・番号が不正です");
     const auto &control=runtime.state.control;Dictionary camera;camera["center"]=control.camera_center;camera["zoom"]=control.camera_zoom;camera["half"]=runtime.state.view_half;
     Dictionary value=progress(runtime);value["run_id"]=runtime.api_run_id;value["camera"]=camera;
-    Dictionary ui;ui["boss_finish"]=speed::BossFinish::snapshot(runtime);ui["boss_bodies"]=speed::PhaseController::snapshot(runtime);ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["coins"]=runtime.state.lifecycle.coins;ui["max_hp"]=runtime.state.ship_config.max_hp;
+    Dictionary ui;ui["hero"]=speed::HeroesSystem::snapshot(runtime);ui["boss_finish"]=speed::BossFinish::snapshot(runtime);ui["boss_bodies"]=speed::PhaseController::snapshot(runtime);ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["coins"]=runtime.state.lifecycle.coins;ui["max_hp"]=runtime.state.ship_config.max_hp;
     const auto shield_source=runtime.state.ship.shield_source_definition;
     ui["ship_shield_visual"]=shield_source?runtime.content->definitions[shield_source-1].visual_id:0;
     ui["ship_radius"]=runtime.state.ship_config.ship_radius;

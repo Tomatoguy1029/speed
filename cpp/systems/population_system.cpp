@@ -3,6 +3,17 @@
 #include "../runtime/run_runtime.h"
 #include <algorithm>
 namespace speed {
+double PopulationSystem::sample_curve(const SpawnTimeline::Curve &curve, double at) {
+    const auto &points = curve.points;
+    if (points.empty()) return 0;
+    if (points.size() == 1 || at <= points.front().time) return points.front().value;
+    if (at >= points.back().time) return points.back().value;
+    size_t k = 0;
+    while (k < points.size() - 2 && at > points[k + 1].time) ++k;
+    const auto &p = points[k]; const auto &q = points[k + 1];
+    const double h = std::max(q.time - p.time, 0.0001), s = (at - p.time) / h, s2 = s * s, s3 = s2 * s;
+    return (2*s3 - 3*s2 + 1)*p.value + (s3 - 2*s2 + s)*h*p.slope + (-2*s3 + 3*s2)*q.value + (s3 - s2)*h*q.slope;
+}
 void PopulationSystem::prepare(RunRuntime &run) {
     const auto &cfg=run.content->population;if (!cfg.active) return;auto &s=run.state;s.spawn_timeline=run.content->population_timeline;s.spawn_timeline_ready=true;
     auto &p=s.population;p={};p.ready=p.refill_ready=true;p.frame_enabled=!run.api_development;p.recycle_scale=cfg.recycle_scale;p.region_cap=cfg.region_cap;p.margin=cfg.margin;p.field_radius=cfg.field_radius;p.planet_radius=cfg.planet_radius;p.total_cap=cfg.total_cap;p.refill_time=cfg.refill_time;

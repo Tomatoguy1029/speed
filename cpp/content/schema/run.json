@@ -933,14 +933,32 @@
     {
       "name": "HeroDefinition",
       "section": 6,
-      "enabled": false,
       "fields": [
         {
           "name": "id",
           "type": "u32",
           "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "stage",
+          "type": "u32"
+        },
+        {
+          "name": "cooldown",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0
         }
-      ]
+      ],
+      "version": 2
     },
     {
       "name": "FieldDefinition",
@@ -1989,6 +2007,30 @@
       {
         "name": "MonocerosSlashRelease",
         "value": "monoceros_slash_release"
+      },
+      {
+        "name": "HeroDiscovered",
+        "value": "hero_discovered"
+      },
+      {
+        "name": "HeroLink",
+        "value": "hero_link"
+      },
+      {
+        "name": "HeroFreed",
+        "value": "hero_freed"
+      },
+      {
+        "name": "HeroPower",
+        "value": "hero_power"
+      },
+      {
+        "name": "HeroPowerEnd",
+        "value": "hero_power_end"
+      },
+      {
+        "name": "Landmark",
+        "value": "landmark"
       }
     ],
     "ResultKind": [
@@ -2669,6 +2711,27 @@
     "monoceros_slash_release": [
       "line",
       "width"
+    ],
+    "hero_discovered": [
+      "id"
+    ],
+    "hero_link": [
+      "from",
+      "to"
+    ],
+    "hero_freed": [
+      "id",
+      "pos"
+    ],
+    "hero_power": [
+      "id",
+      "pos"
+    ],
+    "hero_power_end": [
+      "id"
+    ],
+    "landmark": [
+      "pos"
     ]
   },
   "includes": [
@@ -2679,6 +2742,7 @@
     "field.json",
     "loadout.json",
     "bosses.json",
-    "boss_flow.json"
+    "boss_flow.json",
+    "heroes.json"
   ]
 }

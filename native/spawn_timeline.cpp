@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/population_system.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -24,17 +25,7 @@ bool weights(const Dictionary &source, std::vector<std::pair<StringName, double>
     }
     return true;
 }
-double sample(const speed::SpawnTimeline::Curve &curve, double at) {
-    const auto &points = curve.points;
-    if (points.empty()) return 0;
-    if (points.size() == 1 || at <= points.front().time) return points.front().value;
-    if (at >= points.back().time) return points.back().value;
-    size_t k = 0;
-    while (k < points.size() - 2 && at > points[k + 1].time) ++k;
-    const auto &p = points[k]; const auto &q = points[k + 1];
-    const double h = std::max(q.time - p.time, 0.0001), s = (at - p.time) / h, s2 = s * s, s3 = s2 * s;
-    return (2*s3 - 3*s2 + 1)*p.value + (s3 - 2*s2 + s)*h*p.slope + (-2*s3 + 3*s2)*q.value + (s3 - s2)*h*q.slope;
-}
+
 }
 
 bool SpeedRunCore::configure_spawn_timeline(const Dictionary &data) {
@@ -141,7 +132,7 @@ Dictionary SpeedRunCore::spawn_target(double at, bool bonus) const {
     double total = 0;
     if (!timeline.curves.empty()) {
         for (const auto &curve : timeline.curves) {
-            const double value = std::max(0.0, sample(curve, at)) * (bonus ? 1.0 : 1.0 + pop);
+            const double value = std::max(0.0, speed::PopulationSystem::sample_curve(curve, at)) * (bonus ? 1.0 : 1.0 + pop);
             per[curve.type] = double(per.get(curve.type, 0.0)) + value;
             total += value;
         }

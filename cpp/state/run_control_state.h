@@ -12,6 +12,7 @@ struct RunControlState {
     double world_scale=1, world_real_accum=0, world_dt_accum=0;
     double last_world_real_dt=0, last_world_dt=0, bonus_remaining=0, time_limit=-1;
     int64_t world_steps=0, world_tick_div=1, world_updates=0;
+    bool lab_mode=false;
     bool ui_overlay=false, ui_reward=false, time_limit_reached=false;
     godot::Vector2 camera_center, logical_size;
     double camera_zoom=1, base_view=1, zoom_ref_speed=1, zoom_exp=0, zoom_min=1, look_ahead=0;

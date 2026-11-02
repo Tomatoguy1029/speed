@@ -45,6 +45,7 @@ class SpeedRunCore : public RefCounted {
     Dictionary development_friend_command(const String &kind,const Dictionary &data);
     Dictionary development_attack_command(const String &kind,const Dictionary &payload);
     Dictionary development_contact_command(const Dictionary &payload);
+    Dictionary development_hero_command(const String &,const Dictionary &);
     Dictionary development_field_command(const String &kind,const Dictionary &payload);
     Dictionary development_hound_command(const Dictionary &payload);
     Dictionary development_combat_command(const String &kind,const Dictionary &payload);

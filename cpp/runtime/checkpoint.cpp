@@ -1,3 +1,4 @@
+#include "../systems/heroes.h"
 #include "checkpoint.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
@@ -39,6 +40,7 @@ godot::RunState clone_state(const godot::RunState &source) {
     return state;
 }
 bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) {
+    if (!HeroesSystem::validate(state,content)) return false;
     if (state.ship.shield_source_definition>content.definitions.size()) return false;
     if (!state.started || state.closed || state.next_id<=0 ||
         !std::isfinite(state.time) || !std::isfinite(state.world_time) || !std::isfinite(state.sim_time) ||

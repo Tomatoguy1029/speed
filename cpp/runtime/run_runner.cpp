@@ -1,3 +1,4 @@
+#include "../systems/heroes.h"
 #include "../behaviors/weapons/bipolar.h"
 #include "../behaviors/weapons/interceptor.h"
 #include "../behaviors/weapons/dashRangeDrone.h"
@@ -96,6 +97,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     }
     if (!core.step_ship_input(dt,world_dt,input)) return false;
     BossFinish::record_approach(core.runtime);
+    if (input.hero_press) HeroesSystem::activate(core.runtime);
+    HeroesSystem::step(core.runtime,dt,world_dt);
     if (state.phase==Phase::Play && !state.controls_locked) {
         LightLancesSystem::step(core.runtime,world_dt);
         for (const auto &owned:state.loadout.weapons) {
