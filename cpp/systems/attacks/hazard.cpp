@@ -32,7 +32,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         if (!get(state,handle)) continue;
         if (time>=state.hazards[row].delay && !hazard_act(state,handle,dt)) return true;
         const auto &pending=state.hazards[row];
-        if (time<pending.delay || pending.hit) continue;
+        if (time<pending.delay || pending.hit) {if (std::holds_alternative<HydraShapeHazard>(pending.shape)) record_ship_position(state,handle);continue;}
         if (!hazard_before_touch(state,handle)) return true;
         if (pending.zone_definition && !ZoneSystem::activate(run,handle)) {EventBuilder::flush_combat(run);return true;}
         if (!get(state,handle)) continue;
@@ -42,7 +42,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         if (circle) current.hit=true;
         const auto *contact=get(state,handle);if (!contact) continue;const auto &policy=contact->spec.contact;
         const auto previous=contact->ship_previous_ready?contact->ship_previous:state.ship.pos;
-        if (!CollisionQuery::touches(shape,{previous,state.ship.pos,state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) continue;
+        if (!CollisionQuery::touches(shape,{previous,state.ship.pos,state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) {if (std::holds_alternative<HydraShapeHazard>(current.shape)) record_ship_position(state,handle);continue;}
         if (!std::holds_alternative<WallHazard>(current.shape)) current.hit=true;
         if (circle && circle->kind!=CircleHazardKind::Blast && state.bite_zone_config.hit) {
             godot::Dictionary event;if (state.bite_zone_config.visual_key) event["visual_key"]=state.bite_zone_config.visual_key;else event["scene"]=state.bite_zone_config.scene;

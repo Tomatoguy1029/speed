@@ -893,17 +893,18 @@ static func append_draco_cycle(data: Dictionary, definition: BossDef, boss: int)
 	return OK
 ## 首の通常技の編集値を、分離前後で使う同じ型付き定義へ変換する。
 static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique not in [&"bite_thrust",&"bite_sweep",&"beam_bolt"] or bite.head_kind not in [&"bite",&"beam"]: return {}
+	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique not in [&"bite_thrust",&"bite_sweep",&"beam_bolt",&"beam_fixed"] or bite.head_kind not in [&"bite",&"beam"]: return {}
 	var records := {}
 	var values: Dictionary = definition.params.merged(bite.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64 if bite.technique==&"bite_thrust" else 65 if bite.technique==&"bite_sweep" else 66,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge if bite.technique==&"bite_thrust" else values.sweep_time if bite.technique==&"bite_sweep" else 0.0),"hold":float(values.normal_hold),"damage":float(values.beam_dmg if bite.head_kind==&"beam" else values.bite_dmg),"passes":1,"cuts":1},true)
+	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64 if bite.technique==&"bite_thrust" else 65 if bite.technique==&"bite_sweep" else 66 if bite.technique==&"beam_bolt" else 67,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge if bite.technique==&"bite_thrust" else values.sweep_time if bite.technique==&"bite_sweep" else values.beam_time if bite.technique==&"beam_fixed" else 0.0),"hold":float(values.normal_hold),"damage":float(values.beam_dmg if bite.head_kind==&"beam" else values.bite_dmg),"passes":1,"cuts":1},true)
 	records.BossTechniqueDefinition = [normal]
 	records.HydraNormalDefinition = [{"id":1,"technique":1,"head_kind":[&"bite",&"vortex",&"debris",&"beam",&"thunder"].find(bite.head_kind),"aim_tracking":float(values.get("aim_tracking",0.0)),"attack_cd":float(values.attack_cd),"bite_radius":float(values.get("bite_radius",0.0)),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(bite.technique)])}]
 	var action_rules: Resource = load("res://data/bosses/ai/hydra_action_rules.tres")
 	if bite.technique==&"bite_sweep": records.HydraSweepDefinition = [{"id":1,"technique":1,"arc":float(values.sweep_arc),"reach":float(values.sweep_reach)}]
 	if bite.technique==&"beam_bolt": records.HydraBoltDefinition = [{"id":1,"technique":1,"length":float(values.bolt_length),"width":float(values.bolt_width),"speed":float(values.bolt_speed),"life":float(values.bolt_life)}]
+	if bite.technique==&"beam_fixed": records.HydraFixedBeamDefinition = [{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width)}]
 	records.HydraNormalGate = []
 	for gate: Dictionary in action_rules.active_gates_for(String(bite.technique)):
 		records.HydraNormalGate.append({"id":records.HydraNormalGate.size()+1,"technique":1,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",1.7976931348623157e308)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"distance_origin":int(gate.get("distance_origin",0)),"angle_origin":int(gate.get("angle_origin",0)),"ignore_when_separated":bool(gate.get("ignore_when_separated",false))})

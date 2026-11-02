@@ -1134,6 +1134,32 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraFixedBeamDefinition",
+      "section": 378,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

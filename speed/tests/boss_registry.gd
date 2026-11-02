@@ -8,6 +8,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-fixed-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_fixed_interrupt")
+		return
+	if "--cpp-hydra-fixed" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_fixed")
+		return
 	if "--cpp-hydra-bolt" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_bolt")
 		return
@@ -4167,4 +4173,127 @@ func native_hydra_bolt() -> void:
 	bridge.command("dev_cancel_boss",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"本体の退場では弾を全て消す")
 	view.queue_free();bridge.dispose();await get_tree().process_frame
 	print("[cpp_hydra_bolt] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 既存の首技の正常・中断ケースを予告付き固定ビームへ接続する。
+func native_hydra_fixed() -> void:
+	var move = load("res://data/bosses/hydra_moves/beam_fixed.tres")
+	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"beam_fixed","固定ビームの編集ResourceとUID参照を分離する")
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"beam_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0},"beam_fixed")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("固定ビームの記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle+0.3)*400,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==67,"共通フローから固定ビームを自然に選ぶ")
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	bridge._core.step(0.01);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="beam" and is_equal_approx(body.effects[0].delay,0.14) and is_equal_approx(body.effects[0].life,0.4),"予告の最初の更新でcharge-tの遅れを持つビームを作る")
+	var first: Dictionary = body.effects[0].duplicate(true)
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle+0.3)*400,"velocity":Vector2.ZERO})
+	for tick in 12:
+		bridge._core.step(0.01);bridge._core.step_hazards(0.01);bridge.command("dev_boss_body_state")
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[3].glow>0.8 and body.effects[0].points!=first.points and body.effects[0].age<body.effects[0].delay,"予告中は頭と照準に点列を追従させる")
+	bridge._core.step(0.03);body=bridge.command("dev_boss_body_state").value[0]
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	check(body.necks[3].locked and bridge.command("dev_boss_state").value[0].stage==1,"chargeで首の位置と向きを固定する")
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":effect.points[0].lerp(effect.points[1],0.5),"velocity":Vector2.ZERO})
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025);body=bridge.command("dev_boss_body_state").value[0]
+	var expected: Dictionary = body.duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"予告・ビームの点列・単発命中と時計を保持して戻す")
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025);body=bridge.command("dev_boss_body_state").value[0]
+	check(body==expected and body.effects[0].points==effect.points,"復帰後も同じ固定位置と判定になる");bridge.release_checkpoint(held.value)
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="beam")
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale) and hits.size()==2 and hits[-1].payload.technique==&"beam_fixed" and hits[-1].payload.source==&"hydra","固定線分の実命中は倍率を一度だけ掛けてbeam・技・所有元を記録する")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"固定ビームの正式shot_visualへ予告と照射を渡す")
+	await get_tree().process_frame
+	for tick in 22: bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[3].mode=="idle" and body.effects.is_empty(),"照射とholdの自然終了で待ちへ戻る")
+	var first_id: int = actions[0].id
+	for tick in 20: bridge._core.step(0.025)
+	check(bridge.command("dev_boss_state").value.any(func(t): return t.kind==67 and t.id>first_id),"首の待ち後に次の固定ビームを選べる")
+	bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で予告と照射を消す")
+	bridge._core.set_attack_formation_mode(true)
+	body=bridge.command("dev_boss_body_state").value[0]
+	if body.necks[3].cd>0: bridge._core.step(body.necks[3].cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(body.facing+TAU*3/8)*400,"velocity":Vector2.ZERO})
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1})
+	check(started.ok,"首の直接入口でも固定ビームを開始する")
+	bridge._core.step(0.1);bridge.command("dev_damage",{"entity_id":head.id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[3].alive and body.effects.is_empty() and not body.boss_dead,"参加首の消失でビームを消す")
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	body=bridge.command("dev_boss_body_state").value[0]
+	if body.necks[3].cd>0: bridge._core.step(body.necks[3].cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*400,"velocity":Vector2.ZERO})
+	started=bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1});check(started.ok,"分離後も同じ固定ビームの登録を使う")
+	bridge._core.step(0.1);bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
+	effect=body.effects[0].duplicate(true)
+	check(effect.points[0].distance_to(body.necks[3].position)<0.001,"分離後は照射中も動く頭を起点にビームを更新する")
+	held=bridge.checkpoint();bridge._core.step(0.025);expected=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"分離後の照射の持続Handleも保持して戻す");bridge._core.step(0.025)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"分離後も同じ頭追従の照射へ復帰する");bridge.release_checkpoint(held.value)
+	bridge._core.step(0.4);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty() and body.necks[3].normal_phase==2,"分離後はholdへ入った更新で照射を止める")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id});view.queue_free();bridge.dispose();await get_tree().process_frame
+	print("[cpp_hydra_fixed] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 残っている首の待ちを進め、中断と分離後の未実行ケースだけを確認する。
+func native_hydra_fixed_interrupt() -> void:
+	var c := hydra_normal_case(false,{}, {"normal_charge":0.15,"beam_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0},"beam_fixed")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_attack_formation_mode(true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	if body.necks[3].cd>0: bridge._core.step(body.necks[3].cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(body.facing+TAU*3/8)*400,"velocity":Vector2.ZERO})
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1})
+	check(started.ok,"待ちが終わった首の直接入口で固定ビームを開始する")
+	if not started.ok: print("開始前: ",head," 開始結果: ",started);bridge.dispose();get_tree().quit(1);return
+	bridge._core.step(0.1);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1,"消失前に首が所有する実際の予告形を作る")
+	bridge.command("dev_damage",{"entity_id":head.id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[3].alive and body.effects.is_empty() and not body.boss_dead,"参加首の消失でビームを消す")
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	body=bridge.command("dev_boss_body_state").value[0]
+	if body.necks[3].cd>0: bridge._core.step(body.necks[3].cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*400,"velocity":Vector2.ZERO})
+	started=bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1});check(started.ok,"分離後も同じ固定ビームの登録を使う")
+	if not started.ok: print("分離後の開始前: ",head," 開始結果: ",started);bridge.dispose();get_tree().quit(1);return
+	bridge._core.step(0.1);bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1,"分離後も予告から照射へ進む")
+	if body.effects.is_empty(): bridge.dispose();get_tree().quit(1);return
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	check(effect.points[0].distance_to(body.necks[3].position)<0.001,"分離後は照射中も動く頭を起点にビームを更新する")
+	var held: Dictionary = bridge.checkpoint();bridge._core.step(0.025)
+	var expected: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"分離後の照射の持続Handleも保持して戻す");bridge._core.step(0.025)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"分離後も同じ頭追従の照射へ復帰する");bridge.release_checkpoint(held.value)
+	bridge._core.step(0.4);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty() and body.necks[3].normal_phase==2,"分離後はholdへ入った更新で照射を止める")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id});bridge.dispose()
+	print("[cpp_hydra_fixed_interrupt] failures=",failed)
 	get_tree().quit(1 if failed else 0)
