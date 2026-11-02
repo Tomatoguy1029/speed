@@ -51,8 +51,10 @@ void SpeedRunCore::move_ship(double dt, Vector2 accel) {
         runtime.state.ship.glide_t += dt;
         const double cruise = c.max_speed * c.steer_cruise;
         double sp = runtime.state.ship.glide_speed;
-        const double hold = c.glide_hold * c.glide_duration_mult;
-        const double fade = c.glide_fade * c.glide_duration_mult;
+        const double distance_ratio=std::clamp(runtime.state.draw.total/std::max(runtime.state.draw_config.length,1.0),0.0,1.0);
+        const double duration_mult=distance_ratio*c.glide_duration_mult;
+        const double hold = c.glide_hold * duration_mult;
+        const double fade = c.glide_fade * duration_mult;
         if (runtime.state.ship.glide_t > hold) {
             const double k = (runtime.state.ship.glide_t - hold) / std::max(0.001, fade);
             if (k >= 1) { runtime.state.ship.glide = false; sp = cruise; }

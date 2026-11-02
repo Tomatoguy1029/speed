@@ -66,6 +66,13 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t31" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t31()
+		check(finished,"慣性航行の確認を最後まで実施する")
+		print("[cpp_t31] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t14" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t14()
 		check(finished,"軌跡延長の確認を最後まで実施する")
@@ -971,4 +978,96 @@ func check_cpp_t14() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"軌跡延長の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func check_cpp_t31() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.world_tick_div = 1
+	var definition: TraitDef = load("res://data/traits/T31_glideDuration.tres")
+	var bridge = t07_bridge(config,{"mult":{"length":2.0}})
+	if bridge==null: return false
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	check(bridge._ui.glide_duration_mult==1.0,"取得前は勢いの時間倍率1を使う")
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T31","levels":1}).ok,"T31を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.glide_duration_mult,1.0+definition.stack_bonus(level)),"tresの各段を勢いの時間倍率へ一度適用する")
+	var multiplier: float = bridge._ui.glide_duration_mult
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T31","levels":1}).ok and bridge._ui.glide_duration_mult==multiplier,"上限を越えて勢いの時間を延ばさない")
+	var start: Vector2 = core.ship_snapshot().ship_pos
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
+	core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0)
+	var target: int = core.spawn_enemy(&"drifter",start+Vector2(200,100),{"facing":0.0})
+	bridge.step(1.0/120.0,idle,viewport)
+	var locked: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].facing
+	check(is_equal_approx(locked,0.0),"なぞり中は自律操舵を止める")
+	core.step_draw(10.0)
+	check(core.ship_snapshot().glide and is_equal_approx(core.draw_snapshot().trace_total,config.draw_length*0.5),"実際の短いなぞりを完走して勢いへ入る")
+	var tracking_saved: Dictionary = bridge.checkpoint()
+	bridge.step(1.0/120.0,idle,viewport)
+	var unlocked: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].facing
+	check(absf(unlocked-locked)>0.001 and core.ship_snapshot().glide,"勢いの間はTrackingPolicyの抑制を続けない")
+	bridge.restore(tracking_saved.value)
+	bridge.collect_frame()
+	bridge.release_checkpoint(tracking_saved.value)
+	bridge.command("dev_remove",{"entity_id":target})
+	var beginning: Dictionary = bridge.checkpoint()
+	var initial: Dictionary = core.ship_snapshot()
+	var hold := config.glide_hold*0.5*multiplier
+	var fade := config.glide_fade*0.5*multiplier
+	var first_dt := hold*0.5
+	check(core.step_ship(first_dt,first_dt,{"touch":true,"stick_active":true,"stick":Vector2.UP*(config.stick_dead_zone+1.0)}),"勢いの保持中も機体を操舵する")
+	var held: Dictionary = core.ship_snapshot()
+	check(held.glide and is_equal_approx(held.ship_vel.length(),initial.glide_speed) and absf(held.ship_vel.angle()-initial.ship_vel.angle())>0.01,"保持速度を保ちながら向きを変えられる")
+	var mid_time := hold+fade*0.5
+	core.step_ship(mid_time-first_dt,mid_time-first_dt,{})
+	var mid: Dictionary = core.ship_snapshot()
+	var cruise := config.base_max_speed*config.steer_cruise
+	check(mid.glide and is_equal_approx(mid.glide_t,mid_time) and is_equal_approx(mid.ship_vel.length(),lerpf(initial.glide_speed,cruise,0.5)),"実走距離比と特性の倍率を使った時間で減速する")
+	var saved: Dictionary = bridge.checkpoint()
+	bridge.command("dev_remove_trait",{"id":"T31"})
+	check(bridge._ui.glide_duration_mult==1.0 and core.ship_snapshot().glide_t==mid.glide_t,"解除で倍率だけを戻し、進行中の時間を巻き戻さない")
+	check(bridge.restore(saved.value).ok,"所持段と減速中の進行・倍率を保持して復帰する")
+	bridge.collect_frame()
+	check(core.ship_snapshot()==mid and bridge._ui.glide_duration_mult==multiplier,"復帰後も同じ勢いの進行へ戻る")
+	bridge.release_checkpoint(saved.value)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(hud._cpp_ui.glide_duration_mult==multiplier and hud._cpp_ui.glide,"HUDへ同じ倍率と勢いの状態を渡す")
+	hud.free()
+	core.step_ship(fade*0.5+0.01,fade*0.5+0.01,{})
+	check(not core.ship_snapshot().glide and is_equal_approx(core.ship_snapshot().ship_vel.length(),cruise),"短いなぞりの保持と減速が終わると巡航へ戻る")
+	bridge.restore(beginning.value)
+	bridge.collect_frame()
+	bridge.command("dev_remove_trait",{"id":"T31"})
+	var ordinary_time := (config.glide_hold+config.glide_fade)*0.5+0.01
+	core.step_ship(ordinary_time,ordinary_time,{})
+	check(not core.ship_snapshot().glide,"未取得では同じ距離の勢いが元の時間で終わる")
+	bridge.restore(beginning.value)
+	bridge.collect_frame()
+	bridge.release_checkpoint(beginning.value)
+	# 延長した線でも距離比は1まで。倍の長さで時間まで倍にしない。
+	core.step_draw(config.dash_charge_time*2.0)
+	bridge.command("dev_ship_motion",{"position":Vector2(-3000,0),"velocity":Vector2.ZERO})
+	start = core.ship_snapshot().ship_pos
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},200,1.0)
+	core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(config.draw_length*4.0,0)},300,1.0)
+	core.step_draw(10.0)
+	check(core.ship_snapshot().glide and core.draw_snapshot().trace_total>config.draw_length,"基礎距離を越える延長した線を完走する")
+	var maximum_time := (config.glide_hold+config.glide_fade)*multiplier+0.01
+	core.step_ship(maximum_time,maximum_time,{})
+	check(not core.ship_snapshot().glide,"長いなぞりでも距離比を1で止めた時間で終了する")
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"慣性航行の状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true

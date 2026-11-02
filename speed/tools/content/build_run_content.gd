@@ -93,8 +93,8 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var weapon := load("res://data/weapons/W01_forward.tres") as WeaponDef
 	if weapon==null: return {}
 	data.LoadoutDefinition = [{"id":1,"kind":0,"maximum_level":weapon.level_steps.size(),"external_id":String(weapon.id),"comet_only":weapon.comet_only}]
-	for id in ["T34","T35","T36","T07","T08","T09","T10","T11","T12","T14"]:
-		var trait_def := load("res://data/traits/%s_%s.tres" % [id,{"T34":"bigSwing","T35":"multiShot","T36":"fullBurst","T07":"quickCharge","T08":"capacity","T09":"critRate","T10":"speed","T11":"attack","T12":"pickup","T14":"length"}[id]]) as TraitDef
+	for id in ["T34","T35","T36","T07","T08","T09","T10","T11","T12","T14","T31"]:
+		var trait_def := load("res://data/traits/%s_%s.tres" % [id,{"T34":"bigSwing","T35":"multiShot","T36":"fullBurst","T07":"quickCharge","T08":"capacity","T09":"critRate","T10":"speed","T11":"attack","T12":"pickup","T14":"length","T31":"glideDuration"}[id]]) as TraitDef
 		if trait_def==null: return {}
 		var equipment_id: int = data.LoadoutDefinition.size()+1
 		data.LoadoutDefinition.append({"id":equipment_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":id,"comet_only":false})
@@ -109,7 +109,8 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 				"speed_bonus":trait_def.stack_bonus(level) if id=="T10" else 0.0,
 				"attack_bonus":trait_def.stack_bonus(level) if id=="T11" else 0.0,
 				"pickup_bonus":trait_def.stack_bonus(level) if id=="T12" else 0.0,
-				"length_bonus":trait_def.stack_bonus(level) if id=="T14" else 0.0})
+				"length_bonus":trait_def.stack_bonus(level) if id=="T14" else 0.0,
+				"glide_bonus":trait_def.stack_bonus(level) if id=="T31" else 0.0})
 	if config.post_max==null: return {}
 	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
 	var crit_definition := load("res://data/traits/T09_critRate.tres") as TraitDef

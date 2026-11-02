@@ -977,6 +977,7 @@ struct NumericTraitLevel {
     double attack_bonus{};
     double pickup_bonus{};
     double length_bonus{};
+    double glide_bonus{};
 };
 inline bool read(BinaryReader &input, NumericTraitLevel &out) {
     if (!input.read_u32(out.id)) return false;
@@ -1005,6 +1006,8 @@ inline bool read(BinaryReader &input, NumericTraitLevel &out) {
     if (out.pickup_bonus < 0) return false;
     if (!input.read_f64(out.length_bonus)) return false;
     if (out.length_bonus < 0) return false;
+    if (!input.read_f64(out.glide_bonus)) return false;
+    if (out.glide_bonus < 0) return false;
     return true;
 }
 struct PostMaxChargeDefinition {
@@ -1313,8 +1316,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 30: {
-        if (version != 8) return false;
-        if (count > input.remaining()/92) return false;
+        if (version != 9) return false;
+        if (count > input.remaining()/100) return false;
         for (uint32_t i=0; i<count; ++i) { NumericTraitLevel row; if (!read(input,row)) return false; out.NumericTraitLevel_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
