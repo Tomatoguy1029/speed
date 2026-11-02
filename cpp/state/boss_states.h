@@ -90,6 +90,7 @@ struct FlowNodeState {
 };
 struct BossFlowState {
     uint32_t definition=0,index=0,rest_next=0,completed_actions=0,phase=1;
+    int32_t last_category_override=-1;
     EnemyHandle actor;
     bool active=false,waiting=false,blocked=false,suspended=false,selection_enabled=true;
     double clock=0,retry=0,stamina=0,rest_remaining=0,section_spent=0,interval=0,no_candidate_elapsed=0,post_gap=0;
@@ -169,7 +170,24 @@ struct DracoBodyState {
     std::vector<godot::Vector2> trail,pose,override_points;
     double width=154,head_scale=1.35,depth=1,alpha=1;
 };
+enum class HydraSquadRole : uint32_t {Close,Front,Attack,Block,Bearer};
+struct HydraSquadMotion {
+    bool attack=false,front=false,counter=false,ready=false,has_goal=false,look_on=true;
+    int32_t block=-1,slot=0,slot_count=1;
+    uint32_t move=0;
+    double reserved=0,attack_angle=0,wait=0,last_attack=-9,close_angle=0,close_radius=0,detour_side=0,look_time=0,look_offset=0;
+    godot::Vector2 goal,block_target,separation;
+};
+struct HydraSquadState {
+    godot::Vector2 predicted,bearer_goal;
+    double replan_time=0,formation_angle=0,reorient_time=0,bearer_replan=0,panic=0,panic_cooldown=0,tactic_time=0,attack_gap=1,pair_elapsed=0,wave_angle=0,wave_gap=0.6,counter_time=0;
+    bool chasing=false,pair_launched=false,has_wave_angle=false,suspended=false;
+    int32_t tactic=-1,section_index=-1;
+    EnemyHandle wave_current;
+    std::vector<EnemyHandle> roster,pair;
+};
 struct HydraNeckState {
+    HydraSquadMotion motion;
     HydraHeadKind kind=HydraHeadKind::Bite;
     EnemyHandle actor;
     int64_t id=0;
@@ -184,7 +202,7 @@ struct HydraNeckState {
     double weights[6]={};
     std::vector<godot::Vector2> points;
 };
-struct HydraBodyState {DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
+struct HydraBodyState {HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
     HydraBodyState hydra;
     DracoBodyState draco;

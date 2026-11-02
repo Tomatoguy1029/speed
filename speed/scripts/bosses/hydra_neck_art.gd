@@ -53,6 +53,11 @@ func _draw() -> void:
 		if frame.has("bearer"):
 			var bearer: Dictionary = frame.bearer
 			if not heads_only: _chain(bearer.points,factor,frame.necks.size(),true)
+			elif bearer.alive:
+				var texture: Texture2D = head_textures.get(&"immortal")
+				if texture!=null:
+					draw_set_transform(bearer.position-frame.position,float(bearer.facing)-PI*0.5,Vector2.ONE*factor)
+					draw_texture(texture,-texture.get_size()*0.5)
 		draw_set_transform(Vector2.ZERO)
 		return
 	if host == null or host.ctx == null or not host.has_body(): return

@@ -356,6 +356,722 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "HydraSquadDefinition",
+      "section": 375,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "counter_max",
+          "type": "f64"
+        },
+        {
+          "name": "counter_gap",
+          "type": "f64"
+        },
+        {
+          "name": "counter_sight",
+          "type": "f64"
+        },
+        {
+          "name": "counter_range_cap",
+          "type": "f64"
+        },
+        {
+          "name": "counter_extra",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wave_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wall_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wall_near_weight",
+          "type": "f64"
+        },
+        {
+          "name": "repeat_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wall_time_x",
+          "type": "f64"
+        },
+        {
+          "name": "wall_time_y",
+          "type": "f64"
+        },
+        {
+          "name": "tactic_time_x",
+          "type": "f64"
+        },
+        {
+          "name": "tactic_time_y",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_velocity",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_idle_noise",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_noise",
+          "type": "f64"
+        },
+        {
+          "name": "attack_arrival",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_timeout",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_gap_x",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_gap_y",
+          "type": "f64"
+        },
+        {
+          "name": "initial_gap_x",
+          "type": "f64"
+        },
+        {
+          "name": "initial_gap_y",
+          "type": "f64"
+        },
+        {
+          "name": "wave_candidates",
+          "type": "f64"
+        },
+        {
+          "name": "wave_repeat_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wave_separation",
+          "type": "f64"
+        },
+        {
+          "name": "wave_timeout",
+          "type": "f64"
+        },
+        {
+          "name": "wave_gap_x",
+          "type": "f64"
+        },
+        {
+          "name": "wave_gap_y",
+          "type": "f64"
+        },
+        {
+          "name": "pick_band",
+          "type": "f64"
+        },
+        {
+          "name": "pick_distance",
+          "type": "f64"
+        },
+        {
+          "name": "pick_rest",
+          "type": "f64"
+        },
+        {
+          "name": "pick_front_weight",
+          "type": "f64"
+        },
+        {
+          "name": "pick_front_distance",
+          "type": "f64"
+        },
+        {
+          "name": "lunge_momentum",
+          "type": "f64"
+        },
+        {
+          "name": "look_forward_noise",
+          "type": "f64"
+        },
+        {
+          "name": "look_forward_turn",
+          "type": "f64"
+        },
+        {
+          "name": "look_player_turn",
+          "type": "f64"
+        },
+        {
+          "name": "look_wave",
+          "type": "f64"
+        },
+        {
+          "name": "look_wave_speed",
+          "type": "f64"
+        },
+        {
+          "name": "look_near_extra",
+          "type": "f64"
+        },
+        {
+          "name": "alignment_cap",
+          "type": "f64"
+        },
+        {
+          "name": "alignment_weight",
+          "type": "f64"
+        },
+        {
+          "name": "arrival",
+          "type": "f64"
+        },
+        {
+          "name": "arrival_drift",
+          "type": "f64"
+        },
+        {
+          "name": "arrival_drift_distance",
+          "type": "f64"
+        },
+        {
+          "name": "attack_speed",
+          "type": "f64"
+        },
+        {
+          "name": "avoid_reduction",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_arrival",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_band_x",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_band_y",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_drift",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_near_speed",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_panic_speed",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_radius",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_replan",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_ring",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_speed",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_turn",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_wall_band_x",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_wall_band_y",
+          "type": "f64"
+        },
+        {
+          "name": "block_arrival",
+          "type": "f64"
+        },
+        {
+          "name": "block_count",
+          "type": "f64"
+        },
+        {
+          "name": "block_distance",
+          "type": "f64"
+        },
+        {
+          "name": "block_force_cap",
+          "type": "f64"
+        },
+        {
+          "name": "block_fraction",
+          "type": "f64"
+        },
+        {
+          "name": "block_predict",
+          "type": "f64"
+        },
+        {
+          "name": "block_response",
+          "type": "f64"
+        },
+        {
+          "name": "block_separation",
+          "type": "f64"
+        },
+        {
+          "name": "block_speed",
+          "type": "f64"
+        },
+        {
+          "name": "block_spread",
+          "type": "f64"
+        },
+        {
+          "name": "block_turn",
+          "type": "f64"
+        },
+        {
+          "name": "body_length",
+          "type": "f64"
+        },
+        {
+          "name": "body_radius",
+          "type": "f64"
+        },
+        {
+          "name": "body_step",
+          "type": "f64"
+        },
+        {
+          "name": "body_weight",
+          "type": "f64"
+        },
+        {
+          "name": "chase_extra",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_0",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_1",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_2",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_3",
+          "type": "f64"
+        },
+        {
+          "name": "close_radii_0",
+          "type": "f64"
+        },
+        {
+          "name": "close_radii_1",
+          "type": "f64"
+        },
+        {
+          "name": "close_sight",
+          "type": "f64"
+        },
+        {
+          "name": "close_speed",
+          "type": "f64"
+        },
+        {
+          "name": "cohesion_cap",
+          "type": "f64"
+        },
+        {
+          "name": "cohesion_weight",
+          "type": "f64"
+        },
+        {
+          "name": "detour_radius",
+          "type": "f64"
+        },
+        {
+          "name": "detour_seek",
+          "type": "f64"
+        },
+        {
+          "name": "far_distance",
+          "type": "f64"
+        },
+        {
+          "name": "far_speed",
+          "type": "f64"
+        },
+        {
+          "name": "flee_candidates",
+          "type": "f64"
+        },
+        {
+          "name": "flee_distance_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_far_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_guard_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_margin",
+          "type": "f64"
+        },
+        {
+          "name": "flee_noise",
+          "type": "f64"
+        },
+        {
+          "name": "flee_view_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_wall_weight",
+          "type": "f64"
+        },
+        {
+          "name": "force_cap",
+          "type": "f64"
+        },
+        {
+          "name": "front_count",
+          "type": "f64"
+        },
+        {
+          "name": "front_fraction",
+          "type": "f64"
+        },
+        {
+          "name": "front_loyalty",
+          "type": "f64"
+        },
+        {
+          "name": "front_near_count",
+          "type": "f64"
+        },
+        {
+          "name": "front_outer",
+          "type": "f64"
+        },
+        {
+          "name": "front_pick_distance",
+          "type": "f64"
+        },
+        {
+          "name": "front_radius_x",
+          "type": "f64"
+        },
+        {
+          "name": "front_radius_y",
+          "type": "f64"
+        },
+        {
+          "name": "front_sight",
+          "type": "f64"
+        },
+        {
+          "name": "front_spacing",
+          "type": "f64"
+        },
+        {
+          "name": "front_speed",
+          "type": "f64"
+        },
+        {
+          "name": "front_spread",
+          "type": "f64"
+        },
+        {
+          "name": "front_spread_max",
+          "type": "f64"
+        },
+        {
+          "name": "gain",
+          "type": "f64"
+        },
+        {
+          "name": "goal_response",
+          "type": "f64"
+        },
+        {
+          "name": "neighbor_radius",
+          "type": "f64"
+        },
+        {
+          "name": "neighbor_soft",
+          "type": "f64"
+        },
+        {
+          "name": "panic_cooldown",
+          "type": "f64"
+        },
+        {
+          "name": "panic_distance",
+          "type": "f64"
+        },
+        {
+          "name": "panic_radius",
+          "type": "f64"
+        },
+        {
+          "name": "panic_time",
+          "type": "f64"
+        },
+        {
+          "name": "predict",
+          "type": "f64"
+        },
+        {
+          "name": "reorient",
+          "type": "f64"
+        },
+        {
+          "name": "reorient_gap",
+          "type": "f64"
+        },
+        {
+          "name": "replan_x",
+          "type": "f64"
+        },
+        {
+          "name": "replan_y",
+          "type": "f64"
+        },
+        {
+          "name": "seek_cap",
+          "type": "f64"
+        },
+        {
+          "name": "separation_cap",
+          "type": "f64"
+        },
+        {
+          "name": "separation_radius",
+          "type": "f64"
+        },
+        {
+          "name": "separation_tau",
+          "type": "f64"
+        },
+        {
+          "name": "separation_weight",
+          "type": "f64"
+        },
+        {
+          "name": "sight_distance",
+          "type": "f64"
+        },
+        {
+          "name": "sight_floor",
+          "type": "f64"
+        },
+        {
+          "name": "slot_margin",
+          "type": "f64"
+        },
+        {
+          "name": "turn",
+          "type": "f64"
+        },
+        {
+          "name": "urgency",
+          "type": "f64"
+        },
+        {
+          "name": "velocity_cap",
+          "type": "f64"
+        },
+        {
+          "name": "velocity_floor",
+          "type": "f64"
+        },
+        {
+          "name": "view_margin_x",
+          "type": "f64"
+        },
+        {
+          "name": "view_margin_y",
+          "type": "f64"
+        },
+        {
+          "name": "wall_max",
+          "type": "f64"
+        },
+        {
+          "name": "wall_spread",
+          "type": "f64"
+        },
+        {
+          "name": "busy_windup",
+          "type": "f64"
+        },
+        {
+          "name": "busy_active",
+          "type": "f64"
+        },
+        {
+          "name": "busy_hold",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_limit",
+          "type": "f64"
+        },
+        {
+          "name": "range_bite",
+          "type": "f64"
+        },
+        {
+          "name": "range_thunder",
+          "type": "f64"
+        },
+        {
+          "name": "range_vortex",
+          "type": "f64"
+        },
+        {
+          "name": "range_debris",
+          "type": "f64"
+        },
+        {
+          "name": "range_beam",
+          "type": "f64"
+        }
+      ]
     }
   ],
   "enums": {

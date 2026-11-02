@@ -129,7 +129,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_filters=records.BossFlowFilter_rows;
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
-    bundle->hydra_bodies=records.HydraBodyDefinition_rows;bundle->hydra_regrow=records.HydraRegrowDefinition_rows;bundle->hydra_normals=records.HydraNormalDefinition_rows;bundle->hydra_normal_gates=records.HydraNormalGate_rows;bundle->hydra_swim=records.HydraSwimDefinition_rows;
+    bundle->hydra_bodies=records.HydraBodyDefinition_rows;bundle->hydra_regrow=records.HydraRegrowDefinition_rows;bundle->hydra_normals=records.HydraNormalDefinition_rows;bundle->hydra_normal_gates=records.HydraNormalGate_rows;bundle->hydra_swim=records.HydraSwimDefinition_rows;bundle->hydra_squad=records.HydraSquadDefinition_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
     bundle->draco_bodies=records.DracoBodyDefinition_rows;
     bundle->draco_cycles=records.DracoCycleDefinition_rows;
@@ -845,7 +845,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (body.id!=i+1 || body.phase_threshold<=0 || body.phase_threshold>=1 || body.final_widen_time<=0 || bundle->definitions[body.enemy-1].kind!=(boss.kind==0?EnemyDefinition::Kind::Monoceros:boss.kind==1?EnemyDefinition::Kind::Centaurus:boss.kind==2?EnemyDefinition::Kind::CanisMajor:boss.kind==3?EnemyDefinition::Kind::Hydra:EnemyDefinition::Kind::Draco)) return {};
     }
     for (size_t i=0;i<bundle->hydra_bodies.size();++i) {const auto &p=bundle->hydra_bodies[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || p.neck_rest<=0 || p.head_hp<=0 || p.neck_segments<4 || p.neck_segments>32 || p.neck_iterations>12 || p.arena_x<=0 || p.arena_y<=0) return {};for (auto head:{p.bite,p.vortex,p.debris,p.beam,p.thunder}) if (bundle->definitions[head-1].kind!=EnemyDefinition::Kind::Part) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_bodies[j].boss==p.boss) return {};}
-    if (bundle->hydra_swim.size()!=bundle->hydra_bodies.size()) return {};
+    if (bundle->hydra_swim.size()!=bundle->hydra_bodies.size() || bundle->hydra_squad.size()!=bundle->hydra_bodies.size()) return {};
+    for (size_t i=0;i<bundle->hydra_squad.size();++i) {const auto &p=bundle->hydra_squad[i];if (p.id!=i+1 || p.boss!=bundle->hydra_bodies[i].boss || p.separation_tau<=0 || p.arrival<=0 || p.front_radius_x<=0 || p.pick_rest<=0 || p.body_step<=0 || p.flee_candidates<1 || p.wave_candidates<1) return {};}
     for (size_t i=0;i<bundle->hydra_swim.size();++i) {const auto &p=bundle->hydra_swim[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || bundle->definitions[p.immortal-1].kind!=EnemyDefinition::Kind::Part || p.immortal_hp<=0 || p.snake_speed<=0 || p.snake_turn<=0) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_swim[j].boss==p.boss) return {};}
     for (size_t i=0;i<bundle->hydra_normals.size();++i) {const auto &p=bundle->hydra_normals[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=64 || p.bite_radius<=0) return {};}
     for (size_t i=0;i<bundle->hydra_normal_gates.size();++i) {const auto &p=bundle->hydra_normal_gates[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=64 || p.minimum>p.maximum || p.half_angle<0 || p.half_angle>3.141592653589793) return {};}

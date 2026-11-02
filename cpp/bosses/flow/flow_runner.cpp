@@ -1,4 +1,6 @@
 #include "flow_runner.h"
+#include "../hydra/normal_attack.h"
+#include "../hydra/squad.h"
 #include "technique_runner.h"
 #include "phase_controller.h"
 #include "../monoceros/charge.h"
@@ -33,7 +35,9 @@ bool available(const RunRuntime &r,const BossFlowState &f,uint32_t id,unsigned d
     if (!id || id>r.content->flow_nodes.size() || depth>24) return false;const auto &p=r.content->flow_nodes[id-1];const auto list=children(*r.content,id);
     if (p.kind==0) return true;
     if (p.kind==1) {
-        const auto actor=participant(f,p.participant);return PhaseController::can_start(r,actor) && !actor_busy(r,actor) && cooldown_ready(r,f,p) && FlowRunner::condition(r,f,p.condition,filtered_target(*r.content,p),p.participant) && TechniqueRunner::ready(r,actor,phase_technique(r,f,p.technique));
+        const auto actor=participant(f,p.participant);
+        if (!depth && p.technique && r.content->boss_techniques[p.technique-1].kind==64) {auto &runtime=const_cast<RunRuntime &>(r);auto *b=HydraNormalAttack::body(runtime,actor);if (b && b->hydra.separated) {const auto *n=HydraNormalAttack::neck(*b,actor);if (!n || !n->motion.attack || !n->motion.ready || n->motion.move!=p.technique) return false;}}
+        return PhaseController::can_start(r,actor) && !actor_busy(r,actor) && cooldown_ready(r,f,p) && (r.content->boss_techniques[p.technique-1].kind==64 || FlowRunner::condition(r,f,p.condition,filtered_target(*r.content,p),p.participant)) && TechniqueRunner::ready(r,actor,phase_technique(r,f,p.technique));
     }
     if (list.empty()) return false;
     if (p.kind==2) return available(r,f,list.front(),depth+1);
@@ -48,7 +52,7 @@ void cancel_node(RunRuntime &r,BossFlowState &f,uint32_t row) {
     if (n.child!=UINT32_MAX) cancel_node(r,f,n.child);for (auto child:n.branches) cancel_node(r,f,child);n.status=FlowStatus::Cancelled;
 }
 uint32_t new_node(BossFlowState &f,uint32_t definition) {const uint32_t row=f.nodes.size();FlowNodeState n;n.definition=definition;f.nodes.push_back(n);return row;}
-FlowStatus tick_node(RunRuntime &r,BossFlowState &f,uint32_t row,double dt) {
+FlowStatus tick_node(RunRuntime &r,BossFlowState &f,uint32_t row,double dt,bool internal=false) {
     if (f.nodes[row].status!=FlowStatus::Running || dt<=0) return f.nodes[row].status;
     const auto &p=r.content->flow_nodes[f.nodes[row].definition-1];const auto list=children(*r.content,p.id);
     if (p.kind==0) {f.nodes[row].elapsed+=dt;if (f.nodes[row].elapsed>=p.seconds) f.nodes[row].status=FlowStatus::Finished;}
@@ -56,13 +60,13 @@ FlowStatus tick_node(RunRuntime &r,BossFlowState &f,uint32_t row,double dt) {
         auto &n=f.nodes[row];
         if (!n.ticket.generation) {
             const uint32_t technique=phase_technique(r,f,p.technique);
-            if (!available(r,f,p.id)) n.status=FlowStatus::Failed;
+            if (!available(r,f,p.id,internal?1:0)) n.status=FlowStatus::Failed;
             else {
                 const auto &rule=r.content->boss_techniques[technique-1];const auto actor=participant(f,p.participant);const auto id=r.state.enemy_handles.entity_id(actor);
-                bool admitted=true;if (!r.state.world.attack_formation_mode && r.state.world.attack_budget.enabled) admitted=AttackBudgetSystem(r).request({"boss:"+std::to_string(id),{AttackCategory::Aimed},actor,TechniqueRunner::attack_length(r,actor,technique),1.5,1});
+                bool admitted=true;if (rule.kind!=64 && !r.state.world.attack_formation_mode && r.state.world.attack_budget.enabled) admitted=AttackBudgetSystem(r).request({"boss:"+std::to_string(id),{AttackCategory::Aimed},actor,TechniqueRunner::attack_length(r,actor,technique),1.5,1});
                 if (admitted) n.ticket=TechniqueRunner::begin(r,actor,technique);
                 if (!r.state.bosses.handles.contains(n.ticket)) n.status=FlowStatus::Failed;
-                else {++r.state.bosses.techniques[n.ticket.slot].ticket_refs;const uint64_t key=uint64_t(p.participant)<<32|p.technique;if (r.content->bosses[rule.boss-1].kind==2) f.cooldown_started[key]=PhaseController::find(r,actor)->clock;else f.cooldowns[key]=f.clock+rule.cd;}
+                else {if (auto *b=HydraNormalAttack::body(r,actor)) {if (auto *neck=HydraNormalAttack::neck(*b,actor)) HydraSquad::started(*b,*neck);}++r.state.bosses.techniques[n.ticket.slot].ticket_refs;const uint64_t key=uint64_t(p.participant)<<32|p.technique;if (r.content->bosses[rule.boss-1].kind==2) f.cooldown_started[key]=PhaseController::find(r,actor)->clock;else f.cooldowns[key]=f.clock+rule.cd;}
             }
         } else if (!r.state.bosses.handles.contains(n.ticket)) n.status=FlowStatus::Failed;
         else {const auto stage=r.state.bosses.techniques[n.ticket.slot].stage;if (stage==TechniqueStage::Failed || stage==TechniqueStage::Cancelled) n.status=FlowStatus::Failed;else if (!TechniqueRunner::running(r,n.ticket)) n.status=FlowStatus::Finished;}
@@ -71,18 +75,18 @@ FlowStatus tick_node(RunRuntime &r,BossFlowState &f,uint32_t row,double dt) {
         if (f.nodes[row].cursor>=list.size()) f.nodes[row].status=FlowStatus::Finished;
         else {
             if (f.nodes[row].child==UINT32_MAX) {const auto child=new_node(f,list[f.nodes[row].cursor]);f.nodes[row].child=child;}
-            const auto result=tick_node(r,f,f.nodes[row].child,dt);
+            const auto result=tick_node(r,f,f.nodes[row].child,dt,true);
             if (result==FlowStatus::Failed || result==FlowStatus::Cancelled) f.nodes[row].status=FlowStatus::Failed;
             else if (result==FlowStatus::Finished) {++f.nodes[row].cursor;f.nodes[row].child=UINT32_MAX;if (f.nodes[row].cursor>=list.size()) f.nodes[row].status=FlowStatus::Finished;}
         }
     } else if (p.kind==3) {
         if (f.nodes[row].branches.empty()) for (auto definition:list) {const auto child=new_node(f,definition);f.nodes[row].branches.push_back(child);}
         const auto branches=f.nodes[row].branches;uint32_t done=0;
-        for (auto child:branches) {const auto result=tick_node(r,f,child,dt);if (result==FlowStatus::Failed || result==FlowStatus::Cancelled) {cancel_node(r,f,row);f.nodes[row].status=FlowStatus::Failed;return FlowStatus::Failed;}if (result==FlowStatus::Finished) ++done;}
+        for (auto child:branches) {const auto result=tick_node(r,f,child,dt,true);if (result==FlowStatus::Failed || result==FlowStatus::Cancelled) {cancel_node(r,f,row);f.nodes[row].status=FlowStatus::Failed;return FlowStatus::Failed;}if (result==FlowStatus::Finished) ++done;}
         if (done==branches.size()) f.nodes[row].status=FlowStatus::Finished;
     } else {
         if (f.nodes[row].child==UINT32_MAX) {const auto child=new_node(f,list[FlowRunner::condition(r,f,p.condition,true,p.participant)?0:1]);f.nodes[row].child=child;}
-        f.nodes[row].status=tick_node(r,f,f.nodes[row].child,dt);
+        f.nodes[row].status=tick_node(r,f,f.nodes[row].child,dt,true);
     }
     return f.nodes[row].status;
 }
@@ -93,15 +97,20 @@ std::array<double,4> weights(const ContentBundle &c,const BossFlowSection &p,uin
     for (const auto &w:c.flow_weights) if (w.section==p.id && w.previous==(has?int64_t(previous):-1)) out[w.category]=w.weight;return out;
 }
 bool compatible(const ContentBundle &c,const BossFlowSection &s,const std::vector<uint32_t> &actions,uint32_t next,double cap) {
-    const auto &b=c.flow_actions[next-1];double cost=b.cost;for (auto id:actions) {const auto &a=c.flow_actions[id-1];cost+=a.cost;if (a.exclusive || b.exclusive) return false;for (const auto &p:c.flow_forbidden) if (p.section==s.id && ((p.left==a.external_id && p.right==b.external_id) || (p.right==a.external_id && p.left==b.external_id))) return false;}return cost<=cap+0.00001;
+    const auto &b=c.flow_actions[next-1];double cost=b.cost;for (auto id:actions) {const auto &a=c.flow_actions[id-1];cost+=a.cost;if (a.exclusive || b.exclusive) return false;const auto &left=c.flow_nodes[a.node-1],&right=c.flow_nodes[b.node-1];if (left.kind==1 && right.kind==1 && c.boss_techniques[left.technique-1].kind==64 && c.boss_techniques[right.technique-1].kind==64 && left.participant==right.participant) return false;for (const auto &p:c.flow_forbidden) if (p.section==s.id && ((p.left==a.external_id && p.right==b.external_id) || (p.right==a.external_id && p.left==b.external_id))) return false;}return cost<=cap+0.00001;
 }
 std::vector<uint32_t> choose(RunRuntime &r,const BossFlowState &f,const BossFlowSection &section,const std::vector<uint32_t> &candidates,double cap) {
-    const auto &c=*r.content;const auto w=weights(c,section,category(c,f.last));
+    const auto &c=*r.content;const auto w=weights(c,section,f.last_category_override>=0?f.last_category_override:category(c,f.last));
     struct Identity {std::string name;std::vector<std::vector<uint32_t>> variants;};struct Group {uint32_t category;std::vector<Identity> identities;};std::vector<Group> groups;
-    const auto add=[&](uint32_t kind,std::vector<uint32_t> actions) {auto g=std::find_if(groups.begin(),groups.end(),[&](const auto &g){return g.category==kind;});if (g==groups.end()) {groups.push_back({kind,{}});g=groups.end()-1;}const auto key=identity(c,actions);auto id=std::find_if(g->identities.begin(),g->identities.end(),[&](const auto &p){return p.name==key;});if (id==g->identities.end()) {g->identities.push_back({key,{}});id=g->identities.end()-1;}id->variants.push_back(std::move(actions));};
-    for (auto id:candidates) add(c.flow_actions[id-1].category,{id});
-    if (c.boss_flows[f.definition-1].allow_parallel && w[3]>0) for (size_t i=0;i<candidates.size();++i) if (c.flow_actions[candidates[i]-1].category==0) for (size_t j=i+1;j<candidates.size();++j) if (c.flow_actions[candidates[j]-1].category==0 && compatible(c,section,{candidates[i]},candidates[j],cap)) add(3,{candidates[i],candidates[j]});
-    const auto previous=identity(c,f.last);
+    const auto add=[&](uint32_t kind,std::vector<uint32_t> actions) {auto g=std::find_if(groups.begin(),groups.end(),[&](const auto &g){return g.category==kind;});if (g==groups.end()) {groups.push_back({kind,{}});g=groups.end()-1;}const auto key=identity(c,kind==0 && actions.size()>1?std::vector<uint32_t>{actions.front()}:actions);auto id=std::find_if(g->identities.begin(),g->identities.end(),[&](const auto &p){return p.name==key;});if (id==g->identities.end()) {g->identities.push_back({key,{}});id=g->identities.end()-1;}id->variants.push_back(std::move(actions));};
+    std::vector<uint32_t> squad;auto *hydra=HydraNormalAttack::body(r,f.actor);
+    if (hydra && hydra->hydra.separated && hydra->hydra.squad.tactic==0 && !hydra->hydra.squad.pair.empty()) {
+        for (auto actor:hydra->hydra.squad.pair) {uint32_t found=0;for (auto id:candidates) {const auto &node=c.flow_nodes[c.flow_actions[id-1].node-1];if (node.kind==1 && same_handle(participant(f,node.participant),actor)) {found=id;break;}}if (!found) {squad.clear();break;}squad.push_back(found);}
+    }
+    for (auto id:candidates) {const auto &node=c.flow_nodes[c.flow_actions[id-1].node-1];const bool normal=node.kind==1 && c.boss_techniques[node.technique-1].kind==64;if (hydra && hydra->hydra.separated && hydra->hydra.squad.tactic==0 && !hydra->hydra.squad.pair.empty() && normal) continue;add(c.flow_actions[id-1].category,{id});}
+    double squad_cost=0;for (auto id:squad) squad_cost+=c.flow_actions[id-1].cost;if (!squad.empty() && squad_cost<=cap+0.00001) add(0,squad);
+    if (!(hydra && hydra->hydra.separated && hydra->hydra.squad.tactic==0) && c.boss_flows[f.definition-1].allow_parallel && w[3]>0) for (size_t i=0;i<candidates.size();++i) if (c.flow_actions[candidates[i]-1].category==0) for (size_t j=i+1;j<candidates.size();++j) if (c.flow_actions[candidates[j]-1].category==0 && compatible(c,section,{candidates[i]},candidates[j],cap)) add(3,{candidates[i],candidates[j]});
+    const auto previous=identity(c,f.last_category_override==0 && !f.last.empty()?std::vector<uint32_t>{f.last.front()}:f.last);
     if (section.avoid_repeat && !previous.empty()) {auto alternatives=groups;bool positive=false;for (auto &g:alternatives) {g.identities.erase(std::remove_if(g.identities.begin(),g.identities.end(),[&](const auto &p){return p.name==previous;}),g.identities.end());if (!g.identities.empty() && w[g.category]>0) positive=true;}if (positive) groups=std::move(alternatives);}
     double total=0;for (const auto &g:groups) if (!g.identities.empty()) total+=w[g.category];if (total<=0) return {};
     auto &random=r.state.control.rng;double cursor=random.randf()*total;std::vector<uint32_t> actions;
@@ -110,7 +119,7 @@ std::vector<uint32_t> choose(RunRuntime &r,const BossFlowState &f,const BossFlow
         else {double sum=0;for (const auto &id:g.identities) sum+=(g.category==3?1.0:c.flow_actions[id.variants[0][0]-1].weight);if (sum<=0) return {};double draw=random.randf()*sum;picked=g.identities.size()-1;for (size_t i=0;i<g.identities.size();++i) {draw-=(g.category==3?1.0:c.flow_actions[g.identities[i].variants[0][0]-1].weight);if (draw<0) {picked=i;break;}}}
         const auto &variants=g.identities[picked].variants;actions=variants[*random.randi_range(0,variants.size()-1)];break;
     }
-    if (actions.size()>1) {auto remaining=candidates;while (!remaining.empty() && random.randf()<0.5) {const size_t pick=*random.randi_range(0,remaining.size()-1);const auto next=remaining[pick];remaining.erase(remaining.begin()+pick);if (c.flow_actions[next-1].category==0 && compatible(c,section,actions,next,cap)) {auto expanded=actions;expanded.push_back(next);if (!section.avoid_repeat || identity(c,expanded)!=previous) actions=std::move(expanded);}}}
+    if (actions.size()>1 && !(hydra && hydra->hydra.separated && hydra->hydra.squad.tactic==0)) {auto remaining=candidates;while (!remaining.empty() && random.randf()<0.5) {const size_t pick=*random.randi_range(0,remaining.size()-1);const auto next=remaining[pick];remaining.erase(remaining.begin()+pick);if (c.flow_actions[next-1].category==0 && compatible(c,section,actions,next,cap)) {auto expanded=actions;expanded.push_back(next);if (!section.avoid_repeat || identity(c,expanded)!=previous) actions=std::move(expanded);}}}
     return actions;
 }
 void reset_wait(BossFlowState &f) {f.waiting=false;f.no_candidate_elapsed=0;}
@@ -128,7 +137,9 @@ void tick_flow(RunRuntime &r,BossFlowState &f,double dt) {
     if (f.rest_remaining>0) {f.rest_remaining=std::max(0.0,f.rest_remaining-dt);if (f.rest_remaining<=0) {f.stamina=p.maximum_stamina;f.index=f.rest_next;}return;}
     const auto &section=c.flow_sections[list[f.index]-1];
     if (f.active) {
-        if (!f.roots.empty() || std::any_of(f.participants.begin(),f.participants.end(),[&](auto actor){return actor_busy(r,actor);})) return;f.active=false;++f.completed_actions;
+        bool hydra_wait=false;auto *hydra=HydraNormalAttack::body(r,f.actor);
+        if (hydra) for (auto id:f.last) {const auto &node=c.flow_nodes[c.flow_actions[id-1].node-1];if (node.kind==1 && c.boss_techniques[node.technique-1].kind==64) {const auto *n=HydraNormalAttack::neck(*hydra,participant(f,node.participant));if (n && r.state.enemy_handles.contains(n->actor) && !r.state.enemies[n->actor.slot].dead && (n->normal || n->cd>0)) hydra_wait=true;}}
+        if (!f.roots.empty() || hydra_wait || (!hydra && std::any_of(f.participants.begin(),f.participants.end(),[&](auto actor){return actor_busy(r,actor);}))) return;f.active=false;++f.completed_actions;
         if (f.completed_actions>=section.action_count || (section.has_budget && f.section_spent>=section.budget-0.00001)) {advance(f,section);f.interval=f.post_gap;}else {f.interval=f.post_gap+section.action_interval;if (f.interval>0) f.retry=0;}f.post_gap=0;
         if (f.stamina<=0.00001) {const auto &next=c.flow_sections[list[f.index]-1];if (next.request==2) f.index=next.next;rest(f,p,f.index);}return;
     }
@@ -137,18 +148,27 @@ void tick_flow(RunRuntime &r,BossFlowState &f,double dt) {
     if (f.waiting) {f.no_candidate_elapsed+=dt;if (section.has_timeout && f.no_candidate_elapsed>=section.timeout) {advance(f,section,true);return;}}
     f.retry=std::max(0.0,f.retry-dt);if (f.retry>0) return;f.retry=0.15;
     std::vector<uint32_t> candidates,within;const double cap=std::min(section.cap,p.maximum_stamina),budget=section.has_budget?std::max(0.0,section.budget-f.section_spent):1e300;
-    for (const auto &a:c.flow_actions) if (a.flow==f.definition && filter(c,section,a) && FlowRunner::condition(r,f,a.condition,filtered_target(c,c.flow_nodes[a.node-1])) && available(r,f,a.node)) {if (a.cost<=cap && a.cost<=budget) {within.push_back(a.id);if (a.cost<=f.stamina) candidates.push_back(a.id);}}
+    for (const auto &a:c.flow_actions) if (a.flow==f.definition && filter(c,section,a) && (c.flow_nodes[a.node-1].kind==1 && c.boss_techniques[c.flow_nodes[a.node-1].technique-1].kind==64 || FlowRunner::condition(r,f,a.condition,filtered_target(c,c.flow_nodes[a.node-1]))) && available(r,f,a.node)) {if (a.cost<=cap && a.cost<=budget) {within.push_back(a.id);if (a.cost<=f.stamina) candidates.push_back(a.id);}}
     if (candidates.empty()) {if (!within.empty()) rest(f,p,f.index);else wait_candidate(f,section);return;}
     const auto actions=choose(r,f,section,candidates,std::min({cap,budget,f.stamina}));if (actions.empty()) {wait_candidate(f,section);return;}
     f.nodes.clear();f.roots.clear();for (auto id:actions) {const auto &a=c.flow_actions[id-1];f.roots.push_back(new_node(f,a.node));}
     // コンボは作るだけ。単独技は今のtickで開始する。
     for (size_t i=0;i<actions.size();++i) if (c.flow_nodes[c.flow_actions[actions[i]-1].node-1].kind==1 && tick_node(r,f,f.roots[i],dt)!=FlowStatus::Running) {FlowRunner::cancel(r,f);wait_candidate(f,section);return;}
-    f.active=true;f.last=actions;f.post_gap=0;for (auto id:actions) {const auto &a=c.flow_actions[id-1];f.stamina=std::max(0.0,f.stamina-a.cost);f.section_spent+=a.cost;if (a.label!=1) f.post_gap=std::max(f.post_gap,a.post_gap);}reset_wait(f);
+    f.active=true;f.last=actions;f.last_category_override=-1;if (auto *body=HydraNormalAttack::body(r,f.actor)) if (body->hydra.separated && body->hydra.squad.tactic==0 && actions.size()>1) f.last_category_override=0;f.post_gap=0;for (auto id:actions) {const auto &a=c.flow_actions[id-1];f.stamina=std::max(0.0,f.stamina-a.cost);f.section_spent+=a.cost;if (a.label!=1) f.post_gap=std::max(f.post_gap,a.post_gap);}reset_wait(f);
 }
 }
 bool FlowRunner::condition(const RunRuntime &r,const BossFlowState &f,uint32_t definition,bool filtered,uint32_t role) {
     if (!definition) return true;if (definition>r.content->flow_conditions.size() || !r.state.enemy_handles.contains(participant(f,role))) return false;const auto &p=r.content->flow_conditions[definition-1];const auto &e=r.state.enemies[participant(f,role).slot];const auto relative=((filtered?r.state.enemy_aim:r.state.ship_pos)-e.pos).rotated(-e.facing);
     return f.phase>=p.minimum_phase && relative.length()>=p.minimum && relative.length()<=p.maximum && std::abs(angle_difference(relative.angle()-p.angle))<=p.half_angle+0.00001;
+}
+void FlowRunner::begin_rest(RunRuntime &r,BossFlowState &f,uint32_t next) {rest(f,r.content->boss_flows[f.definition-1],next);}
+bool FlowRunner::start_reactive(RunRuntime &r,BossFlowState &f,EnemyHandle actor,uint32_t definition,double cost) {
+    if (f.blocked || f.suspended || !f.selection_enabled || f.rest_remaining>0 || !std::isfinite(cost) || cost<0 || !definition || definition>r.content->boss_techniques.size() || r.content->boss_techniques[definition-1].boss!=r.content->boss_flows[f.definition-1].boss) return false;
+    const BossFlowSection *section=nullptr;for (const auto &s:r.content->flow_sections) if (s.flow==f.definition && s.order==f.index) section=&s;
+    if (!section || section->request==2 || cost>std::min(f.stamina,section->cap)+0.00001 || (section->has_budget && cost>section->budget-f.section_spent+0.00001) || !TechniqueRunner::ready(r,actor,definition)) return false;
+    const auto ticket=TechniqueRunner::begin(r,actor,definition);if (!r.state.bosses.handles.contains(ticket)) return false;
+    if (auto *b=HydraNormalAttack::body(r,actor)) if (auto *n=HydraNormalAttack::neck(*b,actor)) HydraSquad::started(*b,*n);
+    f.stamina=std::max(0.,f.stamina-cost);f.section_spent+=cost;for (const auto &a:r.content->flow_actions) {const auto &node=r.content->flow_nodes[a.node-1];if (a.flow==f.definition && node.kind==1 && node.technique==definition && same_handle(participant(f,node.participant),actor)) {f.last={a.id};f.last_category_override=-1;break;}}return true;
 }
 bool FlowRunner::attach(RunRuntime &r,EnemyHandle actor,uint32_t definition,const std::vector<EnemyHandle> &participants) {
     if (!definition || definition>r.content->boss_flows.size() || !r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead) return false;for (const auto &f:r.state.bosses.flows) if (same_handle(f.actor,actor)) return false;
@@ -175,7 +195,7 @@ bool FlowRunner::validate_content(const ContentBundle &c) {
 }
 bool FlowRunner::validate(const godot::RunState &s,const ContentBundle &c) {
     for (const auto &f:s.bosses.flows) {
-        if (!f.definition || f.definition>c.boss_flows.size() || f.index>=sections(c,f.definition).size() || f.rest_next>=sections(c,f.definition).size() || f.phase<1 || f.phase>2 || f.participants.empty()) return false;
+        if (f.last_category_override< -1 || f.last_category_override>3 || !f.definition || f.definition>c.boss_flows.size() || f.index>=sections(c,f.definition).size() || f.rest_next>=sections(c,f.definition).size() || f.phase<1 || f.phase>2 || f.participants.empty()) return false;
         for (double value:{f.clock,f.retry,f.stamina,f.rest_remaining,f.section_spent,f.interval,f.no_candidate_elapsed,f.post_gap}) if (!std::isfinite(value) || value<0) return false;
         for (const auto &used:f.cooldown_started) if (!std::isfinite(used.second) || used.second<0) return false;
         for (auto root:f.roots) if (root>=f.nodes.size()) return false;
@@ -183,6 +203,6 @@ bool FlowRunner::validate(const godot::RunState &s,const ContentBundle &c) {
     }return true;
 }
 godot::Array FlowRunner::snapshot(const RunRuntime &r) {
-    godot::Array out;for (const auto &f:r.state.bosses.flows) {godot::Dictionary p;p["definition"]=f.definition;p["actor"]=r.state.enemy_handles.entity_id(f.actor);p["index"]=f.index;p["active"]=f.active;p["stamina"]=f.stamina;p["rest"]=f.rest_remaining;p["spent"]=f.section_spent;p["completed"]=f.completed_actions;p["interval"]=f.interval;p["waiting"]=f.waiting;p["no_candidate_elapsed"]=f.no_candidate_elapsed;p["clock"]=f.clock;godot::Array history;for (auto id:f.last) history.push_back(godot::String(r.content->flow_actions[id-1].external_id.c_str()));p["last"]=history;godot::Array nodes;for (const auto &n:f.nodes) {godot::Dictionary q;q["definition"]=n.definition;q["status"]=int(n.status);q["cursor"]=n.cursor;q["elapsed"]=n.elapsed;nodes.push_back(q);}p["nodes"]=nodes;out.push_back(p);}return out;
+    godot::Array out;for (const auto &f:r.state.bosses.flows) {godot::Dictionary p;godot::PackedInt64Array participants;for (auto actor:f.participants) participants.push_back(r.state.enemy_handles.entity_id(actor));p["participants"]=participants;p["definition"]=f.definition;p["actor"]=r.state.enemy_handles.entity_id(f.actor);p["index"]=f.index;p["active"]=f.active;p["stamina"]=f.stamina;p["rest"]=f.rest_remaining;p["spent"]=f.section_spent;p["completed"]=f.completed_actions;p["interval"]=f.interval;p["waiting"]=f.waiting;p["no_candidate_elapsed"]=f.no_candidate_elapsed;p["clock"]=f.clock;godot::Array history;for (auto id:f.last) history.push_back(godot::String(r.content->flow_actions[id-1].external_id.c_str()));p["last"]=history;godot::Array nodes;for (const auto &n:f.nodes) {godot::Dictionary q;q["definition"]=n.definition;q["status"]=int(n.status);q["cursor"]=n.cursor;q["elapsed"]=n.elapsed;nodes.push_back(q);}p["nodes"]=nodes;out.push_back(p);}return out;
 }
 }

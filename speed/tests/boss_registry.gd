@@ -11,6 +11,9 @@ func _ready() -> void:
 	if "--cpp-hydra-common" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_common")
 		return
+	if "--cpp-hydra-squad" in OS.get_cmdline_user_args() or "--cpp-hydra-squad-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_squad")
+		return
 	if "--cpp-hydra-swim" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_swim")
 		return
@@ -2713,14 +2716,33 @@ func native_canis_bay() -> void:
 	print("[cpp_canis_bay] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-func hydra_regrow_case() -> Dictionary:
+func hydra_regrow_case(flowing := false, squad_changes := {}) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
 	var definition = load("res://data/bosses/hydra.tres").duplicate(true)
 	definition.speed = 0.0
+	definition.params.squad.merge(squad_changes,true)
 	definition.params.merge({"head_hp":10.0,"regrow":0.2,"regrow_per_head":0.1,"regrow_combo":0.25,"fire_regrow_scale":3.0,"chance_time":0.3,"growth_time":0.1,"debris_dmg":0.0},true)
 	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	if flowing:
+		var rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
+		rules.techniques.assign([load("res://data/bosses/hydra_moves/bite_thrust.tres").duplicate(true)])
+		rules.combos = {};rules.conditions = {"bite_thrust":{}};rules.condition_groups = {};rules.graph_nodes = {};rules.selection_bias = {}
+		var flow = load("res://data/bosses/ai/hydra_flow.tres").duplicate(true)
+		flow.sections = flow.sections.slice(0,2)
+		flow.sections[0].next = 1;flow.sections[1].next = 0
+		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		check(not records.is_empty(),"保存済みのrulesとflowの深いコピーを対応済み通常技だけの制作構成へ限定する")
+		if records.is_empty(): return {}
+		var template_action: Dictionary = records.BossFlowAction[0].duplicate(true)
+		var template_node: Dictionary = records.BossFlowNode[template_action.node-1].duplicate(true)
+		records.BossFlowAction.clear();records.BossFlowNode.clear()
+		for index in 8:
+			var node: Dictionary = template_node.duplicate(true);node.id=index+1;node.participant=index+1
+			var action: Dictionary = template_action.duplicate(true);action.id=index+1;action.node=index+1;action.exclusive=false
+			records.BossFlowNode.append(node);records.BossFlowAction.append(action)
+		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
 	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":371,"mode":1,"stage_id":"B_hydra_regrow","profile":{},"settings":{"hitstop":false}})
@@ -3226,8 +3248,9 @@ func native_canis_stream_cancel() -> void:
 	print("[cpp_canis_stream_cancel] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-func hydra_normal_case() -> Dictionary:
-	var c := hydra_regrow_case()
+## 再生・分離・通常技の既存ケースを同じC++窓口へ接続する。
+func hydra_normal_case(flowing := false, squad_changes := {}) -> Dictionary:
+	var c := hydra_regrow_case(flowing,squad_changes)
 	if c.is_empty(): return c
 	var bridge = c.bridge
 	bridge._core.set_motion_context(Vector2(1600,0),Vector2.ZERO,Vector2(2500,1800))
@@ -3353,4 +3376,86 @@ func native_hydra_swim() -> void:
 	view.queue_free();bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_hydra_swim] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 既存の分離・群れ・姿勢のケースをC++の本体と共通フローへ接続する。
+func hydra_squad_case(changes: Dictionary, only_bite := false) -> Dictionary:
+	var c := hydra_normal_case(true,changes)
+	if c.is_empty(): return c
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"})
+	bridge._core.step(0.001);bridge._core.step(1.21)
+	body = bridge.command("dev_boss_body_state").value[0]
+	if only_bite:
+		for n: Dictionary in body.necks:
+			if n.kind!="bite": bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
+	for tick in 125: bridge._core.step(0.025)
+	body = bridge.command("dev_boss_body_state").value[0]
+	var parts := PackedInt64Array([c.id])
+	for n: Dictionary in body.necks: parts.append(n.id)
+	# 死亡した部位も同じ表に保つ。開始時の生存を必須にするAPIには、生存時に固定した世代を渡す。
+	c.parts=parts
+	return c
+
+func native_hydra_squad() -> void:
+	var retry := "--cpp-hydra-squad-retry" in OS.get_cmdline_user_args()
+	var c := hydra_squad_case({"pincer_weight":1.0,"wave_weight":0.0,"wall_weight":0.0,"wall_near_weight":0.0,"initial_gap":Vector2(3.2,3.2),"pincer_timeout":0.05,"counter_max":0,"block_distance":0.0})
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	if not retry: check(body.necks.any(func(n): return n.role==1) and body.necks.any(func(n): return n.velocity.length()>30.0) and body.necks.all(func(n): return body.arena.has_point(n.position) and n.points[-1].distance_to(n.position)<0.001),"前衛と近衛を選び、確定した頭を追う胴と囲いの内側の移動を保つ")
+	check(bridge.command("dev_boss_flow_state").value[0].participants==c.parts,"実在する首の世代を共通フローの参加者へ渡す")
+	for head: Dictionary in body.necks:
+		if head.kind!="bite": bridge.command("dev_damage",{"entity_id":head.id,"amount":1000.0,"cause":"shot"})
+	# 実在する噛みつく2本を使い、保存値を近似技に置き換えない。
+	var launched := false
+	for tick in 180:
+		bridge._core.step(0.025)
+		body = bridge.command("dev_boss_body_state").value[0]
+		if body.pair_launched:
+			launched=true
+			break
+	check(launched and body.necks.filter(func(n): return n.mode=="bite_thrust").size()==2,"挟撃は2本の実際の通常技を一組で開始する")
+	var flow: Dictionary = bridge.command("dev_boss_flow_state").value[0]
+	check(is_equal_approx(flow.stamina,6.0) and is_equal_approx(flow.spent,2.0) and flow.active,"指名の予約を実行時に解放し同じフローの予算を2本分だけ消費する")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.025)
+	var expected: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	var expected_flow: Array = bridge.command("dev_boss_flow_state").value.duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"役割・持ち場・視線の乱数と挟撃中のチケットを保持する")
+	bridge._core.step(0.025)
+	check(bridge.command("dev_boss_body_state").value[0]==expected and bridge.command("dev_boss_flow_state").value==expected_flow,"途中復帰後も視線・力・移動順とフロー予算が一致する")
+	bridge.release_checkpoint(held.value)
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"挟撃・持ち場・視線を正式素材の読み取り専用表示へ渡す")
+	await get_tree().process_frame
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で分隊の攻撃と表示を清算する")
+	view.queue_free();bridge.dispose()
+	# 壁戦術中の迎撃は区間の実行状態を置き換えず、同じ予算だけを消費する。
+	c = hydra_squad_case({"pincer_weight":0.0,"wave_weight":0.0,"wall_weight":1.0,"wall_near_weight":0.0,"block_distance":10000.0})
+	if c.is_empty(): get_tree().quit(1);return
+	bridge=c.bridge;body=bridge.command("dev_boss_body_state").value[0]
+	var n: Dictionary = body.necks[0]
+	bridge.command("dev_ship_motion",{"position":n.free_pos+Vector2.from_angle(n.look_angle)*100.0,"velocity":Vector2.ZERO})
+	check(bridge.command("dev_boss_flow_state").value[0].participants==c.parts,"迎撃も同じ参加者と制作フローへ接続する")
+	bridge._core.step(0.025)
+	body=bridge.command("dev_boss_body_state").value[0];flow=bridge.command("dev_boss_flow_state").value[0]
+	if not retry: check(body.necks.any(func(head): return head.counter and head.mode=="bite_thrust") and body.counter_time>0.0 and is_equal_approx(flow.stamina,7.0) and not flow.active and flow.completed==0,"迎撃が通常技を実行して共通予算を消費し、区間の完了数を増やさない")
+	check(body.necks.filter(func(head): return head.role==3).size()==2,"残る護衛が2つの割込点を担当する")
+	var before: Dictionary = body.duplicate(true)
+	bridge._core.step(0.0)
+	check(bridge.command("dev_boss_body_state").value[0]==before,"世界停止中は役割・視線・割込点と乱数を更新しない")
+	bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.025)
+	check(not bridge.command("dev_boss_body_state").value[0].boss_dead,"迎撃する首の消失は分隊全体の勝利にしない")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id});bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_hydra_squad] failures=",failed)
 	get_tree().quit(1 if failed else 0)
