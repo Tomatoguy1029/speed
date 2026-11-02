@@ -9,7 +9,7 @@ const BossProgram = preload("res://tools/content/build_boss_program.gd")
 
 ## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
 static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"monoceros" or move==null or move.technique!=&"charge": return {}
+	if definition==null or definition.id!=&"monoceros" or move==null or move.technique not in [&"charge",&"kick"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":String(definition.id),"kind":0,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]:
@@ -22,10 +22,10 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			for key: String in source.values():
 				if key.ends_with("_p2"): values[key.trim_suffix("_p2")] = source.values()[key]
 		var resolved: BossTechnique = source.duplicate(true)
-		var row := {"id":phase,"boss":1,"external_id":String(source.technique),"kind":0,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap}
-		for key in ["warn","active","recover","cd","damage","distance"]:
-			row[key] = float(values[key])
-			resolved.set(key,row[key])
+		var row := {"id":phase,"boss":1,"external_id":String(source.technique),"kind":0 if source.technique==&"charge" else 1,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap}
+		for key in ["warn","active","recover","cd","damage","distance","reach","hold","return_speed"]:
+			row[key] = float(values.get(key,0.0))
+			if key in values: resolved.set(key,row[key])
 		if row.active<=0.0: return {}
 		var commands := BossProgram.charge_stage_commands(resolved,boss.lock_lead)
 		if commands.size()!=3: return {}

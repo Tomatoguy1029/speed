@@ -11,6 +11,12 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-kick-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_kick_retry")
+		return
+	if "--cpp-kick" in OS.get_cmdline_user_args():
+		call_deferred("native_kick")
+		return
 	if "--cpp-data-legacy" in OS.get_cmdline_user_args() or "--cpp-data-legacy-retry" in OS.get_cmdline_user_args():
 		call_deferred("native_data_legacy")
 		return
@@ -423,33 +429,39 @@ func capture() -> void:
 	get_tree().quit()
 
 ## B00で確認済みの時刻・掃引・取消・復帰は繰り返さず、本体と技の残る接続を確認する。
-func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0, moon := false) -> Dictionary:
+func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0, moon := false, name := "charge") -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	if planet_x==500.0 or moon: cfg.character_scale = 1.0
+	if planet_x==500.0 or moon or name=="kick": cfg.character_scale = 1.0
 	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.approach_speed = 0.0
 	definition.params.stuck_time = 0.05
 	definition.params.extract_time = 0.05
 	var package: Dictionary = builder.boss_body_package(definition,cfg)
-	var move = load("res://data/bosses/monoceros_moves/charge.tres").duplicate(true)
+	var move = load("res://data/bosses/monoceros_moves/%s.tres"%name).duplicate(true)
 	move.warn = 0.25
 	move.active = 0.2
-	move.active_p2 = 0.2
+	if move.has_field("active_p2"): move.active_p2 = 0.2
 	move.recover = 0.05
 	move.cd = 0.0
-	move.distance = 600.0
+	if move.has_field("distance"): move.distance = 600.0
+	if name=="kick":
+		move.reach = 240.0
+		move.hold = 0.1
+		move.return_speed = TAU
 	var records: Dictionary = package.records
 	for key in builder.boss_technique_records(definition,move): records[key] = builder.boss_technique_records(definition,move)[key]
 	if flow_enabled:
 		var rules = load("res://data/bosses/ai/monoceros_action_rules.tres").duplicate(true)
 		rules.techniques.assign([move])
 		rules.combos = {}
-		rules.conditions = {"charge":{"min":0.0,"max":1000.0}}
+		rules.conditions = {}
+		rules.conditions[name] = {"min":0.0,"max":1000.0} if name=="charge" else {"min":0.0,"max":260.0,"angle":180.0,"half_angle":37.24225668350351}
 		rules.selection_bias = {}
-		rules.costs = {"charge":1.0}
+		rules.costs = {}
+		rules.costs[name] = 1.0
 		rules.condition_groups = {}
 		rules.graph_nodes = {}
 		var program = load("res://scripts/data_types/boss_flow_def.gd").new()
@@ -469,11 +481,12 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	var config: Dictionary = bridge.configure(builder.Schema.write_content(records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":154,"mode":1,"stage_id":"B_monoceros_charge","profile":{},"settings":{"hitstop":false}})
 	if not config.ok: return {}
 	bridge.start(154,{"position":Vector2(300,0)})
-	bridge.subscribe("確認",func(_packet): return true)
+	var captured: Array = []
+	bridge.subscribe("確認",func(packet): captured.append_array(packet.events); return true)
 	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(300,0),Vector2(300,0),Vector2(640,360))
 	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
-	return {"bridge":bridge,"id":id,"move":move,"definition":definition}
+	return {"bridge":bridge,"id":id,"move":move,"definition":definition,"records":records,"events":captured}
 
 func native_charge() -> void:
 	var fixture := charge_fixture(true)
@@ -572,4 +585,115 @@ func native_data_legacy() -> void:
 	check(move.make_runner()==null and owner._move_kinds[&"charge"]==&"charge" and runner.kind()==&"charge","Resourceに実行コードを戻さず通常Actorの設定と実行Runnerを解決する")
 	owner.free()
 	print("[cpp_monoceros_data_legacy] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func kick_fixture(automatic := false, front := false) -> Dictionary:
+	var f := charge_fixture(automatic,false,450.0,false,"kick")
+	var bridge = f.bridge
+	var target := Vector2(180,0) if front else Vector2(-180,0)
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(target,target,Vector2(640,360))
+	bridge._core.set_enemy_motion(f.id,{"facing":0.0})
+	return f
+
+func native_kick() -> void:
+	var fixture := kick_fixture(true)
+	var bridge = fixture.bridge
+	var definition: Dictionary = fixture.records.BossTechniqueDefinition[0]
+	check(definition.kind==1 and definition.reach==240.0 and definition.hold==0.1 and definition.return_speed==TAU,"後ろ蹴りのResource実効値を型付き定義へ生成する")
+	check(fixture.records.BossTechniqueStage[0].at==0.03 and fixture.records.BossTechniqueStage[1].at==0.25 and fixture.records.BossTechniqueStage[2].at==0.45,"後ろ蹴りの予告・固定・発進・終了を編集値から生成する")
+	bridge._core.step(0.01)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(state.stage==0 and body.facing==0.0 and state.direction.is_equal_approx(Vector2.LEFT),"背後で技を自然選択し本体の向きを変えず狙う")
+	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
+	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
+	add_child(view)
+	view.apply_frame(body,state)
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	body = bridge.command("dev_boss_body_state").value[0]
+	view.apply_frame(body,state)
+	var leg: Node2D = view.parts.get_node("RearLeftLeg")
+	check(state.locked and leg.rotation!=0.0 and leg.get_node("Foot").position.y<view._leg_rest["RearLeftLeg"],"予告中は向きを固定し後脚を畳む表示へ接続する")
+	bridge._core.step(0.15)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==1 and state.position==Vector2.ZERO and state.horn[1].is_equal_approx(Vector2(-240,0)),"発進しても移動せず蹄の到達距離の線分を使う")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	body = bridge.command("dev_boss_body_state").value[0]
+	view.apply_frame(body,state)
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	check(state.hit and leg.scale.y>1.0 and view.horn.self_modulate.r==1.0,"後方線分で一回命中し脚を伸ばして角は発光させない")
+	var events: Array = fixture.events
+	check(events.any(func(event): return event.type==&"combat_player_damage" and event.payload.cause==&"horn" and event.payload.source==&"monoceros" and event.payload.technique==&"kick"),"後ろ蹴りの原因・出所・技IDを記録へ渡す")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.05)
+	check(bridge._core.ship_snapshot().ship_hp==hp,"同じ蹴りの重複被弾を防ぐ")
+	check(held.ok and bridge.restore(held.value).ok and bridge.command("dev_boss_state").value[0].hit,"実行途中の固定方向と命中済み状態を復帰する")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==2 and is_equal_approx(state.remaining,0.65),"終了時に停止・PI/戻り速度・回復を合計して待つ")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(is_zero_approx(state.settle_progress),"攻撃後の停止中は後脚の姿勢を保持する")
+	bridge._core.step(0.25)
+	state = bridge.command("dev_boss_state").value[0]
+	body = bridge.command("dev_boss_body_state").value[0]
+	view.apply_frame(body,state)
+	var restored = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
+	restored.set_script(load("res://scripts/render/bosses/monoceros.gd"))
+	add_child(restored)
+	restored.apply_frame(body,state)
+	check(is_equal_approx(state.settle_progress,0.5) and is_equal_approx(restored.parts.get_node("RearLeftLeg").rotation,leg.rotation),"姿勢戻しの途中から表示を作っても同じ後脚へ復帰する")
+	var angle := leg.rotation
+	view.apply_frame(body,state)
+	check(leg.rotation==angle,"世界停止中は後脚の戻しを進めない")
+	bridge._core.step(0.31)
+	bridge._core.step(0.01)
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value[0].id>state.id,"姿勢戻しと回復が終わったら次の蹴りを自然選択する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"後ろ蹴りの通知を共通配信へ渡す")
+	bridge.dispose()
+	view.queue_free()
+	restored.queue_free()
+	fixture = kick_fixture(false,true)
+	bridge = fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+	bridge._core.step(0.25)
+	check(bridge.command("dev_boss_state").value[0].stage==2,"発進時の後方角度から外れた強制蹴りは回復へ戻す")
+	bridge.dispose()
+	for disappear in [false,true]:
+		fixture = kick_fixture()
+		bridge = fixture.bridge
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+		bridge._core.step(0.1)
+		if disappear: bridge.command("dev_kill",{"entity_id":fixture.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+		bridge._core.step(0.2)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and not state.hit and bridge.read_frame().ok,"参加者消失で蹄を取消する" if disappear else "予告取消後に蹄の段階と当たりを残さない")
+		bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_monoceros_kick] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 配信先で受け取った記録と、固定更新の次行動境界の失敗条件だけ確認し直す。
+func native_kick_retry() -> void:
+	var fixture := kick_fixture(true)
+	var bridge = fixture.bridge
+	bridge._core.step(0.01)
+	bridge._core.step(0.25)
+	bridge._core.step(0.1)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(fixture.events.any(func(event): return event.type==&"combat_player_damage" and event.payload.cause==&"horn" and event.payload.source==&"monoceros" and event.payload.technique==&"kick"),"後ろ蹴りの原因・出所・技IDを記録へ渡す")
+	bridge._core.step(0.1)
+	bridge._core.step(0.66)
+	bridge._core.step(0.01)
+	bridge._core.step(0.2)
+	var next: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(next.id>state.id and next.stage==0,"姿勢戻しと回復が終わったら次の蹴りを自然選択する")
+	bridge.dispose()
+	print("[cpp_monoceros_kick_retry] failures=",failed)
 	get_tree().quit(1 if failed else 0)

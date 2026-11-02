@@ -3,6 +3,7 @@
 namespace speed {
 class TechniqueRunner {
 public:
+    static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static TechniqueHandle begin(RunRuntime &,EnemyHandle,uint32_t definition);
     static void step(RunRuntime &,double dt);
     static bool running(const RunRuntime &,TechniqueHandle);

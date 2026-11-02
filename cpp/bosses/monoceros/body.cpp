@@ -1,5 +1,7 @@
 #include "body.h"
 #include "charge.h"
+#include "kick.h"
+#include "../flow/flow_runner.h"
 #include "../../systems/field.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
@@ -23,7 +25,14 @@ void MonocerosBody::step(RunRuntime &r,BossBodyState &body,double dt) {
     for (const auto &t:r.content->boss_techniques) if (t.boss==r.content->boss_bodies[body.definition-1].boss && t.phase==body.phase) {
         if (t.external_id=="charge" && !closing) closing=!MonocerosCharge::in_reach(r,body.actor,t.id);
     }
-    if (!target.locked()) e.facing+=std::clamp(angle_difference(toward.angle()-e.facing),-p.turn*dt,p.turn*dt);
+    bool kick_ready=false;
+    for (const auto &f:r.state.bosses.flows) if (same_handle(f.actor,body.actor)) for (const auto &node:r.content->flow_nodes) {
+        if (node.flow!=f.definition || node.kind!=1 || !node.technique) continue;
+        const auto &base=r.content->boss_techniques[node.technique-1];if (base.kind!=1) continue;
+        const auto cool=f.cooldowns.find(node.technique);if (cool!=f.cooldowns.end() && f.clock<cool->second) continue;
+        for (const auto &t:r.content->boss_techniques) if (t.boss==base.boss && t.kind==1 && t.phase==body.phase && FlowRunner::condition(r,f,node.condition,false) && MonocerosKick::ready(r,body.actor,t.id)) kick_ready=true;
+    }
+    if (!kick_ready && !target.locked()) e.facing+=std::clamp(angle_difference(toward.angle()-e.facing),-p.turn*dt,p.turn*dt);
     if (!closing) {e.vel={};return;}
     double travel=p.approach_speed*std::max(0.0,double(godot::Vector2::from_angle(e.facing).dot(toward.normalized())))*dt;
     if (toward.length()>p.approach_range) travel=std::min(travel,double(toward.length())-p.approach_range);

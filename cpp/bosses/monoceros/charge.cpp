@@ -1,4 +1,5 @@
 #include "charge.h"
+#include "strike_shape.h"
 #include "../../systems/field.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
@@ -27,15 +28,6 @@ godot::Vector2 strike_aim(const RunRuntime &r,const TechniqueState &t,double lea
     }
     target+=velocity*std::clamp(contact,0.0,p.active);
     return tracking(r,t).target(e.pos,e.facing,target);
-}
-void damage(RunRuntime &r,TechniqueState &t,const godot::PackedVector2Array &before) {
-    if (t.hit || t.stage!=TechniqueStage::Active) return;
-    const auto points=MonocerosCharge::horn(r,t);
-    const SweptSegment shape{before[0],before[1],points[0],points[1],boss(r,t).horn_width*0.5};
-    if (!CollisionQuery::touches(shape,{t.previous_ship,r.state.ship_pos,r.state.ship_config.ship_radius},{true,true})) return;
-    ShipDamageRequest request;request.amount=rule(r,t).damage;request.scale=DamageScale::AtkScale;request.cause=Cause::Horn;
-    request.source=r.state.enemies[t.actor.slot].definition+1;request.technique=t.definition;
-    CombatResolver::ship_damage(r,request);t.hit=true;
 }
 void recovery(RunRuntime &r,TechniqueState &t) {t.stage=TechniqueStage::Recovery;t.remaining=rule(r,t).recover;r.state.enemies[t.actor.slot].vel={};}
 }
@@ -87,11 +79,11 @@ void MonocerosCharge::step(RunRuntime &r,TechniqueState &t,double dt) {
         const auto horn_hit=FieldSystem::first_body_hit(r,horn_from,horn_from+step,b.horn_width*0.5);
         const auto body_hit=FieldSystem::first_body_hit(r,from,to,e.radius);
         if (horn_hit && !r.state.field.bodies[horn_hit->body].moon && (!body_hit || horn_hit->t<=body_hit->t)) {
-            e.pos=from.lerp(to,horn_hit->t);damage(r,t,before);t.stuck_body=horn_hit->body;t.stuck_offset=e.pos-r.state.field.bodies[t.stuck_body].position;
+            e.pos=from.lerp(to,horn_hit->t);MonocerosStrike::damage(r,t,before,horn(r,t),b.horn_width);t.stuck_body=horn_hit->body;t.stuck_offset=e.pos-r.state.field.bodies[t.stuck_body].position;
             t.stage=TechniqueStage::Stuck;t.remaining=b.stuck_time;e.vel={};return;
         }
-        if (body_hit) {e.pos=from.lerp(to,body_hit->t);damage(r,t,before);recovery(r,t);return;}
-        e.pos=to;e.vel=step/dt;damage(r,t,before);
+        if (body_hit) {e.pos=from.lerp(to,body_hit->t);MonocerosStrike::damage(r,t,before,horn(r,t),b.horn_width);recovery(r,t);return;}
+        e.pos=to;e.vel=step/dt;MonocerosStrike::damage(r,t,before,horn(r,t),b.horn_width);
     } else if (t.stage==TechniqueStage::Stuck) {
         t.remaining=std::max(0.0,t.remaining-dt);e.pos=r.state.field.bodies[t.stuck_body].position+t.stuck_offset;
         if (t.remaining<=0) {t.stage=TechniqueStage::Extract;t.remaining=b.extract_time;}

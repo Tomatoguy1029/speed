@@ -25,6 +25,7 @@ var state := {}
 var technique := {}
 var appearance := {}
 var _world_clock := -1.0
+var _leg_rest := {}
 var hit := 0.0
 var _body_facing := 0.0
 var _neck_facing := 0.0
@@ -108,7 +109,36 @@ func _sync_parts(dt: float) -> void:
 		var leg := parts.get_node(path) as Node2D
 		leg.rotation = 0.0
 		leg.scale = Vector2.ONE
+		var foot := leg.get_node("Foot") as Node2D
+		if not _leg_rest.has(path): _leg_rest[path] = foot.position.y
+		foot.position.y = float(_leg_rest[path])
+	_kick_pose()
 	_sync_horn(dt, k, horn_tint)
+
+## 後脚は表示専用。C++の進行値から同じ姿勢を組み直せる。
+func _kick_pose() -> void:
+	if technique.get("technique","")!="kick" or int(technique.get("stage",5))>2: return
+	var stage: int = technique.stage
+	var tip: Vector2 = (technique.horn[1]-state.position).rotated(-float(state.facing))
+	var target := parts.transform.affine_inverse()*tip
+	for path in REAR_LEGS:
+		var leg := parts.get_node(path) as Node2D
+		var foot := leg.get_node("Foot") as Node2D
+		var hoof := foot.get_node("Sprite") as Node2D
+		var art := hoof.get_node("Base") as Sprite2D
+		var toward := target-leg.position
+		var turn := wrapf(toward.angle()-PI*0.5,-TAU,0.0)
+		var rest: float = _leg_rest[path]
+		if stage==0:
+			leg.rotation = lerpf(0.0,turn,float(technique.windup_progress))
+			foot.position.y = lerpf(rest,KICK_FOLD,float(technique.windup_progress))
+		else:
+			var extend: float = technique.active_progress if stage==1 else 1.0
+			var back: float = technique.settle_progress if stage==2 else 0.0
+			var natural: float = rest+hoof.position.y+art.texture.get_height()
+			leg.rotation = lerpf(turn,0.0,back)
+			foot.position.y = lerpf(lerpf(KICK_FOLD,rest,extend),rest,back)
+			leg.scale.y = lerpf(lerpf(1.0,maxf(1.0,toward.length()/natural),extend),1.0,back)
 
 func _sync_horn(_dt: float, body_scale: float, tint: Color) -> void:
 	var progress: float = state.phase_progress

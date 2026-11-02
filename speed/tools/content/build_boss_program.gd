@@ -6,7 +6,7 @@ static var generation_count := 0
 
 ## Resourceの実効値から実行キーを作る。保存済みAnimationの時刻は参照しない。
 static func charge_stage_commands(move: BossTechnique, lock_lead: float) -> Array:
-	if move == null or move.get_script().resource_path not in ["res://scripts/bosses/monoceros/techniques/charge.gd","res://scripts/data_types/boss_techniques/monoceros/charge.gd"]: return []
+	if move == null or move.get_script().resource_path not in ["res://scripts/bosses/monoceros/techniques/charge.gd","res://scripts/data_types/boss_techniques/monoceros/charge.gd","res://scripts/data_types/boss_techniques/monoceros/kick.gd","res://scripts/bosses/monoceros/techniques/kick.gd"]: return []
 	var keys := [
 		{"at":maxf(0.01,float(move.warn)-lock_lead),"method":&"lock_aim","args":[]},
 		{"at":float(move.warn),"method":&"launch_strike","args":[]},
