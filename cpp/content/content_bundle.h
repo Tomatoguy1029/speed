@@ -87,6 +87,7 @@ struct ContentBundle {
     std::vector<HydraGridPath> hydra_grid_paths;
     std::vector<HydraPincerDefinition> hydra_pincers;
     std::vector<HydraWindBandDefinition> hydra_wind_bands;
+    std::vector<HydraSequenceDefinition> hydra_sequences;
     std::vector<HydraNorthDefinition> hydra_north;
     std::vector<HydraMajorDefinition> hydra_majors;
     std::vector<HydraThunderDefinition> hydra_thunders;

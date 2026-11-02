@@ -1056,14 +1056,17 @@ static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Di
 	return records
 
 static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north"]: return {}
+	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north",&"sequence"]: return {}
 	var values: Dictionary = definition.params.merged(move.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":88 if move.technique==&"north" else 83 if move.technique==&"debris_shatter" else 82 if move.technique==&"tornado" else 72 if move.technique==&"curve" else 73 if move.technique==&"grid" else 74,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":maxf(float(values.performance_time),float(values.get("north_flight",0.0))),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.bite_dmg if move.technique==&"north" else values.lump_dmg if move.technique==&"tornado" else values.beam_dmg),"passes":1,"cuts":1},true)
+	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":89 if move.technique==&"sequence" else 88 if move.technique==&"north" else 83 if move.technique==&"debris_shatter" else 82 if move.technique==&"tornado" else 72 if move.technique==&"curve" else 73 if move.technique==&"grid" else 74,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":maxf(float(values.performance_time),float(values.get("north_flight",0.0))),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.bite_dmg if move.technique in [&"north",&"sequence"] else values.lump_dmg if move.technique==&"tornado" else values.beam_dmg),"passes":1,"cuts":1},true)
 	var records := {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(move.technique)]),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal]}
 	if move.technique==&"curve": records.HydraCurveDefinition = [{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.curve_delay),"time":float(values.curve_time),"lag":float(values.curve_lag),"turn":float(values.curve_turn)}]
 
+	if move.technique==&"sequence":
+		records.erase("HydraCurveDefinition")
+		records.HydraSequenceDefinition=[{"id":1,"technique":1,"radius":float(values.bite_radius),"lunge":float(values.normal_lunge),"charge":float(values.sequence_charge),"gap":float(values.sequence_gap),"half_angle":float(values.north_half_angle)}]
 	if move.technique==&"north":
 		records.erase("HydraCurveDefinition")
 		records.HydraNorthDefinition=[{"id":1,"technique":1,"radius":float(values.bite_radius),"flight":float(values.north_flight),"lock_time":clampf(float(values.north_lock_time),0.0,normal.warn),"spread":float(values.north_spread),"half_angle":float(values.north_half_angle)}]
@@ -1093,7 +1096,7 @@ static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dic
 	return records
 
 static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north"] else hydra_normal_records(definition,move)
+	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north",&"sequence"] else hydra_normal_records(definition,move)
 	if records.is_empty(): return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}

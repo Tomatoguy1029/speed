@@ -2,15 +2,17 @@
 #include "../../runtime/run_runtime.h"
 #include <optional>
 namespace speed {class HydraTechnique {public:
-    static bool supports(uint32_t kind) {return kind==72 || kind==73 || kind==74 || kind==82 || kind==83 || kind==88;}
+    static bool supports(uint32_t kind) {return kind==72 || kind==73 || kind==74 || kind==82 || kind==83 || kind==88 || kind==89;}
     static const HydraMajorDefinition &rule(const RunRuntime &,uint32_t);
     static void cue(RunRuntime &,const BossBodyState &,const char *,uint32_t,double=0);
     static bool busy(const RunRuntime &,const BossBodyState &);
     static std::vector<EnemyHandle> participants(const RunRuntime &,const BossBodyState &,std::initializer_list<HydraHeadKind>);
     static bool all_participants_alive(const RunRuntime &,const HydraTechniqueState &);
     static std::vector<EnemyHandle> front_heads(const RunRuntime &,const BossBodyState &,uint32_t);
+    static void sequence_prepare(RunRuntime &,TechniqueState &);
+    static void sequence(RunRuntime &,TechniqueState &,double);
     static void north_prepare(RunRuntime &,TechniqueState &);
-    static void north_body(RunRuntime &,BossBodyState &,double);
+    static void front_body(RunRuntime &,BossBodyState &,double);
     static void north_timeline(RunRuntime &,TechniqueState &,double);
     static godot::Array north_targets(const RunRuntime &,const BossBodyState &);
     static void pincer(RunRuntime &,TechniqueState &);

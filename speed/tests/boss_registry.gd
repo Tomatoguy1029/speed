@@ -12,6 +12,12 @@ func _ready() -> void:
 	if "--cpp-hydra-debris-separated" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_debris_separated")
 		return
+	if "--cpp-hydra-sequence-second" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_sequence_second")
+		return
+	if "--cpp-hydra-sequence" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_sequence")
+		return
 	if "--cpp-hydra-north-tail" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_north_tail")
 		return
@@ -5754,3 +5760,83 @@ func native_hydra_north_tail() -> void:
 	hydra_grid_separate(c)
 	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離後はSourceと同じく同時噛みを選ばない")
 	bridge.dispose();await get_tree().process_frame;print("[cpp_hydra_north_tail] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_sequence() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.85,"sequence_charge":0.08,"sequence_gap":0.2,"normal_lunge":0.12,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("sequence",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"sequence","順番噛みの編集Resourceと互換Runnerを分ける")
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==89,"五首から共通フローで順番噛みを自然選択する")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var participants: Array=body.necks.filter(func(n):return n.mode=="sequence")
+	participants.sort_custom(func(a,b):return absf(angle_difference(TAU*float(body.necks.find(a))/body.necks.size()+body.facing,(Vector2(800,0)-body.position).angle()))<absf(angle_difference(TAU*float(body.necks.find(b))/body.necks.size()+body.facing,(Vector2(800,0)-body.position).angle())))
+	check(participants.size()==3 and body.effects.is_empty() and participants.all(func(n):return not n.locked),"正面に近い三首をSource順で選び、予告中は判定を出さない")
+	var before_facing: float=body.facing
+	bridge.command("dev_ship_motion",{"position":Vector2(800,160),"velocity":Vector2.ZERO})
+	for tick in 25:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value[0].stage==1:break
+	var t: Dictionary=bridge.command("dev_boss_state").value[0];body=bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(t.performance_time,0.01) and body.effects.is_empty() and not is_equal_approx(body.facing,before_facing),"発動tickから実行時計へdtを加え、本体は機体へ向け続ける")
+	bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0];t=bridge.command("dev_boss_state").value[0]
+	var first: Dictionary=body.necks.filter(func(n):return n.id==participants[0].id)[0]
+	var fraction: float=clampf((t.performance_time-0.08)/0.12,0.0,1.0)
+	check(body.effects.size()==1 and first.locked and first.position.distance_to(participants[0].position.lerp(Vector2(800,160),fraction))<0.01 and body.effects[0].points[0].distance_to(participants[0].position)<0.01,"一首目は個別の溜め後に現在の機体へ固定しSourceのlerp区間を出す")
+	check(is_equal_approx(body.effects[0].width,70.0) and is_equal_approx(body.effects[0].life,0.081),"順番噛みの線分幅は半径の二倍、寿命はmax(dt,.02)+.001")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	var flight: Dictionary=bridge.checkpoint();bridge._core.step(0.03);bridge._core.step_hazards(0.03);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(flight.ok and bridge.restore(flight.value).ok,"順番噛みの参加首・個別固定・時計と判定を保持する");bridge._core.step(0.03);bridge._core.step_hazards(0.03)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"途中復帰でも同じ首と区間へ進む")
+	bridge.restore(flight.value);body=bridge.command("dev_boss_body_state").value[0]
+	var events: Array=[];bridge.subscribe("順番噛みの記録",func(packet):events.append_array(packet.events);return true)
+	bridge._core.set_run_guards({"invincible":false});var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":body.effects[0].points[0].lerp(body.effects[0].points[1],0.5),"velocity":Vector2.ZERO});bridge._core.step_hazards(0.001);bridge.command("dev_boss_body_state")
+	check(hp>bridge._core.ship_snapshot().ship_hp and events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bite" and e.payload.technique=="sequence" and e.payload.source=="hydra"),"順番噛みが実HPとbite・sequence・hydraの通知へ届く")
+	bridge.restore(flight.value);bridge.command("dev_ship_motion",{"position":Vector2(900,-120),"velocity":Vector2.ZERO});bridge._core.step(0.21)
+	body=bridge.command("dev_boss_body_state").value[0];t=bridge.command("dev_boss_state").value[0]
+	var second: Dictionary=body.necks.filter(func(n):return n.id==participants[1].id)[0]
+	fraction=clampf((t.performance_time-0.2-0.08)/0.12,0.0,1.0)
+	check(second.locked and second.position.distance_to(participants[1].position.lerp(Vector2(900,-120),fraction))<0.01 and events.any(func(e):return e.type=="hydra_cue" and e.payload.cue=="target_locked" and e.payload.neck>=0) and body.necks.filter(func(n):return n.mode=="sequence" and n.locked).size()==2,"二首目は間隔分だけ遅れて新しい機体位置へ固定する")
+	bridge._core.step(0.31);bridge._core.step_hazards(0.001);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.filter(func(n):return n.mode=="sequence" and n.locked).size()==3 and body.necks.filter(func(n):return n.mode=="sequence").all(func(n):return n.position.distance_to(Vector2(800,160) if n.id==participants[0].id else Vector2(900,-120))<0.01),"粗い更新でも三首目まで順に最終地点へ届く")
+	bridge.restore(flight.value);bridge.command("dev_damage",{"entity_id":participants[1].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"参加首一本の消失で順番噛みを中断し全判定を回収する")
+	bridge.restore(flight.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で順番噛みの判定を回収する")
+	bridge.restore(flight.value);bridge.command("dev_remove",{"entity_id":c.id});bridge._core.step(0.01);check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失で順番噛みを中断する")
+	bridge.restore(flight.value)
+	for tick in 180:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(a):return a.id>first_id and a.kind==89),"自然終了と余白後に次の順番噛みを選べる")
+	bridge.release_checkpoint(flight.value);bridge.dispose();view.queue_free()
+	c=hydra_major_case("sequence",edits,false);bridge=c.bridge;hydra_grid_separate(c)
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離後はSourceと同じく順番噛みを選ばない")
+	bridge.dispose();await get_tree().process_frame;print("[cpp_hydra_sequence] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_sequence_second() -> void:
+	var c := hydra_major_case("sequence",{"warning_time":0.15,"performance_time":0.85,"sequence_charge":0.08,"sequence_gap":0.2,"normal_lunge":0.12,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05},true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var participants: Array=body.necks.filter(func(n):return n.mode=="sequence")
+	participants.sort_custom(func(a,b):return absf(angle_difference(TAU*float(body.necks.find(a))/body.necks.size()+body.facing,(Vector2(800,0)-body.position).angle()))<absf(angle_difference(TAU*float(body.necks.find(b))/body.necks.size()+body.facing,(Vector2(800,0)-body.position).angle())))
+	bridge.command("dev_ship_motion",{"position":Vector2(800,160),"velocity":Vector2.ZERO})
+	for tick in 25:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value[0].stage==1:break
+	bridge._core.step(0.08)
+	var events: Array=[];bridge.subscribe("二首目の記録",func(packet):events.append_array(packet.events);return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(900,-120),"velocity":Vector2.ZERO});bridge._core.step(0.21)
+	body=bridge.command("dev_boss_body_state").value[0];var t: Dictionary=bridge.command("dev_boss_state").value[0]
+	var second: Dictionary=body.necks.filter(func(n):return n.id==participants[1].id)[0]
+	var fraction: float=clampf((t.performance_time-0.2-0.08)/0.12,0.0,1.0)
+	check(second.locked and second.position.distance_to(participants[1].position.lerp(Vector2(900,-120),fraction))<0.01 and events.any(func(e):return e.type=="hydra_cue" and e.payload.cue=="target_locked" and e.payload.neck>=0) and body.necks.filter(func(n):return n.mode=="sequence" and n.locked).size()==2,"二首目は間隔分だけ遅れて新しい機体位置へ固定する")
+	bridge.dispose();print("[cpp_hydra_sequence_second] failures=",failed);get_tree().quit(1 if failed else 0)

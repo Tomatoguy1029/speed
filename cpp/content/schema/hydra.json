@@ -1741,6 +1741,47 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraSequenceDefinition",
+      "section": 405,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {
