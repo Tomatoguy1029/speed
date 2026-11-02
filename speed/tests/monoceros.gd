@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-finish-source-hp" in OS.get_cmdline_user_args():
+		call_deferred("native_finish_source_hp")
+		return
 	if "--cpp-finish-fallback" in OS.get_cmdline_user_args():
 		call_deferred("native_finish_fallback")
 		return
@@ -1436,7 +1439,9 @@ func finish_fixture(limit := -1.0, automatic := false) -> Dictionary:
 	return {"bridge":bridge,"id":id,"package":package,"events":events,"cfg":cfg}
 
 func finish_low_hp(f: Dictionary) -> void:
-	f.bridge.command("dev_damage",{"entity_id":f.id,"amount":100000.0,"cause":"debug","no_crit":true})
+	var records: Dictionary = f.package.records
+	var amount: float = float(records.EnemyRecord[0].hp)*(1.0-float(records.BossBodyDefinition[0].phase_threshold)*0.5)
+	f.bridge.command("dev_damage",{"entity_id":f.id,"amount":amount,"cause":"debug","no_crit":true})
 	f.bridge._core.step(0.01)
 	f.bridge._core.step(0.01)
 
@@ -1584,4 +1589,27 @@ func native_finish_fallback() -> void:
 	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"参加者消失後の最終攻撃も記録へ配信する")
 	bridge.dispose()
 	print("[cpp_monoceros_finish_fallback] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_finish_source_hp() -> void:
+	var f := finish_fixture(-1.0,true)
+	check(not f.is_empty(),"通常の実制作パッケージを生成する")
+	if f.is_empty(): get_tree().quit(1);return
+	check(not f.package.records.BossBodyDefinition[0].hp_floor_enabled,"一角獣へ元にない形態HP保護を加えない")
+	finish_low_hp(f)
+	var body: Dictionary = f.bridge.command("dev_boss_body_state").value[0]
+	var expected: float = float(f.package.records.EnemyRecord[0].hp)*float(f.package.records.BossBodyDefinition[0].phase_threshold)*0.5
+	check(body.phase==2 and absf(float(body.hp)-expected)<0.0001,"非致死の低HPは余剰ダメージを戻さず第2形態へ移る")
+	check(f.bridge.read_frame().ok and f.bridge.delivery_error.ok,"低HPの通知を正常に読む")
+	f.bridge.dispose()
+	f = finish_fixture()
+	check(not f.is_empty(),"第1形態の致死条件を準備する")
+	if f.is_empty():get_tree().quit(1);return
+	var hit: Dictionary = f.bridge.command("dev_damage",{"entity_id":f.id,"amount":float(f.package.records.EnemyRecord[0].hp)*2.0,"cause":"debug","no_crit":true})
+	check(hit.ok and f.bridge.command("dev_boss_body_state").value[0].mode==4,"第1形態でも致死ダメージは撃破する")
+	check(f.bridge.step(DT,f.bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok,"第1形態の撃破を通常の終了判定へ進める")
+	var frame: Dictionary = f.bridge.read_frame()
+	check(frame.ok and frame.value.ui.phase==RunState.Phase.FINISHING and f.bridge.delivery_error.ok,"致死後に同じクリア演出へ入り配信する")
+	f.bridge.dispose()
+	print("[cpp_monoceros_source_hp] failures=",failed)
 	get_tree().quit(1 if failed else 0)

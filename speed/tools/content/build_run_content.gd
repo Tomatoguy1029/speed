@@ -124,7 +124,6 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 	var compiled := boss_flow_records(rules,flow,techniques.BossTechniqueDefinition)
 	if compiled.is_empty(): return {}
 	for key in compiled: package.records[key] = compiled[key]
-	package.records.BossBodyDefinition[0].hp_floor_enabled = true
 	package.records.RunConfig[0].time_limit = stage.time_limit if stage!=null else -1.0
 	package.records.LifecycleDefinition[0].legendary = String(stage.legendary_module_id) if stage!=null else ""
 	var finish := {"id":1,"time_up_charge_time":config.time_up_charge_time}
@@ -679,7 +678,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	if flash_slash_entry==null: return {}
 	for path in flash_slash_entry.resources:
 		var key: int = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":key,"key":"loadout/"+path})
+		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":flash_slash_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":flash_slash_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":afterimage_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(afterimage.id).has("followup") else 0.0})
@@ -687,7 +686,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	if afterimage_entry==null: return {}
 	for path in afterimage_entry.resources:
 		var key: int = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":key,"key":"loadout/"+path})
+		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":afterimage_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":afterimage_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":escort_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(escort.id).has("followup") else 0.0})
@@ -695,7 +694,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	if escort_entry==null: return {}
 	for path in escort_entry.resources:
 		var key: int = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":key,"key":"loadout/"+path})
+		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":escort_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":escort_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":interceptor_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if interceptor_target.has("followup") else 0.0})
