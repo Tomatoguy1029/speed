@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-burst-debris" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_burst_debris()
+		check(finished,"破砕片の不足条件を最後まで確認する")
+		print("[cpp_burst_debris] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-light-lances" in OS.get_cmdline_user_args() or "--cpp-light-lances-step-fix" in OS.get_cmdline_user_args():
 		lances_tick_only = "--cpp-light-lances-step-fix" in OS.get_cmdline_user_args()
 		mute_checks = lances_tick_only
@@ -747,3 +753,31 @@ func check_cpp_light_lances() -> void:
 	cpp_bridge.release_checkpoint(empty.value)
 	lances_finished = true
 	cpp_session.free()
+
+func prepare_cpp_duplicator_attack(index_number: int,name: String) -> bool:
+	var definition: TraitDef = load("res://data/traits/T37_duplicator.tres")
+	var saved: Dictionary = definition.params.duplicate(true)
+	definition.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
+	definition.params.angle_min = 0.0
+	definition.params.angle_max = 0.0
+	var ready: bool = await prepare_cpp_attack(index_number,name)
+	definition.params = saved
+	if not ready: return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	return cpp_bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5}).ok
+
+func check_cpp_burst_debris() -> bool:
+	if not await prepare_cpp_duplicator_attack(101,"burst_debris"): return false
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var emitted: Dictionary = cpp_bridge.command("dev_burst_debris",{"position":cpp_origin,"source_id":source,"count":2,"speed":100.0,"damage":2.0,"armor_count":1})
+	check(emitted.ok,"破砕片の元をまとめて完成してから複製する")
+	var state: Array = cpp_core.projectiles_snapshot()
+	check(state.size()==6,"元の破砕片2件のあとで複製4件を生成する")
+	if state.size()!=6: cpp_session.free(); return false
+	check(state.map(func(p): return String(p.type))==["pump","drifter","pump","pump","drifter","drifter"],"完成した装甲と敵の種別を出生順に複製へ引き継ぐ")
+	check(state.all(func(p): return p.hit_ids==[source]) and state[2].pos==state[0].pos and state[4].pos==state[1].pos and is_equal_approx(state[2].damage,1.6),"複製へ元ID・位置・T37の威力を引き継ぐ")
+	var events: Array = cpp_bridge.latest_frame().value.events
+	check(events.size()==3 and events[0].type==&"hull_scatter" and events[1].type==&"duplicate" and events[1].payload.pos==state[0].pos and events[2].payload.pos==state[1].pos,"全生成後の破砕通知から元ごとの分裂通知へ順に進む")
+	check(cpp_core.attack_budget_snapshot().groups.is_empty(),"味方の破砕片は敵の攻撃予算を使わない")
+	cpp_session.free()
+	return true
