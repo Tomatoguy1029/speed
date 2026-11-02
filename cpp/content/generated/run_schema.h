@@ -399,7 +399,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 40) return false;
+    if (out.kind > 41) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -3933,7 +3933,7 @@ inline bool read(BinaryReader &input, BossDefinition &out) {
     if (out.id < 1) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 1) return false;
+    if (out.kind > 2) return false;
     if (!input.read_f64(out.lock_lead)) return false;
     if (out.lock_lead < 0) return false;
     if (!input.read_f64(out.horn_width)) return false;
@@ -4056,7 +4056,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 8) return false;
+    if (out.kind > 10) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -4230,7 +4230,7 @@ inline bool read(BinaryReader &input, BossTechniqueStage &out) {
     if (out.id < 1) return false;
     if (!input.read_u32(out.technique)) return false;
     if (!input.read_u32(out.command)) return false;
-    if (out.command > 4) return false;
+    if (out.command > 6) return false;
     if (!input.read_f64(out.at)) return false;
     if (out.at < 0) return false;
     return true;
@@ -4770,6 +4770,155 @@ inline bool read(BinaryReader &input, CentaurusVolleyDefinition &out) {
     if (!input.read_u32(out.projectile)) return false;
     return true;
 }
+struct CentaurusRearDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double back_offset{};
+    double radius{};
+};
+inline bool read(BinaryReader &input, CentaurusRearDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.back_offset)) return false;
+    if (out.back_offset < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    return true;
+}
+struct CentaurusRainDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t traces{};
+    uint32_t arrows_per_step{};
+    double arrow_gap{};
+    double circle_radius{};
+    double drop_delay{};
+    double drop_height{};
+    double fade{};
+    double fall{};
+    double forward{};
+    double linger{};
+    double trace_bend{};
+    double trace_gap{};
+    double trace_length{};
+    double trace_speed{};
+    double arrow_radius{};
+    double arrow_length{};
+    uint32_t projectile{};
+};
+inline bool read(BinaryReader &input, CentaurusRainDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.traces)) return false;
+    if (out.traces < 1) return false;
+    if (!input.read_u32(out.arrows_per_step)) return false;
+    if (out.arrows_per_step < 1) return false;
+    if (!input.read_f64(out.arrow_gap)) return false;
+    if (out.arrow_gap < 0) return false;
+    if (!input.read_f64(out.circle_radius)) return false;
+    if (out.circle_radius < 0) return false;
+    if (!input.read_f64(out.drop_delay)) return false;
+    if (out.drop_delay < 0) return false;
+    if (!input.read_f64(out.drop_height)) return false;
+    if (out.drop_height < 0) return false;
+    if (!input.read_f64(out.fade)) return false;
+    if (out.fade < 0) return false;
+    if (!input.read_f64(out.fall)) return false;
+    if (out.fall < 0) return false;
+    if (!input.read_f64(out.forward)) return false;
+    if (out.forward < 0) return false;
+    if (!input.read_f64(out.linger)) return false;
+    if (out.linger < 0) return false;
+    if (!input.read_f64(out.trace_bend)) return false;
+    if (out.trace_bend < 0) return false;
+    if (!input.read_f64(out.trace_gap)) return false;
+    if (out.trace_gap < 0) return false;
+    if (!input.read_f64(out.trace_length)) return false;
+    if (out.trace_length < 0) return false;
+    if (!input.read_f64(out.trace_speed)) return false;
+    if (out.trace_speed < 0) return false;
+    if (!input.read_f64(out.arrow_radius)) return false;
+    if (out.arrow_radius < 0) return false;
+    if (!input.read_f64(out.arrow_length)) return false;
+    if (out.arrow_length < 0) return false;
+    if (!input.read_u32(out.projectile)) return false;
+    return true;
+}
+struct CanisBodyDefinition {
+    uint32_t id{};
+    uint32_t boss{};
+    uint32_t hound{};
+    double speed_p2{};
+    double entrance_bark{};
+    double call_time{};
+    double call_cd{};
+    double lead_radius{};
+    double lead_scan{};
+    double lead_catch_up{};
+    double led_hits{};
+    double slot_back{};
+    double slot_side{};
+    double form_wobble{};
+    double lane_open{};
+    double lane_forward{};
+    double form_speed_min{};
+    double form_speed_max{};
+    uint32_t pack_size{};
+    uint32_t call_below{};
+    uint32_t call_to{};
+    uint32_t lead_max{};
+    float led_r{};
+    float led_g{};
+    float led_b{};
+    float led_a{};
+};
+inline bool read(BinaryReader &input, CanisBodyDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_u32(out.hound)) return false;
+    if (!input.read_f64(out.speed_p2)) return false;
+    if (out.speed_p2 < 0) return false;
+    if (!input.read_f64(out.entrance_bark)) return false;
+    if (out.entrance_bark < 0) return false;
+    if (!input.read_f64(out.call_time)) return false;
+    if (out.call_time < 0) return false;
+    if (!input.read_f64(out.call_cd)) return false;
+    if (out.call_cd < 0) return false;
+    if (!input.read_f64(out.lead_radius)) return false;
+    if (out.lead_radius < 0) return false;
+    if (!input.read_f64(out.lead_scan)) return false;
+    if (out.lead_scan < 0) return false;
+    if (!input.read_f64(out.lead_catch_up)) return false;
+    if (out.lead_catch_up < 0) return false;
+    if (!input.read_f64(out.led_hits)) return false;
+    if (out.led_hits < 0) return false;
+    if (!input.read_f64(out.slot_back)) return false;
+    if (out.slot_back < 0) return false;
+    if (!input.read_f64(out.slot_side)) return false;
+    if (out.slot_side < 0) return false;
+    if (!input.read_f64(out.form_wobble)) return false;
+    if (out.form_wobble < 0) return false;
+    if (!input.read_f64(out.lane_open)) return false;
+    if (out.lane_open < 0) return false;
+    if (!input.read_f64(out.lane_forward)) return false;
+    if (out.lane_forward < 0) return false;
+    if (!input.read_f64(out.form_speed_min)) return false;
+    if (out.form_speed_min < 0) return false;
+    if (!input.read_f64(out.form_speed_max)) return false;
+    if (out.form_speed_max < 0) return false;
+    if (!input.read_u32(out.pack_size)) return false;
+    if (!input.read_u32(out.call_below)) return false;
+    if (!input.read_u32(out.call_to)) return false;
+    if (!input.read_u32(out.lead_max)) return false;
+    if (!input.read_f32(out.led_r)) return false;
+    if (!input.read_f32(out.led_g)) return false;
+    if (!input.read_f32(out.led_b)) return false;
+    if (!input.read_f32(out.led_a)) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -4926,6 +5075,9 @@ struct ContentRecords {
     std::vector<HerculesDefinition> HerculesDefinition_rows;
     std::vector<CentaurusBodyDefinition> CentaurusBodyDefinition_rows;
     std::vector<CentaurusVolleyDefinition> CentaurusVolleyDefinition_rows;
+    std::vector<CentaurusRearDefinition> CentaurusRearDefinition_rows;
+    std::vector<CentaurusRainDefinition> CentaurusRainDefinition_rows;
+    std::vector<CanisBodyDefinition> CanisBodyDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -5731,13 +5883,13 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 9) return false;
+        if (version != 11) return false;
         if (count > input.remaining()/637) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 152: {
-        if (version != 2) return false;
+        if (version != 4) return false;
         if (count > input.remaining()/20) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueStage row; if (!read(input,row)) return false; out.BossTechniqueStage_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -5860,6 +6012,24 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/40) return false;
         for (uint32_t i=0; i<count; ++i) { CentaurusVolleyDefinition row; if (!read(input,row)) return false; out.CentaurusVolleyDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 322: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusRearDefinition row; if (!read(input,row)) return false; out.CentaurusRearDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 323: {
+        if (version != 1) return false;
+        if (count > input.remaining()/132) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusRainDefinition row; if (!read(input,row)) return false; out.CentaurusRainDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 340: {
+        if (version != 1) return false;
+        if (count > input.remaining()/164) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisBodyDefinition row; if (!read(input,row)) return false; out.CanisBodyDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -6176,6 +6346,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusBodyDefinition_rows) if (!CentaurusBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusVolleyDefinition_ids;
     for (const auto &row:data.CentaurusVolleyDefinition_rows) if (!CentaurusVolleyDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusRearDefinition_ids;
+    for (const auto &row:data.CentaurusRearDefinition_rows) if (!CentaurusRearDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusRainDefinition_ids;
+    for (const auto &row:data.CentaurusRainDefinition_rows) if (!CentaurusRainDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisBodyDefinition_ids;
+    for (const auto &row:data.CanisBodyDefinition_rows) if (!CanisBodyDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -6332,6 +6508,11 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusBodyDefinition_rows) if (!EnemyRecord_ids.count(row.guard)) return false;
     for (const auto &row:data.CentaurusVolleyDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CentaurusVolleyDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
+    for (const auto &row:data.CentaurusRearDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusRainDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusRainDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
+    for (const auto &row:data.CanisBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.CanisBodyDefinition_rows) if (!EnemyRecord_ids.count(row.hound)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -6458,5 +6639,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=155;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=158;
 }
