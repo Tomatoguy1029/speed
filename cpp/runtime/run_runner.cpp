@@ -107,9 +107,9 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         }
     }
     if (world_step && state.phase==Phase::Play) {
-        if (!CoronaVortex::hit_thrown(core.runtime)) return true;
         if (state.projectile_config.ready && !core.step_projectiles(wd)) return false;
         if (core.check_run_end()) return true;
+        if (!CoronaVortex::hit_thrown(core.runtime)) return true;
         if (!state.hostiles.empty() && !core.step_hostiles(wd)) return false;
         if (core.check_run_end()) return true;
         if (!state.hazards.empty() && !core.step_hazards(wd)) return false;

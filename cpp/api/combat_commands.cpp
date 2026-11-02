@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../behaviors/enemies/corona_vortex.h"
 #include "../systems/combat_resolver.h"
 #include "../output/event_builder.h"
 #include <cmath>
@@ -29,6 +30,7 @@ bool cause(const Dictionary &data,speed::Cause &out) {
 Dictionary SpeedRunCore::development_combat_command(const String &kind,const Dictionary &data) {
     if (!runtime.api_development) return result(false);
     auto &state=runtime.state;
+    if (kind=="dev_corona_after_combat") {if (!data.is_empty()) return result(false);const bool playing=speed::CoronaVortex::hit_thrown(runtime);speed::EventBuilder::flush_combat(runtime);return result(true,playing);}
     if (kind=="dev_ship_damage") {
         speed::ShipDamageRequest request;
         if (!fields(data,{"amount","slow","cause","source","technique","scale","hit_policy"}) || !number(data,"amount") || !cause(data,request.cause)) return result(false);

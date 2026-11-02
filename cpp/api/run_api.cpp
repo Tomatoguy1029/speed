@@ -316,7 +316,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         const bool removed=remove_enemy(int64_t(payload["entity_id"]));
         if (removed) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=removed?success():failure(5,"entity_id","対象がありません");
-    } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat") response=development_combat_command(kind,payload);
+    } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat" || kind=="dev_corona_after_combat") response=development_combat_command(kind,payload);
     else if (kind=="dev_friend_births" || kind=="dev_friend_reserve") response=development_friend_command(kind,payload);
     else if (kind=="dev_emit_attack" || kind=="dev_end_attack" || kind=="dev_attack_scope" || kind=="dev_clear_hostile" || kind=="dev_attack_update") response=development_attack_command(kind,payload);
     else if (kind=="dev_fire_light_arrow") response=development_light_arrow_command(payload);

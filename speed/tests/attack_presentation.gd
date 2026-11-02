@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-corona-throw" in OS.get_cmdline_user_args() or "--cpp-corona-throw-order" in OS.get_cmdline_user_args() or "--cpp-corona-throw-order-fix" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_corona_throw()
+		check(finished,"かんむり座の投射の指定確認を最後まで実施する")
+		print("[cpp_corona_throw] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-corona" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_corona()
 		check(finished,"かんむり座の指定確認を最後まで実施する")
@@ -1708,5 +1714,108 @@ func check_cpp_corona() -> bool:
 	cpp_bridge.step(1.0/120.0,cpp_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	var delivered: Dictionary = cpp_bridge.collect_frame()
 	check(delivered.ok and cpp_bridge.delivery_error.get("ok",false) and cpp_bridge.read_frame().ok,"通常固定更新の通知配信と状態読取まで成功する")
+	cpp_session.free()
+	return true
+
+func spawn_cpp_corona_throw(at: Vector2) -> PackedInt64Array:
+	cpp_bridge.command("dev_ship_motion",{"position":at+Vector2(500,0),"velocity":Vector2.ZERO})
+	cpp_core.set_motion_context(at+Vector2(500,0),at,Vector2(1000,1000))
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"corona","position":at}).value
+	var ammo: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":at-Vector2(0,80)}).value
+	cpp_core.set_enemy_motion(owner,{"fire_t":0.0})
+	cpp_core.step(0.05)
+	cpp_core.step(0.06)
+	return PackedInt64Array([owner,ammo])
+
+func check_cpp_corona_throw() -> bool:
+	var order_only := "--cpp-corona-throw-order" in OS.get_cmdline_user_args() or "--cpp-corona-throw-order-fix" in OS.get_cmdline_user_args()
+	mute_checks = order_only
+	var tuning := {"corona":{"speed":0.0,"params.capture_max":1,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":1000.0,"params.ring":80.0,"params.spin":1.0,"params.telegraph":0.1,"params.align_angle":PI,"params.fire_interval":0.3,"params.throw_speed":300.0,"params.throw_life":1.0,"params.throw_damage_swarm":8.0,"params.throw_effect_scale":1.6},"swarm":{"speed":0.0,"hp":1000.0}}
+	var prepared := await prepare_cpp_attack(117,"corona_throw",PackedStringArray(["corona","swarm"]),tuning)
+	if not prepared: mute_checks = false; return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_core.set_attack_formation_mode(true)
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var ids := spawn_cpp_corona_throw(cpp_origin)
+	var owner: int = ids[0]
+	var ammo: int = ids[1]
+	var thrown: Dictionary = cpp_motion_for(ammo)
+	check(thrown.get("corona_thrown",false) and thrown.held==1 and cpp_core.enemies_snapshot().size()==2 and cpp_core.hostiles_snapshot().is_empty() and cpp_motion_for(owner).corona_count==0,"同じ敵の行を接線方向へ投げ、個体や敵弾を複製しない")
+	if not thrown.get("corona_thrown",false): cpp_session.free(); return false
+	check(is_equal_approx(thrown.corona_life,1.0) and thrown.corona_damage==8.0 and is_equal_approx(thrown.corona_effect,1.6) and is_equal_approx(Vector2(cpp_enemy_for(ammo).vel[0],cpp_enemy_for(ammo).vel[1]).length(),300.0),"投射の速度・寿命・種類別固定威力・表示倍率を編集値から受け取る")
+	cpp_core.advance_attack_budget(cpp_core.inspect().world_time)
+	check(thrown.corona_token>0 and cpp_core.attack_budget_snapshot().used==1.0,"投射中の外部参照で元の攻撃枠を残す")
+	var launched: Dictionary = cpp_bridge.checkpoint()
+	if order_only:
+		mute_checks = false
+		return check_cpp_corona_throw_order(ammo)
+	var before: Array = cpp_core.enemy_motion_snapshot()
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.corona_members.size()==10 and frame.corona_members[3]==1.0 and presentation.frame_view.apply_frame(frame),"投射の赤い円と飾りの尾を通常画面で描く")
+	await get_tree().process_frame
+	cpp_core.set_enemy_motion(owner,{"fire_t":100.0})
+	cpp_core.step(1.01)
+	cpp_core.advance_attack_budget(cpp_core.inspect().world_time)
+	check(cpp_motion_for(ammo).held==0 and not cpp_motion_for(ammo).has("corona_owner") and cpp_enemy_for(ammo).vel==[0.0,0.0] and cpp_core.attack_budget_snapshot().used==0.0,"単体の投射が寿命で終わると通常AIの速さへ戻し攻撃枠を解放する")
+	cpp_core.step(1.02)
+	check(cpp_motion_for(ammo).held==1 and not cpp_motion_for(ammo).corona_thrown and cpp_motion_for(ammo).corona_serial>thrown.corona_serial and cpp_motion_for(owner).corona_count==1,"寿命後の同じ生存個体を新しい捕捉番号で再捕捉する")
+	check(cpp_bridge.restore(launched.value).ok and cpp_core.enemy_motion_snapshot()==before,"飛行中の位置・速度・寿命・相対判定の開始点・予算外部参照を復元する")
+	var position := Vector2(cpp_enemy_for(ammo).pos[0],cpp_enemy_for(ammo).pos[1])
+	var velocity := Vector2(cpp_enemy_for(ammo).vel[0],cpp_enemy_for(ammo).vel[1])
+	var side := Vector2(-velocity.y,velocity.x).normalized()
+	cpp_bridge.command("dev_ship_motion",{"position":position+side*90.0,"velocity":Vector2.ZERO})
+	cpp_core.step(0.1)
+	var finish := Vector2(cpp_enemy_for(ammo).pos[0],cpp_enemy_for(ammo).pos[1])
+	cpp_bridge.command("dev_ship_motion",{"position":finish-side*90.0,"velocity":Vector2.ZERO})
+	check(cpp_bridge.command("dev_corona_after_combat",{}).ok and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0) and cpp_motion_for(ammo).held==0,"両端で頭の円に触れないすれ違いも相対線分で拾い、atk_scaleを掛けず固定8を与えて投射を終了する")
+	cpp_bridge.command("dev_corona_after_combat",{})
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"1投で機体へ繰り返し命中させない")
+	cpp_bridge.restore(launched.value)
+	cpp_core.set_enemy_motion(ammo,{"stone":1.0})
+	cpp_core.step(0.01)
+	check(cpp_motion_for(ammo).held==0 and cpp_motion_for(ammo).stone>0.0 and not cpp_motion_for(ammo).has("corona_owner"),"飛行中の石化は投射を解除して石化した元の敵を残す")
+	cpp_bridge.restore(launched.value)
+	cpp_bridge.command("dev_kill",{"entity_id":ammo,"cause":"debug"})
+	cpp_bridge.command("dev_corona_after_combat",{})
+	check(cpp_enemy_for(ammo).dead==1 and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp),"途中で倒された弾薬は後段の機体判定へ当たらない")
+	cpp_bridge.command("dev_remove",{"entity_id":ammo})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(500,0)}).value
+	check(replacement!=ammo and cpp_motion_for(replacement).held==0 and not cpp_motion_for(replacement).has("corona_owner"),"投射していた行の別個体へ所属や攻撃を漏らさない")
+	cpp_bridge.restore(launched.value)
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	cpp_bridge.command("dev_corona_after_combat",{})
+	cpp_core.advance_attack_budget(cpp_core.inspect().world_time+0.01)
+	check(cpp_motion_for(ammo).held==0 and not cpp_motion_for(ammo).has("corona_owner") and cpp_core.attack_budget_snapshot().used==0.0,"元の冠を先に消すと投射済みも解除し外部参照を回収する")
+	cpp_bridge.restore(empty.value)
+	var terrain := spawn_cpp_corona_throw(Vector2(-260,0))
+	check(cpp_motion_for(terrain[1]).get("corona_thrown",false),"天体へ向かう投射を通常の捕捉と予告から始める")
+	cpp_core.step(0.7)
+	var struck: Dictionary = cpp_enemy_for(terrain[1])
+	check(cpp_motion_for(terrain[1]).held==0 and not cpp_motion_for(terrain[1]).has("corona_owner") and Vector2(struck.pos[0],struck.pos[1]).length()>=cpp_config.planet_radius+struck.radius-0.1,"投射が天体へ当たったら既存の押し戻しを使って解除する")
+	cpp_bridge.restore(launched.value)
+	cpp_bridge.step(1.0/120.0,cpp_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var delivered: Dictionary = cpp_bridge.collect_frame()
+	check(delivered.ok and cpp_bridge.delivery_error.get("ok",false) and cpp_bridge.read_frame().ok,"投射を含む固定更新の通知配信と状態読取まで成功する")
+	check(cpp_bridge.dispose().ok and cpp_core.inspect().closed and cpp_core.enemies_snapshot().is_empty() and cpp_core.attack_budget_snapshot().groups.is_empty(),"ラン終了で周回・投射・所属・予算の外部参照を残さず掃除する")
+	cpp_session.free()
+	return true
+
+func check_cpp_corona_throw_order(ammo: int) -> bool:
+	var retry := "--cpp-corona-throw-order-fix" in OS.get_cmdline_user_args()
+	var body: Dictionary = cpp_enemy_for(ammo)
+	var position := Vector2(body.pos[0],body.pos[1])
+	var velocity := Vector2(body.vel[0],body.vel[1])
+	var side := Vector2(-velocity.y,velocity.x).normalized()
+	var reach: float = body.radius*1.3+cpp_config.ship_radius
+	cpp_bridge.command("dev_ship_motion",{"position":position+side*reach,"velocity":Vector2.ZERO})
+	mute_checks = retry
+	check(cpp_core.fire_shot(position,0.0,1500.0,{"speed":0.0,"r":2.0,"life":1.0,"knock":0.0}),"同じ更新で弾薬を撃ち落とす味方弾を配置する")
+	mute_checks = false
+	cpp_bridge.step(1.0/120.0,cpp_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var delivered: Dictionary = cpp_bridge.collect_frame()
+	check(cpp_enemy_for(ammo).is_empty() and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp),"味方弾で同じ更新に撃破した弾薬は後段の投射判定へ当たらない")
+	if not retry: check(delivered.ok and cpp_bridge.delivery_error.get("ok",false) and cpp_bridge.read_frame().ok,"同時撃破を含む固定更新の通知配信まで成功する")
 	cpp_session.free()
 	return true
