@@ -118,7 +118,7 @@ class SpeedRunCore : public RefCounted {
     bool admit_bite(size_t row, double dt);
     void advance_biter(size_t row, double dt, bool far);
     void update_pushed(Enemy &enemy, double dt);
-    void advance_enemies(double delta);
+    bool advance_enemies(double delta);
 protected:
     static void _bind_methods();
 public:

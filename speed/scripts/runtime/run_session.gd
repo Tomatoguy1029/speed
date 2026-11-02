@@ -13,6 +13,7 @@ var runtime_kind := "gdscript"
 var _sim: RefCounted
 var sim: RefCounted:
 	get:
+		if runtime_kind=="cpp": return null
 		_ensure_sim()
 		return _sim
 var _pending_cpp: Dictionary = {}
@@ -232,8 +233,8 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	if prepared.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
 	if not RunManager.ensure_registered(self): return ERR_OUT_OF_MEMORY
 	var next_bridge = preload("res://scripts/runtime/run_bridge.gd").new()
-	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":1,
-		"stage_id":prepared.index.get("stage_id",""),"profile":options.get("cpp_profile",{}),"settings":{}})
+	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":1 if OS.is_debug_build() or options.get("cpp_start",{}).get("lab_mode",false) else 0,
+		"stage_id":prepared.index.get("stage_id",""),"profile":options.get("cpp_profile",{}),"settings":{"hitstop":bool(SaveManager.settings.get("hitstop",true))}})
 	if not configured.ok:
 		next_bridge.dispose()
 		return ERR_INVALID_DATA

@@ -17,6 +17,13 @@ var shots := ""
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--cpp-stage="):
+			await _test_cpp_stage(arg.trim_prefix("--cpp-stage=").to_int())
+			return
+	if "--cpp-entries" in OS.get_cmdline_user_args():
+		await _test_cpp_entries()
+		return
+	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			shots = arg.trim_prefix("--out=")
 	if shots != "" and DisplayServer.get_name() != "headless":
@@ -101,13 +108,16 @@ func _test_debug_stage_selection() -> void:
 		map._launch.pressed.emit()
 		await _settle_screen()
 		if app._current is RunSession:
-			var initial_run: RunSimulation = app._current.sim
-			app._current.auto_step = false
-			_check(initial_run.state.stage.index == stage and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：ステージ%dを0秒の武器選択から開始する" % stage)
+			var owner: RunSession = app._current
+			owner.auto_step = false
+			while owner.bridge==null and owner.cpp_error==OK: await get_tree().process_frame
+			var initial: Dictionary = owner.bridge.read_frame().value
+			var source: StageDef = load("res://data/stages/stage_%d.tres" % stage)
+			_check(owner._sim==null and initial.ui.run_time==0.0 and initial.ui.cards.initial,"ステージ選択：C++の0秒の武器選択から開始する")
 			await _shot("debug_stage_%d_start" % stage)
-			initial_run.command(&"choose_card", {"index": 0})
-			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage==4 else &"monoceros" if stage==1 else &"draco" if stage==5 else &""), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
-			_check(initial_run.state.stage.boss_enabled == (stage in [1, 4, 5]), "ステージ選択：専用ボス実装済みのステージだけ出現を有効にする：%d" % stage)
+			_cpp_choose(owner,initial)
+			var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(owner.cpp_index_path))
+			_check(index.stage_id==str(source.index),"ステージ選択：保存済みのステージ定義を使う")
 			GameManager.abort_run()
 			await _settle_screen()
 	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
@@ -123,7 +133,10 @@ func _start(stage: int) -> void:
 	SaveManager.data.intro_seen = true
 	GameManager.run_stage = stage
 	GameManager.run_endless = false
-	scene = RunManager.create_run()
+	# 移行元との行動比較用だけに旧処理を明示して作り、通常出撃へ戻さない。
+	var options := {"runtime":"gdscript","stage_index":stage,"stage":ContentManager.runtime_stage(stage),"profile":ProfileManager.for_run(false)}
+	scene = RunManager._register(RunSession.new(),options)
+	scene.start_loading(options)
 	# 行動単体の確認では、そのステージに登場しない敵も配置する。
 	# 通常ランの資源境界を保ち、fixtureが使う追加の外観を開始前にScopeへ渡す。
 	var extra := ContentManager.prepare_resources(PackedStringArray(ContentManager.visual_index.look_paths.values()), false)
@@ -1173,3 +1186,178 @@ func _settle_screen() -> void:
 	while GameManager.screen_transition_active:
 		await get_tree().process_frame
 	await get_tree().process_frame
+
+## S1〜S5の表示確認。通常の選択・入力と、時間を飛ばす診断を別のランで記録する。
+func _cpp_open(stage: int) -> RunSession:
+	GameManager.run_stage = stage
+	GameManager.run_endless = false
+	GameManager.run_start_source = "stage_start"
+	var owner := RunManager.create_run({"seed":932})
+	owner.auto_step = false
+	add_child(owner)
+	for i in 4000:
+		if owner.bridge!=null or owner.cpp_error!=OK: break
+		await get_tree().process_frame
+	_check(owner.bridge!=null and owner._sim==null,"C++通常入口で旧シミュレーションを作らない: %d" % stage)
+	return owner
+
+func _cpp_choose(owner: RunSession, frame: Dictionary) -> bool:
+	var cards: Dictionary = frame.ui.cards
+	if cards.offer_id==0 or cards.selected_id!=0: return true
+	if cards.candidates.is_empty(): return false
+	var candidate: Dictionary = cards.candidates[0]
+	# 既存の通常候補から射撃を優先する。候補やレベルは書き換えない。
+	for item: Dictionary in cards.candidates:
+		if item.id=="W01": candidate = item;break
+	var result: Dictionary = owner.bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":candidate.candidate_id})
+	return result.ok
+
+func _test_cpp_stage(stage: int) -> void:
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
+	var definition: StageDef = load("res://data/stages/stage_%d.tres" % stage)
+	var owner := await _cpp_open(stage)
+	if owner.bridge==null:
+		owner.free()
+		get_tree().quit(1)
+		return
+	var saw := {"early":false,"growth":false,"late":false,"boss":false,"fired":false,"ended":false}
+	var event_counts := {}
+	owner.bridge.subscribe("S進行記録",func(frame: Dictionary):
+		for event: Dictionary in frame.events:
+			var kind := str(event.type)
+			event_counts[kind] = int(event_counts.get(kind,0))+1
+			if kind=="boss_spawn": saw.boss = true
+		return true)
+	var initial: Dictionary = owner.bridge.read_frame().value
+	_check(initial.ui.cards.initial and initial.ui.run_time==0.0,"通常出撃は0秒の武器選択から始まる")
+	var frame: Dictionary = initial
+	var limit := int((definition.time_limit+15.0)*120.0) if definition.time_limit>0 else 120*960
+	for tick in limit:
+		if not _cpp_choose(owner,frame):
+			_check(false,"通常カードを確定する")
+			break
+		owner.cpp_choices.poll()
+		var intent := Intent.new()
+		intent.has_cursor = true
+		var at: Vector2 = frame.ui.ship.ship_pos
+		var t := float(frame.ui.run_time)
+		intent.cursor = Vector2.from_angle(t*0.3)*2400.0
+		intent.pen = at+Vector2.from_angle(float(tick%240)*TAU/240.0)*450.0
+		intent.press = tick%600==0
+		intent.pen_release = tick%600==120
+		intent.hero_press = tick%120==0
+		var step: Dictionary = owner.bridge.step(1.0/120.0,owner.bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+		if not step.ok:
+			_check(false,"通常固定更新に未対応処理や通知エラーがない: "+str(step))
+			break
+		frame = owner.bridge.read_frame().value
+		saw.early = saw.early or frame.ui.run_time>=10.0
+		saw.growth = saw.growth or frame.ui.level>1
+		saw.late = saw.late or frame.ui.run_time>=definition.boss_start(ContentManager.cfg)-1.0
+		saw.fired = saw.fired or owner.bridge.read_metrics().value.friendly_shots>0
+		if frame.result is Dictionary:
+			saw.ended = true
+			break
+		if tick%120==0: await get_tree().process_frame
+	print("[S%d 自然通し] 無敵なし・時間飛ばしなし・強制撃破なし time=%s level=%s gear=%s traits=%s result=%s events=%s criteria=%s" % [stage,frame.ui.run_time,frame.ui.level,frame.ui.weapon_levels,frame.ui.trait_levels,frame.result,event_counts,saw])
+	_check(saw.early and saw.growth and saw.late and (saw.boss or not definition.boss_enabled) and saw.ended,"S%d 自然な序盤→成長→終盤→設定済みボス/終了" % stage)
+	_check(saw.fired,"S%d 通常取得装備が発動する" % stage)
+	owner.free()
+	await get_tree().process_frame
+	# 自然通しの失敗で、独立した後半と終了の接続確認を飛ばさない。
+	owner = await _cpp_open(stage)
+	if owner.bridge!=null:
+		frame = owner.bridge.read_frame().value
+		_cpp_choose(owner,frame)
+		for i in 1000:
+			owner.cpp_choices.poll()
+			owner.bridge.step(1.0/120.0,{}, {"logical_size":Vector2(1280,720)})
+			frame = owner.bridge.read_frame().value
+			if frame.ui.phase==RunState.Phase.PLAY: break
+			await get_tree().process_frame
+		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"invincible","args":{}}})
+		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"time","args":{"seconds":definition.boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1}}})
+		for tick in 120*50:
+			var step: Dictionary = owner.bridge.step(1.0/120.0,{}, {"logical_size":Vector2(1280,720)})
+			if not step.ok:
+				_check(false,"時間短縮した後半の更新: "+str(step))
+				break
+			frame = owner.bridge.read_frame().value
+			_cpp_choose(owner,frame)
+			owner.cpp_choices.poll()
+			if tick==120*15 and definition.boss_enabled:
+				_check(owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"kill_boss","args":{}}}).ok,"時間短縮した診断でボスの終了へ進む")
+			if frame.result is Dictionary: break
+			if tick%60==0: await get_tree().process_frame
+		print("[S%d 時間短縮診断] 無敵・時間飛ばし・強制撃破あり time=%s boss=%s result=%s" % [stage,frame.ui.run_time,frame.ui.boss_bodies,frame.result])
+		_check(not definition.boss_enabled or not frame.ui.boss_bodies.is_empty() or frame.result is Dictionary,"設定済みボスの自動出現を維持する")
+		_check(frame.result is Dictionary,"時間短縮診断の終了へ接続する")
+	owner.free()
+	print("[S%d] passed=%d failed=%d" % [stage,passed,failed])
+	get_tree().quit(1 if failed else 0)
+
+func _test_cpp_entries() -> void:
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
+	GameManager.boot_request = Callable()
+	GameManager.screen = GameManager.Screen.TITLE
+	var app: Node = load("res://scenes/app/main.tscn").instantiate()
+	add_child(app)
+	await _settle_screen()
+	_check(GameManager.screen==GameManager.Screen.TITLE,"通常起動でタイトルを表示する")
+	app._current.get_node("%StartButton").pressed.emit()
+	await _settle_screen()
+	_check(GameManager.screen==GameManager.Screen.MAIN_MENU,"タイトルからメニューへ進む")
+	for stage in range(1,ContentManager.stage_count()+1):
+		GameManager.goto(GameManager.Screen.STAGE_SELECT)
+		await _settle_screen()
+		app._current._map._select(stage-1)
+		app._current._map._launch.pressed.emit()
+		await _settle_screen()
+		var owner := app._current as RunSession
+		if owner!=null:
+			for i in 4000:
+				if owner.bridge!=null or owner.cpp_error!=OK: break
+				await get_tree().process_frame
+		_check(owner!=null and owner.bridge!=null and owner._sim==null,"ステージ%dの通常出撃がC++だけを生成する" % stage)
+		if owner!=null and owner.bridge!=null:
+			var identity := owner.id
+			GameManager.abort_run()
+			await _settle_screen()
+			_check(GameManager.screen==GameManager.Screen.MAIN_MENU and RunManager.session(identity)==null,"ステージ%dから戻るとセッションを解放する" % stage)
+	GameManager.goto(GameManager.Screen.ENEMY_LAB)
+	await _settle_screen()
+	var laboratory = app._current.session
+	for i in 4000:
+		if laboratory.scene!=null and laboratory.scene.bridge!=null: break
+		await get_tree().process_frame
+	_check(laboratory.scene!=null and laboratory.scene.bridge!=null and laboratory.scene._sim==null,"実験場の画面出撃もC++だけを生成する")
+	var lab_id: int = laboratory.scene.id if laboratory.scene!=null else -1
+	GameManager.reset_to_main_menu()
+	await _settle_screen()
+	_check(RunManager.session(lab_id)==null,"実験場から戻るとセッションを解放する")
+	app.free()
+	await get_tree().process_frame
+	var intro := preload("res://scripts/runtime/intro_sequence.gd").new()
+	await intro.setup(self,load("res://data/visuals/intro_presentation.tres"))
+	_check(intro.bridge!=null and intro.session._sim==null,"導入の出撃もC++だけを生成する")
+	intro.dispose()
+	# タイムラインが保存した索引から途中再生する。
+	var path := "res://.content/run/stage_1.json"
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	GameManager.run_start_content = {"index":path,"signature":index.input_sha256}
+	GameManager.run_start_source = "timeline"
+	GameManager.run_start_time = 30.0
+	GameManager.run_stage = 1
+	var owner := RunManager.create_run({"seed":932})
+	owner.auto_step = false
+	add_child(owner)
+	for i in 4000:
+		if owner.bridge!=null or owner.cpp_error!=OK: break
+		await get_tree().process_frame
+	_check(owner.bridge!=null and owner._sim==null and owner.bridge.read_frame().value.ui.run_time==30.0,"タイムラインの途中開始もC++だけを生成する")
+	owner.free()
+	_check(RunManager._sessions.is_empty(),"全入口から戻った後にランを残さない")
+	print("[P01] passed=%d failed=%d" % [passed,failed])
+	get_tree().quit(1 if failed else 0)

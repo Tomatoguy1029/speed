@@ -105,8 +105,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         FieldSystem::step_comets(core.runtime,wd);
         FieldSystem::stream_rocks(core.runtime,wd);
         FieldSystem::step_gravity(core.runtime,wd);
-        // ボスは各種類の移植で、この世界更新区間へ接続する。
-        core.advance_enemies(wd);
+        if (!core.advance_enemies(wd)) return false;
         if (!core.avoid_strong(wd)) return false;
         if (core.check_run_end()) return true;
         if (!core.rebuild_enemy_grid(state.frame_grid_cell)) return false;

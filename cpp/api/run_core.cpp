@@ -205,11 +205,11 @@ bool SpeedRunCore::step(double delta) {
     if (!runtime.state.rows_by_id.empty() && !runtime.state.motion_ready) return false;
     runtime.state.time += delta;
     runtime.state.world_time += delta;
-    advance_enemies(delta);
+    if (!advance_enemies(delta)) return false;
     return true;
 }
 
-void SpeedRunCore::advance_enemies(double delta) {
+bool SpeedRunCore::advance_enemies(double delta) {
     for (auto &body:runtime.state.bosses.bodies) body.hydra.attack_field_advance=false;
     capture_avoidance();
     ++runtime.state.ticks;
@@ -330,6 +330,7 @@ void SpeedRunCore::advance_enemies(double delta) {
     if (!runtime.content->pumps.empty()) speed::PumpBehavior::after_tick(runtime);
     speed::CoronaVortex::tick(runtime,delta,coronas);
     speed::EnemySystem::flush_spawns(runtime);
+    if (runtime.api_configured && !speed::PhaseController::automatic(runtime)) return false;
     if (runtime.state.heroes.boss_stun>0) {
         const double real_dt=runtime.state.control.last_world_real_dt>0?runtime.state.control.last_world_real_dt:delta;
         runtime.state.heroes.boss_stun-=real_dt;
@@ -340,6 +341,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         speed::FlowRunner::step(runtime,delta);
         for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);speed::CanisHowl::ring_tick(runtime,body);if (body.mode!=speed::BossMode::Final) {speed::CanisNova::effect_tick(runtime,body,delta);speed::CanisBlaze::burning_tick(runtime,body,delta);speed::CanisFlames::step(runtime,body,delta);}}
     }
+    return true;
 }
 
 void SpeedRunCore::close() {
@@ -715,7 +717,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
             sync_attack_budget();
             if (!advance_attack_budget(runtime.state.world_time)) return false;
         }
-        advance_enemies(accumulated);
+        if (!advance_enemies(accumulated)) return false;
         avoid_strong(accumulated);
         if (check_run_end()) return true;
         rebuild_enemy_grid(runtime.state.frame_grid_cell);

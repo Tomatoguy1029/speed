@@ -130,6 +130,7 @@ struct ContentBundle {
     std::vector<CanisSiriusFlameDefinition> canis_sirius_flames;
     std::vector<CanisFlameDefinition> canis_flames;
     std::vector<BossBodyDefinition> boss_bodies;
+    std::vector<StageBossDefinition> stage_boss;
     std::vector<CentaurusBodyDefinition> centaurus_bodies;
     std::vector<CentaurusVolleyDefinition> centaurus_volleys;
     std::vector<CentaurusRearDefinition> centaurus_rears;

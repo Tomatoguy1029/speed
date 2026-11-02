@@ -40,6 +40,23 @@ void end_actions(RunRuntime &r,BossBodyState &b) {
 BossBodyState *PhaseController::find(RunRuntime &r,EnemyHandle actor) {for (auto &b:r.state.bosses.bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
 const BossBodyState *PhaseController::find(const RunRuntime &r,EnemyHandle actor) {for (const auto &b:r.state.bosses.bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
 bool PhaseController::can_start(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,actor) && t.reposition>0) return false;const auto *body=find(r,actor);return !body || (body->mode==BossMode::Idle && body->draco.cycle.stage==DracoCycleStage::None && body->draco.closing_walls.empty() && body->initial_wait<=0 && (!body->phase_pending || r.content->bosses[r.content->boss_bodies[body->definition-1].boss-1].kind==1) && !body->centaurus.leaping);}
+bool PhaseController::automatic(RunRuntime &r) {
+    auto &s=r.state;auto &c=s.control;
+    if (c.lab_mode || r.content->stage_boss.empty()) return true;
+    const auto &p=r.content->stage_boss.front();
+    if (c.boss_at<0) {c.boss_at=p.start;if (p.spread>0) c.boss_at+=c.rng.randf()*p.spread;}
+    if (s.lifecycle.endless || s.world.boss_spawned || s.time<c.boss_at) return true;
+    const double distance=std::min(1000.0,double(s.view_half.length())*0.65);
+    auto at=s.ship_pos+godot::Vector2::from_angle(c.rng.randf()*godot::Math::TAU)*distance;
+    for (const auto &body:s.field.bodies) if (!body.moon) {
+        if (at.distance_to(body.position)<body.radius+180.0) at=body.position+(s.ship_pos-body.position).normalized()*(body.radius+220.0);
+        break;
+    }
+    if (at.length()>s.ship_config.field_radius-160.0) at=at.normalized()*(s.ship_config.field_radius-160.0);
+    const auto &body=r.content->boss_bodies[p.body-1];
+    const auto actor=r.content->bosses[body.boss-1].kind==4?DracoBody::spawn(r,p.body,at,true):spawn(r,p.body,at,true);
+    return s.enemy_handles.contains(actor);
+}
 EnemyHandle PhaseController::spawn(RunRuntime &r,uint32_t definition,godot::Vector2 at,bool entrance) {
     auto &s=r.state;if (!definition || definition>r.content->boss_bodies.size() || !at.is_finite() || s.bosses.next_body_id==INT64_MAX) return {};
     const auto &p=r.content->boss_bodies[definition-1];EnemySpawn options;options.position=at;options.facing=(s.ship_pos-at).angle();options.has_facing=true;options.is_boss=true;
