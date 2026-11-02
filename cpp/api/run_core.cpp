@@ -58,6 +58,8 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("ack_frame_run","epoch","sequence"), &SpeedRunCore::ack_frame_run);
     ClassDB::bind_method(D_METHOD("metrics_run"), &SpeedRunCore::metrics_run);
     ClassDB::bind_method(D_METHOD("recording_run","initial"), &SpeedRunCore::recording_run);
+    ClassDB::bind_method(D_METHOD("query_route_run","points","parameters"), &SpeedRunCore::query_route_run);
+    ClassDB::bind_method(D_METHOD("query_route_snapshot","snapshot","points","parameters"), &SpeedRunCore::query_route_snapshot);
     ClassDB::bind_method(D_METHOD("render_run","view","alpha"), &SpeedRunCore::render_run);
     ClassDB::bind_method(D_METHOD("dispose_run"), &SpeedRunCore::dispose_run);
 

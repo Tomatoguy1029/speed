@@ -130,6 +130,11 @@ func read_frame() -> Dictionary:
 	if _busy: return _error(7,"read_frame","更新中は再入できません")
 	return _read_locked() if _core != null else _error(4,"read_frame","破棄済みです")
 
+func query_route(points: PackedVector2Array, parameters := {}) -> Dictionary:
+	if _busy: return _error(7,"route","更新中は経路を判定できません")
+	if _core==null: return _error(4,"route","開始していないランです")
+	return _core.query_route_run(points,parameters)
+
 func checkpoint() -> Dictionary:
 	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"checkpoint","更新中は保持できません")

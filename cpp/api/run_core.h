@@ -191,6 +191,8 @@ public:
     bool configure(const Dictionary &data);
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
     bool step_ship(double real_dt, double world_dt, const Dictionary &input);
+    Dictionary query_route_run(const PackedVector2Array &,const Dictionary &) const;
+    Dictionary query_route_snapshot(const Dictionary &,const PackedVector2Array &,const Dictionary &) const;
     Dictionary ship_snapshot() const;
     bool configure_frame(const Dictionary &config);
     bool step_frame(double real_dt, const Dictionary &input, Vector2 center, Vector2 half, double camera_zoom);
