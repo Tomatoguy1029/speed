@@ -120,7 +120,7 @@ func _track_nova(body: Dictionary) -> void:
 		_nova_layer.draw.connect(_draw_nova)
 		add_child(_nova_layer)
 		var layer := CanvasLayer.new()
-		layer.layer = 25
+		layer.layer = 80
 		add_child(layer)
 		_nova_flash = ColorRect.new()
 		_nova_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -129,7 +129,7 @@ func _track_nova(body: Dictionary) -> void:
 	var age := float(_nova.get("age",-1.0))-float(_nova.get("warn",0.0))
 	var duration := EFFECT_SETTINGS.number(NOVA_KEY,"flash_duration",0.08)
 	_nova_flash.size = get_viewport_rect().size
-	_nova_flash.color = Color(SIRIUS_COLOR,EFFECT_SETTINGS.number(NOVA_KEY,"flash_opacity",0.12)*(1.0-age/maxf(duration,0.001)) if not _nova.is_empty() and age>=0.0 and age<duration else 0.0)
+	_nova_flash.color = Color(Color.WHITE,EFFECT_SETTINGS.number(NOVA_KEY,"flash_opacity",0.12)*(1.0-age/maxf(duration,0.001)) if not _nova.is_empty() and age>=0.0 and age<duration else 0.0)
 	_nova_layer.queue_redraw()
 func _nova_shadow(point: Vector2) -> bool:
 	var to: Vector2 = point-_nova.source
