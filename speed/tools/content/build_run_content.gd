@@ -33,6 +33,7 @@ static func _visual_index() -> StageResources:
 
 ## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
 static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if definition!=null and definition.id==&"draco": return draco_technique_records(definition,move)
 	if definition!=null and definition.id==&"canis_major": return canis_technique_records(definition,move)
 	if definition!=null and definition.id==&"centaurus": return centaurus_technique_records(definition,move)
 	if definition==null or definition.id!=&"monoceros" or move==null or move.technique not in [&"charge",&"kick",&"sweep",&"lance",&"return_charge",&"horn_wave",&"horn_dance",&"sword_flash"]: return {}
@@ -73,6 +74,64 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			command.technique = phase
 			records.BossTechniqueStage.append(command)
 	return records
+
+## ドラコはSourceの3形態を生成する。未登録技は生成エラーとして残す。
+static func draco_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if definition==null or definition.id!=&"draco" or move==null or move.technique!=&"bite": return {}
+	var source: BossTechnique = BossProgram.snapshot(move)
+	var boss := {"id":1,"external_id":"draco","kind":4,"turn":definition.turn,"speed":definition.speed}
+	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[]}
+	for phase in [1,2,3]:
+		var values: Dictionary = source.values().duplicate(true)
+		# Draco.rule()はSource上、形態別の値上書きを行わない。
+		var row := {}
+		for field in Schema.SCHEMA.records.filter(func(v):return v.name=="BossTechniqueDefinition")[0].fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
+		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":96,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values[key])
+		records.BossTechniqueDefinition.append(row)
+		records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
+	return records
+
+static func draco_set_records(definition: BossDef, moves: Array) -> Dictionary:
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[]}
+	var seen := {}
+	for move: BossTechnique in moves:
+		if move==null or seen.has(move.technique): return {}
+		seen[move.technique] = true
+		var source := draco_technique_records(definition,move)
+		if source.is_empty(): return {}
+		if records.BossDefinition.is_empty(): records.BossDefinition = source.BossDefinition
+		var offset: int = records.BossTechniqueDefinition.size()
+		for row: Dictionary in source.BossTechniqueDefinition:
+			row.id += offset
+			records.BossTechniqueDefinition.append(row)
+		for key in source:
+			if key in ["BossDefinition","BossTechniqueDefinition"]: continue
+			for row: Dictionary in source[key]:
+				row.id = records[key].size()+1
+				row.technique += offset
+				records[key].append(row)
+	return records
+
+static func draco_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
+	var package := boss_body_package(definition,config)
+	var records := draco_technique_records(definition,move)
+	if package.is_empty() or records.is_empty(): return {}
+	for key in records: package.records[key] = records[key]
+	append_draco_style(package,move)
+	return package
+
+## 固定の描画設定は生成時に解決する。
+static func append_draco_style(package: Dictionary, move: BossTechnique) -> void:
+	var visual: Node2D = move.visual.instantiate()
+	load("res://data/visuals/effect_settings.tres").apply_to(visual)
+	var style := {}
+	for key in ["telegraph_line_width","active_line_width","telegraph_fill_opacity","telegraph_progress_opacity","telegraph_edge_opacity","motion_trail_opacity"]: style[key] = float(visual.get(key))
+	visual.free()
+	var appearance: Dictionary = package.visuals[-1].appearance
+	if not appearance.has("draco_styles"): appearance.draco_styles = {}
+	appearance.draco_styles[str(move.technique)] = style
 
 ## 号令の実効値と、旧method trackに対応する段階を生成する。
 static func canis_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
@@ -410,6 +469,7 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 
 ## 複数の技を同じボスの定義表へまとめる。実行は既存の型付きフローへ任せる。
 static func boss_technique_set_records(definition: BossDef, moves: Array) -> Dictionary:
+	if definition!=null and definition.id==&"draco": return draco_set_records(definition,moves)
 	if definition!=null and definition.id==&"centaurus": return centaurus_set_records(definition,moves)
 	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[]}
 	var seen := {}
@@ -830,8 +890,7 @@ static func hydra_technique_package(definition: BossDef, move: BossTechnique, co
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
-	if definition!=null and definition.id==&"draco": return boss_body_package(definition,config)
-	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}
+	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"draco"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
 	var source: Dictionary = BossProgram.snapshot(program) if not program.is_empty() else {"rules":load("res://data/bosses/ai/"+str(definition.id)+"_action_rules.tres"),"flow":load("res://data/bosses/ai/"+str(definition.id)+"_flow.tres")}
@@ -844,6 +903,8 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 	if definition.id==&"centaurus": merge_centaurus_records(package.records,techniques)
 	else:
 		for key in techniques: package.records[key] = techniques[key]
+	if definition.id==&"draco":
+		for move in rules.techniques: append_draco_style(package,move)
 	var compiled := boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 	if compiled.is_empty(): return {}
 	if definition.id==&"centaurus":
@@ -917,7 +978,7 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 		if technique.phase==1: ids[String(technique.external_id)] = technique.id
 	for move in rules.techniques:
 		if not ids.has(String(move.technique)): return {}
-	records.BossFlowProgram = [{"id":1,"boss":1,"maximum_stamina":flow.maximum_stamina,"partial_rest":flow.partial_rest,"empty_rest":flow.empty_rest,"idle_only":rules.adapter in [&"monoceros",&"centaurus",&"canis_major"],"allow_parallel":rules.allow_parallel_attacks,"has_bias":not rules.selection_bias.is_empty()}]
+	records.BossFlowProgram = [{"id":1,"boss":1,"maximum_stamina":flow.maximum_stamina,"partial_rest":flow.partial_rest,"empty_rest":flow.empty_rest,"idle_only":rules.adapter in [&"monoceros",&"centaurus",&"canis_major",&"draco"],"allow_parallel":rules.allow_parallel_attacks,"has_bias":not rules.selection_bias.is_empty()}]
 	var sources: Array = rules.techniques.map(func(move): return String(move.technique)) + rules.combos.keys()
 	for source_value in sources:
 		var source := String(source_value)

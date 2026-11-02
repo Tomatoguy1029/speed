@@ -87,7 +87,7 @@ func configure_flow(program: Resource) -> void:
 	_move_kinds.clear()
 	for move in action_rules.techniques:
 		_moves[move.technique] = move
-		_move_kinds[move.technique] = move.make_runner().kind()
+		_move_kinds[move.technique] = preload("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()
 	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
@@ -219,7 +219,7 @@ func start_attack(id: StringName) -> bool:
 	direction = Vector2.from_angle(table.facing[body]) if tech_kind(id) == &"tail_sweep" else (aim - table.pos[body]).normalized()
 	var screen_staged := tech_kind(id) in [&"leap", &"charge", &"rifts"]
 	if not screen_staged: table.facing[body] = direction.angle()
-	_runner = _moves[id].make_runner()
+	_runner = preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[id])
 	var prior_observer := ctx.bosses.recording_actor
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	if _runner != null: _runner.begin(self)

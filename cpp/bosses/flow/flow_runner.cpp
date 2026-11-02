@@ -196,7 +196,7 @@ bool FlowRunner::validate_content(const ContentBundle &c) {
 }
 bool FlowRunner::validate(const godot::RunState &s,const ContentBundle &c) {
     for (const auto &f:s.bosses.flows) {
-        if (f.last_category_override< -1 || f.last_category_override>3 || !f.definition || f.definition>c.boss_flows.size() || f.index>=sections(c,f.definition).size() || f.rest_next>=sections(c,f.definition).size() || f.phase<1 || f.phase>2 || f.participants.empty()) return false;
+        if (f.last_category_override< -1 || f.last_category_override>3 || !f.definition || f.definition>c.boss_flows.size() || f.index>=sections(c,f.definition).size() || f.rest_next>=sections(c,f.definition).size() || f.phase<1 || f.phase>(c.bosses[c.boss_flows[f.definition-1].boss-1].kind==4?3u:2u) || f.participants.empty()) return false;
         for (double value:{f.clock,f.retry,f.stamina,f.rest_remaining,f.section_spent,f.interval,f.no_candidate_elapsed,f.post_gap}) if (!std::isfinite(value) || value<0) return false;
         for (const auto &used:f.cooldown_started) if (!std::isfinite(used.second) || used.second<0) return false;
         for (auto root:f.roots) if (root>=f.nodes.size()) return false;

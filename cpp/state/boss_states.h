@@ -76,8 +76,10 @@ struct CanisNovaShadow {double angle=0,half=0,near=0;};
 struct CanisNovaState {double started=0;std::vector<CanisNovaPair> pairs;std::vector<CanisNovaShadow> shadows;std::vector<bool> ring_hit;bool flashed=false,released=false;};
 struct CanisRelayItem {EnemyHandle actor;double at=0,angle=0;godot::Vector2 from;bool marked=false,fired=false,released=false;};
 struct CanisRelayState {CanisFlameAimState aim;double started=0,last_fire=0,tint_until=0;std::vector<CanisRelayItem> items;bool ordered=false,aiming=false,cancelled=false;};
+struct DracoBiteState {godot::Vector2 origin,retracted,strike;std::vector<godot::Vector2> base,landed;};
+struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::variant<DracoBiteState> move;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;

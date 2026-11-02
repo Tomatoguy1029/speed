@@ -132,6 +132,32 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "DracoBiteDefinition",
+      "section": 433,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retract",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

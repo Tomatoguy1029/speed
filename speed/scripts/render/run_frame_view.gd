@@ -405,7 +405,7 @@ func _valid(frame: Dictionary) -> bool:
 			if row.has("position"):
 				if not row.position is Vector2 or not row.position.is_finite(): return false
 				for key in ["horn","warning"]:
-					if not row.get(key) is PackedVector2Array or row[key].size()!=(0 if int(row.get("kind",0))>=8 else 2): return false
+					if not row.get(key) is PackedVector2Array or (row[key].size() not in [0,2] if key=="warning" and int(row.get("kind",0))>=96 else row[key].size()!=(0 if int(row.get("kind",0))>=8 else 2)): return false
 					for point: Vector2 in row[key]:
 						if not point.is_finite(): return false
 	for key in ["comets","capsules","crows"]:
