@@ -131,7 +131,7 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="star_bolt") {out=VisualRole::StarBolt;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,FullBurstReady=65,FloodEnd=66,Beam=67,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -199,6 +199,9 @@ inline const char *symbol_name(EventType value) {
     case EventType::TelescopeCharge: return "telescope_charge";
     case EventType::TelescopeFire: return "telescope_fire";
     case EventType::Explode: return "explode";
+    case EventType::FullBurstReady: return "full_burst_ready";
+    case EventType::FloodEnd: return "flood_end";
+    case EventType::Beam: return "beam";
     default: return "";
     }
 }
@@ -268,6 +271,9 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="telescope_charge") {out=EventType::TelescopeCharge;return true;}
     if (value=="telescope_fire") {out=EventType::TelescopeFire;return true;}
     if (value=="explode") {out=EventType::Explode;return true;}
+    if (value=="full_burst_ready") {out=EventType::FullBurstReady;return true;}
+    if (value=="flood_end") {out=EventType::FloodEnd;return true;}
+    if (value=="beam") {out=EventType::Beam;return true;}
     return false;
 }
 enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
@@ -285,7 +291,7 @@ inline bool parse_symbol(std::string_view value, ResultKind &out) {
     if (value=="Abort") {out=ResultKind::Abort;return true;}
     return false;
 }
-enum class RenderShapeKind : uint32_t {Polyline=0,Circle=1,Wave=2,Blast=3,LightArrow=4,FriendDebris=5,FriendHull=6,Zone=7,Count};
+enum class RenderShapeKind : uint32_t {Polyline=0,Circle=1,Wave=2,Blast=3,LightArrow=4,FriendDebris=5,FriendHull=6,Zone=7,Flood=8,Count};
 inline const char *symbol_name(RenderShapeKind value) {
     switch(value) {
     case RenderShapeKind::Polyline: return "polyline";
@@ -296,6 +302,7 @@ inline const char *symbol_name(RenderShapeKind value) {
     case RenderShapeKind::FriendDebris: return "friend_debris";
     case RenderShapeKind::FriendHull: return "friend_hull";
     case RenderShapeKind::Zone: return "zone";
+    case RenderShapeKind::Flood: return "flood";
     default: return "";
     }
 }
@@ -308,6 +315,7 @@ inline bool parse_symbol(std::string_view value, RenderShapeKind &out) {
     if (value=="friend_debris") {out=RenderShapeKind::FriendDebris;return true;}
     if (value=="friend_hull") {out=RenderShapeKind::FriendHull;return true;}
     if (value=="zone") {out=RenderShapeKind::Zone;return true;}
+    if (value=="flood") {out=RenderShapeKind::Flood;return true;}
     return false;
 }
 enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,TaperedBeam=7,Count};
@@ -375,12 +383,13 @@ inline bool parse_symbol(std::string_view value, FriendKind &out) {
     if (value=="hull") {out=FriendKind::Hull;return true;}
     return false;
 }
-enum class BeamStyle : uint32_t {Plain=0,Guide=1,Telescope=2,Count};
+enum class BeamStyle : uint32_t {Plain=0,Guide=1,Telescope=2,Flood=3,Count};
 inline const char *symbol_name(BeamStyle value) {
     switch(value) {
     case BeamStyle::Plain: return "plain";
     case BeamStyle::Guide: return "guide";
     case BeamStyle::Telescope: return "telescope";
+    case BeamStyle::Flood: return "flood";
     default: return "";
     }
 }
@@ -388,6 +397,7 @@ inline bool parse_symbol(std::string_view value, BeamStyle &out) {
     if (value=="plain") {out=BeamStyle::Plain;return true;}
     if (value=="guide") {out=BeamStyle::Guide;return true;}
     if (value=="telescope") {out=BeamStyle::Telescope;return true;}
+    if (value=="flood") {out=BeamStyle::Flood;return true;}
     return false;
 }
 enum class WaveStyle : uint32_t {Plain=0,Ripple=1,Lightning=2,Pulser=3,Count};
@@ -607,6 +617,9 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::TelescopeCharge: return field=="pos";
     case EventType::TelescopeFire: return field=="pos" || field=="angle" || field=="length" || field=="width";
     case EventType::Explode: return field=="pos" || field=="radius" || field=="cause" || field=="color" || field=="life";
+    case EventType::FullBurstReady: return field=="pos";
+    case EventType::FloodEnd: return field=="id" || field=="row" || field=="pos" || field=="angle" || field=="length" || field=="width" || field=="spread" || field=="age" || field=="tail" || field=="collapse" || field=="margin";
+    case EventType::Beam: return field=="from" || field=="to" || field=="width" || field=="life" || field=="color" || field=="visual_key";
     default: return false;
     }
 }

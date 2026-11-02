@@ -397,7 +397,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 19) return false;
+    if (out.kind > 20) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -1010,6 +1010,26 @@ inline bool read(BinaryReader &input, ZoneDefinition &out) {
     if (out.fade_duration < 0) return false;
     return true;
 }
+struct FloodDefinition {
+    uint32_t id{};
+    uint32_t beam{};
+    double tail{};
+    double collapse{};
+    double margin{};
+};
+inline bool read(BinaryReader &input, FloodDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.beam)) return false;
+    if (out.beam < 1) return false;
+    if (!input.read_f64(out.tail)) return false;
+    if (out.tail < 0) return false;
+    if (!input.read_f64(out.collapse)) return false;
+    if (out.collapse < 0) return false;
+    if (!input.read_f64(out.margin)) return false;
+    if (out.margin < 0) return false;
+    return true;
+}
 struct BudgetPhase {
     uint32_t id{};
     double start{};
@@ -1530,6 +1550,26 @@ inline bool read(BinaryReader &input, LynxDefinition &out) {
     if (out.slash_range < 0) return false;
     if (!input.read_f64(out.damage)) return false;
     if (out.damage < 0) return false;
+    return true;
+}
+struct SoldierDefinition {
+    uint32_t id{};
+    double accel{};
+    double bolt_speed{};
+    double damage{};
+    double mutiny_shot{};
+};
+inline bool read(BinaryReader &input, SoldierDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.bolt_speed)) return false;
+    if (out.bolt_speed < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.mutiny_shot)) return false;
+    if (out.mutiny_shot < 0) return false;
     return true;
 }
 struct FieldBodyDefinition {
@@ -2064,6 +2104,7 @@ struct ContentRecords {
     std::vector<FriendHullLook> FriendHullLook_rows;
     std::vector<FriendSawPoint> FriendSawPoint_rows;
     std::vector<ZoneDefinition> ZoneDefinition_rows;
+    std::vector<FloodDefinition> FloodDefinition_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
@@ -2082,6 +2123,7 @@ struct ContentRecords {
     std::vector<PulserDefinition> PulserDefinition_rows;
     std::vector<DolphinDefinition> DolphinDefinition_rows;
     std::vector<LynxDefinition> LynxDefinition_rows;
+    std::vector<SoldierDefinition> SoldierDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -2302,6 +2344,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { ZoneDefinition row; if (!read(input,row)) return false; out.ZoneDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 70: {
+        if (version != 1) return false;
+        if (count > input.remaining()/32) return false;
+        for (uint32_t i=0; i<count; ++i) { FloodDefinition row; if (!read(input,row)) return false; out.FloodDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 16: {
         if (version != 1) return false;
         if (count > input.remaining()/20) return false;
@@ -2408,6 +2456,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/60) return false;
         for (uint32_t i=0; i<count; ++i) { LynxDefinition row; if (!read(input,row)) return false; out.LynxDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 71: {
+        if (version != 1) return false;
+        if (count > input.remaining()/36) return false;
+        for (uint32_t i=0; i<count; ++i) { SoldierDefinition row; if (!read(input,row)) return false; out.SoldierDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 21: {
@@ -2592,6 +2646,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FriendSawPoint_rows) if (!FriendSawPoint_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ZoneDefinition_ids;
     for (const auto &row:data.ZoneDefinition_rows) if (!ZoneDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> FloodDefinition_ids;
+    for (const auto &row:data.FloodDefinition_rows) if (!FloodDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
@@ -2628,6 +2684,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DolphinDefinition_rows) if (!DolphinDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LynxDefinition_ids;
     for (const auto &row:data.LynxDefinition_rows) if (!LynxDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> SoldierDefinition_ids;
+    for (const auto &row:data.SoldierDefinition_rows) if (!SoldierDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -2697,6 +2755,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FriendHullDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.FriendHullLook_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.ZoneDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
+    for (const auto &row:data.FloodDefinition_rows) if (!BeamDefinition_ids.count(row.beam)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -2716,6 +2775,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PulserDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.DolphinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.LynxDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.SoldierDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -2860,5 +2920,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=69;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=71;
 }
