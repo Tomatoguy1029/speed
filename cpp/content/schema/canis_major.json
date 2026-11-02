@@ -728,6 +728,47 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisStreamDefinition",
+      "section": 348,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "each_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "min_hounds",
+          "type": "u32",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

@@ -52,11 +52,11 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## 号令の実効値と、旧method trackに対応する段階を生成する。
 static func canis_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius",&"bay",&"blaze"]: return {}
+	if move==null or move.technique not in [&"command",&"howl",&"pounce",&"sirius",&"bay",&"blaze",&"stream"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"canis_major","kind":2,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[],"CanisBayDefinition":[],"CanisBlazeDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[],"CanisSiriusDefinition":[],"CanisBayDefinition":[],"CanisBlazeDefinition":[],"CanisStreamDefinition":[]}
 	for phase in [1,2]:
 		var values: Dictionary = source.values().duplicate(true)
 		if phase==2:
@@ -66,9 +66,15 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43 if move.technique==&"sirius" else 44 if move.technique==&"bay" else 45,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42 if move.technique==&"pounce" else 43 if move.technique==&"sirius" else 44 if move.technique==&"bay" else 45 if move.technique==&"blaze" else 46,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage"]: row[key] = float(values.get(key,0.0))
-		if move.technique==&"blaze":
+		if move.technique==&"stream":
+			row.active = float(values.lunge_time)
+			records.BossTechniqueDefinition.append(row)
+			var detail := {"id":phase,"technique":phase}
+			for key in ["interval","each_warn","lunge_speed","lunge_time","min_hounds"]: detail[key] = int(values[key]) if key=="min_hounds" else float(values[key])
+			records.CanisStreamDefinition.append(detail)
+		elif move.technique==&"blaze":
 			row.active = maxf(0.001,float(values.ignite_at)+maxi(0,int(values.count)-1)*float(values.ignite_step))
 			records.BossTechniqueDefinition.append(row)
 			var detail := {"id":phase,"technique":phase,"flame":phase+4}

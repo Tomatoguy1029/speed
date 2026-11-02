@@ -35,6 +35,12 @@ func _ready() -> void:
 	if "--cpp-centaurus-sail" in OS.get_cmdline_user_args() or "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_sail")
 		return
+	if "--cpp-canis-stream-end" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_stream_end")
+		return
+	if "--cpp-canis-stream" in OS.get_cmdline_user_args() or "--cpp-canis-stream-tail" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_stream")
+		return
 	if "--cpp-canis-blaze" in OS.get_cmdline_user_args():
 		await native_canis_blaze()
 		return
@@ -1555,7 +1561,7 @@ func native_centaurus_shower() -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 共通の本体・表示と、指定した1技を既存ボス検査へつなぐ。
-func canis_move_case(name: String, changes: Dictionary, flowing := false, body_changes := {}, obstacle := false) -> Dictionary:
+func canis_move_case(name: String, changes: Dictionary, flowing := false, body_changes := {}, obstacle := false, start_delay := 0.0) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 100.0 if obstacle else 0.0
@@ -1589,6 +1595,7 @@ func canis_move_case(name: String, changes: Dictionary, flowing := false, body_c
 	bridge.start(159,{"position":Vector2(2000,0)})
 	bridge.command("dev_ship_motion",{"position":Vector2(2000,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(2000,0),Vector2(2000,0),Vector2(3000,2000))
+	if start_delay>0.0: bridge._core.step(start_delay)
 	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-400,0) if obstacle else Vector2.ZERO,"entrance":false}).value
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in package.visuals:
@@ -3101,3 +3108,95 @@ func native_draco_pose_contact(bridge, id: int) -> void:
 	for frame in 20: bridge._core.step_draw(0.04)
 	var damage_events: Array = bridge.read_frame().value.events.filter(func(event):return event.type==&"combat_damage" and event.payload.get("cause")==&"ram" and event.payload.get("target_id")==id and float(event.payload.get("applied",0.0))>0.0)
 	check(damage_events.size()==1,"胴から頭まで同じ描線で通っても全身から離れるまでは一度だけ当たる")
+	get_tree().quit(1 if failed else 0)
+
+func native_canis_stream() -> void:
+	var tail_only := "--cpp-canis-stream-tail" in OS.get_cmdline_user_args()
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/canis_major_moves/stream.tres")
+	var rows: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
+	if not tail_only:
+		check(move.make_runner()==null and rows.CanisStreamDefinition.size()==2 and rows.CanisStreamDefinition[1].lunge_speed==move.lunge_speed_p2 and rows.BossTechniqueDefinition[1].cd==move.cd_p2 and rows.BossTechniqueStage.is_empty(),"順番の号令の編集値・2形態・手動段階を型付き入力へ生成する")
+	var values := {"warn":0.1,"interval":0.05,"each_warn":0.02,"lunge_speed":200.0,"lunge_speed_p2":200.0,"lunge_time":0.08,"recover":0.04,"min_hounds":1}
+	var c := canis_move_case("stream",values,false,{"pack_size":3,"lead_max":3},false,0.5)
+	if not tail_only:
+		check(not c.is_empty(),"世界の途中で出現した本体から単独の技を始める")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var events: Array = []
+	bridge.subscribe("記録確認",func(packet): events.append_array(packet.events);return true)
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	if not tail_only:
+		check(started.ok,"本体の順番の号令を開始する")
+	var t: Dictionary = {}
+	if not tail_only:
+		var held: Dictionary = bridge.checkpoint()
+		bridge._core.step(0.101)
+		t = bridge.command("dev_boss_state").value[0]
+		check(t.kind==46 and t.stage==1 and t.sent and t.sequence.size()==3 and t.sequence[0].marked and not t.sequence[0].launched,"予告明けに猟犬を並べ替え、個別の予告を先に出す")
+		var sequence: Array = t.sequence.duplicate(true)
+		check(bridge.restore(held.value).ok,"送出前の乱数・予告・本体の時計を保持する")
+		bridge._core.step(0.101)
+		check(bridge.command("dev_boss_state").value[0].sequence==sequence,"復帰後も同じ猟犬の順番と発進時刻になる")
+		bridge.release_checkpoint(held.value)
+	else:
+		bridge._core.step(0.101)
+	bridge._core.step(0.021)
+	var lunges: Array = canis_lunges(bridge)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	if not tail_only:
+		check(lunges.size()==1 and lunges[0].sweep and not lunges[0].shared_hit and lunges[0].overwrite and is_equal_approx(lunges[0].until,float(body.clock)+0.08),"個別の掃引・1回制限・固定速度と本体の時計で突進を保つ")
+	var before_hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":lunges[0].position,"velocity":Vector2.ZERO})
+	bridge._core.step(0.001)
+	check(canis_lunges(bridge)[0].hit and bridge._core.ship_snapshot().ship_hp<before_hp,"猟犬の実移動から機体へ命中し実HPを減らす")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(c.view._boss_body_displays.values()[0].technique.technique=="stream","正式な本体表示へ同じ予告・実行状態を渡す")
+	bridge.command("set_ui_overlay",{"active":false})
+	check(events.any(func(e): return e.type==&"canis_cue" and e.payload.get("cue","")=="stream_launch"),"個別の予告と発進を通常の通知へ残す")
+	for k in 22: bridge._core.step(1.0/120.0)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and canis_lunges(bridge).is_empty(),"最後の猟犬の期限で自然に硬直へ進む")
+	bridge._core.step(0.041)
+	check(bridge.command("dev_boss_state").value[0].stage>=5,"硬直が終わると技を閉じる")
+	bridge.dispose();c.view.queue_free()
+	c = canis_move_case("stream",values,false,{"pack_size":3,"lead_max":3});bridge = c.bridge
+	started = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.122)
+	t = bridge.command("dev_boss_state").value[0]
+	var gone: int = t.sequence[1].actor
+	bridge.command("dev_damage",{"entity_id":gone,"amount":100000.0,"cause":"shot"})
+	bridge._core.step(0.06)
+	t = bridge.command("dev_boss_state").value[0]
+	check(not t.sequence[1].launched,"消失した世代の猟犬を後の行再利用で発進させない")
+	check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok and canis_lunges(bridge).is_empty(),"途中取消で個別の予告と固定突進を閉じる")
+	bridge.dispose();c.view.queue_free()
+	c = canis_move_case("stream",values,false,{"pack_size":3,"lead_max":3});bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.122)
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(canis_lunges(bridge).is_empty(),"本体の消失で所有する突進を残さない")
+	bridge.dispose();c.view.queue_free()
+	values.min_hounds = 5
+	c = canis_move_case("stream",values,true,{"pack_size":1,"lead_max":1});bridge = c.bridge
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value.is_empty(),"率いる数が条件未満なら通常フローで選ばない")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_stream] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 初回に粗いdtを使った自然終了の条件だけを固定更新で確認する。
+func native_canis_stream_end() -> void:
+	var c := canis_move_case("stream",{"warn":0.1,"interval":0.05,"each_warn":0.02,"lunge_speed":200.0,"lunge_speed_p2":200.0,"lunge_time":0.08,"recover":0.04,"min_hounds":1},false,{"pack_size":3,"lead_max":3})
+	if c.is_empty(): check(false,"自然終了の入力を生成する");get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.101)
+	bridge._core.step(0.021)
+	for k in 22: bridge._core.step(1.0/120.0)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.stage==2 and canis_lunges(bridge).is_empty(),"最後の猟犬の期限で自然に硬直へ進む")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_stream_end] failures=",failed)
+	get_tree().quit(1 if failed else 0)

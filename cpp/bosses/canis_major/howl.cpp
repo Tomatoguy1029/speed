@@ -1,6 +1,7 @@
 #include "howl.h"
 #include "body.h"
 #include "hound_lunge.h"
+#include "sequence.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/group_system.h"
@@ -35,7 +36,7 @@ void CanisHowl::begin(RunRuntime &r,TechniqueState &t) {t.detail=CanisHowlState{
 void CanisHowl::step(RunRuntime &r,TechniqueState &t,double dt) {
     const auto &base=r.content->boss_techniques[t.definition-1];const auto &p=rule(*r.content,t.definition);auto &v=std::get<CanisHowlState>(t.detail);auto *b=PhaseController::find(r,t.actor);if (!b) {t.stage=TechniqueStage::Failed;return;}r.state.enemies[t.actor.slot].vel={};if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
     if (!v.formed) {auto &e=r.state.enemies[t.actor.slot];if (!TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked()) e.facing+=std::clamp(angle_difference((r.state.enemy_aim-e.pos).angle()-e.facing),-r.content->bosses[base.boss-1].turn*dt,r.content->bosses[base.boss-1].turn*dt);if (b->clock-t.started_at<base.warn) return;v.formed=true;t.stage=TechniqueStage::Active;form(r,t,*b);}
-    for (auto &item:v.sequence) {if (!live(r,item.actor)) continue;if (!item.marked && b->clock>=item.mark) {item.marked=true;GroupSystem::mark(r.state,item.actor,r.state.world_time+std::max(0.0,item.launch-b->clock));cue(r,t,"howl_mark",item.actor);}if (!item.launched && b->clock>=item.launch) {item.launched=true;HoundLungeSettings settings;settings.speed=p.lunge_speed;settings.duration=p.lunge_time;settings.damage=base.damage;settings.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));settings.source_technique=t.definition;CanisHoundLunge::begin(r,*b,item.actor,t.id,settings);auto &ring=b->canis.ring;ring.erase(std::remove_if(ring.begin(),ring.end(),[&](const auto &v){return same_handle(v.actor,item.actor);}),ring.end());cue(r,t,"howl_launch",item.actor);}}
+    CanisSequence::tick(r,t,*b,v.sequence,p.lunge_speed,p.lunge_time,base.damage,"howl");
     CanisHoundLunge::step(r,*b,t.id);if (b->clock>=v.last_launch+p.tail) {cancel(r,t);t.stage=TechniqueStage::Recovery;t.remaining=base.recover;t.locked=false;cue(r,t,"recovery_started");}
 }
 void CanisHowl::cancel(RunRuntime &r,TechniqueState &t) {auto &v=std::get<CanisHowlState>(t.detail);for (const auto &item:v.sequence) GroupSystem::release_order(r.state,item.actor);v.sequence.clear();if (auto *b=PhaseController::find(r,t.actor)) {CanisHoundLunge::end_action(r,*b,t.id,true);end_ring(r,*b);}}

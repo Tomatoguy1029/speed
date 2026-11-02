@@ -6,6 +6,7 @@ const RUNNERS := {
 	"res://scripts/data_types/boss_techniques/centaurus/combo_rain_volley.gd":"res://scripts/bosses/centaurus/techniques/combo_rain_volley.gd",
 	"res://scripts/data_types/boss_techniques/centaurus/sail_run.gd":"res://scripts/bosses/centaurus/techniques/sail_run.gd",
 	"res://scripts/data_types/boss_techniques/centaurus/arrow_shower.gd":"res://scripts/bosses/centaurus/techniques/arrow_shower.gd",
+	"res://scripts/data_types/boss_techniques/canis_major/stream.gd":"res://scripts/bosses/canis_major/techniques/stream.gd",
 	"res://scripts/data_types/boss_techniques/canis_major/blaze.gd":"res://scripts/bosses/canis_major/techniques/blaze.gd",
 	"res://scripts/data_types/boss_techniques/canis_major/bay.gd":"res://scripts/bosses/canis_major/techniques/bay.gd",
 	"res://scripts/data_types/boss_techniques/canis_major/sirius.gd":"res://scripts/bosses/canis_major/techniques/sirius.gd",
