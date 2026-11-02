@@ -876,7 +876,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.set_script([preload("res://scripts/render/bosses/monoceros.gd"),preload("res://scripts/render/bosses/centaurus.gd"),preload("res://scripts/render/bosses/canis_major.gd"),preload("res://scripts/render/bosses/hydra.gd"),preload("res://scripts/render/bosses/draco.gd")][body.kind])
 			_pulser_parent.add_child(display)
 			if body.kind==2: display.setup_flames(_scope,visuals)
-			if body.kind==3: display.setup_effects(_scope,visuals)
+			if body.kind in [3,4]: display.setup_effects(_scope,visuals)
 			_boss_body_displays[body.id] = display
 		var attack := {}
 		for value: Dictionary in frame.get("boss_techniques",[]):
@@ -1608,7 +1608,7 @@ func _sync_cpp_picaro(bodies: Array) -> void:
 func _sync_cpp_boss_final_beams(bodies: Array) -> void:
 	var seen := {}
 	for body: Dictionary in bodies:
-		if int(body.mode)!=3 or float(body.get("final_alpha",0.0))<=0.0: continue
+		if int(body.mode)!=3 or int(body.kind)==3 or float(body.get("final_alpha",0.0))<=0.0: continue
 		seen[body.id] = true
 		if not _boss_final_beams.has(body.id):
 			var line: Line2D = BOSS_FINAL_BEAM.instantiate()

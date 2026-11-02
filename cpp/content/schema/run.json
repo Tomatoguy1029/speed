@@ -1567,6 +1567,10 @@
       {
         "name": "DracoFinale",
         "value": "draco_finale"
+      },
+      {
+        "name": "CloneLeap",
+        "value": "clone_leap"
       }
     ],
     "VisualRole": [

@@ -45,6 +45,7 @@ struct DeathContext {
 };
 struct KillResult { EnemyHandle target;bool killed=false;CombatReason reason=CombatReason::Invalid; };
 struct ShipDamageRequest {
+    bool source_is_explicit=false;
     int64_t observation_id=0;
     godot::Vector2 impact;
     bool has_impact=false;
@@ -82,7 +83,7 @@ struct CombatEvent {
     godot::Vector2 pos,impact,direction;
     double requested=0,resolved=0,applied=0,overkill=0,hp_before=0,hp_after=0;
     double radius=0,facing=0,time=0,world_time=0;
-    bool crit=false,elite=false,killed=false,accepted=false,circle_hazard=false;
+    bool crit=false,elite=false,killed=false,accepted=false,circle_hazard=false,source_is_explicit=false;
     int32_t shatter_depth=0;int64_t meteor_index=-1;
 };
 const char *combat_reason_name(CombatReason reason);

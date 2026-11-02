@@ -17,6 +17,9 @@ func _ready() -> void:
 	if "--cpp-draco-picaro-wall" in OS.get_cmdline_user_args() or "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args():
 		call_deferred("native_picaro_wall")
 		return
+	if "--cpp-draco-clones" in OS.get_cmdline_user_args():
+		call_deferred("native_clones")
+		return
 	if "--cpp-draco-rifts" in OS.get_cmdline_user_args():
 		call_deferred("native_rifts")
 		return
@@ -407,7 +410,7 @@ func native_draco_move_flow(move: BossTechnique) -> void:
 	bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false})
 	var first: int=-1
 	var second:=false
-	for frame in (2400 if move.technique==&"spiral" else 1200):
+	for frame in (2400 if move.technique==&"spiral" else 1800 if move.technique==&"clones" else 1200):
 		bridge._core.step(1.0/120.0)
 		var active: Array=bridge.command("dev_boss_state").value
 		if not active.is_empty():
@@ -1335,3 +1338,204 @@ func native_inhale_ownership(move: BossTechnique) -> void:
 		if attack.spent:break
 	check(caught and waited and not bridge.command("dev_boss_state").value[0].steering_locked,"終了直前に捕まっても本体時計で待ち、操舵を返してから吐き出す")
 	bridge.dispose()
+
+
+## 全身複製は既存のSource・復帰・中断・次行動の入口で確かめる。
+func native_clones() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/clones.tres")
+	var group := "all"
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--clones-group="):group=argument.trim_prefix("--clones-group=")
+	if group in ["all","motion"]:
+		var before := failed
+		await native_clones_motion(move)
+		print("[cpp_draco_clones_motion] failures=",failed-before)
+	if group in ["all","interrupt"]:
+		var before := failed
+		await native_clones_interrupt(move)
+		print("[cpp_draco_clones_interrupt] failures=",failed-before)
+	if group in ["all","damage","pending","remaining"]:await native_clones_damage(move)
+	if group in ["all","shapes","remaining"]:native_clones_shapes(move)
+	if group in ["remove","pending"]:native_clones_remove(move)
+	if group in ["all","flow","pending"]:native_draco_move_flow(move);return
+	print("[cpp_draco_clones_%s] failures="%group,failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_clones_motion(move: BossTechnique) -> void:
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():return
+	var bridge=fixture.bridge
+	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"clones","全身複製の編集Resourceと互換Runnerを分ける")
+	check(fixture.package.records.DracoClonesDefinition.size()==3 and fixture.package.records.HydraNormalDefinition.size()==5,"複製の3形態と5通常技の値・参照を同じスキーマから生成する")
+	bridge.command("set_recording",{"active":true})
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	var sim: RunSimulation=source.sim
+	check(a.start_attack(&"clones") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で全身複製を開始する")
+	var current: Dictionary=bridge.command("dev_boss_state").value[0]
+	# Godot RNGとPCGの抽選は別なので、技の割当だけを同じ結果へそろえる。
+	for j in 3:a._runner.units[j].mode=StringName(current.clones[j].mode)
+	var times_equal:=true
+	var positions_equal:=true
+	var warning_equal:=true
+	var max_error:=0.0
+	var saved: Array=[]
+	var shown: Array=[]
+	var clones_seen:=false
+	var initial_hp: float=bridge._core.ship_snapshot().ship_hp
+	for frame in 1250:
+		# Hostは既存effectsを進めてから、そのtickの新しい判定を足す。
+		bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
+		a.sim_tick(1.0/120.0,1.0/120.0)
+		current=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		times_equal=times_equal and current.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (current.stage==5 or is_equal_approx(current.stage_time,a.elapsed))
+		if a._runner!=null and not current.clone_ended:
+			for j in 3:
+				var unit: Dictionary=a._runner.units[j]
+				var native: Dictionary=current.clones[j]
+				max_error=maxf(max_error,native.position.distance_to(a.table.pos[unit.row]))
+				positions_equal=positions_equal and is_equal_approx(native.time,unit.t) and native.locked==unit.locked and native.done==unit.done
+				for k in native.points.size():max_error=maxf(max_error,native.points[k].distance_to(unit.points[k]))
+			warning_equal=warning_equal and current.telegraph_paths.size()==a.telegraph_paths.size()
+			if current.telegraph_paths.size()==a.telegraph_paths.size():
+				for j in a.telegraph_paths.size():
+					for k in 2:max_error=maxf(max_error,current.telegraph_paths[j][k].distance_to(a.telegraph_paths[j][k]))
+		clones_seen=clones_seen or body.clones.size()==2
+		if current.stage not in saved and current.stage in [0,1,2]:
+			saved.append(current.stage)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"予告・飛び込み・回復の複製とinnerRunnerを値型で保持する")
+			bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_body: Array=bridge.command("dev_boss_body_state").value
+			check(bridge.restore(held.value).ok,"全身複製の途中へ復帰する")
+			bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
+			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body,"復帰後の時計・割当・部位・判定・表示が一致する")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if current.stage not in shown and current.stage in [0,1,2]:
+			shown.append(current.stage)
+			var display=load("res://scripts/render/bosses/draco.gd").new();add_child(display)
+			display.apply_frame(body,current,{})
+			await get_tree().process_frame
+			check(display._parts.visible and display._clones.size()==body.clones.size(),"本体と複製2体を正式な全身素材で予告・実行・回復へ描く")
+			display.free()
+		if current.stage==5 and a.mode==&"idle":break
+	check(times_equal and positions_equal and warning_equal and max_error<0.1,"開始・飛び込み・通常技・帰還・終了の時計と分身形状がSourceに一致する: %s"%max_error)
+	check(clones_seen and saved.size()==3 and shown.size()==3 and bridge.command("dev_boss_body_state").value[-1].clones.is_empty(),"自然終了で複製と全部位を回収し3段階の表示・復帰を通る")
+	check(bridge._core.ship_snapshot().ship_hp<initial_hp and fixture.captured.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="clone_leap" and e.payload.source=="draco" and e.payload.technique=="clones"),"飛び込みが実HPとclone_leap・draco・clonesの通知へ届く")
+	bridge.dispose();source.session.free()
+
+func native_clones_interrupt(move: BossTechnique) -> void:
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():return
+	var bridge=fixture.bridge
+	var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+	var units: Array=bridge.command("dev_boss_state").value[0].clones
+	var clone: Dictionary=units[1]
+	var body_hp: float=body.hp
+	var part: int=clone.parts[clone.parts.size()/2]
+	check(bridge.command("dev_damage",{"entity_id":part,"amount":25.0,"cause":"shot"}).ok,"複製の胴部位へ命中する")
+	check(bridge.command("dev_boss_body_state").value[-1].hp==body_hp and is_equal_approx(bridge.command("dev_boss_state").value[0].clones[1].hp,float(move.clone_hp)-25.0),"複製への命中は複製HPへ転送し本体HPから独立する")
+	var saved: Dictionary=bridge.checkpoint()
+	check(saved.ok,"複製部位へ命中した後の転送先を保持する")
+	bridge.command("dev_damage",{"entity_id":part,"amount":100000.0,"cause":"shot"});bridge._core.step(float(move.warn));bridge._core.step(1.0/120.0)
+	check(not bridge.command("dev_boss_state").value[0].clones[1].alive and bridge.command("dev_boss_state").value[0].stage<5 and bridge.command("dev_boss_body_state").value[-1].clones.size()==1,"参加複製の消失は全部位を消し、生きている体の攻撃を続ける")
+	bridge.restore(saved.value)
+	check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"予告中の複製を取り消す")
+	body=bridge.command("dev_boss_body_state").value[-1]
+	check(body.clones.size()==2 and not body.picaro_attacking and body.clones.map(func(u):return u.id)==[units[1].id,units[2].id],"取消した生存複製は同じ役者と部位のPicaroとして残る")
+	var display=load("res://scripts/render/bosses/draco.gd").new();add_child(display);display.apply_frame(body,{},{});await get_tree().process_frame
+	check(display._clones.size()==2,"取消後のPicaroも全身の正式表示を保つ");display.free()
+	var adopted: Dictionary=bridge.checkpoint();bridge._core.step(1.0/120.0);var expected: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+	check(adopted.ok and bridge.restore(adopted.value).ok,"Picaro変換後を保持して復帰する");bridge._core.step(1.0/120.0);check(bridge.command("dev_boss_body_state").value[-1]==expected,"復帰後も複製胴の形とPicaro時計が一致する")
+	bridge.restore(saved.value);bridge.command("dev_remove",{"entity_id":fixture.boss});bridge._core.step(1.0/120.0)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[-1].clones.is_empty(),"本体の消失は複製と部位を回収して技を中断する")
+	bridge.restore(saved.value)
+	for frame in 500:
+		bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
+		if bridge.command("dev_boss_state").value[0].stage==1 and bridge.command("dev_boss_state").value[0].stage_time>3.0:break
+	var active: Dictionary=bridge.checkpoint()
+	body=bridge.command("dev_boss_body_state").value[-1]
+	var persistent: Array=body.effects.filter(func(e):return e.kind=="rubble")
+	bridge.command("dev_cancel_technique",{"ticket":started.value})
+	body=bridge.command("dev_boss_body_state").value[-1]
+	check(body.effects.all(func(e):return e.kind=="rubble") and body.effects.size()==persistent.size(),"取消は非persistent判定を消し、投石の持続攻撃を残す")
+	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
+	check(bridge.command("dev_boss_body_state").value[-1].clones.is_empty() and bridge.command("dev_boss_body_state").value[-1].effects.is_empty(),"本体取消はPicaroと残留攻撃を回収する")
+	bridge.release_checkpoint(saved.value);bridge.release_checkpoint(adopted.value);bridge.release_checkpoint(active.value);bridge.dispose()
+
+func native_clones_damage(move: BossTechnique) -> void:
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():return
+	var bridge=fixture.bridge
+	bridge.command("set_recording",{"active":true})
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	var effect: Dictionary={}
+	for tick in 600:
+		bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		var damaging: Array=body.effects.filter(func(e):return e.kind!="wind" and is_zero_approx(e.age))
+		if not damaging.is_empty():effect=damaging[0];break
+	check(not effect.is_empty(),"複製内の通常技が初回接触前の判定を出す")
+	if effect.is_empty():bridge.dispose();return
+	var scope := ContentResourceScope.new()
+	var entries := {}
+	for asset: Dictionary in fixture.package.visuals:
+		entries[asset.id]=asset
+		if not asset.path.is_empty():scope.provide(asset.path,load(asset.path))
+	var display=load("res://scripts/render/bosses/draco.gd").new();add_child(display);display.setup_effects(scope,entries)
+	var shown: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+	display.apply_frame(shown,bridge.command("dev_boss_state").value[0],{})
+	await get_tree().process_frame
+	check(display._field.effects.size()==shown.effects.size() and display._clones.size()==2,"分身の通常技判定を正式なHydra効果素材と全身表示へ渡す")
+	display.free()
+	bridge.command("dev_ship_motion",{"position":effect.points[0],"velocity":Vector2.ZERO})
+	var held: Dictionary=bridge.checkpoint()
+	var before: float=bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hazards(float(effect.delay)+1.0/120.0);bridge.command("dev_boss_body_state")
+	check(bridge._core.ship_snapshot().ship_hp==before and fixture.captured.any(func(e):return e.type=="combat_player_damage" and e.payload.source=="hydra" and e.payload.technique=="clones" and not e.payload.accepted),"複製内通常技の被弾拒否もhydra・親clonesへ帰属する")
+	bridge.restore(held.value);bridge._core.step_ship(2.0,2.0,{})
+	bridge.command("dev_ship_motion",{"position":effect.points[0],"velocity":Vector2.ZERO})
+	var accepted_before: int=fixture.captured.filter(func(e):return e.type=="combat_player_damage" and e.payload.source=="hydra" and e.payload.technique=="clones" and e.payload.accepted).size()
+	bridge._core.step_hazards(float(effect.delay)+1.0/120.0);bridge.command("dev_boss_body_state")
+	check(bridge._core.ship_snapshot().ship_hp<before and fixture.captured.filter(func(e):return e.type=="combat_player_damage" and e.payload.source=="hydra" and e.payload.technique=="clones" and e.payload.accepted).size()>accepted_before,"無敵時計が終わると複製内通常技の実HP減少をhydra・親clonesへ記録する")
+	bridge.release_checkpoint(held.value);bridge.dispose()
+
+func native_clones_remove(move: BossTechnique) -> void:
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():return
+	var bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	bridge.command("dev_remove",{"entity_id":fixture.boss});bridge._core.step(1.0/120.0)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[-1].clones.is_empty(),"本体の消失は複製と部位を回収して技を中断する")
+	bridge.dispose()
+
+func native_clones_shapes(move: BossTechnique) -> void:
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():return
+	var bridge=fixture.bridge
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	check(a.start_attack(&"clones") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"分身Hostの判定生成をSourceと同時に始める")
+	var assigned: Array=bridge.command("dev_boss_state").value[0].clones
+	print("[cpp_draco_clones_shapes] 技=",assigned.map(func(u):return u.mode))
+	for j in 3:a._runner.units[j].mode=StringName(assigned[j].mode)
+	var matching:=true
+	var count:=0
+	var error:=0.0
+	for tick in 800:
+		bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0);a.sim_tick(1.0/120.0,1.0/120.0)
+		var emitted: Array=bridge.command("dev_boss_body_state").value[-1].effects.filter(func(e):return is_zero_approx(e.age))
+		var original: Array=a._runner.host.attack_field.effects.filter(func(e):return is_zero_approx(e.age))
+		matching=matching and emitted.size()==original.size()
+		if emitted.size()==original.size():
+			for j in emitted.size():
+				count+=1
+				matching=matching and emitted[j].kind==str(original[j].kind) and is_equal_approx(emitted[j].width,original[j].width) and is_equal_approx(emitted[j].delay,original[j].delay) and is_equal_approx(emitted[j].life,original[j].life) and emitted[j].points.size()==original[j].points.size()
+				if emitted[j].points.size()==original[j].points.size():
+					for k in emitted[j].points.size():error=maxf(error,emitted[j].points[k].distance_to(original[j].points[k]))
+		if a._runner.units.all(func(u):return u.done):break
+	check(matching and count>0 and error<0.1,"分身Hostで使う通常技の発火tick・判定点列・幅・遅れ・寿命がSourceと一致する: %s"%error)
+	bridge.dispose();source.session.free()

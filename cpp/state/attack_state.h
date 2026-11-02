@@ -37,6 +37,8 @@ struct AttackSpec {
     Cause cause=Cause::None;WeaponId weapon=0;
     ShipContactPolicy contact;
     TechniqueId source_technique=0;
+    DefinitionId damage_source=0;
+    TechniqueId damage_technique=0;
     uint32_t contact_definition=0;
 };
 struct AttackRecord {

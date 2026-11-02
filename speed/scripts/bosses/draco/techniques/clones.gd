@@ -1,42 +1,6 @@
-## 全身複製の値と動き。
+## 全身複製の互換Runner。編集値はdata_typesのResourceが持つ。
 @tool
-extends BossTechnique
-
-## 予告（秒）
-@export_range(0,100000,0.01) var warn := 1.2:
-	set(value):
-		warn = value
-		_values_dirty = true
-## 攻撃の継続時間
-@export_range(0,100000,0.01) var active := 7.5:
-	set(value):
-		active = value
-		_values_dirty = true
-## 攻撃後の待ち
-@export_range(0,100000,0.01) var recover := 1.2:
-	set(value):
-		recover = value
-		_values_dirty = true
-## ダメージ
-@export_range(0,100000,0.01) var damage := 28.0:
-	set(value):
-		damage = value
-		_values_dirty = true
-## 当たりの太さ（中心から片側）
-@export_range(0,100000,0.01) var width := 50.0:
-	set(value):
-		width = value
-		_values_dirty = true
-## 複製体のHP
-@export_range(0,100000,0.01) var clone_hp := 350.0:
-	set(value):
-		clone_hp = value
-		_values_dirty = true
-## 複製1体の星数（仮）
-@export_range(0,100000,1) var clone_stars := 13:
-	set(value):
-		clone_stars = value
-		_values_dirty = true
+extends "res://scripts/data_types/boss_techniques/draco/clones.gd"
 
 func make_runner() -> RefCounted:
 	return Runner.new()
@@ -82,7 +46,7 @@ class Runner extends BossTechnique.Runner:
 			tech = n.mode
 			if not runners.has(n.mode):
 				for move in MOVES:
-					if move.technique == n.mode: runners[n.mode] = move.make_runner()
+					if move.technique == n.mode: runners[n.mode] = preload("res://scripts/bosses/legacy_technique_runners.gd").make(move)
 			runners[n.mode].tick_neck(self, n, dt)
 		func _head_pos(n: Dictionary) -> Vector2: return n.strike_pos if n.locked else table.pos[n.row]
 		func _neck_base(n: Dictionary) -> Vector2: return table.pos[n.row]
@@ -90,6 +54,7 @@ class Runner extends BossTechnique.Runner:
 			if not actor.tracking_locked(): n.angle=angle
 		func _cue(_cue: StringName,_attack: StringName,_index: int) -> void: pass
 		func head_index(_n: Dictionary) -> int: return 0
+		func combat_trace_for(_row: int) -> RefCounted: return actor.combat_trace
 		func finish_normal(n: Dictionary) -> void: n.done=true
 	func begin(a: BossActor) -> void:
 		center = a.aim_target()

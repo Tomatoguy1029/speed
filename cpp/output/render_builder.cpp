@@ -96,7 +96,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (view.grow(body.radius).has_point(body.position)) batch(FieldSystem::visual(run,body),2,0).add(i+1,body.position,0,body.radius,Color(0,0,0,1));
     }
     for (size_t i=0;i<state.enemies.size();++i) {
-        const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead || enemy.picaro_owner.generation || (state.control.cinematic_hide_enemies && !enemy.is_boss)) continue;
+        const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead || enemy.clone_visual || enemy.picaro_owner.generation || (state.control.cinematic_hide_enemies && !enemy.is_boss)) continue;
         const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus || definition.kind==EnemyDefinition::Kind::CanisMajor || definition.kind==EnemyDefinition::Kind::Draco || definition.kind==EnemyDefinition::Kind::Hydra || HydraBody::owns_part(run,state.enemy_handles.at(i))) continue;
         const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
