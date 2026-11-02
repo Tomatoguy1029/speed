@@ -76,6 +76,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->walls=records.WallDefinition_rows;
     bundle->slashes=records.SlashDefinition_rows;
     bundle->bolts=records.BoltDefinition_rows;
+    bundle->ring_holds=records.RingHoldDefinition_rows;
+    for (size_t i=0;i<bundle->ring_holds.size();++i) {
+        const auto &d=bundle->ring_holds[i];if (d.id!=i+1 || d.life<=0 || !std::isfinite(float(d.projectile_radius)) || !std::isfinite(float(d.life)) ||
+            bundle->hostile_definitions[d.projectile-1].kind!=uint32_t(HostileKind::Bullet)) return {};
+    }
     bundle->star_bolts=records.StarBoltDefinition_rows;
     for (size_t i=0;i<bundle->star_bolts.size();++i) {
         const auto &s=bundle->star_bolts[i];if (s.id!=i+1 || s.radius<=0 || s.life<=0 || s.flight_scale<=0 ||

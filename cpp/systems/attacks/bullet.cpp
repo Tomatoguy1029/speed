@@ -5,6 +5,21 @@
 #include <cmath>
 #include <algorithm>
 namespace speed {
+AttackHandle BulletSystem::emit(RunRuntime &run,const BulletSpawn &p) {
+    auto &state=run.state;
+    if (!state.started || state.closed || !state.enemy_handles.contains(p.source) || !p.definition || p.definition>run.content->hostile_definitions.size() ||
+        !p.position.is_finite() || !p.velocity.is_finite()) return {};
+    for (double v:{p.speed,p.radius,p.life,p.wait}) if (!std::isfinite(float(v)) || v<0) return {};
+    if (!std::isfinite(p.damage) || p.damage<0) return {};
+    const auto &d=run.content->hostile_definitions[p.definition-1];if (d.kind!=uint32_t(HostileKind::Bullet)) return {};
+    godot::RunState::Hostile shot;shot.definition=p.definition;shot.kind=int64_t(HostileKind::Bullet);shot.pos=p.position;shot.vel=p.velocity;
+    shot.speed=p.speed;shot.radius=p.radius;shot.life=p.life;shot.damage=p.damage;shot.wait=p.wait;
+    AttackSpec spec;spec.cause=Cause::Bullet;spec.owner.live_source=p.source;spec.owner.budget=p.budget;
+    if (!p.budget.value) {const auto &source=state.enemies[p.source.slot];spec.owner.budget.value=AttackBudgetSystem::token(state,AttackBudgetSystem::owner(state,source.id,source.attack_group));}
+    spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
+    if (!AttackSystem::configure_contact(*run.content,d.contact,spec)) return {};
+    return AttackSystem::emit_hostile(state,shot,spec);
+}
 void BulletSystem::petrify(godot::RunState &state,godot::Rect2 view,double duration) {
     for (auto &shot:state.hostiles) if (shot.alive && view.has_point(shot.pos)) shot.stone=duration;
 }

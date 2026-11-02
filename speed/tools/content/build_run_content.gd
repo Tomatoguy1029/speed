@@ -260,6 +260,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.StarBoltDefinition = [{"id":1,"radius":9.0,"life":6.0,"flight_scale":star.flight_scale,"turn_with_velocity":star.turn_with_velocity,
 		"tint_r":star.effect_tint.r,"tint_g":star.effect_tint.g,"tint_b":star.effect_tint.b,"tint_a":star.effect_tint.a,"visual":star_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	star.free()
+	data.RingHoldDefinition = [{"id":1,"projectile_radius":8.0,"life":4.0,"projectile":1}]
 	data.HostileDefinition = [{"id":1,"kind":0,"radius":7.0,"life":4.0,"damage":7.0,"slow":0.0,"turn":0.0,
 		"visual":bullet_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	if definition.behavior==&"shield":
@@ -358,6 +359,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if data.ResourceKey.is_empty():
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)
 			visuals.assign(package.visuals.slice(0,5))
+			data.RingHoldDefinition = resolved.RingHoldDefinition.duplicate(true)
 			data.StarBoltDefinition = resolved.StarBoltDefinition.duplicate(true)
 			data.LoadoutDefinition = resolved.LoadoutDefinition
 			data.ForwardDefinition = resolved.ForwardDefinition

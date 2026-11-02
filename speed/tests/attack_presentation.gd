@@ -20,6 +20,12 @@ func _ready() -> void:
 		return
 
 
+
+	if "--cpp-ring-hold" in OS.get_cmdline_user_args():
+		await check_cpp_ring_hold()
+		print("[cpp_ring_hold] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-star-bolt" in OS.get_cmdline_user_args():
 		await check_cpp_star_bolt()
 		print("[cpp_star_bolt] failed=%d" % failed)
@@ -216,5 +222,49 @@ func check_cpp_star_bolt() -> void:
 	frame = cpp_bridge.read_render(Rect2(-1600,-500,2000,1000)).value
 	check(not frame.batches.any(func(b): return presentation.frame_view.visuals[b.visual_id].role==preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole.StarBolt),"終了した星弾のFlight表示を回収する")
 	cpp_bridge.release_checkpoint(active.value)
+	cpp_bridge.release_checkpoint(empty.value)
+	cpp_session.free()
+
+func check_cpp_ring_hold() -> void:
+	if not await prepare_cpp_attack(92,"ring_hold"): return
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var params := {"source_id":owner,"count":4,"radius":100.0,"wait":0.25,"speed":100.0,"damage":8.0}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_ring_hold",params)
+	check(fired.ok and fired.value.size()==4,"発生元の円周へ4発の待機弾を生成する")
+	if not fired.ok: cpp_session.free(); return
+	var states: Array = cpp_core.hostiles_snapshot()
+	for k in 4:
+		var expected := cpp_origin+Vector2.from_angle(TAU*k/4.0)*100.0
+		check(states[k].pos.distance_to(expected)<0.001 and is_equal_approx(states[k].life,4.25) and is_equal_approx(states[k].wait,0.25),"円周配置と待機を含む寿命を保つ: %d" % k)
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1600,-500,1400,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.apply_frame(frame),"円周に並んだ通常弾を画面へ渡す")
+	var bullets: Array = frame.batches.filter(func(b): return presentation.frame_view.visuals[b.visual_id].role==11)
+	check(bullets.size()==1 and bullets[0].ids.size()==4 and is_equal_approx(bullets[0].transforms[0],8.0),"待機弾は半径8の通常弾として描く")
+	await get_tree().process_frame
+	cpp_core.step_hostiles(0.125)
+	var waiting: Array = cpp_core.hostiles_snapshot()
+	check(waiting[0].pos==states[0].pos and is_equal_approx(waiting[0].life,4.125) and is_equal_approx(waiting[0].wait,0.125),"待機中は動かず寿命だけ減る")
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	var held: Dictionary = cpp_bridge.checkpoint()
+	check(held.ok and cpp_core.attack_snapshot().all(func(a): return a.source_id==owner and not a.source_alive),"発生元の退場後も待機弾を元のIDで保持する")
+	cpp_core.step_hostiles(0.125)
+	check(cpp_core.hostiles_snapshot()[0].pos==states[0].pos and cpp_core.hostiles_snapshot()[0].wait==0.0,"待機時間を使い切る更新は動かない")
+	cpp_core.step_hostiles(0.125)
+	check(cpp_core.hostiles_snapshot()[0].pos.distance_to(states[0].pos+Vector2(12.5,0))<0.001,"待機が終わった次の更新から外向きに飛び出す")
+	cpp_bridge.restore(held.value)
+	check(cpp_core.hostiles_snapshot()==waiting,"待機時間・速度・寿命・位置を保持点から復元する")
+	cpp_core.step_hostiles(0.125)
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(160,0),"velocity":Vector2.ZERO})
+	cpp_core.step_hostiles(0.5)
+	check(cpp_core.hostiles_snapshot().size()==3 and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"飛び出した弾が共通被弾へ通って消える")
+	cpp_core.step_hostiles(4.0)
+	check(cpp_core.hostiles_snapshot().is_empty(),"待機を含む寿命を使い切ると残りの弾も消える")
+	cpp_bridge.restore(empty.value)
+	params.wait = -1.0
+	check(not cpp_bridge.command("dev_fire_ring_hold",params).ok and cpp_core.hostiles_snapshot().is_empty(),"不正な待機時間は弾を追加せず拒否する")
+	cpp_bridge.release_checkpoint(held.value)
 	cpp_bridge.release_checkpoint(empty.value)
 	cpp_session.free()

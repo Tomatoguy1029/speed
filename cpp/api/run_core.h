@@ -28,6 +28,7 @@ class SpeedRunCore : public RefCounted {
     friend class speed::FieldSystem;
     Dictionary development_light_arrow_command(const Dictionary &);
     Dictionary development_star_bolt_command(const Dictionary &);
+    Dictionary development_ring_hold_command(const Dictionary &);
     Dictionary development_bolt_command(const Dictionary &);
     Dictionary development_slash_command(const Dictionary &);
     Dictionary development_wall_command(const String &,const Dictionary &);
