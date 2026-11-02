@@ -11,6 +11,12 @@ struct ForwardWeaponState {
     double base_interval = 0, interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
     int64_t pierce = 0;
 };
+struct ScatterWeaponState {
+    bool ready=false;
+    uint32_t definition=0,shots=0;
+    IntervalTimer fire;
+    double recoil=0,base_interval=0,interval=0,damage=0,life=0,spread=0,knock=0;
+};
 struct EquipmentLevel {uint32_t definition=0,level=0;};
 struct CardCandidate {int64_t id=0;CardKind kind=CardKind::Weapon;uint32_t definition=0,level=0;};
 // 数値特性は取得の境界で畳み、武器の更新中には定義を探索しない。
@@ -20,6 +26,8 @@ struct EquipmentEffects {
 };
 struct LoadoutState {
     EquipmentEffects effects;
+    ScatterWeaponState scatter;
+    uint64_t post_weapon_interval_stacks=0,post_projectile_speed_stacks=0,post_duration_stacks=0,post_knockback_stacks=0;
 
     double charge_profile_factor=1,speed_profile_factor=1,attack_profile_factor=1,pickup_profile_factor=1,length_profile_factor=1;
     uint64_t post_charge_stacks=0,post_crit_stacks=0,post_max_speed_stacks=0,post_weapon_damage_stacks=0,post_followup_stacks=0,post_xp_pickup_stacks=0,post_line_length_stacks=0;

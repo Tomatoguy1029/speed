@@ -46,6 +46,11 @@ Dictionary SpeedRunCore::forward_snapshot() const {
     Dictionary out; out["elapsed"] = runtime.state.forward.interval-runtime.state.forward.fire.remaining; out["recoil"] = runtime.state.forward.recoil; return out;
 }
 
+Dictionary SpeedRunCore::scatter_snapshot() const {
+    const auto &weapon=runtime.state.loadout.scatter;
+    Dictionary out;out["elapsed"]=weapon.interval-weapon.fire.remaining;out["recoil"]=weapon.recoil;return out;
+}
+
 bool SpeedRunCore::set_forward_level(int64_t level) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.forward.ready || level<1) return false;
     if (runtime.state.forward_parameters.is_empty()) {

@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w02" in OS.get_cmdline_user_args() or "--cpp-w02-retry" in OS.get_cmdline_user_args():
+		await check_cpp_w02()
+		print("[cpp_w02] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t35" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t35()
 		check(finished,"マルチショットの確認を最後まで実施する")
@@ -274,7 +280,8 @@ func _ready() -> void:
 	print("[equipment_effects] cases=%d failures=%d errors=%d" % [cases,failures,capture.count()])
 	get_tree().quit(1 if failures or capture.count()>0 else 0)
 
-func check_cpp_w01() -> void:
+func check_cpp_w01(weapon_id: StringName = &"W01") -> void:
+	var retry := "--cpp-w02-retry" in OS.get_cmdline_user_args()
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.start_radius = 900.0
 	config.world_tick_div = 1
@@ -287,15 +294,15 @@ func check_cpp_w01() -> void:
 	stage.index = 88
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["drifter"])
-	var output := "res://.content/dev/run_w01"
+	var output := "res://.content/dev/run_%s" % weapon_id
 	var builder = load("res://tools/content/build_run_content.gd")
-	check(builder.build(stage,config,output,"W01全Lvと特性・解除".sha256_text())==OK,"W01の全Lvの値を生成する")
+	check(builder.build(stage,config,output,"射撃の全Lvと特性・解除".sha256_text())==OK,"射撃の全Lvの値を生成する")
 	var path := output.path_join("stage_88.json")
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":631},true)
 	session.auto_step = false
 	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
-	check(session.bridge!=null,"W01の通常の状態・表示を準備する")
+	check(session.bridge!=null,"射撃の通常の状態・表示を準備する")
 	if session.bridge==null:
 		session.free()
 		return
@@ -308,35 +315,38 @@ func check_cpp_w01() -> void:
 		await check_cpp_w01_detail(session,idle,viewport)
 		session.free()
 		return
+	if weapon_id==&"W02":
+		check(bridge.command("dev_remove_weapon",{"id":"W01"}).ok,"散弾の確認前に初期装備を外す")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W02","levels":1}).ok,"生成した散弾を取得する")
 	var initial: Dictionary = bridge.checkpoint()
 	var lab = SESSION.new()
 	add_child(lab)
 	await lab.reset({"seed":631,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
 	var run: RunSimulation = lab.run
 	run.field.bodies.clear()
-	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W01")
-	for level in range(1,definition.level_steps.size()+1):
+	var definition: WeaponDef = ContentManager.definition(&"weapons",weapon_id)
+	for level in range(5 if retry else 1,definition.level_steps.size()+1):
 		check(bridge.restore(initial.value).ok,"Lv別の確認の初期状態へ戻す")
 		bridge.collect_frame()
 		await lab.reset({"seed":631,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
 		run = lab.run
 		run.field.bodies.clear()
 		run.loadout.reset_loadout()
-		check(run.loadout.grant(&"weapon",&"W01",level),"現行W01を全Lvで装備する")
+		check(run.loadout.grant(&"weapon",weapon_id,level),"現行射撃を全Lvで装備する")
 		# 通常選択と同じ取得処理を通す。途中の解除で過去のタイマーを残さない。
-		check(bridge.command("dev_remove_weapon",{"id":"W01"}).ok,"W01を途中で解除する")
-		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W01","levels":level}).ok,"型付きの定義からW01を各Lvで取得する")
+		check(bridge.command("dev_remove_weapon",{"id":String(weapon_id)}).ok,"射撃を途中で解除する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":String(weapon_id),"levels":level}).ok,"型付きの定義から射撃を各Lvで取得する")
 		for id in ["T34","T35","T36"]:
 			var stacks := 5 if id=="T35" else 2
 			check(run.loadout.grant(&"trait",StringName(id),stacks),"現行の範囲・弾数・連射特性を取得する")
 			check(bridge.command("dev_grant_equipment",{"kind":"trait","id":id,"levels":stacks}).ok,"同じ特性の生成値をC++の実効能力へ畳む")
-		var weapon = run.loadout.weapon_behaviors[&"W01"]
+		var weapon = run.loadout.weapon_behaviors[weapon_id]
 		var source_projectiles: ProjectileSystem = run.projectiles
 		for row in source_projectiles.friend_alive.size():
 			if source_projectiles.friend_alive[row]: source_projectiles.release_friend(row)
 		run.state.rng.state = int(core.inspect().rng_state)
 		var fires := 0
-		for tick in 110:
+		for tick in (170 if weapon_id==&"W02" else 110):
 			if tick in [20,30]: bridge.command("pause",{"paused":tick==20})
 			if tick in [50,56]: core.set_run_guards({"controls_locked":tick==50})
 			var random_before: String = core.inspect().rng_state
@@ -347,9 +357,10 @@ func check_cpp_w01() -> void:
 				input.press = true
 				input.pen = core.ship_snapshot().ship_pos
 			if tick==75:
+				input.touch = true
 				input.pen_release = true
 			check(bridge.step(1.0/120.0,input,viewport).ok,"全Lvで通常の固定更新を進める")
-			var dt: float = core.inspect().world_time-before
+			var dt: float = 0.0 if core.inspect().world_time==before else (1.0/120.0)*bridge._ui.world_scale
 			var ship: Dictionary = core.ship_snapshot()
 			var draw: Dictionary = core.draw_snapshot()
 			run.state.ship_pos = ship.ship_pos
@@ -369,7 +380,7 @@ func check_cpp_w01() -> void:
 				var row: int = expected[n]
 				check(actual[n].pos.distance_to(source_projectiles.friend_pos[row])<0.02 and actual[n].vel.distance_to(source_projectiles.friend_vel[row])<0.02,"砲口・扇状の角度・移動が一致する")
 				check(is_equal_approx(actual[n].radius,source_projectiles.friend_r[row]) and is_equal_approx(actual[n].damage,source_projectiles.friend_dmg[row]) and is_equal_approx(actual[n].life,source_projectiles.friend_life[row]) and actual[n].pierce_left==source_projectiles.friend_pierce_left[row],"範囲・攻撃力・寿命・貫通数が実効値と一致する")
-			check(is_equal_approx(weapon._t,core.forward_snapshot().elapsed) and is_equal_approx(weapon.recoil,core.forward_snapshot().recoil),"射撃間隔と反動を停止・操作ロック・描線に合わせる")
+			check(is_equal_approx(weapon._t,shot_timing(core,weapon_id).elapsed) and is_equal_approx(weapon.recoil,shot_timing(core,weapon_id).recoil),"射撃間隔と反動を停止・操作ロック・描線に合わせる")
 			var fired := run.state.events.any(func(event): return event.type==&"weapon_fire")
 			check((random_before!=core.inspect().rng_state)==fired,"整数の弾数でも発射時に抽選し、停止中は抽選しない Lv%d tick%d" % [level,tick])
 			for event: Dictionary in run.state.events:
@@ -377,32 +388,39 @@ func check_cpp_w01() -> void:
 			if failures: break
 		check(fires>0,"全Lvで実際に発射する")
 		if failures: break
-	# 発射済みの弾・残り時間・反動を同じ保持点から再現する。
-	var mid: Dictionary = bridge.checkpoint()
-	var shots: Array = core.projectiles_snapshot()
-	var timing: Dictionary = core.forward_snapshot()
-	check(bridge.command("dev_remove_weapon",{"id":"W01"}).ok,"装備を外して発射を終了する")
-	check(core.projectiles_snapshot()==shots,"W01を外しても発射済みの弾は自然寿命まで残す")
-	bridge.collect_frame()
-	session.cpp_choices.poll()
-	check(not session.cpp_choices.equipped.has("weapon:W01"),"解除した装備の資源保持を解く")
-	var render: Dictionary = bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
-	check(not render.poses[0].visible,"解除した砲身を表示しない")
-	check(bridge.restore(mid.value).ok,"途中の射撃状態を復帰する")
-	bridge.collect_frame()
-	check(core.projectiles_snapshot()==shots and core.forward_snapshot()==timing,"残った弾とタイマー・反動を一緒に復帰する")
-	check(bridge.read_render(Rect2(-3000,-3000,6000,6000)).value.poses[0].visible,"復帰したW01の砲身を表示する")
-	bridge.release_checkpoint(mid.value)
+	if weapon_id==&"W02": await check_cpp_w02_detail(session,idle,viewport)
+	if not retry:
+		# 発射済みの弾・残り時間・反動を同じ保持点から再現する。
+		var mid: Dictionary = bridge.checkpoint()
+		var shots: Array = core.projectiles_snapshot()
+		var timing: Dictionary = shot_timing(core,weapon_id)
+		check(bridge.command("dev_remove_weapon",{"id":String(weapon_id)}).ok,"装備を外して発射を終了する")
+		check(core.projectiles_snapshot()==shots,"射撃を外しても発射済みの弾は自然寿命まで残す")
+		bridge.collect_frame()
+		session.cpp_choices.poll()
+		check(not session.cpp_choices.equipped.has("weapon:%s" % weapon_id),"解除した装備の資源保持を解く")
+		var render: Dictionary = bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
+		check(not render.poses[0].visible,"解除した砲身を表示しない")
+		check(bridge.restore(mid.value).ok,"途中の射撃状態を復帰する")
+		bridge.collect_frame()
+		check(core.projectiles_snapshot()==shots and shot_timing(core,weapon_id)==timing,"残った弾とタイマー・反動を一緒に復帰する")
+		check(bridge.read_render(Rect2(-3000,-3000,6000,6000)).value.poses[0].visible,"復帰した射撃の砲身を表示する")
+		bridge.release_checkpoint(mid.value)
 	bridge.restore(initial.value)
 	bridge.collect_frame()
-	# 通常のカード選択でW01を昇格し、資源がそろってからだけ確定する。
+	# 通常のカード選択で射撃を昇格し、資源がそろってからだけ確定する。
 	check(bridge.command("dev_add_xp",{"amount":config.xp_base}).ok,"次の通常選択に必要な経験値を取得する")
 	bridge.step(1.0/120.0,idle,viewport)
 	var cards: Dictionary = bridge.read_frame().value.ui.cards
 	var selected := {}
-	for card: Dictionary in cards.candidates:
-		if card.id=="W01": selected=card
-	check(not selected.is_empty(),"通常の成長候補にW01の次のLvを出す")
+	for attempt in config.reroll_count+1:
+		cards = bridge.read_frame().value.ui.cards
+		for card: Dictionary in cards.candidates:
+			if card.id==weapon_id: selected=card
+		print("[射撃の通常候補] 武器=%s 引き直し=%d 候補=%s" % [weapon_id,attempt,cards.candidates.map(func(card): return card.id)])
+		if not selected.is_empty() or attempt==config.reroll_count: break
+		if not bridge.command("reroll",{"offer_id":cards.offer_id}).ok: break
+	check(not selected.is_empty(),"通常の成長候補に射撃の次のLvを出す")
 	if not selected.is_empty():
 		bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":selected.candidate_id})
 		for frame in 120:
@@ -412,8 +430,8 @@ func check_cpp_w01() -> void:
 			await get_tree().process_frame
 		session.cpp_choices.poll()
 		var levels: Array = bridge.read_frame().value.ui.weapon_levels
-		check(levels.any(func(item): return item.id=="W01" and item.level>=2),"通常の選択を一度だけ確定しW01のLvを上げる")
-		check(session.cpp_choices.equipped.has("weapon:W01"),"選択資源を装備の寿命へ移す")
+		check(levels.any(func(item): return item.id==weapon_id and item.level>=2),"通常の選択を一度だけ確定し射撃のLvを上げる")
+		check(session.cpp_choices.equipped.has("weapon:%s" % weapon_id),"選択資源を装備の寿命へ移す")
 	bridge.release_checkpoint(initial.value)
 	lab.free()
 	session.free()
@@ -1235,3 +1253,89 @@ func check_cpp_t35() -> bool:
 	OS.remove_logger(capture)
 	check(capture.count()==0,"マルチショットの状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true
+
+func shot_timing(core, id: StringName) -> Dictionary:
+	return core.scatter_snapshot() if id==&"W02" else core.forward_snapshot()
+
+func check_cpp_w02() -> void:
+	await check_cpp_w01(&"W02")
+
+func check_cpp_w02_detail(session: RunSession,idle: Dictionary,viewport: Dictionary) -> void:
+	var retry := "--cpp-w02-retry" in OS.get_cmdline_user_args()
+	var bridge = session.bridge
+	var core = bridge._core
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W02")
+	bridge.command("dev_remove_trait",{"id":"T35"})
+	bridge.command("dev_remove_trait",{"id":"T36"})
+	check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T35","levels":2}).ok,"端数を含む散弾数の特性を取得する")
+	var saved: Dictionary = bridge.checkpoint()
+	var volleys: Array = []
+	bridge.subscribe("w02_detail",func(frame: Dictionary):
+		for event: Dictionary in frame.events:
+			if event.type==&"weapon_fire" and event.payload.id==&"W02": volleys.append(event.payload)
+		return true)
+	for tick in 165:
+		var count := volleys.size()
+		bridge.step(1.0/120.0,idle,viewport)
+		if volleys.size()==count: continue
+		var fresh: Array = core.projectiles_snapshot().filter(func(shot): return shot.age<0.009)
+		if not retry: check(fresh.size() in [12,13],"9発の1.4倍を12発か13発へ抽選する")
+		var offsets: Array = fresh.map(func(shot): return angle_difference(float(volleys[-1].angle),shot.vel.angle()))
+		offsets.sort()
+		for i in offsets.size():
+			check(absf(offsets[i]-(i-(offsets.size()-1)/2.0)*float(definition.params.spread_step))<0.0001,"端数の抽選後も左右対称の扇へ広げる")
+	check(not volleys.is_empty(),"散弾の端数抽選で実際に発射する")
+	if retry:
+		bridge.release_checkpoint(saved.value)
+		bridge.unsubscribe("w02_detail")
+		return
+	var expected: Array = core.projectiles_snapshot()
+	var timing: Dictionary = core.scatter_snapshot()
+	var random: String = core.inspect().rng_state
+	check(bridge.restore(saved.value).ok,"散弾の発射途中へ戻る")
+	bridge.collect_frame()
+	for tick in 165: bridge.step(1.0/120.0,idle,viewport)
+	check(expected==core.projectiles_snapshot() and timing==core.scatter_snapshot() and random==core.inspect().rng_state,"復帰後の散弾の弾数・位置・反動・乱数を再現する")
+	bridge.release_checkpoint(saved.value)
+	bridge.command("dev_post_weapon_power",{"damage":2,"followup":3})
+	check(bridge.command("dev_post_scatter",{"interval":2,"projectile":3,"duration":4,"knockback":5}).ok,"散弾の対象に指定された最大段後の値を適用する")
+	var post_count := volleys.size()
+	for tick in 90:
+		bridge.step(1.0/120.0,idle,viewport)
+		if volleys.size()>post_count: break
+	var first_post_time: float = core.inspect().world_time
+	post_count = volleys.size()
+	for tick in 90:
+		bridge.step(1.0/120.0,idle,viewport)
+		if volleys.size()>post_count: break
+	var reduced: float = ContentManager.base.post_max.reduced(float(definition.params.interval_by_level[-1]),&"weapon_interval",{&"weapon_interval":2},ContentManager.base.post_max.minimum_interval)
+	check(volleys.size()>post_count and absf(core.inspect().world_time-first_post_time-reduced)<=1.0/120.0,"最大段後の発射間隔を基準値から短縮する")
+	var shots: Array = core.projectiles_snapshot().filter(func(shot): return shot.age<0.009)
+	check(not shots.is_empty(),"最大段後の散弾を新しく発射する")
+	if not shots.is_empty():
+		var post: PostMaxConfig = ContentManager.base.post_max
+		var shot: Dictionary = shots[0]
+		check(is_equal_approx(shot.vel.length(),1300.0*post.factor(&"projectile_speed",{&"projectile_speed":3})) and is_equal_approx(shot.life+1.0/120.0,float(definition.params.life)*post.factor(&"duration",{&"duration":4})),"最大段後の弾速と寿命を発射時に適用する")
+		check(is_equal_approx(shot.knock,float(definition.params.knock)*post.factor(&"knockback",{&"knockback":5})),"最大段後の押し出しを適用する")
+		check(is_equal_approx(shot.damage,ContentManager.base.base_attack*float(definition.params.damage_by_level[-1])*(1.0+post.amount(&"weapon_damage",{&"weapon_damage":2})+post.amount(&"followup",{&"followup":3}))),"最大段後の威力と追撃を共通倍率から適用する")
+		var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":shot.pos+shot.vel*0.04})
+		check(created.ok,"散弾の命中対象を発射先へ置く")
+		var before: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==created.value)[0].hp
+		core.step_projectiles(0.05)
+		var enemies: Array = core.enemies_snapshot().filter(func(enemy): return enemy.id==created.value)
+		check(enemies.is_empty() or enemies[0].hp<before,"散弾が通常の命中処理でダメージを与える")
+	bridge.command("set_ui_overlay",{"active":false})
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.01)
+	check(not presentation.frame_view._scatter_flashes.hits.is_empty(),"散弾の命中を十字・輪・火花の表示へ渡す")
+	var frame: Dictionary = bridge.read_frame().value
+	var muzzle: float = presentation.frame_view._scatter_flashes.muzzle_time
+	presentation.frame_view.update_effects(frame,0.1)
+	check(muzzle==presentation.frame_view._scatter_flashes.muzzle_time,"停止中の世界時計では扇の閃光を進めない")
+	var render: Dictionary = bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
+	var visible := false
+	for batch: Dictionary in render.batches:
+		if batch.visual_id==2 and batch.flags.has(1): visible = true
+	check(visible,"散弾の細い光弾を通常の表示用の値へ渡す")
+	bridge.unsubscribe("w02_detail")
+	await get_tree().process_frame

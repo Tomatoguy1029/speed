@@ -20,6 +20,8 @@ var _missile := PackedFloat32Array()
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
+var _scatter_flashes := ShotFlashes.new()
+var _scatter_world_time := -1.0
 var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
 var _epoch := 0
@@ -231,7 +233,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		if visuals[row.visual_id].role==2:
 			if unchanged_shots.has(row.visual_id): continue
 			var began := Time.get_ticks_usec() if perf.active else 0
-			preload("res://scripts/render/attacks/friend_shot.gd").apply_frame(batch as PixelPainter,row.transforms)
+			preload("res://scripts/render/attacks/friend_shot.gd").apply_frame(batch as PixelPainter,row.transforms,row.flags)
 			perf.since(&"view_geometry.attacks",began)
 		else: batch.apply_frame(row.transforms,row.colors)
 	for id in batches:
@@ -317,6 +319,8 @@ func receive_frame(frame: Dictionary) -> bool:
 		_queued_events.clear()
 		_flashes = ShotFlashes.new()
 		_forward_world_time = -1.0
+		_scatter_flashes = ShotFlashes.new()
+		_scatter_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_meteor_shards.clear()
@@ -332,6 +336,10 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_forward:
 		_flashes = ShotFlashes.new()
 		_forward_world_time = -1.0
+	var equipped_scatter: bool = frame.ui.get("weapon_levels",[]).any(func(item): return item.id=="W02")
+	if not equipped_scatter:
+		_scatter_flashes = ShotFlashes.new()
+		_scatter_world_time = -1.0
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
 		if event.type==&"shield_stolen":
@@ -358,6 +366,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*2.4,"color":Color("#ffe27a"),"life":duration,"max":duration})
 			_burst(event.pos,Color("#ffd23f"),14,360.0)
 		if event.type==&"ship_explode": _death_burst(event.pos)
+		if equipped_scatter: preload("res://scripts/render/equipment/scatter.gd").frame_event(_scatter_flashes,event)
 		if equipped_forward: preload("res://scripts/render/equipment/forward.gd").frame_event(_flashes,event)
 	_queued_events.clear()
 	var ui: Dictionary = frame.ui
@@ -403,6 +412,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var draw_start := Time.get_ticks_usec() if perf.active else 0
 	_effects.begin()
 	preload("res://scripts/render/equipment/forward.gd").frame_draw(_flashes,_effects,world_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_forward)
+	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
+	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
+	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
 	_effects.end()
 	perf.since(&"view_geometry.attacks",draw_start)
 	if active and not ui.draw.drawing and ui.hitstop<=0.0:

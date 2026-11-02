@@ -15,6 +15,8 @@ struct ContentBundle {
     std::vector<EnemyDefinition> definitions;
     std::vector<ResourceKey> visuals;
     std::vector<ForwardDefinition> forward_levels;
+    std::vector<ScatterDefinition> scatter_levels;
+    ScatterPostDefinition scatter_post;
     std::vector<BiteDefinition> bites;
     std::vector<HoundDefinition> hounds;
     std::vector<GunnerDefinition> gunners;

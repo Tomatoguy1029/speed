@@ -7,7 +7,7 @@ AttackHandle FriendShotSystem::emit(RunRuntime &run,godot::RunState::Friendly sh
         !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.damage) || shot.damage<0 || shot.pierce_left<0) return {};
     for (double value:{shot.radius,shot.life,shot.knock}) if (!std::isfinite(value) || value<0) return {};
     AttackSpec spec;spec.cause=Cause::Shot;spec.policies=policy(EndPolicy::NaturalLifetime);
-    if (shot.weapon_id==godot::StringName("W01")) spec.weapon=1;
+    for (const auto &weapon:run.content->equipment) if (weapon.kind==0 && shot.weapon_id==godot::StringName(weapon.external_id.c_str())) {spec.weapon=weapon.id;break;}
     if (!run.content->friend_shots.empty()) {
         shot.definition=1;
         if (!AttackSystem::configure_contact(*run.content,run.content->friend_shots.front().contact,spec)) return {};

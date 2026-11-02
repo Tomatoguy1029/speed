@@ -121,6 +121,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 				"pickup_bonus":trait_def.stack_bonus(level) if id=="T12" else 0.0,
 				"length_bonus":trait_def.stack_bonus(level) if id=="T14" else 0.0,
 				"glide_bonus":trait_def.stack_bonus(level) if id=="T31" else 0.0})
+	var scatter := load("res://data/weapons/W02_scatter.tres") as WeaponDef
+	if scatter==null: return {}
+	var scatter_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":scatter_id,"kind":0,"maximum_level":scatter.level_steps.size(),"external_id":"W02","comet_only":scatter.comet_only})
+	for level in scatter.level_steps.size():
+		data.ScatterDefinition.append({"id":level+1,"weapon":scatter_id,"level":level+1,"interval":float(scatter.params.interval_by_level[level]),"damage":float(scatter.params.damage_by_level[level]),"shots":int(scatter.params.shots_by_level[level]),"life":float(scatter.params.life),"spread":float(scatter.params.spread_step),"knock":float(scatter.params.knock)})
 	if config.post_max==null: return {}
 	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
 	var crit_definition := load("res://data/traits/T09_critRate.tres") as TraitDef
@@ -128,6 +134,9 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxCritDefinition = [{"id":1,"trait_maximum":float(crit_definition.params.get("max",1.0)),"trained_bonus":crit_definition.stack_bonus(config.trait_max_stacks),"increment":float(config.post_max.increments.get("crit_chance",0.0))}]
 	data.PostMaxMotionDefinition = [{"id":1,"max_speed_increment":float(config.post_max.increments.get("max_speed",0.0))}]
 	data.PostMaxWeaponPowerDefinition = [{"id":1,"equipment":1,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(weapon.id).has("followup") else 0.0}]
+	data.PostMaxWeaponPowerDefinition.append({"id":2,"equipment":scatter_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(scatter.id).has("followup") else 0.0})
+	var target: Dictionary = config.post_max.target(scatter.id)
+	data.ScatterPostDefinition = [{"id":1,"interval_increment":float(config.post_max.increments.get("weapon_interval",0.0)) if target.has("interval") else 0.0,"projectile_increment":float(config.post_max.increments.get("projectile_speed",0.0)) if target.has("projectile") else 0.0,"duration_increment":float(config.post_max.increments.get("duration",0.0)) if "life" in target.get("duration",[]) else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if target.has("knockback") else 0.0,"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_interval":config.post_max.minimum_interval}]
 	data.PostMaxPickupDefinition = [{"id":1,"xp_radius_increment":float(config.post_max.increments.get("pickup_radius",0.0))}]
 	data.PostMaxDrawDefinition = [{"id":1,"line_length_increment":float(config.post_max.increments.get("line_length",0.0))}]
 	data.LifecycleDefinition = [{"id":1,"death_freeze_time":config.death_freeze_time,"death_explosion_time":config.death_explosion_time,"death_game_over_time":config.death_game_over_time,"clear_bonus":config.clear_bonus,"legendary":String(stage.legendary_module_id) if stage!=null else "","death_world_dim":config.death_world_dim}]
@@ -143,6 +152,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":1,"asset":key})
+	var scatter_entry: ContentEntry = ContentManager.catalog.find(&"weapons",scatter.id)
+	if scatter_entry==null: return {}
+	for path in scatter_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":scatter_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":scatter_id,"asset":key})
 	if config.planet_radius>0.0:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":9})
@@ -244,6 +260,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			visuals.assign(package.visuals.slice(0,5))
 			data.LoadoutDefinition = resolved.LoadoutDefinition
 			data.ForwardDefinition = resolved.ForwardDefinition
+			data.ScatterDefinition = resolved.ScatterDefinition
+			data.ScatterPostDefinition = resolved.ScatterPostDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
 			data.LifecycleDefinition = resolved.LifecycleDefinition
 			for section in ["PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:
@@ -288,10 +306,11 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for bite: Dictionary in data.BiteDefinition: bite.visual_key = key
 	for resource: Dictionary in equipment_resources:
 		var row := resource.duplicate()
+		row.erase("equipment")
 		row.id = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":row.id,"role":row.role})
 		visuals.append(row)
-		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":1,"asset":row.id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":int(resource.get("equipment",1)),"asset":row.id})
 	for resource: Dictionary in field_visuals:
 		var row := resource.duplicate()
 		row.id = data.ResourceKey.size()+1

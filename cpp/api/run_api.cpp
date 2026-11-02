@@ -203,6 +203,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
                 changed=speed::EquipmentSystem::grant(runtime,d.id,uint32_t(int64_t(payload["levels"])));
         }
         response=changed?success():failure(5,"equipment","装備を変更できません");
+    } else if (kind=="dev_post_scatter" && runtime.api_development && payload.size()==4 && is(payload,"interval",Variant::INT) && is(payload,"projectile",Variant::INT) && is(payload,"duration",Variant::INT) && is(payload,"knockback",Variant::INT) && int64_t(payload["interval"])>=0 && int64_t(payload["projectile"])>=0 && int64_t(payload["duration"])>=0 && int64_t(payload["knockback"])>=0) {
+        auto &p=runtime.state.loadout;p.post_weapon_interval_stacks=uint64_t(int64_t(payload["interval"]));p.post_projectile_speed_stacks=uint64_t(int64_t(payload["projectile"]));p.post_duration_stacks=uint64_t(int64_t(payload["duration"]));p.post_knockback_stacks=uint64_t(int64_t(payload["knockback"]));response=success();
     } else if (kind=="dev_post_length" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
         runtime.state.loadout.post_line_length_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
     } else if (kind=="dev_post_pickup" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {

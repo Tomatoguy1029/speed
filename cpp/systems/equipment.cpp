@@ -48,12 +48,19 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
     if (old>=d.maximum_level || (!old && owned.size()>=(d.kind==0?run.content->progression.weapon_slots:run.content->progression.trait_slots))) return false;
     const uint32_t next=old+std::min(levels,d.maximum_level-old);
     if (d.kind==0) {
-        if (d.external_id!="W01") return false;
+        if (d.external_id=="W01") {
         const auto &level=run.content->forward_levels[next-1];auto &forward=run.state.forward;
         if (forward.ready) ForwardBehavior::set_interval(forward,level.interval);
         else {forward={};forward.base_interval=forward.interval=forward.fire.remaining=level.interval;}
         forward.damage=level.damage;forward.pierce=level.pierce;forward.life=level.life;forward.spread=level.spread;forward.knock=level.knock;
         forward.character_scale=run.content->config.character_scale;forward.ready=true;
+        } else if (d.external_id=="W02") {
+            const auto &level=run.content->scatter_levels[next-1];auto &scatter=run.state.loadout.scatter;
+            if (scatter.ready) scatter.fire.remaining+=level.interval-scatter.interval;
+            else {scatter={};scatter.fire.remaining=level.interval;}
+            scatter.base_interval=scatter.interval=level.interval;scatter.definition=id;scatter.shots=level.shots;
+            scatter.damage=level.damage;scatter.life=level.life;scatter.spread=level.spread;scatter.knock=level.knock;scatter.ready=true;
+        } else return false;
     } else if (std::none_of(run.content->numeric_traits.begin(),run.content->numeric_traits.end(),[&](const auto &v){return v.equipment==id && v.level==next;})) return false;
     if (current==owned.end()) owned.push_back({id,next});else current->level=next;
     refresh_effects(run);
@@ -68,8 +75,12 @@ bool EquipmentSystem::remove_trait(RunRuntime &run,uint32_t id) {
 bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     auto &owned=run.state.loadout.weapons;
     auto current=std::find_if(owned.begin(),owned.end(),[&](const auto &v){return v.definition==id;});
-    if (current==owned.end() || !id || id>run.content->equipment.size() || run.content->equipment[id-1].external_id!="W01") return false;
+    if (current==owned.end() || !id || id>run.content->equipment.size()) return false;
     // 発射済みの自然寿命の弾は、装備の解除後も残す。
-    run.state.forward={};owned.erase(current);refresh_effects(run);return true;
+    const auto &external=run.content->equipment[id-1].external_id;
+    if (external=="W01") run.state.forward={};
+    else if (external=="W02") run.state.loadout.scatter={};
+    else return false;
+    owned.erase(current);refresh_effects(run);return true;
 }
 }

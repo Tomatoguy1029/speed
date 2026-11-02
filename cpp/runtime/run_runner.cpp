@@ -1,5 +1,6 @@
 #include "run_runner.h"
 #include "../systems/attack_system.h"
+#include "../behaviors/weapons/scatter.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
 #include "../systems/pickup_system.h"
@@ -67,7 +68,17 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (!core.rebuild_enemy_grid(state.frame_grid_cell)) return false;
     }
     if (!core.step_ship_input(dt,world_dt,input)) return false;
-    if (state.phase==Phase::Play && !state.controls_locked && state.forward.ready) core.step_forward(world_dt);
+    if (state.phase==Phase::Play && !state.controls_locked) {
+        // 取得順で更新し、各武器の後に進行状態を確認する。
+        if (state.loadout.ready) {
+            for (const auto &owned:state.loadout.weapons) {
+                const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
+                if (id=="W01") core.step_forward(world_dt);
+                else if (id=="W02") ScatterBehavior::step(core.runtime,world_dt);
+                if (state.phase!=Phase::Play) break;
+            }
+        } else if (state.forward.ready) core.step_forward(world_dt);
+    }
     if (world_step && state.phase==Phase::Play) {
         if (state.projectile_config.ready && !core.step_projectiles(wd)) return false;
         if (core.check_run_end()) return true;

@@ -52,6 +52,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->crystal_values={records.RunConfig_rows[0].crystal_low,records.RunConfig_rows[0].crystal_mid,records.RunConfig_rows[0].crystal_high};
     bundle->visuals=records.ResourceKey_rows;
     bundle->forward_levels=records.ForwardDefinition_rows;
+    bundle->scatter_levels=records.ScatterDefinition_rows;
+    if (records.ScatterPostDefinition_rows.size()!=1) return {};
+    bundle->scatter_post=records.ScatterPostDefinition_rows.front();
     bundle->bites=records.BiteDefinition_rows;
     bundle->hounds=records.HoundDefinition_rows;
     bundle->gunners=records.GunnerDefinition_rows;
@@ -112,6 +115,14 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto &d=bundle->equipment[index];
         if (d.id!=index+1 || !equipment_names.insert(d.external_id).second) return {};
         if (d.id==1) continue;
+        if (d.external_id=="W02") {
+            if (d.kind!=0 || d.comet_only || d.maximum_level!=bundle->scatter_levels.size() || !power_weapons.count(d.id)) return {};
+            for (size_t i=0;i<bundle->scatter_levels.size();++i) {
+                const auto &level=bundle->scatter_levels[i];
+                if (level.weapon!=d.id || level.level!=i+1 || level.interval<=0) return {};
+            }
+            continue;
+        }
         // カプセルは未装備の彗星武器をIDで保持する。実行の登録は武器ごとに確認する。
         if (d.kind==0 && d.comet_only) continue;
         if (d.kind!=1 || (d.external_id!="T31" && d.external_id!="T14" && d.external_id!="T12" && d.external_id!="T11" && d.external_id!="T10" && d.external_id!="T09" && d.external_id!="T08" && d.external_id!="T07" && d.external_id!="T34" && d.external_id!="T35" && d.external_id!="T36")) return {};
@@ -120,6 +131,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             if (std::count_if(bundle->numeric_traits.begin(),bundle->numeric_traits.end(),[&](const auto &v){return v.equipment==d.id && v.level==level;})!=1) return {};
         }
     }
+    if (std::count_if(bundle->equipment.begin(),bundle->equipment.end(),[](const auto &d){return d.external_id=="W02";})!=1) return {};
     for (const auto &v:bundle->numeric_traits) {
         const auto &d=bundle->equipment[v.equipment-1];
         if (d.kind!=1 || v.level>d.maximum_level) return {};

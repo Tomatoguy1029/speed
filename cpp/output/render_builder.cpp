@@ -92,7 +92,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const double radius=saw?double(shot.radius):18.0*1.82*config.character_scale;
         if (!view.grow(radius).has_point(pose.position)) continue;
         if (saw && !run.content->rock_fields.empty()) batch(run.content->definitions[run.content->rock_fields.front().saw-1].visual_id,10,0).add(shot.id,pose.position,pose.angle,radius,Color(0,0,0,1));
-        else batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1));
+        else batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1),shot.visual==StringName("weapon/scatter")?(shot.life<0.09?2:1):0);
     }
     for (const auto &shot:state.hostiles) {
         if (!shot.alive || !shot.definition || !view.grow(40.0).has_point(shot.pos)) continue;
@@ -121,14 +121,16 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Array poses;
     Vector2 ship=state.ship.pos;double angle=state.ship.heading.angle();
     if (previous.ready) {ship=previous.ship_position.lerp(ship,alpha);angle=previous.ship_angle+angle_difference(angle-previous.ship_angle)*alpha;}
-    const double recoil=state.forward.recoil>0?(state.forward.recoil>0.06?2.0:1.0)*pixel:0;
-    const auto at=ship-state.ship.heading*recoil;
+    const double forward_recoil=state.forward.recoil>0?(state.forward.recoil>0.06?2.0:1.0)*pixel:0;
+    const auto &scatter=state.loadout.scatter;
+    const double scatter_recoil=scatter.recoil>0?(scatter.recoil>0.035?2.0:1.0)*pixel:0;
+    const auto at=ship-state.ship.heading*std::max(forward_recoil,scatter_recoil);
     const Transform2D transform(angle+godot::Math::PI/2.0,Vector2(config.character_scale,config.character_scale),0,at);
     int32_t visual_state=state.ship.hurt>0?1:0;
     if (state.ship.invuln>0 && std::fmod(state.time*20.0,2.0)<1.0) visual_state|=2;
     for (const auto visual:{config.cannon_visual,config.ship_visual}) {
         Dictionary pose;pose["participant_id"]=0;pose["part_key"]=visual;pose["transform"]=transform;
-        pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
+        pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
     out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;return out;

@@ -6,6 +6,7 @@ static func create_batch(pixel: float) -> PixelPainter:
 	painter.setup_painter(pixel)
 	return painter
 
-static func apply_frame(painter: PixelPainter, transforms: PackedFloat32Array) -> void:
+static func apply_frame(painter: PixelPainter, transforms: PackedFloat32Array, flags: PackedInt32Array) -> void:
 	for n in range(0,transforms.size(),6):
-		painter.bolt(Vector2(transforms[n+4],transforms[n+5]),atan2(transforms[n+1],transforms[n]),17,2)
+		var style: int = flags[n/6]
+		painter.bolt(Vector2(transforms[n+4],transforms[n+5]),atan2(transforms[n+1],transforms[n]),3 if style==2 else (6 if style==1 else 17),0 if style==2 else (1 if style==1 else 2))
