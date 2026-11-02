@@ -13,7 +13,7 @@ void FloodSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,go
     const auto *record=AttackSystem::get(run.state,h.attack);if (!record) return;const auto &d=run.content->floods.front();
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Flood);shape["layer"]=11;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
     PackedVector2Array points;points.push_back(h.pos);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);PackedFloat32Array widths;widths.push_back(b->half_width*2);PackedColorArray colors;colors.push_back(h.color);
-    shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;shape["time"]=double(h.time);shape["delay"]=double(h.delay);shape["active"]=double(h.duration);shape["angle"]=double(b->angle);shape["length"]=double(b->length);shape["spread"]=double(b->arc);shape["margin"]=d.margin;out.push_back(shape);
+    shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;shape["time"]=double(h.time);shape["delay"]=double(h.delay);shape["active"]=double(h.duration);shape["angle"]=double(b->angle);shape["length"]=double(b->length);shape["spread"]=double(b->arc);shape["effect_group"]=b->flood_group;shape["margin"]=d.margin;out.push_back(shape);
 }
 void FloodSystem::end_visual(RunRuntime &run,const FloodTailState &f,int64_t id) {
     if (run.content->floods.empty()) return;const auto &d=run.content->floods.front();if (f.age>=d.tail) return;

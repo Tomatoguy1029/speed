@@ -77,7 +77,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->marlins=records.MarlinDefinition_rows;
     bundle->pulsers=records.PulserDefinition_rows;
     bundle->dolphins=records.DolphinDefinition_rows;
-    bundle->reticles=records.ReticleDefinition_rows;
+    bundle->reticles=records.ReticleDefinition_rows;bundle->aquarius=records.AquariusDefinition_rows;
     bundle->clocks=records.ClockDefinition_rows;
     bundle->aurigas=records.AurigaDefinition_rows;
     bundle->soldiers=records.SoldierDefinition_rows;
@@ -281,7 +281,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -395,6 +395,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{item_clock->accel,item_clock->warn,item_clock->hand_long,item_clock->hand_short,item_clock->hand_width,item_clock->long_speed,item_clock->short_speed,item_clock->damage}) if (!std::isfinite(float(value))) return {};
             definition.clock_definition=uint32_t(item_clock-bundle->clocks.begin()+1);definition.accel=item_clock->accel;
         } else if (item_clock!=bundle->clocks.end()) return {};
+        const auto aquarius=std::find_if(bundle->aquarius.begin(),bundle->aquarius.end(),[&](const auto &p){return p.id==row.id;});
+        if (row.kind==24) {
+            if (aquarius==bundle->aquarius.end() || aquarius->telegraph<=0) return {};
+            for (double value:{aquarius->accel,aquarius->approach,aquarius->telegraph,aquarius->beam_time,aquarius->beam_length,aquarius->half_width,aquarius->spread,aquarius->rest,aquarius->damage,aquarius->admission_duration}) if (!std::isfinite(float(value))) return {};
+            definition.aquarius_definition=uint32_t(aquarius-bundle->aquarius.begin()+1);definition.accel=aquarius->accel;
+        } else if (aquarius!=bundle->aquarius.end()) return {};
         const auto item_reticle=std::find_if(bundle->reticles.begin(),bundle->reticles.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==23) {
             if (item_reticle==bundle->reticles.end() || item_reticle->aim_time<=0) return {};

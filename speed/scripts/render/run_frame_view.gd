@@ -18,6 +18,8 @@ var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
 var _lance_hits: Array = []
+var _aquarius := PackedFloat32Array()
+var _flood_groups: Dictionary = {}
 var _shell_displays: Dictionary = {}
 var _flood_displays: Dictionary = {}
 var _flood_tails: Array[Dictionary] = []
@@ -165,6 +167,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		var began := Time.get_ticks_usec() if perf.active else 0
 		preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
+		preload("res://scripts/render/enemies/aquarius.gd").draw_frame(canvas,_aquarius,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/reticle.gd").draw_frame(canvas,_reticle,1.0/maxf(_zoom,0.01))
@@ -327,6 +330,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
 			for value: float in row.gunner:
 				if not is_finite(value): return false
+		if row.has("aquarius"):
+			if not row.aquarius is PackedFloat32Array or row.aquarius.size()%5!=0: return false
+			for value: float in row.aquarius:
+				if not is_finite(value): return false
 		if row.has("glows"):
 			if not row.glows is PackedFloat32Array or row.glows.size()%3!=0: return false
 			for value: float in row.glows:
@@ -344,7 +351,7 @@ func _valid(frame: Dictionary) -> bool:
 			for key in ["angle","clock","flight_scale","full","petrified_radius"]:
 				if not row.get(key) is float or not is_finite(row[key]): return false
 		if row.kind==SHAPE_KIND.Flood:
-			if row.points.size()!=1 or row.widths.size()!=1: return false
+			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("effect_group") is int or row.effect_group<0: return false
 			for key in ["time","delay","active","angle","length","spread","margin"]:
 				if not row.get(key) is float or not is_finite(row[key]): return false
 		if row.kind==SHAPE_KIND.Zone:
@@ -397,6 +404,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	var previous_lynx := _lynx
 	var previous_dolphin := _dolphin
 	var previous_sniper := _sniper
+	_aquarius = PackedFloat32Array()
 	_gunner = PackedFloat32Array()
 	_beamer = PackedFloat32Array()
 	_missile = PackedFloat32Array()
@@ -407,6 +415,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	_dolphin = PackedFloat32Array()
 	_sniper = PackedFloat32Array()
 	for row: Dictionary in frame.batches:
+		if row.has("aquarius"): _aquarius.append_array(row.aquarius)
 		if row.has("gunner"): _gunner.append_array(row.gunner)
 		if row.has("beamer"): _beamer.append_array(row.beamer)
 		if row.has("missile"): _missile.append_array(row.missile)
@@ -460,6 +469,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in _zone_displays.values(): display.hide()
 	for display: Node in _shell_displays.values(): display.hide()
 	for display: Dictionary in _flood_displays.values(): display.node.hide()
+	var flood_groups := {}
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
@@ -485,10 +495,14 @@ func apply_frame(frame: Dictionary) -> bool:
 			if water.row.get("owner_id",0)!=row.owner_id: water.fired = false
 			preload("res://scripts/render/attacks/flood.gd").frame_apply(water,row)
 			water.node.show()
+			var group: int = row.effect_group if row.effect_group>0 else row.owner_id
+			flood_groups[group] = true
 			if row.time>=row.delay and not water.fired:
 				water.fired = true
-				if pipeline!=null: pipeline.add_wave(row.points[0],800.0,0.7)
-				_burst(row.points[0],row.colors[0].lightened(0.3),36,760.0)
+				if not _flood_groups.has(group):
+					_flood_groups[group] = true
+					if pipeline!=null: pipeline.add_wave(row.points[0],800.0,0.7)
+					_burst(row.points[0],row.colors[0].lightened(0.3),36,760.0)
 			continue
 		if row.kind==SHAPE_KIND.Zone:
 			var key := int(row.order)
@@ -573,6 +587,8 @@ func apply_frame(frame: Dictionary) -> bool:
 			line.end_cap_mode = line.begin_cap_mode
 			line.show()
 			line_index += 1
+	for group in _flood_groups.keys():
+		if not flood_groups.has(group): _flood_groups.erase(group)
 	for display: Dictionary in _shape_displays.values():
 		display.node.visible = display.used
 		if display.circles!=display.previous_circles: display.node.queue_redraw()
@@ -656,6 +672,8 @@ func receive_frame(frame: Dictionary) -> bool:
 		_flood_world_time = -1.0
 		for tail: Dictionary in _flood_tails: tail.node.queue_free()
 		_flood_tails.clear()
+		_flood_groups.clear()
+		for water: Dictionary in _flood_displays.values(): water.fired = false; water.row = {}
 		_zone_world_time = -1.0
 		for bursts: Node in _zone_bursts.values(): bursts.queue_free()
 		_zone_bursts.clear()

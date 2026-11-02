@@ -917,6 +917,75 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "AquariusDefinition",
+      "section": 104,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_width",
+          "source": "beam_width",
+          "type": "f64",
+          "min": 0,
+          "multiplier": 0.5
+        },
+        {
+          "name": "beams",
+          "type": "u32",
+          "min": 1
+        }
+      ]
     }
   ],
   "enums": {}

@@ -56,6 +56,7 @@ struct ContentBundle {
     std::vector<FloodDefinition> floods;
     std::vector<LightLanceDefinition> light_lances;
     std::vector<ShellDefinition> shells;
+    std::vector<AquariusDefinition> aquarius;
     std::vector<ShellSource> shell_sources;
     std::vector<FriendHullLook> hull_looks;
     std::vector<FriendSawPoint> saw_points;

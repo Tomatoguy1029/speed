@@ -352,9 +352,10 @@ Dictionary SpeedRunCore::frame_run() {
     Array voices;
     const auto &state=runtime.state;
     if (state.phase!=Phase::Finishing && state.phase!=Phase::Ended) for (size_t group=0;group<state.behavior_rows.size();++group) {
-        if (state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Beamer && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Sniper) continue;
+        if (state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Beamer && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Sniper && state.behavior_kinds[group]!=speed::EnemyDefinition::Kind::Aquarius) continue;
         for (auto row:state.behavior_rows[group]) {
             const auto &enemy=state.enemies[row];if (enemy.dead || enemy.mode!=EnemyMode::Windup || (state.behavior_kinds[group]==speed::EnemyDefinition::Kind::Beamer && enemy.timer<=runtime.content->beamers[runtime.content->definitions[enemy.definition].beamer_definition-1].beam_time)) continue;
+            if (state.behavior_kinds[group]==speed::EnemyDefinition::Kind::Aquarius && enemy.timer<=runtime.content->aquarius[runtime.content->definitions[enemy.definition].aquarius_definition-1].beam_time) continue;
             Dictionary voice;voice["id"]=enemy.id;voice["paused"]=state.phase!=Phase::Play || control.ui_overlay || control.ui_reward || state.hitstop>0 || enemy.stone>0 || enemy.held || enemy.shove_time>0 || enemy.knock_t>0;
             voices.push_back(voice);
         }

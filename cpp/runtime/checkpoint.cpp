@@ -142,7 +142,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (!hazard.pos.is_finite() || !std::isfinite(hazard.time) || !std::isfinite(hazard.delay) || !std::isfinite(hazard.duration) || !std::isfinite(hazard.damage)) return false;
         if (hazard.zone_definition && (hazard.zone_definition>content.zones.size() || !std::holds_alternative<CircleHazard>(hazard.shape) || std::get<CircleHazard>(hazard.shape).kind!=CircleHazardKind::Blast || !std::isfinite(hazard.enemy_damage) || hazard.enemy_damage<0)) return false;
         if (const auto *beam=std::get_if<BeamHazard>(&hazard.shape)) {
-            if ((beam->style==uint32_t(BeamStyle::Flood) && content.floods.empty()) || beam->style>=uint32_t(BeamStyle::Count) || !beam->definition || beam->definition>content.beams.size() || !std::isfinite(beam->angle) || !std::isfinite(beam->length) || beam->length<0 ||
+            if ((beam->style==uint32_t(BeamStyle::Flood) && content.floods.empty()) || beam->flood_group<0 || beam->style>=uint32_t(BeamStyle::Count) || !beam->definition || beam->definition>content.beams.size() || !std::isfinite(beam->angle) || !std::isfinite(beam->length) || beam->length<0 ||
                 !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
         }
         if (const auto *wall=std::get_if<WallHazard>(&hazard.shape)) {

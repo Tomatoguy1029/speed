@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-aquarius" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_aquarius()
+		check(finished,"みずがめ座の指定確認を最後まで実施する")
+		print("[cpp_aquarius] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-shell" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_shell()
 		check(finished,"圧縮弾の指定確認を最後まで実施する")
@@ -183,7 +189,7 @@ var cpp_bridge
 var cpp_core
 var cpp_config: GameConfig
 var cpp_origin := Vector2(-900,0)
-func prepare_cpp_attack(index_number: int, name: String) -> bool:
+func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStringArray(["drifter"]), tuning: Dictionary = {}) -> bool:
 	cpp_config = ContentManager.base.duplicate(true)
 	cpp_config.start_radius = 900.0
 	cpp_config.planet_radius = 100.0
@@ -194,7 +200,8 @@ func prepare_cpp_attack(index_number: int, name: String) -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = index_number
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = enemy_ids
+	stage.enemy_tuning = tuning
 	var output := "res://.content/dev/"+name
 	var builder = load("res://tools/content/build_run_content.gd")
 	if builder.build(stage,cpp_config,output,name.sha256_text())!=OK:
@@ -1003,5 +1010,78 @@ func check_cpp_shell() -> bool:
 	check(cpp_core.hostiles_snapshot().is_empty() and cpp_core.hazards_snapshot().is_empty(),"一括消去では圧縮弾と収納情報だけを消す")
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_bridge.release_checkpoint(empty.value)
+	cpp_session.free()
+	return true
+
+func cpp_motion_for(id: int) -> Dictionary:
+	var rows: Array = cpp_core.enemy_motion_snapshot().filter(func(e): return e.id==id)
+	return rows[0] if not rows.is_empty() else {}
+
+func check_cpp_aquarius() -> bool:
+	var tuning := {"aquarius":{"speed":0.0,"params.beams":4,"params.telegraph":0.3,"params.beam_time":0.4,"params.beam_len":500.0,"params.beam_width":10.0,"params.beam_spread":0.2,"params.bullet_dmg":5.0,"params.rest":0.2,"params.fire_interval":0.6,"params.approach":300.0}}
+	if not await prepare_cpp_attack(108,"aquarius",PackedStringArray(["aquarius","drifter"]),tuning): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(220,0),"velocity":Vector2.ZERO})
+	cpp_core.set_attack_formation_mode(true)
+	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"aquarius","position":cpp_origin}).value
+	var initial: Dictionary = cpp_bridge.checkpoint()
+	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	cpp_core.step(0.7)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"予算がなければみずがめ座は予告を始めない")
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_core.step(0.7)
+	var hazards: Array = cpp_core.hazards_snapshot()
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and hazards.size()==4 and is_equal_approx(cpp_motion_for(actor).timer,0.7),"編集した4方向と予告・照射時間で攻撃を始める")
+	if hazards.size()!=4: cpp_session.free(); return false
+	for k in 4:
+		check(is_equal_approx(hazards[k].angle,k*PI/2.0) and is_equal_approx(hazards[k].length,500.0) and is_equal_approx(hazards[k].half_width,5.0) and is_equal_approx(hazards[k].arc,0.2),"水流%dの方向・長さ・片側幅・広がりを編集値から生成する" % k)
+	var events: Array = cpp_bridge.read_frame().value.events
+	check(events.any(func(e): return e.type==&"aquarius_aim" and e.payload.count==4 and e.payload.id==actor),"予告の演出値を個体IDとともに通知する")
+	cpp_core.step(0.15)
+	cpp_core.step_hazards(0.15)
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(frame.shapes.size()==4 and presentation.frame_view.apply_frame(frame) and presentation.frame_view._aquarius.size()==5,"広角の水の予告とみずがめ座の口の光を通常画面で描く")
+	await get_tree().process_frame
+	var pending: Dictionary = cpp_bridge.checkpoint()
+	var before: Array = cpp_core.enemy_motion_snapshot()
+	var warned: Array = cpp_core.hazards_snapshot()
+	cpp_core.step(0.2)
+	cpp_core.step_hazards(0.2)
+	events = cpp_bridge.read_frame().value.events
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-5.0) and events.filter(func(e): return e.type==&"enemy_laser_fire" and e.payload.id==actor).size()==1,"予告を越えると一度だけ照射を通知して水流が当たる")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view._flood_groups.size()==1 and presentation.pipeline._waves.size()==1,"一斉の4本を同じ表示グループにして衝撃演出を1回だけ出す")
+	await get_tree().process_frame
+	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before and cpp_core.hazards_snapshot()==warned,"敵の時刻・向き・chargeと4本の予告・表示グループを復元する")
+	cpp_core.step(0.2)
+	cpp_core.step_hazards(0.2)
+	var previous_waves: int = presentation.pipeline._waves.size()
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view._flood_groups.size()==1 and presentation.pipeline._waves.size()==previous_waves+1,"復帰後の一斉照射も演出を1回だけ再開する")
+	cpp_core.step(0.4)
+	cpp_core.step_hazards(0.4)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and cpp_core.hazards_snapshot().is_empty(),"照射を終えると水流を消して編集した休みに入る")
+	cpp_core.step(0.25)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE,"休みを終えると接近へ戻る")
+	cpp_bridge.restore(initial.value)
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_core.step(0.7)
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	check(cpp_core.hazards_snapshot().is_empty(),"予告中にみずがめ座を倒すと付いた水流をすべて消す")
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"aquarius","position":cpp_origin}).value
+	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0,"行を使い直した別個体へ予告やchargeを漏らさない")
+	cpp_bridge.restore(pending.value)
+	cpp_core.step(0.2)
+	cpp_core.step_hazards(0.2)
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	check(cpp_core.hazards_snapshot().is_empty(),"照射中に発生元を先に消しても水流の所有参照を残さない")
+	cpp_bridge.release_checkpoint(pending.value)
+	cpp_bridge.release_checkpoint(initial.value)
 	cpp_session.free()
 	return true
