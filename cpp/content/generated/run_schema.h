@@ -1390,6 +1390,105 @@ inline bool read(BinaryReader &input, DeathChainDefinition &out) {
     if (out.damage < 0) return false;
     return true;
 }
+struct EncounterDefinition {
+    uint32_t id{};
+    bool active{};
+    double interval{};
+};
+inline bool read(BinaryReader &input, EncounterDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_bool(out.active)) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    return true;
+}
+struct EncounterPattern {
+    uint32_t id{};
+    uint32_t attempts{};
+    uint32_t min_fodder{};
+    double margin{};
+    double window{};
+    double draw_seconds{};
+    double exit_clearance{};
+    double rotation{};
+    double scale_min{};
+    double scale_max{};
+    double min_spacing{};
+};
+inline bool read(BinaryReader &input, EncounterPattern &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.attempts)) return false;
+    if (out.attempts < 1) return false;
+    if (out.attempts > 32) return false;
+    if (!input.read_u32(out.min_fodder)) return false;
+    if (!input.read_f64(out.margin)) return false;
+    if (!input.read_f64(out.window)) return false;
+    if (!input.read_f64(out.draw_seconds)) return false;
+    if (!input.read_f64(out.exit_clearance)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_min)) return false;
+    if (!input.read_f64(out.scale_max)) return false;
+    if (!input.read_f64(out.min_spacing)) return false;
+    return true;
+}
+struct EncounterPoint {
+    uint32_t id{};
+    uint32_t pattern{};
+    double x{};
+    double y{};
+};
+inline bool read(BinaryReader &input, EncounterPoint &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.pattern)) return false;
+    if (out.pattern < 1) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    return true;
+}
+struct EncounterRegion {
+    uint32_t id{};
+    uint32_t pattern{};
+    uint32_t enemy{};
+    double x{};
+    double y{};
+    double angle{};
+    double jitter{};
+    uint32_t min_count{};
+    uint32_t max_count{};
+    bool fodder{};
+    bool elite{};
+};
+inline bool read(BinaryReader &input, EncounterRegion &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.pattern)) return false;
+    if (out.pattern < 1) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.angle)) return false;
+    if (!input.read_f64(out.jitter)) return false;
+    if (!input.read_u32(out.min_count)) return false;
+    if (out.min_count > 100) return false;
+    if (!input.read_u32(out.max_count)) return false;
+    if (out.max_count > 100) return false;
+    if (!input.read_bool(out.fodder)) return false;
+    if (!input.read_bool(out.elite)) return false;
+    return true;
+}
+struct EncounterPhase {
+    uint32_t id{};
+    std::string name{};
+};
+inline bool read(BinaryReader &input, EncounterPhase &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.name)) return false;
+    return true;
+}
 struct ProgressionDefinition {
     uint32_t id{};
     double xp_base{};
@@ -3511,6 +3610,120 @@ inline bool read(BinaryReader &input, KillSonicDefinition &out) {
     if (out.life < 0) return false;
     return true;
 }
+struct MassTowDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    double capture_radius{};
+    double hold{};
+    double follow{};
+    double interval{};
+    double shot_speed{};
+    double damage{};
+    double size_ref{};
+    double life{};
+    double knock{};
+    double clump_spacing{};
+    double projectile_increment{};
+    double duration_increment{};
+    double knockback_increment{};
+    double area_increment{};
+    double interval_increment{};
+    double minimum_ratio{};
+    double minimum_interval{};
+    uint32_t visible{};
+};
+inline bool read(BinaryReader &input, MassTowDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.capture_radius)) return false;
+    if (out.capture_radius < 0) return false;
+    if (!input.read_f64(out.hold)) return false;
+    if (out.hold < 0) return false;
+    if (!input.read_f64(out.follow)) return false;
+    if (out.follow < 0) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.shot_speed)) return false;
+    if (out.shot_speed < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.size_ref)) return false;
+    if (out.size_ref < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.knock)) return false;
+    if (out.knock < 0) return false;
+    if (!input.read_f64(out.clump_spacing)) return false;
+    if (out.clump_spacing < 0) return false;
+    if (!input.read_f64(out.projectile_increment)) return false;
+    if (out.projectile_increment < 0) return false;
+    if (!input.read_f64(out.duration_increment)) return false;
+    if (out.duration_increment < 0) return false;
+    if (!input.read_f64(out.knockback_increment)) return false;
+    if (out.knockback_increment < 0) return false;
+    if (!input.read_f64(out.area_increment)) return false;
+    if (out.area_increment < 0) return false;
+    if (!input.read_f64(out.interval_increment)) return false;
+    if (out.interval_increment < 0) return false;
+    if (!input.read_f64(out.minimum_ratio)) return false;
+    if (out.minimum_ratio < 0) return false;
+    if (!input.read_f64(out.minimum_interval)) return false;
+    if (out.minimum_interval < 0) return false;
+    if (!input.read_u32(out.visible)) return false;
+    if (out.visible < 1) return false;
+    return true;
+}
+struct BipolarDefinition {
+    uint32_t id{};
+    uint32_t weapon{};
+    uint32_t level{};
+    double damage{};
+    double width{};
+    double radius_factor{};
+    double life{};
+    double knock{};
+    double min_length{};
+    double delay{};
+    double visual_life{};
+    double area_increment{};
+    double knockback_increment{};
+    uint32_t color{};
+};
+inline bool read(BinaryReader &input, BipolarDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.weapon)) return false;
+    if (out.weapon < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.width)) return false;
+    if (out.width < 0) return false;
+    if (!input.read_f64(out.radius_factor)) return false;
+    if (out.radius_factor < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.knock)) return false;
+    if (out.knock < 0) return false;
+    if (!input.read_f64(out.min_length)) return false;
+    if (out.min_length < 0) return false;
+    if (!input.read_f64(out.delay)) return false;
+    if (out.delay < 0) return false;
+    if (!input.read_f64(out.visual_life)) return false;
+    if (out.visual_life < 0) return false;
+    if (!input.read_f64(out.area_increment)) return false;
+    if (out.area_increment < 0) return false;
+    if (!input.read_f64(out.knockback_increment)) return false;
+    if (out.knockback_increment < 0) return false;
+    if (!input.read_u32(out.color)) return false;
+    return true;
+}
 struct BossDefinition {
     uint32_t id{};
     std::string external_id{};
@@ -3607,6 +3820,39 @@ struct BossTechniqueDefinition {
     double boom_ahead{};
     double stop_decay{};
     double shatter_time{};
+    uint32_t passes{};
+    double overshoot{};
+    double brake_time{};
+    double brake_speed_ratio{};
+    double turn_time{};
+    double turn_lock{};
+    double head_lead{};
+    double windup_turn{};
+    double pull{};
+    double swing_time{};
+    double swing_turn{};
+    double release_offset{};
+    double recharge{};
+    double wave_speed{};
+    double wave_start{};
+    double wave_max{};
+    double wave_half_angle{};
+    double wave_width{};
+    double aim_lock{};
+    double min_run{};
+    double circle_turn{};
+    double circle_speed{};
+    double circle_late_time{};
+    double circle_speed_late{};
+    double circle_decel{};
+    double circle_accel{};
+    double align_angle{};
+    double align_min_distance{};
+    double align_min_time{};
+    double circle_max_time{};
+    double glow_angle{};
+    double end_time{};
+    double end_decay{};
 };
 inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -3614,7 +3860,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 3) return false;
+    if (out.kind > 6) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -3687,6 +3933,72 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (out.stop_decay < 0) return false;
     if (!input.read_f64(out.shatter_time)) return false;
     if (out.shatter_time < 0) return false;
+    if (!input.read_u32(out.passes)) return false;
+    if (out.passes < 1) return false;
+    if (!input.read_f64(out.overshoot)) return false;
+    if (out.overshoot < 0) return false;
+    if (!input.read_f64(out.brake_time)) return false;
+    if (out.brake_time < 0) return false;
+    if (!input.read_f64(out.brake_speed_ratio)) return false;
+    if (out.brake_speed_ratio < 0) return false;
+    if (!input.read_f64(out.turn_time)) return false;
+    if (out.turn_time < 0) return false;
+    if (!input.read_f64(out.turn_lock)) return false;
+    if (out.turn_lock < 0) return false;
+    if (!input.read_f64(out.head_lead)) return false;
+    if (out.head_lead < 0) return false;
+    if (!input.read_f64(out.windup_turn)) return false;
+    if (out.windup_turn < 0) return false;
+    if (!input.read_f64(out.pull)) return false;
+    if (out.pull < 0) return false;
+    if (!input.read_f64(out.swing_time)) return false;
+    if (out.swing_time < 0) return false;
+    if (!input.read_f64(out.swing_turn)) return false;
+    if (out.swing_turn < 0) return false;
+    if (!input.read_f64(out.release_offset)) return false;
+    if (out.release_offset < 0) return false;
+    if (!input.read_f64(out.recharge)) return false;
+    if (out.recharge < 0) return false;
+    if (!input.read_f64(out.wave_speed)) return false;
+    if (out.wave_speed < 0) return false;
+    if (!input.read_f64(out.wave_start)) return false;
+    if (out.wave_start < 0) return false;
+    if (!input.read_f64(out.wave_max)) return false;
+    if (out.wave_max < 0) return false;
+    if (!input.read_f64(out.wave_half_angle)) return false;
+    if (out.wave_half_angle < 0) return false;
+    if (!input.read_f64(out.wave_width)) return false;
+    if (out.wave_width < 0) return false;
+    if (!input.read_f64(out.aim_lock)) return false;
+    if (out.aim_lock < 0) return false;
+    if (!input.read_f64(out.min_run)) return false;
+    if (out.min_run < 0) return false;
+    if (!input.read_f64(out.circle_turn)) return false;
+    if (out.circle_turn < 0) return false;
+    if (!input.read_f64(out.circle_speed)) return false;
+    if (out.circle_speed < 0) return false;
+    if (!input.read_f64(out.circle_late_time)) return false;
+    if (out.circle_late_time < 0) return false;
+    if (!input.read_f64(out.circle_speed_late)) return false;
+    if (out.circle_speed_late < 0) return false;
+    if (!input.read_f64(out.circle_decel)) return false;
+    if (out.circle_decel < 0) return false;
+    if (!input.read_f64(out.circle_accel)) return false;
+    if (out.circle_accel < 0) return false;
+    if (!input.read_f64(out.align_angle)) return false;
+    if (out.align_angle < 0) return false;
+    if (!input.read_f64(out.align_min_distance)) return false;
+    if (out.align_min_distance < 0) return false;
+    if (!input.read_f64(out.align_min_time)) return false;
+    if (out.align_min_time < 0) return false;
+    if (!input.read_f64(out.circle_max_time)) return false;
+    if (out.circle_max_time < 0) return false;
+    if (!input.read_f64(out.glow_angle)) return false;
+    if (out.glow_angle < 0) return false;
+    if (!input.read_f64(out.end_time)) return false;
+    if (out.end_time < 0) return false;
+    if (!input.read_f64(out.end_decay)) return false;
+    if (out.end_decay < 0) return false;
     return true;
 }
 struct BossTechniqueStage {
@@ -4008,6 +4320,11 @@ struct ContentRecords {
     std::vector<PopulationClipType> PopulationClipType_rows;
     std::vector<PopulationClipFormation> PopulationClipFormation_rows;
     std::vector<DeathChainDefinition> DeathChainDefinition_rows;
+    std::vector<EncounterDefinition> EncounterDefinition_rows;
+    std::vector<EncounterPattern> EncounterPattern_rows;
+    std::vector<EncounterPoint> EncounterPoint_rows;
+    std::vector<EncounterRegion> EncounterRegion_rows;
+    std::vector<EncounterPhase> EncounterPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
@@ -4077,6 +4394,8 @@ struct ContentRecords {
     std::vector<SonicDefinition> SonicDefinition_rows;
     std::vector<ContactArcDefinition> ContactArcDefinition_rows;
     std::vector<KillSonicDefinition> KillSonicDefinition_rows;
+    std::vector<MassTowDefinition> MassTowDefinition_rows;
+    std::vector<BipolarDefinition> BipolarDefinition_rows;
     std::vector<BossDefinition> BossDefinition_rows;
     std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
     std::vector<BossTechniqueStage> BossTechniqueStage_rows;
@@ -4401,6 +4720,36 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
         for (uint32_t i=0; i<count; ++i) { DeathChainDefinition row; if (!read(input,row)) return false; out.DeathChainDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 188: {
+        if (version != 1) return false;
+        if (count > input.remaining()/13) return false;
+        for (uint32_t i=0; i<count; ++i) { EncounterDefinition row; if (!read(input,row)) return false; out.EncounterDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 189: {
+        if (version != 1) return false;
+        if (count > input.remaining()/76) return false;
+        for (uint32_t i=0; i<count; ++i) { EncounterPattern row; if (!read(input,row)) return false; out.EncounterPattern_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 190: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { EncounterPoint row; if (!read(input,row)) return false; out.EncounterPoint_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 191: {
+        if (version != 1) return false;
+        if (count > input.remaining()/54) return false;
+        for (uint32_t i=0; i<count; ++i) { EncounterRegion row; if (!read(input,row)) return false; out.EncounterRegion_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 192: {
+        if (version != 1) return false;
+        if (count > input.remaining()/8) return false;
+        for (uint32_t i=0; i<count; ++i) { EncounterPhase row; if (!read(input,row)) return false; out.EncounterPhase_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 17: {
@@ -4817,6 +5166,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { KillSonicDefinition row; if (!read(input,row)) return false; out.KillSonicDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 203: {
+        if (version != 1) return false;
+        if (count > input.remaining()/152) return false;
+        for (uint32_t i=0; i<count; ++i) { MassTowDefinition row; if (!read(input,row)) return false; out.MassTowDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 204: {
+        if (version != 1) return false;
+        if (count > input.remaining()/96) return false;
+        for (uint32_t i=0; i<count; ++i) { BipolarDefinition row; if (!read(input,row)) return false; out.BipolarDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 150: {
         if (version != 2) return false;
         if (count > input.remaining()/124) return false;
@@ -4824,8 +5185,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 4) return false;
-        if (count > input.remaining()/293) return false;
+        if (version != 7) return false;
+        if (count > input.remaining()/553) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -5001,6 +5362,16 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PopulationClipFormation_rows) if (!PopulationClipFormation_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DeathChainDefinition_ids;
     for (const auto &row:data.DeathChainDefinition_rows) if (!DeathChainDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> EncounterDefinition_ids;
+    for (const auto &row:data.EncounterDefinition_rows) if (!EncounterDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> EncounterPattern_ids;
+    for (const auto &row:data.EncounterPattern_rows) if (!EncounterPattern_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> EncounterPoint_ids;
+    for (const auto &row:data.EncounterPoint_rows) if (!EncounterPoint_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> EncounterRegion_ids;
+    for (const auto &row:data.EncounterRegion_rows) if (!EncounterRegion_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> EncounterPhase_ids;
+    for (const auto &row:data.EncounterPhase_rows) if (!EncounterPhase_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
     for (const auto &row:data.ProgressionDefinition_rows) if (!ProgressionDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LoadoutAsset_ids;
@@ -5139,6 +5510,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ContactArcDefinition_rows) if (!ContactArcDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> KillSonicDefinition_ids;
     for (const auto &row:data.KillSonicDefinition_rows) if (!KillSonicDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MassTowDefinition_ids;
+    for (const auto &row:data.MassTowDefinition_rows) if (!MassTowDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BipolarDefinition_ids;
+    for (const auto &row:data.BipolarDefinition_rows) if (!BipolarDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossDefinition_ids;
     for (const auto &row:data.BossDefinition_rows) if (!BossDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossTechniqueDefinition_ids;
@@ -5216,6 +5591,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PopulationClipFormation_rows) if (!PopulationClip_ids.count(row.clip)) return false;
     for (const auto &row:data.PopulationClipFormation_rows) if (!FormationDefinition_ids.count(row.formation)) return false;
     for (const auto &row:data.DeathChainDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.EncounterPoint_rows) if (!EncounterPattern_ids.count(row.pattern)) return false;
+    for (const auto &row:data.EncounterRegion_rows) if (!EncounterPattern_ids.count(row.pattern)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -5287,6 +5664,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.SonicDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.ContactArcDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.KillSonicDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.MassTowDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.BipolarDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.BossBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -5428,5 +5807,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=133;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=140;
 }
