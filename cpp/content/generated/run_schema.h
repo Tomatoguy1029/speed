@@ -3475,6 +3475,42 @@ inline bool read(BinaryReader &input, ContactArcDefinition &out) {
     if (out.visual_life < 0) return false;
     return true;
 }
+struct KillSonicDefinition {
+    uint32_t id{};
+    uint32_t equipment{};
+    uint32_t level{};
+    int64_t kills{};
+    int64_t limit{};
+    double radius{};
+    double damage{};
+    double radius_decay{};
+    double damage_decay{};
+    double knock{};
+    double life{};
+};
+inline bool read(BinaryReader &input, KillSonicDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_i64(out.kills)) return false;
+    if (!input.read_i64(out.limit)) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.radius_decay)) return false;
+    if (out.radius_decay < 0) return false;
+    if (!input.read_f64(out.damage_decay)) return false;
+    if (out.damage_decay < 0) return false;
+    if (!input.read_f64(out.knock)) return false;
+    if (out.knock < 0) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    return true;
+}
 struct BossDefinition {
     uint32_t id{};
     std::string external_id{};
@@ -4040,6 +4076,7 @@ struct ContentRecords {
     std::vector<ContactWaveDefinition> ContactWaveDefinition_rows;
     std::vector<SonicDefinition> SonicDefinition_rows;
     std::vector<ContactArcDefinition> ContactArcDefinition_rows;
+    std::vector<KillSonicDefinition> KillSonicDefinition_rows;
     std::vector<BossDefinition> BossDefinition_rows;
     std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
     std::vector<BossTechniqueStage> BossTechniqueStage_rows;
@@ -4774,6 +4811,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { ContactArcDefinition row; if (!read(input,row)) return false; out.ContactArcDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 240: {
+        if (version != 1) return false;
+        if (count > input.remaining()/76) return false;
+        for (uint32_t i=0; i<count; ++i) { KillSonicDefinition row; if (!read(input,row)) return false; out.KillSonicDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 150: {
         if (version != 2) return false;
         if (count > input.remaining()/124) return false;
@@ -5094,6 +5137,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.SonicDefinition_rows) if (!SonicDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ContactArcDefinition_ids;
     for (const auto &row:data.ContactArcDefinition_rows) if (!ContactArcDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> KillSonicDefinition_ids;
+    for (const auto &row:data.KillSonicDefinition_rows) if (!KillSonicDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossDefinition_ids;
     for (const auto &row:data.BossDefinition_rows) if (!BossDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossTechniqueDefinition_ids;
@@ -5241,6 +5286,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ContactWaveDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.SonicDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.ContactArcDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
+    for (const auto &row:data.KillSonicDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.BossBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -5382,5 +5428,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=132;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=133;
 }
