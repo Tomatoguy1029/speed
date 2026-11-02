@@ -85,7 +85,10 @@ bool AttackSystem::release_friendly(State &state,uint64_t count) {
     if (count>state.attacks.friendly_reservations) return false;
     state.attacks.friendly_reservations-=count;return true;
 }
-uint64_t AttackSystem::flying_count(const State &state) {return state.attacks.friendly_reservations>UINT64_MAX-state.live_friends?UINT64_MAX:state.live_friends+state.attacks.friendly_reservations;}
+uint64_t AttackSystem::flying_count(const State &state) {
+    const uint64_t live=state.live_friends;if (state.attacks.lances.size()>UINT64_MAX-live) return UINT64_MAX;
+    const uint64_t count=live+state.attacks.lances.size();return state.attacks.friendly_reservations>UINT64_MAX-count?UINT64_MAX:count+state.attacks.friendly_reservations;
+}
 AttackHandle AttackSystem::emit_friendly(RunRuntime &run,State::Friendly value,AttackSpec spec) {
     FriendlyBirthScope scope(run,run.workspace.friend_birth_batches.empty());
     const auto handle=emit_friendly(run.state,std::move(value),spec);

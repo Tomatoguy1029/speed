@@ -779,6 +779,32 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "LightLanceDefinition",
+      "section": 72,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "u32",
+          "min": 1
+        }
+      ]
     }
   ],
   "enums": {

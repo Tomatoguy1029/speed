@@ -1318,6 +1318,10 @@
       {
         "name": "EndBlast",
         "value": "endBlast"
+      },
+      {
+        "name": "CritBeam",
+        "value": "critBeam"
       }
     ],
     "VisualRole": [
@@ -1658,6 +1662,14 @@
       {
         "name": "Beam",
         "value": "beam"
+      },
+      {
+        "name": "CriticalLance",
+        "value": "critical_lance"
+      },
+      {
+        "name": "CriticalLanceHit",
+        "value": "critical_lance_hit"
       }
     ],
     "ResultKind": [
@@ -2110,6 +2122,16 @@
       "life",
       "color",
       "visual_key"
+    ],
+    "critical_lance": [
+      "from",
+      "to",
+      "width"
+    ],
+    "critical_lance_hit": [
+      "pos",
+      "radius",
+      "direction"
     ]
   },
   "includes": [

@@ -3,6 +3,8 @@
 #include "combat_types.h"
 #include <unordered_map>
 #include <vector>
+#include <deque>
+#include <unordered_set>
 namespace speed {
 struct FriendHullState {uint32_t definition=0,source_definition=0;int64_t source_id=-1;bool saw=false;};
 struct FriendDebrisState {uint32_t definition=0;DebrisStyle style=DebrisStyle::Plain;};
@@ -46,7 +48,16 @@ struct AttackRecord {
     bool ship_previous_ready=false;
 };
 
+struct LightLanceState {
+    uint64_t id=0;uint32_t definition=0;
+    godot::Vector2 from,velocity;
+    double length=0,width=0,damage=0,knock=0,life=0;
+    bool duplicate=false;
+    std::unordered_set<int64_t> hits;
+};
 struct AttackState {
+    std::deque<LightLanceState> lances;
+    uint64_t next_lance_id=1;
     std::vector<AttackRecord> records;
     EntityStore<AttackTag> handles;
     std::vector<uint32_t> free_records;

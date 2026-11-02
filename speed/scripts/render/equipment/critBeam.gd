@@ -54,3 +54,33 @@ func on_event(event: Dictionary) -> void:
 
 func finished() -> bool:
 	return not active and node.shots.is_empty()
+
+## 通知の命中位置だけを使う。ゲーム側の敵表や命中処理へ戻らない。
+static func frame_event(flashes: Array, hits: Array, event: Dictionary, pixel: float) -> void:
+	if event.type==&"critical_lance": flashes.append({"age":0.0})
+	if event.type!=&"critical_lance_hit": return
+	var sparks: Array[Dictionary] = []
+	for k in 4+randi()%7:
+		sparks.append({"a":(randf()-0.5)*2.2+(PI if randf()<0.25 else 0.0)+event.direction.angle(),"v":8.0+randf()*30.0,"life":0.12+randf()*0.28,"c":Color.WHITE if randf()<0.4 else (Color("#a8d0ff") if randf()<0.5 else Color("#5a96ff"))})
+	hits.append({"pos":event.pos,"r":event.radius/pixel*0.55,"age":0.0,"sparks":sparks})
+
+static func frame_draw(p: PixelPainter, flashes: Array, hits: Array, dt: float, ship_pos: Vector2, heading: Vector2) -> void:
+	for f in flashes:
+		f.age += dt
+		var q: float = f.age / 0.12
+		if q >= 1.0: continue
+		var nose := ship_pos + heading * 9.0 * p.px
+		p.disk(nose, 5.0 * (1.0 - q) + 2.0, Color.WHITE if q < 0.5 else Color("#8fc0ff"))
+		for i in 5:
+			var a := heading.angle() + (i / 5.0 - 0.5) * 1.4
+			p.dot(nose + Vector2.from_angle(a) * (4.0 + 10.0 * q) * p.px, Color("#cfe6ff"))
+	flashes.assign(flashes.filter(func(f): return f.age < 0.12))
+	for h in hits:
+		h.age += dt
+		if h.age < 0.08: p.disk(h.pos, h.r + 2.0, Color.WHITE)
+		for s in h.sparks:
+			var q: float = h.age / s.life
+			if q >= 1.0: continue
+			var d: float = h.r + s.v * (1.0 - pow(1.0 - q, 2.0))
+			p.dot(h.pos + Vector2.from_angle(s.a) * d * p.px, s.c, 2 if q < 0.5 else 1)
+	hits.assign(hits.filter(func(h): return h.age < 0.4))

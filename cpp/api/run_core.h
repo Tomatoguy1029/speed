@@ -27,6 +27,7 @@ class SpeedRunCore : public RefCounted {
     friend class speed::PickupSystem;
     friend class speed::FieldSystem;
     Dictionary development_hull_command(const String &,const Dictionary &);
+    Dictionary development_lances_command(const String &,const Dictionary &);
     Dictionary development_zone_command(const Dictionary &);
     Dictionary development_debris_command(const String &,const Dictionary &);
     Dictionary development_light_arrow_command(const Dictionary &);

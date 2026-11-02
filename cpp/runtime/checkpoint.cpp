@@ -126,6 +126,12 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0) return false;
         } else if (shot.arrow.definition) return false;
     }
+    std::unordered_set<uint64_t> lance_ids;
+    for (const auto &lance:state.attacks.lances) {
+        if (!lance.id || lance.id>=state.attacks.next_lance_id || !lance_ids.insert(lance.id).second || !lance.definition || lance.definition>content.light_lances.size() || !lance.from.is_finite() || !lance.velocity.is_finite()) return false;
+        for (double value:{lance.length,lance.width,lance.damage,lance.knock,lance.life}) if (!std::isfinite(value) || value<0) return false;
+        for (auto id:lance.hits) if (id<=0) return false;
+    }
     for (const auto &hazard:state.hazards) if (hazard.alive) {
         if (!hazard.pos.is_finite() || !std::isfinite(hazard.time) || !std::isfinite(hazard.delay) || !std::isfinite(hazard.duration) || !std::isfinite(hazard.damage)) return false;
         if (hazard.zone_definition && (hazard.zone_definition>content.zones.size() || !std::holds_alternative<CircleHazard>(hazard.shape) || std::get<CircleHazard>(hazard.shape).kind!=CircleHazardKind::Blast || !std::isfinite(hazard.enemy_damage) || hazard.enemy_damage<0)) return false;

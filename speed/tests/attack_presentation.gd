@@ -7,6 +7,8 @@ var lump_notification_only := false
 var arrow_fixes := false
 var mute_checks := false
 var zone_fade_only := false
+var lances_finished := false
+var lances_tick_only := false
 
 func check(ok: bool, message: String) -> void:
 	if mute_checks: return
@@ -15,6 +17,14 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-light-lances" in OS.get_cmdline_user_args() or "--cpp-light-lances-step-fix" in OS.get_cmdline_user_args():
+		lances_tick_only = "--cpp-light-lances-step-fix" in OS.get_cmdline_user_args()
+		mute_checks = lances_tick_only
+		await check_cpp_light_lances()
+		check(lances_finished,"光の槍の指定確認を最後まで実施する")
+		print("[cpp_light_lances] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-star-role" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_star_role()
 		check(finished,"統合した星弾の表示役割の確認を最後まで実施する")
@@ -673,4 +683,67 @@ func check_cpp_flood() -> void:
 	cpp_core.advance_attack_budget(2.0)
 	check(cpp_core.attack_budget_snapshot().groups.is_empty(),"水流の終了で所有枠を解放する")
 	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()
+
+func check_cpp_light_lances() -> void:
+	var duplicator: TraitDef = load("res://data/traits/T37_duplicator.tres")
+	var original: Dictionary = duplicator.params.duplicate(true)
+	duplicator.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
+	duplicator.params.angle_min = 0.0
+	duplicator.params.angle_max = 0.0
+	var ready: bool = await prepare_cpp_attack(100,"light_lances")
+	duplicator.params = original
+	if not ready: return
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(200,0)}).value
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(100,0)}).value
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var params := {"position":cpp_origin,"direction":Vector2.LEFT,"length":300.0,"width":120.0,"damage":1.0,"knock":0.0}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_light_lances",params)
+	check(fired.ok and fired.value.size()==3,"元を登録して左右の複製を待ち列から順に生成する")
+	if not fired.ok: cpp_session.free(); return
+	var events: Array = cpp_bridge.latest_frame().value.events
+	var hits: Array = events.filter(func(e): return e.type==&"combat_damage" and e.payload.cause==&"critBeam")
+	check(hits.size()==6,"元と複製の3本がそれぞれ貫通して即時命中する")
+	if hits.size()==6:
+		check(hits[0].payload.target_id==near and hits[1].payload.target_id==far and hits[2].payload.target_id==near and hits[3].payload.target_id==far and hits[4].payload.target_id==near and hits[5].payload.target_id==far,"元の距離順命中を終えてから複製を1本ずつ距離順に解決する")
+		check(is_equal_approx(hits[0].payload.requested,1.0) and is_equal_approx(hits[2].payload.requested,0.8),"複製だけにT37の威力を掛ける")
+	check(events[0].type==&"duplicate" and events.filter(func(e): return e.type==&"critical_lance").size()==3 and events.filter(func(e): return e.type==&"hit").all(func(e): return not e.payload.crit),"分裂通知を先に出し、発射通知とno_critを保つ")
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view._critical_lances!=null and presentation.frame_view._critical_lances.shots.size()==3 and presentation.frame_view._lance_hits.size()==6,"発射・貫通・敵の火花をC++通知から通常画面で描く")
+	await get_tree().process_frame
+	var state: Dictionary = cpp_bridge.command("dev_light_lances_state",{}).value
+	check(state.items.size()==3 and state.flying_count==3 and state.pending==0 and state.items.all(func(l): return l.hits.size()==2 and is_equal_approx(l.life,0.5)),"槍の独立した命中集合と寿命を同時数に含める")
+	var held: Dictionary = cpp_bridge.checkpoint()
+	var stepped: Dictionary = cpp_bridge.step(1.0/120.0,cpp_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var after: Dictionary = cpp_bridge.command("dev_light_lances_state",{}).value
+	if lances_tick_only: mute_checks = false
+	check(stepped.ok and after.items[0].life<state.items[0].life and after.items[0].from==state.items[0].from and after.items[0].hits==state.items[0].hits,"世界更新では寿命だけが進み再命中や始点の移動をしない")
+	if lances_tick_only:
+		cpp_bridge.release_checkpoint(held.value)
+		cpp_bridge.release_checkpoint(empty.value)
+		lances_finished = true
+		cpp_session.free()
+		return
+	check(cpp_bridge.restore(held.value).ok and cpp_bridge.command("dev_light_lances_state",{}).value==state,"元・複製の向き・威力・寿命・命中IDを復元する")
+	check(cpp_bridge.command("dev_tick_light_lances",{"world_dt":0.5}).value.items.is_empty(),"世界時間の寿命で槍を回収する")
+	presentation.frame_view.update_effects(cpp_bridge.latest_frame().value,0.51)
+	check(presentation.frame_view._critical_lances.shots.is_empty() and presentation.frame_view._lance_flashes.is_empty() and presentation.frame_view._lance_hits.is_empty(),"飛行と発射・命中の演出も寿命で消える")
+	cpp_bridge.restore(empty.value)
+	cpp_bridge.command("dev_remove_trait",{"id":"T37"})
+	var births := []
+	for n in 216: births.append({"position":cpp_origin+Vector2(0,400),"velocity":Vector2.ZERO,"damage":0.0,"life":1.0})
+	cpp_bridge.command("dev_friend_births",{"births":births})
+	cpp_bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+	cpp_bridge.command("dev_debris_on_death",{"source_id":near,"count":1,"speed":0.0,"damage":0.0})
+	params.length = 100.0
+	params.damage = 10000.0
+	cpp_bridge.command("dev_fire_light_lances",params)
+	state = cpp_bridge.command("dev_light_lances_state",{}).value
+	check(state.items.size()==3 and state.flying_count==220 and state.pending==0 and cpp_core.projectiles_snapshot().filter(func(s): return s.kind==1).size()==1,"未処理の槍2本も同時数へ数え、元の命中が作る破片を上限越えで複製しない")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_bridge.release_checkpoint(empty.value)
+	lances_finished = true
 	cpp_session.free()

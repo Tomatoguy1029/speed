@@ -6,6 +6,7 @@
 #include "../behaviors/weapons/endBlast.h"
 #include "../behaviors/traits/rampage.h"
 #include "../behaviors/traits/fullBurst.h"
+#include "../systems/attacks/light_lances.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
 #include "../systems/pickup_system.h"
@@ -74,6 +75,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     }
     if (!core.step_ship_input(dt,world_dt,input)) return false;
     if (state.phase==Phase::Play && !state.controls_locked) {
+        LightLancesSystem::step(core.runtime,world_dt);
         // 取得順で更新し、各武器の後に進行状態を確認する。
         if (state.loadout.ready) {
             for (const auto &owned:state.loadout.weapons) {
