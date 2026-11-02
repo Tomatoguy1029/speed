@@ -1036,11 +1036,11 @@ static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Di
 	return records
 
 static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid",&"beam_pincer"],&"tornado"]: return {}
+	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid",&"beam_pincer"],&"tornado",&"debris_shatter"]: return {}
 	var values: Dictionary = definition.params.merged(move.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":82 if move.technique==&"tornado" else 72 if move.technique==&"curve" else 73 if move.technique==&"grid" else 74,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":float(values.performance_time),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.lump_dmg if move.technique==&"tornado" else values.beam_dmg),"passes":1,"cuts":1},true)
+	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":83 if move.technique==&"debris_shatter" else 82 if move.technique==&"tornado" else 72 if move.technique==&"curve" else 73 if move.technique==&"grid" else 74,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":float(values.performance_time),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.lump_dmg if move.technique==&"tornado" else values.beam_dmg),"passes":1,"cuts":1},true)
 	var records := {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(move.technique)]),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal]}
 	if move.technique==&"curve": records.HydraCurveDefinition = [{"id":1,"technique":1,"length":float(values.get("beam_len",0.0)),"width":float(values.beam_width),"delay":float(values.get("curve_delay",0.0)),"time":float(values.get("curve_time",0.0)),"lag":float(values.get("curve_lag",0.0)),"turn":float(values.get("curve_turn",0.0))}]}
 
@@ -1071,7 +1071,7 @@ static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dic
 	return records
 
 static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid",&"beam_pincer"],&"tornado"] else hydra_normal_records(definition,move)
+	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid",&"beam_pincer"],&"tornado",&"debris_shatter"] else hydra_normal_records(definition,move)
 	if records.is_empty(): return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
@@ -1087,6 +1087,10 @@ static func hydra_technique_package(definition: BossDef, move: BossTechnique, co
 		var values: Dictionary = definition.params.merged(move.values(),true)
 		var enemy: int = package.records.StringEntry.filter(func(row): return row.value=="hydra_rubble")[0].id
 		package.records.HydraTornadoDefinition = [{"id":1,"technique":1,"enemy":enemy,"charge":float(values.tornado_charge),"life":float(values.tornado_life),"speed":float(values.tornado_speed),"width":float(values.tornado_width)}]
+	if move.technique==&"debris_shatter":
+		var values: Dictionary = definition.params.merged(move.values(),true)
+		var enemy: int = package.records.StringEntry.filter(func(row): return row.value=="hydra_rubble")[0].id
+		package.records.HydraShatterDefinition = [{"id":1,"technique":1,"enemy":enemy,"count":int(values.rubble_count),"length":float(values.beam_len),"width":float(values.beam_width),"shard_damage":float(values.shard_dmg),"shard_speed":float(values.shard_speed),"arc":float(values.shatter_arc),"deploy":float(values.shatter_deploy),"time":float(values.shatter_time)}]
 	var shot: PackedScene = move.get("shot_visual") if move.has_field("shot_visual") else null
 	if shot!=null:
 		var key: int = package.records.ResourceKey.size()+1

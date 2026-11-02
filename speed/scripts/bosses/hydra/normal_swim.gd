@@ -58,7 +58,7 @@ static func tick(a: Node, n, dt: float) -> void:
 					var direction := Vector2.from_angle(n.sweep)
 					a.attack_field.add_shape(PackedVector2Array([n.free_pos, n.free_pos + direction * float(p.bolt_length)]), float(p.bolt_width), 0.0, float(p.bolt_life), float(p.beam_dmg), &"bolt", n.row, direction * float(p.bolt_speed), true)
 				&"rubble_lump", &"rubble_fan":
-					var runner: RefCounted = a._moves[id].make_runner()
+					var runner: RefCounted = load("res://scripts/bosses/legacy_technique_runners.gd").make(a._moves[id])
 					if kind == &"rubble_lump": runner.launch_rubble(a, n, n.sweep, float(p.lump_r))
 					else:
 						for i in int(p.rubble_count):

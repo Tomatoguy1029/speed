@@ -1477,7 +1477,7 @@
         {
           "name": "count",
           "type": "u32",
-          "min": 1
+          "min": 0
         }
       ]
     },
@@ -1563,6 +1563,67 @@
         },
         {
           "name": "width",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraShatterDefinition",
+      "section": 393,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shard_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shard_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time",
           "type": "f64",
           "min": 0
         }

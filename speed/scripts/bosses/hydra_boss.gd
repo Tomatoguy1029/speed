@@ -729,7 +729,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 	if not chosen.is_empty(): participants.assign(chosen)
 	combat_trace.begin(attack, combat_origin)
 	tech = attack
-	special = preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[attack])
+	special = preload("res://scripts/bosses/legacy_technique_runners.gd").make(load("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[attack])
 	special.a = self
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""

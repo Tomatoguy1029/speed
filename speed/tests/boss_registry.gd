@@ -15,6 +15,12 @@ func _ready() -> void:
 	if "--cpp-hydra-grid" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_grid")
 		return
+	if "--cpp-hydra-shatter-record" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_shatter_record")
+		return
+	if "--cpp-hydra-shatter" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_shatter")
+		return
 	if "--cpp-hydra-tornado" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_tornado")
 		return
@@ -5112,3 +5118,82 @@ func native_hydra_tornado() -> void:
 	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==82),"回復とコンボ待ちの後に次の技を自然に選ぶ")
 	bridge.release_checkpoint(gathered.value);bridge.release_checkpoint(launched.value);bridge.dispose();view.queue_free();await get_tree().process_frame
 	print("[cpp_hydra_tornado] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_shatter() -> void:
+	var c := hydra_major_case("debris_shatter",{"warning_time":0.1,"performance_time":0.8,"shatter_deploy":0.2,"shatter_time":0.4,"shatter_arc":1.8,"rubble_count":3,"beam_len":800.0,"beam_width":80.0,"beam_dmg":7.0,"shard_dmg":9.0,"shard_speed":300.0,"tech_recovery":0.05,"cooldown":0.1},true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	var events: Array=[];bridge.subscribe("瓦礫砕きの記録",func(packet):events.append_array(packet.events);return true)
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"debris_shatter","瓦礫砕きの編集値とRunnerを分ける")
+	for tick in 40:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==83,"共通フローが瓦礫とビームの2首を自然に選ぶ")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var heads: Array=body.necks.filter(func(n):return n.mode=="debris_shatter")
+	check(heads.size()==2 and heads[0].kind=="debris" and heads[1].kind=="beam" and body.effects.is_empty(),"必要な2首だけ参加し、予告中に攻撃しない")
+	bridge._core.step(0.1);bridge._core.step(0.05)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var stones: Array=bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead)
+	check(stones.size()==3 and body.effects.is_empty() and stones.all(func(e):return Vector2(e.vel[0],e.vel[1])==Vector2.ZERO),"個別展開中は静止した瓦礫を3個広げ、ビームを出さない")
+	var deployed: Dictionary=bridge.checkpoint()
+	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="beam" and body.effects[0].width==80.0 and is_equal_approx(body.effects[0].points[0].distance_to(body.effects[0].points[1]),800.0),"展開時刻の後に線分ビームを始める")
+	var beam: Dictionary=body.effects[0];var direction: Vector2=(beam.points[1]-beam.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":beam.points[0]+direction*100,"velocity":Vector2.ZERO})
+	var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hazards(0.01)
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"ビームは線分で実HPへ倍率を一度だけ掛ける")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	for tick in 16:bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var shots: Array=bridge._core.hostiles_snapshot()
+	check(shots.size()>0 and shots.size()%6==0 and shots.all(func(e):return is_equal_approx(e.vel.length(),300.0)),"掃引ビームが瓦礫へ触れた順に6発ずつ破片を出す")
+	var cues: Array=events.filter(func(e):return e.type=="hydra_cue" and e.payload.cue=="rubble_shattered")
+	check(cues.size()*6==shots.size(),"瓦礫を砕いた回数と6発のまとまりを対応させる")
+	var after: Dictionary=bridge.checkpoint();var expected_shots: Array=shots.duplicate(true)
+	check(bridge.restore(deployed.value).ok,"瓦礫の世代参照・配置先・掃引の時計を保持して戻す")
+	bridge._core.step(0.06);bridge._core.step_hazards(0.01)
+	for tick in 16:bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(bridge._core.hostiles_snapshot()==expected_shots,"復帰後も砕く順番と破片の軌道・乱数消費が同じになる")
+	bridge.restore(after.value)
+	if not shots.is_empty():
+		bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+		bridge.command("dev_ship_motion",{"position":shots[0].pos,"velocity":Vector2.ZERO})
+		hp=bridge._core.ship_snapshot().ship_hp;bridge._core.step_hostiles(0.001);bridge.command("dev_boss_body_state")
+		check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,9.0),"破片はshard_dmgそのままで実HPを減らし追加倍率を掛けない")
+		check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bullet" and e.payload.technique=="debris_shatter" and e.payload.source=="hydra"),"破片はbullet・debris_shatter・hydraを記録する")
+	bridge.restore(deployed.value);bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"展開中の取消で瓦礫を回収する")
+	bridge.restore(after.value);bridge.command("dev_damage",{"entity_id":heads[1].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge._core.hostiles_snapshot().size()==shots.size(),"参加首消失ではビームと残る瓦礫を消し、発射済み破片を残す")
+	var remaining_life: float=shots.map(func(shot):return shot.life).max() if not shots.is_empty() else 1.0
+	bridge._core.step_hostiles(remaining_life+0.1)
+	check(bridge._core.hostiles_snapshot().is_empty(),"発射済み破片は自然寿命で回収する")
+	bridge.restore(after.value);bridge._core.step(0.3)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"実行時間で自然終了し持続ビームを消す")
+	for tick in 80:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==83):break
+	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==83),"自然終了の待ち後に次のコンボを選ぶ")
+	bridge.release_checkpoint(deployed.value);bridge.release_checkpoint(after.value);bridge.dispose();view.queue_free();await get_tree().process_frame
+	print("[cpp_hydra_debris_shatter] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_shatter_record() -> void:
+	var c := hydra_major_case("debris_shatter",{"warning_time":0.1,"performance_time":0.8,"shatter_deploy":0.2,"shatter_time":0.4,"shatter_arc":1.8,"rubble_count":3,"beam_len":800.0,"beam_width":80.0,"beam_dmg":7.0,"shard_dmg":9.0,"shard_speed":300.0,"tech_recovery":0.05,"cooldown":0.1})
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	var events: Array=[];bridge.subscribe("破片の記録",func(packet):events.append_array(packet.events);return true)
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.1);bridge._core.step(0.05);bridge._core.step(0.06)
+	for tick in 16:bridge._core.step(0.025)
+	var shots: Array=bridge._core.hostiles_snapshot()
+	if shots.is_empty():check(false,"記録用の破片が出る");bridge.dispose();get_tree().quit(1);return
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge.command("dev_ship_motion",{"position":shots[0].pos,"velocity":Vector2.ZERO})
+	bridge._core.step_hostiles(0.001);bridge.command("dev_boss_body_state")
+	check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bullet" and e.payload.technique=="debris_shatter" and e.payload.source=="hydra"),"破片の原因・技と、共通通知のボス所有元を保つ")
+	bridge.dispose();print("[cpp_hydra_shatter_record] failures=",failed);get_tree().quit(1 if failed else 0)
