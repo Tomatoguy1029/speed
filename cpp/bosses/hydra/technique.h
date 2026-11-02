@@ -2,13 +2,16 @@
 #include "../../runtime/run_runtime.h"
 #include <optional>
 namespace speed {class HydraTechnique {public:
-    static bool supports(uint32_t kind) {return kind==72 || kind==73 || kind==74 || kind==82 || kind==83 || kind==88 || kind==89;}
+    static bool supports(uint32_t kind) {return kind==72 || kind==73 || kind==74 || kind==82 || kind==83 || kind==88 || kind==89 || kind==90;}
     static const HydraMajorDefinition &rule(const RunRuntime &,uint32_t);
     static void cue(RunRuntime &,const BossBodyState &,const char *,uint32_t,double=0);
     static bool busy(const RunRuntime &,const BossBodyState &);
     static std::vector<EnemyHandle> participants(const RunRuntime &,const BossBodyState &,std::initializer_list<HydraHeadKind>);
     static bool all_participants_alive(const RunRuntime &,const HydraTechniqueState &);
     static std::vector<EnemyHandle> front_heads(const RunRuntime &,const BossBodyState &,uint32_t);
+    static void swarm_prepare(RunRuntime &,TechniqueState &);
+    static bool swarm_position(RunRuntime &,TechniqueState &,double);
+    static void swarm(RunRuntime &,TechniqueState &,double);
     static void sequence_prepare(RunRuntime &,TechniqueState &);
     static void sequence(RunRuntime &,TechniqueState &,double);
     static void north_prepare(RunRuntime &,TechniqueState &);

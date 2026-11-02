@@ -1782,6 +1782,62 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraSwarmDefinition",
+      "section": 406,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "formation_margin",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "formation_timeout",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "formation_tolerance",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

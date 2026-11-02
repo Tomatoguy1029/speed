@@ -12,6 +12,9 @@ func _ready() -> void:
 	if "--cpp-hydra-debris-separated" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_debris_separated")
 		return
+	if "--cpp-hydra-swarm" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_swarm")
+		return
 	if "--cpp-hydra-sequence-second" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_sequence_second")
 		return
@@ -5840,3 +5843,105 @@ func native_hydra_sequence_second() -> void:
 	var fraction: float=clampf((t.performance_time-0.2-0.08)/0.12,0.0,1.0)
 	check(second.locked and second.position.distance_to(participants[1].position.lerp(Vector2(900,-120),fraction))<0.01 and events.any(func(e):return e.type=="hydra_cue" and e.payload.cue=="target_locked" and e.payload.neck>=0) and body.necks.filter(func(n):return n.mode=="sequence" and n.locked).size()==2,"二首目は間隔分だけ遅れて新しい機体位置へ固定する")
 	bridge.dispose();print("[cpp_hydra_sequence_second] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func hydra_swarm_expected_target(body: Dictionary, neck: Dictionary, ship: Vector2, reach: float) -> Vector2:
+	var from: Vector2=neck.position
+	var to: Vector2=from+(ship-from).normalized()*reach
+	var safe: Rect2=body.arena.grow(-neck.radius)
+	var delta: Vector2=to-from
+	var fraction := 1.0
+	var normal := Vector2.ZERO
+	for axis in 2:
+		if is_zero_approx(delta[axis]):continue
+		var f: float=((safe.end[axis] if delta[axis]>0.0 else safe.position[axis])-from[axis])/delta[axis]
+		if f>=0.0 and f<=fraction:
+			fraction=f;normal=Vector2.ZERO;normal[axis]=-signf(delta[axis])
+	return from.lerp(to,fraction)+normal*0.01
+
+func native_hydra_swarm() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.9,"sequence_charge":0.08,"swarm_gap":0.05,"swarm_flight":0.18,"swarm_reach":1800.0,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("swarm",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"swarm","連続飛びかかりの編集Resourceと互換Runnerを分ける")
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離前には連続飛びかかりを選ばない")
+	hydra_grid_separate(c)
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==90,"分離後の共通フローから連続飛びかかりを自然選択する")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var t: Dictionary=actions[0]
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var rect: Rect2=Rect2(Vector2(-1400,-1000),Vector2(2800,2000)).intersection(body.arena).grow(-70.0)
+	var slots: PackedVector2Array=t.swarm_slots
+	var exact: bool = slots.size()==body.necks.size()
+	for i in slots.size():exact=exact and slots[i].distance_to(rect.get_center()+Vector2(cos(TAU*i/slots.size())*rect.size.x*0.45,sin(TAU*i/slots.size())*rect.size.y*0.45))<0.01
+	check(t.positioning and t.performance_time==0.0 and exact and body.necks.all(func(n):return n.mode=="swarm"),"全生存首を画面と闘技場の交差矩形の楕円へ配置し、その間は技時計を止める")
+	var preparing: Dictionary=bridge.checkpoint();bridge._core.step(0.02);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(preparing.ok and bridge.restore(preparing.value).ok,"配置途中の持ち場・到着状態・経過を保持する");bridge._core.step(0.02)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"配置途中の復帰でも同じ位置と点列へ進む")
+	var ready := false
+	for tick in 1200:
+		bridge._core.step(0.02)
+		t=bridge.command("dev_boss_state").value[0]
+		if not t.positioning:ready=true;break
+		if t.stage>=5:break
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(ready and t.stage==0 and t.performance_time==0.0 and body.effects.is_empty(),"全首の配置完了から予告時計を再開し、配置中には攻撃を出さない")
+	if not ready:print(t);bridge.dispose();get_tree().quit(1);return
+	var positioned: Dictionary=bridge.checkpoint()
+	var origins := {};var targets := {}
+	for n: Dictionary in body.necks:
+		origins[n.id]=n.position;targets[n.id]=hydra_swarm_expected_target(body,n,Vector2(-200,0),1800.0)
+	for tick in 30:
+		bridge._core.step(0.01)
+		t=bridge.command("dev_boss_state").value[0]
+		if t.stage==1:break
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(t.performance_time,0.01) and body.effects.size()==1 and is_equal_approx(body.effects[0].width,35.0) and is_equal_approx(body.effects[0].delay,0.08) and is_equal_approx(body.effects[0].life,0.001) and body.effects[0].points[1].distance_to(targets[body.necks[0].id])<0.02,"発動tickから個別時計を進め、闘技場で切った固定軌道を半径と同じ幅の予告へ出す")
+	var active: Dictionary=bridge.checkpoint();var events: Array=[];bridge.subscribe("連続飛びかかりの記録",func(packet):events.append_array(packet.events);return true)
+	bridge._core.set_run_guards({"invincible":false});var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":body.effects[0].points[0].lerp(body.effects[0].points[1],0.5),"velocity":Vector2.ZERO});bridge._core.step_hazards(0.04);bridge.command("dev_boss_body_state")
+	check(bridge._core.ship_snapshot().ship_hp==hp and not events.any(func(e):return e.type=="combat_player_damage"),"個別予告にはダメージと0ダメージ通知を出さない")
+	bridge.restore(active.value);bridge.command("dev_ship_motion",{"position":Vector2(600,-500),"velocity":Vector2.ZERO});bridge._core.step(0.08)
+	body=bridge.command("dev_boss_body_state").value[0];t=bridge.command("dev_boss_state").value[0]
+	var offensive: Array=body.effects.filter(func(e):return e.delay==0.0)
+	var first: Dictionary=body.necks[0]
+	var fraction: float=clampf((t.performance_time-0.08)/0.18,0.0,1.0)
+	check(first.locked and first.position.distance_to(Vector2(origins[first.id]).lerp(targets[first.id],fraction))<0.02 and offensive.size()==1 and is_equal_approx(offensive[0].width,35.0) and is_equal_approx(offensive[0].life,0.081),"配置後に機体が動いても固定軌道を変えず、Sourceの飛行式とdt+.001の区間を出す")
+	check(first.position==first.free_pos and body.necks.all(func(n):return n.points[-1].distance_to(n.position)<0.01),"飛行位置をfree_posと首点列へ同じtickに反映する")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	var flight: Dictionary=bridge.checkpoint();bridge._core.step(0.02);bridge._core.step_hazards(0.02);expected=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(flight.ok and bridge.restore(flight.value).ok,"飛行途中の個別段階・標的・形状を保持する");bridge._core.step(0.02);bridge._core.step_hazards(0.02)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"飛行途中から復帰しても同じ区間と首姿勢になる")
+	bridge.restore(flight.value);body=bridge.command("dev_boss_body_state").value[0];offensive=body.effects.filter(func(e):return e.delay==0.0);events.clear()
+	bridge._core.set_run_guards({"invincible":false});hp=bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":offensive[0].points[0].lerp(offensive[0].points[1],0.5),"velocity":Vector2.ZERO});bridge._core.step_hazards(0.001);bridge.command("dev_boss_body_state")
+	check(hp>bridge._core.ship_snapshot().ship_hp and events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bite" and e.payload.technique=="swarm" and e.payload.source=="hydra"),"連続飛びかかりが実HPとbite・swarm・hydra通知へ届く")
+	bridge.restore(flight.value);bridge.command("dev_damage",{"entity_id":first.id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(bridge.command("dev_boss_state").value[0].stage==1 and body.necks.filter(func(n):return n.alive).size()==7 and body.effects.all(func(e):return e.points[0].distance_to(origins[first.id])>0.01),"参加首一本の消失ではその攻撃を消し、残りの首で続ける")
+	bridge.restore(flight.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で連続飛びかかりの判定と予告を回収する")
+	bridge.restore(flight.value);body=bridge.command("dev_boss_body_state").value[0]
+	for n: Dictionary in body.necks:bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.01);check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"全参加首が消えると連続飛びかかりを中断する")
+	bridge.restore(flight.value);bridge.command("dev_remove",{"entity_id":c.id});bridge._core.step(0.01);check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失で連続飛びかかりを中断する")
+	bridge.restore(flight.value);bridge._core.step(0.65);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.all(func(n):return n.position.distance_to(targets[n.id])<0.02),"粗い更新でも八首がそれぞれの固定軌道の終端へ届く")
+	bridge.restore(flight.value)
+	for tick in 200:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(a):return a.id>first_id and a.kind==90),"自然終了と余白の後に次の連続飛びかかりを選べる")
+	bridge.release_checkpoint(preparing.value);bridge.release_checkpoint(positioned.value);bridge.release_checkpoint(active.value);bridge.release_checkpoint(flight.value);bridge.dispose();view.queue_free()
+	c=hydra_major_case("swarm",edits,false,{"formation_timeout":0.01});bridge=c.bridge;hydra_grid_separate(c)
+	check(bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"配置待ちの直接入口を開始する");bridge._core.step(0.02)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"配置の制限時間を超えると攻撃を出さず中断する");bridge.dispose()
+	c=hydra_major_case("swarm",edits,false,{"formation_tolerance":1000000000.0});bridge=c.bridge;hydra_grid_separate(c)
+	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(80,80));check(bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"配置後の画面内条件を確かめる入口を開始する");bridge._core.step(0.02)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"到着扱いでも首が画面外に残れば中断する");bridge.dispose()
+	c=hydra_major_case("swarm",edits,false);bridge=c.bridge;hydra_grid_separate(c);body=bridge.command("dev_boss_body_state").value[0]
+	for i in 7:bridge.command("dev_damage",{"entity_id":body.necks[i].id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.001);check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"生存首が一本だけでは連続飛びかかりを開始しない");bridge.dispose()
+	await get_tree().process_frame;print("[cpp_hydra_swarm] failures=",failed);get_tree().quit(1 if failed else 0)
