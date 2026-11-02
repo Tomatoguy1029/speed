@@ -12,6 +12,7 @@ namespace speed {
 struct CoronaAmmunition {uint32_t definition=0;double weight=0,damage=0;};
 struct ContentBundle {
     std::vector<DracoFinaleDefinition> draco_finales;
+    std::vector<DracoFlowGateDefinition> draco_flow_gates;
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};
     RunConfig config;
     HeroConfig hero_config;

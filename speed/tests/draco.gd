@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-finish" in OS.get_cmdline_user_args():
+		call_deferred("native_finish")
+		return
 	if "--cpp-draco-inhale" in OS.get_cmdline_user_args() or "--cpp-draco-inhale-pose" in OS.get_cmdline_user_args():
 		call_deferred("native_inhale")
 		return
@@ -1539,3 +1542,156 @@ func native_clones_shapes(move: BossTechnique) -> void:
 		if a._runner.units.all(func(u):return u.done):break
 	check(matching and count>0 and error<0.1,"分身Hostで使う通常技の発火tick・判定点列・幅・遅れ・寿命がSourceと一致する: %s"%error)
 	bridge.dispose();source.session.free()
+
+## 全技を持つ本番パッケージから、条件・費用・区間予算を通して進む。
+func finish_fixture(name := "", phase := 1, limit := -1.0) -> Dictionary:
+	var builder=load("res://tools/content/build_run_content.gd")
+	var cfg: GameConfig=load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius=0.0
+	cfg.time_up_charge_time=0.3
+	for key in ["death_freeze_time","death_explosion_time","death_game_over_time"]:cfg.set(key,0.01)
+	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time"]:cfg.set(key,0.02)
+	var definition: BossDef=load("res://data/bosses/draco.tres").duplicate(true)
+	var rules=load("res://data/bosses/ai/draco_action_rules.tres").duplicate(true)
+	var flow=load("res://data/bosses/ai/draco_flow.tres").duplicate(true)
+	if not name.is_empty():
+		for section: Dictionary in flow.sections:
+			if section.get("request","")!="rest":section.allowed_techniques=[name]
+	var stage:=RuntimeStage.new();stage.time_limit=limit
+	var package: Dictionary=builder.boss_package(definition,cfg,stage,{"rules":rules,"flow":flow})
+	if package.is_empty():check(false,"全13技の本番パッケージを生成する: "+name);return {}
+	var bridge=load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary=bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":449,"mode":1,"stage_id":"B_draco_finish","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok:check(false,"全13技の型付き定義を読む: "+str(configured));return {}
+	bridge.start(105,{"position":Vector2(300,0)})
+	bridge._core.set_motion_context(Vector2(300,0),Vector2.ZERO,Vector2(1400,1000))
+	bridge._core.set_run_guards({"invincible":true})
+	var events: Array=[];bridge.subscribe("全技の進行",func(packet):events.append_array(packet.events);return true)
+	bridge.command("set_recording",{"active":true})
+	var id: int=bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var f: Dictionary={"bridge":bridge,"boss":id,"package":package,"captured":events,"rules":rules,"flow":flow}
+	for target_phase in range(2,phase+1):
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+		bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp,"cause":"shot"})
+		for tick in 800:
+			check(bridge._core.step(0.02),"形態移行の世界更新を受理する");bridge._core.step_hazards(0.02)
+			body=bridge.command("dev_boss_body_state").value[0]
+			if body.mode==1 and body.phase==target_phase:break
+		check(body.phase==target_phase and body.mode==1,"実HPの閾値から形態を進め、戦闘へ戻る: %d"%target_phase)
+	return f
+
+func finish_target(f: Dictionary, gate: Dictionary) -> void:
+	var active: Array=f.bridge.command("dev_boss_state").value
+	if active.any(func(attack):return attack.actor==f.boss and attack.stage<5):return
+	var body: Dictionary=f.bridge.command("dev_boss_body_state").value[0]
+	var distance: float=(float(gate.get("min",0.0))+minf(float(gate.get("max",600.0)),800.0))*0.5
+	var at: Vector2=body.position+Vector2.from_angle(body.facing+deg_to_rad(float(gate.get("angle",0.0))))*distance
+	f.bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+	f.bridge._core.set_motion_context(at,at,Vector2(1400,1000))
+
+func finish_tick(f: Dictionary, dt := 0.02) -> void:
+	f.bridge._core.step(dt);f.bridge._core.step_hazards(dt);f.bridge.command("dev_boss_body_state")
+
+func finish_frame(f: Dictionary, input: Dictionary = {}) -> bool:
+	var fields: Dictionary=f.bridge.pack_intent(Intent.new())
+	fields.merge(input,true)
+	return f.bridge.step(1.0/120.0,fields,{"logical_size":Vector2(1400,1000)}).ok
+
+func native_finish() -> void:
+	var group: String="all"
+	var only_move: String=""
+	var only_phase: String=""
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--finish-group="):group=arg.trim_prefix("--finish-group=")
+		if arg.begins_with("--finish-move="):only_move=arg.trim_prefix("--finish-move=")
+		if arg.begins_with("--finish-phase="):only_phase=arg.trim_prefix("--finish-phase=")
+	if group in ["all","moves","remaining"]:
+		var phases: Dictionary={"bite":1,"tail_sweep":1,"tail_slam":1,"star_fan":1,"breath":1,"meteor":1,"charge":1,"leap":1,"rifts":1,"spiral":1,"clones":2,"picaro_wall":2,"inhale":3}
+		var activated: Array[String]=[]
+		for name: String in phases:
+			if not only_move.is_empty() and not name in only_move.split(","):continue
+			var f:=finish_fixture(name,phases[name])
+			if f.is_empty():continue
+			check(f.package.records.BossTechniqueDefinition.filter(func(row):return row.boss==1 and row.phase==1).size()==13,"全技を持つ同じパッケージから選ぶ: "+name)
+			check(f.package.records.DracoFlowGateDefinition.all(func(row):return row.maximum_phase==3),"省略を含む形態上限3を生成する: "+name)
+			var emitted:=false
+			for tick in 2000:
+				finish_target(f,f.rules.conditions.get(name,{}));finish_tick(f)
+				emitted=f.captured.any(func(event):return event.type=="boss_action" and event.payload.action==name and event.payload.step=="execute")
+				if emitted:break
+			if not emitted:print("[cpp_draco_finish] 未発動=",name," flow=",f.bridge.command("dev_boss_flow_state").value)
+			check(emitted,"本番条件・費用・予算から選んだ実発動を記録する: "+name)
+			if emitted:
+				activated.append(name)
+				print("[cpp_draco_finish] 実発動=",name)
+			var body: Dictionary=f.bridge.command("dev_boss_body_state").value[0]
+			var attacks: Array=f.bridge.command("dev_boss_state").value
+			var own: Array=attacks.filter(func(attack):return attack.actor==f.boss)
+			if not own.is_empty():await show_native_draco(f,body,own[0])
+			check(body.phase==phases[name],"通常HP・低HPの形態で技を選ぶ: "+name)
+			f.bridge.dispose()
+		print("[cpp_draco_finish] 本番フローの実発動=",activated)
+	if group in ["all","selection","remaining"]:
+		for phase in [1,2,3]:
+			if not only_phase.is_empty() and not str(phase) in only_phase.split(","):continue
+			var f:=finish_fixture("",phase)
+			if f.is_empty():continue
+			var selected: Array[String]=[]
+			for tick in 1800:
+				finish_target(f,{"min":250.0,"max":600.0});finish_tick(f)
+				for event: Dictionary in f.captured:
+					if event.type=="boss_action" and event.payload.step=="execute" and not event.payload.action in selected:selected.append(event.payload.action)
+				if selected.size()>=3:break
+			check(selected.size()>=3,"候補制限のない本番プログラムが形態ごとの複数技を選ぶ: %d"%phase)
+			check(phase>=2 or (not "clones" in selected and not "picaro_wall" in selected),"第1形態で低HP専用技を選ばない")
+			check(phase>=3 or not "inhale" in selected,"第3形態前に吸引を選ばない")
+			print("[cpp_draco_finish] 候補制限なし phase=",phase," 実発動=",selected)
+			f.bridge.dispose()
+	if group in ["all","end","timeout","remaining"]:
+		var f:=finish_fixture("",1,0.01)
+		if not f.is_empty():
+			for tick in 4:check(finish_frame(f),"時間切れの固定更新を受理する")
+			var body: Dictionary=f.bridge.command("dev_boss_body_state").value[0]
+			check(f.captured.any(func(e):return e.type=="time_limit_reached") and f.bridge.read_frame().value.ui.phase==RunState.Phase.DYING,"Sourceと同じく時間切れの一撃は溜めを挟まず機体を倒す")
+			for tick in 8:finish_frame(f)
+			var result: Variant=f.bridge.read_frame().value.result
+			check(result!=null and result.kind=="Death" and not f.captured.any(func(e):return e.type=="clear_banner"),"時間切れは勝利を付けず敗北で確定する")
+			f.bridge.dispose()
+	if group in ["all","end","abort"]:
+		var f:=finish_fixture("rifts")
+		if not f.is_empty():
+			for tick in 1500:
+				finish_target(f,f.rules.conditions.rifts);finish_tick(f)
+				if f.captured.any(func(e):return e.type=="boss_action" and e.payload.action=="rifts" and e.payload.step=="execute"):break
+			check(f.bridge.command("abort",{"reason":0}).ok and f.bridge.read_frame().value.result.kind=="Abort","技の途中中断は勝利を付けず終了する")
+			var body: Dictionary=f.bridge.command("dev_boss_body_state").value[0]
+			check(body.mode==5 and body.rift_walls.is_empty() and body.closing_walls==0,"途中中断で持続攻撃を回収する")
+			f.bridge.dispose()
+	if group=="clear":
+		var f:=finish_fixture("",3)
+		if not f.is_empty():
+			var bridge=f.bridge
+			var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+			bridge.command("dev_damage",{"entity_id":f.boss,"amount":body.hp+1.0,"cause":"shot"})
+			body=bridge.command("dev_boss_body_state").value[0]
+			check(body.finale.active and body.finale.stage=="release","第3形態の実HPを削り切ると決着が始まる")
+			for tick in 800:
+				finish_frame(f)
+				body=bridge.command("dev_boss_body_state").value[0]
+				if body.finale.stage=="input":break
+			check(body.finale.stage=="input","実撃破から決着専用入力へ進む")
+			finish_frame(f,{"has_cursor":true,"pen":body.finale.center,"finale_pen":body.finale.center,"finale_pressed":true})
+			finish_frame(f,{"has_cursor":true,"pen":body.finale.center+Vector2(100,0),"finale_pen":body.finale.center+Vector2(100,0),"finale_released":true})
+			for tick in 1200:
+				finish_frame(f)
+				if bridge.read_frame().value.result!=null:break
+			var frame: Dictionary=bridge.read_frame().value
+			check(frame.result!=null and frame.result.kind=="Clear","最後の決着から通常のCLEAR結果を一度だけ確定する")
+			check(f.captured.filter(func(e):return e.type=="boss_defeated").size()==1 and f.captured.filter(func(e):return e.type=="clear_banner").size()==1 and f.captured.filter(func(e):return e.type=="run_finished").size()==1,"撃破・CLEAR・結果確定の通知を各1回届ける")
+			var count: int=f.captured.size()
+			for tick in 5:finish_frame(f)
+			check(f.captured.size()==count,"完了後の固定更新で勝利通知を繰り返さない")
+			print("[cpp_draco_finish] 最終通知=",f.captured.filter(func(e):return e.type in ["boss_defeated","clear_banner","run_finished"]))
+			bridge.dispose()
+	print("[cpp_draco_finish] group=",group," failures=",failed)
+	get_tree().quit(1 if failed else 0)
