@@ -11,6 +11,7 @@ var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
 var _scope: ContentResourceScope
 var _pixel := 1.82
+var _shot_transforms: Dictionary = {}
 var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _gunner_marks: DrawLayer
@@ -168,16 +169,27 @@ func _valid(frame: Dictionary) -> bool:
 func apply_frame(frame: Dictionary) -> bool:
 	var begin := Time.get_ticks_usec()
 	if not _valid(frame): return false
-	for batch: InstanceBatch in batches.values(): batch.begin()
+	var next_shots := {}
+	for row: Dictionary in frame.batches:
+		if visuals[row.visual_id].role==2: next_shots[row.visual_id] = row.transforms
+	var unchanged_shots := {}
+	for id in visuals:
+		if visuals[id].role==2 and next_shots.get(id,PackedFloat32Array())==_shot_transforms.get(id,PackedFloat32Array()): unchanged_shots[id] = true
+	_shot_transforms = next_shots
+	for id in batches:
+		if not unchanged_shots.has(id): batches[id].begin()
 	for display: Node in enemy_frames.values(): display.begin()
 	for node: Sprite2D in parts.values(): node.hide()
 	for line in _lines: line.hide()
-	_gunner.clear()
-	_beamer.clear()
+	var previous_gunner := _gunner
+	var previous_beamer := _beamer
+	_gunner = PackedFloat32Array()
+	_beamer = PackedFloat32Array()
 	for row: Dictionary in frame.batches:
 		if row.has("gunner"): _gunner.append_array(row.gunner)
 		if row.has("beamer"): _beamer.append_array(row.beamer)
-	_gunner_marks.queue_redraw()
+	# 描画命令はCanvasItemが保持する。変わらない予告は再構築しない。
+	if _gunner!=previous_gunner or _beamer!=previous_beamer: _gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	var packed_bytes := 0
@@ -201,16 +213,18 @@ func apply_frame(frame: Dictionary) -> bool:
 		if batch.get_parent()!=_layer(row.layer): batch.reparent(_layer(row.layer))
 		batch.get_parent().move_child(batch,-1)
 		if visuals[row.visual_id].role==2:
+			if unchanged_shots.has(row.visual_id): continue
 			var began := Time.get_ticks_usec() if perf.active else 0
 			preload("res://scripts/render/attacks/friend_shot.gd").apply_frame(batch as PixelPainter,row.transforms)
 			perf.since(&"view_geometry.attacks",began)
 		else: batch.apply_frame(row.transforms,row.colors)
-	for batch: InstanceBatch in batches.values(): batch.end()
+	for id in batches:
+		if not unchanged_shots.has(id): batches[id].end()
 	for display: Node in enemy_frames.values(): display.end()
 	for display: Dictionary in _shape_displays.values():
-		display.node.hide()
+		display.used = false
+		display.previous_circles = display.circles.duplicate()
 		display.circles.clear()
-		display.node.queue_redraw()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
@@ -222,16 +236,15 @@ func apply_frame(frame: Dictionary) -> bool:
 				var circles: Array = []
 				var node := preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
 				parent.add_child(node)
-				_shape_displays[key] = {"node":node,"circles":circles}
+				_shape_displays[key] = {"node":node,"circles":circles,"used":false,"previous_circles":[]}
 			display = _shape_displays[key]
 			parent = display.node
-			parent.show()
-			parent.get_parent().move_child(parent,-1)
+			display.used = true
+			if parent.get_index()!=parent.get_parent().get_child_count()-1: parent.get_parent().move_child(parent,-1)
 		for i in row.widths.size():
 			if row.kind==1:
 				if display.is_empty() or row.offsets[i+1]-row.offsets[i]!=1: return false
 				display.circles.append({"position":row.points[row.offsets[i]],"radius":row.widths[i],"color":row.colors[i]})
-				display.node.queue_redraw()
 				continue
 			if line_index==_lines.size():
 				var line := Line2D.new()
@@ -245,6 +258,9 @@ func apply_frame(frame: Dictionary) -> bool:
 			line.default_color = row.colors[i]
 			line.show()
 			line_index += 1
+	for display: Dictionary in _shape_displays.values():
+		display.node.visible = display.used
+		if display.circles!=display.previous_circles: display.node.queue_redraw()
 	for row: Dictionary in frame.poses:
 		var key := "%d:%d" % [row.participant_id,row.part_key]
 		if not parts.has(key):
