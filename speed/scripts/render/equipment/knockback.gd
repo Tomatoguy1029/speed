@@ -4,6 +4,25 @@ extends WeaponVisual
 
 var breaks: Array[Dictionary] = []
 var hits: Array[Dictionary] = []
+var _frame_seen := {}
+var frame_shake := 0.0
+
+func _effect_key() -> String: return "weapon/knockback"
+
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+
+func sync_frame(values: Array, dt: float) -> void:
+	var alive := {}
+	for value: Dictionary in values:
+		alive[value.id] = true
+		if _frame_seen.has(value.id): continue
+		on_event({"type":&"shot_hit" if value.hit else &"hull_scatter","visual_key":"weapon/knockback","pos":value.pos})
+		if value.hit: hits[-1].age = value.age-dt
+		else: breaks[-1].age = value.age-dt
+	_frame_seen = alive
 
 func setup(render: RunPresentation, owner_behavior) -> void:
 	super(render, owner_behavior)
@@ -16,13 +35,16 @@ func on_event(ev: Dictionary) -> void:
 		var glitter: Array[Dictionary] = []
 		for i in 40: glitter.append({"a": randf() * TAU, "v": 30.0 + randf() * 90.0})
 		breaks.append({"pos": ev.pos, "age": 0.0, "glitter": glitter})
-		rm.shake = maxf(rm.shake, 4.0)
+		if rm==null: frame_shake = maxf(frame_shake,4.0)
+		else: rm.shake = maxf(rm.shake,4.0)
 	elif ev.type == &"shot_hit":
 		hits.append({"pos": ev.pos, "age": 0.0, "turn": randf() * TAU})
 
 func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+	frame_tick(world_dt(),state.world_time)
+
+func frame_tick(dt: float, clock: float) -> void:
+	var p: PixelPainter = _painter if rm==null else painter()
 	p.begin()
 	for b in breaks:
 		b.age += dt
@@ -33,7 +55,7 @@ func tick(_dt: float) -> void:
 			p.thick_ring(b.pos, 8.0 + 26.0 * q, 2 if q < 0.5 else 1, Color.WHITE if q < 0.5 else Color("#e8dcff"))
 		if a < 0.8:
 			var k := a / 0.8
-			var phase := int(state.world_time * 30.0)
+			var phase := int(clock*30.0)
 			for g in b.glitter:
 				if (int(g.v) + phase) % 4 == 0 and k > 0.5: continue
 				var d: float = g.v * (1.0 - pow(1.0 - k, 2.0))

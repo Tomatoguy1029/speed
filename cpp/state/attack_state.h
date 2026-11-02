@@ -70,6 +70,7 @@ struct AttackState {
     std::unordered_map<int64_t,std::vector<AttackHandle>> by_source;
     std::unordered_map<uint64_t,std::vector<AttackHandle>> by_technique,by_participant,by_boss,by_encounter;
     std::unordered_map<int64_t,DebrisDeathFixture> development_debris_sources;
+    std::unordered_set<int64_t> development_hull_captures;
     int64_t next_id=1;
     uint64_t friendly_reservations=0;
     bool hostile_updating=false,hostile_clear_pending=false;

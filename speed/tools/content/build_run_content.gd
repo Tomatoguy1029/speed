@@ -319,6 +319,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var mine_profile: Dictionary = preload("res://scripts/render/fx/burst_runtime.gd").profile("weapon/mines")
 	for level in mines.level_steps.size():
 		data.MinesDefinition.append({"id":level+1,"weapon":mines_id,"level":level+1,"count":int(mines.params.count_by_level[level]),"damage":float(mines.params.damage_by_level[level]),"radius":float(mines.params.radius_by_level[level]),"life":float(mines.params.life_by_level[level]),"maximum":int(mines.params.max),"trigger":float(mines.params.trigger),"spread":float(mines.params.spread),"range_min":float(mines.params.range_min),"range_max":float(mines.params.range_max),"duration_increment":float(config.post_max.increments.get("duration",0.0)) if "life_by_level" in mines_target.get("duration",[]) else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if mines_target.has("knockback") else 0.0,"visual_life":maxf(float(mine_profile.life),0.4)*float(mine_profile.time_scale)})
+	var knockback := load("res://data/weapons/W03_knockback.tres") as WeaponDef
+	if knockback==null or config.post_max==null: return {}
+	var knockback_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":knockback_id,"kind":0,"maximum_level":knockback.level_steps.size(),"external_id":"W03","comet_only":false})
+	var knockback_target: Dictionary = config.post_max.target(knockback.id)
+	for level in knockback.level_steps.size():
+		data.KnockbackDefinition.append({"id":level+1,"weapon":knockback_id,"level":level+1,"chance":float(knockback.params.chance_by_level[level]),"chain_limit":int(knockback.params.chain_limit_by_level[level]),"speed":float(knockback.params.speed),"life":float(knockback.params.life),"base_damage":config.hull_debris_damage,"base_attack":config.base_attack,"base_knock":config.hull_debris_knock,"base_life":config.hull_debris_life,"projectile_increment":float(config.post_max.increments.get("projectile_speed",0.0)) if knockback_target.has("projectile") else 0.0,"duration_increment":float(config.post_max.increments.get("duration",0.0)) if knockback_target.has("duration") else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if knockback_target.has("knockback") else 0.0,"area_increment":float(config.post_max.increments.get("area",0.0)) if knockback_target.has("area") else 0.0})
 	if config.post_max==null: return {}
 	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
 	for comet_id in ContentManager.catalog.table(&"weapons"):
@@ -341,6 +348,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":4,"equipment":barrier_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(barrier.id).has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":5,"equipment":end_blast_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(end_blast.id).has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":6,"equipment":mines_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if mines_target.has("followup") else 0.0})
+	data.PostMaxWeaponPowerDefinition.append({"id":7,"equipment":knockback_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if knockback_target.has("followup") else 0.0})
+	var knockback_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W03")
+	if knockback_entry==null: return {}
+	for path in knockback_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":knockback_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":knockback_id,"asset":key})
 	var mines_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W07")
 	if mines_entry==null: return {}
 	for path in mines_entry.resources:
@@ -686,6 +701,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ScatterPostDefinition = resolved.ScatterPostDefinition
 			data.RearDefinition = resolved.RearDefinition
 			data.RearPostDefinition = resolved.RearPostDefinition
+			data.KnockbackDefinition = resolved.KnockbackDefinition
 			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
 			data.BarrierDefinition = resolved.BarrierDefinition

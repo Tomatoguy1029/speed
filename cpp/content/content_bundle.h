@@ -19,6 +19,7 @@ struct ContentBundle {
     ScatterPostDefinition scatter_post;
     std::vector<RearDefinition> rear_levels;
     RearPostDefinition rear_post;
+    std::vector<KnockbackDefinition> knockback_levels;
     std::vector<MinesDefinition> mines_levels;
     std::vector<EndBlastDefinition> end_blast_levels;
     std::vector<BarrierDefinition> barrier_levels;

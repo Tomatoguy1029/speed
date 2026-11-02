@@ -8,6 +8,7 @@
 #include "reflected.h"
 #include "wall.h"
 #include "friend_debris.h"
+#include "../../behaviors/weapons/knockback.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -66,6 +67,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
             Dictionary event; event["pos"] = impact; event["dir"] = vel.normalized();
             event["visual_key"] = String(shot.visual); event["kind"] = shot.kind;
             FrameBuilder::append(runtime,"shot_hit",event);
+            if (shot.visual==StringName("weapon/knockback")) KnockbackBehavior::hit(runtime,impact);
             if (runtime.state.phase != godot::RunState::Phase::Play) { shot.pos=position;shot.life=life;return true; }
             if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else {life=0;end_reason=speed::AttackEndReason::Hit;} }
         }

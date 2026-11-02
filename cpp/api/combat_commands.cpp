@@ -52,8 +52,9 @@ Dictionary SpeedRunCore::development_combat_command(const String &kind,const Dic
     const auto found=state.rows_by_id.find(int64_t(data["entity_id"]));if (found==state.rows_by_id.end()) return result(false);
     const auto target=state.enemy_handles.at(uint32_t(found->second));
     if (kind=="dev_enemy_combat") {
-        if (!fields(data,{"entity_id","guard","damage_target","pump_owner","mode"}) || data.size()<2) return result(false);
+        if (!fields(data,{"entity_id","guard","damage_target","pump_owner","mode","capture_on_death"}) || data.size()<2) return result(false);
         if (data.has("mode") && (data["mode"].get_type()!=Variant::INT || int64_t(data["mode"])<0 || int64_t(data["mode"])>3)) return result(false);
+        if (data.has("capture_on_death") && data["capture_on_death"].get_type()!=Variant::BOOL) return result(false);
         if (data.has("guard") && (!number(data,"guard") || double(data["guard"])<0)) return result(false);
         speed::EnemyHandle parent=state.enemies[target.slot].damage_target;
         if (data.has("damage_target")) {
@@ -81,6 +82,7 @@ Dictionary SpeedRunCore::development_combat_command(const String &kind,const Dic
                 pump_owner=state.enemy_handles.at(uint32_t(found->second));if (pump_owner.slot==target.slot) return result(false);
             }
         }
+        if (data.has("capture_on_death")) {if (bool(data["capture_on_death"])) state.attacks.development_hull_captures.insert(state.enemy_handles.entity_id(target));else state.attacks.development_hull_captures.erase(state.enemy_handles.entity_id(target));}
         auto &enemy=state.enemies[target.slot];if (data.has("mode")) enemy.mode=speed::EnemyMode(int64_t(data["mode"]));if (data.has("guard")) enemy.guard=data["guard"];enemy.damage_target=parent;enemy.pump_owner=pump_owner;
         return result(true);
     }

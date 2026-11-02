@@ -69,6 +69,14 @@ struct EndBlastWeaponState {
     std::vector<EndBlastPending> pending;
     std::vector<EndBlastVisual> visuals;
 };
+struct KnockbackVisual {godot::Vector2 pos;uint64_t id=0;bool hit=false;double born_world_time=0;};
+struct KnockbackState {
+    bool ready=false;
+    uint32_t definition=0,chain_limit=0;
+    uint64_t serial=0;
+    double chance=0,speed=0,life=0,base_damage=0,base_attack=0,base_knock=0,base_life=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0;
+    std::vector<KnockbackVisual> visuals;
+};
 struct CritBeamState {bool ready=false;double next_time=0,cooldown=0,damage=0,length=0,width=0,knock=0;};
 struct VortexInstance {
     godot::Vector2 pos;
@@ -117,6 +125,7 @@ struct EquipmentEffects {
 struct LoadoutState {
     EquipmentEffects effects;
     bool full_burst_owned=false,full_burst_active=false;
+    KnockbackState knockback;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;
@@ -128,7 +137,7 @@ struct LoadoutState {
     ScatterWeaponState scatter;
     RearWeaponState rear;
     BarrierWeaponState barrier;
-    uint64_t post_weapon_interval_stacks=0,post_projectile_speed_stacks=0,post_duration_stacks=0,post_knockback_stacks=0;
+    uint64_t post_weapon_interval_stacks=0,post_projectile_speed_stacks=0,post_duration_stacks=0,post_knockback_stacks=0,post_area_stacks=0;
 
     double charge_profile_factor=1,speed_profile_factor=1,attack_profile_factor=1,pickup_profile_factor=1,length_profile_factor=1;
     uint64_t post_charge_stacks=0,post_crit_stacks=0,post_max_speed_stacks=0,post_weapon_damage_stacks=0,post_followup_stacks=0,post_xp_pickup_stacks=0,post_line_length_stacks=0;

@@ -2,6 +2,7 @@
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/crab.h"
 #include "../behaviors/weapons/barrier.h"
+#include "../behaviors/weapons/knockback.h"
 #include "../behaviors/traits/rampage.h"
 #include "../behaviors/traits/critBeam.h"
 #include "../behaviors/enemies/shield.h"
@@ -15,6 +16,9 @@
 #include <cmath>
 namespace speed {
 namespace {
+bool development_capture(RunRuntime &run,const DeathContext &death) {
+    return run.api_development && run.state.attacks.development_hull_captures.erase(death.corpse.id)>0;
+}
 void passive_death(RunRuntime &run,const DeathContext &death) {
     auto &state=run.state;if (state.world.attack_formation_mode || death.corpse.is_boss) return;
     AttackBudgetSystem(run).passive(std::to_string(death.corpse.id),death.target);
@@ -26,7 +30,7 @@ bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest 
 }
 }
 CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);death_marked_hooks.push_back(SniperBehavior::died);death_marked_hooks.push_back(PhoenixBehavior::died);death_marked_hooks.push_back(CrabBehavior::died);
-    death_marked_hooks.push_back(FieldSystem::comet_gravity);barrier_hooks.push_back(BarrierBehavior::block);trait_kill_hooks.push_back(RampageBehavior::kill);critical_hooks.push_back(CritBeamBehavior::critical);enemy_death_hooks.push_back(SplitBehavior::died);enemy_death_hooks.push_back(FriendDebrisSystem::development_death);}
+    death_marked_hooks.push_back(FieldSystem::comet_gravity);barrier_hooks.push_back(BarrierBehavior::block);shatter_hooks.push_back(KnockbackBehavior::defeated);capture_hooks.push_back(development_capture);trait_kill_hooks.push_back(RampageBehavior::kill);critical_hooks.push_back(CritBeamBehavior::critical);enemy_death_hooks.push_back(SplitBehavior::died);enemy_death_hooks.push_back(FriendDebrisSystem::development_death);}
 bool CombatHooks::register_enemy(EnemyDefinition::Kind kind,EnemyPolicy policy) {
     if (dispatch_depth) return false;policies[kind]=policy;return true;
 }

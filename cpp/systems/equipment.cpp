@@ -93,6 +93,10 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W03") {
+            const auto &level=run.content->knockback_levels[next-1];auto &k=run.state.loadout.knockback;
+            k.ready=true;k.definition=id;k.chain_limit=level.chain_limit;k.chance=level.chance;k.speed=level.speed;k.life=level.life;k.base_damage=level.base_damage;k.base_attack=level.base_attack;k.base_knock=level.base_knock;k.base_life=level.base_life;
+            k.projectile_increment=level.projectile_increment;k.duration_increment=level.duration_increment;k.knockback_increment=level.knockback_increment;k.area_increment=level.area_increment;
         } else if (d.external_id=="W07") {
             const auto &level=run.content->mines_levels[next-1];auto &m=run.state.loadout.mines;
             m.ready=true;m.chain=next>=3;m.definition=id;m.count=level.count;m.maximum=level.maximum;m.damage=level.damage;m.radius=level.radius;m.life=level.life;
@@ -140,6 +144,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W03") run.state.loadout.knockback={};
     else if (external=="W07") run.state.loadout.mines={};
     else if (external=="W29") run.state.loadout.end_blast={};
     else if (external=="W02") run.state.loadout.scatter={};

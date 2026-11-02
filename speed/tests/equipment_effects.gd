@@ -72,6 +72,13 @@ func _ready() -> void:
 		print("[cpp_t06_source_clock] failed=%d" % failures)
 		get_tree().quit(1 if failures else 0)
 		return
+
+	if "--cpp-w03" in OS.get_cmdline_user_args() or "--cpp-w03-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_w03()
+		print("[cpp_w03] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t06" in OS.get_cmdline_user_args() or "--cpp-t06-fixes" in OS.get_cmdline_user_args():
 		await check_cpp_t06()
 		print("[cpp_t06] failed=%d" % failures)
@@ -2678,3 +2685,159 @@ func check_cpp_t06_source_clock() -> bool:
 	check(is_equal_approx(bridge._ui.lance_effects[0].age,before.lance_effects[0].age+world_dt),"発射光・命中火花は元の世界秒で進む")
 	session.free()
 	return true
+
+func w03_bridge(bytes: PackedByteArray, seed_value: int):
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	check(bridge.configure(bytes,{"api_version":1,"run_id":93,"mode":1,"stage_id":"84","profile":{},"settings":{}}).ok,"星砕きの固定入力を共通の生成物から準備する")
+	bridge.start(seed_value)
+	bridge.collect_frame()
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	return bridge
+
+func w03_kill(bridge, depth: int = 0, cause: String = "shot", preset: float = 0.0, capture: bool = false, boss: bool = false) -> int:
+	var core = bridge._core
+	var position: Vector2 = core.ship_snapshot().ship_pos+Vector2(100,100)
+	var id: int = core.spawn_enemy(&"drifter",position,{"is_boss":true}) if boss else bridge.command("dev_spawn",{"definition_id":"drifter","position":position}).value
+	core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
+	var hp: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==id)[0].hp
+	if capture: bridge.command("dev_enemy_combat",{"entity_id":id,"capture_on_death":true})
+	if preset>0.0: bridge.command("dev_damage",{"entity_id":id,"amount":hp*preset,"knock":0.0,"no_crit":true})
+	check(bridge.command("dev_damage",{"entity_id":id,"amount":hp*(1.0-preset),"cause":cause,"direction":Vector2.RIGHT,"knock":0.0,"no_crit":true,"shatter_depth":depth}).ok,"最後の一撃を共通の撃破へ通す")
+	return id
+
+func check_cpp_w03() -> void:
+	var retry: bool = "--cpp-w03-fixes" in OS.get_cmdline_user_args()
+	var capture := ErrorCapture.new()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var bytes: PackedByteArray = builder.compile_chase(ContentManager.enemies[&"drifter"],config,schema.sha256("星砕きの固定入力".to_utf8_buffer()))
+	# PCG32の固定seed3490で実連鎖を確認し、通常候補も初回にW03を含む。
+	var seed_value := 3490
+	var session = await trait_test_session("W03",config,seed_value)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("w03",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W03")
+	var area: TraitDef = ContentManager.definition(&"traits",&"T34")
+	var attack: TraitDef = ContentManager.definition(&"traits",&"T11")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,definition.level_steps.size()+1):
+		var should_check: bool = not retry or level>2
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		var granted: Dictionary = bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":level})
+		if should_check: check(granted.ok,"星砕きを全段取得する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T11","levels":2})
+		bridge.command("dev_post_scatter",{"interval":0,"projectile":2,"duration":2,"knockback":2,"area":2})
+		bridge.command("dev_post_weapon_power",{"damage":2,"followup":0})
+		events.clear()
+		var parent: int = w03_kill(bridge)
+		var dust: Array = core.projectiles_snapshot()
+		if should_check: check(dust.size()==2 and dust.all(func(piece): return piece.shatter_depth==1 and piece.hit_ids==[parent]),"全段の発動抽選から初回深さ1の破片を生成する")
+		if should_check: check(is_equal_approx(bridge._ui.knockback.chance,definition.params.chance_by_level[level-1]) and bridge._ui.knockback.chain_limit==definition.params.chain_limit_by_level[level-1],"全段の発動率と連鎖上限を生成値から取得する")
+		for piece: Dictionary in dust:
+			var speed: float = definition.params.speed*(1.0+2.0*config.post_max.increments.projectile_speed)
+			if should_check: check(piece.vel.length()>=speed*0.6999 and piece.vel.length()<=speed*1.3001 and is_equal_approx(piece.life,definition.params.life*(1.0+2.0*config.post_max.increments.duration)),"速度と寿命の最大段後補正を元の破片へ渡す")
+			if should_check: check(is_equal_approx(piece.damage,config.hull_debris_damage*(1.0+attack.stack_bonus(2))*(1.0+2.0*config.post_max.increments.weapon_damage)) and is_equal_approx(piece.knock,config.hull_debris_knock*(1.0+2.0*config.post_max.increments.knockback)) and is_equal_approx(piece.radius,4.0*1.82*config.character_scale*(1.0+area.stack_bonus(2))*(1.0+2.0*config.post_max.increments.area)),"攻撃力と武器威力・ノックバック・範囲を一度ずつ合成する")
+		var types: Array = events.map(func(event): return event.type)
+		if should_check: check(types.find(&"kill")>=0 and types.find(&"kill")<types.find(&"hull_scatter"),"撃破通知のあとに船体破片を同期生成する")
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._knockback_visual!=null and presentation.frame_view._knockback_visual.breaks.size()==1 and presentation.frame_view._barrier_armor.visible,"砕けた輪ときらめき・機体装備を本番表示へ渡す")
+		var shapes: Array = bridge.read_render(Rect2(core.ship_snapshot().ship_pos-Vector2(1000,1000),Vector2(2000,2000))).value.shapes
+		if should_check: check(shapes.filter(func(shape): return shape.get("debris_style",-1)==1).size()==2,"星屑2個を共通の破片描画へ渡す")
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(core.projectiles_snapshot()==dust,"停止中は破片の位置・寿命・深さを進めない")
+		bridge.command("pause",{"paused":false})
+		var target_position: Vector2 = dust[0].pos+dust[0].vel.normalized()*40.0
+		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target_position}).value
+		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
+		var saved: Dictionary = bridge.checkpoint()
+		events.clear()
+		for tick in 12: bridge.step(1.0/120.0,idle,viewport)
+		var hit_events: Array = events.filter(func(event): return event.type==&"combat_damage" and event.payload.cause==&"hullDebris" and event.payload.weapon_id>0)
+		check(hit_events.any(func(event): return event.payload.shatter_depth==1) and core.projectiles_snapshot().any(func(piece): return piece.shatter_depth==2),"実際の破片の命中から深さを増やした連鎖を同期生成する")
+		if retry and level<=2:
+			bridge.release_checkpoint(saved.value)
+			continue
+		presentation._present_cpp(0.01)
+		if should_check: check(not presentation.frame_view._knockback_visual.hits.is_empty(),"星屑の命中を小さな光として表示する")
+		var expected: Array = core.projectiles_snapshot()
+		var expected_visuals: Array = bridge._ui.knockback.visuals.duplicate(true)
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._knockback_visual.breaks.size()==1,"復帰した砕けの残留表示を状態から作り直す")
+		for tick in 12: bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(core.projectiles_snapshot()==expected and bridge._ui.knockback.visuals==expected_visuals,"復帰後も抽選・深さ・命中済みID・位置・表示を再現する")
+		bridge.command("dev_remove_weapon",{"id":"W03"})
+		presentation._present_cpp(0.01)
+		if should_check: check(not bridge._ui.knockback.ready and presentation.frame_view._knockback_visual==null and not presentation.frame_view._barrier_armor.visible and core.projectiles_snapshot()==expected,"解除は次の発動と専用表示を止め生成済み破片は残す")
+		var remaining := 0.0
+		for piece: Dictionary in expected: remaining = maxf(remaining,piece.life)
+		for tick in ceili(remaining*120.0)+2: bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(core.projectiles_snapshot().is_empty(),"残る破片を自然寿命で回収する")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	if not retry:
+		# 深さの上限と半減抽選。通常のRunRandom入力を固定し、率は変えない。
+		for level in range(1,definition.level_steps.size()+1):
+			var valid = w03_bridge(bytes,446)
+			valid.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":level})
+			w03_kill(valid,definition.params.chain_limit_by_level[level-1])
+			check(valid._core.projectiles_snapshot().size()==2 and valid._core.projectiles_snapshot().all(func(piece): return piece.shatter_depth==definition.params.chain_limit_by_level[level-1]+1),"上限ちょうどの親は次の深さの破片を生成する")
+			valid.dispose()
+			var control = w03_bridge(bytes,446)
+			w03_kill(control)
+			var control_rng: String = control._core.inspect().rng_state
+			control.dispose()
+			var over = w03_bridge(bytes,446)
+			over.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":level})
+			w03_kill(over,definition.params.chain_limit_by_level[level-1]+1)
+			check(over._core.projectiles_snapshot().is_empty() and over._core.inspect().rng_state==control_rng,"上限を超える親では生成せず抽選も消費しない")
+			over.dispose()
+			var decay_seed: int = [303,313,314,306,306][level-1]
+			for depth in [0,1]:
+				var decay = w03_bridge(bytes,decay_seed)
+				decay.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":level})
+				w03_kill(decay,depth)
+				check(decay._core.projectiles_snapshot().size()==(2 if depth==0 else 0),"同じ抽選値が初回では発動し深さ1の半減後は発動しない")
+				decay.dispose()
+		for reason in ["afterimage","capture","small","boss"]:
+			var guarded = w03_bridge(bytes,446)
+			guarded.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":5})
+			w03_kill(guarded,0,"afterimage" if reason=="afterimage" else "shot",0.25 if reason=="small" else 0.0,reason=="capture",reason=="boss")
+			check(guarded._core.projectiles_snapshot().is_empty(),"分身・船体の取得・小さいとどめ・ボスでは発動しない: %s" % reason)
+			guarded.dispose()
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":5})
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+		var source: int = w03_kill(bridge)
+		var duplicated: Array = core.projectiles_snapshot()
+		check(duplicated.size()>2 and duplicated.all(func(piece): return piece.shatter_depth==1 and piece.hit_ids==[source]),"複製でも元の星砕き深さと命中済みIDを引き継ぐ")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W03","levels":1})
+	await trait_select_upgrade(session,"W03",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"星砕きの状態と表示に実行エラーがない: %s" % [capture.messages()])
