@@ -6,7 +6,7 @@ static var generation_count := 0
 
 ## Resourceの実効値から実行キーを作る。保存済みAnimationの時刻は参照しない。
 static func charge_stage_commands(move: BossTechnique, lock_lead: float) -> Array:
-	if move == null or move.get_script().resource_path not in ["res://scripts/bosses/monoceros/techniques/charge.gd","res://scripts/data_types/boss_techniques/monoceros/charge.gd","res://scripts/data_types/boss_techniques/monoceros/kick.gd","res://scripts/bosses/monoceros/techniques/kick.gd"]: return []
+	if move == null or move.get_script().resource_path not in ["res://scripts/data_types/boss_techniques/monoceros/charge.gd","res://scripts/data_types/boss_techniques/monoceros/kick.gd"]: return []
 	var keys := [
 		{"at":maxf(0.01,float(move.warn)-lock_lead),"method":&"lock_aim","args":[]},
 		{"at":float(move.warn),"method":&"launch_strike","args":[]},
@@ -34,8 +34,8 @@ static func validate(source: Dictionary) -> PackedStringArray:
 	if rules != null:
 		var ids := {}
 		for move in rules.techniques:
-			if not move is BossTechnique or preload("res://scripts/bosses/legacy_technique_runners.gd").make(move) == null:
-				errors.append("技の実行スクリプトがありません")
+			if not move is BossTechnique or not move.is_scripted():
+				errors.append("技の編集用Resourceがありません")
 				continue
 			var id := String(move.technique)
 			if id.is_empty() or ids.has(id): errors.append("技IDの重複・欠損: " + id)

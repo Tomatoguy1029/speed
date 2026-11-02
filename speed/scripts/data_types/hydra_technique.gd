@@ -2,6 +2,11 @@
 @tool
 extends "res://scripts/data_types/boss_technique.gd"
 class_name HydraTechnique
+const NECKS := {
+	3: [&"bite", &"vortex", &"debris"],
+	5: [&"bite", &"vortex", &"debris", &"beam", &"thunder"],
+	8: [&"bite", &"vortex", &"debris", &"beam", &"thunder", &"bite", &"beam", &"vortex"],
+}
 @export var head_kind: StringName
 
 func _validate_property(property: Dictionary) -> void:

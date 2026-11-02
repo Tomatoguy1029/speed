@@ -1,6 +1,7 @@
 ## 比較で対応する追跡敵の固定値を、編集元と本番の倍率から生成する。
 @tool
 extends RefCounted
+const AttackDefaults = preload("res://scripts/data_types/attack_defaults.gd")
 
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
@@ -154,7 +155,7 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 			if not is_finite(value) or value<0.0: return {}
 			row.aquila[pair[0]] = value
 		if row.aquila.lock_time<=0.0 or row.aquila.dash_speed<=0.0 or row.aquila.drop_step<=0.0: return {}
-		row.aquila.admission_duration = row.aquila.aim_time+row.aquila.lock_time+row.aquila.dash_time+row.aquila.blast_delay+ProjectileSystem.ZONE_FLASH
+		row.aquila.admission_duration = row.aquila.aim_time+row.aquila.lock_time+row.aquila.dash_time+row.aquila.blast_delay+AttackDefaults.ZONE_FLASH
 	if definition.behavior == &"phoenix":
 		row.phoenix = {}
 		for pair in [["retreat_distance","retreat_distance"],["retreat_time","retreat_time"],["telegraph","telegraph"],["dive_time","dive_time"],["impact_radius","impact_radius"],["impact_time","impact_time"],["impact_damage","impact_dmg"],["recover_time","recover_time"]]:
@@ -272,7 +273,7 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		row.drift = {"has_life":definition.params.has("life"),"life":float(definition.params.get("life",0.0)),"ram_guard":definition.gate==&"guard"}
 		if not is_finite(row.drift.life) or row.drift.life<0.0: return {}
 	if definition.behavior == &"rocket":
-		row.rocket = {"blast_duration":ProjectileSystem.ZONE_FLASH,"admission_duration":float(definition.params.get("telegraph",definition.params.get("windup",0.0)))+float(definition.params.get("dash_time",definition.params.get("beam_time",definition.params.get("blast_delay",0.2))))+0.1}
+		row.rocket = {"blast_duration":AttackDefaults.ZONE_FLASH,"admission_duration":float(definition.params.get("telegraph",definition.params.get("windup",0.0)))+float(definition.params.get("dash_time",definition.params.get("beam_time",definition.params.get("blast_delay",0.2))))+0.1}
 		for pair in [["life","life"],["fuse","fuse"],["blast_radius","blast_radius"],["blast_damage","blast_dmg"]]:
 			if not definition.params.has(pair[1]): return {}
 			row.rocket[pair[0]] = float(definition.params[pair[1]])
@@ -418,6 +419,6 @@ static func compile_bite_zone(visual_library: Resource) -> Dictionary:
 	var scene := "res://scenes/attacks/zone_bite.tscn"
 	if not ResourceLoader.exists(scene): scene = "res://scenes/attacks/zone.tscn"
 	var layers: Dictionary = visual_library.get_meta("looks",{}).get(scene,{}) if visual_library != null else {}
-	return {"version":1,"duration":ProjectileSystem.ZONE_FLASH,"scene":scene,
+	return {"version":1,"duration":AttackDefaults.ZONE_FLASH,"scene":scene,
 		"hit":layers.get("Hit") != null or not layers.get("Hit_sprites",[]).is_empty(),
 		"fade":layers.get("Fade") != null or not layers.get("Fade_sprites",[]).is_empty()}

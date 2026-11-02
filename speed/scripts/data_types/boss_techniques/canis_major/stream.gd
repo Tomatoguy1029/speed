@@ -57,6 +57,3 @@ extends BossTechnique
 	set(value):
 		cd_p2 = value
 		_values_dirty = true
-
-func make_runner() -> RefCounted:
-	return null

@@ -1,6 +1,9 @@
 ## 編集元から利用する種類と依存資源を解決する。外観の差し替えもここで反映する。
 @tool
 extends RefCounted
+## C++へ登録した種類の描画資源と派生敵。制作時に値の依存を解決する。
+const BEHAVIOR_ATTACKS := {"aquarius": ["flood"], "aquila": ["zone"], "auriga": ["wall"], "beamer": ["beam", "cross"], "biter": ["zone"], "cepheus": ["bolt"], "clock": ["wall"], "crab": ["zone"], "cross": ["cross"], "dolphin": ["wave"], "enemy_behavior": ["enemy", "zone"], "gunner": ["enemy"], "lynx": ["slash"], "missile": ["enemy"], "phoenix": ["zone"], "pulser": ["wave"], "pump": ["shell"], "ruler": ["wall"], "saw": ["saw"], "sniper": ["beam"], "triangle": ["wall"]}
+const BEHAVIOR_ENEMIES := {"beamer": ["cross"], "biter": ["biter"], "cepheus": ["cepheus_soldier"], "corona_vortex": ["corona"], "marlin": ["marlin"], "missile": ["missile"], "soldier": ["cepheus"], "split": ["splitling"], "triangle": ["triangle_star"]}
 static func _add(paths: Dictionary, path: String) -> void:
 	if paths.has(path) or not ResourceLoader.exists(path): return
 	paths[path] = true
@@ -16,18 +19,15 @@ static func _script(paths: Dictionary, path: String) -> String:
 	return FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""
 static func _attack(paths: Dictionary, kind: String) -> void:
 	_add(paths, "res://scenes/attacks/%s.tscn" % kind)
-	_script(paths, "res://scripts/attacks/%s.gd" % kind)
 	_script(paths, "res://scripts/render/attacks/%s.gd" % kind)
 	if kind in ["zone", "beam"]:
 		for file in DirAccess.get_files_at("res://scripts/render/attacks"):
 			if file.begins_with(kind + "_") and file.ends_with(".gd") and file != "beam_flood.gd":
 				_add(paths, "res://scenes/attacks/" + file.get_basename() + ".tscn")
 				_script(paths, "res://scripts/render/attacks/" + file)
-	if kind in ["enemy", "ring_hold", "lump"]:
-		_script(paths, "res://scripts/attacks/bullet.gd")
+	if kind in ["enemy","ring_hold","lump"]:
 		_script(paths, "res://scripts/render/attacks/bullet.gd")
 	if kind == "enemy":
-		_script(paths, "res://scripts/attacks/missile.gd")
 		_script(paths, "res://scripts/render/attacks/missile.gd")
 	if kind in ["cross", "flood"]: _script(paths, "res://scripts/render/attacks/beam.gd")
 	if kind == "flood":
@@ -76,10 +76,7 @@ static func build(stage: RuntimeStage, output := "res://.content", config: GameC
 		for id in catalog.table(&"enemies"): ids[String(id)] = true
 	var pending := ids.keys()
 	var known := catalog.table(&"enemies")
-	var attack_pattern := RegEx.new()
-	attack_pattern.compile('projectiles\\.fire_([A-Za-z_]+)')
-	var shared := FileAccess.get_file_as_string("res://scripts/enemies/enemy_behavior.gd")
-	for match in attack_pattern.search_all(shared): _attack(paths, match.get_string(1))
+	for kind in BEHAVIOR_ATTACKS.get("enemy_behavior",[]): _attack(paths,kind)
 	for entry in catalog.table(&"heroes").values(): _add(paths, entry.path)
 	while not pending.is_empty():
 		var id: String = pending.pop_back()
@@ -87,16 +84,14 @@ static func build(stage: RuntimeStage, output := "res://.content", config: GameC
 		if entry == null: continue
 		_add(paths, entry.path)
 		var definition := load(entry.path) as EnemyDef
-		var behavior := "res://scripts/enemies/%s.gd" % definition.behavior
-		var text := _script(paths, behavior)
 		_script(paths, "res://scripts/render/enemies/%s.gd" % definition.behavior)
 		_script(paths, "res://scripts/render/enemies/%s.gd" % id)
-		for match in attack_pattern.search_all(text): _attack(paths, match.get_string(1))
+		for kind in BEHAVIOR_ATTACKS.get(String(definition.behavior),[]): _attack(paths,kind)
 		# 派生体と増援に使うIDは、行動のリテラルと定義の値から解決する。
 		var values := var_to_str(definition.params)
 		for candidate in known:
 			var token := '"' + String(candidate) + '"'
-			if not ids.has(String(candidate)) and (text.contains(token) or values.contains(token)):
+			if not ids.has(String(candidate)) and (String(candidate) in BEHAVIOR_ENEMIES.get(String(definition.behavior),[]) or values.contains(token)):
 				ids[String(candidate)] = true
 				pending.append(String(candidate))
 		var skin := stage.enemy_sprite_path(StringName(id)).get_file().get_basename()
@@ -113,7 +108,7 @@ static func build(stage: RuntimeStage, output := "res://.content", config: GameC
 		_add(paths, boss.path)
 		var definition := load(boss.path) as BossDef
 		_add(paths, definition.scene_path)
-	for common in ["res://.content/hero_aura.res", "res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/render_pipeline.gd", "res://scripts/render/gpu_sparks.gd", "res://scripts/render/ship_visual.gd", "res://scripts/render/body_visual.gd", "res://scripts/render/meteor_visual.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
+	for common in ["res://.content/hero_aura.res", "res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/render_pipeline.gd", "res://scripts/render/gpu_sparks.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
 	# 武器・特性の演出は途中で手に入るので、使う shader をすべて事前に準備する
 	for folder in ["res://scripts/render/equipment", "res://scripts/render/friendly", "res://scripts/render/fx"]:
 		for file in DirAccess.get_files_at(folder):

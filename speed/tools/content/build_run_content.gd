@@ -2,9 +2,7 @@
 @tool
 extends RefCounted
 const Schema = preload("res://tools/content/generated/run_schema.gd")
-const Wave = preload("res://scripts/attacks/wave.gd")
-const Slash = preload("res://scripts/attacks/slash.gd")
-const Missile = preload("res://scripts/attacks/missile.gd")
+const AttackDefaults = preload("res://scripts/data_types/attack_defaults.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 const BossProgram = preload("res://tools/content/build_boss_program.gd")
 
@@ -1404,14 +1402,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		{"id":4,"shape":1,"scale":0,"hit_policy":0,"add_ship_radius":false,"ship_sweep":false,"width":0.0}]
 	data.BeamDefinition = [{"id":1,"contact":3}]
 	data.ContactDefinition.append({"id":5,"shape":5,"scale":0,"hit_policy":0,"add_ship_radius":true,"ship_sweep":false,"width":0.0})
-	data.WaveDefinition = [{"id":1,"contact":5,"enemy_min_distance":Wave.ENEMY_MIN_DISTANCE,"enemy_knock":Wave.ENEMY_KNOCK}]
+	data.WaveDefinition = [{"id":1,"contact":5,"enemy_min_distance":AttackDefaults.ENEMY_MIN_DISTANCE,"enemy_knock":AttackDefaults.ENEMY_KNOCK}]
 	data.ContactDefinition.append({"id":6,"shape":1,"scale":0,"hit_policy":3,"add_ship_radius":true,"ship_sweep":false,"width":0.0})
 	data.WallDefinition = [{"id":1,"contact":6}]
 	data.ContactDefinition.append({"id":7,"shape":3,"scale":0,"hit_policy":1,"add_ship_radius":true,"ship_sweep":false,"width":0.0})
 	for claw in 3:
-		var points: PackedVector2Array = Slash.slash_local(claw)
+		var points: PackedVector2Array = AttackDefaults.slash_local(claw)
 		for sample in points.size():
-			data.SlashDefinition.append({"id":data.SlashDefinition.size()+1,"claw":claw,"sample":sample,"x":points[sample].x,"y":points[sample].y,"thickness":Slash.SLASH_THICK,"contact":7})
+			data.SlashDefinition.append({"id":data.SlashDefinition.size()+1,"claw":claw,"sample":sample,"x":points[sample].x,"y":points[sample].y,"thickness":AttackDefaults.SLASH_THICK,"contact":7})
 	var bolt_visual: AttackVisual = load("res://scenes/attacks/bolt.tscn").instantiate()
 	var bolt_tint := AttackVisual.apply_effect_settings_to(bolt_visual)
 	data.BoltDefinition = [{"id":1,"radius":7.0,"life":4.0,"flight_scale":bolt_visual.flight_scale,"tint_r":bolt_tint.r,"tint_g":bolt_tint.g,"tint_b":bolt_tint.b,"tint_a":bolt_tint.a,"contact":1}]
@@ -1440,7 +1438,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		var visual: Node = load(visual_scene).instantiate()
 		data.BiteDefinition = [{"id":1,"reach":source.bite.bite_reach,"warn":source.bite.bite_telegraph,
 			"rest":source.bite.bite_rest,"radius":source.bite.bite_radius,"damage":source.bite.bullet_dmg,
-			"duration":ProjectileSystem.ZONE_FLASH,"visual_key":7,
+			"duration":AttackDefaults.ZONE_FLASH,"visual_key":7,
 			"hit":visual.get_node_or_null("Hit")!=null,"fade":visual.get_node_or_null("Fade")!=null}]
 		visual.free()
 	if definition.behavior==&"lynx":
@@ -1680,7 +1678,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	if rear==null: return {}
 	var rear_id: int = data.LoadoutDefinition.size()+1
 	data.LoadoutDefinition.append({"id":rear_id,"kind":0,"maximum_level":rear.level_steps.size(),"external_id":"W23","comet_only":rear.comet_only})
-	var mount: Vector2 = preload("res://scripts/weapons/rear.gd").MOUNT_PIXEL-Vector2(15.5,30.0)
+	var mount: Vector2 = AttackDefaults.REAR_MOUNT_PIXEL-Vector2(15.5,30.0)
 	for level in rear.level_steps.size():
 		data.RearDefinition.append({"id":level+1,"weapon":rear_id,"level":level+1,"interval":float(rear.params.interval_by_level[level]),"damage":float(rear.params.damage_by_level[level]),"pierce":int(rear.params.pierce_by_level[level]),"life":float(rear.params.life),"spread":float(rear.params.spread_step),"knock":float(rear.params.knock),"color":Color(rear.params.color).to_rgba32(),"mount_x":mount.x,"mount_y":mount.y,"muzzle_distance":12.5})
 	var flash_slash := load("res://data/weapons/W28_flashSlash.tres") as WeaponDef
@@ -2036,7 +2034,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		var values: Dictionary = settings.resolved_values("enemy/aquila",path) if style==4 else settings.values_for(path)
 		var tint: Color = values.get("effect_tint",Color.WHITE)
 		var meta: Dictionary = star_library.get_meta("looks",{}).get(path,{})
-		var record := {"id":style+1,"style":style,"contact":2,"active":ProjectileSystem.ZONE_FLASH,"hit_duration":zone_visual.hit_duration,"fade_duration":zone_visual.fade_duration,"hit":meta.get("Hit") is Mesh or not meta.get("Hit_sprites",[]).is_empty(),"fade":meta.get("Fade") is Mesh or not meta.get("Fade_sprites",[]).is_empty(),"tint_r":tint.r,"tint_g":tint.g,"tint_b":tint.b,"tint_a":tint.a}
+		var record := {"id":style+1,"style":style,"contact":2,"active":AttackDefaults.ZONE_FLASH,"hit_duration":zone_visual.hit_duration,"fade_duration":zone_visual.fade_duration,"hit":meta.get("Hit") is Mesh or not meta.get("Hit_sprites",[]).is_empty(),"fade":meta.get("Fade") is Mesh or not meta.get("Fade_sprites",[]).is_empty(),"tint_r":tint.r,"tint_g":tint.g,"tint_b":tint.b,"tint_a":tint.a}
 		for key in ["glow_opacity","ring_opacity","ring_width","arm_count","lightning_reach","lightning_width"]: record[key] = float(values.get(key,zone_visual.get(key) if style==4 else 0.0))
 		data.ZoneDefinition.append(record)
 		zone_visual.free()
@@ -2058,7 +2056,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		visuals.append({"id":reflected_visual,"role":13,"path":""})
 		data.HostileDefinition.append({"id":2,"kind":2,"radius":5.0,"life":source.shield.reflect_life,"damage":source.shield.reflect_dmg,"slow":0.0,"turn":0.0,
 			"visual":reflected_visual,"stone_visual":bullet_visual+1,"contact":1})
-	data.HostileDefinition.append({"id":data.HostileDefinition.size()+1,"kind":1,"radius":Missile.RADIUS,"life":Missile.LIFE,"damage":Missile.DEFAULT_DAMAGE,"slow":0.0,"turn":0.0,
+	data.HostileDefinition.append({"id":data.HostileDefinition.size()+1,"kind":1,"radius":AttackDefaults.RADIUS,"life":AttackDefaults.LIFE,"damage":AttackDefaults.DEFAULT_DAMAGE,"slow":0.0,"turn":0.0,
 		"visual":bullet_visual,"stone_visual":bullet_visual+1,"contact":1})
 	for i in weapon.level_steps.size():
 		data.ForwardDefinition.append({"id":i+1,"weapon":1,"level":i+1,

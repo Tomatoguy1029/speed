@@ -31,7 +31,6 @@ static func build(output := "res://data/content_catalog.tres") -> Error:
 				var paths := {}
 				var dependencies = load("res://tools/content/build_stage_resources.gd")
 				dependencies._add(paths, path)
-				dependencies._script(paths, "res://scripts/%s/%s.gd" % [category, entry.code_id])
 				dependencies._script(paths, "res://scripts/render/equipment/%s.gd" % entry.code_id)
 				entry.resources = PackedStringArray(paths.keys())
 				entry.resources.sort()

@@ -1,5 +1,6 @@
 ## 吐き出しビーム左右の彗星弾。技リソースのInspectorで弧を調整する。
 @tool
+class_name DracoExhaleArc
 extends Resource
 @export var offset := Vector2.ZERO
 @export var radius := 180.0
