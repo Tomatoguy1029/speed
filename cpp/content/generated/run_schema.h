@@ -4112,7 +4112,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 45) return false;
+    if (out.kind > 64) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -5571,6 +5571,31 @@ inline bool read(BinaryReader &input, CanisBlazeDefinition &out) {
     if (out.accel < 0) return false;
     return true;
 }
+struct CanisStreamDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double interval{};
+    double each_warn{};
+    double lunge_speed{};
+    double lunge_time{};
+    uint32_t min_hounds{};
+};
+inline bool read(BinaryReader &input, CanisStreamDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.each_warn)) return false;
+    if (out.each_warn < 0) return false;
+    if (!input.read_f64(out.lunge_speed)) return false;
+    if (out.lunge_speed < 0) return false;
+    if (!input.read_f64(out.lunge_time)) return false;
+    if (out.lunge_time < 0) return false;
+    if (!input.read_u32(out.min_hounds)) return false;
+    if (out.min_hounds < 0) return false;
+    return true;
+}
 struct HydraBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -5685,6 +5710,461 @@ inline bool read(BinaryReader &input, HydraRegrowDefinition &out) {
     if (out.debris_dmg < 0) return false;
     return true;
 }
+struct HydraNormalDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t head_kind{};
+    double aim_tracking{};
+    double attack_cd{};
+    double bite_radius{};
+    double cost{};
+};
+inline bool read(BinaryReader &input, HydraNormalDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.head_kind)) return false;
+    if (out.head_kind > 4) return false;
+    if (!input.read_f64(out.aim_tracking)) return false;
+    if (out.aim_tracking < 0) return false;
+    if (!input.read_f64(out.attack_cd)) return false;
+    if (out.attack_cd < 0) return false;
+    if (!input.read_f64(out.bite_radius)) return false;
+    if (out.bite_radius < 0) return false;
+    if (!input.read_f64(out.cost)) return false;
+    if (out.cost < 0) return false;
+    return true;
+}
+struct HydraSwimDefinition {
+    uint32_t id{};
+    uint32_t boss{};
+    uint32_t immortal{};
+    double separation_time{};
+    double immortal_hp{};
+    double snake_speed{};
+    double snake_turn{};
+    double snake_accel{};
+    double bearer_speed{};
+    double solo_bearer_distance{};
+    double look_player_turn{};
+    double attack_speed{};
+    double lunge_momentum{};
+};
+inline bool read(BinaryReader &input, HydraSwimDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_u32(out.immortal)) return false;
+    if (!input.read_f64(out.separation_time)) return false;
+    if (out.separation_time < 0) return false;
+    if (!input.read_f64(out.immortal_hp)) return false;
+    if (out.immortal_hp < 0) return false;
+    if (!input.read_f64(out.snake_speed)) return false;
+    if (out.snake_speed < 0) return false;
+    if (!input.read_f64(out.snake_turn)) return false;
+    if (out.snake_turn < 0) return false;
+    if (!input.read_f64(out.snake_accel)) return false;
+    if (out.snake_accel < 0) return false;
+    if (!input.read_f64(out.bearer_speed)) return false;
+    if (out.bearer_speed < 0) return false;
+    if (!input.read_f64(out.solo_bearer_distance)) return false;
+    if (out.solo_bearer_distance < 0) return false;
+    if (!input.read_f64(out.look_player_turn)) return false;
+    if (out.look_player_turn < 0) return false;
+    if (!input.read_f64(out.attack_speed)) return false;
+    if (out.attack_speed < 0) return false;
+    if (!input.read_f64(out.lunge_momentum)) return false;
+    if (out.lunge_momentum < 0) return false;
+    return true;
+}
+struct HydraNormalGate {
+    uint32_t id{};
+    uint32_t technique{};
+    double minimum{};
+    double maximum{};
+    double angle{};
+    double half_angle{};
+    uint32_t distance_origin{};
+    uint32_t angle_origin{};
+    bool ignore_when_separated{};
+};
+inline bool read(BinaryReader &input, HydraNormalGate &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.minimum)) return false;
+    if (out.minimum < 0) return false;
+    if (!input.read_f64(out.maximum)) return false;
+    if (out.maximum < 0) return false;
+    if (!input.read_f64(out.angle)) return false;
+    if (!input.read_f64(out.half_angle)) return false;
+    if (!input.read_u32(out.distance_origin)) return false;
+    if (out.distance_origin > 2) return false;
+    if (!input.read_u32(out.angle_origin)) return false;
+    if (out.angle_origin > 1) return false;
+    if (!input.read_bool(out.ignore_when_separated)) return false;
+    return true;
+}
+struct HydraSquadDefinition {
+    uint32_t id{};
+    uint32_t boss{};
+    double counter_max{};
+    double counter_gap{};
+    double counter_sight{};
+    double counter_range_cap{};
+    double counter_extra{};
+    double pincer_weight{};
+    double wave_weight{};
+    double wall_weight{};
+    double wall_near_weight{};
+    double repeat_weight{};
+    double wall_time_x{};
+    double wall_time_y{};
+    double tactic_time_x{};
+    double tactic_time_y{};
+    double pincer_velocity{};
+    double pincer_idle_noise{};
+    double pincer_noise{};
+    double attack_arrival{};
+    double pincer_timeout{};
+    double pincer_gap_x{};
+    double pincer_gap_y{};
+    double initial_gap_x{};
+    double initial_gap_y{};
+    double wave_candidates{};
+    double wave_repeat_weight{};
+    double wave_separation{};
+    double wave_timeout{};
+    double wave_gap_x{};
+    double wave_gap_y{};
+    double pick_band{};
+    double pick_distance{};
+    double pick_rest{};
+    double pick_front_weight{};
+    double pick_front_distance{};
+    double lunge_momentum{};
+    double look_forward_noise{};
+    double look_forward_turn{};
+    double look_player_turn{};
+    double look_wave{};
+    double look_wave_speed{};
+    double look_near_extra{};
+    double alignment_cap{};
+    double alignment_weight{};
+    double arrival{};
+    double arrival_drift{};
+    double arrival_drift_distance{};
+    double attack_speed{};
+    double avoid_reduction{};
+    double bearer_arrival{};
+    double bearer_band_x{};
+    double bearer_band_y{};
+    double bearer_drift{};
+    double bearer_near_speed{};
+    double bearer_panic_speed{};
+    double bearer_radius{};
+    double bearer_replan{};
+    double bearer_ring{};
+    double bearer_speed{};
+    double bearer_turn{};
+    double bearer_wall_band_x{};
+    double bearer_wall_band_y{};
+    double block_arrival{};
+    double block_count{};
+    double block_distance{};
+    double block_force_cap{};
+    double block_fraction{};
+    double block_predict{};
+    double block_response{};
+    double block_separation{};
+    double block_speed{};
+    double block_spread{};
+    double block_turn{};
+    double body_length{};
+    double body_radius{};
+    double body_step{};
+    double body_weight{};
+    double chase_extra{};
+    double close_angles_0{};
+    double close_angles_1{};
+    double close_angles_2{};
+    double close_angles_3{};
+    double close_radii_0{};
+    double close_radii_1{};
+    double close_sight{};
+    double close_speed{};
+    double cohesion_cap{};
+    double cohesion_weight{};
+    double detour_radius{};
+    double detour_seek{};
+    double far_distance{};
+    double far_speed{};
+    double flee_candidates{};
+    double flee_distance_weight{};
+    double flee_far_weight{};
+    double flee_guard_weight{};
+    double flee_margin{};
+    double flee_noise{};
+    double flee_view_weight{};
+    double flee_wall_weight{};
+    double force_cap{};
+    double front_count{};
+    double front_fraction{};
+    double front_loyalty{};
+    double front_near_count{};
+    double front_outer{};
+    double front_pick_distance{};
+    double front_radius_x{};
+    double front_radius_y{};
+    double front_sight{};
+    double front_spacing{};
+    double front_speed{};
+    double front_spread{};
+    double front_spread_max{};
+    double gain{};
+    double goal_response{};
+    double neighbor_radius{};
+    double neighbor_soft{};
+    double panic_cooldown{};
+    double panic_distance{};
+    double panic_radius{};
+    double panic_time{};
+    double predict{};
+    double reorient{};
+    double reorient_gap{};
+    double replan_x{};
+    double replan_y{};
+    double seek_cap{};
+    double separation_cap{};
+    double separation_radius{};
+    double separation_tau{};
+    double separation_weight{};
+    double sight_distance{};
+    double sight_floor{};
+    double slot_margin{};
+    double turn{};
+    double urgency{};
+    double velocity_cap{};
+    double velocity_floor{};
+    double view_margin_x{};
+    double view_margin_y{};
+    double wall_max{};
+    double wall_spread{};
+    double busy_windup{};
+    double busy_active{};
+    double busy_hold{};
+    double look_attack_on_x{};
+    double look_attack_on_y{};
+    double look_attack_off_x{};
+    double look_attack_off_y{};
+    double look_attack_limit{};
+    double look_front_on_x{};
+    double look_front_on_y{};
+    double look_front_off_x{};
+    double look_front_off_y{};
+    double look_front_limit{};
+    double look_close_on_x{};
+    double look_close_on_y{};
+    double look_close_off_x{};
+    double look_close_off_y{};
+    double look_close_limit{};
+    double look_block_on_x{};
+    double look_block_on_y{};
+    double look_block_off_x{};
+    double look_block_off_y{};
+    double look_block_limit{};
+    double look_bearer_on_x{};
+    double look_bearer_on_y{};
+    double look_bearer_off_x{};
+    double look_bearer_off_y{};
+    double look_bearer_limit{};
+    double range_bite{};
+    double range_thunder{};
+    double range_vortex{};
+    double range_debris{};
+    double range_beam{};
+};
+inline bool read(BinaryReader &input, HydraSquadDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_f64(out.counter_max)) return false;
+    if (!input.read_f64(out.counter_gap)) return false;
+    if (!input.read_f64(out.counter_sight)) return false;
+    if (!input.read_f64(out.counter_range_cap)) return false;
+    if (!input.read_f64(out.counter_extra)) return false;
+    if (!input.read_f64(out.pincer_weight)) return false;
+    if (!input.read_f64(out.wave_weight)) return false;
+    if (!input.read_f64(out.wall_weight)) return false;
+    if (!input.read_f64(out.wall_near_weight)) return false;
+    if (!input.read_f64(out.repeat_weight)) return false;
+    if (!input.read_f64(out.wall_time_x)) return false;
+    if (!input.read_f64(out.wall_time_y)) return false;
+    if (!input.read_f64(out.tactic_time_x)) return false;
+    if (!input.read_f64(out.tactic_time_y)) return false;
+    if (!input.read_f64(out.pincer_velocity)) return false;
+    if (!input.read_f64(out.pincer_idle_noise)) return false;
+    if (!input.read_f64(out.pincer_noise)) return false;
+    if (!input.read_f64(out.attack_arrival)) return false;
+    if (!input.read_f64(out.pincer_timeout)) return false;
+    if (!input.read_f64(out.pincer_gap_x)) return false;
+    if (!input.read_f64(out.pincer_gap_y)) return false;
+    if (!input.read_f64(out.initial_gap_x)) return false;
+    if (!input.read_f64(out.initial_gap_y)) return false;
+    if (!input.read_f64(out.wave_candidates)) return false;
+    if (!input.read_f64(out.wave_repeat_weight)) return false;
+    if (!input.read_f64(out.wave_separation)) return false;
+    if (!input.read_f64(out.wave_timeout)) return false;
+    if (!input.read_f64(out.wave_gap_x)) return false;
+    if (!input.read_f64(out.wave_gap_y)) return false;
+    if (!input.read_f64(out.pick_band)) return false;
+    if (!input.read_f64(out.pick_distance)) return false;
+    if (!input.read_f64(out.pick_rest)) return false;
+    if (!input.read_f64(out.pick_front_weight)) return false;
+    if (!input.read_f64(out.pick_front_distance)) return false;
+    if (!input.read_f64(out.lunge_momentum)) return false;
+    if (!input.read_f64(out.look_forward_noise)) return false;
+    if (!input.read_f64(out.look_forward_turn)) return false;
+    if (!input.read_f64(out.look_player_turn)) return false;
+    if (!input.read_f64(out.look_wave)) return false;
+    if (!input.read_f64(out.look_wave_speed)) return false;
+    if (!input.read_f64(out.look_near_extra)) return false;
+    if (!input.read_f64(out.alignment_cap)) return false;
+    if (!input.read_f64(out.alignment_weight)) return false;
+    if (!input.read_f64(out.arrival)) return false;
+    if (!input.read_f64(out.arrival_drift)) return false;
+    if (!input.read_f64(out.arrival_drift_distance)) return false;
+    if (!input.read_f64(out.attack_speed)) return false;
+    if (!input.read_f64(out.avoid_reduction)) return false;
+    if (!input.read_f64(out.bearer_arrival)) return false;
+    if (!input.read_f64(out.bearer_band_x)) return false;
+    if (!input.read_f64(out.bearer_band_y)) return false;
+    if (!input.read_f64(out.bearer_drift)) return false;
+    if (!input.read_f64(out.bearer_near_speed)) return false;
+    if (!input.read_f64(out.bearer_panic_speed)) return false;
+    if (!input.read_f64(out.bearer_radius)) return false;
+    if (!input.read_f64(out.bearer_replan)) return false;
+    if (!input.read_f64(out.bearer_ring)) return false;
+    if (!input.read_f64(out.bearer_speed)) return false;
+    if (!input.read_f64(out.bearer_turn)) return false;
+    if (!input.read_f64(out.bearer_wall_band_x)) return false;
+    if (!input.read_f64(out.bearer_wall_band_y)) return false;
+    if (!input.read_f64(out.block_arrival)) return false;
+    if (!input.read_f64(out.block_count)) return false;
+    if (!input.read_f64(out.block_distance)) return false;
+    if (!input.read_f64(out.block_force_cap)) return false;
+    if (!input.read_f64(out.block_fraction)) return false;
+    if (!input.read_f64(out.block_predict)) return false;
+    if (!input.read_f64(out.block_response)) return false;
+    if (!input.read_f64(out.block_separation)) return false;
+    if (!input.read_f64(out.block_speed)) return false;
+    if (!input.read_f64(out.block_spread)) return false;
+    if (!input.read_f64(out.block_turn)) return false;
+    if (!input.read_f64(out.body_length)) return false;
+    if (!input.read_f64(out.body_radius)) return false;
+    if (!input.read_f64(out.body_step)) return false;
+    if (!input.read_f64(out.body_weight)) return false;
+    if (!input.read_f64(out.chase_extra)) return false;
+    if (!input.read_f64(out.close_angles_0)) return false;
+    if (!input.read_f64(out.close_angles_1)) return false;
+    if (!input.read_f64(out.close_angles_2)) return false;
+    if (!input.read_f64(out.close_angles_3)) return false;
+    if (!input.read_f64(out.close_radii_0)) return false;
+    if (!input.read_f64(out.close_radii_1)) return false;
+    if (!input.read_f64(out.close_sight)) return false;
+    if (!input.read_f64(out.close_speed)) return false;
+    if (!input.read_f64(out.cohesion_cap)) return false;
+    if (!input.read_f64(out.cohesion_weight)) return false;
+    if (!input.read_f64(out.detour_radius)) return false;
+    if (!input.read_f64(out.detour_seek)) return false;
+    if (!input.read_f64(out.far_distance)) return false;
+    if (!input.read_f64(out.far_speed)) return false;
+    if (!input.read_f64(out.flee_candidates)) return false;
+    if (!input.read_f64(out.flee_distance_weight)) return false;
+    if (!input.read_f64(out.flee_far_weight)) return false;
+    if (!input.read_f64(out.flee_guard_weight)) return false;
+    if (!input.read_f64(out.flee_margin)) return false;
+    if (!input.read_f64(out.flee_noise)) return false;
+    if (!input.read_f64(out.flee_view_weight)) return false;
+    if (!input.read_f64(out.flee_wall_weight)) return false;
+    if (!input.read_f64(out.force_cap)) return false;
+    if (!input.read_f64(out.front_count)) return false;
+    if (!input.read_f64(out.front_fraction)) return false;
+    if (!input.read_f64(out.front_loyalty)) return false;
+    if (!input.read_f64(out.front_near_count)) return false;
+    if (!input.read_f64(out.front_outer)) return false;
+    if (!input.read_f64(out.front_pick_distance)) return false;
+    if (!input.read_f64(out.front_radius_x)) return false;
+    if (!input.read_f64(out.front_radius_y)) return false;
+    if (!input.read_f64(out.front_sight)) return false;
+    if (!input.read_f64(out.front_spacing)) return false;
+    if (!input.read_f64(out.front_speed)) return false;
+    if (!input.read_f64(out.front_spread)) return false;
+    if (!input.read_f64(out.front_spread_max)) return false;
+    if (!input.read_f64(out.gain)) return false;
+    if (!input.read_f64(out.goal_response)) return false;
+    if (!input.read_f64(out.neighbor_radius)) return false;
+    if (!input.read_f64(out.neighbor_soft)) return false;
+    if (!input.read_f64(out.panic_cooldown)) return false;
+    if (!input.read_f64(out.panic_distance)) return false;
+    if (!input.read_f64(out.panic_radius)) return false;
+    if (!input.read_f64(out.panic_time)) return false;
+    if (!input.read_f64(out.predict)) return false;
+    if (!input.read_f64(out.reorient)) return false;
+    if (!input.read_f64(out.reorient_gap)) return false;
+    if (!input.read_f64(out.replan_x)) return false;
+    if (!input.read_f64(out.replan_y)) return false;
+    if (!input.read_f64(out.seek_cap)) return false;
+    if (!input.read_f64(out.separation_cap)) return false;
+    if (!input.read_f64(out.separation_radius)) return false;
+    if (!input.read_f64(out.separation_tau)) return false;
+    if (!input.read_f64(out.separation_weight)) return false;
+    if (!input.read_f64(out.sight_distance)) return false;
+    if (!input.read_f64(out.sight_floor)) return false;
+    if (!input.read_f64(out.slot_margin)) return false;
+    if (!input.read_f64(out.turn)) return false;
+    if (!input.read_f64(out.urgency)) return false;
+    if (!input.read_f64(out.velocity_cap)) return false;
+    if (!input.read_f64(out.velocity_floor)) return false;
+    if (!input.read_f64(out.view_margin_x)) return false;
+    if (!input.read_f64(out.view_margin_y)) return false;
+    if (!input.read_f64(out.wall_max)) return false;
+    if (!input.read_f64(out.wall_spread)) return false;
+    if (!input.read_f64(out.busy_windup)) return false;
+    if (!input.read_f64(out.busy_active)) return false;
+    if (!input.read_f64(out.busy_hold)) return false;
+    if (!input.read_f64(out.look_attack_on_x)) return false;
+    if (!input.read_f64(out.look_attack_on_y)) return false;
+    if (!input.read_f64(out.look_attack_off_x)) return false;
+    if (!input.read_f64(out.look_attack_off_y)) return false;
+    if (!input.read_f64(out.look_attack_limit)) return false;
+    if (!input.read_f64(out.look_front_on_x)) return false;
+    if (!input.read_f64(out.look_front_on_y)) return false;
+    if (!input.read_f64(out.look_front_off_x)) return false;
+    if (!input.read_f64(out.look_front_off_y)) return false;
+    if (!input.read_f64(out.look_front_limit)) return false;
+    if (!input.read_f64(out.look_close_on_x)) return false;
+    if (!input.read_f64(out.look_close_on_y)) return false;
+    if (!input.read_f64(out.look_close_off_x)) return false;
+    if (!input.read_f64(out.look_close_off_y)) return false;
+    if (!input.read_f64(out.look_close_limit)) return false;
+    if (!input.read_f64(out.look_block_on_x)) return false;
+    if (!input.read_f64(out.look_block_on_y)) return false;
+    if (!input.read_f64(out.look_block_off_x)) return false;
+    if (!input.read_f64(out.look_block_off_y)) return false;
+    if (!input.read_f64(out.look_block_limit)) return false;
+    if (!input.read_f64(out.look_bearer_on_x)) return false;
+    if (!input.read_f64(out.look_bearer_on_y)) return false;
+    if (!input.read_f64(out.look_bearer_off_x)) return false;
+    if (!input.read_f64(out.look_bearer_off_y)) return false;
+    if (!input.read_f64(out.look_bearer_limit)) return false;
+    if (!input.read_f64(out.range_bite)) return false;
+    if (!input.read_f64(out.range_thunder)) return false;
+    if (!input.read_f64(out.range_vortex)) return false;
+    if (!input.read_f64(out.range_debris)) return false;
+    if (!input.read_f64(out.range_beam)) return false;
+    return true;
+}
 struct DracoBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -5700,6 +6180,7 @@ struct DracoBodyDefinition {
     double head_radius{};
     double part_hp{};
     double part_armor{};
+    double entrance_quiet{};
 };
 inline bool read(BinaryReader &input, DracoBodyDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -5730,6 +6211,38 @@ inline bool read(BinaryReader &input, DracoBodyDefinition &out) {
     if (out.part_hp < 0) return false;
     if (!input.read_f64(out.part_armor)) return false;
     if (out.part_armor < 0) return false;
+    if (!input.read_f64(out.entrance_quiet)) return false;
+    if (out.entrance_quiet < 0) return false;
+    return true;
+}
+struct DracoCycleDefinition {
+    uint32_t id{};
+    uint32_t boss{};
+    double collect_time{};
+    uint32_t count{};
+};
+inline bool read(BinaryReader &input, DracoCycleDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_f64(out.collect_time)) return false;
+    if (out.collect_time < 0) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count > 2048) return false;
+    return true;
+}
+struct DracoCycleCandidate {
+    uint32_t id{};
+    uint32_t cycle{};
+    uint32_t enemy{};
+    bool excluded{};
+};
+inline bool read(BinaryReader &input, DracoCycleCandidate &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.cycle)) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    if (!input.read_bool(out.excluded)) return false;
     return true;
 }
 struct ContentRecords {
@@ -5908,9 +6421,16 @@ struct ContentRecords {
     std::vector<CanisSiriusDefinition> CanisSiriusDefinition_rows;
     std::vector<CanisBayDefinition> CanisBayDefinition_rows;
     std::vector<CanisBlazeDefinition> CanisBlazeDefinition_rows;
+    std::vector<CanisStreamDefinition> CanisStreamDefinition_rows;
     std::vector<HydraBodyDefinition> HydraBodyDefinition_rows;
     std::vector<HydraRegrowDefinition> HydraRegrowDefinition_rows;
+    std::vector<HydraNormalDefinition> HydraNormalDefinition_rows;
+    std::vector<HydraSwimDefinition> HydraSwimDefinition_rows;
+    std::vector<HydraNormalGate> HydraNormalGate_rows;
+    std::vector<HydraSquadDefinition> HydraSquadDefinition_rows;
     std::vector<DracoBodyDefinition> DracoBodyDefinition_rows;
+    std::vector<DracoCycleDefinition> DracoCycleDefinition_rows;
+    std::vector<DracoCycleCandidate> DracoCycleCandidate_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -6734,7 +7254,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 22) return false;
+        if (version != 24) return false;
         if (count > input.remaining()/637) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -6967,6 +7487,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CanisBlazeDefinition row; if (!read(input,row)) return false; out.CanisBlazeDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 348: {
+        if (version != 1) return false;
+        if (count > input.remaining()/44) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisStreamDefinition row; if (!read(input,row)) return false; out.CanisStreamDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 370: {
         if (version != 1) return false;
         if (count > input.remaining()/172) return false;
@@ -6979,10 +7505,46 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { HydraRegrowDefinition row; if (!read(input,row)) return false; out.HydraRegrowDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 372: {
+        if (version != 1) return false;
+        if (count > input.remaining()/44) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraNormalDefinition row; if (!read(input,row)) return false; out.HydraNormalDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 373: {
+        if (version != 1) return false;
+        if (count > input.remaining()/92) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraSwimDefinition row; if (!read(input,row)) return false; out.HydraSwimDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 374: {
+        if (version != 1) return false;
+        if (count > input.remaining()/49) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraNormalGate row; if (!read(input,row)) return false; out.HydraNormalGate_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 375: {
+        if (version != 1) return false;
+        if (count > input.remaining()/1408) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraSquadDefinition row; if (!read(input,row)) return false; out.HydraSquadDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 430: {
         if (version != 1) return false;
-        if (count > input.remaining()/100) return false;
+        if (count > input.remaining()/108) return false;
         for (uint32_t i=0; i<count; ++i) { DracoBodyDefinition row; if (!read(input,row)) return false; out.DracoBodyDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 431: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoCycleDefinition row; if (!read(input,row)) return false; out.DracoCycleDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 432: {
+        if (version != 1) return false;
+        if (count > input.remaining()/13) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoCycleCandidate row; if (!read(input,row)) return false; out.DracoCycleCandidate_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -7339,12 +7901,26 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisBayDefinition_rows) if (!CanisBayDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisBlazeDefinition_ids;
     for (const auto &row:data.CanisBlazeDefinition_rows) if (!CanisBlazeDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisStreamDefinition_ids;
+    for (const auto &row:data.CanisStreamDefinition_rows) if (!CanisStreamDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraBodyDefinition_ids;
     for (const auto &row:data.HydraBodyDefinition_rows) if (!HydraBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraRegrowDefinition_ids;
     for (const auto &row:data.HydraRegrowDefinition_rows) if (!HydraRegrowDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraNormalDefinition_ids;
+    for (const auto &row:data.HydraNormalDefinition_rows) if (!HydraNormalDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraSwimDefinition_ids;
+    for (const auto &row:data.HydraSwimDefinition_rows) if (!HydraSwimDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraNormalGate_ids;
+    for (const auto &row:data.HydraNormalGate_rows) if (!HydraNormalGate_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraSquadDefinition_ids;
+    for (const auto &row:data.HydraSquadDefinition_rows) if (!HydraSquadDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DracoBodyDefinition_ids;
     for (const auto &row:data.DracoBodyDefinition_rows) if (!DracoBodyDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoCycleDefinition_ids;
+    for (const auto &row:data.DracoCycleDefinition_rows) if (!DracoCycleDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoCycleCandidate_ids;
+    for (const auto &row:data.DracoCycleCandidate_rows) if (!DracoCycleCandidate_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -7532,6 +8108,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisBayDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.pounce)) return false;
     for (const auto &row:data.CanisBlazeDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CanisBlazeDefinition_rows) if (!CanisFlameDefinition_ids.count(row.flame)) return false;
+    for (const auto &row:data.CanisStreamDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.HydraBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.bite)) return false;
     for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.vortex)) return false;
@@ -7539,7 +8116,15 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.beam)) return false;
     for (const auto &row:data.HydraBodyDefinition_rows) if (!EnemyRecord_ids.count(row.thunder)) return false;
     for (const auto &row:data.HydraRegrowDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.HydraNormalDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.HydraSwimDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.HydraSwimDefinition_rows) if (!EnemyRecord_ids.count(row.immortal)) return false;
+    for (const auto &row:data.HydraNormalGate_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.HydraSquadDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.DracoBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.DracoCycleDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.DracoCycleCandidate_rows) if (!DracoCycleDefinition_ids.count(row.cycle)) return false;
+    for (const auto &row:data.DracoCycleCandidate_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -7666,5 +8251,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=178;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=185;
 }
