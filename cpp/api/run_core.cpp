@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../bosses/flow/technique_runner.h"
+#include "../bosses/flow/flow_runner.h"
 #include "../behaviors/enemies/gunner.h"
 #include "../behaviors/enemies/missile.h"
 #include "../behaviors/enemies/rocket.h"
@@ -193,7 +194,7 @@ bool SpeedRunCore::step(double delta) {
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
-    speed::TechniqueRunner::step(runtime,delta);
+    speed::FlowRunner::step(runtime,delta);
     capture_avoidance();
     ++runtime.state.ticks;
     if (runtime.state.aim_ready && !runtime.state.draw.tracing) {

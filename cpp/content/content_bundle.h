@@ -41,6 +41,15 @@ struct ContentBundle {
     std::vector<SplitDefinition> splits;
     std::vector<DefenderDefinition> defenders;
     std::vector<CrowDefinition> crows;
+    std::vector<BossFlowProgram> boss_flows;
+    std::vector<BossFlowSection> flow_sections;
+    std::vector<BossFlowCondition> flow_conditions;
+    std::vector<BossFlowNode> flow_nodes;
+    std::vector<BossFlowChild> flow_children;
+    std::vector<BossFlowAction> flow_actions;
+    std::vector<BossFlowFilter> flow_filters;
+    std::vector<BossFlowWeight> flow_weights;
+    std::vector<BossFlowForbidden> flow_forbidden;
     std::vector<BossDefinition> bosses;
     std::vector<BossTechniqueDefinition> boss_techniques;
     std::vector<BossTechniqueStage> boss_stages;

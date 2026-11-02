@@ -2316,6 +2316,7 @@
     "enemies.json",
     "field.json",
     "loadout.json",
-    "bosses.json"
+    "bosses.json",
+    "boss_flow.json"
   ]
 }

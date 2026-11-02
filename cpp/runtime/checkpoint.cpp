@@ -1,5 +1,6 @@
 #include "checkpoint.h"
 #include "../bosses/flow/technique_runner.h"
+#include "../bosses/flow/flow_runner.h"
 #include "../systems/attack_system.h"
 #include "../systems/group_system.h"
 #include "../systems/field.h"
@@ -200,7 +201,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     for (const auto &pending:state.pending_enemies) if (!pending.definition || pending.definition>content.definitions.size() || !pending.position.is_finite() || !pending.velocity.is_finite() || !std::isfinite(pending.facing) || !std::isfinite(pending.hit_cd) || pending.hit_cd<0 || !std::isfinite(pending.guard) || pending.guard<0 || !std::isfinite(pending.knock) || pending.knock<0 || !std::isfinite(pending.priority)) return false;
     for (auto weapon:state.loadout.pending_comet_weapons) if (!weapon || weapon>content.equipment.size() || !content.equipment[weapon-1].comet_only) return false;
     for (const auto &capsule:pickups.capsules) if (!capsule.pos.is_finite() || !std::isfinite(capsule.age) || capsule.age<0 || (capsule.kind==CapsuleKind::CometWeapon && (!capsule.weapon || capsule.weapon>content.equipment.size() || !content.equipment[capsule.weapon-1].comet_only))) return false;
-    if (!TechniqueRunner::validate(state,content)) return false;
+    if (!TechniqueRunner::validate(state,content) || !FlowRunner::validate(state,content)) return false;
     if (!FieldSystem::validate(state,content)) return false;
     if (!GroupSystem::validate(state)) return false;
     return AttackSystem::rebuild(state);

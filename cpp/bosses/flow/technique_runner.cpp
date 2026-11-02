@@ -18,12 +18,13 @@ TechniqueHandle TechniqueRunner::begin(RunRuntime &run,EnemyHandle actor,uint32_
     auto &s=run.state;
     if (!definition || definition>run.content->boss_techniques.size() || !s.enemy_handles.contains(actor) || s.enemies[actor.slot].dead || s.bosses.next_id==INT64_MAX) return {};
     for (const auto &t:s.bosses.techniques) if (live(t.stage) && same_handle(t.actor,actor)) return {};
-    size_t row=0;while (row<s.bosses.techniques.size() && live(s.bosses.techniques[row].stage)) ++row;
+    size_t row=0;while (row<s.bosses.techniques.size() && (live(s.bosses.techniques[row].stage) || s.bosses.techniques[row].ticket_refs)) ++row;
     if (row==s.bosses.techniques.size()) s.bosses.techniques.emplace_back();
     else s.bosses.handles.release(s.bosses.handles.at(uint32_t(row)));
     auto &technique=s.bosses.techniques[row];technique={};technique.id=s.bosses.next_id++;technique.actor=actor;technique.definition=definition;
     const auto handle=s.bosses.handles.attach(uint32_t(row),technique.id);
     MonocerosCharge::begin(run,technique);
+    s.enemies[actor.slot].mode=EnemyMode::Windup;
     // advance(0)と同じく、時刻0の命令だけは開始時に実行する。
     for (const auto &stage:run.content->boss_stages) if (stage.technique==definition && stage.at==0) {
         ++technique.command_cursor;MonocerosCharge::command(run,technique,TechniqueCommand(stage.command));
@@ -34,7 +35,7 @@ TechniqueHandle TechniqueRunner::begin(RunRuntime &run,EnemyHandle actor,uint32_
 void TechniqueRunner::cancel(RunRuntime &run,TechniqueHandle handle) {
     if (!running(run,handle)) return;
     auto &technique=run.state.bosses.techniques[handle.slot];technique.stage=TechniqueStage::Cancelled;
-    if (run.state.enemy_handles.contains(technique.actor)) {auto &e=run.state.enemies[technique.actor.slot];e.vel={};e.charge=0;}
+    if (run.state.enemy_handles.contains(technique.actor)) {auto &e=run.state.enemies[technique.actor.slot];e.vel={};e.charge=0;e.mode=EnemyMode::Move;}
     AttackSystem::end_technique(run.state,handle,true);
 }
 void TechniqueRunner::step(RunRuntime &run,double dt) {
@@ -57,6 +58,7 @@ void TechniqueRunner::step(RunRuntime &run,double dt) {
         }
         const auto &p=run.content->boss_techniques[technique.definition-1];auto &e=s.enemies[technique.actor.slot];
         e.charge=technique.stage==TechniqueStage::Windup?std::clamp(technique.elapsed/std::max(0.001,p.warn),0.0,1.0):0;
+        e.mode=technique.stage==TechniqueStage::Windup?EnemyMode::Windup:technique.stage==TechniqueStage::Active?EnemyMode::Dash:live(technique.stage)?EnemyMode::Recover:EnemyMode::Move;
         technique.previous_ship=s.ship_pos;
         if (!live(technique.stage)) AttackSystem::end_technique(s,handle,technique.stage!=TechniqueStage::Finished);
     }

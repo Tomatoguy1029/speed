@@ -36,6 +36,82 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			records.BossTechniqueStage.append(command)
 	return records
 
+static func _flow_condition(records: Dictionary, gate: Dictionary) -> int:
+	for key in gate:
+		if key not in ["min","max","angle","half_angle","min_phase"]: return 0
+	var id: int = records.BossFlowCondition.size()+1
+	records.BossFlowCondition.append({"id":id,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",100000.0)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"minimum_phase":int(gate.get("min_phase",1))})
+	return id
+
+static func _flow_node(records: Dictionary, node: Dictionary, rules: Resource, techniques: Dictionary, depth := 0) -> int:
+	if depth>24 or node.get("type","") not in ["wait","action","sequence","parallel","branch"]: return 0
+	var id: int = records.BossFlowNode.size()+1
+	var row := {"id":id,"flow":1,"kind":["wait","action","sequence","parallel","branch"].find(node.type),"seconds":float(node.get("seconds",0.0)),"technique":0,"condition":0,"participant":int(node.get("participant",0))}
+	if node.type=="action":
+		if not techniques.has(String(node.get("id",""))): return 0
+		row.technique = techniques[String(node.id)]
+		row.condition = _flow_condition(records,rules.conditions.get(String(node.id),{}))
+	elif node.type=="branch": row.condition = _flow_condition(records,node.get("condition",{}))
+	if node.type in ["action","branch"] and row.condition==0: return 0
+	records.BossFlowNode.append(row)
+	var children: Array = node.get("children",[])
+	if (node.type in ["sequence","parallel"] and children.is_empty()) or (node.type=="branch" and children.size()!=2): return 0
+	for i in children.size():
+		var child := _flow_node(records,children[i],rules,techniques,depth+1)
+		if child==0: return 0
+		records.BossFlowChild.append({"id":records.BossFlowChild.size()+1,"parent":id,"child":child,"order":i})
+	return id
+
+## フローの条件と木を索引へ変換する。Script・Callable・任意条件名は持ち込まない。
+static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array) -> Dictionary:
+	if rules==null or flow==null or not BossProgram.validate({"rules":rules,"flow":flow}).is_empty(): return {}
+	var records := {}
+	for record in Schema.SCHEMA.records:
+		if record.name.begins_with("BossFlow"): records[record.name] = []
+	var ids := {}
+	for technique in techniques:
+		if technique.phase==1: ids[String(technique.external_id)] = technique.id
+	for move in rules.techniques:
+		if not ids.has(String(move.technique)): return {}
+	records.BossFlowProgram = [{"id":1,"boss":1,"maximum_stamina":flow.maximum_stamina,"partial_rest":flow.partial_rest,"empty_rest":flow.empty_rest,"idle_only":rules.adapter in [&"monoceros",&"centaurus"],"allow_parallel":rules.allow_parallel_attacks,"has_bias":not rules.selection_bias.is_empty()}]
+	var sources: Array = rules.techniques.map(func(move): return String(move.technique)) + rules.combos.keys()
+	for source in sources:
+		var combo: bool = rules.combos.has(source)
+		var move: BossTechnique
+		if not combo:
+			for candidate in rules.techniques:
+				if String(candidate.technique)==source: move = candidate
+		for entry in rules.active_gate_entries_for(source):
+			var gate: int = _flow_condition(records,entry.gate)
+			if gate==0: return {}
+			var node := _flow_node(records,rules.combos[source] if combo else {"type":"action","id":source},rules,ids)
+			if node==0: return {}
+			if not combo: records.BossFlowNode[node-1].condition = gate
+			var category: int = ["normal","combo","major"].find(entry.category)
+			if category<0: return {}
+			records.BossFlowAction.append({"id":records.BossFlowAction.size()+1,"flow":1,"external_id":source,"node":node,"condition":gate,"category":category,"label":category,"group":entry.group,"cost":float(rules.costs.get(source,2.0 if combo else 1.0)),"weight":float(rules.selection_bias.get(source,1.0)),"post_gap":0.0 if combo else move.post_gap,"exclusive":true})
+	for i in flow.sections.size():
+		var section: Dictionary = flow.sections[i]
+		var id: int = i+1
+		records.BossFlowSection.append({"id":id,"flow":1,"order":i,"request":["normal","major","rest","any"].find(section.get("request","normal")),"cap":float(section.get("cap",flow.maximum_stamina)),"has_budget":section.has("section_budget"),"budget":float(section.get("section_budget",0.0)),"action_count":int(section.get("action_count",1)),"action_interval":float(section.get("action_interval",0.0)),"has_timeout":section.has("no_candidate_timeout"),"timeout":float(section.get("no_candidate_timeout",0.0)),"has_fallback":section.has("fallback"),"fallback":int(section.get("fallback",0)),"next":int(section.get("next",(i+1)%flow.sections.size())),"filter_groups":section.has("allowed_groups") or section.has("allowed_categories"),"filter_allowed":section.has("allowed_techniques"),"avoid_repeat":section.get("avoid_repeat",true)})
+		for key in ["allowed_groups","allowed_categories","allowed_techniques","excluded_techniques"]:
+			for value in section.get(key,[]): records.BossFlowFilter.append({"id":records.BossFlowFilter.size()+1,"section":id,"kind":["allowed_groups","allowed_categories","allowed_techniques","excluded_techniques"].find(key),"value":String(value)})
+		var policies := [{"previous":-1,"weights":section.get("weights",{"single":100.0})}]
+		var previous_seen := []
+		for policy in section.get("probability_rules",[]):
+			var previous: int = ["single","combo","major","parallel"].find(policy.get("previous",""))
+			if previous<0 or previous in previous_seen: continue
+			previous_seen.append(previous)
+			policies.append({"previous":previous,"weights":policy.weights})
+		for policy in policies:
+			if policy.previous>=0 and policy.weights.is_empty(): records.BossFlowWeight.append({"id":records.BossFlowWeight.size()+1,"section":id,"previous":policy.previous,"category":0,"weight":0.0})
+			for category in policy.weights:
+				var kind: int = ["single","combo","major","parallel"].find(category)
+				if kind<0: return {}
+				records.BossFlowWeight.append({"id":records.BossFlowWeight.size()+1,"section":id,"previous":policy.previous,"category":kind,"weight":float(policy.weights[category])})
+		for pair in section.get("forbidden",[]): records.BossFlowForbidden.append({"id":records.BossFlowForbidden.size()+1,"section":id,"left":String(pair[0]),"right":String(pair[1])})
+	return records
+
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
 	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)

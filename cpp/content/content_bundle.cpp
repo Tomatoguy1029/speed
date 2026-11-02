@@ -1,4 +1,5 @@
 #include "content_bundle.h"
+#include "../bosses/flow/flow_runner.h"
 #include <godot_cpp/classes/hashing_context.hpp>
 #include <algorithm>
 #include <cstring>
@@ -83,6 +84,15 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->defenders=records.DefenderDefinition_rows;
     bundle->crabs=records.CrabDefinition_rows;
     bundle->crows=records.CrowDefinition_rows;
+    bundle->boss_flows=records.BossFlowProgram_rows;
+    bundle->flow_sections=records.BossFlowSection_rows;
+    bundle->flow_conditions=records.BossFlowCondition_rows;
+    bundle->flow_nodes=records.BossFlowNode_rows;
+    bundle->flow_children=records.BossFlowChild_rows;
+    bundle->flow_actions=records.BossFlowAction_rows;
+    bundle->flow_filters=records.BossFlowFilter_rows;
+    bundle->flow_weights=records.BossFlowWeight_rows;
+    bundle->flow_forbidden=records.BossFlowForbidden_rows;
     bundle->bosses=records.BossDefinition_rows;
     bundle->boss_techniques=records.BossTechniqueDefinition_rows;
     bundle->boss_stages=records.BossTechniqueStage_rows;
@@ -106,6 +116,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     }
     for (size_t i=0;i<bundle->boss_stages.size();++i) if (bundle->boss_stages[i].id!=i+1) return {};
     bundle->pumps=records.PumpDefinition_rows;
+    if (!FlowRunner::validate_content(*bundle)) return {};
     bundle->clocks=records.ClockDefinition_rows;
     bundle->aurigas=records.AurigaDefinition_rows;
     bundle->soldiers=records.SoldierDefinition_rows;bundle->cepheus=records.CepheusDefinition_rows;

@@ -11,9 +11,9 @@ const BossTechniqueDefinition &rule(const RunRuntime &r,const TechniqueState &t)
 const BossDefinition &boss(const RunRuntime &r,const TechniqueState &t) {return r.content->bosses[rule(r,t).boss-1];}
 double horn_length(const RunRuntime &r,const TechniqueState &t) {const auto &p=boss(r,t);return r.state.enemies[t.actor.slot].radius*(rule(r,t).phase>=2?p.horn_length_ratio_p2:p.horn_length_ratio);}
 TrackingPolicy tracking(const RunRuntime &r,const TechniqueState &t) {const auto &e=r.state.enemies[t.actor.slot];return {r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)};}
-godot::Vector2 strike_aim(const RunRuntime &r,const TechniqueState &t) {
+godot::Vector2 strike_aim(const RunRuntime &r,const TechniqueState &t,double lead=-1) {
     const auto &p=rule(r,t);const auto &e=r.state.enemies[t.actor.slot];const auto velocity=r.state.ship.vel;
-    auto target=r.state.ship_pos+velocity*boss(r,t).lock_lead;
+    auto target=r.state.ship_pos+velocity*(lead<0?boss(r,t).lock_lead:lead);
     const auto offset=target-e.pos;const double speed=p.distance/p.active,reach=horn_length(r,t);
     const double a=velocity.length_squared()-speed*speed,b=2.0*(offset.dot(velocity)-reach*speed),c=offset.length_squared()-reach*reach;
     double contact=0;
@@ -38,6 +38,12 @@ void damage(RunRuntime &r,TechniqueState &t,const godot::PackedVector2Array &bef
     CombatResolver::ship_damage(r,request);t.hit=true;
 }
 void recovery(RunRuntime &r,TechniqueState &t) {t.stage=TechniqueStage::Recovery;t.remaining=rule(r,t).recover;r.state.enemies[t.actor.slot].vel={};}
+}
+bool MonocerosCharge::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {
+    if (!r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead || !definition || definition>r.content->boss_techniques.size()) return false;
+    TechniqueState t;t.actor=actor;t.definition=definition;const auto &p=rule(r,t);const auto &b=boss(r,t);const auto &e=r.state.enemies[actor.slot];
+    const double reach=p.distance+horn_length(r,t)+b.horn_width*0.5+r.state.ship_config.ship_radius;
+    return e.pos.distance_to(r.state.ship_pos)<=reach && std::abs(angle_difference((r.state.ship_pos-e.pos).angle()-e.facing))<=b.turn*std::max(0.0,p.warn-b.lock_lead) && e.pos.distance_to(strike_aim(r,t,p.warn))<=reach;
 }
 godot::PackedVector2Array MonocerosCharge::horn(const RunRuntime &r,const TechniqueState &t,bool warning) {
     const auto &e=r.state.enemies[t.actor.slot];const auto direction=godot::Vector2::from_angle(e.facing);
