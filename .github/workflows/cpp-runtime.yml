@@ -10,6 +10,12 @@ on:
         description: '確認する作業ブランチまたは完全コミット'
         required: true
         type: string
+      platform:
+        description: '確認する配布対象'
+        required: true
+        type: choice
+        default: windows
+        options: [windows, macos, all]
 
 env:
   PYTHONUTF8: '1'
@@ -23,12 +29,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-14
-            platform: macos
-          - os: windows-2022
-            platform: windows
-    runs-on: ${{ matrix.os }}
+        platform: ${{ fromJSON(inputs.platform == 'all' && '["macos","windows"]' || inputs.platform == 'macos' && '["macos"]' || '["windows"]') }}
+    runs-on: ${{ matrix.platform == 'macos' && 'macos-14' || 'windows-2022' }}
     defaults:
       run:
         shell: bash
