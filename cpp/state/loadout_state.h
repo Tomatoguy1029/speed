@@ -79,6 +79,9 @@ struct KnockbackState {
     double chance=0,speed=0,life=0,base_damage=0,base_attack=0,base_knock=0,base_life=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0;
     std::vector<KnockbackVisual> visuals;
 };
+struct EscortTrailPoint {godot::Vector2 pos;double life=0.22;bool join=false;};
+struct EscortDrone {godot::Vector2 pos,dir;std::vector<EscortTrailPoint> trail;bool break_trail=true;};
+struct DashRangeDroneState {bool ready=false,active=false;uint32_t definition=0,count=0;int64_t dash_id=-1;double distance=0,damage=0,tail=0,hit_radius=0,area_increment=0,deploy_distance=0,idle_spacing=0,idle_back=0,return_rate=0;std::vector<EscortDrone> drones;std::vector<godot::Vector2> normals;std::unordered_set<int64_t> hits;};
 struct InterceptorDrone {godot::Vector2 pos;EnemyHandle target;int64_t target_id=-1;double angle=0,flash=0,kick=0,next=0;uint32_t left=0;};
 struct InterceptorState {bool ready=false;uint32_t definition=0,count=0,burst=0,color=0;double clock=0,damage=0,interval=0,burst_interval=0,range=0,orbit=0,orbit_speed=0,target_interval=0,shot_radius=0,shot_speed=0,life=0,projectile_increment=0,duration_increment=0,interval_increment=0,minimum_ratio=0,minimum_interval=0;std::vector<InterceptorDrone> drones;std::unordered_map<int64_t,double> target_after;};
 struct BipolarPending {godot::Vector2 from,to;uint64_t id=0;double delay=0;};
@@ -167,6 +170,7 @@ struct LoadoutState {
     MassTowState mass_tow;
     BipolarState bipolar;
     InterceptorState interceptor;
+    DashRangeDroneState escort;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;

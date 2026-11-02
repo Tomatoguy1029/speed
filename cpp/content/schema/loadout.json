@@ -1537,6 +1537,74 @@
           "type": "u32"
         }
       ]
+    },
+    {
+      "name": "DashRangeDroneDefinition",
+      "section": 206,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 2
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tail",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "idle_spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "idle_back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "return_rate",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 2
     }
   ],
   "enums": {

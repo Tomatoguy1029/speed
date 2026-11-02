@@ -93,6 +93,8 @@ var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
 var _kill_sonic_visual: RefCounted
+var _escort_world_time := -1.0
+var _escort_visual: RefCounted
 var _interceptor_world_time := -1.0
 var _interceptor_visual: RefCounted
 var _bipolar_world_time := -1.0
@@ -890,6 +892,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		_vortex_world_time = -1.0
 		if _kill_sonic_visual!=null: _kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+		if _escort_visual!=null: _escort_visual.dispose()
+		_escort_visual = null
+		_escort_world_time = -1.0
 		if _interceptor_visual!=null: _interceptor_visual.dispose()
 		_interceptor_visual = null
 		_interceptor_world_time = -1.0
@@ -960,6 +965,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_kill_sonic and _kill_sonic_visual!=null:
 		_kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+	var equipped_escort: bool = frame.ui.get("escort",{}).get("ready",false)
+	if equipped_escort and _escort_visual==null:
+		_escort_visual = preload("res://scripts/render/equipment/dashRangeDrone.gd").new()
+		_escort_visual.setup_frame(_layer(14),_layer(18),_pixel)
+	if not equipped_escort and _escort_visual!=null:
+		_escort_visual.dispose()
+		_escort_visual = null
+		_escort_world_time = -1.0
 	var equipped_interceptor: bool = frame.ui.get("interceptor",{}).get("ready",false)
 	if equipped_interceptor and _interceptor_visual==null:
 		_interceptor_visual = preload("res://scripts/render/equipment/interceptor.gd").new()
@@ -1110,6 +1123,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		_boss_lance_visual.frame_event(event)
 		_boss_wave_visual.frame_event(event)
+		if _escort_visual!=null: _escort_visual.on_event(event)
 		if _interceptor_visual!=null: _interceptor_visual.on_event(event)
 		if _bipolar_visual!=null: _bipolar_visual.frame_event(event)
 		if event.type==&"beam" and event.get("visual_key","")=="weapon/bipolar": ruler_shake = maxf(ruler_shake,5.0)
@@ -1282,6 +1296,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
+	var escort_dt: float = 0.0 if _escort_world_time<0.0 else maxf(0.0,ui.world_time-_escort_world_time)
+	_escort_world_time = ui.world_time if equipped_escort else -1.0
+	if _escort_visual!=null: _escort_visual.frame_tick(ui.escort,ui.character_scale,_zoom,ui.ship,ui.draw.tracing,escort_dt)
 	var interceptor_dt: float = 0.0 if _interceptor_world_time<0.0 else maxf(0.0,ui.world_time-_interceptor_world_time)
 	_interceptor_world_time = ui.world_time if equipped_interceptor else -1.0
 	if _interceptor_visual!=null: _interceptor_visual.frame_tick(ui.interceptor.drones,interceptor_dt)
@@ -1362,7 +1379,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		sprite.position = ui.ship.ship_pos
 		sprite.rotation = ui.ship.ship_heading.angle()+PI/2.0
 		sprite.frame = int(_jet_time*12.0)%3
-		sprite.visible = ui.phase==0 or ui.phase==4
+		sprite.visible = (ui.phase==0 or ui.phase==4) and not (equipped_escort and ui.draw.tracing)
 
 func _death_burst(at: Vector2) -> void:
 	_burst(at,Color("#9fe8ff"),60,500.0)

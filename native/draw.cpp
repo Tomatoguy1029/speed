@@ -1,4 +1,5 @@
 #include "../cpp/behaviors/weapons/bipolar.h"
+#include "../cpp/behaviors/weapons/dashRangeDrone.h"
 #include "../cpp/behaviors/weapons/massTow.h"
 #include "run_core.h"
 #include "../cpp/systems/field.h"
@@ -122,7 +123,11 @@ void SpeedRunCore::commit_draw() {
     speed::RampageBehavior::launch(runtime);
     speed::SonicBehavior::launch(runtime);
     speed::KillSonicBehavior::launch(runtime);
-    speed::BipolarBehavior::launch(runtime);
+    for (const auto &owned:runtime.state.loadout.weapons) {
+        const auto &id=runtime.content->equipment[owned.definition-1].external_id;
+        if (id=="W22") speed::BipolarBehavior::launch(runtime);
+        else if (id=="W26") speed::DashRangeDroneBehavior::launch(runtime);
+    }
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;
     Dictionary launch; launch["pos"] = runtime.state.ship.pos; launch["dir"] = dir; launch["gauge"] = runtime.state.draw.amount;
     emit_event("launch", launch);
@@ -160,7 +165,8 @@ void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
     for (const auto &owned:runtime.state.loadout.weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
-        if (id=="W22") speed::BipolarBehavior::end(runtime);
+        if (id=="W26") speed::DashRangeDroneBehavior::end(runtime);
+        else if (id=="W22") speed::BipolarBehavior::end(runtime);
         else if (id=="W21") speed::MassTowBehavior::end(runtime);
         else if (id=="W29") speed::EndBlastBehavior::end(runtime);
         else if (id=="W07") speed::MinesBehavior::end(runtime);
@@ -197,6 +203,13 @@ bool SpeedRunCore::step_draw(double real_dt) {
         }
         return true;
     }
+    const auto trail=[&](Vector2 from) {
+        speed::FullChargeBehavior::trail(runtime,from,runtime.state.ship.pos);
+        for (const auto &owned:runtime.state.loadout.weapons) {
+            if (runtime.state.phase!=RunState::Phase::Play) return;
+            if (runtime.content->equipment[owned.definition-1].external_id=="W26") speed::DashRangeDroneBehavior::trail(runtime,from,runtime.state.ship.pos);
+        }
+    };
     double dist = runtime.state.draw.rate * real_dt;
     while (dist > 1e-9 && runtime.state.draw.segment < runtime.state.draw.path.size() - 1) {
         const Vector2 a = runtime.state.draw.path[runtime.state.draw.segment], b = runtime.state.draw.path[runtime.state.draw.segment + 1];
@@ -216,8 +229,9 @@ bool SpeedRunCore::step_draw(double real_dt) {
         runtime.state.ship.pos = a + u * runtime.state.draw.seg_pos;
         runtime.state.ship.vel = u * runtime.state.draw.speed;
         runtime.state.ship.heading = u;
-        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) {speed::FullChargeBehavior::trail(runtime,from,runtime.state.ship.pos);end_trace(false);return true;}
-        speed::FullChargeBehavior::trail(runtime,from,runtime.state.ship.pos);
+        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) {trail(from);end_trace(false);return true;}
+        trail(from);
+        if (runtime.state.phase!=RunState::Phase::Play) return true;
         const double speed = runtime.state.ship.vel.length();
         if (speed < runtime.state.draw.speed) runtime.state.draw.speed = speed;
         if (runtime.state.draw.seg_pos >= length - 1e-9) { ++runtime.state.draw.segment; runtime.state.draw.seg_pos = 0; }

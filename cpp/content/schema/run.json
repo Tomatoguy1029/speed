@@ -1436,6 +1436,10 @@
       {
         "name": "Bipolar",
         "value": "bipolar"
+      },
+      {
+        "name": "DashRangeDrone",
+        "value": "dashRangeDrone"
       }
     ],
     "VisualRole": [
@@ -1908,6 +1912,14 @@
       {
         "name": "SlashRelease",
         "value": "slash_release"
+      },
+      {
+        "name": "EscortDeploy",
+        "value": "escort_deploy"
+      },
+      {
+        "name": "EscortSlash",
+        "value": "escort_slash"
       }
     ],
     "ResultKind": [
@@ -2544,6 +2556,14 @@
     "slash_release": [
       "line",
       "width"
+    ],
+    "escort_deploy": [
+      "pos",
+      "targets"
+    ],
+    "escort_slash": [
+      "pos",
+      "dir"
     ]
   },
   "includes": [

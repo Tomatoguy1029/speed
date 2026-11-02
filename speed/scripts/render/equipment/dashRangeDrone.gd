@@ -4,6 +4,20 @@ extends WeaponVisual
 var deploys: Array[Dictionary] = []
 var slashes: Array[Dictionary] = []
 var sparks := PixelSparks.new()
+var _frame_node: Node2D
+func setup_frame(parent: Node2D, effects: Node2D, pixel: float) -> void:
+	_frame_node = preload("res://scripts/render/dash_range_drone.gd").new()
+	parent.add_child(_frame_node)
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	effects.add_child(_painter)
+func frame_tick(values: Dictionary, scale_value: float, zoom: float, ship: Dictionary, tracing: bool, dt: float) -> void:
+	_frame_node.step_frame(values,scale_value,zoom,ship,tracing,dt)
+	_draw_effects(_painter,dt)
+func dispose() -> void:
+	if is_instance_valid(_frame_node): _frame_node.queue_free()
+	super()
+
 
 func setup(render: RunPresentation, owner_behavior) -> void:
 	super(render, owner_behavior)
@@ -21,7 +35,9 @@ func on_event(ev: Dictionary) -> void:
 func tick(_dt: float) -> void:
 	var dt := world_dt()
 	node.step(behavior if active else null, cfg, rm.cam_zoom, state, dt)
-	var p := painter()
+	_draw_effects(painter(),dt)
+
+func _draw_effects(p: PixelPainter, dt: float) -> void:
 	p.begin()
 	for d in deploys:
 		d.age += dt

@@ -516,6 +516,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var mount: Vector2 = preload("res://scripts/weapons/rear.gd").MOUNT_PIXEL-Vector2(15.5,30.0)
 	for level in rear.level_steps.size():
 		data.RearDefinition.append({"id":level+1,"weapon":rear_id,"level":level+1,"interval":float(rear.params.interval_by_level[level]),"damage":float(rear.params.damage_by_level[level]),"pierce":int(rear.params.pierce_by_level[level]),"life":float(rear.params.life),"spread":float(rear.params.spread_step),"knock":float(rear.params.knock),"color":Color(rear.params.color).to_rgba32(),"mount_x":mount.x,"mount_y":mount.y,"muzzle_distance":12.5})
+	var escort := load("res://data/weapons/W26_dashRangeDrone.tres") as WeaponDef
+	if escort==null: return {}
+	var escort_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":escort_id,"kind":0,"maximum_level":escort.level_steps.size(),"external_id":"W26","comet_only":escort.comet_only})
+	for level in escort.level_steps.size():
+		var values := {"id":level+1,"weapon":escort_id,"level":level+1,"count":int(escort.params.drones_per_side_by_level[level])*2,"damage":float(escort.params.damage_by_level[level]),"tail":float(escort.params.tail_by_level[level]),"hit_radius":float(escort.params.drone_hit_radius),"area_increment":float(config.post_max.increments.area) if config.post_max.target(escort.id).has("area") else 0.0}
+		for key in ["deploy_distance","idle_spacing","idle_back","return_rate"]: values[key] = float(escort.params[key])
+		data.DashRangeDroneDefinition.append(values)
 	var interceptor := load("res://data/weapons/W25_interceptor.tres") as WeaponDef
 	if interceptor==null: return {}
 	var interceptor_id: int = data.LoadoutDefinition.size()+1
@@ -618,6 +626,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_wave_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if contact_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":sonic_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if sonic_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_arc_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if arc_target.has("followup") else 0.0})
+	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":escort_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(escort.id).has("followup") else 0.0})
+	var escort_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W26")
+	if escort_entry==null: return {}
+	for path in escort_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"key":"loadout/"+path})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":escort_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":escort_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":interceptor_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if interceptor_target.has("followup") else 0.0})
 	var interceptor_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W25")
 	if interceptor_entry==null: return {}
@@ -1091,6 +1107,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
 			data.InterceptorDefinition = resolved.InterceptorDefinition
+			data.DashRangeDroneDefinition = resolved.DashRangeDroneDefinition
 			data.BipolarDefinition = resolved.BipolarDefinition
 			data.MassTowDefinition = resolved.MassTowDefinition
 			data.ContactArcDefinition = resolved.ContactArcDefinition

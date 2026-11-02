@@ -117,6 +117,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W26") {
+            const auto &v=run.content->escort_levels[next-1];auto &w=run.state.loadout.escort;w.ready=true;w.definition=id;w.count=v.count;w.damage=v.damage;w.tail=v.tail;w.hit_radius=v.hit_radius;w.area_increment=v.area_increment;w.deploy_distance=v.deploy_distance;w.idle_spacing=v.idle_spacing;w.idle_back=v.idle_back;w.return_rate=v.return_rate;
         } else if (d.external_id=="W25") {
             const auto &v=run.content->interceptor_levels[next-1];auto &w=run.state.loadout.interceptor;w.ready=true;w.definition=id;w.damage=v.damage;w.interval=v.interval;w.burst_interval=v.burst_interval;w.range=v.range;w.orbit=v.orbit;w.orbit_speed=v.orbit_speed;w.target_interval=v.target_interval;w.shot_radius=v.shot_radius;w.shot_speed=v.shot_speed;w.life=v.life;w.projectile_increment=v.projectile_increment;w.duration_increment=v.duration_increment;w.interval_increment=v.interval_increment;w.minimum_ratio=v.minimum_ratio;w.minimum_interval=v.minimum_interval;w.count=v.count;w.burst=v.burst;w.color=v.color;
         } else if (d.external_id=="W22") {
@@ -188,6 +190,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W26") run.state.loadout.escort={};
     else if (external=="W25") run.state.loadout.interceptor={};
     else if (external=="W22") run.state.loadout.bipolar={};
     else if (external=="W21") run.state.loadout.mass_tow={};

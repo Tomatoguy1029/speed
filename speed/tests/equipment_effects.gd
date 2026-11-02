@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w26" in OS.get_cmdline_user_args() or "--cpp-w26-post" in OS.get_cmdline_user_args():
+		await check_cpp_w26()
+		print("[cpp_w26] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-weapon-world-clock" in OS.get_cmdline_user_args():
 		await check_cpp_weapon_world_clock()
 		print("[cpp_weapon_world_clock] failed=%d" % failures)
@@ -3621,3 +3626,97 @@ func check_cpp_weapon_world_clock() -> void:
 		await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"W01なしの専用表示時計に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w26() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	config.trace_radius = 1.0
+	var session = await trait_test_session("W26",config,626)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W26")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var events: Array = []
+	bridge.subscribe("w26_check",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	for level in ([] if "--cpp-w26-post" in OS.get_cmdline_user_args() else range(1,definition.level_steps.size()+1)):
+		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"編隊の全段の基準を復元する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W26","levels":level}).ok,"編隊を全段取得する")
+		var center: Vector2 = core.ship_snapshot().ship_pos
+		var hit: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(200.0,30.758*config.character_scale)}).value
+		core.set_enemy_motion(hit,{"held":true,"vel":Vector2.ZERO})
+		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==hit)[0].hp
+		events.clear()
+		trait_start_trace(bridge,600.0)
+		check(bridge._ui.escort.active and bridge._ui.escort.drones.size()==definition.params.drones_per_side_by_level[level-1]*2,"全段の機数で発進する")
+		check(events.any(func(e):return e.type==&"escort_deploy" and e.payload.targets.size()==definition.params.drones_per_side_by_level[level-1]*2),"全機の展開通知を配信する")
+		for tick in 8: check(bridge.step(1.0/120.0,idle,viewport).ok,"実秒のなぞり区間で編隊を進める")
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"展開と通過命中の通知を表示へ配信する")
+		var wing: Dictionary = bridge._ui.escort
+		var drone: Dictionary = wing.drones[0]
+		var deploy: float = smoothstep(0.0,1.0,clampf(wing.distance/(float(definition.params.deploy_distance)*config.character_scale),0.0,1.0))
+		var expected: Vector2 = bridge._ui.ship.ship_pos+Vector2(-31.0,13.0).lerp(Vector2(-9.0*1.82,13.0*1.82),deploy)*config.character_scale
+		check(drone.pos.distance_to(expected)<0.001 and drone.dir==Vector2.RIGHT and drone.trail.size()>0 and drone.trail.size()<=96,"なぞりの距離で編隊を滑らかに展開し光跡を保持する")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._escort_visual!=null and presentation.frame_view._escort_visual._frame_node._frame==wing and not presentation.frame_view._flame.visible,"全機と光跡を既存の画像で表示して突進の炎を光跡へ替える")
+		var saved: Dictionary = bridge.checkpoint()
+		bridge.command("pause",{"paused":true})
+		var paused: Dictionary = bridge._ui.escort.duplicate(true)
+		bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.1)
+		check(bridge._ui.escort==paused,"停止中は編隊と光跡の寿命を止める")
+		bridge.command("pause",{"paused":false})
+		for tick in 40: bridge.step(1.0/120.0,idle,viewport)
+		var after: Dictionary = bridge._ui.escort.duplicate(true)
+		var enemies: Array = core.enemies_snapshot()
+		var struck: Array = enemies.filter(func(e): return e.id==hit)
+		var damage: float = config.base_attack*float(definition.params.damage_by_level[level-1])
+		check((struck.is_empty() if hp<=damage else is_equal_approx(struck[0].hp,hp-damage)) and events.filter(func(e):return e.type==&"escort_slash").size()==1,"全機で敵IDを共有し同じ突進の通過命中を一度だけ与える")
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"編隊となぞりと光跡の途中へ復帰する")
+		for tick in 40: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.escort==after and core.enemies_snapshot()==enemies,"途中復帰後の編隊・命中済みID・経路距離・光跡寿命を再現する")
+		for tick in 80: bridge.step(1.0/120.0,idle,viewport)
+		check(not bridge._ui.escort.active and bridge._ui.escort.drones.all(func(d):return d.trail.is_empty()),"突進後は攻撃を止めて光跡を自然消滅させる")
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"途中解除の基準へ復帰する")
+		bridge.command("dev_remove_weapon",{"id":"W26"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.escort.ready and bridge._ui.escort.drones.is_empty() and presentation.frame_view._escort_visual==null,"途中解除で編隊・光跡・専用表示を回収する")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	if "--cpp-w26-post" in OS.get_cmdline_user_args():
+		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"編隊の範囲境界へ復帰する")
+		bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W26","levels":1})
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
+		bridge.command("dev_post_scatter",{"interval":0,"projectile":0,"duration":0,"knockback":0,"area":2})
+		var center: Vector2 = core.ship_snapshot().ship_pos
+		var probe: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(999,999)}).value
+		var enemy_radius: float = core.enemies_snapshot().filter(func(e):return e.id==probe)[0].radius
+		core.remove_enemy(probe)
+		var area: TraitDef = ContentManager.definition(&"traits",&"T34")
+		var radius: float = float(definition.params.drone_hit_radius)*config.character_scale*(1.0+area.stack_bonus(2))*(1.0+2.0*config.post_max.increments.area)
+		var inside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240.0,13.0*1.82*config.character_scale+enemy_radius+radius-0.01)}).value
+		var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240.0,13.0*1.82*config.character_scale+enemy_radius+radius+0.01)}).value
+		for id: int in [inside,outside]: core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
+		trait_start_trace(bridge,600.0)
+		for tick in 45: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"範囲補正後の命中通知を配信する")
+		var enemies: Array = core.enemies_snapshot()
+		check(enemies.all(func(e):return e.id!=inside) and enemies.any(func(e):return e.id==outside and e.hp==ContentManager.definition(&"enemies",&"drifter").hp),"範囲特性と最大段後補正を一度ずつ掛けて通過半径の内外を分ける")
+	bridge.release_checkpoint(initial.value)
+	bridge.unsubscribe("w26_check")
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"編隊の状態と表示に実行エラーがない: %s" % [errors.messages()])
