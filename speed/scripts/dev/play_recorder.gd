@@ -598,6 +598,8 @@ func _on_phase_changed(phase: int) -> void:
 ## ランの記録を閉じる。
 func _end(result: String) -> void:
 	if _cpp_session_id>0:
+		if is_instance_valid(_session) and _session.bridge!=null:
+			_session.bridge.command("set_recording",{"active":false})
 		_flush_cpp_performance()
 		_cpp_sample()
 		var ending := _cpp_record_previous.duplicate(true)
@@ -945,6 +947,7 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 		var existing: Dictionary = state.value.existing.duplicate(true)
 		existing.merge({"type":"xp_existing","t":_cpp_time,"world_t":state.value.world_t,"xp_reward_version":2,"origin":"unobserved"},true)
 		_write(existing)
+	session.bridge.command("set_recording",{"active":combat_level>0})
 	_flush()
 	session.tree_exiting.connect(_end.bind("quit"))
 	_update_label()

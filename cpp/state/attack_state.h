@@ -31,6 +31,7 @@ struct AttackOwner {
 };
 struct AttackSpec {
     AttackOwner owner;
+    int64_t observation_id=0;
     EndPolicies policies=0;
     TechniqueHandle technique;ParticipantHandle participant;BossHandle boss;EncounterHandle encounter;
     Cause cause=Cause::None;WeaponId weapon=0;

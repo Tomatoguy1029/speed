@@ -2,6 +2,7 @@
 extends Node
 var failed := 0
 func check(ok: bool, message: String) -> void:
+	if "--cpp-boss-trace-stop" in OS.get_cmdline_user_args() and message!="録画停止で並行首の評価をそれぞれ閉じる": return
 	if "--cpp-canis-finish-retry" in OS.get_cmdline_user_args() and (message.begins_with("全技の共通パッケージを開始する") or message.begins_with("連携の内包技も同じ24件") or message.begins_with("通常HP・低HPに対応する形態を選ぶ")): return
 	if "--cpp-centaurus-combo-shower-tail" in OS.get_cmdline_user_args() and message not in ["強弓の予告が終わるとコズミックの矢を放つ","後半の強弓の姿勢と矢を正式表示へ渡す","強弓の硬直で連携を自然終了し、放った矢は残す","降り矢・強弓の戦闘とcueを同じ通知経路へ送る","前半の取消・参加者消失で降り矢を消して強弓を始めない"]: return
 	if "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args() and not message.begins_with("弧の中心") and not message.begins_with("弧の終端") and not message.begins_with("硬直が終わっても") and not message.begins_with("次の帆走") and not message.begins_with("取消で護衛"): return
@@ -38,6 +39,9 @@ func _ready() -> void:
 		return
 	if "--cpp-hydra-headbutt" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_headbutt")
+		return
+	if "--cpp-boss-trace" in OS.get_cmdline_user_args() or "--cpp-boss-trace-stop" in OS.get_cmdline_user_args():
+		call_deferred("native_boss_trace")
 		return
 	if "--cpp-hydra-pincer" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_pincer")
@@ -5945,3 +5949,87 @@ func native_hydra_swarm() -> void:
 	for i in 7:bridge.command("dev_damage",{"entity_id":body.necks[i].id,"amount":1000.0,"cause":"shot"})
 	bridge._core.step(0.001);check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"生存首が一本だけでは連続飛びかかりを開始しない");bridge.dispose()
 	await get_tree().process_frame;print("[cpp_hydra_swarm] failures=",failed);get_tree().quit(1 if failed else 0)
+
+
+class TraceRecorder:
+	extends "res://scripts/dev/play_recorder.gd"
+	func _recording_directory() -> String: return "/tmp/speed-boss-observation-recording"
+
+func trace_recorder(bridge) -> Dictionary:
+	var session := RunSession.new()
+	session.id = 371
+	session.runtime_kind = "cpp"
+	session.auto_step = false
+	session.bridge = bridge
+	add_child(session)
+	session.add_to_group("recordable_runs")
+	var recorder := TraceRecorder.new()
+	add_child(recorder)
+	recorder.set_process(false)
+	recorder.armed = true
+	recorder._begin_cpp(session,true)
+	check(recorder._file!=null,"既存の録画入口から共通観測を開始する")
+	return {"session":session,"recorder":recorder}
+
+func native_boss_trace() -> void:
+	var c := hydra_normal_case(false,{}, {"normal_charge":0.1,"normal_lunge":0.25,"normal_hold":0.05,"attack_cd":0.01,"bite_radius":150.0})
+	if c.is_empty(): check(false,"並行首の定義を生成する");get_tree().quit(1);return
+	var bridge = c.bridge
+	var events: Array = []
+	bridge.subscribe("首の観測",func(packet): events.append_array(packet.events);return true)
+	var recording := trace_recorder(bridge)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	for index in [0,5]:
+		bridge.command("dev_ship_motion",{"position":body.necks[index].position,"velocity":Vector2.ZERO})
+		check(bridge.command("dev_boss_technique",{"entity_id":body.necks[index].id,"definition":1}).ok,"並行する首を正式技から開始する")
+	for tick in 24:
+		bridge._core.step(1.0/120.0)
+		bridge._core.step_hazards(1.0/120.0)
+		bridge.command("dev_boss_body_state")
+	var starts: Array = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="selected")
+	var executions: Array = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="execute")
+	check(starts.size()==2 and starts[0].payload.action_id!=starts[1].payload.action_id and starts[0].payload.body_id!=starts[1].payload.body_id,"並行首は異なる行動IDを持つ")
+	check(executions.size()==2,"判定形状を繰り返し生成してもexecuteは各行動に一度だけ記録する")
+	recording.recorder._end("stopped")
+	var closed: Array = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="observation_end")
+	check(closed.size()==2 and closed.all(func(e): return e.payload.reason=="recording_end" and e.payload.checks>0),"録画停止で並行首の評価をそれぞれ閉じる")
+	check(bridge.read_recording().value.active_observations==0,"録画停止後に観測を残さない")
+	recording.recorder.free();recording.session.free()
+	if "--cpp-boss-trace-stop" in OS.get_cmdline_user_args():
+		print("[cpp_boss_trace_stop] failures=",failed)
+		get_tree().quit(1 if failed else 0)
+		return
+	c = hydra_normal_case(false,{}, {"normal_charge":0.1,"normal_hold":0.1,"attack_cd":0.01,"bolt_length":150.0,"bolt_width":60.0,"bolt_speed":200.0,"bolt_life":2.0},"beam_bolt")
+	if c.is_empty(): check(false,"残留弾の定義を生成する");get_tree().quit(1);return
+	bridge = c.bridge
+	events = []
+	bridge.subscribe("残留弾の観測",func(packet): events.append_array(packet.events);return true)
+	bridge.command("set_recording",{"active":true})
+	body = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*200,"velocity":Vector2.ZERO})
+	check(bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1}).ok,"残留する弾の技を開始する")
+	for tick in 40:
+		bridge._core.step(1.0/120.0)
+		bridge.command("dev_boss_body_state")
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and bridge.read_recording().value.active_observations==1,"技が終わっても残留弾の元の観測を保持する")
+	var old_effect: Dictionary = body.effects[0].duplicate(true)
+	head = body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*200,"velocity":Vector2.ZERO})
+	check(bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1}).ok,"残留弾がある間に次の技を開始する")
+	var old_id: int = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="selected")[0].payload.action_id
+	bridge._core.set_run_guards({"invincible":false})
+	bridge.command("dev_ship_motion",{"position":(old_effect.points[0]+old_effect.points[1])*0.5,"velocity":Vector2.ZERO})
+	bridge._core.step_hazards(1.0/120.0)
+	bridge.command("dev_boss_body_state")
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.cause=="bolt")
+	check(not hits.is_empty() and hits[-1].payload.observation_id==old_id and hits[-1].payload.hp_before>hits[-1].payload.hp_after,"次の技の開始後も残留弾の実HP減少を元の行動へ加算する")
+	bridge.command("dev_remove",{"entity_id":head.id})
+	closed = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="observation_end")
+	check(closed.size()==2 and closed.all(func(e): return e.payload.reason=="actor_end"),"役者の破棄で残留弾と次の行動の両観測を閉じる")
+	bridge.command("set_recording",{"active":false})
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_boss_trace] failures=",failed)
+	get_tree().quit(1 if failed else 0)

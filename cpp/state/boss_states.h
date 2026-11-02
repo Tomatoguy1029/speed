@@ -109,7 +109,7 @@ struct HydraGridState {HydraGridPlan plan;std::vector<bool> arrived;double posit
 struct HydraTechniqueState {double time=0;bool playing=false;std::vector<EnemyHandle> participants;std::variant<HydraCurveState,HydraGridState,HydraPincerState,HydraTornadoState,HydraShatterState,HydraNorthState,HydraSequenceState,HydraSwarmState> move;};
 struct TechniqueState {
     std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState,CanisSiriusFlameState,HydraTechniqueState> detail;
-    int64_t id=0;
+    int64_t id=0,observation_id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;
     EnemyHandle actor;

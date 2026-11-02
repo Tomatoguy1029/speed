@@ -16,5 +16,5 @@ public:
     explicit MetricsTimer(MetricSample &value):sample(value) {}
     ~MetricsTimer();
 };
-class MetricsBuilder {public: static godot::Dictionary read(const RunRuntime &); static godot::Dictionary recording(const RunRuntime &,bool);};
+class MetricsBuilder {public: static void flush_observations(RunRuntime &); static void set_recording(RunRuntime &,bool); static godot::Dictionary read(const RunRuntime &); static godot::Dictionary recording(const RunRuntime &,bool);};
 }

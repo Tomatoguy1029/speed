@@ -24,11 +24,13 @@ ShipContactResult CombatResolver::attack_ship_damage(RunRuntime &run,AttackHandl
     const auto spec=attack->spec;const auto &policy=spec.contact;
     const auto before=attack->ship_previous_ready?attack->ship_previous:run.state.ship.pos;
     const ShipMotion ship{before,run.state.ship.pos,run.state.ship_config.ship_radius};
+    if (auto *o=run.state.observations.find(spec.observation_id)) ++o->checks;
     result.touching=CollisionQuery::touches(shape,ship,{policy.add_ship_radius,policy.ship_sweep});
+    if (result.touching) if (auto *o=run.state.observations.find(spec.observation_id)) ++o->contacts;
     AttackSystem::record_ship_position(run.state,handle);
     if (!result.touching || (attack->ship_hit && policy.hit_policy!=HitPolicy::EveryTick)) return result;
     if (policy.hit_policy==HitPolicy::MarkBefore) AttackSystem::mark_ship_hit(run.state,handle);
-    ShipDamageRequest request;request.amount=amount;request.slow=slow;request.cause=spec.cause;
+    ShipDamageRequest request;request.observation_id=spec.observation_id;request.amount=amount;request.slow=slow;request.cause=spec.cause;
     request.source=spec.owner.source_definition;request.technique=spec.source_technique;
     request.scale=policy.scale;request.hit_policy=policy.hit_policy;
     result.attempted=true;result.damage=ship_damage(run,request);

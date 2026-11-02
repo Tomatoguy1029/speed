@@ -2127,6 +2127,10 @@
       {
         "name": "DracoRoar",
         "value": "draco_roar"
+      },
+      {
+        "name": "BossAction",
+        "value": "boss_action"
       }
     ],
     "ResultKind": [
@@ -2263,7 +2267,8 @@
       "accepted",
       "reason",
       "hp_before",
-      "hp_after"
+      "hp_after",
+      "observation_id"
     ],
     "critical_hit": [
       "pos",
@@ -2873,6 +2878,19 @@
     "draco_roar": [
       "pos",
       "radius"
+    ],
+    "boss_action": [
+      "action_id",
+      "body_id",
+      "action",
+      "boss",
+      "observed_start",
+      "step",
+      "checks",
+      "contacts",
+      "applied",
+      "outcome",
+      "reason"
     ]
   },
   "includes": [

@@ -45,6 +45,7 @@ struct DeathContext {
 };
 struct KillResult { EnemyHandle target;bool killed=false;CombatReason reason=CombatReason::Invalid; };
 struct ShipDamageRequest {
+    int64_t observation_id=0;
     godot::Vector2 impact;
     bool has_impact=false;
     double amount=0,slow=0;
@@ -74,7 +75,7 @@ struct CombatEvent {
     RetireReason retire_reason=RetireReason::Outside;
     SpawnOrigin origin=SpawnOrigin::Normal;
     SpawnRole role=SpawnRole::Regular;
-    int64_t struck_id=0,target_id=0;
+    int64_t struck_id=0,target_id=0,observation_id=0;
     DefinitionId definition=0,source=0;
     WeaponId weapon_id=0;
     TechniqueId technique=0;

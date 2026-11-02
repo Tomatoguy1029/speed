@@ -1,4 +1,5 @@
 #include "event_builder.h"
+#include "metrics_builder.h"
 #include "../systems/attacks/zone.h"
 #include "../systems/attacks/flood.h"
 #include "../systems/pickup_system.h"
@@ -67,7 +68,8 @@ void EventBuilder::enemy_kill(RunRuntime &run,const DeathContext &death) {
     event.radius=death.corpse.radius;event.facing=death.corpse.facing;event.elite=death.corpse.elite;run.state.combat_events.push_back(event);
 }
 void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &request,const ShipDamageResult &result) {
-    CombatEvent event;event.kind=CombatEventKind::ShipDamage;event.cause=request.cause;event.source=request.source;event.technique=request.technique;
+    if (auto *o=run.state.observations.find(request.observation_id)) o->applied+=std::max(0.0,result.hp_before-result.hp_after);
+    CombatEvent event;event.observation_id=request.observation_id;event.kind=CombatEventKind::ShipDamage;event.cause=request.cause;event.source=request.source;event.technique=request.technique;
     event.pos=run.state.ship.pos;event.time=run.state.time;event.world_time=run.state.world_time;event.reason=result.reason;
     event.requested=request.amount;event.resolved=result.amount;event.hp_before=result.hp_before;event.hp_after=result.hp_after;event.accepted=result.accepted;
     if (result.accepted) {event.kind=CombatEventKind::Hurt;run.state.combat_events.push_back(event);event.kind=CombatEventKind::ShipDamage;}
@@ -116,7 +118,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
                 d["technique"]=godot::StringName(technique.external_id.c_str());
                 d["source"]=godot::StringName(run.content->bosses[technique.boss-1].external_id.c_str());
             }
-            d["requested"]=e.requested;
+            d["observation_id"]=e.observation_id;d["requested"]=e.requested;
             d["amount"]=e.resolved;d["accepted"]=e.accepted;d["reason"]=combat_reason_name(e.reason);d["hp_before"]=e.hp_before;
             d["hp_after"]=e.hp_after;d["t"]=e.time;d["world_t"]=e.world_time;append(run,"combat_player_damage",d);break;
         case CombatEventKind::Retire:
@@ -125,6 +127,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
         }
     }
     run.state.combat_events.clear();
+    MetricsBuilder::flush_observations(run);
 }
 godot::Dictionary EventBuilder::damage_result(const RunRuntime &run,const DamageResult &result) {
     godot::Dictionary out;out["requested"]=result.requested;out["resolved"]=result.resolved;out["applied"]=result.applied;

@@ -41,6 +41,7 @@ AttackHandle register_attack(State &state,AttackPool pool,uint32_t row,AttackSpe
             spec.owner.live_source={};
         }
     }
+    if (!spec.observation_id && state.bosses.handles.contains(spec.technique)) spec.observation_id=state.bosses.techniques[spec.technique.slot].observation_id;
     while (!all.free_records.empty() && !all.handles.reusable(all.free_records.back())) all.free_records.pop_back();
     if (all.free_records.empty() && all.records.size()>=UINT32_MAX) return {};
     if (!AttackBudgetSystem::retain(state,spec.owner.budget)) return {};
@@ -48,7 +49,7 @@ AttackHandle register_attack(State &state,AttackPool pool,uint32_t row,AttackSpe
     if (all.free_records.empty()) all.records.emplace_back();else {slot=all.free_records.back();all.free_records.pop_back();}
     const auto handle=all.handles.attach(slot,all.next_id);
     if (!all.handles.contains(handle)) {AttackBudgetSystem::release(state,spec.owner.budget);return {};}
-    all.records[slot]={spec,pool,row,all.next_id++,true,false,state.ship.pos,true};add_indexes(state,handle,all.records[slot]);return handle;
+    all.records[slot]={spec,pool,row,all.next_id++,true,false,state.ship.pos,true};add_indexes(state,handle,all.records[slot]);state.observations.retain(spec.observation_id);return handle;
 }
 std::vector<AttackHandle> indexed(const Index &index,uint64_t key) {
     auto found=index.find(key);return found==index.end()?std::vector<AttackHandle>():found->second;
@@ -147,6 +148,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     }
     }
     const auto &s=record.spec;
+    state.observations.release(s.observation_id);
     erase_index(all.by_source,s.owner.source_id,handle);erase_index(all.by_technique,handle_key(s.technique),handle);
     erase_index(all.by_participant,handle_key(s.participant),handle);erase_index(all.by_boss,handle_key(s.boss),handle);
     erase_index(all.by_encounter,handle_key(s.encounter),handle);
@@ -157,7 +159,9 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     event.flood=flood;event.zone_definition=zone_definition;event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);return true;
 }
 void AttackSystem::source_ended(State &state,EnemyHandle source,AttackEndReason reason) {
-    const auto id=state.enemy_handles.entity_id(source);auto found=state.attacks.by_source.find(id);
+    const auto id=state.enemy_handles.entity_id(source);
+    if (reason==AttackEndReason::ParticipantEnd || reason==AttackEndReason::BossClear) state.observations.actor_ended(id);
+    auto found=state.attacks.by_source.find(id);
     if (!id || found==state.attacks.by_source.end()) return;
     const auto handles=found->second;
     for (auto handle:handles) {
@@ -170,6 +174,7 @@ void AttackSystem::source_ended(State &state,EnemyHandle source,AttackEndReason 
 }
 void AttackSystem::end_technique(State &state,TechniqueHandle technique,bool cancelled) {
     if (!technique.generation) return;
+    if (state.bosses.handles.contains(technique)) state.observations.finish(state.bosses.techniques[technique.slot].observation_id);
     filter_end(state,indexed(state.attacks.by_technique,handle_key(technique)),policy(EndPolicy::EndWithTechnique)|(cancelled?policy(EndPolicy::CancelWithTechnique):0),cancelled?AttackEndReason::TechniqueCancel:AttackEndReason::TechniqueEnd);
 }
 void AttackSystem::end_participant(State &state,ParticipantHandle participant) {

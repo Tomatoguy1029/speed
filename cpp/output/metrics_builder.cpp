@@ -5,12 +5,48 @@
 #include <godot_cpp/variant/array.hpp>
 #include <algorithm>
 #include <climits>
+#include <map>
+#include <tuple>
 namespace speed {
 MetricsTimer::~MetricsTimer() {
     const int64_t us=std::max<int64_t>(0,std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-began).count());
     sample.total_us+=std::min(us,INT64_MAX-sample.total_us);
     if (sample.count<INT64_MAX) ++sample.count;
     sample.max_us=std::max(sample.max_us,us);
+}
+void MetricsBuilder::flush_observations(RunRuntime &r) {
+    for (const auto &e:r.state.observations.pending) {
+        const auto &a=e.action;const auto &t=r.content->boss_techniques[a.definition-1];
+        godot::Dictionary d;d["action_id"]=a.id;d["body_id"]=a.actor_id;d["action"]=godot::String(t.external_id.c_str());
+        d["boss"]=godot::String(r.content->bosses[t.boss-1].external_id.c_str());d["observed_start"]=a.observed_start;
+        d["step"]=e.step==ObservationEvent::Selected?"selected":e.step==ObservationEvent::Execute?"execute":"observation_end";
+        d["checks"]=int64_t(a.checks);d["contacts"]=int64_t(a.contacts);d["applied"]=a.applied;
+        if (e.step>=ObservationEvent::Finished) d["outcome"]=a.applied>0?"hit":a.contacts>0?"contact_blocked":a.checks>0?"evaluated_miss":"no_hit_observed";
+        d["reason"]=e.step==ObservationEvent::RecordingEnd?"recording_end":e.step==ObservationEvent::ActorEnd?"actor_end":"finished";
+        FrameBuilder::append(r,"boss_action",d);
+    }
+    r.state.observations.pending.clear();
+}
+void MetricsBuilder::set_recording(RunRuntime &r,bool active) {
+    auto &s=r.state;auto &o=s.observations;if (o.recording==active) return;
+    if (!active) o.stop();else {
+        o.recording=true;
+        for (auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished) t.observation_id=o.begin(s.enemy_handles.entity_id(t.actor),t.definition,false);
+        // 終了して行が再利用された技も、発生時のHandleと出所で分ける。
+        std::map<std::tuple<int64_t,uint64_t,uint32_t>,int64_t> remaining;
+        for (auto &a:s.attacks.records) if (a.alive && a.spec.source_technique) {
+            auto &spec=a.spec;int64_t id=0;
+            if (s.bosses.handles.contains(spec.technique)) id=s.bosses.techniques[spec.technique.slot].observation_id;
+            else for (const auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && s.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {id=t.observation_id;break;}
+            if (!o.find(id)) {
+                const auto key=std::make_tuple(spec.owner.source_id,handle_key(spec.technique),spec.source_technique);
+                auto &retained=remaining[key];if (!retained) {retained=o.begin(spec.owner.source_id,spec.source_technique,false);if (auto *v=o.find(retained)) v->running=false;}
+                id=retained;
+            }
+            spec.observation_id=id;o.retain(id);
+        }
+    }
+    flush_observations(r);
 }
 godot::Dictionary MetricsBuilder::read(const RunRuntime &run) {
     auto out=FrameBuilder::metrics(run);godot::Dictionary timings;
@@ -50,6 +86,7 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         const StringName origin(symbol_name(e.origin)),role(symbol_name(e.role));origins[origin]=int64_t(origins.get(origin,0))+1;roles[role]=int64_t(roles.get(role,0))+1;
     }
     Dictionary population;population["origins"]=origins;population["roles"]=roles;population["raw"]=s.population.raw;population["accumulator"]=s.population.accumulator;out["population"]=population;
+    out["active_observations"]=int64_t(s.observations.actions.size());
     if (initial) {
         Dictionary tuning;
         for (const auto &v:c.enemy_tuning) {const auto id=c.definitions[v.enemy-1].id;Dictionary values=tuning.get(id,Dictionary());values[String::utf8(v.key.c_str())]=v.value;tuning[id]=values;}
