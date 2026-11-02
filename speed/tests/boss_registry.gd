@@ -6391,3 +6391,477 @@ func semantics_hydra_swarm() -> void:
 	check(first.locked and first.position.distance_to(Vector2(origins[first.id]).lerp(targets[first.id],fraction))<=1e-4 and offensive.size()==1 and semantics_number(offensive[0].width,35.0) and semantics_number(offensive[0].life,0.081),"配置後に機体が動いても固定軌道を変えず、Sourceの飛行式とdt+.001の区間を出す")
 	check(first.position==first.free_pos and body.necks.all(func(n):return n.points[-1].distance_to(n.position)<=1e-4),"飛行位置をfree_posと首点列へ同じtickに反映する")
 	semantics_hydra_finish(bridge,"swarm")
+
+func semantics_hydra_bite_hit() -> void:
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"normal_lunge":0.4,"normal_hold":0.1,"attack_cd":0.05,"bite_radius":150.0,"bite_dmg":7.0})
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_ship_motion",{"position":body.necks[0].position+Vector2(200,0),"velocity":Vector2.ZERO})
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = []
+	bridge.subscribe("命中記録",func(packet): events.append_array(packet.events);return true)
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	for tick in 50:
+		bridge._core.step(0.01)
+		bridge._core.step_hazards(0.01)
+		bridge.command("dev_boss_body_state")
+	var hits: Array = events.filter(func(event): return event.type=="combat_player_damage" and event.payload.accepted and event.payload.cause=="bite")
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	if failed: print("命中の状態: ",bridge._core.ship_snapshot()," 命中記録: ",hits)
+	bridge.dispose()
+	print("[cpp_hydra_bite_hit] failures=",failed)
+	semantics_hydra_finish(bridge,"bite_hit")
+
+func semantics_hydra_sweep() -> void:
+	var move = load("res://data/bosses/hydra_moves/bite_sweep.tres")
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"sweep_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"sweep_arc":1.8,"sweep_reach":350.0,"bite_radius":150.0,"bite_dmg":7.0},"bite_sweep")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = []
+	bridge.subscribe("薙ぎの記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_ship_motion",{"position":Vector2(350,0),"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	bridge._core.step(0.011)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[0].locked and body.effects.size()==1 and semantics_number(body.effects[0].life,0.12) and body.effects[0].width==150.0,"発動時刻に根元を中心とする薙ぎを寿命0.12秒で出す")
+	bridge._core.step(0.025)
+	for tick in 36:
+		bridge._core.step(0.01);bridge._core.step_hazards(0.01);bridge.command("dev_boss_body_state")
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bite")
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	semantics_hydra_finish(bridge,"sweep")
+
+func semantics_hydra_bolt() -> void:
+	var move = load("res://data/bosses/hydra_moves/beam_bolt.tres")
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"bolt_length":150.0,"bolt_width":60.0,"bolt_speed":400.0,"bolt_life":2.0,"beam_dmg":7.0},"beam_bolt")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("ビーム弾の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*220,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	bridge._core.step(0.011);body=bridge.command("dev_boss_body_state").value[0]
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	var direction: Vector2 = (effect.points[1]-effect.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":effect.points[1]+direction*100,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hazards(0.3);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects[0].points[0].distance_to(effect.points[0]+direction*120)<=1e-4,"世界時間で等速移動し、前の点列から掃引する")
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bolt")
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	semantics_hydra_finish(bridge,"bolt")
+
+func semantics_hydra_fixed() -> void:
+	var move = load("res://data/bosses/hydra_moves/beam_fixed.tres")
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"beam_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0},"beam_fixed")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("固定ビームの記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle+0.3)*400,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	bridge._core.step(0.01);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="beam" and semantics_number(body.effects[0].delay,0.14) and semantics_number(body.effects[0].life,0.4),"予告の最初の更新でcharge-tの遅れを持つビームを作る")
+	var first: Dictionary = body.effects[0].duplicate(true)
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle+0.3)*400,"velocity":Vector2.ZERO})
+	for tick in 12:
+		bridge._core.step(0.01);bridge._core.step_hazards(0.01);bridge.command("dev_boss_body_state")
+	body=bridge.command("dev_boss_body_state").value[0]
+	bridge._core.step(0.03);body=bridge.command("dev_boss_body_state").value[0]
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":effect.points[0].lerp(effect.points[1],0.5),"velocity":Vector2.ZERO})
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025);body=bridge.command("dev_boss_body_state").value[0]
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="beam")
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	semantics_hydra_finish(bridge,"fixed")
+
+func semantics_hydra_blades() -> void:
+	var edits := {"normal_charge":0.15,"blade_interval":0.08,"normal_hold":0.2,"attack_cd":0.05,"blade_size":60.0,"blade_width":40.0,"blade_speed":300.0,"blade_life":3.0,"blade_spread":1.0,"bite_dmg":7.0}
+	var move = load("res://data/bosses/hydra_moves/wind_blades.tres")
+	var c := hydra_normal_case(true,{},edits,"wind_blades")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("風刃の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(body.facing+TAU/8)*400,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	bridge._core.step(0.011);body=bridge.command("dev_boss_body_state").value[0]
+	if body.effects.is_empty(): bridge.dispose();get_tree().quit(1);return
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	var origin: Vector2 = (effect.points[0]+effect.points[12])*0.5
+	var direction: Vector2 = (effect.points[6]-origin).normalized()
+	bridge.command("dev_ship_motion",{"position":effect.points[6]+direction*35,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hazards(0.2);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects[0].points[6].distance_to(effect.points[6]+direction*60)<=1e-4,"世界時間で刃全体を等速移動させる")
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="wind_blade")
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	semantics_hydra_finish(bridge,"blades")
+
+func semantics_hydra_rubble() -> void:
+	var name := "rubble_fan" if "--fan" in OS.get_cmdline_user_args() else "rubble_lump"
+	var fan := name=="rubble_fan"
+	var move = load("res://data/bosses/hydra_moves/%s.tres" % name)
+	var edits := {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"lump_speed":400.0,"lump_dmg":7.0}
+	if fan: edits.merge({"rubble_count":6,"rubble_spread":1.3,"rubble_small_radius":16.0})
+	else: edits.lump_r=26.0
+	var c := hydra_normal_case(true,{},edits,name)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("瓦礫の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[2]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*300,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	bridge._core.step(0.011);body=bridge.command("dev_boss_body_state").value[0]
+	var count: int = 6 if fan else 1
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	var rubble: Array = bridge._core.enemies_snapshot().filter(func(e): return e.type=="hydra_rubble" and not e.dead)
+	if fan:
+		var first_velocity := Vector2(rubble[0].vel[0],rubble[0].vel[1])
+		var last_velocity := Vector2(rubble[-1].vel[0],rubble[-1].vel[1])
+		for j in rubble.size():
+			var expected_velocity:=Vector2.from_angle(body.necks[2].angle+lerpf(-0.65,0.65,float(j)/5.0))*400.0
+			check(Vector2(rubble[j].vel[0],rubble[j].vel[1]).distance_to(expected_velocity)<=1e-4,"散弾の全初速をSource式の指定許容幅で照合する")
+	bridge.command("dev_ship_motion",{"position":effect.points[0],"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hazards(0.01);body=bridge.command("dev_boss_body_state").value[0]
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="rubble")
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	semantics_hydra_finish(bridge,"rubble")
+
+func semantics_hydra_tornado() -> void:
+	var c := hydra_major_case("tornado",{"warning_time":0.15,"performance_time":0.65,"tornado_charge":0.2,"tornado_life":0.3,"tornado_speed":400.0,"tornado_width":120.0,"lump_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	var events: Array=[];bridge.subscribe("竜巻の記録",func(packet):events.append_array(packet.events);return true)
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var heads: Array=body.necks.filter(func(n):return n.mode=="tornado")
+	bridge._core.step(0.15);body=bridge.command("dev_boss_body_state").value[0]
+	var feed: Array=body.effects.filter(func(e):return e.kind=="tornado_charge")
+	var center:Vector2=feed[0].points[0]
+	var source_direction:Vector2=(Vector2(800,0)-body.necks.filter(func(n):return n.mode=="tornado" and n.kind=="vortex")[0].position).normalized()
+	bridge.command("dev_ship_motion",{"position":feed[0].points[0],"velocity":Vector2.ZERO})
+	bridge._core.step_hazards(0.01)
+	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
+	var active: Array=body.effects.filter(func(e):return e.kind=="tornado")
+	check(active.size()==1 and active[0].width==120.0 and active[0].points[0].distance_to(center-source_direction*45.0)<=1e-4 and active[0].points[1].distance_to(center+source_direction*45.0)<=1e-4 and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"個別溜めの時刻に瓦礫を回収し、長さ90の竜巻を放つ")
+	if "--semantics-hydra-shape-only" in OS.get_cmdline_user_args():semantics_hydra_finish(bridge,"tornado_shape");return
+	if active.is_empty():bridge.dispose();get_tree().quit(1);return
+	var effect: Dictionary=active[0].duplicate(true);var direction: Vector2=(effect.points[1]-effect.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":effect.points[1]+direction*10,"velocity":Vector2.ZERO})
+	var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
+	var expected: Dictionary=body.duplicate(true)
+	check(body.effects[0].points[0].distance_to(effect.points[0]+direction*20)<=1e-4 and semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"竜巻は等速掃引し実HPへ倍率を一度だけ掛ける")
+	semantics_hydra_finish(bridge,"tornado")
+
+func semantics_hydra_thunder() -> void:
+	var move = load("res://data/bosses/hydra_moves/thunder_drop.tres")
+	var c := hydra_thunder_case(true)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var events: Array = [];bridge.subscribe("落雷の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[4]
+	var target: Vector2 = head.position+Vector2.from_angle(head.angle)*450
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(30,0)})
+	for tick in 200:
+		hydra_thunder_tick(bridge,0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	check(actions[0].aim.distance_to(target+Vector2(12,0))<=1e-4,"開始時に速度とthunder_leadで一度だけ先読みする")
+	hydra_thunder_tick(bridge,0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="lightning" and body.effects[0].points.size()==2 and body.effects[0].width==100.0 and semantics_number(body.effects[0].delay,0.19),"最初の首更新でcharge-tの予告と直径を生成する")
+	for tick in 10: hydra_thunder_tick(bridge,0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var expected: Dictionary = body.duplicate(true)
+	var strike: Vector2 = expected.effects[0].points[0]
+	bridge._core.set_run_guards({"invincible":false})
+	bridge.command("dev_ship_motion",{"position":strike,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	for tick in 11: hydra_thunder_tick(bridge,0.01)
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="lightning")
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	semantics_hydra_finish(bridge,"thunder")
+
+func semantics_hydra_headbutt() -> void:
+	var c:=hydra_headbutt_case(true)
+	if c.is_empty():get_tree().quit(1);return
+	var b=c.bridge;var state:Dictionary=b.command("dev_boss_body_state").value[0];var n:Dictionary=state.necks[4]
+	var target:Vector2=n.position+Vector2.from_angle(n.angle)*450
+	b.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	for tick in 200:
+		hydra_thunder_tick(b,0.01)
+		if not b.command("dev_boss_state").value.is_empty():break
+	var acts:Array=b.command("dev_boss_state").value
+	if acts.is_empty():b.dispose();get_tree().quit(1);return
+	for tick in 10:hydra_thunder_tick(b,0.01)
+	for tick in 5:hydra_thunder_tick(b,0.01)
+	state=b.command("dev_boss_body_state").value[0]
+	var expected:Dictionary=state.duplicate(true)
+	b.command("dev_ship_motion",{"position":target+Vector2(0,80),"velocity":Vector2.ZERO});b._core.set_run_guards({"invincible":false})
+	var events:Array=[];b.subscribe("頭突きの落雷記録",func(packet):events.append_array(packet.events);return true)
+	var hp:float=b._core.ship_snapshot().ship_hp
+	for tick in 9:hydra_thunder_tick(b,0.01)
+	state=b.command("dev_boss_body_state").value[0]
+	var light:Array=state.effects.filter(func(e):return e.kind=="lightning")
+	var hits:Array=events.filter(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="lightning")
+	check(light.size()==1 and light[0].points[0].distance_to(target)<=1e-4 and light[0].width==240.0,"踏み込みの終了に狙った位置へ一度だけ落雷する")
+	check(semantics_number(hp-b._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実HPの指定許容幅")
+	semantics_hydra_finish(b,"headbutt")
+
+func semantics_hydra_wind() -> void:
+	var edits := {"normal_charge":0.15,"wind_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"wind_length":300.0,"wind_width":90.0,"wind_force":400.0}
+	pass
+	var c := hydra_normal_case(true,{},edits,"wind_band")
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	var events: Array=[];bridge.subscribe("風の帯の記録",func(packet):events.append_array(packet.events);return true)
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0];var head: Dictionary=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*200.0,"velocity":Vector2.ZERO})
+	for tick in 100:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	bridge._core.step(0.08);bridge._core.step_hazards(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	bridge._core.step(0.08);bridge._core.step_hazards(0.08);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[1].locked and body.effects.size()==1 and body.effects[0].kind=="wind" and semantics_number(body.effects[0].wind_force,400.0) and semantics_number(body.effects[0].life,0.4),"溜め後に押す力と寿命を持つ無害な風の線分を作る")
+	var first: Dictionary=body.effects[0].duplicate(true)
+	bridge.command("dev_ship_motion",{"position":Vector2(900,-600),"velocity":Vector2.ZERO});bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var point: Vector2=first.points[0].lerp(first.points[1],0.5);var direction: Vector2=(first.points[1]-first.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2.ZERO})
+	var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025);body=bridge.command("dev_boss_body_state").value[0];var ship: Dictionary=bridge._core.ship_snapshot()
+	check(ship.ship_vel.distance_to(direction*400.0*0.025)<=1e-4 and ship.ship_hp==hp and ship.ship_hurt==0.0 and ship.ship_invuln==0.0,"接触はforce×世界dtだけ押し、倍率・ダメージ・被弾表示・無敵時間を付けない")
+	var expected: Dictionary=body.duplicate(true);var expected_velocity: Vector2=ship.ship_vel
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(bridge._core.ship_snapshot().ship_vel.distance_to(direction*20.0)<=1e-4,"同じ風に触れている間は毎tick押し出す")
+	semantics_hydra_finish(bridge,"wind")
+
+func semantics_hydra_shatter() -> void:
+	var c := hydra_major_case("debris_shatter",{"warning_time":0.1,"performance_time":0.8,"shatter_deploy":0.2,"shatter_time":0.4,"shatter_arc":1.8,"rubble_count":3,"beam_len":800.0,"beam_width":80.0,"beam_dmg":7.0,"shard_dmg":9.0,"shard_speed":300.0,"tech_recovery":0.05,"cooldown":0.1},true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	var events: Array=[];bridge.subscribe("瓦礫砕きの記録",func(packet):events.append_array(packet.events);return true)
+	for tick in 40:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var heads: Array=body.necks.filter(func(n):return n.mode=="debris_shatter")
+	bridge._core.step(0.1);bridge._core.step(0.05)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var stones: Array=bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead)
+	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="beam" and body.effects[0].width==80.0 and body.effects[0].points[1].distance_to(body.effects[0].points[0]+Vector2.from_angle(body.necks.filter(func(n):return n.mode=="debris_shatter" and n.kind=="beam")[0].angle)*800.0)<=1e-4,"展開時刻の後に線分ビームを始める")
+	var beam: Dictionary=body.effects[0];var direction: Vector2=(beam.points[1]-beam.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":beam.points[0]+direction*100,"velocity":Vector2.ZERO})
+	var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hazards(0.01)
+	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"ビームは線分で実HPへ倍率を一度だけ掛ける")
+	for tick in 16:bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var shots: Array=bridge._core.hostiles_snapshot()
+	for j in shots.size():
+		var base_angle:float=shots[j-j%6].vel.angle()
+		check(shots[j].vel.distance_to(Vector2.from_angle(base_angle+float(j%6)*0.45)*300.0)<=1e-4,"破片の全速度をSourceの式で照合する")
+	var cues: Array=events.filter(func(e):return e.type=="hydra_cue" and e.payload.cue=="rubble_shattered")
+	if not shots.is_empty():
+		bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+		bridge.command("dev_ship_motion",{"position":shots[0].pos,"velocity":Vector2.ZERO})
+		hp=bridge._core.ship_snapshot().ship_hp;bridge._core.step_hostiles(0.001);bridge.command("dev_boss_body_state")
+		check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,9.0),"破片はshard_dmgそのままで実HPを減らし追加倍率を掛けない")
+	semantics_hydra_finish(bridge,"shatter")
+
+func semantics_hydra_final() -> void:
+	var count:=9 if "--separated" in OS.get_cmdline_user_args() else 3
+	var c:=hydra_finish_case("",count,0.01)
+	if c.is_empty():check(false,"最終攻撃の固定場面を準備する");get_tree().quit(1);return
+	var bridge=c.bridge;var body:Dictionary;var input_ship:Vector2
+	for tick in 30:
+		input_ship=bridge._core.ship_snapshot().ship_pos
+		centaurus_finish_steps(bridge,1);body=bridge.command("dev_boss_body_state").value[0]
+		if body.mode==3 and body.effects.any(func(e):return e.get("final",false)):break
+	var beams:Array=body.effects.filter(func(e):return e.get("final",false))
+	var rule:Dictionary=c.package.records.BossBodyDefinition[0]
+	var params:Dictionary=c.package.records.HydraBodyDefinition[0]
+	var progress:float=clampf((body.final_elapsed-(0.3-rule.final_widen_time))/rule.final_widen_time,0.0,1.0)
+	var width:float=lerpf(rule.final_warn_width,rule.final_beam_width,progress*progress)
+	var reach:float=Vector2(params.arena_x,params.arena_y).length()*1.5
+	check(not beams.is_empty(),"首別最終ビームの数値を採取する")
+	for beam:Dictionary in beams:
+		var start:Vector2=beam.points[0]
+		var direction:Vector2=(input_ship-start).normalized()
+		check(("--semantics-hydra-geometry-only" in OS.get_cmdline_user_args() or semantics_number(beam.width,width)) and beam.points[1].distance_to(start+direction*reach)<=1e-4,"最終ビームの幅と終点をSource式の指定許容幅で照合する")
+	semantics_hydra_finish(bridge,"final_"+str(count))
+
+func semantics_hydra_body() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/hydra.tres")
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	if package.is_empty(): get_tree().quit(1); return
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	if bytes.is_empty():
+		for record in builder.Schema.SCHEMA.records:
+			for row in package.records[record.name]:
+				if not builder.Schema._valid_record(row,record): print("生成入力の不一致: ",record.name," ",row)
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":370,"mode":1,"stage_id":"B_hydra_body","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); get_tree().quit(1); return
+	bridge.start(370,{"position":Vector2(1600,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(1600,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1600,0),Vector2(1600,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var wall_hit: Dictionary = bridge.command("dev_field_query",{"action":"hit","from":body.arena.get_center(),"to":body.arena.end+Vector2(100,100),"radius":10.0})
+	var clear_hit: Dictionary = bridge.command("dev_field_query",{"action":"hit","from":body.arena.get_center(),"to":body.arena.get_center()+Vector2(10,0),"radius":10.0})
+	for n: Dictionary in body.necks:
+		check(semantics_number(n.length,float(definition.params.neck_rest)*0.3) and n.points.size()==int(definition.params.neck_segments)+1,"最初の技前の短い首と戦闘の点列を確定する")
+		check(semantics_number(n.head_hp,float(definition.params.head_hp)*cfg.enemy_hp_mult),"本体と独立した首HPを確定する")
+
+	bridge._core.step(0.1);body=bridge.command("dev_boss_body_state").value[0]
+	var hp:float=body.hp
+	for cause in ["ram","touch","wave"]:bridge.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":cause,"direction":Vector2.RIGHT,"knock":1500.0})
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.hp,hp-3.0),"本体HPの指定許容幅")
+	semantics_hydra_finish(bridge,"body")
+
+func semantics_hydra_swim() -> void:
+	var c := hydra_normal_case()
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":body.necks[0].id,"amount":1000.0,"cause":"shot"})
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"})
+	bridge._core.step(0.001)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.separated and body.participants.size()==10 and body.bearer.alive and body.necks.all(func(n): return n.alive and semantics_number(n.hp,n.max_hp)),"実分離で全首と不死首の所有・HPを作る")
+	var before := body.duplicate(true)
+	bridge._core.step(0.1)
+	body = bridge.command("dev_boss_body_state").value[0]
+	bridge._core.step(1.2)
+	bridge._core.step(0.025)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.bearer.velocity.length()>0 and body.bearer.points.size()>8 and body.bearer.points[-1].distance_to(body.bearer.position)<=1e-4,"不死首が操舵し、胴体の先端が確定した頭に一致する")
+	semantics_hydra_finish(bridge,"swim")
+
+func semantics_hydra_squad() -> void:
+	var retry := "--cpp-hydra-squad-retry" in OS.get_cmdline_user_args()
+	var c := hydra_squad_case({"pincer_weight":1.0,"wave_weight":0.0,"wall_weight":0.0,"wall_near_weight":0.0,"initial_gap":Vector2(3.2,3.2),"pincer_timeout":0.05,"counter_max":0,"block_distance":0.0})
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.any(func(n): return n.role==1) and body.necks.any(func(n): return n.velocity.length()>30.0) and body.necks.all(func(n): return body.arena.has_point(n.position) and n.points[-1].distance_to(n.position)<=1e-4),"前衛と近衛を選び、確定した頭を追う胴と囲いの内側の移動を保つ")
+	for head: Dictionary in body.necks:
+		if head.kind!="bite": bridge.command("dev_damage",{"entity_id":head.id,"amount":1000.0,"cause":"shot"})
+	# 実在する噛みつく2本を使い、保存値を近似技に置き換えない。
+	var launched := false
+	for tick in 180:
+		bridge._core.step(0.025)
+		body = bridge.command("dev_boss_body_state").value[0]
+		if body.pair_launched:
+			launched=true
+			break
+	var flow: Dictionary = bridge.command("dev_boss_flow_state").value[0]
+	check(semantics_number(flow.stamina,6.0) and semantics_number(flow.spent,2.0) and flow.active,"指名の予約を実行時に解放し同じフローの予算を2本分だけ消費する")
+	bridge.dispose()
+	c = hydra_squad_case({"pincer_weight":0.0,"wave_weight":0.0,"wall_weight":1.0,"wall_near_weight":0.0,"block_distance":10000.0})
+	if c.is_empty(): get_tree().quit(1);return
+	bridge=c.bridge;body=bridge.command("dev_boss_body_state").value[0]
+	var n: Dictionary = body.necks[0]
+	bridge.command("dev_ship_motion",{"position":n.free_pos+Vector2.from_angle(n.look_angle)*100.0,"velocity":Vector2.ZERO})
+	bridge._core.step(0.025)
+	body=bridge.command("dev_boss_body_state").value[0];flow=bridge.command("dev_boss_flow_state").value[0]
+	check(body.necks.any(func(head): return head.counter and head.mode=="bite_thrust") and body.counter_time>0.0 and semantics_number(flow.stamina,7.0) and not flow.active and flow.completed==0,"迎撃が通常技を実行して共通予算を消費し、区間の完了数を増やさない")
+	semantics_hydra_finish(bridge,"squad")
+
+func semantics_hydra_regrow() -> void:
+	var c:=hydra_regrow_case();var bridge=c.bridge
+	var before:Dictionary=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":before.necks[0].id,"amount":1000.0,"cause":"shot"})
+	bridge.command("dev_damage",{"entity_id":before.necks[1].id,"amount":1000.0,"cause":"fire"})
+	var body:Dictionary=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.necks[0].regrow,0.4) and semantics_number(body.necks[1].regrow,0.6),"再生猶予と炎の待ちの指定許容幅")
+	bridge.dispose();c=hydra_regrow_case();bridge=c.bridge
+	before=bridge.command("dev_boss_body_state").value[0]
+	for n:Dictionary in before.necks:bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.001);body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.chance_left,0.3),"全滅時の露出時間の指定許容幅")
+	bridge._core.step(0.2);body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.necks[2].regrow,0.2),"露出中の再生時計の指定許容幅")
+	bridge.dispose();c=hydra_regrow_case();bridge=c.bridge
+	var input:Dictionary=bridge.pack_intent(Intent.new());input.press=true;input.touch=true;input.pen=Vector2(1600,0)
+	bridge._core.handle_draw(input,1000,1.0)
+	input.press=false;input.has_cursor=true;input.pen=Vector2(2000,0);input.pen_release=true
+	bridge._core.handle_draw(input,1010,1.0);before=bridge.command("dev_boss_body_state").value[0]
+	for j in 2:bridge.command("dev_damage",{"entity_id":before.necks[j].id,"amount":1000.0,"cause":"ram"})
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.necks[1].regrow,0.375),"同一描線の連続撃破猶予の指定許容幅")
+	bridge.dispose();c=hydra_regrow_case();bridge=c.bridge;before=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":before.max_hp*0.7,"cause":"shot"})
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.growth_left,0.1),"5首成長時計の指定許容幅")
+	bridge._core.step(0.101);body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.growth_left,0.1),"8首成長時計の指定許容幅")
+	semantics_hydra_finish(bridge,"regrow")
