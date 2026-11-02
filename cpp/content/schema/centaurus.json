@@ -323,6 +323,52 @@
           "ref": "LightArrowDefinition"
         }
       ]
+    },
+    {
+      "name": "CentaurusPowerDefinition",
+      "section": 324,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "alert",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "travel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
     }
   ],
   "enums": {}

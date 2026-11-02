@@ -13,6 +13,7 @@ var technique := {}
 var _world_clock := -1.0
 var _technique_id := 0
 var _released := 0
+var _alerting := false
 var hit := 0.0
 var pulse := 0.0
 var leap_ring := 0.0
@@ -41,6 +42,8 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		_rain_visual = preload("res://scripts/render/bosses/centaurus_rain.gd").new()
 		add_child(_rain_visual)
 	_rain_visual.apply_frame(attack.get("rain",{}) if int(attack.get("stage",5))==1 else {},float(body.clock))
+	if bool(attack.get("alerting",false)) and not _alerting: pulse = 0.3
+	_alerting = bool(attack.get("alerting",false))
 	technique = attack
 	_world_clock = float(body.clock)
 	position = body.position
@@ -125,6 +128,18 @@ func draw_fraction() -> float:
 func _draw() -> void:
 	if leap_ring > 0.0: draw_arc(Vector2.ZERO, 30.0 + (0.3 - leap_ring) * 160.0, 0.0, TAU, 24, Color(BOW, leap_ring / 0.3), pixel_size)
 	if state.is_empty(): return
+	if _mode()==&"windup" and technique.get("technique","")=="power_shot":
+		var mouth: Vector2 = technique.aim_origin
+		var color := DANGER if bool(technique.alerting) else WARNING
+		for offset in technique.offsets:
+			var endpoint := mouth+Vector2.from_angle(float(technique.aim_angle)+offset)*float(technique.travel)
+			var contact := Geom.seg_circle_t(mouth,endpoint,technique.ship_position,float(technique.ship_radius))
+			if contact>=0.0: endpoint = mouth.lerp(endpoint,contact)
+			var from := to_local(mouth)
+			var end := to_local(endpoint)
+			draw_line(from,end,Color(color,0.12),8.0)
+			draw_line(from,end,Color(color,0.95 if bool(technique.alerting) else 0.6),2.0)
+			draw_line(from,end,Color(1.0,0.75 if bool(technique.alerting) else 0.95,0.6,0.8),0.8)
 	var r := float(state.radius)
 	var k := r / 90.0
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
@@ -145,7 +160,9 @@ func _draw() -> void:
 		draw_arc(Vector2(-14, 0), 60.0 + grow * 90.0, 0.0, TAU, 32, Color(sail_star_color, 0.8 * (1.0 - grow)), pixel_size * 2.0)
 	if pulse > 0.0:
 		draw_arc(Vector2(62, 0), 30.0 + (0.3 - pulse) * 80.0, 0.0, TAU, 20, Color(STRING, pulse * 2.5), pixel_size)
-	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain"]:
+	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain","power_shot"]:
 		var pull := Vector2(62.0+cos(1.1)*26.0-float(state.charge)*34.0,0.0)
-		draw_line(pull,pull+Vector2(56.0,0.0),WARNING,pixel_size*1.5)
+		var power: bool = technique.get("technique","")=="power_shot"
+		var glow := DANGER if bool(technique.get("alerting",false)) else WARNING
+		draw_line(pull,pull+Vector2(70.0 if power else 56.0,0.0),glow,pixel_size*(3.0 if power else 1.5))
 	draw_set_transform(Vector2.ZERO)

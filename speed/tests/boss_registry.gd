@@ -6,6 +6,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-centaurus-power-cancel" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_power_cancel")
+		return
+	if "--cpp-centaurus-power" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_power")
+		return
 	if "--cpp-canis-body" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_body")
 		return
@@ -702,4 +708,172 @@ func native_canis_body() -> void:
 	view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_body] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func centaurus_power_case(flow_enabled := false,tracking := true) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	var definition = load("res://data/bosses/centaurus.tres").duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.guard_count = 0
+	definition.params.guard_min = 0
+	definition.speed = 0.0
+	var move = load("res://data/bosses/centaurus_moves/power_shot.tres").duplicate(true)
+	move.warn = 0.1
+	move.alert = 0.04
+	move.count = 3
+	move.count_p2 = 5
+	move.track_during_warn = tracking
+	move.recover = 0.05
+	move.cd = 0.0
+	var package: Dictionary = builder.centaurus_technique_package(definition,move,cfg)
+	if flow_enabled:
+		var rules = load("res://data/bosses/ai/centaurus_action_rules.tres").duplicate(true)
+		rules.techniques.assign([move])
+		rules.combos = {}
+		rules.conditions = {"power_shot":{"min":0.0,"max":500.0}}
+		rules.costs = {"power_shot":1.0}
+		rules.selection_bias = {}
+		rules.condition_groups = {}
+		rules.graph_nodes = {}
+		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
+		flow.maximum_stamina = 10.0
+		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		for key in records: package.records[key] = records[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":158,"mode":1,"stage_id":"B_centaurus_power_shot","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(158,{"position":Vector2(300,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge._core.set_motion_context(Vector2(300,0),Vector2(300,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
+	return {"bridge":bridge,"id":id,"package":package,"events":events}
+
+
+## 強弓の警告固定・同時発射・通常終了・中断を確認する。
+
+func native_centaurus_power() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/centaurus_moves/power_shot.tres")
+	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
+	check(records.CentaurusPowerDefinition[0].count==1 and records.CentaurusPowerDefinition[1].count==3 and records.LightArrowDefinition[0].cosmic and records.CentaurusPowerDefinition[0].spread==move.spread,"強弓の全値・形態別本数・コズミック外観を生成する")
+	check(records.BossTechniqueStage.size()==6 and is_equal_approx(records.BossTechniqueStage[0].at,move.warn-move.alert) and records.BossTechniqueStage[1].at==move.warn and is_equal_approx(records.BossTechniqueStage[2].at,move.warn+0.05),"alert・release・end_attackを実効値から生成する")
+	check(move.make_runner()==null,"強弓の編集ResourceからRunnerを分離する")
+	var c := centaurus_power_case(true)
+	check(not c.is_empty(),"強弓・固有矢・本体・フローを同じ生成形式で読む")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(900,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.001)
+	var attacks: Array = bridge.command("dev_boss_state").value
+	check(not attacks.is_empty() and attacks[0].kind==11 and attacks[0].stage==0,"強弓の選択条件は遅延照準の位置を使う")
+	if attacks.is_empty(): bridge.dispose(); get_tree().quit(1); return
+	var first: int = attacks[0].id
+	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2.ZERO})
+	bridge._core.step(0.05)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(not t.alerting and is_equal_approx(t.facing,PI*0.25) and bridge._core.hostiles_snapshot().is_empty(),"予告中は機体の今の位置へ即座に向き発射を待つ")
+	bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	var origin: Vector2 = t.locked_origin
+	var angle: float = t.locked_angle
+	check(t.alerting and is_equal_approx(angle,PI*0.25) and origin.is_equal_approx(Vector2.from_angle(angle)*t.radius*load("res://data/bosses/centaurus.tres").params.bow_reach),"warn-alertで弓口の起点と向きを固定する")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,1.0)
+	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0].technique.alerting,"固定した警告射線と機体で切れる表示を正式表示へ渡す")
+	await get_tree().process_frame
+	var held: Dictionary = bridge.checkpoint()
+	bridge.command("dev_ship_motion",{"position":Vector2(300,-300),"velocity":Vector2.ZERO})
+	bridge._core.step(0.04)
+	t = bridge.command("dev_boss_state").value[0]
+	var after: Dictionary = t.duplicate(true)
+	var shots: Array = bridge._core.hostiles_snapshot()
+	check(t.stage==1 and t.released==3 and shots.size()==3 and is_equal_approx(t.facing,angle),"機体が移動してもwarn時刻に固定した向きへ3本を同時発射する")
+	var positions_ok := shots.size()==3
+	for k in shots.size(): positions_ok = positions_ok and shots[k].pos.is_equal_approx(origin) and is_equal_approx(shots[k].vel.angle(),angle+(k-1)*move.spread) and shots[k].kind==builder.Schema.ENUMS.HostileKind.CosmicArrow and is_equal_approx(shots[k].life,move.travel/move.speed)
+	check(positions_ok,"固定起点・対称の扇角度・射程÷速さの寿命でコズミック矢を出す")
+	check(bridge.restore(held.value).ok,"警告後の固定起点・向き・未発射状態を復帰する")
+	bridge.command("dev_ship_motion",{"position":Vector2(300,-300),"velocity":Vector2.ZERO})
+	bridge._core.step(0.04)
+	check(bridge.command("dev_boss_state").value[0]==after and bridge._core.hostiles_snapshot()==shots,"復帰後も同じ起点と角度から同じ矢を発射する")
+	bridge.release_checkpoint(held.value)
+	var render: Dictionary = bridge.read_render(Rect2(-2000,-2000,4000,4000)).value
+	check(view.apply_frame(render) and view._boss_body_displays.values()[0]._parts._clip=="shot_release" and render.shapes.filter(func(shape): return shape.kind==builder.Schema.ENUMS.RenderShapeKind.LightArrow and shape.cosmic).size()==3,"弓の解放姿勢と3本のコズミック矢を正式表示する")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and not bridge.command("dev_boss_state").value[0].alerting,"発射から0.05秒後に警告を消して硬直へ移る")
+	bridge._core.step(0.05)
+	bridge._core.step(0.15)
+	bridge._core.step(0.15)
+	check(bridge.command("dev_boss_state").value[0].id>first,"硬直終了後に次の行動を選ぶ")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"警告と発射cueを公開更新・記録・配信へ渡す")
+	bridge.dispose()
+	view.queue_free()
+	c = centaurus_power_case()
+	bridge = c.bridge
+	var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
+	bridge._core.step(0.06)
+	check(bridge.command("dev_cancel_technique",{"ticket":ticket}).ok,"警告中に強弓を取消できる")
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge._core.hostiles_snapshot().is_empty(),"警告中の取消後は矢を撃たない")
+	bridge.dispose()
+	c = centaurus_power_case()
+	bridge = c.bridge
+	ticket = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
+	bridge._core.step(0.1)
+	check(bridge.command("dev_cancel_technique",{"ticket":ticket}).ok and bridge._core.hostiles_snapshot().size()==3,"発射後の取消でも撃った矢を残す")
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge.command("dev_ship_motion",{"position":Vector2(500,0),"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step_hostiles(0.5)
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,move.damage*load("res://data/config.tres").atk_scale),"参加者が消えても残った強弓の矢が機体へ実ダメージを与える")
+	bridge._core.step_hostiles(1.0)
+	check(bridge._core.hostiles_snapshot().is_empty(),"発射済みの矢は寿命で終わる")
+	bridge.dispose()
+	c = centaurus_power_case(false,false)
+	bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge.command("dev_ship_motion",{"position":Vector2(0,300),"velocity":Vector2.ZERO})
+	bridge._core.step(0.05)
+	check(is_zero_approx(bridge.command("dev_boss_state").value[0].facing),"追尾しない設定では予告開始時の機体位置へ旋回する")
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge._core.hostiles_snapshot().is_empty(),"予告中の参加者消失で未発射の技を止める")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"参加者消失の出来事を配信する")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_power] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 指定の中断確認に不足していた警告フラグの解除だけを確認する。
+
+func native_centaurus_power_cancel() -> void:
+	var c := centaurus_power_case()
+	var bridge = c.bridge
+	var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
+	bridge._core.step(0.06)
+	bridge.command("dev_cancel_technique",{"ticket":ticket})
+	check(not bridge.command("dev_boss_state").value[0].alerting,"警告中の取消で固定射線の警告フラグを消す")
+	bridge.dispose()
+	c = centaurus_power_case()
+	bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge._core.step(0.06)
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.01)
+	check(not bridge.command("dev_boss_state").value[0].alerting,"参加者消失でも固定射線の警告フラグを消す")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_power_cancel] failures=",failed)
 	get_tree().quit(1 if failed else 0)
