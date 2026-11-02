@@ -493,6 +493,78 @@
           "ref": "HostileDefinition"
         }
       ]
+    },
+    {
+      "name": "FriendDebrisDefinition",
+      "section": 60,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "character_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_points",
+          "type": "u32"
+        },
+        {
+          "name": "maximum",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
     }
   ],
   "enums": {
@@ -626,6 +698,20 @@
       {
         "name": "Lightning",
         "value": "lightning"
+      }
+    ],
+    "DebrisStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Stardust",
+        "value": "stardust"
+      },
+      {
+        "name": "Pump",
+        "value": "pump"
       }
     ]
   }

@@ -7,6 +7,7 @@
 #include "../../output/frame_builder.h"
 #include "reflected.h"
 #include "wall.h"
+#include "friend_debris.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -32,10 +33,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
         auto end_reason=speed::AttackEndReason::Lifetime;
         shot.age = double(shot.age) + world_dt;
         shot.angle = double(shot.angle) + double(shot.spin) * world_dt;
-        if (shot.kind == 1 && shot.visual != StringName("weapon/knockback")) {
-            shot.trail.append(destination);
-            if (shot.trail.size() > runtime.state.projectile_config.trail_points) shot.trail.remove_at(0);
-        }
+        if (shot.kind==int64_t(FriendKind::Debris)) FriendDebrisSystem::advance(runtime,shot,destination);
         const double padding = double(shot.radius) + std::max(runtime.state.combat_config.max_enemy_radius, runtime.state.grid.max_radius);
         const Vector2 pad(padding, padding);
         hits.clear();
@@ -55,7 +53,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
             if (life<=0 || enemy.dead || !runtime.state.enemy_handles.contains(target) || shot.hit_ids.count(runtime.state.enemy_handles.entity_id(target))) continue;
             const Vector2 impact = from.lerp(to, hit.time);
             DamageRequest request;request.struck=struck;request.amount=shot.damage;request.direction=speed>0?vel/speed:Vector2();request.knock=shot.knock;
-            request.impact=impact;request.has_impact=true;request.no_crit=shot.no_crit;
+            request.impact=impact;request.has_impact=true;request.no_crit=shot.no_crit;request.shatter_depth=shot.debris.shatter_depth;
             if (const auto *record=get(runtime.state,processing_handle)) {request.cause=record->spec.cause;request.weapon_id=record->spec.weapon;}else break;
             if (shot.kind==int64_t(FriendKind::Shot) && !CombatResolver::allows_hit(runtime,struck,request)) {
                 speed::ReflectedSystem::reflect(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),impact,vel,shot.radius);
@@ -77,12 +75,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
         }
         shot.pos = position; shot.life = life;
         if (life <= 0) {
-            if (shot.kind == 1) {
-                if (shot.visual != StringName("weapon/knockback") && shot.trail.size() > 1) {
-                    Dictionary ended; ended["points"] = shot.trail; ended["color"] = shot.color;
-                    FrameBuilder::append(runtime,"debris_trail",ended);
-                }
-            }
+            if (shot.kind==int64_t(FriendKind::Debris)) FriendDebrisSystem::finish(runtime,shot);
             speed::AttackSystem::end(runtime.state,processing_handle,end_reason);
         }
     }

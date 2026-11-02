@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <vector>
 namespace speed {
+struct FriendDebrisState {uint32_t definition=0;DebrisStyle style=DebrisStyle::Plain;int32_t shatter_depth=0;};
+struct DebrisDeathFixture {uint32_t count=0;double speed=0,damage=0;};
 struct LightArrowState {uint32_t definition=0;float length=0;};
 struct StarBoltState {uint32_t definition=0;};
 struct BoltState {uint32_t definition=0;};
@@ -49,6 +51,7 @@ struct AttackState {
     std::vector<uint32_t> free_records;
     std::unordered_map<int64_t,std::vector<AttackHandle>> by_source;
     std::unordered_map<uint64_t,std::vector<AttackHandle>> by_technique,by_participant,by_boss,by_encounter;
+    std::unordered_map<int64_t,DebrisDeathFixture> development_debris_sources;
     int64_t next_id=1;
     bool hostile_updating=false,hostile_clear_pending=false;
     AttackEndReason clear_reason=AttackEndReason::BossClear;

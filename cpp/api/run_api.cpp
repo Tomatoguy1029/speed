@@ -291,6 +291,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_fire_star_bolt") response=development_star_bolt_command(payload);
     else if (kind=="dev_fire_ring_hold") response=development_ring_hold_command(payload);
     else if (kind=="dev_fire_lump") response=development_lump_command(payload);
+    else if (kind=="dev_burst_debris" || kind=="dev_scatter_hull" || kind=="dev_fling_corpse" || kind=="dev_debris_on_death") response=development_debris_command(kind,payload);
     else if (kind=="dev_fire_bolt") response=development_bolt_command(payload);
     else if (kind=="dev_fire_slash") response=development_slash_command(payload);
     else if (kind=="dev_fire_wall" || kind=="dev_move_wall") response=development_wall_command(kind,payload);

@@ -141,6 +141,7 @@ struct RunState {
     Array collections;
     bool pickups_ready = false;
     struct Friendly {
+        speed::FriendDebrisState debris;
         uint32_t definition=0;
         bool alive = true, pierce = false, no_crit = false;
         int64_t kind = 0, generation = 0, pierce_left = 0, id = 0;

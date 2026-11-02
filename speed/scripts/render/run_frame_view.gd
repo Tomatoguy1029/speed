@@ -14,6 +14,8 @@ var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
 var _arrow_displays: Dictionary = {}
+var _debris_displays: Dictionary = {}
+var _debris_trails: Array[Dictionary] = []
 var _scope: ContentResourceScope
 var _pixel := 1.82
 var _shot_transforms: Dictionary = {}
@@ -120,6 +122,9 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 			_particle_canvas.draw_line(beam.from,beam.to,color,beam.width)
 			_particle_canvas.draw_circle(beam.from,beam.width*0.5,color)
 			_particle_canvas.draw_circle(beam.to,beam.width*0.5,color)
+
+		for trail: Dictionary in _debris_trails:
+			if trail.points.size()>1: _particle_canvas.draw_polyline(trail.points,Color(1.0,0.6,0.25,0.6*trail.life/trail.max),3.0*_pixel/maxf(_zoom,0.01))
 		for ring: Dictionary in _rings:
 			var k: float = ring.life/ring.max
 			var color: Color = EFFECT_SETTINGS.tinted("",ring.color)
@@ -218,9 +223,13 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
+		if row.kind==SHAPE_KIND.FriendDebris:
+			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("trail") is PackedVector2Array or not row.get("velocity") is Vector2 or row.get("debris_style") not in [0,1,2]: return false
+			for key in ["angle","age","life","clock","trail_width"]:
+				if not row.get(key) is float or not is_finite(row[key]): return false
 		if row.kind==SHAPE_KIND.LightArrow:
 			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("cosmic") is bool or not row.get("cosmic_star_count") is int: return false
 			for key in ["angle","length","world_time","shot_length_scale","shot_width_scale","core_width","cosmic_speed"]:
@@ -307,10 +316,21 @@ func apply_frame(frame: Dictionary) -> bool:
 		display.circles.clear()
 	for display: Node in _wave_displays.values(): display.hide()
 	for display: Node in _arrow_displays.values(): display.hide()
+	for display: Node in _debris_displays.values(): display.hide()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
+		if row.kind==SHAPE_KIND.FriendDebris:
+			var key := int(row.order)
+			if not _debris_displays.has(key):
+				var debris := preload("res://scripts/render/attacks/friend_debris.gd").new()
+				parent.add_child(debris)
+				debris.setup(_scope,_pixel)
+				_debris_displays[key] = debris
+			_debris_displays[key].apply_frame(row,_zoom)
+			_debris_displays[key].show()
+			continue
 		if row.kind==SHAPE_KIND.LightArrow:
 			var key := "%d:%d" % [row.layer,row.order]
 			if not _arrow_displays.has(key):
@@ -409,6 +429,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_rampage_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
+		_debris_trails.clear()
 		_meteor_shards.clear()
 		_shield_transfers.clear()
 	for event: Dictionary in frame.events:
@@ -495,6 +516,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_telescope_beams.append({"from":event.pos,"to":event.pos+direction*event.length,"width":event.width*1.6,"life":0.28,"max":0.28})
 			_rings.append({"pos":event.pos,"radius":40.0,"color":Color(1.0,0.75,0.6),"life":0.22,"max":0.22})
 			_burst(event.pos,Color(1.0,0.5,0.35),10,500.0,direction)
+
+		if event.type==&"debris_trail" and event.get("life",0.0)>0.0:
+			_debris_trails.append({"points":event.points,"life":event.life,"max":event.life})
 		if event.type==&"ring":
 			if _rings.size()>80: _rings.pop_front()
 			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
@@ -516,6 +540,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	for trail: Dictionary in _debris_trails: trail.life -= effect_dt
+	_debris_trails = _debris_trails.filter(func(trail: Dictionary): return trail.life>0.0)
 	for effect: Dictionary in _shield_transfers: effect.life -= effect_dt
 	_shield_transfers = _shield_transfers.filter(func(effect: Dictionary): return effect.life>0.0)
 	_shield_transfer_canvas.queue_redraw()

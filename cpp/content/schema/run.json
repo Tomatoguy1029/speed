@@ -1302,7 +1302,8 @@
       {
         "name": "Barrier",
         "value": "barrier"
-      }
+      },
+      {"name": "Corpse", "value": "corpse"}
     ],
     "VisualRole": [
       {
@@ -1662,7 +1663,8 @@
       {
         "name": "LightArrow",
         "value": "light_arrow"
-      }
+      },
+      {"name": "FriendDebris", "value": "friend_debris"}
     ]
   },
   "event_fields": {
@@ -1750,7 +1752,8 @@
     ],
     "debris_trail": [
       "points",
-      "color"
+      "color",
+      "life"
     ],
     "draw_start": [],
     "duplicate": [
@@ -1774,7 +1777,8 @@
     ],
     "hull_scatter": [
       "pos",
-      "count"
+      "count",
+      "visual_key"
     ],
     "hurt": [
       "pos",

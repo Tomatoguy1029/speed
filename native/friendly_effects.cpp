@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/systems/attacks/friend_debris.h"
 #include <cmath>
 using namespace godot;
 
@@ -37,24 +38,9 @@ bool SpeedRunCore::configure_projectiles(const Dictionary &config, const Diction
     return true;
 }
 
-bool SpeedRunCore::burst_debris(Vector2 position, int64_t count, double speed, double damage, Color color, int64_t source_id) {
-    if (!runtime.state.started || runtime.state.closed || !runtime.state.combat_ready || !runtime.state.projectile_config.ready || !position.is_finite() || count < 0 || count > INT32_MAX ||
-            !std::isfinite(float(speed)) || speed < 0 || !std::isfinite(damage) || damage < 0) return false;
-    for (float channel : {color.r, color.g, color.b, color.a}) if (!std::isfinite(channel)) return false;
-    constexpr double tau = 6.283185307179586476925286766559;
-    for (int64_t k = 0; k < count; ++k) {
-        const Vector2 unit = Vector2::from_angle(tau * k / double(count) + double(runtime.state.control.rng.randf()) * 0.4);
-        Friendly shot;
-        shot.kind = 1; shot.cause = "hullDebris"; shot.pos = position + unit * 10.0;
-        shot.vel = unit * speed * (0.8 + 0.3 * double(runtime.state.control.rng.randf()));
-        shot.radius = 12; shot.damage = damage; shot.life = runtime.state.projectile_config.debris_life;
-        shot.pierce = true; shot.no_crit = true; shot.color = color; shot.knock = runtime.state.projectile_config.debris_knock;
-        shot.angle = double(runtime.state.control.rng.randf()) * tau; shot.spin = k % 2 == 0 ? 10 : -10;
-        if (source_id != -1) shot.hit_ids.insert(source_id);
-        add_friend(std::move(shot));
-    }
-    Dictionary event; event["pos"] = position; event["count"] = count; emit_event("hull_scatter", event);
-    return true;
+bool SpeedRunCore::burst_debris(Vector2 position,int64_t count,double speed,double damage,Color color,int64_t source_id) {
+    speed::DebrisBurstParams p;p.position=position;p.count=count;p.speed=speed;p.damage=damage;p.color=color;p.source_id=source_id;
+    return speed::FriendDebrisSystem::burst(runtime,p);
 }
 
 void SpeedRunCore::duplicate_friend(size_t source, Vector2 impact) {

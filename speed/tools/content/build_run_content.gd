@@ -294,6 +294,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.StarBoltDefinition = [{"id":1,"radius":9.0,"life":6.0,"flight_scale":star.flight_scale,"turn_with_velocity":star.turn_with_velocity,
 		"tint_r":star.effect_tint.r,"tint_g":star.effect_tint.g,"tint_b":star.effect_tint.b,"tint_a":star.effect_tint.a,"visual":star_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	star.free()
+	var debris_settings: Resource = load("res://data/visuals/effect_settings.tres")
+	var debris_tint: Color = debris_settings.tinted("",Color.WHITE)
+	data.FriendDebrisDefinition = [{"id":1,"life":config.hull_debris_life,"knock":config.hull_debris_knock,"spread":deg_to_rad(config.hull_debris_spread),
+		"character_scale":config.character_scale,"trail_life":config.corpse_trail_life,"trail_width":debris_settings.number("","debris_trail_width",1.0),
+		"trail_points":config.corpse_trail_points,"maximum":200,"contact":4,"tint_r":debris_tint.r,"tint_g":debris_tint.g,"tint_b":debris_tint.b,"tint_a":debris_tint.a}]
 	data.LumpDefinition = [{"id":1,"life":4.0,"projectile":1}]
 	data.RingHoldDefinition = [{"id":1,"projectile_radius":8.0,"life":4.0,"projectile":1}]
 	data.HostileDefinition = [{"id":1,"kind":0,"radius":7.0,"life":4.0,"damage":7.0,"slow":0.0,"turn":0.0,
@@ -400,6 +405,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if data.ResourceKey.is_empty():
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)
 			visuals.assign(package.visuals.slice(0,5))
+			data.FriendDebrisDefinition = resolved.FriendDebrisDefinition.duplicate(true)
 			data.LumpDefinition = resolved.LumpDefinition.duplicate(true)
 			data.RingHoldDefinition = resolved.RingHoldDefinition.duplicate(true)
 			data.StarBoltDefinition = resolved.StarBoltDefinition.duplicate(true)
@@ -499,6 +505,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")
+	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png"]:
+		if not paths.has(asset): paths.append(asset)
 	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")
 	for visual: Dictionary in visuals:
 		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)

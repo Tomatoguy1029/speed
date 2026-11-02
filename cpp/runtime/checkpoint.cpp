@@ -81,7 +81,14 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             !state.enemy_handles.reusable(uint32_t(row))) return false;
     }
     for (auto row:state.dead_rows) if (row>=state.enemies.size() || !state.enemies[row].alive || !state.enemies[row].dead) return false;
-    for (const auto &shot:state.friends) if (shot.alive && shot.definition>content.friend_shots.size()) return false;
+    for (const auto &shot:state.friends) if (shot.alive) {
+        if (shot.definition>content.friend_shots.size()) return false;
+        if (shot.kind==int64_t(FriendKind::Debris)) {
+            if (!shot.debris.definition || shot.debris.definition>content.friend_debris.size() || shot.debris.style>=DebrisStyle::Count || shot.debris.shatter_depth<0 ||
+                !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.angle) || !std::isfinite(shot.spin)) return false;
+            for (auto point:shot.trail) if (!point.is_finite()) return false;
+        }
+    }
     for (const auto &shot:state.hostiles) if (shot.alive) {
         if (shot.definition>content.hostile_definitions.size()) return false;
         if (shot.kind==int64_t(HostileKind::Slash)) {

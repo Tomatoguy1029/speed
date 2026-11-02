@@ -1,5 +1,6 @@
 ## 攻撃の表示を読み込めることと、水流の資源を初回使用時だけ準備することを確認する。
 extends Node
+const ENUMS = preload("res://tools/content/generated/run_schema.gd").ENUMS
 
 var failed := 0
 var lump_notification_only := false
@@ -20,6 +21,12 @@ func _ready() -> void:
 		get_tree().quit(1 if failed else 0)
 		return
 
+
+	if "--cpp-friend-debris" in OS.get_cmdline_user_args():
+		await check_cpp_friend_debris()
+		print("[cpp_friend_debris] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-render-kinds" in OS.get_cmdline_user_args() or "--cpp-render-kinds-view-fix" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_render_kinds()
 		check(finished,"統合で変わった表示種別の確認を最後まで実施する")
@@ -357,3 +364,56 @@ func check_cpp_star_role() -> bool:
 	cpp_session.free()
 	await get_tree().process_frame
 	return true
+
+func check_cpp_friend_debris() -> void:
+	if not await prepare_cpp_attack(94,"friend_debris"): return
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(100,0)}).value
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var fixture: Dictionary = cpp_bridge.command("dev_debris_on_death",{"source_id":source,"count":1,"speed":100.0,"damage":2.0})
+	check(fixture.ok,"開発用の撃破元へ破片生成を予約する")
+	if not fixture.ok: cpp_session.free(); return
+	check(cpp_core.fire_shot(cpp_origin,0.0,100.0,{"speed":1000.0,"life":1.0}),"破片を生成する敵へ味方弾を発射する")
+	cpp_core.step_projectiles(0.1)
+	var pieces: Array = cpp_core.projectiles_snapshot().filter(func(p): return p.kind==1)
+	check(pieces.size()==1 and is_equal_approx(pieces[0].age,0.1),"撃破で後ろへ追加された破片も同じ更新で移動する")
+	check(pieces.size()==1 and pieces[0].hit_ids.has(source),"破片は撃破元の命中済みIDを引き継ぐ")
+	cpp_core.step_projectiles(0.1)
+	var state: Array = cpp_core.projectiles_snapshot()
+	check(state[0].trail.size()==2 and state[0].angle!=0.0,"破片が回転して通った位置を残す")
+	var held: Dictionary = cpp_bridge.checkpoint()
+	check(held.ok,"飛んでいる破片と軌跡を値で保持する")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(frame.shapes.any(func(s): return s.kind==ENUMS.RenderShapeKind.FriendDebris and s.trail.size()==2),"破片の形と軌跡を表示用の値へ渡す")
+	check(presentation.frame_view.apply_frame(frame),"破片の形と軌跡を通常画面で描く")
+	await get_tree().process_frame
+	cpp_core.step_projectiles(1.0)
+	check(cpp_core.projectiles_snapshot().is_empty(),"破片が寿命で消える")
+	var events: Array = cpp_bridge.read_frame().value.events
+	check(events.any(func(e): return e.type==&"debris_trail" and e.payload.points.size()>1),"消えた破片は軌跡の終了表示を通知する")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(not presentation.frame_view._debris_trails.is_empty(),"終了後の軌跡を表示側が保持して描く")
+	cpp_bridge.restore(held.value)
+	check(cpp_core.projectiles_snapshot()==state,"破片の速度・角度・軌跡・命中済みIDを復元する")
+	cpp_bridge.restore(empty.value)
+	var scattered: Dictionary = cpp_bridge.command("dev_scatter_hull",{"source_id":source,"direction":Vector2.RIGHT,"speed":100.0,"damage":2.0,"shatter_depth":2})
+	check(scattered.ok,"星屑の破片を型付き生成器から出す")
+	cpp_core.step_projectiles(0.1)
+	var dust: Array = cpp_core.projectiles_snapshot()
+	check(not dust.is_empty() and dust.all(func(p): return p.trail.is_empty() and p.shatter_depth==2),"星屑は通常の軌跡を作らず連鎖の深さを保つ")
+	frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	check(presentation.frame_view.apply_frame(frame),"星屑の点と尾を通常画面で描く")
+	await get_tree().process_frame
+	cpp_bridge.restore(empty.value)
+	var pumped: Dictionary = cpp_bridge.command("dev_burst_debris",{"position":cpp_origin,"count":2,"speed":100.0,"damage":2.0,"armor_count":1})
+	check(pumped.ok,"ポンプ由来の装甲と敵の破片を生成する")
+	cpp_core.step_projectiles(0.1)
+	check(cpp_core.projectiles_snapshot().all(func(p): return p.trail.is_empty()),"ポンプ由来の破片は通常の軌跡を作らない")
+	frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	check(presentation.frame_view.apply_frame(frame),"ポンプ由来の破片を通常画面で描く")
+	await get_tree().process_frame
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_bridge.release_checkpoint(empty.value)
+	cpp_session.free()
