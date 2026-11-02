@@ -71,6 +71,12 @@ func _ready() -> void:
 		print("[cpp_w28_boss_visual] failed=%d" % failures)
 		get_tree().quit(1 if failures else 0)
 		return
+	if "--cpp-overlap" in OS.get_cmdline_user_args() or "--cpp-overlap-retry" in OS.get_cmdline_user_args():
+		var completed = await check_cpp_overlap()
+		check(completed==true,"同時作用の指定確認を最後まで完了する")
+		print("[cpp_overlap] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w28" in OS.get_cmdline_user_args() or "--cpp-w28-retry" in OS.get_cmdline_user_args():
 		var completed = await check_cpp_w28()
 		check(completed==true,"閃光斬の指定確認を最後まで完了する")
@@ -1751,6 +1757,9 @@ func trait_test_session(id: String, config: GameConfig, seed_value: int):
 	stage.index = 84
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"] if id in ["T03","T06"] else ["drifter"])
+	if id=="C_overlap":
+		stage.resources.enemy_ids = PackedStringArray(["drifter","corona","biter"])
+		stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":0.0,"speed":0.0},"corona":{"speed":0.0,"params.spin":0.0,"params.pull":0.0,"params.telegraph":100.0,"params.fire_interval":100.0},"biter":{"hp":1.0,"armor":0.0,"speed":0.0}}
 	if id=="W28": stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":0.0}}
 	if id=="T06": stage.enemy_tuning = {"shield":{"hp":200.0}}
 	var output := "res://.content/dev/run_"+id
@@ -3907,3 +3916,109 @@ func check_cpp_w28_boss_visual() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"二つの斬撃表示の通知が混ざらない: %s" % [capture.messages()])
+
+func check_cpp_overlap() -> bool:
+	var retry: bool = "--cpp-overlap-retry" in OS.get_cmdline_user_args()
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	config.trace_radius = 1.0
+	var session = await trait_test_session("C_overlap",config,3490)
+	if session==null:
+		OS.remove_logger(errors)
+		return false
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var center: Vector2 = core.ship_snapshot().ship_pos
+	var events: Array = []
+	bridge.subscribe("overlap_check",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	for id in ["W04","W28","W21","W03"]:
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1}).ok,"同時作用の実際の武器を取得する")
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":1})
+	var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(100,0)}).value
+	core.set_enemy_motion(target,{"vel":Vector2.ZERO})
+	trait_start_trace(bridge,600.0)
+	check(core.step_draw(1.0) and core.step_draw(10.0),"世界を進めず最初の突進を終えて次を充填する")
+	bridge.command("dev_ship_motion",{"position":center-Vector2(400,0),"velocity":Vector2.ZERO})
+	trait_start_trace(bridge,600.0)
+	core.step_draw(0.2)
+	check(core.step_draw(1.0),"別の突進IDで同じ敵へ2つめの印を付ける")
+	bridge.command("set_ui_overlay",{"active":false})
+	check(bridge._ui.flash_slash.marks.size()==2 and bridge._ui.flash_slash.dash_count==2,"2つの突進が同じ敵の印を独立して索引する")
+	var owner: int = bridge.command("dev_spawn",{"definition_id":"corona","position":center+Vector2(100,100)}).value
+	core.set_enemy_motion(owner,{"fire_t":100.0})
+	for tick in 12: check(bridge.step(1.0/120.0,idle,viewport).ok, "複数の震空と斬撃待ちの敵を冠で捕捉する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"重なった各状態と通知を配信する")
+	var motion: Array = core.enemy_motion_snapshot().filter(func(e):return e.id==target)
+	check(motion.size()==1 and motion[0].held==1 and motion[0].slash_hold==1 and motion[0].corona_owner==owner,"冠のheldと閃光斬のslash_holdを独立して持つ")
+	check(bridge._ui.contact_wave.waves.size()==2 and bridge._ui.contact_wave.waves.all(func(w):return w.caught.any(func(c):return c.id==target)),"同じ敵へ複数の震空が重なり冠と閃光斬を除外しない")
+	var triple: Dictionary = bridge.checkpoint()
+	bridge.command("dev_remove_weapon",{"id":"W28"})
+	motion = core.enemy_motion_snapshot().filter(func(e):return e.id==target)
+	check(motion[0].held==1 and motion[0].slash_hold==0 and bridge._ui.contact_wave.waves.size()==2,"閃光斬の交換は冠と震空の状態を消さない")
+	bridge.command("dev_remove_weapon",{"id":"W04"})
+	check(core.enemy_motion_snapshot().filter(func(e):return e.id==target)[0].held==1,"震空の交換は冠の保持を解除しない")
+	check(bridge.restore(triple.value).ok and bridge.collect_frame().ok,"3種類の同時作用と複数印の順番へ復帰する")
+	bridge.command("dev_remove_weapon",{"id":"W04"})
+	motion = core.enemy_motion_snapshot().filter(func(e):return e.id==target)
+	check(motion[0].held==1 and motion[0].slash_hold==1,"先に震空を外しても冠と閃光斬を保つ")
+	bridge.command("dev_remove",{"entity_id":owner})
+	motion = core.enemy_motion_snapshot().filter(func(e):return e.id==target)
+	check(motion[0].held==0 and motion[0].slash_hold==1 and not motion[0].has("corona_owner"),"冠を解放しても閃光斬の保持は残る")
+	for tick in 13: bridge.step(1.0/120.0,idle,viewport)
+	motion = core.enemy_motion_snapshot().filter(func(e):return e.id==target)
+	check(bridge._ui.flash_slash.marks.size()==1 and bridge._ui.flash_slash.marks[0].left>0 and motion[0].slash_hold==0,"先の印の完了は後の印が残っていても元の順でboolを解除する")
+	check(bridge.restore(triple.value).ok and bridge.collect_frame().ok,"死亡と船体利用の基準へ復帰する")
+	core.step_draw(10.0)
+	trait_start_trace(bridge,600.0)
+	var hp: float = core.enemies_snapshot().filter(func(e):return e.id==target)[0].hp
+	bridge.command("dev_damage",{"entity_id":target,"amount":hp-1.0,"cause":"shot","knock":0.0})
+	events.clear()
+	core.collide_ship(center-Vector2(200,0),config.trace_radius)
+	bridge.command("set_ui_overlay",{"active":false})
+	check(bridge._ui.mass_tow.cargo.size()==1 and events.filter(func(e):return e.type==&"anchor_capture").size()==1 and not events.any(func(e):return e.type==&"hull_scatter"),"死亡後はアンカーキャノンが先に船体を取り星砕きを抑える")
+	check(bridge._ui.rampage.kills==1,"通常の撃破は特性の撃破hookを一度だけ通す")
+	bridge.command("dev_remove",{"entity_id":target})
+	var next: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(500,300)}).value
+	for tick in 2: bridge.step(1.0/120.0,idle,viewport)
+	motion = core.enemy_motion_snapshot().filter(func(e):return e.id==next)
+	check(next!=target and motion[0].held==0 and motion[0].slash_hold==0 and not motion[0].has("corona_owner") and bridge._ui.flash_slash.marks.is_empty() and bridge._ui.flash_slash.dash_count==0,"死亡行を使う別個体へ冠・印・索引・保持を漏らさない")
+	check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"船体を一撃で使う境界へ復帰する")
+	for id in ["W03","W21"]: bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1})
+	trait_start_trace(bridge,600.0)
+	var fresh: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(100,100)}).value
+	core.set_enemy_motion(fresh,{"held":true,"vel":Vector2.ZERO})
+	events.clear()
+	bridge.command("dev_damage",{"entity_id":fresh,"amount":1000.0,"cause":"shot","direction":Vector2.RIGHT,"knock":0.0,"no_crit":true})
+	check(bridge._ui.mass_tow.cargo.size()==1 and not events.any(func(e):return e.type==&"hull_scatter"),"一撃の船体はW21が先に捕獲し星砕きへ重複して渡さない")
+	if not retry:
+		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"ミラージュの専用撃破の基準へ復帰する")
+		for id in ["W21","W03","W27"]: bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1})
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":1})
+		trait_start_trace(bridge,600.0)
+		core.step_draw(0.1)
+		var echo_target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,0)}).value
+		core.set_enemy_motion(echo_target,{"held":true,"vel":Vector2.ZERO})
+		hp = core.enemies_snapshot().filter(func(e):return e.id==echo_target)[0].hp
+		bridge.command("dev_damage",{"entity_id":echo_target,"amount":hp-1.0,"cause":"shot","knock":0.0})
+		events.clear()
+		for tick in 20: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"ミラージュの実際の撃破通知を配信する")
+		check(events.filter(func(e):return e.type==&"kill" and e.payload.id==echo_target and e.payload.cause=="afterimage").size()==1 and bridge._ui.mass_tow.cargo.is_empty() and not events.any(func(e):return e.type in [&"anchor_capture",&"hull_scatter"]) and bridge._ui.rampage.kills==0,"ミラージュ撃破は船体を使用済みにしW21・W03と撃破hookを抑える")
+	bridge.release_checkpoint(triple.value)
+	bridge.release_checkpoint(initial.value)
+	bridge.unsubscribe("overlap_check")
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"同時作用と行再利用に実行エラーがない: %s" % [errors.messages()])
+	return true
