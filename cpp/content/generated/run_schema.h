@@ -4112,7 +4112,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 41) return false;
+    if (out.kind > 42) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -5354,6 +5354,40 @@ inline bool read(BinaryReader &input, CanisHowlDefinition &out) {
     if (out.tail < 0) return false;
     return true;
 }
+struct CanisPounceDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double active{};
+    uint32_t alone_hounds{};
+    double cd_alone{};
+    double lock{};
+    double overshoot{};
+    double lead_extra{};
+    uint32_t chain{};
+    double chain_warn{};
+};
+inline bool read(BinaryReader &input, CanisPounceDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.active)) return false;
+    if (out.active < 0) return false;
+    if (!input.read_u32(out.alone_hounds)) return false;
+    if (out.alone_hounds < 0) return false;
+    if (!input.read_f64(out.cd_alone)) return false;
+    if (out.cd_alone < 0) return false;
+    if (!input.read_f64(out.lock)) return false;
+    if (out.lock < 0) return false;
+    if (!input.read_f64(out.overshoot)) return false;
+    if (out.overshoot < 0) return false;
+    if (!input.read_f64(out.lead_extra)) return false;
+    if (out.lead_extra < 0) return false;
+    if (!input.read_u32(out.chain)) return false;
+    if (out.chain < 0) return false;
+    if (!input.read_f64(out.chain_warn)) return false;
+    if (out.chain_warn < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -5526,6 +5560,7 @@ struct ContentRecords {
     std::vector<CanisFlameDefinition> CanisFlameDefinition_rows;
     std::vector<CanisCommandDefinition> CanisCommandDefinition_rows;
     std::vector<CanisHowlDefinition> CanisHowlDefinition_rows;
+    std::vector<CanisPounceDefinition> CanisPounceDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -6349,7 +6384,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 18) return false;
+        if (version != 19) return false;
         if (count > input.remaining()/637) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -6556,6 +6591,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/128) return false;
         for (uint32_t i=0; i<count; ++i) { CanisHowlDefinition row; if (!read(input,row)) return false; out.CanisHowlDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 344: {
+        if (version != 1) return false;
+        if (count > input.remaining()/64) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisPounceDefinition row; if (!read(input,row)) return false; out.CanisPounceDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -6904,6 +6945,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisCommandDefinition_rows) if (!CanisCommandDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisHowlDefinition_ids;
     for (const auto &row:data.CanisHowlDefinition_rows) if (!CanisHowlDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisPounceDefinition_ids;
+    for (const auto &row:data.CanisPounceDefinition_rows) if (!CanisPounceDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -7084,6 +7127,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisFlameDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.CanisCommandDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CanisHowlDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CanisPounceDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -7210,5 +7254,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=171;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=172;
 }
