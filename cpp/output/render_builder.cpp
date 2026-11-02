@@ -96,7 +96,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (view.grow(body.radius).has_point(body.position)) batch(FieldSystem::visual(run,body),2,0).add(i+1,body.position,0,body.radius,Color(0,0,0,1));
     }
     for (size_t i=0;i<state.enemies.size();++i) {
-        const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead || enemy.picaro_owner.generation) continue;
+        const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead || enemy.picaro_owner.generation || (state.control.cinematic_hide_enemies && !enemy.is_boss)) continue;
         const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus || definition.kind==EnemyDefinition::Kind::CanisMajor || definition.kind==EnemyDefinition::Kind::Draco || definition.kind==EnemyDefinition::Kind::Hydra || HydraBody::owns_part(run,state.enemy_handles.at(i))) continue;
         const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
@@ -208,7 +208,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     PackedFloat64Array pulser;
     for (uint32_t i=0;i<state.enemies.size();++i) {
-        const auto &e=state.enemies[i];if (!e.alive || e.dead || e.held || e.stone>0 || state.enemy_handles.contains(e.pump_owner) || e.mode!=EnemyMode::Windup) continue;
+        const auto &e=state.enemies[i];if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss) || e.held || e.stone>0 || state.enemy_handles.contains(e.pump_owner) || e.mode!=EnemyMode::Windup) continue;
         const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Pulser) continue;
         const auto &p=run.content->pulsers[d.pulser_definition-1];const double radius=PulserBehavior::ring_radius(run,i);
         if (!view.grow(radius+p.width*26).has_point(e.pos)) continue;
@@ -222,43 +222,43 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (const auto &well:state.field.wells) for (double value:{double(well.position.x),double(well.position.y),well.born,well.life,well.radius}) well_values.push_back(value);
     gravity["time"]=state.world_time;gravity["wells"]=well_values;
     PackedFloat64Array ruler;
-    for (const auto &e:state.enemies) if (e.alive && !e.dead && std::holds_alternative<RulerState>(e.behavior_state)) {
+    for (const auto &e:state.enemies) if (e.alive && !e.dead && !state.control.cinematic_hide_enemies && std::holds_alternative<RulerState>(e.behavior_state)) {
         const auto &d=run.content->definitions[e.definition];const auto &p=run.content->rulers[d.ruler_definition-1];const auto color=d.color.lightened(0.2);
         for (double value:{double(e.pos.x),double(e.pos.y),e.radius,e.facing,double(e.mode),e.charge,p.beam_len,p.beam_width,p.beam_start_gap,double(color.r),double(color.g),double(color.b)}) ruler.push_back(value);
     }
     PackedFloat64Array triangle_star;
     for (const auto &h:state.hazards) {const auto *w=std::get_if<WallHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);
         if (!h.alive || !w || w->style!=uint32_t(WallStyle::Trail) || !record || !state.enemy_handles.contains(record->spec.owner.live_source)) continue;
-        const auto &owner=state.enemies[record->spec.owner.live_source.slot];if (owner.dead || run.content->definitions[owner.definition].kind!=EnemyDefinition::Kind::TriangleStar) continue;
+        const auto &owner=state.enemies[record->spec.owner.live_source.slot];if (state.control.cinematic_hide_enemies || owner.dead || run.content->definitions[owner.definition].kind!=EnemyDefinition::Kind::TriangleStar) continue;
         const auto head=h.pos+Vector2::from_angle(w->angle)*w->length;for (double value:{double(h.pos.x),double(h.pos.y),double(head.x),double(head.y),double(w->half_width)*2}) triangle_star.push_back(value);
     }
     Dictionary cepheus;PackedFloat64Array cepheus_values,cepheus_marks;
-    for (const auto &e:state.enemies) if (e.alive && !e.dead && std::holds_alternative<CepheusState>(e.behavior_state) && e.mode==EnemyMode::Windup) for (double v:{double(e.pos.x),double(e.pos.y),e.radius,e.facing,e.charge}) cepheus_values.push_back(v);
-    for (const auto &m:state.groups.summon_marks) {const double age=m.age;if (age>=m.life) continue;for (double v:{double(m.pos.x),double(m.pos.y),double(m.king.x),double(m.king.y),double(m.color.r),double(m.color.g),double(m.color.b),double(m.color.a),age/m.life,state.world_time}) cepheus_marks.push_back(v);}
+    for (const auto &e:state.enemies) if (e.alive && !e.dead && !state.control.cinematic_hide_enemies && std::holds_alternative<CepheusState>(e.behavior_state) && e.mode==EnemyMode::Windup) for (double v:{double(e.pos.x),double(e.pos.y),e.radius,e.facing,e.charge}) cepheus_values.push_back(v);
+    for (const auto &m:state.groups.summon_marks) {if (state.control.cinematic_hide_enemies) continue;const double age=m.age;if (age>=m.life) continue;for (double v:{double(m.pos.x),double(m.pos.y),double(m.king.x),double(m.king.y),double(m.color.r),double(m.color.g),double(m.color.b),double(m.color.a),age/m.life,state.world_time}) cepheus_marks.push_back(v);}
     cepheus["values"]=cepheus_values;cepheus["marks"]=cepheus_marks;
     PackedFloat64Array corona,corona_members;
     for (const auto &e:state.enemies) {
-        if (!e.alive || e.dead) continue;
+        if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss)) continue;
         if (const auto *o=std::get_if<CoronaState>(&e.behavior_state)) if (o->ready && view.grow(200).has_point(e.pos)) {const auto &p=run.content->coronas[run.content->definitions[e.definition].corona_definition-1];for (double v:{double(e.pos.x),double(e.pos.y),p.ring,state.world_time*p.spin,e.radius,double(e.mode),e.charge}) corona.push_back(v);}
         if (e.corona && view.grow(180).has_point(e.pos) && state.enemy_handles.contains(e.corona->owner)) {const auto &a=*e.corona;const auto &owner=state.enemies[a.owner.slot];const auto &o=std::get<CoronaState>(owner.behavior_state);const bool selected=state.enemy_handles.contains(o.selected) && state.enemy_handles.entity_id(o.selected)==e.id;for (double v:{double(e.pos.x),double(e.pos.y),e.radius*a.effect,a.thrown?1.0:0.0,double(e.vel.x),double(e.vel.y),selected?1.0:0.0,double(owner.pos.x),double(owner.pos.y),state.world_time}) corona_members.push_back(v);}
     }
     Dictionary aquila;PackedFloat64Array aquila_values;
     for (const auto &e:state.enemies) {
-        if (!e.alive || e.dead || e.mode!=EnemyMode::Windup) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Aquila) continue;
+        if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss) || e.mode!=EnemyMode::Windup) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Aquila) continue;
         const auto &p=run.content->aquilas[d.aquila_definition-1];const auto center=std::get<AquilaState>(e.behavior_state).anchor;
         for (double v:{double(e.pos.x),double(e.pos.y),e.radius,e.charge,double(center.x),double(center.y),p.dash_speed*p.drop_step,p.blast_radius,e.held || e.stone>0?0.0:1.0}) aquila_values.push_back(v);
     }
     aquila["values"]=aquila_values;aquila["view"]=view;
     PackedFloat64Array phoenix;
     for (const auto &e:state.enemies) {
-        if (!e.alive || e.dead || (e.mode!=EnemyMode::Windup && e.mode!=EnemyMode::Dash)) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Phoenix) continue;
+        if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss) || (e.mode!=EnemyMode::Windup && e.mode!=EnemyMode::Dash)) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Phoenix) continue;
         const auto &p=run.content->phoenixes[d.phoenix_definition-1];const auto center=std::get<PhoenixState>(e.behavior_state).anchor;const double radius=std::max(e.radius*1.1,p.impact_radius);
         if (!view.grow(radius*3).has_point(center)) continue;
         for (double v:{double(center.x),double(center.y),e.radius,e.facing,radius,e.mode==EnemyMode::Windup?e.charge:1.0,double(e.id%31)/31.0}) phoenix.push_back(v);
     }
     Dictionary marlin;PackedInt64Array marlin_ids;PackedFloat64Array marlin_values;
     for (size_t i=0;i<state.enemies.size();++i) {
-        const auto &e=state.enemies[i];if (!e.alive || e.dead || e.held || e.stone>0) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Marlin) continue;
+        const auto &e=state.enemies[i];if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss) || e.held || e.stone>0) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Marlin) continue;
         const auto &p=run.content->marlins[d.marlin_definition-1];const auto direction=Vector2::from_angle(e.facing),from=e.pos+direction*e.radius;auto to=e.pos+direction*p.dash_speed*p.dash_time;
         if (const auto hit=FieldSystem::first_body_hit(run,e.pos,to,e.radius)) to=e.pos.lerp(to,hit->t);
         marlin_ids.push_back(e.id);for (double v:{double(e.pos.x),double(e.pos.y),e.facing,e.radius,e.radius*d.sprite_scale,d.sprite_angle+e.facing,double(e.mode),e.charge,e.timer,p.dash_time,double(from.x),double(from.y),double(to.x),double(to.y)}) marlin_values.push_back(v);

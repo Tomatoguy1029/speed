@@ -427,6 +427,7 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		if definition.id==&"draco":
 		var draco := {"id":1,"boss":1,"head_radius":definition.radius,"part_hp":definition.hp,"part_armor":definition.armor}
 		for key in ["body_length","body_width","head_scale","body_wave","aim_lead_cap","approach_distance"]: draco[key] = float(definition.params[key])
+		draco.entrance_quiet = float(definition.params.get("entrance_quiet",2.5))
 		draco.body_segments = int(definition.params.body_segments)
 		draco.threshold_1 = float(definition.params.thresholds[0])
 		draco.threshold_2 = float(definition.params.thresholds[1])

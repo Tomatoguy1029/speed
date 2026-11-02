@@ -34,6 +34,7 @@
 namespace speed {
 void RunRunner::camera(godot::SpeedRunCore &core,double dt,godot::Vector2 size) {
     auto &state=core.runtime.state;auto &control=state.control;
+    if (control.cinematic_camera) {control.logical_size=size;state.view_center=control.camera_center;state.view_half=size/(2.0*control.camera_zoom);return;}
     const double factor=std::pow(control.zoom_ref_speed/std::max(control.zoom_ref_speed,state.ship_config.max_speed),control.zoom_exp);
     const double zoom=std::min(size.x,size.y)/control.base_view*std::clamp(factor,control.zoom_min,1.0);
     if (!control.camera_ready) {control.camera_center=state.ship.pos;control.camera_zoom=zoom;control.camera_ready=true;}

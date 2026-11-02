@@ -14,15 +14,41 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 	position = body.position
 	rotation = body.facing
 	visible = body.mode<4
+	var intro: Dictionary = body.get("intro",{})
+	var intro_active: bool = intro.get("active",false)
+	_parts.visible = not intro_active or intro.time>=float(body.get("entrance_quiet",2.5))
 	hit = float(body.flash)
 	var points := PackedVector2Array()
 	for point: Vector2 in body.body_points: points.append(to_local(point))
-	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),float(body.alpha),false,hit)
+	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),false,hit)
 	queue_redraw()
 func _draw() -> void:
 	if state.is_empty() or not visible: return
+	_draw_rift()
+	var intro: Dictionary = state.get("intro",{})
+	var glow: float = float(intro.chest_glow) if intro.get("active",false) else 1.0
 	var depth := float(state.perspective_scale)
 	var core := Vector2(-110.0*float(state.head_scale)*depth,0)
 	var pulse := 0.85+sin(float(state.clock)*3.0)*0.15
-	draw_circle(core,43.0*depth,Color(0.38,0.59,1.0,0.16*pulse*float(state.alpha)))
-	preload("res://scripts/bosses/draco_form.gd").star(self,core,27.0*depth,Color(0.85,0.96,1.0,float(state.alpha)))
+	draw_circle(core,43.0*depth,Color(0.38,0.59,1.0,0.16*pulse*float(state.alpha)*glow))
+	preload("res://scripts/bosses/draco_form.gd").star(self,core,27.0*depth,Color(0.85,0.96,1.0,float(state.alpha)*glow))
+
+func _draw_rift() -> void:
+	var intro: Dictionary = state.get("intro",{})
+	if not intro.get("active",false) or intro.rift<=0.0: return
+	var opening: float = intro.rift
+	var center: Vector2 = intro.rift_center
+	var axis := Vector2.DOWN
+	var line := PackedVector2Array()
+	for j in 19:
+		var along := float(j-9)*55.0*opening
+		var side := (sin(j*2.3)*24.0+sin(j*4.9)*12.0)*opening
+		line.append(to_local(center+axis*along+axis.orthogonal()*side))
+	draw_polyline(line,Color(0.41,0.25,0.88,0.22),160.0*opening,false)
+	draw_polyline(line,Color("#5a4d91"),105.0*opening,false)
+	draw_polyline(line,Color("#050612"),88.0*opening,false)
+	if intro.eyes>0.0 and intro.emerged<0.4:
+		for side in [-1,1]:
+			var at: Vector2 = to_local(center+axis.orthogonal()*side*65.0)
+			var offset := axis.rotated(-rotation)*12.0
+			draw_line(at-offset,at+offset,Color(1.0,0.1,0.3,float(intro.eyes)),8.0,false)

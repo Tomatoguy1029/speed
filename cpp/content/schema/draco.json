@@ -74,6 +74,11 @@
           "name": "part_armor",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "entrance_quiet",
+          "type": "f64",
+          "min": 0
         }
       ]
     }

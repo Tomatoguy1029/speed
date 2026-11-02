@@ -5,6 +5,9 @@ func check(value: bool, message: String) -> void:
 		failures += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-draco-intro" in OS.get_cmdline_user_args() or "--cpp-draco-intro-position" in OS.get_cmdline_user_args():
+		call_deferred("native_intro")
+		return
 	var stage: RuntimeStage = ContentManager.runtime_stage(5).duplicate(true)
 	stage.boss_enabled = false
 	var session := RunManager.create_session(self, {"lab":true,"stage":stage,"stage_index":5,"seed":1605}, false)
@@ -178,4 +181,83 @@ func _ready() -> void:
 	check(not sim.state.controls_locked and not sim.state.cinematic_camera and sim.state.world_scale>0.0,"完走後に演出のロックを残さない")
 	session.free()
 	print("[draco_cinematics] failures=",failures)
+	get_tree().quit(1 if failures else 0)
+
+## 既存の登場方向・中断・二重skip・安全配置・自然終了をC++入口へ接続する。
+func native_intro() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	var package: Dictionary = builder.boss_body_package(load("res://data/bosses/draco.tres"),cfg)
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":188,"mode":1,"stage_id":"B_draco_intro","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"登場の編集値を生成データから読む")
+	if not configured.ok: print(configured);get_tree().quit(1);return
+	bridge.start(1605,{"position":Vector2(180,260),"lab_mode":true})
+	bridge.subscribe("確認",func(_frame):return true)
+	bridge._core.set_motion_context(Vector2(180,260),Vector2(60,180),Vector2(800,450))
+	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"level":1,"position":Vector2(180,260)}})
+	var boss := 0
+	var position_only := "--cpp-draco-intro-position" in OS.get_cmdline_user_args()
+	if not position_only:
+		for angle in [0.0,PI*0.5,PI,-PI*0.5]:
+			var initial := Vector2(180,260)-Vector2.from_angle(angle)*700.0
+			boss = bridge.command("dev_spawn_boss",{"definition":1,"position":initial,"entrance":false}).value
+			bridge.command("dev_edit",{"kind":"camera","payload":{"center":Vector2(60,180),"size":Vector2(960,540),"zoom":0.6,"bars":0.0}})
+			bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"begin"})
+			bridge._core.step(1.0)
+			var body: Dictionary = bridge.command("dev_boss_body_state").value[-1]
+			check(is_equal_approx(float(body.facing),PI*0.5),"登場方向を四方から同じ対面構図に揃える")
+			bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"cancel"})
+			var frame: Dictionary = bridge.read_frame().value
+			check(frame.camera.center.is_equal_approx(Vector2(60,180)) and is_equal_approx(frame.camera.zoom,0.6),"中断はカメラ中心と倍率を復元する")
+			check(frame.camera.half.is_equal_approx(Vector2(800,450)),"中断は入力用の表示範囲を返す")
+			check(bridge.command("dev_boss_body_state").value[-1].position.is_equal_approx(initial),"中断は本体位置を戻す")
+			check(not frame.ui.controls_locked and not frame.ui.cinematic_camera and frame.ui.cinematic_bars==0.0,"中断は操作とHUDを返す")
+			bridge.command("dev_cancel_boss",{"entity_id":boss})
+		boss = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-500,-100),"entrance":true}).value
+		bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"skip"})
+		bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"skip"})
+		check(bridge.command("dev_boss_body_state").value[-1].mode==1 and bridge.command("dev_boss_body_state").value[-1].guard==0.0 and not bridge.read_frame().value.ui.controls_locked,"二重スキップでも戦闘へ返す")
+	if position_only: boss = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-500,-100),"entrance":false}).value
+	for ship_at in [Vector2(0,-9900),Vector2(9000,2500),Vector2(1200,1200)]:
+		check(bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"level":1,"position":ship_at}}).ok,"安全配置の自機位置を設定する")
+		var planet: Vector2 = ship_at+Vector2.UP*430.0
+		check(bridge.command("dev_edit",{"kind":"planet","payload":{"position":planet,"radius":300.0}}).ok,"安全配置の天体を置く")
+		bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"begin"})
+		bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"skip"})
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[-1]
+		var head: Vector2 = body.position
+		var margin: float = body.radius+40.0
+		check(head.length()<=cfg.field_radius-margin+0.1 and head.distance_to(planet)>=300.0+margin-0.1,"頭を境界と天体から離す")
+		check(bridge._core.ship_snapshot().ship_pos==ship_at,"対面のために自機を瞬間移動しない")
+	if position_only:
+		bridge.dispose()
+		print("[B_draco_intro_position] failures=",failures)
+		get_tree().quit(1 if failures else 0)
+		return
+	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"level":1,"position":Vector2(180,260)}})
+	bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"begin"})
+	bridge._core.step(3.4)
+	var scope := ContentResourceScope.new()
+	for visual: Dictionary in package.visuals:
+		if not visual.path.is_empty(): scope.provide(visual.path,load(visual.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(package.visuals)
+	view.setup(scope,entries,cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value),"裂け目と出現を既存の描画経路へ渡す")
+	await get_tree().process_frame
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"登場途中の値状態を保持する")
+	bridge._core.step(1.0)
+	var expected: Dictionary = bridge.command("dev_boss_body_state").value[-1]
+	check(bridge.restore(held.value).ok,"登場途中を復帰する")
+	bridge._core.step(1.0)
+	check(bridge.command("dev_boss_body_state").value[-1]==expected,"復帰後も同じ位置・段階・時刻になる")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(10.0)
+	check(not bridge.command("dev_boss_body_state").value[-1].intro.active and bridge.command("dev_boss_body_state").value[-1].mode==1,"登場は自然終了で戦闘へ渡す")
+	view.free();bridge.dispose()
+	print("[B_draco_intro] failures=",failures)
 	get_tree().quit(1 if failures else 0)

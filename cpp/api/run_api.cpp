@@ -320,7 +320,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
     else if (kind=="dev_defender_boost" || kind=="dev_defender_clear_boost" || kind=="dev_spawn_comet" || kind=="dev_comet_state" || kind=="dev_spawn_warp" || kind=="dev_set_warp" || kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
     else if (kind=="dev_boss_trial") response=development_boss_trial_command(payload);
-    else if (kind=="dev_draco_picaro" || kind=="dev_draco_pose" || kind=="dev_canis_lunge" || kind=="dev_cancel_canis_lunge" || kind=="dev_canis_flame" || kind=="dev_boss_technique" || kind=="dev_boss_state" || kind=="dev_cancel_technique" || kind=="dev_boss_flow" || kind=="dev_boss_flow_state" || kind=="dev_cancel_flow" || kind=="dev_spawn_boss" || kind=="dev_boss_body_state" || kind=="dev_cancel_boss" || kind=="dev_boss_final") response=development_boss_command(kind,payload);
+    else if (kind=="dev_draco_intro" || kind=="dev_draco_picaro" || kind=="dev_draco_pose" || kind=="dev_canis_lunge" || kind=="dev_cancel_canis_lunge" || kind=="dev_canis_flame" || kind=="dev_boss_technique" || kind=="dev_boss_state" || kind=="dev_cancel_technique" || kind=="dev_boss_flow" || kind=="dev_boss_flow_state" || kind=="dev_cancel_flow" || kind=="dev_spawn_boss" || kind=="dev_boss_body_state" || kind=="dev_cancel_boss" || kind=="dev_boss_final") response=development_boss_command(kind,payload);
     else if (kind=="dev_contact") response=development_contact_command(payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);
@@ -346,7 +346,7 @@ Dictionary SpeedRunCore::frame_run() {
     if (runtime.frame_workspace.invalid) return failure(8,"events","通知の型・項目・番号が不正です");
     const auto &control=runtime.state.control;Dictionary camera;camera["center"]=control.camera_center;camera["zoom"]=control.camera_zoom;camera["half"]=runtime.state.view_half;
     Dictionary value=progress(runtime);value["run_id"]=runtime.api_run_id;value["camera"]=camera;
-    Dictionary ui;ui["hero"]=speed::HeroesSystem::snapshot(runtime);ui["boss_finish"]=speed::BossFinish::snapshot(runtime);ui["boss_bodies"]=speed::PhaseController::snapshot(runtime);ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["coins"]=runtime.state.lifecycle.coins;ui["invincible"]=runtime.state.invincible;ui["max_hp"]=runtime.state.ship_config.max_hp;
+    Dictionary ui;ui["hero"]=speed::HeroesSystem::snapshot(runtime);ui["boss_finish"]=speed::BossFinish::snapshot(runtime);ui["boss_bodies"]=speed::PhaseController::snapshot(runtime);ui["input_enabled"]=runtime.state.phase==Phase::Play && !runtime.state.controls_locked && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["coins"]=runtime.state.lifecycle.coins;ui["invincible"]=runtime.state.invincible;ui["max_hp"]=runtime.state.ship_config.max_hp;
     const auto shield_source=runtime.state.ship.shield_source_definition;
     ui["ship_shield_visual"]=shield_source?runtime.content->definitions[shield_source-1].visual_id:0;
     ui["ship_radius"]=runtime.state.ship_config.ship_radius;
@@ -369,7 +369,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["rear"]=rear_snapshot();
     ui["barrier"]=barrier_snapshot();
     Dictionary gear;gear["distance"]=runtime.state.loadout.boost_distance;gear["maximum"]=runtime.state.loadout.full_charge_maximum;gear["burst_power"]=runtime.state.loadout.effects.burst_power;gear["ignore_armor"]=runtime.state.loadout.effects.ignore_armor;ui["full_charge"]=gear;ui["base_draw_length"]=runtime.state.draw_config.length;
-    ui["cinematic_bars"]=runtime.state.control.cinematic_bars;ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
+    ui["controls_locked"]=runtime.state.controls_locked;ui["encounter_protected"]=runtime.state.encounter_protected;ui["cinematic_camera"]=control.cinematic_camera;ui["cinematic_hide_enemies"]=control.cinematic_hide_enemies;ui["cinematic_bars"]=runtime.state.control.cinematic_bars;ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=presentation_frozen(runtime);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;
     ui["shot_multiplier"]=runtime.state.loadout.effects.shot_amount;

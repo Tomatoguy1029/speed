@@ -135,7 +135,23 @@ struct DracoPicaroMember {
     double born=0,angle=0;
     uint32_t stars=1;
 };
+struct DracoCinematicState {
+    bool saved=false,controls_locked=false,protected_ship=false,camera=false,hide=false;
+    double bars=0,zoom=1,world_scale=1;
+    godot::Vector2 center,half,heading;
+};
+struct DracoIntroState {
+    struct Held {EnemyHandle actor;bool held=false;};
+    DracoCinematicState saved;
+    std::vector<Held> held;
+    bool active=false;
+    uint8_t stage=0;
+    double time=0,rift=0,eyes=0,chest=0,emerged=0,zoom=1,facing=0,guard=0;
+    BossMode mode=BossMode::Idle;
+    godot::Vector2 origin,ship,camera,center,rift_center;
+};
 struct DracoBodyState {
+    DracoIntroState intro;
     std::vector<DracoPicaroMember> picaro;
     std::vector<EnemyHandle> picaro_pending;
     bool picaro_attacking=true;

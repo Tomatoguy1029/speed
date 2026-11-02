@@ -6,6 +6,7 @@
 #include "../hydra/body.h"
 #include "../hydra/regrow.h"
 #include "../draco/body.h"
+#include "../draco/intro.h"
 #include "../draco/picaro.h"
 #include "../canis_major/flames.h"
 #include "../canis_major/hound_lunge.h"
@@ -74,7 +75,8 @@ void PhaseController::step(RunRuntime &r,double dt) {
         if (definition.kind==3 && b.mode!=BossMode::Final) {e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);HydraBody::step(r,b,dt);continue;}
         if (definition.kind==1) CentaurusBody::pre_step(r,b,dt);
         e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);bool suspend=true;
-        if (b.mode==BossMode::Entrance) {
+        if (definition.kind==4 && b.draco.intro.active) {DracoIntro::tick(r,b,dt);
+        } else if (b.mode==BossMode::Entrance) {
             b.entrance_elapsed+=dt;const double progress=std::clamp(b.entrance_elapsed/std::max(0.05,p.entrance_time),0.0,1.0);const auto prior=e.pos;e.pos=b.entrance_from.lerp(b.entrance_target,1.0-std::pow(1.0-progress,3.0));e.vel=(e.pos-prior)/dt;
             if (progress>=1) {b.mode=BossMode::Idle;e.vel={};if (definition.kind==2) {b.canis.barking=true;b.canis.call_left=CanisMajorBody::rule(r,b).entrance_bark;}}
         } else if (definition.kind==2 && (b.canis.barking || b.canis.calling)) {
