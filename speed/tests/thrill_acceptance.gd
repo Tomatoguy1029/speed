@@ -1391,6 +1391,16 @@ func _test_cpp_entries() -> void:
 		if laboratory.scene!=null and laboratory.scene.bridge!=null: break
 		await get_tree().process_frame
 	_check(laboratory.scene!=null and laboratory.scene.bridge!=null and laboratory.scene._sim==null,"実験場の画面出撃もC++だけを生成する")
+	if laboratory.scene!=null and laboratory.scene.bridge!=null:
+		var lab_bridge: RefCounted = laboratory.scene.bridge
+		var input: Dictionary = lab_bridge.pack_intent(Intent.new())
+		var at: float = ContentManager.stage(1).boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1
+		_check(lab_bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":false,"invincible":true,"time":at}}).ok,"実験場の明示した自動開始を設定する")
+		for i in 3: lab_bridge.step(1.0/120.0,input,{"logical_size":Vector2(1280,720)})
+		_check(lab_bridge.read_frame().value.ui.boss_bodies.is_empty(),"実験場の自動ボスなしでは後半時刻でも始めない")
+		_check(lab_bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":true,"invincible":true,"time":at}}).ok,"実験場の自動ボスを明示して許可する")
+		for i in 3: lab_bridge.step(1.0/120.0,input,{"logical_size":Vector2(1280,720)})
+		_check(not lab_bridge.read_frame().value.ui.boss_bodies.is_empty(),"実験場の明示した自動ボスは通常の出現へつながる")
 	var lab_id: int = laboratory.scene.id if laboratory.scene!=null else -1
 	GameManager.reset_to_main_menu()
 	await _settle_screen()
