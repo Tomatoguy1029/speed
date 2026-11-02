@@ -90,6 +90,7 @@ struct ContentBundle {
     std::vector<CanisHuntDefinition> canis_hunts;
     std::vector<CanisHuntPounceDefinition> canis_hunt_pounces;
     std::vector<CanisNovaDefinition> canis_novas;
+    std::vector<CanisRelayDefinition> canis_relays;
     std::vector<CanisFlameDefinition> canis_flames;
     std::vector<BossBodyDefinition> boss_bodies;
     std::vector<CentaurusBodyDefinition> centaurus_bodies;

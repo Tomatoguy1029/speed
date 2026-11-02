@@ -20,7 +20,7 @@ func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 func clear_flames() -> void:
 	if flames!=null: flames.clear()
 func frame_event(event: Dictionary) -> void:
-	if event.get("type",&"")==&"canis_cue" and event.cue in ["aim_locked","pounce","command","sirius","phase_changed","howl","call","called","stream_windup","bay_windup","entrance_bark","nova_windup","nova_flash"]:
+	if event.get("type",&"")==&"canis_cue" and event.cue in ["aim_locked","pounce","command","sirius","phase_changed","howl","call","called","stream_windup","bay_windup","entrance_bark","nova_windup","nova_flash","relay_windup","relay_mark","relay_fire"]:
 		_pulse_until = float(event.world_time)+0.35
 		if not state.is_empty(): apply_frame(state,technique)
 	if flames!=null: flames.frame_event(event)
@@ -77,7 +77,11 @@ func _track_command(body: Dictionary, attack: Dictionary, dt: float) -> void:
 	_lunge_layer.queue_redraw()
 	queue_redraw()
 func _draw() -> void:
-	if (technique.get("technique","")=="sirius" or (technique.get("technique","")=="hunt" and technique.get("aiming",false))) and int(technique.get("stage",5))==0:
+	for warning: Dictionary in technique.get("warnings",[]):
+		var from: Vector2 = warning.from
+		var to := from+Vector2.from_angle(float(warning.angle))*float(warning.length)
+		draw_line(to_local(from),to_local(to),Color(SIRIUS_COLOR,lerpf(0.12,0.45,float(warning.progress))),lerpf(1.0,3.0,float(warning.progress)))
+	if (technique.get("technique","")=="sirius" or (technique.get("technique","") in ["hunt","relay"] and technique.get("aiming",false))) and int(technique.get("stage",5))==0:
 		var color := Color("#ff667d") if technique.locked else Color("#e8f6ff")
 		var alpha := 0.35 if technique.locked else lerpf(0.12,0.45,float(state.charge))
 		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))

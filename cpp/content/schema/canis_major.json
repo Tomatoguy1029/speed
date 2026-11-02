@@ -966,6 +966,62 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisRelayDefinition",
+      "section": 352,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "hound_flame",
+          "type": "u32",
+          "ref": "CanisFlameDefinition"
+        },
+        {
+          "name": "final_flame",
+          "type": "u32",
+          "ref": "CanisFlameDefinition"
+        },
+        {
+          "name": "min_hounds",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "each_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_turn",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

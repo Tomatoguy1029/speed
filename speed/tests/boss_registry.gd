@@ -23,6 +23,9 @@ func _ready() -> void:
 	if "--cpp-hydra-swim" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_swim")
 		return
+	if "--cpp-canis-relay" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_relay")
+		return
 	if "--cpp-canis-nova" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_nova")
 		return
@@ -3911,4 +3914,100 @@ func native_canis_nova() -> void:
 	bridge.dispose();c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_nova] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 猟犬の固定射撃と、残り予告時間で先読みする最後の射撃を接続する。
+func native_canis_relay() -> void:
+	var c := canis_move_case("relay",{"warn":0.1,"interval":0.05,"each_warn":0.05,"hound_beam_time":0.1,"hound_beam_length":250.0,"hound_beam_width":15.0,"hound_damage":7.0,"final_warn":0.1,"final_lock":0.03,"final_turn":3.0,"final_time":0.12,"final_length":300.0,"final_width":20.0,"final_damage":9.0,"beam_particle_life":0.25,"recover":0.03},false,{"pack_size":3,"lead_max":3},false,0.5)
+	check(not c.is_empty(),"光を継ぐ群れを本体・猟犬・炎・正式表示と同じ制作入口へ渡す")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = []
+	bridge.subscribe("継ぐ炎の記録",func(packet): events.append_array(packet.events);return true)
+	var records: Dictionary = c.package.records
+	check(c.move.make_runner()==null and records.CanisRelayDefinition.size()==2 and records.CanisRelayDefinition[1].hound_flame==8 and records.CanisRelayDefinition[1].final_flame==2 and records.CanisFlameDefinition[6].damage==7.0 and records.CanisFlameDefinition[0].damage==9.0 and records.BossTechniqueStage.is_empty(),"全編集値・二形態と猟犬用/本体用の炎を一意に生成する")
+	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(ticket.ok,"制作入口では通常選択の猟犬数と分けて単独発動する")
+	var initial: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.11)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.stage==0 and t.ordered and t.items.size()==3 and t.items[0].marked and not t.items[0].fired and t.warnings.size()==1,"全体予告を終えてから抽選し、最初の猟犬だけ個別予告を始める")
+	check(is_equal_approx(float(t.items[1].at)-float(t.items[0].at),0.05) and is_equal_approx(float(t.last_fire)-float(t.items[0].at),0.15),"個別時刻と最後の発射予定を本体clockへ置く")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(c.view._boss_body_displays.values()[0].technique.warnings.size()==1,"猟犬の固定予告を正式表示へ渡す")
+	var marked: Dictionary = bridge.checkpoint()
+	var first: Dictionary = t.items[0].duplicate(true)
+	bridge.command("dev_ship_motion",{"position":Vector2(1000,1000),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1000,1000),Vector2(1000,1000),Vector2(3000,2000))
+	bridge._core.step(0.055)
+	t = bridge.command("dev_boss_state").value[0]
+	var jets: Array = canis_effects(bridge).filter(func(v): return v.kind==0 and v.profile==7)
+	check(t.items[0].fired and jets.size()==1 and jets[0].target==first.actor and is_equal_approx(float(jets[0].angle),float(first.angle)) and jets[0].from==first.from,"発射時には予告した位置と角度を使い、機体を狙い直さない")
+	var jet_id: int = jets[0].id
+	var fired: Dictionary = bridge.checkpoint()
+	var moved := Vector2(500,100)
+	bridge.command("dev_relocate",{"entity_id":first.actor,"position":moved})
+	bridge._core.step(0.001)
+	jets = canis_effects(bridge).filter(func(v): return v.kind==0 and v.target==first.actor)
+	check(jets.size()==1 and jets[0].pos.distance_to(moved)<60.0 and is_equal_approx(float(jets[0].angle),float(first.angle)),"発射後の口元だけを猟犬の実位置へ追従させ、角度は固定する")
+	bridge.restore(fired.value)
+	var particle: Dictionary = canis_effects(bridge).filter(func(v): return v.kind==1 and v.profile==7)[0]
+	bridge.command("dev_ship_motion",{"position":particle.pos,"velocity":Vector2.ZERO})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp<hp,"猟犬の炎の粒で実際の機体HPを減らす")
+	bridge.command("set_ui_overlay",{"active":false})
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="flame_jet" and e.payload.technique=="relay"),"炎の噴射という原因と光を継ぐ群れという技を別々に記録する")
+	bridge.restore(fired.value)
+	bridge._core.step(0.02)
+	var continued: Dictionary = bridge.command("dev_boss_state").value[0].duplicate(true)
+	var flames: Array = canis_effects(bridge).duplicate(true)
+	check(bridge.restore(fired.value).ok,"順番と猟犬に付いた炎の途中へ復帰する")
+	bridge._core.step(0.02)
+	check(bridge.command("dev_boss_state").value[0]==continued and canis_effects(bridge)==flames,"復帰後も射撃の予定・猟犬・粒・乱数を一致させる")
+	bridge.restore(fired.value)
+	bridge.command("dev_remove",{"entity_id":first.actor})
+	bridge._core.step(0.001)
+	check(not canis_effects(bridge).any(func(v): return v.kind==0 and v.id==jet_id and v.emitting) and canis_effects(bridge).any(func(v): return v.kind==1),"射撃中の猟犬が消失すると新しい粒だけを止め、発射済みの粒は残す")
+	bridge.restore(fired.value)
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	check(bridge.command("dev_boss_state").value[0].stage==7 and not canis_effects(bridge).is_empty(),"取消では個別予告と猟犬の指示を解き、発射済みの炎は消さない")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(not c.view._boss_body_displays.values()[0].flames.displays.is_empty(),"取消後の猟犬の炎を専用profileで正式表示する")
+	bridge.restore(marked.value)
+	bridge.command("dev_remove",{"entity_id":t.items[2].actor})
+	for k in 100:
+		bridge._core.step(0.008)
+		t = bridge.command("dev_boss_state").value[0]
+		if t.aiming: break
+	check(t.aiming and is_equal_approx(t.aim_age,0.008) and bridge.command("dev_boss_body_state").value[0].clock>=t.last_fire+0.35,"最後の猟犬が消失しても最後の予定時刻と固定の間隔から本体の照準を始める")
+	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
+	bridge._core.set_motion_context(Vector2(300,300),Vector2(300,300),Vector2(3000,2000))
+	bridge._core.step(0.02)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.aim.is_equal_approx(Vector2(309.2,300)) and not t.locked,"最後の先読みは加算前の残り予告時間を使う")
+	for k in 20:
+		bridge._core.step(0.01)
+		t = bridge.command("dev_boss_state").value[0]
+		if t.fired: break
+	check(t.fired and t.locked and t.stage==1,"最後の照準を固定して本体の炎を開始する")
+	bridge._core.step(0.13)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and bridge.command("dev_boss_state").value[0].cancelled,"最後の噴射を終えると猟犬を解放して硬直へ進む")
+	bridge._core.step(0.04)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and not canis_effects(bridge).is_empty(),"自然終了後も最後の炎の粒は寿命まで残す")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(canis_effects(bridge).is_empty(),"本体の終了では残留炎も回収する")
+	bridge.restore(initial.value)
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	check(canis_effects(bridge).is_empty(),"発射前の取消では炎を生成しない")
+	for checkpoint in [initial,marked,fired]: bridge.release_checkpoint(checkpoint.value)
+	bridge.dispose();c.view.queue_free()
+	c = canis_move_case("relay",{},true,{"pack_size":5,"lead_max":5});bridge=c.bridge
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value.is_empty(),"通常フローは必要な6体がそろわないと光を継ぐ群れを選ばない")
+	bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_relay] failures=",failed)
 	get_tree().quit(1 if failed else 0)
