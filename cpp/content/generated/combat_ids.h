@@ -633,6 +633,45 @@ inline bool parse_symbol(std::string_view value, EnemyModeId &out) {
     if (value=="recover") {out=EnemyModeId::Recover;return true;}
     return false;
 }
+enum class HazardStyleId : uint32_t {Plain=0,Reticle=1,Lightning=2,Blast=3,Ray=4,Bite=5,Ripple=6,Flood=7,Trail=8,Telescope=9,Phoenix=10,Guide=11,Aquila=12,Draco=13,Pulser=14,Count};
+inline const char *symbol_name(HazardStyleId value) {
+    switch(value) {
+    case HazardStyleId::Plain: return "plain";
+    case HazardStyleId::Reticle: return "reticle";
+    case HazardStyleId::Lightning: return "lightning";
+    case HazardStyleId::Blast: return "blast";
+    case HazardStyleId::Ray: return "ray";
+    case HazardStyleId::Bite: return "bite";
+    case HazardStyleId::Ripple: return "ripple";
+    case HazardStyleId::Flood: return "flood";
+    case HazardStyleId::Trail: return "trail";
+    case HazardStyleId::Telescope: return "telescope";
+    case HazardStyleId::Phoenix: return "phoenix";
+    case HazardStyleId::Guide: return "guide";
+    case HazardStyleId::Aquila: return "aquila";
+    case HazardStyleId::Draco: return "draco";
+    case HazardStyleId::Pulser: return "pulser";
+    default: return "";
+    }
+}
+inline bool parse_symbol(std::string_view value, HazardStyleId &out) {
+    if (value=="plain") {out=HazardStyleId::Plain;return true;}
+    if (value=="reticle") {out=HazardStyleId::Reticle;return true;}
+    if (value=="lightning") {out=HazardStyleId::Lightning;return true;}
+    if (value=="blast") {out=HazardStyleId::Blast;return true;}
+    if (value=="ray") {out=HazardStyleId::Ray;return true;}
+    if (value=="bite") {out=HazardStyleId::Bite;return true;}
+    if (value=="ripple") {out=HazardStyleId::Ripple;return true;}
+    if (value=="flood") {out=HazardStyleId::Flood;return true;}
+    if (value=="trail") {out=HazardStyleId::Trail;return true;}
+    if (value=="telescope") {out=HazardStyleId::Telescope;return true;}
+    if (value=="phoenix") {out=HazardStyleId::Phoenix;return true;}
+    if (value=="guide") {out=HazardStyleId::Guide;return true;}
+    if (value=="aquila") {out=HazardStyleId::Aquila;return true;}
+    if (value=="draco") {out=HazardStyleId::Draco;return true;}
+    if (value=="pulser") {out=HazardStyleId::Pulser;return true;}
+    return false;
+}
 enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,TaperedBeam=7,Count};
 inline const char *symbol_name(ContactShapeKind value) {
     switch(value) {

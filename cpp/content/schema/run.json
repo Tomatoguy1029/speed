@@ -2338,6 +2338,68 @@
         "name": "Recover",
         "value": "recover"
       }
+    ],
+    "HazardStyleId": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Reticle",
+        "value": "reticle"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      },
+      {
+        "name": "Blast",
+        "value": "blast"
+      },
+      {
+        "name": "Ray",
+        "value": "ray"
+      },
+      {
+        "name": "Bite",
+        "value": "bite"
+      },
+      {
+        "name": "Ripple",
+        "value": "ripple"
+      },
+      {
+        "name": "Flood",
+        "value": "flood"
+      },
+      {
+        "name": "Trail",
+        "value": "trail"
+      },
+      {
+        "name": "Telescope",
+        "value": "telescope"
+      },
+      {
+        "name": "Phoenix",
+        "value": "phoenix"
+      },
+      {
+        "name": "Guide",
+        "value": "guide"
+      },
+      {
+        "name": "Aquila",
+        "value": "aquila"
+      },
+      {
+        "name": "Draco",
+        "value": "draco"
+      },
+      {
+        "name": "Pulser",
+        "value": "pulser"
+      }
     ]
   },
   "event_fields": {
