@@ -14,6 +14,16 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-ranged-restart" in OS.get_cmdline_user_args():
+		battleship_enemy = true
+		for kind in ["battleship","spreader"]:
+			ranged_type_override = kind
+			gunner_finished = false
+			await check_cpp_gunner()
+			check(gunner_finished,"連続出撃の表示準備を最後まで実施: "+kind)
+		print("[cpp_ranged_restart] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-enemy-scalar-precision" in OS.get_cmdline_user_args():
 		await check_cpp_gunner()
 		check(gunner_finished,"敵の時間と向きの精度確認を最後まで実施する")
@@ -157,6 +167,11 @@ func check_cpp_gunner() -> void:
 	check(session.bridge!=null,"射撃型の通常のランと表示を準備する: %s / %s" % [type,session.cpp_error])
 	if session.bridge==null:
 		session.free()
+		return
+	if "--cpp-ranged-restart" in OS.get_cmdline_user_args():
+		gunner_finished = true
+		session.free()
+		await get_tree().process_frame
 		return
 	var bridge = session.bridge
 	var core = bridge._core

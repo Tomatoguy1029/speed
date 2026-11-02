@@ -192,7 +192,13 @@ class ResourceJob:
 		signature = version
 		task_id = WorkerThreadPool.add_task(_load, false, "Load " + path)
 	func _load() -> void:
-		resource = ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE if not signature.is_empty() else ResourceLoader.CACHE_MODE_REUSE)
+		# WorkerThreadPool内のloadはエンジンの別タスクになる。専用Thread内で
+		# 同期読込し、同じパスの別版も結果の確定まで所有する。
+		var reader := Thread.new()
+		if reader.start(_read_resource)!=OK: return
+		resource = reader.wait_to_finish() as Resource
+	func _read_resource() -> Resource:
+		return ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE if not signature.is_empty() else ResourceLoader.CACHE_MODE_REUSE)
 	func finish() -> void:
 		# 終了時はフレームが進まないので、描画資源の作成要求も主スレッドで処理する。
 		while not WorkerThreadPool.is_task_completed(task_id):
