@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../behaviors/enemies/gunner.h"
 #include "../behaviors/enemies/missile.h"
+#include "../behaviors/enemies/rocket.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
@@ -194,7 +195,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Missile) {
+            if (def.kind==speed::EnemyDefinition::Kind::Rocket) {
+                speed::RocketBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Missile) {
                 speed::MissileBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Beamer) {
                 speed::BeamerBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
@@ -207,6 +210,7 @@ void SpeedRunCore::advance_enemies(double delta) {
                 enemy.vel=speed::PursuitBehavior::velocity(enemy,runtime.state.ship_pos,def.turn,far?delta*3.0:delta,policy);
             }
         }
+        if (enemy.dead) continue;
         enemy.pos += enemy.vel * delta;
         if (!far || (enemy.id+runtime.state.ticks)%3==0) speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);
       }
@@ -594,8 +598,8 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
         step_hazards(accumulated);
     }
     if (check_run_end()) return true;
-    for (size_t row : runtime.state.dead_rows) if (runtime.state.enemies[row].alive && runtime.state.enemies[row].dead) remove_enemy(runtime.state.enemies[row].id);
-    runtime.state.dead_rows.clear();
+    auto dead_rows=std::move(runtime.state.dead_rows);runtime.state.dead_rows.clear();
+    for (size_t row : dead_rows) if (runtime.state.enemies[row].alive && runtime.state.enemies[row].dead) remove_enemy(runtime.state.enemies[row].id);
     if (world_step) {
         if (runtime.state.population.frame_enabled && !runtime.state.population.blocked && !attack_guard_active() && !step_population(accumulated, runtime.state.population.bonus)) return false;
         step_pickups(accumulated);

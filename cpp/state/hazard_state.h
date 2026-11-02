@@ -5,7 +5,8 @@
 #include <variant>
 #include <vector>
 namespace speed {
-struct CircleHazard {float radius=0;};
+enum class CircleHazardKind { Bite, Blast };
+struct CircleHazard {float radius=0;CircleHazardKind kind=CircleHazardKind::Bite;};
 struct BeamHazard {float angle=0,length=0,half_width=0,arc=0;uint32_t definition=0,style=0;};
 struct WallHazard {float angle=0,length=0,half_width=0;uint32_t definition=0,style=0;bool blocking=false;};
 struct WaveHazard {

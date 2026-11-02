@@ -2,6 +2,7 @@
 #include "../systems/field.h"
 #include "../systems/attack_system.h"
 #include "../systems/attacks/beam.h"
+#include "../systems/attacks/blast.h"
 #include "../systems/attacks/wave.h"
 #include "../systems/attacks/wall.h"
 #include "../systems/attacks/slash.h"
@@ -84,8 +85,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         const bool warning=definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {enemy_batch.glows.push_back(pose.position.x);enemy_batch.glows.push_back(pose.position.y);enemy_batch.glows.push_back(radius);}
-        enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,
-            Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1),enemy.flash>0 || warning?1:0);
+        const auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):definition.color):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
+        enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,color,enemy.flash>0 || warning?1:0);
     }
     for (size_t i=0;i<state.friends.size();++i) {
         const auto &shot=state.friends[i];if (!shot.alive) continue;
@@ -112,7 +113,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     Array batches;for (auto &group:groups) if (!group.second.instances.empty()) batches.push_back(group.second.value());
     Array shapes;
-    for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);WallSystem::render(run,row,view,shapes);}
+    for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);WallSystem::render(run,row,view,shapes);BlastSystem::render(run,row,view,shapes);}
     for (uint32_t row=0;row<state.hostiles.size();++row) {SlashSystem::render(run,row,view,shapes);BoltSystem::render(run,row,view,shapes);}
     const auto &points=state.draw.drawing?state.draw.points:state.draw.path;
     if ((state.draw.drawing || state.draw.tracing) && points.size()>1) {

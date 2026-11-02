@@ -257,6 +257,54 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "RocketDefinition",
+      "section": 39,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fuse",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {}

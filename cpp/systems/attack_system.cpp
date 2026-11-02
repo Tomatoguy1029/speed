@@ -90,9 +90,10 @@ AttackHandle AttackSystem::emit_hostile(State &state,State::Hostile value,Attack
     return handle;
 }
 AttackHandle AttackSystem::emit_hazard(State &state,State::Hazard value,AttackSpec spec) {
-    const bool circle=std::holds_alternative<CircleHazard>(value.shape);
-    if (circle && !state.bite_zone_config.ready) return {};
-    if (circle && value.duration<=0) value.duration=state.bite_zone_config.duration;
+    const auto *circle=std::get_if<CircleHazard>(&value.shape);
+    const bool bite=circle && circle->kind==CircleHazardKind::Bite;
+    if (bite && !state.bite_zone_config.ready) return {};
+    if (bite && value.duration<=0) value.duration=state.bite_zone_config.duration;
     if (!std::isfinite(value.duration) || value.duration<0 || (circle && value.duration==0)) return {};
     const size_t row=state.free_hazards.empty()?state.hazards.size():state.free_hazards.back();if (row>=UINT32_MAX) return {};
     const auto handle=register_attack(state,AttackPool::Hazard,uint32_t(row),spec);if (!get(state,handle)) return {};
@@ -117,7 +118,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
         if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hostiles.push_back(record.row);}break;
     }
     case AttackPool::Hazard: {
-        auto &value=state.hazards[record.row];pos=value.pos;circle=std::holds_alternative<CircleHazard>(value.shape);
+        auto &value=state.hazards[record.row];pos=value.pos;circle=std::holds_alternative<CircleHazard>(value.shape) && std::get<CircleHazard>(value.shape).kind!=CircleHazardKind::Blast;
         if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hazards.push_back(record.row);}break;
     }
     }

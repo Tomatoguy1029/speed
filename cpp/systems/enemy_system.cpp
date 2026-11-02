@@ -80,6 +80,7 @@ bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason)
     CombatEvent event;event.kind=CombatEventKind::Retire;event.retire_reason=reason;
     event.target_id=enemy.id;event.definition=uint32_t(enemy.definition+1);event.pos=enemy.pos;
     event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);
+    state.dead_rows.erase(std::remove(state.dead_rows.begin(),state.dead_rows.end(),row),state.dead_rows.end());
     enemy.alive=false;release(state,uint32_t(row));
     if (state.enemy_handles.reusable(uint32_t(row))) state.free_rows.push_back(row);
     state.rows_by_id.erase(enemy.id);return true;

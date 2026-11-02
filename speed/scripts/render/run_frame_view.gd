@@ -130,6 +130,7 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 		elif entry.role==11: preload("res://scripts/render/attacks/bullet.gd").setup_batch(batch)
 		elif entry.role==12: batch.setup_polygon(InstanceBatch.circle_points(32))
 		elif entry.role==13: preload("res://scripts/render/attacks/reflected.gd").setup_batch(batch)
+		elif entry.role==14: batch.setup_polygon(entry.points)
 		else:
 			batch.setup_texture(_scope.resources.get(entry.path) as Texture2D,entry.get("rect",Rect2()))
 			var material := ShaderMaterial.new()
@@ -168,7 +169,7 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [0,1,2] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [0,1,2,3] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
 		if row.kind==2:
@@ -260,11 +261,11 @@ func apply_frame(frame: Dictionary) -> bool:
 			wave.show()
 			continue
 		var display: Dictionary = {}
-		if int(row.owner_id)>0 or row.kind==1:
-			var key := "%d:%d" % [row.layer,row.order]
+		if int(row.owner_id)>0 or row.kind in [1,3]:
+			var key := "%d:%d:%d" % [row.kind,row.layer,row.order]
 			if not _shape_displays.has(key):
 				var circles: Array = []
-				var node := preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
+				var node: DrawLayer = preload("res://scripts/render/attacks/zone.gd").frame_group(circles,_pixel) if row.kind==3 else preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
 				parent.add_child(node)
 				_shape_displays[key] = {"node":node,"circles":circles,"used":false,"previous_circles":[]}
 			display = _shape_displays[key]
@@ -272,7 +273,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.used = true
 			if parent.get_index()!=parent.get_parent().get_child_count()-1: parent.get_parent().move_child(parent,-1)
 		for i in row.widths.size():
-			if row.kind==1:
+			if row.kind in [1,3]:
 				if display.is_empty() or row.offsets[i+1]-row.offsets[i]!=1: return false
 				display.circles.append({"position":row.points[row.offsets[i]],"radius":row.widths[i],"color":row.colors[i]})
 				continue

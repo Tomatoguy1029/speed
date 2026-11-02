@@ -7,11 +7,11 @@ const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9,&"rocket":10}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -75,6 +75,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			"duration":ProjectileSystem.ZONE_FLASH,"visual_key":7,
 			"hit":visual.get_node_or_null("Hit")!=null,"fade":visual.get_node_or_null("Fade")!=null}]
 		visual.free()
+	if definition.behavior==&"rocket":
+		var rocket: Dictionary = source.rocket.duplicate()
+		rocket.id = 1
+		rocket.contact = 2
+		data.RocketDefinition = [rocket]
 	if definition.behavior==&"missile":
 		var missile: Dictionary = source.missile.duplicate()
 		missile.id = 1
@@ -104,11 +109,17 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		if look==null or not look.prepared: return {}
 		row.sprite_angle = look.angle
 		if not look.size_from_collision: row.sprite_scale *= maxf(look.base.get_width(),look.base.get_height())*0.5/maxf(definition.radius,0.001)
-	if not ResourceLoader.exists(sprite): return {}
+	var polygon := PackedVector2Array()
+	if not ResourceLoader.exists(sprite):
+		if definition.behavior!=&"rocket": return {}
+		polygon = RunPresentation._placeholder_points(definition.shape)
+		sprite = ""
+		row.sprite_angle = 0.0
 	var visuals := [{"id":1,"role":1,"path":"res://assets/pixel/airship.png"},
 		{"id":2,"role":2,"path":""},{"id":3,"role":3,"path":"res://assets/pixel/xp_crystal_facets.tres"},
 		{"id":4,"role":4,"path":""},{"id":5,"role":5,"path":"res://assets/pixel/airship_canon.png"},
-		{"id":6,"role":6 if look!=null else 0,"path":sprite}]
+		{"id":6,"role":14 if not polygon.is_empty() else (6 if look!=null else 0),"path":sprite}]
+	if not polygon.is_empty(): visuals[5].points = polygon
 	if not data.BiteDefinition.is_empty(): visuals.append({"id":7,"role":8,"path":"res://scenes/attacks/zone_biter.tscn"})
 	for visual: Dictionary in visuals: data.ResourceKey.append({"id":visual.id,"role":visual.role})
 	var weapon := load("res://data/weapons/W01_forward.tres") as WeaponDef
@@ -244,6 +255,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
+		for rocket: Dictionary in resolved.RocketDefinition:
+			rocket.id = row.id
+			data.RocketDefinition.append(rocket)
 		for missile: Dictionary in resolved.MissileEnemyDefinition:
 			missile.id = row.id
 			data.MissileEnemyDefinition.append(missile)
