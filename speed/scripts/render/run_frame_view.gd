@@ -92,6 +92,7 @@ var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
 var _kill_sonic_visual: RefCounted
+var _bipolar_visual: RefCounted
 var _mass_tow_visual: RefCounted
 var _contact_arc_visual: RefCounted
 var _sonic_visual: RefCounted
@@ -880,6 +881,8 @@ func receive_frame(frame: Dictionary) -> bool:
 		_vortex_world_time = -1.0
 		if _kill_sonic_visual!=null: _kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+		if _bipolar_visual!=null: _bipolar_visual.dispose()
+		_bipolar_visual = null
 		if _mass_tow_visual!=null: _mass_tow_visual.dispose()
 		_mass_tow_visual = null
 		if _contact_arc_visual!=null: _contact_arc_visual.dispose()
@@ -943,6 +946,13 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_kill_sonic and _kill_sonic_visual!=null:
 		_kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+	var equipped_bipolar: bool = frame.ui.get("bipolar",{}).get("ready",false)
+	if equipped_bipolar and _bipolar_visual==null:
+		_bipolar_visual = preload("res://scripts/render/equipment/bipolar.gd").new()
+		_bipolar_visual.setup_frame(_layer(18),_layer(19),_pixel)
+	if not equipped_bipolar and _bipolar_visual!=null:
+		_bipolar_visual.dispose()
+		_bipolar_visual = null
 	var equipped_tow: bool = frame.ui.get("mass_tow",{}).get("ready",false)
 	if equipped_tow and _mass_tow_visual==null:
 		_mass_tow_visual = preload("res://scripts/render/equipment/massTow.gd").new()
@@ -1076,6 +1086,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		_boss_lance_visual.frame_event(event)
 		_boss_wave_visual.frame_event(event)
+		if _bipolar_visual!=null: _bipolar_visual.frame_event(event)
+		if event.type==&"beam" and event.get("visual_key","")=="weapon/bipolar": ruler_shake = maxf(ruler_shake,5.0)
 		if _mass_tow_visual!=null and (event.type in [&"anchor_capture",&"anchor_fire"] or event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow"): _mass_tow_visual.frame_event(event)
 		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
 		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
@@ -1102,7 +1114,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_burst(event.pos,event.color,10,260.0)
 		if event.type==&"cepheus_summon":
 			_rings.append({"pos":event.pos,"radius":70.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
-		if event.type==&"beam":
+		if event.type==&"beam" and event.get("visual_key","")!="weapon/bipolar":
 			var life: float = event.get("life",0.4)*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_mutiny_beams.append({"from":event.from,"to":event.to,"width":event.width,"life":life,"max":life,"color":event.get("color",Color(1,0.95,0.6))})
 		if event.type==&"telescope_charge": _rings.append({"pos":event.pos,"radius":30.0,"color":Color(1.0,0.4,0.3),"life":0.2,"max":0.2})
@@ -1140,7 +1152,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			if event.radius>=150.0 and pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.4)
 		if event.type==&"debris_trail" and event.get("life",0.0)>0.0:
 			_debris_trails.append({"points":event.points,"life":event.life,"max":event.life})
-		if event.type==&"ring":
+		if event.type==&"ring" and event.get("visual_key","")!="weapon/bipolar":
 			if _rings.size()>80: _rings.pop_front()
 			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":duration,"max":duration})
@@ -1244,6 +1256,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
+	if _bipolar_visual!=null:
+		_bipolar_visual.sync_frame(ui.bipolar,ui.ship,ui.world_time,_dim_rect)
+		_bipolar_visual.frame_tick(world_dt)
 	if _mass_tow_visual!=null:
 		_mass_tow_visual.sync_frame(ui.mass_tow,ui.ship,ui.world_time)
 		_mass_tow_visual.frame_tick(world_dt)

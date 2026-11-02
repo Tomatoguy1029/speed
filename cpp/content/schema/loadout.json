@@ -1350,6 +1350,82 @@
           "min": 1
         }
       ]
+    },
+    {
+      "name": "BipolarDefinition",
+      "section": 204,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_factor",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "min_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "color",
+          "type": "u32"
+        }
+      ]
     }
   ],
   "enums": {

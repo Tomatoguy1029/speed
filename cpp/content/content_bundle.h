@@ -25,6 +25,7 @@ struct ContentBundle {
     std::vector<MinesDefinition> mines_levels;
     std::vector<ContactArcDefinition> contact_arc_levels;
     std::vector<MassTowDefinition> mass_tow_levels;
+    std::vector<BipolarDefinition> bipolar_levels;
     std::vector<SonicDefinition> sonic_levels;
     std::vector<ContactWaveDefinition> contact_wave_levels;
     std::vector<EndBlastDefinition> end_blast_levels;

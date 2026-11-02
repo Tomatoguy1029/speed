@@ -1,3 +1,4 @@
+#include "../cpp/behaviors/weapons/bipolar.h"
 #include "../cpp/behaviors/weapons/massTow.h"
 #include "run_core.h"
 #include "../cpp/systems/field.h"
@@ -121,6 +122,7 @@ void SpeedRunCore::commit_draw() {
     speed::RampageBehavior::launch(runtime);
     speed::SonicBehavior::launch(runtime);
     speed::KillSonicBehavior::launch(runtime);
+    speed::BipolarBehavior::launch(runtime);
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;
     Dictionary launch; launch["pos"] = runtime.state.ship.pos; launch["dir"] = dir; launch["gauge"] = runtime.state.draw.amount;
     emit_event("launch", launch);
@@ -158,7 +160,8 @@ void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
     for (const auto &owned:runtime.state.loadout.weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
-        if (id=="W21") speed::MassTowBehavior::end(runtime);
+        if (id=="W22") speed::BipolarBehavior::end(runtime);
+        else if (id=="W21") speed::MassTowBehavior::end(runtime);
         else if (id=="W29") speed::EndBlastBehavior::end(runtime);
         else if (id=="W07") speed::MinesBehavior::end(runtime);
     }

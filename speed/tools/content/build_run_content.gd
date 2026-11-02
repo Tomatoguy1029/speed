@@ -571,6 +571,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		if comet_weapon==null: return {}
 		var comet_equipment: int = data.LoadoutDefinition.size()+1
 		data.LoadoutDefinition.append({"id":comet_equipment,"kind":0,"maximum_level":comet_weapon.level_steps.size(),"external_id":String(comet_weapon.id),"comet_only":true})
+		if comet_weapon.id==&"W22":
+			var post: Dictionary = config.post_max.target(comet_weapon.id)
+			for level in comet_weapon.level_steps.size():
+				var factor: float = 1.0+0.1*(comet_weapon.level_steps[level]-1)
+				var values := {"id":level+1,"weapon":comet_equipment,"level":level+1,"damage":float(comet_weapon.params.damage)*(1.0+0.3*(comet_weapon.level_steps[level]-1)),"width":float(comet_weapon.params.width)*factor,"radius_factor":factor,"delay":0.18,"visual_life":preload("res://scripts/render/equipment/bipolar.gd").BEAM_SECONDS,"color":Color(comet_weapon.params.color).to_rgba32(),"area_increment":float(config.post_max.increments.area) if post.has("area") else 0.0,"knockback_increment":float(config.post_max.increments.knockback) if post.has("knockback") else 0.0}
+				for key in ["life","knock","min_length"]: values[key] = float(comet_weapon.params[key])
+				data.BipolarDefinition.append(values)
 		if comet_weapon.id==&"W21":
 			var post: Dictionary = config.post_max.target(comet_weapon.id)
 			for level in comet_weapon.level_steps.size():
@@ -596,6 +603,15 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_wave_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if contact_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":sonic_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if sonic_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_arc_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if arc_target.has("followup") else 0.0})
+	var bipolar_weapon: int = data.BipolarDefinition[0].weapon
+	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":bipolar_weapon,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(&"W22").has("followup") else 0.0})
+	var bipolar_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W22")
+	if bipolar_entry==null: return {}
+	for path in bipolar_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":bipolar_weapon})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":bipolar_weapon,"asset":key})
 	var tow_weapon: int = data.MassTowDefinition[0].weapon
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":tow_weapon,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(&"W21").has("followup") else 0.0})
 	var tow_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W21")
@@ -1017,6 +1033,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.KnockbackDefinition = resolved.KnockbackDefinition
 			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
+			data.BipolarDefinition = resolved.BipolarDefinition
 			data.MassTowDefinition = resolved.MassTowDefinition
 			data.ContactArcDefinition = resolved.ContactArcDefinition
 			data.SonicDefinition = resolved.SonicDefinition

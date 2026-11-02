@@ -1,3 +1,4 @@
+#include "../behaviors/weapons/bipolar.h"
 #include "../behaviors/weapons/massTow.h"
 #include "run_runner.h"
 #include "../behaviors/enemies/corona_vortex.h"
@@ -93,6 +94,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
             for (const auto &owned:state.loadout.weapons) {
                 const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
                 if (id=="W01") core.step_forward(world_dt);
+                else if (id=="W22") BipolarBehavior::step(core.runtime,world_dt);
                 else if (id=="W21") MassTowBehavior::step(core.runtime,world_dt);
                 else if (id=="W08") SonicBehavior::step(core.runtime,world_dt);
                 else if (id=="W04") ContactWaveBehavior::step(core.runtime,world_dt);

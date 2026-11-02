@@ -1432,6 +1432,10 @@
       {
         "name": "HornWave",
         "value": "horn_wave"
+      },
+      {
+        "name": "Bipolar",
+        "value": "bipolar"
       }
     ],
     "VisualRole": [
@@ -1888,6 +1892,10 @@
       {
         "name": "AnchorFire",
         "value": "anchor_fire"
+      },
+      {
+        "name": "BipolarCharge",
+        "value": "bipolar_charge"
       }
     ],
     "ResultKind": [
@@ -2188,7 +2196,8 @@
       "pos",
       "radius",
       "color",
-      "life"
+      "life",
+      "visual_key"
     ],
     "shoot": [
       "pos",
@@ -2345,7 +2354,8 @@
       "width",
       "life",
       "color",
-      "visual_key"
+      "visual_key",
+      "width_scale"
     ],
     "critical_lance": [
       "from",
@@ -2504,6 +2514,10 @@
       "pos",
       "dir",
       "radius"
+    ],
+    "bipolar_charge": [
+      "from",
+      "to"
     ]
   },
   "includes": [

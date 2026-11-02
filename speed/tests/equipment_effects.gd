@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w22" in OS.get_cmdline_user_args():
+		await check_cpp_w22()
+		print("[cpp_w22] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w21" in OS.get_cmdline_user_args():
 		await check_cpp_w21()
 		print("[cpp_w21] failed=%d" % failures)
@@ -3405,3 +3410,90 @@ func check_cpp_w21() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"牽引船体の状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w22() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	config.base_attack = 1.0
+	var session = await trait_test_session("W22",config,622)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W22")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,definition.level_steps.size()+1):
+		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"双極ビームの全段の基準を復元する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W22","levels":level}).ok,"双極ビームを全段取得する")
+		var from: Vector2 = trait_start_trace(bridge,600.0)
+		check(bridge._ui.bipolar.active and bridge._ui.bipolar.origin==from,"発進した位置へ発射器を置く")
+		var active: Dictionary = bridge.checkpoint()
+		check(core.step_draw(0.01),"なぞり中の距離を進める")
+		bridge.command("set_ui_overlay",{"active":false})
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._bipolar_visual!=null and presentation.frame_view._bipolar_visual._frame.active,"なぞり中の結晶とねじれた糸を表示する")
+		check(core.step_draw(10.0),"描線を最後まで走って終了する")
+		bridge.command("set_ui_overlay",{"active":false})
+		var to: Vector2 = core.ship_snapshot().ship_pos
+		var pending: Dictionary = bridge._ui.bipolar.pending[0]
+		check(not bridge._ui.bipolar.active and pending.from==from and pending.to==to and is_equal_approx(pending.delay,0.18),"実際の終了位置まで0.18世界秒の予告を作る")
+		var midpoint: Vector2 = from.lerp(to,0.5)
+		var hit: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":midpoint}).value
+		var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":midpoint+Vector2(0,300)}).value
+		for id in [hit,outside]: core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
+		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==hit)[0].hp
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T11","levels":1})
+		var power: float = bridge._ui.attack_power
+		var saved: Dictionary = bridge.checkpoint()
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._bipolar_visual.charges.size()==1,"両端へ吸い込む予告の光を表示する")
+		bridge.command("pause",{"paused":true})
+		var stopped: Dictionary = bridge._ui.bipolar.duplicate(true)
+		bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.bipolar==stopped,"停止中は予告の世界秒を進めない")
+		bridge.command("pause",{"paused":false})
+		for tick in 22: check(bridge.step(1.0/120.0,idle,viewport).ok,"予告からビームの更新を通す")
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"発射・命中・両端の輪を表示と記録へ配信する")
+		check(bridge._ui.bipolar.pending.is_empty() and bridge._ui.bipolar.beams.size()==1,"予告が終わると一度だけ発射する")
+		var enemies: Array = core.enemies_snapshot()
+		var struck: Array = enemies.filter(func(e): return e.id==hit)
+		var damage: float = power*definition.params.damage*(1.0+0.3*(definition.level_steps[level-1]-1))
+		check((struck.is_empty() if hp<=damage else is_equal_approx(struck[0].hp,hp-damage)) and is_equal_approx(enemies.filter(func(e): return e.id==outside)[0].hp,hp),"発射時の攻撃力と全段の威力で線分内だけに当てる")
+		presentation._present_cpp(0.01)
+		var visual = presentation.frame_view._bipolar_visual
+		check(visual.beams.size()==1 and visual.beams[0].node.visible and visual.beams[0].material.shader==preload("res://shaders/bipolar_beam.gdshader"),"専用shader・ピクセル炎・両端の輪を本番表示へ渡す")
+		check(is_equal_approx(bridge._ui.bipolar.beams[0].width_scale,1.0+0.1*(definition.level_steps[level-1]-1)),"全段のビーム幅倍率を表示へ渡す")
+		var fired: Dictionary = bridge._ui.bipolar.duplicate(true)
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"予告途中へ復帰する")
+		for tick in 22: bridge.step(1.0/120.0,idle,viewport)
+		check(core.enemies_snapshot()==enemies and bridge._ui.bipolar==fired,"予告の残り秒と命中・表示の状態を再現する")
+		var visible: Dictionary = bridge.checkpoint()
+		bridge.command("dev_remove_weapon",{"id":"W22"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.bipolar.ready and bridge._ui.bipolar.beams.is_empty() and presentation.frame_view._bipolar_visual==null,"発射後の途中解除で表示を片付ける")
+		check(bridge.restore(visible.value).ok and bridge.collect_frame().ok,"発射したビームの途中へ復帰する")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._bipolar_visual.beams.size()==1 and is_equal_approx(presentation.frame_view._bipolar_visual.beams[0].age,fired.beams[0].age),"復帰したビームを保持した経過秒で表示する")
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"発射前の解除条件へ復帰する")
+		bridge.command("dev_remove_weapon",{"id":"W22"})
+		for tick in 22: bridge.step(1.0/120.0,idle,viewport)
+		check(core.enemies_snapshot().filter(func(e): return e.id==hit)[0].hp==hp and bridge._ui.bipolar.beams.is_empty(),"予告中の解除では発射しない")
+		check(bridge.restore(active.value).ok and bridge.collect_frame().ok and bridge._ui.bipolar.active and bridge._ui.bipolar.origin==from,"発進中の復帰で始点を失わない")
+		bridge.release_checkpoint(visible.value)
+		bridge.release_checkpoint(saved.value)
+		bridge.release_checkpoint(active.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"双極ビームの状態と表示に実行エラーがない: %s" % [errors.messages()])

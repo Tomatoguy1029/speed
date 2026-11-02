@@ -47,6 +47,9 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
     for (const auto &v:state.loadout.kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
+    const auto &bipolar=state.loadout.bipolar;if (!bipolar.origin.is_finite() || !std::isfinite(bipolar.started)) return false;
+    for (const auto &v:bipolar.pending) if (!v.from.is_finite() || !v.to.is_finite() || !std::isfinite(v.delay) || v.delay<=0 || !v.id || v.id>=bipolar.next_id) return false;
+    for (const auto &v:bipolar.beams) if (!v.from.is_finite() || !v.to.is_finite() || !std::isfinite(v.age) || v.age<0 || !v.id || v.id>=bipolar.next_id || !std::isfinite(v.width_scale) || v.width_scale<=0) return false;
     if (!std::isfinite(state.loadout.mass_tow.fire.remaining)) return false;
     for (const auto &c:state.loadout.mass_tow.cargo) if (!c.pos.is_finite() || !c.relative.is_finite() || !std::isfinite(c.angle) || c.radius<=0 || !std::isfinite(c.radius) || c.source_id<=0 || !c.definition || c.definition>content.definitions.size()) return false;
     if (!std::isfinite(state.loadout.contact_arc.ready_at)) return false;

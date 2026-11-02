@@ -117,6 +117,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W22") {
+            const auto &v=run.content->bipolar_levels[next-1];auto &w=run.state.loadout.bipolar;w.ready=true;w.definition=id;w.damage=v.damage;w.width=v.width;w.radius_factor=v.radius_factor;w.life=v.life;w.knock=v.knock;w.min_length=v.min_length;w.delay=v.delay;w.visual_life=v.visual_life;w.area_increment=v.area_increment;w.knockback_increment=v.knockback_increment;w.color=v.color;
         } else if (d.external_id=="W21") {
             const auto &v=run.content->mass_tow_levels[next-1];auto &w=run.state.loadout.mass_tow;w.ready=true;w.definition=id;
             w.capture_radius=v.capture_radius;w.hold=v.hold;w.follow=v.follow;w.interval=v.interval;w.shot_speed=v.shot_speed;w.damage=v.damage;w.size_ref=v.size_ref;w.life=v.life;w.knock=v.knock;w.clump_spacing=v.clump_spacing;w.projectile_increment=v.projectile_increment;w.duration_increment=v.duration_increment;w.knockback_increment=v.knockback_increment;w.area_increment=v.area_increment;w.interval_increment=v.interval_increment;w.minimum_ratio=v.minimum_ratio;w.minimum_interval=v.minimum_interval;w.visible=v.visible;
@@ -184,6 +186,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W22") run.state.loadout.bipolar={};
     else if (external=="W21") run.state.loadout.mass_tow={};
     else if (external=="W17") run.state.loadout.contact_arc={};
     else if (external=="W08") run.state.loadout.sonic={};
