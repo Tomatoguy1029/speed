@@ -4056,7 +4056,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 7) return false;
+    if (out.kind > 8) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -4230,7 +4230,7 @@ inline bool read(BinaryReader &input, BossTechniqueStage &out) {
     if (out.id < 1) return false;
     if (!input.read_u32(out.technique)) return false;
     if (!input.read_u32(out.command)) return false;
-    if (out.command > 2) return false;
+    if (out.command > 4) return false;
     if (!input.read_f64(out.at)) return false;
     if (out.at < 0) return false;
     return true;
@@ -4589,6 +4589,187 @@ inline bool read(BinaryReader &input, HeroConfig &out) {
     if (!input.read_u32(out.guards)) return false;
     return true;
 }
+struct PerseusDefinition {
+    uint32_t id{};
+    uint32_t hero{};
+    double boss_stun{};
+};
+inline bool read(BinaryReader &input, PerseusDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.hero)) return false;
+    if (!input.read_f64(out.boss_stun)) return false;
+    if (out.boss_stun < 0) return false;
+    return true;
+}
+struct LeoDefinition {
+    uint32_t id{};
+    uint32_t hero{};
+    double width_mult{};
+};
+inline bool read(BinaryReader &input, LeoDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.hero)) return false;
+    if (!input.read_f64(out.width_mult)) return false;
+    if (out.width_mult < 0) return false;
+    return true;
+}
+struct GeminiDefinition {
+    uint32_t id{};
+    uint32_t hero{};
+};
+inline bool read(BinaryReader &input, GeminiDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.hero)) return false;
+    return true;
+}
+struct HerculesDefinition {
+    uint32_t id{};
+    uint32_t hero{};
+    double interval{};
+    double fall_time{};
+    double power{};
+    double radius{};
+    double burn_time{};
+    double burn_power{};
+};
+inline bool read(BinaryReader &input, HerculesDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.hero)) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.fall_time)) return false;
+    if (out.fall_time < 0) return false;
+    if (!input.read_f64(out.power)) return false;
+    if (out.power < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.burn_time)) return false;
+    if (out.burn_time < 0) return false;
+    if (!input.read_f64(out.burn_power)) return false;
+    if (out.burn_power < 0) return false;
+    return true;
+}
+struct CentaurusBodyDefinition {
+    uint32_t id{};
+    uint32_t body{};
+    uint32_t guard{};
+    double keep_min{};
+    double keep_max{};
+    double guard_refill{};
+    double guard_search{};
+    double guard_scan{};
+    double sail_guard_min{};
+    double sail_guard_max{};
+    double sail_guard_speed{};
+    double sail_guard_wobble{};
+    double bow_reach{};
+    double path_cos{};
+    double path_min{};
+    double path_max{};
+    double path_hold{};
+    double retreat_trigger{};
+    double retreat_far{};
+    double retreat_max{};
+    double retreat_turn{};
+    double retreat_cd{};
+    double leap_trigger{};
+    double leap_distance{};
+    double leap_time{};
+    double leap_cd{};
+    double run_speed{};
+    double run_speed_p2{};
+    uint32_t guard_count{};
+    uint32_t guard_min{};
+};
+inline bool read(BinaryReader &input, CentaurusBodyDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.body)) return false;
+    if (!input.read_u32(out.guard)) return false;
+    if (!input.read_f64(out.keep_min)) return false;
+    if (out.keep_min < 0) return false;
+    if (!input.read_f64(out.keep_max)) return false;
+    if (out.keep_max < 0) return false;
+    if (!input.read_f64(out.guard_refill)) return false;
+    if (out.guard_refill < 0) return false;
+    if (!input.read_f64(out.guard_search)) return false;
+    if (out.guard_search < 0) return false;
+    if (!input.read_f64(out.guard_scan)) return false;
+    if (out.guard_scan < 0) return false;
+    if (!input.read_f64(out.sail_guard_min)) return false;
+    if (out.sail_guard_min < 0) return false;
+    if (!input.read_f64(out.sail_guard_max)) return false;
+    if (out.sail_guard_max < 0) return false;
+    if (!input.read_f64(out.sail_guard_speed)) return false;
+    if (out.sail_guard_speed < 0) return false;
+    if (!input.read_f64(out.sail_guard_wobble)) return false;
+    if (out.sail_guard_wobble < 0) return false;
+    if (!input.read_f64(out.bow_reach)) return false;
+    if (out.bow_reach < 0) return false;
+    if (!input.read_f64(out.path_cos)) return false;
+    if (out.path_cos < 0) return false;
+    if (!input.read_f64(out.path_min)) return false;
+    if (out.path_min < 0) return false;
+    if (!input.read_f64(out.path_max)) return false;
+    if (out.path_max < 0) return false;
+    if (!input.read_f64(out.path_hold)) return false;
+    if (out.path_hold < 0) return false;
+    if (!input.read_f64(out.retreat_trigger)) return false;
+    if (out.retreat_trigger < 0) return false;
+    if (!input.read_f64(out.retreat_far)) return false;
+    if (out.retreat_far < 0) return false;
+    if (!input.read_f64(out.retreat_max)) return false;
+    if (out.retreat_max < 0) return false;
+    if (!input.read_f64(out.retreat_turn)) return false;
+    if (out.retreat_turn < 0) return false;
+    if (!input.read_f64(out.retreat_cd)) return false;
+    if (out.retreat_cd < 0) return false;
+    if (!input.read_f64(out.leap_trigger)) return false;
+    if (out.leap_trigger < 0) return false;
+    if (!input.read_f64(out.leap_distance)) return false;
+    if (out.leap_distance < 0) return false;
+    if (!input.read_f64(out.leap_time)) return false;
+    if (out.leap_time < 0) return false;
+    if (!input.read_f64(out.leap_cd)) return false;
+    if (out.leap_cd < 0) return false;
+    if (!input.read_f64(out.run_speed)) return false;
+    if (out.run_speed < 0) return false;
+    if (!input.read_f64(out.run_speed_p2)) return false;
+    if (out.run_speed_p2 < 0) return false;
+    if (!input.read_u32(out.guard_count)) return false;
+    if (out.guard_count < 0) return false;
+    if (!input.read_u32(out.guard_min)) return false;
+    if (out.guard_min < 0) return false;
+    return true;
+}
+struct CentaurusVolleyDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t count{};
+    double interval{};
+    double radius{};
+    double travel{};
+    uint32_t projectile{};
+};
+inline bool read(BinaryReader &input, CentaurusVolleyDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count < 1) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.travel)) return false;
+    if (out.travel < 0) return false;
+    if (!input.read_u32(out.projectile)) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -4739,6 +4920,12 @@ struct ContentRecords {
     std::vector<HeroStar> HeroStar_rows;
     std::vector<HeroLink> HeroLink_rows;
     std::vector<HeroConfig> HeroConfig_rows;
+    std::vector<PerseusDefinition> PerseusDefinition_rows;
+    std::vector<LeoDefinition> LeoDefinition_rows;
+    std::vector<GeminiDefinition> GeminiDefinition_rows;
+    std::vector<HerculesDefinition> HerculesDefinition_rows;
+    std::vector<CentaurusBodyDefinition> CentaurusBodyDefinition_rows;
+    std::vector<CentaurusVolleyDefinition> CentaurusVolleyDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -5544,13 +5731,13 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 8) return false;
+        if (version != 9) return false;
         if (count > input.remaining()/637) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 152: {
-        if (version != 1) return false;
+        if (version != 2) return false;
         if (count > input.remaining()/20) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueStage row; if (!read(input,row)) return false; out.BossTechniqueStage_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -5637,6 +5824,42 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/88) return false;
         for (uint32_t i=0; i<count; ++i) { HeroConfig row; if (!read(input,row)) return false; out.HeroConfig_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 283: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { PerseusDefinition row; if (!read(input,row)) return false; out.PerseusDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 284: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { LeoDefinition row; if (!read(input,row)) return false; out.LeoDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 285: {
+        if (version != 1) return false;
+        if (count > input.remaining()/8) return false;
+        for (uint32_t i=0; i<count; ++i) { GeminiDefinition row; if (!read(input,row)) return false; out.GeminiDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 286: {
+        if (version != 1) return false;
+        if (count > input.remaining()/56) return false;
+        for (uint32_t i=0; i<count; ++i) { HerculesDefinition row; if (!read(input,row)) return false; out.HerculesDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 320: {
+        if (version != 1) return false;
+        if (count > input.remaining()/220) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusBodyDefinition row; if (!read(input,row)) return false; out.CentaurusBodyDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 321: {
+        if (version != 1) return false;
+        if (count > input.remaining()/40) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusVolleyDefinition row; if (!read(input,row)) return false; out.CentaurusVolleyDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -5941,6 +6164,18 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HeroLink_rows) if (!HeroLink_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HeroConfig_ids;
     for (const auto &row:data.HeroConfig_rows) if (!HeroConfig_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PerseusDefinition_ids;
+    for (const auto &row:data.PerseusDefinition_rows) if (!PerseusDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> LeoDefinition_ids;
+    for (const auto &row:data.LeoDefinition_rows) if (!LeoDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> GeminiDefinition_ids;
+    for (const auto &row:data.GeminiDefinition_rows) if (!GeminiDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HerculesDefinition_ids;
+    for (const auto &row:data.HerculesDefinition_rows) if (!HerculesDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusBodyDefinition_ids;
+    for (const auto &row:data.CentaurusBodyDefinition_rows) if (!CentaurusBodyDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusVolleyDefinition_ids;
+    for (const auto &row:data.CentaurusVolleyDefinition_rows) if (!CentaurusVolleyDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -6089,6 +6324,14 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BossFlowForbidden_rows) if (!BossFlowSection_ids.count(row.section)) return false;
     for (const auto &row:data.HeroStar_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
     for (const auto &row:data.HeroLink_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
+    for (const auto &row:data.PerseusDefinition_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
+    for (const auto &row:data.LeoDefinition_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
+    for (const auto &row:data.GeminiDefinition_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
+    for (const auto &row:data.HerculesDefinition_rows) if (!HeroDefinition_ids.count(row.hero)) return false;
+    for (const auto &row:data.CentaurusBodyDefinition_rows) if (!BossBodyDefinition_ids.count(row.body)) return false;
+    for (const auto &row:data.CentaurusBodyDefinition_rows) if (!EnemyRecord_ids.count(row.guard)) return false;
+    for (const auto &row:data.CentaurusVolleyDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusVolleyDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -6215,5 +6458,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=149;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=155;
 }
