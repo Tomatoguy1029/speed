@@ -1,5 +1,6 @@
 ## RenderFrameの値だけを描画へ渡す。敵表や武器の実体は参照しない。
 extends Node2D
+const SHAPE_KIND = preload("res://tools/content/generated/run_schema.gd").ENUMS.RenderShapeKind
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
 var perf := PerfLog.new()
 var metrics_record := {}
@@ -183,16 +184,16 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [0,1,2,3,4] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
-		if row.kind==4:
+		if row.kind==SHAPE_KIND.LightArrow:
 			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("cosmic") is bool or not row.get("cosmic_star_count") is int: return false
 			for key in ["angle","length","world_time","shot_length_scale","shot_width_scale","core_width","cosmic_speed"]:
 				if not row.get(key) is float or not is_finite(row[key]): return false
 			for key in ["arrow_color","cosmic_color_a","cosmic_color_b"]:
 				if not row.get(key) is Color: return false
-		if row.kind==2:
+		if row.kind==SHAPE_KIND.Wave:
 			if row.points.size()!=1 or row.widths.size()!=1 or row.get("wave_style") not in [0,1,2,3]: return false
 			for key in ["radius","max_radius","angle","arc","gap","gap_arc","time","delay"]:
 				if not row.get(key) is float or not is_finite(row[key]): return false
@@ -270,7 +271,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
-		if row.kind==4:
+		if row.kind==SHAPE_KIND.LightArrow:
 			var key := "%d:%d" % [row.layer,row.order]
 			if not _arrow_displays.has(key):
 				var arrow := preload("res://scripts/render/attacks/light_arrow.gd").new()
@@ -279,7 +280,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			_arrow_displays[key].apply_frame(row)
 			_arrow_displays[key].show()
 			continue
-		if row.kind==2:
+		if row.kind==SHAPE_KIND.Wave:
 			var key := "%d:%d" % [row.layer,row.order]
 			if not _wave_displays.has(key):
 				var wave := preload("res://scripts/render/attacks/wave.gd").new()
@@ -291,11 +292,11 @@ func apply_frame(frame: Dictionary) -> bool:
 			wave.show()
 			continue
 		var display: Dictionary = {}
-		if int(row.owner_id)>0 or row.kind in [1,3]:
+		if int(row.owner_id)>0 or row.kind in [SHAPE_KIND.Circle,SHAPE_KIND.Blast]:
 			var key := "%d:%d:%d" % [row.kind,row.layer,row.order]
 			if not _shape_displays.has(key):
 				var circles: Array = []
-				var node: DrawLayer = preload("res://scripts/render/attacks/zone.gd").frame_group(circles,func(): return 1.0/maxf(_zoom,0.01)) if row.kind==3 else preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
+				var node: DrawLayer = preload("res://scripts/render/attacks/zone.gd").frame_group(circles,func(): return 1.0/maxf(_zoom,0.01)) if row.kind==SHAPE_KIND.Blast else preload("res://scripts/render/attacks/beam.gd").frame_group(circles)
 				parent.add_child(node)
 				_shape_displays[key] = {"node":node,"circles":circles,"used":false,"previous_circles":[]}
 			display = _shape_displays[key]
@@ -303,7 +304,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.used = true
 			if parent.get_index()!=parent.get_parent().get_child_count()-1: parent.get_parent().move_child(parent,-1)
 		for i in row.widths.size():
-			if row.kind in [1,3]:
+			if row.kind in [SHAPE_KIND.Circle,SHAPE_KIND.Blast]:
 				if display.is_empty() or row.offsets[i+1]-row.offsets[i]!=1: return false
 				display.circles.append({"position":row.points[row.offsets[i]],"radius":row.widths[i],"color":row.colors[i]})
 				continue

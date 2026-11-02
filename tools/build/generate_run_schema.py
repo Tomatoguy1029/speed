@@ -78,7 +78,8 @@ def generate():
         if 'native' in f:cpp += [f'    out.{f["native"]}=row.{f["name"]};']
     cpp+=['    out.kind=static_cast<EnemyDefinition::Kind>(row.kind);','    return out;','}',f'inline constexpr uint32_t FORMAT_VERSION={schema["format_version"]}, ABI_VERSION={schema["abi_version"]}, SECTION_COUNT={len(records)};','}']
     gd=['## 共通スキーマから生成。直接編集しない。','extends RefCounted','',f'const SCHEMA = {json.dumps(schema,ensure_ascii=False).replace("false","false").replace("true","true")}']
-    gd += [GD_WRITER]
+    enum_values={name:{entry['name']:index for index,entry in enumerate(entries)} for name,entries in schema['enums'].items()}
+    gd += [f'const ENUMS = {json.dumps(enum_values,ensure_ascii=False)}', GD_WRITER]
     return {'cpp/content/generated/combat_ids.h':'\n'.join(enums)+'\n','cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd)+'\n'}
 
 GD_WRITER = r'''

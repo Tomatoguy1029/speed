@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 namespace speed {
-enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Count};
+enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Arrow=33,Count};
 inline const char *symbol_name(Cause value) {
     switch(value) {
     case Cause::None: return "";
@@ -39,6 +39,7 @@ inline const char *symbol_name(Cause value) {
     case Cause::Beam: return "beam";
     case Cause::Wall: return "wall";
     case Cause::Bolt: return "bolt";
+    case Cause::Arrow: return "arrow";
     default: return "";
     }
 }
@@ -76,6 +77,7 @@ inline bool parse_symbol(std::string_view value, Cause &out) {
     if (value=="beam") {out=Cause::Beam;return true;}
     if (value=="wall") {out=Cause::Wall;return true;}
     if (value=="bolt") {out=Cause::Bolt;return true;}
+    if (value=="arrow") {out=Cause::Arrow;return true;}
     return false;
 }
 enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,ReflectedShot=13,EnemyPolygon=14,Count};
@@ -261,13 +263,14 @@ inline bool parse_symbol(std::string_view value, ResultKind &out) {
     if (value=="Abort") {out=ResultKind::Abort;return true;}
     return false;
 }
-enum class RenderShapeKind : uint32_t {Polyline=0,Circle=1,Wave=2,Blast=3,Count};
+enum class RenderShapeKind : uint32_t {Polyline=0,Circle=1,Wave=2,Blast=3,LightArrow=4,Count};
 inline const char *symbol_name(RenderShapeKind value) {
     switch(value) {
     case RenderShapeKind::Polyline: return "polyline";
     case RenderShapeKind::Circle: return "circle";
     case RenderShapeKind::Wave: return "wave";
     case RenderShapeKind::Blast: return "blast";
+    case RenderShapeKind::LightArrow: return "light_arrow";
     default: return "";
     }
 }
@@ -276,6 +279,7 @@ inline bool parse_symbol(std::string_view value, RenderShapeKind &out) {
     if (value=="circle") {out=RenderShapeKind::Circle;return true;}
     if (value=="wave") {out=RenderShapeKind::Wave;return true;}
     if (value=="blast") {out=RenderShapeKind::Blast;return true;}
+    if (value=="light_arrow") {out=RenderShapeKind::LightArrow;return true;}
     return false;
 }
 enum class ContactShapeKind : uint32_t {PointCircle=0,SegmentCircle=1,SweptSegment=2,Polyline=3,Fan=4,RingBand=5,Rect=6,TaperedBeam=7,Count};
@@ -303,7 +307,7 @@ inline bool parse_symbol(std::string_view value, ContactShapeKind &out) {
     if (value=="tapered_beam") {out=ContactShapeKind::TaperedBeam;return true;}
     return false;
 }
-enum class HostileKind : uint32_t {Bullet=0,Missile=1,Reflected=2,Slash=3,Bolt=4,Count};
+enum class HostileKind : uint32_t {Bullet=0,Missile=1,Reflected=2,Slash=3,Bolt=4,LightArrow=5,CosmicArrow=6,Count};
 inline const char *symbol_name(HostileKind value) {
     switch(value) {
     case HostileKind::Bullet: return "bullet";
@@ -311,6 +315,8 @@ inline const char *symbol_name(HostileKind value) {
     case HostileKind::Reflected: return "reflected";
     case HostileKind::Slash: return "slash";
     case HostileKind::Bolt: return "bolt";
+    case HostileKind::LightArrow: return "light_arrow";
+    case HostileKind::CosmicArrow: return "cosmic_arrow";
     default: return "";
     }
 }
@@ -320,6 +326,8 @@ inline bool parse_symbol(std::string_view value, HostileKind &out) {
     if (value=="reflected") {out=HostileKind::Reflected;return true;}
     if (value=="slash") {out=HostileKind::Slash;return true;}
     if (value=="bolt") {out=HostileKind::Bolt;return true;}
+    if (value=="light_arrow") {out=HostileKind::LightArrow;return true;}
+    if (value=="cosmic_arrow") {out=HostileKind::CosmicArrow;return true;}
     return false;
 }
 enum class FriendKind : uint32_t {Shot=0,Debris=1,Hull=2,Count};

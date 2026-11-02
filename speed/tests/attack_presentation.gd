@@ -12,6 +12,13 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-render-kinds" in OS.get_cmdline_user_args() or "--cpp-render-kinds-view-fix" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_render_kinds()
+		check(finished,"統合で変わった表示種別の確認を最後まで実施する")
+		print("[cpp_render_kinds] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
 	if "--cpp-light-arrow" in OS.get_cmdline_user_args() or "--cpp-light-arrow-fixes" in OS.get_cmdline_user_args():
 		arrow_fixes = "--cpp-light-arrow-fixes" in OS.get_cmdline_user_args()
 		mute_checks = arrow_fixes
@@ -96,7 +103,7 @@ func check_cpp_light_arrow() -> void:
 	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1600,-500,1400,1000)).value
 	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
 	presentation._present_cpp(0.0)
-	check(frame.shapes.size()==1 and frame.shapes[0].kind==4 and frame.shapes[0].length==0.0 and not frame.shapes[0].cosmic,"長さ0の矢も矢じりと表示だけの尾を出す")
+	check(frame.shapes.size()==1 and frame.shapes[0].kind==preload("res://tools/content/generated/run_schema.gd").ENUMS.RenderShapeKind.LightArrow and frame.shapes[0].length==0.0 and not frame.shapes[0].cosmic,"長さ0の矢も矢じりと表示だけの尾を出す")
 	check(presentation.frame_view.apply_frame(frame),"光の矢を通常画面で描く")
 	await get_tree().process_frame
 	cpp_bridge.command("dev_remove",{"entity_id":owner})
@@ -138,3 +145,26 @@ func check_cpp_light_arrow() -> void:
 	cpp_bridge.release_checkpoint(active.value)
 	cpp_bridge.release_checkpoint(empty.value)
 	cpp_session.free()
+
+func check_cpp_render_kinds() -> bool:
+	if not await prepare_cpp_attack(90,"light_arrow"): return false
+	const SHAPES = preload("res://tools/content/generated/run_schema.gd").ENUMS.RenderShapeKind
+	var params := {"position":cpp_origin,"angle":0.0,"speed":100.0,"radius":12.0,"travel":400.0,"damage":8.0}
+	if not cpp_bridge.command("dev_fire_light_arrow",params).ok: return false
+	params["position"] = cpp_origin+Vector2(80,0)
+	params["cosmic"] = true
+	params["length"] = 100.0
+	if not cpp_bridge.command("dev_fire_light_arrow",params).ok: return false
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1600,-500,1400,1000)).value
+	if "--cpp-render-kinds-view-fix" not in OS.get_cmdline_user_args():
+		check(frame.shapes.size()==2 and frame.shapes.all(func(row): return row.kind==SHAPES.LightArrow),"光の矢の番号をC++とGodotの同じ生成定義から読む")
+		check(frame.shapes.any(func(row): return row.cosmic) and frame.shapes.any(func(row): return not row.cosmic),"通常とコズミックの表示値を保持する")
+	frame.shapes.append({"kind":SHAPES.Blast,"layer":10,"order":5,"owner_id":50,"points":PackedVector2Array([cpp_origin+Vector2(160,0)]),
+		"offsets":PackedInt32Array([0,1]),"widths":PackedFloat32Array([30.0]),"colors":PackedColorArray([Color.ORANGE])})
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(presentation.frame_view.apply_frame(frame),"番号が異なる爆発と矢の表示を同じフレームへ渡す")
+	await get_tree().process_frame
+	check(presentation.frame_view._arrow_displays.size()==2 and presentation.frame_view._shape_displays.has("%d:10:5" % SHAPES.Blast),"爆発と矢をそれぞれの表示へ振り分ける")
+	cpp_session.free()
+	await get_tree().process_frame
+	return true
