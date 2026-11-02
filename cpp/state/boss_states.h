@@ -58,7 +58,7 @@ struct TechniqueState {
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;
     TechniqueStage stage=TechniqueStage::Windup;
-    double elapsed=0,remaining=0,reposition=0;
+    double elapsed=0,remaining=0,reposition=0,started_at=0;
     godot::Vector2 aim,direction,previous_ship,stuck_offset,reposition_direction;
     uint32_t stuck_body=UINT32_MAX;
     bool locked=false,hit=false;

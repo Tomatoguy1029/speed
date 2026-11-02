@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-centaurus-stomp" in OS.get_cmdline_user_args() or "--cpp-centaurus-stomp-runtime" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_stomp")
+		return
 	if "--cpp-canis-flame" in OS.get_cmdline_user_args() or "--cpp-canis-flame-tail" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_flame")
 		return
@@ -986,4 +989,137 @@ func native_canis_flame() -> void:
 	view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_flame] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func centaurus_stomp_case(flow_enabled := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	var definition = load("res://data/bosses/centaurus.tres").duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.guard_count = 0
+	definition.params.guard_min = 0
+	definition.speed = 0.0
+	var move = load("res://data/bosses/centaurus_moves/stomp.tres").duplicate(true)
+	move.warn = 0.1
+	move.active = 0.1
+	move.recover = 0.05
+	move.cd = 0.0
+	var package: Dictionary = builder.centaurus_technique_package(definition,move,cfg)
+	if flow_enabled:
+		var rules = load("res://data/bosses/ai/centaurus_action_rules.tres").duplicate(true)
+		rules.techniques.assign([move])
+		rules.combos = {}
+		rules.conditions = {"stomp":{"min":0.0,"max":500.0}}
+		rules.costs = {"stomp":1.0}
+		rules.selection_bias = {}
+		rules.condition_groups = {}
+		rules.graph_nodes = {}
+		var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
+		flow.maximum_stamina = 10.0
+		flow.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		for key in records: package.records[key] = records[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	if bytes.is_empty():
+		for record in builder.Schema.SCHEMA.records:
+			for row in package.records[record.name]:
+				if not builder.Schema._valid_record(row,record): print("生成入力の不一致: ",record.name," ",row)
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":158,"mode":1,"stage_id":"B_centaurus_stomp","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(158,{"position":Vector2(300,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge._core.set_motion_context(Vector2(900,0),Vector2(900,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
+	return {"bridge":bridge,"id":id,"package":package,"events":events}
+
+
+## 踏みつけの扇・脚の中心・時計・受理された命中だけの1回制限を確認する。
+
+func native_centaurus_stomp() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/centaurus_moves/stomp.tres")
+	var source = load("res://scripts/bosses/centaurus/techniques/stomp.gd")
+	var animation = load("res://data/visuals/centaurus_animation.tres")
+	if "--cpp-centaurus-stomp-runtime" not in OS.get_cmdline_user_args():
+		var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
+		check(records.CentaurusStompDefinition.size()==2 and records.CentaurusStompDefinition[0].radius==move.range_radius and is_equal_approx(records.CentaurusStompDefinition[0].half_angle,deg_to_rad(move.half_angle)) and records.BossTechniqueStage.is_empty(),"全項目と脚のフレームを生成し、戦闘method trackを使わない")
+		check(move.make_runner()==null,"編集ResourceからRunnerを分離する")
+	var c := centaurus_stomp_case(true)
+	check(not c.is_empty(),"踏みつけを制作入口から型付きデータへつなぐ")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge._core.step(0.001)
+	var attacks: Array = bridge.command("dev_boss_state").value
+	check(not attacks.is_empty() and attacks[0].kind==12 and attacks[0].stage==0,"遅延照準ではなく機体の今の位置で技を選ぶ")
+	if attacks.is_empty(): bridge.dispose(); get_tree().quit(1); return
+	var t: Dictionary = attacks[0]
+	var expected: Vector2 = (source.contact_center(animation,0.0)*t.radius/135.0).rotated(t.facing-PI*0.5)+t.position
+	check(t.center.is_equal_approx(expected),"脚の保存配置から現在の接地点を生成する")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,1.0)
+	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0]._mode()==&"windup","扇の予告と脚の姿勢を正式表示へつなぐ")
+	var facing: float = t.facing
+	bridge.command("dev_ship_motion",{"position":t.center+Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge.command("dev_ship_defense",{"shield":1.0,"invulnerability":0.0})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==1 and not t.hit and is_equal_approx(t.facing,facing) and bridge._core.ship_snapshot().ship_hp==hp,"予告中は向きを固定し、拒否されたダメージで命中済みにしない")
+	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0]._mode()==&"strike" and view._boss_body_displays.values()[0]._parts._clip=="stomp","実行中の脚のコマと扇を表示する")
+	var held: Dictionary = bridge.checkpoint()
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.01)
+	var after: Dictionary = bridge.command("dev_boss_state").value[0].duplicate(true)
+	var hp_after: float = bridge._core.ship_snapshot().ship_hp
+	check(after.hit and is_equal_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale),"盾がなくなると扇で1回だけ実ダメージを受ける")
+	check(bridge.restore(held.value).ok,"開始時計・命中フラグ・脚の時刻を保持復帰する")
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0]==after and bridge._core.ship_snapshot().ship_hp==hp_after,"復帰後の中心・段階・命中結果が一致する")
+	bridge.release_checkpoint(held.value)
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and bridge._core.ship_snapshot().ship_hp==hp_after,"有効時間の終わりに判定を閉じて硬直する")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==5,"硬直が自然終了する")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"技の予告・実行・命中を公開更新と記録へ配信する")
+	bridge.dispose()
+	view.queue_free()
+	c = centaurus_stomp_case()
+	bridge = c.bridge
+	var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).value
+	t = bridge.command("dev_boss_state").value[0]
+	bridge.command("dev_ship_motion",{"position":t.center+Vector2(-200,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.1)
+	check(not bridge.command("dev_boss_state").value[0].hit,"中心の後ろは半径内でも扇の判定に入らない")
+	bridge.command("dev_ship_motion",{"position":t.center+Vector2(1000,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.01)
+	check(not bridge.command("dev_boss_state").value[0].hit,"今の機体位置だけを使い通過した線分で命中しない")
+	hp = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_cancel_technique",{"ticket":ticket})
+	bridge.command("dev_ship_motion",{"position":t.center+Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge._core.ship_snapshot().ship_hp==hp,"取消後は扇の残留判定を持たない")
+	bridge.dispose()
+	c = centaurus_stomp_case()
+	bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value[0].stage==7,"参加者消失で未実行の踏みつけを取消する")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_stomp] failures=",failed)
 	get_tree().quit(1 if failed else 0)

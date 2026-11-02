@@ -1503,6 +1503,10 @@
       {
         "name": "SiriusTrail",
         "value": "sirius_trail"
+      },
+      {
+        "name": "Stomp",
+        "value": "stomp"
       }
     ],
     "VisualRole": [

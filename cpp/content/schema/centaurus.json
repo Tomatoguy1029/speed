@@ -369,6 +369,118 @@
           "ref": "LightArrowDefinition"
         }
       ]
+    },
+    {
+      "name": "CentaurusStompDefinition",
+      "section": 325,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CentaurusStompFoot",
+      "section": 326,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "frame",
+          "type": "u32"
+        },
+        {
+          "name": "leg",
+          "type": "u32",
+          "max": 1
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0.02
+        },
+        {
+          "name": "interpolate",
+          "type": "bool"
+        },
+        {
+          "name": "pivot",
+          "type": "bool"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "scale_x",
+          "type": "f64"
+        },
+        {
+          "name": "scale_y",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        },
+        {
+          "name": "skew",
+          "type": "f64"
+        },
+        {
+          "name": "pivot_x",
+          "type": "f64"
+        },
+        {
+          "name": "pivot_y",
+          "type": "f64"
+        },
+        {
+          "name": "origin_x",
+          "type": "f64"
+        },
+        {
+          "name": "origin_y",
+          "type": "f64"
+        },
+        {
+          "name": "contact_x",
+          "type": "f64"
+        },
+        {
+          "name": "contact_y",
+          "type": "f64"
+        }
+      ]
     }
   ],
   "enums": {}

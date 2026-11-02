@@ -51,9 +51,9 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot"]: return {}
+	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot",&"stomp"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"LightArrowDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
 	var boss := {"id":1,"external_id":"centaurus","kind":1,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
 	records.BossDefinition = [boss]
@@ -75,9 +75,16 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9 if move.technique==&"rear_attack" else 10 if move.technique==&"rain" else 11,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":8 if move.technique==&"volley" else 9 if move.technique==&"rear_attack" else 10 if move.technique==&"rain" else 11 if move.technique==&"power_shot" else 12,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage","speed"]: row[key] = float(values.get(key,0.0))
-		if move.technique==&"power_shot":
+		if move.technique==&"stomp":
+			row.active = float(values.active)
+			records.BossTechniqueDefinition.append(row)
+			records.CentaurusStompDefinition.append({"id":phase,"technique":phase,"radius":float(values.range_radius),"half_angle":deg_to_rad(float(values.half_angle))})
+			for foot in centaurus_stomp_feet(load("res://data/visuals/centaurus_animation.tres"),phase):
+				foot.id = records.CentaurusStompFoot.size()+1
+				records.CentaurusStompFoot.append(foot)
+		elif move.technique==&"power_shot":
 			row.active = 0.05
 			records.BossTechniqueDefinition.append(row)
 			records.CentaurusPowerDefinition.append({"id":phase,"technique":phase,"count":maxi(1,int(values.count)),"alert":float(values.alert),"radius":float(values.radius),"travel":float(values.travel),"spread":float(values.spread),"projectile":1})
@@ -109,6 +116,25 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 			for k in count: records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":3,"at":row.warn+float(values.interval)*k})
 			records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":4,"at":row.warn+row.active})
 	return records
+
+## 脚のコマと補間値を生成し、実行中に表示Resourceを参照しない。
+static func centaurus_stomp_feet(animation: Resource, technique: int) -> Array:
+	var frames: Array = animation.clips.get("stomp",[])
+	if frames.is_empty(): frames = [{"pose":animation.poses.get("neutral",{}),"duration":0.02}]
+	var out: Array = []
+	for index in frames.size():
+		var frame: Dictionary = frames[index]
+		for leg in 2:
+			var path: String = ["FrontLeftLeg","FrontRightLeg"][leg]
+			var entry: Dictionary = frame.pose.get(path,animation.poses.get("neutral",{}).get(path,{}))
+			var next: Dictionary = frames[mini(index+1,frames.size()-1)].pose.get(path,{})
+			var pivot: Vector2 = animation.part_pivots.get(path,Vector2.ZERO)
+			var origin: Vector2 = entry.get("pivot_origin",Vector2.ZERO)
+			var position: Vector2 = entry.get("position",Vector2.ZERO)
+			var scale: Vector2 = entry.get("scale",Vector2.ONE)
+			var contact: Vector2 = Vector2(11.5 if leg==0 else 7.5,52.0)
+			out.append({"id":out.size()+1,"technique":technique,"frame":index,"leg":leg,"duration":maxf(0.02,float(frame.get("duration",0.15))),"interpolate":bool(frame.get("interpolate",false)) and index<frames.size()-1 and not next.is_empty(),"pivot":animation.part_pivots.has(path) and entry.has("pivot_origin"),"x":position.x,"y":position.y,"scale_x":scale.x,"scale_y":scale.y,"rotation":float(entry.get("rotation",0.0)),"skew":float(entry.get("skew",0.0)),"pivot_x":pivot.x,"pivot_y":pivot.y,"origin_x":origin.x,"origin_y":origin.y,"contact_x":contact.x,"contact_y":contact.y})
+	return out
 
 ## 個別移行済みの技を、共通本体と同じ制作入口へまとめる。
 static func centaurus_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:

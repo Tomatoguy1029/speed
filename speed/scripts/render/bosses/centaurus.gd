@@ -73,7 +73,7 @@ func _mode() -> StringName:
 	if state.mode>=4: return &"defeated"
 	if state.get("leaping",false): return &"leap"
 	if technique.get("technique","")=="rain" and int(technique.get("stage",5))==1: return &"rain"
-	if technique.get("technique","")=="rear_attack" and int(technique.get("stage",5))==1: return &"strike"
+	if technique.get("technique","") in ["rear_attack","stomp"] and int(technique.get("stage",5))==1: return &"strike"
 	return [&"windup",&"shooting",&"recovery",&"idle",&"idle",&"idle",&"idle",&"idle"][int(technique.get("stage",5))]
 
 func _poly(points: Array, color: Color) -> void:
@@ -140,6 +140,10 @@ func _draw() -> void:
 			draw_line(from,end,Color(color,0.12),8.0)
 			draw_line(from,end,Color(color,0.95 if bool(technique.alerting) else 0.6),2.0)
 			draw_line(from,end,Color(1.0,0.75 if bool(technique.alerting) else 0.95,0.6,0.8),0.8)
+	if technique.get("technique","")=="stomp" and int(technique.get("stage",5))<2:
+		var points := PackedVector2Array([to_local(technique.center)])
+		for i in 33: points.append(to_local(technique.center+Vector2.from_angle(float(state.facing)+lerpf(-float(technique.half_angle),float(technique.half_angle),i/32.0))*float(technique.range_radius)))
+		draw_colored_polygon(points,Color(DANGER if int(technique.stage)==1 else WARNING,0.2))
 	var r := float(state.radius)
 	var k := r / 90.0
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
