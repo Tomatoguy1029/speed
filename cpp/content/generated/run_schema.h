@@ -397,7 +397,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 17) return false;
+    if (out.kind > 18) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -957,6 +957,59 @@ inline bool read(BinaryReader &input, FriendSawPoint &out) {
     if (!input.read_f32(out.y)) return false;
     return true;
 }
+struct ZoneDefinition {
+    uint32_t id{};
+    uint32_t style{};
+    uint32_t contact{};
+    double active{};
+    bool hit{};
+    bool fade{};
+    float tint_r{};
+    float tint_g{};
+    float tint_b{};
+    float tint_a{};
+    double glow_opacity{};
+    double ring_opacity{};
+    double ring_width{};
+    double arm_count{};
+    double lightning_reach{};
+    double lightning_width{};
+    double hit_duration{};
+    double fade_duration{};
+};
+inline bool read(BinaryReader &input, ZoneDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.style)) return false;
+    if (out.style > 7) return false;
+    if (!input.read_u32(out.contact)) return false;
+    if (out.contact < 1) return false;
+    if (!input.read_f64(out.active)) return false;
+    if (out.active < 0) return false;
+    if (!input.read_bool(out.hit)) return false;
+    if (!input.read_bool(out.fade)) return false;
+    if (!input.read_f32(out.tint_r)) return false;
+    if (!input.read_f32(out.tint_g)) return false;
+    if (!input.read_f32(out.tint_b)) return false;
+    if (!input.read_f32(out.tint_a)) return false;
+    if (!input.read_f64(out.glow_opacity)) return false;
+    if (out.glow_opacity < 0) return false;
+    if (!input.read_f64(out.ring_opacity)) return false;
+    if (out.ring_opacity < 0) return false;
+    if (!input.read_f64(out.ring_width)) return false;
+    if (out.ring_width < 0) return false;
+    if (!input.read_f64(out.arm_count)) return false;
+    if (out.arm_count < 0) return false;
+    if (!input.read_f64(out.lightning_reach)) return false;
+    if (out.lightning_reach < 0) return false;
+    if (!input.read_f64(out.lightning_width)) return false;
+    if (out.lightning_width < 0) return false;
+    if (!input.read_f64(out.hit_duration)) return false;
+    if (out.hit_duration < 0) return false;
+    if (!input.read_f64(out.fade_duration)) return false;
+    if (out.fade_duration < 0) return false;
+    return true;
+}
 struct BudgetPhase {
     uint32_t id{};
     double start{};
@@ -1410,6 +1463,44 @@ inline bool read(BinaryReader &input, PulserDefinition &out) {
     if (out.width < 0) return false;
     if (!input.read_f64(out.damage)) return false;
     if (out.damage < 0) return false;
+    return true;
+}
+struct DolphinDefinition {
+    uint32_t id{};
+    double accel{};
+    double keep{};
+    double warn{};
+    double aim_turn{};
+    double arc{};
+    double radius{};
+    double speed{};
+    double width{};
+    double damage{};
+    double enemy_damage{};
+};
+inline bool read(BinaryReader &input, DolphinDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.warn)) return false;
+    if (out.warn < 0) return false;
+    if (!input.read_f64(out.aim_turn)) return false;
+    if (out.aim_turn < 0) return false;
+    if (!input.read_f64(out.arc)) return false;
+    if (out.arc < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.speed)) return false;
+    if (out.speed < 0) return false;
+    if (!input.read_f64(out.width)) return false;
+    if (out.width < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.enemy_damage)) return false;
+    if (out.enemy_damage < 0) return false;
     return true;
 }
 struct FieldBodyDefinition {
@@ -1881,6 +1972,36 @@ inline bool read(BinaryReader &input, RampageDefinition &out) {
     if (out.half_life < 0) return false;
     return true;
 }
+struct DuplicatorDefinition {
+    uint32_t id{};
+    uint32_t equipment{};
+    uint32_t level{};
+    double chance{};
+    double damage{};
+    uint32_t maximum{};
+    double angle_min{};
+    double angle_max{};
+};
+inline bool read(BinaryReader &input, DuplicatorDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.chance)) return false;
+    if (out.chance < 0) return false;
+    if (out.chance > 1) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_u32(out.maximum)) return false;
+    if (out.maximum < 0) return false;
+    if (!input.read_f64(out.angle_min)) return false;
+    if (out.angle_min < 0) return false;
+    if (!input.read_f64(out.angle_max)) return false;
+    if (out.angle_max < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -1913,6 +2034,7 @@ struct ContentRecords {
     std::vector<FriendHullDefinition> FriendHullDefinition_rows;
     std::vector<FriendHullLook> FriendHullLook_rows;
     std::vector<FriendSawPoint> FriendSawPoint_rows;
+    std::vector<ZoneDefinition> ZoneDefinition_rows;
     std::vector<BudgetPhase> BudgetPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
@@ -1929,6 +2051,7 @@ struct ContentRecords {
     std::vector<SniperDefinition> SniperDefinition_rows;
     std::vector<MarlinDefinition> MarlinDefinition_rows;
     std::vector<PulserDefinition> PulserDefinition_rows;
+    std::vector<DolphinDefinition> DolphinDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -1947,6 +2070,7 @@ struct ContentRecords {
     std::vector<BarrierPostDefinition> BarrierPostDefinition_rows;
     std::vector<FullChargeDefinition> FullChargeDefinition_rows;
     std::vector<RampageDefinition> RampageDefinition_rows;
+    std::vector<DuplicatorDefinition> DuplicatorDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -2142,6 +2266,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { FriendSawPoint row; if (!read(input,row)) return false; out.FriendSawPoint_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 68: {
+        if (version != 1) return false;
+        if (count > input.remaining()/102) return false;
+        for (uint32_t i=0; i<count; ++i) { ZoneDefinition row; if (!read(input,row)) return false; out.ZoneDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 16: {
         if (version != 1) return false;
         if (count > input.remaining()/20) return false;
@@ -2236,6 +2366,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/68) return false;
         for (uint32_t i=0; i<count; ++i) { PulserDefinition row; if (!read(input,row)) return false; out.PulserDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 66: {
+        if (version != 1) return false;
+        if (count > input.remaining()/84) return false;
+        for (uint32_t i=0; i<count; ++i) { DolphinDefinition row; if (!read(input,row)) return false; out.DolphinDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 21: {
@@ -2346,6 +2482,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { RampageDefinition row; if (!read(input,row)) return false; out.RampageDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 67: {
+        if (version != 1) return false;
+        if (count > input.remaining()/48) return false;
+        for (uint32_t i=0; i<count; ++i) { DuplicatorDefinition row; if (!read(input,row)) return false; out.DuplicatorDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -2412,6 +2554,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FriendHullLook_rows) if (!FriendHullLook_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FriendSawPoint_ids;
     for (const auto &row:data.FriendSawPoint_rows) if (!FriendSawPoint_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> ZoneDefinition_ids;
+    for (const auto &row:data.ZoneDefinition_rows) if (!ZoneDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BudgetPhase_ids;
     for (const auto &row:data.BudgetPhase_rows) if (!BudgetPhase_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ProgressionDefinition_ids;
@@ -2444,6 +2588,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.MarlinDefinition_rows) if (!MarlinDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PulserDefinition_ids;
     for (const auto &row:data.PulserDefinition_rows) if (!PulserDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DolphinDefinition_ids;
+    for (const auto &row:data.DolphinDefinition_rows) if (!DolphinDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -2480,6 +2626,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FullChargeDefinition_rows) if (!FullChargeDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> RampageDefinition_ids;
     for (const auto &row:data.RampageDefinition_rows) if (!RampageDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DuplicatorDefinition_ids;
+    for (const auto &row:data.DuplicatorDefinition_rows) if (!DuplicatorDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -2510,6 +2658,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.FriendDebrisDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.FriendHullDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.FriendHullLook_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.ZoneDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
@@ -2527,6 +2676,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.SniperDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.MarlinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.PulserDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.DolphinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -2545,6 +2695,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BarrierDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.FullChargeDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.RampageDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.DuplicatorDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -2670,5 +2821,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=65;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=68;
 }

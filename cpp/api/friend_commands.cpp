@@ -40,6 +40,14 @@ bool births(speed::RunRuntime &run,const Array &rows,unsigned depth,bool execute
         shot.cause=StringName(d.get("cause",String("shot")));shot.weapon_id=StringName(d.get("weapon_id",String()));shot.visual=StringName(d.get("visual_key",String("weapon/forward")));shot.type=StringName(d.get("type",String()));
         speed::AttackSpec spec;spec.policies=speed::policy(speed::EndPolicy::NaturalLifetime);
         if (!speed::parse_symbol(String(shot.cause).utf8().get_data(),spec.cause) || !speed::parse_symbol(String(d.get("callback",String("none"))).utf8().get_data(),shot.callback.kind)) return false;
+        if (shot.kind==int64_t(speed::FriendKind::Debris)) {
+            if (run.content->friend_debris.empty()) return false;
+            shot.debris.definition=1;
+            shot.debris.style=shot.visual==StringName("weapon/knockback")?speed::DebrisStyle::Stardust:shot.visual==StringName("enemy/pump_burst")?speed::DebrisStyle::Pump:speed::DebrisStyle::Plain;
+        } else if (shot.kind==int64_t(speed::FriendKind::Hull)) {
+            if (run.content->friend_hulls.empty() || spec.cause!=speed::Cause::Saw) return false;
+            shot.hull={1,0,-1,true};
+        }
         if (d.has("hit_ids")) {
             if (d["hit_ids"].get_type()!=Variant::PACKED_INT64_ARRAY) return false;
             const PackedInt64Array ids=d["hit_ids"];for (auto id:ids) {if (id<=0) return false;shot.hit_ids.insert(id);}
@@ -65,5 +73,5 @@ Dictionary SpeedRunCore::development_friend_command(const String &kind,const Dic
         size_t count=0;const Array rows=d["births"];
         if (births(runtime,rows,0,false,count)) {count=0;ok=births(runtime,rows,0,true,count);}
     }
-    Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["message"]=ok?"":"味方攻撃の生成条件が不正です";out["field"]=ok?"":"births/count";out["value"]=int64_t(speed::AttackSystem::flying_count(runtime.state));return out;
+    Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["message"]=ok?String():String::utf8("味方攻撃の生成条件が不正です");out["field"]=ok?"":"births/count";out["value"]=int64_t(speed::AttackSystem::flying_count(runtime.state));return out;
 }

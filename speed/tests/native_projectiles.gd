@@ -21,6 +21,12 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-t37-kind-merge" in OS.get_cmdline_user_args():
+		var completed := check_cpp_t37_kind_merge()
+		check(completed,"複製と種類別生成の統合確認を最後まで実施する")
+		print("[cpp_t37_kind_merge] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-t37" in OS.get_cmdline_user_args() or "--cpp-t37-fixes" in OS.get_cmdline_user_args() or "--cpp-t37-state-format" in OS.get_cmdline_user_args():
 		t37_state_only = "--cpp-t37-state-format" in OS.get_cmdline_user_args()
 		t37_retry = t37_state_only or "--cpp-t37-fixes" in OS.get_cmdline_user_args()
@@ -488,3 +494,28 @@ func check_cpp_t37() -> void:
 	fixture.dispose()
 	lab.free()
 	await get_tree().process_frame
+
+func check_cpp_t37_kind_merge() -> bool:
+	check(load("res://tests/native_hostiles.gd").can_instantiate(),"統合した敵攻撃検査の構文を読み込める")
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	for field in ["planet_radius","moon_count","meteor_count","iron_count","saw_count"]: config.set(field,0)
+	config.start_radius = 900.0
+	var bridge = t37_fixture_bridge(config)
+	var core = bridge._core
+	check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5}).ok,"固定抽選の複製を取得する")
+	var source: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-900,0)}).value
+	check(bridge.command("dev_scatter_hull",{"source_id":source,"direction":Vector2.RIGHT,"speed":100.0,"damage":2.0,"shatter_depth":3}).ok,"種類別の星屑を出生列の完了時に複製する")
+	var dust: Array = core.projectiles_snapshot()
+	check(dust.size()==6 and dust.all(func(p): return p.shatter_depth==3 and p.hit_ids==[source]),"星屑の元2件と複製4件が共通の深さと命中済みIDを保持する")
+	check(bridge.command("dev_fire_hull",{"position":Vector2(-900,0),"velocity":Vector2.RIGHT*100.0,"definition_id":"drifter","source_id":source,"radius":12.0,"damage":2.0,"life":1.0,"angle":0.0,"knock":10.0}).ok,"種類別の船体弾を完成後に複製する")
+	var hulls: Array = core.projectiles_snapshot().filter(func(p): return p.kind==2)
+	check(hulls.size()==3 and hulls.all(func(p): return p.source_id==source and p.source_definition==1 and not p.saw),"船体弾の元と複製が元外観と個体IDを保持する")
+	var snapshot: Array = core.projectiles_snapshot()
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"種類別の深さと元外観を含む複製を保持できる")
+	if not held.ok: bridge.dispose(); return false
+	core.step_projectiles(0.05)
+	check(bridge.restore(held.value).ok and core.projectiles_snapshot()==snapshot,"統合した種類別の複製を同じ値へ復帰する")
+	bridge.release_checkpoint(held.value)
+	bridge.dispose()
+	return true
