@@ -203,6 +203,8 @@ struct LoadoutState {
     int64_t level=0,pending_levels=0,rerolls=0,next_offer_id=1,offer_id=0,selected_id=0;
     double xp=0,xp_gained=0,xp_gain_mult=1;
     std::vector<EquipmentLevel> weapons,traits;
+    uint32_t comet_weapon=0;
+    bool comet_direct=false;
     std::vector<uint32_t> pending_comet_weapons;
     std::vector<CardCandidate> candidates;
 };

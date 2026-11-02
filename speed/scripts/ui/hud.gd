@@ -397,6 +397,9 @@ func _card_command(command: StringName, args := {}) -> void:
 			var index := int(args.get("index",-1))
 			if index<0 or index>=cards.get("candidates",[]).size(): return
 			payload.candidate_id = cards.candidates[index].candidate_id
+			if cards.candidates[index].kind=="swap":
+				command = &"choose_swap"
+				payload.replace_weapon_id = str(cards.candidates[index].id)
 		_card_discard.merge(_card_held)
 		bridge.command(String(command),payload)
 		return
@@ -1304,13 +1307,45 @@ func _cpp_card_visibility() -> void:
 func _show_cpp_cards() -> void:
 	var state: Dictionary = _cpp_ui.get("cards",{})
 	var cards: Array = state.get("candidates",[])
-	for child in _cards_row.get_children():
-		_cards_row.remove_child(child)
-		child.queue_free()
-	_swap_box.hide()
+	for row in [_cards_row,_swap_grid]:
+		for child in row.get_children():
+			row.remove_child(child)
+			child.queue_free()
+	var swap: bool = str(state.get("swap_pick",""))!="" and not state.get("comet_direct",false)
+	_swap_box.visible = swap
+	_swap_keep.visible = swap
+	_cards_row.visible = not swap
+	_cards_title.visible = true
+	_reroll_button.visible = not swap
+	if swap:
+		var got: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(state.swap_pick))
+		if _swap_new_card!=null:
+			_swap_box.remove_child(_swap_new_card)
+			_swap_new_card.queue_free()
+		_swap_new_card = CARD_VIEW.create({"tag":tr("card.new_weapon"),"name":got.get_display_name(),"desc":got.get_description()},-1,144,10,got)
+		_swap_new_card.position = Vector2(248,28)
+		_swap_new_card.focus_mode = Control.FOCUS_NONE
+		_swap_new_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		CARD_VIEW.set_palette(_swap_new_card,COMET_ONLY_COLOR,Color("#371b23"))
+		_swap_box.add_child(_swap_new_card)
+		_swap_new_name = _swap_new_card.get_node("Name")
+		_swap_new_desc = _swap_new_card.get_node("Description")
+		for i in cards.size():
+			var card: Dictionary = cards[i]
+			var info := card_info(card)
+			if card.kind=="keep":
+				_swap_keep_index = i
+				_swap_keep.text = info.name
+			else:
+				var entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(card.id))
+				var button := CARD_VIEW.create_weapon_slot(entry)
+				button.tooltip_text = "%s\n%s" % [info.name,info.desc]
+				button.pressed.connect(func(): _card_command(&"choose_card",{"index":i}))
+				_swap_grid.add_child(button)
+		_link_swap_focus()
 	var width := minf(144.0,(464.0-16.0*(cards.size()-1))/maxi(1,cards.size()))
 	var left := 89.0+(464.0-(cards.size()*width+maxi(0,cards.size()-1)*16.0))*0.5
-	for i in cards.size():
+	for i in (0 if swap else cards.size()):
 		var card: Dictionary = cards[i]
 		var entry: ContentEntry = ContentManager.catalog.find(&"traits" if card.kind=="trait" else &"weapons",StringName(card.id))
 		var button := CARD_VIEW.create(card_info(card),i,width,10,entry,card.kind=="post_max")
@@ -1320,7 +1355,7 @@ func _show_cpp_cards() -> void:
 	_cards_title.text = "準備に失敗しました。もう一度準備するか、選び直してください。" if int(state.get("error_code",0))<0 else "準備しています…" if state.get("preparing",false) else tr("hud.start_title") if state.get("initial",false) else tr("hud.levelup_title")
 	var remaining := int(_cpp_ui.get("rerolls_left",0))
 	_reroll_button.text = tr("hud.reroll").format({n=remaining,key=OS.get_keycode_string(InputActions.key_of(&"reroll"))})
-	_reroll_button.disabled = remaining<=0
+	_reroll_button.disabled = remaining<=0 or swap
 	_cpp_retry.visible = int(state.get("error_code",0))==-1
 	_cpp_cancel.visible = int(state.get("selected_id",0))!=0
 	_cpp_card_visibility()
@@ -1350,7 +1385,7 @@ func _input_cpp(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if not choosing or event.is_echo(): return
-	for i in 3:
+	for i in (0 if str(_cpp_ui.get("cards",{}).get("swap_pick",""))!="" else 3):
 		if event.is_action_pressed(StringName("card_%d" % (i+1))):
 			_card_command(&"choose_card",{"index":i})
 			get_viewport().set_input_as_handled()

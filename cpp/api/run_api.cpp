@@ -172,6 +172,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         runtime.state.hitstop_enabled=payload["hitstop"];if (!runtime.state.hitstop_enabled) runtime.state.hitstop=0;response=success();
     } else if (kind=="choose_card" && payload.size()==2 && is(payload,"offer_id",Variant::INT) && is(payload,"candidate_id",Variant::INT)) {
         response=speed::ProgressionSystem::choose(runtime,payload["offer_id"],payload["candidate_id"])?success():failure(5,"offer_id/candidate_id","現在の候補と一致しません");
+    } else if (kind=="choose_swap" && payload.size()==3 && is(payload,"offer_id",Variant::INT) && is(payload,"candidate_id",Variant::INT) && is(payload,"replace_weapon_id",Variant::STRING)) {
+        response=speed::ProgressionSystem::choose_swap(runtime,payload["offer_id"],payload["candidate_id"],payload["replace_weapon_id"])?success():failure(5,"replace_weapon_id","交換先と候補が一致しません");
     } else if (kind=="reroll" && payload.size()==1 && is(payload,"offer_id",Variant::INT)) {
         response=speed::ProgressionSystem::reroll(*this,payload["offer_id"])?success():failure(4,"offer_id","引き直せません");
     } else if (kind=="cancel_choice" && payload.size()==1 && is(payload,"offer_id",Variant::INT)) {
@@ -292,7 +294,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_tune" && payload.size()==3 && is(payload,"target_id",Variant::STRING) && is(payload,"revision",Variant::INT) && is(payload,"values",Variant::PACKED_BYTE_ARRAY)) {
         Dictionary replace;replace["definition_id"]=payload["target_id"];replace["expected_revision"]=payload["revision"];replace["replacement"]=payload["values"];
         response=speed::DevCommands::replace_definition(runtime,replace);
-    } else if (kind=="dev_edit" && runtime.api_development && payload.size()==2 && is(payload,"kind",Variant::STRING) && is(payload,"payload",Variant::DICTIONARY) && (String(payload["kind"])=="post_max" || String(payload["kind"])=="post_max_offer" || String(payload["kind"])=="progression")) {
+    } else if (kind=="dev_edit" && runtime.api_development && payload.size()==2 && is(payload,"kind",Variant::STRING) && is(payload,"payload",Variant::DICTIONARY) && (String(payload["kind"])=="post_max" || String(payload["kind"])=="post_max_offer" || String(payload["kind"])=="progression" || String(payload["kind"])=="comet_weapon")) {
         response=speed::ProgressionSystem::development(*this,payload["kind"],payload["payload"])?success():failure(1,"progression","");
         if (!bool(response["ok"])) response["message"]=String::utf8("強化の種類・対象・値を確認してください");
     } else if (kind=="dev_set_scenario" || (kind=="dev_edit" && payload.has("kind") && String(payload["kind"])!="parameter" && String(payload["kind"])!="boss_parameter" && String(payload["kind"])!="config")) response=development_lab_command(kind,payload);

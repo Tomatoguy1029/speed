@@ -234,6 +234,10 @@ func _read_locked() -> Dictionary:
 	if not result.ok: return result
 	if not _latest.is_empty() and _latest.epoch!=result.value.epoch: _ui = {}
 	preload("res://scripts/runtime/post_max_card_view.gd").format_frame(result.value)
+	for event: Dictionary in result.value.events:
+		if event.type=="text":
+			var entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(event.payload.get("text","")))
+			if entry!=null: event.payload.text = entry.get_display_name()
 	_ui.merge(result.value.ui,true)
 	_latest = result.value.duplicate(true)
 	_latest.ui = _ui.duplicate(true)

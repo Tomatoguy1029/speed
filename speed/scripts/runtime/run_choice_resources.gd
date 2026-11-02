@@ -22,7 +22,7 @@ func consume_frame(frame: Dictionary) -> bool:
 	return true
 
 func _key(card: Dictionary) -> String:
-	return str(card.kind)+":"+str(card.id)
+	return str(card.get("resource_kind",card.kind))+":"+str(card.get("resource_id",card.id))
 
 func _cancel(row: Dictionary) -> void:
 	if not row.get("borrowed",false): row.scope.cancel()
@@ -81,7 +81,7 @@ func poll() -> void:
 						scope.failed = true
 					else:
 						scope = prepare.call(ordered) if prepare.is_valid() else ContentManager.prepare_resources(ordered,DisplayServer.get_name()!="headless",resources.signatures)
-			candidates[request.request_id] = {"scope":scope,"key":key,"level":card.level,"borrowed":borrowed,"notified":false}
+			candidates[request.request_id] = {"scope":scope,"key":key,"level":card.get("resource_level",card.level),"borrowed":borrowed,"notified":false}
 		var row: Dictionary = candidates[request.request_id]
 		if row.notified: continue
 		var scope: ContentResourceScope = row.scope

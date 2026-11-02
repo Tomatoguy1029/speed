@@ -16,6 +16,7 @@ public:
     static bool add_experience(godot::SpeedRunCore &,double final_xp);
     static bool open(godot::SpeedRunCore &,bool initial=false);
     static bool choose(RunRuntime &,int64_t offer,int64_t candidate);
+    static bool choose_swap(RunRuntime &,int64_t offer,int64_t candidate,const godot::String &replace);
     static bool cancel(RunRuntime &,int64_t offer);
     static bool reroll(godot::SpeedRunCore &,int64_t offer);
     static bool complete(RunRuntime &,int64_t request,int status);
