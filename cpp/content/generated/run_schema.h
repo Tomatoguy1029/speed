@@ -4112,7 +4112,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 104) return false;
+    if (out.kind > 107) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 3) return false;
@@ -6709,6 +6709,90 @@ inline bool read(BinaryReader &input, HydraWindBandDefinition &out) {
     if (out.force < 0) return false;
     return true;
 }
+struct HydraNorthDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double radius{};
+    double flight{};
+    double lock_time{};
+    double spread{};
+    double half_angle{};
+};
+inline bool read(BinaryReader &input, HydraNorthDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.flight)) return false;
+    if (out.flight < 0) return false;
+    if (!input.read_f64(out.lock_time)) return false;
+    if (out.lock_time < 0) return false;
+    if (!input.read_f64(out.spread)) return false;
+    if (out.spread < 0) return false;
+    if (!input.read_f64(out.half_angle)) return false;
+    if (out.half_angle < 0) return false;
+    return true;
+}
+struct HydraSequenceDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double radius{};
+    double lunge{};
+    double charge{};
+    double gap{};
+    double half_angle{};
+};
+inline bool read(BinaryReader &input, HydraSequenceDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.lunge)) return false;
+    if (out.lunge < 0) return false;
+    if (!input.read_f64(out.charge)) return false;
+    if (out.charge < 0) return false;
+    if (!input.read_f64(out.gap)) return false;
+    if (out.gap < 0) return false;
+    if (!input.read_f64(out.half_angle)) return false;
+    if (out.half_angle < 0) return false;
+    return true;
+}
+struct HydraSwarmDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double radius{};
+    double flight{};
+    double charge{};
+    double gap{};
+    double reach{};
+    double formation_margin{};
+    double formation_timeout{};
+    double formation_tolerance{};
+};
+inline bool read(BinaryReader &input, HydraSwarmDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.flight)) return false;
+    if (out.flight < 0) return false;
+    if (!input.read_f64(out.charge)) return false;
+    if (out.charge < 0) return false;
+    if (!input.read_f64(out.gap)) return false;
+    if (out.gap < 0) return false;
+    if (!input.read_f64(out.reach)) return false;
+    if (out.reach < 0) return false;
+    if (!input.read_f64(out.formation_margin)) return false;
+    if (out.formation_margin < 0) return false;
+    if (!input.read_f64(out.formation_timeout)) return false;
+    if (out.formation_timeout < 0) return false;
+    if (!input.read_f64(out.formation_tolerance)) return false;
+    if (out.formation_tolerance < 0) return false;
+    return true;
+}
 struct DracoBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -6973,6 +7057,86 @@ inline bool read(BinaryReader &input, DracoRiftsDefinition &out) {
     if (out.scratch_width < 0) return false;
     return true;
 }
+struct DracoPicaroWallDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t count{};
+    uint32_t arrows{};
+    double interval{};
+    double flight{};
+    double impact_warn{};
+    double radius{};
+};
+inline bool read(BinaryReader &input, DracoPicaroWallDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count > 2048) return false;
+    if (!input.read_u32(out.arrows)) return false;
+    if (out.arrows > 2048) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.flight)) return false;
+    if (out.flight < 0) return false;
+    if (!input.read_f64(out.impact_warn)) return false;
+    if (out.impact_warn < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    return true;
+}
+struct DracoPicaroWallCandidate {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t enemy{};
+};
+inline bool read(BinaryReader &input, DracoPicaroWallCandidate &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.enemy)) return false;
+    return true;
+}
+struct DracoSpiralDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double radius_factor{};
+    double aspect_ratio{};
+    double inner_radius_factor{};
+    double coil_time{};
+    double pause{};
+    double head_offset{};
+    double exit_duration{};
+    double spiral_length{};
+    double shrink_time{};
+    double touch_invuln{};
+};
+inline bool read(BinaryReader &input, DracoSpiralDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.radius_factor)) return false;
+    if (out.radius_factor < 0) return false;
+    if (!input.read_f64(out.aspect_ratio)) return false;
+    if (out.aspect_ratio < 0) return false;
+    if (!input.read_f64(out.inner_radius_factor)) return false;
+    if (out.inner_radius_factor < 0) return false;
+    if (!input.read_f64(out.coil_time)) return false;
+    if (out.coil_time < 0) return false;
+    if (!input.read_f64(out.pause)) return false;
+    if (out.pause < 0) return false;
+    if (!input.read_f64(out.head_offset)) return false;
+    if (out.head_offset < 0) return false;
+    if (!input.read_f64(out.exit_duration)) return false;
+    if (out.exit_duration < 0) return false;
+    if (!input.read_f64(out.spiral_length)) return false;
+    if (out.spiral_length < 0) return false;
+    if (!input.read_f64(out.shrink_time)) return false;
+    if (out.shrink_time < 0) return false;
+    if (!input.read_f64(out.touch_invuln)) return false;
+    if (out.touch_invuln < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -7177,6 +7341,9 @@ struct ContentRecords {
     std::vector<HydraShatterDefinition> HydraShatterDefinition_rows;
     std::vector<HydraThunderDefinition> HydraThunderDefinition_rows;
     std::vector<HydraWindBandDefinition> HydraWindBandDefinition_rows;
+    std::vector<HydraNorthDefinition> HydraNorthDefinition_rows;
+    std::vector<HydraSequenceDefinition> HydraSequenceDefinition_rows;
+    std::vector<HydraSwarmDefinition> HydraSwarmDefinition_rows;
     std::vector<DracoBodyDefinition> DracoBodyDefinition_rows;
     std::vector<DracoCycleDefinition> DracoCycleDefinition_rows;
     std::vector<DracoCycleCandidate> DracoCycleCandidate_rows;
@@ -7189,6 +7356,9 @@ struct ContentRecords {
     std::vector<DracoStarFanDefinition> DracoStarFanDefinition_rows;
     std::vector<DracoMeteorDefinition> DracoMeteorDefinition_rows;
     std::vector<DracoRiftsDefinition> DracoRiftsDefinition_rows;
+    std::vector<DracoPicaroWallDefinition> DracoPicaroWallDefinition_rows;
+    std::vector<DracoPicaroWallCandidate> DracoPicaroWallCandidate_rows;
+    std::vector<DracoSpiralDefinition> DracoSpiralDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -8413,6 +8583,24 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { HydraWindBandDefinition row; if (!read(input,row)) return false; out.HydraWindBandDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 404: {
+        if (version != 1) return false;
+        if (count > input.remaining()/48) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraNorthDefinition row; if (!read(input,row)) return false; out.HydraNorthDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 405: {
+        if (version != 1) return false;
+        if (count > input.remaining()/48) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraSequenceDefinition row; if (!read(input,row)) return false; out.HydraSequenceDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 406: {
+        if (version != 1) return false;
+        if (count > input.remaining()/72) return false;
+        for (uint32_t i=0; i<count; ++i) { HydraSwarmDefinition row; if (!read(input,row)) return false; out.HydraSwarmDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 430: {
         if (version != 1) return false;
         if (count > input.remaining()/108) return false;
@@ -8483,6 +8671,24 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/68) return false;
         for (uint32_t i=0; i<count; ++i) { DracoRiftsDefinition row; if (!read(input,row)) return false; out.DracoRiftsDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 443: {
+        if (version != 1) return false;
+        if (count > input.remaining()/48) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoPicaroWallDefinition row; if (!read(input,row)) return false; out.DracoPicaroWallDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 446: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoPicaroWallCandidate row; if (!read(input,row)) return false; out.DracoPicaroWallCandidate_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 444: {
+        if (version != 1) return false;
+        if (count > input.remaining()/88) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoSpiralDefinition row; if (!read(input,row)) return false; out.DracoSpiralDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -8895,6 +9101,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HydraThunderDefinition_rows) if (!HydraThunderDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraWindBandDefinition_ids;
     for (const auto &row:data.HydraWindBandDefinition_rows) if (!HydraWindBandDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraNorthDefinition_ids;
+    for (const auto &row:data.HydraNorthDefinition_rows) if (!HydraNorthDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraSequenceDefinition_ids;
+    for (const auto &row:data.HydraSequenceDefinition_rows) if (!HydraSequenceDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> HydraSwarmDefinition_ids;
+    for (const auto &row:data.HydraSwarmDefinition_rows) if (!HydraSwarmDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DracoBodyDefinition_ids;
     for (const auto &row:data.DracoBodyDefinition_rows) if (!DracoBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DracoCycleDefinition_ids;
@@ -8919,6 +9131,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DracoMeteorDefinition_rows) if (!DracoMeteorDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DracoRiftsDefinition_ids;
     for (const auto &row:data.DracoRiftsDefinition_rows) if (!DracoRiftsDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoPicaroWallDefinition_ids;
+    for (const auto &row:data.DracoPicaroWallDefinition_rows) if (!DracoPicaroWallDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoPicaroWallCandidate_ids;
+    for (const auto &row:data.DracoPicaroWallCandidate_rows) if (!DracoPicaroWallCandidate_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoSpiralDefinition_ids;
+    for (const auto &row:data.DracoSpiralDefinition_rows) if (!DracoSpiralDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -9150,6 +9368,9 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HydraShatterDefinition_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.HydraThunderDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.HydraWindBandDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.HydraNorthDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.HydraSequenceDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.HydraSwarmDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.DracoBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.DracoCycleDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.DracoCycleCandidate_rows) if (!DracoCycleDefinition_ids.count(row.cycle)) return false;
@@ -9166,6 +9387,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DracoMeteorDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.DracoMeteorDefinition_rows) if (!EnemyRecord_ids.count(row.rock_enemy)) return false;
     for (const auto &row:data.DracoRiftsDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.DracoPicaroWallDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.DracoPicaroWallCandidate_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.DracoPicaroWallCandidate_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
+    for (const auto &row:data.DracoSpiralDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -9292,5 +9517,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=215;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=221;
 }
