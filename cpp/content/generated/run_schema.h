@@ -3167,6 +3167,219 @@ inline bool read(BinaryReader &input, BossTechniqueStage &out) {
     if (out.at < 0) return false;
     return true;
 }
+struct BossFlowProgram {
+    uint32_t id{};
+    uint32_t boss{};
+    double maximum_stamina{};
+    double partial_rest{};
+    double empty_rest{};
+    bool idle_only{};
+    bool allow_parallel{};
+    bool has_bias{};
+};
+inline bool read(BinaryReader &input, BossFlowProgram &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_f64(out.maximum_stamina)) return false;
+    if (out.maximum_stamina < 0) return false;
+    if (!input.read_f64(out.partial_rest)) return false;
+    if (out.partial_rest < 0) return false;
+    if (!input.read_f64(out.empty_rest)) return false;
+    if (out.empty_rest < 0) return false;
+    if (!input.read_bool(out.idle_only)) return false;
+    if (!input.read_bool(out.allow_parallel)) return false;
+    if (!input.read_bool(out.has_bias)) return false;
+    return true;
+}
+struct BossFlowSection {
+    uint32_t id{};
+    uint32_t flow{};
+    uint32_t order{};
+    uint32_t request{};
+    double cap{};
+    bool has_budget{};
+    double budget{};
+    uint32_t action_count{};
+    double action_interval{};
+    bool has_timeout{};
+    double timeout{};
+    bool has_fallback{};
+    uint32_t fallback{};
+    uint32_t next{};
+    bool filter_groups{};
+    bool filter_allowed{};
+    bool avoid_repeat{};
+};
+inline bool read(BinaryReader &input, BossFlowSection &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.flow)) return false;
+    if (!input.read_u32(out.order)) return false;
+    if (!input.read_u32(out.request)) return false;
+    if (out.request > 3) return false;
+    if (!input.read_f64(out.cap)) return false;
+    if (out.cap < 0) return false;
+    if (!input.read_bool(out.has_budget)) return false;
+    if (!input.read_f64(out.budget)) return false;
+    if (out.budget < 0) return false;
+    if (!input.read_u32(out.action_count)) return false;
+    if (out.action_count < 1) return false;
+    if (!input.read_f64(out.action_interval)) return false;
+    if (out.action_interval < 0) return false;
+    if (!input.read_bool(out.has_timeout)) return false;
+    if (!input.read_f64(out.timeout)) return false;
+    if (out.timeout < 0) return false;
+    if (!input.read_bool(out.has_fallback)) return false;
+    if (!input.read_u32(out.fallback)) return false;
+    if (!input.read_u32(out.next)) return false;
+    if (!input.read_bool(out.filter_groups)) return false;
+    if (!input.read_bool(out.filter_allowed)) return false;
+    if (!input.read_bool(out.avoid_repeat)) return false;
+    return true;
+}
+struct BossFlowCondition {
+    uint32_t id{};
+    double minimum{};
+    double maximum{};
+    double angle{};
+    double half_angle{};
+    uint32_t minimum_phase{};
+};
+inline bool read(BinaryReader &input, BossFlowCondition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.minimum)) return false;
+    if (out.minimum < 0) return false;
+    if (!input.read_f64(out.maximum)) return false;
+    if (out.maximum < 0) return false;
+    if (!input.read_f64(out.angle)) return false;
+    if (!input.read_f64(out.half_angle)) return false;
+    if (out.half_angle < 0) return false;
+    if (!input.read_u32(out.minimum_phase)) return false;
+    if (out.minimum_phase < 1) return false;
+    return true;
+}
+struct BossFlowNode {
+    uint32_t id{};
+    uint32_t flow{};
+    uint32_t kind{};
+    double seconds{};
+    uint32_t technique{};
+    uint32_t condition{};
+    uint32_t participant{};
+};
+inline bool read(BinaryReader &input, BossFlowNode &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.flow)) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 4) return false;
+    if (!input.read_f64(out.seconds)) return false;
+    if (out.seconds < 0) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.condition)) return false;
+    if (!input.read_u32(out.participant)) return false;
+    return true;
+}
+struct BossFlowChild {
+    uint32_t id{};
+    uint32_t parent{};
+    uint32_t child{};
+    uint32_t order{};
+};
+inline bool read(BinaryReader &input, BossFlowChild &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.parent)) return false;
+    if (!input.read_u32(out.child)) return false;
+    if (!input.read_u32(out.order)) return false;
+    return true;
+}
+struct BossFlowAction {
+    uint32_t id{};
+    uint32_t flow{};
+    std::string external_id{};
+    uint32_t node{};
+    uint32_t condition{};
+    uint32_t category{};
+    uint32_t label{};
+    std::string group{};
+    double cost{};
+    double weight{};
+    double post_gap{};
+    bool exclusive{};
+};
+inline bool read(BinaryReader &input, BossFlowAction &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.flow)) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_u32(out.node)) return false;
+    if (!input.read_u32(out.condition)) return false;
+    if (!input.read_u32(out.category)) return false;
+    if (out.category > 2) return false;
+    if (!input.read_u32(out.label)) return false;
+    if (out.label > 2) return false;
+    if (!input.read_string(out.group)) return false;
+    if (!input.read_f64(out.cost)) return false;
+    if (out.cost < 0) return false;
+    if (!input.read_f64(out.weight)) return false;
+    if (out.weight < 0) return false;
+    if (!input.read_f64(out.post_gap)) return false;
+    if (out.post_gap < 0) return false;
+    if (!input.read_bool(out.exclusive)) return false;
+    return true;
+}
+struct BossFlowFilter {
+    uint32_t id{};
+    uint32_t section{};
+    uint32_t kind{};
+    std::string value{};
+};
+inline bool read(BinaryReader &input, BossFlowFilter &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.section)) return false;
+    if (!input.read_u32(out.kind)) return false;
+    if (out.kind > 3) return false;
+    if (!input.read_string(out.value)) return false;
+    return true;
+}
+struct BossFlowWeight {
+    uint32_t id{};
+    uint32_t section{};
+    int64_t previous{};
+    uint32_t category{};
+    double weight{};
+};
+inline bool read(BinaryReader &input, BossFlowWeight &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.section)) return false;
+    if (!input.read_i64(out.previous)) return false;
+    if (out.previous < -1) return false;
+    if (out.previous > 3) return false;
+    if (!input.read_u32(out.category)) return false;
+    if (out.category > 3) return false;
+    if (!input.read_f64(out.weight)) return false;
+    if (out.weight < 0) return false;
+    return true;
+}
+struct BossFlowForbidden {
+    uint32_t id{};
+    uint32_t section{};
+    std::string left{};
+    std::string right{};
+};
+inline bool read(BinaryReader &input, BossFlowForbidden &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.section)) return false;
+    if (!input.read_string(out.left)) return false;
+    if (!input.read_string(out.right)) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -3275,6 +3488,15 @@ struct ContentRecords {
     std::vector<BossDefinition> BossDefinition_rows;
     std::vector<BossTechniqueDefinition> BossTechniqueDefinition_rows;
     std::vector<BossTechniqueStage> BossTechniqueStage_rows;
+    std::vector<BossFlowProgram> BossFlowProgram_rows;
+    std::vector<BossFlowSection> BossFlowSection_rows;
+    std::vector<BossFlowCondition> BossFlowCondition_rows;
+    std::vector<BossFlowNode> BossFlowNode_rows;
+    std::vector<BossFlowChild> BossFlowChild_rows;
+    std::vector<BossFlowAction> BossFlowAction_rows;
+    std::vector<BossFlowFilter> BossFlowFilter_rows;
+    std::vector<BossFlowWeight> BossFlowWeight_rows;
+    std::vector<BossFlowForbidden> BossFlowForbidden_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -3925,6 +4147,60 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { BossTechniqueStage row; if (!read(input,row)) return false; out.BossTechniqueStage_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 153: {
+        if (version != 1) return false;
+        if (count > input.remaining()/35) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowProgram row; if (!read(input,row)) return false; out.BossFlowProgram_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 154: {
+        if (version != 1) return false;
+        if (count > input.remaining()/66) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowSection row; if (!read(input,row)) return false; out.BossFlowSection_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 155: {
+        if (version != 1) return false;
+        if (count > input.remaining()/40) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowCondition row; if (!read(input,row)) return false; out.BossFlowCondition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 156: {
+        if (version != 1) return false;
+        if (count > input.remaining()/32) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowNode row; if (!read(input,row)) return false; out.BossFlowNode_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 157: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowChild row; if (!read(input,row)) return false; out.BossFlowChild_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 158: {
+        if (version != 1) return false;
+        if (count > input.remaining()/57) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowAction row; if (!read(input,row)) return false; out.BossFlowAction_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 159: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowFilter row; if (!read(input,row)) return false; out.BossFlowFilter_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 160: {
+        if (version != 1) return false;
+        if (count > input.remaining()/28) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowWeight row; if (!read(input,row)) return false; out.BossFlowWeight_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 161: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { BossFlowForbidden row; if (!read(input,row)) return false; out.BossFlowForbidden_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -4143,6 +4419,24 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossTechniqueDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossTechniqueStage_ids;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueStage_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowProgram_ids;
+    for (const auto &row:data.BossFlowProgram_rows) if (!BossFlowProgram_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowSection_ids;
+    for (const auto &row:data.BossFlowSection_rows) if (!BossFlowSection_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowCondition_ids;
+    for (const auto &row:data.BossFlowCondition_rows) if (!BossFlowCondition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowNode_ids;
+    for (const auto &row:data.BossFlowNode_rows) if (!BossFlowNode_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowChild_ids;
+    for (const auto &row:data.BossFlowChild_rows) if (!BossFlowChild_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowAction_ids;
+    for (const auto &row:data.BossFlowAction_rows) if (!BossFlowAction_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowFilter_ids;
+    for (const auto &row:data.BossFlowFilter_rows) if (!BossFlowFilter_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowWeight_ids;
+    for (const auto &row:data.BossFlowWeight_rows) if (!BossFlowWeight_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossFlowForbidden_ids;
+    for (const auto &row:data.BossFlowForbidden_rows) if (!BossFlowForbidden_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -4246,6 +4540,17 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.KnockbackDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.BossTechniqueDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.BossTechniqueStage_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.BossFlowProgram_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.BossFlowSection_rows) if (!BossFlowProgram_ids.count(row.flow)) return false;
+    for (const auto &row:data.BossFlowNode_rows) if (!BossFlowProgram_ids.count(row.flow)) return false;
+    for (const auto &row:data.BossFlowChild_rows) if (!BossFlowNode_ids.count(row.parent)) return false;
+    for (const auto &row:data.BossFlowChild_rows) if (!BossFlowNode_ids.count(row.child)) return false;
+    for (const auto &row:data.BossFlowAction_rows) if (!BossFlowProgram_ids.count(row.flow)) return false;
+    for (const auto &row:data.BossFlowAction_rows) if (!BossFlowNode_ids.count(row.node)) return false;
+    for (const auto &row:data.BossFlowAction_rows) if (!BossFlowCondition_ids.count(row.condition)) return false;
+    for (const auto &row:data.BossFlowFilter_rows) if (!BossFlowSection_ids.count(row.section)) return false;
+    for (const auto &row:data.BossFlowWeight_rows) if (!BossFlowSection_ids.count(row.section)) return false;
+    for (const auto &row:data.BossFlowForbidden_rows) if (!BossFlowSection_ids.count(row.section)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -4372,5 +4677,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=107;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=116;
 }
