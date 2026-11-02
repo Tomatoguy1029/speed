@@ -22,7 +22,7 @@ struct LoadoutState {
     EquipmentEffects effects;
 
     double charge_profile_factor=1;
-    uint64_t post_charge_stacks=0;
+    uint64_t post_charge_stacks=0,post_crit_stacks=0;
     bool ready=false,initial_offer=false;
     int64_t level=0,pending_levels=0,rerolls=0,next_offer_id=1,offer_id=0,selected_id=0;
     double xp=0,xp_gained=0,xp_gain_mult=1;

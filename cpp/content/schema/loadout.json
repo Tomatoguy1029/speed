@@ -44,9 +44,14 @@
           "name": "capacity_bonus",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "crit_bonus",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 3
+      "version": 4
     },
     {
       "name": "PostMaxChargeDefinition",
@@ -70,6 +75,32 @@
         },
         {
           "name": "minimum_time",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxCritDefinition",
+      "section": 32,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "trait_maximum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trained_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "increment",
           "type": "f64",
           "min": 0
         }

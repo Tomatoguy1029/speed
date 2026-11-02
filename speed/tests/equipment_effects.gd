@@ -66,6 +66,13 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t09" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t09()
+		check(finished,"急所見切りの確認を最後まで実施する")
+		print("[cpp_t09] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t08" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t08()
 		check(finished,"大容量チャージの確認を最後まで実施する")
@@ -409,16 +416,16 @@ func check_cpp_w01_detail(session: RunSession,idle: Dictionary,viewport: Diction
 	bridge.unsubscribe("w01_detail")
 	await get_tree().process_frame
 
-func t07_bridge(config: GameConfig,profile: Dictionary):
+func t07_bridge(config: GameConfig,profile: Dictionary,enemy_definition: EnemyDef = null):
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var bytes: PackedByteArray = builder.compile_chase(ContentManager.enemies[&"drifter"],config,schema.sha256("急速充填の固定場面".to_utf8_buffer()))
+	var bytes: PackedByteArray = builder.compile_chase(enemy_definition if enemy_definition!=null else ContentManager.enemies[&"drifter"],config,schema.sha256("数値特性の固定場面".to_utf8_buffer()))
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":93,"mode":1,"stage_id":"t07","profile":profile,"settings":{}})
 	if not configured.ok:
-		check(false,"特性と最大段後の生成物を読み込む: %s" % configured)
+		check(false,"数値特性と最大段後の生成物を読み込む: %s" % configured)
 		return null
-	check(bridge.start(933,{"position":Vector2(-3000,0)}).ok,"急速充填の固定場面を開始する")
+	check(bridge.start(933,{"position":Vector2(-3000,0)}).ok,"数値特性の固定場面を開始する")
 	bridge.collect_frame()
 	return bridge
 
@@ -558,4 +565,86 @@ func check_cpp_t08() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"大容量チャージの状態・表示に実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func t09_contact_hits(bridge,config: GameConfig,count: int) -> Array:
+	var events: Array = []
+	bridge.subscribe("t09_contact",func(frame):
+		events.append_array(frame.events)
+		return true)
+	for _i in count:
+		var id: int = bridge._core.spawn_enemy(&"drifter",Vector2(-3000,0))
+		bridge._core.rebuild_enemy_grid(200.0)
+		bridge.command("dev_ship_motion",{"position":Vector2(-2900,0),"velocity":Vector2(config.base_max_speed*2.0,0)})
+		bridge._core.collide_ship(Vector2(-3100,0),config.ship_radius)
+		bridge.command("dev_remove",{"entity_id":id})
+	bridge.unsubscribe("t09_contact")
+	return events
+
+func check_cpp_t09() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: TraitDef = load("res://data/traits/T09_critRate.tres")
+	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	enemy.hp = 1000000.0
+	enemy.armor = 0.0
+	var bridge = t07_bridge(config,{},enemy)
+	if bridge==null: return false
+	var cap := float(definition.params.get("max",1.0))
+	check(is_equal_approx(bridge._ui.crit_chance,minf(cap,config.base_crit_chance)),"未取得でもtresの上限を含む基礎クリティカル率を使う")
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T09","levels":1}).ok,"T09を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.crit_chance,minf(cap,config.base_crit_chance+definition.stack_bonus(level))),"前半/後半の増分を生成値から一度だけ適用する")
+	var trained: float = bridge._ui.crit_chance
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T09","levels":1}).ok and bridge._ui.crit_chance==trained,"重ね数上限を越えて率を増やさない")
+	var reserve := maxf(0.0,minf(1.0,cap)-minf(minf(1.0,cap),config.base_crit_chance+definition.stack_bonus(config.trait_max_stacks)))
+	bridge.command("dev_post_crit",{"stacks":2})
+	check(is_equal_approx(bridge._ui.crit_chance,trained+minf(reserve,config.post_max.amount(&"crit_chance",{&"crit_chance":2}))),"最大段後はT09を最大にしても残る余地だけを加算する")
+	bridge.command("dev_post_crit",{"stacks":10000})
+	var maximum: float = bridge._ui.crit_chance
+	check(is_equal_approx(maximum,trained+reserve),"最大段後の積み増しも予約した上限で止める")
+	var saved: Dictionary = bridge.checkpoint()
+	bridge.command("dev_remove_trait",{"id":"T09"})
+	check(is_equal_approx(bridge._ui.crit_chance,minf(cap,config.base_crit_chance)+reserve),"解除で通常の特性分だけを外す")
+	bridge.command("dev_post_crit",{"stacks":0})
+	check(is_equal_approx(bridge._ui.crit_chance,minf(cap,config.base_crit_chance)),"最大段後の加算も外すと基礎値へ戻る")
+	check(bridge.restore(saved.value).ok,"所持段と最大段後の積み増しを保持して復帰する")
+	bridge.collect_frame()
+	check(is_equal_approx(bridge._ui.crit_chance,maximum),"復帰後も同じ実効クリティカル率を公開する")
+	bridge.release_checkpoint(saved.value)
+	var events: Array = t09_contact_hits(bridge,config,32)
+	var hits: Array = events.filter(func(event): return event.type==&"hit")
+	var criticals: Array = hits.filter(func(event): return event.payload.crit)
+	check(hits.size()==32 and not criticals.is_empty() and criticals.size()<32,"実際の体当たり入口が同じRunRandomでクリティカルを抽選する")
+	var attack := config.base_attack*config.atk_scale
+	check(hits.all(func(event): return is_equal_approx(event.payload.dmg,attack*(config.crit_mult if event.payload.crit else 1.0))),"抽選結果が実際のダメージ倍率へ一度だけ効く")
+	check(events.filter(func(event): return event.type==&"critical_hit").size()==criticals.size(),"クリティカルの見た目へ命中ごとに1つ通知する")
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(is_equal_approx(hud._cpp_ui.crit_chance,maximum) and hud._cpp_ui.trait_levels.any(func(item): return item.id=="T09" and item.level==config.trait_max_stacks),"HUDへ実効値と所持段を同じ状態から渡す")
+	hud.free()
+	bridge.dispose()
+	# 基礎値だけでT09の上限へ届く調整でも、最大段後の余地を作らない。
+	config.base_crit_chance = cap
+	bridge = t07_bridge(config,{},enemy)
+	if bridge==null: return false
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T09","levels":config.trait_max_stacks})
+	bridge.command("dev_post_crit",{"stacks":10000})
+	check(is_equal_approx(bridge._ui.crit_chance,cap),"基礎値と特性が上限へ届いた場合は加算を止める")
+	bridge.dispose()
+	config.base_crit_chance = 0.0
+	bridge = t07_bridge(config,{},enemy)
+	if bridge==null: return false
+	events = t09_contact_hits(bridge,config,1)
+	check(events.any(func(event): return event.type==&"hit") and not events.any(func(event): return event.type==&"critical_hit"),"確率0では弱点のない相手へクリティカルを出さない")
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"急所見切りの状態・利用側・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true

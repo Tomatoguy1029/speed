@@ -33,6 +33,7 @@ struct ContentBundle {
     std::vector<LoadoutAsset> equipment_assets;
     std::vector<NumericTraitLevel> numeric_traits;
     PostMaxChargeDefinition post_charge;
+    PostMaxCritDefinition post_crit;
     static std::shared_ptr<const ContentBundle> read(const godot::PackedByteArray &bytes);
 };
 }

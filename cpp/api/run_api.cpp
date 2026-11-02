@@ -164,6 +164,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
                 changed=speed::EquipmentSystem::grant(runtime,d.id,uint32_t(int64_t(payload["levels"])));
         }
         response=changed?success():failure(5,"equipment","装備を変更できません");
+    } else if (kind=="dev_post_crit" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
+        runtime.state.loadout.post_crit_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
     } else if (kind=="dev_post_charge" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
         runtime.state.loadout.post_charge_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
     } else if (kind=="dev_benchmark" && runtime.api_development && payload.size()==1 && is(payload,"leveling",Variant::BOOL)) {
@@ -270,6 +272,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=control.ui_overlay || control.ui_reward || runtime.state.phase==Phase::Paused || runtime.state.phase==Phase::LevelUp || (runtime.state.phase==Phase::Dying && runtime.state.sequence_t<runtime.state.death_freeze);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;
+    ui["crit_chance"]=runtime.state.combat_config.crit_chance;ui["crit_mult"]=runtime.state.combat_config.crit_mult;
     ui["capacity"]=runtime.state.draw_config.capacity;ui["charge_time"]=runtime.state.draw_config.charge_time;ui["min_charge"]=runtime.state.draw_config.min_charge;ui["full_burst"]=runtime.state.loadout.effects.full_gauge_rate>0;
     ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);value["ui"]=speed::FrameBuilder::ui_delta(runtime,ui);
     value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=speed::ProgressionSystem::requests(runtime);value["result"]=speed::Lifecycle::result(runtime);return success(value);
