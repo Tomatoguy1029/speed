@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-aquila" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_aquila()
+		check(finished,"わし座の指定確認を最後まで実施する")
+		print("[cpp_aquila] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-phoenix" in OS.get_cmdline_user_args() or "--cpp-phoenix-fix" in OS.get_cmdline_user_args() or "--cpp-phoenix-fix2" in OS.get_cmdline_user_args() or "--cpp-phoenix-fix3" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_phoenix()
 		check(finished,"ほうおう座の指定確認を最後まで実施する")
@@ -1296,5 +1302,84 @@ func check_cpp_phoenix() -> bool:
 	cpp_core.step(0.6)
 	cpp_core.advance_attack_budget(1.0)
 	check(cpp_core.hazards_snapshot().is_empty() and cpp_core.attack_budget_snapshot().used==0.0,"突入前に元個体を解放しても古い参照で炎を生成しない")
+	cpp_session.free()
+	return true
+
+func check_cpp_aquila() -> bool:
+	var tuning := {"aquila":{"speed":80.0,"turn":0.8,"params.fire_interval":0.3,"params.aim_time":0.2,"params.lock_time":0.2,"params.dash_speed":500.0,"params.dash_time":0.4,"params.drop_step":0.1,"params.blast_delay":0.2,"params.blast_radius":80.0,"params.bullet_dmg":6.0,"params.recover":0.2,"params.keep":300.0}}
+	if not await prepare_cpp_attack(112,"aquila",PackedStringArray(["aquila","drifter"]),tuning): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	var target := cpp_origin+Vector2(500,0)
+	cpp_bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	cpp_core.set_motion_context(target,cpp_origin,Vector2(1000,1000))
+	cpp_core.set_attack_formation_mode(true)
+	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"aquila","position":cpp_origin}).value
+	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	cpp_core.step(0.4)
+	var waiting: Dictionary = cpp_motion_for(actor)
+	var cruising: Dictionary = cpp_core.enemies_snapshot()[0]
+	check(waiting.mode==EnemyTable.Mode.MOVE and cruising.vel!=[0.0,0.0] and absf(cruising.facing)>0.01,"予算待ちも現在の機体へ直進せず旋回巡航する")
+	cpp_bridge.command("dev_relocate",{"entity_id":actor,"position":cpp_origin})
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_core.step(0.31)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.4),"編集した間隔の後に照準と固定待ちの予告へ入る")
+	cpp_core.step(0.1)
+	check(cpp_motion_for(actor).charge==0.0,"照準中はまだ進路を固定しない")
+	cpp_core.step(0.11)
+	var warning: Dictionary = cpp_motion_for(actor)
+	var anchor := cpp_origin+Vector2(200,0)
+	check(warning.anchor.is_equal_approx(anchor) and warning.charge>0.0,"現在の機体へ向く進路を編集した最大走行距離で固定する")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(cpp_origin-Vector2(200,300),Vector2(1000,600))).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.aquila.values.size()==9 and is_equal_approx(frame.aquila.values[6],50.0) and is_equal_approx(frame.aquila.values[7],80.0) and presentation.frame_view.apply_frame(frame) and presentation.frame_view._aquila==frame.aquila.values,"固定した終点までの線と編集した雷の間隔・半径を通常画面で描く")
+	await get_tree().process_frame
+	var pending: Dictionary = cpp_bridge.checkpoint()
+	var before: Array = cpp_core.enemy_motion_snapshot()
+	cpp_bridge.command("dev_ship_motion",{"position":target+Vector2(0,250),"velocity":Vector2.ZERO})
+	cpp_core.step(0.1)
+	check(cpp_motion_for(actor).anchor.is_equal_approx(anchor),"進路固定後に相手が動いても追い直さない")
+	cpp_core.step(0.1)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.DASH and is_equal_approx(cpp_core.enemies_snapshot()[0].pos[0],cpp_origin.x+50.0) and cpp_core.hazards_snapshot().size()==2,"突入に入ったフレームから実dtだけ進み始点と50先へ雷を置く")
+	cpp_core.step(0.3)
+	var hazards: Array = cpp_core.hazards_snapshot()
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and is_equal_approx(cpp_core.enemies_snapshot()[0].pos[0],anchor.x) and hazards.size()==5,"固定終点で止まり50間隔で5個の雷を置く")
+	if hazards.size()!=5: cpp_session.free(); return false
+	for k in 5:
+		check(hazards[k].pos.is_equal_approx(cpp_origin+Vector2(k*50,0)) and is_equal_approx(hazards[k].delay,0.2) and hazards[k].radius==80.0 and hazards[k].damage==6.0 and hazards[k].style==ENUMS.ZoneStyle.Aquila,"雷%dの実位置・予告時間・半径・威力を編集値から生成する" % k)
+	cpp_core.step(0.21)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and is_equal_approx(cpp_motion_for(actor).fire_t,0.3),"休止を終えると編集した間隔で巡航へ戻る")
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"aquila","position":cpp_origin+Vector2(600,300)}).value
+	check(replacement!=actor and cpp_motion_for(replacement).anchor==Vector2.ZERO and cpp_motion_for(replacement).bud_t==0.0 and cpp_motion_for(replacement).charge==0.0 and cpp_core.hazards_snapshot().size()==5,"元個体を先に消し行を使い直しても雷は残り、固定終点や生成時刻を漏らさない")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin,"velocity":Vector2.ZERO})
+	cpp_core.step_hazards(0.21)
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-6.0),"発生元の退場後も遅延した雷が共通被弾へ通る")
+	frame = cpp_bridge.read_render(Rect2(cpp_origin-Vector2(200,300),Vector2(1000,600))).value
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.apply_frame(frame) and frame.shapes.filter(func(shape): return shape.kind==ENUMS.RenderShapeKind.Zone and shape.zone_style==ENUMS.ZoneStyle.Aquila).size()==5,"独立した5個の雷を通常画面で描く")
+	await get_tree().process_frame
+	cpp_core.step_hazards(0.4)
+	check(cpp_core.hazards_snapshot().is_empty(),"置いた雷は攻撃寿命で終了する")
+	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before,"固定進路・段階・残り時間・次の雷時刻を保持から復元する")
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	cpp_core.step(0.6)
+	check(cpp_core.hazards_snapshot().is_empty(),"予告中に倒すと突入と未生成の雷を取り消す")
+	cpp_bridge.restore(pending.value)
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	cpp_core.step(0.6)
+	check(cpp_core.hazards_snapshot().is_empty(),"突入前に元個体を先に解放しても古い参照から雷を生成しない")
+	cpp_bridge.restore(pending.value)
+	cpp_bridge.command("dev_relocate",{"entity_id":actor,"position":Vector2(-260,0)})
+	cpp_bridge.command("dev_ship_motion",{"position":Vector2(500,0),"velocity":Vector2.ZERO})
+	cpp_core.set_motion_context(Vector2(500,0),Vector2(-3000,0),Vector2(320,180))
+	cpp_core.step(0.31)
+	cpp_core.step(0.21)
+	var blocked: Vector2 = cpp_motion_for(actor).anchor
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.19) and blocked.x> -260.0 and blocked.x< -100.0,"画面外でも実時間で予告し天体に当たる手前へ終点を切る")
+	cpp_core.step(0.2)
+	var stopped: Dictionary = cpp_core.enemies_snapshot()[0]
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and is_equal_approx(stopped.pos[0],blocked.x) and cpp_core.hazards_snapshot().all(func(h): return h.pos.x<=blocked.x+0.01),"天体で切った予告と実走行・最後の雷を同じ終点へそろえる")
 	cpp_session.free()
 	return true

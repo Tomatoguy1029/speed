@@ -1154,6 +1154,73 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "AquilaDefinition",
+      "section": 103,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 1e-06
+        },
+        {
+          "name": "dash_speed",
+          "type": "f64",
+          "min": 1e-06
+        },
+        {
+          "name": "dash_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "drop_step",
+          "type": "f64",
+          "min": 1e-06
+        },
+        {
+          "name": "blast_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

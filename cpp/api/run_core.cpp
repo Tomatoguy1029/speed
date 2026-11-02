@@ -15,6 +15,7 @@
 #include "../behaviors/enemies/cross.h"
 #include "../behaviors/enemies/bomber.h"
 #include "../behaviors/enemies/phoenix.h"
+#include "../behaviors/enemies/aquila.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -215,7 +216,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         const Vector2 from=enemy.pos;
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta);speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
-        const bool far = def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
+        const bool far = def.kind!=speed::EnemyDefinition::Kind::Aquila && def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
             if (def.kind==speed::EnemyDefinition::Kind::Lynx) {
@@ -226,6 +227,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::AurigaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Clock) {
                 speed::ClockBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Aquila) {
+                speed::AquilaBehavior::step(runtime,uint32_t(row),delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Phoenix) {
                 speed::PhoenixBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Bomber) {
@@ -268,6 +271,7 @@ void SpeedRunCore::advance_enemies(double delta) {
             }
         }
         if (!runtime.state.enemy_handles.contains(update_handles[row]) || runtime.state.enemies[row].dead) continue;
+        if (def.kind==speed::EnemyDefinition::Kind::Aquila) speed::AquilaBehavior::before_move(runtime,update_handles[row],delta);
         if (def.kind==speed::EnemyDefinition::Kind::Marlin) {
             speed::MarlinBehavior::before_move(runtime,update_handles[row],delta);
             if (!runtime.state.enemy_handles.contains(update_handles[row]) || runtime.state.enemies[row].dead) continue;

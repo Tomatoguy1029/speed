@@ -17,6 +17,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Sniper) enemy.behavior_state=SniperState{};
     if (def.kind==EnemyDefinition::Kind::Marlin) enemy.behavior_state=MarlinState{};
     if (def.kind==EnemyDefinition::Kind::Phoenix) enemy.behavior_state=PhoenixState{};
+    if (def.kind==EnemyDefinition::Kind::Aquila) enemy.behavior_state=AquilaState{};
     if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
     if (def.kind==EnemyDefinition::Kind::Auriga) enemy.behavior_state=AurigaState{};

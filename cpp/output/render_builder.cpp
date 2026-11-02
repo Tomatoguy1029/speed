@@ -182,6 +182,13 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary gravity;PackedFloat64Array well_values;
     for (const auto &well:state.field.wells) for (double value:{double(well.position.x),double(well.position.y),well.born,well.life,well.radius}) well_values.push_back(value);
     gravity["time"]=state.world_time;gravity["wells"]=well_values;
+    Dictionary aquila;PackedFloat64Array aquila_values;
+    for (const auto &e:state.enemies) {
+        if (!e.alive || e.dead || e.mode!=EnemyMode::Windup) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Aquila) continue;
+        const auto &p=run.content->aquilas[d.aquila_definition-1];const auto center=std::get<AquilaState>(e.behavior_state).anchor;
+        for (double v:{double(e.pos.x),double(e.pos.y),e.radius,e.charge,double(center.x),double(center.y),p.dash_speed*p.drop_step,p.blast_radius,e.held || e.stone>0?0.0:1.0}) aquila_values.push_back(v);
+    }
+    aquila["values"]=aquila_values;aquila["view"]=view;
     PackedFloat64Array phoenix;
     for (const auto &e:state.enemies) {
         if (!e.alive || e.dead || (e.mode!=EnemyMode::Windup && e.mode!=EnemyMode::Dash)) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Phoenix) continue;
@@ -224,6 +231,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;return out;
+    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;return out;
 }
 }
