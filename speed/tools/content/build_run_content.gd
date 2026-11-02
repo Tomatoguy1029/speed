@@ -52,11 +52,11 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## 号令の実効値と、旧method trackに対応する段階を生成する。
 static func canis_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move==null or move.technique not in [&"command",&"howl"]: return {}
+	if move==null or move.technique not in [&"command",&"howl",&"pounce"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"canis_major","kind":2,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CanisCommandDefinition":[],"CanisHowlDefinition":[],"CanisPounceDefinition":[]}
 	for phase in [1,2]:
 		var values: Dictionary = source.values().duplicate(true)
 		if phase==2:
@@ -66,9 +66,17 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 		for record in Schema.SCHEMA.records:
 			if record.name!="BossTechniqueDefinition": continue
 			for field in record.fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(move.technique),"kind":40 if move.technique==&"command" else 41 if move.technique==&"howl" else 42,"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","recover","cd","damage"]: row[key] = float(values[key])
-		if move.technique==&"howl":
+		if move.technique==&"pounce":
+			row.active = float(values.active)
+			records.BossTechniqueDefinition.append(row)
+			var detail := {"id":phase,"technique":phase}
+			for field in Schema.SCHEMA.records.filter(func(v): return v.name=="CanisPounceDefinition")[0].fields:
+				if field.name in ["id","technique"]: continue
+				detail[field.name] = int(values[field.name]) if field.type=="u32" else float(values[field.name])
+			records.CanisPounceDefinition.append(detail)
+		elif move.technique==&"howl":
 			row.active = float(values.follow_time)+maxi(0,int(values.ring_count)-1)*float(values.seq_interval)+float(values.seq_warn)+float(values.tail)+0.05
 			records.BossTechniqueDefinition.append(row)
 			var detail := {"id":phase,"technique":phase}

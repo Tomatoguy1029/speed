@@ -64,7 +64,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
     for (auto &b:s.bosses.bodies) {
         if (b.mode==BossMode::Defeated || b.mode==BossMode::Cancelled) continue;
         if (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead) {cancel(r,b.actor);continue;}
-        auto &e=s.enemies[b.actor.slot];const auto &p=r.content->boss_bodies[b.definition-1];const auto &definition=r.content->bosses[p.boss-1];b.clock+=dt;
+        auto &e=s.enemies[b.actor.slot];const auto &p=r.content->boss_bodies[b.definition-1];const auto &definition=r.content->bosses[p.boss-1];b.clock+=dt;if (definition.kind==2) b.canis.turn_motion=0;
         if (definition.kind==1) CentaurusBody::pre_step(r,b,dt);
         e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);bool suspend=true;
         if (b.mode==BossMode::Entrance) {

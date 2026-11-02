@@ -12,7 +12,7 @@
 namespace speed {
 namespace {
 const CanisHowlDefinition &rule(const ContentBundle &c,uint32_t definition) {return *std::find_if(c.canis_howls.begin(),c.canis_howls.end(),[&](const auto &p){return p.technique==definition;});}
-void cue(RunRuntime &r,const TechniqueState &t,const char *name,EnemyHandle actor={}) {const auto &e=r.state.enemies[r.state.enemy_handles.contains(actor)?actor.slot:t.actor.slot];godot::Dictionary p;p["id"]=r.state.enemy_handles.entity_id(t.actor);p["technique"]=t.definition;p["cue"]=name;p["position"]=e.pos;p["angle"]=r.state.enemies[t.actor.slot].facing;p["world_time"]=r.state.world_time;FrameBuilder::append(r,"canis_cue",p);}
+void cue(RunRuntime &r,const TechniqueState &t,const char *name,EnemyHandle actor={}) {const auto &e=r.state.enemies[r.state.enemy_handles.contains(actor)?actor.slot:t.actor.slot];godot::Dictionary p;p["id"]=r.state.enemy_handles.entity_id(t.actor);p["technique"]=t.definition;p["cue"]=name;p["position"]=e.pos;p["angle"]=r.state.enemies[t.actor.slot].facing;const auto *body=PhaseController::find(r,t.actor);p["world_time"]=body?body->clock:r.state.world_time;FrameBuilder::append(r,"canis_cue",p);}
 bool live(const RunRuntime &r,EnemyHandle h) {return r.state.enemy_handles.contains(h) && !r.state.enemies[h.slot].dead;}
 void end_ring(RunRuntime &r,BossBodyState &b) {for (const auto &v:b.canis.ring) GroupSystem::release_order(r.state,v.actor);b.canis.ring.clear();b.canis.ring_started=-1;b.canis.ring_definition=0;}
 void form(RunRuntime &r,TechniqueState &t,BossBodyState &b) {

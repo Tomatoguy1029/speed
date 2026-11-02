@@ -1,0 +1,14 @@
+#include "technique_common.h"
+#include "../flow/phase_controller.h"
+#include "../../systems/tracking_policy.h"
+#include "../../systems/motion_math.h"
+#include "../../systems/combat_resolver.h"
+#include "../../output/frame_builder.h"
+#include <algorithm>
+namespace speed {
+void CanisTechnique::cue(RunRuntime &r,const TechniqueState &t,const char *name) {const auto &e=r.state.enemies[t.actor.slot];godot::Dictionary p;p["id"]=e.id;p["technique"]=t.definition;p["cue"]=name;p["position"]=e.pos;p["angle"]=e.facing;const auto *body=PhaseController::find(r,t.actor);p["world_time"]=body?body->clock:r.state.world_time;FrameBuilder::append(r,"canis_cue",p);}
+void CanisTechnique::face(RunRuntime &r,TechniqueState &t,godot::Vector2 target,double rate,double dt) {auto &e=r.state.enemies[t.actor.slot];if (TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked()) return;const double prior=e.facing;e.facing+=std::clamp(angle_difference((target-e.pos).angle()-e.facing),-rate*dt,rate*dt);if (auto *b=PhaseController::find(r,t.actor)) b->canis.turn_motion=angle_difference(e.facing-prior)/std::max(dt,0.001);}
+void CanisTechnique::lock_aim(RunRuntime &r,TechniqueState &t,bool direction_only,double overshoot) {const auto &e=r.state.enemies[t.actor.slot];const TrackingPolicy tracking{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)};if (tracking.locked()) t.aim=tracking.target(e.pos,e.facing,t.aim);t.locked=true;if (direction_only) t.direction=godot::Vector2::from_angle(e.facing);else {const auto to=t.aim-e.pos;t.direction=to.length_squared()>1?to.normalized():godot::Vector2::from_angle(e.facing);t.aim+=t.direction*overshoot;}cue(r,t,"aim_locked");}
+bool CanisTechnique::touches(const RunRuntime &r,const TechniqueState &t,godot::Vector2 from,godot::Vector2 to,double radius) {const auto distance=[](godot::Vector2 p,godot::Vector2 a,godot::Vector2 b) {const auto v=b-a;const double f=v.length_squared()>0?std::clamp(double((p-a).dot(v))/v.length_squared(),0.0,1.0):0;return p.distance_to(a+v*f);};const double reach=radius+r.state.ship_config.ship_radius;return distance(r.state.ship_pos,from,to)<=reach || distance(to,t.previous_ship,r.state.ship_pos)<=reach;}
+void CanisTechnique::hit(RunRuntime &r,TechniqueState &t,double damage,Cause cause) {t.hit=true;ShipDamageRequest request;request.amount=damage;request.scale=DamageScale::AtkScale;request.cause=cause;request.source=r.state.enemies[t.actor.slot].definition+1;request.technique=t.definition;request.hit_policy=HitPolicy::MarkBefore;CombatResolver::ship_damage(r,request);}
+}

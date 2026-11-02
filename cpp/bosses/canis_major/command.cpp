@@ -9,7 +9,7 @@
 #include <algorithm>
 namespace speed {
 namespace {
-void cue(RunRuntime &r,const TechniqueState &t,const char *name) {const auto &e=r.state.enemies[t.actor.slot];godot::Dictionary p;p["id"]=e.id;p["technique"]=t.definition;p["cue"]=name;p["position"]=e.pos;p["angle"]=e.facing;p["world_time"]=r.state.world_time;FrameBuilder::append(r,"canis_cue",p);}
+void cue(RunRuntime &r,const TechniqueState &t,const char *name) {const auto &e=r.state.enemies[t.actor.slot];godot::Dictionary p;p["id"]=e.id;p["technique"]=t.definition;p["cue"]=name;p["position"]=e.pos;p["angle"]=e.facing;const auto *body=PhaseController::find(r,t.actor);p["world_time"]=body?body->clock:r.state.world_time;FrameBuilder::append(r,"canis_cue",p);}
 void clear_warning(RunRuntime &r,TechniqueState &t) {auto &v=std::get<CanisCommandState>(t.detail);for (auto actor:v.warned) if (auto *order=GroupSystem::order(r.state,actor)) {order->warning=false;order->warning_until=0;}v.warned.clear();}
 }
 bool CanisCommand::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {const auto *b=PhaseController::find(r,actor);if (!b || b->canis.barking || b->canis.calling || !r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead) return false;const auto v=std::find_if(r.content->canis_commands.begin(),r.content->canis_commands.end(),[&](const auto &p){return p.technique==definition;});return v!=r.content->canis_commands.end() && b->canis.led.size()>=v->min_hounds;}

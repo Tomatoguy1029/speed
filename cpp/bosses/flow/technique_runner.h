@@ -4,6 +4,8 @@ namespace speed {
 class TechniqueRunner {
 public:
     static double attack_length(const BossTechniqueDefinition &);
+    static double attack_length(const RunRuntime &,EnemyHandle,uint32_t);
+    static double cooldown(const RunRuntime &,EnemyHandle,uint32_t);
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static TechniqueHandle begin(RunRuntime &,EnemyHandle,uint32_t definition);
     static void step(RunRuntime &,double dt);

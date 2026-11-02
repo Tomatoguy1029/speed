@@ -56,11 +56,12 @@ struct MonocerosSwordState {
     bool released=false;
     godot::Vector2 target;
 };
+struct CanisPounceState {uint32_t definition=0;int64_t left=1;double stage_time=0,warn_time=0;bool jumping=false,done=false;};
 struct CanisSequenceItem {EnemyHandle actor;double mark=0,launch=0;bool marked=false,launched=false;};
 struct CanisHowlState {bool formed=false;double last_launch=0;std::vector<CanisSequenceItem> sequence;};
 struct CanisCommandState {std::vector<EnemyHandle> warned;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;
@@ -88,6 +89,7 @@ struct BossFlowState {
     std::vector<FlowNodeState> nodes;
     std::vector<EnemyHandle> participants;
     std::unordered_map<uint64_t,double> cooldowns;
+    std::unordered_map<uint64_t,double> cooldown_started;
 };
 enum class BossMode : uint8_t { Entrance,Idle,Phase,Final,Defeated,Cancelled };
 // 単体のボスは本体が唯一の参加者。独立した護衛は敵として別に寿命を持つ。

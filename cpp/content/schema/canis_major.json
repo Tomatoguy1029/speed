@@ -364,6 +364,62 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisPounceDefinition",
+      "section": 344,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "active",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "alone_hounds",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "cd_alone",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "overshoot",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead_extra",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "chain",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "chain_warn",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

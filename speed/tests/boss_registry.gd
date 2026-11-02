@@ -20,6 +20,15 @@ func _ready() -> void:
 	if "--cpp-centaurus-sail" in OS.get_cmdline_user_args() or "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_sail")
 		return
+	if "--cpp-canis-pounce-cue" in OS.get_cmdline_user_args() or "--cpp-canis-pounce-cue-display" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_pounce_cue")
+		return
+	if "--cpp-canis-pounce-solo" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_pounce_solo")
+		return
+	if "--cpp-canis-pounce" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_pounce")
+		return
 	if "--cpp-canis-howl" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_howl")
 		return
@@ -1521,15 +1530,17 @@ func native_centaurus_shower() -> void:
 	print("[cpp_centaurus_shower] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-func canis_move_case(name: String, changes: Dictionary, flowing := false) -> Dictionary:
+## 共通の本体・表示と、指定した1技を既存ボス検査へつなぐ。
+func canis_move_case(name: String, changes: Dictionary, flowing := false, body_changes := {}, obstacle := false) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
-	cfg.planet_radius = 0.0
+	cfg.planet_radius = 100.0 if obstacle else 0.0
 	cfg.base_hp = 1000.0
 	var definition = load("res://data/bosses/canis_major.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.call_below = 0
 	definition.speed = 0.0
+	for key in body_changes: definition.params[key] = body_changes[key]
 	var move = load("res://data/bosses/canis_major_moves/%s.tres" % name).duplicate(true)
 	for key in changes: move.set(key,changes[key])
 	var package: Dictionary = builder.canis_technique_package(definition,move,cfg)
@@ -1554,7 +1565,7 @@ func canis_move_case(name: String, changes: Dictionary, flowing := false) -> Dic
 	bridge.start(159,{"position":Vector2(2000,0)})
 	bridge.command("dev_ship_motion",{"position":Vector2(2000,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(2000,0),Vector2(2000,0),Vector2(3000,2000))
-	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-400,0) if obstacle else Vector2.ZERO,"entrance":false}).value
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
@@ -2223,4 +2234,206 @@ func native_centaurus_finish() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_finish] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 本体の飛びかかりを、先読み・固定・着地・連続跳躍まで照合する。
+func native_canis_pounce() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/canis_major_moves/pounce.tres")
+	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
+	check(move.make_runner()==null and records.CanisPounceDefinition.size()==2 and records.BossTechniqueStage.is_empty(),"飛びかかりの値をmanualの型付き定義へ分ける")
+	check(records.BossTechniqueDefinition[1].warn==move.warn_p2 and records.BossTechniqueDefinition[1].cd==move.cd_p2 and records.CanisPounceDefinition[1].cd_alone==move.cd_alone_p2 and records.CanisPounceDefinition[0].overshoot==move.overshoot,"形態別の予告・再使用待ちと先の着地点の値を生成する")
+	var c := canis_move_case("pounce",{"warn":0.1,"active":0.2,"lock":0.04,"overshoot":40.0,"lead_extra":0.1,"recover":0.05})
+	check(not c.is_empty(),"飛びかかりの制作値を本体と正式表示へつなぐ")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2(100,0)})
+	bridge._core.set_motion_context(Vector2(300,0),Vector2(300,0),Vector2(3000,2000))
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(started.ok,"本体の独立した飛びかかりを開始する")
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.left==1 and t.aim.is_equal_approx(Vector2(320,0)) and not t.locked,"群れが多いと1回だけ跳び残り予告とlead_extraで先読みする")
+	bridge._core.step(0.04)
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var display = c.view._boss_body_displays.values()[0]
+	check(display.technique.technique=="pounce" and is_equal_approx(display.technique.crouch,0.4) and is_equal_approx(display.parts.scale.x/display.parts.scale.y,1.06/0.94),"正式パーツへ溜めの縮みと着地点の予告を渡す")
+	bridge._core.step(0.021)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.locked and t.aim.is_equal_approx(Vector2(356,0)) and t.direction.is_equal_approx(Vector2.RIGHT),"lock時点の先読みにovershootを足して固定する")
+	bridge.command("dev_ship_motion",{"position":Vector2(800,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(800,0),Vector2(800,0),Vector2(3000,2000))
+	bridge._core.step(0.04)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==1 and t.jumping and t.position==Vector2.ZERO and t.aim.is_equal_approx(Vector2(356,0)),"warnで発進しそのtickは動かず固定した着地点を維持する")
+	var active: Dictionary = bridge.checkpoint()
+	check(active.ok,"発進した本体の狙い・段階・命中旗を保持する")
+	bridge.command("dev_ship_motion",{"position":Vector2(178,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(178,0),Vector2(178,0),Vector2(3000,2000))
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.05)
+	t = bridge.command("dev_boss_state").value[0]
+	var hp_after: float = bridge._core.ship_snapshot().ship_hp
+	check(t.position.is_equal_approx(Vector2(89,0)) and t.hit and is_equal_approx(hp-hp_after,move.damage*load("res://data/config.tres").atk_scale),"残り時間で移動し本体の掃引と機体線分から1回だけ実ダメージを出す")
+	var after: Dictionary = t.duplicate(true)
+	check(bridge.restore(active.value).ok,"飛びかかりの発進時点へ復帰する")
+	bridge.command("dev_ship_motion",{"position":Vector2(178,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(178,0),Vector2(178,0),Vector2(3000,2000))
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0]==after and bridge._core.ship_snapshot().ship_hp==hp_after,"復帰後も位置・速度・命中結果を同じにする")
+	bridge._core.step(0.15)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==2 and t.done and t.left==0 and t.position.is_equal_approx(Vector2(356,0)) and bridge._core.ship_snapshot().ship_hp==hp_after,"activeの終わりで着地し再命中せず硬直へ移る")
+	var read_only: Dictionary = t.duplicate(true)
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(bridge.command("dev_boss_state").value[0]==read_only,"飛びかかりの正式表示は戦闘へ値を書き戻さない")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==5,"硬直を終え技の完了を返す")
+	bridge.restore(active.value)
+	bridge._core.set_run_guards({"invincible":true})
+	bridge.command("dev_ship_motion",{"position":Vector2(178,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(178,0),Vector2(178,0),Vector2(3000,2000))
+	hp = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].hit and bridge._core.ship_snapshot().ship_hp==hp,"ダメージを拒否されても接触を先に命中済みにする")
+	bridge._core.set_run_guards({"invincible":false})
+	bridge._core.step(0.01)
+	check(bridge._core.ship_snapshot().ship_hp==hp,"保護が終わっても同じ跳躍では再試行しない")
+	bridge.restore(active.value)
+	check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"跳躍途中を取消する")
+	var stopped: Vector2 = bridge.command("dev_boss_body_state").value[0].position
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].position==stopped,"取消後は飛びかかりの移動と当たりを止める")
+	bridge.restore(active.value)
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失は飛びかかりを取消する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"飛びかかりの出来事と実被弾を配信する")
+	bridge.release_checkpoint(active.value)
+	bridge.dispose()
+	c.view.queue_free()
+	# 天体で着地した後も、残る回数はchain_warnから新しい跳躍として進める。
+	var collision := canis_move_case("pounce",{"warn":0.05,"active":0.4,"chain":2,"chain_warn":0.05,"alone_hounds":20,"overshoot":0.0,"recover":0.05},false,{},true)
+	check(not collision.is_empty(),"地形付きの飛びかかりを同じ生成入口で作る")
+	if collision.is_empty(): get_tree().quit(1); return
+	var other = collision.bridge
+	other.command("dev_boss_technique",{"entity_id":collision.id,"definition":1})
+	other._core.step(0.05)
+	other._core.step(0.2)
+	var jump: Dictionary = other.command("dev_boss_state").value[0]
+	check(jump.stage==0 and jump.left==1 and jump.stage_time==0.0 and jump.warn_time==0.05 and jump.position.x<=-230.0,"天体で早く着地し残る1回をchain_warnと新しい狙いで準備する")
+	other._core.step(0.05)
+	other._core.step(0.4)
+	check(other.command("dev_boss_state").value[0].stage==2 and other.command("dev_boss_state").value[0].done,"最後の跳躍の着地で連続技を終える")
+	other.dispose()
+	collision.view.queue_free()
+	# 再使用待ちは本体clockと使用時刻から、現在の形態と群れの数で引き直す。
+	var cooldown := canis_move_case("pounce",{"warn":0.02,"warn_p2":0.04,"active":0.02,"lock":0.0,"recover":0.01,"cd":0.8,"cd_p2":0.4,"cd_alone":0.12,"cd_alone_p2":0.08,"chain":2,"chain_warn":0.02},true,{"phase_time":0.02,"lead_scan":0.01})
+	check(not cooldown.is_empty(),"形態と群れの数を使う再使用待ちを生成する")
+	if cooldown.is_empty(): get_tree().quit(1); return
+	var flow_bridge = cooldown.bridge
+	flow_bridge._core.step(0.01)
+	var first: Dictionary = flow_bridge.command("dev_boss_state").value[0]
+	for dt in [0.02,0.02,0.01,0.01,0.15]: flow_bridge._core.step(dt)
+	check(flow_bridge.command("dev_boss_state").value[0].id==first.id and flow_bridge.command("dev_boss_state").value[0].stage==5,"群れが多い間は通常の再使用待ちを保つ")
+	var waiting: Dictionary = flow_bridge.checkpoint()
+	check(waiting.ok,"使用時刻と次の選択待ちを保持する")
+	var led: Array = flow_bridge.command("dev_boss_body_state").value[0].led
+	for i in 6: flow_bridge.command("dev_remove",{"entity_id":led[i].id})
+	flow_bridge._core.step(0.01)
+	flow_bridge._core.step(0.14)
+	jump = flow_bridge.command("dev_boss_state").value[0]
+	check(jump.id>first.id and jump.stage==0 and jump.left==2,"群れが少なくなると残る待ちをcd_aloneで引き直し連続跳躍を選ぶ")
+	check(flow_bridge.restore(waiting.value).ok,"第1形態の再使用待ちへ復帰する")
+	var body: Dictionary = flow_bridge.command("dev_boss_body_state").value[0]
+	flow_bridge.command("dev_damage",{"entity_id":cooldown.id,"amount":body.max_hp*0.55,"cause":"bullet"})
+	for dt in [0.01,0.02,0.15]: flow_bridge._core.step(dt)
+	check(flow_bridge.command("dev_boss_state").value[0].id==first.id,"第2形態でもその形態の通常待ちの境界までは始めない")
+	flow_bridge._core.step(0.15)
+	jump = flow_bridge.command("dev_boss_state").value[0]
+	check(jump.id>first.id and jump.definition==2 and jump.stage==0 and jump.warn_time==0.04,"前の使用時刻を保ち第2形態のcdと予告で次行動を始める")
+	var second_id: int = jump.id
+	for dt in [0.04,0.02,0.01,0.01,0.15]: flow_bridge._core.step(dt)
+	check(flow_bridge.command("dev_boss_state").value[0].id==second_id,"第2形態の通常cdの間は選び直さない")
+	led = flow_bridge.command("dev_boss_body_state").value[0].led
+	for i in 6: flow_bridge.command("dev_remove",{"entity_id":led[i].id})
+	flow_bridge._core.step(0.01)
+	flow_bridge._core.step(0.14)
+	jump = flow_bridge.command("dev_boss_state").value[0]
+	check(jump.id>second_id and jump.definition==2 and jump.left==2,"第2形態でも現在の少ない群れに合わせcd_alone_p2を使う")
+	flow_bridge.release_checkpoint(waiting.value)
+	flow_bridge.dispose()
+	cooldown.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_pounce] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 成功済みの飛びかかりを再実行せず、群れの数え直し後の再使用判定だけを確認する。
+func native_canis_pounce_solo() -> void:
+	var c := canis_move_case("pounce",{"warn":0.02,"warn_p2":0.04,"active":0.02,"lock":0.0,"recover":0.01,"cd":0.8,"cd_p2":0.4,"cd_alone":0.12,"cd_alone_p2":0.08,"chain":2,"chain_warn":0.02},true,{"phase_time":0.02,"lead_scan":0.01})
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge._core.step(0.01)
+	var first: Dictionary = bridge.command("dev_boss_state").value[0]
+	for dt in [0.02,0.02,0.01,0.01,0.15]: bridge._core.step(dt)
+	var waiting: Dictionary = bridge.checkpoint()
+	var led: Array = bridge.command("dev_boss_body_state").value[0].led
+	for i in 6: bridge.command("dev_remove",{"entity_id":led[i].id})
+	bridge._core.step(0.01)
+	print("第1形態の群れ再計数: ",bridge.command("dev_boss_body_state").value[0].led)
+	bridge._core.step(0.14)
+	var jump: Dictionary = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	print("第1形態の少ない群れ: clock=",body.clock," 技=",jump)
+	check(jump.id>first.id and jump.stage==0 and jump.left==2 and body.clock<0.81,"群れ再計数後は通常cdより早くcd_aloneで連続跳躍を選ぶ")
+	bridge.restore(waiting.value)
+	body = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp*0.55,"cause":"bullet"})
+	for dt in [0.01,0.02,0.15,0.15]: bridge._core.step(dt)
+	var second: Dictionary = bridge.command("dev_boss_state").value[0]
+	for dt in [0.04,0.02,0.01,0.01,0.15]: bridge._core.step(dt)
+	led = bridge.command("dev_boss_body_state").value[0].led
+	for i in 6: bridge.command("dev_remove",{"entity_id":led[i].id})
+	bridge._core.step(0.01)
+	print("第2形態の群れ再計数: ",bridge.command("dev_boss_body_state").value[0].led)
+	bridge._core.step(0.14)
+	jump = bridge.command("dev_boss_state").value[0]
+	body = bridge.command("dev_boss_body_state").value[0]
+	print("第2形態の少ない群れ: clock=",body.clock," 技=",jump)
+	check(jump.id>second.id and jump.definition==2 and jump.stage==0 and jump.left==2 and body.clock<0.95,"第2形態も通常cdより早くcd_alone_p2で連続跳躍を選ぶ")
+	bridge.release_checkpoint(waiting.value)
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_pounce_solo] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 後から登場した本体の表示時計へ、飛びかかりの光を接続する。
+func native_canis_pounce_cue() -> void:
+	var c := canis_move_case("pounce",{"warn":0.05,"lock":0.02})
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge._core.step(0.5)
+	var actor: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-500,0),"entrance":false}).value
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":actor,"definition":1})
+	bridge._core.step(0.04)
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var packet: Dictionary = bridge.read_frame().value
+	var locked: Array = packet.events.filter(func(v): return v.type==&"canis_cue" and v.payload.id==actor and v.payload.cue=="aim_locked")
+	if "--cpp-canis-pounce-cue-display" not in OS.get_cmdline_user_args():
+		check(locked.size()==1 and is_equal_approx(locked[0].payload.world_time,0.04),"技の光の時刻を後から出た本体の時計で渡す")
+	bridge.collect_frame()
+	c.view.update_effects(packet,0.0)
+	var display = c.view._boss_body_displays.values().filter(func(v): return v.state.actor==actor)[0]
+	check(is_equal_approx(display.pulse,0.35),"狙い固定の出来事から正式な口元の星を同じ表示で光らせる")
+	var state: Array = bridge.command("dev_boss_state").value.duplicate(true)
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(bridge.command("dev_boss_state").value==state,"技の光は戦闘状態を書き戻さない")
+	bridge.command("dev_cancel_technique",{"ticket":started.value})
+	bridge._core.step(0.4)
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(is_zero_approx(display.pulse),"本体の世界時計で技の光を消す")
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_pounce_cue] failures=",failed)
 	get_tree().quit(1 if failed else 0)

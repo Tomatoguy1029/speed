@@ -18,6 +18,11 @@ uint32_t phase_technique(const RunRuntime &r,const BossFlowState &f,uint32_t id)
     for (const auto &p:r.content->boss_techniques) if (p.boss==base.boss && p.external_id==base.external_id && p.phase==f.phase) return p.id;
     return 0;
 }
+bool cooldown_ready(const RunRuntime &r,const BossFlowState &f,const BossFlowNode &node) {
+    const uint64_t key=uint64_t(node.participant)<<32|node.technique;const auto actor=participant(f,node.participant);const auto definition=phase_technique(r,f,node.technique);if (!definition) return false;
+    if (r.content->bosses[r.content->boss_techniques[definition-1].boss-1].kind==2) {const auto used=f.cooldown_started.find(key);const auto *body=PhaseController::find(r,actor);return used==f.cooldown_started.end() || (body && body->clock>=used->second+TechniqueRunner::cooldown(r,actor,definition));}
+    const auto cool=f.cooldowns.find(key);return cool==f.cooldowns.end() || f.clock>=cool->second;
+}
 std::vector<uint32_t> children(const ContentBundle &c,uint32_t parent) {std::vector<uint32_t> out;for (const auto &p:c.flow_children) if (p.parent==parent) out.push_back(p.child);return out;}
 std::vector<uint32_t> sections(const ContentBundle &c,uint32_t flow) {std::vector<uint32_t> out;for (const auto &p:c.flow_sections) if (p.flow==flow) out.push_back(p.id);return out;}
 bool filtered_target(const ContentBundle &c,const BossFlowNode &node) {
@@ -28,7 +33,7 @@ bool available(const RunRuntime &r,const BossFlowState &f,uint32_t id,unsigned d
     if (!id || id>r.content->flow_nodes.size() || depth>24) return false;const auto &p=r.content->flow_nodes[id-1];const auto list=children(*r.content,id);
     if (p.kind==0) return true;
     if (p.kind==1) {
-        const auto actor=participant(f,p.participant);const auto cool=f.cooldowns.find(uint64_t(p.participant)<<32|p.technique);return PhaseController::can_start(r,actor) && !actor_busy(r,actor) && (cool==f.cooldowns.end() || f.clock>=cool->second) && FlowRunner::condition(r,f,p.condition,filtered_target(*r.content,p),p.participant) && TechniqueRunner::ready(r,actor,phase_technique(r,f,p.technique));
+        const auto actor=participant(f,p.participant);return PhaseController::can_start(r,actor) && !actor_busy(r,actor) && cooldown_ready(r,f,p) && FlowRunner::condition(r,f,p.condition,filtered_target(*r.content,p),p.participant) && TechniqueRunner::ready(r,actor,phase_technique(r,f,p.technique));
     }
     if (list.empty()) return false;
     if (p.kind==2) return available(r,f,list.front(),depth+1);
@@ -54,10 +59,10 @@ FlowStatus tick_node(RunRuntime &r,BossFlowState &f,uint32_t row,double dt) {
             if (!available(r,f,p.id)) n.status=FlowStatus::Failed;
             else {
                 const auto &rule=r.content->boss_techniques[technique-1];const auto actor=participant(f,p.participant);const auto id=r.state.enemy_handles.entity_id(actor);
-                bool admitted=true;if (!r.state.world.attack_formation_mode && r.state.world.attack_budget.enabled) admitted=AttackBudgetSystem(r).request({"boss:"+std::to_string(id),{AttackCategory::Aimed},actor,TechniqueRunner::attack_length(rule),1.5,1});
+                bool admitted=true;if (!r.state.world.attack_formation_mode && r.state.world.attack_budget.enabled) admitted=AttackBudgetSystem(r).request({"boss:"+std::to_string(id),{AttackCategory::Aimed},actor,TechniqueRunner::attack_length(r,actor,technique),1.5,1});
                 if (admitted) n.ticket=TechniqueRunner::begin(r,actor,technique);
                 if (!r.state.bosses.handles.contains(n.ticket)) n.status=FlowStatus::Failed;
-                else {++r.state.bosses.techniques[n.ticket.slot].ticket_refs;f.cooldowns[uint64_t(p.participant)<<32|p.technique]=f.clock+rule.cd;}
+                else {++r.state.bosses.techniques[n.ticket.slot].ticket_refs;const uint64_t key=uint64_t(p.participant)<<32|p.technique;if (r.content->bosses[rule.boss-1].kind==2) f.cooldown_started[key]=PhaseController::find(r,actor)->clock;else f.cooldowns[key]=f.clock+rule.cd;}
             }
         } else if (!r.state.bosses.handles.contains(n.ticket)) n.status=FlowStatus::Failed;
         else {const auto stage=r.state.bosses.techniques[n.ticket.slot].stage;if (stage==TechniqueStage::Failed || stage==TechniqueStage::Cancelled) n.status=FlowStatus::Failed;else if (!TechniqueRunner::running(r,n.ticket)) n.status=FlowStatus::Finished;}
@@ -172,6 +177,7 @@ bool FlowRunner::validate(const godot::RunState &s,const ContentBundle &c) {
     for (const auto &f:s.bosses.flows) {
         if (!f.definition || f.definition>c.boss_flows.size() || f.index>=sections(c,f.definition).size() || f.rest_next>=sections(c,f.definition).size() || f.phase<1 || f.phase>2 || f.participants.empty()) return false;
         for (double value:{f.clock,f.retry,f.stamina,f.rest_remaining,f.section_spent,f.interval,f.no_candidate_elapsed,f.post_gap}) if (!std::isfinite(value) || value<0) return false;
+        for (const auto &used:f.cooldown_started) if (!std::isfinite(used.second) || used.second<0) return false;
         for (auto root:f.roots) if (root>=f.nodes.size()) return false;
         for (const auto &n:f.nodes) if (!n.definition || n.definition>c.flow_nodes.size() || n.status>FlowStatus::Cancelled || !std::isfinite(n.elapsed) || n.elapsed<0 || (n.child!=UINT32_MAX && n.child>=f.nodes.size()) || (n.ticket.generation && !s.bosses.handles.contains(n.ticket))) return false;
     }return true;

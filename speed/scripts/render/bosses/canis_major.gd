@@ -4,6 +4,8 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 var state := {}
 var technique := {}
 var hit := 0.0
+var pulse := 0.0
+var _pulse_until := -1.0
 var _clock := -1.0
 var gait := 0.0
 var flames: Node2D
@@ -18,10 +20,16 @@ func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 func clear_flames() -> void:
 	if flames!=null: flames.clear()
 func frame_event(event: Dictionary) -> void:
+	if event.get("type",&"")==&"canis_cue" and event.cue in ["aim_locked","pounce","command","sirius","phase_changed","howl","call","called","stream_windup","bay_windup","entrance_bark"]:
+		_pulse_until = float(event.world_time)+0.35
+		if not state.is_empty(): apply_frame(state,technique)
 	if flames!=null: flames.frame_event(event)
 func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	var dt: float = maxf(0.0,float(body.clock)-_clock) if _clock>=0.0 else 0.0
-	if _clock>float(body.clock): gait = 0.0
+	if _clock>float(body.clock):
+		gait = 0.0
+		_pulse_until = -1.0
+	pulse = maxf(0.0,_pulse_until-float(body.clock))
 	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock))
 	_track_command(body,attack,dt)
 	state = body
@@ -33,14 +41,16 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	hit = float(body.flash)
 	gait += dt*(18.0 if int(attack.get("stage",5))==1 else 9.0)
 	var k := float(body.radius)/100.0
-	parts.scale = Vector2.ONE*k
+	var crouch := float(attack.get("crouch",0.0)) if int(attack.get("stage",5)) in [0,1] else 0.0
+	var stretch := float(attack.get("stretch",1.0)) if int(attack.get("stage",5)) in [0,1] else 1.0
+	parts.scale = Vector2(k*(1.0+crouch*0.15),k*stretch)
 	var moving: bool = body.velocity.length()>5.0
 	var legs := ["RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg"]
 	for i in legs.size(): parts.get_node(legs[i]).rotation = sin(gait+(0.0 if i==0 or i==3 else PI))*(0.16 if moving else 0.015)
 	parts.get_node("Tail").rotation = sin(gait*0.4)*0.07
 	parts.get_node("Head").rotation = -0.45*smoothstep(0.0,0.65,float(body.charge)) if attack.get("technique","")=="howl" and int(attack.get("stage",5))==0 else 0.0
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
-	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(body.charge),0.0)
+	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(body.charge),pulse)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE
 
 ## 描画専用の短い履歴。戦闘の猟犬位置へ書き戻さない。
@@ -66,6 +76,11 @@ func _track_command(body: Dictionary, attack: Dictionary, dt: float) -> void:
 	_lunge_layer.queue_redraw()
 	queue_redraw()
 func _draw() -> void:
+	if technique.get("technique","")=="pounce" and int(technique.get("stage",5))==0:
+		var reach := position.distance_to(technique.aim)
+		var color := Color("#ff667d") if technique.locked else Color("#f2b567")
+		draw_line(Vector2(float(state.radius),0.0),Vector2(maxf(float(state.radius),reach),0.0),Color(color,0.35+float(state.charge)*0.4),6.0 if technique.locked else 3.0)
+		draw_arc(Vector2(reach,0.0),float(state.radius)*0.5,0.0,TAU,24,Color(color,0.6),3.0)
 	if technique.get("technique","")!="command" or int(technique.get("stage",5))!=0: return
 	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE*float(state.radius)/100.0)
 	for ring in 2:
