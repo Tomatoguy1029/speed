@@ -2193,6 +2193,88 @@ inline bool read(BinaryReader &input, CepheusDefinition &out) {
     if (out.fan_step < 0) return false;
     return true;
 }
+struct PumpDefinition {
+    uint32_t id{};
+    uint32_t store_max{};
+    uint32_t release_base{};
+    double accel{};
+    double pull_radius{};
+    double pull{};
+    double swallow_reach{};
+    double swallow_interval{};
+    double grow{};
+    double telegraph{};
+    double lock_time{};
+    double shell_speed{};
+    double shell_radius{};
+    double shell_range{};
+    double burst_radius{};
+    double damage{};
+    double recover{};
+    double release_per{};
+    double release_speed{};
+    double release_damage{};
+    double release_radius{};
+    double mouth_radius{};
+    double admission_duration{};
+};
+inline bool read(BinaryReader &input, PumpDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.store_max)) return false;
+    if (out.store_max < 1) return false;
+    if (!input.read_u32(out.release_base)) return false;
+    if (out.release_base < 0) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.pull_radius)) return false;
+    if (out.pull_radius < 0) return false;
+    if (!input.read_f64(out.pull)) return false;
+    if (out.pull < 0) return false;
+    if (!input.read_f64(out.swallow_reach)) return false;
+    if (out.swallow_reach < 0) return false;
+    if (!input.read_f64(out.swallow_interval)) return false;
+    if (out.swallow_interval < 0) return false;
+    if (!input.read_f64(out.grow)) return false;
+    if (out.grow < 0) return false;
+    if (!input.read_f64(out.telegraph)) return false;
+    if (out.telegraph < 0) return false;
+    if (!input.read_f64(out.lock_time)) return false;
+    if (out.lock_time < 0) return false;
+    if (!input.read_f64(out.shell_speed)) return false;
+    if (out.shell_speed < 0) return false;
+    if (!input.read_f64(out.shell_radius)) return false;
+    if (out.shell_radius < 0) return false;
+    if (!input.read_f64(out.shell_range)) return false;
+    if (out.shell_range < 0) return false;
+    if (!input.read_f64(out.burst_radius)) return false;
+    if (out.burst_radius < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.recover)) return false;
+    if (out.recover < 0) return false;
+    if (!input.read_f64(out.release_per)) return false;
+    if (out.release_per < 0) return false;
+    if (!input.read_f64(out.release_speed)) return false;
+    if (out.release_speed < 0) return false;
+    if (!input.read_f64(out.release_damage)) return false;
+    if (out.release_damage < 0) return false;
+    if (!input.read_f64(out.release_radius)) return false;
+    if (out.release_radius < 0) return false;
+    if (!input.read_f64(out.mouth_radius)) return false;
+    if (out.mouth_radius < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    return true;
+}
+struct TriangleStarDefinition {
+    uint32_t id{};
+};
+inline bool read(BinaryReader &input, TriangleStarDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -3160,6 +3242,8 @@ struct ContentRecords {
     std::vector<CrabDefinition> CrabDefinition_rows;
     std::vector<CrowDefinition> CrowDefinition_rows;
     std::vector<CepheusDefinition> CepheusDefinition_rows;
+    std::vector<PumpDefinition> PumpDefinition_rows;
+    std::vector<TriangleStarDefinition> TriangleStarDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -3643,6 +3727,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CepheusDefinition row; if (!read(input,row)) return false; out.CepheusDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 131: {
+        if (version != 1) return false;
+        if (count > input.remaining()/172) return false;
+        for (uint32_t i=0; i<count; ++i) { PumpDefinition row; if (!read(input,row)) return false; out.PumpDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 112: {
+        if (version != 1) return false;
+        if (count > input.remaining()/4) return false;
+        for (uint32_t i=0; i<count; ++i) { TriangleStarDefinition row; if (!read(input,row)) return false; out.TriangleStarDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -3981,6 +4077,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CrowDefinition_rows) if (!CrowDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CepheusDefinition_ids;
     for (const auto &row:data.CepheusDefinition_rows) if (!CepheusDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PumpDefinition_ids;
+    for (const auto &row:data.PumpDefinition_rows) if (!PumpDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> TriangleStarDefinition_ids;
+    for (const auto &row:data.TriangleStarDefinition_rows) if (!TriangleStarDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -4117,6 +4217,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CrowDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.CepheusDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.CepheusDefinition_rows) if (!EnemyRecord_ids.count(row.soldier)) return false;
+    for (const auto &row:data.PumpDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.TriangleStarDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -4270,5 +4372,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=105;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=107;
 }
