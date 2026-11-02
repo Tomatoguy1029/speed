@@ -1,4 +1,5 @@
 #include "enemy_system.h"
+#include "../behaviors/enemies/phoenix.h"
 #include "attack_system.h"
 #include "attack_budget.h"
 #include "group_system.h"
@@ -15,6 +16,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     const auto &def=run.content->definitions[definition];godot::RunState::Enemy enemy;
     if (def.kind==EnemyDefinition::Kind::Sniper) enemy.behavior_state=SniperState{};
     if (def.kind==EnemyDefinition::Kind::Marlin) enemy.behavior_state=MarlinState{};
+    if (def.kind==EnemyDefinition::Kind::Phoenix) enemy.behavior_state=PhoenixState{};
     if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
     if (def.kind==EnemyDefinition::Kind::Auriga) enemy.behavior_state=AurigaState{};
@@ -69,6 +71,7 @@ size_t EnemySystem::parts_alive(const godot::RunState &state,EnemyHandle parent)
 bool EnemySystem::attack_active(const godot::RunState &state,EnemyHandle handle) {
     if (!state.enemy_handles.contains(handle)) return false;
     const auto &enemy=state.enemies[handle.slot];
+    if (std::holds_alternative<PhoenixState>(enemy.behavior_state) && enemy.mode==godot::RunState::EnemyMode::Move && enemy.timer>0) return true;
     if (const auto *clock=std::get_if<ClockState>(&enemy.behavior_state)) return clock->hands[0].generation!=0;
     if (std::holds_alternative<AurigaState>(enemy.behavior_state)) return true;
     if (std::holds_alternative<SniperState>(enemy.behavior_state)) return enemy.mode==EnemyMode::Windup || enemy.charge>0;
@@ -78,7 +81,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     if (!run.state.enemy_handles.contains(handle)) return false;
     const auto &enemy=run.state.enemies[handle.slot];
     const auto &definition=run.content->definitions[enemy.definition];
-    if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle) return true;
+    if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle || definition.kind==EnemyDefinition::Kind::Phoenix) return true;
     if (definition.kind==EnemyDefinition::Kind::Dolphin || definition.kind==EnemyDefinition::Kind::Aquarius || definition.kind==EnemyDefinition::Kind::Cross) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Bomber) return enemy.pos.distance_to(run.state.ship_pos)<=run.content->bombers[definition.bomber_definition-1].trigger;
     if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
@@ -114,13 +117,14 @@ void EnemySystem::clear_regular(RunRuntime &run) {
 }
 bool EnemySystem::mark_dead(RunRuntime &run,EnemyHandle handle) {
     auto &state=run.state;if (!state.enemy_handles.contains(handle) || state.enemies[handle.slot].dead) return false;
-    state.enemies[handle.slot].dead=true;state.dead_rows.push_back(handle.slot);AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);leave_hound(state,handle.slot);return true;
+    PhoenixBehavior::cancel(run,handle);state.enemies[handle.slot].dead=true;state.dead_rows.push_back(handle.slot);AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);leave_hound(state,handle.slot);return true;
 }
 bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason) {
     auto &state=run.state;
     if (!state.enemy_handles.contains(handle)) return false;
     const size_t row=handle.slot;auto &enemy=state.enemies[row];
     if (!enemy.alive) return false;
+    PhoenixBehavior::cancel(run,handle);
     PickupSystem::lose(run,enemy.id,reason==RetireReason::Outside?CargoLoss::Retreat:reason==RetireReason::BonusClear?CargoLoss::Cleared:CargoLoss::Released);
     AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);
     leave_hound(state,row);

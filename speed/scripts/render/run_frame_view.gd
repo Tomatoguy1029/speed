@@ -54,6 +54,7 @@ var _sniper_world_time := 0.0
 var _telescope_beams: Array[Dictionary] = []
 var _pulser_visual: EnemyVisual
 var _pulser_parent: Node2D
+var _phoenix_visual: EnemyVisual
 var _marlin_visual: EnemyVisual
 var _gunner_marks: DrawLayer
 var _effects: PixelPainter
@@ -145,6 +146,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	marlin_layer.add_child(marlin_parent)
 	_marlin_visual = preload("res://scripts/render/enemies/marlin.gd").new()
 	_marlin_visual.setup_frame(marlin_parent)
+	_phoenix_visual = preload("res://scripts/render/enemies/phoenix.gd").new()
+	_phoenix_visual.setup_frame(marlin_parent)
 	_pulser_parent = marlin_parent
 	_pulser_visual = preload("res://scripts/render/enemies/pulser.gd").new()
 	_shield_holder = Node2D.new()
@@ -285,6 +288,10 @@ func _valid(frame: Dictionary) -> bool:
 	if frame.has("pulser"):
 		if not frame.pulser is PackedFloat64Array or frame.pulser.size()%6!=0: return false
 		for value in frame.pulser:
+			if not is_finite(value): return false
+	if frame.has("phoenix"):
+		if not frame.phoenix is PackedFloat64Array or frame.phoenix.size()%7!=0: return false
+		for value: float in frame.phoenix:
 			if not is_finite(value): return false
 	if frame.has("marlin"):
 		var data = frame.marlin
@@ -616,6 +623,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		_gravity = frame.gravity
 		_gravity_canvas.queue_redraw()
 	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
+	if frame.has("phoenix"): _phoenix_visual.apply_frame(frame.phoenix,_sniper_world_time,_zoom)
 	if frame.has("marlin"): _marlin_visual.apply_frame(frame.marlin,_sniper_world_time,_zoom)
 	for row: Dictionary in frame.poses:
 		var key := "%d:%d" % [row.participant_id,row.part_key]

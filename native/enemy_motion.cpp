@@ -70,6 +70,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         if (const auto *clock=std::get_if<speed::ClockState>(&e->behavior_state)) {row["spin"]=e->spin;godot::PackedInt64Array hands;for (auto hand:clock->hands) {const auto *record=speed::AttackSystem::get(runtime.state,hand);hands.push_back(record?record->id:0);}row["hands"]=hands;}
         if (const auto *soldier=std::get_if<speed::SoldierState>(&e->behavior_state)) {row["king_id"]=soldier->king_id;row["slot"]=soldier->slot;row["formation_anchor"]=soldier->formation.anchor;}
         if (const auto *lynx=std::get_if<speed::LynxState>(&e->behavior_state)) row["buds"]=lynx->buds;
+        if (const auto *phoenix=std::get_if<speed::PhoenixState>(&e->behavior_state)) row["anchor"]=phoenix->anchor;
         if (const auto *marlin=std::get_if<speed::MarlinState>(&e->behavior_state)) row["anchor"]=marlin->anchor;
         row["mode"] = int(e->mode); row["timer"] = e->timer; row["charge"] = e->charge; out.append(row);
     }

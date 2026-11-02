@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-phoenix" in OS.get_cmdline_user_args() or "--cpp-phoenix-fix" in OS.get_cmdline_user_args() or "--cpp-phoenix-fix2" in OS.get_cmdline_user_args() or "--cpp-phoenix-fix3" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_phoenix()
+		check(finished,"ほうおう座の指定確認を最後まで実施する")
+		print("[cpp_phoenix] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-bomber" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_bomber()
 		check(finished,"自爆する雑魚の指定確認を最後まで実施する")
@@ -1217,5 +1223,78 @@ func check_cpp_bomber() -> bool:
 	cpp_bridge.command("dev_remove",{"entity_id":actor})
 	cpp_core.step(0.4)
 	check(cpp_core.hazards_snapshot().is_empty(),"予告中に発生元を先に消しても古い参照から自爆しない")
+	cpp_session.free()
+	return true
+
+func check_cpp_phoenix() -> bool:
+	var retry3 := "--cpp-phoenix-fix3" in OS.get_cmdline_user_args()
+	var retry2 := retry3 or "--cpp-phoenix-fix2" in OS.get_cmdline_user_args()
+	var retry := retry2 or "--cpp-phoenix-fix" in OS.get_cmdline_user_args()
+	mute_checks = retry
+	var tuning := {"phoenix":{"params.retreat_distance":1000.0,"params.retreat_time":0.2,"params.telegraph":0.3,"params.dive_time":0.2,"params.impact_radius":150.0,"params.impact_time":0.5,"params.impact_dmg":9.0,"params.recover_time":0.2}}
+	if not await prepare_cpp_attack(111,"phoenix",PackedStringArray(["phoenix","drifter"]),tuning): return false
+	mute_checks = retry3
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	var aim := cpp_origin+Vector2(200,0)
+	cpp_bridge.command("dev_ship_motion",{"position":aim,"velocity":Vector2.ZERO})
+	cpp_core.set_motion_context(aim,cpp_origin,Vector2(3000,3000))
+	cpp_core.set_attack_formation_mode(true)
+	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"phoenix","position":cpp_origin}).value
+	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	cpp_core.step(0.05)
+	if not retry: check(cpp_core.enemies_snapshot()[0].pos==[cpp_origin.x,cpp_origin.y] and cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_motion_for(actor).timer==0.0,"予算を待つほうおう座は位置を保つ")
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_core.step(0.1)
+	if not retry2: check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and is_equal_approx(Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1]).distance_to(cpp_origin),500.0) and cpp_core.enemies_snapshot()[0].vel==[0.0,0.0],"編集した離脱距離を残り時間の補間で進み、速度加算しない")
+	if not retry: check(cpp_core.attack_budget_snapshot().groups.size()==1 and cpp_core.attack_budget_snapshot().used==1.0,"離脱中も同じ攻撃枠を保持する")
+	cpp_core.step(0.1)
+	var warning: Dictionary = cpp_motion_for(actor)
+	if not retry2: check(warning.mode==EnemyTable.Mode.WINDUP and warning.anchor.is_finite() and warning.anchor.distance_to(aim)>0.01 and is_equal_approx(warning.timer,0.3),"離脱を終えると遅れた照準の着地点を固定して予告する")
+	var fixed: Vector2 = warning.anchor
+	var retreated := Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1])
+	var pending: Dictionary = cpp_bridge.checkpoint()
+	var before: Array = cpp_core.enemy_motion_snapshot()
+	cpp_bridge.command("dev_ship_motion",{"position":aim+Vector2(300,100),"velocity":Vector2.ZERO})
+	cpp_core.step(0.15)
+	check(cpp_motion_for(actor).anchor==fixed and is_equal_approx(cpp_motion_for(actor).charge,0.5),"予告中に相手が移動しても着地点を追い直さない")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(fixed-Vector2(250,250),Vector2(500,500))).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	if not retry: check(frame.batches.all(func(b): return not b.ids.has(actor)) and frame.phoenix.size()==7 and presentation.frame_view.apply_frame(frame) and presentation.frame_view._phoenix_visual._frame_values==frame.phoenix,"本体が画面外でも着地点の影と専用shaderの火の粉を描く")
+	await get_tree().process_frame
+	cpp_core.step(0.16)
+	if not retry: check(cpp_motion_for(actor).mode==EnemyTable.Mode.DASH and is_equal_approx(cpp_motion_for(actor).timer,0.2),"編集した予告が終わると突入へ切り替える")
+	cpp_core.step(0.1)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.DASH and Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1]).is_equal_approx(retreated.lerp(fixed,0.5)),"突入も固定点まで残り時間に合わせて補間する")
+	cpp_core.step(0.1)
+	var hazards: Array = cpp_core.hazards_snapshot()
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and hazards.size()==1 and hazards[0].pos==fixed and hazards[0].radius==150.0 and is_equal_approx(hazards[0].active,0.5),"着地で編集した範囲と有効時間の炎を生成して停止する")
+	if hazards.size()!=1: cpp_session.free(); return false
+	cpp_bridge.command("dev_ship_motion",{"position":fixed,"velocity":Vector2.ZERO})
+	cpp_core.step_hazards(0.01)
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-9.0),"着地炎の共通被弾を発動時に1回だけ処理する")
+	frame = cpp_bridge.read_render(Rect2(fixed-Vector2(300,300),Vector2(600,600))).value
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.apply_frame(frame) and frame.shapes.any(func(shape): return shape.kind==ENUMS.RenderShapeKind.Zone and shape.zone_style==ENUMS.ZoneStyle.Phoenix),"着地の炎を通常画面で表示する")
+	await get_tree().process_frame
+	cpp_core.step(0.21)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE,"休みが終わると次の離脱へ戻る")
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"phoenix","position":cpp_origin+Vector2(300,300)}).value
+	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).anchor==Vector2.ZERO and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0 and cpp_core.hazards_snapshot().size()==1,"着地後の元個体を先に消し行を再利用しても炎は独立し着地点を漏らさない")
+	cpp_core.step_hazards(0.5)
+	check(cpp_core.hazards_snapshot().is_empty() and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-9.0),"余韻は追加命中せず指定した有効時間で終了する")
+	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before,"離脱先・固定着地点・段階・残り時間を保持から復元する")
+	mute_checks = false
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	cpp_core.step(0.6)
+	cpp_core.advance_attack_budget(1.0)
+	check(cpp_core.hazards_snapshot().is_empty() and cpp_motion_for(actor).charge==0.0 and cpp_core.attack_budget_snapshot().used==0.0,"予告中の撃破で突入と炎を取り消し、chargeと攻撃枠を終了する")
+	cpp_bridge.restore(pending.value)
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	cpp_core.step(0.6)
+	cpp_core.advance_attack_budget(1.0)
+	check(cpp_core.hazards_snapshot().is_empty() and cpp_core.attack_budget_snapshot().used==0.0,"突入前に元個体を解放しても古い参照で炎を生成しない")
 	cpp_session.free()
 	return true

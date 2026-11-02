@@ -1097,6 +1097,63 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "PhoenixDefinition",
+      "section": 102,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "retreat_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "dive_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

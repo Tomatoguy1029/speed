@@ -14,6 +14,7 @@
 #include "../behaviors/enemies/aquarius.h"
 #include "../behaviors/enemies/cross.h"
 #include "../behaviors/enemies/bomber.h"
+#include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -225,6 +226,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::AurigaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Clock) {
                 speed::ClockBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Phoenix) {
+                speed::PhoenixBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Bomber) {
                 speed::BomberBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Cross) {
