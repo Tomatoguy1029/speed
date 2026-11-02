@@ -1210,6 +1210,10 @@ func _cpp_choose(owner: RunSession, frame: Dictionary) -> bool:
 	# 既存の通常候補から射撃を優先する。候補やレベルは書き換えない。
 	for item: Dictionary in cards.candidates:
 		if item.id=="W01": candidate = item;break
+	if "--cpp-late-only" in OS.get_cmdline_user_args():
+		var priorities := {"W05":120,"T10":110,"T07":105,"W23":100,"T11":95,"W08":90,"T05":85,"W01":80,"T31":75,"T04":70,"W17":65,"T12":60}
+		for item: Dictionary in cards.candidates:
+			if int(priorities.get(item.id,0))>int(priorities.get(candidate.id,0)): candidate = item
 	var result: Dictionary = owner.bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":candidate.candidate_id})
 	return result.ok
 
@@ -1224,7 +1228,7 @@ func _test_cpp_stage(stage: int) -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 現在位置から一定だけ先を向き、通常の満充填とタッチ描線の確定を待つ。
-func _cpp_route_input(frame: Dictionary, driver: Dictionary) -> Intent:
+func _cpp_route_input(frame: Dictionary, driver: Dictionary, owner: RunSession) -> Intent:
 	var intent := Intent.new()
 	var ship: Dictionary = frame.ui.ship
 	var draw: Dictionary = frame.ui.draw
@@ -1233,12 +1237,24 @@ func _cpp_route_input(frame: Dictionary, driver: Dictionary) -> Intent:
 	intent.has_cursor = true
 	intent.cursor = ahead*2400.0
 	intent.hero_press = int(frame.tick)%120==0
+	if driver.smart:
+		if frame.ui.phase==RunState.Phase.PLAY and not draw.drawing and not draw.tracing and int(frame.tick)>=int(driver.scan):
+			var path := _cpp_safer_path(owner,frame,(intent.cursor-at).normalized(),450.0,driver)
+			driver.cursor = path[-1]
+			driver.scan = int(frame.tick)+30
+		if driver.has("cursor"): intent.cursor = driver.cursor
+		intent.hero_press = not str(frame.ui.hero.power).is_empty() and frame.ui.hero.cooldown<=0 and (frame.ui.hp<frame.ui.max_hp*0.7 or int(driver.blockers)>0)
+
 	var clock := float(frame.tick)/120.0
 	if driver.start<0.0 and clock>=driver.next and not draw.drawing and not draw.tracing and draw.gauge>=1.0:
 		var heading: Vector2 = ship.ship_heading
 		if heading.length_squared()<0.1: heading = (intent.cursor-at).normalized()
 		driver.stroke.clear()
-		for k in 7: driver.stroke.append(at+heading*(60.0+220.0*k)+heading.orthogonal()*(80.0 if k%2 else -80.0))
+		if driver.smart:
+			var length: float = frame.ui.base_draw_length*frame.ui.capacity*draw.gauge*(frame.ui.max_speed/ContentManager.cfg.base_max_speed)*frame.ui.length_mult*0.9
+			driver.stroke = Array(_cpp_safer_path(owner,frame,(intent.cursor-at).normalized(),length,driver))
+		else:
+			for k in 7: driver.stroke.append(at+heading*(60.0+220.0*k)+heading.orthogonal()*(80.0 if k%2 else -80.0))
 		driver.start = clock
 		driver.next = clock+1.0
 	if driver.start>=0.0:
@@ -1250,6 +1266,26 @@ func _cpp_route_input(frame: Dictionary, driver: Dictionary) -> Intent:
 			intent.pen_release = true
 			driver.start = -1.0
 	return intent
+
+## 読取専用の経路判定で候補を比べる。未来の不確実さは安全の保証に数えない。
+func _cpp_safer_path(owner: RunSession, frame: Dictionary, direction: Vector2, length: float, driver: Dictionary) -> PackedVector2Array:
+	var at: Vector2 = frame.ui.ship.ship_pos
+	var best := PackedVector2Array([at,at+direction*length])
+	var score := INF
+	for angle in [0.0,-0.7,0.7,-1.4,1.4]:
+		var path := PackedVector2Array()
+		for k in 7: path.append(at+direction.rotated(angle)*(length*k/6.0))
+		var answer: Dictionary = owner.bridge.query_route(path,{"margin":16.0,"window":0.2,"draw_seconds":0.06,"exit_clearance":80.0})
+		if not answer.ok:
+			driver.query_errors += 1
+			continue
+		if not answer.value.unsupported.is_empty(): driver.uncertain += 1
+		var next_score: float = answer.value.blockers.size()*1000.0+absf(angle)-minf(answer.value.fodder.size(),100.0)*0.01
+		if next_score<score:
+			score = next_score
+			best = path
+			driver.blockers = answer.value.blockers.size()
+	return best
 
 func _test_cpp_natural(stage: int, definition: StageDef) -> void:
 	var late_only := "--cpp-late-only" in OS.get_cmdline_user_args()
@@ -1271,14 +1307,14 @@ func _test_cpp_natural(stage: int, definition: StageDef) -> void:
 	var initial: Dictionary = owner.bridge.read_frame().value
 	if not late_only: _check(initial.ui.cards.initial and initial.ui.run_time==0.0,"通常出撃は0秒の武器選択から始まる")
 	var frame: Dictionary = initial
-	var driver := {"stroke":[],"start":-1.0,"next":0.0}
+	var driver := {"stroke":[],"start":-1.0,"next":0.0,"smart":late_only,"scan":0,"blockers":0,"query_errors":0,"uncertain":0}
 	var limit := int((definition.time_limit+15.0)*120.0*2.0) if definition.time_limit>0 else 120*1920
 	for tick in limit:
 		if not _cpp_choose(owner,frame):
 			_check(false,"通常カードを確定する")
 			break
 		owner.cpp_choices.poll()
-		var intent := _cpp_route_input(frame,driver)
+		var intent := _cpp_route_input(frame,driver,owner)
 		var step: Dictionary = owner.bridge.step(1.0/120.0,owner.bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
 		if not step.ok:
 			_check(false,"通常固定更新に未対応処理や通知エラーがない: "+str(step))
@@ -1298,6 +1334,8 @@ func _test_cpp_natural(stage: int, definition: StageDef) -> void:
 		if tick%120==0: await get_tree().process_frame
 	print("[S%d 自然通し] 無敵なし・時間飛ばしなし・強制撃破なし time=%s level=%s gear=%s traits=%s result=%s events=%s criteria=%s" % [stage,frame.ui.run_time,frame.ui.level,frame.ui.weapon_levels,frame.ui.trait_levels,frame.result,event_counts,saw])
 	if late_only:
+		print("[S%d 後半入力] query_errors=%s future_uncertain=%s" % [stage,driver.query_errors,driver.uncertain])
+		_check(driver.query_errors==0,"後半の入力補正は読取専用の経路判定を通す")
 		_check(saw.late and (saw.boss or not definition.boss_enabled) and saw.ended,"S%d 未成立だった自然な後半→ボス/終了" % stage)
 	else:
 		_check(saw.early and saw.growth and saw.late and (saw.boss or not definition.boss_enabled) and saw.ended,"S%d 自然な序盤→成長→終盤→設定済みボス/終了" % stage)
