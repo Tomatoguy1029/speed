@@ -46,6 +46,7 @@ Array SpeedRunCore::hazards_snapshot() const {
     for (size_t i = 0; i < runtime.state.hazards.size(); ++i) {
         const auto &zone = runtime.state.hazards[i]; if (!zone.alive) continue;
         Dictionary row; row["row"] = int64_t(i); row["pos"] = zone.pos; row["radius"] = std::holds_alternative<speed::CircleHazard>(zone.shape)?std::get<speed::CircleHazard>(zone.shape).radius:0.0;
+        if (zone.zone_definition) {row["kind"]=1;row["zone_definition"]=zone.zone_definition;row["style"]=runtime.content->zones[zone.zone_definition-1].style;row["enemy_damage"]=zone.enemy_damage;}
         row["time"] = zone.time; row["delay"] = zone.delay; row["active"] = zone.duration;
         if (const auto *beam=std::get_if<speed::BeamHazard>(&zone.shape)) {
             row["kind"]=0;row["angle"]=beam->angle;row["length"]=beam->length;row["half_width"]=beam->half_width;row["arc"]=beam->arc;

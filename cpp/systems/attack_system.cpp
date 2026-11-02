@@ -122,7 +122,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     const auto *entry=get(state,handle);if (!entry) return false;
     const auto record=*entry;auto &all=state.attacks;
     all.records[handle.slot].alive=false;
-    godot::Vector2 pos;bool circle=false;
+    godot::Vector2 pos;bool circle=false;uint32_t zone_definition=0;
     switch(record.pool) {
     case AttackPool::Friendly: {
         auto &value=state.friends[record.row];pos=value.pos;
@@ -135,7 +135,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
         if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hostiles.push_back(record.row);}break;
     }
     case AttackPool::Hazard: {
-        auto &value=state.hazards[record.row];pos=value.pos;circle=std::holds_alternative<CircleHazard>(value.shape) && std::get<CircleHazard>(value.shape).kind!=CircleHazardKind::Blast;
+        auto &value=state.hazards[record.row];pos=value.pos;zone_definition=value.zone_definition;circle=std::holds_alternative<CircleHazard>(value.shape) && std::get<CircleHazard>(value.shape).kind!=CircleHazardKind::Blast;
         if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hazards.push_back(record.row);}break;
     }
     }
@@ -147,7 +147,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     all.handles.release(handle);if (all.handles.reusable(handle.slot)) all.free_records.push_back(handle.slot);
     CombatEvent event;event.kind=CombatEventKind::AttackRetired;event.target_id=record.id;event.source_entity_id=s.owner.source_id;
     event.source=s.owner.source_definition;event.attack_pool=record.pool;event.attack_end_reason=reason;event.pos=pos;event.circle_hazard=circle;
-    event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);return true;
+    event.zone_definition=zone_definition;event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);return true;
 }
 void AttackSystem::source_ended(State &state,EnemyHandle source,AttackEndReason reason) {
     const auto id=state.enemy_handles.entity_id(source);auto found=state.attacks.by_source.find(id);

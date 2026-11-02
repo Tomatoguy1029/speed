@@ -1632,6 +1632,10 @@
       {
         "name": "TelescopeFire",
         "value": "telescope_fire"
+      },
+      {
+        "name": "Explode",
+        "value": "explode"
       }
     ],
     "ResultKind": [
@@ -1670,7 +1674,11 @@
         "value": "light_arrow"
       },
       {"name": "FriendDebris", "value": "friend_debris"},
-      {"name": "FriendHull", "value": "friend_hull"}
+      {"name": "FriendHull", "value": "friend_hull"},
+      {
+        "name": "Zone",
+        "value": "zone"
+      }
     ]
   },
   "event_fields": {
@@ -1695,7 +1703,9 @@
       "scene",
       "phase",
       "pos",
-      "visual_key"
+      "visual_key",
+      "duration",
+      "tint"
     ],
     "bonus": [
       "enter",
@@ -2037,6 +2047,13 @@
       "angle",
       "length",
       "width"
+    ],
+    "explode": [
+      "pos",
+      "radius",
+      "cause",
+      "color",
+      "life"
     ]
   },
   "includes": [

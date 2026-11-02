@@ -326,6 +326,20 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.StarBoltDefinition = [{"id":1,"radius":9.0,"life":6.0,"flight_scale":star.flight_scale,"turn_with_velocity":star.turn_with_velocity,
 		"tint_r":star.effect_tint.r,"tint_g":star.effect_tint.g,"tint_b":star.effect_tint.b,"tint_a":star.effect_tint.a,"visual":star_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	star.free()
+	data.ZoneDefinition = []
+	var zone_names := ["zone","zone_reticle","zone_lightning","zone_bite","zone_aquila","zone_phoenix","zone_bomber","zone_pump"]
+	for style in zone_names.size():
+		var path: String = "res://scenes/attacks/%s.tscn" % zone_names[style]
+		var zone_scene: PackedScene = load(path)
+		var zone_visual: Node = zone_scene.instantiate()
+		var settings: Resource = load("res://data/visuals/effect_settings.tres")
+		var values: Dictionary = settings.resolved_values("enemy/aquila",path) if style==4 else settings.values_for(path)
+		var tint: Color = values.get("effect_tint",zone_visual.effect_tint)
+		var meta: Dictionary = star_library.get_meta("looks",{}).get(path,{})
+		var record := {"id":style+1,"style":style,"contact":2,"active":ProjectileSystem.ZONE_FLASH,"hit_duration":zone_visual.hit_duration,"fade_duration":zone_visual.fade_duration,"hit":meta.get("Hit") is Mesh or not meta.get("Hit_sprites",[]).is_empty(),"fade":meta.get("Fade") is Mesh or not meta.get("Fade_sprites",[]).is_empty(),"tint_r":tint.r,"tint_g":tint.g,"tint_b":tint.b,"tint_a":tint.a}
+		for key in ["glow_opacity","ring_opacity","ring_width","arm_count","lightning_reach","lightning_width"]: record[key] = float(values.get(key,zone_visual.get(key) if style==4 else 0.0))
+		data.ZoneDefinition.append(record)
+		zone_visual.free()
 	var debris_settings: Resource = load("res://data/visuals/effect_settings.tres")
 	var debris_tint: Color = debris_settings.tinted("",Color.WHITE)
 	data.FriendDebrisDefinition = [{"id":1,"life":config.hull_debris_life,"knock":config.hull_debris_knock,"spread":deg_to_rad(config.hull_debris_spread),
@@ -451,6 +465,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)
 			visuals.assign(package.visuals.slice(0,5))
 			data.FriendHullDefinition = resolved.FriendHullDefinition.duplicate(true)
+			data.ZoneDefinition = resolved.ZoneDefinition.duplicate(true)
 			data.FriendSawPoint = resolved.FriendSawPoint.duplicate(true)
 			data.FriendDebrisDefinition = resolved.FriendDebrisDefinition.duplicate(true)
 			data.LumpDefinition = resolved.LumpDefinition.duplicate(true)
@@ -553,7 +568,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")
-	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png"]:
+	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png","res://.content/attack_visuals.res","res://scripts/render/attacks/zone.gd","res://scripts/render/fx/blast_bursts.gd"]:
 		if not paths.has(asset): paths.append(asset)
 	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")
 	for visual: Dictionary in visuals:

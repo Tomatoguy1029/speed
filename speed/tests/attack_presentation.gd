@@ -6,6 +6,7 @@ var failed := 0
 var lump_notification_only := false
 var arrow_fixes := false
 var mute_checks := false
+var zone_fade_only := false
 
 func check(ok: bool, message: String) -> void:
 	if mute_checks: return
@@ -22,6 +23,13 @@ func _ready() -> void:
 		return
 
 
+	if "--cpp-zone" in OS.get_cmdline_user_args() or "--cpp-zone-fade-fix" in OS.get_cmdline_user_args():
+		zone_fade_only = "--cpp-zone-fade-fix" in OS.get_cmdline_user_args()
+		mute_checks = zone_fade_only
+		await check_cpp_zone()
+		print("[cpp_zone] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-friendly-angle-fix" in OS.get_cmdline_user_args():
 		mute_checks = true
 		var ready: bool = await prepare_cpp_attack(96,"friendly_angle")
@@ -487,3 +495,72 @@ func check_cpp_friend_hull() -> void:
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_bridge.release_checkpoint(empty.value)
 	cpp_session.free()
+
+func check_cpp_zone() -> void:
+	var library: Resource = load("res://.content/attack_visuals.res")
+	var original: Dictionary = library.get_meta("looks").duplicate(true)
+	var looks: Dictionary = original.duplicate(true)
+	var phase_scene := "res://scenes/attacks/zone_reticle.tscn"
+	looks[phase_scene]["Hit"] = QuadMesh.new()
+	looks[phase_scene]["Fade"] = QuadMesh.new()
+	library.set_meta("looks",looks)
+	if not await prepare_cpp_attack(97,"zone"):
+		library.set_meta("looks",original)
+		return
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(300,0)}).value
+	var target: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(60,0)}).value
+	var token: int = cpp_core.passive_attack("zone_owner",source)
+	var params := {"position":cpp_origin,"radius":80.0,"delay":0.2,"damage":8.0,"enemy_damage":2.0,"style":1,"owner_id":source,"budget":token}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_zone",params)
+	check(fired.ok and token>0,"発生元の枠を保持して範囲攻撃を生成する")
+	if not fired.ok: cpp_session.free(); library.set_meta("looks",original); return
+	cpp_core.step_hazards(0.1)
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	check(frame.shapes.any(func(s): return s.kind==ENUMS.RenderShapeKind.Zone and s.time<s.delay) and presentation.frame_view.apply_frame(frame),"範囲の照準予告を通常画面で描く")
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp),"予告中は機体へ当てない")
+	await get_tree().process_frame
+	cpp_bridge.command("dev_remove",{"entity_id":source})
+	cpp_core.advance_attack_budget(1.0)
+	check(cpp_core.attack_budget_snapshot().groups.size()==1 and cpp_core.hazards_snapshot().size()==1,"発生元の退場後も予告と残留枠を保つ")
+	var held: Dictionary = cpp_bridge.checkpoint()
+	var saved: Array = cpp_core.hazards_snapshot()
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin,"velocity":Vector2.ZERO})
+	cpp_core.step_hazards(0.11)
+	var events: Array = cpp_bridge.read_frame().value.events
+	check(events.filter(func(e): return e.type==&"combat_damage" and e.payload.cause==&"chain" and e.payload.target_id==target).size()==1,"発動時に範囲の敵へ一度だけ誘爆する")
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"発動時に円と機体半径で一度だけ命中する")
+	check(events.any(func(e): return e.type==&"attack_visual_end" and e.payload.phase=="Hit"),"図形のあるHitだけを通知する")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(not presentation.frame_view._attack_ends.is_empty(),"命中後のHit図形を通常画面へ渡す")
+	cpp_core.step_hazards(0.02)
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0) and cpp_bridge.read_frame().value.events.all(func(e): return e.type!=&"explode"),"発動後は表示を残して機体と敵へ重ねて当てない")
+	check(cpp_bridge.restore(held.value).ok and cpp_core.hazards_snapshot()==saved,"予告時刻・誘爆値・未命中・所有枠を復元する")
+	if zone_fade_only: mute_checks = false
+	cpp_core.step_hazards(0.5)
+	events = cpp_bridge.read_frame().value.events
+	check(cpp_core.hazards_snapshot().is_empty() and events.any(func(e): return e.type==&"attack_visual_end" and e.payload.phase=="Fade"),"終了時にFadeを通知し範囲を消す")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	if zone_fade_only:
+		check(not presentation.frame_view._attack_ends.is_empty(),"終了後のFade図形を通常画面へ渡す")
+		cpp_bridge.release_checkpoint(held.value)
+		cpp_session.free()
+		library.set_meta("looks",original)
+		return
+	cpp_core.advance_attack_budget(2.0)
+	check(cpp_core.attack_budget_snapshot().groups.is_empty(),"終了した範囲の所有枠を解放する")
+	for style in [0,2,3,4,5,6,7]:
+		check(cpp_bridge.command("dev_fire_zone",{"position":cpp_origin+Vector2(style*30,0),"radius":45.0,"delay":0.0,"damage":0.0,"style":style}).ok,"種類ごとの範囲表示を生成する: %d" % style)
+	cpp_core.step_hazards(0.01)
+	frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	check(presentation.frame_view.apply_frame(frame),"通常・雷・噛み・わし・ほうおう・ボマー・ポンプの発動表示を描く")
+	await get_tree().process_frame
+	cpp_core.step_hazards(0.3)
+	frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	presentation.frame_view.apply_frame(frame)
+	check(cpp_core.hazards_snapshot().is_empty() and presentation.frame_view._zone_bursts.size()==3 and presentation.frame_view._zone_bursts.values().all(func(b): return not b._items.is_empty()),"火球の表示寿命は当たりの終了後も独立して残る")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()
+	library.set_meta("looks",original)

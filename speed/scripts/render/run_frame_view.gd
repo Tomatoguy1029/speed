@@ -15,6 +15,11 @@ var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
 var _arrow_displays: Dictionary = {}
 var _debris_displays: Dictionary = {}
+var _zone_displays: Dictionary = {}
+var _zone_bursts: Dictionary = {}
+var _zone_seen: Dictionary = {}
+var _zone_world_time := -1.0
+var _attack_ends: Array[Dictionary] = []
 var _hull_displays: Dictionary = {}
 var _debris_trails: Array[Dictionary] = []
 var _scope: ContentResourceScope
@@ -141,6 +146,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 			_particle_canvas.draw_circle(beam.from,beam.width*0.5,color)
 			_particle_canvas.draw_circle(beam.to,beam.width*0.5,color)
 
+		for effect: Dictionary in _attack_ends:
+			var fade: float = 1.0-effect.age/effect.duration
+			var tint: Color = effect.tint*Color(1,1,1,fade)
+			if effect.mesh!=null: _particle_canvas.draw_mesh(effect.mesh,null,Transform2D(0.0,effect.pos),tint)
+			for piece: Dictionary in effect.sprites: _particle_canvas.draw_mesh(piece.mesh,piece.texture,Transform2D(0.0,effect.pos),tint)
 		for trail: Dictionary in _debris_trails:
 			if trail.points.size()>1: _particle_canvas.draw_polyline(trail.points,Color(1.0,0.6,0.25,0.6*trail.life/trail.max),3.0*_pixel/maxf(_zoom,0.01))
 		for ring: Dictionary in _rings:
@@ -254,9 +264,13 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull,SHAPE_KIND.Zone] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
+		if row.kind==SHAPE_KIND.Zone:
+			if row.points.size()!=1 or row.widths.size()!=1 or row.get("zone_style") not in range(8) or not row.get("tint") is Color or not row.get("arm_count") is int: return false
+			for key in ["time","delay","active","glow_opacity","ring_opacity","ring_width","lightning_reach","lightning_width"]:
+				if not row.get(key) is float or not is_finite(row[key]): return false
 		if row.kind==SHAPE_KIND.FriendHull:
 			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("angle") is float or not row.get("saw") is bool or not row.get("visual_id") is int or not row.get("hull_points") is PackedVector2Array: return false
 		if row.kind==SHAPE_KIND.FriendDebris:
@@ -354,10 +368,23 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in _arrow_displays.values(): display.hide()
 	for display: Node in _debris_displays.values(): display.hide()
 	for display: Node in _hull_displays.values(): display.hide()
+	for display: Node in _zone_displays.values(): display.hide()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
+		if row.kind==SHAPE_KIND.Zone:
+			var key := int(row.order)
+			if not _zone_displays.has(key):
+				var node := DrawLayer.new()
+				parent.add_child(node)
+				_zone_displays[key] = node
+			var node: DrawLayer = _zone_displays[key]
+			node.draw_fn = func(c: CanvasItem): preload("res://scripts/render/attacks/zone.gd").draw_frame(c,row,1.0/maxf(_zoom,0.01))
+			node.show()
+			node.queue_redraw()
+			_zone_burst(row)
+			continue
 		if row.kind==SHAPE_KIND.FriendHull:
 			var key := int(row.order)
 			if not _hull_displays.has(key):
@@ -482,6 +509,11 @@ func receive_frame(frame: Dictionary) -> bool:
 		_particles.clear()
 		_rings.clear()
 		_debris_trails.clear()
+		_attack_ends.clear()
+		_zone_seen.clear()
+		_zone_world_time = -1.0
+		for bursts: Node in _zone_bursts.values(): bursts.queue_free()
+		_zone_bursts.clear()
 		_meteor_shards.clear()
 		_shield_transfers.clear()
 	for event: Dictionary in frame.events:
@@ -577,6 +609,15 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":40.0,"color":Color(1.0,0.75,0.6),"life":0.22,"max":0.22})
 			_burst(event.pos,Color(1.0,0.5,0.35),10,500.0,direction)
 
+		if event.type==&"attack_visual_end":
+			var library: Resource = _scope.resources.get("res://.content/attack_visuals.res")
+			if library!=null:
+				var layers: Dictionary = library.get_meta("looks",{}).get(event.get("scene",""),{})
+				var phase: String = event.phase
+				_attack_ends.append({"mesh":layers.get(phase),"sprites":layers.get(phase+"_sprites",[]),"pos":event.pos,"duration":event.get("duration",0.25 if phase=="Hit" else 0.2),"age":0.0,"tint":event.get("tint",Color.WHITE)})
+		if event.type==&"explode":
+			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":event.life,"max":event.life})
+			if event.radius>=150.0 and pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.4)
 		if event.type==&"debris_trail" and event.get("life",0.0)>0.0:
 			_debris_trails.append({"points":event.points,"life":event.life,"max":event.life})
 		if event.type==&"ring":
@@ -601,6 +642,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	var zone_dt: float = 0.0 if _zone_world_time<0.0 else maxf(0.0,ui.world_time-_zone_world_time)
+	_zone_world_time = ui.world_time
+	for bursts: BlastBursts in _zone_bursts.values(): bursts.step(zone_dt)
+	for effect: Dictionary in _attack_ends: effect.age += effect_dt
+	_attack_ends = _attack_ends.filter(func(effect: Dictionary): return effect.age<effect.duration)
 	for trail: Dictionary in _debris_trails: trail.life -= effect_dt
 	_debris_trails = _debris_trails.filter(func(trail: Dictionary): return trail.life>0.0)
 	for effect: Dictionary in _shield_transfers: effect.life -= effect_dt
@@ -687,3 +733,22 @@ func _timed_shape(canvas: CanvasItem, original: Callable) -> void:
 	var began := Time.get_ticks_usec() if perf.active else 0
 	original.call(canvas)
 	perf.since(&"view_draw.attacks",began)
+
+func _zone_burst(row: Dictionary) -> void:
+	if row.zone_style<5 or row.time<row.delay or _zone_seen.get(row.order,0)==row.owner_id: return
+	_zone_seen[row.order] = row.owner_id
+	var style: int = row.zone_style
+	var key: String = "enemy/phoenix" if style==5 else "res://scenes/attacks/zone_%s.tscn" % ("bomber" if style==6 else "pump")
+	var fixed: Dictionary = preload("res://scripts/render/fx/burst_runtime.gd").profile(key,false)
+	var effect_scale: float = float(fixed.get("effect_scale",1.0))
+	if not _zone_bursts.has(style):
+		var bursts := BlastBursts.new()
+		bursts.key = key
+		if style==6: bursts.shader = preload("res://shaders/bomber_burst.gdshader")
+		bursts.setup(_pixel*float(fixed.get("pixel_scale",1.0)))
+		bursts.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		_layer(14).add_child(bursts)
+		_zone_bursts[style] = bursts
+	var bursts: BlastBursts = _zone_bursts[style]
+	bursts.add(row.points[0],row.widths[0]/bursts.px*effect_scale,row.delay-row.time)
+	bursts.step(0.0)

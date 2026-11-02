@@ -5,6 +5,7 @@
 #include "beam.h"
 #include "wave.h"
 #include "wall.h"
+#include "zone.h"
 #include <cmath>
 namespace speed {
 bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
@@ -18,7 +19,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         const double time=double(hazard.time)+dt;hazard.time=time;
         const auto owner=record->spec.owner.live_source;
         const bool owner_ended=record->spec.owner.attached && (!state.enemy_handles.contains(owner) || state.enemies[owner.slot].dead || state.enemy_handles.contains(state.enemies[owner.slot].pump_owner));
-        if (time>=double(hazard.delay)+double(hazard.duration) || owner_ended) {end(state,handle,owner_ended?AttackEndReason::ParticipantEnd:AttackEndReason::Lifetime);continue;}
+        if (time>=double(hazard.delay)+double(hazard.duration) || owner_ended) {end(state,handle,owner_ended?AttackEndReason::ParticipantEnd:AttackEndReason::Lifetime);EventBuilder::flush_combat(run);continue;}
         if (time>=hazard.delay && std::holds_alternative<WaveHazard>(hazard.shape)) {
             if (owner.generation && std::get<WaveHazard>(hazard.shape).style==uint32_t(WaveStyle::Pulser)) {
                 auto &spec=state.attacks.records[handle.slot].spec;spec.owner.live_source={};spec.owner.attached=false;
@@ -32,6 +33,8 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         auto &current=state.hazards[row];
         if (time<current.delay || current.hit) continue;
         if (!hazard_before_touch(state,handle)) return true;
+        if (current.zone_definition && !ZoneSystem::activate(run,handle)) {EventBuilder::flush_combat(run);return true;}
+        if (!get(state,handle)) continue;
         const auto *circle=std::get_if<CircleHazard>(&current.shape);
         const ContactShape shape=circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
         if (circle) current.hit=true;
@@ -43,6 +46,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
             godot::Dictionary event;if (state.bite_zone_config.visual_key) event["visual_key"]=state.bite_zone_config.visual_key;else event["scene"]=state.bite_zone_config.scene;
             event["phase"]="Hit";event["pos"]=state.ship.pos;EventBuilder::flush_combat(run);FrameBuilder::append(run,"attack_visual_end",event);
         }
+        if (current.zone_definition) ZoneSystem::end_visual(run,current.zone_definition,true,state.ship.pos);
         CombatResolver::attack_ship_damage(run,handle,shape,current.damage,0);EventBuilder::flush_combat(run);
         if (state.phase!=godot::RunState::Phase::Play) return true;
     }

@@ -656,6 +656,97 @@
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "ZoneDefinition",
+      "section": 68,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "style",
+          "type": "u32",
+          "max": 7
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "active",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit",
+          "type": "bool"
+        },
+        {
+          "name": "fade",
+          "type": "bool"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        },
+        {
+          "name": "glow_opacity",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_opacity",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arm_count",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lightning_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lightning_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fade_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {
@@ -799,6 +890,40 @@
       {
         "name": "Stardust",
         "value": "stardust"
+      },
+      {
+        "name": "Pump",
+        "value": "pump"
+      }
+    ],
+    "ZoneStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Reticle",
+        "value": "reticle"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      },
+      {
+        "name": "Bite",
+        "value": "bite"
+      },
+      {
+        "name": "Aquila",
+        "value": "aquila"
+      },
+      {
+        "name": "Phoenix",
+        "value": "phoenix"
+      },
+      {
+        "name": "Bomber",
+        "value": "bomber"
       },
       {
         "name": "Pump",

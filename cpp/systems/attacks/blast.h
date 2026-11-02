@@ -6,7 +6,7 @@ struct BlastParams {
     godot::Color color;
     EnemyHandle source;
     BudgetToken budget;
-    double radius=0,damage=0,duration=0;
+    double radius=0,damage=0,duration=0,delay=0;
     uint32_t contact=0;
 };
 class BlastSystem {
