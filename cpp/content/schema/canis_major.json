@@ -420,6 +420,52 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisSiriusDefinition",
+      "section": 345,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "flame",
+          "type": "u32",
+          "ref": "CanisFlameDefinition"
+        },
+        {
+          "name": "shots",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "shot_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

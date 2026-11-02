@@ -76,6 +76,12 @@ func _track_command(body: Dictionary, attack: Dictionary, dt: float) -> void:
 	_lunge_layer.queue_redraw()
 	queue_redraw()
 func _draw() -> void:
+	if technique.get("technique","")=="sirius" and int(technique.get("stage",5))==0:
+		var color := Color("#ff667d") if technique.locked else Color("#e8f6ff")
+		var alpha := 0.35 if technique.locked else lerpf(0.12,0.45,float(state.charge))
+		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))
+		var mouth := Vector2(float(state.radius)*0.84,0.0)
+		draw_line(mouth,mouth+Vector2(float(technique.beam_length),0.0),Color(color,alpha),width)
 	if technique.get("technique","")=="pounce" and int(technique.get("stage",5))==0:
 		var reach := position.distance_to(technique.aim)
 		var color := Color("#ff667d") if technique.locked else Color("#f2b567")

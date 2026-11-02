@@ -23,6 +23,9 @@ func _ready() -> void:
 	if "--cpp-centaurus-sail" in OS.get_cmdline_user_args() or "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_sail")
 		return
+	if "--cpp-canis-sirius" in OS.get_cmdline_user_args():
+		await native_canis_sirius()
+		return
 	if "--cpp-canis-pounce-cue" in OS.get_cmdline_user_args() or "--cpp-canis-pounce-cue-display" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_pounce_cue")
 		return
@@ -2538,4 +2541,74 @@ func native_hydra_body() -> void:
 	view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_hydra_body] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 連射の照準固定・間隔と、取消後に残る炎を同じ制作入口で確認する。
+func native_canis_sirius() -> void:
+	var c := canis_move_case("sirius",{"shots":2,"warn":0.1,"lock":0.04,"lead":0.2,"aim_turn":3.0,"beam_time":0.1,"beam_length":300.0,"beam_width":20.0,"beam_particle_life":0.2,"shot_gap":0.05,"recover":0.05,"trail_delay":0.1,"trail_time":1.0})
+	check(not c.is_empty(),"シリウスの全実効値を本体・炎・正式表示と同じ生成入口へ渡す")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	var observed: Array = []
+	bridge.subscribe("確認",func(packet): observed.append_array(packet.events); return true)
+	var records: Dictionary = c.package.records
+	check(c.move.make_runner()==null and records.CanisSiriusDefinition.size()==2 and records.BossTechniqueStage.is_empty() and records.CanisFlameDefinition[0].length==300.0 and records.CanisFlameDefinition[0].particle_life==0.2,"編集値だけのResourceから連射と戦闘粒を生成する")
+	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
+	bridge._core.set_motion_context(Vector2(300,300),Vector2(300,300),Vector2(3000,2000))
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(started.ok,"制作入口でシリウスを単独発動する")
+	bridge._core.step(0.065)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.stage==0 and not t.locked and is_equal_approx(t.facing,0.195) and t.aim==Vector2(320,300),"先読みと旋回を適用し固定判定は加算前の予告時刻を見る")
+	bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.locked and is_equal_approx(t.facing,0.225),"warnからlockを引いた境界で向きを固定する")
+	bridge.command("dev_ship_motion",{"position":Vector2(1000,-1000),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1000,-1000),Vector2(1000,-1000),Vector2(3000,2000))
+	bridge._core.step(0.04)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==1 and t.fired and t.shot==0 and is_equal_approx(t.facing,0.225) and canis_effects(bridge).any(func(v): return v.kind==0) and canis_effects(bridge).any(func(v): return v.kind==2),"予告を終えたtickに固定方向の噴射と焼け跡を生成する")
+	var active: Dictionary = bridge.checkpoint()
+	check(active.ok,"連射途中の段階・炎・乱数を保持する")
+	bridge._core.step(0.1)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.shot==1 and t.gap_left==0.05 and t.stage==1,"1発目の終了後に独立した射撃間隔を置く")
+	var after: Dictionary = t.duplicate(true)
+	var flames: Array = canis_effects(bridge).duplicate(true)
+	check(bridge.restore(active.value).ok,"連射途中へ復帰する")
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0]==after and canis_effects(bridge)==flames,"復帰後も次の射撃段階と全ての粒を一致させる")
+	bridge._core.step(0.05)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.stage==0 and not t.fired and not t.locked and t.age==0.0,"間隔の終了tickは次の予告開始だけを行う")
+	bridge._core.step(0.1)
+	bridge._core.step(0.1)
+	check(bridge.command("dev_boss_state").value[0].stage==2 and bridge.command("dev_boss_state").value[0].shot==2,"最後の放射時間が終わると硬直へ移る")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and not canis_effects(bridge).is_empty(),"自然終了しても発射済みの炎と焼け跡は残る")
+	bridge.restore(active.value)
+	var probe := Vector2.from_angle(0.225)*160.0
+	bridge.command("dev_ship_motion",{"position":probe,"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(probe,probe,Vector2(3000,2000))
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.03)
+	check(bridge._core.ship_snapshot().ship_hp<hp and canis_effects(bridge).any(func(v): return v.kind==0 and v.hit),"放射した粒の接触が親の命中旗と実ダメージへつながる")
+	bridge.command("dev_boss_state")
+	check(observed.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="flame_jet" and e.payload.technique=="sirius"),"原因は炎の噴射、技はシリウスとして別々に記録する")
+	bridge.restore(active.value)
+	check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"放射途中を取り消す")
+	bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and not canis_effects(bridge).is_empty(),"取消は連射を止め、発射済みの炎を寿命まで残す")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(not c.view._boss_body_displays.values()[0].flames.displays.is_empty(),"取消後に残る粒と焼け跡も正式表示へ渡す")
+	bridge.restore(active.value)
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and canis_effects(bridge).is_empty(),"本体消失では技と残留炎をまとめて終了する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"技の出来事を共通配信へ届ける")
+	bridge.release_checkpoint(active.value)
+	bridge.dispose()
+	c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_sirius] failures=",failed)
 	get_tree().quit(1 if failed else 0)
