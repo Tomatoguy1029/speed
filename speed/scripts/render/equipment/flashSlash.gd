@@ -10,12 +10,53 @@ var streaks: Array[Dictionary] = []
 var _released := -1.0
 var _add: PixelPainter
 var _streaks: PixelShapes
+var _frame_mode := false
+var _frame_marks: Array = []
+var _frame_scale := 1.0
+var _angles: Dictionary = {}
 
 func dispose() -> void:
 	if is_instance_valid(_add): _add.queue_free()
 	if is_instance_valid(_streaks): _streaks.queue_free()
 	super()
 
+func _angle(dash: int, id: int) -> float:
+	var key := "%d/%d" % [dash,id]
+	if not _angles.has(key):
+		var random := RandomNumberGenerator.new()
+		random.seed = hash(key)
+		_angles[key] = random.randf()*TAU
+	return _angles[key]
+func frame_event(ev: Dictionary) -> void:
+	var visual := ev.duplicate()
+	if ev.type in [&"slash_mark",&"flash_slash"]:
+		visual.angle = _angle(int(ev.dash),int(ev.id))+float(ev.get("cut",0))*0.55
+		visual.row = -1
+	on_event(visual)
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_frame_mode = true
+	_add = PixelPainter.new()
+	_add.setup_painter(pixel)
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_add.material = add
+	parent.add_child(_add)
+	_streaks = PixelShapes.new()
+	_streaks.setup(pixel,PixelShapes.Shape.SPINDLE)
+	parent.add_child(_streaks)
+func frame_tick(values: Dictionary, scale_value: float, dt: float) -> void:
+	_frame_scale = scale_value
+	_frame_marks = values.marks
+	_released = values.released
+	needles.clear()
+	var live := {}
+	for mark: Dictionary in _frame_marks:
+		live["%d/%d" % [mark.dash,mark.id]] = true
+		if mark.valid and mark.left==mark.total:
+			needles[mark.id] = {"pos":mark.pos,"angle":_angle(mark.dash,mark.id),"r":mark.r,"age":mark.age}
+	for key in _angles.keys():
+		if not live.has(key): _angles.erase(key)
+	_draw_effects(dt)
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"slash_mark":
@@ -30,7 +71,7 @@ func on_event(ev: Dictionary) -> void:
 				var dir: Vector2 = (path[index + 1] - path[index]).normalized()
 				var at: Vector2 = path[index].lerp(path[index + 1], fmod(f * (path.size() - 1), 1.0))
 				var off := (randf() - 0.5) * (24.0 if randf() < 0.7 else 80.0)
-				streaks.append({"pos": at + dir.orthogonal() * off * 1.82 * cfg.character_scale,
+				streaks.append({"pos": at + dir.orthogonal() * off * 1.82 * (_frame_scale if _frame_mode else cfg.character_scale),
 					"angle": dir.angle() + (randf() - 0.5) * (0.7 if randf() < 0.6 else 2.6),
 					"len": 30.0 + randf() * (180.0 if randf() < 0.25 else 80.0), "w": 1.4 + randf() * 2.2,
 					"age": -float(ev.pause) - f * float(ev.sweep)})
@@ -41,8 +82,9 @@ func on_event(ev: Dictionary) -> void:
 			needles.erase(ev.get("id", -1))
 
 func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+	_draw_effects(world_dt())
+func _draw_effects(dt: float) -> void:
+	var p: PixelPainter = _add if _frame_mode else painter()
 	if _add == null:
 		_add = PixelPainter.new()
 		_add.setup_painter(p.px)
@@ -55,10 +97,13 @@ func tick(_dt: float) -> void:
 		rm._layers.top.add_child(_streaks)
 	_add.begin()
 	_streaks.begin()
-	if _released >= 0.0: _released += dt
-	var t: EnemyTable = behavior.ctx.enemies.table
+	if not _frame_mode and _released >= 0.0: _released += dt
+	var t: EnemyTable = null if _frame_mode else behavior.ctx.enemies.table
 	for id in needles.keys():
 		var nd: Dictionary = needles[id]
+		if _frame_mode:
+			_needle(_add,nd.pos,nd)
+			continue
 		if not behavior.ctx.enemies.is_same(nd.row, id) or t.dead[nd.row] != 0:
 			needles.erase(id)
 			continue

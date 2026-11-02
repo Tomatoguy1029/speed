@@ -1,4 +1,5 @@
 #include "equipment.h"
+#include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/forward.h"
 #include "../behaviors/traits/killSonic.h"
 #include "../behaviors/traits/rampage.h"
@@ -14,11 +15,12 @@ void EquipmentSystem::electric_contact(RunRuntime &run,EnemyHandle target) {
         if (run.content->equipment[owned.definition-1].external_id=="W17") ContactArcBehavior::contact(run,target);
     }
 }
-void EquipmentSystem::contact(RunRuntime &run,EnemyHandle target,godot::Vector2 pos) {
+void EquipmentSystem::contact(RunRuntime &run,EnemyHandle target,godot::Vector2 pos,double damage) {
     electric_contact(run,target);
     for (const auto &owned:run.state.loadout.weapons) {
         if (run.state.phase!=godot::RunState::Phase::Play) return;
         if (run.content->equipment[owned.definition-1].external_id=="W04") ContactWaveBehavior::contact(run,pos);
+        else if (run.content->equipment[owned.definition-1].external_id=="W28") FlashSlashBehavior::contact(run,target,damage);
     }
 }
 void EquipmentSystem::refresh_effects(RunRuntime &run) {
@@ -117,6 +119,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W28") {
+            const auto &v=run.content->flash_slash_levels[next-1];auto &w=run.state.loadout.flash_slash;w.ready=true;w.definition=id;w.cuts=v.cuts;w.streaks=v.streaks;w.multiplier=v.multiplier;w.pause=v.pause;w.sweep=v.sweep;
         } else if (d.external_id=="W27") {
             const auto &v=run.content->afterimage_levels[next-1];auto &w=run.state.loadout.afterimage;w.ready=true;w.definition=id;w.count=v.count;w.total=v.total;w.delay=v.delay;
         } else if (d.external_id=="W26") {
@@ -192,6 +196,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W28") FlashSlashBehavior::dispose(run);
     else if (external=="W27") run.state.loadout.afterimage={};
     else if (external=="W26") run.state.loadout.escort={};
     else if (external=="W25") run.state.loadout.interceptor={};

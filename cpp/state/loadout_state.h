@@ -79,6 +79,8 @@ struct KnockbackState {
     double chance=0,speed=0,life=0,base_damage=0,base_attack=0,base_knock=0,base_life=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0;
     std::vector<KnockbackVisual> visuals;
 };
+struct FlashSlashMark {EnemyHandle target;int64_t id=0,dash=0;double distance=0,damage=0,time=-1,delay=0,age=0;uint32_t left=0,total=0;};
+struct FlashSlashState {bool ready=false;uint32_t definition=0,cuts=0,streaks=0;double multiplier=0,pause=0,sweep=0,clock=0,released=-1;std::vector<FlashSlashMark> marks;std::unordered_map<int64_t,std::unordered_set<int64_t>> marked_ids;};
 struct AfterimageLeg {godot::Vector2 a,b;double start=0,finish=0,power=0,radius=0;};
 struct AfterimageCopy {godot::Vector2 pos,dir;double delay=0,progress=0,alpha=0;size_t cursor=0;std::unordered_set<int64_t> hits;};
 struct AfterimageEcho {uint64_t id=0;double start=0,until=0,share=0;bool ended=false;std::vector<AfterimageLeg> legs;std::vector<AfterimageCopy> copies;};
@@ -176,6 +178,7 @@ struct LoadoutState {
     InterceptorState interceptor;
     DashRangeDroneState escort;
     AfterimageState afterimage;
+    FlashSlashState flash_slash;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;

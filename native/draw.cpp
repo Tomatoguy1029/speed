@@ -2,6 +2,7 @@
 #include "../cpp/behaviors/weapons/dashRangeDrone.h"
 #include "../cpp/behaviors/weapons/massTow.h"
 #include "run_core.h"
+#include "../cpp/behaviors/weapons/flashSlash.h"
 #include "../cpp/behaviors/weapons/afterimage.h"
 #include "../cpp/systems/field.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
@@ -167,7 +168,8 @@ void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
     for (const auto &owned:runtime.state.loadout.weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
-        if (id=="W27") speed::AfterimageBehavior::end(runtime);
+        if (id=="W28") speed::FlashSlashBehavior::end(runtime);
+        else if (id=="W27") speed::AfterimageBehavior::end(runtime);
         else if (id=="W26") speed::DashRangeDroneBehavior::end(runtime);
         else if (id=="W22") speed::BipolarBehavior::end(runtime);
         else if (id=="W21") speed::MassTowBehavior::end(runtime);

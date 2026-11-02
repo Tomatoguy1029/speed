@@ -1365,9 +1365,9 @@ func native_sword() -> void:
 	check(f.events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"sword_flash" and e.payload.source==&"monoceros" and e.payload.technique==&"sword_flash"),"斬撃の原因をsword_flashへ分けて記録へ渡す")
 	var visual = load("res://scripts/bosses/monoceros/sword_flash_visual.gd").new()
 	add_child(visual)
-	var releases: Array = f.events.filter(func(e): return e.type==&"slash_release")
+	var releases: Array = f.events.filter(func(e): return e.type==&"monoceros_slash_release")
 	check(releases.size()==1,"斬撃の線と幅を登録済み通知で一回配信する")
-	visual.frame_event({"type":&"slash_release","line":releases[0].payload.line,"width":releases[0].payload.width})
+	visual.frame_event({"type":&"monoceros_slash_release","line":releases[0].payload.line,"width":releases[0].payload.width})
 	visual.apply_frame(0.15)
 	check(visual.effects.size()==8 and visual.effects[0].line==body.last_slash and visual.effects[0].width==20.0,"表示乱数の針と斬撃は通知の判定線から作り戦闘へ書き戻さない")
 	var held: Dictionary = bridge.checkpoint()
@@ -1401,7 +1401,7 @@ func native_sword() -> void:
 		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
 		bridge._core.step(0.2)
 		state = bridge.command("dev_boss_state").value[0]
-		check(state.stage==7 and not state.hit and not f.events.any(func(e): return e.type==&"slash_release") and bridge.read_frame().ok,"参加者消失で斬撃を放たない" if disappear else "取消後に斬撃の当たりを残さない")
+		check(state.stage==7 and not state.hit and not f.events.any(func(e): return e.type==&"monoceros_slash_release") and bridge.read_frame().ok,"参加者消失で斬撃を放たない" if disappear else "取消後に斬撃の当たりを残さない")
 		bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_monoceros_sword] failures=",failed)

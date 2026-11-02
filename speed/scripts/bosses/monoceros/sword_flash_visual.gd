@@ -41,7 +41,7 @@ func reset_frame() -> void:
 	world_clock = -1.0
 
 func frame_event(event: Dictionary) -> void:
-	if event.type==&"slash_release": _add_effects(event.line,float(event.width))
+	if event.type==&"monoceros_slash_release": _add_effects(event.line,float(event.width))
 	if event.type in [&"boss_defeated",&"boss_cancelled",&"final_strike"]: reset_frame()
 
 func advance(dt: float) -> void:

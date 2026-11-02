@@ -1643,6 +1643,52 @@
           "max": 0.5
         }
       ]
+    },
+    {
+      "name": "FlashSlashDefinition",
+      "section": 208,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "cuts",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "streaks",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "multiplier",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pause",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sweep",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

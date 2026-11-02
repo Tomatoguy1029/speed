@@ -31,6 +31,7 @@ struct ContentBundle {
     std::vector<InterceptorDefinition> interceptor_levels;
     std::vector<DashRangeDroneDefinition> escort_levels;
     std::vector<AfterimageDefinition> afterimage_levels;
+    std::vector<FlashSlashDefinition> flash_slash_levels;
     std::vector<SonicDefinition> sonic_levels;
     std::vector<ContactWaveDefinition> contact_wave_levels;
     std::vector<EndBlastDefinition> end_blast_levels;

@@ -546,6 +546,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var mount: Vector2 = preload("res://scripts/weapons/rear.gd").MOUNT_PIXEL-Vector2(15.5,30.0)
 	for level in rear.level_steps.size():
 		data.RearDefinition.append({"id":level+1,"weapon":rear_id,"level":level+1,"interval":float(rear.params.interval_by_level[level]),"damage":float(rear.params.damage_by_level[level]),"pierce":int(rear.params.pierce_by_level[level]),"life":float(rear.params.life),"spread":float(rear.params.spread_step),"knock":float(rear.params.knock),"color":Color(rear.params.color).to_rgba32(),"mount_x":mount.x,"mount_y":mount.y,"muzzle_distance":12.5})
+	var flash_slash := load("res://data/weapons/W28_flashSlash.tres") as WeaponDef
+	if flash_slash==null: return {}
+	var flash_slash_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":flash_slash_id,"kind":0,"maximum_level":flash_slash.level_steps.size(),"external_id":"W28","comet_only":flash_slash.comet_only})
+	for level in flash_slash.level_steps.size():
+		data.FlashSlashDefinition.append({"id":level+1,"weapon":flash_slash_id,"level":level+1,"cuts":int(flash_slash.params.cuts_by_level[level]),"streaks":int(flash_slash.params.streaks_by_level[level]),"multiplier":float(flash_slash.params.mult_by_level[level]),"pause":float(flash_slash.params.pause),"sweep":float(flash_slash.params.sweep)})
 	var afterimage := load("res://data/weapons/W27_afterimage.tres") as WeaponDef
 	if afterimage==null: return {}
 	var afterimage_id: int = data.LoadoutDefinition.size()+1
@@ -662,6 +668,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_wave_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if contact_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":sonic_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if sonic_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_arc_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if arc_target.has("followup") else 0.0})
+	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":flash_slash_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(flash_slash.id).has("followup") else 0.0})
+	var flash_slash_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W28")
+	if flash_slash_entry==null: return {}
+	for path in flash_slash_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"key":"loadout/"+path})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":flash_slash_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":flash_slash_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":afterimage_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(afterimage.id).has("followup") else 0.0})
 	var afterimage_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W27")
 	if afterimage_entry==null: return {}
@@ -1153,6 +1167,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
 			data.InterceptorDefinition = resolved.InterceptorDefinition
+			data.FlashSlashDefinition = resolved.FlashSlashDefinition
 			data.AfterimageDefinition = resolved.AfterimageDefinition
 			data.DashRangeDroneDefinition = resolved.DashRangeDroneDefinition
 			data.BipolarDefinition = resolved.BipolarDefinition

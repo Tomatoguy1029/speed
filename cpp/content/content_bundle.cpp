@@ -68,6 +68,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->interceptor_levels=records.InterceptorDefinition_rows;
     bundle->escort_levels=records.DashRangeDroneDefinition_rows;
     bundle->afterimage_levels=records.AfterimageDefinition_rows;
+    bundle->flash_slash_levels=records.FlashSlashDefinition_rows;
     bundle->sonic_levels=records.SonicDefinition_rows;
     bundle->contact_wave_levels=records.ContactWaveDefinition_rows;
     bundle->end_blast_levels=records.EndBlastDefinition_rows;
@@ -283,6 +284,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.external_id=="T04") {
             if (d.kind!=1 || d.maximum_level!=bundle->full_charge_levels.size()) return {};
             for (size_t i=0;i<bundle->full_charge_levels.size();++i) if (bundle->full_charge_levels[i].equipment!=d.id || bundle->full_charge_levels[i].level!=i+1) return {};
+            continue;
+        }
+        if (d.external_id=="W28") {
+            if (d.kind!=0 || d.comet_only || d.maximum_level!=bundle->flash_slash_levels.size() || !power_weapons.count(d.id)) return {};
+            for (size_t i=0;i<bundle->flash_slash_levels.size();++i) {const auto &v=bundle->flash_slash_levels[i];if (v.weapon!=d.id || v.level!=i+1) return {};}
             continue;
         }
         if (d.external_id=="W27") {

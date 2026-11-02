@@ -93,6 +93,8 @@ var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
 var _kill_sonic_visual: RefCounted
+var _slash_world_time := -1.0
+var _slash_visual: RefCounted
 var _afterimage_clock := -1.0
 var _afterimage_visual: RefCounted
 var _escort_world_time := -1.0
@@ -898,6 +900,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		_vortex_world_time = -1.0
 		if _kill_sonic_visual!=null: _kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+		if _slash_visual!=null: _slash_visual.dispose()
+		_slash_visual = null
+		_slash_world_time = -1.0
 		if _afterimage_visual!=null: _afterimage_visual.dispose()
 		_afterimage_visual = null
 		_afterimage_clock = -1.0
@@ -974,6 +979,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_kill_sonic and _kill_sonic_visual!=null:
 		_kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+	var equipped_slash: bool = frame.ui.get("flash_slash",{}).get("ready",false)
+	if equipped_slash and _slash_visual==null:
+		_slash_visual = preload("res://scripts/render/equipment/flashSlash.gd").new()
+		_slash_visual.setup_frame(_layer(19),_pixel)
+	if not equipped_slash and _slash_visual!=null:
+		_slash_visual.dispose()
+		_slash_visual = null
+		_slash_world_time = -1.0
 	var equipped_afterimage: bool = frame.ui.get("afterimage",{}).get("ready",false)
 	if equipped_afterimage and _afterimage_visual==null:
 		_afterimage_visual = preload("res://scripts/render/equipment/afterimage.gd").new()
@@ -1140,6 +1153,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		_boss_lance_visual.frame_event(event)
 		_boss_wave_visual.frame_event(event)
+		if _slash_visual!=null: _slash_visual.frame_event(event)
 		if _escort_visual!=null: _escort_visual.on_event(event)
 		if _interceptor_visual!=null: _interceptor_visual.on_event(event)
 		if _bipolar_visual!=null: _bipolar_visual.frame_event(event)
@@ -1324,6 +1338,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
+	var slash_dt: float = 0.0 if _slash_world_time<0.0 else maxf(0.0,ui.world_time-_slash_world_time)
+	_slash_world_time = ui.world_time if equipped_slash else -1.0
+	if _slash_visual!=null: _slash_visual.frame_tick(ui.flash_slash,ui.character_scale,slash_dt)
 	var afterimage_dt: float = 0.0 if _afterimage_clock<0.0 else maxf(0.0,ui.afterimage.clock-_afterimage_clock)
 	_afterimage_clock = ui.afterimage.clock if equipped_afterimage else -1.0
 	if _afterimage_visual!=null: _afterimage_visual.frame_tick(ui.afterimage,ui.character_scale,afterimage_dt)

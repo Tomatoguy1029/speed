@@ -48,6 +48,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
     for (const auto &v:state.loadout.kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
+    auto &slash=state.loadout.flash_slash;if (!std::isfinite(slash.clock) || slash.clock<0 || !std::isfinite(slash.released)) return false;slash.marked_ids.clear();
+    for (const auto &m:slash.marks) {if (m.id<=0 || !m.total || !m.left || m.left>m.total || !std::isfinite(m.time) || !std::isfinite(m.delay) || m.delay<0 || !std::isfinite(m.age) || m.age<0 || !std::isfinite(m.damage) || m.damage<0 || !std::isfinite(m.distance) || m.distance<0 || (state.enemy_handles.contains(m.target) && state.enemy_handles.entity_id(m.target)!=m.id) || !slash.marked_ids[m.dash].insert(m.id).second) return false;}
     const auto &afterimage=state.loadout.afterimage;if (!std::isfinite(afterimage.clock) || afterimage.clock<0 || afterimage.echoes.size()>8) return false;
     bool current_found=afterimage.current==0;
     for (const auto &echo:afterimage.echoes) {if (!echo.id || echo.id>=afterimage.next_id || !std::isfinite(echo.start) || !std::isfinite(echo.until) || !std::isfinite(echo.share) || echo.share<0 || echo.legs.size()>2048 || echo.copies.empty() || echo.copies.size()>8) return false;if (echo.id==afterimage.current) {if (echo.ended) return false;current_found=true;}

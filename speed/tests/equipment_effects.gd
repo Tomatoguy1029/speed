@@ -66,6 +66,17 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w28-boss-visual" in OS.get_cmdline_user_args():
+		await check_cpp_w28_boss_visual()
+		print("[cpp_w28_boss_visual] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+	if "--cpp-w28" in OS.get_cmdline_user_args() or "--cpp-w28-retry" in OS.get_cmdline_user_args():
+		var completed = await check_cpp_w28()
+		check(completed==true,"閃光斬の指定確認を最後まで完了する")
+		print("[cpp_w28] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w27" in OS.get_cmdline_user_args() or "--cpp-w27-retry" in OS.get_cmdline_user_args():
 		await check_cpp_w27()
 		print("[cpp_w27] failed=%d" % failures)
@@ -1740,6 +1751,7 @@ func trait_test_session(id: String, config: GameConfig, seed_value: int):
 	stage.index = 84
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"] if id in ["T03","T06"] else ["drifter"])
+	if id=="W28": stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":0.0}}
 	if id=="T06": stage.enemy_tuning = {"shield":{"hp":200.0}}
 	var output := "res://.content/dev/run_"+id
 	var builder = load("res://tools/content/build_run_content.gd")
@@ -3798,3 +3810,100 @@ func check_cpp_w27() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"ミラージュの状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w28() -> bool:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	var session = await trait_test_session("W28",config,628)
+	if session==null:
+		OS.remove_logger(errors)
+		return false
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W28")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var events: Array = []
+	bridge.subscribe("w28_check",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	for level in range(1,definition.level_steps.size()+1):
+		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"閃光斬の全段の基準へ復帰する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W28","levels":level}).ok,"閃光斬を全段取得する")
+		var center: Vector2 = core.ship_snapshot().ship_pos
+		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(100,0)}).value
+		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
+		events.clear()
+		trait_start_trace(bridge,600.0)
+		for tick in 40:
+			check(bridge.step(1.0/120.0,idle,viewport).ok,"通常の体当たりから閃光斬の印を付ける")
+			if not bridge._ui.flash_slash.marks.is_empty(): break
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"印の通知と保持状態を表示へ配信する")
+		var marks: Array = bridge._ui.flash_slash.marks
+		check(marks.size()==1,"敵IDと突進IDを索引して同じ突進の印を一度だけ付ける")
+		if marks.is_empty(): break
+		var mark: Dictionary = marks[0]
+		var ram: Array = events.filter(func(e):return e.type==&"combat_damage" and e.payload.cause=="ram")
+		check(mark.total==int(definition.params.cuts_by_level[level-1]) and mark.left==mark.total and mark.time<0 and is_equal_approx(mark.damage,float(ram[0].payload.applied)*float(definition.params.mult_by_level[level-1])),"全段の斬撃回数と実体当たりダメージを印へ固定する")
+		check(core.enemy_motion_snapshot().filter(func(e):return e.id==target)[0].slash_hold==1,"通常の敵は独立した閃光斬の保持で止まる")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._slash_visual!=null and presentation.frame_view._slash_visual.needles.has(target),"保持した敵の現在位置に既存の光の針を表示する")
+		var saved: Dictionary = bridge.checkpoint()
+		bridge.command("pause",{"paused":true})
+		var paused: Dictionary = bridge._ui.flash_slash.duplicate(true)
+		bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.1)
+		check(bridge._ui.flash_slash==paused,"停止中は印の時間と表示を止める")
+		bridge.command("pause",{"paused":false})
+		for tick in 150: check(bridge.step(1.0/120.0,idle,viewport).ok,"突進の終了後に順番に斬る")
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"発進後の斬撃と解放を表示へ配信する")
+		check(events.filter(func(e):return e.type==&"flash_slash").size()==mark.total and bridge._ui.flash_slash.marks.is_empty() and bridge._ui.flash_slash.dash_count==0,"指定回数だけ斬って印と索引を寿命と同時に回収する")
+		var enemies: Array = core.enemies_snapshot()
+		check(core.enemy_motion_snapshot().filter(func(e):return e.id==target)[0].slash_hold==0,"斬り終えた印が保持を解除する")
+		var after: Dictionary = bridge._ui.flash_slash.duplicate(true)
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"印・残り回数・取得順と索引を途中復帰する")
+		for tick in 150: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.flash_slash==after and core.enemies_snapshot()==enemies,"途中復帰で同じ順番とダメージを再現する")
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"印の途中解除の基準へ復帰する")
+		bridge.command("dev_remove_weapon",{"id":"W28"})
+		presentation._present_cpp(0.01)
+		check(bridge._ui.flash_slash.marks.is_empty() and bridge._ui.flash_slash.dash_count==0 and core.enemy_motion_snapshot().filter(func(e):return e.id==target)[0].slash_hold==0 and presentation.frame_view._slash_visual==null,"途中解除で保持・印・索引・光の針を回収する")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	bridge.unsubscribe("w28_check")
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"閃光斬の状態と表示に実行エラーがない: %s" % [errors.messages()])
+	return true
+
+func check_cpp_w28_boss_visual() -> void:
+	OS.add_logger(capture)
+	var boss = preload("res://scripts/bosses/monoceros/sword_flash_visual.gd").new()
+	add_child(boss)
+	var weapon = preload("res://scripts/render/equipment/flashSlash.gd").new()
+	var parent := Node2D.new()
+	add_child(parent)
+	weapon.setup_frame(parent,1.0)
+	var release := {"type":&"slash_release","path":PackedVector2Array([Vector2.ZERO,Vector2(100,0)]),"count":3,"sweep":0.1,"pause":0.1}
+	boss.frame_event(release)
+	weapon.frame_event(release)
+	check(boss.effects.is_empty() and weapon.streaks.size()==3,"武器の解放通知を一角獣の斬撃として読まない")
+	var slash := {"type":&"monoceros_slash_release","line":PackedVector2Array([Vector2.ZERO,Vector2(100,0)]),"width":8.0}
+	boss.frame_event(slash)
+	weapon.frame_event(slash)
+	check(not boss.effects.is_empty() and weapon.streaks.size()==3,"一角獣の斬撃を武器の解放通知として読まない")
+	weapon.dispose()
+	parent.free()
+	boss.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"二つの斬撃表示の通知が混ざらない: %s" % [capture.messages()])

@@ -1469,6 +1469,10 @@
       {
         "name": "Finale",
         "value": "finale"
+      },
+      {
+        "name": "FlashSlash",
+        "value": "flashSlash"
       }
     ],
     "VisualRole": [
@@ -1973,6 +1977,18 @@
       {
         "name": "ClearBanner",
         "value": "clear_banner"
+      },
+      {
+        "name": "SlashMark",
+        "value": "slash_mark"
+      },
+      {
+        "name": "FlashSlash",
+        "value": "flash_slash"
+      },
+      {
+        "name": "MonocerosSlashRelease",
+        "value": "monoceros_slash_release"
       }
     ],
     "ResultKind": [
@@ -2609,8 +2625,10 @@
       "reason"
     ],
     "slash_release": [
-      "line",
-      "width"
+      "path",
+      "count",
+      "sweep",
+      "pause"
     ],
     "escort_deploy": [
       "pos",
@@ -2633,7 +2651,25 @@
     "boss_explode": [
       "pos"
     ],
-    "clear_banner": []
+    "clear_banner": [],
+    "slash_mark": [
+      "pos",
+      "radius",
+      "id",
+      "dash"
+    ],
+    "flash_slash": [
+      "pos",
+      "length",
+      "width",
+      "id",
+      "dash",
+      "cut"
+    ],
+    "monoceros_slash_release": [
+      "line",
+      "width"
+    ]
   },
   "includes": [
     "attacks.json",
