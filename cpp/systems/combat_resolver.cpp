@@ -70,6 +70,7 @@ EnemyHandle CombatResolver::damage_target(const RunRuntime &run,EnemyHandle stru
 GateResult CombatResolver::gate(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {
     const auto &s=run.state;if (!s.enemy_handles.contains(target)) return GateResult::Pass;
     const auto &e=s.enemies[target.slot];const auto &d=run.content->definitions[e.definition];const bool ram=request.cause==Cause::Ram;
+    const auto &p=run.combat_hooks.enemy_policy(d.kind);if (p.passes && p.passes(run,target)) return GateResult::Pass;
     if (d.kind==EnemyDefinition::Kind::Shield) return ShieldBehavior::blocks_front(run,target,request.has_impact?request.impact:e.pos,request.direction)?(ram?GateResult::Bounce:GateResult::Pass):GateResult::Allow;
     switch (d.gate) {
     case EnemyDefinition::Gate::Solid:return ram?GateResult::Bounce:GateResult::Allow;
@@ -82,7 +83,7 @@ GateResult CombatResolver::gate(const RunRuntime &run,EnemyHandle target,const D
         return ram?GateResult::Bounce:GateResult::Pass;
     default:break;
     }
-    const auto &p=run.combat_hooks.enemy_policy(d.kind);return !p.allows || p.allows(run,target,request)?GateResult::Allow:GateResult::Pass;
+    return !p.allows || p.allows(run,target,request)?GateResult::Allow:GateResult::Pass;
 }
 bool CombatResolver::allows_hit(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {return gate(run,target,request)==GateResult::Allow;}
 double CombatResolver::ram_damage(const RunRuntime &run,EnemyHandle target,double amount) {

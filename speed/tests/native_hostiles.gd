@@ -16,6 +16,11 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-triangle-star" in OS.get_cmdline_user_args():
+		await check_cpp_triangle_star()
+		print("[cpp_triangle_star] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-cepheus" in OS.get_cmdline_user_args():
 		await check_cpp_cepheus()
 		print("[cpp_cepheus] failed=%d" % failed)
@@ -1620,4 +1625,84 @@ func check_cpp_cepheus() -> void:
 	check(cepheus_soldiers(core,replacement).is_empty(),"召喚途中で王を倒すと兵を後から生成しない")
 	bridge.release_checkpoint(pending.value)
 	bridge.release_checkpoint(seven.value)
+	session.free()
+
+func check_cpp_triangle_star() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 94
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["darter","triangle_star"])
+	stage.enemy_tuning = {"darter":{"speed":0.0,"params.windup":0.05,"params.dash_speed":0.0,"params.dash_time":0.3}}
+	var output := "res://.content/dev/run_triangle_star"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"三角形の星の部位とゲート".sha256_text())
+	check(built==OK,"三角形の星の編集値と専用画像を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_94.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":941},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"星の部位と通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.configure_attack_budget({"enabled":false,"budget":4.0,"jitter":0.0})
+	core.set_motion_context(target,target,Vector2(640,360))
+	# 親triangleは別の移行単位。既存DASH種類で部位の親mode依存を確かめる。
+	var parent: int = core.spawn_enemy(&"darter",target+Vector2(500,0),{})
+	var at := target+Vector2(200,100)
+	var made: Dictionary = bridge.command("dev_spawn_part",{"parent_id":parent,"definition_id":"triangle_star","position":at})
+	check(made.ok,"既存の部位生成入口で星を登録する")
+	if not made.ok:
+		session.free()
+		return
+	var star: int = made.value
+	check(pulse_motion(core,star).parent_id==parent,"星は世代付きの親と個体IDを保持する")
+	var hit: Dictionary = bridge.command("dev_damage",{"entity_id":star,"amount":0.5,"cause":"shot","no_crit":true})
+	check(hit.ok and hit.value.applied==0.5,"親が止まっている間は星へ通常の攻撃が通る")
+	core.step(0.05)
+	core.step(0.05)
+	check(pulse_motion(core,parent).mode==EnemyTable.Mode.DASH and Vector2(dolphin_enemy(core,star).vel[0],dolphin_enemy(core,star).vel[1])==Vector2.ZERO,"星は独自に進まず親の辺移動を参照する")
+	core.set_enemy_motion(parent,{"held":true})
+	hit = bridge.command("dev_damage",{"entity_id":star,"amount":0.5,"cause":"shot","no_crit":true})
+	check(hit.ok and hit.value.applied==0.0 and hit.value.reason==&"damage_gate","親が辺を移動中は星のゲートがダメージを止める")
+	var hp: float = dolphin_enemy(core,star).hp
+	core.rebuild_enemy_grid(cfg.grid_cell)
+	bridge.command("dev_ship_motion",{"position":at+Vector2(5,0),"velocity":Vector2(1200,0)})
+	core.collide_ship(at-Vector2(5,0),cfg.ship_radius)
+	check(dolphin_enemy(core,star).hp==hp and core.ship_snapshot().ship_vel==Vector2(1200,0),"移動中の星を体当たりで通り抜け、反射もダメージも出さない")
+	var wall: Dictionary = bridge.command("dev_fire_wall",{"position":at-Vector2(150,0),"angle":0.0,"length":150.0,"width":14.0,"delay":0.0,"active":0.5,"damage":3.0,"style":1,"attached":true,"owner_id":star})
+	check(wall.ok,"既存の壁入口で星へ赤い軌跡を付ける")
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	var hazards: Array = core.hazards_snapshot()
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(900,500),Vector2(1800,1000))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(frame.triangle_star.size()==5 and presentation.frame_view.apply_frame(frame),"星の画像と段差のある赤い軌跡を通常画面へ表示する")
+	await get_tree().process_frame
+	core.step_hazards(0.6)
+	check(core.hazards_snapshot().is_empty(),"星の軌跡は自然寿命で終了する")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before and core.hazards_snapshot()==hazards,"親参照・ゲート・軌跡を値から復帰する")
+	bridge.command("dev_kill",{"entity_id":star,"cause":"shot"})
+	core.step_hazards(0.01)
+	check(core.hazards_snapshot().is_empty() and not dolphin_enemy(core,parent).dead,"星の途中撃破で付属軌跡を終了し親へダメージを転送しない")
+	bridge.restore(pending.value)
+	core.remove_enemy(parent)
+	var replacement: int = core.spawn_enemy(&"darter",target+Vector2(500,0),{})
+	core.step(0.01)
+	core.step_hazards(0.01)
+	check(dolphin_enemy(core,star).dead and core.hazards_snapshot().is_empty() and replacement!=parent,"親の先行削除と行の再利用で古い星を新しい親へ結び付けない")
+	core.remove_enemy(star)
+	var alone: int = core.spawn_enemy(&"triangle_star",at,{})
+	core.step(0.01)
+	check(dolphin_enemy(core,alone).dead and not pulse_motion(core,alone).has("parent_id"),"親のない単体の星は古い親参照を持たず正常に退場する")
+	bridge.release_checkpoint(pending.value)
 	session.free()

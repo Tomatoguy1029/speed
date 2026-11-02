@@ -18,6 +18,7 @@ public:
         void (*body_damaged)(RunRuntime &,EnemyHandle)=nullptr;
         bool (*can_defeat)(const RunRuntime &,EnemyHandle)=nullptr;
         DeathHook boss_defeated=nullptr;
+        bool (*passes)(const RunRuntime &,EnemyHandle)=nullptr;
     };
     class Dispatch {
         CombatHooks &owner;

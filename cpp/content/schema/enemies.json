@@ -1589,6 +1589,18 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "TriangleStarDefinition",
+      "section": 112,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
     }
   ],
   "enums": {}

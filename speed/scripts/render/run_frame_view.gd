@@ -18,6 +18,7 @@ var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
 var _lance_hits: Array = []
+var _triangle_star := PackedFloat64Array()
 var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
 var _aquila := PackedFloat64Array()
 var _aquila_view := Rect2()
@@ -208,6 +209,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/cross.gd").draw_frame(canvas,_cross,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/bomber.gd").draw_frame(canvas,_bomber,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/crab.gd").draw_frame(canvas,_crab,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/triangle_star.gd").draw_frame(canvas,_triangle_star,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/cepheus.gd").draw_frame(canvas,_cepheus,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/aquila.gd").draw_frame(canvas,_aquila,_aquila_view,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
@@ -338,6 +340,10 @@ func _valid(frame: Dictionary) -> bool:
 	if frame.has("pulser"):
 		if not frame.pulser is PackedFloat64Array or frame.pulser.size()%6!=0: return false
 		for value in frame.pulser:
+			if not is_finite(value): return false
+	if frame.has("triangle_star"):
+		if not frame.triangle_star is PackedFloat64Array or frame.triangle_star.size()%5!=0: return false
+		for value: float in frame.triangle_star:
 			if not is_finite(value): return false
 	if frame.has("cepheus"):
 		if not frame.cepheus is Dictionary: return false
@@ -711,6 +717,10 @@ func apply_frame(frame: Dictionary) -> bool:
 		_gravity_canvas.queue_redraw()
 	if frame.has("boss_techniques"): _boss_technique_visual.apply_frame(frame.boss_techniques)
 	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
+	var triangle_star: PackedFloat64Array = frame.get("triangle_star",PackedFloat64Array())
+	if triangle_star!=_triangle_star:
+		_triangle_star=triangle_star
+		_gunner_marks.queue_redraw()
 	var cepheus: Dictionary = frame.get("cepheus",{"values":PackedFloat64Array(),"marks":PackedFloat64Array()})
 	if cepheus!=_cepheus:
 		_cepheus=cepheus

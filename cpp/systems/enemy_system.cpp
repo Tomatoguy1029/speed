@@ -70,7 +70,7 @@ void EnemySystem::flush_spawns(RunRuntime &run) {
 }
 int64_t EnemySystem::spawn_part(RunRuntime &run,EnemyHandle parent,size_t definition,godot::Vector2 position) {
     auto &state=run.state;
-    if (!state.enemy_handles.contains(parent) || state.enemies[parent.slot].dead || definition>=run.content->definitions.size() || run.content->definitions[definition].kind!=EnemyDefinition::Kind::Part) return -1;
+    if (!state.enemy_handles.contains(parent) || state.enemies[parent.slot].dead || definition>=run.content->definitions.size() || (run.content->definitions[definition].kind!=EnemyDefinition::Kind::Part && run.content->definitions[definition].kind!=EnemyDefinition::Kind::TriangleStar)) return -1;
     const auto parent_id=state.enemies[parent.slot].id;const bool held=state.enemies[parent.slot].held;
     EnemySpawn options;options.position=position;options.group=state.enemies[parent.slot].attack_group;
     options.value=state.enemies[parent.slot].attack_value;options.priority=state.enemies[parent.slot].attack_priority;options.has_value=options.has_priority=true;
