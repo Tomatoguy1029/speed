@@ -162,6 +162,7 @@ void tick_flow(RunRuntime &r,BossFlowState &f,double dt) {
 }
 bool FlowRunner::condition(const RunRuntime &r,const BossFlowState &f,uint32_t definition,bool filtered,uint32_t role) {
     if (!definition) return true;if (definition>r.content->flow_conditions.size() || !r.state.enemy_handles.contains(participant(f,role))) return false;const auto &p=r.content->flow_conditions[definition-1];const auto &e=r.state.enemies[participant(f,role).slot];const auto relative=((filtered?r.state.enemy_aim:r.state.ship_pos)-e.pos).rotated(-e.facing);
+    if (r.content->bosses[r.content->boss_flows[f.definition-1].boss-1].kind==4) for (const auto &gate:r.content->draco_flow_gates) if (gate.condition==definition && f.phase>gate.maximum_phase) return false;
     return f.phase>=p.minimum_phase && relative.length()>=p.minimum && relative.length()<=p.maximum && std::abs(angle_difference(relative.angle()-p.angle))<=p.half_angle+0.00001;
 }
 void FlowRunner::begin_rest(RunRuntime &r,BossFlowState &f,uint32_t next) {rest(f,r.content->boss_flows[f.definition-1],next);}
@@ -191,6 +192,8 @@ bool FlowRunner::validate_content(const ContentBundle &c) {
     for (const auto &p:c.boss_flows) if (p.maximum_stamina<=0 || sections(c,p.id).empty()) return false;
     for (const auto &p:c.flow_sections) {const auto list=sections(c,p.flow);if (p.order>=list.size() || list[p.order]!=p.id || p.next>=list.size() || (p.has_fallback && p.fallback>=list.size()) || p.cap<=0 || (p.has_budget && p.budget<=0)) return false;}
     for (const auto &p:c.flow_conditions) if (p.minimum>p.maximum || p.half_angle>godot::Math::PI) return false;
+    std::set<uint32_t> draco_conditions;
+    for (const auto &gate:c.draco_flow_gates) {if (!draco_conditions.insert(gate.condition).second || gate.condition>c.flow_conditions.size() || gate.maximum_phase<c.flow_conditions[gate.condition-1].minimum_phase) return false;}
     std::function<bool(uint32_t,unsigned,std::set<uint32_t>)> tree=[&](uint32_t id,unsigned depth,std::set<uint32_t> path) {
         if (!id || id>c.flow_nodes.size() || depth>24 || !path.insert(id).second) return false;const auto &p=c.flow_nodes[id-1];const auto list=children(c,id);if (p.kind<=1 && !list.empty()) return false;if (p.kind==4 && (list.size()!=2 || !p.condition)) return false;if ((p.kind==2 || p.kind==3) && list.empty()) return false;
         if (p.condition>c.flow_conditions.size() || (p.kind==1 && (!p.technique || p.technique>c.boss_techniques.size() || c.boss_techniques[p.technique-1].boss!=c.boss_flows[p.flow-1].boss))) return false;

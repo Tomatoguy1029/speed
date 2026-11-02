@@ -123,6 +123,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->boss_flows=records.BossFlowProgram_rows;
     bundle->flow_sections=records.BossFlowSection_rows;
     bundle->flow_conditions=records.BossFlowCondition_rows;
+    bundle->draco_flow_gates=records.DracoFlowGateDefinition_rows;
     bundle->flow_nodes=records.BossFlowNode_rows;
     bundle->flow_children=records.BossFlowChild_rows;
     bundle->flow_actions=records.BossFlowAction_rows;

@@ -1252,11 +1252,12 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 			package.visuals.append(value)
 	return package
 
-static func _flow_condition(records: Dictionary, gate: Dictionary, hydra := false) -> int:
+static func _flow_condition(records: Dictionary, gate: Dictionary, hydra := false, draco := false) -> int:
 	for key in gate:
-		if key not in ["min","max","angle","half_angle","min_phase"] and not (hydra and key in ["distance_origin","angle_origin","ignore_when_separated"]): return 0
+		if key not in ["min","max","angle","half_angle","min_phase"] and not (hydra and key in ["distance_origin","angle_origin","ignore_when_separated"]) and not (draco and key=="max_phase"): return 0
 	var id: int = records.BossFlowCondition.size()+1
 	records.BossFlowCondition.append({"id":id,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",100000.0)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"minimum_phase":int(gate.get("min_phase",1))})
+	if draco: records.DracoFlowGateDefinition.append({"id":records.DracoFlowGateDefinition.size()+1,"condition":id,"maximum_phase":int(gate.get("max_phase",3))})
 	return id
 
 static func _flow_node(records: Dictionary, node: Dictionary, rules: Resource, techniques: Dictionary, depth := 0) -> int:
@@ -1266,8 +1267,8 @@ static func _flow_node(records: Dictionary, node: Dictionary, rules: Resource, t
 	if node.type=="action":
 		if not techniques.has(String(node.get("id",""))): return 0
 		row.technique = techniques[String(node.id)]
-		row.condition = _flow_condition(records,rules.conditions.get(String(node.id),{}),rules.adapter==&"hydra")
-	elif node.type=="branch": row.condition = _flow_condition(records,node.get("condition",{}),rules.adapter==&"hydra")
+		row.condition = _flow_condition(records,rules.conditions.get(String(node.id),{}),rules.adapter==&"hydra",rules.adapter==&"draco")
+	elif node.type=="branch": row.condition = _flow_condition(records,node.get("condition",{}),rules.adapter==&"hydra",rules.adapter==&"draco")
 	if node.type in ["action","branch"] and row.condition==0: return 0
 	records.BossFlowNode.append(row)
 	var children: Array = node.get("children",[])
@@ -1283,7 +1284,7 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 	if rules==null or flow==null or not BossProgram.validate({"rules":rules,"flow":flow}).is_empty(): return {}
 	var records := {}
 	for record in Schema.SCHEMA.records:
-		if record.name.begins_with("BossFlow"): records[record.name] = []
+		if record.name.begins_with("BossFlow") or record.name=="DracoFlowGateDefinition": records[record.name] = []
 	var ids := {}
 	for technique in techniques:
 		if technique.phase==1: ids[String(technique.external_id)] = technique.id
@@ -1299,7 +1300,7 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 			for candidate in rules.techniques:
 				if String(candidate.technique)==source: move = candidate
 		for entry in rules.active_gate_entries_for(source):
-			var gate: int = _flow_condition(records,entry.gate,rules.adapter==&"hydra")
+			var gate: int = _flow_condition(records,entry.gate,rules.adapter==&"hydra",rules.adapter==&"draco")
 			if gate==0: return {}
 			var node := _flow_node(records,rules.combos[source] if combo else {"type":"action","id":source},rules,ids)
 			if node==0: return {}
@@ -2105,7 +2106,7 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 		# 固有表と、その表が使う共通攻撃の定義を参照関係から一緒に加える。
 		var tables := {}
 		for record: Dictionary in Schema.SCHEMA.records:
-			if String(record.name).begins_with("Boss"): tables[record.name] = true
+			if String(record.name).begins_with("Boss") or record.name=="DracoFlowGateDefinition": tables[record.name] = true
 		var expanded := true
 		while expanded:
 			expanded = false

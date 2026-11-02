@@ -16,5 +16,6 @@ namespace speed {class DracoTechnique {public:
     static void blend(RunRuntime &,BossBodyState &,const std::vector<godot::Vector2> &,const std::vector<godot::Vector2> &,double);
     static godot::Vector2 mouth(const RunRuntime &,const BossBodyState &);
     static godot::Vector2 predict(const RunRuntime &,EnemyHandle,double,double);
+    static bool observe_contact(RunRuntime &,TechniqueState &,bool);
     static void hit_segment(RunRuntime &,TechniqueState &,godot::Vector2,godot::Vector2,double,Cause cause=Cause::Bite);
 };}
