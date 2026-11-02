@@ -1,4 +1,5 @@
 #include "enemy_system.h"
+#include "../bosses/draco/picaro.h"
 #include "../bosses/flow/phase_controller.h"
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/defender.h"
@@ -54,6 +55,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Crow) enemy.behavior_state=CrowState{};
     if (def.kind==EnemyDefinition::Kind::Defender) {enemy.behavior_state=DefenderState{};run.workspace.defender_posts_tick=-1;}
     enemy.origin=p.origin;enemy.role=p.is_boss?SpawnRole::BossBody:(state.field.rock_handles.contains(p.rock)?SpawnRole::Terrain:SpawnRole::Regular);
+    enemy.picaro_owner=p.picaro_owner;enemy.source_definition=p.picaro_owner.generation?uint32_t(definition+1):0;
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
@@ -80,13 +82,14 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Crab && !p.has_facing) CrabBehavior::steer(run,uint32_t(row));
     if (def.kind==EnemyDefinition::Kind::Crow) CrowBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)),p.flock_member);
     if (def.kind==EnemyDefinition::Kind::Triangle) TriangleBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)));
+    if (p.picaro_owner.generation) DracoPicaro::spawned(run,state.enemy_handles.at(uint32_t(row)));
     return enemy.id;
 }
 void EnemySystem::flush_spawns(RunRuntime &run) {
     auto pending=std::move(run.state.pending_enemies);run.state.pending_enemies.clear();
     for (const auto &entry:pending) {
         EnemySpawn p;p.position=entry.position;p.velocity=entry.velocity;p.facing=entry.facing;p.has_facing=true;
-        p.hit_cd=entry.hit_cd;p.guard=entry.guard;p.knock=entry.knock;p.priority=entry.priority;p.has_priority=true;p.origin=entry.origin;
+        p.hit_cd=entry.hit_cd;p.guard=entry.guard;p.knock=entry.knock;p.priority=entry.priority;p.has_priority=true;p.origin=entry.origin;p.picaro_owner=entry.picaro_owner;
         spawn_base(run,entry.definition-1,p);
     }
 }
@@ -95,6 +98,7 @@ int64_t EnemySystem::spawn_part(RunRuntime &run,EnemyHandle parent,size_t defini
     if (!state.enemy_handles.contains(parent) || state.enemies[parent.slot].dead || definition>=run.content->definitions.size() || (run.content->definitions[definition].kind!=EnemyDefinition::Kind::Part && run.content->definitions[definition].kind!=EnemyDefinition::Kind::TriangleStar)) return -1;
     const auto parent_id=state.enemies[parent.slot].id;const bool held=state.enemies[parent.slot].held;
     EnemySpawn options;options.origin=state.enemies[parent.slot].is_boss?SpawnOrigin::BossPart:state.enemies[parent.slot].origin;options.position=position;options.group=state.enemies[parent.slot].attack_group;
+    options.picaro_owner=state.enemies[parent.slot].picaro_owner;
     options.value=state.enemies[parent.slot].attack_value;options.priority=state.enemies[parent.slot].attack_priority;options.has_value=options.has_priority=true;
     const auto id=spawn_base(run,definition,options);if (id<0) return id;
     const auto row=state.rows_by_id.at(id);auto &part=state.enemies[row];part.parent=parent;part.parent_id=parent_id;part.held=held;part.role=state.enemies[parent.slot].is_boss?SpawnRole::BossPart:SpawnRole::Regular;

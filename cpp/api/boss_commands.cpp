@@ -8,6 +8,7 @@
 #include "../bosses/hydra/body.h"
 #include "../bosses/draco/body.h"
 #include "../bosses/draco/pose.h"
+#include "../bosses/draco/picaro.h"
 #include "../bosses/canis_major/flames.h"
 #include "../bosses/canis_major/hound_lunge.h"
 #include "../systems/attack_system.h"
@@ -31,6 +32,19 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));const auto target=runtime.state.rows_by_id.find(int64_t(p["target"]));const int64_t definition=p["definition"],observation=p["observation"];if (found==runtime.state.rows_by_id.end() || definition<=0 || uint64_t(definition)>runtime.content->canis_flames.size() || observation<0) return result(false);
         auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=2 || body->mode>=speed::BossMode::Defeated) return result(false);
         const auto handle=speed::CanisFlames::begin(runtime,*body,definition,target==runtime.state.rows_by_id.end()?speed::EnemyHandle{}:runtime.state.enemy_handles.at(target->second),observation);const auto *record=speed::AttackSystem::get(runtime.state,handle);return result(record!=nullptr,record?record->id:0);
+    }
+    if (kind=="dev_draco_picaro") {
+        if (p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);
+        const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);
+        auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=4 || body->mode>=speed::BossMode::Defeated) return result(false);
+        const String operation=p["operation"];
+        if (operation=="spawn" && p.size()==4 && p.get("source",Variant()).get_type()==Variant::STRING && p.get("position",Variant()).get_type()==Variant::VECTOR2 && Vector2(p["position"]).is_finite()) {
+            for (uint32_t j=0;j<runtime.content->definitions.size();++j) if (runtime.content->definitions[j].id==StringName(String(p["source"]))) {const auto h=speed::DracoPicaro::spawn(runtime,*body,j+1,p["position"]);return result(runtime.state.enemy_handles.contains(h),runtime.state.enemy_handles.entity_id(h));}return result(false);
+        }
+        if (operation=="pause" && p.size()==3 && p.get("cancel",Variant()).get_type()==Variant::BOOL) {speed::DracoPicaro::pause(runtime,*body,p["cancel"]);return result(true);}
+        if (operation=="attack" && p.size()==2) {body->draco.picaro_attacking=true;return result(true);}
+        if (operation=="clear" && p.size()==2) {speed::DracoPicaro::clear(runtime,*body);return result(true);}
+        return result(false);
     }
     if (kind=="dev_draco_pose") {
         if (p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);

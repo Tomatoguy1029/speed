@@ -112,6 +112,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             !state.rows_by_id.emplace(enemy.id,row).second) return false;
     }
     for (const auto &enemy:state.enemies) if (enemy.alive) {
+        if (enemy.source_definition>content.definitions.size() || (enemy.picaro_owner.generation && !enemy.source_definition)) return false;
         if (enemy.origin>=SpawnOrigin::Count || enemy.role>=SpawnRole::Count) return false;
         if (state.enemy_handles.contains(enemy.parent) && state.enemy_handles.entity_id(enemy.parent)!=enemy.parent_id) return false;
         const auto *sniper=std::get_if<SniperState>(&enemy.behavior_state);

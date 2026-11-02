@@ -76,6 +76,8 @@ var _telescope_beams: Array[Dictionary] = []
 var _pulser_visual: EnemyVisual
 var _pulser_parent: Node2D
 var _phoenix_visual: EnemyVisual
+var _picaro_sprites := {}
+var _picaro_material: ShaderMaterial
 var _boss_body_displays := {}
 var _boss_technique_visual: Node2D
 var _boss_lance_visual: Node2D
@@ -828,6 +830,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		_boss_wave_visual.apply_frame(waves,float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
 		_boss_sword_visual.apply_frame(float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
 	var body_seen := {}
+	_sync_cpp_picaro(frame.get("boss_bodies",[]))
 	for body: Dictionary in frame.get("boss_bodies",[]):
 		if body.kind not in [0,1,2,3,4]: continue
 		body_seen[body.id] = true
@@ -1530,3 +1533,46 @@ func _draw_hero_values(canvas: CanvasItem) -> void:
 	if _hero_frame.is_empty(): return
 	var half: Vector2 = _hero_frame.view_half
 	preload("res://scripts/render/hero_constellation.gd").draw(canvas,_hero_frame.get("hero",{}),1.0/maxf(0.01,float(_hero_frame.get("camera_zoom",1.0))),float(_hero_frame.world_time),Rect2(_hero_frame.view_center-half,half*2.0),_hero_aura,_hero_material)
+
+## 元の敵と同じ画像・形へ、既存のコズミック表示だけを重ねる。
+func _sync_cpp_picaro(bodies: Array) -> void:
+	if _picaro_material==null:
+		_picaro_material = ShaderMaterial.new()
+		_picaro_material.shader = preload("res://shaders/picaro.gdshader")
+	var used := {}
+	for body: Dictionary in bodies:
+		for member: Dictionary in body.get("picaro",[]):
+			var entry: Dictionary = visuals.get(member.visual_id,{})
+			if entry.is_empty(): continue
+			used[member.id] = true
+			if not _picaro_sprites.has(member.id):
+				var texture: Texture2D
+				var resource: Resource = _scope.resources.get(entry.path)
+				if resource is EnemyLook: texture = resource.previews.get(entry.get("hull_preview",""))
+				elif resource is Texture2D: texture = resource
+				var node: Node2D
+				if texture!=null:
+					var sprite := Sprite2D.new()
+					sprite.texture = texture
+					node = sprite
+				else:
+					var shape := Polygon2D.new()
+					shape.polygon = entry.get("points",InstanceBatch.circle_points(24))
+					shape.color = member.color
+					node = shape
+				node.material = _picaro_material
+				_layer(8).add_child(node)
+				_picaro_sprites[member.id] = node
+			var node: Node2D = _picaro_sprites[member.id]
+			node.position = member.position
+			node.rotation = member.angle
+			node.visible = not body.get("cinematic_hide_enemies",false)
+			var forming := clampf(1.0-float(member.born_age),0.0,1.0)
+			var radius: float = lerpf(float(member.sprite_radius),maxf(float(member.sprite_radius)*1.8,70.0),forming*forming)
+			node.scale = Vector2.ONE*radius
+			if node is Sprite2D: node.scale *= 2.0/maxf(node.texture.get_width(),node.texture.get_height())
+			node.modulate = Color(1,1,1,0.7 if member.guard>0.0 else 1.0)
+	for id in _picaro_sprites.keys():
+		if not used.has(id):
+			_picaro_sprites[id].queue_free()
+			_picaro_sprites.erase(id)

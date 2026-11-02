@@ -12,7 +12,7 @@ void CrowBehavior::spawned(RunRuntime &r,EnemyHandle h,bool member) {
     s.enemies[h.slot].mode=EnemyMode::Dash;const double facing=s.enemies[h.slot].facing;const auto u=godot::Vector2::from_angle(facing);const godot::Vector2 side(-u.y,u.x);
     const godot::Vector2 formation[]={godot::Vector2(-1,-1.1),godot::Vector2(-1.1,1),godot::Vector2(-2.1,0.2)};
     for (int64_t k=0;k<std::min<int64_t>(int64_t(p.flock)-1,3);++k) {
-        EnemySpawn options;options.origin=leader.origin;options.position=leader.pos+(u*formation[k].x+side*formation[k].y)*p.flock_gap;options.facing=facing;options.has_facing=true;options.elite=leader.elite;options.flock_member=true;
+        EnemySpawn options;options.origin=leader.origin;options.picaro_owner=leader.picaro_owner;options.position=leader.pos+(u*formation[k].x+side*formation[k].y)*p.flock_gap;options.facing=facing;options.has_facing=true;options.elite=leader.elite;options.flock_member=true;
         options.group=leader.attack_group;options.value=leader.attack_value;options.priority=leader.attack_priority;options.has_value=options.has_priority=true;
         const auto id=EnemySystem::spawn_base(r,leader.definition,options);if (id>0) s.enemies[s.rows_by_id.at(id)].mode=EnemyMode::Dash;
     }

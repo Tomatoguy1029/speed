@@ -55,7 +55,7 @@ void CepheusBehavior::step(RunRuntime &r,uint32_t row,double dt) {
         if (e.timer>-dt*1.5) {
             std::array<bool,7> taken{};for (auto h:soldiers(r,self)) taken[std::get<SoldierState>(s.enemies[h.slot].behavior_state).slot]=true;
             for (uint32_t k=0;k<tiers[v.tier-1];++k) if (!taken[k]) {
-                const auto at=slot(s.enemies[row],f,k);EnemySpawn spawn;spawn.origin=SpawnOrigin::Summon;spawn.position=at.first;spawn.facing=at.second;spawn.has_facing=true;spawn.group=e.attack_group;spawn.value=e.attack_value;spawn.has_value=true;spawn.priority=e.attack_priority;spawn.has_priority=true;
+                const auto at=slot(s.enemies[row],f,k);EnemySpawn spawn;spawn.origin=SpawnOrigin::Summon;spawn.picaro_owner=e.picaro_owner;spawn.position=at.first;spawn.facing=at.second;spawn.has_facing=true;spawn.group=e.attack_group;spawn.value=e.attack_value;spawn.has_value=true;spawn.priority=e.attack_priority;spawn.has_priority=true;
                 const auto id=EnemySystem::spawn_base(r,p.soldier-1,spawn);if (id<0) continue;
                 const auto child=s.enemy_handles.at(uint32_t(s.rows_by_id.at(id)));SoldierBehavior::configure(r,child,self,k,f,false);
             }

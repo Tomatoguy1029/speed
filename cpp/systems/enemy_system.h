@@ -9,6 +9,7 @@ struct EnemySpawn {
     bool has_velocity=false,has_hound_pack=false,flock_member=false,elite=false,is_boss=false,has_facing=false,has_value=false,has_priority=false,has_managed=false,managed=false;
     SpawnOrigin origin=SpawnOrigin::Normal;
     RockHandle rock;
+    EnemyHandle picaro_owner;
 };
 class EnemySystem {
 public:

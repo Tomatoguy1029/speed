@@ -128,7 +128,16 @@ struct CanisBodyState {
     std::vector<CanisHoundRef> led;
     std::vector<EnemyHandle> lunging;
 };
+struct DracoPicaroMember {
+    EnemyHandle actor;
+    std::vector<EnemyHandle> parts,clone_parts;
+    double born=0,angle=0;
+    uint32_t stars=1;
+};
 struct DracoBodyState {
+    std::vector<DracoPicaroMember> picaro;
+    std::vector<EnemyHandle> picaro_pending;
+    bool picaro_attacking=true;
     std::vector<godot::Vector2> trail,pose,override_points;
     double width=154,head_scale=1.35,depth=1,alpha=1;
 };

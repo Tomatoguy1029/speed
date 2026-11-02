@@ -6,6 +6,7 @@
 #include "../hydra/body.h"
 #include "../hydra/regrow.h"
 #include "../draco/body.h"
+#include "../draco/picaro.h"
 #include "../canis_major/flames.h"
 #include "../canis_major/hound_lunge.h"
 #include "../monoceros/horn_wave.h"
@@ -69,7 +70,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
     for (auto &b:s.bosses.bodies) {
         if (b.mode==BossMode::Defeated || b.mode==BossMode::Cancelled) continue;
         if (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead) {cancel(r,b.actor);continue;}
-        auto &e=s.enemies[b.actor.slot];const auto &p=r.content->boss_bodies[b.definition-1];const auto &definition=r.content->bosses[p.boss-1];b.clock+=dt;if (definition.kind==2) b.canis.turn_motion=0;
+        const auto &p=r.content->boss_bodies[b.definition-1];const auto &definition=r.content->bosses[p.boss-1];b.clock+=dt;if (definition.kind==4) DracoPicaro::tick(r,b);auto &e=s.enemies[b.actor.slot];if (definition.kind==2) b.canis.turn_motion=0;
         if (definition.kind==3 && b.mode!=BossMode::Final) {e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);HydraBody::step(r,b,dt);continue;}
         if (definition.kind==1) CentaurusBody::pre_step(r,b,dt);
         e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);bool suspend=true;
