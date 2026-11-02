@@ -2632,7 +2632,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if not paths.has(asset): paths.append(asset)
 	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")
 	for visual: Dictionary in visuals:
-		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
+		if (visual.role!=7 or visual.has("boss") or visual.has("hydra_move")) and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():
 		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
 	for asset in ["res://assets/pixel/airship_electronic_probe.png","res://assets/pixel/airship_blue_flame.png","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]:

@@ -629,8 +629,11 @@ func _finish_manual() -> void:
 
 func _populate_moves(selected := "") -> void:
 	_phase_picker.clear()
-	for phase in (3 if _target_id == "draco" else 2):
-		_phase_picker.add_item("形態 %d" % (phase + 1), phase + 1)
+	if _target_id=="hydra":
+		for label in ["3本の首","5本の首","8本の首","分離後"]:_phase_picker.add_item(label,_phase_picker.item_count+1)
+	else:
+		for phase in (3 if _target_id == "draco" else 2):
+			_phase_picker.add_item("形態 %d" % (phase + 1), phase + 1)
 	_move_picker.clear()
 	if preview.action_rules == null: return
 	for move in preview.action_rules.techniques:
@@ -640,7 +643,8 @@ func _populate_moves(selected := "") -> void:
 		_move_picker.set_item_metadata(index, id)
 		if id == selected:
 			_move_picker.select(index)
-			_phase_picker.select(clampi(int(preview.action_rules.conditions.get(id, {}).get("min_phase", 1)) - 1, 0, _phase_picker.item_count - 1))
+			var phase: int=4 if _target_id=="hydra" and id in ["swarm","grid"] else 3 if _target_id=="hydra" and id=="beam_pincer" else 2 if _target_id=="hydra" and id in ["north","sequence","curve","beam_fixed","beam_bolt","thunder_drop","thunder_headbutt","debris_shatter"] else int(preview.action_rules.conditions.get(id, {}).get("min_phase",1))
+			_phase_picker.select(clampi(phase-1,0,_phase_picker.item_count-1))
 	for id in preview.action_rules.combos:
 		var index := _move_picker.item_count
 		_move_picker.add_item("コンボ · " + String(id))

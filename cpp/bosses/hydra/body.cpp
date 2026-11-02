@@ -47,6 +47,24 @@ void HydraBody::spawned(RunRuntime &r,BossBodyState &b) {
     b.hydra.major_cd=0;for (const auto &v:r.content->hydra_majors) if (r.content->boss_techniques[v.technique-1].boss==r.content->boss_bodies[b.definition-1].boss) b.hydra.major_cd=v.global_cd*0.6;
     HydraRegrow::set_count(r,b,3);
 }
+void HydraBody::reset_trial(RunRuntime &r,BossBodyState &b,uint32_t stage) {
+    release(r,b);b.hydra={};const auto id=r.state.enemy_handles.entity_id(b.actor);b.participants={{b.actor,b.actor,id,true,true}};auto &e=r.state.enemies[b.actor.slot];e.hp=e.max_hp=r.content->definitions[e.definition].hp;e.armor=0;spawned(r,b);
+    if (stage>=2) HydraRegrow::set_count(r,b,stage>=3?8:5);
+    const auto &regrow=HydraRegrow::rule(r,b);e.hp=e.max_hp*(stage>=3?regrow.growth_second:stage==2?regrow.growth_first:1.0);
+    if (stage==4) {HydraSwim::begin(r,b);b.hydra.separation_left=0;}
+    b.hydra.growth_left=b.hydra.major_cd=b.hydra.combo_left=b.hydra.recovery_left=b.hydra.major_padding_left=0;b.hydra.separation_pending=false;e.guard=0;
+    for (auto &n:b.hydra.necks) {n.cd=0;n.length=rule(r,b).neck_rest;if (HydraRegrow::alive(r,n)) {auto &part=r.state.enemies[n.actor.slot];part.guard=0;part.pos=head(r,b,n);follow_neck(r,b,n,0);}}
+    if (stage==4 && HydraRegrow::alive(r,b.hydra.bearer)) r.state.enemies[b.hydra.bearer.actor.slot].guard=0;
+    for (auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) {f.participants={b.actor};for (const auto &n:b.hydra.necks) f.participants.push_back(n.actor);f.suspended=false;}
+}
+EnemyHandle HydraBody::trial_actor(RunRuntime &r,BossBodyState &b,uint32_t definition) {
+    auto actor=b.actor;if (HydraNormalAttack::supports(r.content->boss_techniques[definition-1].kind)) {
+        const auto spec=std::find_if(r.content->hydra_normals.begin(),r.content->hydra_normals.end(),[&](const auto &v){return v.technique==definition;});if (spec==r.content->hydra_normals.end()) return {};
+        const auto it=std::find_if(b.hydra.necks.begin(),b.hydra.necks.end(),[&](const auto &n){return uint32_t(n.kind)==spec->head_kind && HydraRegrow::alive(r,n);});if (it==b.hydra.necks.end()) return {};auto &n=*it;n.cd=0;actor=n.actor;
+        for (const auto &gate:r.content->hydra_normal_gates) if (gate.technique==definition) {const auto origin=gate.distance_origin==1?head(r,b,n):gate.distance_origin==2?base(r,b,n):r.state.enemies[b.actor.slot].pos;const double distance=(gate.minimum+std::min(gate.maximum,std::max(gate.minimum,800.0)))*0.5,angle=r.state.enemies[b.actor.slot].facing+(gate.angle_origin==1?n.base_angle:0)+gate.angle;const auto target=origin+godot::Vector2::from_angle(angle)*distance;r.state.ship.pos=r.state.ship_pos=target;r.state.enemy_aim=target;break;}
+    }
+    return actor;
+}
 godot::Vector2 HydraBody::neck_base(const RunRuntime &r,const BossBodyState &b,const HydraNeckState &n) {return base(r,b,n);}
 godot::Vector2 HydraBody::head_position(const RunRuntime &r,const BossBodyState &b,const HydraNeckState &n) {return head(r,b,n);}
 void HydraBody::follow_neck(RunRuntime &r,BossBodyState &b,HydraNeckState &n,double dt) {if (b.hydra.separated) HydraSwim::follow(r,b,n,dt);else chain(r,b,n,dt);}

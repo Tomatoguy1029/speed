@@ -3,6 +3,8 @@
 namespace speed {class HydraBody {public:
     static const HydraBodyDefinition &rule(const RunRuntime &,const BossBodyState &);
     static EnemyHandle spawn(RunRuntime &,uint32_t,godot::Vector2,bool);
+    static void reset_trial(RunRuntime &,BossBodyState &,uint32_t);
+    static EnemyHandle trial_actor(RunRuntime &,BossBodyState &,uint32_t);
     static void spawned(RunRuntime &,BossBodyState &);
     static godot::Vector2 neck_base(const RunRuntime &,const BossBodyState &,const HydraNeckState &);
     static godot::Vector2 head_position(const RunRuntime &,const BossBodyState &,const HydraNeckState &);

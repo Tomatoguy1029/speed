@@ -2,7 +2,7 @@
 extends RefCounted
 
 const PROGRAM := preload("res://tools/content/build_boss_program.gd")
-const BOSSES: Array[StringName] = [&"monoceros", &"centaurus", &"canis_major"]
+const BOSSES: Array[StringName] = [&"monoceros", &"centaurus", &"canis_major", &"hydra"]
 var session
 var boss := ""
 var entity_id := -1
@@ -45,9 +45,15 @@ func attack_playing() -> bool:
 
 func unavailable(id: String, phase: int) -> String:
 	if not has_body(): return "ボスが不在または決着中です。ボスを選び直してください。"
-	if phase < 1 or phase > 2: return "存在しない形態です。"
+	if phase < 1 or phase > (4 if boss=="hydra" else 2): return "存在しない形態です。"
 	if boss=="canis_major" and id=="hunt_pounce" and phase!=1: return "この技は第1形態で再生してください。"
 	if not _moves.has(StringName(id)) and not action_rules.combos.has(id): return "未登録の技: " + id
+	if boss=="hydra":
+		if id in ["swarm","grid"] and phase!=4:return "この技は分離後に再生してください。"
+		if id in ["north","sequence","curve"] and phase not in [2,3]:return "この技は5本か8本の首で再生してください。"
+		if id=="beam_pincer" and phase<3:return "この技には8本の首が必要です。"
+		if id in ["beam_fixed","beam_bolt","thunder_drop","thunder_headbutt","debris_shatter"] and phase<2:return "この技には5本以上の首が必要です。"
+
 	return ""
 
 func _first_action(node: Dictionary) -> String:
@@ -58,7 +64,9 @@ func _first_action(node: Dictionary) -> String:
 	return ""
 
 func _prepare(phase: int, point: Vector2, selection: bool, guard: float, steering: bool) -> bool:
-	var result: Dictionary = session.bridge.boss_trial(entity_id,"prepare",{"phase":phase,"origin":_origin,"target":point,"selection":selection,"guard":guard,"steering_locked":steering})
+	var fields := {"phase":phase,"origin":_origin,"target":point,"selection":selection,"guard":guard,"steering_locked":steering}
+	if boss=="hydra": fields.logical_size=session.scene.view.get_viewport().get_visible_rect().size
+	var result: Dictionary = session.bridge.boss_trial(entity_id,"prepare",fields)
 	if not result.ok: message = result.message
 	session._refresh_projection()
 	return result.ok
@@ -78,7 +86,7 @@ func execute(id: String, phase: int) -> bool:
 	if maximum < minimum:
 		message = "コンボの開始距離が重なっていません。"
 		return false
-	phase = clampi(phase,maxi(int(gate.get("min_phase",1)),int(outer.get("min_phase",1))),2)
+	phase = clampi(phase,maxi(int(gate.get("min_phase",1)),int(outer.get("min_phase",1))),4 if boss=="hydra" else 2)
 	var point := _origin + Vector2.from_angle(deg_to_rad(float(gate.get("angle",0.0)))) * (minimum + maxf(minimum,minf(1400.0,maximum))) * 0.5
 	if not _prepare(phase,point,false,0.0,_saved.steering_locked): return false
 	active = true
