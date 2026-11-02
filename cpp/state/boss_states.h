@@ -81,8 +81,9 @@ struct DracoBreathState {std::vector<RockHandle> rocks;std::vector<godot::Vector
 struct DracoStagingState {uint8_t phase=0;double side=1,exit_angle=0,away_angle=0,exit_time=0;std::vector<godot::Vector2> trail,points;};
 struct DracoChargeState {DracoStagingState staging;godot::Vector2 origin,destination,settled;bool positioned=false;};
 struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState> move;};
+struct CanisSiriusFlameState {double age=0,emit_left=0;bool started=false;};
 struct TechniqueState {
-    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState> detail;
+    std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState,CanisSiriusFlameState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;

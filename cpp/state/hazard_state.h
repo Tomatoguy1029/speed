@@ -25,7 +25,7 @@ struct CanisFlameHazard {
     int64_t observation=0;
     godot::Vector2 origin,velocity;
     double age=0,life=0,emit=0,angle=0,length=0,radius=0;
-    bool source_ended=false;
+    bool source_ended=false,harmful=true;
     EnemyHandle target;
     AttackHandle jet,trail;
 };

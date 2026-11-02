@@ -35,6 +35,12 @@ func _ready() -> void:
 	if "--cpp-hydra-swim" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_swim")
 		return
+	if "--cpp-canis-sirius-flame-flow" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_sirius_flame_flow")
+		return
+	if "--cpp-canis-sirius-flame" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_sirius_flame")
+		return
 	if "--cpp-canis-relay" in OS.get_cmdline_user_args():
 		call_deferred("native_canis_relay")
 		return
@@ -343,6 +349,7 @@ func centaurus_volley_case(flow_enabled := false) -> Dictionary:
 		flow.maximum_stamina = 10.0
 		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): return {}
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":159,"mode":1,"stage_id":"B_centaurus_volley","profile":{},"settings":{"hitstop":false}})
@@ -521,6 +528,7 @@ func centaurus_rear_case(flow_enabled := false) -> Dictionary:
 		flow.maximum_stamina = 10.0
 		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): return {}
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":158,"mode":1,"stage_id":"B_centaurus_rear_attack","profile":{},"settings":{"hitstop":false}})
@@ -650,6 +658,7 @@ func centaurus_rain_case(flow_enabled := false) -> Dictionary:
 		flow.maximum_stamina = 10.0
 		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): return {}
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":158,"mode":1,"stage_id":"B_centaurus_rain","profile":{},"settings":{"hitstop":false}})
@@ -867,6 +876,7 @@ func centaurus_power_case(flow_enabled := false,tracking := true) -> Dictionary:
 		flow.maximum_stamina = 10.0
 		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): return {}
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":158,"mode":1,"stage_id":"B_centaurus_power_shot","profile":{},"settings":{"hitstop":false}})
@@ -1139,6 +1149,7 @@ func centaurus_stomp_case(flow_enabled := false) -> Dictionary:
 		flow.maximum_stamina = 10.0
 		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): return {}
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
@@ -1354,6 +1365,7 @@ func centaurus_fan_case(flow_enabled := false,tracking := true) -> Dictionary:
 		flow.maximum_stamina = 10.0
 		flow.sections = [{"request":"normal","weights":{"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): return {}
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":158,"mode":1,"stage_id":"B_centaurus_fan_volley","profile":{},"settings":{"hitstop":false}})
@@ -1639,6 +1651,7 @@ func canis_move_case(name: String, changes: Dictionary, flowing := false, body_c
 		flow.maximum_stamina = 10.0
 		flow.sections = [{"request":"any","weights":{"single":1.0,"major":1.0},"cap":1.0,"action_count":1,"next":0}]
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
+		if records.is_empty(): return {}
 		for key in records: package.records[key] = records[key]
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":159,"mode":1,"stage_id":"B_canis_major_"+name,"profile":{},"settings":{"hitstop":false}})
@@ -4296,4 +4309,100 @@ func native_hydra_fixed_interrupt() -> void:
 	check(body.effects.is_empty() and body.necks[3].normal_phase==2,"分離後はholdへ入った更新で照射を止める")
 	bridge.command("dev_cancel_boss",{"entity_id":c.id});bridge.dispose()
 	print("[cpp_hydra_fixed_interrupt] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 予告の無害な粒と、毎tick判定する本体の放射を同じ炎部品で確認する。
+func native_canis_sirius_flame() -> void:
+	var c := canis_move_case("sirius_flame",{"warn":0.12,"duration":0.1,"emit_rate":20.0,"spread":0.0,"particle_speed":0.0,"drag":0.0,"life":0.3,"r_start":8.0,"r_end":8.0,"hit_scale":1.0,"turn":2.0,"advance":40.0,"advance_until":100.0,"damage":7.0,"recover":0.03},false,{"pack_size":0,"lead_max":0},false,0.5)
+	check(not c.is_empty(),"シリウスの光を本体・粒・正式表示と同じ制作入口へ渡す")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = []
+	bridge.subscribe("連続炎の記録",func(packet): events.append_array(packet.events);return true)
+	var records: Dictionary = c.package.records
+	check(c.move.make_runner()==null and records.CanisSiriusFlameDefinition.size()==2 and records.CanisSiriusFlameDefinition[1].flame==4 and records.CanisFlameDefinition[2].speed==0.0 and records.CanisFlameDefinition[2].damage==7.0 and records.CanisFlameDefinition[2].particle_life==0.3 and records.BossTechniqueStage.is_empty(),"全編集値と二形態の自由な粒を生成し、method trackを残さない")
+	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(ticket.ok,"猟犬がいない場合もシリウスの光を単独発動する")
+	var initial: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.06)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	var warnings: Array = canis_effects(bridge).filter(func(v): return v.kind==1 and not v.harmful)
+	check(t.kind==51 and t.stage==0 and not t.started and is_equal_approx(t.age,0.06) and is_equal_approx(t.emit_left,0.08) and warnings.size()==1 and is_equal_approx(warnings[0].life,0.3) and is_equal_approx(warnings[0].velocity.length(),100.0),"予告中は18個毎秒の無害な粒を出し、固定寿命と速度を使う")
+	var warning: Dictionary = bridge.checkpoint()
+	bridge.command("dev_ship_motion",{"position":warnings[0].pos,"velocity":Vector2.ZERO})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp==hp,"無害な予告の粒に触れても実際の機体HPを減らさない")
+	bridge.restore(warning.value)
+	bridge._core.step(0.07)
+	t = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var harmful: Array = canis_effects(bridge).filter(func(v): return v.kind==1 and v.harmful)
+	check(t.started and t.stage==1 and t.age==0.0 and is_equal_approx(t.emit_left,0.4) and harmful.size()==1 and body.position.x>0.0,"予告を越えたtickに攻撃時計と発生余りをリセットし、そのtickの前進と放射を行う")
+	var active: Dictionary = bridge.checkpoint()
+	var particle: Dictionary = harmful[0]
+	var reach: float = particle.radius+load("res://data/config.tres").ship_radius
+	bridge.command("dev_ship_motion",{"position":particle.pos+Vector2(0,reach),"velocity":Vector2.ZERO})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	hp = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp==hp,"粒の半径と機体半径がちょうど接する境界ではstrictな判定で被弾しない")
+	bridge.command("dev_ship_motion",{"position":particle.pos+Vector2(0,reach-0.1),"velocity":Vector2.ZERO})
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp<hp,"自由な炎の粒の内側へ触れると実際の機体HPを減らす")
+	hp = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
+	bridge._core.step(0.001)
+	check(bridge._core.ship_snapshot().ship_hp<hp,"噴射の一度制限を流用せず、同じ自由な粒が毎tick判定する")
+	bridge.command("set_ui_overlay",{"active":false})
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause=="sirius_flame" and e.payload.technique=="sirius_flame"),"シリウスの光という原因と技を共通記録へ届ける")
+	bridge.restore(active.value)
+	bridge._core.step(0.02)
+	var continued: Dictionary = bridge.command("dev_boss_state").value[0].duplicate(true)
+	var flames: Array = canis_effects(bridge).duplicate(true)
+	check(bridge.restore(active.value).ok,"放射中の時計・発生余り・粒・乱数へ復帰する")
+	bridge._core.step(0.02)
+	check(bridge.command("dev_boss_state").value[0]==continued and canis_effects(bridge)==flames,"復帰後も本体の旋回・前進と全ての粒を一致させる")
+	c.view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	var display = c.view._boss_body_displays.values()[0]
+	check(display.technique.flame and display.technique.glow==1.0 and not display.flames.displays.is_empty(),"本体の口元の発光と予告/攻撃の粒を正式表示へ渡す")
+	await get_tree().process_frame
+	bridge.restore(active.value)
+	bridge._core.step(0.101)
+	check(bridge.command("dev_boss_state").value[0].stage==2,"放射時間を越えると硬直へ進む")
+	bridge._core.step(0.04)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and not canis_effects(bridge).is_empty(),"自然終了後も炎の粒は寿命まで残る")
+	bridge.restore(active.value)
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	var count: int = canis_effects(bridge).size()
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and canis_effects(bridge).size()<=count and not canis_effects(bridge).is_empty(),"取消は放射の追加を止め、発射済みの粒は残す")
+	bridge.restore(active.value)
+	bridge.command("dev_remove",{"entity_id":c.id})
+	bridge._core.step(0.001)
+	check(canis_effects(bridge).is_empty(),"本体消失では残っている無害な粒と攻撃の粒を回収する")
+	bridge.restore(initial.value)
+	bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+	check(canis_effects(bridge).is_empty(),"開始前の取消では粒を生成しない")
+	for checkpoint in [initial,warning,active]: bridge.release_checkpoint(checkpoint.value)
+	bridge.dispose();c.view.queue_free()
+	await native_canis_sirius_flame_flow()
+
+func native_canis_sirius_flame_flow() -> void:
+	for name in ["sirius_flame","nova","relay"]:
+		var c := canis_move_case(name,{"track_during_warn":false},true,{"pack_size":0 if name=="sirius_flame" else 5,"lead_max":0 if name=="sirius_flame" else 5})
+		check(not c.is_empty(),"%s の互換Runner登録を検証して通常フローを生成する" % name)
+		if c.is_empty(): get_tree().quit(1);return
+		var bridge = c.bridge
+		check(c.package.records.BossFlowProgram.size()==1 and bridge.command("dev_boss_flow_state").value.size()==1,"%s の条件確認を実際に接続したフローで行う" % name)
+		bridge._core.step(0.01)
+		var techniques: Array = bridge.command("dev_boss_state").value
+		if name=="sirius_flame": check(not techniques.is_empty() and techniques[0].kind==51,"通常フローでも猟犬の数で制限せずシリウスの光を選べる")
+		else: check(techniques.is_empty(),"%s は通常フローで必要な6体がそろうまで選ばない" % name)
+		bridge.dispose();c.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_new_flow] failures=",failed)
 	get_tree().quit(1 if failed else 0)

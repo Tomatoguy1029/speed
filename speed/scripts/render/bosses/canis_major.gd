@@ -20,7 +20,7 @@ func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 func clear_flames() -> void:
 	if flames!=null: flames.clear()
 func frame_event(event: Dictionary) -> void:
-	if event.get("type",&"")==&"canis_cue" and event.cue in ["aim_locked","pounce","command","sirius","phase_changed","howl","call","called","stream_windup","bay_windup","entrance_bark","nova_windup","nova_flash","relay_windup","relay_mark","relay_fire"]:
+	if event.get("type",&"")==&"canis_cue" and event.cue in ["aim_locked","pounce","command","sirius","phase_changed","howl","call","called","stream_windup","bay_windup","entrance_bark","nova_windup","nova_flash","relay_windup","relay_mark","relay_fire","flame_windup","flame_start"]:
 		_pulse_until = float(event.world_time)+0.35
 		if not state.is_empty(): apply_frame(state,technique)
 	if flames!=null: flames.frame_event(event)
@@ -51,7 +51,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	parts.get_node("Tail").rotation = sin(gait*0.4)*0.07
 	parts.get_node("Head").rotation = -0.45*smoothstep(0.0,0.65,float(body.charge)) if attack.get("technique","")=="howl" and int(attack.get("stage",5))==0 else 0.0
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
-	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(body.charge),pulse)
+	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(attack.get("glow",body.charge)) if int(attack.get("stage",5)) in [0,1] else float(body.charge),pulse)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE
 
 ## 描画専用の短い履歴。戦闘の猟犬位置へ書き戻さない。

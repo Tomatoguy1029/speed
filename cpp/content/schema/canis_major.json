@@ -1022,6 +1022,47 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CanisSiriusFlameDefinition",
+      "section": 353,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "flame",
+          "type": "u32",
+          "ref": "CanisFlameDefinition"
+        },
+        {
+          "name": "emit_rate",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "advance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "advance_until",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}
