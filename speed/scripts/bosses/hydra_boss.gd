@@ -57,7 +57,7 @@ func use_action_rules(value: Resource) -> void:
 	_move_kinds.clear()
 	for move in value.techniques:
 		_moves[move.technique] = move.duplicate(true)
-		_move_kinds[move.technique] = move.make_runner().kind()
+		_move_kinds[move.technique] = preload("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()
 		if move.head_kind != &"": _normal_moves[move.technique] = true
 	technique_visuals.configure(self, _moves)
 	normal_runners.clear()
@@ -1340,7 +1340,7 @@ func tick_normal(neck, dt: float) -> void:
 		NORMAL_SWIM.tick(self, neck, dt)
 		return
 	var id: StringName = neck.mode
-	if not normal_runners.has(id): normal_runners[id] = _moves[id].make_runner()
+	if not normal_runners.has(id): normal_runners[id] = preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[id])
 	normal_runners[id].tick_neck(self, neck, dt)
 
 func _sync_technique_visuals(dt: float) -> void:

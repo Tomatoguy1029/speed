@@ -1,6 +1,6 @@
 [gd_resource type="Resource" format=3 uid="uid://cvgf1y0pakok5"]
 
-[ext_resource type="Script" uid="uid://benhf3i5qfdip" path="res://scripts/bosses/hydra/techniques/bite_thrust.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/hydra/bite_thrust.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/bosses/hydra/bite_thrust_visual.tscn" id="visual"]
 
 [resource]

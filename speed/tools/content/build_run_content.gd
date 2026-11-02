@@ -637,6 +637,7 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		squad["range_beam"] = float(squad_values.attack_ranges[&"beam"])
 		data.HydraSquadDefinition = [squad]
 		# 移植済み通常技だけを生成する。ほかの種類は各種類の移行で登録する。
+<<<<<<< HEAD
 		var bite: BossTechnique = load("res://data/bosses/hydra_moves/bite_thrust.tres")
 		var values: Dictionary = definition.params.merged(bite.values(),true)
 		var normal := {}
@@ -656,6 +657,10 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		draco.threshold_1 = float(definition.params.thresholds[0])
 		draco.threshold_2 = float(definition.params.thresholds[1])
 		data.DracoBodyDefinition = [draco]
+=======
+		var normal_records := hydra_normal_records(definition,load("res://data/bosses/hydra_moves/bite_thrust.tres"))
+		for key in normal_records: data[key] = normal_records[key]
+>>>>>>> 7592b9a0 (feat: ヒドラの噛みつきを編集値と共通実行へ分離)
 	if definition.id==&"centaurus":
 		var centaurus := {"id":1,"body":1,"guard":1}
 		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="CentaurusBodyDefinition")[0].fields:
@@ -717,6 +722,7 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	package.visuals.append({"id":key,"role":7,"path":("res://scenes/bosses/hydra_frame.tscn" if definition.id==&"hydra" else "res://scenes/bosses/%s_presentation.tscn" % definition.id),"boss":String(definition.id),"appearance":definition.part_appearance.duplicate(true)})
 	return package
 
+<<<<<<< HEAD
 ## 候補の順序と重複を保ち、生成済みの敵定義へ結ぶ。資源は既存のdraco用一覧を使う。
 static func draco_cycle_candidates(definition: BossDef) -> Array:
 	var choices: Array = definition.params.get("picaro_candidates",[]).duplicate()
@@ -735,6 +741,31 @@ static func append_draco_cycle(data: Dictionary, definition: BossDef, boss: int)
 		if found.size()!=1: return ERR_INVALID_DATA
 		data.DracoCycleCandidate.append({"id":data.DracoCycleCandidate.size()+1,"cycle":cycle,"enemy":found[0].id,"excluded":StringName(id) in definition.params.get("picaro_excluded",[])})
 	return OK
+=======
+## 首の通常技の編集値を、分離前後で使う同じ型付き定義へ変換する。
+static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Dictionary:
+	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique!=&"bite_thrust" or bite.head_kind!=&"bite": return {}
+	var records := {}
+	var values: Dictionary = definition.params.merged(bite.values(),true)
+	var normal := {}
+	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
+	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge),"hold":float(values.normal_hold),"damage":float(values.bite_dmg),"passes":1,"cuts":1},true)
+	records.BossTechniqueDefinition = [normal]
+	records.HydraNormalDefinition = [{"id":1,"technique":1,"head_kind":0,"aim_tracking":float(values.get("aim_tracking",0.0)),"attack_cd":float(values.attack_cd),"bite_radius":float(values.bite_radius),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs["bite_thrust"])}]
+	var action_rules: Resource = load("res://data/bosses/ai/hydra_action_rules.tres")
+	records.HydraNormalGate = []
+	for gate: Dictionary in action_rules.active_gates_for("bite_thrust"):
+		records.HydraNormalGate.append({"id":records.HydraNormalGate.size()+1,"technique":1,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",1.7976931348623157e308)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"distance_origin":int(gate.get("distance_origin",0)),"angle_origin":int(gate.get("angle_origin",0)),"ignore_when_separated":bool(gate.get("ignore_when_separated",false))})
+	return records
+
+static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
+	var records := hydra_normal_records(definition,move)
+	if records.is_empty(): return {}
+	var package := boss_body_package(definition,config)
+	if package.is_empty(): return {}
+	for key in records: package.records[key] = records[key]
+	return package
+>>>>>>> 7592b9a0 (feat: ヒドラの噛みつきを編集値と共通実行へ分離)
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:

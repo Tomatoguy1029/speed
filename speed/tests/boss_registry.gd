@@ -8,6 +8,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-bite-hit" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_bite_hit")
+		return
+	if "--cpp-hydra-bite" in OS.get_cmdline_user_args() or "--cpp-hydra-bite-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_bite")
+		return
 	if "--cpp-hydra-common" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_common")
 		return
@@ -2580,6 +2586,7 @@ func native_hydra_body() -> void:
 	print("[cpp_hydra_body] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
+<<<<<<< HEAD
 ## 連射の照準固定・間隔と、取消後に残る炎を同じ制作入口で確認する。
 func native_canis_sirius() -> void:
 	var c := canis_move_case("sirius",{"shots":2,"warn":0.1,"lock":0.04,"lead":0.2,"aim_turn":3.0,"beam_time":0.1,"beam_length":300.0,"beam_width":20.0,"beam_particle_life":0.2,"shot_gap":0.05,"recover":0.05,"trail_delay":0.1,"trail_time":1.0})
@@ -2717,6 +2724,9 @@ func native_canis_bay() -> void:
 	get_tree().quit(1 if failed else 0)
 
 func hydra_regrow_case(flowing := false, squad_changes := {}) -> Dictionary:
+=======
+func hydra_regrow_case(flowing := false, squad_changes := {}, move_changes := {}) -> Dictionary:
+>>>>>>> 7592b9a0 (feat: ヒドラの噛みつきを編集値と共通実行へ分離)
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
@@ -2725,6 +2735,11 @@ func hydra_regrow_case(flowing := false, squad_changes := {}) -> Dictionary:
 	definition.params.squad.merge(squad_changes,true)
 	definition.params.merge({"head_hp":10.0,"regrow":0.2,"regrow_per_head":0.1,"regrow_combo":0.25,"fire_regrow_scale":3.0,"chance_time":0.3,"growth_time":0.1,"debris_dmg":0.0},true)
 	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	if not move_changes.is_empty():
+		var move = load("res://data/bosses/hydra_moves/bite_thrust.tres").duplicate(true)
+		move.assign_values(move_changes)
+		package = builder.hydra_technique_package(definition,move,cfg)
+
 	if flowing:
 		var rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
 		rules.techniques.assign([load("res://data/bosses/hydra_moves/bite_thrust.tres").duplicate(true)])
@@ -3249,8 +3264,8 @@ func native_canis_stream_cancel() -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 再生・分離・通常技の既存ケースを同じC++窓口へ接続する。
-func hydra_normal_case(flowing := false, squad_changes := {}) -> Dictionary:
-	var c := hydra_regrow_case(flowing,squad_changes)
+func hydra_normal_case(flowing := false, squad_changes := {}, move_changes := {}) -> Dictionary:
+	var c := hydra_regrow_case(flowing,squad_changes,move_changes)
 	if c.is_empty(): return c
 	var bridge = c.bridge
 	bridge._core.set_motion_context(Vector2(1600,0),Vector2.ZERO,Vector2(2500,1800))
@@ -3458,4 +3473,117 @@ func native_hydra_squad() -> void:
 	bridge.command("dev_cancel_boss",{"entity_id":c.id});bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_hydra_squad] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 既存の通常技検査から、制作値・時計・掃引・寿命・中断を同じ窓口で確認する。
+func native_hydra_bite() -> void:
+	var retry := "--cpp-hydra-bite-retry" in OS.get_cmdline_user_args()
+	var move = load("res://data/bosses/hydra_moves/bite_thrust.tres").duplicate(true)
+	if not retry: check(move.make_runner()==null and move.get_script().resource_path=="res://scripts/data_types/boss_techniques/hydra/bite_thrust.gd","噛みつきの制作Resourceは編集値だけを持つ")
+	if not retry: check(load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"bite_thrust","通常入口の切替前も互換Runnerから元の噛みつきを呼べる")
+	var edits := {"normal_charge":0.15,"normal_lunge":0.4,"normal_hold":0.1,"attack_cd":0.05,"bite_radius":150.0,"bite_dmg":7.0}
+	var c := hydra_normal_case(true,{},edits)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var generated: Dictionary = c.package.records.BossTechniqueDefinition[0]
+	var normal: Dictionary = c.package.records.HydraNormalDefinition[0]
+	if not retry: check(generated.warn==0.15 and generated.active==0.4 and generated.hold==0.1 and generated.damage==7.0 and normal.attack_cd==0.05 and normal.bite_radius==150.0,"編集値を生成し種類固有の時間・幅・ダメージと待ちを保つ")
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var target: Vector2 = body.necks[0].position+Vector2(200,0)
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	bridge._core.set_run_guards({"invincible":false})
+	var actions: Array = []
+	for tick in 200:
+		bridge._core.step(0.01)
+		actions = bridge.command("dev_boss_state").value
+		if not actions.is_empty(): break
+	check(not actions.is_empty(),"共通フローの候補選択の待ち後に自然開始する")
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	var t: Dictionary = actions[0]
+	check(t.kind==64 and t.stage==0 and t.elapsed==0.0 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"自然選択で首の予告を開始し、その更新では攻撃を出さない")
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[0].glow>0.9 and body.effects.is_empty() and bridge._core.ship_snapshot().ship_hp==hp,"予告は頭の発光だけで命中判定を出さない")
+	bridge._core.step(0.011)
+	body=bridge.command("dev_boss_body_state").value[0]
+	t=bridge.command("dev_boss_state").value[0]
+	check(t.stage==1 and body.necks[0].locked and body.effects.size()==1 and body.effects[0].width==150.0 and body.effects[0].points.size()==2,"発動時刻に元の頭から今の頭への点列を出し幅を保つ")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.025)
+	var expected: Dictionary = bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"噛みつきの固定目標・段階・首と点列を途中保持して戻す")
+	bridge._core.step(0.025)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"途中復帰後も同じ編集時間と形状へ進む")
+	bridge.release_checkpoint(held.value)
+	for tick in 13:
+		bridge._core.step(0.025)
+		bridge._core.step_hazards(0.025)
+		bridge.command("dev_boss_body_state")
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"実際の点列が掃引する機体へ命中し倍率を一度だけ掛ける")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"噛みつく首と判定形を正式表示へ渡す")
+	await get_tree().process_frame
+	bridge._core.step(0.15)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[0].mode=="idle" and body.effects.is_empty(),"自然終了で0.1秒の残留判定も清算して首の待ちへ戻る")
+	var first_id: int = t.id
+	for tick in 12: bridge._core.step(0.025)
+	check(bridge.command("dev_boss_state").value.any(func(action): return action.id>first_id and action.kind==64),"首の待ちが終わると共通フローから次の噛みつきを選ぶ")
+	bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"途中取消は噛みつきの残留判定を消す")
+	body=bridge.command("dev_boss_body_state").value[0]
+	var other: Dictionary = body.necks[5]
+	bridge.command("dev_ship_motion",{"position":other.position+Vector2.from_angle(other.angle)*200.0,"velocity":Vector2.ZERO})
+	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":other.id,"definition":1})
+	check(started.ok,"別の噛みつく首から同じ種類を開始する")
+	bridge._core.step(0.2)
+	bridge.command("dev_damage",{"entity_id":other.id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[5].alive and body.effects.is_empty() and not body.boss_dead,"参加首の消失でその判定を終了し、本体の勝利にしない")
+	bridge._core.set_run_guards({"invincible":true})
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"})
+	bridge._core.step(0.001);bridge._core.step(1.21)
+	body=bridge.command("dev_boss_body_state").value[0]
+	for head: Dictionary in body.necks: bridge.command("dev_damage",{"entity_id":head.id,"amount":1000.0,"cause":"shot"})
+	bridge.command("dev_ship_motion",{"position":Vector2(10000,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(10000,0),Vector2(10000,0),Vector2(100,100))
+	bridge._core.step(3.1);bridge._core.step(0.001)
+	var bearer: int = bridge.command("dev_boss_body_state").value[0].bearer.id
+	check(bridge.command("dev_boss_state").value.any(func(action): return action.kind==64 and action.actor==bearer and action.stage==0),"不死首の単独攻撃は画面内・距離・通常指名を要求せず同じ噛みつきを開始する")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	view.queue_free();bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_hydra_bite] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 実命中の失敗項目だけを、共通攻撃の更新を含めて再確認する入口。
+func native_hydra_bite_hit() -> void:
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"normal_lunge":0.4,"normal_hold":0.1,"attack_cd":0.05,"bite_radius":150.0,"bite_dmg":7.0})
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_ship_motion",{"position":body.necks[0].position+Vector2(200,0),"velocity":Vector2.ZERO})
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = []
+	bridge.subscribe("命中記録",func(packet): events.append_array(packet.events);return true)
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	for tick in 50:
+		bridge._core.step(0.01)
+		bridge._core.step_hazards(0.01)
+		bridge.command("dev_boss_body_state")
+	var hits: Array = events.filter(func(event): return event.type=="combat_player_damage" and event.payload.accepted and event.payload.cause=="bite")
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale) and hits.size()==1 and hits[0].payload.source==&"hydra" and hits[0].payload.technique==&"bite_thrust","実際の点列が掃引する機体へ命中し倍率を一度だけ掛け、元の攻撃原因と技を記録する")
+	if failed: print("命中の状態: ",bridge._core.ship_snapshot()," 命中記録: ",hits)
+	bridge.dispose()
+	print("[cpp_hydra_bite_hit] failures=",failed)
 	get_tree().quit(1 if failed else 0)
