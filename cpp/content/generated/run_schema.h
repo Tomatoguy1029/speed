@@ -4112,7 +4112,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 40) return false;
+    if (out.kind > 41) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -5082,6 +5082,62 @@ inline bool read(BinaryReader &input, CentaurusShowerDefinition &out) {
     if (!input.read_u32(out.projectile)) return false;
     return true;
 }
+struct CentaurusSailDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double approach_speed{};
+    double radius_min{};
+    double radius_max{};
+    double arc{};
+    double duration{};
+    double interval{};
+    double radius{};
+    double length{};
+    double travel{};
+    uint32_t projectile{};
+};
+inline bool read(BinaryReader &input, CentaurusSailDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.approach_speed)) return false;
+    if (out.approach_speed < 0) return false;
+    if (!input.read_f64(out.radius_min)) return false;
+    if (out.radius_min < 0) return false;
+    if (!input.read_f64(out.radius_max)) return false;
+    if (out.radius_max < 0) return false;
+    if (!input.read_f64(out.arc)) return false;
+    if (out.arc < 0) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (out.duration < 0) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.length)) return false;
+    if (out.length < 0) return false;
+    if (!input.read_f64(out.travel)) return false;
+    if (out.travel < 0) return false;
+    if (!input.read_u32(out.projectile)) return false;
+    return true;
+}
+struct CentaurusComboDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t first{};
+    uint32_t second{};
+    double gap{};
+};
+inline bool read(BinaryReader &input, CentaurusComboDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.first)) return false;
+    if (!input.read_u32(out.second)) return false;
+    if (!input.read_f64(out.gap)) return false;
+    if (out.gap < 0) return false;
+    return true;
+}
 struct CanisBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -5235,6 +5291,67 @@ inline bool read(BinaryReader &input, CanisCommandDefinition &out) {
     if (!input.read_f64(out.lunge_time)) return false;
     if (out.lunge_time < 0) return false;
     if (!input.read_u32(out.min_hounds)) return false;
+    return true;
+}
+struct CanisHowlDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double catch_up{};
+    double close_time{};
+    uint32_t gap_slots{};
+    uint32_t gaps{};
+    double gather_time{};
+    double ring_close{};
+    uint32_t ring_count{};
+    double ring_radius{};
+    double spawn_out{};
+    uint32_t summon_max{};
+    double follow_time{};
+    double follow_rate{};
+    double seq_interval{};
+    double seq_warn{};
+    double lunge_speed{};
+    double lunge_time{};
+    double tail{};
+};
+inline bool read(BinaryReader &input, CanisHowlDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.catch_up)) return false;
+    if (out.catch_up < 0) return false;
+    if (!input.read_f64(out.close_time)) return false;
+    if (out.close_time < 0) return false;
+    if (!input.read_u32(out.gap_slots)) return false;
+    if (out.gap_slots < 0) return false;
+    if (!input.read_u32(out.gaps)) return false;
+    if (out.gaps < 0) return false;
+    if (!input.read_f64(out.gather_time)) return false;
+    if (out.gather_time < 0) return false;
+    if (!input.read_f64(out.ring_close)) return false;
+    if (out.ring_close < 0) return false;
+    if (!input.read_u32(out.ring_count)) return false;
+    if (out.ring_count < 0) return false;
+    if (!input.read_f64(out.ring_radius)) return false;
+    if (out.ring_radius < 0) return false;
+    if (!input.read_f64(out.spawn_out)) return false;
+    if (out.spawn_out < 0) return false;
+    if (!input.read_u32(out.summon_max)) return false;
+    if (out.summon_max < 0) return false;
+    if (!input.read_f64(out.follow_time)) return false;
+    if (out.follow_time < 0) return false;
+    if (!input.read_f64(out.follow_rate)) return false;
+    if (out.follow_rate < 0) return false;
+    if (!input.read_f64(out.seq_interval)) return false;
+    if (out.seq_interval < 0) return false;
+    if (!input.read_f64(out.seq_warn)) return false;
+    if (out.seq_warn < 0) return false;
+    if (!input.read_f64(out.lunge_speed)) return false;
+    if (out.lunge_speed < 0) return false;
+    if (!input.read_f64(out.lunge_time)) return false;
+    if (out.lunge_time < 0) return false;
+    if (!input.read_f64(out.tail)) return false;
+    if (out.tail < 0) return false;
     return true;
 }
 struct ContentRecords {
@@ -5403,9 +5520,12 @@ struct ContentRecords {
     std::vector<CentaurusStompFoot> CentaurusStompFoot_rows;
     std::vector<CentaurusFanDefinition> CentaurusFanDefinition_rows;
     std::vector<CentaurusShowerDefinition> CentaurusShowerDefinition_rows;
+    std::vector<CentaurusSailDefinition> CentaurusSailDefinition_rows;
+    std::vector<CentaurusComboDefinition> CentaurusComboDefinition_rows;
     std::vector<CanisBodyDefinition> CanisBodyDefinition_rows;
     std::vector<CanisFlameDefinition> CanisFlameDefinition_rows;
     std::vector<CanisCommandDefinition> CanisCommandDefinition_rows;
+    std::vector<CanisHowlDefinition> CanisHowlDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -6229,7 +6349,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 16) return false;
+        if (version != 18) return false;
         if (count > input.remaining()/637) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -6402,6 +6522,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CentaurusShowerDefinition row; if (!read(input,row)) return false; out.CentaurusShowerDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 329: {
+        if (version != 1) return false;
+        if (count > input.remaining()/84) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusSailDefinition row; if (!read(input,row)) return false; out.CentaurusSailDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 330: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusComboDefinition row; if (!read(input,row)) return false; out.CentaurusComboDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 340: {
         if (version != 1) return false;
         if (count > input.remaining()/164) return false;
@@ -6418,6 +6550,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/28) return false;
         for (uint32_t i=0; i<count; ++i) { CanisCommandDefinition row; if (!read(input,row)) return false; out.CanisCommandDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 343: {
+        if (version != 1) return false;
+        if (count > input.remaining()/128) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisHowlDefinition row; if (!read(input,row)) return false; out.CanisHowlDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     default: return false;
@@ -6754,12 +6892,18 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusFanDefinition_rows) if (!CentaurusFanDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusShowerDefinition_ids;
     for (const auto &row:data.CentaurusShowerDefinition_rows) if (!CentaurusShowerDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusSailDefinition_ids;
+    for (const auto &row:data.CentaurusSailDefinition_rows) if (!CentaurusSailDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusComboDefinition_ids;
+    for (const auto &row:data.CentaurusComboDefinition_rows) if (!CentaurusComboDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisBodyDefinition_ids;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!CanisBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisFlameDefinition_ids;
     for (const auto &row:data.CanisFlameDefinition_rows) if (!CanisFlameDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisCommandDefinition_ids;
     for (const auto &row:data.CanisCommandDefinition_rows) if (!CanisCommandDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisHowlDefinition_ids;
+    for (const auto &row:data.CanisHowlDefinition_rows) if (!CanisHowlDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -6930,10 +7074,16 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusFanDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
     for (const auto &row:data.CentaurusShowerDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CentaurusShowerDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
+    for (const auto &row:data.CentaurusSailDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusSailDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
+    for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.first)) return false;
+    for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.second)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!EnemyRecord_ids.count(row.hound)) return false;
     for (const auto &row:data.CanisFlameDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.CanisCommandDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CanisHowlDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -7060,5 +7210,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=168;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=171;
 }
