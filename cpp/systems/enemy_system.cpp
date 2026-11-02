@@ -39,6 +39,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Split) enemy.behavior_state=SplitState{};
     if (def.kind==EnemyDefinition::Kind::Crow) enemy.behavior_state=CrowState{};
     if (def.kind==EnemyDefinition::Kind::Defender) {enemy.behavior_state=DefenderState{};run.workspace.defender_posts_tick=-1;}
+    enemy.origin=p.origin;enemy.role=p.is_boss?SpawnRole::BossBody:(state.field.rock_handles.contains(p.rock)?SpawnRole::Terrain:SpawnRole::Regular);
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
@@ -71,7 +72,7 @@ void EnemySystem::flush_spawns(RunRuntime &run) {
     auto pending=std::move(run.state.pending_enemies);run.state.pending_enemies.clear();
     for (const auto &entry:pending) {
         EnemySpawn p;p.position=entry.position;p.velocity=entry.velocity;p.facing=entry.facing;p.has_facing=true;
-        p.hit_cd=entry.hit_cd;p.guard=entry.guard;p.knock=entry.knock;p.priority=entry.priority;p.has_priority=true;
+        p.hit_cd=entry.hit_cd;p.guard=entry.guard;p.knock=entry.knock;p.priority=entry.priority;p.has_priority=true;p.origin=entry.origin;
         spawn_base(run,entry.definition-1,p);
     }
 }
@@ -79,10 +80,10 @@ int64_t EnemySystem::spawn_part(RunRuntime &run,EnemyHandle parent,size_t defini
     auto &state=run.state;
     if (!state.enemy_handles.contains(parent) || state.enemies[parent.slot].dead || definition>=run.content->definitions.size() || (run.content->definitions[definition].kind!=EnemyDefinition::Kind::Part && run.content->definitions[definition].kind!=EnemyDefinition::Kind::TriangleStar)) return -1;
     const auto parent_id=state.enemies[parent.slot].id;const bool held=state.enemies[parent.slot].held;
-    EnemySpawn options;options.position=position;options.group=state.enemies[parent.slot].attack_group;
+    EnemySpawn options;options.origin=state.enemies[parent.slot].is_boss?SpawnOrigin::BossPart:state.enemies[parent.slot].origin;options.position=position;options.group=state.enemies[parent.slot].attack_group;
     options.value=state.enemies[parent.slot].attack_value;options.priority=state.enemies[parent.slot].attack_priority;options.has_value=options.has_priority=true;
     const auto id=spawn_base(run,definition,options);if (id<0) return id;
-    const auto row=state.rows_by_id.at(id);auto &part=state.enemies[row];part.parent=parent;part.parent_id=parent_id;part.held=held;
+    const auto row=state.rows_by_id.at(id);auto &part=state.enemies[row];part.parent=parent;part.parent_id=parent_id;part.held=held;part.role=state.enemies[parent.slot].is_boss?SpawnRole::BossPart:SpawnRole::Regular;
     state.enemies[parent.slot].parts.push_back(state.enemy_handles.at(uint32_t(row)));return id;
 }
 bool EnemySystem::move_part(RunRuntime &run,EnemyHandle part,EnemyHandle parent,godot::Vector2 position,double facing) {
@@ -129,6 +130,7 @@ bool EnemySystem::relocate(RunRuntime &run,EnemyHandle handle,godot::Vector2 pos
     CoronaVortex::release(run,handle);PumpBehavior::gone(run,handle,false);
     PhaseController::cancel(run,handle);
     AttackSystem::source_ended(state,handle,AttackEndReason::Relocate);
+    for (auto part:enemy.parts) if (state.enemy_handles.contains(part)) AttackSystem::source_ended(state,part,AttackEndReason::Relocate);
     enemy.pos=position;
     const auto toward=(state.ship_pos-position).normalized();
     const TrackingPolicy tracking{state.draw.tracing,enemy.held,state.enemy_handles.contains(enemy.pump_owner)};
@@ -174,7 +176,7 @@ bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason)
     const size_t last=rows.back();rows[enemy.behavior_slot]=last;
     state.enemies[last].behavior_slot=enemy.behavior_slot;rows.pop_back();
     CombatEvent event;event.kind=CombatEventKind::Retire;event.retire_reason=reason;
-    event.target_id=enemy.id;event.definition=uint32_t(enemy.definition+1);event.pos=enemy.pos;
+    event.origin=enemy.origin;event.role=enemy.role;event.target_id=enemy.id;event.definition=uint32_t(enemy.definition+1);event.pos=enemy.pos;
     event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);
     state.dead_rows.erase(std::remove(state.dead_rows.begin(),state.dead_rows.end(),row),state.dead_rows.end());
     enemy.alive=false;release(state,uint32_t(row));

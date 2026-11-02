@@ -4,6 +4,7 @@
 #include <array>
 #include <memory>
 #include "generated/run_schema.h"
+#include "population_data.h"
 
 namespace speed {
 // ランと保持したランで共有する読み取り専用の定義。
@@ -102,8 +103,12 @@ struct ContentBundle {
     GravityDefinition gravity;
     WarpDefinition warp;
     CometDefinition comet;
+    std::vector<DeathChainDefinition> death_chains;
     PopulationDefinition population;
     SpawnTimeline population_timeline;
+    std::vector<PopulationFormation> formations;
+    std::vector<PopulationClipData> population_clips;
+    double formation_base_view=1;
     std::vector<LoadoutDefinition> equipment;
     std::vector<LoadoutAsset> equipment_assets;
     std::vector<NumericTraitLevel> numeric_traits;

@@ -1,5 +1,6 @@
 #pragma once
 #include "../../native/runtime_data.h"
+#include "../content/population_data.h"
 #include "entity_store.h"
 #include "enemy_states.h"
 #include "boss_states.h"
@@ -47,21 +48,12 @@ struct RunState {
     using AttackBudget=speed::AttackBudgetState;
     speed::WorldState world;
     speed::FieldState field;
-    struct Formation {
-        struct Marker { StringName type; Vector2 offset; double rotation = 0; };
-        struct Entry { double weight = 0; Vector2 pos; };
-        struct Layout { double weight = 0, value = -1; Variant managed; std::vector<StringName> types; std::vector<std::vector<Marker>> placements; };
-        std::vector<Entry> entries;
-        std::vector<Layout> layouts;
-    };
+    using Formation=speed::PopulationFormation;
     std::vector<Formation> formations;
     double formation_base_view = 1;
-    struct Clip {
+    struct Clip : speed::PopulationClipData {
         struct Group { std::vector<std::pair<size_t,int64_t>> members; bool arrived = false; };
-        double start = 0, end = 0, interval = 0, priority = 0, next = -1e9;
-        int64_t maximum = 0;
-        PackedStringArray types;
-        std::vector<size_t> formations;
+        double next = -1e9;
         std::vector<Group> groups;
     };
     std::vector<Clip> clips;

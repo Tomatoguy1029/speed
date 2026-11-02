@@ -548,6 +548,10 @@ int64_t SpeedRunCore::spawn_enemy(StringName type,Vector2 position,const Diction
             if (value.get_type()!=Variant::BOOL) return -1;
             if (name=="flock_member") params.flock_member=value;else if (name=="elite") params.elite=value;else if (name=="is_boss") params.is_boss=value;else {params.has_managed=true;params.managed=value;}
         } else if (name=="vel") {if (value.get_type()!=Variant::VECTOR2 || !Vector2(value).is_finite()) return -1;params.velocity=value;}
+        else if (name=="spawn_origin") {
+            if (value.get_type()!=Variant::INT || int64_t(value)<0 || int64_t(value)>=int64_t(speed::SpawnOrigin::Count)) return -1;
+            params.origin=speed::SpawnOrigin(int64_t(value));
+        }
         else if (name=="attack_group" || name=="hound_pack") {
             if (value.get_type()!=Variant::INT || (name=="attack_group" && int64_t(value)<0)) return -1;
             if (name=="attack_group") params.group=value;else params.hound_pack=value;

@@ -72,6 +72,8 @@ struct CombatEvent {
     Cause cause=Cause::None;
     CombatReason reason=CombatReason::Applied;
     RetireReason retire_reason=RetireReason::Outside;
+    SpawnOrigin origin=SpawnOrigin::Normal;
+    SpawnRole role=SpawnRole::Regular;
     int64_t struck_id=0,target_id=0;
     DefinitionId definition=0,source=0;
     WeaponId weapon_id=0;

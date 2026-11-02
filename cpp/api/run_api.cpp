@@ -284,7 +284,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     } else if (kind=="dev_finish" && runtime.api_development && payload.size()==1 && is(payload,"cleared",Variant::BOOL)) {
         response=speed::Lifecycle::finish(runtime,bool(payload["cleared"])?speed::ResultKind::Clear:speed::ResultKind::Death)?success():failure(4,"result","結果は確定済みです");
     } else if (kind=="dev_spawn" && runtime.api_development && payload.size()==2 && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite()) {
-        auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],Dictionary());
+        Dictionary options;options["spawn_origin"]=int64_t(speed::SpawnOrigin::DevPlacement);
+        auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],options);
         if (entity>0) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=entity>0?success(entity):failure(5,"definition_id","生成できる定義がありません");
     } else if (kind=="dev_soldier_formation" && runtime.api_development && payload.size()==6 && is(payload,"entity_id",Variant::INT) && is(payload,"king_id",Variant::INT) && is(payload,"slot",Variant::INT) && is(payload,"tier",Variant::INT) && is(payload,"anchor",Variant::VECTOR2) && is(payload,"values",Variant::PACKED_FLOAT64_ARRAY)) {

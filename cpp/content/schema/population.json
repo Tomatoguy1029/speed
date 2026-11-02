@@ -204,6 +204,242 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "FormationEntry",
+      "section": 180,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "formation",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationDefinition"
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "FormationLayout",
+      "section": 181,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "formation",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationDefinition"
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "value",
+          "type": "f64"
+        },
+        {
+          "name": "managed",
+          "type": "i64",
+          "min": -1,
+          "max": 1
+        }
+      ]
+    },
+    {
+      "name": "FormationType",
+      "section": 182,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationLayout"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "FormationMarker",
+      "section": 183,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationLayout"
+        },
+        {
+          "name": "entry",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationEntry"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationClip",
+      "section": 184,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "start",
+          "type": "f64"
+        },
+        {
+          "name": "end",
+          "type": "f64"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "groups",
+          "type": "u32"
+        },
+        {
+          "name": "priority",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationClipType",
+      "section": 185,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "clip",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationClip"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "PopulationClipFormation",
+      "section": 186,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "clip",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationClip"
+        },
+        {
+          "name": "formation",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationDefinition"
+        }
+      ]
+    },
+    {
+      "name": "DeathChainDefinition",
+      "section": 187,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {
@@ -235,6 +471,54 @@
       {
         "name": "Residue",
         "value": "residue"
+      }
+    ],
+    "SpawnOrigin": [
+      {
+        "name": "Normal",
+        "value": "normal"
+      },
+      {
+        "name": "Refill",
+        "value": "refill"
+      },
+      {
+        "name": "Summon",
+        "value": "summon"
+      },
+      {
+        "name": "Split",
+        "value": "split"
+      },
+      {
+        "name": "BossPart",
+        "value": "boss_part"
+      },
+      {
+        "name": "HeroLandmark",
+        "value": "hero_landmark"
+      },
+      {
+        "name": "DevPlacement",
+        "value": "dev_placement"
+      }
+    ],
+    "SpawnRole": [
+      {
+        "name": "Regular",
+        "value": "regular"
+      },
+      {
+        "name": "Terrain",
+        "value": "terrain"
+      },
+      {
+        "name": "BossBody",
+        "value": "boss_body"
+      },
+      {
+        "name": "BossPart",
+        "value": "boss_part"
       }
     ]
   }

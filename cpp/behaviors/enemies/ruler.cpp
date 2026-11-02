@@ -23,7 +23,7 @@ void RulerBehavior::step(RunRuntime &r,uint32_t row,double dt) {
         EnemyMotion::keep_distance(r,row,p.keep,p.accel,dt);if (e.age<p.split_delay) return;
         const auto rel=s.ship_pos-e.pos;godot::Vector2 direction=std::abs(rel.x)>std::abs(rel.y)?godot::Vector2((rel.x>0)-(rel.x<0),0):godot::Vector2(0,(rel.y>0)-(rel.y<0));
         if (direction==godot::Vector2()) direction={0,1};if (tracking.locked()) direction=godot::Vector2::from_angle(e.facing);
-        EnemySpawn spawn;spawn.position=e.pos;spawn.facing=direction.angle();spawn.has_facing=true;spawn.elite=e.elite;spawn.group=e.attack_group;spawn.value=e.attack_value;spawn.has_value=true;spawn.priority=e.attack_priority;spawn.has_priority=true;
+        EnemySpawn spawn;spawn.origin=SpawnOrigin::Split;spawn.position=e.pos;spawn.facing=direction.angle();spawn.has_facing=true;spawn.elite=e.elite;spawn.group=e.attack_group;spawn.value=e.attack_value;spawn.has_value=true;spawn.priority=e.attack_priority;spawn.has_priority=true;
         const auto child_id=EnemySystem::spawn_base(r,e.definition,spawn);v.side=1;e.facing=direction.angle();e.mode=EnemyMode::Dash;e.timer=p.deploy_time;e.vel=godot::Vector2(-direction.y,direction.x)*p.deploy_speed*0.6;
         if (child_id>0) {auto &child=s.enemies[s.rows_by_id.at(child_id)];std::get<RulerState>(child.behavior_state).side=-1;child.facing=direction.angle();child.mode=EnemyMode::Dash;child.timer=p.deploy_time;child.vel=-e.vel;}
         godot::Dictionary event;event["pos"]=spawn.position;event["angle"]=direction.angle();event["color"]=d.color;FrameBuilder::append(r,"ruler_split",event);return;

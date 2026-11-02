@@ -70,15 +70,15 @@ double SpeedRunCore::survey_population(double target) {
             const auto &enemy = runtime.state.enemies[member.first];
             if (enemy.alive && enemy.id == member.second && view.has_point(enemy.pos)) { group.arrived = true; break; }
         }
-        if (!group.arrived) for (const auto &member : group.members) entering.insert(member.first);
+        if (!group.arrived) for (const auto &member:group.members) if (member.first<runtime.state.enemies.size() && runtime.state.enemies[member.first].alive && !runtime.state.enemies[member.first].dead && runtime.state.enemies[member.first].id==member.second) entering.insert(member.first);
     }
     for (const auto &rows : runtime.state.behavior_rows) for (size_t row : rows) {
         const auto &enemy = runtime.state.enemies[row];
-        if (enemy.dead || runtime.state.field.rock_handles.contains(enemy.rock)) continue;
+        if (enemy.dead || enemy.is_boss || enemy.role==speed::SpawnRole::BossPart || runtime.state.field.rock_handles.contains(enemy.rock)) continue;
         if (p.maximum[enemy.definition] > 0) ++p.type_counts[enemy.definition];
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const double x = std::abs(relative.x), y = std::abs(relative.y);
-        if (x > limit.x || y > limit.y) { if (runtime.content->definitions[enemy.definition].kind!=speed::EnemyDefinition::Kind::Crow && entering.find(row) == entering.end()) p.far_rows.push_back(row); continue; }
+        if (x > limit.x || y > limit.y) { if (!runtime.state.enemy_handles.contains(enemy.parent) && runtime.content->definitions[enemy.definition].kind!=speed::EnemyDefinition::Kind::Crow && runtime.content->definitions[enemy.definition].kind!=speed::EnemyDefinition::Kind::Phoenix && entering.find(row) == entering.end()) p.far_rows.push_back(row); continue; }
         int region = 4;
         if (x >= center_x || y >= center_y) {
             region = x * runtime.state.view_half.y > y * runtime.state.view_half.x ? (relative.x < 0 ? 0 : 1) : (relative.y < 0 ? 2 : 3);

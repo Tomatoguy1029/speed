@@ -546,6 +546,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (item_reticle!=bundle->reticles.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
+    bundle->death_chains=records.DeathChainDefinition_rows;
+    for (size_t i=0;i<bundle->death_chains.size();++i) bundle->definitions[bundle->death_chains[i].id-1].death_chain_definition=uint32_t(i+1);
     if (records.PopulationDefinition_rows.size()!=1) return {};
     bundle->population=records.PopulationDefinition_rows.front();const auto &pc=bundle->population;auto &timeline=bundle->population_timeline;
     if (pc.refill_time<=0) return {};
@@ -565,6 +567,44 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     if (records.PopulationType_rows.size()!=bundle->definitions.size()) return {};
     std::unordered_set<uint32_t> types;
     for (const auto &row:records.PopulationType_rows) {if (!types.insert(row.enemy).second) return {};timeline.types.push_back({bundle->definitions[row.enemy-1].id,row.rank,row.maximum,row.ranged});}
+    // 配置の固定変換は生成済み。ここでは索引だけ作り、実際の画面・向きは出現時に読む。
+    auto &formations=bundle->formations;
+    for (const auto &row:records.FormationDefinition_rows) {
+        if (row.id!=formations.size()+1 || (!formations.empty() && row.base_view!=bundle->formation_base_view)) return {};
+        bundle->formation_base_view=row.base_view;formations.emplace_back();
+    }
+    std::vector<std::pair<size_t,size_t>> entries,layouts;
+    for (const auto &row:records.FormationEntry_rows) {
+        if (row.id!=entries.size()+1 || row.formation>formations.size() || !std::isfinite(float(row.x)) || !std::isfinite(float(row.y))) return {};
+        auto &formation=formations[row.formation-1];entries.emplace_back(row.formation-1,formation.entries.size());
+        formation.entries.push_back({row.weight,godot::Vector2(row.x,row.y)});
+    }
+    for (const auto &row:records.FormationLayout_rows) {
+        if (row.id!=layouts.size()+1 || row.formation>formations.size()) return {};
+        auto &formation=formations[row.formation-1];layouts.emplace_back(row.formation-1,formation.layouts.size());
+        PopulationFormation::Layout layout;layout.weight=row.weight;layout.value=row.value;layout.managed=int32_t(row.managed);layout.placements.resize(formation.entries.size());formation.layouts.push_back(std::move(layout));
+    }
+    for (const auto &row:records.FormationType_rows) {
+        if (row.layout>layouts.size()) return {};const auto [f,l]=layouts[row.layout-1];
+        formations[f].layouts[l].types.push_back(bundle->definitions[row.enemy-1].id);
+    }
+    for (const auto &row:records.FormationMarker_rows) {
+        if (row.layout>layouts.size() || row.entry>entries.size() || !std::isfinite(float(row.x)) || !std::isfinite(float(row.y))) return {};
+        const auto [f,l]=layouts[row.layout-1];const auto [ef,e]=entries[row.entry-1];if (f!=ef) return {};
+        auto &layout=formations[f].layouts[l];auto &markers=layout.placements[e];
+        if (markers.size()>=layout.types.size() || layout.types[markers.size()]!=bundle->definitions[row.enemy-1].id) return {};
+        markers.push_back({bundle->definitions[row.enemy-1].id,godot::Vector2(row.x,row.y),row.rotation});
+    }
+    for (const auto &formation:formations) {
+        if (formation.entries.empty() || formation.layouts.empty()) return {};
+        for (const auto &layout:formation.layouts) for (const auto &markers:layout.placements) if (markers.size()!=layout.types.size()) return {};
+    }
+    for (const auto &row:records.PopulationClip_rows) {
+        if (row.id!=bundle->population_clips.size()+1 || (row.end!=-1 && row.end<row.start)) return {};
+        PopulationClipData clip;clip.start=row.start;clip.end=row.end==-1?std::numeric_limits<double>::infinity():row.end;clip.interval=row.interval;clip.maximum=row.groups;clip.priority=row.priority;bundle->population_clips.push_back(std::move(clip));
+    }
+    for (const auto &row:records.PopulationClipType_rows) bundle->population_clips[row.clip-1].types.push_back(bundle->definitions[row.enemy-1].id);
+    for (const auto &row:records.PopulationClipFormation_rows) bundle->population_clips[row.clip-1].formations.push_back(row.formation-1);
     bundle->corona_ammunition.resize(bundle->coronas.size());std::unordered_set<std::string> corona_names;
     for (const auto &row:records.CoronaType_rows) {
         if (row.owner>bundle->definitions.size() || row.name.empty() || !std::isfinite(row.weight) || !std::isfinite(row.damage) || !corona_names.insert(std::to_string(row.owner)+":"+row.name).second) return {};

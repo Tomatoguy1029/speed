@@ -24,7 +24,7 @@ void SpeedRunCore::spawn_hounds(size_t row, const Dictionary &options) {
     const double gap = std::max(0.0, def.pack.gap);
     for (int64_t k = 1; k < def.pack.count; ++k) {
         const Vector2 at = parent.pos - direction * gap * double((k + 1) / 2) + side * gap * (k % 2 ? 0.5 : -0.5);
-        Dictionary child = options.duplicate(); child["hound_pack"] = pack; child["facing"] = parent.facing;
+        Dictionary child = options.duplicate(); child["spawn_origin"]=int64_t(parent.origin);child["hound_pack"] = pack; child["facing"] = parent.facing;
         child["attack_group"] = parent.attack_group; child["attack_value"] = parent.attack_value; child["attack_priority"] = parent.attack_priority;
         spawn_enemy(def.id, at, child);
     }

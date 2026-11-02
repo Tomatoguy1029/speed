@@ -229,6 +229,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
 	data.EnemyRecord = [row]
+	if definition.params.has("chain_power"):
+		var chain := {"id":1,"power":float(definition.params.chain_power),"radius":float(definition.params.blast_radius),"delay":float(definition.params.blast_delay),"damage":float(definition.params.blast_dmg)}
+		for value in chain.values():
+			if not is_finite(value) or value<0.0: return {}
+		data.DeathChainDefinition = [chain]
 	data.PopulationType = [{"id":1,"enemy":1,"rank":definition.rank,"maximum":definition.max_alive,"ranged":definition.ranged}]
 	if definition.behavior in [&"biter",&"hound",&"defender"]:
 		var visual_scene := "res://scenes/attacks/zone_biter.tscn"
@@ -389,7 +394,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	for point in saw_points: data.FriendSawPoint.append({"id":data.FriendSawPoint.size()+1,"x":point.x,"y":point.y})
 	var polygon := PackedVector2Array()
 	if not ResourceLoader.exists(sprite):
-		if definition.behavior not in [&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
+		if definition.behavior not in [&"chase",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
 		polygon = RunPresentation._placeholder_points(definition.shape)
 		sprite = ""
 		row.sprite_angle = 0.0
@@ -771,6 +776,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		shell_source.id = row.id
 		shell_source.enemy = row.id
 		data.ShellSource.append(shell_source)
+		for chain: Dictionary in resolved.DeathChainDefinition:
+			chain.id = row.id
+			data.DeathChainDefinition.append(chain)
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
@@ -1035,6 +1043,37 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.PopulationCurve.append(curve_row)
 			for n in curve.points.size(): data.PopulationPoint.append({"id":data.PopulationPoint.size()+1,"curve":curve_row.id,"time":curve.points[n].x,"value":curve.points[n].y,"slope":SpawnCurve._slope(curve.points,n) if curve.points.size()>1 else 0.0})
 		for window in stage.surge_windows(config): data.PopulationWindow.append({"id":data.PopulationWindow.size()+1,"start":window.x,"end":window.y if is_finite(window.y) else -1.0})
+
+
+	var formation_enemy_indices := {}
+	for enemy in data.StringEntry: formation_enemy_indices[StringName(enemy.value)] = enemy.id
+	var clips := Legacy.compile_spawn_clips(stage,config)
+	if clips.is_empty(): return ERR_INVALID_DATA
+	for formation: Dictionary in clips.formations:
+		var formation_id: int = data.FormationDefinition.size()+1
+		data.FormationDefinition.append({"id":formation_id,"base_view":config.base_view})
+		var entry_ids: Array[int] = []
+		for entry: Dictionary in formation.entries:
+			var entry_id: int = data.FormationEntry.size()+1
+			entry_ids.append(entry_id)
+			data.FormationEntry.append({"id":entry_id,"formation":formation_id,"weight":entry.weight,"x":entry.pos.x,"y":entry.pos.y})
+		for layout: Dictionary in formation.layouts:
+			var layout_id: int = data.FormationLayout.size()+1
+			data.FormationLayout.append({"id":layout_id,"formation":formation_id,"weight":layout.weight,"value":layout.value,"managed":-1 if layout.managed==null else int(bool(layout.managed))})
+			for type in layout.types:
+				if not formation_enemy_indices.has(StringName(type)): return ERR_UNAVAILABLE
+				data.FormationType.append({"id":data.FormationType.size()+1,"layout":layout_id,"enemy":formation_enemy_indices[StringName(type)]})
+			for e in layout.placements.size():
+				for marker: Dictionary in layout.placements[e]:
+					data.FormationMarker.append({"id":data.FormationMarker.size()+1,"layout":layout_id,"entry":entry_ids[e],"enemy":formation_enemy_indices[StringName(marker.type)],"x":marker.offset.x,"y":marker.offset.y,"rotation":marker.rotation})
+	for clip: Dictionary in clips.clips:
+		var clip_id: int = data.PopulationClip.size()+1
+		data.PopulationClip.append({"id":clip_id,"start":clip.start,"end":clip.end if is_finite(clip.end) else -1.0,"interval":clip.interval,"groups":clip.groups,"priority":clip.priority})
+		for type in clip.types:
+			if not formation_enemy_indices.has(StringName(type)): return ERR_UNAVAILABLE
+			data.PopulationClipType.append({"id":data.PopulationClipType.size()+1,"clip":clip_id,"enemy":formation_enemy_indices[StringName(type)]})
+		for formation in clip.formations:
+			data.PopulationClipFormation.append({"id":data.PopulationClipFormation.size()+1,"clip":clip_id,"formation":formation+1})
 
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()

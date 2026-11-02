@@ -59,7 +59,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
     std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) { return a->id < b->id; });
     Array out;
     for (const auto *e : ordered) {
-        Dictionary row; row["id"] = e->id; row["stone"] = e->stone; row["knock_t"] = e->knock_t;
+        Dictionary row; row["id"] = e->id;row["spawn_origin"]=int64_t(e->origin);row["spawn_role"]=int64_t(e->role); row["stone"] = e->stone; row["knock_t"] = e->knock_t;
         row["shove_time"] = e->shove_time; row["shove_vel"] = e->shove_vel; row["shove_from"] = e->shove_from;
         row["turn_locked"]=runtime.state.draw.tracing && !e->held && !runtime.state.enemy_handles.contains(e->pump_owner);
         row["held"] = int(e->held); row["slash_hold"] = int(e->slash_hold); row["shoved"] = int(e->shoved);

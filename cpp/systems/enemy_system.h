@@ -7,6 +7,7 @@ struct EnemySpawn {
     double facing=0,size=0,knock=0,value=1,priority=0,spin=0,guard=0,hit_cd=0;
     int64_t group=0,hound_pack=-1;
     bool flock_member=false,elite=false,is_boss=false,has_facing=false,has_value=false,has_priority=false,has_managed=false,managed=false;
+    SpawnOrigin origin=SpawnOrigin::Normal;
     RockHandle rock;
 };
 class EnemySystem {

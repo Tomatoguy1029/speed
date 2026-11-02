@@ -101,7 +101,7 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
         }
         if (p.maximum[selected] > 0 && p.type_counts[selected] >= p.maximum[selected]) continue;
         const auto &definition = runtime.content->definitions[selected];
-        Dictionary options;
+        Dictionary options;options["spawn_origin"]=int64_t(speed::SpawnOrigin::Refill);
         options["elite"] = p.maximum[selected] == 0 && runtime.state.control.rng.randf() < 0.01 + double(surge["elite"]);
         options["facing"] = (runtime.state.ship_pos - Vector2(point)).angle();
         if (definition.size_var) options["size"] = definition.scaling.radius * (0.85 + runtime.state.control.rng.randf() * 0.45);

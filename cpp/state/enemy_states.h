@@ -1,5 +1,6 @@
 #pragma once
 #include "entity_store.h"
+#include "../content/generated/combat_ids.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <cstddef>
 #include <vector>
@@ -17,7 +18,7 @@ struct PumpState {std::vector<uint32_t> contents;double bud_t=0;};
 struct CrabState {int32_t buds=1;AttackHandle sweep;};
 struct AquilaState {Vector2 anchor;double bud_t=0;};
 struct PhoenixState {Vector2 anchor;};
-struct PendingEnemySpawn {uint32_t definition=0;Vector2 position,velocity;double facing=0,hit_cd=0,guard=0,knock=0,priority=0;};
+struct PendingEnemySpawn {uint32_t definition=0;Vector2 position,velocity;double facing=0,hit_cd=0,guard=0,knock=0,priority=0;SpawnOrigin origin=SpawnOrigin::Split;};
 struct CrowState {};
 struct DefenderBoost {bool active=false;double speed=0,wobble=0,until=0,phase=0;};
 struct DefenderState {DefenderBoost boost;};
@@ -36,6 +37,8 @@ struct SniperState {std::vector<float> rays;};
 struct Enemy {
     std::variant<std::monostate,TriangleState,RulerState,CepheusState,SniperState,MarlinState,LynxState,SoldierState,AurigaState,ClockState,ReticleState,PhoenixState,AquilaState,SplitState,DefenderState,CrabState,CrowState,PumpState,CoronaState> behavior_state;
     std::optional<CoronaMember> corona;
+    SpawnOrigin origin=SpawnOrigin::Normal;
+    SpawnRole role=SpawnRole::Regular;
     int64_t id = 0;
     int64_t attack_group = 0;
     double attack_value = 1, attack_priority = 0;

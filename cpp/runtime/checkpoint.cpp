@@ -50,6 +50,11 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (!w.pos.is_finite() || !std::isfinite(w.age) || !std::isfinite(w.radius) || !std::isfinite(w.damage) || w.age<0 || w.radius<0 || w.damage<0) return false;
         for (const auto &h:w.caught) if (h.id<=0 || !std::isfinite(h.age) || h.age<0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
     }
+    if (state.clips_ready) for (const auto &clip:state.clips) {
+        if (!std::isfinite(clip.next) || !std::isfinite(clip.start) || std::isnan(clip.end) || clip.end<clip.start || !std::isfinite(clip.interval) || clip.interval<0 || clip.maximum<0) return false;
+        for (auto formation:clip.formations) if (formation>=state.formations.size()) return false;
+        for (const auto &group:clip.groups) for (const auto &[row,id]:group.members) if (row>=state.enemies.size() || id<=0 || id>=state.next_id) return false;
+    }
     state.rows_by_id.clear();
     std::unordered_set<size_t> visited,free;
     for (size_t group=0;group<state.behavior_rows.size();++group) {
@@ -73,6 +78,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
             !state.rows_by_id.emplace(enemy.id,row).second) return false;
     }
     for (const auto &enemy:state.enemies) if (enemy.alive) {
+        if (enemy.origin>=SpawnOrigin::Count || enemy.role>=SpawnRole::Count) return false;
         if (state.enemy_handles.contains(enemy.parent) && state.enemy_handles.entity_id(enemy.parent)!=enemy.parent_id) return false;
         const auto *sniper=std::get_if<SniperState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Sniper)!=(sniper!=nullptr)) return false;

@@ -77,7 +77,7 @@ bool SpeedRunCore::step_clips() {
             }
             if (alive) retained.push_back(std::move(group));
             else {
-                Dictionary event; event["clip"] = int64_t(n); event["key"] = group.members.front().second;
+                Dictionary event; event["clip"] = int64_t(n); event["key"] = group.members.empty()?int64_t(0):group.members.front().second;
                 emit_event("clip_group_end", event);
             }
         }
@@ -102,7 +102,7 @@ bool SpeedRunCore::step_clips() {
         const int64_t selected = pick(weights);
         if (selected < 0) continue;
         const auto &layout = runtime.state.formations[index].layouts[selected];
-        const PackedInt64Array ids = spawn_formation(index, selected, -1, clip.types, layout.value, clip.priority, layout.managed);
+        const PackedInt64Array ids = spawn_formation(index, selected, -1, clip.types, layout.value, clip.priority, layout.managed<0?Variant():Variant(bool(layout.managed)));
         if (ids.is_empty()) continue;
         Clip::Group group;
         for (int i = 0; i < ids.size(); ++i) group.members.emplace_back(runtime.state.rows_by_id.at(ids[i]), ids[i]);

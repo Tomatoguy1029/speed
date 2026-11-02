@@ -45,6 +45,11 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
     const int64_t maximum=c.progression.weapon_slots*wm+c.progression.trait_slots*tm;
     Dictionary progress;progress["weapon_levels"]=weapons;progress["trait_levels"]=traits;progress["max_levels"]=maximum;progress["completion"]=maximum?double(weapons+traits)/maximum:0.0;
     Dictionary out;out["t"]=s.time;out["world_t"]=s.world_time;out["level"]=s.loadout.level;out["hp"]=s.ship.hp;out["kills"]=s.kills;out["weapons"]=weapon_levels;out["traits"]=trait_levels;out["xp"]=xp;out["equipment_progress"]=progress;
+    Dictionary origins,roles;
+    for (const auto &e:s.enemies) if (e.alive && !e.dead) {
+        const StringName origin(symbol_name(e.origin)),role(symbol_name(e.role));origins[origin]=int64_t(origins.get(origin,0))+1;roles[role]=int64_t(roles.get(role,0))+1;
+    }
+    Dictionary population;population["origins"]=origins;population["roles"]=roles;population["raw"]=s.population.raw;population["accumulator"]=s.population.accumulator;out["population"]=population;
     if (initial) {
         Dictionary existing;existing["ground"]=existing_ground;existing["carried"]=existing_cargo;existing["cap"]=cap;out["existing"]=existing;
         Dictionary values,rewards;for (size_t i=0;i<3;++i) values[names[i]]=c.crystal_values[i];

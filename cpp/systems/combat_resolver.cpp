@@ -6,6 +6,8 @@
 #include "attack_system.h"
 #include "enemy_system.h"
 #include "pickup_system.h"
+#include "attack_budget.h"
+#include "attacks/zone.h"
 #include "../output/event_builder.h"
 #include "../runtime/run_runtime.h"
 #include <algorithm>
@@ -162,6 +164,12 @@ KillResult CombatResolver::kill_enemy(RunRuntime &run,const DamageRequest &reque
     if (death.hull_used && state.enemy_handles.contains(result.target)) state.enemies[result.target.slot].hull_scattered=true;
     if (!death.hull_used) run.combat_hooks.shatter(run,death);
     run.combat_hooks.enemy_death(run,death);
+    const auto &definition=run.content->definitions[enemy.definition];
+    if (definition.death_chain_definition) {
+        const auto &p=run.content->death_chains[definition.death_chain_definition-1];ZoneParams zone;
+        zone.position=death.corpse.pos;zone.color=definition.color;zone.radius=p.radius;zone.delay=p.delay;zone.damage=p.damage;zone.enemy_damage=attack_power(run)*p.power;
+        zone.source_id=death.corpse.id;zone.source_definition=death.corpse.definition;zone.budget.value=AttackBudgetSystem(run).passive(std::to_string(death.corpse.id),death.target);ZoneSystem::emit(run,zone);
+    }
     PickupSystem::drop_enemy(run,death.corpse);
     if (request.cause!=Cause::Afterimage) {
         run.combat_hooks.trait_kill(run,death);run.combat_hooks.weapon_kill(run,death);

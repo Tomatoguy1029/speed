@@ -119,6 +119,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             d["amount"]=e.resolved;d["accepted"]=e.accepted;d["reason"]=combat_reason_name(e.reason);d["hp_before"]=e.hp_before;
             d["hp_after"]=e.hp_after;d["t"]=e.time;d["world_t"]=e.world_time;append(run,"combat_player_damage",d);break;
         case CombatEventKind::Retire:
+            if (run.api_configured) {d["spawn_origin"]=int64_t(e.origin);d["spawn_role"]=int64_t(e.role);}
             d["id"]=e.target_id;d["reason"]=int(e.retire_reason);d["enemy_type"]=definition_name(run,e.definition);append(run,"enemy_retire",d);break;
         }
     }

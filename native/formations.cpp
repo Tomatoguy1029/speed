@@ -45,8 +45,9 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
                 if (std::none_of(runtime.content->definitions.begin(), runtime.content->definitions.end(), [&](const auto &d) { return d.id == type; })) return false;
                 layout.types.push_back(type);
             }
-            layout.managed = row.get("managed", Variant());
-            if (layout.managed.get_type() != Variant::NIL && layout.managed.get_type() != Variant::BOOL) return false;
+            const Variant managed=row.get("managed", Variant());
+            if (managed.get_type()!=Variant::NIL && managed.get_type()!=Variant::BOOL) return false;
+            layout.managed=managed.get_type()==Variant::NIL?-1:(bool(managed)?1:0);
             if (row.get("placements", Variant()).get_type() != Variant::ARRAY) return false;
             const Array placements = row["placements"];
             if (placements.size() != entries.size()) return false;

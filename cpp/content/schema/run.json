@@ -1023,14 +1023,19 @@
     {
       "name": "FormationDefinition",
       "section": 9,
-      "enabled": false,
       "fields": [
         {
           "name": "id",
           "type": "u32",
           "min": 1
+        },
+        {
+          "name": "base_view",
+          "type": "f64",
+          "min": 0
         }
-      ]
+      ],
+      "version": 2
     },
     {
       "name": "BossFlowDefinition",
@@ -1985,7 +1990,9 @@
       "pos",
       "id",
       "reason",
-      "enemy_type"
+      "enemy_type",
+      "spawn_origin",
+      "spawn_role"
     ],
     "game_over": [],
     "gauge_full": [],
