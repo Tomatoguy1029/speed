@@ -1202,6 +1202,7 @@ func _cpp_open(stage: int) -> RunSession:
 	return owner
 
 func _cpp_choose(owner: RunSession, frame: Dictionary) -> bool:
+	if frame.ui.phase==RunState.Phase.PAUSED: return owner.bridge.command("pause",{"paused":false}).ok
 	var cards: Dictionary = frame.ui.cards
 	if cards.offer_id==0 or cards.selected_id!=0: return true
 	if cards.candidates.is_empty(): return false
@@ -1216,6 +1217,7 @@ func _test_cpp_stage(stage: int) -> void:
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.data.intro_seen = true
 	var definition: StageDef = load("res://data/stages/stage_%d.tres" % stage)
+	print("[S%d 定義] boss_enabled=%s boss_id=%s boss_start=%s time_limit=%s" % [stage,definition.boss_enabled,definition.boss_id,definition.boss_start(ContentManager.cfg),definition.time_limit])
 	var owner := await _cpp_open(stage)
 	if owner.bridge==null:
 		owner.free()
@@ -1259,6 +1261,7 @@ func _test_cpp_stage(stage: int) -> void:
 		if frame.result is Dictionary:
 			saw.ended = true
 			break
+		if tick%(120*60)==0: print("[S%d 自然進行] time=%s level=%s hp=%s" % [stage,frame.ui.run_time,frame.ui.level,frame.ui.hp])
 		if tick%120==0: await get_tree().process_frame
 	print("[S%d 自然通し] 無敵なし・時間飛ばしなし・強制撃破なし time=%s level=%s gear=%s traits=%s result=%s events=%s criteria=%s" % [stage,frame.ui.run_time,frame.ui.level,frame.ui.weapon_levels,frame.ui.trait_levels,frame.result,event_counts,saw])
 	_check(saw.early and saw.growth and saw.late and (saw.boss or not definition.boss_enabled) and saw.ended,"S%d 自然な序盤→成長→終盤→設定済みボス/終了" % stage)
