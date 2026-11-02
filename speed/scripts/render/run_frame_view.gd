@@ -1,7 +1,7 @@
 ## RenderFrameの値だけを描画へ渡す。敵表や武器の実体は参照しない。
 extends Node2D
-const VISUAL_ROLE = preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole
-const SHAPE_KIND = preload("res://tools/content/generated/run_schema.gd").ENUMS.RenderShapeKind
+const VISUAL_ROLE = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.VisualRole
+const SHAPE_KIND = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.RenderShapeKind
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
 var perf := PerfLog.new()
 var metrics_record := {}

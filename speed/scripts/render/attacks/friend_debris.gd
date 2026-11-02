@@ -1,6 +1,6 @@
 ## C++が確定した破片の位置・回転・軌跡だけを描く。
 extends Node2D
-const STYLE = preload("res://tools/content/generated/run_schema.gd").ENUMS.DebrisStyle
+const STYLE = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.DebrisStyle
 const PUMP_SHADER := preload("res://shaders/pump_debris.gdshader")
 const PUMP_ENEMIES := [preload("res://assets/pixel/drifter.png"),preload("res://assets/pixel/swarm.png"),preload("res://assets/pixel/splitling.png")]
 var _row: Dictionary = {}
