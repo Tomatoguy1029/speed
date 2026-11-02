@@ -1700,6 +1700,47 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraNorthDefinition",
+      "section": 404,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

@@ -13,6 +13,7 @@ func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
 var white: Texture2D
 func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	state = body
+	queue_redraw()
 	position = body.position
 	rotation = 0.0
 	visible = body.mode<4
@@ -52,3 +53,10 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 		effects[effect.id].update_effect(effect,float(body.clock))
 	for id in effects.keys():
 		if not live.has(id): effects[id].queue_free();effects.erase(id)
+
+func _draw() -> void:
+	for target: Dictionary in state.get("north_targets",[]):
+		var color := Color("#fff2b0") if target.locked else Color("#ffd16c")
+		draw_line(target.from-position,target.target-position,Color(color,0.55),3.0,true)
+		draw_arc(target.target-position,target.radius,0.0,TAU,40,color,3.0,true)
+		draw_circle(target.target-position,6.0,color)

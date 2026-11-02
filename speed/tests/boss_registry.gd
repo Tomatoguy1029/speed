@@ -12,6 +12,12 @@ func _ready() -> void:
 	if "--cpp-hydra-debris-separated" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_debris_separated")
 		return
+	if "--cpp-hydra-north-tail" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_north_tail")
+		return
+	if "--cpp-hydra-north" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_north")
+		return
 	if "--cpp-hydra-wind-resource" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_wind_resource")
 		return
@@ -5649,3 +5655,102 @@ func hydra_separated_debris_combo(name: String) -> void:
 	bridge.command("dev_cancel_boss",{"entity_id":c.id})
 	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),name+"：分離後の本体取消で持続する判定を回収する")
 	bridge.release_checkpoint(gathered.value);bridge.release_checkpoint(firing.value);bridge.dispose();view.queue_free();await get_tree().process_frame
+
+
+func native_hydra_north() -> void:
+	var edits := {"warning_time":0.24,"performance_time":0.5,"north_flight":0.12,"north_lock_time":0.12,"north_spread":90.0,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("north",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"north","同時噛みつきの編集Resourceと互換Runnerを分ける")
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==88,"五首から共通フローで同時噛みつきを選ぶ")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	check(body.north_targets.size()==3 and body.necks.filter(func(n):return n.mode=="north").size()==3,"機体方向に近い三首だけへ線と円の予告を渡す")
+	bridge.command("dev_ship_motion",{"position":Vector2(850,180),"velocity":Vector2.ZERO});bridge._core.step(0.05)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var targets: Array=body.north_targets.duplicate(true)
+	var tracking: Dictionary=bridge.command("dev_boss_state").value[0]
+	check(tracking.north_aiming and tracking.north_target==Vector2(850,180) and body.necks.any(func(n):return n.mode=="north" and n.glow>0),"首更新で機体を追い、首を引いて光らせる")
+	var direction: Vector2=(Vector2(850,180)-body.position).normalized();var side: Vector2=direction.orthogonal()
+	var center: Vector2=body.position+direction*maxf(Vector2(850,180).distance_to(body.position),body.radius+c.package.records.HydraBodyDefinition[0].neck_rest)
+	var ordered: Array=targets.duplicate(true);ordered.sort_custom(func(a,b):return a.target.dot(side)<b.target.dot(side))
+	var exact := ordered.size()==3
+	for i in ordered.size():exact=exact and ordered[i].target.distance_to(center+side*90.0*(i-1))<0.01
+	check(exact,"根元の横位置で並べた三首へ中心と90間隔のSource標的式を使う")
+	var held: Dictionary=bridge.checkpoint();bridge._core.step(0.02);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"狙いを追っている途中の時計と参加首を保持して戻す");bridge._core.step(0.02)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"復帰後も同じ首の位置と予告へ進む")
+	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0];targets=body.north_targets.duplicate(true)
+	check(targets.size()==3 and targets.all(func(x):return x.locked),"固定時刻で三首の狙いを固定する")
+	bridge.command("dev_ship_motion",{"position":Vector2(950,-220),"velocity":Vector2.ZERO});bridge._core.step(0.03)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.north_targets.map(func(x):return x.target)==targets.map(func(x):return x.target),"固定後に機体が動いても標的位置を変えない")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	for tick in 20:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value[0].north_burst:break
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty() and body.north_targets.is_empty(),"発動tickは首を進めず予告だけを閉じる")
+	var burst: Dictionary=bridge.checkpoint();var from: Array=body.necks.filter(func(n):return n.mode=="north").map(func(n):return n.position)
+	bridge._core.step(0.04);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==3 and body.effects.all(func(e):return e.points.size()==2 and is_equal_approx(e.width,70.0) and is_equal_approx(e.life,0.041)),"次の首更新で移動区間を三つの幅付き線分へ出す")
+	var events: Array=[];bridge.subscribe("同時噛みの記録",func(packet):events.append_array(packet.events);return true)
+	bridge._core.set_run_guards({"invincible":false});var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_motion",{"position":body.effects[0].points[0].lerp(body.effects[0].points[1],0.5),"velocity":Vector2.ZERO});bridge._core.step_hazards(0.001);bridge.command("dev_boss_body_state")
+	check(hp>bridge._core.ship_snapshot().ship_hp and events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bite" and e.payload.technique=="north" and e.payload.source=="hydra"),"噛みつきが実HPとbite・north・hydra通知へ届く")
+	bridge.restore(burst.value);bridge._core.step(0.04);var flight: Dictionary=bridge.checkpoint();bridge._core.step(0.02);expected=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(flight.ok and bridge.restore(flight.value).ok,"飛行途中の首と判定を保持する");bridge._core.step(0.02);check(bridge.command("dev_boss_body_state").value[0]==expected,"飛行途中の復帰でも区間を飛ばさない")
+	bridge.restore(burst.value);body=bridge.command("dev_boss_body_state").value[0];var participant: Dictionary=body.necks.filter(func(n):return n.mode=="north")[0]
+	bridge.command("dev_damage",{"entity_id":participant.id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"参加首一本の消失で同時噛みと判定を中断する")
+	bridge.restore(flight.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"途中取消で全区間を回収する")
+	bridge.restore(flight.value);bridge.command("dev_remove",{"entity_id":c.id});bridge._core.step(0.01);check(bridge.command("dev_boss_state").value[0].stage==7,"本体の消失で同時噛みを中断する")
+	bridge.restore(burst.value);bridge._core.step(0.13);body=bridge.command("dev_boss_body_state").value[0]
+	var landed: Array=body.necks.filter(func(n):return n.mode=="north").map(func(n):return n.position)
+	check(landed.size()==3 and landed.all(func(p):return targets.any(func(x):return x.target.distance_to(p)<0.01)),"follow時刻をまたいでも全首が最後の標的位置へ到達する")
+	for tick in 150:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==88),"自然終了と余白の後に次の同時噛みを選ぶ")
+	bridge.release_checkpoint(held.value);bridge.release_checkpoint(burst.value);bridge.release_checkpoint(flight.value);bridge.dispose();view.queue_free()
+	c=hydra_major_case("north",edits,false);bridge=c.bridge
+	hydra_grid_separate(c)
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離後はSourceと同じく同時噛みを選ばない")
+	bridge.dispose();await get_tree().process_frame;print("[cpp_hydra_north] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_north_tail() -> void:
+	var edits := {"warning_time":0.24,"performance_time":0.5,"north_flight":0.12,"north_lock_time":0.12,"north_spread":90.0,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("north",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	var targets: Array=[]
+	for tick in 60:
+		bridge._core.step(0.01)
+		var b: Dictionary=bridge.command("dev_boss_body_state").value[0]
+		if not b.north_targets.is_empty():targets=b.north_targets.duplicate(true)
+		var actions: Array=bridge.command("dev_boss_state").value
+		if not actions.is_empty() and actions[0].north_burst:break
+	var first_id: int=bridge.command("dev_boss_state").value[0].id
+	var burst: Dictionary=bridge.checkpoint()
+	bridge._core.step(0.04);var flight: Dictionary=bridge.checkpoint()
+	var body: Dictionary
+	var view=hydra_move_view(c)
+	bridge.restore(burst.value);body=bridge.command("dev_boss_body_state").value[0];var participant: Dictionary=body.necks.filter(func(n):return n.mode=="north")[0]
+	bridge.command("dev_damage",{"entity_id":participant.id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"参加首一本の消失で同時噛みと判定を中断する")
+	bridge.restore(flight.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"途中取消で全区間を回収する")
+	bridge.restore(flight.value);bridge.command("dev_remove",{"entity_id":c.id});bridge._core.step(0.01);check(bridge.command("dev_boss_state").value[0].stage==7,"本体の消失で同時噛みを中断する")
+	bridge.restore(burst.value);bridge._core.step(0.13);body=bridge.command("dev_boss_body_state").value[0]
+	var landed: Array=body.necks.filter(func(n):return n.mode=="north").map(func(n):return n.position)
+	check(landed.size()==3 and landed.all(func(p):return targets.any(func(x):return x.target.distance_to(p)<0.01)),"follow時刻をまたいでも全首が最後の標的位置へ到達する")
+	for tick in 150:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==88),"自然終了と余白の後に次の同時噛みを選ぶ")
+	bridge.release_checkpoint(burst.value);bridge.release_checkpoint(flight.value);bridge.dispose();view.queue_free()
+	c=hydra_major_case("north",edits,false);bridge=c.bridge
+	hydra_grid_separate(c)
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離後はSourceと同じく同時噛みを選ばない")
+	bridge.dispose();await get_tree().process_frame;print("[cpp_hydra_north_tail] failures=",failed);get_tree().quit(1 if failed else 0)

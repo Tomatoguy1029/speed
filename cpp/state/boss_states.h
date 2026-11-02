@@ -100,10 +100,11 @@ struct HydraShatterStone {EnemyHandle actor;godot::Vector2 from,to;bool shattere
 struct HydraShatterState {bool initialized=false;double aim=0;std::vector<HydraShatterStone> rubble;};
 struct HydraTornadoState {bool initialized=false,launched=false;godot::Vector2 center,direction,from;AttackHandle vortex;std::vector<EnemyHandle> rubble;};
 struct HydraCurveState {};
+struct HydraNorthState {bool aiming=true,burst=false,followed=false;godot::Vector2 target;};
 struct HydraPincerState {std::vector<double> aims;};
 struct HydraGridPlan {uint32_t layout=0,region=0;std::vector<godot::Vector2> starts,ends,path;godot::Vector2 bearer;double length=0;};
 struct HydraGridState {HydraGridPlan plan;std::vector<bool> arrived;double position_elapsed=0;bool positioning=true;};
-struct HydraTechniqueState {double time=0;bool playing=false;std::vector<EnemyHandle> participants;std::variant<HydraCurveState,HydraGridState,HydraPincerState,HydraTornadoState,HydraShatterState> move;};
+struct HydraTechniqueState {double time=0;bool playing=false;std::vector<EnemyHandle> participants;std::variant<HydraCurveState,HydraGridState,HydraPincerState,HydraTornadoState,HydraShatterState,HydraNorthState> move;};
 struct TechniqueState {
     std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState,CanisSiriusFlameState,HydraTechniqueState> detail;
     int64_t id=0;
