@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-fling-corpse" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_fling_corpse()
+		check(finished,"死体投射の指定確認を最後まで実施する")
+		print("[cpp_fling_corpse] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-scatter-hull" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_scatter_hull()
 		check(finished,"船体散開の不足条件を最後まで確認する")
@@ -799,5 +805,36 @@ func check_cpp_scatter_hull() -> bool:
 		check(not scattered.ok and cpp_core.projectiles_snapshot().is_empty(),"フィールド由来の岩を船体の破片へ変えない: %d" % rock.kind)
 	var raw: int = cpp_bridge.command("dev_spawn",{"definition_id":"meteor","position":cpp_origin-Vector2(100,0)}).value
 	check(cpp_bridge.command("dev_scatter_hull",{"source_id":raw,"direction":Vector2.RIGHT,"speed":100.0,"damage":1.0}).ok,"フィールド番号のない生成個体は定義名だけで除外しない")
+	cpp_session.free()
+	return true
+
+func check_cpp_fling_corpse() -> bool:
+	if not await prepare_cpp_duplicator_attack(103,"fling_corpse"): return false
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var corpse: Dictionary = cpp_core.enemies_snapshot().filter(func(e): return e.id==source)[0]
+	cpp_bridge.command("dev_kill",{"entity_id":source,"cause":"debug"})
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(100,0)}).value
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(200,0)}).value
+	var fired: Dictionary = cpp_bridge.command("dev_fling_corpse",{"source_id":source,"velocity":Vector2(1000,0),"damage":2.0,"radius_mult":1.5,"knock_mult":0.0,"life_mult":0.5})
+	check(fired.ok,"開発用の登録入口から死体を投射する")
+	if not fired.ok: cpp_session.free(); return false
+	var shots: Array = cpp_core.projectiles_snapshot()
+	check(shots.size()==3 and shots.all(func(p): return p.cause==&"corpse" and p.pos==cpp_origin and p.hit_ids==[source] and is_equal_approx(p.life,0.45) and is_equal_approx(p.radius,maxf(10.0,corpse.radius*0.6)*1.5) and p.knock==0.0),"元と複製へ死体の位置・半径・元IDと投射倍率を写す")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.shapes.size()==3 and frame.shapes.all(func(s): return s.debris_style==ENUMS.DebrisStyle.Stardust) and presentation.frame_view.apply_frame(frame),"投射した死体と複製を星屑の形で通常画面へ渡す")
+	await get_tree().process_frame
+	cpp_core.step_projectiles(0.25)
+	var events: Array = cpp_bridge.read_frame().value.events
+	var hits: Array = events.filter(func(e): return e.type==&"combat_damage" and e.payload.cause==&"corpse")
+	check(hits.size()==6 and hits[0].payload.target_id==near and hits[1].payload.target_id==far and events.all(func(e): return e.type!=&"duplicate"),"死体は距離順に貫通し、命中から再複製しない")
+	cpp_bridge.command("dev_remove",{"entity_id":source})
+	var state: Array = cpp_core.projectiles_snapshot()
+	var held: Dictionary = cpp_bridge.checkpoint()
+	check(held.ok and state.all(func(p): return p.hit_ids.has(near) and p.hit_ids.has(far)),"元の敵を消しても投射と命中済みIDを保持する")
+	cpp_core.step_projectiles(1.0)
+	check(cpp_core.projectiles_snapshot().is_empty(),"投射した死体と複製は寿命で消える")
+	check(cpp_bridge.restore(held.value).ok and cpp_core.projectiles_snapshot()==state,"死体投射の位置・速度・角度・命中ID・寿命を復元する")
+	cpp_bridge.release_checkpoint(held.value)
 	cpp_session.free()
 	return true
