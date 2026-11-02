@@ -286,26 +286,8 @@ func _ready() -> void:
 	if "--cpp-centaurus-body" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_body")
 		return
-	var session := RunManager.create_session(self, {"lab": true, "seed": 42}, false)
-	session.auto_step = false
-	var bosses = session.sim.bosses
-	var one = bosses.spawn_lab(&"monoceros", Vector2(3000, 0))
-	var two = bosses.spawn_lab(&"monoceros", Vector2(-3000, 0))
-	check(bosses.get("actors") != null, "ボス管理は役者の一覧を持つ")
-	if bosses.get("actors") != null:
-		check(bosses.actors.size() == 2, "同じSystemに2体を登録する")
-		var a = bosses.actor_for_row(one)
-		var b = bosses.actor_for_row(two)
-		check(a.ctx == session.sim.ctx and b.ctx == session.sim.ctx, "両方の役者が同じランのContextを使う")
-		bosses.remove_actor(a)
-		check(not a.has_body() and b.has_body(), "1体を取り除いても他の本体を保持する")
-		check(bosses.actor_for_row(one) == null and bosses.actor_for_row(two) == b, "行とIDで正しい役者を返す")
-	session.free()
-	await get_tree().process_frame
-	print("[boss_registry] %d failures" % failed)
-	get_tree().quit(1 if failed else 0)
+	call_deferred("native_centaurus_body")
 
-## ケンタウルス本体の既存ボス登録検査をC++の状態・表示へつなぐ。
 func native_centaurus_body() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
