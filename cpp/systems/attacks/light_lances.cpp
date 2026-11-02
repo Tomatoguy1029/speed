@@ -12,7 +12,7 @@ std::vector<uint64_t> LightLancesSystem::fire(RunRuntime &run,const LightLancePa
     auto &state=run.state;std::vector<uint64_t> created;
     if (!state.started || state.closed || !state.combat_ready || state.phase!=godot::RunState::Phase::Play || run.content->light_lances.empty() || !p.position.is_finite() || !p.direction.is_finite()) return created;
     for (double value:{p.length,p.width,p.damage,p.knock}) if (!std::isfinite(value) || value<0) return created;
-    const auto &definition=run.content->light_lances.front();const auto velocity=p.direction*(p.length/definition.flight_time);if (!velocity.is_finite()) return created;
+    const auto &definition=run.content->light_lances.front();const auto velocity=p.direction*p.length/definition.flight_time;if (!velocity.is_finite()) return created;
     LightLanceState original;original.definition=definition.id;original.from=p.position;original.velocity=velocity;original.length=p.length;original.width=p.width;original.damage=p.damage;original.knock=p.knock;
     struct VisualHit {EnemyHandle target;godot::Vector2 direction;};std::vector<VisualHit> visual_hits;
     std::vector<LightLanceState> queue{original};size_t next=0;uint64_t reserved=0;
