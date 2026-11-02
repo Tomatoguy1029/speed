@@ -5,32 +5,6 @@ func check(ok: bool, label: String) -> void:
 	if not ok:
 		failed += 1
 		push_error(label)
-class SemanticsSession extends Node:
-	var sim: RunSimulation
-	var auto_step: bool=false
-	func dispose_source() -> void:
-		for actor in sim.bosses.actors.duplicate():
-			if is_instance_valid(actor):actor.free()
-		sim.bosses.actors.clear();sim.dispose()
-
-func semantics_strict() -> bool:
-	return "--semantics-strict" in OS.get_cmdline_user_args()
-
-func semantics_session(options: Dictionary):
-	if not semantics_strict():return RunManager.create_session(self,options,false)
-	var session:=SemanticsSession.new()
-	session.sim=RunSimulation.new();session.sim.actor_parent=self
-	session.sim.options=options.duplicate();session.sim.options["empty"]=true
-	session.sim.setup();add_child(session)
-	return session
-
-func semantics_number(a: float,b: float) -> bool:
-	return absf(a-b)<=maxf(1e-9,maxf(absf(a),absf(b))*1e-9) if semantics_strict() else is_equal_approx(a,b)
-
-func semantics_finish(bridge,session,label: String,errors: Array) -> void:
-	print("SEMANTICS_DRACO ",label," errors=",errors," failures=",failed)
-	bridge.dispose();session.dispose_source();session.free();get_tree().quit(1 if failed else 0)
-
 func _ready() -> void:
 	if "--cpp-draco-finish" in OS.get_cmdline_user_args():
 		call_deferred("native_finish")
@@ -124,50 +98,22 @@ func draco_move_stage(attack: Dictionary) -> int:
 	return (3 if attack.get("staging_phase",0)==1 else 4) if attack.stage==0 and not attack.staging_ready else int(attack.stage)
 
 func native_draco_move(move_id: String) -> void:
-	var motion_only:= semantics_strict() or "--cpp-draco-"+move_id+"-motion" in OS.get_cmdline_user_args()
+	var motion_only:= "--cpp-draco-"+move_id+"-motion" in OS.get_cmdline_user_args()
 	var move: BossTechnique=load("res://data/bosses/draco_moves/%s.tres"%move_id)
 	var label: String=move.display_name
 	var fixture:=breath_fixture(move)
 	if fixture.is_empty():get_tree().quit(1);return
 	var bridge=fixture.bridge
 	check(fixture.package.records["DracoChargeDefinition" if move_id=="charge" else "DracoLeapDefinition"].size()==3,label+"の実効値を3形態へ生成する")
-	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
-	stage.boss_enabled=false
-	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
-	session.auto_step=false
-	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
-	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
-	var a=sim.bosses.actor
-	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
-	sim.state.ship_pos=Vector2(700,0);sim.state.enemy_aim=Vector2(700,0);sim.state.ship_vel=Vector2.ZERO
-	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
-	check(a.start_attack(StringName(move_id)) and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++の移動攻撃を開始する")
-	# SourceのGodot RNGとC++ PCGの抽選値は異なるため、選ばれた左右を同じにして動作を照合する。
-	a._runner.staging.side=bridge.command("dev_boss_state").value[0].staging_side
-	var position_error:=0.0
-	var shape_error:=0.0
-	var warning_error:=0.0
-	var attack_error:=0.0
-	var times_equal:=true
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++の移動攻撃を開始する")
 	var saved: Array=[]
 	var rendered: Array=[]
 	for frame in 900:
-		a.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		bridge._core.step(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		position_error=maxf(position_error,body.position.distance_to(a.table.pos[a.body]))
-		var points: PackedVector2Array=a.body_points()
-		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and semantics_number(attack.stage_time,a.elapsed)
-		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked
-		if attack.attack_points.size()==a.attack_points.size():
-			for j in a.attack_points.size():attack_error=maxf(attack_error,attack.attack_points[j].distance_to(a.attack_points[j]))
-		else:attack_error=INF
-		if not a.telegraph_paths.is_empty():
+		if not attack.warning.is_empty():
 			if not motion_only:check(attack.warning.size()==2,"予告の線分を出す")
-			if attack.warning.size()==2:
-				for j in 2:warning_error=maxf(warning_error,attack.warning[j].distance_to(a.telegraph_paths[0][j]))
 		var key: int=draco_move_stage(attack)
 		if not motion_only and key not in saved and key<5:
 			saved.append(key)
@@ -189,13 +135,9 @@ func native_draco_move(move_id: String) -> void:
 			add_child(display);display.apply_frame(body,attack,appearance);await get_tree().process_frame
 			check(display._parts.visible,"同じ技状態から予告・攻撃軌跡・回復を描画する")
 			display.free()
-		if attack.stage==5 and a.mode==&"idle":break
-	check(times_equal,"Sourceと退場中の時計0・予告・実行・回復の切替tickが一致する")
-	check(position_error<=(1e-4 if semantics_strict() else 0.1) and shape_error<=(1e-4 if semantics_strict() else 0.1) and warning_error<=(1e-4 if semantics_strict() else 0.1) and attack_error<=(1e-4 if semantics_strict() else 0.1),label+"の頭・全身・予告・口線分がSourceと一致する: %s/%s/%s/%s"%[position_error,shape_error,warning_error,attack_error])
-	if semantics_strict():
-		semantics_finish(bridge,session,move_id,[position_error,shape_error,warning_error,attack_error]);return
+		if attack.stage==5:break
 	if motion_only:
-		bridge.dispose();session.free()
+		bridge.dispose()
 		native_draco_move_flow(move)
 		return
 	check(saved.size()==(4 if move_id=="charge" else 5) and rendered.size()==3,"退場から自然終了までの各段階を通る")
@@ -213,7 +155,7 @@ func native_draco_move(move_id: String) -> void:
 	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
 	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
 	check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失で移動攻撃を取り消す")
-	bridge.dispose();session.free()
+	bridge.dispose()
 	native_draco_move_flow(move)
 
 func native_draco_move_flow(move: BossTechnique) -> void:
@@ -250,60 +192,22 @@ func native_draco_move_flow(move: BossTechnique) -> void:
 	print("[cpp_draco_%s] failures="%move.technique,failed)
 	get_tree().quit(1 if failed else 0)
 
-## 既存の尾の着弾・小さな波・中断を同じSourceへ照合する。
+## 尾の着弾・小さな波・中断を確認する。
 func native_tail_slam() -> void:
 	var move: BossTechnique=load("res://data/bosses/draco_moves/tail_slam.tres")
 	var fixture:=breath_fixture(move)
 	if fixture.is_empty():get_tree().quit(1);return
 	var bridge=fixture.bridge
 	check(fixture.package.records.DracoTailSlamDefinition.size()==3,"尾の叩きつけの実効値を3形態へ生成する")
-	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
-	stage.boss_enabled=false
-	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
-	session.auto_step=false
-	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
-	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
-	var a=sim.bosses.actor
-	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
-	sim.state.ship_pos=Vector2(700,0);sim.state.enemy_aim=Vector2(700,0);sim.state.ship_vel=Vector2.ZERO;sim.state.ship_invuln=0.0
-	check(a.start_attack(&"tail_slam") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で尾の叩きつけを開始する")
-	var shape_error:=0.0
-	var ring_error:=0.0
-	var times_equal:=true
-	var hazard_equal:=true
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で尾の叩きつけを開始する")
 	var saved: Array=[]
 	var shown: Array=[]
 	var landed:=false
 	for frame in 300:
-		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
 		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and semantics_number(attack.stage_time,a.elapsed)
-		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked and attack.fired==a._runner.fired
-		var points: PackedVector2Array=a.body_points()
-		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
-		if a.telegraph_paths.size()==attack.telegraph_paths.size():
-			for path in a.telegraph_paths.size():
-				if a.telegraph_paths[path].size()!=attack.telegraph_paths[path].size():ring_error=INF
-				else:
-					for j in a.telegraph_paths[path].size():ring_error=maxf(ring_error,a.telegraph_paths[path][j].distance_to(attack.telegraph_paths[path][j]))
-		else:ring_error=INF
-		var hazards: Array=bridge._core.hazards_snapshot()
-		var source_hazards: Array=[]
-		for j in sim.projectiles.hazard_alive.size():
-			if sim.projectiles.hazard_alive[j]!=0:source_hazards.append(j)
-		hazard_equal=hazard_equal and hazards.size()==source_hazards.size()
-		for h: Dictionary in hazards:
-			var found:=false
-			for j: int in source_hazards:
-				if h.kind!=int(sim.projectiles.hazard_kind[j]):continue
-				found=h.pos.distance_to(sim.projectiles.hazard_pos[j])<=(1e-4 if semantics_strict() else 0.01) and semantics_number(h.damage,sim.projectiles.hazard_dmg[j]) and semantics_number(h.delay,sim.projectiles.hazard_delay[j]) and semantics_number(h.active,sim.projectiles.hazard_active[j])
-				if h.kind==1:found=found and semantics_number(h.radius,sim.projectiles.hazard_len[j])
-				if h.kind==2:found=found and semantics_number(h.length,sim.projectiles.hazard_len[j]) and semantics_number(h.radius,sim.projectiles.wave_radius(j)) and semantics_number(h.half_width*2,sim.projectiles.hazard_width[j])
-				hazard_equal=hazard_equal and found
-		if not semantics_strict() and attack.stage not in saved and attack.stage<3:
+		if attack.stage not in saved and attack.stage<3:
 			saved.append(attack.stage)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"尾の予告・実行・回復の途中を値型で保持する")
@@ -316,7 +220,7 @@ func native_tail_slam() -> void:
 			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body and bridge._core.hazards_snapshot()==future_hazards,"復帰後の尾の姿勢・段階・攻撃が同じになる")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
 		var key: int=3 if attack.fired and not landed else attack.stage
-		if not semantics_strict() and key in [0,3,2] and key not in shown:
+		if key in [0,3,2] and key not in shown:
 			shown.append(key)
 			var appearance: Dictionary={}
 			for visual: Dictionary in fixture.package.visuals:
@@ -329,12 +233,8 @@ func native_tail_slam() -> void:
 				check(body.impacts.size()==1 and rendered.shapes.any(func(shape):return shape.kind==2) and rendered.shapes.any(func(shape):return shape.kind==7),"着弾の表示とzone・waveの形を通常の描画出力へ渡す")
 				landed=true
 			display.free()
-		if attack.stage==5 and a.mode==&"idle":break
-	check(times_equal,"Sourceと予告・固定・着弾1回・回復・終了のtickが一致する")
-	check(shape_error<=(1e-4 if semantics_strict() else 0.1) and ring_error<=(1e-4 if semantics_strict() else 0.1),"尾のベジェ・両端固定・49点の予告円がSourceと一致する: %s/%s"%[shape_error,ring_error])
-	check(hazard_equal and bridge._core.hazards_snapshot().is_empty(),"zoneとwaveの生成時刻・形・ダメージ・自然寿命がSourceと一致する")
-	if semantics_strict():
-		semantics_finish(bridge,session,"tail_slam",[shape_error,ring_error]);return
+		if attack.stage==5:break
+	check(bridge._core.hazards_snapshot().is_empty(),"zoneとwaveを自然寿命で回収する")
 	check(saved.size()==3 and shown.size()==3,"予告から自然終了までの状態と表示を通る")
 	check(fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.accepted and event.payload.cause==&"blast" and event.payload.source==&"draco" and event.payload.technique==&"tail_slam"),"着地円の実HPと原因・出所・技名を記録する")
 	for target in [0,1,2]:
@@ -345,7 +245,7 @@ func native_tail_slam() -> void:
 		check(bridge.command("dev_cancel_technique",{"ticket":started.value}).ok,"尾の予告・実行・回復で取り消す")
 		check(bridge.command("dev_boss_state").value[0].telegraph_paths.is_empty(),"取消は尾の予告を消す")
 		bridge._core.step_hazards(1.0)
-	bridge.dispose();session.free()
+	bridge.dispose()
 	# 着地円の外に避け、取消・本体消失後にも波だけを受ける既存の残留攻撃ケース。
 	for operation in ["dev_cancel_technique","dev_cancel_boss","outside"]:
 		fixture=breath_fixture(move);bridge=fixture.bridge
@@ -368,44 +268,21 @@ func native_tail_slam() -> void:
 	native_draco_move_flow(move)
 
 func native_breath() -> void:
-	var rays_only := semantics_strict() or "--cpp-draco-breath-rays" in OS.get_cmdline_user_args()
 	var move: BossTechnique = load("res://data/bosses/draco_moves/breath.tres")
 	var fixture := breath_fixture(move)
 	if fixture.is_empty(): get_tree().quit(1);return
 	var bridge = fixture.bridge
-	var stage: RuntimeStage = ContentManager.runtime_stage(5).duplicate(true)
-	stage.boss_enabled=false
-	var session = semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
-	session.auto_step=false
-	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
-	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
-	var actor=sim.bosses.actor
-	actor.selection_enabled=false;actor.clock=0.0;actor.cycle.cancel();actor.cancel_attack()
-	sim.state.ship_pos=Vector2(700,0);sim.state.enemy_aim=Vector2(700,0);sim.state.ship_vel=Vector2.ZERO;sim.state.ship_invuln=0.0
-	check(actor.start_attack(&"breath") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++のブレスを開始する")
-	var driver=actor._runner
-	var max_rock_error := 0.0
-	var max_ray_error := 0.0
-	var stage_equal := true
-	var facing_error := 0.0
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++のブレスを開始する")
 	var behind_safe := true
 	var damaged_after_break := false
 	for frame in 610:
-		actor.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		bridge._core.step(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		stage_equal=stage_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[actor.mode]
-		facing_error=maxf(facing_error,absf(angle_difference(body.facing,actor.table.facing[actor.body])))
-		for j in attack.rocks.size(): max_rock_error=maxf(max_rock_error,attack.rocks[j].position.distance_to(driver.rocks[j].pos))
-		if attack.attack_points.size()==actor.attack_points.size():
-			for j in attack.attack_points.size(): max_ray_error=maxf(max_ray_error,attack.attack_points[j].distance_to(actor.attack_points[j]))
-		elif attack.stage==1 and actor.mode==&"active": check(false,"遮蔽の光線数がSourceと一致する")
 		if frame==275:
 			behind_safe=not fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.accepted)
-			sim.enemies.mark_dead(driver.rocks[1].row)
 			bridge.command("dev_kill",{"entity_id":attack.rocks[1].actor,"cause":"debug"})
-		if frame==280 and not rays_only:
+		if frame==280:
 			damaged_after_break=fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.cause==&"breath" and event.payload.source==&"draco" and event.payload.accepted)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"遮蔽破壊後のブレス・岩・光線を保持する")
@@ -415,7 +292,7 @@ func native_breath() -> void:
 			bridge._core.step(1.0/120.0)
 			check(bridge.command("dev_boss_state").value==future,"復帰後も同じ遮蔽光線で進む")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not rays_only and frame in [120,280,430]:
+		if frame in [120,280,430]:
 			var appearance := {}
 			for visual: Dictionary in fixture.package.visuals:
 				if visual.get("boss","")=="draco":appearance=visual.appearance
@@ -423,17 +300,6 @@ func native_breath() -> void:
 			add_child(display);display.apply_frame(body,attack,appearance);display.queue_redraw();await get_tree().process_frame
 			check(display._parts.visible,"扇の予告・遮蔽されたブレス・岩の破壊を状態から描画する")
 			display.free()
-	if semantics_strict():
-		check(max_ray_error<=1e-4 and max_rock_error<=1e-4 and facing_error<=1e-9,"ブレスの位置と角度の指定許容幅")
-		semantics_finish(bridge,session,"breath",[max_rock_error,max_ray_error,facing_error]);return
-	if rays_only:
-		check(max_ray_error<0.1,"Sourceと65光線の遮蔽点列が一致する: %s"%max_ray_error)
-		bridge.dispose();session.free()
-		print("[cpp_draco_breath_rays] failures=",failed)
-		get_tree().quit(1 if failed else 0)
-		return
-	check(stage_equal and facing_error<0.0001,"Sourceの開始・発動・終了時刻と薙ぐ向きが一致する")
-	check(max_rock_error<0.1 and max_ray_error<0.1,"投石の移動と65光線の遮蔽点列が一致する: %s/%s"%[max_rock_error,max_ray_error])
 	check(behind_safe and damaged_after_break,"岩の裏は安全で、遮蔽を壊した光線から被弾する")
 	check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return rock.destroyed and not rock.alive),"自然終了は残る岩をすべて崩す")
 	for seconds in [0.3,1.5,3.7]:
@@ -444,7 +310,7 @@ func native_breath() -> void:
 	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
 	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
 	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return rock.destroyed and not rock.alive),"本体消失はブレスと所有する投石を取り消す")
-	bridge.dispose();session.free()
+	bridge.dispose()
 	var clear: BossTechnique=move.duplicate(true);clear.rocks=0
 	for at in [Vector2(1000,230),Vector2(1000,210)]:
 		fixture=breath_fixture(clear);bridge=fixture.bridge
@@ -495,34 +361,14 @@ func native_tail_sweep() -> void:
 	var bridge=fixture.bridge
 	check(fixture.package.records.DracoTailSweepDefinition.size()==3,"尾の薙ぎ払いの実効値を3形態へ生成する")
 	bridge.command("dev_ship_motion",{"position":Vector2(-700,0),"velocity":Vector2.ZERO})
-	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
-	stage.boss_enabled=false
-	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
-	session.auto_step=false
-	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
-	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
-	var a=sim.bosses.actor
-	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
-	sim.state.ship_pos=Vector2(-700,0);sim.state.enemy_aim=Vector2(-700,0);sim.state.ship_vel=Vector2.ZERO;sim.state.ship_invuln=0.0
-	check(a.start_attack(&"tail_sweep") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で尾の薙ぎ払いを開始する")
-	var shape_error:=0.0
-	var area_error:=0.0
-	var times_equal:=true
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で尾の薙ぎ払いを開始する")
 	var saved: Array=[]
 	var shown: Array=[]
 	for frame in 350:
-		a.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		bridge._core.step(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and semantics_number(attack.stage_time,a.elapsed)
-		var points: PackedVector2Array=a.body_points()
-		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
-		var area: PackedVector2Array=a.telegraph_areas[0].polygon if not a.telegraph_areas.is_empty() else PackedVector2Array()
-		if area.size()!=attack.telegraph_polygon.size():area_error=INF
-		else:
-			for j in area.size():area_error=maxf(area_error,area[j].distance_to(attack.telegraph_polygon[j]))
-		if not semantics_strict() and attack.stage not in saved and attack.stage<3:
+		if attack.stage not in saved and attack.stage<3:
 			saved.append(attack.stage)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"尾の予告・実行・回復の途中を値型で保持する")
@@ -533,7 +379,7 @@ func native_tail_sweep() -> void:
 			bridge._core.step(1.0/120.0)
 			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body,"復帰後の尾の姿勢・段階・前回点列が同じになる")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not semantics_strict() and attack.stage not in shown and attack.stage<3:
+		if attack.stage not in shown and attack.stage<3:
 			shown.append(attack.stage)
 			var appearance: Dictionary={}
 			for visual: Dictionary in fixture.package.visuals:
@@ -542,11 +388,7 @@ func native_tail_sweep() -> void:
 			add_child(display);display.apply_frame(body,attack,appearance);await get_tree().process_frame
 			check(display._parts.visible,"尾の扇の塗り・薙ぎ払い・回復を状態から描く")
 			display.free()
-		if attack.stage==5 and a.mode==&"idle":break
-	check(times_equal,"Sourceと予告・実行・回復・終了のtickが一致する")
-	check(shape_error<=(1e-4 if semantics_strict() else 0.1) and area_error<=(1e-4 if semantics_strict() else 0.1),"尾の両端固定と96点の予告の扇がSourceと一致する: %s/%s"%[shape_error,area_error])
-	if semantics_strict():
-		semantics_finish(bridge,session,"tail_sweep",[shape_error,area_error]);return
+		if attack.stage==5:break
 	check(saved.size()==3 and shown.size()==3,"予告から自然終了までの状態と表示を通る")
 	var hits: Array=fixture.captured.filter(func(event):return event.type==&"combat_player_damage" and event.payload.accepted and event.payload.cause==&"tail_sweep" and event.payload.source==&"draco" and event.payload.technique==&"tail_sweep")
 	check(hits.size()==1,"尾の根元から先までの掃引は実HPへ1回だけ命中し原因・出所・技名を記録する")
@@ -560,21 +402,8 @@ func native_tail_sweep() -> void:
 	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
 	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
 	check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失で尾の薙ぎ払いを取り消す")
-	bridge.dispose();session.free()
+	bridge.dispose()
 	native_draco_move_flow(move)
-
-func source_draco_fixture(target: Vector2) -> Dictionary:
-	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
-	stage.boss_enabled=false
-	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
-	session.auto_step=false
-	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
-	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
-	var actor=sim.bosses.actor
-	actor.selection_enabled=false;actor.cycle.cancel();actor.cancel_attack();actor.clock=0.0;actor.table.facing[actor.body]=0.0;actor.body_trail.clear();actor.body_pose.clear();actor.body_override.clear();actor.reset_pose()
-	sim.state.ship_pos=target;sim.state.enemy_aim=target;sim.state.ship_vel=Vector2.ZERO;sim.state.ship_invuln=0.0
-	return {"session":session,"sim":sim,"actor":actor}
 
 func show_native_draco(fixture: Dictionary, body: Dictionary, attack: Dictionary) -> void:
 	var appearance: Dictionary={}
@@ -591,42 +420,16 @@ func native_star_fan() -> void:
 	if fixture.is_empty():get_tree().quit(1);return
 	var bridge=fixture.bridge
 	check(fixture.package.records.DracoStarFanDefinition.size()==3,"星弾の扇の実効値を3形態へ生成する")
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	var sim: RunSimulation=source.sim
-	check(a.start_attack(&"star_fan") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で星弾の扇を開始する")
-	var shape_error:=0.0
-	var warning_error:=0.0
-	var shot_error:=0.0
-	var times_equal:=true
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で星弾の扇を開始する")
 	var saved: Array=[]
 	var shown: Array=[]
 	for frame in 300:
 		if frame==10:
-			sim.state.ship_pos=Vector2(700,100);sim.state.enemy_aim=sim.state.ship_pos
-			bridge.command("dev_ship_motion",{"position":sim.state.ship_pos,"velocity":Vector2.ZERO})
-		a.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+			bridge.command("dev_ship_motion",{"position":Vector2(700,100),"velocity":Vector2.ZERO})
+		bridge._core.step(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and semantics_number(attack.stage_time,a.elapsed)
-		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked and attack.fired==a._runner.fired
-		var points: PackedVector2Array=a.body_points()
-		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
-		if a.telegraph_paths.size()!=attack.telegraph_paths.size():warning_error=INF
-		else:
-			for j in a.telegraph_paths.size():
-				for k in 2:warning_error=maxf(warning_error,a.telegraph_paths[j][k].distance_to(attack.telegraph_paths[j][k]))
-		var shots: Array=bridge._core.hostiles_snapshot()
-		var source_shots: Array=[]
-		for row in sim.projectiles.hostile_alive.size():
-			if sim.projectiles.hostile_alive[row]!=0:source_shots.append(row)
-		if shots.size()!=source_shots.size():shot_error=INF
-		else:
-			for j in shots.size():
-				var row: int=source_shots[j]
-				shot_error=maxf(shot_error,shots[j].pos.distance_to(sim.projectiles.hostile_pos[row]))
-				shot_error=maxf(shot_error,shots[j].vel.distance_to(sim.projectiles.hostile_vel[row]))
-		if not semantics_strict() and attack.stage not in saved and attack.stage<3:
+		if attack.stage not in saved and attack.stage<3:
 			saved.append(attack.stage)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"星弾の予告・実行・回復を値型で保持する")
@@ -637,12 +440,9 @@ func native_star_fan() -> void:
 			bridge._core.step(1.0/120.0)
 			check(bridge.command("dev_boss_state").value==future and bridge._core.hostiles_snapshot()==future_shots,"復帰後の照準・発射済み・弾が一致する")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not semantics_strict() and attack.stage not in shown and attack.stage<3:
+		if attack.stage not in shown and attack.stage<3:
 			shown.append(attack.stage);await show_native_draco(fixture,body,attack)
-		if attack.stage==5 and a.mode==&"idle":break
-	check(times_equal and shape_error<=(1e-4 if semantics_strict() else 0.1) and warning_error<=(1e-4 if semantics_strict() else 0.1) and shot_error<=(1e-4 if semantics_strict() else 0.1),"照準・段階・全身・予告線・9弾の位置と速度がSourceと一致する: %s/%s/%s"%[shape_error,warning_error,shot_error])
-	if semantics_strict():
-		semantics_finish(bridge,source.session,"star_fan",[shape_error,warning_error,shot_error]);return
+		if attack.stage==5:break
 	check(saved.size()==3 and shown.size()==3 and bridge._core.hostiles_snapshot().size()==9,"星弾は予告後の最初の実行tickで一度だけ9発出る")
 	var star_rule: Dictionary=fixture.package.records.StarBoltDefinition[fixture.package.records.DracoStarFanDefinition[0].projectile-1]
 	var visual: Dictionary=fixture.package.visuals[star_rule.visual-1]
@@ -655,7 +455,7 @@ func native_star_fan() -> void:
 	if not stars.is_empty():batch.apply_frame(stars[0].transforms,stars[0].colors)
 	await get_tree().process_frame
 	batch.free()
-	bridge.dispose();source.session.free()
+	bridge.dispose()
 	for operation in ["before","dev_cancel_technique","dev_cancel_boss","outside"]:
 		fixture=breath_fixture(move);bridge=fixture.bridge
 		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
@@ -682,22 +482,15 @@ func native_meteor() -> void:
 	if fixture.is_empty():get_tree().quit(1);return
 	var bridge=fixture.bridge
 	check(fixture.package.records.DracoMeteorDefinition.size()==3,"隕石投射の実効値を3形態へ生成する")
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	check(a.start_attack(&"meteor") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で隕石投射を開始する")
-	var error:=0.0
-	var times_equal:=true
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で隕石投射を開始する")
 	var saved: Array=[]
 	var shown: Array=[]
 	for frame in 240:
-		a.sim_tick(1.0/120.0,1.0/120.0);bridge._core.step(1.0/120.0)
+		bridge._core.step(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and semantics_number(attack.stage_time,a.elapsed)
-		var rocks: Array=a._runner.rocks if a._runner!=null else a.placed_meteors
-		check(attack.rocks.size()==rocks.size() and attack.telegraph_paths.is_empty(),"3個の岩だけを作りブレスの扇は出さない")
-		for j in rocks.size():error=maxf(error,rocks[j].pos.distance_to(attack.rocks[j].position))
-		if not semantics_strict() and attack.stage not in saved and attack.stage<3:
+		check(attack.rocks.size()==3 and attack.telegraph_paths.is_empty(),"3個の岩だけを作りブレスの扇は出さない")
+		if attack.stage not in saved and attack.stage<3:
 			saved.append(attack.stage)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"隕石投射の予告・実行・回復を値型で保持する")
@@ -707,13 +500,10 @@ func native_meteor() -> void:
 			bridge._core.step(1.0/120.0)
 			check(bridge.command("dev_boss_state").value==future,"復帰後の岩の位置・生存・段階が一致する")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not semantics_strict() and attack.stage not in shown and attack.stage<3:
+		if attack.stage not in shown and attack.stage<3:
 			shown.append(attack.stage);await show_native_draco(fixture,body,attack)
-		if attack.stage==5 and a.mode==&"idle":break
-	check(times_equal and error<=(1e-4 if semantics_strict() else 0.1),"岩の口元からの補間と予告・実行・回復・終了のtickがSourceと一致する: %s"%error)
-	if semantics_strict():
-		semantics_finish(bridge,source.session,"meteor",[error]);return
-	check(saved.size()==3 and shown.size()==3 and a.placed_meteors.size()==3,"通常終了で3個の岩を置いたまま次の技へ渡す")
+		if attack.stage==5:break
+	check(saved.size()==3 and shown.size()==3 and bridge.command("dev_boss_body_state").value[-1].placed_meteors.size()==3,"通常終了で3個の岩を置いたまま次の技へ渡す")
 	var placed: Array=bridge.command("dev_boss_state").value[0].rocks.duplicate(true)
 	check(bridge.checkpoint().ok,"置いた岩の所有を終了後にも値型で保持する")
 	var reused: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
@@ -721,7 +511,7 @@ func native_meteor() -> void:
 	check(reused.ok and attack.reused and attack.rocks==placed,"次の隕石投射は既存の岩を同じ位置・IDのまま引き取る")
 	bridge.command("dev_cancel_technique",{"ticket":reused.value})
 	check(bridge.command("dev_boss_state").value[0].rocks.all(func(rock):return not rock.alive and rock.destroyed),"取消は引き取った岩も壊す")
-	bridge.dispose();source.session.free()
+	bridge.dispose()
 	var breath: BossTechnique=load("res://data/bosses/draco_moves/breath.tres")
 	fixture=breath_fixture(move,false,[move,breath]);bridge=fixture.bridge
 	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
@@ -761,61 +551,25 @@ func native_rifts() -> void:
 	var bridge=fixture.bridge
 	check(fixture.package.records.DracoRiftsDefinition.size()==3 and is_equal_approx(fixture.package.records.BossTechniqueDefinition[0].reach,1500.06),"亀裂はtresの到達距離を丸めず3形態へ生成する")
 	var initial_hp: float=bridge._core.ship_snapshot().ship_hp
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	var sim: RunSimulation=source.sim
-	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
-	check(a.start_attack(&"rifts") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で三本爪の亀裂を開始する")
-	a._runner.staging.side=bridge.command("dev_boss_state").value[0].staging_side
-	var shape_error:=0.0
-	var warning_error:=0.0
-	var ship_error:=0.0
-	var times_equal:=true
-	var hazard_equal:=true
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で三本爪の亀裂を開始する")
 	var saved: Array=[]
 	var shown: Array=[]
-	var source_alias_difference: Array=[]
+	var repair_checked:=false
 	var moved:=false
 	var gated:=false
 	for frame in 1400:
-		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
 		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or semantics_number(attack.stage_time,a.elapsed))
-		if a._runner!=null:times_equal=times_equal and attack.locked==a._runner.locked and attack.sides==a._runner.sides
-		var points: PackedVector2Array=a.body_points()
-		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
-		if a.telegraph_paths.size()!=attack.telegraph_paths.size():warning_error=INF
-		else:
-			for j in a.telegraph_paths.size():
-				for k in 2:warning_error=maxf(warning_error,a.telegraph_paths[j][k].distance_to(attack.telegraph_paths[j][k]))
-		var hazards: Array=bridge._core.hazards_snapshot()
-		var source_hazards: Array=[]
-		for row in sim.projectiles.hazard_alive.size():
-			if sim.projectiles.hazard_alive[row]!=0:source_hazards.append(row)
-		# 世代つき参照では、消えたslashの裸行が再利用壁を消すSourceの別名参照を引き継がない。
-		if attack.stage<2:
-			hazard_equal=hazard_equal and hazards.size()==source_hazards.size()
-			var matched: Array=[]
-			for h: Dictionary in hazards:
-				var found:=false
-				for row: int in source_hazards:
-					if row in matched:continue
-					if h.pos.distance_to(sim.projectiles.hazard_pos[row])>(1e-4 if semantics_strict() else 0.1) or (not semantics_number(h.length,sim.projectiles.hazard_len[row]) if semantics_strict() else absf(h.length-sim.projectiles.hazard_len[row])>0.1) or (not semantics_number(h.half_width*2.0,sim.projectiles.hazard_width[row]) if semantics_strict() else absf(h.half_width*2.0-sim.projectiles.hazard_width[row])>0.01) or (not semantics_number(h.damage,sim.projectiles.hazard_dmg[row]) if semantics_strict() else absf(h.damage-sim.projectiles.hazard_dmg[row])>0.01) or (not semantics_number(h.active,sim.projectiles.hazard_active[row]) if semantics_strict() else absf(h.active-sim.projectiles.hazard_active[row])>0.0001) or (not semantics_number(h.delay,sim.projectiles.hazard_delay[row]) if semantics_strict() else absf(h.delay-sim.projectiles.hazard_delay[row])>0.0001) or h.blocking!=bool(sim.projectiles.hazard_block[row]):continue
-					found=true;matched.append(row);break
-				hazard_equal=hazard_equal and found
-		elif source_alias_difference.is_empty() and body.closing_walls>0:
-			source_alias_difference=[source_hazards.size(),hazards.size()]
+		if not repair_checked and body.closing_walls>0:
+			repair_checked=true
 			check(body.closing_walls==6 and body.rift_walls.size()==6,"世代の切れたslashで再利用された壁を消さず、所有する6本を修復する")
 		if attack.locked and attack.stage==0 and not moved:
 			moved=true
 			var path: PackedVector2Array=attack.rift_paths[0]
-			sim.state.ship_pos=path[0].lerp(path[1],0.5)
-			bridge.command("dev_ship_motion",{"position":sim.state.ship_pos,"velocity":Vector2.ZERO})
-		ship_error=maxf(ship_error,sim.state.ship_pos.distance_to(bridge._core.ship_snapshot().ship_pos))
+			bridge.command("dev_ship_motion",{"position":path[0].lerp(path[1],0.5),"velocity":Vector2.ZERO})
 		var key: int=6 if attack.stage==5 and body.closing_walls>0 else draco_move_stage(attack)
-		if not semantics_strict() and key not in saved and key in [4,3,0,1,2,6]:
+		if key not in saved and key in [4,3,0,1,2,6]:
 			saved.append(key)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"退場・入場・予告・実行・回復・修復を値型で保持する")
@@ -827,21 +581,15 @@ func native_rifts() -> void:
 			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body and bridge._core.hazards_snapshot()==future_hazards,"復帰後の時計・爪・壁・修復が一致する")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not semantics_strict() and key not in shown and key in [0,1,2,6] and (key!=1 or attack.sides==2):
+		if key not in shown and key in [0,1,2,6] and (key!=1 or attack.sides==2):
 			shown.append(key);await show_native_draco(fixture,body,attack)
-		if not semantics_strict() and key==6 and not gated:
+		if key==6 and not gated:
 			gated=true
 			check(not bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"修復が残る間は次の技を開始しない")
-		if attack.stage==5 and body.closing_walls==0 and a.mode==&"idle" and a.closing_walls.is_empty():break
-	check(times_equal and shape_error<=(1e-4 if semantics_strict() else 0.1) and warning_error<=(1e-4 if semantics_strict() else 0.1),"退場・入場・予告・左右発火・回復・終了のtickと全身・経路がSourceと一致する: %s/%s"%[shape_error,warning_error])
-	check(hazard_equal,"所有の終了前までslashと壁の生成時刻・形・幅・ダメージがSourceと一致する")
-	check(ship_error<=(1e-4 if semantics_strict() else 0.1),"壁の伸長中の押し出し位置がSourceと一致する: %s"%ship_error)
-	if semantics_strict():
-		semantics_finish(bridge,source.session,"rifts",[shape_error,warning_error,ship_error]);return
-	print("[cpp_draco_rifts] Sourceの裸行再利用で修復開始時の壁数=",source_alias_difference)
+		if attack.stage==5 and body.closing_walls==0:break
 	check(saved.size()==6 and shown.size()==4 and gated and bridge._core.hazards_snapshot().is_empty(),"6段階の保持・表示と修復後の全壁解放を通る")
 	check(bridge._core.ship_snapshot().ship_hp<initial_hp and fixture.captured.any(func(event):return event.type==&"combat_player_damage" and event.payload.accepted and event.payload.cause==&"wall" and event.payload.source==&"draco" and event.payload.technique==&"rifts"),"爪が実HPに当たり原因・出所・技名を記録する")
-	bridge.dispose();source.session.free()
+	bridge.dispose()
 	for target in [4,3,0,1,2]:
 		fixture=breath_fixture(move);bridge=fixture.bridge
 		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
@@ -870,39 +618,14 @@ func native_picaro_wall() -> void:
 	var fixture:=breath_fixture(move)
 	if fixture.is_empty():get_tree().quit(1);return
 	var bridge=fixture.bridge
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	var sim: RunSimulation=source.sim
-	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
-	check(a.start_attack(&"picaro_wall") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++でピカロ隊列と光の矢を開始する")
-	var times_equal:=true
-	var impacts_equal:=true
-	var members_equal:=true
-	var member_diagnostic:=false
-	var remaining_only:= semantics_strict() or "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args()
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++でピカロ隊列と光の矢を開始する")
+	var remaining_only:= "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args()
 	var saved: Array=[]
 	var shown:=false
 	for frame in 1050:
-		sim.enemies.tick(1.0/120.0,1.0/120.0);a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
 		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or semantics_number(attack.stage_time,a.elapsed))
-		if a._runner!=null:
-			times_equal=times_equal and attack.shots==a._runner.shots
-			impacts_equal=impacts_equal and attack.arrow_impacts.size()==a._runner.impacts.size()
-			if attack.arrow_impacts.size()==a._runner.impacts.size():
-				for j in attack.arrow_impacts.size():
-					var native: Dictionary=attack.arrow_impacts[j]
-					var old: Dictionary=a._runner.impacts[j]
-					impacts_equal=impacts_equal and semantics_number(native.age,old.age) and semantics_number(native.wait,old.wait) and native.locked==(old.pos!=Vector2.INF) and (not native.locked or native.position.distance_to(old.pos)<=(1e-4 if semantics_strict() else 0.01))
-		members_equal=members_equal and body.picaro.size()==a.picaro.alive().size()
-		for j in mini(body.picaro.size(),a.picaro.alive().size()):
-			var m: Dictionary=a.picaro.alive()[j]
-			var match_member: bool=body.picaro[j].position.distance_to(a.table.pos[m.row])<=(1e-4 if semantics_strict() else 0.1) and body.picaro[j].held==(a.table.held[m.row]!=0)
-			if not match_member and not member_diagnostic:
-				member_diagnostic=true;print("隊列差 frame=",frame," native=",body.picaro[j]," source_position=",a.table.pos[m.row]," held=",a.table.held[m.row]," clock=",a.clock)
-			members_equal=members_equal and match_member
 		var key: int=3 if attack.arrow_impacts.any(func(i):return i.locked) else attack.stage
 		if not remaining_only and key not in saved and attack.stage<3:
 			saved.append(key)
@@ -919,13 +642,9 @@ func native_picaro_wall() -> void:
 			shown=true
 			await show_native_draco(fixture,body,attack)
 		if attack.stage==5:break
-	if semantics_strict():
-		check(times_equal and impacts_equal and members_equal,"隊列と矢の時計と位置の指定許容幅")
-		semantics_finish(bridge,source.session,"picaro_wall",[]);return
-	if not remaining_only:check(times_equal and impacts_equal,"Sourceと予告・発射・画面上端による待ち・照準固定・着弾・終了のtickが一致する")
-	check(members_equal and (remaining_only or saved.size()==4 and shown),"隊列の配置・生成保護・停止と全段階の保持復帰・表示を通る")
+	if not remaining_only:check(saved.size()==4 and shown,"全段階の保持復帰・表示を通る")
 
-	bridge.dispose();source.session.free()
+	bridge.dispose()
 	for operation in ([] if remaining_only else ["windup","pending","locked","dev_cancel_boss"]):
 		fixture=breath_fixture(move);bridge=fixture.bridge
 		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
@@ -957,11 +676,8 @@ func spiral_key(attack: Dictionary) -> int:
 	if attack.stage==1:return 2 if attack.stage_time<attack.coil_time else 3 if attack.stage_time<attack.coil_time+attack.pause_time else 4
 	return 5 if attack.stage==2 else 6
 
-func spiral_camera(bridge,source: Dictionary={}) -> void:
+func spiral_camera(bridge) -> void:
 	bridge.command("dev_edit",{"kind":"camera","payload":{"center":Vector2(700,0),"size":Vector2(1600,900),"zoom":1.0,"bars":0.0}})
-	if not source.is_empty():
-		source.sim.ctx.options.view_size=Vector2(1600,900)
-		source.sim.state.view_center=Vector2(700,0);source.sim.state.view_half=Vector2(800,450);source.sim.state.camera_zoom=1.0
 
 ## 既存の螺旋・拘束解放・中断ケースを値型と読取表示へ接続する。
 func native_spiral() -> void:
@@ -969,39 +685,16 @@ func native_spiral() -> void:
 	var fixture:=breath_fixture(move)
 	if fixture.is_empty():get_tree().quit(1);return
 	var bridge=fixture.bridge
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	var sim: RunSimulation=source.sim
-	spiral_camera(bridge,source)
-	check(a.start_attack(&"spiral") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で螺旋収縮を開始する")
-	var geometry_only:="--semantics-spiral-geometry-only" in OS.get_cmdline_user_args()
-	var times_equal:=true
-	var state_equal:=true
-	var shape_error:=0.0
-	var camera_error:=0.0
-	var zoom_equal:=true
+	spiral_camera(bridge)
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で螺旋収縮を開始する")
 	var saved: Array=[]
 	var shown: Array=[]
 	for frame in 2400:
-		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
 		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		var output: Dictionary=bridge.read_frame().value
-		if not geometry_only:
-			times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or semantics_number(attack.stage_time,a.elapsed))
-		if not geometry_only:
-			state_equal=state_equal and output.ui.controls_locked==sim.state.controls_locked and output.ui.encounter_protected==sim.state.encounter_protected and output.ui.cinematic_camera==sim.state.cinematic_camera
-		if not geometry_only:
-			zoom_equal=zoom_equal and semantics_number(output.camera.zoom,sim.state.camera_zoom)
-		if not geometry_only:
-			camera_error=maxf(camera_error,maxf(output.camera.center.distance_to(sim.state.view_center),maxf(output.camera.half.distance_to(sim.state.view_half),absf(output.camera.zoom-sim.state.camera_zoom))))
-		var points: PackedVector2Array=a.body_points()
-		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
-		if not geometry_only:
-			if a._runner!=null:state_equal=state_equal and attack.departing==a._runner.departing and attack.holding_player==a._runner.holding_player and attack.charging==a._runner.charging and attack.trapped_hit==a._runner.trapped_hit
 		var key:=spiral_key(attack)
-		if not semantics_strict() and key not in saved and key<6:
+		if key not in saved and key<6:
 			saved.append(key)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"退場・再入場・巻き・予告・収縮・回復を保持する")
@@ -1013,17 +706,13 @@ func native_spiral() -> void:
 			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 			check(future==bridge.command("dev_boss_state").value and future_body==bridge.command("dev_boss_body_state").value and future_hazards==bridge._core.hazards_snapshot(),"復帰後の胴・壁・カメラと拘束が同じになる")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not semantics_strict() and key in [0,2,3,4,5] and key not in shown:
+		if key in [0,2,3,4,5] and key not in shown:
 			shown.append(key);await show_native_draco(fixture,body,attack)
 		if attack.stage==5:break
-	check(times_equal and state_equal,"Sourceと退場・再入場・巻きの拘束・解放・固定予告・収縮・終了のtickが一致する")
-	check(shape_error<=(1e-4 if semantics_strict() else 0.2) and camera_error<=(1e-4 if semantics_strict() else 0.1) and (zoom_equal or not semantics_strict()),"螺旋の2周・曲げ・追従履歴・カメラの寸法がSourceと一致する: %s/%s"%[shape_error,camera_error])
-	if semantics_strict():
-		semantics_finish(bridge,source.session,"spiral",[shape_error,camera_error]);return
 	check(saved.size()==6 and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"各段階の復帰と表示を通り、終了時に壁を解放する")
 	check(fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.cause==&"spiral" and e.payload.source==&"draco" and e.payload.technique==&"spiral"),"収縮中の接触の実HPと原因・出所・技名を記録する")
 	check(fixture.captured.filter(func(e):return e.type==&"draco_roar").size()==1,"巻き終わりの咆哮を1回だけ渡す")
-	bridge.dispose();source.session.free()
+	bridge.dispose()
 	for target in [0,1,2,3,4,5]:
 		fixture=breath_fixture(move);bridge=fixture.bridge;spiral_camera(bridge)
 		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
@@ -1061,7 +750,7 @@ func native_spiral_contact() -> void:
 		if attack.trapped_hit:break
 	var hits: Array=fixture.captured.filter(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"spiral")
 	if hits.size()!=1:print("収縮の被弾=",fixture.captured.filter(func(e):return e.type==&"combat_player_damage"))
-	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and semantics_number(hits[0].payload.hp_before-hits[0].payload.hp_after,35.0),"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
+	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and is_equal_approx(hits[0].payload.hp_before-hits[0].payload.hp_after,35.0),"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
 	bridge.dispose()
 	print("[cpp_draco_spiral_contact] failures=",failed);get_tree().quit(1 if failed else 0)
 
@@ -1070,40 +759,17 @@ func native_inhale() -> void:
 	var fixture:=breath_fixture(move)
 	if fixture.is_empty():get_tree().quit(1);return
 	var bridge=fixture.bridge
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	var sim: RunSimulation=source.sim
-	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
-	check(a.start_attack(&"inhale") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で吸引と吐き出しを開始する")
-	var side: float=bridge.command("dev_boss_state").value[0].staging_side
-	a._runner.staging.outside=sim.state.view_center+Vector2(side*(sim.state.view_half.x+a.table.r[a.body]+100.0),0)
-	a._runner.staging.inside=sim.state.view_center+Vector2(side*minf(700.0,sim.state.view_half.x*0.72),0)
-	a._runner.staging.facing=a.tracking_angle((a.aim_target()-a._runner.staging.inside).angle())
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で吸引と吐き出しを開始する")
 	var native_frame_checked:=false
 	var remaining_pose:= "--cpp-draco-inhale-pose" in OS.get_cmdline_user_args()
-	var times_equal:=true
-	var state_equal:=true
-	var shape_error:=0.0
-	var ship_error:=0.0
-	var beam_error:=0.0
-	var beam_equal:=true
 	var saved: Array=[]
 	var shown: Array=[]
 	for frame in 1500:
-		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
 		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or semantics_number(attack.stage_time,a.elapsed))
-		ship_error=maxf(ship_error,bridge._core.ship_snapshot().ship_pos.distance_to(sim.state.ship_pos))
-		var points: PackedVector2Array=a.body_points()
-		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
-		if a._runner!=null:
-			state_equal=state_equal and attack.caught==a._runner.caught and attack.spent==a._runner.spent and attack.steering_locked==sim.state.steering_locked and semantics_number(attack.release_at,a._runner.release_at)
-			if a._runner.beam>=0 and sim.projectiles.owns_hazard(a._runner.beam,a.body,a.body_id):beam_error=maxf(beam_error,absf(attack.beam_length-sim.projectiles.hazard_len[a._runner.beam]))
-		if a._runner!=null and a._runner.beam>=0 and sim.projectiles.owns_hazard(a._runner.beam,a.body,a.body_id):beam_equal=beam_equal and semantics_number(attack.beam_length,sim.projectiles.hazard_len[a._runner.beam])
 		var key: int=0 if attack.stage==0 else 4 if attack.stage==2 else 3 if attack.spent else 2 if attack.caught else 1
-		if not semantics_strict() and not remaining_pose and key not in saved and attack.stage<3:
+		if not remaining_pose and key not in saved and attack.stage<3:
 			saved.append(key)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"横入り・吸引・噛みつき・吐き出し・回復を保持する")
@@ -1115,9 +781,9 @@ func native_inhale() -> void:
 			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 			check(future==bridge.command("dev_boss_state").value and future_body==bridge.command("dev_boss_body_state").value and future_shots==bridge._core.hostiles_snapshot(),"復帰後の吸引・停止時計・ビーム・彗星が同じになる")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not semantics_strict() and not remaining_pose and key in [0,1,3,4] and key not in shown:
+		if not remaining_pose and key in [0,1,3,4] and key not in shown:
 			shown.append(key);await show_native_draco(fixture,body,attack)
-		if not semantics_strict() and not remaining_pose and attack.spent and attack.stage==1 and not 5 in shown:
+		if not remaining_pose and attack.spent and attack.stage==1 and not 5 in shown:
 			var rendered: Dictionary=bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
 			var beams: Array=rendered.shapes.filter(func(row):return row.get("draco_beam",false))
 			if not beams.is_empty():
@@ -1126,7 +792,7 @@ func native_inhale() -> void:
 				add_child(display);display.frame_apply(beams[0],1.0);await get_tree().process_frame
 				check(display.material.shader!=null and is_equal_approx(display.material.get_shader_parameter("half0"),float(move.width)*0.5),"口元の溜めと伸びる光線を既存の専用shaderで描く")
 				display.free()
-		if not semantics_strict() and remaining_pose and attack.beam_alive and not native_frame_checked:
+		if remaining_pose and attack.beam_alive and not native_frame_checked:
 			var render: Dictionary=bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
 			var view=load("res://scripts/render/run_frame_view.gd").new()
 			for visual: Dictionary in fixture.package.visuals:view.visuals[int(visual.id)]=visual
@@ -1134,17 +800,13 @@ func native_inhale() -> void:
 			view.free();native_frame_checked=true
 		if attack.stage==5:break
 	if remaining_pose:
-		check(shape_error<0.2 and native_frame_checked,"吸引の横入りと胴の固定履歴がSourceに一致する: %s"%shape_error)
-		bridge.dispose();source.session.free()
+		check(native_frame_checked,"専用光線の読取値を通常描画へ渡す")
+		bridge.dispose()
 		print("[cpp_draco_inhale_pose] failures=",failed);get_tree().quit(1 if failed else 0);return
-	check(times_equal and state_equal,"Sourceと横入り・吸引・捕獲・操舵解放・吐き出し・終了のtickが一致する")
-	check(shape_error<=(1e-4 if semantics_strict() else 0.2) and ship_error<=(1e-4 if semantics_strict() else 0.1) and (beam_equal if semantics_strict() else beam_error<0.1),"Sourceと姿勢・引き寄せ・全幅ビームの伸長が一致する: %s/%s/%s"%[shape_error,ship_error,beam_error])
-	if semantics_strict():
-		semantics_finish(bridge,source.session,"inhale",[shape_error,ship_error,beam_error]);return
 	check(saved.size()==5 and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"全段階の復帰・表示を通り、終了時にビームを解放する")
-	check(bridge._core.hostiles_snapshot().size()==24 and sim.projectiles.hostile_count()==24,"実験場の12星から弧ごとの割当と上限24発を生成し、終了後も彗星を残す")
+	check(bridge._core.hostiles_snapshot().size()==24,"実験場の12星から弧ごとの割当と上限24発を生成し、終了後も彗星を残す")
 	check(fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"inhale_bite" and e.payload.source==&"draco" and e.payload.technique==&"inhale" and is_equal_approx(e.payload.hp_before-e.payload.hp_after,30.0)),"吸引の噛みつきの実HPと専用原因・出所・技名を記録する")
-	bridge.dispose();source.session.free()
+	bridge.dispose()
 	for operation in ["windup","pull","caught","spent","recovery","dev_cancel_boss"]:
 		fixture=breath_fixture(move);bridge=fixture.bridge
 		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
@@ -1199,7 +861,7 @@ func native_inhale_ownership(move: BossTechnique) -> void:
 	bridge.dispose()
 
 
-## 全身複製は既存のSource・復帰・中断・次行動の入口で確かめる。
+## 全身複製の復帰・中断・次行動を確かめる。
 func native_clones() -> void:
 	var move: BossTechnique=load("res://data/bosses/draco_moves/clones.tres")
 	var group := "all"
@@ -1224,20 +886,10 @@ func native_clones_motion(move: BossTechnique) -> void:
 	var fixture:=breath_fixture(move)
 	if fixture.is_empty():return
 	var bridge=fixture.bridge
-	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"clones","全身複製の編集Resourceと互換Runnerを分ける")
 	check(fixture.package.records.DracoClonesDefinition.size()==3 and fixture.package.records.HydraNormalDefinition.size()==5,"複製の3形態と5通常技の値・参照を同じスキーマから生成する")
 	bridge.command("set_recording",{"active":true})
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	var sim: RunSimulation=source.sim
-	check(a.start_attack(&"clones") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で全身複製を開始する")
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"C++で全身複製を開始する")
 	var current: Dictionary=bridge.command("dev_boss_state").value[0]
-	# Godot RNGとPCGの抽選は別なので、技の割当だけを同じ結果へそろえる。
-	for j in 3:a._runner.units[j].mode=StringName(current.clones[j].mode)
-	var times_equal:=true
-	var positions_equal:=true
-	var warning_equal:=true
-	var max_error:=0.0
 	var saved: Array=[]
 	var shown: Array=[]
 	var clones_seen:=false
@@ -1245,23 +897,10 @@ func native_clones_motion(move: BossTechnique) -> void:
 	for frame in 1250:
 		# Hostは既存effectsを進めてから、そのtickの新しい判定を足す。
 		bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
-		a.sim_tick(1.0/120.0,1.0/120.0)
 		current=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		times_equal=times_equal and current.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (current.stage==5 or semantics_number(current.stage_time,a.elapsed))
-		if a._runner!=null and not current.clone_ended:
-			for j in 3:
-				var unit: Dictionary=a._runner.units[j]
-				var native: Dictionary=current.clones[j]
-				max_error=maxf(max_error,native.position.distance_to(a.table.pos[unit.row]))
-				positions_equal=positions_equal and semantics_number(native.time,unit.t) and native.locked==unit.locked and native.done==unit.done
-				for k in native.points.size():max_error=maxf(max_error,native.points[k].distance_to(unit.points[k]))
-			warning_equal=warning_equal and current.telegraph_paths.size()==a.telegraph_paths.size()
-			if current.telegraph_paths.size()==a.telegraph_paths.size():
-				for j in a.telegraph_paths.size():
-					for k in 2:max_error=maxf(max_error,current.telegraph_paths[j][k].distance_to(a.telegraph_paths[j][k]))
 		clones_seen=clones_seen or body.clones.size()==2
-		if not semantics_strict() and current.stage not in saved and current.stage in [0,1,2]:
+		if current.stage not in saved and current.stage in [0,1,2]:
 			saved.append(current.stage)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"予告・飛び込み・回復の複製とinnerRunnerを値型で保持する")
@@ -1272,20 +911,17 @@ func native_clones_motion(move: BossTechnique) -> void:
 			bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
 			check(bridge.command("dev_boss_state").value==future and bridge.command("dev_boss_body_state").value==future_body,"復帰後の時計・割当・部位・判定・表示が一致する")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if not semantics_strict() and current.stage not in shown and current.stage in [0,1,2]:
+		if current.stage not in shown and current.stage in [0,1,2]:
 			shown.append(current.stage)
 			var display=load("res://scripts/render/bosses/draco.gd").new();add_child(display)
 			display.apply_frame(body,current,{})
 			await get_tree().process_frame
 			check(display._parts.visible and display._clones.size()==body.clones.size(),"本体と複製2体を正式な全身素材で予告・実行・回復へ描く")
 			display.free()
-		if current.stage==5 and a.mode==&"idle":break
-	check(times_equal and positions_equal and warning_equal and max_error<=(1e-4 if semantics_strict() else 0.1),"開始・飛び込み・通常技・帰還・終了の時計と分身形状がSourceに一致する: %s"%max_error)
-	if semantics_strict():
-		semantics_finish(bridge,source.session,"clones_motion",[max_error]);return
+		if current.stage==5:break
 	check(clones_seen and saved.size()==3 and shown.size()==3 and bridge.command("dev_boss_body_state").value[-1].clones.is_empty(),"自然終了で複製と全部位を回収し3段階の表示・復帰を通る")
 	check(bridge._core.ship_snapshot().ship_hp<initial_hp and fixture.captured.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="clone_leap" and e.payload.source=="draco" and e.payload.technique=="clones"),"飛び込みが実HPとclone_leap・draco・clonesの通知へ届く")
-	bridge.dispose();source.session.free()
+	bridge.dispose()
 
 func native_clones_interrupt(move: BossTechnique) -> void:
 	var fixture:=breath_fixture(move)
@@ -1377,31 +1013,15 @@ func native_clones_shapes(move: BossTechnique) -> void:
 	var fixture:=breath_fixture(move)
 	if fixture.is_empty():return
 	var bridge=fixture.bridge
-	var source:=source_draco_fixture(Vector2(700,0))
-	var a=source.actor
-	check(a.start_attack(&"clones") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"分身Hostの判定生成をSourceと同時に始める")
-	var assigned: Array=bridge.command("dev_boss_state").value[0].clones
-	print("[cpp_draco_clones_shapes] 技=",assigned.map(func(u):return u.mode))
-	for j in 3:a._runner.units[j].mode=StringName(assigned[j].mode)
-	var matching:=true
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"分身Hostの判定生成を始める")
 	var count:=0
-	var error:=0.0
 	for tick in 800:
-		bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0);a.sim_tick(1.0/120.0,1.0/120.0)
+		bridge._core.step_hazards(1.0/120.0);bridge._core.step(1.0/120.0)
 		var emitted: Array=bridge.command("dev_boss_body_state").value[-1].effects.filter(func(e):return is_zero_approx(e.age))
-		var original: Array=a._runner.host.attack_field.effects.filter(func(e):return is_zero_approx(e.age))
-		matching=matching and emitted.size()==original.size()
-		if emitted.size()==original.size():
-			for j in emitted.size():
-				count+=1
-				matching=matching and emitted[j].kind==str(original[j].kind) and semantics_number(emitted[j].width,original[j].width) and semantics_number(emitted[j].delay,original[j].delay) and semantics_number(emitted[j].life,original[j].life) and emitted[j].points.size()==original[j].points.size()
-				if emitted[j].points.size()==original[j].points.size():
-					for k in emitted[j].points.size():error=maxf(error,emitted[j].points[k].distance_to(original[j].points[k]))
-		if a._runner.units.all(func(u):return u.done):break
-	check(matching and count>0 and error<=(1e-4 if semantics_strict() else 0.1),"分身Hostで使う通常技の発火tick・判定点列・幅・遅れ・寿命がSourceと一致する: %s"%error)
-	if semantics_strict():
-		semantics_finish(bridge,source.session,"clones_shapes",[error]);return
-	bridge.dispose();source.session.free()
+		count+=emitted.size()
+		if bridge.command("dev_boss_state").value[0].clone_ended:break
+	check(count>0,"分身Hostが通常技の判定を生成する")
+	bridge.dispose()
 
 ## 全技を持つ本番パッケージから、条件・費用・区間予算を通して進む。
 func finish_fixture(name := "", phase := 1, limit := -1.0) -> Dictionary:
@@ -1512,7 +1132,7 @@ func native_finish() -> void:
 		if not f.is_empty():
 			for tick in 4:check(finish_frame(f),"時間切れの固定更新を受理する")
 			var body: Dictionary=f.bridge.command("dev_boss_body_state").value[0]
-			check(f.captured.any(func(e):return e.type=="time_limit_reached") and f.bridge.read_frame().value.ui.phase==RunIds.Phase.Dying,"Sourceと同じく時間切れの一撃は溜めを挟まず機体を倒す")
+			check(f.captured.any(func(e):return e.type=="time_limit_reached") and f.bridge.read_frame().value.ui.phase==RunIds.Phase.Dying,"時間切れの一撃は溜めを挟まず機体を倒す")
 			for tick in 8:finish_frame(f)
 			var result: Variant=f.bridge.read_frame().value.result
 			check(result!=null and result.kind=="Death" and not f.captured.any(func(e):return e.type=="clear_banner"),"時間切れは勝利を付けず敗北で確定する")
