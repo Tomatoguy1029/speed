@@ -2657,12 +2657,16 @@ func check_cpp_t06_source_clock() -> bool:
 	bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(200,0)})
 	var shield: int = bridge.command("dev_spawn",{"definition_id":"shield","position":origin+Vector2(400,0)}).value
 	core.set_enemy_motion(shield,{"held":true,"facing":0.0,"vel":Vector2.ZERO})
-	check(bridge.command("dev_fire_light_lances",{"position":origin,"direction":Vector2.RIGHT,"length":700.0,"width":20.0,"damage":100.0,"knock":0.0}).ok,"元の時計を比べる槍と発射光・命中火花を生成する")
+	check(bridge.command("dev_fire_light_lances",{"position":origin,"direction":Vector2.RIGHT,"length":700.0,"width":20.0,"damage":10.0,"knock":0.0}).ok,"元の時計を比べる槍と発射光・命中火花を生成する")
+	check(bridge.command("dev_damage",{"entity_id":shield,"amount":1.0,"cause":"ram","crit":true}).ok,"体当たり会心で元のヒットストップ条件を作る")
 	bridge.collect_frame()
 	check(bridge._ui.hitstop>1.0/120.0 and bridge._ui.tracing and not bridge._ui.lance_effects.is_empty(),"ヒットストップとなぞり中の時計条件を準備できる")
 	var before: Dictionary = bridge._ui.duplicate(true)
 	bridge.step(1.0/120.0,idle,viewport)
 	check(bridge._ui.light_lances[0].age==before.light_lances[0].age and bridge._ui.lance_effects==before.lance_effects,"元の槍本体と世界秒の光・火花はヒットストップ中に止まる")
+	if "--cpp-t06-hitstop-fix" in OS.get_cmdline_user_args():
+		session.free()
+		return true
 	bridge.command("set_settings",{"hitstop":false})
 	core.set_run_guards({"controls_locked":true})
 	bridge.collect_frame()

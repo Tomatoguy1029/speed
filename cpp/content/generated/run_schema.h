@@ -397,7 +397,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 23) return false;
+    if (out.kind > 24) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -1855,6 +1855,47 @@ inline bool read(BinaryReader &input, ReticleDefinition &out) {
     if (out.small_r < 0) return false;
     return true;
 }
+struct AquariusDefinition {
+    uint32_t id{};
+    double accel{};
+    double approach{};
+    double telegraph{};
+    double beam_time{};
+    double beam_length{};
+    double spread{};
+    double rest{};
+    double damage{};
+    double admission_duration{};
+    double half_width{};
+    uint32_t beams{};
+};
+inline bool read(BinaryReader &input, AquariusDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.approach)) return false;
+    if (out.approach < 0) return false;
+    if (!input.read_f64(out.telegraph)) return false;
+    if (out.telegraph < 0) return false;
+    if (!input.read_f64(out.beam_time)) return false;
+    if (out.beam_time < 0) return false;
+    if (!input.read_f64(out.beam_length)) return false;
+    if (out.beam_length < 0) return false;
+    if (!input.read_f64(out.spread)) return false;
+    if (out.spread < 0) return false;
+    if (!input.read_f64(out.rest)) return false;
+    if (out.rest < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    if (!input.read_f64(out.half_width)) return false;
+    if (out.half_width < 0) return false;
+    if (!input.read_u32(out.beams)) return false;
+    if (out.beams < 1) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -2534,6 +2575,35 @@ inline bool read(BinaryReader &input, VortexDefinition &out) {
     if (out.collapse < 0) return false;
     return true;
 }
+struct CritBeamDefinition {
+    uint32_t id{};
+    uint32_t equipment{};
+    uint32_t level{};
+    double cooldown{};
+    double damage{};
+    double length{};
+    double width{};
+    double knock{};
+};
+inline bool read(BinaryReader &input, CritBeamDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_f64(out.cooldown)) return false;
+    if (out.cooldown < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.length)) return false;
+    if (out.length < 0) return false;
+    if (!input.read_f64(out.width)) return false;
+    if (out.width < 0) return false;
+    if (!input.read_f64(out.knock)) return false;
+    if (out.knock < 0) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -2599,6 +2669,7 @@ struct ContentRecords {
     std::vector<AurigaDefinition> AurigaDefinition_rows;
     std::vector<ClockDefinition> ClockDefinition_rows;
     std::vector<ReticleDefinition> ReticleDefinition_rows;
+    std::vector<AquariusDefinition> AquariusDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -2624,6 +2695,7 @@ struct ContentRecords {
     std::vector<RunUpDefinition> RunUpDefinition_rows;
     std::vector<MinesDefinition> MinesDefinition_rows;
     std::vector<VortexDefinition> VortexDefinition_rows;
+    std::vector<CritBeamDefinition> CritBeamDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -3016,6 +3088,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { ReticleDefinition row; if (!read(input,row)) return false; out.ReticleDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 104: {
+        if (version != 1) return false;
+        if (count > input.remaining()/88) return false;
+        for (uint32_t i=0; i<count; ++i) { AquariusDefinition row; if (!read(input,row)) return false; out.AquariusDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -3166,6 +3244,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { VortexDefinition row; if (!read(input,row)) return false; out.VortexDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 95: {
+        if (version != 1) return false;
+        if (count > input.remaining()/52) return false;
+        for (uint32_t i=0; i<count; ++i) { CritBeamDefinition row; if (!read(input,row)) return false; out.CritBeamDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -3298,6 +3382,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ClockDefinition_rows) if (!ClockDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ReticleDefinition_ids;
     for (const auto &row:data.ReticleDefinition_rows) if (!ReticleDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> AquariusDefinition_ids;
+    for (const auto &row:data.AquariusDefinition_rows) if (!AquariusDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -3348,6 +3434,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.MinesDefinition_rows) if (!MinesDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> VortexDefinition_ids;
     for (const auto &row:data.VortexDefinition_rows) if (!VortexDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CritBeamDefinition_ids;
+    for (const auto &row:data.CritBeamDefinition_rows) if (!CritBeamDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -3410,6 +3498,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.AurigaDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ClockDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ReticleDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.AquariusDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -3433,6 +3522,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.RunUpDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.MinesDefinition_rows) if (!LoadoutDefinition_ids.count(row.weapon)) return false;
     for (const auto &row:data.VortexDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.CritBeamDefinition_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -3558,5 +3648,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=89;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=91;
 }
