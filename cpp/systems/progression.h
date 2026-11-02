@@ -4,6 +4,13 @@ namespace godot { class SpeedRunCore; }
 namespace speed {
 class ProgressionSystem {
 public:
+    static uint64_t *post_stacks(LoadoutState &,const std::string &);
+    static double post_amount(const RunRuntime &,const std::string &);
+    static double post_effect(const RunRuntime &,const std::string &,uint64_t extra=0);
+    static double post_reduced(const RunRuntime &,const std::string &,double,uint64_t extra=0);
+    static bool post_eligible(const RunRuntime &,uint32_t);
+    static bool normal_complete(const RunRuntime &);
+    static bool development(godot::SpeedRunCore &,const godot::String &,const godot::Dictionary &);
     static void initialize(RunRuntime &,bool initial);
     static double next_xp(const RunRuntime &);
     static bool add_experience(godot::SpeedRunCore &,double final_xp);

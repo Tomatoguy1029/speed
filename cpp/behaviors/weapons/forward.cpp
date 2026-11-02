@@ -1,6 +1,7 @@
 #include "forward.h"
 #include "../../systems/timing.h"
 #include "../../systems/equipment.h"
+#include "../../systems/progression.h"
 #include "../../systems/combat_resolver.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/attacks/friend_shot.h"
@@ -21,7 +22,7 @@ void ForwardBehavior::step(RunRuntime &run,double dt) {
     if (!forward.ready || dt<=0 || state.controls_locked || state.phase!=godot::RunState::Phase::Play) return;
     const auto &effects=state.loadout.effects;
     const double rate=state.draw.gauge<1?1:1+effects.full_gauge_rate*state.draw.gauge;
-    const double interval=forward.base_interval/rate;
+    const double interval=ProgressionSystem::post_reduced(run,"weapon_interval",forward.base_interval)/rate;
     forward.fire.remaining+=interval-forward.interval;forward.interval=interval;
     if (!advance(forward,dt,state.draw.drawing || state.draw.tracing)) return;
     const int64_t count=EquipmentSystem::shot_count(run,1);
@@ -29,10 +30,10 @@ void ForwardBehavior::step(RunRuntime &run,double dt) {
     const auto origin=state.ship.pos+state.ship.heading*16.0*1.82*forward.character_scale;
     for (int64_t i=0;i<count;++i) {
         godot::RunState::Friendly shot;
-        shot.pos=origin;shot.vel=godot::Vector2::from_angle(angle+(i-(count-1)/2.0)*forward.spread)*1300.0;
+        shot.pos=origin;shot.vel=godot::Vector2::from_angle(angle+(i-(count-1)/2.0)*forward.spread)*1300.0*(1+ProgressionSystem::post_amount(run,"projectile_speed"));
         shot.radius=5.0*effects.area;
         shot.damage=CombatResolver::attack_power(run)*EquipmentSystem::weapon_damage_factor(run,1)*forward.damage;
-        shot.life=forward.life;shot.pierce_left=forward.pierce;shot.knock=forward.knock;
+        shot.life=forward.life*(1+ProgressionSystem::post_amount(run,"duration"));shot.pierce_left=forward.pierce;shot.knock=forward.knock*(1+ProgressionSystem::post_amount(run,"knockback"));
         shot.color=godot::Color::html("ffe46b");shot.weapon_id="W01";shot.visual="weapon/forward";
         FriendShotSystem::emit(run,std::move(shot));
     }

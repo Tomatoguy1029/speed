@@ -1,4 +1,5 @@
 #include "equipment.h"
+#include "progression.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/forward.h"
 #include "../behaviors/traits/killSonic.h"
@@ -69,10 +70,19 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     run.state.ship_config.glide_duration_mult=1.0+glide_bonus;
     run.state.draw_config.capacity=1.0+capacity_bonus;
     const auto &p=run.state.loadout;
-    const double old_hp=run.state.ship_config.max_hp;
+    const double old_hp=run.state.ship_config.max_hp-p.post_hp_applied;
     run.state.ship_config.max_hp=run.content->config.ship_config_max_hp+p.hp_profile_add;
     if (old_hp>0 && run.state.ship_config.max_hp>old_hp) run.state.ship.hp+=run.state.ship_config.max_hp-old_hp;
+    run.state.loadout.post_hp_applied=ProgressionSystem::post_amount(run,"max_hp");
+    run.state.ship_config.max_hp+=run.state.loadout.post_hp_applied;
     run.state.ship.hp=std::min(run.state.ship.hp,run.state.ship_config.max_hp);
+    run.state.combat_config.crit_mult=run.content->config.combat_crit_mult+ProgressionSystem::post_amount(run,"crit_mult");
+    run.state.ship_config.acceleration=run.content->config.ship_config_acceleration*(1+ProgressionSystem::post_amount(run,"acceleration"));
+    run.state.ship_config.turn_rate=run.content->config.ship_config_turn_rate*(1+ProgressionSystem::post_amount(run,"turn_rate"));
+    run.state.ship_config.invulnerability=run.content->config.ship_config_invulnerability+ProgressionSystem::post_effect(run,"invulnerability");
+    run.state.pickup_config.repair_fraction=run.content->config.pickup_repair_fraction+ProgressionSystem::post_effect(run,"repair");
+    run.state.pickup_config.speed_mult=run.content->config.pickup_speed_mult*(1+ProgressionSystem::post_amount(run,"pickup_speed"));
+    run.state.loadout.xp_gain_mult=1+ProgressionSystem::post_amount(run,"xp_gain");
     const auto &post=run.content->post_charge;
     const double base=run.content->config.draw_config_charge_time*p.charge_profile_factor/(1.0+charge_bonus);
     const double floor=std::min(base,std::max(post.minimum_time,base*post.minimum_ratio));

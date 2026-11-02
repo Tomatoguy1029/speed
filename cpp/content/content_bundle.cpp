@@ -277,6 +277,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->budget_phases=records.BudgetPhase_rows;
     if (records.ProgressionDefinition_rows.size()!=1 || records.ProgressionDefinition_rows.front().xp_base<=0) return {};
     bundle->progression=records.ProgressionDefinition_rows.front();
+    bundle->post_max=records.PostMaxDefinition_rows;
+    bundle->post_max_targets=records.PostMaxTarget_rows;
+    bundle->post_max_intervals=records.PostMaxInterval_rows;
+    std::unordered_set<std::string> post_ids;
+    for (size_t i=0;i<bundle->post_max.size();++i) if (bundle->post_max[i].id!=i+1 || !post_ids.insert(bundle->post_max[i].external_id).second) return {};
+    for (const auto &v:bundle->post_max_intervals) if (!v.base || v.level>records.LoadoutDefinition_rows[v.equipment-1].maximum_level || records.LoadoutDefinition_rows[v.equipment-1].kind!=0) return {};
     if (records.LifecycleDefinition_rows.size()!=1) return {};
     bundle->lifecycle=records.LifecycleDefinition_rows.front();
     bundle->field_bodies=records.FieldBodyDefinition_rows;

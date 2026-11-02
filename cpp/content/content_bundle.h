@@ -124,6 +124,9 @@ struct ContentBundle {
     std::vector<FriendShotDefinition> friend_shots;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;
+    std::vector<PostMaxDefinition> post_max;
+    std::vector<PostMaxTarget> post_max_targets;
+    std::vector<PostMaxInterval> post_max_intervals;
     LifecycleDefinition lifecycle;
     std::vector<FieldBodyDefinition> field_bodies;
     std::vector<MoonDefinition> moon_definitions;

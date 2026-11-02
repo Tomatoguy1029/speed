@@ -233,6 +233,7 @@ func _read_locked() -> Dictionary:
 	began = Time.get_ticks_usec() if perf.active else 0
 	if not result.ok: return result
 	if not _latest.is_empty() and _latest.epoch!=result.value.epoch: _ui = {}
+	preload("res://scripts/runtime/post_max_card_view.gd").format_frame(result.value)
 	_ui.merge(result.value.ui,true)
 	_latest = result.value.duplicate(true)
 	_latest.ui = _ui.duplicate(true)

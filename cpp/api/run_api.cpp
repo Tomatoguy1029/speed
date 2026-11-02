@@ -292,6 +292,9 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_tune" && payload.size()==3 && is(payload,"target_id",Variant::STRING) && is(payload,"revision",Variant::INT) && is(payload,"values",Variant::PACKED_BYTE_ARRAY)) {
         Dictionary replace;replace["definition_id"]=payload["target_id"];replace["expected_revision"]=payload["revision"];replace["replacement"]=payload["values"];
         response=speed::DevCommands::replace_definition(runtime,replace);
+    } else if (kind=="dev_edit" && runtime.api_development && payload.size()==2 && is(payload,"kind",Variant::STRING) && is(payload,"payload",Variant::DICTIONARY) && (String(payload["kind"])=="post_max" || String(payload["kind"])=="post_max_offer" || String(payload["kind"])=="progression")) {
+        response=speed::ProgressionSystem::development(*this,payload["kind"],payload["payload"])?success():failure(1,"progression","");
+        if (!bool(response["ok"])) response["message"]=String::utf8("強化の種類・対象・値を確認してください");
     } else if (kind=="dev_set_scenario" || (kind=="dev_edit" && payload.has("kind") && String(payload["kind"])!="parameter" && String(payload["kind"])!="boss_parameter" && String(payload["kind"])!="config")) response=development_lab_command(kind,payload);
     else if (kind=="dev_edit" && payload.size()==2 && is(payload,"kind",Variant::STRING) && is(payload,"payload",Variant::DICTIONARY) && (String(payload["kind"])=="parameter" || String(payload["kind"])=="boss_parameter" || String(payload["kind"])=="config")) response=speed::DevCommands::replace_definition(runtime,payload["payload"]);
     else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat" || kind=="dev_corona_after_combat") response=development_combat_command(kind,payload);

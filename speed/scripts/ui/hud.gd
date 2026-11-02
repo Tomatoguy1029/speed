@@ -1313,7 +1313,7 @@ func _show_cpp_cards() -> void:
 	for i in cards.size():
 		var card: Dictionary = cards[i]
 		var entry: ContentEntry = ContentManager.catalog.find(&"traits" if card.kind=="trait" else &"weapons",StringName(card.id))
-		var button := CARD_VIEW.create(card_info(card),i,width,10,entry)
+		var button := CARD_VIEW.create(card_info(card),i,width,10,entry,card.kind=="post_max")
 		button.position = Vector2(left+i*(width+16),83)
 		button.pressed.connect(func(): _card_command(&"choose_card",{"index":i}))
 		_cards_row.add_child(button)

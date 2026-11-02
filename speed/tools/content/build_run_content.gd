@@ -1113,6 +1113,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
 			"life":float(weapon.params.life),"spread":float(weapon.params.spread_step),"knock":float(weapon.params.knock),
 			"pierce":int(weapon.params.pierce_by_level[i])})
+	preload("res://tools/content/run_progression_data.gd").append(data,config)
 	return {"records":data,"visuals":visuals}
 
 static func chase_records(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
@@ -1425,7 +1426,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.DuplicatorDefinition = resolved.DuplicatorDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
 			data.LifecycleDefinition = resolved.LifecycleDefinition
-			for section in ["PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:
+			for section in ["PostMaxDefinition","PostMaxTarget","PostMaxInterval","PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:
 				data[section] = resolved[section]
 			equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
 			data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
