@@ -1191,8 +1191,9 @@ func _ready_cpp() -> void:
 	_loadout_icons.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
 	_entrance_skip=Button.new()
-	_entrance_skip.text=tr("hud.skip_entrance")
-	_entrance_skip.position=Vector2(24,24)
+	_entrance_skip.text=tr("hud.skip_finish")
+	_entrance_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_entrance_skip.position=Vector2(-210,-58)
 	_entrance_skip.size=Vector2(190,38)
 	_entrance_skip.hide()
 	_entrance_skip.pressed.connect(func():bridge.command("skip_boss_entrance"))
@@ -1277,7 +1278,13 @@ func _layout_cpp_art() -> void:
 	_cards_box.scale = Vector2.ONE*factor
 
 func _draw_cpp() -> void:
-	if _cpp_ui.is_empty() or not show_status or float(_cpp_ui.get("cinematic_bars",0.0))>0.0:return
+	if _cpp_ui.is_empty():return
+	var bars: float=_cpp_ui.get("cinematic_bars",0.0)
+	if bars>0.0:
+		var height:=size.y*0.1*bars
+		draw_rect(Rect2(Vector2.ZERO,Vector2(size.x,height)),Color.BLACK)
+		draw_rect(Rect2(Vector2(0,size.y-height),Vector2(size.x,height)),Color.BLACK)
+	if not show_status or bars>0.0:return
 	if _cpp_ui.get("boss_finish",{}).get("active",false):
 		_draw_banner()
 		return
@@ -1455,11 +1462,11 @@ func _update_cpp_cinematic() -> void:
 	var modules: Array=_cpp_ui.get("final_modules",[])
 	var active: bool=int(_cpp_ui.phase)==RunState.Phase.PLAY
 	_speed_indicator.visible=active and bars<=0.0
-	_loadout_icons.visible=active and not modules.is_empty()
+	_loadout_icons.visible=active and not modules.is_empty() and (show_status or bars>0.0)
 	_entrance_skip.visible=false
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		var intro: Dictionary=body.get("intro",{})
-		if intro.get("active",false) and float(intro.get("time",0.0))>=0.4:_entrance_skip.visible=true
+		if active and intro.get("active",false) and float(intro.get("time",0.0))>=0.4:_entrance_skip.visible=true
 	var factor:=minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
 	_loadout_icons.position=(size-ART_SIZE*factor)*0.5
 	_loadout_icons.scale=Vector2.ONE*factor

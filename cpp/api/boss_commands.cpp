@@ -8,6 +8,7 @@
 #include "../bosses/hydra/body.h"
 #include "../bosses/draco/body.h"
 #include "../bosses/draco/intro.h"
+#include "../bosses/draco/finale.h"
 #include "../bosses/draco/cycle.h"
 #include "../bosses/draco/pose.h"
 #include "../bosses/draco/technique.h"
@@ -40,6 +41,11 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         if (p.size()!=2 || p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=4 || body->mode>=speed::BossMode::Defeated) return result(false);
         const String operation=p["operation"];if (operation=="initial") return result(speed::DracoCycle::begin_initial(runtime,*body));if (operation=="deep") return result(speed::DracoCycle::begin_deep(runtime,*body));if (operation=="cancel") {speed::DracoCycle::cancel(runtime,*body);return result(true);}return result(false);
+    }
+    if (kind=="dev_draco_finale") {
+        if (p.size()!=2 || p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);
+        const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=4 || body->mode>=speed::BossMode::Defeated) return result(false);
+        const String operation=p["operation"];if (operation=="begin") return result(speed::DracoFinale::begin(runtime,*body));else if (operation=="cancel") speed::DracoFinale::dispose(runtime,*body);else return result(false);return result(true);
     }
     if (kind=="dev_draco_intro") {
         if (p.size()!=2 || p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);
