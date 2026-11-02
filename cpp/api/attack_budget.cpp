@@ -1,6 +1,6 @@
 #include "run_core.h"
-#include "../cpp/systems/attack_budget.h"
-#include "../cpp/systems/population_system.h"
+#include "../systems/attack_budget.h"
+#include "../systems/population_system.h"
 #include <cmath>
 using namespace godot;
 namespace {

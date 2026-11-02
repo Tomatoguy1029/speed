@@ -1,5 +1,5 @@
-#include "run_core.h"
-#include "../cpp/systems/timing.h"
+#include "../api/run_core.h"
+#include "timing.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

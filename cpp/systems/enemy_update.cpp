@@ -1,9 +1,9 @@
-#include "run_core.h"
-#include "../cpp/systems/motion_math.h"
-#include "../cpp/systems/enemy_system.h"
-#include "../cpp/behaviors/enemies/defender.h"
-#include "../cpp/behaviors/enemies/crow.h"
-#include "../cpp/systems/attack_system.h"
+#include "../api/run_core.h"
+#include "motion_math.h"
+#include "enemy_system.h"
+#include "../behaviors/enemies/defender.h"
+#include "../behaviors/enemies/crow.h"
+#include "attack_system.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

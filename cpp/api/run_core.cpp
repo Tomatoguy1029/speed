@@ -45,7 +45,7 @@
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
 #include "../output/event_builder.h"
-#include "../../native/geometry.h"
+#include "../systems/geometry.h"
 #include "../systems/enemy_system.h"
 #include "../systems/pickup_system.h"
 #include "../systems/attack_budget.h"

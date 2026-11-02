@@ -1,8 +1,8 @@
-#include "run_core.h"
-#include "../cpp/systems/enemy_system.h"
-#include "../cpp/systems/group_system.h"
-#include "../cpp/systems/tracking_policy.h"
-#include "../cpp/behaviors/enemies/hound.h"
+#include "../api/run_core.h"
+#include "enemy_system.h"
+#include "group_system.h"
+#include "tracking_policy.h"
+#include "../behaviors/enemies/hound.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

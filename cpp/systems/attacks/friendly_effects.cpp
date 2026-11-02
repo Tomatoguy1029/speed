@@ -1,6 +1,6 @@
-#include "run_core.h"
-#include "../cpp/systems/attacks/friend_debris.h"
-#include "../cpp/behaviors/traits/duplicator.h"
+#include "../../api/run_core.h"
+#include "friend_debris.h"
+#include "../../behaviors/traits/duplicator.h"
 #include <cmath>
 using namespace godot;
 

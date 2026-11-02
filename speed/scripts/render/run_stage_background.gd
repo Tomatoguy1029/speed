@@ -6,6 +6,7 @@ var color := Color.BLACK
 var area := Rect2()
 var sprites: Array[Dictionary] = []
 var fires: Array[Dictionary] = []
+var static_fires: Array[PixelFire] = []
 
 func setup(scope: ContentResourceScope, metadata: Resource, at: Vector2) -> void:
 	origin = at
@@ -39,6 +40,7 @@ func setup(scope: ContentResourceScope, metadata: Resource, at: Vector2) -> void
 		fire.position = origin+use.get("offset",Vector2.ZERO)
 		fire.scale = Vector2.ONE*float(use.get("scale",1.0))
 		add_child(fire)
+		static_fires.append(fire)
 
 func update_frame(camera: Dictionary) -> void:
 	area = Rect2(camera.center-camera.half,camera.half*2.0).grow(200.0)
@@ -51,3 +53,16 @@ func update_frame(camera: Dictionary) -> void:
 
 func _draw() -> void:
 	draw_rect(area,color)
+
+## 制作プレビューは一時停止・コマ送りの時計で炎も動かす。
+func set_manual(value: bool) -> void:
+	for row: Dictionary in fires: row.node.manual = value
+	for fire: PixelFire in static_fires: fire.manual = value
+
+func restart() -> void:
+	for row: Dictionary in fires: row.node.restart()
+	for fire: PixelFire in static_fires: fire.restart()
+
+func advance(delta: float) -> void:
+	for row: Dictionary in fires: row.node.advance(delta)
+	for fire: PixelFire in static_fires: fire.advance(delta)

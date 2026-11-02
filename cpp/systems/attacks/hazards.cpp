@@ -1,8 +1,8 @@
-#include "run_core.h"
-#include "../cpp/systems/attacks/wave.h"
-#include "../cpp/systems/attack_system.h"
-#include "../cpp/systems/combat_resolver.h"
-#include "../cpp/output/event_builder.h"
+#include "../../api/run_core.h"
+#include "wave.h"
+#include "../attack_system.h"
+#include "../combat_resolver.h"
+#include "../../output/event_builder.h"
 #include <cmath>
 using namespace godot;
 

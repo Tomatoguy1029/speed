@@ -6,8 +6,8 @@ const NOISE := preload("res://assets/effects/build/aura_noise.png")
 var settings: EnemyMarkSettings
 var _entries: Dictionary = {}
 
-func setup(render: RunPresentation) -> void:
-	super.setup(render)
+func setup(scope: ContentResourceScope) -> void:
+	super.setup(scope)
 	for entry: Dictionary in _masks.values():
 		_entries[entry.texture] = entry
 	_material = ShaderMaterial.new()
@@ -23,13 +23,13 @@ func refresh() -> void:
 	for sprite in _sprites:
 		settings.apply_aura_to(sprite.material as ShaderMaterial)
 
-func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
+func add_body(body: Dictionary, clock: float) -> void:
 	var slot := _count
-	super._add_body(t, row, deformation)
+	super.add_body(body, clock)
 	if _count == slot: return
 	var sprite := _sprites[slot]
 	# 本番shaderのinstance uniformを、編集shaderでは個別materialへ渡す。
 	configure(sprite, _entries[sprite.texture])
 	var material := sprite.material as ShaderMaterial
-	material.set_shader_parameter("pump_full", _pump_full[slot])
-	material.set_shader_parameter("clock", _rm.state.world_time)
+	material.set_shader_parameter("pump_full", body.get("pump_full",0.0))
+	material.set_shader_parameter("clock", clock)

@@ -20,7 +20,7 @@
 #include "attacks/friend_debris.h"
 #include "../runtime/run_runtime.h"
 #include "field.h"
-#include "../../native/geometry.h"
+#include "geometry.h"
 #include <cmath>
 namespace speed {
 namespace {

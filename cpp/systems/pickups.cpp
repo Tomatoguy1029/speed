@@ -1,7 +1,7 @@
-#include "run_core.h"
-#include "../cpp/systems/progression.h"
-#include "../cpp/systems/pickup_system.h"
-#include "../cpp/behaviors/enemies/crow.h"
+#include "../api/run_core.h"
+#include "progression.h"
+#include "pickup_system.h"
+#include "../behaviors/enemies/crow.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>

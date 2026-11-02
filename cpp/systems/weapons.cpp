@@ -1,7 +1,7 @@
-#include "run_core.h"
-#include "../cpp/behaviors/weapons/forward.h"
-#include "../cpp/systems/attacks/friend_shot.h"
-#include "../cpp/systems/attack_system.h"
+#include "../api/run_core.h"
+#include "../behaviors/weapons/forward.h"
+#include "attacks/friend_shot.h"
+#include "attack_system.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

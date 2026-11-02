@@ -1,6 +1,6 @@
 #pragma once
 #include "../state/combat_types.h"
-#include "../../native/runtime_data.h"
+#include "../content/runtime_data.h"
 #include <map>
 #include <vector>
 namespace speed {

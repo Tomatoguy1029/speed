@@ -1,6 +1,6 @@
-#include "run_core.h"
-#include "../cpp/systems/attack_system.h"
-#include "../cpp/systems/enemy_system.h"
+#include "../api/run_core.h"
+#include "attack_system.h"
+#include "enemy_system.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

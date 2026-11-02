@@ -43,7 +43,7 @@ if env.get('is_msvc', False):
 else:
     env.Append(CXXFLAGS=['-ffp-contract=off'])
 name = 'speed_runtime' + env['suffix'] + ('.dylib' if env['platform'] == 'macos' else '.dll')
-sources = Glob('../native/*.cpp') + Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/heroes/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp') + Glob('bosses/flow/*.cpp') + Glob('bosses/monoceros/*.cpp') + Glob('bosses/centaurus/*.cpp') + Glob('bosses/canis_major/*.cpp') + Glob('bosses/hydra/*.cpp') + Glob('bosses/draco/*.cpp')
+sources = Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/heroes/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp') + Glob('bosses/flow/*.cpp') + Glob('bosses/monoceros/*.cpp') + Glob('bosses/centaurus/*.cpp') + Glob('bosses/canis_major/*.cpp') + Glob('bosses/hydra/*.cpp') + Glob('bosses/draco/*.cpp')
 objects = []
 for source in sources:
     relative = Path(source.abspath).relative_to(here.parent)

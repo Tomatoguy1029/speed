@@ -101,19 +101,23 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         control.world_real_accum=control.world_dt_accum=0;control.world_steps=0;
         control.last_world_real_dt=wr;control.last_world_dt=wd;++control.world_updates;
         if (state.world.attack_budget.frame_enabled || core.runtime.content->encounter.active) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
-        FieldSystem::update(core.runtime);
-        FieldSystem::step_comets(core.runtime,wd);
-        FieldSystem::stream_rocks(core.runtime,wd);
-        FieldSystem::step_gravity(core.runtime,wd);
-        if (!core.advance_enemies(wd)) return false;
-        if (!core.avoid_strong(wd)) return false;
+        if (control.lab_enemy_ai || !control.lab_mode) {
+            FieldSystem::update(core.runtime);
+            FieldSystem::step_comets(core.runtime,wd);
+            FieldSystem::stream_rocks(core.runtime,wd);
+            FieldSystem::step_gravity(core.runtime,wd);
+            if (!core.advance_enemies(wd)) return false;
+            if (!core.avoid_strong(wd)) return false;
+        }
         if (core.check_run_end()) return true;
         if (!core.rebuild_enemy_grid(state.frame_grid_cell)) return false;
     }
     if (!core.step_ship_input(dt,world_dt,input)) return false;
     BossFinish::record_approach(core.runtime);
-    if (input.hero_press) HeroesSystem::activate(core.runtime);
-    HeroesSystem::step(core.runtime,dt,world_dt);
+    if (control.lab_enemy_ai || !control.lab_mode) {
+        if (input.hero_press) HeroesSystem::activate(core.runtime);
+        HeroesSystem::step(core.runtime,dt,world_dt);
+    }
     if (state.phase==Phase::Play && !state.controls_locked) {
         LightLancesSystem::step(core.runtime,world_dt);
         for (const auto &owned:state.loadout.weapons) {
@@ -163,13 +167,13 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     auto dead_rows=std::move(state.dead_rows);state.dead_rows.clear();
     for (size_t row:dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);
     if (state.pickups_ready) PickupSystem::prune(core.runtime);
-    if (world_step) {
+    if (world_step && (control.lab_enemy_ai || !control.lab_mode)) {
         if (!EncounterSystem::advance(core.runtime)) return false;
         if (state.population.frame_enabled && !state.population.blocked && !core.attack_guard_active() && !core.step_population(wd,control.bonus_remaining>0)) return false;
         if (state.pickups_ready && !core.step_pickups(wd)) return false;
     }
     state.ship_pos=state.ship.pos;
-    if (state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
+    if ((control.lab_enemy_ai || !control.lab_mode) && state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
     camera(core,dt,size);
     if (!core.check_run_end()) {
         if (state.loadout.ready) ProgressionSystem::open(core);

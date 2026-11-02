@@ -2496,6 +2496,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ShieldDefinition.append(shield)
 		var visual: Dictionary = package.visuals[5].duplicate()
 		visual.id = i+6
+		visual.mark_key = "shape:"+String(definition.shape) if visual.path.is_empty() else "sprite:"+id
 		data.ResourceKey.append({"id":visual.id,"role":visual.role})
 		visuals.append(visual)
 		if visual.role==6:

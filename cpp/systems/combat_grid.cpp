@@ -1,5 +1,5 @@
-#include "run_core.h"
-#include "../cpp/systems/collision_query.h"
+#include "../api/run_core.h"
+#include "collision_query.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
