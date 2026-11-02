@@ -42,6 +42,11 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="): output = arg.trim_prefix("--out=")
 	if not output.is_empty(): DirAccess.make_dir_recursive_absolute(output)
+	if "--cpp-reward-display" in OS.get_cmdline_user_args():
+		await cpp_reward_display()
+		print("[cpp_reward_display] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-save-failure" in OS.get_cmdline_user_args():
 		var fixture = load("res://tests/stage_enemy_tuning.gd").new()
 		check(await fixture.cpp_save(self,true),"F4の未保存保持と生成失敗を確認する")
@@ -307,3 +312,27 @@ func cpp_live() -> bool:
 	first.free()
 	second.free()
 	return true
+
+func cpp_reward_display() -> void:
+	var source := RuntimeStage.new()
+	source.index = 4
+	source.enemies = [&"drifter"]
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	var panel = load("res://scripts/dev/stage_enemy_panel.gd").new()
+	panel.bind_run(source,config,{})
+	add_child(panel)
+	panel._select_enemy("drifter")
+	panel._category = "すべて"
+	panel._refresh_rows()
+	var common: EnemyDef = ContentManager.enemies[&"drifter"]
+	panel._edit_value(3.0,"rank",float(common.rank))
+	var resolved := StageEnemyTuning.resolve(common,panel.values.drifter)
+	var hp_text: String = panel._row_controls.hp[0].text
+	var reward_text: String = panel._row_controls["xp_reward_counts.mid"][0].text
+	check(hp_text.contains("実効 "+String.num(resolved.base_hp(config),3)) and reward_text.contains("実効 "+String.num(float(resolved.resolve_xp_reward().counts[1]),3)),"星の数を変えるとHPと固定報酬の実効値表示も更新する")
+	var reward_base := StageEnemyTuning.base_value(common,"xp_reward_counts.mid",config)
+	panel._toggle_override(true,"xp_reward_counts.mid",reward_base)
+	check(panel.values.drifter["xp_reward_counts.mid"]==resolved.resolve_xp_reward().counts[1],"結晶の上書きONは現在の星から計算した値で始める")
+	panel._reset_key("rank",panel._row_controls.rank[2],float(common.rank))
+	check(panel._row_controls.hp[0].text.contains("実効 "+String.num(common.base_hp(config),3)),"星の上書きを解除すると派生HP表示も基準へ戻る")
+	panel.free()

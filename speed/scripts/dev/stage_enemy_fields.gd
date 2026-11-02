@@ -108,7 +108,7 @@ static func editor(controls: Array) -> SpinBox:
 	var spin := SpinBox.new()
 	spin.name = "Value"
 	spin.min_value = minf(data.base, StageEnemyTuning.minimum(data.key))
-	spin.max_value = maxf(data.base, 100000.0)
+	spin.max_value = 10.0 if data.key=="rank" else maxf(data.base, 100000.0)
 	spin.step = 1.0 if data.integer else 0.01
 	spin.value = data.value
 	spin.custom_minimum_size.x = 100

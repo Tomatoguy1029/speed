@@ -307,6 +307,7 @@ func _refresh_rows() -> void:
 		_heading.text = "一致する敵がありません"
 		return
 	_heading.text = "%s  /  %s\n%s" % [_enemy.display_name, _id, _category]
+	var effective := StageEnemyTuning.resolve(_enemy,values.get(_id,{}))
 	var groups := {}
 	for key in StageEnemyTuning.keys_for(_enemy):
 		if not FIELDS.belongs(key, _category): continue
@@ -339,7 +340,7 @@ func _refresh_rows() -> void:
 				toggle.text = ("▾  " if open else "▸  ") + category + "  ·  %d項目" % groups[category].size())
 			for key in groups[category]:
 				var base := StageEnemyTuning.base_value(_enemy, key, _cfg)
-				var value := float(values.get(_id, {}).get(key, base))
+				var value := StageEnemyTuning.base_value(effective,key,_cfg)
 				var integer: bool = key=="rank" or key.begins_with("xp_reward_counts.") or (key.begins_with("params.") and _enemy.params[key.trim_prefix("params.")] is int)
 				_row_controls[key] = FIELDS.row(content, key, base, value, integer, _wide, _edit_value.bind(key, base), _reset_key, _toggle_override.bind(key, base), func(text): _hint.text = text)
 				_refresh_difference(key, value, base)
@@ -355,7 +356,8 @@ func _refresh_difference(key: String, value: float, base: float) -> void:
 		if not is_equal_approx(spin.value, value): spin.set_value_no_signal(value)
 	if controls[2] != null: controls[2].visible = overridden
 	var state: Label = _row_controls[key][0]
-	state.text = "%s実効 %s\n%s" % ["* " if unsaved else "", String.num(value, 3), "上書き %+.2f" % (value - base) if overridden else "共通値を使用"]
+	var inherited := "星の数から計算" if (key=="hp" or key.begins_with("xp_reward_counts.")) and not is_equal_approx(value,base) else "共通値を使用"
+	state.text = "%s実効 %s\n%s" % ["* " if unsaved else "", String.num(value, 3), "上書き %+.2f" % (value - base) if overridden else inherited]
 	state.tooltip_text = ("未保存 / " if unsaved else "保存済み / ") + ("ステージ上書き" if overridden else "共通値を使用")
 	state.tooltip_text += "\nサイズ・エリートなどの個体補正前の標準値。"
 	state.modulate = Color("#ffda87") if unsaved else Color.WHITE
@@ -364,12 +366,18 @@ func _refresh_difference(key: String, value: float, base: float) -> void:
 func _edit_value(value: float, key: String, base: float) -> void:
 	if not values.has(_id): values[_id] = {}
 	values[_id][key] = value
-	_refresh_difference(key, value, base)
+	_refresh_effective()
 	_changed()
+
+func _refresh_effective() -> void:
+	var effective := StageEnemyTuning.resolve(_enemy,values.get(_id,{}))
+	for key: String in _row_controls:
+		_refresh_difference(key,StageEnemyTuning.base_value(effective,key,_cfg),StageEnemyTuning.base_value(_enemy,key,_cfg))
 
 func _toggle_override(enabled: bool, key: String, base: float) -> void:
 	if enabled:
-		_edit_value(base, key, base)
+		var effective := StageEnemyTuning.resolve(_enemy,values.get(_id,{}))
+		_edit_value(StageEnemyTuning.base_value(effective,key,_cfg), key, base)
 	else:
 		_reset_key(key, _row_controls[key][2], base)
 
@@ -378,7 +386,7 @@ func _reset_key(key: String, spin: SpinBox, base: float) -> void:
 		values[_id].erase(key)
 		if values[_id].is_empty(): values.erase(_id)
 	if spin != null: spin.set_value_no_signal(base)
-	_refresh_difference(key, base, base)
+	_refresh_effective()
 	_changed()
 
 func _changed() -> void:
