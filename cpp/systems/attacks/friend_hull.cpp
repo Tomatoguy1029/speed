@@ -12,7 +12,7 @@ AttackHandle FriendHullSystem::emit(RunRuntime &run,const FriendHullParams &p) {
     s.pos=p.position;s.vel=p.velocity;s.radius=p.radius;s.damage=p.damage;s.life=p.life;s.pierce=true;s.no_crit=true;s.knock=p.saw?d.saw_knock:p.knock;
     s.angle=p.saw?p.velocity.angle():p.angle;s.spin=p.saw?d.saw_spin:0;s.cause=p.saw?"saw":"towShot";s.color=godot::Color::html(p.saw?"d9dde6":"ffbe65");
     if (p.source_id!=-1) s.hit_ids.insert(p.source_id);
-    s.type=p.saw?godot::StringName("saw"):run.content->definitions[p.source_definition-1].id;s.visual=p.saw?godot::StringName():godot::StringName("weapon/massTow");
+    s.type=p.saw?godot::StringName("saw"):run.content->definitions[p.source_definition-1].source_id();s.visual=p.saw?godot::StringName():godot::StringName("weapon/massTow");
     AttackSpec spec;spec.cause=p.saw?Cause::Saw:Cause::TowShot;spec.policies=policy(EndPolicy::NaturalLifetime);spec.owner.source_id=std::max(int64_t(0),p.source_id);spec.owner.source_definition=p.source_definition;
     if (!AttackSystem::configure_contact(*run.content,d.contact,spec)) return {};
     return AttackSystem::emit_friendly(run,std::move(s),spec);

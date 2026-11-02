@@ -77,7 +77,7 @@ Dictionary FrameBuilder::metrics(const RunRuntime &run) {
     std::vector<int64_t> counts(run.content->definitions.size(),0);
     for (const auto &rows:run.state.behavior_rows) for (auto row:rows) ++counts[run.state.enemies[row].definition];
     Dictionary types,pools;
-    for (size_t i=0;i<counts.size();++i) if (counts[i]) types[run.content->definitions[i].id]=counts[i];
+    for (size_t i=0;i<counts.size();++i) if (counts[i]) {const auto name=run.content->definitions[i].source_id();types[name]=int64_t(types.get(name,int64_t(0)))+counts[i];}
     int64_t attacks[3]={};
     for (const auto &attack:run.state.attacks.records) if (attack.alive) ++attacks[int(attack.pool)];
     for (int i=0;i<3;++i) pools[String::num_int64(i)]=attacks[i];

@@ -28,9 +28,7 @@ const char *combat_reason_name(CombatReason reason) {
 namespace {
 godot::StringName definition_name(const RunRuntime &run,DefinitionId id) {
     if (!id || id>run.content->definitions.size()) return {};
-    const auto name=run.content->definitions[id-1].id;
-    // 生成用の投石定義も、Sourceと同じ隕石として記録・破片表示へ渡す。
-    return name==godot::StringName("draco_breath_rock")?godot::StringName("meteor"):name;
+    return run.content->definitions[id-1].source_id();
 }
 CombatEvent event_for(RunRuntime &run,const DamageRequest &request,EnemyHandle target) {
     CombatEvent event;const auto &state=run.state;

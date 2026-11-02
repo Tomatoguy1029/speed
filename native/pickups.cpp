@@ -51,7 +51,7 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
         if (runtime.state.pickup_config.fixed_rewards) {
             row["ground_order"]=int64_t(gem.order);row["id"]=int64_t(gem.id);row["kind"]=int(gem.kind);row["base_xp"]=gem.value;row["velocity"]=gem.velocity;row["wait"]=gem.wait;
             Dictionary origin;origin["source"]=gem.origin.source==speed::CrystalSource::Enemy?"enemy":gem.origin.source==speed::CrystalSource::StrongGold?"strong_gold":"direct";
-            origin["enemy"]=gem.origin.definition?runtime.content->definitions[gem.origin.definition-1].id:StringName();origin["enemy_id"]=gem.origin.enemy_id;
+            origin["enemy"]=gem.origin.definition?runtime.content->definitions[gem.origin.definition-1].source_id():StringName();origin["enemy_id"]=gem.origin.enemy_id;
             origin["spawn_t"]=gem.origin.run_time;origin["spawn_world_t"]=gem.origin.world_time;row["origin"]=origin;
         }
         return row;

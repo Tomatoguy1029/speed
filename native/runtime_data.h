@@ -11,6 +11,8 @@ struct EnemyDefinition {
     enum class Gate {None,Solid,Membrane,Ghost,Immortal,Claw,Back,Guard} gate=Gate::None;
     double gate_arc=1.6;
     godot::StringName id;
+    // 生成定義の検索キーと、Sourceの表示・記録用の識別を分ける。
+    godot::StringName source_id() const {return id==godot::StringName("draco_breath_rock")?godot::StringName("meteor"):id;}
     uint32_t reflected_definition=0,gunner_definition=0,beamer_definition=0,missile_definition=0,rocket_definition=0,drift_definition=0,dash_definition=0,battleship_definition=0,sniper_definition=0,marlin_definition=0,pulser_definition=0,dolphin_definition=0,lynx_definition=0,soldier_definition=0,auriga_definition=0,clock_definition=0,reticle_definition=0,aquarius_definition=0,cross_definition=0,bomber_definition=0,phoenix_definition=0,aquila_definition=0,split_definition=0,defender_definition=0,crab_definition=0,crow_definition=0,cepheus_definition=0,pump_definition=0,corona_definition=0,ruler_definition=0,triangle_definition=0;
     uint32_t death_chain_definition=0;
     uint32_t visual_id=0;double sprite_scale=1,sprite_angle=0;bool polygon_visual=false,ram_guard=false;

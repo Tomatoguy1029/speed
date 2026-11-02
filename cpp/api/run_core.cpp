@@ -605,7 +605,7 @@ Array SpeedRunCore::enemies_snapshot() const {
         if (!enemy.alive) continue;
         const auto &def = runtime.content->definitions[enemy.definition];
         Dictionary row;
-        row["id"] = enemy.id; row["type"] = String(def.id);
+        row["id"] = enemy.id; row["type"] = String(def.source_id());
         row["pos"] = Array::make(enemy.pos.x, enemy.pos.y);
         row["vel"] = Array::make(enemy.vel.x, enemy.vel.y);
         row["hp"] = enemy.hp; row["armor"] = enemy.armor;
