@@ -59,7 +59,13 @@ static func build_all(force := false, output := ROOT) -> Error:
 	if error != OK: return error
 	error = load("res://tools/content/build_native_data.gd").build_spawn_timelines(output)
 	if error != OK: return error
-	var outputs := [catalog_path]
+	var intro: Dictionary = load("res://scripts/runtime/intro_sequence.gd").practice_package(load("res://data/config.tres"),load("res://data/visuals/intro_presentation.tres"))
+	var intro_output := output.path_join("run/intro")
+	error = load("res://tools/content/build_run_content.gd").build(intro.stage,intro.config,intro_output,"導入練習".sha256_text(),intro.definitions)
+	if error!=OK: return error
+	var intro_path := intro_output.path_join("stage_1.json")
+	var intro_index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(intro_path))
+	var outputs := [catalog_path,intro_path,intro_index.binary,intro_index.resources]
 	var visual_index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	for file in DirAccess.get_files_at(output):
 		if file.begins_with("look_") and not output.path_join(file) in visual_index.look_paths.values(): continue

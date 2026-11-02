@@ -983,7 +983,7 @@ func choice_fixture(initial := false) -> Dictionary:
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	if not bridge.configure(bytes,{"api_version":1,"run_id":58,"mode":1,"stage_id":"choice","profile":{},"settings":{}}).ok: return {}
 	if not bridge.start(41,{"equipment":[]} if initial else {}).ok: return {}
-	var assets = load("res://tools/content/run_resources.gd").new()
+	var assets = load("res://scripts/data_types/run_resources.gd").new()
 	for row: Dictionary in builder.chase_package(definition,config).visuals:
 		if not row.path.is_empty():
 			assets.keys[row.id] = row.path

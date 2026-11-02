@@ -2710,7 +2710,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		file.store_buffer(bytes)
 		file.close()
 	if FileAccess.get_file_as_bytes(binary_path)!=bytes: return ERR_FILE_CORRUPT
-	var resources = preload("res://tools/content/run_resources.gd").new()
+	var resources = preload("res://scripts/data_types/run_resources.gd").new()
 	resources.input_sha256 = input_sha256
 	resources.paths = paths
 	resources.dependencies = manifest.hashes

@@ -1,10 +1,105 @@
 #!/usr/bin/env python3
-"""固定したSDKとAPIでラン拡張をビルドする。SDKは作業ツリーの外へ用意する。"""
+"""固定依存の拡張ビルドと、独立コピーでのGodot共通生成・配布を行う。"""
 import argparse
+import hashlib
 import json
 from pathlib import Path
+import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import zipfile
+
+
+def run(command):
+    subprocess.run([str(part) for part in command], check=True)
+
+
+def library_name(platform, arch):
+    prefix, suffix = ('lib', 'dylib') if platform == 'macos' else ('', 'dll')
+    return f'{prefix}speed_runtime.{platform}.template_release.{arch}.{suffix}'
+
+
+def build(root, lock, args, arch, output):
+    run([args.scons, '-C', root / 'cpp', '-j', args.jobs,
+         'godot_cpp_dir=' + str(args.sdk.resolve()), 'platform=' + args.platform,
+         'arch=' + arch, 'target=template_release', 'precision=' + lock['precision'],
+         'output_dir=' + str(output), 'build_dir=' + str(args.build_dir.resolve())])
+
+
+def package(root, lock, args):
+    destination = args.package_dir.resolve()
+    if destination == root or root in destination.parents:
+        raise ValueError('配布用の作業先はソースツリーの外へ指定してください')
+    destination.mkdir(parents=True, exist_ok=True)
+    project = destination / 'project'
+    if project.exists():
+        raise ValueError('配布用のprojectが既にあります。新しい作業先を指定してください')
+    version = subprocess.check_output([args.godot, '--headless', '--version'], text=True).strip()
+    if not re.match(re.escape(lock['engine']) + r'\.stable(?:\.|$)', version):
+        raise ValueError('Godot本体がdependencies.jsonの安定版と一致しません: ' + version)
+    templates = args.templates.resolve()
+    if templates.name != lock['export_templates'] or (templates / 'version.txt').read_text().strip() != lock['export_templates']:
+        raise ValueError('export templateの版がdependencies.jsonと一致しません')
+    template = templates / ('macos.zip' if args.platform == 'macos' else 'windows_release_x86_64.exe')
+    if not template.is_file():
+        raise ValueError('配布対象のexport templateがありません: ' + str(template))
+    shutil.copytree(root / 'speed', project,
+                    ignore=shutil.ignore_patterns('.godot', '.content', 'bin', '__pycache__'))
+    # 配布の確認もプレイヤーの保存先から隔離する。
+    save = project / 'scripts/managers/save_manager.gd'
+    original_save = save.read_text()
+    source = original_save
+    for key, filename in [('SAVE_PATH', 'save.json'), ('SETTINGS_PATH', 'settings.cfg')]:
+        before = f'const {key} := "user://{filename}"'
+        if before not in source:
+            raise ValueError('保存先の隔離対象を確認できません: ' + key)
+        source = source.replace(before, f'const {key} := {json.dumps(str(destination / filename))}', 1)
+    save.write_text(source)
+    libraries = project / 'extensions/run/bin'
+    libraries.mkdir(parents=True, exist_ok=True)
+    arches = ['arm64', 'x86_64'] if args.platform == 'macos' else ['x86_64']
+    for arch in arches:
+        build(root, lock, args, arch, libraries)
+    if args.platform == 'macos':
+        universal = libraries / library_name('macos', 'universal')
+        run(['lipo', '-create', *[libraries / library_name('macos', arch) for arch in arches], '-output', universal])
+        run(['lipo', '-verify_arch', *arches, universal])
+        extension = project / 'extensions/run/run_core.gdextension'
+        config = extension.read_text()
+        for arch in arches:
+            config = config.replace(library_name('macos', arch), universal.name)
+            (libraries / library_name('macos', arch)).unlink()
+        extension.write_text(config)
+    licenses = project / 'licenses/run'
+    licenses.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(args.sdk / 'LICENSE.md', licenses / 'GODOT-CPP.txt')
+    shutil.copy2(root / 'cpp/dependencies.json', licenses / 'dependencies.json')
+    presets = project / 'export_presets.cfg'
+    config = presets.read_text()
+    section = '[preset.0.options]' if args.platform == 'macos' else '[preset.1.options]'
+    config = config.replace(section, section + '\n\ncustom_template/release=' + json.dumps(str(template)), 1)
+    presets.write_text(config)
+    engine = [args.godot, '--headless', '--path', project]
+    # importで型・資源索引を準備してから、正規の共通生成へ渡す。
+    run([*engine, '--editor', '--import', '--log-file', destination / 'import.log'])
+    run([*engine, '--script', 'res://tools/content/build_all.gd', '--log-file', destination / 'generate.log', '--', '--force'])
+    if not args.verify:
+        save.write_text(original_save)
+    output = destination / 'export'
+    output.mkdir(exist_ok=True)
+    preset = 'macOS' if args.platform == 'macos' else 'Windows'
+    artifact = output / ('Speed.zip' if args.platform == 'macos' else 'Speed.exe')
+    run([*engine, '--editor', '--export-release', preset, artifact, '--log-file', destination / 'export.log'])
+    if args.platform == 'macos':
+        with zipfile.ZipFile(artifact) as archive:
+            archive.extractall(output)
+        for executable in output.glob('*.app/Contents/MacOS/*'):
+            executable.chmod(executable.stat().st_mode | 0o111)
+    run([sys.executable, root / 'speed/tests/export_package.py', output, '--platform', args.platform,
+         *(['--runtime'] if args.verify else []), '--script', root / 'speed/tests/check_rules.gd'])
+    print('配布物: ' + str(artifact))
 
 
 def main():
@@ -14,21 +109,31 @@ def main():
     parser.add_argument('--sdk', type=Path, required=True, help='固定コミットのgodot-cpp')
     parser.add_argument('--scons', default='scons', help='固定版SConsの実行ファイル')
     parser.add_argument('--platform', choices=['macos', 'windows'], required=True)
-    parser.add_argument('--arch', choices=['arm64', 'x86_64'], required=True)
-    parser.add_argument('--output', type=Path, help='共有ライブラリの出力先')
+    parser.add_argument('--arch', choices=['arm64', 'x86_64'], help='単体ビルドのCPU。配布時は対象CPUをすべて作る')
+    parser.add_argument('--output', type=Path, help='単体ビルドの共有ライブラリ出力先')
+    parser.add_argument('--build-dir', type=Path, default=Path(tempfile.gettempdir()) / 'speed-run-build' / hashlib.sha256(str(root).encode()).hexdigest()[:12], help='ソース外の中間object出力先')
+    parser.add_argument('--package-dir', type=Path, help='新しい独立作業先。ビルド・共通生成・exportを順に行う')
+    parser.add_argument('--godot', help='dependencies.jsonと一致するGodot本体')
+    parser.add_argument('--templates', type=Path, help='version.txtを持つ固定版export templateディレクトリ')
+    parser.add_argument('--verify', action='store_true', help='配布エンジンで最小ランとライブラリ欠落時の失敗を確認する')
     parser.add_argument('--jobs', type=int, default=4)
     args = parser.parse_args()
-    if args.platform == 'windows' and args.arch != 'x86_64':
+    if args.platform == 'windows' and args.arch not in (None, 'x86_64'):
         parser.error('Windowsの対象はx86_64です')
     if not args.sdk.is_dir():
         parser.error('SDKがありません。dependencies.jsonの公式URLと完全コミットを使って取得してください')
-    subprocess.run([sys.executable, str(root / 'tools/build/generate_run_schema.py'), '--check'], check=True)
-    command = [args.scons, '-C', str(root / 'cpp'), '-j', str(args.jobs),
-               'godot_cpp_dir=' + str(args.sdk.resolve()), 'platform=' + args.platform,
-               'arch=' + args.arch, 'target=template_release', 'precision=' + lock['precision']]
-    if args.output:
-        command.append('output_dir=' + str(args.output.resolve()))
-    return subprocess.call(command)
+    if args.package_dir and not (args.godot and args.templates):
+        parser.error('配布には --godot と --templates が必要です')
+    if not args.package_dir and not args.arch:
+        parser.error('単体ビルドには --arch が必要です')
+    if root == args.build_dir.resolve() or root in args.build_dir.resolve().parents:
+        parser.error('中間object出力先はソースツリーの外へ指定してください')
+    run([sys.executable, root / 'tools/build/generate_run_schema.py', '--check'])
+    if args.package_dir:
+        package(root, lock, args)
+    else:
+        build(root, lock, args, args.arch, (args.output or root / 'speed/extensions/run/bin').resolve())
+    return 0
 
 
 if __name__ == '__main__':
