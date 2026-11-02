@@ -1,5 +1,6 @@
 ## 生成済み外観とRenderFrameの値だけで、装甲と噛みつきの顎を描く。
 extends Node2D
+var perf := PerfLog.new()
 var _canvas: CanvasLayer
 var _parts: Array[Dictionary] = []
 var _sparks: InstanceBatch
@@ -70,8 +71,12 @@ func begin() -> void:
 	_glows.clear()
 	queue_redraw()
 	for part: Dictionary in _parts:
+		var began := Time.get_ticks_usec() if perf.active else 0
 		part.base.begin()
+		perf.since(&"enemies.body",began)
+		began = Time.get_ticks_usec() if perf.active else 0
 		part.armor.begin()
+		perf.since(&"enemies.armor",began)
 	if _sparks!=null: _sparks.begin()
 
 func _jaw(mode: int, charge: float, timer: float, rest: float) -> float:
@@ -104,19 +109,30 @@ func apply_frame(row: Dictionary) -> void:
 			var turn := jaw if part.name=="jaw_left" else -jaw if part.name=="jaw_right" else 0.0
 			var pivot: Vector2 = part.pivot*(radius/17.0)
 			var center := position+(pivot-pivot.rotated(turn)).rotated(angle)
+			var began := Time.get_ticks_usec() if perf.active else 0
 			part.base.add(center,angle+turn,radius,row.colors[i])
+			perf.since(&"enemies.body",began)
+			began = Time.get_ticks_usec() if perf.active else 0
 			part.armor.add(center,angle+turn,radius,row.colors[i])
+			perf.since(&"enemies.armor",began)
 
 func end() -> void:
 	for part: Dictionary in _parts:
+		var began := Time.get_ticks_usec() if perf.active else 0
 		part.base.end()
+		perf.since(&"enemies.body",began)
+		began = Time.get_ticks_usec() if perf.active else 0
 		part.armor.end()
+		perf.since(&"enemies.armor",began)
 	if _sparks!=null: _sparks.end()
 
 func _draw() -> void:
+	var began := Time.get_ticks_usec() if perf.active else 0
 	for i in range(0,_glows.size(),3):
 		for layer in range(3,0,-1):
 			draw_circle(Vector2(_glows[i],_glows[i+1]),_glows[i+2]*(1.0+layer*0.22),Color(1,1,1,0.08))
+
+	perf.since(&"view_draw.enemy_decorations",began)
 
 func set_death_brightness(value: float) -> void:
 	for part: Dictionary in _parts:

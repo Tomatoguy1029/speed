@@ -1,5 +1,6 @@
 ## Sessionが所有するC++ランの窓口。個別Systemの更新は公開しない。
 extends RefCounted
+var perf := PerfLog.new()
 var _core: RefCounted
 var _busy := false
 var _disposed := false
@@ -54,7 +55,9 @@ func step(dt: float, input: Dictionary, viewport: Dictionary) -> Dictionary:
 	if _busy: return _error(7,"step","更新中は再入できません")
 	if _core == null: return _error(4,"step","設定前または破棄済みです")
 	_busy = true
+	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.step_run(dt,input,viewport)
+	perf.since(&"sim",began)
 	if result.ok: _collect_locked()
 	_busy = false
 	return result
@@ -75,7 +78,9 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 	if not intent is Intent:
 		_busy = false
 		return _error(1,"input","Intentを返す入力元を指定してください")
+	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.step_run(dt,pack_intent(intent),{"logical_size":logical_size})
+	perf.since(&"sim",began)
 	if result.ok: _collect_locked()
 	_busy = false
 	return result
@@ -102,7 +107,11 @@ func send_envelope(envelope: Dictionary) -> Dictionary:
 
 func read_render(view: Rect2, alpha := 1.0) -> Dictionary:
 	if _busy: return _error(7,"read_render","更新中は再入できません")
-	return _core.render_run(view,alpha) if _core!=null else _error(4,"read_render","破棄済みです")
+	if _core==null: return _error(4,"read_render","破棄済みです")
+	var began := Time.get_ticks_usec() if perf.active else 0
+	var result: Dictionary = _core.render_run(view,alpha)
+	perf.since(&"output_build",began)
+	return result
 
 func read_frame() -> Dictionary:
 	if _busy: return _error(7,"read_frame","更新中は再入できません")
@@ -156,18 +165,27 @@ func dispose() -> Dictionary:
 
 ## UIの差分は窓口内で合成する。外側へ戦闘の可変参照を渡さない。
 func _read_locked() -> Dictionary:
+	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.frame_run()
+	perf.since(&"output_build",began)
+	began = Time.get_ticks_usec() if perf.active else 0
 	if not result.ok: return result
 	if not _latest.is_empty() and _latest.epoch!=result.value.epoch: _ui = {}
 	_ui.merge(result.value.ui,true)
 	_latest = result.value.duplicate(true)
 	_latest.ui = _ui.duplicate(true)
-	return _ok(_latest.duplicate(true))
+	var snapshot := _ok(_latest.duplicate(true))
+	perf.since(&"bridge_copy",began)
+	return snapshot
 
 func latest_frame() -> Dictionary:
 	if _busy: return _error(7,"latest_frame","配信中は読めません")
 	if _core==null: return _error(4,"latest_frame","破棄済みです")
-	return _ok(_latest.duplicate(true)) if not _latest.is_empty() else read_frame()
+	if _latest.is_empty(): return read_frame()
+	var began := Time.get_ticks_usec() if perf.active else 0
+	var snapshot := _ok(_latest.duplicate(true))
+	perf.since(&"bridge_copy",began)
+	return snapshot
 
 func read_metrics() -> Dictionary:
 	if _busy: return _error(7,"read_metrics","更新中は読めません")
@@ -200,7 +218,10 @@ func _deliver_locked() -> Dictionary:
 	for name: String in _subscribers:
 		var receiver: Dictionary = _subscribers[name]
 		if receiver.epoch==_delivery.epoch and receiver.sequence>=sequence and receiver.revision>=_delivery.state_revision: continue
-		if not receiver.consumer.is_valid() or receiver.consumer.call(_delivery.duplicate(true))!=true:
+		var began := Time.get_ticks_usec() if perf.active else 0
+		var packet: Dictionary = _delivery.duplicate(true)
+		perf.since(&"bridge_copy",began)
+		if not receiver.consumer.is_valid() or receiver.consumer.call(packet)!=true:
 			return _error(8,"subscriber", "通知を受け取れません: %s" % name)
 		receiver.epoch = _delivery.epoch
 		receiver.sequence = sequence

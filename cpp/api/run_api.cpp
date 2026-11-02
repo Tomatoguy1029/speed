@@ -152,6 +152,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
                 changed=speed::EquipmentSystem::grant(runtime,d.id,uint32_t(int64_t(payload["levels"])));
         }
         response=changed?success():failure(5,"equipment","装備を変更できません");
+    } else if (kind=="dev_benchmark" && runtime.api_development && payload.size()==1 && is(payload,"leveling",Variant::BOOL)) {
+        runtime.state.loadout.xp_gain_mult=bool(payload["leveling"])?1.0:0.0;response=success();
     } else if (kind=="dev_add_xp" && runtime.api_development && payload.size()==1 && (is(payload,"amount",Variant::FLOAT) || is(payload,"amount",Variant::INT))) {
         response=speed::ProgressionSystem::add_experience(*this,payload["amount"])?success():failure(1,"amount","最終取得XPが不正です");
     } else if (kind=="abort" && payload.size()==1 && is(payload,"reason",Variant::INT)) {

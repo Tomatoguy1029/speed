@@ -56,6 +56,11 @@ func _ready() -> void:
 		var parts := arg.trim_prefix("--").split("=", false, 1)
 		if parts.size() == 2:
 			options[parts[0]] = parts[1]
+	if options.get("runtime","")=="cpp":
+		var cpp_profile = load("res://tools/profile_cpp_run.gd").new()
+		cpp_profile.options = options.duplicate()
+		add_child(cpp_profile)
+		return
 	SaveManager.data = SaveManager.default_data()
 	GameManager.run_stage = int(options.get("stage", "1"))
 	GameManager.run_endless = false

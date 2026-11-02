@@ -9,3 +9,7 @@ extends Resource
 @export var equipment: Dictionary = {}
 @export var order := PackedStringArray()
 @export var signatures: Dictionary = {}
+
+@export var background_color := Color.BLACK
+@export var backgrounds: Array[BackgroundPlacement] = []
+@export var fire_uses: Dictionary = {}

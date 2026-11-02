@@ -73,6 +73,14 @@ Dictionary FrameBuilder::metrics(const RunRuntime &run) {
     out["schema_version"]=1;out["run_id"]=run.api_run_id;out["epoch"]=run.epoch;out["tick"]=run.state.control.tick;
     out["fixed_steps"]=m.fixed_steps;out["commands"]=m.commands;out["events_emitted"]=m.events_emitted;out["events_acked"]=m.events_acked;
     out["pending_events"]=int64_t(run.frame_workspace.pending.size());out["enemies"]=int64_t(run.state.rows_by_id.size());
-    out["friendly_shots"]=int64_t(run.state.live_friends);return out;
+    out["friendly_shots"]=int64_t(run.state.live_friends);
+    std::vector<int64_t> counts(run.content->definitions.size(),0);
+    for (const auto &rows:run.state.behavior_rows) for (auto row:rows) ++counts[run.state.enemies[row].definition];
+    Dictionary types,pools;
+    for (size_t i=0;i<counts.size();++i) if (counts[i]) types[run.content->definitions[i].id]=counts[i];
+    int64_t attacks[3]={};
+    for (const auto &attack:run.state.attacks.records) if (attack.alive) ++attacks[int(attack.pool)];
+    for (int i=0;i<3;++i) pools[String::num_int64(i)]=attacks[i];
+    out["enemy_types"]=types;out["attack_pools"]=pools;return out;
 }
 }

@@ -29,6 +29,7 @@ var bridge: RefCounted
 var cpp_resources: Resource
 var cpp_scope: ContentResourceScope
 var frame_view: Node2D
+var cpp_background: Node2D
 var run: RunSimulation
 var state: RunState
 var cfg: GameConfig
@@ -1587,6 +1588,10 @@ func _ready_cpp() -> void:
 	frame_view = load("res://scripts/render/run_frame_view.gd").new()
 	get_node(world_path).add_child(frame_view)
 	frame_view.setup(cpp_scope,cpp_resources.visuals,float(snapshot.value.ui.character_scale))
+	cpp_background = preload("res://scripts/render/run_stage_background.gd").new()
+	cpp_background.z_index = -10
+	frame_view.add_child(cpp_background)
+	cpp_background.setup(cpp_scope,cpp_resources,snapshot.value.ui.ship.ship_pos)
 	bridge.subscribe("presentation",frame_view.receive_frame)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
@@ -1615,7 +1620,12 @@ func _present_cpp(delta: float) -> void:
 		frame_view.hide()
 		return
 	frame_view.show()
+	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
+	cpp_background.update_frame(frame.camera)
 	frame_view.update_effects(frame,delta)
+	frame_view.perf.since(&"view_effects",effects_start)
+	var tail_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")
 	if hud!=null: hud.apply_snapshot(frame.ui)
 	pipeline.step(0.0 if frame.ui.get("presentation_frozen",not frame.ui.input_enabled) else delta,cam_center,cam_zoom)
+	frame_view.perf.since(&"view_tail",tail_start)

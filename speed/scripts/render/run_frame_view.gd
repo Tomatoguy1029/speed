@@ -1,6 +1,7 @@
 ## RenderFrameの値だけを描画へ渡す。敵表や武器の実体は参照しない。
 extends Node2D
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
+var perf := PerfLog.new()
 var visuals: Dictionary = {}
 var batches: Dictionary = {}
 var parts: Dictionary = {}
@@ -60,8 +61,10 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 
 	_gunner_marks = DrawLayer.new()
 	_gunner_marks.draw_fn = func(canvas: CanvasItem):
+		var began := Time.get_ticks_usec() if perf.active else 0
 		preload("res://scripts/render/enemies/gunner.gd").draw_frame(canvas,_gunner,_pixel)
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
+		perf.since(&"view_draw.attacks",began)
 	_layer(9).add_child(_gunner_marks)
 	_effects = PixelPainter.new()
 	_effects.setup_painter(_pixel)
@@ -163,8 +166,8 @@ func _valid(frame: Dictionary) -> bool:
 	return true
 
 func apply_frame(frame: Dictionary) -> bool:
-	if not _valid(frame): return false
 	var begin := Time.get_ticks_usec()
+	if not _valid(frame): return false
 	for batch: InstanceBatch in batches.values(): batch.begin()
 	for display: Node in enemy_frames.values(): display.begin()
 	for node: Sprite2D in parts.values(): node.hide()
@@ -177,11 +180,18 @@ func apply_frame(frame: Dictionary) -> bool:
 	_gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
+	var packed_bytes := 0
 	for row: Dictionary in rows:
+		if perf.active:
+			packed_bytes+=row.ids.size()*8+row.transforms.size()*4+row.colors.size()*16+row.flags.size()*4
+			for key in ["gunner","beamer","glows"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
+			if row.has("biter"):
+				for key in row.biter: packed_bytes+=row.biter[key].size()*4
 		if visuals[row.visual_id].role==6:
 			if not enemy_frames.has(row.visual_id):
 				var display = preload("res://scripts/render/run_enemy_frame.gd").new()
 				add_child(display)
+				display.perf = perf
 				display.setup(_scope,visuals[row.visual_id])
 				display.begin()
 				enemy_frames[row.visual_id] = display
@@ -191,7 +201,9 @@ func apply_frame(frame: Dictionary) -> bool:
 		if batch.get_parent()!=_layer(row.layer): batch.reparent(_layer(row.layer))
 		batch.get_parent().move_child(batch,-1)
 		if visuals[row.visual_id].role==2:
+			var began := Time.get_ticks_usec() if perf.active else 0
 			preload("res://scripts/render/attacks/friend_shot.gd").apply_frame(batch as PixelPainter,row.transforms)
+			perf.since(&"view_geometry.attacks",began)
 		else: batch.apply_frame(row.transforms,row.colors)
 	for batch: InstanceBatch in batches.values(): batch.end()
 	for display: Node in enemy_frames.values(): display.end()
@@ -201,6 +213,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		display.node.queue_redraw()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
+		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
 		var display: Dictionary = {}
 		if int(row.owner_id)>0 or row.kind==1:
@@ -249,6 +262,8 @@ func apply_frame(frame: Dictionary) -> bool:
 		sprite.modulate = Color("#ff6b5a") if row.visual_state & 1 else Color.WHITE
 		if row.visual_state & 2: sprite.modulate.a = 0.5
 	submit_us = Time.get_ticks_usec()-begin
+	perf.add(&"view_submit",submit_us)
+	perf.add(&"render_packed_bytes",packed_bytes)
 	return true
 
 ## 固定更新の間に届いた通知を、次の表示まで保持する。
@@ -336,9 +351,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var active: bool = ui.input_enabled
 	var world_dt: float = 0.0 if _forward_world_time<0.0 else maxf(0.0,ui.world_time-_forward_world_time)
 	_forward_world_time = ui.world_time if equipped_forward else -1.0
+	var draw_start := Time.get_ticks_usec() if perf.active else 0
 	_effects.begin()
 	preload("res://scripts/render/equipment/forward.gd").frame_draw(_flashes,_effects,world_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_forward)
 	_effects.end()
+	perf.since(&"view_geometry.attacks",draw_start)
 	if active and not ui.draw.drawing and ui.hitstop<=0.0:
 		_jet_time += dt*clampf(ui.ship_vel.length()/ui.base_max_speed,0.0,3.0)
 	for sprite in [_flame,_spark]:
@@ -356,3 +373,8 @@ func _death_burst(at: Vector2) -> void:
 		var angle := randf()*TAU
 		var speed := 500.0*(0.3+randf())
 		_particles.append({"pos":at,"vel":Vector2.from_angle(angle)*speed*0.6,"life":0.5+randf()*0.4,"max":0.9,"color":Color("#9fe8ff"),"size":2.0+randf()*4.0})
+
+func _timed_shape(canvas: CanvasItem, original: Callable) -> void:
+	var began := Time.get_ticks_usec() if perf.active else 0
+	original.call(canvas)
+	perf.since(&"view_draw.attacks",began)

@@ -290,6 +290,12 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
 	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]:
 		if not paths.has(asset): paths.append(asset)
+	for placement: BackgroundPlacement in stage.backgrounds:
+		for asset: String in [placement.texture_path,placement.fire_preset_path]:
+			if not asset.is_empty() and not paths.has(asset): paths.append(asset)
+	for key in stage.fire_uses:
+		var asset: String = str(stage.fire_uses[key].get("preset",""))
+		if not asset.is_empty() and not paths.has(asset): paths.append(asset)
 	paths.sort()
 	var profiles_error: Error = preload("res://tools/content/build_visuals.gd").validate()
 	if profiles_error!=OK: return profiles_error
@@ -300,6 +306,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	resolved_input.append_array(Schema.write_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])))
 	resolved_input.append_array("\n".join(paths).to_utf8_buffer())
 	resolved_input.append_array(var_to_bytes(appearance_metadata))
+	resolved_input.append_array(var_to_bytes([stage.background_color,stage.backgrounds.map(func(item): return [item.texture_path,item.offset,item.scale,item.rotation_degrees,item.display_tint(),item.bounds(),item.parallax,item.fire_preset_path,item.fire_offset,item.fire_scale]),stage.fire_uses]))
 	resolved_input.append_array(var_to_bytes(manifest.hashes))
 	resolved_input.append_array(var_to_bytes([manifest.keys,manifest.equipment,manifest.order,manifest.signatures,visuals]))
 	input_sha256 = Schema.sha256(resolved_input).hex_encode()
@@ -328,6 +335,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	resources.signatures = manifest.signatures
 	resources.keys = manifest.keys
 	resources.visuals.assign(visuals.duplicate(true))
+	resources.background_color = stage.background_color
+	resources.backgrounds.assign(stage.backgrounds.duplicate(true))
+	resources.fire_uses = stage.fire_uses.duplicate(true)
 	for visual: Dictionary in resources.visuals:
 		if appearance_metadata.has(visual.id): visual.merge(appearance_metadata[visual.id])
 	for visual: Dictionary in visuals:
