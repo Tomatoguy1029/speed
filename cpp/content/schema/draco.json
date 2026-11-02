@@ -570,6 +570,135 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DracoInhaleDefinition",
+      "section": 445,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "inhale_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "picaro_pull_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mouth_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bite_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_extend",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "comets_per_star",
+          "type": "u32",
+          "max": 100000
+        },
+        {
+          "name": "comet_cap",
+          "type": "u32",
+          "max": 100000
+        },
+        {
+          "name": "comet_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "BoltDefinition"
+        },
+        {
+          "name": "beam_definition",
+          "type": "u32",
+          "ref": "BeamDefinition"
+        }
+      ]
+    },
+    {
+      "name": "DracoInhaleArc",
+      "section": 447,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "offset_x",
+          "type": "f64"
+        },
+        {
+          "name": "offset_y",
+          "type": "f64"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle_degrees",
+          "type": "f64"
+        },
+        {
+          "name": "spread_degrees",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        }
+      ]
     }
   ],
   "enums": {}

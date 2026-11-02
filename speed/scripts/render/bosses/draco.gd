@@ -36,6 +36,7 @@ func _draw() -> void:
 	_draw_rift_walls()
 	_draw_arrow_impacts()
 	_draw_spiral_charge()
+	_draw_inhale()
 	var cycle: Dictionary = state.get("cycle",{})
 	if cycle.get("stage",0)==2:
 		for j in 16:
@@ -189,3 +190,11 @@ func _draw_spiral_charge() -> void:
 		var direction:=Vector2.from_angle(j*TAU/12.0)
 		draw_line(center+direction*(radius+20),center+direction*(radius+4),warning,3.0,false)
 	preload("res://scripts/bosses/draco_form.gd").star(self,center,7.0+progress*12.0,warning)
+
+func _draw_inhale() -> void:
+	if attack.get("technique","")!="inhale" or int(attack.get("stage",5))>=3 or attack.get("spent",false):return
+	var mouth:=to_local(state.position+Vector2.from_angle(state.facing)*120.0*float(state.head_scale)*float(state.perspective_scale))
+	for j in 24:
+		var k:=fmod(float(attack.stage_time)*0.7+j/24.0,1.0)
+		var at:=mouth+Vector2.from_angle(j*2.399963)*float(_move_style.get("pull_range",1500.0))*(1.0-k)
+		draw_line(at,at+(mouth-at).normalized()*25.0,Color(0.6,0.5,1.0,k*0.6),3.0)

@@ -77,17 +77,17 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 
 ## ドラコはSourceの3形態を生成する。未登録技は生成エラーとして残す。
 static func draco_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam",&"tail_sweep",&"star_fan",&"meteor",&"rifts",&"picaro_wall",&"spiral"]: return {}
+	if definition==null or definition.id!=&"draco" or move==null or move.technique not in [&"bite",&"breath",&"charge",&"leap",&"tail_slam",&"tail_sweep",&"star_fan",&"meteor",&"rifts",&"picaro_wall",&"inhale",&"spiral"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":"draco","kind":4,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
-	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[],"DracoRiftsDefinition":[],"DracoSpiralDefinition":[],"DracoPicaroWallDefinition":[],"DracoPicaroWallCandidate":[]}
+	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[],"DracoRiftsDefinition":[],"DracoInhaleDefinition":[],"DracoInhaleArc":[],"DracoSpiralDefinition":[],"DracoPicaroWallDefinition":[],"DracoPicaroWallCandidate":[]}
 	for phase in [1,2,3]:
 		var values: Dictionary = source.values().duplicate(true)
 		# Draco.rule()はSource上、形態別の値上書きを行わない。
 		var row := {}
 		for field in Schema.SCHEMA.records.filter(func(v):return v.name=="BossTechniqueDefinition")[0].fields: row[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100,&"tail_sweep":101,&"star_fan":102,&"meteor":103,&"rifts":104,&"picaro_wall":106,&"spiral":107}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
+		row.merge({"id":phase,"boss":1,"external_id":str(source.technique),"kind":{&"bite":96,&"breath":97,&"charge":98,&"leap":99,&"tail_slam":100,&"tail_sweep":101,&"star_fan":102,&"meteor":103,&"rifts":104,&"picaro_wall":106,&"inhale":108,&"spiral":107}[source.technique],"phase":phase,"track_during_warn":source.track_during_warn,"post_gap":source.post_gap,"passes":1,"cuts":1},true)
 		for key in ["warn","active","recover","damage","reach","width"]: row[key] = float(values.get(key,0.0))
 		records.BossTechniqueDefinition.append(row)
 		if source.technique==&"bite": records.DracoBiteDefinition.append({"id":phase,"technique":phase,"lead_cap":float(values.lead_cap),"retract":float(values.retract)})
@@ -104,6 +104,24 @@ static func draco_technique_records(definition: BossDef, move: BossTechnique) ->
 			detail.shrink_time = float(values.shrink_time)
 			detail.touch_invuln = float(values.touch_invuln)
 			records.DracoSpiralDefinition.append(detail)
+		elif source.technique==&"inhale":
+			var detail := {"id":phase,"technique":phase}
+			detail.inhale_time = float(values.inhale_time)
+			detail.pull_range = float(values.pull_range)
+			detail.pull_speed = float(values.pull_speed)
+			detail.picaro_pull_speed = float(values.picaro_pull_speed)
+			detail.mouth_radius = float(values.mouth_radius)
+			detail.bite_damage = float(values.bite_damage)
+			detail.beam_time = float(values.beam_time)
+			detail.beam_extend = float(values.beam_extend)
+			detail.beam_warn = float(values.beam_warn)
+			detail.comets_per_star = int(values.comets_per_star)
+			detail.comet_cap = int(values.comet_cap)
+			detail.comet_speed = float(values.comet_speed)
+			detail.projectile=1;detail.beam_definition=1
+			records.DracoInhaleDefinition.append(detail)
+			for arc: Resource in source.arcs:
+				records.DracoInhaleArc.append({"id":records.DracoInhaleArc.size()+1,"technique":phase,"offset_x":arc.offset.x,"offset_y":arc.offset.y,"radius":arc.radius,"angle_degrees":arc.angle_degrees,"spread_degrees":arc.spread_degrees,"count":arc.count})
 		elif source.technique==&"picaro_wall":
 			var detail := {"id":phase,"technique":phase,"count":int(values.count),"arrows":int(values.arrows)}
 			for key in ["interval","flight","impact_warn","radius"]: detail[key]=float(values[key])
@@ -122,7 +140,7 @@ static func draco_technique_records(definition: BossDef, move: BossTechnique) ->
 	return records
 
 static func draco_set_records(definition: BossDef, moves: Array) -> Dictionary:
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[],"DracoRiftsDefinition":[],"DracoSpiralDefinition":[],"DracoPicaroWallDefinition":[],"DracoPicaroWallCandidate":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"DracoBiteDefinition":[],"DracoBreathDefinition":[],"DracoChargeDefinition":[],"DracoLeapDefinition":[],"DracoTailSlamDefinition":[],"DracoTailSweepDefinition":[],"DracoStarFanDefinition":[],"DracoMeteorDefinition":[],"DracoRiftsDefinition":[],"DracoInhaleDefinition":[],"DracoInhaleArc":[],"DracoSpiralDefinition":[],"DracoPicaroWallDefinition":[],"DracoPicaroWallCandidate":[]}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
@@ -149,6 +167,7 @@ static func draco_technique_package(definition: BossDef, move: BossTechnique, co
 	for key in records: package.records[key] = records[key]
 	if move.technique in [&"breath",&"meteor"]: append_draco_breath_rock(package,move,config)
 	if move.technique==&"star_fan": append_draco_star_bolt(package,move)
+	if move.technique==&"inhale": append_draco_inhale_bolt(package,move)
 	if move.technique==&"picaro_wall": append_draco_picaro_wall(package,move,config)
 	append_draco_style(package,move)
 	return package
@@ -192,6 +211,7 @@ static func append_draco_style(package: Dictionary, move: BossTechnique) -> void
 	else:
 		for key in ["telegraph_line_width","active_line_width","telegraph_fill_opacity","telegraph_progress_opacity","telegraph_edge_opacity","motion_trail_opacity","impact_lifetime","collapse_lifetime"]: style[key] = float(visual.get(key))
 	visual.free()
+	if move.technique==&"inhale":style.pull_range=float(move.pull_range)
 	var appearance := {}
 	for asset: Dictionary in package.visuals:
 		if asset.get("boss","")=="draco": appearance=asset.appearance;break
@@ -1149,6 +1169,7 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 		for move in rules.techniques:
 			if move.technique in [&"breath",&"meteor"]: append_draco_breath_rock(package,move,config)
 			if move.technique==&"star_fan": append_draco_star_bolt(package,move)
+			if move.technique==&"inhale": append_draco_inhale_bolt(package,move)
 			if move.technique==&"picaro_wall": append_draco_picaro_wall(package,move,config)
 			append_draco_style(package,move)
 	var compiled := boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
@@ -2695,3 +2716,12 @@ static func append_draco_picaro_wall(package: Dictionary, move: BossTechnique, c
 	for id in candidates: enemies.append(append_draco_enemy(package,load(_catalog().find(&"enemies",StringName(id)).path),config))
 	for detail: Dictionary in package.records.DracoPicaroWallDefinition:
 		for enemy: int in enemies: package.records.DracoPicaroWallCandidate.append({"id":package.records.DracoPicaroWallCandidate.size()+1,"technique":detail.technique,"enemy":enemy})
+
+static func append_draco_inhale_bolt(package: Dictionary, move: BossTechnique) -> void:
+	var visual: AttackVisual=move.shot_visual.instantiate()
+	var tint:=AttackVisual.apply_effect_settings_to(visual)
+	var row: Dictionary=package.records.BoltDefinition[0].duplicate(true)
+	row.merge({"id":package.records.BoltDefinition.size()+1,"flight_scale":visual.flight_scale,"tint_r":tint.r,"tint_g":tint.g,"tint_b":tint.b,"tint_a":tint.a},true)
+	package.records.BoltDefinition.append(row)
+	for detail: Dictionary in package.records.DracoInhaleDefinition:detail.projectile=row.id
+	visual.free()

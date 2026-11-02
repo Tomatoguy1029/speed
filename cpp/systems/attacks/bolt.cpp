@@ -4,14 +4,14 @@
 #include <cmath>
 namespace speed {
 AttackHandle BoltSystem::emit(RunRuntime &run,const BoltParams &p) {
-    if (!run.state.started || run.state.closed || run.content->bolts.empty() || !p.position.is_finite() || !std::isfinite(p.angle) ||
+    if (!run.state.started || run.state.closed || run.content->bolts.empty() || p.definition>run.content->bolts.size() || !p.position.is_finite() || !std::isfinite(p.angle) ||
         !std::isfinite(float(p.speed)) || p.speed<0 || !std::isfinite(p.damage) || p.damage<0 ||
         (p.owner.generation && !run.state.enemy_handles.contains(p.owner))) return {};
-    const auto &definition=run.content->bolts.front();
-    godot::RunState::Hostile shot;shot.kind=int64_t(HostileKind::Bolt);shot.bolt.definition=1;
+    const auto &definition=run.content->bolts[p.definition?p.definition-1:0];
+    godot::RunState::Hostile shot;shot.kind=int64_t(HostileKind::Bolt);shot.bolt.definition=p.definition?p.definition:1;
     shot.pos=p.position;shot.vel=godot::Vector2::from_angle(p.angle)*p.speed;shot.speed=p.speed;
     shot.radius=definition.radius;shot.life=definition.life;shot.damage=p.damage;
-    AttackSpec spec;spec.cause=Cause::Bolt;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;
+    AttackSpec spec;spec.cause=Cause::Bolt;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (!AttackSystem::configure_contact(*run.content,definition.contact,spec)) return {};
     const auto handle=AttackSystem::emit_hostile(run.state,shot,spec);

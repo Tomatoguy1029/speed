@@ -5,6 +5,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-inhale" in OS.get_cmdline_user_args() or "--cpp-draco-inhale-pose" in OS.get_cmdline_user_args():
+		call_deferred("native_inhale")
+		return
 	if "--cpp-draco-spiral-contact" in OS.get_cmdline_user_args():
 		call_deferred("native_spiral_contact")
 		return
@@ -257,6 +260,9 @@ func breath_fixture(move: BossTechnique, flow_enabled := false, moves: Array = [
 		for record in records:package.records[record]=records[record]
 		for part: BossTechnique in moves:
 			if part.technique in [&"breath",&"meteor"]:builder.append_draco_breath_rock(package,part,cfg)
+			if part.technique==&"inhale":builder.append_draco_inhale_bolt(package,part)
+			if part.technique==&"picaro_wall":builder.append_draco_picaro_wall(package,part,cfg)
+			if part.technique==&"star_fan":builder.append_draco_star_bolt(package,part)
 			builder.append_draco_style(package,part)
 	if flow_enabled:
 		var rules=load("res://scripts/data_types/boss_action_rules.gd").new()
@@ -1200,3 +1206,132 @@ func native_spiral_contact() -> void:
 	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and is_equal_approx(hits[0].payload.hp_before-hits[0].payload.hp_after,35.0),"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
 	bridge.dispose()
 	print("[cpp_draco_spiral_contact] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_inhale() -> void:
+	var move: BossTechnique=load("res://data/bosses/draco_moves/inhale.tres")
+	var fixture:=breath_fixture(move)
+	if fixture.is_empty():get_tree().quit(1);return
+	var bridge=fixture.bridge
+	var source:=source_draco_fixture(Vector2(700,0))
+	var a=source.actor
+	var sim: RunSimulation=source.sim
+	sim.state.view_center=Vector2(700,0);sim.state.view_half=Vector2(800,450)
+	check(a.start_attack(&"inhale") and bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"SourceとC++で吸引と吐き出しを開始する")
+	var side: float=bridge.command("dev_boss_state").value[0].staging_side
+	a._runner.staging.outside=sim.state.view_center+Vector2(side*(sim.state.view_half.x+a.table.r[a.body]+100.0),0)
+	a._runner.staging.inside=sim.state.view_center+Vector2(side*minf(700.0,sim.state.view_half.x*0.72),0)
+	a._runner.staging.facing=a.tracking_angle((a.aim_target()-a._runner.staging.inside).angle())
+	var native_frame_checked:=false
+	var remaining_pose:= "--cpp-draco-inhale-pose" in OS.get_cmdline_user_args()
+	var times_equal:=true
+	var state_equal:=true
+	var shape_error:=0.0
+	var ship_error:=0.0
+	var beam_error:=0.0
+	var saved: Array=[]
+	var shown: Array=[]
+	for frame in 1500:
+		a.sim_tick(1.0/120.0,1.0/120.0);sim.projectiles._update_hazards(1.0/120.0)
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		times_equal=times_equal and attack.stage=={&"windup":0,&"active":1,&"recovery":2,&"idle":5}[a.mode] and (attack.stage==5 or is_equal_approx(attack.stage_time,a.elapsed))
+		ship_error=maxf(ship_error,bridge._core.ship_snapshot().ship_pos.distance_to(sim.state.ship_pos))
+		var points: PackedVector2Array=a.body_points()
+		for j in points.size():shape_error=maxf(shape_error,points[j].distance_to(body.body_points[j]))
+		if a._runner!=null:
+			state_equal=state_equal and attack.caught==a._runner.caught and attack.spent==a._runner.spent and attack.steering_locked==sim.state.steering_locked and is_equal_approx(attack.release_at,a._runner.release_at)
+			if a._runner.beam>=0 and sim.projectiles.owns_hazard(a._runner.beam,a.body,a.body_id):beam_error=maxf(beam_error,absf(attack.beam_length-sim.projectiles.hazard_len[a._runner.beam]))
+		var key: int=0 if attack.stage==0 else 4 if attack.stage==2 else 3 if attack.spent else 2 if attack.caught else 1
+		if not remaining_pose and key not in saved and attack.stage<3:
+			saved.append(key)
+			var held: Dictionary=bridge.checkpoint()
+			check(held.ok,"横入り・吸引・噛みつき・吐き出し・回復を保持する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			var future: Array=bridge.command("dev_boss_state").value
+			var future_body: Array=bridge.command("dev_boss_body_state").value
+			var future_shots: Array=bridge._core.hostiles_snapshot()
+			check(bridge.restore(held.value).ok,"吸引の途中へ復帰する")
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			check(future==bridge.command("dev_boss_state").value and future_body==bridge.command("dev_boss_body_state").value and future_shots==bridge._core.hostiles_snapshot(),"復帰後の吸引・停止時計・ビーム・彗星が同じになる")
+			bridge.restore(held.value);bridge.release_checkpoint(held.value)
+		if not remaining_pose and key in [0,1,3,4] and key not in shown:
+			shown.append(key);await show_native_draco(fixture,body,attack)
+		if not remaining_pose and attack.spent and attack.stage==1 and not 5 in shown:
+			var rendered: Dictionary=bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
+			var beams: Array=rendered.shapes.filter(func(row):return row.get("draco_beam",false))
+			if not beams.is_empty():
+				shown.append(5)
+				var display=load("res://scripts/render/attacks/beam_draco.gd").new()
+				add_child(display);display.frame_apply(beams[0],1.0);await get_tree().process_frame
+				check(display.material.shader!=null and is_equal_approx(display.material.get_shader_parameter("half0"),float(move.width)*0.5),"口元の溜めと伸びる光線を既存の専用shaderで描く")
+				display.free()
+		if remaining_pose and attack.beam_alive and not native_frame_checked:
+			var render: Dictionary=bridge.read_render(Rect2(-3000,-3000,6000,6000)).value
+			var view=load("res://scripts/render/run_frame_view.gd").new()
+			for visual: Dictionary in fixture.package.visuals:view.visuals[int(visual.id)]=visual
+			check(view._valid(render),"専用光線の読取値を通常描画の入口が受け付ける")
+			view.free();native_frame_checked=true
+		if attack.stage==5:break
+	if remaining_pose:
+		check(shape_error<0.2 and native_frame_checked,"吸引の横入りと胴の固定履歴がSourceに一致する: %s"%shape_error)
+		bridge.dispose();source.session.free()
+		print("[cpp_draco_inhale_pose] failures=",failed);get_tree().quit(1 if failed else 0);return
+	check(times_equal and state_equal,"Sourceと横入り・吸引・捕獲・操舵解放・吐き出し・終了のtickが一致する")
+	check(shape_error<0.2 and ship_error<0.1 and beam_error<0.1,"Sourceと姿勢・引き寄せ・全幅ビームの伸長が一致する: %s/%s/%s"%[shape_error,ship_error,beam_error])
+	check(saved.size()==5 and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"全段階の復帰・表示を通り、終了時にビームを解放する")
+	check(bridge._core.hostiles_snapshot().size()==24 and sim.projectiles.hostile_count()==24,"実験場の12星から弧ごとの割当と上限24発を生成し、終了後も彗星を残す")
+	check(fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"inhale_bite" and e.payload.source==&"draco" and e.payload.technique==&"inhale" and is_equal_approx(e.payload.hp_before-e.payload.hp_after,30.0)),"吸引の噛みつきの実HPと専用原因・出所・技名を記録する")
+	bridge.dispose();source.session.free()
+	for operation in ["windup","pull","caught","spent","recovery","dev_cancel_boss"]:
+		fixture=breath_fixture(move);bridge=fixture.bridge
+		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 1400:
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+			if operation=="windup" or operation=="pull" and attack.stage==1 or operation=="caught" and attack.caught or operation in ["spent","dev_cancel_boss"] and attack.spent or operation=="recovery" and attack.stage==2:break
+		if operation=="dev_cancel_boss":bridge.command(operation,{"entity_id":fixture.boss})
+		else:bridge.command("dev_cancel_technique",{"ticket":started.value})
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		check(bridge._core.hazards_snapshot().is_empty() and not attack.steering_locked,"各段階の取消・本体消失でビームと操舵制限を解放する")
+		if operation in ["spent","recovery","dev_cancel_boss"]:check(bridge._core.hostiles_snapshot().size()==24,"吐き出した彗星は取消と本体消失でも自然寿命まで残す")
+		bridge.dispose()
+	await native_inhale_ownership(move)
+	native_draco_move_flow(move)
+
+func native_inhale_ownership(move: BossTechnique) -> void:
+	# 実在ピカロの星数を使い、実験場の代用星を使わないケース。
+	var wall: BossTechnique=load("res://data/bosses/draco_moves/picaro_wall.tres")
+	var fixture:=breath_fixture(move,false,[move,wall])
+	var bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	for frame in 200:
+		bridge._core.step(1.0/120.0)
+		if bridge.command("dev_boss_state").value[0].stage==1:break
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+	var mouth: Vector2=body.position+Vector2.from_angle(body.facing)*120.0*float(body.head_scale)
+	for source in ["telescope","lynx"]:check(bridge.command("dev_draco_picaro",{"entity_id":fixture.boss,"operation":"spawn","source":source,"position":mouth}).ok,"吸引の口元に実在ピカロを置く")
+	for frame in 500:
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		if bridge.command("dev_boss_state").value[0].spent:break
+	check(bridge.command("dev_boss_body_state").value[-1].picaro.is_empty() and bridge._core.hostiles_snapshot().size()==14,"ピカロを直接消去して3星+4星から14発を弧へ割り当てる")
+	bridge.dispose()
+	# 吸い込み終了直前の捕獲は、本体時計で0.8秒待つ間だけ段階時計を止める。
+	fixture=breath_fixture(move);bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	var caught:=false
+	var waited:=false
+	for frame in 1400:
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		body=bridge.command("dev_boss_body_state").value[-1]
+		if attack.stage==1 and not caught:
+			var at: Vector2=body.position+Vector2(5000,0)
+			if attack.stage_time>=2.95:at=body.position+Vector2.from_angle(body.facing)*120.0*float(body.head_scale)
+			bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+		bridge._core.step(1.0/120.0)
+		attack=bridge.command("dev_boss_state").value[0]
+		caught=caught or attack.caught
+		if caught and attack.steering_locked and is_equal_approx(attack.stage_time,3.0):waited=true
+		if attack.spent:break
+	check(caught and waited and not bridge.command("dev_boss_state").value[0].steering_locked,"終了直前に捕まっても本体時計で待ち、操舵を返してから吐き出す")
+	bridge.dispose()

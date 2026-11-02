@@ -54,6 +54,7 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         if (operation=="spawn" && p.size()==4 && p.get("source",Variant()).get_type()==Variant::STRING && p.get("position",Variant()).get_type()==Variant::VECTOR2 && Vector2(p["position"]).is_finite()) {
             for (uint32_t j=0;j<runtime.content->definitions.size();++j) if (runtime.content->definitions[j].id==StringName(String(p["source"]))) {const auto h=speed::DracoPicaro::spawn(runtime,*body,j+1,p["position"]);return result(runtime.state.enemy_handles.contains(h),runtime.state.enemy_handles.entity_id(h));}return result(false);
         }
+        if (operation=="inhale_stars" && p.size()==3 && p.get("stars",Variant()).get_type()==Variant::INT && int64_t(p["stars"])>=0 && int64_t(p["stars"])<=100000) {body->draco.lab_inhale_stars=uint32_t(int64_t(p["stars"]));return result(true);}
         if (operation=="pause" && p.size()==3 && p.get("cancel",Variant()).get_type()==Variant::BOOL) {speed::DracoPicaro::pause(runtime,*body,p["cancel"]);return result(true);}
         if (operation=="attack" && p.size()==2) {body->draco.picaro_attacking=true;return result(true);}
         if (operation=="clear" && p.size()==2) {speed::DracoPicaro::clear(runtime,*body);return result(true);}

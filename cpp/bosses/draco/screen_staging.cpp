@@ -1,10 +1,15 @@
 #include "screen_staging.h"
 #include "body.h"
 #include "pose.h"
+#include "../../systems/tracking_policy.h"
+#include "../../systems/motion_math.h"
 #include "../flow/phase_controller.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
+void DracoScreenStaging::side_entry(RunRuntime &r,TechniqueState &t,DracoSideEntryState &s) {auto &e=r.state.enemies[t.actor.slot];s.side=r.state.control.rng.randf()<0.5?-1:1;s.origin=e.pos;s.outside=r.state.view_center+godot::Vector2(s.side*(r.state.view_half.x+e.radius+100),0);s.inside=r.state.view_center+godot::Vector2(s.side*std::min(700.0,double(r.state.view_half.x)*0.72),0);s.angle=e.facing;s.facing=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.angle(e.facing,(DracoTechnique::predict(r,t.actor,0,0)-s.inside).angle());}
+void DracoScreenStaging::advance_side(RunRuntime &r,TechniqueState &t,const DracoSideEntryState &s,double progress) {auto &e=r.state.enemies[t.actor.slot];e.pos=progress<0.4?s.origin.lerp(s.outside,DracoTechnique::smooth(progress/0.4)):s.outside.lerp(s.inside,DracoTechnique::smooth((progress-0.4)/0.6));e.facing=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.angle(e.facing,godot::Math::lerp_angle(s.angle,s.facing,DracoTechnique::smooth(progress/0.65)));}
+bool DracoScreenStaging::validate_side(const DracoSideEntryState &s) {return s.origin.is_finite() && s.outside.is_finite() && s.inside.is_finite() && std::isfinite(s.angle) && std::isfinite(s.facing) && (s.side==-1 || s.side==1);}
 void DracoScreenStaging::begin(RunRuntime &r,TechniqueState &t,DracoStagingState &s,bool enter,double height) {
     const auto &b=*PhaseController::find(r,t.actor);s.enter=enter;s.height=height;s.side=r.state.control.rng.randf()<0.5?-1:1;s.points=DracoPose::samples(DracoPose::points(r,b),DracoBody::rule(r,b).body_segments+1);s.trail=s.points;auto away=s.points.front()-r.state.ship_pos;if (away.length_squared()<1) away=godot::Vector2::from_angle(r.state.enemies[t.actor.slot].facing);s.exit_angle=(s.points[0]-s.points[1]).angle();s.away_angle=away.angle();
 }

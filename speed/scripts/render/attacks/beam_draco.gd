@@ -91,3 +91,39 @@ func _strip(c: CanvasItem, at: Vector2, angle: float, length: float, half: float
 	c.draw_polygon(PackedVector2Array([at - v * h, at + u * length - v * h, at + u * length + v * h, at + v * h]),
 		PackedColorArray([col, col, col, col]),
 		PackedVector2Array([Vector2(0.0, -h) / 1000.0, Vector2(length, -h) / 1000.0, Vector2(length, h) / 1000.0, Vector2(0.0, h) / 1000.0]))
+
+# C++から来る同じ判定寸法を、通常表示と同じshaderへ渡す。
+var _frame_row := {}
+func frame_apply(row: Dictionary, pixel: float) -> void:
+	_frame_row=row
+	if material==null:
+		var mat:=ShaderMaterial.new()
+		mat.shader=load("res://shaders/draco_beam.gdshader")
+		mat.set_shader_parameter("noise_tex",load("res://assets/fx/water_noise.png"))
+		ShaderTuning.apply(mat,PROFILE,"res://scenes/attacks/beam_draco.tscn")
+		material=mat
+		EFFECT_SETTINGS.apply_key(self,PROFILE,"res://scenes/attacks/beam_draco.tscn")
+	var mat:=material as ShaderMaterial
+	var settings: Dictionary=EFFECT_SETTINGS.resolved_values(PROFILE,"res://scenes/attacks/beam_draco.tscn")
+	var tint: Color=settings.get("effect_tint",Color.WHITE)
+	var color: Color=row.colors[0]
+	mat.set_shader_parameter("linear_colors",get_viewport().use_hdr_2d)
+	mat.set_shader_parameter("clock",row.clock)
+	mat.set_shader_parameter("pixel",pixel*2.0*float(settings.get("pixel_scale",1.0)))
+	mat.set_shader_parameter("half0",row.widths[0])
+	mat.set_shader_parameter("tint",Vector3(color.r*tint.r,color.g*tint.g,color.b*tint.b))
+	mat.set_shader_parameter("opacity",tint.a)
+	mat.set_shader_parameter("beam_len",row.length)
+	queue_redraw()
+func _draw() -> void:
+	if _frame_row.is_empty(): return
+	var row: Dictionary=_frame_row
+	var half: float=row.widths[0]
+	var at: Vector2=row.points[0]
+	var seed: float=fmod(float(row.order),17.0)/17.0
+	if row.time<row.delay:
+		_orb(self,at,half,clampf(row.time/maxf(row.delay,0.001),0.0,1.0),seed)
+		return
+	var strength:=clampf((row.delay+row.active-row.time)/maxf(fade_seconds,0.001),0.0,1.0)
+	if row.length>1.0:_strip(self,at,row.angle,row.length,half,strength,seed)
+	_orb(self,at,half,strength,seed)

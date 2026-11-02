@@ -94,7 +94,9 @@ struct DracoSpiralState {
     std::vector<godot::Vector2> points,trail,entry;
     std::vector<AttackHandle> walls;
 };
-struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState,DracoPicaroWallState,DracoSpiralState> move;};
+struct DracoSideEntryState {godot::Vector2 origin,outside,inside;double angle=0,facing=0,side=1;};
+struct DracoInhaleState {DracoSideEntryState staging;uint32_t stars=0;bool spent=false,caught=false;double release_at=0;AttackHandle beam;godot::Vector2 direction;};
+struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState,DracoPicaroWallState,DracoInhaleState,DracoSpiralState> move;};
 struct CanisSiriusFlameState {double age=0,emit_left=0;bool started=false;};
 struct HydraShatterStone {EnemyHandle actor;godot::Vector2 from,to;bool shattered=false;};
 struct HydraShatterState {bool initialized=false;double aim=0;std::vector<HydraShatterStone> rubble;};
@@ -204,6 +206,7 @@ struct DracoCycleState {
 struct DracoImpact {godot::Vector2 position;double time=0,radius=0;uint32_t technique=0;};
 struct DracoClosingWall {AttackHandle attack;godot::Vector2 from;double time=0.3,duration=0.3,delay=0,length=0,half_width=0,angle=0;};
 struct DracoBodyState {
+    uint32_t lab_inhale_stars=12;
     std::vector<DracoClosingWall> closing_walls;
     std::vector<RockHandle> placed_meteors;
     std::vector<DracoImpact> impacts;

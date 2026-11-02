@@ -4,17 +4,17 @@
 #include <cmath>
 namespace speed {
 AttackHandle BeamSystem::emit(RunRuntime &run,const BeamParams &p) {
-    if (!run.state.started || run.state.closed || p.style>=BeamStyle::Count || !p.position.is_finite() || run.content->beams.empty() ||
+    if (!run.state.started || run.state.closed || p.style>=BeamStyle::Count || !p.position.is_finite() || run.content->beams.empty() || p.definition>run.content->beams.size() ||
         (p.owner.generation && !run.state.enemy_handles.contains(p.owner))) return {};
     for (double value:{p.length,p.half_width,p.delay,p.active,p.damage}) if (!std::isfinite(value) || value<0) return {};
     for (double value:{p.length,p.half_width,p.delay,p.active,p.angle,p.arc}) if (!std::isfinite(float(value))) return {};
     for (float channel:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(channel)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.delay=p.delay;hazard.duration=p.active;hazard.damage=p.damage;hazard.color=p.color;
-    hazard.shape=BeamHazard{float(p.angle),float(p.length),float(p.half_width),float(p.arc),1,uint32_t(p.style)};
-    AttackSpec spec;spec.cause=Cause::Beam;spec.owner.live_source=p.owner;spec.owner.attached=p.owner.generation>0 && p.attached;spec.owner.budget=p.budget;
+    hazard.shape=BeamHazard{float(p.angle),float(p.length),float(p.half_width),float(p.arc),p.definition?p.definition:1,uint32_t(p.style)};
+    AttackSpec spec;spec.cause=Cause::Beam;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.attached=p.owner.generation>0 && p.attached;spec.owner.budget=p.budget;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (p.owner.generation && p.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);
-    if (!AttackSystem::configure_contact(*run.content,run.content->beams.front().contact,spec)) return {};
+    if (!AttackSystem::configure_contact(*run.content,run.content->beams[p.definition?p.definition-1:0].contact,spec)) return {};
     return AttackSystem::emit_hazard(run.state,hazard,spec);
 }
 bool BeamSystem::move(RunRuntime &run,AttackHandle handle,godot::Vector2 position,double angle,std::optional<double> length) {
@@ -33,6 +33,11 @@ void BeamSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     using namespace godot;
     const auto &hazard=run.state.hazards[row];const auto *beam=std::get_if<BeamHazard>(&hazard.shape);if (!hazard.alive || !beam || beam->style==uint32_t(BeamStyle::Flood)) return;
     const auto *record=AttackSystem::get(run.state,hazard.attack);if (!record) return;
+    if (beam->style==uint32_t(BeamStyle::Draco)) {
+        Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Polyline);shape["layer"]=11;shape["order"]=int32_t(row);shape["owner_id"]=record->id;shape["draco_beam"]=true;
+        PackedVector2Array points;points.push_back(hazard.pos);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);PackedFloat32Array widths;widths.push_back(beam->half_width);PackedColorArray colors;colors.push_back(hazard.color);
+        shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;shape["time"]=double(hazard.time);shape["delay"]=double(hazard.delay);shape["active"]=double(hazard.duration);shape["angle"]=double(beam->angle);shape["length"]=double(beam->length);shape["clock"]=run.state.world_time;shapes.push_back(shape);return;
+    }
     const double zoom=std::max(0.01,run.state.control.camera_zoom);const bool charging=hazard.time<hazard.delay;
     if (!charging && !view.grow(beam->length).has_point(hazard.pos)) return;
     Dictionary shape;shape["kind"]=int32_t(charging?RenderShapeKind::Circle:RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;

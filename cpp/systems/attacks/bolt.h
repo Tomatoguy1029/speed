@@ -6,6 +6,8 @@ struct BoltParams {
     double angle=0,speed=0,damage=0;
     EnemyHandle owner;
     BudgetToken budget;
+    TechniqueHandle technique;
+    uint32_t definition=0;
 };
 class BoltSystem {
 public:

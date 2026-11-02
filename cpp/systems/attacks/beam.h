@@ -11,6 +11,8 @@ struct BeamParams {
     EnemyHandle owner;
     bool attached=true;
     BudgetToken budget;
+    TechniqueHandle technique;
+    uint32_t definition=0;
 };
 class BeamSystem {
 public:

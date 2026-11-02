@@ -14,6 +14,7 @@ var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
 var _arrow_displays: Dictionary = {}
+var _draco_beam_displays := {}
 var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
@@ -568,6 +569,10 @@ func _valid(frame: Dictionary) -> bool:
 			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("trail") is PackedVector2Array or not row.get("velocity") is Vector2 or row.get("debris_style") not in [0,1,2]: return false
 			for key in ["angle","age","life","clock","trail_width"]:
 				if not row.get(key) is float or not is_finite(row[key]): return false
+		if row.get("draco_beam",false):
+			if row.kind!=SHAPE_KIND.Polyline or row.points.size()!=1 or row.widths.size()!=1: return false
+			for key in ["time","delay","active","angle","length","clock"]:
+				if not row.get(key) is float or not is_finite(row[key]): return false
 		if row.kind==SHAPE_KIND.LightArrow:
 			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("cosmic") is bool or not row.get("cosmic_star_count") is int: return false
 			for key in ["angle","length","world_time","shot_length_scale","shot_width_scale","core_width","cosmic_speed"]:
@@ -680,6 +685,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		display.circles.clear()
 	for display: Node in _wave_displays.values(): display.hide()
 	for display: Node in _arrow_displays.values(): display.hide()
+	for display: Node in _draco_beam_displays.values(): display.hide()
 	for display: Node in _debris_displays.values(): display.hide()
 	for display: Node in _hull_displays.values(): display.hide()
 	for display: Node in _zone_displays.values(): display.hide()
@@ -751,6 +757,16 @@ func apply_frame(frame: Dictionary) -> bool:
 				_debris_displays[key] = debris
 			_debris_displays[key].apply_frame(row,_zoom)
 			_debris_displays[key].show()
+			continue
+		if row.get("draco_beam",false):
+			var key:=int(row.order)
+			if not _draco_beam_displays.has(key):
+				var beam:=preload("res://scripts/render/attacks/beam_draco.gd").new()
+				parent.add_child(beam)
+				if pipeline!=null and not pipeline.rich:beam.visibility_layer=1|RenderPipeline.GLOW_LAYER
+				_draco_beam_displays[key]=beam
+			_draco_beam_displays[key].frame_apply(row,1.0/maxf(_zoom,0.01))
+			_draco_beam_displays[key].show()
 			continue
 		if row.kind==SHAPE_KIND.LightArrow:
 			var key := "%d:%d" % [row.layer,row.order]
