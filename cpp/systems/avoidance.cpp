@@ -39,7 +39,7 @@ bool SpeedRunCore::avoid_strong(double dt) {
     }
     if (obstacles.empty() || normal_radius <= 0) return true;
     constexpr double cell_size = 160.0;
-    auto cell_of = [](Vector2 p) { return Vector2i(int32_t(std::floor(p.x / cell_size)), int32_t(std::floor(p.y / cell_size))); };
+    auto cell_of = [cell_size](Vector2 p) { return Vector2i(int32_t(std::floor(p.x / cell_size)), int32_t(std::floor(p.y / cell_size))); };
     for (size_t row : obstacles) {
         const auto &e = runtime.state.enemies[row]; const double extent = e.radius + normal_radius + normal_step + 2.0;
         // GDScriptは減算をdoubleで行ってからセル座標を作る。
