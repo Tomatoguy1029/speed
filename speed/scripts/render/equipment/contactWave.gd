@@ -22,7 +22,7 @@ func sync_frame(values: Array, dt: float) -> void:
 			on_event({"type":&"space_quake","pos":value.pos,"radius":value.radius})
 			quakes[-1].id = value.id
 		for quake: Dictionary in quakes:
-			if quake.get("id",0)==value.id: quake.age = value.age-dt
+			if quake.get("id",0)==value.id: quake.age = value.visual_age-dt
 	_frame_seen = alive
 	quakes = quakes.filter(func(quake): return alive.has(quake.get("id",0)))
 

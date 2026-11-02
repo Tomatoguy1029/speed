@@ -171,7 +171,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     else if (external=="W23") run.state.loadout.rear={};
     else if (external=="W17") run.state.loadout.contact_arc={};
     else if (external=="W08") run.state.loadout.sonic={};
-    else if (external=="W04") run.state.loadout.contact_wave={};
+    else if (external=="W04") {auto ripples=std::move(run.state.loadout.contact_wave.ripples);run.state.loadout.contact_wave={};run.state.loadout.contact_wave.ripples=std::move(ripples);}
     else if (external=="W03") run.state.loadout.knockback={};
     else if (external=="W07") run.state.loadout.mines={};
     else if (external=="W29") run.state.loadout.end_blast={};

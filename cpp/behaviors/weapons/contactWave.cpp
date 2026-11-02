@@ -13,7 +13,7 @@ void ContactWaveBehavior::contact(RunRuntime &run,godot::Vector2 pos) {
     ContactWaveInstance wave;wave.id=w.next_id++;wave.pos=pos;
     wave.radius=w.radius*run.state.loadout.effects.area*(1+w.area_increment*double(run.state.loadout.post_area_stacks));
     wave.damage=CombatResolver::attack_power(run)*EquipmentSystem::weapon_damage_factor(run,w.definition)*w.damage;
-    w.waves.push_back(wave);godot::Dictionary event;event["pos"]=pos;event["radius"]=wave.radius;event["life"]=0.58;FrameBuilder::append(run,"space_quake",event);
+    w.waves.push_back(wave);w.ripples.push_back({pos,wave.radius,0});if (w.ripples.size()>8) w.ripples.erase(w.ripples.begin());godot::Dictionary event;event["pos"]=pos;event["radius"]=wave.radius;event["life"]=0.58;FrameBuilder::append(run,"space_quake",event);
 }
 void ContactWaveBehavior::step(RunRuntime &run,double dt) {
     auto &s=run.state;auto &w=s.loadout.contact_wave;if (!w.ready || dt<=0) return;

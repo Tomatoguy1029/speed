@@ -1221,7 +1221,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_contact_wave_visual.sync_frame(ui.contact_wave.waves,contact_wave_dt)
 		_contact_wave_visual.frame_tick(contact_wave_dt)
 	if pipeline!=null:
-		pipeline.sync_contact_ripples(ui.get("contact_wave",{}).get("waves",[]),_pixel)
+		pipeline.sync_contact_ripples(ui.get("contact_wave",{}).get("ripples",[]),_pixel)
 		ShaderTuning.apply(pipeline.ripple_material(),"weapon/contactWave")
 	var knockback_dt: float = 0.0 if _knockback_world_time<0.0 else maxf(0.0,ui.world_time-_knockback_world_time)
 	_knockback_world_time = ui.world_time if equipped_knockback else -1.0

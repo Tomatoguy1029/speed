@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w04-clock" in OS.get_cmdline_user_args():
+		await check_cpp_w04_clock()
+		print("[cpp_w04_clock] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w17" in OS.get_cmdline_user_args() or "--cpp-w17-fixes" in OS.get_cmdline_user_args():
 		await check_cpp_w17()
 		print("[cpp_w17] failed=%d" % failures)
@@ -2947,7 +2952,7 @@ func check_cpp_w04() -> void:
 		check(bridge._ui.contact_wave==after and core.enemies_snapshot()==enemies,"復帰後も押し運びと命中済み集合・HPを再現する")
 		bridge.command("dev_remove_weapon",{"id":"W04"})
 		presentation._present_cpp(0.01)
-		check(not bridge._ui.contact_wave.ready and bridge._ui.contact_wave.waves.is_empty() and presentation.frame_view._contact_wave_visual==null and presentation.pipeline._ripples.is_empty(),"途中解除で捕捉・波・変形と専用表示を片付ける")
+		check(not bridge._ui.contact_wave.ready and bridge._ui.contact_wave.waves.is_empty() and presentation.frame_view._contact_wave_visual==null and not presentation.pipeline._ripples.is_empty(),"途中解除で捕捉・波・変形を片付け、画面の歪みは独立して残す")
 		bridge.release_checkpoint(saved.value)
 		if failures: break
 	bridge.release_checkpoint(initial.value)
@@ -3124,3 +3129,86 @@ func check_cpp_w17() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"接触電撃の状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w04_clock() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var session = await trait_test_session("W04",trait_test_config(),604)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W04","levels":1})
+	var origin: Vector2 = core.ship_snapshot().ship_pos
+	var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(100,0)}).value
+	core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
+	trait_start_trace(bridge,1200.0)
+	for tick in 30:
+		bridge.step(1.0/120.0,idle,viewport)
+		if not bridge._ui.contact_wave.waves.is_empty(): break
+	check(not bridge._ui.contact_wave.waves.is_empty() and not bridge._ui.contact_wave.ripples.is_empty(),"波と独立した実秒の歪みを同じ接触から発生させる")
+	if bridge._ui.contact_wave.waves.is_empty() or bridge._ui.contact_wave.ripples.is_empty():
+		session.free()
+		OS.remove_logger(errors)
+		return
+	var before: Dictionary = bridge._ui.contact_wave.duplicate(true)
+	var step: Dictionary = bridge.step(1.0/120.0,idle,viewport)
+	check(step.ok and bridge.read_frame().ok and bridge.delivery_error.ok,"独立表示時計の固定更新と通知を配信する")
+	var wave_dt: float = bridge._ui.contact_wave.waves[0].age-before.waves[0].age
+	var ripple_dt: float = bridge._ui.contact_wave.ripples[0].age-before.ripples[0].age
+	check(wave_dt>0.0 and wave_dt<1.0/120.0 and is_equal_approx(ripple_dt,1.0/120.0),"なぞり中は波・閃光の世界秒と画面の歪みの実秒を分ける")
+	bridge.command("set_settings",{"hitstop":true})
+	var hit_target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":core.ship_snapshot().ship_pos+Vector2(0,200)}).value
+	bridge.command("dev_damage",{"entity_id":hit_target,"amount":0.01,"cause":"ram","crit":true})
+	before = bridge._ui.contact_wave.duplicate(true)
+	check(bridge._ui.hitstop>1.0/120.0,"歪みの実秒を確認するヒットストップを作る")
+	bridge.step(1.0/120.0,idle,viewport)
+	check(bridge._ui.contact_wave.waves==before.waves and is_equal_approx(bridge._ui.contact_wave.ripples[0].age,before.ripples[0].age+1.0/120.0),"ヒットストップ中は波・閃光を止め画面の歪みだけ進める")
+	bridge.command("set_ui_overlay",{"active":true})
+	before = bridge._ui.contact_wave.duplicate(true)
+	bridge.step(1.0/120.0,idle,viewport)
+	check(bridge._ui.contact_wave==before,"UI停止中は世界秒と実秒の両方を止める")
+	bridge.command("set_ui_overlay",{"active":false})
+	before = bridge._ui.contact_wave.duplicate(true)
+	var world_before: float = bridge._ui.world_time
+	core.set_run_guards({"controls_locked":true})
+	bridge.step(1.0/120.0,idle,viewport)
+	check(bridge._ui.contact_wave.waves[0].age==before.waves[0].age and is_equal_approx(bridge._ui.contact_wave.waves[0].visual_age,before.waves[0].visual_age+bridge._ui.world_time-world_before),"操作ロック中も閃光は元の世界秒で進み物理の波を待たない")
+	core.set_run_guards({"controls_locked":false})
+	var saved: Dictionary = bridge.checkpoint()
+	for tick in 120:
+		bridge.step(1.0/120.0,idle,viewport)
+		if bridge._ui.contact_wave.ripples.is_empty(): break
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.01)
+	check(bridge._ui.contact_wave.ripples.is_empty() and not bridge._ui.contact_wave.waves.is_empty() and presentation.pipeline._ripples.is_empty() and not presentation.frame_view._contact_wave_visual.quakes.is_empty(),"画面の歪みが先に終わっても物理の波と世界秒の閃光状態を残す")
+	bridge.restore(saved.value)
+	bridge.collect_frame()
+	var held_ripples: Array = bridge._ui.contact_wave.ripples.duplicate(true)
+	bridge.command("dev_remove_weapon",{"id":"W04"})
+	presentation._present_cpp(0.01)
+	check(not bridge._ui.contact_wave.ready and bridge._ui.contact_wave.waves.is_empty() and bridge._ui.contact_wave.ripples==held_ripples and presentation.frame_view._contact_wave_visual==null and not presentation.pipeline._ripples.is_empty(),"装備の解除で物理の波と閃光を終えても画面の歪みは元の寿命まで残す")
+	var unowned: Dictionary = bridge.checkpoint()
+	bridge.step(1.0/120.0,idle,viewport)
+	check(is_equal_approx(bridge._ui.contact_wave.ripples[0].age,held_ripples[0].age+1.0/120.0),"装備の解除後も画面の歪みの時計だけ進める")
+	bridge.restore(unowned.value)
+	bridge.collect_frame()
+	presentation._present_cpp(0.01)
+	check(not bridge._ui.contact_wave.ready and bridge._ui.contact_wave.ripples==held_ripples and not presentation.pipeline._ripples.is_empty(),"途中復帰で装備から独立した残留表示と経過時間を戻す")
+	for tick in 120:
+		bridge.step(1.0/120.0,idle,viewport)
+		if bridge._ui.contact_wave.ripples.is_empty(): break
+	presentation._present_cpp(0.01)
+	check(bridge._ui.contact_wave.ripples.is_empty() and presentation.pipeline._ripples.is_empty(),"装備の解除後の歪みも0.58実秒で終了する")
+	bridge.release_checkpoint(unowned.value)
+	bridge.release_checkpoint(saved.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"独立した歪み表示の確認に実行エラーがない: %s" % [errors.messages()])

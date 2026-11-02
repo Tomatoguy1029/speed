@@ -50,8 +50,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     for (const auto &v:state.loadout.contact_arc.visuals) {if (!std::isfinite(v.age) || v.age<0 || v.segments.size()%2) return false;for (auto p:v.segments) if (!p.is_finite()) return false;}
     for (const auto &f:state.loadout.sonic.frames) if (!f.pos.is_finite() || !std::isfinite(f.age) || f.age<0) return false;
     for (const auto &h:state.loadout.sonic.pending) if (!h.velocity.is_finite() || !std::isfinite(h.age) || !std::isfinite(h.damage) || h.id<=0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
+    if (state.loadout.contact_wave.ripples.size()>8) return false;
+    for (const auto &v:state.loadout.contact_wave.ripples) if (!v.pos.is_finite() || !std::isfinite(v.age) || !std::isfinite(v.radius) || v.age<0 || v.radius<0) return false;
     for (const auto &w:state.loadout.contact_wave.waves) {
-        if (!w.pos.is_finite() || !std::isfinite(w.age) || !std::isfinite(w.radius) || !std::isfinite(w.damage) || w.age<0 || w.radius<0 || w.damage<0) return false;
+        if (!w.pos.is_finite() || !std::isfinite(w.age) || !std::isfinite(w.visual_age) || w.visual_age<0 || !std::isfinite(w.radius) || !std::isfinite(w.damage) || w.age<0 || w.radius<0 || w.damage<0) return false;
         for (const auto &h:w.caught) if (h.id<=0 || !std::isfinite(h.age) || h.age<0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
     }
     if (state.clips_ready) for (const auto &clip:state.clips) {
