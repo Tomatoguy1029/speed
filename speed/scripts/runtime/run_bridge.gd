@@ -105,6 +105,14 @@ func command(kind: String, payload := {}) -> Dictionary:
 	_next_command += 1
 	return send_envelope(envelope)
 
+## 単独ボス制作試行も、通常の命令番号・版・再入検査へ通す。
+func boss_trial(entity_id: int, action: String, fields: Dictionary = {}) -> Dictionary:
+	if fields.has("entity_id") or fields.has("action"): return _error(1,"boss_trial","試行対象と操作は専用の引数で指定してください")
+	var payload := fields.duplicate(true)
+	payload.entity_id = entity_id
+	payload.action = action
+	return command("dev_boss_trial",payload)
+
 func send_envelope(envelope: Dictionary) -> Dictionary:
 	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"command","更新中は再入できません")

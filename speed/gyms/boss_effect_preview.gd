@@ -305,7 +305,7 @@ func set_effect(path: String, resume: Variant = null) -> void:
 	if hud != null: hud.visible = false
 	if _boss != "hydra" and not _final_preview:
 		var debugger := MANUAL.new()
-		if debugger.bind(actor): manual = debugger
+		if debugger.bind(session, _boss, program): manual = debugger
 	if _final_preview: _start_final_strike(keep_playing)
 	else: _execute_selected(keep_playing)
 

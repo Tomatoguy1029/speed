@@ -5,11 +5,10 @@ const MANUAL := preload("res://gyms/boss_technique_debug.gd")
 const TECHNIQUE_GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
 const TECHNIQUE_FIELDS := preload("res://tools/editor/boss_flow/technique_fields.gd")
 
-var preview_actor: BossActor
+var preview: RefCounted
 var manual: RefCounted
 var _target_id := ""
 var _target_boss := false
-var _current_program_path := ""
 var _target_picker: OptionButton
 var _phase_picker: OptionButton
 var _move_picker: OptionButton
@@ -228,7 +227,7 @@ func _ensure_tuning_state(boss: String, id: String, preview_move: Resource = nul
 	var draft: Dictionary = saved.duplicate(true)
 	if _prefer_preview_values and preview_move != null:
 		var preview_values := _capture_editable(preview_move)
-		preview_values.merge(_capture_conditions(preview_actor.action_rules, id))
+		preview_values.merge(_capture_conditions(preview.action_rules, id))
 		for field in saved:
 			if preview_values.has(field): draft[field] = preview_values[field]
 	_saved[key] = saved
@@ -240,10 +239,10 @@ func _ensure_tuning_state(boss: String, id: String, preview_move: Resource = nul
 	return true
 
 func _selected_move() -> Resource:
-	if not is_instance_valid(preview_actor): return null
+	if not is_instance_valid(preview): return null
 	var id := _selected_technique()
-	if id.is_empty() or preview_actor.action_rules.combos.has(id): return null
-	return preview_actor._moves.get(StringName(id))
+	if id.is_empty() or preview.action_rules.combos.has(id): return null
+	return preview._moves.get(StringName(id))
 
 func _refresh_tuning_selection() -> void:
 	if _tuning_toggle == null: return
@@ -259,7 +258,7 @@ func _refresh_tuning_selection() -> void:
 		workspace.hide_tuning()
 		return
 	_tuning_toggle.disabled = false
-	_tuning_title.text = TECHNIQUE_GRAPH.technique_title(preview_actor.action_rules if is_instance_valid(preview_actor) else null, _selected_technique()) + "を調整"
+	_tuning_title.text = TECHNIQUE_GRAPH.technique_title(preview.action_rules if is_instance_valid(preview) else null, _selected_technique()) + "を調整"
 	_rebuild_tuning_fields(key, move)
 	_update_tuning_status(key)
 
@@ -268,11 +267,11 @@ func _rebuild_tuning_fields(key: String, move: Resource) -> void:
 		_tuning_fields.remove_child(child)
 		child.queue_free()
 	var draft: Dictionary = _drafts[key]
-	if move.technique == &"inhale" and is_instance_valid(preview_actor) and "lab_inhale_stars" in preview_actor:
+	if move.technique == &"inhale" and is_instance_valid(preview) and "lab_inhale_stars" in preview:
 		# 実験場には吸い込むピカロがいないので、吐き出す彗星弾の数を確かめるための星の数を決める。保存しない。
-		_add_tuning_field("吸い込んだ星の数（試遊用）", float(preview_actor.lab_inhale_stars), Vector2(0.0, 200.0), 1.0,
+		_add_tuning_field("吸い込んだ星の数（試遊用）", float(preview.lab_inhale_stars), Vector2(0.0, 200.0), 1.0,
 			"実験場で吸い込んだことにする星の数です。星1つにつき彗星弾の数が増え、弧ごとの弾数と全体の上限で止まります。保存しません。",
-			func(value: float): preview_actor.lab_inhale_stars = int(value))
+			func(value: float): preview.lab_inhale_stars = int(value))
 	for field in ["min", "max", "angle", "half_angle"]:
 		var condition: String = "condition_" + field
 		if not draft.has(condition): continue
@@ -389,14 +388,14 @@ func _apply_tuning_preview() -> void:
 	var key := _current_tuning_key()
 	if move == null or not _drafts.has(key): return
 	var copy := _move_with_draft(move, _drafts[key])
-	preview_actor._moves[StringName(_selected_technique())] = copy
-	for index in preview_actor.action_rules.techniques.size():
-		if String(preview_actor.action_rules.techniques[index].technique) == _selected_technique():
-			preview_actor.action_rules.techniques[index] = copy
-	var gate: Dictionary = preview_actor.action_rules.conditions.get(_selected_technique(), {}).duplicate(true)
+	preview._moves[StringName(_selected_technique())] = copy
+	for index in preview.action_rules.techniques.size():
+		if String(preview.action_rules.techniques[index].technique) == _selected_technique():
+			preview.action_rules.techniques[index] = copy
+	var gate: Dictionary = preview.action_rules.conditions.get(_selected_technique(), {}).duplicate(true)
 	for field in ["min", "max", "angle", "half_angle"]:
 		if _drafts[key].has("condition_" + field): gate[field] = _drafts[key]["condition_" + field]
-	preview_actor.action_rules.conditions[_selected_technique()] = gate
+	preview.action_rules.conditions[_selected_technique()] = gate
 
 func _save_tuning() -> void:
 	var focus := get_viewport().gui_get_focus_owner()
@@ -502,7 +501,7 @@ func _activate_enemy_mode() -> void:
 	_finish_manual()
 	_target_id = ""
 	_target_boss = false
-	preview_actor = null
+	preview = null
 	_technique_row.hide()
 	_manual_status.hide()
 	_manual_message.hide()
@@ -522,7 +521,7 @@ func _activate_enemy(id: String) -> void:
 	_finish_manual()
 	_target_id = ""
 	_target_boss = false
-	preview_actor = null
+	preview = null
 	_technique_row.hide()
 	_manual_status.hide()
 	_manual_message.hide()
@@ -550,7 +549,7 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 	_finish_manual()
 	_target_id = ""
 	_target_boss = false
-	preview_actor = null
+	preview = null
 	if selected.is_empty(): _repeat_id = ""
 	var stage: int = {"hydra": 4, "draco": 5, "centaurus": 2, "canis_major": 3}.get(id, 1)
 	var settings := {"empty": true, "stage": stage, "ship_pos": [400, 0] if id == "hydra" else [500, 0],
@@ -558,8 +557,6 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 	if id == "hydra":
 		settings["hero"] = "hercules"
 		settings["config"] = {"base_attack": ContentManager.base.base_attack * 6.0}
-	await session.reset(settings)
-	if serial != _switch_serial: return
 	var path := preview_program if not preview_program.is_empty() else "res://.content/boss_%s.tres" % id
 	if not ResourceLoader.exists(path):
 		_manual_message.text = "実行用のボスデータがありません: " + path
@@ -584,35 +581,40 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 		_manual_message.show()
 		_switching = false
 		return
-	var combo_request: bool = not selected.is_empty() and program.data.rules.combos.has(selected)
-	if combo_request: _single_candidate_program(program, selected)
-	session.perform("boss", {"type": id, "pos": [0, 0]})
-	preview_actor = session.run.bosses.actor
-	if preview_actor == null:
+	if StringName(id) not in MANUAL.BOSSES:
+		_manual_message.text = "このボスの制作試行はまだ移行していません: " + id
+		_manual_message.show()
 		_switching = false
 		return
-	preview_actor.configure_flow(program)
+	settings.boss_programs = {id:program.data}
+	await session.reset(settings)
+	if serial != _switch_serial: return
+	if not session.perform("boss", {"type":id,"pos":[0,0]}):
+		_manual_message.text = session.last_error.get("message","ボスを配置できません。")
+		_manual_message.show()
+		_switching = false
+		return
+	var debugger := MANUAL.new()
+	if not debugger.bind(session,id,program):
+		_switching = false
+		return
+	manual = debugger
+	preview = debugger
 	_prefer_preview_values = not preview_program.is_empty() and not path.ends_with("boss_%s.tres" % id)
-	if combo_request and id == "monoceros": _prepare_monoceros_combo(program.data.rules, selected)
-	_current_program_path = path
-	if id != "hydra":
-		var debugger := MANUAL.new()
-		if debugger.bind(preview_actor): manual = debugger
 	_target_id = id
 	_target_boss = true
-	_select_target(id, true)
+	_select_target(id,true)
 	_populate_moves(selected)
-	_technique_row.visible = id == "hydra" or manual != null
+	_technique_row.show()
 	_manual_status.hide()
 	_manual_message.hide()
-	_phase_picker.visible = id != "hydra"
+	_phase_picker.show()
 	_refresh_tuning_selection()
 	_execute.tooltip_text = "選択した技を最初から再生します。変更は試遊中だけです。"
 	_switching = false
 	_set_mode(3)
 	_refresh()
-	if not selected.is_empty() and not combo_request: _execute_selected()
-	elif combo_request: _manual_message.hide()
+	if not selected.is_empty(): _execute_selected()
 
 func _select_target(id: String, boss: bool) -> void:
 	for index in _target_picker.item_count:
@@ -620,49 +622,6 @@ func _select_target(id: String, boss: bool) -> void:
 		if target is Dictionary and String(target.get("id", "")) == id and bool(target.get("boss", false)) == boss:
 			_target_picker.select(index)
 			return
-
-func _single_candidate_program(program: Resource, selected: String) -> void:
-	# ボス行動エディターのコンボ試遊と同じ一候補フロー。生成物だけを変える。
-	var rules: Resource = program.data.rules
-	for id in rules.node_ids():
-		var source: String = rules.source_for(id)
-		var binding: Dictionary = rules.graph_nodes.get(id, {}).duplicate()
-		binding.source = source
-		binding.connected = source == selected
-		rules.graph_nodes[id] = binding
-	var flow: Resource = program.data.flow
-	flow.maximum_stamina = maxf(20.0, float(rules.costs.get(selected, 1.0)))
-	flow.sections = [{"name": "選択した技", "request": "any", "cap": flow.maximum_stamina, "next": 1,
-		"weights": {"single": 100.0, "combo": 100.0, "major": 100.0}},
-		{"name": "再生完了", "request": "any", "cap": flow.maximum_stamina, "next": 1, "weights": {}}]
-
-func _first_combo_action(step: Dictionary) -> String:
-	if step.get("type", "") == "action": return String(step.get("id", ""))
-	for child in step.get("children", []):
-		if child is Dictionary:
-			var action := _first_combo_action(child)
-			if not action.is_empty(): return action
-	return ""
-
-func _prepare_monoceros_combo(rules: Resource, selected: String) -> void:
-	var first := _first_combo_action(rules.combos[selected])
-	if first.is_empty(): return
-	var combo_gate: Dictionary = rules.conditions.get(selected, {})
-	var first_gate: Dictionary = rules.conditions.get(first, {})
-	var minimum := maxf(float(combo_gate.get("min", 0.0)), float(first_gate.get("min", 0.0)))
-	var maximum := minf(float(combo_gate.get("max", INF)), float(first_gate.get("max", INF)))
-	if maximum < minimum: return
-	var distance := (minimum + maxf(minimum, minf(maximum, 1400.0))) * 0.5
-	var angle := deg_to_rad(float(first_gate.get("angle", combo_gate.get("angle", 0.0))))
-	var origin: Vector2 = preview_actor.table.pos[preview_actor.body]
-	var point := origin + Vector2.from_angle(preview_actor.table.facing[preview_actor.body] + angle) * distance
-	preview_actor.phase = maxi(int(combo_gate.get("min_phase", 1)), int(first_gate.get("min_phase", 1)))
-	preview_actor._cooldown = 0.0
-	preview_actor.reposition = 0.0
-	session.pinned = point
-	session.run.state.ship_pos = point
-	session.run.state.enemy_aim = point
-	session.run.state.view_center = point
 
 func _finish_manual() -> void:
 	if manual != null: manual.finish()
@@ -673,16 +632,16 @@ func _populate_moves(selected := "") -> void:
 	for phase in (3 if _target_id == "draco" else 2):
 		_phase_picker.add_item("形態 %d" % (phase + 1), phase + 1)
 	_move_picker.clear()
-	if preview_actor.action_rules == null: return
-	for move in preview_actor.action_rules.techniques:
+	if preview.action_rules == null: return
+	for move in preview.action_rules.techniques:
 		var id := String(move.technique)
 		var index := _move_picker.item_count
-		_move_picker.add_item(TECHNIQUE_GRAPH.technique_title(preview_actor.action_rules if is_instance_valid(preview_actor) else null, id) + " · " + id)
+		_move_picker.add_item(TECHNIQUE_GRAPH.technique_title(preview.action_rules if is_instance_valid(preview) else null, id) + " · " + id)
 		_move_picker.set_item_metadata(index, id)
 		if id == selected:
 			_move_picker.select(index)
-			_phase_picker.select(clampi(int(preview_actor.action_rules.conditions.get(id, {}).get("min_phase", 1)) - 1, 0, _phase_picker.item_count - 1))
-	for id in preview_actor.action_rules.combos:
+			_phase_picker.select(clampi(int(preview.action_rules.conditions.get(id, {}).get("min_phase", 1)) - 1, 0, _phase_picker.item_count - 1))
+	for id in preview.action_rules.combos:
 		var index := _move_picker.item_count
 		_move_picker.add_item("コンボ · " + String(id))
 		_move_picker.set_item_metadata(index, String(id))
@@ -690,36 +649,20 @@ func _populate_moves(selected := "") -> void:
 	if _move_picker.item_count > 0 and selected.is_empty(): _move_picker.select(0)
 
 func _execute_selected() -> void:
-	if _switching or _move_picker.selected < 0 or not is_instance_valid(preview_actor): return
+	if _switching or _move_picker.selected < 0 or manual == null: return
 	_clear_trial_input()
-	var id := String(_move_picker.get_selected_metadata())
-	if _target_boss and not preview_actor.action_rules.combos.has(id):
-		var focus := get_viewport().gui_get_focus_owner()
-		if focus != null and _tuning_panel.is_ancestor_of(focus): focus.release_focus()
-		_apply_tuning_preview()
-	if preview_actor.action_rules.combos.has(id):
-		await _activate_boss(_target_id, id, _current_program_path)
-		_repeat_id = id if is_instance_valid(preview_actor) else ""
-		_repeat_wait = REPEAT_GAP
-		return
-	# 手動実行に対応していないボスは、通常AIの試遊を続ける。
-	if _target_id != "hydra" and manual == null:
-		_manual_message.text = "この技は手動再生できません。"
-		_manual_message.show()
-		return
-	var started := false
-	if _target_id == "hydra":
-		started = _execute_hydra(id)
-	elif manual != null:
-		started = manual.execute(id, _phase_picker.get_selected_id())
-	if started:
+	var id := _selected_technique()
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and _tuning_panel.is_ancestor_of(focus): focus.release_focus()
+	_apply_tuning_preview()
+	if manual.execute(id,_phase_picker.get_selected_id()):
 		session.playing = true
 		_manual_message.hide()
 		_repeat_id = id
 		_repeat_wait = REPEAT_GAP
 	else:
 		_repeat_id = ""
-		_manual_message.text = "実行できません: " + id if _target_id == "hydra" else manual.message
+		_manual_message.text = manual.message
 		_manual_message.show()
 
 ## 再生した技が終わったら、少し間を置いて同じ技を最初から撃ち直す。
@@ -731,80 +674,21 @@ func _tick_repeat(delta: float) -> void:
 	_repeat_wait -= delta
 	if _repeat_wait > 0.0: return
 	_repeat_wait = REPEAT_GAP
-	if preview_actor.action_rules.combos.has(_repeat_id):
-		var combo := _repeat_id
-		await _activate_boss(_target_id, combo, _current_program_path)
-		_repeat_id = combo if is_instance_valid(preview_actor) else ""
-		return
 	if _repeat_id == _selected_technique(): _apply_tuning_preview()
-	var started: bool = _execute_hydra(_repeat_id) if _target_id == "hydra" else manual != null and manual.execute(_repeat_id, _phase_picker.get_selected_id())
-	if not started:
-		_manual_message.text = "繰り返しを止めました: " + (_repeat_id if _target_id == "hydra" or manual == null else manual.message)
+	if not manual.execute(_repeat_id,_phase_picker.get_selected_id()):
+		_manual_message.text = "繰り返しを止めました: " + manual.message
 		_manual_message.show()
 		_repeat_id = ""
 
 func _repeat_finished() -> bool:
-	if preview_actor.action_rules.combos.has(_repeat_id):
-		var adapter = preview_actor.flow_adapter
-		return preview_actor.flow_runner.index >= 1 and not preview_actor.attack_playing() and (adapter == null or not adapter.running())
-	if _target_id == "hydra":
-		return not preview_actor.busy and preview_actor.necks.all(func(n): return n.mode == &"idle")
-	return not preview_actor.attack_playing()
-
-func _execute_hydra(id: String) -> bool:
-	var actor = preview_actor
-	if not actor.has_body() or actor.action_rules == null: return false
-	actor.interrupt_tech()
-	# 再生のたびに全頭を生やし直すと、離脱した蛇の移動履歴と姿勢が途切れる。
-	if actor.count != 8 or actor.necks.any(func(neck): return not actor._alive(neck)):
-		actor._set_count(8)
-	actor._tech_cd = 0.0
-	actor.combo_wait = 0.0
-	actor.recovery_t = 0.0
-	if id in ["grid", "swarm"] and not actor.separated: actor.begin_separation()
-	for neck in actor.necks: neck.cd = 0.0
-	_position_for_hydra(id)
-	var move: Resource = actor._moves.get(StringName(id))
-	if move == null: return false
-	var started := false
-	if move.head_kind != &"":
-		var neck = actor._first(move.head_kind)
-		started = neck != null and actor.start_normal(actor.necks.find(neck), StringName(id), true)
-	else:
-		started = actor.try_start_tech(StringName(id), 1.0, [], true)
-	if started: actor.hsm.set_active(false)
-	return started
-
-func _position_for_hydra(id: String) -> void:
-	var actor = preview_actor
-	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
-	var distance := (float(gate.get("min", 0.0)) + minf(1400.0, float(gate.get("max", 600.0)))) * 0.5
-	# 離脱後の本体は泳いで移動する。再再生でも現在地を基準に自機を置く。
-	var origin: Vector2 = actor.table.pos[actor.body]
-	var move: Resource = actor._moves.get(StringName(id))
-	if move != null and move.head_kind != &"":
-		var neck = actor._first(move.head_kind)
-		if neck != null:
-			actor.table.facing[actor.body] = -neck.base_angle
-			neck.angle = 0.0
-			neck.length = float(actor.def.params.neck_rest)
-			origin = actor._head_pos(neck) if int(gate.get("distance_origin", 0)) == 1 else actor._neck_base(neck)
-	var point := origin + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance
-	session.pinned = point
-	session.run.state.ship_pos = point
-	session.run.state.enemy_aim = point
-	session.run.state.view_center = point
-	session.run.loadout.reset_loadout()
+	if manual == null: return true
+	var body: Dictionary = manual.state()
+	if preview.action_rules.combos.has(_repeat_id): return body.get("flow_index",0)>=1 and not body.get("busy",false)
+	return not body.get("busy",false)
 
 func _return_to_ai() -> void:
 	_repeat_id = ""
-	_finish_manual()
-	if _target_id == "hydra" and is_instance_valid(preview_actor):
-		preview_actor.interrupt_tech()
-		preview_actor.hsm.set_active(true)
-	if StringName(_target_id) in MANUAL.BOSSES and is_instance_valid(preview_actor):
-		manual = MANUAL.new()
-		manual.bind(preview_actor)
+	if manual != null: manual.finish()
 	_clear_trial_input()
 	_manual_message.hide()
 
@@ -828,19 +712,14 @@ func _reset() -> void:
 
 func _process(delta: float) -> void:
 	super(delta)
-	if _target_id.is_empty() or not _target_boss or _switching or not is_instance_valid(preview_actor): return
-	if _target_id != "hydra" and manual == null: return
+	if _target_id.is_empty() or not _target_boss or _switching or not is_instance_valid(preview): return
+	if manual == null: return
 	_tick_repeat(delta)
-	if manual != null:
-		var selected := String(_move_picker.get_selected_metadata()) if _move_picker.selected >= 0 else ""
-		var reason: String = "" if preview_actor.action_rules.combos.has(selected) else manual.unavailable(selected, _phase_picker.get_selected_id()) if not selected.is_empty() else "登録技なし"
-		_execute.disabled = not reason.is_empty()
-		_manual_status.text = manual.status() + (" / 再生中" if session.playing else " / 停止中")
-		_execute.tooltip_text = reason if not reason.is_empty() else _manual_status.text
-	else:
-		_execute.disabled = _move_picker.selected < 0 or not preview_actor.has_body()
-		_manual_status.text = "Hydra / %s / %s" % ["再生中" if session.playing else "停止中", String(preview_actor.tech)]
-		_execute.tooltip_text = _manual_status.text
+	var selected := _selected_technique()
+	var reason: String = manual.unavailable(selected,_phase_picker.get_selected_id()) if not selected.is_empty() else "登録技なし"
+	_execute.disabled = not reason.is_empty()
+	_manual_status.text = manual.status() + (" / 再生中" if session.playing else " / 停止中")
+	_execute.tooltip_text = reason if not reason.is_empty() else _manual_status.text
 
 func _exit_tree() -> void:
 	_finish_manual()

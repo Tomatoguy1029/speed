@@ -42,3 +42,24 @@ func _ready() -> void:
 	editor.free()
 	print("[draco_editor_roundtrip] failures=",failures)
 	get_tree().quit(1 if failures else 0)
+
+## 既存の技編集・保存・再読込を、指定ボスのコピーだけで確認する。
+func native_technique_roundtrip(parent: Node, boss: String) -> int:
+	var editor = load("res://tools/editor/boss_flow/editor.gd").new()
+	parent.add_child(editor)
+	editor.open_boss("res://data/bosses/ai/%s_action_rules.tres" % boss,"res://data/bosses/ai/%s_flow.tres" % boss)
+	var id := "kick" if boss=="monoceros" else "volley"
+	var source_path := "res://data/bosses/%s_moves/%s.tres" % [boss,id]
+	var source: Resource = ResourceLoader.load(source_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	var path := "res://.content/dev/%s_tools_roundtrip.tres" % boss
+	var before := FileAccess.get_sha256(source_path)
+	var count := failures
+	check(ResourceSaver.save(source.duplicate(true),path)==OK,boss+": 技の編集コピーを保存する")
+	check(editor.open_technique(path)==OK,boss+": 既存の技編集画面で開く")
+	editor.set_value("warn",1.25)
+	check(editor.save_current()==OK,boss+": 技の変更を保存する")
+	var reloaded: Resource = ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	check(reloaded!=null and is_equal_approx(reloaded.warn,1.25) and FileAccess.get_sha256(source_path)==before,boss+": 保存値を再読込し、Sourceを保つ")
+	DirAccess.remove_absolute(path)
+	editor.free()
+	return failures-count

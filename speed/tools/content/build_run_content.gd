@@ -487,12 +487,15 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	return package
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
-static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
+static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
-	var rules = load("res://data/bosses/ai/"+str(definition.id)+"_action_rules.tres")
-	var flow = load("res://data/bosses/ai/"+str(definition.id)+"_flow.tres")
+	var source: Dictionary = BossProgram.snapshot(program) if not program.is_empty() else {"rules":load("res://data/bosses/ai/"+str(definition.id)+"_action_rules.tres"),"flow":load("res://data/bosses/ai/"+str(definition.id)+"_flow.tres")}
+	var rules: Resource = source.get("rules")
+	var flow: Resource = source.get("flow")
+	if rules==null or flow==null or not BossProgram.validate(source).is_empty(): return {}
+	if String(rules.adapter)!=String(definition.id): return {}
 	var techniques := boss_technique_set_records(definition,rules.techniques)
 	if techniques.is_empty(): return {}
 	if definition.id==&"centaurus": merge_centaurus_records(package.records,techniques)
@@ -573,7 +576,8 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 		if not ids.has(String(move.technique)): return {}
 	records.BossFlowProgram = [{"id":1,"boss":1,"maximum_stamina":flow.maximum_stamina,"partial_rest":flow.partial_rest,"empty_rest":flow.empty_rest,"idle_only":rules.adapter in [&"monoceros",&"centaurus",&"canis_major"],"allow_parallel":rules.allow_parallel_attacks,"has_bias":not rules.selection_bias.is_empty()}]
 	var sources: Array = rules.techniques.map(func(move): return String(move.technique)) + rules.combos.keys()
-	for source in sources:
+	for source_value in sources:
+		var source := String(source_value)
 		var combo: bool = rules.combos.has(source)
 		var move: BossTechnique
 		if not combo:
@@ -1365,13 +1369,39 @@ static func encounter_records(data: Dictionary, profile: Dictionary, enemy_ids: 
 	return OK
 
 ## 実験場のボスも、個別制作で使う型付きパッケージを同じ表へ加える。
-static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definitions: Dictionary, config: GameConfig, stage: RuntimeStage) -> Error:
+static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definitions: Dictionary, config: GameConfig, stage: RuntimeStage, programs: Dictionary = {}) -> Error:
 	var ids := definitions.keys()
 	ids.sort()
 	for id in ids:
-		var package := boss_package(definitions[id],config,stage)
+		var package := boss_package(definitions[id],config,stage,programs.get(String(id),{}))
 		if package.is_empty(): return ERR_UNAVAILABLE
 		var source: Dictionary = package.records
+		# 固有表と、その表が使う共通攻撃の定義を参照関係から一緒に加える。
+		var tables := {}
+		for record: Dictionary in Schema.SCHEMA.records:
+			if String(record.name).begins_with("Boss"): tables[record.name] = true
+		var expanded := true
+		while expanded:
+			expanded = false
+			for record: Dictionary in Schema.SCHEMA.records:
+				if source.get(record.name,[]).is_empty(): continue
+				for field: Dictionary in record.fields:
+					var target: String = field.get("ref","")
+					if target.is_empty() or target in ["EnemyRecord","ResourceKey"]: continue
+					if tables.has(target) and not tables.has(record.name):
+						tables[record.name] = true
+						expanded = true
+		# 共通攻撃・接触は依存先だけを追加し、そこを使う別の攻撃表へは広げない。
+		expanded = true
+		while expanded:
+			expanded = false
+			for record: Dictionary in Schema.SCHEMA.records:
+				if not tables.has(record.name) or source.get(record.name,[]).is_empty(): continue
+				for field: Dictionary in record.fields:
+					var target: String = field.get("ref","")
+					if not target.is_empty() and target not in ["EnemyRecord","ResourceKey"] and not tables.has(target):
+						tables[target] = true
+						expanded = true
 		var maps := {"EnemyRecord":{}}
 		for body: Dictionary in source.BossBodyDefinition:
 			var enemy: Dictionary = source.EnemyRecord[body.enemy-1].duplicate(true)
@@ -1387,12 +1417,23 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			hull.id = data.FriendHullLook.size()+1
 			hull.enemy = index
 			data.FriendHullLook.append(hull)
+		# 護衛などは通常敵の同じ定義へ結び、本体だけを追加する。
+		for enemy: Dictionary in source.EnemyRecord:
+			if maps.EnemyRecord.has(enemy.id): continue
+			var external: String = source.StringEntry[enemy.id-1].value
+			var found: Array = data.StringEntry.filter(func(entry): return entry.value==external)
+			if found.size()!=1: return ERR_INVALID_DATA
+			maps.EnemyRecord[enemy.id] = found[0].id
 		for record: Dictionary in Schema.SCHEMA.records:
-			if not String(record.name).begins_with("Boss"): continue
+			if not tables.has(record.name): continue
+			if record.name=="BossFinishDefinition" and not data[record.name].is_empty():
+				maps[record.name] = {1:1}
+				continue
 			maps[record.name] = {}
 			for row: Dictionary in source[record.name]: maps[record.name][row.id] = data[record.name].size()+maps[record.name].size()+1
 		for record: Dictionary in Schema.SCHEMA.records:
-			if not String(record.name).begins_with("Boss"): continue
+			if not tables.has(record.name): continue
+			if record.name=="BossFinishDefinition" and not data[record.name].is_empty(): continue
 			for original: Dictionary in source[record.name]:
 				var row := original.duplicate(true)
 				row.id = maps[record.name][row.id]
@@ -1410,7 +1451,7 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			visuals.append(visual)
 	return OK
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null) -> Error:
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
@@ -1788,7 +1829,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 
 	var encounter_error := encounter_records(data,encounter_profile,enemy_ids)
 	if encounter_error!=OK: return encounter_error
-	var bosses_error := append_bosses(data,visuals,boss_definitions,config,stage)
+	var bosses_error := append_bosses(data,visuals,boss_definitions,config,stage,boss_programs)
 	if bosses_error!=OK: return bosses_error
 	# 開発中の追加定義は既存の装備・保留要求の資源番号を維持する。
 	if previous_resources!=null:

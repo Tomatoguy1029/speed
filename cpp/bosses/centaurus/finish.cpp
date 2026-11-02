@@ -20,7 +20,7 @@ void leap(RunRuntime &r,BossBodyState &b) {auto &v=b.centaurus;auto &e=r.state.e
 bool rear_ready(const RunRuntime &r,const BossBodyState &b,const BossFlowState &f) {if (f.rest_remaining>0) return false;for (const auto &a:r.content->flow_actions) {if (a.flow!=f.definition || a.external_id!="rear_attack" || f.stamina<a.cost) continue;const auto id=technique(r,b,"rear_attack");if (id && TechniqueRunner::ready(r,b.actor,id) && FlowRunner::condition(r,f,a.condition,false)) return true;}return false;}
 }
 bool CentaurusFinish::idle(RunRuntime &r,BossBodyState &b) {
-    const auto flow=std::find_if(r.state.bosses.flows.begin(),r.state.bosses.flows.end(),[&](const auto &f){return same_handle(f.actor,b.actor);});if (flow==r.state.bosses.flows.end() || b.initial_wait>0 || b.phase_pending) return false;
+    const auto flow=std::find_if(r.state.bosses.flows.begin(),r.state.bosses.flows.end(),[&](const auto &f){return same_handle(f.actor,b.actor);});if (flow==r.state.bosses.flows.end() || !flow->selection_enabled || b.initial_wait>0 || b.phase_pending) return false;
     auto &v=b.centaurus;const auto &p=rule(r,b);const auto &e=r.state.enemies[b.actor.slot];const auto wall=technique(r,b,"shower_wall");const bool wall_ready=wall && TechniqueRunner::ready(r,b.actor,wall);const double distance=e.pos.distance_to(r.state.ship_pos);
     if (wall_ready && b.clock>=v.leap_ready_at && distance<p.leap_trigger) {leap(r,b);return true;}
     if (rear_ready(r,b,*flow)) return false;

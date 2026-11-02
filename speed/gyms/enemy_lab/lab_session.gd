@@ -16,6 +16,8 @@ var last_error := {}
 var _source: RuntimeStage
 var _definitions := {}
 var _boss_definitions := {}
+## 制作画面だけの深いコピー。通常ランや保存用specには入れない。
+var _boss_programs := {}
 var _baseline_bosses := {}
 var _config: GameConfig
 var _output := ""
@@ -86,6 +88,8 @@ func reset(settings := {}) -> void:
 	current_branch = tr("lab.initial_branch")
 	spec = {"seed": 932, "empty": true, "stage": 1, "auto_spawn": false, "invincible": true}
 	spec.merge(settings.duplicate(true), true)
+	_boss_programs = preload("res://tools/content/build_boss_program.gd").snapshot(spec.get("boss_programs",{}))
+	spec.erase("boss_programs")
 	# 保存で本番の外観が変わっても、この実験の巻き戻しは開始時の値から再生する。
 	if not spec.has("overrides"):
 		spec["overrides"] = {}
@@ -149,7 +153,7 @@ func _rebuild() -> void:
 			if key=="params":
 				for param in spec.boss_overrides[String(id)].params: boss.params[param] = safe_parameter(param,spec.boss_overrides[String(id)].params[param])
 			else: boss.set(key,spec.boss_overrides[String(id)][key])
-		if not BUILDER.boss_package(boss,_config,_source).is_empty(): _boss_definitions[id] = boss
+		if not BUILDER.boss_package(boss,_config,_source,_boss_programs.get(String(id),{})).is_empty(): _boss_definitions[id] = boss
 	for id in spec.get("boss_overrides",{}):
 		if not _boss_definitions.has(StringName(id)):
 			last_error = {"ok":false,"message":"このボスの編集はまだ移行していません: "+String(id)}
@@ -158,7 +162,7 @@ func _rebuild() -> void:
 	# 未移行種類は配置時に失敗として返す。旧ランで補完しない。
 	_formation_sources = []
 	_output = "res://.content/dev/lab_%d_%d" % [OS.get_process_id(),get_instance_id()]
-	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions)
+	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions,null,_boss_programs)
 	if built!=OK:
 		last_error = {"ok":false,"message":"実験の定義を生成できません: "+error_string(built)}
 		run = null
@@ -396,7 +400,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			if source.is_empty(): return {"ok":false,"message":"配置の形式が不正です"}
 			var next_sources := _formation_sources.duplicate(true)
 			next_sources.append(source)
-			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources,_boss_definitions)
+			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources,_boss_definitions,null,_boss_programs)
 			if built!=OK: return {"ok":false,"message":"配置の定義を生成できません"}
 			var bundle := _read_generated()
 			if bundle.is_empty(): return {"ok":false,"message":"配置の生成物を読み込めません"}
@@ -476,7 +480,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			for id in args.ids:
 				if not ContentManager.phases.has(StringName(id)): return {"ok":false,"message":"時間帯の定義がありません"}
 				next.phases.append(ContentManager.phases[StringName(id)].duplicate(true))
-			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources,_boss_definitions)
+			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources,_boss_definitions,null,_boss_programs)
 			if built!=OK: return {"ok":false,"message":"時間帯の定義を生成できません"}
 			var bundle := _read_generated()
 			if bundle.is_empty(): return {"ok":false,"message":"時間帯の生成物を読み込めません"}
@@ -499,6 +503,15 @@ func _read_generated() -> Dictionary:
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	return LOADER.read_bundle(path,index.input_sha256)
 
+## 次の技再生にだけ使う値を、本番と同じ変換・版検査で取り替える。
+func set_boss_program(id: String, program: Dictionary) -> Dictionary:
+	var previous: Dictionary = _boss_programs
+	_boss_programs = _boss_programs.duplicate()
+	_boss_programs[id] = preload("res://tools/content/build_boss_program.gd").snapshot(program)
+	var result := _edit_definition({"type":id},"boss_program")
+	if not result.get("ok",false): _boss_programs = previous
+	return result
+
 func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	var next := _definitions.duplicate(true)
 	var bosses := _boss_definitions.duplicate(true)
@@ -508,11 +521,12 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	if kind=="config":
 		if key not in ["base_attack","base_max_speed","draw_length","draw_confirm_delay","draw_time_scale","trace_radius","boss_hp","boss_armor"]: return {"ok":false}
 		config.set(key,maxf(0.001,float(args.get("value",0.0))))
-	elif kind in ["boss_parameter","boss_appearance"]:
+	elif kind in ["boss_parameter","boss_appearance","boss_program"]:
 		if kind=="boss_parameter" and (not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT,TYPE_BOOL]): return {"ok":false}
 		if not bosses.has(type): return {"ok":false,"message":"このボスの編集はまだ移行していません"}
 		var definition: BossDef = bosses[type]
-		if kind=="boss_appearance":
+		if kind=="boss_program": pass
+		elif kind=="boss_appearance":
 			if not BossDef.valid_part_appearance(args.get("parts")): return {"ok":false}
 			definition.part_appearance = args.parts.duplicate(true)
 		elif key.begins_with("params.") and definition.params.has(key.trim_prefix("params.")):
@@ -538,13 +552,13 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		elif key in ["hp","toughness","armor","speed","radius","accel","turn","xp","weak_arc","attack_weight","hitstop_multiplier"]:
 			definition.set(key,clampi(int(args.value),-1,1) if key=="toughness" else maxf(0.01 if key in ["hp","radius"] else 0.0,float(args.value)))
 		else: return {"ok":false}
-	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources,bosses)
+	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources,bosses,scene.cpp_resources,_boss_programs)
 	if built!=OK: return {"ok":false,"message":"編集の定義を生成できません"}
 	var path := _output.path_join("stage_%d.json" % _source.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var bundle: Dictionary = LOADER.read_bundle(path,index.input_sha256)
 	if bundle.is_empty(): return {"ok":false,"message":"編集の定義を読み込めません"}
-	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "boss_parameter" if kind in ["boss_parameter","boss_appearance"] else "parameter")
+	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "boss_parameter" if kind in ["boss_parameter","boss_appearance","boss_program"] else "parameter")
 	if result.ok:
 		_definitions = next
 		_boss_definitions = bosses
@@ -570,7 +584,9 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 				palettes[entry.path].append(next[id].armor_colors)
 			for visual_path in palettes:
 				var look: EnemyLook = scope.resources[visual_path]
-				scope.provide(visual_path,ARMOR_PAINT.prepare_look(load(look.source_path),palettes[visual_path]))
+				var colors: Array[Dictionary] = []
+				colors.assign(palettes[visual_path])
+				scope.provide(visual_path,ARMOR_PAINT.prepare_look(load(look.source_path),colors))
 			presentation.cpp_resources = bundle.resources
 			presentation.cpp_scope = scope
 			presentation.frame_view.replace_lab_visuals(scope,bundle.resources.visuals)
