@@ -2,6 +2,11 @@ extends Node
 var failed := 0
 var source: HeroAuraAssets
 func _ready() -> void:
+	if "--cpp-gemini" in OS.get_cmdline_user_args():
+		await cpp_gemini_display()
+		print("[cpp_H_gemini_view] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-leo" in OS.get_cmdline_user_args():
 		await cpp_leo_display()
 		print("[cpp_H_leo_view] failed=%d" % failed)
@@ -225,6 +230,55 @@ func cpp_leo_display() -> void:
 	check(view.apply_frame(render.value) and frame.ui.hero.trace_width==4.0 and frame.ui.hero.active>13.0,"復帰で金色の帯と残り時間を出し直す")
 	await settle()
 	check(v.get_texture().get_image().save_png("/tmp/speed-heroes-leo.png")==OK,"しし座の表示を保存する")
+	v.queue_free()
+	await get_tree().process_frame
+	bridge.dispose()
+	failed += guide.failed+behavior.failed
+	guide.free()
+	behavior.free()
+
+func cpp_gemini_display() -> void:
+	var guide = load("res://tests/hero_guidance.gd").new()
+	var behavior = load("res://tests/hero_behaviors.gd").new()
+	var bridge = guide._cpp_fixture(true)
+	behavior._cpp_rescue(bridge,"gemini")
+	bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO})
+	var intent := Intent.new()
+	intent.hero_press = true
+	behavior._cpp_step(bridge,intent)
+	behavior._cpp_draw(bridge)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	var rect := Rect2(-512,-384,1024,768)
+	var captured: Dictionary = bridge.read_render(rect,1.0)
+	check(captured.ok and captured.value.shapes.any(func(shape): return shape.layer==3 and shape.order==2 and shape.points[0]==Vector2(-300,0)),"保存した一本目を薄い青の線で出す")
+	behavior._cpp_second_line(bridge)
+	bridge._core.step_draw(0.01)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	var frame: Dictionary = behavior._cpp_read(bridge)
+	var held: Dictionary = bridge.checkpoint()
+	var v := viewport()
+	var camera := Camera2D.new()
+	v.add_child(camera)
+	var scope := ContentResourceScope.new()
+	for path in ["res://.content/hero_aura.res","res://.content/meteor_pieces.res","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]: scope.provide(path,load(path))
+	for visual: Dictionary in guide._cpp_visuals:
+		if not String(visual.get("path","")).is_empty(): scope.provide(visual.path,load(visual.path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	v.add_child(view)
+	view.setup(scope,guide._cpp_visuals,frame.ui.character_scale)
+	view.update_effects(frame,0.0)
+	var render: Dictionary = bridge.read_render(rect,1.0)
+	check(view.apply_frame(render.value) and render.value.shapes.any(func(shape): return shape.layer==3 and shape.order==3 and shape.points[0]==frame.ui.hero.twin.position),"二本目の線と双子の機体を進んだ位置で描く")
+	bridge.command("dev_tick_heroes",{"dt":10.0,"run_time":10.0})
+	frame = behavior._cpp_read(bridge)
+	check(frame.ui.hero.active==0.0 and bridge.read_render(rect,1.0).value.shapes.any(func(shape): return shape.order==3),"効果の期限でも走行中の双子の表示を消さない")
+	check(bridge.restore(held.value).ok,"双子の表示途中へ戻す")
+	frame = behavior._cpp_read(bridge)
+	view.update_effects(frame,0.0)
+	render = bridge.read_render(rect,1.0)
+	check(view.apply_frame(render.value) and frame.ui.hero.active>9.0,"復帰で双子の線・位置と残り時間を出し直す")
+	await settle()
+	check(v.get_texture().get_image().save_png("/tmp/speed-heroes-gemini.png")==OK,"ふたご座の表示を保存する")
 	v.queue_free()
 	await get_tree().process_frame
 	bridge.dispose()

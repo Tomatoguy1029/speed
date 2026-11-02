@@ -3,9 +3,18 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <array>
 #include <vector>
+#include <unordered_set>
 namespace speed {
 // 星座、目印二枠、力をランと一緒に値で保持する。
 struct HeroState {
+    struct Twin {
+        std::vector<godot::Vector2> first,path;
+        godot::Vector2 position;
+        std::unordered_set<int64_t> inside;
+        double rate=0,segment_position=0;
+        size_t segment=0;
+        bool tracing=false;
+    } twin;
     uint32_t hero=0,power=0;
     godot::Vector2 center,previous;
     std::vector<godot::Vector2> stars,landmarks;

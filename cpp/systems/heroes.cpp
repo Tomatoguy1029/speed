@@ -126,6 +126,8 @@ void HeroesSystem::activate(RunRuntime &run) {
 }
 Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
     const auto &h=run.state.heroes;Dictionary out;out["trace_width"]=trace_width(run);out["trace_radius"]=run.state.trace_radius*trace_width(run);out["boss_stun"]=h.boss_stun;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;
+    Dictionary twin;godot::PackedVector2Array first,path;for (auto p:h.twin.first) first.push_back(p);for (auto p:h.twin.path) path.push_back(p);
+    twin["first"]=first;twin["path"]=path;twin["position"]=h.twin.position;twin["tracing"]=h.twin.tracing;twin["rate"]=h.twin.rate;twin["segment"]=int64_t(h.twin.segment);twin["segment_position"]=h.twin.segment_position;out["twin"]=twin;
     godot::PackedVector2Array stars,landmarks;godot::PackedByteArray lit,done;godot::PackedInt32Array links;godot::PackedInt64Array ids;godot::PackedFloat64Array times;
     for (auto p:h.stars) stars.push_back(p);for (auto p:h.landmarks) landmarks.push_back(p);for (auto v:h.lit) lit.push_back(v);
     if (h.hero) for (auto [a,b]:run.content->heroes[h.hero-1].links) {links.push_back(a);links.push_back(b);}
@@ -135,6 +137,8 @@ Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
 bool HeroesSystem::validate(const godot::RunState &s,const ContentBundle &c) {
     const auto &h=s.heroes;if (h.hero>c.heroes.size() || h.power>c.heroes.size() || !h.center.is_finite() || !h.previous.is_finite() || !std::isfinite(h.cooldown) || !std::isfinite(h.active) || !std::isfinite(h.next) || !std::isfinite(h.boss_stun) || h.boss_stun<0 || h.cooldown<0 || h.active<0 || h.landmarks.size()>2) return false;
     if (h.hero && (h.stars.size()!=c.heroes[h.hero-1].stars.size() || h.lit.size()!=c.heroes[h.hero-1].links.size())) return false;
+    const auto &t=h.twin;if (!t.position.is_finite() || !std::isfinite(t.rate) || t.rate<0 || !std::isfinite(t.segment_position) || t.segment_position<0 || (t.tracing && (t.path.size()<2 || t.segment>=t.path.size()-1))) return false;
+    for (auto p:t.first) if (!p.is_finite()) return false;for (auto p:t.path) if (!p.is_finite()) return false;for (auto id:t.inside) if (id<=0) return false;
     for (auto p:h.stars) if (!p.is_finite()) return false;for (auto p:h.landmarks) if (!p.is_finite()) return false;for (auto v:h.lit) if (v>1) return false;
     for (size_t i=0;i<2;++i) if (!std::isfinite(h.landmark_times[i]) || h.carrier_ids[i]<0 || (s.enemy_handles.contains(h.carriers[i]) && s.enemy_handles.entity_id(h.carriers[i])!=h.carrier_ids[i])) return false;return true;
 }

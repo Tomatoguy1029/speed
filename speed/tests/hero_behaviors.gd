@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-gemini" in OS.get_cmdline_user_args():
+		_cpp_gemini()
+		return
 	if "--cpp-leo" in OS.get_cmdline_user_args():
 		_cpp_leo()
 		return
@@ -199,4 +202,66 @@ func _cpp_leo() -> void:
 	failed += fixture.failed
 	fixture.free()
 	print("[cpp_H_leo] failed=%d" % failed)
+	get_tree().quit(1 if failed else 0)
+
+func _cpp_second_line(bridge) -> void:
+	check(bridge._core.handle_draw({"press":true,"pen":Vector2(-300,200)},3000,1.0),"二本目を別の位置から描き始める")
+	check(bridge._core.handle_draw({"has_cursor":true,"pen":Vector2(300,200)},4000,1.0),"二本目を伸ばす")
+	check(bridge._core.handle_draw({"has_cursor":true,"press":true,"pen":Vector2(300,200)},5000,1.0),"二本の線を確定する")
+
+func _cpp_gemini() -> void:
+	var fixture = load("res://tests/hero_guidance.gd").new()
+	var bridge = fixture._cpp_fixture(true)
+	_cpp_rescue(bridge,"gemini")
+	bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO})
+	var input := Intent.new()
+	input.hero_press = true
+	_cpp_step(bridge,input)
+	var main_enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2.ZERO}).value
+	var twin_enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(0,200)}).value
+	_cpp_draw(bridge)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	var frame := _cpp_read(bridge)
+	check(frame.ui.hero.twin.first.size()==2 and frame.ui.draw.drawing and not frame.ui.draw.tracing and frame.ui.draw.draw_points.is_empty(),"一本目を保存して突進せず次の描き始めを待つ")
+	var gauge: float = frame.ui.draw.gauge
+	var limit: float = frame.ui.draw.draw_limit
+	check(gauge<1.0 and fixture._cpp_events.any(func(e): return e.type=="twin_first"),"一本目だけで使用量を減らして通知する")
+	var first_held: Dictionary = bridge.checkpoint()
+	_cpp_second_line(bridge)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	frame = _cpp_read(bridge)
+	check(frame.ui.draw.tracing and frame.ui.hero.twin.tracing and frame.ui.hero.twin.first.is_empty() and frame.ui.hero.twin.path[0]==Vector2(-300,200),"本体は一本目、双子は別の位置の二本目を走る")
+	check(frame.ui.draw.gauge==gauge and frame.ui.draw.draw_limit==limit,"二本目でゲージを追加消費せず長さの上限も保つ")
+	bridge._core.step_draw(0.01)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	frame = _cpp_read(bridge)
+	var at: Vector2 = frame.ui.hero.twin.position
+	check(is_equal_approx(at.x,frame.ui.ship.ship_pos.x) and at.y==200.0,"双子は本体と同じなぞり速度で進む")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok and first_held.ok,"一本目保存中と双子の途中を保持する")
+	bridge._core.step_draw(1.0)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	frame = _cpp_read(bridge)
+	check(not frame.ui.draw.tracing and not frame.ui.hero.twin.tracing and frame.ui.hero.twin.path.is_empty(),"二本を走り終えると双子の状態を片付ける")
+	check(fixture._cpp_events.any(func(e): return e.type=="combat_damage" and e.payload.target_id==main_enemy and e.payload.cause=="ram" and e.payload.applied>0.0),"本体の線で通常の突進命中を解決する")
+	var hits: Array = fixture._cpp_events.filter(func(e): return e.type=="combat_damage" and e.payload.target_id==twin_enemy and e.payload.cause=="ram" and e.payload.applied>0.0)
+	check(hits.size()==1,"双子の線も同じ敵へ一度だけ体当たりする")
+	check(bridge.restore(held.value).ok,"双子が進んだ途中へ戻す")
+	frame = _cpp_read(bridge)
+	check(frame.ui.hero.twin.position==at and frame.ui.hero.twin.tracing and frame.ui.hero.active>9.0,"復帰で双子の位置・進み・残り時間が戻る")
+	bridge.command("dev_tick_heroes",{"dt":10.0,"run_time":10.0})
+	frame = _cpp_read(bridge)
+	check(frame.ui.hero.active==0.0 and frame.ui.hero.twin.tracing,"効果の期限後も発進済みの双子を残す")
+	bridge._core.step_draw(1.0)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":10.0})
+	check(not _cpp_read(bridge).ui.hero.twin.tracing,"期限後の双子も最後まで走る")
+	check(bridge.restore(first_held.value).ok,"一本目保存中へ戻す")
+	bridge._core.handle_draw({"touch":true,"pen_release":true},6000,1.0)
+	bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
+	frame = _cpp_read(bridge)
+	check(not frame.ui.draw.drawing and frame.ui.hero.twin.first.is_empty(),"二本目を描く前の取消で保存した一本目も消す")
+	bridge.dispose()
+	failed += fixture.failed
+	fixture.free()
+	print("[cpp_H_gemini] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)

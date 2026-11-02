@@ -1,3 +1,4 @@
+#include "../cpp/behaviors/heroes/gemini.h"
 #include "../cpp/systems/heroes.h"
 #include "../cpp/behaviors/weapons/bipolar.h"
 #include "../cpp/behaviors/weapons/dashRangeDrone.h"
@@ -89,8 +90,11 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
 }
 
 void SpeedRunCore::commit_draw() {
-    if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); return; }
-    runtime.state.draw.gauge = std::max(0.0, runtime.state.draw.gauge - runtime.state.draw.start_charge * std::min(1.0, runtime.state.draw.length / runtime.state.draw.limit));
+    if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear();runtime.state.heroes.twin.first.clear(); return; }
+    if (speed::GeminiBehavior::capture_first(runtime)) return;
+    const bool twin=speed::GeminiBehavior::swap_paths(runtime);
+    if (!twin) runtime.state.draw.gauge = std::max(0.0, runtime.state.draw.gauge - runtime.state.draw.start_charge * std::min(1.0, runtime.state.draw.length / runtime.state.draw.limit));
+    if (runtime.state.control.bonus_remaining>0) runtime.state.draw.gauge=1;
     auto points = runtime.state.draw.points;
     if (runtime.state.ship.pos.distance_to(points[0]) > 1) points.insert(0, runtime.state.ship.pos);
     const Vector2 dir = (points[1] - points[0]).normalized();
@@ -121,6 +125,7 @@ void SpeedRunCore::commit_draw() {
     runtime.state.draw.seg_pos = 0;
     runtime.state.draw.drawing = false;
     runtime.state.draw.tracing = true;
+    if (twin) speed::GeminiBehavior::launch(runtime);
     speed::RunUpBehavior::launch(runtime);
     speed::FullChargeBehavior::launch(runtime);
     speed::RampageBehavior::launch(runtime);
@@ -155,7 +160,7 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
     if (!runtime.state.draw.drawing) return true;
     if (!runtime.state.draw.started) {
         if (press) { runtime.state.draw.started = true; runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
-        else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); }
+        else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear();runtime.state.heroes.twin.first.clear(); }
         return true;
     }
     if (bool(input.has_cursor)) extend_draw(pen, camera_zoom);
@@ -207,6 +212,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
             runtime.state.draw.gauge = std::min(1.0, runtime.state.draw.gauge + real_dt / (runtime.state.draw_config.charge_time * runtime.state.draw_config.capacity));
             if (before < 1 && runtime.state.draw.gauge >= 1) emit_event("gauge_full");
         }
+        speed::GeminiBehavior::step(runtime,real_dt);
         return true;
     }
     const auto trail=[&](Vector2 from) {
@@ -236,7 +242,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
         runtime.state.ship.pos = a + u * runtime.state.draw.seg_pos;
         runtime.state.ship.vel = u * runtime.state.draw.speed;
         runtime.state.ship.heading = u;
-        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime))) {trail(from);end_trace(false);return true;}
+        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime))) {trail(from);end_trace(false);speed::GeminiBehavior::step(runtime,real_dt);return true;}
         trail(from);
         if (runtime.state.phase!=RunState::Phase::Play) return true;
         const double speed = runtime.state.ship.vel.length();
@@ -245,6 +251,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
     }
     runtime.state.draw.progress = std::clamp(double(runtime.state.draw.segment) / std::max(1.0, double(runtime.state.draw.path.size() - 1)), 0.0, 1.0);
     if (runtime.state.draw.segment >= runtime.state.draw.path.size() - 1) end_trace(true);
+    speed::GeminiBehavior::step(runtime,real_dt);
     runtime.state.ship_pos = runtime.state.ship.pos;
     return true;
 }

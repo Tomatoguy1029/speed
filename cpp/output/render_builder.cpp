@@ -268,6 +268,13 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (uint32_t row=0;row<state.friends.size();++row) {FriendDebrisSystem::render(run,row,view,shapes,alpha);FriendHullSystem::render(run,row,view,shapes,alpha);}
     for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);WallSystem::render(run,row,view,shapes);BlastSystem::render(run,row,view,shapes);ZoneSystem::render(run,row,view,shapes);FloodSystem::render(run,row,view,shapes);}
     for (uint32_t row=0;row<state.hostiles.size();++row) {SlashSystem::render(run,row,view,shapes);BoltSystem::render(run,row,view,shapes);LightArrowSystem::render(run,row,view,shapes);ShellSystem::render(run,row,view,shapes);}
+    for (const auto *twin:{&state.heroes.twin.first,&state.heroes.twin.path}) if (twin->size()>1) {
+        Dictionary line;line["kind"]=int(RenderShapeKind::Polyline);line["layer"]=3;line["order"]=2;line["owner_id"]=0;PackedVector2Array points;for (auto p:*twin) points.push_back(p);line["points"]=points;
+        PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(points.size());line["offsets"]=offsets;PackedFloat32Array widths;widths.push_back(config.trace_radius*2);line["widths"]=widths;PackedColorArray colors;colors.push_back(Color(0.75,0.9,1,0.5));line["colors"]=colors;shapes.push_back(line);
+    }
+    if (state.heroes.twin.tracing) {
+        Dictionary head;head["kind"]=int(RenderShapeKind::Circle);head["layer"]=3;head["order"]=3;head["owner_id"]=0;PackedVector2Array points;points.push_back(state.heroes.twin.position);points.push_back(state.heroes.twin.position);head["points"]=points;PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);offsets.push_back(2);head["offsets"]=offsets;PackedFloat32Array widths;widths.push_back(state.ship_config.ship_radius*1.3);widths.push_back(state.ship_config.ship_radius*0.7);head["widths"]=widths;PackedColorArray colors;colors.push_back(Color(0.75,0.92,1,0.55));colors.push_back(Color(1,1,1,0.9));head["colors"]=colors;shapes.push_back(head);
+    }
     const auto &points=state.draw.drawing?state.draw.points:state.draw.path;
     if ((state.draw.drawing || state.draw.tracing) && points.size()>1) {
         const double width=HeroesSystem::trace_width(run),radius=config.trace_radius*width;

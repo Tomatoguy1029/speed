@@ -154,6 +154,22 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "GeminiDefinition",
+      "section": 285,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        }
+      ]
     }
   ],
   "enums": {}

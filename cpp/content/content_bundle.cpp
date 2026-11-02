@@ -54,6 +54,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->hero_config=records.HeroConfig_rows.front();
     bundle->perseus=records.PerseusDefinition_rows;
     bundle->leo=records.LeoDefinition_rows;
+    bundle->gemini=records.GeminiDefinition_rows;
     if (bundle->hero_config.first_max<bundle->hero_config.first_min || bundle->hero_config.second_max<bundle->hero_config.second_min) return {};
     std::unordered_set<std::string> hero_names;
     for (const auto &row:records.HeroDefinition_rows) {
@@ -70,6 +71,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (hero.stars.empty() || hero.links.empty()) return {};
         const auto count=std::count_if(bundle->perseus.begin(),bundle->perseus.end(),[&](const auto &p){return p.hero==hero.definition.id;});
         if (count!=(hero.definition.external_id=="perseus"?1:0)) return {};
+        if (std::count_if(bundle->gemini.begin(),bundle->gemini.end(),[&](const auto &p){return p.hero==hero.definition.id;})!=(hero.definition.external_id=="gemini"?1:0)) return {};
         if (std::count_if(bundle->leo.begin(),bundle->leo.end(),[&](const auto &p){return p.hero==hero.definition.id;})!=(hero.definition.external_id=="leo"?1:0)) return {};
     }
 

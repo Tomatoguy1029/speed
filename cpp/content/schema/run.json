@@ -2031,6 +2031,10 @@
       {
         "name": "Landmark",
         "value": "landmark"
+      },
+      {
+        "name": "TwinFirst",
+        "value": "twin_first"
       }
     ],
     "ResultKind": [
@@ -2732,7 +2736,8 @@
     ],
     "landmark": [
       "pos"
-    ]
+    ],
+    "twin_first": []
   },
   "includes": [
     "attacks.json",
