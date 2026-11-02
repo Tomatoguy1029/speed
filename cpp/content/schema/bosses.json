@@ -16,7 +16,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 3
+          "max": 4
         },
         {
           "name": "lock_lead",

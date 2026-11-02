@@ -1,0 +1,44 @@
+#include "body.h"
+#include "../flow/phase_controller.h"
+#include "../flow/technique_runner.h"
+#include "../flow/flow_runner.h"
+#include "../../systems/enemy_system.h"
+#include "../../systems/tracking_policy.h"
+#include "../../output/frame_builder.h"
+#include <algorithm>
+#include <cmath>
+namespace speed {
+namespace {
+constexpr double PI=3.141592653589793,TAU=PI*2;
+double taper(double t) {return 1.0-0.77*std::pow(std::clamp((t-0.55)/0.45,0.0,1.0),1.35);}
+double length(const std::vector<godot::Vector2> &v) {double n=0;for (size_t i=1;i<v.size();++i) n+=v[i-1].distance_to(v[i]);return n;}
+std::vector<godot::Vector2> samples(const std::vector<godot::Vector2> &v,uint32_t count,bool head=true) {std::vector<godot::Vector2> out;if (v.empty() || !count) return out;const double total=length(v);size_t at=0;double traversed=0;for (uint32_t j=0;j<count;++j) {const double target=total*(head?double(j)/std::max(1u,count-1):double(j+1)/count);while (at+2<v.size() && target>traversed+v[at].distance_to(v[at+1])) {traversed+=v[at].distance_to(v[at+1]);++at;}out.push_back(at+1<v.size()?v[at].lerp(v[at+1],(target-traversed)/std::max(0.001,double(v[at].distance_to(v[at+1])))):v.back());}return out;}
+}
+const DracoBodyDefinition &DracoBody::rule(const RunRuntime &r,const BossBodyState &b) {const auto boss=r.content->boss_bodies[b.definition-1].boss;return *std::find_if(r.content->draco_bodies.begin(),r.content->draco_bodies.end(),[&](const auto &p){return p.boss==boss;});}
+EnemyHandle DracoBody::spawn(RunRuntime &r,uint32_t definition,godot::Vector2 at,bool entrance) {
+    if (!definition || definition>r.content->boss_bodies.size() || r.content->bosses[r.content->boss_bodies[definition-1].boss-1].kind!=4) return {};
+    const auto actor=PhaseController::spawn(r,definition,at,false);auto *b=PhaseController::find(r,actor);if (!b) return {};const auto &p=rule(r,*b);b->draco.width=p.body_width;b->draco.head_scale=p.head_scale;
+    for (uint32_t j=0;j<p.body_segments;++j) {EnemySpawn options;options.position=at;options.is_boss=true;options.origin=SpawnOrigin::BossPart;const auto id=EnemySystem::spawn_base(r,r.content->boss_bodies[definition-1].enemy-1,options);if (id<0) {PhaseController::cancel(r,actor);return {};}const auto part=r.state.enemy_handles.at(r.state.rows_by_id.at(id));auto &e=r.state.enemies[part.slot];e.parent=actor;e.parent_id=r.state.enemy_handles.entity_id(actor);e.damage_target=actor;e.hp=e.max_hp=p.part_hp;e.armor=p.part_armor;e.role=SpawnRole::BossPart;r.state.enemies[actor.slot].parts.push_back(part);b->participants.push_back({part,actor,id,false,true});}
+    update(r,*b);return actor;
+}
+void DracoBody::step(RunRuntime &r,BossBodyState &b,double dt) {auto &e=r.state.enemies[b.actor.slot];const auto &p=rule(r,b);const TrackingPolicy tracking{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)};const auto delta=tracking.target(e.pos,e.facing,r.state.ship_pos)-e.pos;e.vel={};if (delta.length()>p.approach_distance) {const auto from=e.pos;e.pos+=delta.normalized()*r.content->bosses[p.boss-1].speed*dt;e.facing=tracking.angle(e.facing,delta.angle());e.vel=(e.pos-from)/dt;}update(r,b);}
+void DracoBody::update(RunRuntime &r,BossBodyState &b) {
+    const auto &p=rule(r,b);auto &d=b.draco;const auto &head=r.state.enemies[b.actor.slot];
+    if (d.trail.empty()) {d.trail.push_back(head.pos);for (uint32_t j=0;j<p.body_segments;++j) {const double t=double(j+1)/p.body_segments;const double wave=std::sin(t*TAU*1.25-b.clock*0.75)*p.body_wave*std::sin(t*PI*0.8);d.trail.push_back(head.pos+godot::Vector2(-t*p.body_length,wave).rotated(head.facing));}const double n=length(d.trail);if (n>0.001) for (auto &v:d.trail) v=head.pos+(v-head.pos)*(p.body_length/n);}
+    if (d.override_points.empty()) {
+        const auto previous=d.trail.front();const double distance=previous.distance_to(head.pos);const bool settled=distance<0.01 && d.trail.size()==p.body_segments+1 && std::abs(length(d.trail)-p.body_length)<p.body_length*0.02;if (!settled) {if (distance>0.01) {const uint32_t steps=std::max(1,int(std::ceil(distance/24.0)));for (uint32_t j=1;j<=steps;++j) d.trail.insert(d.trail.begin(),previous.lerp(head.pos,double(j)/steps));}else d.trail.front()=head.pos;
+        std::vector<godot::Vector2> path{d.trail.front()};double remaining=p.body_length;for (size_t j=1;j<d.trail.size();++j) {const double span=path.back().distance_to(d.trail[j]);if (span<0.001) continue;if (span>=remaining) {path.push_back(path.back().lerp(d.trail[j],remaining/span));remaining=0;break;}path.push_back(d.trail[j]);remaining-=span;}if (remaining>0.001) {const auto direction=path.size()>1?(path.back()-path[path.size()-2]).normalized():godot::Vector2(-1,0);path.push_back(path.back()+direction*remaining);}d.trail=std::move(path);}d.pose=settled?d.trail:samples(d.trail,p.body_segments+1);
+    } else d.pose=d.override_points;
+    auto points=d.pose;for (auto &v:points) v=head.pos+(v-head.pos)*d.depth;
+    const auto row_points=samples(points,p.body_segments,false);r.state.enemies[b.actor.slot].radius=p.head_radius*d.head_scale*d.depth;
+    for (size_t j=1;j<b.participants.size();++j) {const auto actor=b.participants[j].actor;if (!r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead) continue;auto &e=r.state.enemies[actor.slot];e.pos=row_points[j-1];e.guard=head.guard;e.radius=d.width*0.5*taper(double(j)/p.body_segments)*d.depth;}
+}
+void DracoBody::cancel(RunRuntime &r,BossBodyState &b) {for (auto &p:b.participants) {p.active=false;if (!p.is_body) EnemySystem::mark_dead(r,p.actor);}b.draco.override_points.clear();r.state.encounter_protected=false;}
+void DracoBody::damaged(RunRuntime &r,BossBodyState &b) {
+    auto &e=r.state.enemies[b.actor.slot];const auto &p=rule(r,b);if (b.phase<=2 && e.hp<=e.max_hp*(b.phase==1?p.threshold_1:p.threshold_2)) {e.hp=e.max_hp*(b.phase==1?p.threshold_1:p.threshold_2);for (uint32_t row=0;row<r.state.bosses.techniques.size();++row) if (same_handle(r.state.bosses.techniques[row].actor,b.actor)) TechniqueRunner::cancel(r,r.state.bosses.handles.at(row));for (auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) FlowRunner::cancel(r,f);++b.phase;b.mode=BossMode::Phase;b.phase_remaining=r.content->boss_bodies[b.definition-1].phase_time;e.guard=1;r.state.encounter_protected=true;godot::Dictionary event;event["boss"]="draco";event["id"]=r.state.enemy_handles.entity_id(b.actor);event["phase"]=b.phase;event["reason"]="hp_threshold";FrameBuilder::append(r,"boss_phase",event);update(r,b);}
+    else if (b.phase==3 && e.hp<=0) {for (uint32_t row=0;row<r.state.bosses.techniques.size();++row) if (same_handle(r.state.bosses.techniques[row].actor,b.actor)) TechniqueRunner::cancel(r,r.state.bosses.handles.at(row));b.mode=BossMode::Final;e.guard=1;e.vel={};r.state.encounter_protected=true;for (auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) {FlowRunner::cancel(r,f);f.suspended=true;} // 決着は後続の専用Runnerへ渡し、通常撃破を確定しない。
+    }
+}
+bool DracoBody::validate(const godot::RunState &s,const ContentBundle &c,const BossBodyState &b) {if (c.bosses[c.boss_bodies[b.definition-1].boss-1].kind!=4) return true;const auto it=std::find_if(c.draco_bodies.begin(),c.draco_bodies.end(),[&](const auto &p){return p.boss==c.boss_bodies[b.definition-1].boss;});if (it==c.draco_bodies.end() || b.participants.size()!=it->body_segments+1 || !std::isfinite(b.draco.width) || b.draco.width<=0 || !std::isfinite(b.draco.head_scale) || b.draco.head_scale<=0 || !std::isfinite(b.draco.depth) || b.draco.depth<0.1 || b.draco.depth>1 || !std::isfinite(b.draco.alpha) || b.draco.alpha<0 || b.draco.alpha>1) return false;for (const auto *v:{&b.draco.trail,&b.draco.pose,&b.draco.override_points}) for (auto p:*v) if (!p.is_finite()) return false;for (size_t j=1;j<b.participants.size();++j) {const auto &p=b.participants[j];if (p.id<=0 || (s.enemy_handles.contains(p.actor) && s.enemy_handles.entity_id(p.actor)!=p.id) || p.is_body || !same_handle(p.health_target,b.actor) || p.active!=(b.mode<BossMode::Defeated)) return false;if (p.active && (!s.enemy_handles.contains(p.actor) || s.enemies[p.actor.slot].dead || !same_handle(s.enemies[p.actor.slot].damage_target,b.actor))) return false;}return true;}
+void DracoBody::snapshot(const RunRuntime &r,const BossBodyState &b,godot::Dictionary &p) {const auto &d=b.draco;godot::PackedVector2Array points;const auto at=r.state.enemies[b.actor.slot].pos;for (auto v:d.pose) points.push_back(at+(v-at)*d.depth);p["body_points"]=points;p["body_width"]=d.width;p["head_scale"]=d.head_scale;p["perspective_scale"]=d.depth;p["alpha"]=d.alpha;godot::Array segments;for (size_t j=1;j<b.participants.size();++j) {const auto actor=b.participants[j].actor;if (!r.state.enemy_handles.contains(actor)) continue;const auto &e=r.state.enemies[actor.slot];godot::Dictionary q;q["id"]=e.id;q["position"]=e.pos;q["radius"]=e.radius;q["hp"]=e.hp;segments.push_back(q);}p["segments"]=segments;}
+}

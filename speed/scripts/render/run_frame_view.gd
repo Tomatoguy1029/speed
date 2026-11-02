@@ -829,7 +829,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		_boss_sword_visual.apply_frame(float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
 	var body_seen := {}
 	for body: Dictionary in frame.get("boss_bodies",[]):
-		if body.kind not in [0,1,2,3]: continue
+		if body.kind not in [0,1,2,3,4]: continue
 		body_seen[body.id] = true
 		if body.mode>=4:
 			if _boss_body_displays.has(body.id):
@@ -838,13 +838,13 @@ func apply_frame(frame: Dictionary) -> bool:
 			continue
 		var entry := {}
 		for asset in visuals.values():
-			if asset.get("boss","")==["monoceros","centaurus","canis_major","hydra"][body.kind]: entry = asset; break
+			if asset.get("boss","")==["monoceros","centaurus","canis_major","hydra","draco"][body.kind]: entry = asset; break
 		if entry.is_empty(): continue
 		if not _boss_body_displays.has(body.id):
 			var scene: PackedScene = _scope.resources.get(entry.path)
 			if scene==null: continue
 			var display = scene.instantiate()
-			display.set_script([preload("res://scripts/render/bosses/monoceros.gd"),preload("res://scripts/render/bosses/centaurus.gd"),preload("res://scripts/render/bosses/canis_major.gd"),preload("res://scripts/render/bosses/hydra.gd")][body.kind])
+			display.set_script([preload("res://scripts/render/bosses/monoceros.gd"),preload("res://scripts/render/bosses/centaurus.gd"),preload("res://scripts/render/bosses/canis_major.gd"),preload("res://scripts/render/bosses/hydra.gd"),preload("res://scripts/render/bosses/draco.gd")][body.kind])
 			_pulser_parent.add_child(display)
 			if body.kind==2: display.setup_flames(_scope,visuals)
 			_boss_body_displays[body.id] = display

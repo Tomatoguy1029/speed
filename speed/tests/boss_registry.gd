@@ -8,6 +8,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-draco-body" in OS.get_cmdline_user_args():
+		call_deferred("native_draco_body")
+		return
 	if "--cpp-hydra-regrow-display" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_regrow_display")
 		return
@@ -2823,4 +2826,91 @@ func native_hydra_regrow_display() -> void:
 	view.queue_free();bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_hydra_regrow_display] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_draco_body() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/draco.tres")
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	check(not package.is_empty(),"本体と胴の編集値を生成する")
+	if package.is_empty(): get_tree().quit(1); return
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	check(not bytes.is_empty(),"ドラコの型付きレコードを書き出す")
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":146,"mode":1,"stage_id":"B_draco_body","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"本体と胴の定義をC++へ読む")
+	if not configured.ok: print(configured); get_tree().quit(1); return
+	bridge.start(146,{"position":Vector2(1800,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	bridge._core.set_motion_context(Vector2(1800,0),Vector2(-900,0),Vector2(640,360))
+	var spawned: Dictionary = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false})
+	check(spawned.ok,"ドラコ本体と部位を生成する")
+	if not spawned.ok: get_tree().quit(1); return
+	var id: int = spawned.value
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.kind==4 and body.participants.size()==definition.params.body_segments+1,"本体と全ての胴の参加者を保持する")
+	var ids := {}
+	for part: Dictionary in body.participants:
+		check(not ids.has(part.id) and part.active and part.health_target==id,"部位ごとの論理IDと本体へのHP転送先を持つ")
+		ids[part.id] = true
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(package.visuals)
+	view.setup(scope,entries,cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value) and view._boss_body_displays.size()==1,"最初の技前に正式なパーツを表示する")
+	var display = view._boss_body_displays.values()[0]
+	check(display._parts.visible and display._parts._segments.size()>0,"胴・尾・頭の画像と法線を点列に沿って表示する")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	bridge._core.step(0.1)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.velocity==Vector2(definition.speed,0) and body.position.x>0.0,"通常移動は遅延した敵照準ではなく自機へ進む")
+	var prior_velocity: Vector2 = body.velocity
+	var tail_id: int = body.participants[-1].id
+	for target in [id,tail_id]:
+		check(bridge.command("dev_damage",{"entity_id":target,"amount":10.0,"cause":"bullet","direction":Vector2.RIGHT,"knock":1500.0}).ok,"本体と尾の被弾を共通戦闘へ渡す")
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(body.hp,body.max_hp-20.0) and is_equal_approx(body.segments[-1].hp,definition.hp) and body.velocity==prior_velocity,"胴のHPを独立に減らさず本体へ転送しノックバックしない")
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(display.hit>0.0,"部位の被弾も本体表示の白い光へ渡す")
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.apply_snapshot(bridge.read_frame().value.ui)
+	check(hud._cpp_ui.boss_bodies[0].actor==id and is_equal_approx(hud._cpp_ui.boss_bodies[0].hp,body.hp),"本体IDと共有HPをHUDへ渡す")
+	hud.free()
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"本体・胴・点列の途中状態を保持する")
+	bridge._core.step(0.2)
+	var after: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(bridge.restore(held.value).ok,"参加者IDと点列を復帰する")
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"復帰後も本体と胴が同じ位置へ進む")
+	bridge.release_checkpoint(held.value)
+	display.apply_frame(after)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"表示から戦闘の点列や位置を書き戻さない")
+	bridge.command("dev_damage",{"entity_id":tail_id,"amount":1.0e8,"cause":"bullet"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.phase==2 and body.mode==2 and is_equal_approx(body.hp,body.max_hp*0.7) and not body.boss_dead,"尾への大ダメージで次の形態のHPまで減らし勝利しない")
+	bridge._core.step(1.01)
+	bridge.command("dev_damage",{"entity_id":id,"amount":1.0e8,"cause":"bullet"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.phase==3 and is_equal_approx(body.hp,body.max_hp*0.4) and not body.boss_dead,"第3形態も本体のHP下限を保つ")
+	bridge._core.step(1.01)
+	bridge.command("dev_damage",{"entity_id":id,"amount":1.0e8,"cause":"bullet"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.mode==3 and not body.boss_dead and body.participants[0].active,"最終致死は通常撃破でなく専用の決着へ渡す")
+	bridge.command("dev_cancel_boss",{"entity_id":id})
+	body = bridge.command("dev_boss_body_state").value[0]
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(body.participants.all(func(part):return not part.active) and not display.visible,"中断で全参加者と本体表示を閉じる")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.delivery_error.ok,"中断後も固定更新と通知の配信を終える")
+	view.free()
+	bridge.dispose()
+	print("[B_draco_body] failures=",failed)
 	get_tree().quit(1 if failed else 0)

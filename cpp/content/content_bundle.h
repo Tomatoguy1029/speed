@@ -73,6 +73,7 @@ struct ContentBundle {
     std::vector<HydraBodyDefinition> hydra_bodies;
     std::vector<HydraRegrowDefinition> hydra_regrow;
     std::vector<CanisBodyDefinition> canis_bodies;
+    std::vector<DracoBodyDefinition> draco_bodies;
     std::vector<CanisCommandDefinition> canis_commands;
     std::vector<CanisHowlDefinition> canis_howls;
     std::vector<CanisPounceDefinition> canis_pounces;

@@ -124,6 +124,10 @@ struct CanisBodyState {
     std::vector<CanisHoundRef> led;
     std::vector<EnemyHandle> lunging;
 };
+struct DracoBodyState {
+    std::vector<godot::Vector2> trail,pose,override_points;
+    double width=154,head_scale=1.35,depth=1,alpha=1;
+};
 struct HydraNeckState {
     HydraHeadKind kind=HydraHeadKind::Bite;
     EnemyHandle actor;
@@ -137,6 +141,7 @@ struct HydraNeckState {
 struct HydraBodyState {bool separation_pending=false,separated=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
     HydraBodyState hydra;
+    DracoBodyState draco;
     CanisBodyState canis;
     CentaurusBodyState centaurus;
     std::vector<ParticipantState> participants;

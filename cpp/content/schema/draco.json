@@ -1,0 +1,82 @@
+{
+  "records": [
+    {
+      "name": "DracoBodyDefinition",
+      "section": 430,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "body_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "body_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "body_wave",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "threshold_1",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "threshold_2",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "body_segments",
+          "type": "u32",
+          "min": 1,
+          "max": 2048
+        },
+        {
+          "name": "head_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "part_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "part_armor",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}
