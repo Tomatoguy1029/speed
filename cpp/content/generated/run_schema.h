@@ -397,7 +397,7 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 18) return false;
+    if (out.kind > 19) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
@@ -1503,6 +1503,35 @@ inline bool read(BinaryReader &input, DolphinDefinition &out) {
     if (out.enemy_damage < 0) return false;
     return true;
 }
+struct LynxDefinition {
+    uint32_t id{};
+    double accel{};
+    double keep{};
+    double warn{};
+    double slash_speed{};
+    double slash_size{};
+    double slash_range{};
+    double damage{};
+};
+inline bool read(BinaryReader &input, LynxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.accel)) return false;
+    if (out.accel < 0) return false;
+    if (!input.read_f64(out.keep)) return false;
+    if (out.keep < 0) return false;
+    if (!input.read_f64(out.warn)) return false;
+    if (out.warn < 0) return false;
+    if (!input.read_f64(out.slash_speed)) return false;
+    if (out.slash_speed < 0) return false;
+    if (!input.read_f64(out.slash_size)) return false;
+    if (out.slash_size < 0) return false;
+    if (!input.read_f64(out.slash_range)) return false;
+    if (out.slash_range < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -2052,6 +2081,7 @@ struct ContentRecords {
     std::vector<MarlinDefinition> MarlinDefinition_rows;
     std::vector<PulserDefinition> PulserDefinition_rows;
     std::vector<DolphinDefinition> DolphinDefinition_rows;
+    std::vector<LynxDefinition> LynxDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -2374,6 +2404,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { DolphinDefinition row; if (!read(input,row)) return false; out.DolphinDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 69: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { LynxDefinition row; if (!read(input,row)) return false; out.LynxDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -2590,6 +2626,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.PulserDefinition_rows) if (!PulserDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DolphinDefinition_ids;
     for (const auto &row:data.DolphinDefinition_rows) if (!DolphinDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> LynxDefinition_ids;
+    for (const auto &row:data.LynxDefinition_rows) if (!LynxDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -2677,6 +2715,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.MarlinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.PulserDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.DolphinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.LynxDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -2821,5 +2860,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=68;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=69;
 }
