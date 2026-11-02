@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-fixed-values" in OS.get_cmdline_user_args():
+		await check_semantics_fixed_values()
+		print("[semantics_fixed_values] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-selection" in OS.get_cmdline_user_args():
 		await check_semantics_selection()
 		print("[semantics_selection] failed=%d" % failed)
@@ -657,3 +662,76 @@ func check_semantics_selection() -> void:
 		if failed:break
 	semantics_distribution("技選択",counts[0],counts[1])
 	print("SEMANTICS_SELECTION ",JSON.stringify({"seeds":[0,63],"opportunities_per_seed":64,"counts":counts,"failed":failed}))
+
+func semantics_fixed_values(run: RunSimulation, bridge) -> Array:
+	var expected := {}
+	var actual := {}
+	var ui: Dictionary=bridge.read_frame().value.ui
+	for key in ["max_speed","max_hp","attack_mult","crit_chance","crit_mult","pickup_radius","xp_pickup_radius","charge_time","capacity","length_mult","glide_duration_mult"]:
+		expected[key]=run.state.stats.get(key);actual[key]=ui[key]
+	expected.area=run.loadout.area_multiplier();actual.area=ui.area_multiplier
+	expected.shots=1.0+run.loadout._trait_bonus(&"T35");actual.shots=ui.shot_multiplier
+	expected.rate=run.loadout.shooting_rate();actual.rate=ui.shooting_rate
+	expected.attack=run.combat.attack_power();actual.attack=ui.attack_power
+	expected.next_xp=run.loadout.xp_needed();actual.next_xp=ui.next_xp
+	var native_ship: Dictionary=bridge._core.ship_snapshot()
+	for key in ["ship_pos","ship_vel","ship_heading","ship_hp","ship_hurt","ship_invuln","ship_shield_flash","ship_shield_t","ship_shield_max","ship_boost_t","ship_fade_t","glide","glide_t","glide_speed","peak_speed"]:
+		expected[key]=run.state.get(key);actual[key]=native_ship[key]
+	var clock: Dictionary=bridge._core.inspect()
+	for key in ["time","world_time","sim_time","phase"]:
+		expected[key]=run.state.get(key);actual[key]=clock[key]
+	for kind in ["weapon","trait"]:
+		expected[kind]=run.state.weapons if kind=="weapon" else run.state.traits
+		var levels := {}
+		for row: Dictionary in ui.weapon_levels if kind=="weapon" else ui.trait_levels:levels[StringName(row.id)]=row.level
+		actual[kind]=levels
+	return [expected,actual]
+
+func check_semantics_fixed_values() -> void:
+	var config: GameConfig=ContentManager.base.duplicate(true)
+	config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	config.comet_interval_min=1e8;config.comet_interval_max=1e8;config.gravity_interval_min=1e8;config.gravity_interval_max=1e8
+	config.start_radius=900;config.weapon_slots=32;config.trait_slots=32
+	var stage:=RuntimeStage.new()
+	stage.index=199;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter"])
+	var phase:=PhaseDef.new()
+	phase.id=&"固定値";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0
+	stage.phases=[phase]
+	var output:="res://.content/dev/semantics_fixed_values"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1固定の能力値".sha256_text())!=OK:
+		check(false,"現在のSourceから固定値の定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_199.json")))
+	var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new()
+	var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new()
+	OS.add_logger(capture)
+	var cases:=0
+	for kind in ["weapon","trait"]:
+		var category:=&"weapons" if kind=="weapon" else &"traits"
+		for id in ContentManager.catalog.table(category):
+			var run:=semantics_legacy(config,stage,{},17)
+			var intent:=Intent.new()
+			intent.has_cursor=true;intent.cursor=Vector2(500,250)
+			run.input_source=func():return intent
+			run.view_size_source=func():return Vector2(1280,720)
+			var bridge=semantics_bridge(bytes,17)
+			if bridge==null:check(false,"固定値のC++ランを開始する");run.dispose();return
+			for level in range(1,(config.weapon_max_level if kind=="weapon" else config.trait_max_stacks)+1):
+				check(run.loadout.grant(StringName(kind),id,1) and bridge.command("dev_grant_equipment",{"kind":kind,"id":String(id),"levels":1}).ok,"比較する同じ取得状態を作る %s/%d"%[id,level])
+				for tick in 64:
+					run._play_tick(1.0/120.0)
+					var stepped:Dictionary=bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+					if not stepped.ok or capture.count()>0:
+						check(false,"固定場面の更新エラー %s/%d: %s %s"%[id,level,stepped,capture.messages()]);break
+					var values:=semantics_fixed_values(run,bridge)
+					var found:String=comparison.semantics_difference(values[0],values[1])
+					check(found.is_empty(),"f64/Vector2/整数の指定許容幅 %s Lv%d tick%d: %s"%[id,level,tick,found])
+					if not found.is_empty():break
+				cases+=1
+				if failed:break
+			run.dispose();bridge.dispose()
+			if failed:break
+		if failed:break
+	OS.remove_logger(capture)
+	check(capture.count()==0,"固定場面の両実装に実行時エラーがない")
+	print("SEMANTICS_FIXED_VALUES ",JSON.stringify({"cases":cases,"ticks_per_level":64,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"numeric_values":comparison.semantics_numeric_values,"failed":failed,"scope":"全武器/特性の各段の共通実効値・機体移動・時計。種類固有の発火・命中の厳密幅は別"}))

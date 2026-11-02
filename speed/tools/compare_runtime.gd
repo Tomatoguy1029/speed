@@ -92,3 +92,34 @@ func create_native() -> RefCounted:
 	if not ClassDB.class_exists(&"SpeedRunCore"):
 		return null
 	return ClassDB.instantiate(&"SpeedRunCore")
+
+var semantics_f64_error := 0.0
+var semantics_vector_error := 0.0
+var semantics_numeric_values := 0
+
+## 設計15.1。整数・列順・接触は既存の厳密比較を保つ。
+func semantics_difference(left: Variant, right: Variant, path := "result") -> String:
+	if left is Vector2 and right is Vector2:
+		var error: float=left.distance_to(right)
+		semantics_vector_error=maxf(semantics_vector_error,error)
+		semantics_numeric_values+=1
+		return "" if error<=1e-4 else path+": Vector2誤差 %s > 1e-4"%error
+	if left is float and right is float:
+		var error: float=absf(left-right)
+		semantics_f64_error=maxf(semantics_f64_error,error)
+		semantics_numeric_values+=1
+		return "" if is_finite(left) and is_finite(right) and error<=maxf(1e-9,maxf(absf(left),absf(right))*1e-9) else path+": f64 %s != %s"%[left,right]
+	if left is Dictionary and right is Dictionary:
+		if left.size()!=right.size():return path+": 項目数が違う"
+		for key in left:
+			if not right.has(key):return path+"."+str(key)+": 項目がない"
+			var found:=semantics_difference(left[key],right[key],path+"."+str(key))
+			if not found.is_empty():return found
+		return ""
+	if left is Array and right is Array:
+		if left.size()!=right.size():return path+": 要素数が違う"
+		for i in left.size():
+			var found:=semantics_difference(left[i],right[i],path+"[%d]"%i)
+			if not found.is_empty():return found
+		return ""
+	return difference(left,right,path)
