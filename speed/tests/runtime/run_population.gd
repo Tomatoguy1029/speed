@@ -10,6 +10,17 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-interaction-hit="):
+			check_semantics_enemy_interactions();get_tree().quit(1 if failed else 0);return
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-attack-aux="):
+			check_semantics_attack_values();get_tree().quit(1 if failed else 0);return
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-enemy-aux="):
+			check_semantics_enemy_aux(arg.trim_prefix("--semantics-enemy-aux="));get_tree().quit(1 if failed else 0);return
+	if "--semantics-sonic-pending" in OS.get_cmdline_user_args():
+		check_semantics_equipment_hits();get_tree().quit(1 if failed else 0);return
 	if "--semantics-enemy-interactions" in OS.get_cmdline_user_args():
 		check_semantics_enemy_interactions()
 		print("[semantics_enemy_interactions] failed=%d" % failed)
@@ -1189,7 +1200,8 @@ func semantics_hit_values(run: RunSimulation, bridge, id: String) -> Array:
 	return [source,native]
 
 func check_semantics_equipment_hits() -> void:
-	var post_mode:="--semantics-equipment-post" in OS.get_cmdline_user_args()
+	var sonic_pending:="--semantics-sonic-pending" in OS.get_cmdline_user_args()
+	var post_mode:=sonic_pending or "--semantics-equipment-post" in OS.get_cmdline_user_args()
 	var post_from:=""
 	for arg:String in OS.get_cmdline_user_args():
 		if arg.begins_with("--semantics-equipment-post-from="):post_from=arg.trim_prefix("--semantics-equipment-post-from=")
@@ -1211,11 +1223,13 @@ func check_semantics_equipment_hits() -> void:
 	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
 	var cases:=0
 	for id:String in (["W03","W04","W05","W07","W08","W17","W21","W22","W25","W26","W27","W28","W29","T04","T05","T36"] if post_mode else ["W03","W04","W05","W08","W17","W21","W22","W25","W26","W28","W29","T03","T05","T06","T32","T33"]):
+		if sonic_pending and id!="W08":continue
 		if post_mode and not post_from.is_empty() and ["W03","W04","W05","W07","W08","W17","W21","W22","W25","W26","W27","W28","W29","T04","T05","T36"].find(id)<["W03","W04","W05","W07","W08","W17","W21","W22","W25","W26","W27","W28","W29","T04","T05","T36"].find(post_from):continue
 		if "--semantics-equipment-hits-tail" in OS.get_cmdline_user_args() and id not in ["T06","T32","T33"]:continue
 		for level in range(1,6):
 			if "--semantics-equipment-hits-tail" in OS.get_cmdline_user_args() and id=="T06" and level<3:continue
-			if post_mode and id not in ["T05","T36"] and level<5:continue
+			if sonic_pending and level==5:continue
+			if not sonic_pending and post_mode and id not in ["T05","T36"] and level<5:continue
 			if post_mode and post_from=="T36" and level<3:continue
 			var run:=semantics_legacy(config,stage,definitions,3490)
 			run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies()
@@ -1429,6 +1443,9 @@ class SemanticsRuler extends RULER_SOURCE:
 		newborn.clear()
 
 func check_semantics_attack_values() -> void:
+	var aux_kind:=""
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-attack-aux="):aux_kind=arg.trim_prefix("--semantics-attack-aux=")
 	var probe=COMPARE.new().create_native()
 	if probe==null:check(false,"攻撃のC++拡張を読む");return
 	probe.close()
@@ -1436,16 +1453,17 @@ func check_semantics_attack_values() -> void:
 	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
 	config.base_crit_chance=0
 	var stage:=RuntimeStage.new();stage.boss_enabled=false;stage.index=206;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter","shield","missile","lynx","cepheus_soldier","dolphin","beamer","auriga"])
-	var output:="res://.content/dev/semantics_attack_values"
+	var output:="res://.content/dev/semantics_attack_values"+aux_kind
 	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1攻撃の不足値".sha256_text())!=OK:check(false,"攻撃の固定値を生成する");return
 	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_206.json")))
 	var bytes:=FileAccess.get_file_as_bytes(index.binary)
 	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
-	var more_mode:="--semantics-more-attack-values" in OS.get_cmdline_user_args()
+	var more_mode:=aux_kind in ["saw","shell"] or "--semantics-more-attack-values" in OS.get_cmdline_user_args()
 	var first_tick:=0
 	for arg:String in OS.get_cmdline_user_args():
 		if arg.begins_with("--semantics-attack-tick="):first_tick=int(arg.trim_prefix("--semantics-attack-tick="))
 	var cases:=0;var kinds:=["light_arrow","star_bolt","ring_hold","lump","zone","cross","flood","shell","fling_corpse","saw"] if more_mode else ["bullet","missile","wave","beam","wall","slash","bolt","reflected"]
+	if not aux_kind.is_empty():kinds=[aux_kind]
 	var from_kind:=""
 	for arg:String in OS.get_cmdline_user_args():
 		if arg.begins_with("--semantics-attack-from="):from_kind=arg.trim_prefix("--semantics-attack-from=")
@@ -1485,8 +1503,8 @@ func check_semantics_attack_values() -> void:
 				run.projectiles.fire_flood(origin-Vector2(100,0),0.0,200.0,32.0,0.2,0.2,0.3,8.0)
 				check(bridge.command("dev_fire_flood",{"position":origin-Vector2(100,0),"angle":0.0,"length":200.0,"width":32.0,"spread":0.2,"delay":0.2,"active":0.3,"damage":8.0}).ok,"水流の固定入力を生成する")
 			"shell":
-				run.projectiles.fire_shell(source[0],0.0,100.0,12.0,80.0,80.0,8.0)
-				check(bridge.command("dev_fire_shell",{"source_id":source[1],"angle":0.0,"speed":100.0,"radius":12.0,"range":80.0,"burst":80.0,"damage":8.0}).ok,"圧縮弾の固定入力を生成する")
+				run.projectiles.fire_shell(source[0],0.0,100.0,12.0,800.0 if aux_kind=="shell" else 80.0,80.0,8.0)
+				check(bridge.command("dev_fire_shell",{"source_id":source[1],"angle":0.0,"speed":100.0,"radius":12.0,"range":800.0 if aux_kind=="shell" else 80.0,"burst":80.0,"damage":8.0}).ok,"圧縮弾の固定入力を生成する")
 			"fling_corpse":
 				run.combat.kill_enemy(source[0],{"cause":&"debug"});bridge.command("dev_kill",{"entity_id":source[1],"cause":"debug"})
 				run.projectiles.fling_corpse(source[0],Vector2(100,0),2.0,1.5,0.0,0.5)
@@ -1504,7 +1522,7 @@ func check_semantics_attack_values() -> void:
 				hazard=run.projectiles.fire_wave(source_pos,0.0,PI,300.0,100.0,12.0,0.1,7.0,0.2,0.1,Color.WHITE,80.0)
 				run.projectiles.hazard_edmg[hazard]=1.0
 				bridge.command("dev_fire_wave",{"position":source_pos,"angle":0.0,"arc":PI,"radius":300.0,"speed":100.0,"width":12.0,"delay":0.1,"damage":7.0,"gap":0.2,"gap_arc":0.1,"start_radius":80.0,"enemy_damage":1.0})
-				semantics_spawn_pair(run,bridge,origin)
+				semantics_spawn_pair(run,bridge,origin);core.rebuild_enemy_grid(config.grid_cell)
 			"beam","wall":
 				if kind=="beam":hazard=run.projectiles.fire_beam(source_pos,0.0,200.0,32.0,0.1,0.5,7.0)
 				else:hazard=run.projectiles.fire_wall(source_pos,0.0,200.0,32.0,0.1,0.5,7.0)
@@ -1525,6 +1543,8 @@ func check_semantics_attack_values() -> void:
 				var opts:={"speed":1200.0,"r":5.0,"life":4.0}
 				run.projectiles.fire_shot(origin,PI,10.0,opts);core.fire_shot(origin,PI,10.0,opts)
 				run.projectiles._update_friendly(0.5);core.step_projectiles(0.5)
+		if aux_kind=="shell":
+			run.state.ship_pos=origin;run.state.ship_vel=Vector2.ZERO;bridge.command("dev_ship_motion",{"position":origin,"velocity":Vector2.ZERO})
 		var checked_geometry:=false
 		for tick in (8 if kind not in ["slash","bolt"] else 1):
 			if kind in ["fling_corpse","saw"]:
@@ -1533,6 +1553,7 @@ func check_semantics_attack_values() -> void:
 				run.projectiles._update_hazards(0.1);core.step_hazards(0.1)
 			else:
 				run.projectiles._update_hostile(0.1);core.step_hostiles(0.1)
+			if aux_kind=="shell":run.projectiles._update_hazards(0.1);core.step_hazards(0.1)
 			if capture.count()>0:check(false,"攻撃の更新エラー %s: %s"%[kind,capture.messages()]);break
 			var source_values:={"hp":run.state.ship_hp,"velocity":run.state.ship_vel,"shield_t":run.state.ship_shield_t}
 			var actual_values:={"hp":core.ship_snapshot().ship_hp,"velocity":core.ship_snapshot().ship_vel,"shield_t":core.ship_snapshot().ship_shield_t}
@@ -1569,11 +1590,29 @@ func check_semantics_attack_values() -> void:
 					var at:=origin+Vector2(0,10);points=[at-Vector2(0,34),at+Vector2(0,6)]
 					if frame.shapes.size()>0:rendered=Array(frame.shapes[0].points.slice(0,2))
 				source_values.points=points;actual_values.points=rendered;checked_geometry=true
-			if kind==from_kind and tick<first_tick:continue
+			if not aux_kind.is_empty():
+				source_values={};actual_values={}
+				if aux_kind=="wave":
+					var old:=[];var native:=[]
+					for row in run.enemies.table.alive.size():
+						if run.enemies.table.alive[row] and not run.enemies.table.dead[row]:old.append({"id":run.enemies.table.id[row],"hp":run.enemies.table.hp[row]})
+					for enemy:Dictionary in core.enemies_snapshot():
+						if not enemy.dead:native.append(semantics_fields(enemy,["id","hp"]))
+					source_values.enemies=old;actual_values.enemies=native
+				elif aux_kind=="saw":
+					var old:=[]
+					for row in run.projectiles.friend_alive.size():
+						if run.projectiles.friend_alive[row]:old.append(float(run.projectiles.friend_angle[row]))
+					source_values.angles=old;actual_values.angles=core.projectiles_snapshot().map(func(v):return v.angle)
+					var render:Dictionary=bridge.read_render(Rect2(origin-Vector2(1000,1000),Vector2(2000,2000))).value
+					source_values.render_angles=old;actual_values.render_angles=render.shapes.filter(func(v):return v.get("saw",false)).map(func(v):return v.angle)
+				else:source_values.hp=run.state.ship_hp;actual_values.hp=core.ship_snapshot().ship_hp
+			if (kind==from_kind or kind==aux_kind) and tick<first_tick:continue
 			var found:String=comparison.semantics_difference(source_values,actual_values)
 			if not found.is_empty():print("ATTACK_DIFFERENCE ",source_values,actual_values," HOSTILES=",core.hostiles_snapshot())
 			check(found.is_empty(),"攻撃の指定許容幅 %s tick%d: %s"%[kind,tick,found])
 			if not found.is_empty():break
+		if aux_kind=="shell":check(run.state.ship_hp<config.base_hp,"圧縮弾の破裂の実HPを採取する")
 		if not failed and kind in ["slash","bolt"]:
 			var at:Vector2=origin+Vector2(0,20) if kind=="bolt" else load("res://scripts/attacks/slash.gd").slash_points(origin+Vector2(20,0),0.0,60.0,1.0,1)[8]
 			run.state.ship_pos=at;bridge.command("dev_ship_motion",{"position":at,"velocity":run.state.ship_vel})
@@ -1836,7 +1875,11 @@ func check_semantics_enemy_interactions() -> void:
 	probe.close()
 	var config:GameConfig=ContentManager.base.duplicate(true)
 	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	var hit_kind:=""
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-interaction-hit="):hit_kind=arg.trim_prefix("--semantics-interaction-hit=")
 	var kinds:=["defender","pump","corona","corona_throw"]
+	if not hit_kind.is_empty():kinds=["pump" if hit_kind=="pump" else "corona_throw"]
 	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
 	var from_kind:="";var first_tick:=0;var cases:=0
 	for arg:String in OS.get_cmdline_user_args():
@@ -1851,7 +1894,10 @@ func check_semantics_enemy_interactions() -> void:
 		if kind=="defender":definitions[&"drifter"].rank=3
 		if kind=="pump":definitions[&"swarm"].rank=1
 		stage.enemy_tuning={"pump":{"speed":0.0,"turn":100.0,"params.store_max":2,"params.pull_radius":300.0,"params.pull":200.0,"params.swallow_reach":0.0,"params.swallow_interval":0.1,"params.telegraph":0.3,"params.lock_time":0.1,"params.shell_speed":300.0,"params.shell_r":12.0,"params.shell_range":600.0,"params.burst_radius":80.0,"params.bullet_dmg":7.0,"params.recover":0.2},"corona":{"speed":0.0,"params.capture_max":1 if kind=="corona_throw" else 2,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":1000.0 if kind=="corona_throw" else 100.0,"params.ring":80.0,"params.spin":1.0,"params.telegraph":0.1,"params.align_angle":PI,"params.fire_interval":0.3 if kind=="corona_throw" else 100.0,"params.throw_speed":300.0,"params.throw_life":1.0,"params.throw_damage_swarm":8.0,"params.throw_effect_scale":1.6}}
-		var output:="res://.content/dev/semantics_enemy_interactions"
+		if hit_kind=="pump":
+			stage.enemy_tuning.pump.merge({"hp":5.0,"params.release_base":2,"params.release_per":1.0,"params.release_speed":100.0,"params.release_dmg":0.5,"params.release_radius":50.0},true)
+			stage.enemy_tuning["drifter"]={"hp":100.0,"speed":0.0}
+		var output:="res://.content/dev/semantics_enemy_interactions"+hit_kind
 		if load("res://tools/content/build_run_content.gd").build(stage,config,output,("設計15.1敵相互作用"+kind).sha256_text(),definitions)!=OK:check(false,"敵相互作用の定義を生成する");break
 		var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_209.json")));var bytes:=FileAccess.get_file_as_bytes(index.binary)
 		var run:=semantics_legacy(config,stage,definitions,89)
@@ -1887,6 +1933,27 @@ func check_semantics_enemy_interactions() -> void:
 			var dt:=0.06 if kind=="corona_throw" and tick==1 else 0.05
 			run.state.time+=dt;run.state.world_time+=dt;run.enemies.tick(dt,dt);core.step(dt)
 			run.combat.rebuild_grid();core.rebuild_enemy_grid(config.grid_cell)
+			if not hit_kind.is_empty():
+				if hit_kind=="pump" and run.enemies.table.buds[owner]>0:
+					var target:=semantics_spawn_pair(run,bridge,at+Vector2(0,60));core.rebuild_enemy_grid(config.grid_cell)
+					var before:float=run.enemies.table.hp[target[0]]
+					run.combat.damage_enemy(owner,10.0,{"cause":&"shot","no_crit":true});bridge.command("dev_damage",{"entity_id":native_owner,"amount":10.0,"cause":"shot","no_crit":true})
+					var hp:float=core.enemies_snapshot().filter(func(v):return v.id==target[1])[0].hp
+					var found:String=comparison.semantics_difference(run.enemies.table.hp[target[0]],hp)
+					check(found.is_empty() and run.enemies.table.hp[target[0]]<before,"収納途中撃破の円爆発の実HPの指定許容幅: "+found);active=true;break
+				elif hit_kind=="corona":
+					var vortex=run.enemies.behavior(&"corona").vortex
+					var thrown:Array=vortex.members.keys().filter(func(row):return vortex.members[row].thrown)
+					if not thrown.is_empty():
+						var ammo:int=thrown[0];var position:Vector2=run.enemies.table.pos[ammo];var velocity:Vector2=run.enemies.table.vel[ammo]
+						var side:=Vector2(-velocity.y,velocity.x).normalized()
+						run.state.ship_pos=position+side*90.0;bridge.command("dev_ship_motion",{"position":run.state.ship_pos,"velocity":Vector2.ZERO})
+						run.state.time+=0.1;run.state.world_time+=0.1;run.enemies.tick(0.1,0.1);core.step(0.1)
+						run.state.ship_pos=run.enemies.table.pos[ammo]-side*90.0;bridge.command("dev_ship_motion",{"position":run.state.ship_pos,"velocity":Vector2.ZERO})
+						run.enemies.after_combat();bridge.command("dev_corona_after_combat",{})
+						var found:String=comparison.semantics_difference(run.state.ship_hp,core.ship_snapshot().ship_hp)
+						check(found.is_empty() and run.state.ship_hp<config.base_hp,"投射の相対線分命中の固定8の実HPの指定許容幅: "+found);active=true;break
+				continue
 			if kind==from_kind and tick<first_tick:continue
 			if capture.count()>0:check(false,"敵相互作用の更新エラー %s tick%d: %s"%[kind,tick,capture.messages()]);break
 			var values:=semantics_enemy_values(run,core);var expected:={"enemies":values[0]};var actual:={"enemies":values[1]}
@@ -1923,3 +1990,71 @@ func check_semantics_enemy_interactions() -> void:
 		if failed:break
 	OS.remove_logger(capture);check(capture.count()==0,"敵相互作用のSource/C++に実行エラーがない")
 	print("SEMANTICS_ENEMY_INTERACTIONS ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+func check_semantics_enemy_aux(kind: String) -> void:
+	var probe=COMPARE.new().create_native()
+	if probe==null:check(false,"敵補助値のC++拡張を読む");return
+	probe.close()
+	var config:GameConfig=ContentManager.base.duplicate(true)
+	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	var stage:=RuntimeStage.new();stage.boss_enabled=false;stage.index=210;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["splitter","crow","marlin"])
+	var definitions:={}
+	for id in [&"splitter",&"crow",&"marlin"]:definitions[id]=ContentManager.enemies[id].duplicate(true);definitions[id].size_var=false
+	definitions[&"splitter"].speed=0;definitions[&"splitter"].params.bud_interval=0.1;definitions[&"splitter"].params.max_buds=1
+	definitions[&"crow"].params.aim_spread=0.0
+	var output:="res://.content/dev/semantics_enemy_aux_"+kind
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,("設計15.1敵補助値"+kind).sha256_text(),definitions)!=OK:check(false,"敵補助値の定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_210.json")));var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var run:=semantics_legacy(config,stage,definitions,955);var bridge=semantics_bridge(bytes,955);var comparison=COMPARE.new()
+	if bridge==null:check(false,"敵補助値の固定場面を開始する");run.dispose();return
+	run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies();run.enemies._next_id=1;run.state.enemy_aim=run.state.ship_pos
+	var core=bridge._core;core.configure_attack_budget({"enabled":false})
+	var at:Vector2=run.state.ship_pos+Vector2(300,0)
+	if kind=="split":
+		var row:int=run.enemies.spawn(run.enemies.def_of(&"splitter"),at,{"facing":0.7});var id:int=core.spawn_enemy(&"splitter",at,{"facing":0.7})
+		run.enemies.tick(0.1,0.1);core.step(0.1)
+		for operation in ["bud","death"]:
+			if operation=="death":
+				run.combat.damage_enemy(row,1e6,{"cause":&"bullet","no_crit":true});bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+				run.enemies.tick(0.01,0.01);core.step(0.01)
+			var old:=[];var actual:=[];var table:=run.enemies.table
+			for j in table.alive.size():
+				if table.alive[j] and not table.dead[j] and table.type[j]==&"splitling" and table.age[j]==0.0:old.append({"id":table.id[j],"pos":table.pos[j],"vel":table.vel[j],"facing":table.facing[j],"radius":table.r[j],"hp":table.hp[j]})
+			var motions:Array=core.enemy_motion_snapshot()
+			for enemy:Dictionary in core.enemies_snapshot():
+				if enemy.type=="splitling" and not enemy.dead and motions.filter(func(v):return v.id==enemy.id)[0].age==0.0:actual.append({"id":enemy.id,"pos":Vector2(enemy.pos[0],enemy.pos[1]),"vel":Vector2(enemy.vel[0],enemy.vel[1]),"facing":enemy.facing,"radius":enemy.radius,"hp":enemy.hp})
+			check(not old.is_empty(),"分裂の出生値を実際に採取する: "+operation)
+			var found:String=comparison.semantics_difference(old,actual);check(found.is_empty(),"分裂の出生位置と速度の指定許容幅: "+operation+" "+found)
+	elif kind=="crow":
+		run.enemies.spawn(run.enemies.def_of(&"crow"),at,{"facing":0.0,"flock_member":true});core.spawn_enemy(&"crow",at,{"facing":0.0,"flock_member":true})
+		var gem_at:=at+Vector2(-90,65)
+		var gem_row:int=run.pickups.drop_crystal(gem_at,0,&"debug");bridge.command("dev_drop_crystal",{"position":gem_at,"kind":0})
+		# 散布の乱数出力は比較せず、選ばれた配置を固定して吸引以後を照合する。
+		run.pickups.gem_pos[gem_row]=core.pickups_snapshot().gems[0].pos
+		var observed:=false
+		for tick in 5:
+			run.enemies.gather_pickups(run.pickups,0.01);core.step_pickups(0.01)
+			var old:=[]
+			for j in run.pickups.gem_alive.size():
+				if run.pickups.gem_alive[j]:old.append(run.pickups.gem_pos[j])
+			var actual:Array=core.pickups_snapshot().gems.map(func(g):return g.pos)
+			var found:String=comparison.semantics_difference(old,actual);check(found.is_empty(),"結晶の吸引位置の指定許容幅: "+found);observed=observed or not old.is_empty()
+		check(observed,"回収前の結晶移動値を実際に採取する")
+	else:
+		at=run.state.ship_pos-Vector2(560,0)
+		var row:int=run.enemies.spawn(run.enemies.def_of(&"marlin"),at,{"vel":Vector2(200,300)});var id:int=core.spawn_enemy(&"marlin",at,{"vel":Vector2(200,300)})
+		run.enemies.table.fire_t[row]=3.0;core.set_enemy_motion(id,{"fire_t":3.0})
+		for tick in 5:run.enemies.tick(0.05,0.05);core.step(0.05)
+		at=run.enemies.table.pos[row];var target:=at+Vector2(600,0)
+		run.state.ship_pos=target;core.set_motion_context(target,target,Vector2(640,360));run.enemies.table.fire_t[row]=0.85;core.set_enemy_motion(id,{"fire_t":0.85})
+		run.enemies.tick(0.1,0.1);core.step(0.1)
+		run.state.ship_pos=target+Vector2(0,800);core.set_motion_context(run.state.ship_pos,target,Vector2(640,360))
+		for tick in 9:
+			run.enemies.tick(0.1,0.1);core.step(0.1)
+			if run.enemies.table.mode[row]==EnemyTable.Mode.DASH:break
+		run.enemies.tick(0.9,0.9);core.step(0.9)
+		var table:=run.enemies.table;var native:Dictionary=core.enemies_snapshot().filter(func(e):return e.id==id)[0];var motion:Dictionary=core.enemy_motion_snapshot().filter(func(e):return e.id==id)[0]
+		var expected:={"pos":table.pos[row],"vel":table.vel[row],"facing":table.facing[row],"anchor":table.anchor[row],"timer":table.timer[row]}
+		var actual:={"pos":Vector2(native.pos[0],native.pos[1]),"vel":Vector2(native.vel[0],native.vel[1]),"facing":native.facing,"anchor":motion.anchor,"timer":motion.timer}
+		var found:String=comparison.semantics_difference(expected,actual);check(found.is_empty(),"突進最終区間の指定許容幅: "+found)
+	run.dispose();bridge.dispose();print("SEMANTICS_ENEMY_AUX ",kind," numeric_values=",comparison.semantics_numeric_values," f64=",comparison.semantics_f64_error," vector=",comparison.semantics_vector_error," failed=",failed)
