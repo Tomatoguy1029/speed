@@ -81,8 +81,9 @@ void notify_grant(RunRuntime &run,const CardCandidate &card) {
 }
 }
 void ProgressionSystem::initialize(RunRuntime &run,bool initial) {
-    auto &p=run.state.loadout;p={};p.ready=true;p.rerolls=run.content->progression.reroll_count;
+    auto &p=run.state.loadout;const double charge_factor=p.charge_profile_factor;p={};p.charge_profile_factor=charge_factor;p.ready=true;p.rerolls=run.content->progression.reroll_count;
     if (!initial) p.weapons.push_back({1,1});else run.state.forward.ready=false;
+    EquipmentSystem::refresh_effects(run);
     run.resource_workspace.requests.clear();
 }
 double ProgressionSystem::next_xp(const RunRuntime &run) {

@@ -40,7 +40,17 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     if (int64_t(options["api_version"])!=1) return failure(2,"api_version","APIの版が一致しません");
     if (int64_t(options["run_id"])<=0 || int64_t(options["mode"])<0 || int64_t(options["mode"])>1 || String(options["stage_id"]).is_empty()) return failure(1,"options","ラン番号・モード・ステージが不正です");
     const Dictionary profile=options["profile"],settings=options["settings"];
-    if (!profile.is_empty() || !keys(settings,{"hitstop"}) || (settings.has("hitstop") && !is(settings,"hitstop",Variant::BOOL))) return failure(1,"profile/settings","未登録の設定項目があります");
+    if (!keys(profile,{"reduce"}) || (profile.has("reduce") && !is(profile,"reduce",Variant::DICTIONARY)) || !keys(settings,{"hitstop"}) || (settings.has("hitstop") && !is(settings,"hitstop",Variant::BOOL))) return failure(1,"profile/settings","未登録の設定項目があります");
+    double charge_factor=1;
+    if (profile.has("reduce")) {
+        const Dictionary reduce=profile["reduce"];
+        if (!keys(reduce,{"charge_time"})) return failure(1,"profile.reduce","未登録の永続強化です");
+        if (reduce.has("charge_time")) {
+            const Variant value=reduce["charge_time"];
+            if ((value.get_type()!=Variant::FLOAT && value.get_type()!=Variant::INT) || !std::isfinite(double(value)) || double(value)<=0) return failure(1,"profile.reduce.charge_time","充填倍率は有限の正数にしてください");
+            charge_factor=value;
+        }
+    }
     if (bytes.size()<88 || std::memcmp(bytes.ptr(),"SPDRUN01",8)) return failure(1,"bundle","生成物の形式が不正です");
     if (bytes.decode_u32(8)!=speed::FORMAT_VERSION || bytes.decode_u32(12)!=speed::ABI_VERSION) return failure(2,"bundle","生成物の版が一致しません");
     Ref<SpeedRunCore> candidate;candidate.instantiate();
@@ -54,7 +64,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     state.forward.base_interval=state.forward.interval=forward.interval;state.forward.fire.remaining=forward.interval;state.forward.damage=forward.damage;
     state.forward.life=forward.life;state.forward.spread=forward.spread;state.forward.knock=forward.knock;state.forward.pierce=forward.pierce;
     state.forward.character_scale=candidate->runtime.content->config.character_scale;state.forward.ready=true;
-    state.hitstop_enabled=settings.get("hitstop",true);
+    state.hitstop_enabled=settings.get("hitstop",true);state.loadout.charge_profile_factor=charge_factor;
     const auto &lifecycle=candidate->runtime.content->lifecycle;
     state.lifecycle_ready=true;state.death_freeze=lifecycle.death_freeze_time;state.death_explosion=lifecycle.death_explosion_time;state.death_game_over=lifecycle.death_game_over_time;
     if (!candidate->runtime.content->budget_phases.empty()) {
@@ -144,15 +154,18 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=speed::ProgressionSystem::complete(runtime,payload["request_id"],payload["status"])?success():failure(5,"request_id/status","未処理の資源要求と一致しません");
     } else if (kind=="retry_resources" && payload.size()==1 && is(payload,"request_id",Variant::INT)) {
         response=speed::ProgressionSystem::retry(runtime,payload["request_id"])?success():failure(5,"request_id","再試行できる失敗要求がありません");
-    } else if ((kind=="dev_grant_equipment" || kind=="dev_remove_weapon") && runtime.api_development && is(payload,"id",Variant::STRING)) {
+    } else if ((kind=="dev_grant_equipment" || kind=="dev_remove_weapon" || kind=="dev_remove_trait") && runtime.api_development && is(payload,"id",Variant::STRING)) {
         const String external=payload["id"];bool changed=false;
         for (const auto &d:runtime.content->equipment) if (external==String::utf8(d.external_id.c_str())) {
             if (kind=="dev_remove_weapon" && payload.size()==1) changed=speed::EquipmentSystem::remove_weapon(runtime,d.id);
+            else if (kind=="dev_remove_trait" && payload.size()==1) changed=speed::EquipmentSystem::remove_trait(runtime,d.id);
             else if (kind=="dev_grant_equipment" && payload.size()==3 && is(payload,"kind",Variant::STRING) && is(payload,"levels",Variant::INT) &&
                 String(payload["kind"])==(d.kind==0?"weapon":"trait") && int64_t(payload["levels"])>0 && int64_t(payload["levels"])<=UINT32_MAX)
                 changed=speed::EquipmentSystem::grant(runtime,d.id,uint32_t(int64_t(payload["levels"])));
         }
         response=changed?success():failure(5,"equipment","装備を変更できません");
+    } else if (kind=="dev_post_charge" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
+        runtime.state.loadout.post_charge_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
     } else if (kind=="dev_benchmark" && runtime.api_development && payload.size()==1 && is(payload,"leveling",Variant::BOOL)) {
         runtime.state.loadout.xp_gain_mult=bool(payload["leveling"])?1.0:0.0;response=success();
     } else if (kind=="dev_collect_gems" && runtime.api_development && payload.is_empty()) {
@@ -257,6 +270,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
     ui["presentation_frozen"]=control.ui_overlay || control.ui_reward || runtime.state.phase==Phase::Paused || runtime.state.phase==Phase::LevelUp || (runtime.state.phase==Phase::Dying && runtime.state.sequence_t<runtime.state.death_freeze);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;
+    ui["capacity"]=runtime.state.draw_config.capacity;ui["charge_time"]=runtime.state.draw_config.charge_time;ui["min_charge"]=runtime.state.draw_config.min_charge;ui["full_burst"]=runtime.state.loadout.effects.full_gauge_rate>0;
     ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);value["ui"]=speed::FrameBuilder::ui_delta(runtime,ui);
     value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=speed::ProgressionSystem::requests(runtime);value["result"]=speed::Lifecycle::result(runtime);return success(value);
 }

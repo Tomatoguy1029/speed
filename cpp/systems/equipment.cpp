@@ -4,12 +4,16 @@
 namespace speed {
 void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
-    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;
+    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0;
     for (const auto &owned:run.state.loadout.traits) {
         for (const auto &level:run.content->numeric_traits) if (level.equipment==owned.definition && level.level==owned.level) {
-            effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;
+            effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;
         }
     }
+    const auto &p=run.state.loadout;const auto &post=run.content->post_charge;
+    const double base=run.content->config.draw_config_charge_time*p.charge_profile_factor/(1.0+charge_bonus);
+    const double floor=std::min(base,std::max(post.minimum_time,base*post.minimum_ratio));
+    run.state.draw_config.charge_time=std::max(floor,base*(1.0-post.increment*double(p.post_charge_stacks)));
 }
 bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
     if (!levels || !id || id>run.content->equipment.size()) return false;
@@ -31,6 +35,11 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
     refresh_effects(run);
     if (std::find(run.state.lifecycle.obtained.begin(),run.state.lifecycle.obtained.end(),id)==run.state.lifecycle.obtained.end()) run.state.lifecycle.obtained.push_back(id);
     return true;
+}
+bool EquipmentSystem::remove_trait(RunRuntime &run,uint32_t id) {
+    auto &owned=run.state.loadout.traits;const auto found=std::find_if(owned.begin(),owned.end(),[&](const auto &item){return item.definition==id;});
+    if (found==owned.end()) return false;
+    owned.erase(found);refresh_effects(run);return true;
 }
 bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     auto &owned=run.state.loadout.weapons;

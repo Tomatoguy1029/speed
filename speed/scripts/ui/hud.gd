@@ -443,6 +443,9 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if bridge!=null:
 		_update_speed_indicator(delta)
+		if not _cpp_ui.is_empty() and not _cpp_ui.get("presentation_frozen",true):
+			_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
+			_ring_flash_t = maxf(0.0,_ring_flash_t-delta)
 		queue_redraw()
 		return
 	_update_speed_indicator(delta)
@@ -1109,24 +1112,30 @@ func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 ## 描けるまでは専用の不足色を使い、描ける量に目盛りを置く。描けるようになった瞬間に広がる輪、1周溜まりきった瞬間に白い光を出す。
 func _draw_gauge_ring() -> void:
 	var s := run.state
-	var c := get_viewport().get_mouse_position() + Vector2(26, 26)
-	var min_charge := run.cfg.draw_min_charge
-	var capacity := s.stats.capacity
-	var amount := s.gauge_amount()
+	var displayed := s.draw_gauge*(1.0-s.draw_length/maxf(1.0,s.draw_limit)) if s.drawing else s.gauge_amount()
+	_draw_gauge_values(run.cfg.draw_min_charge,s.stats.capacity,s.gauge_amount(),s.drawing,not s.drawing and not s.tracing,displayed,s.traits.has(&"T36"))
+
+func _draw_cpp_gauge_ring() -> void:
+	var draw: Dictionary = _cpp_ui.draw
+	var capacity := float(_cpp_ui.capacity)
+	var amount := float(draw.gauge)*capacity
+	var displayed := float(draw.draw_gauge)*(1.0-float(draw.draw_length)/maxf(1.0,float(draw.draw_limit))) if draw.drawing else amount
+	_draw_gauge_values(float(_cpp_ui.min_charge),capacity,amount,draw.drawing,not draw.drawing and not draw.tracing,displayed,_cpp_ui.full_burst)
+
+func _draw_gauge_values(min_charge: float,capacity: float,amount: float,drawing: bool,charging: bool,displayed: float,full_burst: bool) -> void:
+	var c := get_viewport().get_mouse_position()+Vector2(26,26)
 	var usable := amount >= min_charge
-	var charging := not s.drawing and not s.tracing
 	if usable and not _ring_usable and charging:
 		_ring_pulse_t = RING_PULSE_TIME
 	_ring_usable = usable
 	if charging and _lap_filled(_ring_amount, amount, capacity):
-		_ring_flash_t = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
-		_ring_flash_max = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
+		_ring_flash_t = 0.1 if full_burst else RING_FLASH_TIME
+		_ring_flash_max = 0.1 if full_burst else RING_FLASH_TIME
 	_ring_amount = amount
-	if s.drawing:
-		amount = s.draw_gauge * (1.0 - s.draw_length / maxf(1.0, s.draw_limit))
+	amount = displayed
 	var flash := _ring_flash_t / _ring_flash_max if _ring_flash_t > 0.0 else 0.0
 	var pulse := 1.0 - _ring_pulse_t / RING_PULSE_TIME if _ring_pulse_t > 0.0 else -1.0
-	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, s.drawing, usable, flash, pulse, BOOST_STYLE, RING_GAP)
+	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, drawing, usable, flash, pulse, BOOST_STYLE, RING_GAP)
 
 ## 内側・外側のどれかのリングが、before から after の間に溜まりきったか
 func _lap_filled(before: float, after: float, capacity: float) -> bool:
@@ -1209,6 +1218,7 @@ func _draw_cpp() -> void:
 	var seconds := int(_cpp_ui.run_time)
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	draw_set_transform(Vector2.ZERO)
+	_draw_cpp_gauge_ring()
 	_draw_banner()
 
 func _cpp_card_visibility() -> void:

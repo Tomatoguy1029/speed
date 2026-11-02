@@ -66,6 +66,21 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t07-view" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t07_view()
+		check(finished,"急速充填の表示と下限を最後まで確認する")
+		print("[cpp_t07_view] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
+	if "--cpp-t07" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t07()
+		if finished: finished = await check_cpp_t07_view()
+		check(finished,"急速充填の確認を最後まで実施する")
+		print("[cpp_t07] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-w01" in OS.get_cmdline_user_args() or "--cpp-w01-detail" in OS.get_cmdline_user_args():
 		await check_cpp_w01()
 		print("[cpp_w01] failed=%d" % failures)
@@ -386,3 +401,100 @@ func check_cpp_w01_detail(session: RunSession,idle: Dictionary,viewport: Diction
 	check(muzzle==presentation.frame_view._flashes.muzzle_time,"世界時計が止まっている表示では砲口の光も進めない")
 	bridge.unsubscribe("w01_detail")
 	await get_tree().process_frame
+
+func t07_bridge(config: GameConfig,profile: Dictionary):
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var bytes: PackedByteArray = builder.compile_chase(ContentManager.enemies[&"drifter"],config,schema.sha256("急速充填の固定場面".to_utf8_buffer()))
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":93,"mode":1,"stage_id":"t07","profile":profile,"settings":{}})
+	if not configured.ok:
+		check(false,"特性と最大段後の生成物を読み込む: %s" % configured)
+		return null
+	check(bridge.start(933,{"position":Vector2(-3000,0)}).ok,"急速充填の固定場面を開始する")
+	bridge.collect_frame()
+	return bridge
+
+func check_cpp_t07() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: TraitDef = load("res://data/traits/T07_quickCharge.tres")
+	var factor := 0.8
+	var bridge = t07_bridge(config,{"reduce":{"charge_time":factor}})
+	if bridge==null: return false
+	check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*factor),"未取得時は永続強化までの充填時間を使う")
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":1}).ok,"T07を共通取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*factor/(1.0+definition.stack_bonus(level))),"各段の生成値から一度だけ実効充填時間を求める")
+	var baseline: float = bridge._ui.charge_time
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":1}).ok and bridge._ui.charge_time==baseline,"上限を越えて取得せず実効値も変えない")
+	check(bridge.command("dev_post_charge",{"stacks":5}).ok,"最大段後の短縮を同じ再計算へ渡す")
+	var expected: float = config.post_max.reduced(baseline,&"charge_time",{&"charge_time":5},config.post_max.minimum_charge_time)
+	check(is_equal_approx(bridge._ui.charge_time,expected),"通常特性から最大段後の短縮へ同じ順で適用する")
+	var saved: Dictionary = bridge.checkpoint()
+	bridge.command("dev_post_charge",{"stacks":10000})
+	var floor_time := minf(baseline,maxf(config.post_max.minimum_charge_time,baseline*config.post_max.minimum_time_ratio))
+	check(is_equal_approx(bridge._ui.charge_time,floor_time),"最大段後の充填短縮は元と同じ下限で止める")
+	check(bridge.command("dev_remove_trait",{"id":"T07"}).ok,"特性を解除して実効値を再計算する")
+	bridge.command("dev_post_charge",{"stacks":0})
+	check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*factor),"解除後も永続強化を保ち、特性の効果を残さない")
+	check(bridge.restore(saved.value).ok,"所持段・永続倍率・最大段後の積み増しを保持して復帰する")
+	bridge.collect_frame()
+	check(is_equal_approx(bridge._ui.charge_time,expected),"復帰後に同じ実効値を表示へ渡す")
+	bridge.release_checkpoint(saved.value)
+	# 実際の描線でゲージを使い、利用側のstep_drawで充填量を確認する。
+	var core = bridge._core
+	var start := Vector2(-3000,0)
+	check(core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0),"実際の描線入力を開始する")
+	check(core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0),"線を発進してゲージを消費する")
+	check(core.step_draw(10.0) and not core.draw_snapshot().tracing,"なぞりを終えて再充填へ戻る")
+	var gauge: float = core.draw_snapshot().gauge
+	check(gauge<1.0 and core.step_draw(0.01),"利用側の実時間で再充填する")
+	check(is_equal_approx(core.draw_snapshot().gauge,minf(1.0,gauge+0.01/expected)),"実効充填時間が戦闘のゲージ増分へ一度だけ効く")
+	bridge.dispose()
+	OS.remove_logger(capture)
+	check(capture.count()==0,"急速充填の状態に実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func check_cpp_t07_view() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var factor := 0.8
+	var bridge = t07_bridge(config,{"reduce":{"charge_time":factor}})
+	if bridge==null: return false
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":config.trait_max_stacks})
+	bridge.command("dev_post_charge",{"stacks":5})
+	var core = bridge._core
+	var start := Vector2(-3000,0)
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
+	core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0)
+	core.step_draw(10.0)
+	core.step_draw(0.01)
+	var baseline := 0.0
+	bridge.command("set_ui_overlay",{"active":false})
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(hud._cpp_ui.charge_time==bridge._ui.charge_time and is_equal_approx(hud._ring_amount,core.draw_snapshot().gauge),"HUDのリングへ同じ実効値と充填量を描画する")
+	hud.free()
+	bridge.dispose()
+	# 元の充填時間が表示上の最小秒数より短い場合も、特性を弱めない。
+	config.dash_charge_time = 0.1
+	bridge = t07_bridge(config,{"reduce":{"charge_time":factor}})
+	if bridge==null: return false
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":config.trait_max_stacks})
+	baseline = bridge._ui.charge_time
+	bridge.command("dev_post_charge",{"stacks":10000})
+	check(is_equal_approx(bridge._ui.charge_time,baseline),"元から短い充填を最大段後の下限で長くしない")
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"急速充填の状態・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
