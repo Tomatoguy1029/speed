@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if ("--semantics-equipment-values" in OS.get_cmdline_user_args() or "--semantics-equipment-tail" in OS.get_cmdline_user_args()):
+		check_semantics_equipment_values()
+		print("[semantics_equipment_values] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-hero-values" in OS.get_cmdline_user_args():
 		check_semantics_hero_values()
 		print("[semantics_hero_values] failed=%d" % failed)
@@ -939,3 +944,134 @@ func check_semantics_hero_values() -> void:
 	OS.remove_logger(capture)
 	check(capture.count()==0,"英雄の両実装に実行時エラーがない")
 	print("SEMANTICS_HERO_VALUES ",JSON.stringify({"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"failed":failed,"scope":"全4英雄の実秒持続時間/CD/ボス停止/実効描線幅。乱数座標と固有攻撃は含めない"}))
+
+# 固有装備の未証明だった数値だけ。取得・解除・表示・復帰の成功は再検査しない。
+func semantics_fields(value: Dictionary, keys: Array) -> Dictionary:
+	var out := {}
+	for key in keys: out[key]=value[key]
+	return out
+
+func semantics_rows(rows: Array, keys: Array) -> Array:
+	var out := []
+	for row: Dictionary in rows: out.append(semantics_fields(row,keys))
+	return out
+
+func semantics_start_trace(run: RunSimulation, bridge, length: float) -> void:
+	var at:=run.state.ship_pos
+	var intent:=Intent.new()
+	intent.press=true;intent.touch=true;intent.pen=at
+	run.draw._start(intent)
+	bridge._core.handle_draw(bridge.pack_intent(intent),1000,1.0)
+	intent.press=false;intent.has_cursor=true;intent.pen=at+Vector2.RIGHT*length;intent.pen_release=true
+	run.draw._extend(intent.pen);run.draw._commit(intent)
+	bridge._core.handle_draw(bridge.pack_intent(intent),1010,1.0)
+	bridge.command("set_ui_overlay",{"active":false})
+
+func semantics_equipment_values(run: RunSimulation, bridge, id: String) -> Array:
+	var ui:Dictionary=bridge.read_frame().value.ui
+	var kind:=&"weapon" if id.begins_with("W") else &"trait"
+	var behavior=(run.loadout.weapon_behaviors if kind==&"weapon" else run.loadout.trait_behaviors)[StringName(id)]
+	match id:
+		"W07":
+			var keys:=["pos","age","life","damage","radius"]
+			return [semantics_rows(behavior.mines,keys),semantics_rows(ui.mines.items,keys)]
+		"W22":
+			return [semantics_rows(behavior.pending,["from","to","delay"]),semantics_rows(ui.bipolar.pending,["from","to","delay"])]
+		"W25":
+			var keys:=["pos","angle","flash","kick","next"]
+			return [{"clock":behavior._clock,"drones":semantics_rows(behavior.drones,keys)},
+				{"clock":ui.interceptor.clock,"drones":semantics_rows(ui.interceptor.drones,keys)}]
+		"W26":
+			var keys:=["pos","dir"]
+			return [{"distance":behavior._distance,"drones":semantics_rows(behavior.drones,keys)},
+				{"distance":ui.escort.distance,"drones":semantics_rows(ui.escort.drones,keys)}]
+		"W27":
+			var source:=[];var actual:=[]
+			for echo:Dictionary in behavior.echoes:
+				var value:=semantics_fields(echo,["start","until","share"])
+				value.copies=semantics_rows(echo.copies,["pos","dir","alpha","progress","delay"]);source.append(value)
+			for echo:Dictionary in ui.afterimage.echoes:
+				var value:=semantics_fields(echo,["start","until","share"])
+				value.copies=semantics_rows(echo.copies,["pos","dir","alpha","progress","delay"]);actual.append(value)
+			return [{"clock":behavior._clock,"echoes":source},{"clock":ui.afterimage.clock,"echoes":actual}]
+		"W29":
+			return [{"radius":behavior.area(behavior.at_level("radius_by_level")),"pending":semantics_rows(behavior.pending,["radius","damage","delay"])},
+				{"radius":ui.end_blast.radius,"pending":semantics_rows(ui.end_blast.pending,["radius","damage","delay"])}]
+		"T03":
+			var keys:=["pos","age","radius","damage","duration"]
+			return [{"items":semantics_rows(behavior.vortexes,keys),"gauge":run.state.gauge},
+				{"items":semantics_rows(ui.vortex.items,keys),"gauge":ui.draw.gauge}]
+		"T04":
+			return [{"maximum":behavior.multiplier(run.cfg.draw_length),"power":run.combat.burst_power,"attack":run.combat.attack_power()},
+				{"maximum":ui.full_charge.maximum,"power":ui.full_charge.burst_power,"attack":ui.attack_power}]
+		"T36":return [run.loadout.shooting_rate(),ui.shooting_rate]
+	return [{},{}]
+
+func check_semantics_equipment_values() -> void:
+	var probe=COMPARE.new().create_native()
+	if probe==null:check(false,"C++拡張を読み込む");return
+	probe.close()
+	var config:GameConfig=ContentManager.base.duplicate(true)
+	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	config.world_tick_div=1;config.base_crit_chance=0;config.xp_base=1e8
+	config.comet_interval_min=1e8;config.comet_interval_max=1e8;config.gravity_interval_min=1e8;config.gravity_interval_max=1e8
+	var stage:=RuntimeStage.new()
+	stage.boss_enabled=false;stage.index=203;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter"])
+	var phase:=PhaseDef.new();phase.id=&"装備固有値";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0;stage.phases=[phase]
+	var output:="res://.content/dev/semantics_equipment_values"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1装備固有値".sha256_text())!=OK:check(false,"装備固有値の定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_203.json")))
+	var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new()
+	var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
+	var cases:=0
+	for id:String in ["W07","W22","W25","W26","W27","W29","T03","T04","T36"]:
+		if "--semantics-equipment-tail" in OS.get_cmdline_user_args() and id=="W07":continue
+		for level in range(1,6):
+			var run:=semantics_legacy(config,stage,{},41)
+			run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies()
+			run.loadout.reset_loadout()
+			var intent:=Intent.new();run.input_source=func():return intent;run.view_size_source=func():return Vector2(1280,720)
+			var bridge=semantics_bridge(bytes,41)
+			if bridge==null:check(false,"装備固有値のC++ランを開始する");run.dispose();OS.remove_logger(capture);return
+			var native_events:=[]
+			bridge.subscribe("固有値の通知",func(packet):native_events.append_array(packet.events);return true)
+			var kind:=&"weapon" if id.begins_with("W") else &"trait"
+			run.loadout.grant(kind,StringName(id),level);bridge.command("dev_grant_equipment",{"kind":String(kind),"id":id,"levels":level})
+			if id=="T36":
+				run.loadout.grant(&"weapon",&"W02",1);bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W02","levels":1})
+			semantics_start_trace(run,bridge,600.0)
+			var aligned_mines:=false
+			for tick in 300:
+				run.state.events.clear();native_events.clear()
+				run._play_tick(1.0/120.0)
+				var stepped:Dictionary=bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+				if not stepped.ok or capture.count()>0:check(false,"固有値の更新エラー %s/%d: %s"%[id,level,capture.messages()]);break
+				if id=="W07" and not aligned_mines:
+					var old:Array=run.loadout.weapon_behaviors[&"W07"].mines
+					var current:Array=bridge._ui.mines.items
+					if old.size()>0 and old.size()==current.size():
+						# PCGとGodotの乱数出力は一致させない。選ばれた配置を以後の固定入力へ揃える。
+						for n in old.size():
+							old[n].from=current[n].from;old[n].to=current[n].to
+							old[n].pos=old[n].from.lerp(old[n].to,1.0-pow(1.0-minf(1.0,old[n].age/0.14),3.0))
+						aligned_mines=true
+				var values:=semantics_equipment_values(run,bridge,id)
+				if id=="W22":
+					var old_beams:=[];var new_beams:=[]
+					for event:Dictionary in run.state.events:
+						if event.type==&"beam":old_beams.append(semantics_fields(event,["from","to","width","life","width_scale"]))
+					for event:Dictionary in native_events:
+						if event.type==&"beam":new_beams.append(semantics_fields(event.payload,["from","to","width","life","width_scale"]))
+					values=[{"pending":values[0],"beams":old_beams},{"pending":values[1],"beams":new_beams}]
+				var found:String=comparison.semantics_difference(values[0],values[1])
+				check(found.is_empty(),"固有値の指定許容幅 %s Lv%d tick%d: %s"%[id,level,tick,found])
+				if not found.is_empty():break
+			cases+=1
+			print("SEMANTICS_EQUIPMENT_CASE %s Lv%d failed=%d"%[id,level,failed])
+			run.dispose();bridge.dispose()
+			if failed:break
+		if failed:break
+	OS.remove_logger(capture)
+	check(capture.count()==0,"固有装備のSource/C++に実行エラーがない")
+	print("SEMANTICS_EQUIPMENT_VALUES ",JSON.stringify({"cases":cases,"ticks_per_case":300,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
