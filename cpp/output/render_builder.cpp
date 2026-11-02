@@ -1,4 +1,5 @@
 #include "../systems/heroes.h"
+#include "../bosses/canis_major/body.h"
 #include "../behaviors/weapons/massTow.h"
 #include "render_builder.h"
 #include "../bosses/flow/technique_runner.h"
@@ -95,7 +96,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     for (size_t i=0;i<state.enemies.size();++i) {
         const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead) continue;
-        const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus) continue;
+        const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus || definition.kind==EnemyDefinition::Kind::CanisMajor) continue;
         const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
         if (meteor && state.field.rock_handles.contains(enemy.rock) && state.field.rocks[enemy.rock.slot].kind==RockKind::Comet) {
@@ -169,7 +170,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) enemy_batch.ruler_sides.push_back(ruler->side);
         const bool warning=definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {enemy_batch.glows.push_back(pose.position.x);enemy_batch.glows.push_back(pose.position.y);enemy_batch.glows.push_back(radius);}
-        auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):definition.color):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
+        auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):CanisMajorBody::color(run,state.enemy_handles.at(i),definition.color)):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
         if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode==EnemyMode::Windup) color.g=std::fmod(enemy.charge*3.0,1.0)>=0.45?1.0:0.0;
         godot::Vector2 deform;double amount=0;bool flash=false;
         for (const auto &w:state.loadout.contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}

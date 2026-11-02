@@ -4,6 +4,7 @@
 #include "../bosses/flow/phase_controller.h"
 #include "../bosses/monoceros/body.h"
 #include "../bosses/centaurus/body.h"
+#include "../bosses/canis_major/body.h"
 #include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dictionary &p) {
@@ -13,7 +14,7 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
     if (kind=="dev_spawn_boss") {
         if (p.size()!=3 || p.get("definition",Variant()).get_type()!=Variant::INT || p.get("position",Variant()).get_type()!=Variant::VECTOR2 || p.get("entrance",Variant()).get_type()!=Variant::BOOL) return result(false);
         const int64_t definition=p["definition"];if (definition<=0 || uint64_t(definition)>runtime.content->boss_bodies.size()) return result(false);
-        const auto &d=runtime.content->bosses[runtime.content->boss_bodies[definition-1].boss-1];const auto actor=d.kind==0?speed::MonocerosBody::spawn(runtime,definition,p["position"],p["entrance"]):speed::CentaurusBody::spawn(runtime,definition,p["position"],p["entrance"]);
+        const auto &d=runtime.content->bosses[runtime.content->boss_bodies[definition-1].boss-1];const auto actor=d.kind==0?speed::MonocerosBody::spawn(runtime,definition,p["position"],p["entrance"]):d.kind==1?speed::CentaurusBody::spawn(runtime,definition,p["position"],p["entrance"]):speed::CanisMajorBody::spawn(runtime,definition,p["position"],p["entrance"]);
         return result(runtime.state.enemy_handles.contains(actor),runtime.state.enemy_handles.entity_id(actor));
     }
     if (kind=="dev_cancel_boss" || kind=="dev_boss_final") {

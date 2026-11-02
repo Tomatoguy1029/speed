@@ -1,6 +1,7 @@
 #pragma once
 #include "entity_store.h"
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/color.hpp>
 #include <vector>
 #include <variant>
 #include <unordered_map>
@@ -94,7 +95,15 @@ struct CentaurusBodyState {
     double guard_scan=0,guard_refill=0,path_hold=0,turn_motion=0,leap_ready_at=0,leap_elapsed=0,retreat_ready_at=0;
     int32_t path_side=1,sail_side=1;
 };
+struct CanisHoundRef {EnemyHandle actor;double base_hp=0;godot::Color color;};
+struct CanisBodyState {
+    bool pack_spawned=false,barking=false,calling=false;
+    double call_left=0,call_ready_at=0,lead_scan=0,turn_motion=0;
+    std::vector<CanisHoundRef> led;
+    std::vector<EnemyHandle> lunging;
+};
 struct BossBodyState {
+    CanisBodyState canis;
     CentaurusBodyState centaurus;
     std::vector<ParticipantState> participants;
     int64_t id=0;

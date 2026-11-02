@@ -145,22 +145,22 @@ static func boss_technique_set_records(definition: BossDef, moves: Array) -> Dic
 
 ## 共通本体の生成入力。技の登録は各ボスの移植経路が追加する。
 static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictionary:
-	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}
+	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major"]: return {}
 	# 機体・装備・接触など共通セクションの生成を既存の入口へそろえる。
-	var package := chase_package(load("res://data/enemies/defender.tres" if definition.id==&"centaurus" else "res://data/enemies/drifter.tres"),config)
+	var package := chase_package(load("res://data/enemies/defender.tres" if definition.id==&"centaurus" else "res://data/enemies/hound.tres" if definition.id==&"canis_major" else "res://data/enemies/drifter.tres"),config)
 	if package.is_empty(): return {}
 	var data: Dictionary = package.records
 	var row: Dictionary = data.EnemyRecord[0]
-	if definition.id==&"centaurus":
+	if definition.id in [&"centaurus",&"canis_major"]:
 		row = row.duplicate(true)
 		row.id = 2
 		data.EnemyRecord.append(row)
-		data.StringEntry.append({"id":2,"value":"centaurus"})
+		data.StringEntry.append({"id":2,"value":String(definition.id)})
 		data.DefinitionIndex.append({"id":2,"enemy":2})
 		data.PopulationType.append({"id":2,"enemy":2,"rank":5,"maximum":1,"ranged":false})
 	var hp: float = definition.hp if definition.use_def_stats else config.boss_hp
 	var armor: float = definition.armor if definition.use_def_stats else config.boss_armor
-	row.kind = 39 if definition.id==&"monoceros" else 40
+	row.kind = 39 if definition.id==&"monoceros" else 40 if definition.id==&"centaurus" else 41
 	row.radius = definition.radius*config.character_scale
 	row.hp = hp*config.enemy_hp_mult
 	row.armor = armor*config.enemy_armor_mult
@@ -179,7 +179,7 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	row.knockback = 0.0
 	row.gate = 0
 	data.StringEntry[row.id-1].value = String(definition.id)
-	var boss := {"id":1,"external_id":String(definition.id),"kind":0 if definition.id==&"monoceros" else 1,"turn":definition.turn,"speed":definition.speed}
+	var boss := {"id":1,"external_id":String(definition.id),"kind":0 if definition.id==&"monoceros" else 1 if definition.id==&"centaurus" else 2,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = float(definition.params.get(key,0.0))
 	data.BossDefinition = [boss]
 	var body := {"id":1,"boss":1,"enemy":row.id,"hp_floor_enabled":false}
@@ -203,6 +203,21 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 			var settings := {}
 			for name in ["key_energy","fill_energy","key_angle","fill_angle","height","ambient","normal_strength"]: settings[name] = guard.visual_value(name,lighting.get(name))
 			guard_visual.merge({"settings":settings,"paint":look.colors_key(guard.armor_colors),"hull_preview":look.preview_key(guard.armor_colors),"biting":false,"pump":false,"biter_parts":""})
+	if definition.id==&"canis_major":
+		var canis := {"id":1,"boss":1,"hound":1}
+		for key in ["speed_p2","entrance_bark","call_time","call_cd","lead_radius","lead_scan","lead_catch_up","led_hits","slot_back","slot_side","form_wobble","lane_open","lane_forward","form_speed_min","form_speed_max"]: canis[key] = float(definition.params[key])
+		for key in ["pack_size","call_below","call_to","lead_max"]: canis[key] = int(definition.params[key])
+		var color: Color = definition.params.led_color
+		canis.merge({"led_r":color.r,"led_g":color.g,"led_b":color.b,"led_a":color.a})
+		data.CanisBodyDefinition = [canis]
+		var hound: EnemyDef = load("res://data/enemies/hound.tres")
+		var hound_visual: Dictionary = package.visuals[5]
+		if hound_visual.role==6:
+			var look: EnemyLook = load(hound_visual.path)
+			var lighting: Resource = load("res://data/visuals/enemy_lighting.tres")
+			var settings := {}
+			for name in ["key_energy","fill_energy","key_angle","fill_angle","height","ambient","normal_strength"]: settings[name] = hound.visual_value(name,lighting.get(name))
+			hound_visual.merge({"settings":settings,"paint":look.colors_key(hound.armor_colors),"hull_preview":look.preview_key(hound.armor_colors),"biting":false,"pump":false,"biter_parts":""})
 	var key: int = data.ResourceKey.size()+1
 	data.ResourceKey.append({"id":key,"role":7})
 	package.visuals.append({"id":key,"role":7,"path":"res://scenes/bosses/%s_presentation.tscn" % definition.id,"boss":String(definition.id),"appearance":definition.part_appearance.duplicate(true)})

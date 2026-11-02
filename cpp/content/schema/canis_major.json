@@ -1,0 +1,133 @@
+{
+  "records": [
+    {
+      "name": "CanisBodyDefinition",
+      "section": 340,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "hound",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "speed_p2",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "entrance_bark",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "call_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "call_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead_scan",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead_catch_up",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "led_hits",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slot_back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slot_side",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "form_wobble",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lane_open",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lane_forward",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "form_speed_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "form_speed_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pack_size",
+          "type": "u32"
+        },
+        {
+          "name": "call_below",
+          "type": "u32"
+        },
+        {
+          "name": "call_to",
+          "type": "u32"
+        },
+        {
+          "name": "lead_max",
+          "type": "u32"
+        },
+        {
+          "name": "led_r",
+          "type": "f32"
+        },
+        {
+          "name": "led_g",
+          "type": "f32"
+        },
+        {
+          "name": "led_b",
+          "type": "f32"
+        },
+        {
+          "name": "led_a",
+          "type": "f32"
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

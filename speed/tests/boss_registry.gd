@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-canis-body" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_body")
+		return
 	if "--cpp-centaurus-rain" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_rain")
 		return
@@ -615,4 +618,88 @@ func native_centaurus_rain() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_rain] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_canis_body() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/canis_major.tres")
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	check(not package.is_empty(),"本体と猟犬を同じ固定入力から生成する")
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	if bytes.is_empty():
+		for record in builder.Schema.SCHEMA.records:
+			for row in package.records[record.name]:
+				if not builder.Schema._valid_record(row,record): print("生成入力の不一致: ",record.name," ",row)
+	check(not bytes.is_empty(),"大犬座の全項目と参照を型付き形式へ書く")
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":144,"mode":1,"stage_id":"B_canis_major_body","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"型付き本体・猟犬・表示資源を読む")
+	if not configured.ok: print(configured); get_tree().quit(1); return
+	bridge.start(144,{"position":Vector2(1600,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(1600,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1600,0),Vector2(1600,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.kind==2 and body.participants.size()==1 and body.participants[0].id==id and body.participants[0].health_target==id,"猟犬は本体の部位やHP共有に加えない")
+	check(body.led.size()==definition.params.pack_size,"本体とは別の個体IDで指定数の猟犬を率いる")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(package.visuals)
+	view.setup(scope,entries,cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value) and view._boss_body_displays.size()==1,"正式なパーツを表示入口へ接続する")
+	var display = view._boss_body_displays.values()[0]
+	check(display.parts.visible,"最初の技の前から本体とシリウスを表示する")
+	bridge._core.step(0.1)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(body.velocity.length(),definition.speed),"機体を向いて通常速度で追う")
+	var velocity: Vector2 = body.velocity
+	for cause in ["ram","touch","wave"]:
+		check(bridge.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":cause,"direction":Vector2.RIGHT,"knock":1500.0}).ok,"全方向からの被弾を受ける")
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.velocity==velocity and is_equal_approx(body.hp,body.max_hp-3.0),"本体のHPを減らし外力のノックバックは受けない")
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(display.hit>0.0,"被弾の値を正式表示へ渡す")
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.apply_snapshot(bridge.read_frame().value.ui)
+	check(hud._cpp_ui.boss_bodies[0].actor==id and is_equal_approx(hud._cpp_ui.boss_bodies[0].hp,body.hp),"本体IDと現在HPをHUDへ渡す")
+	hud.free()
+	bridge.command("dev_kill",{"entity_id":body.led[0].id,"cause":"debug"})
+	check(not bridge.command("dev_boss_body_state").value[0].boss_dead,"猟犬の撃破でボスを撃破しない")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"本体と群れの途中状態を値として保持する")
+	bridge._core.step(0.6)
+	var after: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(bridge.restore(held.value).ok,"本体と群れのID・隊形時計を復帰する")
+	bridge._core.step(0.6)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"復帰後の本体・群れが同じ状態になる")
+	bridge.release_checkpoint(held.value)
+	var position_before: Vector2 = after.position
+	display.apply_frame(after)
+	check(bridge.command("dev_boss_body_state").value[0].position==position_before,"表示から戦闘位置を書き戻さない")
+	bridge.command("dev_cancel_boss",{"entity_id":id})
+	body = bridge.command("dev_boss_body_state").value[0]
+	view.apply_frame(bridge.read_render(Rect2(-3000,-2000,6000,4000)).value)
+	check(not body.participants[0].active and body.led.is_empty() and not display.visible,"中断で群れの指示を解き本体の寿命と表示を閉じる")
+	var entering: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(500,500),"entrance":true}).value
+	bridge._core.step(1.4)
+	var entrance: Dictionary = bridge.command("dev_boss_body_state").value[1]
+	check(entrance.barking and entrance.position.is_equal_approx(Vector2(500,500)),"画面外から登場して吠える時間へ移る")
+	bridge._core.step(0.6)
+	check(not bridge.command("dev_boss_body_state").value[1].barking,"吠え終わってから通常待機へ戻る")
+	bridge.command("dev_damage",{"entity_id":entering,"amount":entrance.max_hp+1.0,"cause":"bullet"})
+	entrance = bridge.command("dev_boss_body_state").value[1]
+	check(entrance.mode==4 and not entrance.participants[0].active and entrance.boss_dead,"第1形態の致死ダメージもHP保護を入れず撃破する")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"中断と撃破の通知を最後まで配信する")
+	bridge.dispose()
+	view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_body] failures=",failed)
 	get_tree().quit(1 if failed else 0)
