@@ -17,6 +17,7 @@ var delivery_error: Dictionary = {}
 var _metrics_record := {}
 var _metrics_bytes := 0
 var _resource_wait_started := 0
+var recording_origin := {}
 
 static func _error(code: int, field: String, message: String) -> Dictionary:
 	return {"ok":false,"code":code,"field":field,"message":message,"value":null}
@@ -36,6 +37,7 @@ func configure(bytes: PackedByteArray, options: Dictionary) -> Dictionary:
 		_run_id = options.run_id
 		_epoch = result.value.epoch
 		_development = options.mode == 1
+		recording_origin = {"options":options.duplicate(true),"payload_sha256":result.value.bundle_hash}
 		_metrics_record = perf.open(&"metrics")
 	return result
 
@@ -46,7 +48,13 @@ func start(seed_value: int, options := {}) -> Dictionary:
 	_busy = true
 	var result: Dictionary = _core.start_run(seed_value,options)
 	_busy = false
+	if result.ok: recording_origin["start"] = {"seed":str(seed_value),"options":options.duplicate(true)}
 	return result
+
+func read_recording(initial := false) -> Dictionary:
+	if _busy: return _error(7,"recording","更新中は読めません")
+	if _core==null: return _error(4,"recording","破棄済みです")
+	return _core.recording_run(initial)
 
 static func pack_intent(intent: Intent) -> Dictionary:
 	return {"has_cursor":intent.has_cursor,"cursor":intent.cursor,"stick":intent.stick,"stick_active":intent.stick_active,

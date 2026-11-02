@@ -19,6 +19,7 @@ var paths: Array[String] = []
 var rows: Array = []
 
 func check(ok: bool, label: String) -> void:
+	if "--legacy-d02-fixes" in OS.get_cmdline_user_args() and label not in ["far player rejects melee","Draco locked charge can be dodged"]: return
 	checks += 1
 	if not ok:
 		failures += 1
@@ -106,7 +107,7 @@ func execute(id: StringName, dodge := false) -> void:
 	var moved := false
 	for frame in 1800:
 		if dodge and not moved:
-			var locked: bool = actor.locked if actor is MonocerosBoss else (actor._driver != null and "locked" in actor._driver and actor._driver.locked)
+			var locked: bool = actor.locked if actor is MonocerosBoss else (actor._runner != null and "locked" in actor._runner and actor._runner.locked)
 			if locked:
 				sim.state.ship_pos += Vector2(0, 1000)
 				moved = true
@@ -115,10 +116,14 @@ func execute(id: StringName, dodge := false) -> void:
 	check(actor.mode == &"idle", "real attack completes " + String(id))
 
 func _ready() -> void:
+	if "--legacy-d02-fixes" in OS.get_cmdline_user_args():
+		await check_legacy_d02_fixes()
+		return
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.dev_meta_override = {}
 	# Natural candidate evaluation uses real phase, cooldown, turn, and predicted reach gates.
 	fresh()
+	sim.state.ship_pos = Vector2(actor._moves[&"sweep"].reach_limit(actor.horn_length())+100.0,0)
 	actor.selection_enabled = true
 	tick()
 	var decisions := events("boss_decision")
@@ -286,3 +291,19 @@ func invariant_trial(enabled: bool) -> Array:
 	actor.selection_enabled = true
 	for frame in 900: tick(Vector2(0, 35))
 	return [sim.state.ship_hp, actor.table.pos[actor.body], actor.technique, sim.state.rng.state, sim.projectiles.hostile_count()]
+
+func check_legacy_d02_fixes() -> void:
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.dev_meta_override = {}
+	fresh()
+	sim.state.ship_pos = Vector2(actor._moves[&"sweep"].reach_limit(actor.horn_length())+100.0,0)
+	actor.selection_enabled = true
+	tick()
+	var decisions := events("boss_decision")
+	check(decisions.size()==1 and decisions[0].candidates.any(func(c):return c.id=="sweep" and not c.eligible),"far player rejects melee")
+	fresh(5)
+	execute(&"charge",true)
+	check(outcome("charge").get("outcome")=="evaluated_miss","Draco locked charge can be dodged")
+	close()
+	print("[legacy_d02_fixes] checks=%d failures=%d" % [checks,failures])
+	get_tree().quit(1 if failures else 0)

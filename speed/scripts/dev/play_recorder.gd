@@ -42,9 +42,12 @@ var _recording_id := ""
 var _io_failed := false
 var armed := false
 var _run: RunSimulation = null
-## 通知経路の移行用。区間集計と旧JSONLとの対応はD02で接続する。
+## C++ランの通知と、録画区間の読み取り専用集計。
 var _cpp_session_id := 0
 var _cpp_time := 0.0
+var _cpp_next_sample := 0.0
+var _cpp_record_previous := {}
+var _cpp_event_sequence := 0
 var _cpp_perf_previous := {}
 var _cpp_perf_last_us := 0
 var _cpp_perf_frames := 0
@@ -330,6 +333,9 @@ func _process(delta: float) -> void:
 		_update_label()
 	if _cpp_session_id>0:
 		_cpp_perf_tick(Time.get_ticks_usec())
+		if _cpp_time>=_cpp_next_sample:
+			_cpp_sample()
+			_cpp_next_sample = _cpp_time+INTERVAL
 		return
 	if _run == null:
 		return
@@ -593,7 +599,12 @@ func _on_phase_changed(phase: int) -> void:
 func _end(result: String) -> void:
 	if _cpp_session_id>0:
 		_flush_cpp_performance()
-		_write({"type":"end","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"result":result})
+		_cpp_sample()
+		var ending := _cpp_record_previous.duplicate(true)
+		ending.merge({"type":"end","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"result":result,
+			"xp_reward_version":2,"xp_cumulative":_last_xp_summary,"xp_observed":_xp_window(_last_xp_summary,_xp_start_summary,"recording_total")},true)
+		ending.erase("xp")
+		_write(ending)
 		_flush()
 		_saved_text = "記録に失敗しました" if _io_failed else "保存："+_file.get_path().get_file()
 		_saved_t = SAVED_NOTICE
@@ -884,6 +895,8 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 	if not armed or _cpp_session_id==session.id or session.is_queued_for_deletion() or not session.is_in_group("recordable_runs"): return
 	var snapshot: Dictionary = session.bridge.read_frame()
 	if not snapshot.ok: return
+	var state: Dictionary = session.bridge.read_recording(true)
+	if not state.ok: return
 	_end("quit")
 	attach_cpp(session)
 	var directory := _recording_directory()
@@ -912,8 +925,27 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 	_io_failed = false
 	_real_start_us = Time.get_ticks_usec()
 	_recording_id = "%d-%d" % [session.id,_real_start_us]
-	_write({"type":"header","format":"cpp_events_v1","version":1,"run_id":session.id,
-		"recording_id":_recording_id,"epoch":snapshot.value.epoch,"tick":snapshot.value.tick,"during_run":during_run})
+	_cpp_record_previous = state.value
+	_xp_start_summary = state.value.xp.duplicate(true)
+	_last_xp_summary = _xp_start_summary.duplicate(true)
+	_cpp_next_sample = _cpp_time+INTERVAL
+	_cpp_event_sequence = int(_cpp_perf_previous.get("events_emitted",0))
+	for event: Dictionary in snapshot.value.events: _cpp_event_sequence = maxi(_cpp_event_sequence,int(event.sequence))
+	var identity: Dictionary = state.value.identity.duplicate(true)
+	identity["implementation_revision"] = OS.get_environment("SPEED_BUILD_REVISION")
+	identity["implementation_version"] = "cpp_api%d_state%d" % [identity.abi_version,identity.state_schema_version]
+	identity["xp_reward_config_sha256"] = IDENTITY.digest(state.value.xp_config)
+	_write({"type":"start","format":"cpp_events_v2","version":2,"schema_version":4,"measurement_version":3,"combat_version":1,"xp_reward_version":2,
+		"stage":identity.stage_id,"start_time":_cpp_time,"run_id":session.id,"recording_id":_recording_id,"epoch":snapshot.value.epoch,"tick":snapshot.value.tick,
+		"missing_prefix":during_run,"during_run":during_run,"event_sequence_at_start":_cpp_event_sequence,"engine_version":Engine.get_version_info().string,"interval":INTERVAL,
+		"identity":identity,"run_start":session.bridge.recording_origin.duplicate(true),"recording_start":state.value,
+		"xp_config":state.value.xp_config,"xp_cumulative_at_start":_xp_start_summary,"equipment_progress":state.value.equipment_progress,
+		"combat_config":{"level":combat_level}})
+	if during_run:
+		var existing: Dictionary = state.value.existing.duplicate(true)
+		existing.merge({"type":"xp_existing","t":_cpp_time,"world_t":state.value.world_t,"xp_reward_version":2,"origin":"unobserved"},true)
+		_write(existing)
+	_flush()
 	session.tree_exiting.connect(_end.bind("quit"))
 	_update_label()
 
@@ -922,10 +954,13 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 	if _cpp_session_id==0 or frame.run_id!=_cpp_session_id: return true
 	_cpp_time = frame.ui.run_time
 	for event: Dictionary in frame.events:
-		var record: Dictionary = event.duplicate(true)
+		if int(event.sequence)<=_cpp_event_sequence: continue
+		_cpp_event_sequence = int(event.sequence)
+		var record: Dictionary = event.payload.duplicate(true)
+		for key in ["epoch","sequence","tick","t","world_t","type"]: record[key] = event[key]
 		record["run_id"] = frame.run_id
 		record["recording_id"] = _recording_id
-		_write(record)
+		_write(_cpp_record_value(record))
 	_update_label()
 	# 書込失敗は記録側で終了させる。同じ行の再試行で重複記録しない。
 	return true
@@ -952,3 +987,30 @@ func _flush_cpp_performance() -> void:
 	_cpp_perf_previous = current
 	_cpp_perf_frames = 0
 	_cpp_perf_elapsed_us = 0
+
+## 定期記録では集計だけを読み、個々の結晶は途中開始時に一度だけ写す。
+func _cpp_sample() -> void:
+	if _session==null or _session.bridge==null: return
+	var response: Dictionary = _session.bridge.read_recording()
+	if not response.ok: return
+	var current: Dictionary = response.value
+	var window := _xp_window(current.xp,_last_xp_summary,"recording_interval")
+	var record: Dictionary = current.duplicate(true)
+	record.merge({"type":"sample","run_id":_cpp_session_id,"recording_id":_recording_id,"xp_reward_version":2,"xp":window,
+		"xp_picked_actual":window.collected_actual_xp,"xp_dropped_base":_base_xp_total(window.supplied),"xp_field_base":_base_xp_total(window.ground)},true)
+	_write(record)
+	_last_xp_summary = current.xp.duplicate(true)
+	_cpp_record_previous = current
+
+static func _cpp_record_value(value: Variant) -> Variant:
+	if value is Vector2: return [value.x,value.y]
+	if value is Color: return [value.r,value.g,value.b,value.a]
+	if value is Dictionary:
+		var out := {}
+		for key in value: out[String(key)] = _cpp_record_value(value[key])
+		return out
+	if value is Array or value is PackedVector2Array:
+		var out := []
+		for item in value: out.append(_cpp_record_value(item))
+		return out
+	return value

@@ -31,6 +31,19 @@ class CombatSummaryTest(unittest.TestCase):
         self.assertEqual(len(data["observed_outcomes"]), 2)
         self.assertEqual(data["coverage"], "recorded_interval")
 
+    def test_cpp_envelopes_and_player_hp_loss(self):
+        data = self.run_rows([
+            {"type": "header", "format": "cpp_events_v1", "during_run": False},
+            {"type": "xp_drop", "sequence": 8, "payload": {"base_xp": 2}},
+            {"type": "hurt", "sequence": 9, "payload": {"amount": 100}},
+            {"type": "combat_player_damage", "sequence": 10, "payload": {"hp_before": 30, "hp_after": 28, "amount": 100, "reason": "applied", "cause": "rain"}},
+            {"type": "combat_player_damage", "sequence": 11, "payload": {"hp_before": 28, "hp_after": 28, "reason": "shield"}},
+            {"type": "end"},
+        ])
+        self.assertEqual(data["applied_damage"], {"player": 2})
+        self.assertEqual(data["sequence_gaps"], 0)
+        self.assertEqual(data["damage_reasons"], {"player:applied": 1, "player:shield": 1})
+
     def test_truncated_or_dropped_records_are_partial(self):
         data = self.run_rows([{"type": "start", "combat_version": 1}, {"type": "boss_phase", "sequence": 3}], suffix='{"type":')
         self.assertEqual(data["coverage"], "partial")

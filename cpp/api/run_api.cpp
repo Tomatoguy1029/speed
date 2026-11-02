@@ -419,6 +419,11 @@ Dictionary SpeedRunCore::metrics_run() const {
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_metrics","開始していないランです");
     return success(speed::MetricsBuilder::read(runtime));
 }
+Dictionary SpeedRunCore::recording_run(bool initial) const {
+    if (runtime.busy) return failure(7,"recording","更新中は読めません");
+    if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"recording","開始していないランです");
+    return success(speed::MetricsBuilder::recording(runtime,initial));
+}
 Dictionary SpeedRunCore::dispose_run() {
     if (runtime.busy) return failure(7,"dispose","更新中は再入できません");Guard guard(runtime.busy);
     if (!runtime.state.closed) {close();if (runtime.epoch<INT64_MAX) ++runtime.epoch;}

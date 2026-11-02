@@ -5,7 +5,7 @@ from collections import Counter
 import json
 from pathlib import Path
 
-COMBAT_TYPES = {"boss_decision", "boss_action", "boss_effect", "boss_phase", "combat_damage"}
+COMBAT_TYPES = {"combat_player_damage","boss_decision", "boss_action", "boss_effect", "boss_phase", "combat_damage"}
 
 
 def summarize(path, boss=None, action=None, timeline=False):
@@ -22,16 +22,28 @@ def summarize(path, boss=None, action=None, timeline=False):
             except (ValueError, json.JSONDecodeError) as error:
                 errors.append({"line": number, "error": str(error)[:100]})
                 continue
+            # 初期C++形式の封筒と、既存形式/移行後の平坦な行を読み分ける。
+            if isinstance(row.get("payload"), dict):
+                row = {**row["payload"], **{key: value for key, value in row.items() if key != "payload"}}
             kind = row.get("type", "unknown")
+            if kind == "header" and row.get("format") == "cpp_events_v1":
+                start = {**row, "missing_prefix": row.get("during_run")}
+            if kind == "combat_player_damage":
+                row = {**row, "target": "player", "applied": max(0, row.get("hp_before", 0) - row.get("hp_after", 0))}
             if kind == "start":
                 start = row
             if kind == "end":
                 end = row
+            cpp = str(start.get("format", "")).startswith("cpp_events_")
+            current = row.get("sequence")
+            if cpp and isinstance(current, int):
+                previous = sequence if sequence is not None else start.get("event_sequence_at_start", current - 1)
+                sequence_gaps += max(0, current - previous - 1)
+                sequence = current
             if kind not in COMBAT_TYPES:
                 continue
             combat_rows += 1
-            current = row.get("sequence")
-            if isinstance(current, int):
+            if not cpp and isinstance(current, int):
                 sequence_gaps += max(0, current - (sequence or 0) - 1)
                 sequence = current
             if boss and row.get("boss") != boss:
@@ -47,7 +59,7 @@ def summarize(path, boss=None, action=None, timeline=False):
                 # Keep interrupted, incomplete, and detached effect scopes separate.
                 key = f"{kind}/{row.get('boss', '?')}/{row.get('action', '?')}/{row.get('step', '?')}:{row['outcome']}"
                 outcomes[key] += 1
-            if kind == "combat_damage":
+            if kind in {"combat_damage", "combat_player_damage"}:
                 target = row.get("target", "unknown")
                 applied[target] += row.get("applied", 0)
                 damage_reasons[f"{target}:{row.get('reason', 'unknown')}"] += 1

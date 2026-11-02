@@ -16,6 +16,8 @@ var recording_path := ""
 var shots := ""
 
 func check(ok: bool, label: String) -> void:
+	if "--cpp-recording-sequence-fix" in OS.get_cmdline_user_args() and not (label.begins_with("開始前の通知番号") or label.begins_with("C++通知の座標")): return
+	if "--legacy-mid-fixes" in OS.get_cmdline_user_args() and not (label.begins_with("途中開始の残存結晶") or label.begins_with("重複開始で")): return
 	if ok:
 		passed += 1
 	else:
@@ -23,6 +25,17 @@ func check(ok: bool, label: String) -> void:
 		push_error("[play_recorder] " + label)
 
 func _ready() -> void:
+	if "--legacy-mid-fixes" in OS.get_cmdline_user_args():
+		await verify_mid_run_start()
+		print("[legacy_mid_fixes] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--cpp-recording" in OS.get_cmdline_user_args():
+		var finished: bool = await verify_cpp_recording()
+		check(finished,"C++録画の指定確認を最後まで実施する")
+		print("[cpp_recording] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-perf" in OS.get_cmdline_user_args() or "--cpp-perf-bytes-fixes" in OS.get_cmdline_user_args():
 		var finished: bool = await verify_cpp_perf()
 		check(finished,"C++のF3と同時録画の確認を最後まで実施する")
@@ -128,13 +141,14 @@ func verify_mid_run_start() -> void:
 		check(start.recording_start.t == 42.0 and start.recording_start.level == 3 and start.recording_start.xp == 0.125, "録画開始時の時計・レベル・XP を保存する")
 		check(start.recording_start.weapons.W01 == 2 and start.recording_start.xp_gained == 1000.0, "録画開始時の装備と累計を保存する")
 		check(start.missing_prefix and start.recording_start.trigger == "during_run", "同じ通常ランでも前半欠落を明示する")
-		var existing: Dictionary = read_rows(path)[1]
+		var existing: Dictionary = read_rows(path).filter(func(row):return row.type=="xp_existing")[0]
 		check(existing.type == "xp_existing" and existing.origin == "unobserved" and int(existing.ground[0].id) == existing_id and existing.ground[0].kind == "mid" and existing.ground[0].base_xp == run.cfg.xp_crystal_values[PickupSystem.GemKind.MID], "途中開始の残存結晶IDと値を生成不明として記録する")
 		check(start.run_start.conditions.profile == RECORDER.IDENTITY.plain(initial_profile) and start.recording_start.conditions.profile.mult.xp == 9.0, "開始時の強化と途中録画時の強化を区別する")
 		check(rec._offered.size() == run.state.cards.size(), "既に表示中のカード候補を引き継ぐ")
+		var previous_rows := read_rows(path).size()
 		rec._set_armed(true)
 		rec._begin(scene)
-		check(rec._file.get_path() == path and read_rows(path).size() == 2, "重複開始でファイルを作り直さない")
+		check(rec._file.get_path() == path and read_rows(path).size() == previous_rows, "重複開始でファイルを作り直さない")
 		run.flush_events()
 		check(read_rows(path).filter(func(row): return row.type == "hurt").is_empty(), "Ctrl+F9前から通知待ちの被弾を観測区間へ混ぜない")
 		rec._process(0.0)
@@ -742,3 +756,107 @@ func verify_cpp_perf_bytes(session: RunSession, overlay: PerfOverlay) -> bool:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	return true
+
+func verify_cpp_recording() -> bool:
+	var on: Dictionary = await cpp_recording_scenario(true)
+	var off: Dictionary = await cpp_recording_scenario(false)
+	check(not on.is_empty() and on==off,"録画の開始/停止/再開と読取でランの状態・乱数・XPを変えない")
+	return not on.is_empty() and not off.is_empty()
+
+func cpp_recording_scenario(recording: bool) -> Dictionary:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	config.gem_max = 2
+	config.xp_base = 100000.0
+	var stage := RuntimeStage.new()
+	stage.index = 88
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_recording"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"録画と経験値の対応".sha256_text())!=OK: return {}
+	var path := output.path_join("stage_88.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":688},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if session.bridge==null: session.free();return {}
+	var bridge = session.bridge
+	var core = bridge._core
+	if not core.has_method("recording_run"):
+		check(false,"C++の正しい状態から録画用の集計を読み取れる")
+		session.free()
+		return {}
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var origin: Vector2 = core.ship_snapshot().ship_pos
+	var owner: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(500,0)}).value
+	core.set_enemy_motion(owner,{"held":true})
+	var carried: int = bridge.command("dev_drop_crystal",{"position":origin+Vector2(500,0),"kind":1}).value
+	var carry_ok: bool = bridge.command("dev_carry_crystal",{"entity_id":owner,"crystal_id":carried}).ok
+	if "--cpp-recording-fix" not in OS.get_cmdline_user_args(): check(carry_ok,"途中開始前の運搬結晶を準備する")
+	for kind in 3: bridge.command("dev_drop_crystal",{"position":origin+Vector2(700,0),"kind":kind})
+	bridge.collect_frame()
+	var before: Dictionary = core.inspect()
+	var before_sequence: int = bridge.read_metrics().value.events_emitted
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	var paths: Array[String] = []
+	if recording:
+		var key := InputEventKey.new()
+		key.keycode = KEY_F9
+		key.pressed = true
+		key.ctrl_pressed = true
+		rec._input(key)
+		check(rec._file!=null and rec._cpp_session_id==session.id,"Ctrl+F9で途中のC++ランを記録する")
+		if rec._file==null: rec.free();session.free();return {}
+		paths.append(rec._file.get_path())
+		check(core.inspect()==before,"開始時のXP集計と識別情報の読取は時計・乱数を変えない")
+	bridge.command("dev_kill",{"entity_id":owner,"cause":"shot"})
+	bridge.command("dev_pickup_rates",{"ship":1.5,"run":2.0})
+	bridge.command("dev_collect_gems",{})
+	bridge.command("dev_ship_damage",{"amount":2.0,"cause":"slash"})
+	bridge.command("dev_ship_damage",{"amount":1.0,"cause":"slash"})
+	bridge.collect_frame()
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	for tick in 4: bridge.step(1.0/120.0,idle,{"logical_size":Vector2(1280,720)})
+	if recording:
+		rec._cpp_sample()
+		rec._set_armed(false)
+		rec._set_armed(true)
+		check(rec._file!=null,"録画を停止して同じランで再開する")
+		if rec._file!=null: paths.append(rec._file.get_path())
+	bridge.command("dev_drop_crystal",{"position":origin+Vector2(700,0),"kind":0})
+	bridge.collect_frame()
+	for tick in 4: bridge.step(1.0/120.0,idle,{"logical_size":Vector2(1280,720)})
+	if recording:
+		rec._set_armed(false)
+		for i in paths.size():
+			var rows := read_rows(paths[i])
+			check(not rows.is_empty(),"短いC++録画をJSONLとして読み取れる")
+			if rows.is_empty(): continue
+			var start: Dictionary = rows.front()
+			check(start.type=="start" and start.schema_version==4 and start.measurement_version==3 and start.combat_version==1 and start.xp_reward_version==2,"既存識別子とC++形式版を残す")
+			check(start.format=="cpp_events_v2" and start.identity.payload_sha256.length()==64 and start.identity.xp_reward_config_sha256.length()==64 and start.identity.implementation_version.begins_with("cpp_api"),"定義署名・報酬署名・実装版と開始条件を残す")
+			check(start.run_start.start.seed=="688" and start.missing_prefix,"開始seedと途中開始を明示する")
+			var existing: Array = rows.filter(func(row):return row.type=="xp_existing")
+			check(existing.size()==1 and existing[0].origin=="unobserved","途中開始の結晶の未観測の出所を推定しない")
+			var ending: Dictionary = rows.back()
+			check(ending.type=="end" and ending.has("xp_cumulative") and ending.has("xp_observed") and ending.has("equipment_progress"),"終了時はラン累計と録画区間を分ける")
+			if i==0:
+				check(start.event_sequence_at_start==before_sequence,"開始前の通知番号を区間の欠落として数えない")
+				check(rows.any(func(row):return row.type=="hurt" and row.pos is Array and row.pos.size()==2),"C++通知の座標を既存と同じ数値配列で記録する")
+				check(existing[0].ground.size()==2 and existing[0].carried.size()==1 and existing[0].cap.absorber_id>0,"途中開始の地面・運搬・集約先の基準XPを保存する")
+				check(rows.any(func(row):return row.type in ["xp_drop","xp_absorb"] and row.get("source","")=="crow_carry" and row.id==carried and not row.new_supply),"運搬から戻した結晶を新しい供給と混ぜない")
+				check(rows.any(func(row):return row.type=="combat_player_damage" and row.cause=="slash" and row.accepted) and rows.any(func(row):return row.type=="combat_player_damage" and not row.accepted),"機体の実HP減少と拒否理由を同じ通知経路から記録する")
+				check(ending.xp_observed.collected_actual_xp>0.0 and ending.xp_observed.supplied.high.base_xp>=0.0,"倍率適用後XPと基準XPの区間差を保存する")
+			else:
+				check(ending.xp_observed.collected_actual_xp==0.0 and ending.xp_observed.supplied.low.count==1,"再開前の取得を録画区間へ混ぜない")
+		print("[cpp_recording] output="+paths[0])
+	var result := {"inspect":core.inspect(),"xp":bridge.read_recording().value.xp,"ship":core.ship_snapshot()}
+	rec.free()
+	session.free()
+	await get_tree().process_frame
+	return result

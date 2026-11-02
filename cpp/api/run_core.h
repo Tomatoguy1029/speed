@@ -183,6 +183,7 @@ public:
     Dictionary frame_run();
     Dictionary ack_frame_run(int64_t epoch,int64_t sequence);
     Dictionary metrics_run() const;
+    Dictionary recording_run(bool initial) const;
     Dictionary render_run(const Rect2 &view,const Variant &alpha) const;
     Dictionary dispose_run();
     bool configure_content(const PackedByteArray &bytes);
