@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-rings" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_rings()
+		check(finished,"複数輪の不足条件を最後まで確認する")
+		print("[cpp_rings] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-cosmic-arrow" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_cosmic_arrow()
 		check(finished,"コズミック矢の不足条件を最後まで確認する")
@@ -898,6 +904,31 @@ func check_cpp_cosmic_arrow() -> bool:
 	check(cpp_bridge.restore(held.value).ok and cpp_core.hostiles_snapshot()==state,"コズミック矢の種類・尾・位置・速度・寿命へ復帰する")
 	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
 	check(frame.shapes.size()==1 and frame.shapes[0].cosmic and frame.shapes[0].cosmic_color_a!=frame.shapes[0].cosmic_color_b and frame.shapes[0].cosmic_star_count>0,"復帰後もコズミック専用の配色と星を使う")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()
+	return true
+
+func check_cpp_rings() -> bool:
+	if not await prepare_cpp_attack(106,"rings"): return false
+	var params := {"position":cpp_origin,"angle":0.0,"arc":PI,"radius":500.0,"speed":100.0,"width":12.0,"delay":0.2,"damage":7.0,"layers":3,"interval":0.15,"gap":0.2,"gap_arc":0.1,"gap_step":0.4}
+	var emitted: Dictionary = cpp_bridge.command("dev_fire_wave",params)
+	if not emitted.ok: check(false,"複数輪の保持確認を生成する"); cpp_session.free(); return false
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin-Vector2(45,0),"velocity":Vector2.ZERO})
+	cpp_core.step_hazards(0.8)
+	var state: Array = cpp_core.hazards_snapshot()
+	check(state.size()==3 and state.all(func(h): return h.hit),"重なった3層の輪がそれぞれ独立した一回の接触を持つ")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.shapes.size()==3 and presentation.frame_view.apply_frame(frame) and presentation.frame_view._wave_displays.size()==3,"3層の輪を独立した表示として通常画面へ渡す")
+	await get_tree().process_frame
+	var held: Dictionary = cpp_bridge.checkpoint()
+	cpp_core.step_hazards(4.5)
+	check(cpp_core.hazards_snapshot().size()==2,"遅延の小さい最初の輪から消える")
+	cpp_core.step_hazards(0.1)
+	check(cpp_core.hazards_snapshot().size()==1,"2番目の輪は自身の時刻で消える")
+	cpp_core.step_hazards(0.2)
+	check(cpp_core.hazards_snapshot().is_empty(),"最後の輪も自身の時刻で消える")
+	check(cpp_bridge.restore(held.value).ok and cpp_core.hazards_snapshot()==state,"複数輪の時刻・切れ目・独立した命中状態をまとめて復元する")
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_session.free()
 	return true
