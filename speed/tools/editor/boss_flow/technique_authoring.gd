@@ -29,7 +29,7 @@ static func create(adapter: String, id: String, title: String, script_path: Stri
 	if not belongs_to_boss: return {"error": ERR_INVALID_DATA, "message": "選択したボスの技スクリプトを選んでください。"}
 	var move: Variant = script.new()
 	if not move is BossTechnique: return {"error": ERR_INVALID_DATA, "message": "BossTechniqueを継承するスクリプトを選んでください。"}
-	var runner: RefCounted = move.make_runner()
+	var runner: RefCounted = preload("res://scripts/bosses/legacy_technique_runners.gd").make(move)
 	if runner == null or not runner.has_method("kind"): return {"error": ERR_INVALID_DATA, "message": "実行するRunnerを持つ技スクリプトを選んでください。"}
 	if adapter != "hydra" and not move.has_field("warn"): return {"error": ERR_INVALID_DATA, "message": "予告と実行処理を持つ技スクリプトを選んでください。"}
 	var prototype: Resource

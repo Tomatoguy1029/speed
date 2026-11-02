@@ -33,7 +33,7 @@ func unavailable(id: String, phase: int) -> String:
 	var maximum := 3 if actor.def.id == &"draco" else 2
 	if phase < 1 or phase > maximum: return "存在しない形態です。"
 	if actor.def.id == &"draco":
-		if move.make_runner() == null: return "技の実行スクリプトがありません。"
+		if preload("res://scripts/bosses/legacy_technique_runners.gd").make(move) == null: return "技の実行スクリプトがありません。"
 		if id == "picaro_wall":
 			for type in move.values().get("wall_candidates", [&"telescope", &"lynx"]):
 				if actor.ctx.enemies.def_of(StringName(type)) == null: return "必要な敵リソースがありません: " + String(type)

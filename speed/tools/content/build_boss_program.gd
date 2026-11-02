@@ -34,7 +34,7 @@ static func validate(source: Dictionary) -> PackedStringArray:
 	if rules != null:
 		var ids := {}
 		for move in rules.techniques:
-			if not move is BossTechnique or move.make_runner() == null:
+			if not move is BossTechnique or preload("res://scripts/bosses/legacy_technique_runners.gd").make(move) == null:
 				errors.append("技の実行スクリプトがありません")
 				continue
 			var id := String(move.technique)

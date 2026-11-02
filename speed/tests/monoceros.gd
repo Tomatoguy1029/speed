@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-data-legacy" in OS.get_cmdline_user_args() or "--cpp-data-legacy-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_data_legacy")
+		return
 	if "--cpp-charge-terrain" in OS.get_cmdline_user_args():
 		call_deferred("native_charge_terrain")
 		return
@@ -549,3 +552,24 @@ func native_charge_terrain() -> void:
 	bridge.dispose()
 	get_tree().quit(1 if failed else 0)
 	print("[cpp_monoceros_charge_terrain] failures=",failed)
+
+## PureDataを旧生成・通常のActorへ渡す、残っていた互換条件だけ確認する。
+func native_data_legacy() -> void:
+	var compiler = load("res://tools/content/build_boss_program.gd")
+	var result: Dictionary = {"error":OK,"program":load("res://.content/tests/monoceros_pure_data.tres")} if "--cpp-data-legacy-retry" in OS.get_cmdline_user_args() else compiler.build_boss("monoceros","res://.content/tests/monoceros_pure_data.tres")
+	if "--cpp-data-legacy-retry" not in OS.get_cmdline_user_args(): check(result.error==OK,"分離した編集値から通常のボス生成を完了する")
+	if result.error!=OK:
+		get_tree().quit(1)
+		return
+	var owner := MonocerosBoss.new()
+	owner.def = load("res://data/bosses/monoceros.tres")
+	var ctx := RunContext.new()
+	ctx.state = RunState.new()
+	owner.ctx = ctx
+	owner.configure_flow(result.program)
+	var move: BossTechnique = result.program.data.rules.techniques.filter(func(value): return value.technique==&"charge")[0]
+	var runner = preload("res://scripts/bosses/legacy_technique_runners.gd").make(move)
+	check(move.make_runner()==null and owner._move_kinds[&"charge"]==&"charge" and runner.kind()==&"charge","Resourceに実行コードを戻さず通常Actorの設定と実行Runnerを解決する")
+	owner.free()
+	print("[cpp_monoceros_data_legacy] failures=",failed)
+	get_tree().quit(1 if failed else 0)

@@ -60,7 +60,7 @@ func configure_flow(program: Resource) -> void:
 	_sequenced.clear()
 	for move in action_rules.techniques:
 		_moves[move.technique] = move
-		var runner: RefCounted = move.make_runner()
+		var runner: RefCounted = preload("res://scripts/bosses/legacy_technique_runners.gd").make(move)
 		_move_kinds[move.technique] = runner.kind()
 		_sequenced[move.technique] = runner.sequenced()
 	technique_visuals.configure(self, _moves)
@@ -329,7 +329,7 @@ func attack_playing() -> bool:
 	return mode != &"idle"
 
 func _begin_pass() -> void:
-	_runner = _moves[technique].make_runner()
+	_runner = preload("res://scripts/bosses/legacy_technique_runners.gd").make(_moves[technique])
 	_runner._begin_pass(self)
 
 func _tracks_during_warn() -> bool:

@@ -38,7 +38,3 @@ extends BossTechnique
 	set(value):
 		active_p2 = value
 		_values_dirty = true
-
-## 通常入口の切替前だけ、旧ボスの互換Runnerを返す。C++生成は値だけを読む。
-func make_runner() -> RefCounted:
-	return load("res://scripts/bosses/monoceros/techniques/charge.gd").Runner.new()
