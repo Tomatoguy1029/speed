@@ -29,8 +29,9 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	if _clock>float(body.clock):
 		gait = 0.0
 		_pulse_until = -1.0
+	if not state.is_empty() and int(body.phase)>int(state.phase): _pulse_until = float(body.clock)+0.35
 	pulse = maxf(0.0,_pulse_until-float(body.clock))
-	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock),body.get("burning",[]),{"position":body.position+Vector2.from_angle(float(body.facing))*float(body.radius)*0.84,"active":attack.get("technique","")=="blaze" and int(attack.get("stage",5))==0})
+	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock),body.get("burning",[]),{"position":body.position+Vector2.from_angle(float(body.facing))*float(body.radius)*0.84,"profile":attack.get("flame_profile",5),"active":attack.get("technique","")=="blaze" and int(attack.get("stage",5))==0})
 	_track_command(body,attack,dt)
 	_track_nova(body)
 	state = body

@@ -329,6 +329,79 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 				if int(asset.get("canis_flame",0))==phase: asset.path = move.flame_settings.resource_path
 	return package
 
+## 全技で同じ子技を参照し、炎と表示もスキーマの参照先に合わせてまとめる。
+static func canis_set_package(definition: BossDef, moves: Array, config: GameConfig) -> Dictionary:
+	var package := boss_body_package(definition,config)
+	if package.is_empty(): return {}
+	var sources := []
+	var identities := {}
+	var seen := {}
+	for move: BossTechnique in moves:
+		if move==null or seen.has(move.technique): return {}
+		seen[move.technique] = true
+		var part := canis_technique_package(definition,move,config)
+		if part.is_empty(): return {}
+		sources.append({"move":String(move.technique),"package":part})
+		for original: Dictionary in part.records.BossTechniqueDefinition:
+			if original.external_id!=String(move.technique): continue
+			var row := original.duplicate(true)
+			row.id = package.records.BossTechniqueDefinition.size()+1
+			identities[[row.external_id,row.phase]] = row.id
+			package.records.BossTechniqueDefinition.append(row)
+	# 単独試行で選ばれなかった内包技も、同じ参照表に一度だけ登録する。
+	for source: Dictionary in sources:
+		for original: Dictionary in source.package.records.BossTechniqueDefinition:
+			var key := [original.external_id,original.phase]
+			if identities.has(key): continue
+			var row := original.duplicate(true)
+			row.id = package.records.BossTechniqueDefinition.size()+1
+			identities[key] = row.id
+			package.records.BossTechniqueDefinition.append(row)
+	package.records.CanisFlameDefinition.clear()
+	package.visuals = package.visuals.filter(func(asset): return not asset.has("canis_flame"))
+	var resource_ids := {}
+	package.records.ResourceKey.clear()
+	for asset: Dictionary in package.visuals:
+		resource_ids[asset.id] = package.records.ResourceKey.size()+1
+		asset.id = resource_ids[asset.id]
+		package.records.ResourceKey.append({"id":asset.id,"role":asset.role})
+	for enemy: Dictionary in package.records.EnemyRecord: enemy.visual_id = resource_ids[enemy.visual_id]
+	var registered := {}
+	for source: Dictionary in sources:
+		var records := {"BossDefinition":source.package.records.BossDefinition}
+		var references := {"BossTechniqueDefinition":{}}
+		for row: Dictionary in source.package.records.BossTechniqueDefinition:
+			references.BossTechniqueDefinition[row.id] = identities[[row.external_id,row.phase]]
+		for record: Dictionary in Schema.SCHEMA.records:
+			if record.name in ["BossTechniqueDefinition","CanisBodyDefinition","CanisFlameDefinition"]: continue
+			if record.name!="BossTechniqueStage" and not String(record.name).begins_with("Canis"): continue
+			for original: Dictionary in source.package.records.get(record.name,[]):
+				var move: String = source.package.records.BossTechniqueDefinition[original.technique-1].external_id
+				if move!=source.move and seen.has(StringName(move)): continue
+				var key := [record.name,references.BossTechniqueDefinition[original.technique],original.id if record.name=="BossTechniqueStage" else 0]
+				if registered.has(key): continue
+				registered[key] = true
+				if not records.has(record.name): records[record.name] = []
+				var row := original.duplicate(true)
+				row.id = records[record.name].size()+1
+				records[record.name].append(row)
+				for field: Dictionary in record.fields:
+					if field.get("ref","")!="CanisFlameDefinition": continue
+					var profile: Dictionary = source.package.records.CanisFlameDefinition[row[field.name]-1]
+					if not records.has("CanisFlameDefinition"): records.CanisFlameDefinition = []
+					if not records.CanisFlameDefinition.any(func(value): return value.id==profile.id): records.CanisFlameDefinition.append(profile)
+		var maps := merge_boss_records(package.records,records,references)
+		for original: Dictionary in source.package.visuals:
+			if not original.has("canis_flame") and not original.has("canis_burst"): continue
+			if original.has("canis_flame") and not maps.get("CanisFlameDefinition",{}).has(original.canis_flame): continue
+			var asset := original.duplicate(true)
+			if asset.has("canis_flame"): asset.canis_flame = maps.CanisFlameDefinition[asset.canis_flame]
+			if asset.has("canis_burst"): asset.canis_burst = maps.CanisBlazeDefinition[asset.canis_burst]
+			asset.id = package.records.ResourceKey.size()+1
+			package.records.ResourceKey.append({"id":asset.id,"role":asset.role})
+			package.visuals.append(asset)
+	return package
+
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
 	if move!=null and move.technique in [&"combo_rain_volley",&"combo_shower_shot"]: return centaurus_combo_records(definition,move)
@@ -428,18 +501,26 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 
 ## 種類別の索引と参照を共通スキーマから付け替え、複数技を一つへまとめる。
 static func merge_centaurus_records(target: Dictionary, source: Dictionary) -> void:
-	var offsets := {}
-	for key in source: offsets[key] = target.get(key,[]).size() if key!="BossDefinition" else 0
-	for record in Schema.SCHEMA.records:
+	merge_boss_records(target,source)
+
+static func merge_boss_records(target: Dictionary, source: Dictionary, references: Dictionary = {}) -> Dictionary:
+	var maps := references.duplicate(true)
+	maps.BossDefinition = {1:1}
+	for key in source:
+		if key=="BossDefinition": continue
+		if not target.has(key): target[key] = []
+		maps[key] = {}
+		for row: Dictionary in source[key]: maps[key][row.id] = target[key].size()+maps[key].size()+1
+	for record: Dictionary in Schema.SCHEMA.records:
 		if record.name not in source or record.name=="BossDefinition": continue
-		if not target.has(record.name): target[record.name] = []
 		for original: Dictionary in source[record.name]:
-			var row: Dictionary = original.duplicate(true)
-			row.id += offsets[record.name]
-			for field in record.fields:
-				if field.has("ref"): row[field.name] += int(offsets.get(field.ref,0))
+			var row := original.duplicate(true)
+			row.id = maps[record.name][row.id]
+			for field: Dictionary in record.fields:
+				if field.has("ref") and maps.has(field.ref): row[field.name] = maps[field.ref][row[field.name]]
 			target[record.name].append(row)
 	if target.get("BossDefinition",[]).is_empty(): target.BossDefinition = source.BossDefinition
+	return maps
 
 ## 連携は子の値を保持し、前半の硬直を挟まずgapから後半へ進む。
 static func centaurus_combo_records(definition: BossDef, move: BossTechnique, parts: Array = []) -> Dictionary:
@@ -939,7 +1020,7 @@ static func hydra_technique_package(definition: BossDef, move: BossTechnique, co
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
-	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"draco"]: return {}
+	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"draco"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
 	var source: Dictionary = BossProgram.snapshot(program) if not program.is_empty() else {"rules":load("res://data/bosses/ai/"+str(definition.id)+"_action_rules.tres"),"flow":load("res://data/bosses/ai/"+str(definition.id)+"_flow.tres")}
@@ -947,8 +1028,11 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 	var flow: Resource = source.get("flow")
 	if rules==null or flow==null or not BossProgram.validate(source).is_empty(): return {}
 	if String(rules.adapter)!=String(definition.id): return {}
-	var techniques := boss_technique_set_records(definition,rules.techniques)
-	if techniques.is_empty(): return {}
+	if definition.id==&"canis_major":
+		package = canis_set_package(definition,rules.techniques,config)
+		if package.is_empty(): return {}
+	var techniques: Dictionary = {} if definition.id==&"canis_major" else boss_technique_set_records(definition,rules.techniques)
+	if techniques.is_empty() and definition.id!=&"canis_major": return {}
 	if definition.id==&"centaurus": merge_centaurus_records(package.records,techniques)
 	else:
 		for key in techniques: package.records[key] = techniques[key]
@@ -1909,8 +1993,10 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 					if row.condition>0: row.condition = maps.BossFlowCondition[row.condition]
 				data[record.name].append(row)
 		for original: Dictionary in package.visuals:
-			if not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish: continue
+			if not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish and not original.has("canis_flame") and not original.has("canis_burst") and not original.get("canis_burning",false) and not original.get("canis_trail",false): continue
 			var visual := original.duplicate(true)
+			if visual.has("canis_flame"): visual.canis_flame = maps.CanisFlameDefinition[visual.canis_flame]
+			if visual.has("canis_burst"): visual.canis_burst = maps.CanisBlazeDefinition[visual.canis_burst]
 			visual.id = data.ResourceKey.size()+1
 			data.ResourceKey.append({"id":visual.id,"role":visual.role})
 			visuals.append(visual)

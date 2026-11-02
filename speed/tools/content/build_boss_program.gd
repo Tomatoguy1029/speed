@@ -108,7 +108,7 @@ static func snapshot(value: Variant) -> Variant:
 	if value is Script: return value
 	# 外部シーンを複製すると生成済み .tres のサブリソースになり、
 	# 戦闘描画が resource_path から元のシーンを再ロードできなくなる。
-	if value is PackedScene: return value
+	if value is PackedScene or value is PixelFireSettings: return value
 	if value is Resource:
 		var copy: Resource = value.duplicate(true)
 		for property in value.get_property_list():

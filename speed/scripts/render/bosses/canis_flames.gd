@@ -88,7 +88,7 @@ func apply_frame(rows: Array, clock: float, burning: Array = [], mouth: Dictiona
 	if not mouth.is_empty() and (mouth.get("active",false) or rows.any(func(row): return row.kind==3) or not fading.is_empty()):
 		var key := "口元の点火"
 		seen[key] = true
-		_cloud(key,presets.get(5),[{"pos":mouth.position,"radius":28.0,"seed":0}],clock)
+		_cloud(key,presets.get(mouth.get("profile",5)),[{"pos":mouth.position,"radius":28.0,"seed":0}],clock)
 	for id in bursts.keys():
 		var event: Dictionary = bursts[id]
 		var preset: PixelFireSettings = burst_presets.get(event.profile)

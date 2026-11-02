@@ -2,6 +2,7 @@
 extends Node
 var failed := 0
 func check(ok: bool, message: String) -> void:
+	if "--cpp-canis-finish-retry" in OS.get_cmdline_user_args() and (message.begins_with("全技の共通パッケージを開始する") or message.begins_with("連携の内包技も同じ24件") or message.begins_with("通常HP・低HPに対応する形態を選ぶ")): return
 	if "--cpp-centaurus-combo-shower-tail" in OS.get_cmdline_user_args() and message not in ["強弓の予告が終わるとコズミックの矢を放つ","後半の強弓の姿勢と矢を正式表示へ渡す","強弓の硬直で連携を自然終了し、放った矢は残す","降り矢・強弓の戦闘とcueを同じ通知経路へ送る","前半の取消・参加者消失で降り矢を消して強弓を始めない"]: return
 	if "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args() and not message.begins_with("弧の中心") and not message.begins_with("弧の終端") and not message.begins_with("硬直が終わっても") and not message.begins_with("次の帆走") and not message.begins_with("取消で護衛"): return
 	if not ok:
@@ -13,6 +14,12 @@ func _ready() -> void:
 		return
 	if "--cpp-hydra-blades" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_blades")
+		return
+	if "--cpp-canis-finish-display" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_finish_display")
+		return
+	if "--cpp-canis-finish" in OS.get_cmdline_user_args():
+		call_deferred("native_canis_finish")
 		return
 	if "--cpp-hydra-fixed-retry" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_fixed_interrupt")
@@ -4539,4 +4546,133 @@ func native_hydra_blades_origin() -> void:
 	bridge._core.step(0.16);bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0]
 	check(body.effects.size()==2 and body.effects[0].id<body.effects[1].id and ((body.effects[1].points[0]+body.effects[1].points[12])*0.5).distance_to(body.necks[1].position)<0.001,"空き行の再利用後も2枚目を生成順に出力し、現在の頭を起点にする")
 	bridge.dispose();print("[cpp_hydra_blades_origin] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 全技を同じ制作パッケージから通常選択し、決着へつなぐ。
+func canis_finish_case(name := "", low := false, limit := -1.0) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.base_hp = 10000.0
+	cfg.character_scale = 1.0
+	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
+	for key in ["death_freeze_time","death_explosion_time","death_game_over_time"]: cfg.set(key,0.01)
+	var boss = load("res://data/bosses/canis_major.tres").duplicate(true)
+	boss.speed = 0.0
+	boss.params.initial_wait = 0.0
+	boss.params.phase_time = 0.01
+	var rules = load("res://data/bosses/ai/canis_major_action_rules.tres").duplicate(true)
+	var flow = load("res://data/bosses/ai/canis_major_flow.tres").duplicate(true)
+	if not name.is_empty():
+		flow.sections = [{"request":"any","allowed_techniques":[name],"cap":3.0,"action_count":1,"next":0,"weights":{"single":1.0,"combo":1.0,"major":1.0}}]
+	var stage := RuntimeStage.new()
+	stage.time_limit = limit
+	stage.legendary_module_id = ContentManager.stage(3).legendary_module_id
+	var package: Dictionary = builder.boss_package(boss,cfg,stage,{"rules":rules,"flow":flow})
+	if package.is_empty(): return {}
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":187,"mode":1,"stage_id":"B_canis_major_finish","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(187,{"position":Vector2(500,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(500,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(500,0),Vector2(500,0),Vector2(2000,1500))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	if low:
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+		bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp*0.6,"cause":"debug","no_crit":true})
+		bridge._core.step(0.01)
+		bridge._core.step(0.01)
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(package.visuals)
+	view.setup(scope,entries,1.0)
+	bridge.subscribe("表示",view.receive_frame)
+	return {"bridge":bridge,"id":id,"package":package,"events":events,"view":view,"scope":scope}
+
+func native_canis_finish() -> void:
+	var activated: Array[String] = []
+	var cues := {"command":"command","howl":"howl","pounce":"pounce","sirius":"sirius","bay":"pounce","blaze":"blaze_ignite","stream":"stream_launch","hunt":"stream_launch","hunt_pounce":"stream_launch","nova":"nova_flash","relay":"relay_fire","sirius_flame":"flame_start"}
+	for name: String in cues:
+		var f := canis_finish_case(name,name in ["sirius","blaze","hunt","nova","relay","sirius_flame"])
+		check(not f.is_empty(),"全技の共通パッケージを開始する: "+name)
+		if f.is_empty(): get_tree().quit(1); return
+		var bridge = f.bridge
+		check(f.package.records.BossTechniqueDefinition.size()==24 and f.package.records.CanisStreamDefinition.size()==2 and f.package.records.CanisPounceDefinition.size()==2,"連携の内包技も同じ24件の定義を参照する: "+name)
+		var selected := false
+		var emitted := false
+		for tick in 1200:
+			bridge._core.step(0.01)
+			var states: Array = bridge.command("dev_boss_state").value
+			selected = selected or states.any(func(row): return row.technique==name)
+			bridge.collect_frame()
+			emitted = f.events.any(func(event): return event.type==&"canis_cue" and event.payload.cue==cues[name])
+			if emitted: break
+		check(selected and emitted,"制作の条件・予算・通常選択から実際に発動する: "+name)
+		if selected and emitted: activated.append(name)
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+		check(body.phase==(2 if name in ["sirius","blaze","hunt","nova","relay","sirius_flame"] else 1),"通常HP・低HPに対応する形態を選ぶ: "+name)
+		check(f.view.apply_frame(bridge.read_render(Rect2(-2000,-1500,4000,3000)).value) and f.view._boss_body_displays.values()[0].technique.get("technique","")==name,"全技の発動状態を正式表示へ渡す: "+name)
+		var clocks: Dictionary = bridge.command("dev_boss_flow_state").value[0]
+		bridge._core.step(0.001)
+		check(is_equal_approx(bridge.command("dev_boss_flow_state").value[0].clock,clocks.clock),"技中はフローの時計を進めない: "+name)
+		bridge.dispose()
+		f.view.queue_free()
+	print("[cpp_canis_finish] 通常選択から実発動=",activated)
+	var f := canis_finish_case("nova",true)
+	var bridge = f.bridge
+	bridge._core.step(0.01)
+	bridge._core.step(0.02)
+	check(bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"}).ok,"低HP形態の本体を撃破できる")
+	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunState.Phase.FINISHING,"撃破から共通の決着へ進む")
+	check(bridge.command("dev_boss_body_state").value[0].flames.is_empty() and bridge.command("dev_boss_body_state").value[0].nova.is_empty(),"撃破で残留炎と閃光を解放する")
+	centaurus_finish_steps(bridge,23)
+	var frame: Dictionary = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Clear" and f.events.any(func(event): return event.type==&"clear_banner"),"CLEARと勝利通知を一度確定する")
+	check(bridge.collect_frame().ok and bridge.delivery_error.ok,"決着と勝利を共通の通知経路へ渡す")
+	bridge.dispose()
+	f.view.queue_free()
+	f = canis_finish_case("",false,0.01)
+	bridge = f.bridge
+	centaurus_finish_steps(bridge,2)
+	check(bridge.command("dev_boss_body_state").value[0].mode==3,"時間切れで最終攻撃を始める")
+	f.view.apply_frame(bridge.read_render(Rect2(-2000,-1500,4000,3000)).value)
+	check(f.view._boss_final_beams.size()==1 and is_equal_approx(f.view._boss_final_beams.values()[0].width,bridge.command("dev_boss_body_state").value[0].final_width),"最終攻撃の幅と位置を共通の正式ビームへ渡す")
+	centaurus_finish_steps(bridge,24)
+	frame = bridge.read_frame().value
+	check(frame.result!=null and frame.result.kind=="Death" and frame.result.last_damage.cause==&"final_strike","時間切れの最終攻撃から敗北へ進む")
+	bridge.dispose()
+	f.view.queue_free()
+	f = canis_finish_case("relay",true)
+	bridge = f.bridge
+	bridge._core.step(0.01)
+	check(bridge.command("abort",{"reason":0}).ok and bridge.read_frame().value.result.kind=="Abort" and bridge.command("dev_boss_body_state").value[0].mode==5,"途中中断は本体を取消し、勝利を付けずに終える")
+	check(bridge.command("dev_boss_body_state").value[0].flames.is_empty(),"途中中断で残留攻撃を解放する")
+	bridge.dispose()
+	f.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_finish] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_canis_finish_display() -> void:
+	var f := canis_finish_case()
+	check(not f.is_empty(),"全技を持つ表示確認のランを開始する")
+	if f.is_empty(): get_tree().quit(1); return
+	var assets_ready := true
+	for asset: Dictionary in f.package.visuals:
+		if asset.has("canis_flame") or asset.has("canis_burst"): assets_ready = not asset.path.is_empty() and f.scope.resources.has(asset.path) and assets_ready
+	check(assets_ready,"全技の炎と爆発が外部表示資源を参照する")
+	check(f.view.apply_frame(f.bridge.read_render(Rect2(-2000,-1500,4000,3000)).value),"全技の表示資源を正式表示へ接続する")
+	var flames = f.view._boss_body_displays.values()[0].flames
+	check(flames.presets.size()==f.package.records.CanisFlameDefinition.size() and flames.burst_presets.size()==2 and flames.burning_preset!=null and flames.trail_preset!=null,"全技分の炎・爆発・燃える猟犬・焼け跡を保持する")
+	f.bridge.dispose()
+	f.view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_canis_finish_display] failures=",failed)
 	get_tree().quit(1 if failed else 0)

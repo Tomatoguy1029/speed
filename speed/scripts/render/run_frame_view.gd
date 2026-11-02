@@ -78,6 +78,8 @@ var _pulser_parent: Node2D
 var _phoenix_visual: EnemyVisual
 var _picaro_sprites := {}
 var _picaro_material: ShaderMaterial
+const BOSS_FINAL_BEAM := preload("res://scenes/render/boss_final_beam.tscn")
+var _boss_final_beams := {}
 var _boss_body_displays := {}
 var _boss_technique_visual: Node2D
 var _boss_lance_visual: Node2D
@@ -829,6 +831,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		for body: Dictionary in frame.boss_bodies: waves.append_array(body.get("horn_waves",[]))
 		_boss_wave_visual.apply_frame(waves,float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
 		_boss_sword_visual.apply_frame(float(frame.boss_bodies[0].clock) if not frame.boss_bodies.is_empty() else _sniper_world_time)
+	_sync_cpp_boss_final_beams(frame.get("boss_bodies",[]))
 	var body_seen := {}
 	_sync_cpp_picaro(frame.get("boss_bodies",[]))
 	for body: Dictionary in frame.get("boss_bodies",[]):
@@ -1577,3 +1580,28 @@ func _sync_cpp_picaro(bodies: Array) -> void:
 		if not used.has(id):
 			_picaro_sprites[id].queue_free()
 			_picaro_sprites.erase(id)
+
+## 最終攻撃も、各ボスの戦闘状態を読み取る同じ表示経路へ通す。
+func _sync_cpp_boss_final_beams(bodies: Array) -> void:
+	var seen := {}
+	for body: Dictionary in bodies:
+		if int(body.mode)!=3 or float(body.get("final_alpha",0.0))<=0.0: continue
+		seen[body.id] = true
+		if not _boss_final_beams.has(body.id):
+			var line: Line2D = BOSS_FINAL_BEAM.instantiate()
+			_pulser_parent.add_child(line)
+			_boss_final_beams[body.id] = line
+		var line: Line2D = _boss_final_beams[body.id]
+		line.points = PackedVector2Array([body.position,body.final_to])
+		line.width = body.final_width
+		line.modulate.a = body.final_alpha
+		var material := line.material as ShaderMaterial
+		material.set_shader_parameter("tint",EFFECT_SETTINGS.tinted("boss/final_strike",Color(1,0.25,0.4)))
+		material.set_shader_parameter("clock",body.final_clock)
+		material.set_shader_parameter("warning",body.final_warning)
+		material.set_shader_parameter("span",body.position.distance_to(body.final_to))
+		material.set_shader_parameter("thickness",body.final_width)
+	for id in _boss_final_beams.keys():
+		if not seen.has(id):
+			_boss_final_beams[id].queue_free()
+			_boss_final_beams.erase(id)
