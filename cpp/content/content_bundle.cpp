@@ -161,9 +161,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         for (const auto &stage:bundle->boss_stages) if (stage.technique==p.id) stages.push_back(stage);
         if (p.kind==16) {
             const auto combo=std::find_if(bundle->centaurus_combos.begin(),bundle->centaurus_combos.end(),[&](const auto &v){return v.technique==p.id;});
-            if (combo==bundle->centaurus_combos.end() || bundle->bosses[p.boss-1].kind!=1 || p.external_id!="combo_rain_volley" || !stages.empty()) return {};
+            if (combo==bundle->centaurus_combos.end() || bundle->bosses[p.boss-1].kind!=1 || (p.external_id!="combo_rain_volley" && p.external_id!="combo_shower_shot") || !stages.empty()) return {};
             const auto &a=bundle->boss_techniques[combo->first-1],&b=bundle->boss_techniques[combo->second-1];
-            if (a.kind!=10 || b.kind!=8 || a.boss!=p.boss || b.boss!=p.boss || a.phase!=p.phase || b.phase!=p.phase) return {};continue;
+            if ((p.external_id=="combo_rain_volley"?(a.kind!=10 || b.kind!=8):(a.kind!=14 || a.external_id!="shower_chase" || b.kind!=11)) || a.boss!=p.boss || b.boss!=p.boss || a.phase!=p.phase || b.phase!=p.phase) return {};continue;
         }
         if (p.kind==15) {
             const auto sail=std::find_if(bundle->centaurus_sails.begin(),bundle->centaurus_sails.end(),[&](const auto &v){return v.technique==p.id;});

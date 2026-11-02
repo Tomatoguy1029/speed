@@ -92,7 +92,7 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if move!=null and move.technique==&"combo_rain_volley": return centaurus_combo_records(definition,move)
+	if move!=null and move.technique in [&"combo_rain_volley",&"combo_shower_shot"]: return centaurus_combo_records(definition,move)
 	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot",&"stomp",&"fan_volley",&"sail_run",&"shower_chase",&"shower_wall",&"shower_path"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusShowerDefinition":[],"CentaurusFanDefinition":[],"CentaurusSailDefinition":[],"CentaurusComboDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
@@ -204,9 +204,11 @@ static func merge_centaurus_records(target: Dictionary, source: Dictionary) -> v
 
 ## 連携は子の値を保持し、前半の硬直を挟まずgapから後半へ進む。
 static func centaurus_combo_records(definition: BossDef, move: BossTechnique, parts: Array = []) -> Dictionary:
-	if move.technique!=&"combo_rain_volley": return {}
-	if parts.is_empty(): parts = [load("res://data/bosses/centaurus_moves/rain.tres"),load("res://data/bosses/centaurus_moves/volley.tres")]
-	if parts.size()!=2 or parts[0].technique!=&"rain" or parts[1].technique!=&"volley": return {}
+	if move.technique not in [&"combo_rain_volley",&"combo_shower_shot"]: return {}
+	var names: Array = ["rain","volley"] if move.technique==&"combo_rain_volley" else ["shower_chase","power_shot"]
+	if parts.is_empty():
+		for name in names: parts.append(load("res://data/bosses/centaurus_moves/"+name+".tres"))
+	if parts.size()!=2 or str(parts[0].technique)!=names[0] or str(parts[1].technique)!=names[1]: return {}
 	var records := centaurus_technique_records(definition,parts[0])
 	var second := centaurus_technique_records(definition,parts[1])
 	if records.is_empty() or second.is_empty(): return {}
@@ -242,7 +244,7 @@ static func centaurus_stomp_feet(animation: Resource, technique: int) -> Array:
 ## 個別移行済みの技を、共通本体と同じ制作入口へまとめる。
 static func centaurus_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, parts: Array = []) -> Dictionary:
 	var package := boss_body_package(definition,config)
-	var records := centaurus_combo_records(definition,move,parts) if move.technique==&"combo_rain_volley" else centaurus_technique_records(definition,move)
+	var records := centaurus_combo_records(definition,move,parts) if move.technique in [&"combo_rain_volley",&"combo_shower_shot"] else centaurus_technique_records(definition,move)
 	if package.is_empty() or records.is_empty(): return {}
 	var offset: int = package.records.LightArrowDefinition.size()
 	for style in records.LightArrowDefinition:
@@ -259,9 +261,13 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 	var arrow_scene: PackedScene = move.get("shot_visual")
 	if move.technique in [&"shower_chase",&"shower_wall",&"shower_path"]: arrow_scene = load("res://data/bosses/centaurus_moves/fan_volley.tres").shot_visual
 	var scenes: Array = [arrow_scene,move.visual]
-	if move.technique==&"combo_rain_volley":
-		if parts.is_empty(): parts = [load("res://data/bosses/centaurus_moves/rain.tres"),load("res://data/bosses/centaurus_moves/volley.tres")]
-		for part in parts: scenes.append_array([part.get("shot_visual"),part.visual])
+	if move.technique in [&"combo_rain_volley",&"combo_shower_shot"]:
+		if parts.is_empty():
+			for name in (["rain","volley"] if move.technique==&"combo_rain_volley" else ["shower_chase","power_shot"]): parts.append(load("res://data/bosses/centaurus_moves/"+name+".tres"))
+		for part in parts:
+			var shot: PackedScene = part.get("shot_visual")
+			if shot==null and str(part.technique).begins_with("shower_"): shot = load("res://data/bosses/centaurus_moves/fan_volley.tres").shot_visual
+			scenes.append_array([shot,part.visual])
 	for scene: PackedScene in scenes:
 		if scene==null: continue
 		var asset: int = package.records.ResourceKey.size()+1

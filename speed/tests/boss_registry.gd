@@ -2,10 +2,15 @@
 extends Node
 var failed := 0
 func check(ok: bool, message: String) -> void:
+	if "--cpp-centaurus-combo-shower-tail" in OS.get_cmdline_user_args() and message not in ["強弓の予告が終わるとコズミックの矢を放つ","後半の強弓の姿勢と矢を正式表示へ渡す","強弓の硬直で連携を自然終了し、放った矢は残す","降り矢・強弓の戦闘とcueを同じ通知経路へ送る","前半の取消・参加者消失で降り矢を消して強弓を始めない"]: return
+	if "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args() and not message.begins_with("弧の中心") and not message.begins_with("弧の終端") and not message.begins_with("硬直が終わっても") and not message.begins_with("次の帆走") and not message.begins_with("取消で護衛"): return
 	if not ok:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-centaurus-combo-shower" in OS.get_cmdline_user_args() or "--cpp-centaurus-combo-shower-tail" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_combo_shower")
+		return
 	if "--cpp-centaurus-combo-rain" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_combo_rain")
 		return
@@ -1967,4 +1972,69 @@ func native_centaurus_combo_rain() -> void:
 		bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_combo_rain] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 追跡する降り矢から照準固定の強弓へ進む。
+func native_centaurus_combo_shower() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/centaurus_moves/combo_shower_shot.tres")
+	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
+	check(records.CentaurusComboDefinition.size()==2 and records.CentaurusComboDefinition[0].gap==move.gap and records.CentaurusShowerDefinition[0].pattern==0 and records.CentaurusPowerDefinition[0].technique==3 and records.BossTechniqueDefinition[4].cd==move.cd and move.make_runner()==null,"降り矢と強弓の全値・形態別参照・連携の値を生成する")
+	var c := centaurus_combo_case(true)
+	check(not c.is_empty(),"追跡する降り矢・強弓・固有外観を同じ制作入口で読む")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":5})
+	bridge._core.step(0.02)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.technique=="shower_chase" and t.combo=="combo_shower_shot" and t.shower.marks.size()==1 and not t.shower.marks[0].landed,"前半の遅延予告は追跡する降り矢の判定・時計を使う")
+	bridge._core.step(0.031)
+	check(bridge.command("dev_boss_state").value[0].shower.marks[0].landed,"前半の印は自身のmark_timeで一度だけ着弾する")
+	bridge._core.step(0.031)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.combo_waiting and t.shower.marks.is_empty() and is_equal_approx(t.remaining,0.05),"降り矢の表示と攻撃を閉じ、前半の硬直を挟まずgapへ進む")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.051)
+	t = bridge.command("dev_boss_state").value[0]
+	var after: Dictionary = t.duplicate(true)
+	check(t.technique=="power_shot" and t.combo_step==1 and t.stage==0 and is_zero_approx(t.elapsed),"次の更新で強弓自身の予告を始める")
+	check(bridge.restore(held.value).ok,"降り矢終了後のgapと子の値を途中復帰する")
+	bridge._core.step(0.051)
+	check(bridge.command("dev_boss_state").value[0]==after,"復帰後も同じ境界で強弓へ進む")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.011)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.alerting,"後半は強弓自身のalert時刻で照準を固定する")
+	bridge._core.step(0.011)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.released==1 and bridge._core.hostiles_snapshot().size()==1 and bridge._core.hostiles_snapshot()[0].kind==builder.Schema.ENUMS.HostileKind.CosmicArrow,"強弓の予告が終わるとコズミックの矢を放つ")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,1.0)
+	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0].technique.technique=="power_shot","後半の強弓の姿勢と矢を正式表示へ渡す")
+	bridge._core.step(0.051)
+	bridge._core.step(0.031)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge._core.hostiles_snapshot().size()==1,"強弓の硬直で連携を自然終了し、放った矢は残す")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"降り矢・強弓の戦闘とcueを同じ通知経路へ送る")
+	bridge.dispose()
+	view.queue_free()
+	for remove in [false,true]:
+		c = centaurus_combo_case(true)
+		bridge = c.bridge
+		var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":5}).value
+		bridge._core.step(0.02)
+		if remove: bridge.command("dev_remove",{"entity_id":c.id})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket})
+		bridge._core.step(0.6)
+		t = bridge.command("dev_boss_state").value[0]
+		check(t.stage==7 and t.shower.marks.is_empty() and bridge._core.hostiles_snapshot().is_empty(),"前半の取消・参加者消失で降り矢を消して強弓を始めない")
+		bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_combo_shower] failures=",failed)
 	get_tree().quit(1 if failed else 0)
