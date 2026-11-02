@@ -299,6 +299,115 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "RearDefinition",
+      "section": 40,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pierce",
+          "type": "u32"
+        },
+        {
+          "name": "color",
+          "type": "u32"
+        },
+        {
+          "name": "mount_x",
+          "type": "f64"
+        },
+        {
+          "name": "mount_y",
+          "type": "f64"
+        },
+        {
+          "name": "muzzle_distance",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "RearPostDefinition",
+      "section": 41,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

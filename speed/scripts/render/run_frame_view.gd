@@ -21,6 +21,11 @@ var _gunner_marks: DrawLayer
 var _effects: PixelPainter
 var _flashes := ShotFlashes.new()
 var _scatter_flashes := ShotFlashes.new()
+var _rear_flashes := ShotFlashes.new()
+var _rear_shells: Array[Dictionary] = []
+var _rear_world_time := -1.0
+var _rear_canvas: DrawLayer
+var _rear_frame: Dictionary = {}
 var _scatter_world_time := -1.0
 var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
@@ -54,6 +59,14 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	for entry in entries: visuals[int(entry.id)] = entry
 	for entry: Dictionary in entries:
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
+	_rear_canvas = DrawLayer.new()
+	_layer(18).add_child(_rear_canvas)
+	_rear_canvas.draw_fn = func(canvas: CanvasItem):
+		if _rear_frame.is_empty() or not _rear_frame.rear.ready or not _ship_visible: return
+		var ui: Dictionary = _rear_frame
+		var color := Color("#ff6b5a") if ui.ship.ship_hurt>0.0 else Color.WHITE
+		if ui.ship.ship_invuln>0.0 and fmod(ui.world_time*20.0,2.0)<1.0: color.a = 0.5
+		preload("res://scripts/render/equipment/rear.gd").frame_extra(canvas,_scope.resources.get("res://assets/pixel/airship_turret_base.png"),_scope.resources.get("res://assets/pixel/airship_turret.png"),_ship_visual_position,ui.ship.ship_pos,ui.ship.ship_heading,ui.rear.mount,ui.rear.aim,ui.rear.recoil,ui.character_scale,color)
 	_shield_holder = Node2D.new()
 	_layer(18).add_child(_shield_holder)
 	var transfer_layer := CanvasLayer.new()
@@ -322,6 +335,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		_forward_world_time = -1.0
 		_scatter_flashes = ShotFlashes.new()
 		_scatter_world_time = -1.0
+		_rear_flashes = ShotFlashes.new()
+		_rear_shells.clear()
+		_rear_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_meteor_shards.clear()
@@ -341,6 +357,15 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_scatter:
 		_scatter_flashes = ShotFlashes.new()
 		_scatter_world_time = -1.0
+	var equipped_rear: bool = frame.ui.get("weapon_levels",[]).any(func(item): return item.id=="W23")
+	if not equipped_rear:
+		_rear_flashes = ShotFlashes.new()
+		_rear_shells.clear()
+		_rear_world_time = -1.0
+	_rear_frame = frame.ui
+	_rear_canvas.visible = equipped_rear and _ship_visible
+	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
+	_rear_canvas.queue_redraw()
 	_zoom = frame.camera.zoom
 	for event: Dictionary in _queued_events:
 		if event.type==&"shield_stolen":
@@ -367,6 +392,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*2.4,"color":Color("#ffe27a"),"life":duration,"max":duration})
 			_burst(event.pos,Color("#ffd23f"),14,360.0)
 		if event.type==&"ship_explode": _death_burst(event.pos)
+		if equipped_rear: preload("res://scripts/render/equipment/rear.gd").frame_event(_rear_flashes,_rear_shells,event,frame.ui.ship.ship_heading,frame.ui.rear.mount)
 		if equipped_scatter: preload("res://scripts/render/equipment/scatter.gd").frame_event(_scatter_flashes,event)
 		if equipped_forward: preload("res://scripts/render/equipment/forward.gd").frame_event(_flashes,event)
 	_queued_events.clear()
@@ -416,6 +442,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var rear_dt: float = 0.0 if _rear_world_time<0.0 else maxf(0.0,ui.world_time-_rear_world_time)
+	_rear_world_time = ui.world_time if equipped_rear else -1.0
+	preload("res://scripts/render/equipment/rear.gd").frame_draw(_rear_flashes,_rear_shells,_effects,rear_dt,ui.rear.mount,ui.rear.aim,equipped_rear)
 	_effects.end()
 	perf.since(&"view_geometry.attacks",draw_start)
 	if active and not ui.draw.drawing and ui.hitstop<=0.0:

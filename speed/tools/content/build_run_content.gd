@@ -149,6 +149,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.LoadoutDefinition.append({"id":scatter_id,"kind":0,"maximum_level":scatter.level_steps.size(),"external_id":"W02","comet_only":scatter.comet_only})
 	for level in scatter.level_steps.size():
 		data.ScatterDefinition.append({"id":level+1,"weapon":scatter_id,"level":level+1,"interval":float(scatter.params.interval_by_level[level]),"damage":float(scatter.params.damage_by_level[level]),"shots":int(scatter.params.shots_by_level[level]),"life":float(scatter.params.life),"spread":float(scatter.params.spread_step),"knock":float(scatter.params.knock)})
+	var rear := load("res://data/weapons/W23_rear.tres") as WeaponDef
+	if rear==null: return {}
+	var rear_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":rear_id,"kind":0,"maximum_level":rear.level_steps.size(),"external_id":"W23","comet_only":rear.comet_only})
+	var mount: Vector2 = preload("res://scripts/weapons/rear.gd").MOUNT_PIXEL-Vector2(15.5,30.0)
+	for level in rear.level_steps.size():
+		data.RearDefinition.append({"id":level+1,"weapon":rear_id,"level":level+1,"interval":float(rear.params.interval_by_level[level]),"damage":float(rear.params.damage_by_level[level]),"pierce":int(rear.params.pierce_by_level[level]),"life":float(rear.params.life),"spread":float(rear.params.spread_step),"knock":float(rear.params.knock),"color":Color(rear.params.color).to_rgba32(),"mount_x":mount.x,"mount_y":mount.y,"muzzle_distance":12.5})
 	if config.post_max==null: return {}
 	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
 	var crit_definition := load("res://data/traits/T09_critRate.tres") as TraitDef
@@ -159,6 +166,9 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":2,"equipment":scatter_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(scatter.id).has("followup") else 0.0})
 	var target: Dictionary = config.post_max.target(scatter.id)
 	data.ScatterPostDefinition = [{"id":1,"interval_increment":float(config.post_max.increments.get("weapon_interval",0.0)) if target.has("interval") else 0.0,"projectile_increment":float(config.post_max.increments.get("projectile_speed",0.0)) if target.has("projectile") else 0.0,"duration_increment":float(config.post_max.increments.get("duration",0.0)) if "life" in target.get("duration",[]) else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if target.has("knockback") else 0.0,"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_interval":config.post_max.minimum_interval}]
+	data.PostMaxWeaponPowerDefinition.append({"id":3,"equipment":rear_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(rear.id).has("followup") else 0.0})
+	var rear_target: Dictionary = config.post_max.target(rear.id)
+	data.RearPostDefinition = [{"id":1,"interval_increment":float(config.post_max.increments.get("weapon_interval",0.0)) if rear_target.has("interval") else 0.0,"projectile_increment":float(config.post_max.increments.get("projectile_speed",0.0)) if rear_target.has("projectile") else 0.0,"duration_increment":float(config.post_max.increments.get("duration",0.0)) if "life" in rear_target.get("duration",[]) else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if rear_target.has("knockback") else 0.0,"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_interval":config.post_max.minimum_interval}]
 	data.PostMaxPickupDefinition = [{"id":1,"xp_radius_increment":float(config.post_max.increments.get("pickup_radius",0.0))}]
 	data.PostMaxDrawDefinition = [{"id":1,"line_length_increment":float(config.post_max.increments.get("line_length",0.0))}]
 	data.LifecycleDefinition = [{"id":1,"death_freeze_time":config.death_freeze_time,"death_explosion_time":config.death_explosion_time,"death_game_over_time":config.death_game_over_time,"clear_bonus":config.clear_bonus,"legendary":String(stage.legendary_module_id) if stage!=null else "","death_world_dim":config.death_world_dim}]
@@ -181,6 +191,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":scatter_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":scatter_id,"asset":key})
+	var rear_entry: ContentEntry = ContentManager.catalog.find(&"weapons",rear.id)
+	if rear_entry==null: return {}
+	for path in rear_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":rear_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":rear_id,"asset":key})
 	if config.planet_radius>0.0:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":9})
@@ -289,6 +306,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ForwardDefinition = resolved.ForwardDefinition
 			data.ScatterDefinition = resolved.ScatterDefinition
 			data.ScatterPostDefinition = resolved.ScatterPostDefinition
+			data.RearDefinition = resolved.RearDefinition
+			data.RearPostDefinition = resolved.RearPostDefinition
 			data.ProgressionDefinition = resolved.ProgressionDefinition
 			data.LifecycleDefinition = resolved.LifecycleDefinition
 			for section in ["PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:
@@ -376,7 +395,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():
 		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
-	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]:
+	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png"]:
 		if not paths.has(asset): paths.append(asset)
 	for placement: BackgroundPlacement in stage.backgrounds:
 		for asset: String in [placement.texture_path,placement.fire_preset_path]:

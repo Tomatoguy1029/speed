@@ -51,6 +51,12 @@ Dictionary SpeedRunCore::scatter_snapshot() const {
     Dictionary out;out["elapsed"]=weapon.interval-weapon.fire.remaining;out["recoil"]=weapon.recoil;return out;
 }
 
+Dictionary SpeedRunCore::rear_snapshot() const {
+    const auto &weapon=runtime.state.loadout.rear;
+    Dictionary out;out["elapsed"]=weapon.interval-weapon.fire.remaining;out["recoil"]=weapon.recoil;
+    out["ready"]=weapon.ready;out["mount"]=runtime.state.ship.pos+Vector2(weapon.mount_x,weapon.mount_y).rotated(runtime.state.ship.heading.angle()+Math::PI/2.0)*weapon.character_scale;out["aim"]=-runtime.state.ship.heading;return out;
+}
+
 bool SpeedRunCore::set_forward_level(int64_t level) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.forward.ready || level<1) return false;
     if (runtime.state.forward_parameters.is_empty()) {

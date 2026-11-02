@@ -17,6 +17,8 @@ struct ContentBundle {
     std::vector<ForwardDefinition> forward_levels;
     std::vector<ScatterDefinition> scatter_levels;
     ScatterPostDefinition scatter_post;
+    std::vector<RearDefinition> rear_levels;
+    RearPostDefinition rear_post;
     std::vector<BiteDefinition> bites;
     std::vector<HoundDefinition> hounds;
     std::vector<GunnerDefinition> gunners;

@@ -79,6 +79,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure_forward", "parameters", "level", "character_scale"), &SpeedRunCore::configure_forward);
     ClassDB::bind_method(D_METHOD("forward_snapshot"), &SpeedRunCore::forward_snapshot);
     ClassDB::bind_method(D_METHOD("scatter_snapshot"), &SpeedRunCore::scatter_snapshot);
+    ClassDB::bind_method(D_METHOD("rear_snapshot"), &SpeedRunCore::rear_snapshot);
     ClassDB::bind_method(D_METHOD("spawn_hostile", "fields"), &SpeedRunCore::spawn_hostile);
     ClassDB::bind_method(D_METHOD("step_hostiles", "world_dt"), &SpeedRunCore::step_hostiles);
     ClassDB::bind_method(D_METHOD("hostiles_snapshot"), &SpeedRunCore::hostiles_snapshot);

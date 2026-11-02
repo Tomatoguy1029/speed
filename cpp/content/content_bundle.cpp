@@ -55,6 +55,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->scatter_levels=records.ScatterDefinition_rows;
     if (records.ScatterPostDefinition_rows.size()!=1) return {};
     bundle->scatter_post=records.ScatterPostDefinition_rows.front();
+    bundle->rear_levels=records.RearDefinition_rows;
+    if (records.RearPostDefinition_rows.size()!=1) return {};
+    bundle->rear_post=records.RearPostDefinition_rows.front();
     bundle->bites=records.BiteDefinition_rows;
     bundle->hounds=records.HoundDefinition_rows;
     bundle->gunners=records.GunnerDefinition_rows;
@@ -131,6 +134,14 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto &d=bundle->equipment[index];
         if (d.id!=index+1 || !equipment_names.insert(d.external_id).second) return {};
         if (d.id==1) continue;
+        if (d.external_id=="W23") {
+            if (d.kind!=0 || d.comet_only || d.maximum_level!=bundle->rear_levels.size() || !power_weapons.count(d.id)) return {};
+            for (size_t i=0;i<bundle->rear_levels.size();++i) {
+                const auto &level=bundle->rear_levels[i];
+                if (level.weapon!=d.id || level.level!=i+1 || level.interval<=0) return {};
+            }
+            continue;
+        }
         if (d.external_id=="W02") {
             if (d.kind!=0 || d.comet_only || d.maximum_level!=bundle->scatter_levels.size() || !power_weapons.count(d.id)) return {};
             for (size_t i=0;i<bundle->scatter_levels.size();++i) {
@@ -148,6 +159,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         }
     }
     if (std::count_if(bundle->equipment.begin(),bundle->equipment.end(),[](const auto &d){return d.external_id=="W02";})!=1) return {};
+    if (std::count_if(bundle->equipment.begin(),bundle->equipment.end(),[](const auto &d){return d.external_id=="W23";})!=1) return {};
     for (const auto &v:bundle->numeric_traits) {
         const auto &d=bundle->equipment[v.equipment-1];
         if (d.kind!=1 || v.level>d.maximum_level) return {};

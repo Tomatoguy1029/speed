@@ -11,6 +11,10 @@ struct ForwardWeaponState {
     double base_interval = 0, interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
     int64_t pierce = 0;
 };
+struct RearWeaponState : ForwardWeaponState {
+    uint32_t definition=0,color=0;
+    double mount_x=0,mount_y=0,muzzle_distance=0;
+};
 struct ScatterWeaponState {
     bool ready=false;
     uint32_t definition=0,shots=0;
@@ -27,6 +31,7 @@ struct EquipmentEffects {
 struct LoadoutState {
     EquipmentEffects effects;
     ScatterWeaponState scatter;
+    RearWeaponState rear;
     uint64_t post_weapon_interval_stacks=0,post_projectile_speed_stacks=0,post_duration_stacks=0,post_knockback_stacks=0;
 
     double charge_profile_factor=1,speed_profile_factor=1,attack_profile_factor=1,pickup_profile_factor=1,length_profile_factor=1;

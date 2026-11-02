@@ -154,6 +154,7 @@ public:
     bool configure_forward(const Dictionary &parameters, int64_t level, double character_scale);
     Dictionary forward_snapshot() const;
     Dictionary scatter_snapshot() const;
+    Dictionary rear_snapshot() const;
     bool set_forward_level(int64_t level);
     int64_t spawn_hostile(const Dictionary &fields);
     bool step_hostiles(double world_dt);
