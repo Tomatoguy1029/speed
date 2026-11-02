@@ -17,7 +17,7 @@ void BattleshipBehavior::step(RunRuntime &run,uint32_t row,double dt) {
         if (!budget.request(request)) {enemy.charge=0;return;}
     }
     const bool fire=GunnerTiming::advance(enemy.fire_t,enemy.charge,dt,gun.warn,def.fire_interval);
-    enemy.fire_t=float(enemy.fire_t);enemy.charge=float(enemy.charge);if (!fire) return;
+    if (!fire) return;
     BulletValues values;values.damage=gun.damage;values.slow=gun.slow;
     const double base=enemy.facing,denominator=std::max(int64_t(1),int64_t(gun.volley)-1);
     for (uint32_t i=0;i<gun.volley;++i) BulletSystem::fire_enemy(run,handle,base+(double(i)/denominator-0.5)*gun.spread,gun.bullet_speed,values);

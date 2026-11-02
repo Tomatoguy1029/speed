@@ -24,10 +24,10 @@ void BeamerBehavior::step(RunRuntime &run,uint32_t row,double dt) {
     if (enemy.mode==Mode::Move) EnemyMotion::keep_distance(run,row,beam.keep,beam.accel,dt);
     else enemy.vel*=std::max(0.0,1.0-8.0*dt);
     if (enemy.mode==Mode::Move) {
-        enemy.fire_t=float(remaining_time(enemy.fire_t,dt));if (enemy.fire_t>0) return;
+        enemy.fire_t=remaining_time(enemy.fire_t,dt);if (enemy.fire_t>0) return;
         const TrackingPolicy tracking{state.draw.tracing,enemy.held,state.enemy_handles.contains(enemy.pump_owner)};
         const double angle=tracking.angle(enemy.facing,(state.enemy_aim-enemy.pos).angle());
-        enemy.facing=float(angle);enemy.mode=Mode::Windup;enemy.timer=float(beam.telegraph+beam.beam_time);
+        enemy.facing=angle;enemy.mode=Mode::Windup;enemy.timer=beam.telegraph+beam.beam_time;
         sound(run,"enemy_laser_charge",row,true);
         BeamParams params;params.owner=handle;params.style=BeamStyle::Guide;
         params.length=beam.beam_length;params.half_width=beam.half_width;params.delay=beam.telegraph;params.active=beam.beam_time;
@@ -41,9 +41,9 @@ void BeamerBehavior::step(RunRuntime &run,uint32_t row,double dt) {
         }
         return;
     }
-    const double before=enemy.timer;enemy.timer=float(remaining_time(enemy.timer,dt));
+    const double before=enemy.timer;enemy.timer=remaining_time(enemy.timer,dt);
     if (before>beam.beam_time && enemy.timer<=beam.beam_time) sound(run,"enemy_laser_fire",row);
-    enemy.charge=float(std::clamp(1.0-(enemy.timer-beam.beam_time)/beam.telegraph,0.0,1.0));
-    if (enemy.timer<=0) {enemy.mode=Mode::Move;enemy.fire_t=float(definition.fire_interval);enemy.charge=0;}
+    enemy.charge=std::clamp(1.0-(enemy.timer-beam.beam_time)/beam.telegraph,0.0,1.0);
+    if (enemy.timer<=0) {enemy.mode=Mode::Move;enemy.fire_t=definition.fire_interval;enemy.charge=0;}
 }
 }

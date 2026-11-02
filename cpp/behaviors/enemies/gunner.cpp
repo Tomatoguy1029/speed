@@ -27,7 +27,7 @@ void GunnerBehavior::step(RunRuntime &run,uint32_t row,double dt) {
     }
     EnemyMotion::keep_distance(run,row,gun.keep,gun.accel,dt);
     const bool fire=GunnerTiming::advance(enemy.fire_t,enemy.charge,dt,gun.telegraph,def.fire_interval);
-    enemy.fire_t=float(enemy.fire_t);enemy.charge=float(enemy.charge);
+
     if (!fire) return;
     const TrackingPolicy tracking{state.draw.tracing,enemy.held,state.enemy_handles.contains(enemy.pump_owner)};
     const double angle=tracking.angle(enemy.facing,(state.enemy_aim-enemy.pos).angle());

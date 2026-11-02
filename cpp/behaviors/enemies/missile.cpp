@@ -20,7 +20,7 @@ void MissileBehavior::step(RunRuntime &run,uint32_t row,double dt) {
     }
     EnemyMotion::keep_distance(run,row,missile.keep,missile.accel,dt);
     const bool fire=GunnerTiming::advance(enemy.fire_t,enemy.charge,dt,missile.warn,def.fire_interval);
-    enemy.fire_t=float(enemy.fire_t);enemy.charge=float(enemy.charge);
+
     if (!fire) return;
     BulletValues values;values.damage=missile.damage;values.slow=missile.slow;values.turn=missile.missile_turn;
     MissileSystem::fire_enemy(run,handle,enemy.facing,missile.missile_speed,values);

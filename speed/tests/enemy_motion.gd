@@ -14,6 +14,12 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-enemy-scalar-precision" in OS.get_cmdline_user_args():
+		await check_cpp_gunner()
+		check(gunner_finished,"敵の時間と向きの精度確認を最後まで実施する")
+		print("[cpp_enemy_scalar_precision] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-battleship-enemy" in OS.get_cmdline_user_args():
 		battleship_enemy = true
 		ranged_type_override = "battleship"
@@ -157,6 +163,18 @@ func check_cpp_gunner() -> void:
 	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	var target: Vector2 = core.ship_snapshot().ship_pos
 	var initial: Dictionary = bridge.checkpoint()
+	if "--cpp-enemy-scalar-precision" in OS.get_cmdline_user_args():
+		core.configure_attack_budget({"enabled":false})
+		var id: int = bridge.command("dev_spawn",{"definition_id":"gunner","position":target+Vector2(800,120)}).value
+		core.set_motion_context(target,target,Vector2(640,360))
+		check(core.set_enemy_motion(id,{"fire_t":0.8,"charge":0.1234567890123,"facing":0.2345678901234}),"倍精度の時間と向きを設定できる")
+		var state: Dictionary = core.enemy_motion_snapshot()[0]
+		check(state.fire_t==0.8 and state.charge==0.1234567890123 and core.enemies_snapshot()[0].facing==0.2345678901234,"敵表の倍精度を入力から状態まで保つ")
+		core.step(0.8)
+		check(core.hostiles_snapshot().size()==1,"残り時間と同じ更新で射撃し、丸めによって次の更新へ遅れない")
+		gunner_finished = true
+		session.free()
+		return
 	var comparison = preload("res://tools/compare_runtime.gd").new()
 	var budget_probe = preload("res://tests/native_attack_budget.gd").new()
 	for kind in (["normal"] if gunner_cycle or ranged_retry else ["normal","death","reuse"]):

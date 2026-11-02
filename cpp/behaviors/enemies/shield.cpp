@@ -9,7 +9,7 @@ namespace speed {
 void ShieldBehavior::step(RunRuntime &run,uint32_t row,double dt) {
     auto &state=run.state;auto &enemy=state.enemies[row];const auto &def=run.content->definitions[enemy.definition];
     const TrackingPolicy tracking{state.draw.tracing,enemy.held,state.enemy_handles.contains(enemy.pump_owner)};
-    enemy.fire_t=float(remaining_time(enemy.fire_t,dt));
+    enemy.fire_t=remaining_time(enemy.fire_t,dt);
     EnemyMotion::steer(enemy,state.enemy_aim,enemy.speed,def.accel,dt,tracking);
     EnemyMotion::turn(enemy,(state.ship_pos-enemy.pos).angle(),def.turn,dt,tracking);
 }

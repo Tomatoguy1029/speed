@@ -14,10 +14,10 @@ void RocketBehavior::step(RunRuntime &run,uint32_t row,double dt) {
         if (!budget.request(request)) {enemy.vel=PursuitBehavior::velocity(enemy,state.ship_pos,def.turn,dt,tracking);return;}
     }
     if (enemy.mode==EnemyMode::Move) {
-        if (!tracking.locked()) enemy.facing=float((state.enemy_aim-enemy.pos).angle());
-        enemy.vel=godot::Vector2::from_angle(enemy.facing)*enemy.speed;enemy.mode=EnemyMode::Dash;enemy.timer=float(rocket.life);return;
+        if (!tracking.locked()) enemy.facing=(state.enemy_aim-enemy.pos).angle();
+        enemy.vel=godot::Vector2::from_angle(enemy.facing)*enemy.speed;enemy.mode=EnemyMode::Dash;enemy.timer=rocket.life;return;
     }
-    enemy.timer=float(remaining_time(enemy.timer,dt));
+    enemy.timer=remaining_time(enemy.timer,dt);
     if (enemy.pos.distance_squared_to(state.ship_pos)<=rocket.fuse*rocket.fuse) {
         BlastParams blast;blast.position=enemy.pos;blast.color=def.color;blast.source=handle;blast.budget.value=budget.token(owner);
         blast.radius=rocket.blast_radius;blast.damage=rocket.blast_damage;blast.duration=rocket.blast_duration;blast.contact=rocket.contact;

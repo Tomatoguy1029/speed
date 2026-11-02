@@ -28,7 +28,6 @@ bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
         else if (key == "held" || key == "slash_hold") { if (value.get_type() != Variant::BOOL) return false; }
         else if (key == "stone" || key == "knock_t" || key == "shove_time" || key=="fire_t" || key=="charge" || key=="facing") {
             if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
-            if ((key=="fire_t" || key=="charge" || key=="facing") && !std::isfinite(float(double(value)))) return false;
         } else if (key == "vel" || key == "shove_vel") {
             if (value.get_type() != Variant::VECTOR2 || !Vector2(value).is_finite()) return false;
         } else return false;
@@ -38,9 +37,9 @@ bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
         const int64_t owner=state["pump_owner"];
         enemy.pump_owner=owner>0?runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(owner))):speed::EnemyHandle();
     }
-    if (state.has("fire_t")) enemy.fire_t=float(double(state["fire_t"]));
-    if (state.has("charge")) enemy.charge=float(double(state["charge"]));
-    if (state.has("facing")) enemy.facing=float(double(state["facing"]));
+    if (state.has("fire_t")) enemy.fire_t=double(state["fire_t"]);
+    if (state.has("charge")) enemy.charge=double(state["charge"]);
+    if (state.has("facing")) enemy.facing=double(state["facing"]);
     if (state.has("held")) enemy.held = state["held"];
     if (state.has("slash_hold")) enemy.slash_hold = state["slash_hold"];
     if (state.has("stone")) enemy.stone = state["stone"];

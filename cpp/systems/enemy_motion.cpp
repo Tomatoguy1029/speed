@@ -9,7 +9,7 @@ void EnemyMotion::steer(godot::RunState::Enemy &enemy,godot::Vector2 target,doub
 }
 void EnemyMotion::turn(godot::RunState::Enemy &enemy,double angle,double rate,double dt,const TrackingPolicy &policy) {
     if (policy.locked()) return;
-    enemy.facing=float(enemy.facing+std::clamp(angle_difference(angle-enemy.facing),-rate*dt,rate*dt));
+    enemy.facing=enemy.facing+std::clamp(angle_difference(angle-enemy.facing),-rate*dt,rate*dt);
 }
 void EnemyMotion::keep_distance(RunRuntime &run,uint32_t row,double keep,double accel,double dt) {
     auto &state=run.state;auto &enemy=state.enemies[row];const auto aim=state.enemy_aim;
