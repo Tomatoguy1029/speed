@@ -21,20 +21,27 @@ var _disposed := false
 
 func setup(parent: Node, visuals: IntroPresentation) -> void:
 	presentation = visuals
-	var config := _practice_config()
-	var stage := RuntimeStage.new()
-	stage.index = 1
-	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray([String(presentation.practice_enemy.id)])
-	stage.boss_enabled = false
-	var definitions := {presentation.practice_enemy.id:presentation.practice_enemy.duplicate(true)}
-	var output := "res://.content/dev/intro_%d_%d" % [OS.get_process_id(),parent.get_instance_id()]
-	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,config,output,"導入練習".sha256_text(),definitions)
-	if built!=OK:
-		error = {"ok":false,"message":"導入の定義を生成できません"}
+	var package := practice_package(ContentManager.cfg,presentation)
+	var config: GameConfig = package.config
+	var stage: RuntimeStage = package.stage
+	var definitions: Dictionary = package.definitions
+	var index_path := "res://.content/run/intro/stage_1.json"
+	if OS.has_feature("editor"):
+		var output := "res://.content/dev/intro_%d_%d" % [OS.get_process_id(),parent.get_instance_id()]
+		var builder = load("res://tools/content/build_run_content.gd")
+		var built: Error = builder.build(stage,config,output,"導入練習".sha256_text(),definitions)
+		if built!=OK:
+			error = {"ok":false,"message":"導入の定義を生成できません"}
+			return
+		index_path = output.path_join("stage_1.json")
+	if not FileAccess.file_exists(index_path):
+		error = {"ok":false,"message":"導入の生成済み定義がありません"}
 		return
-	var index_path := output.path_join("stage_1.json")
-	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+	if not parsed is Dictionary or not parsed.get("input_sha256","") is String:
+		error = {"ok":false,"message":"導入の生成済み定義を読み込めません"}
+		return
+	var index: Dictionary = parsed
 	session = RunManager.create_session(parent,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":932,"hud":false,"cpp_start":{"lab_mode":true},"cpp_edit_source":{"stage":stage,"config":config,"definitions":definitions}},true)
 	session.remove_from_group("recordable_runs")
 	session.auto_step = false
@@ -59,8 +66,16 @@ func setup(parent: Node, visuals: IntroPresentation) -> void:
 	practice.setup(self,presentation,run.state.ship_pos)
 	_film_camera(1.15)
 
-func _practice_config() -> GameConfig:
-	var config := ContentManager.cfg.duplicate(true) as GameConfig
+static func practice_package(base: GameConfig, visuals: IntroPresentation) -> Dictionary:
+	var stage := RuntimeStage.new()
+	stage.index = 1
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray([String(visuals.practice_enemy.id)])
+	stage.boss_enabled = false
+	return {"stage":stage,"config":_practice_config(base),"definitions":{visuals.practice_enemy.id:visuals.practice_enemy.duplicate(true)}}
+
+static func _practice_config(base: GameConfig) -> GameConfig:
+	var config := base.duplicate(true) as GameConfig
 	config.planet_radius = 0.0
 	config.moon_count = 0
 	config.meteor_count = 0

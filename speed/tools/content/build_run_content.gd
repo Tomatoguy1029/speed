@@ -1252,11 +1252,12 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 			package.visuals.append(value)
 	return package
 
-static func _flow_condition(records: Dictionary, gate: Dictionary, hydra := false) -> int:
+static func _flow_condition(records: Dictionary, gate: Dictionary, hydra := false, draco := false) -> int:
 	for key in gate:
-		if key not in ["min","max","angle","half_angle","min_phase"] and not (hydra and key in ["distance_origin","angle_origin","ignore_when_separated"]): return 0
+		if key not in ["min","max","angle","half_angle","min_phase"] and not (hydra and key in ["distance_origin","angle_origin","ignore_when_separated"]) and not (draco and key=="max_phase"): return 0
 	var id: int = records.BossFlowCondition.size()+1
 	records.BossFlowCondition.append({"id":id,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",100000.0)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"minimum_phase":int(gate.get("min_phase",1))})
+	if draco: records.DracoFlowGateDefinition.append({"id":records.DracoFlowGateDefinition.size()+1,"condition":id,"maximum_phase":int(gate.get("max_phase",3))})
 	return id
 
 static func _flow_node(records: Dictionary, node: Dictionary, rules: Resource, techniques: Dictionary, depth := 0) -> int:
@@ -1266,8 +1267,8 @@ static func _flow_node(records: Dictionary, node: Dictionary, rules: Resource, t
 	if node.type=="action":
 		if not techniques.has(String(node.get("id",""))): return 0
 		row.technique = techniques[String(node.id)]
-		row.condition = _flow_condition(records,rules.conditions.get(String(node.id),{}),rules.adapter==&"hydra")
-	elif node.type=="branch": row.condition = _flow_condition(records,node.get("condition",{}),rules.adapter==&"hydra")
+		row.condition = _flow_condition(records,rules.conditions.get(String(node.id),{}),rules.adapter==&"hydra",rules.adapter==&"draco")
+	elif node.type=="branch": row.condition = _flow_condition(records,node.get("condition",{}),rules.adapter==&"hydra",rules.adapter==&"draco")
 	if node.type in ["action","branch"] and row.condition==0: return 0
 	records.BossFlowNode.append(row)
 	var children: Array = node.get("children",[])
@@ -1283,7 +1284,7 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 	if rules==null or flow==null or not BossProgram.validate({"rules":rules,"flow":flow}).is_empty(): return {}
 	var records := {}
 	for record in Schema.SCHEMA.records:
-		if record.name.begins_with("BossFlow"): records[record.name] = []
+		if record.name.begins_with("BossFlow") or record.name=="DracoFlowGateDefinition": records[record.name] = []
 	var ids := {}
 	for technique in techniques:
 		if technique.phase==1: ids[String(technique.external_id)] = technique.id
@@ -1299,7 +1300,7 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 			for candidate in rules.techniques:
 				if String(candidate.technique)==source: move = candidate
 		for entry in rules.active_gate_entries_for(source):
-			var gate: int = _flow_condition(records,entry.gate,rules.adapter==&"hydra")
+			var gate: int = _flow_condition(records,entry.gate,rules.adapter==&"hydra",rules.adapter==&"draco")
 			if gate==0: return {}
 			var node := _flow_node(records,rules.combos[source] if combo else {"type":"action","id":source},rules,ids)
 			if node==0: return {}
@@ -2105,7 +2106,7 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 		# 固有表と、その表が使う共通攻撃の定義を参照関係から一緒に加える。
 		var tables := {}
 		for record: Dictionary in Schema.SCHEMA.records:
-			if String(record.name).begins_with("Boss"): tables[record.name] = true
+			if String(record.name).begins_with("Boss") or record.name=="DracoFlowGateDefinition": tables[record.name] = true
 		var expanded := true
 		while expanded:
 			expanded = false
@@ -2128,11 +2129,13 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 					if not target.is_empty() and target not in ["EnemyRecord","ResourceKey"] and not tables.has(target):
 						tables[target] = true
 						expanded = true
-		var maps := {"EnemyRecord":{}}
+		var maps := {"EnemyRecord":{},"ResourceKey":{}}
+		var added_enemies := {}
 		for body: Dictionary in source.BossBodyDefinition:
 			var enemy: Dictionary = source.EnemyRecord[body.enemy-1].duplicate(true)
 			var index: int = data.EnemyRecord.size()+1
 			maps.EnemyRecord[enemy.id] = index
+			maps.ResourceKey[enemy.visual_id] = data.EnemyRecord[0].visual_id
 			enemy.id = index
 			enemy.visual_id = data.EnemyRecord[0].visual_id
 			data.EnemyRecord.append(enemy)
@@ -2148,12 +2151,16 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			var enemy := original.duplicate(true)
 			var name: String = source.StringEntry[original.id-1].value
 			var found: Array = data.StringEntry.filter(func(row):return row.value==name)
-			if not found.is_empty(): maps.EnemyRecord[original.id]=found[0].id;continue
+			if not found.is_empty():
+				maps.EnemyRecord[original.id]=found[0].id
+				maps.ResourceKey[original.visual_id]=data.EnemyRecord[found[0].id-1].visual_id
+				continue
 			var visual: Dictionary = package.visuals[original.visual_id-1].duplicate(true)
 			visual.id=data.ResourceKey.size()+1
 			data.ResourceKey.append({"id":visual.id,"role":visual.role});visuals.append(visual)
+			maps.ResourceKey[original.visual_id]=visual.id
 			enemy.id=data.EnemyRecord.size()+1;enemy.visual_id=visual.id
-			maps.EnemyRecord[original.id]=enemy.id;data.EnemyRecord.append(enemy)
+			maps.EnemyRecord[original.id]=enemy.id;added_enemies[original.id]=true;data.EnemyRecord.append(enemy)
 			data.StringEntry.append({"id":enemy.id,"value":name});data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
 			for original_type: Dictionary in source.PopulationType:
 				if original_type.enemy!=original.id:continue
@@ -2161,13 +2168,52 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 			for original_hull: Dictionary in source.FriendHullLook:
 				if original_hull.enemy!=original.id: continue
 				var hull := original_hull.duplicate(true);hull.id=data.FriendHullLook.size()+1;hull.enemy=enemy.id;data.FriendHullLook.append(hull)
+		# 技で追加する敵には、その敵の移動・接触などの型付き表も付ける。
+		for record: Dictionary in Schema.SCHEMA.records:
+			if tables.has(record.name) or record.name in ["EnemyRecord","DefinitionIndex","PopulationType","FriendHullLook"]: continue
+			var selected_rows := []
+			for row: Dictionary in source[record.name]:
+				for field: Dictionary in record.fields:
+					if field.get("ref","")=="EnemyRecord" and added_enemies.has(row[field.name]):
+						selected_rows.append(row);break
+			if not selected_rows.is_empty():
+				source[record.name] = selected_rows
+				tables[record.name] = true
+		expanded = true
+		while expanded:
+			expanded = false
+			for record: Dictionary in Schema.SCHEMA.records:
+				if not tables.has(record.name) or source[record.name].is_empty(): continue
+				for field: Dictionary in record.fields:
+					var target: String=field.get("ref","")
+					if not target.is_empty() and target not in ["EnemyRecord","ResourceKey"] and not tables.has(target):
+						tables[target]=true;expanded=true
+
 		for record: Dictionary in Schema.SCHEMA.records:
 			if not tables.has(record.name): continue
 			if record.name=="BossFinishDefinition" and not data[record.name].is_empty():
 				maps[record.name] = {1:1}
 				continue
 			maps[record.name] = {}
-			for row: Dictionary in source[record.name]: maps[record.name][row.id] = data[record.name].size()+maps[record.name].size()+1
+			for row: Dictionary in source[record.name]: maps[record.name][row.id] = maps.EnemyRecord[row.id] if record.fields[0].get("ref","")=="EnemyRecord" else data[record.name].size()+maps[record.name].size()+1
+		# 共通弾などが使う資源も、ボス固有素材と同じ番号変換を通す。
+		var resource_refs := {}
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not tables.has(record.name): continue
+			for field: Dictionary in record.fields:
+				if field.get("ref","")!="ResourceKey": continue
+				for row: Dictionary in source[record.name]: resource_refs[row[field.name]] = true
+
+		for original: Dictionary in package.visuals:
+			if not resource_refs.has(original.id) and not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish and not original.has("hydra_move") and not original.has("canis_flame") and not original.has("canis_burst") and not original.get("canis_burning",false) and not original.get("canis_trail",false): continue
+			if maps.ResourceKey.has(original.id): continue
+			var visual := original.duplicate(true)
+			if visual.has("canis_flame"): visual.canis_flame = maps.CanisFlameDefinition[visual.canis_flame]
+			if visual.has("canis_burst"): visual.canis_burst = maps.CanisBlazeDefinition[visual.canis_burst]
+			visual.id = data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":visual.id,"role":visual.role})
+			visuals.append(visual)
+			maps.ResourceKey[original.id] = visual.id
 		for record: Dictionary in Schema.SCHEMA.records:
 			if not tables.has(record.name): continue
 			if record.name=="BossFinishDefinition" and not data[record.name].is_empty(): continue
@@ -2175,19 +2221,11 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 				var row := original.duplicate(true)
 				row.id = maps[record.name][row.id]
 				for field: Dictionary in record.fields:
-					if field.has("ref"): row[field.name] = maps[field.ref][row[field.name]]
+					if field.has("ref"): row[field.name] = maps[field.ref][original[field.name]]
 				if record.name=="BossFlowNode":
 					if row.technique>0: row.technique = maps.BossTechniqueDefinition[row.technique]
 					if row.condition>0: row.condition = maps.BossFlowCondition[row.condition]
 				data[record.name].append(row)
-		for original: Dictionary in package.visuals:
-			if not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish and not original.has("hydra_move") and not original.has("canis_flame") and not original.has("canis_burst") and not original.get("canis_burning",false) and not original.get("canis_trail",false): continue
-			var visual := original.duplicate(true)
-			if visual.has("canis_flame"): visual.canis_flame = maps.CanisFlameDefinition[visual.canis_flame]
-			if visual.has("canis_burst"): visual.canis_burst = maps.CanisBlazeDefinition[visual.canis_burst]
-			visual.id = data.ResourceKey.size()+1
-			data.ResourceKey.append({"id":visual.id,"role":visual.role})
-			visuals.append(visual)
 	return OK
 
 static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}) -> Error:
@@ -2631,7 +2669,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if not paths.has(asset): paths.append(asset)
 	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")
 	for visual: Dictionary in visuals:
-		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
+		if (visual.role!=7 or visual.has("boss") or visual.has("hydra_move")) and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():
 		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
 	for asset in ["res://assets/pixel/airship_electronic_probe.png","res://assets/pixel/airship_blue_flame.png","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]:
@@ -2672,7 +2710,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		file.store_buffer(bytes)
 		file.close()
 	if FileAccess.get_file_as_bytes(binary_path)!=bytes: return ERR_FILE_CORRUPT
-	var resources = preload("res://tools/content/run_resources.gd").new()
+	var resources = preload("res://scripts/data_types/run_resources.gd").new()
 	resources.input_sha256 = input_sha256
 	resources.paths = paths
 	resources.dependencies = manifest.hashes
@@ -2798,7 +2836,8 @@ static func append_draco_clones(package: Dictionary, move: BossTechnique, config
 		var source: Dictionary=chase_package(definition,config).records
 		var enemy: Dictionary=source.EnemyRecord[0].duplicate(true)
 		enemy.id=data.EnemyRecord.size()+1;enemy.visual_id=data.EnemyRecord[0].visual_id
-		data.EnemyRecord.append(enemy);data.StringEntry.append({"id":enemy.id,"value":name});data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
+		# 通常のヒドラ本体と一緒に生成しても、技内部の出所定義が同名にならないようにする。
+		data.EnemyRecord.append(enemy);data.StringEntry.append({"id":enemy.id,"value":"draco_clone_hydra" if name=="hydra" else name});data.DefinitionIndex.append({"id":enemy.id,"enemy":enemy.id})
 		var drift: Dictionary=source.DriftDefinition[0].duplicate(true);drift.id=enemy.id;data.DriftDefinition.append(drift)
 		var population: Dictionary=source.PopulationType[0].duplicate(true);population.id=data.PopulationType.size()+1;population.enemy=enemy.id;data.PopulationType.append(population)
 		enemies[name]=enemy.id

@@ -1,6 +1,7 @@
 #include "../systems/heroes.h"
 #include "run_core.h"
 #include "../bosses/flow/phase_controller.h"
+#include "../bosses/draco/intro.h"
 #include "../bosses/monoceros/finish.h"
 #include "../behaviors/enemies/soldier.h"
 #include "../systems/attack_system.h"
@@ -263,6 +264,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=speed::ProgressionSystem::add_experience(*this,payload["amount"])?success():failure(1,"amount","最終取得XPが不正です");
     } else if (kind=="abort" && payload.size()==1 && is(payload,"reason",Variant::INT)) {
         response=speed::BossFinish::abort(runtime)?success():failure(4,"result","結果は確定済みです");
+    } else if (kind=="skip_boss_entrance" && payload.is_empty()) {
+        for (auto &body:runtime.state.bosses.bodies) if (body.draco.intro.active) speed::DracoIntro::end(runtime,body);response=success();
     } else if (kind=="skip_finish" && payload.is_empty()) {
         response=speed::BossFinish::skip(runtime)?success():failure(4,"phase","クリア演出中だけスキップできます");
     } else if (kind=="dev_finish" && runtime.api_development && payload.size()==1 && is(payload,"cleared",Variant::BOOL)) {
@@ -333,7 +336,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
     else if (kind=="dev_defender_boost" || kind=="dev_defender_clear_boost" || kind=="dev_spawn_comet" || kind=="dev_comet_state" || kind=="dev_spawn_warp" || kind=="dev_set_warp" || kind=="dev_add_well" || kind=="dev_spawn_well" || kind=="dev_tick_gravity" || kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);
     else if (kind=="dev_boss_trial") response=development_boss_trial_command(payload);
-    else if (kind=="dev_draco_cycle" || kind=="dev_draco_intro" || kind=="dev_draco_picaro" || kind=="dev_draco_pose" || kind=="dev_canis_lunge" || kind=="dev_cancel_canis_lunge" || kind=="dev_canis_flame" || kind=="dev_boss_technique" || kind=="dev_boss_state" || kind=="dev_cancel_technique" || kind=="dev_boss_flow" || kind=="dev_boss_flow_state" || kind=="dev_cancel_flow" || kind=="dev_spawn_boss" || kind=="dev_boss_body_state" || kind=="dev_cancel_boss" || kind=="dev_boss_final") response=development_boss_command(kind,payload);
+    else if (kind=="dev_draco_finale" || kind=="dev_draco_cycle" || kind=="dev_draco_intro" || kind=="dev_draco_picaro" || kind=="dev_draco_pose" || kind=="dev_canis_lunge" || kind=="dev_cancel_canis_lunge" || kind=="dev_canis_flame" || kind=="dev_boss_technique" || kind=="dev_boss_state" || kind=="dev_cancel_technique" || kind=="dev_boss_flow" || kind=="dev_boss_flow_state" || kind=="dev_cancel_flow" || kind=="dev_spawn_boss" || kind=="dev_boss_body_state" || kind=="dev_cancel_boss" || kind=="dev_boss_final") response=development_boss_command(kind,payload);
     else if (kind=="dev_contact") response=development_contact_command(payload);
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);

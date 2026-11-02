@@ -5,6 +5,9 @@ func check(value: bool, message: String) -> void:
 		failures += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-draco-finale" in OS.get_cmdline_user_args():
+		call_deferred("native_finale")
+		return
 	if "--cpp-draco-cycle" in OS.get_cmdline_user_args():
 		call_deferred("native_cycle")
 		return
@@ -350,3 +353,226 @@ func native_cycle() -> void:
 	view.free();bridge.dispose();session.free()
 	print("[B_draco_cycle] failures=",failures)
 	get_tree().quit(1 if failures else 0)
+
+## 最終決着の指定された状態・中断・構図・HUDを同じラン入口で確認する。
+func finale_fixture(size:=Vector2(1280,720),facing:=INF,move: BossTechnique=null) -> Dictionary:
+	var ship_at:=Vector2(-300,200) if is_inf(facing) else Vector2(430,-220)+Vector2.from_angle(facing)*700.0
+	var builder=load("res://tools/content/build_run_content.gd")
+	var cfg: GameConfig=load("res://data/config.tres").duplicate(true)
+	var package: Dictionary=builder.boss_body_package(load("res://data/bosses/draco.tres"),cfg) if move==null else builder.draco_technique_package(load("res://data/bosses/draco.tres"),move,cfg)
+	var bridge=load("res://scripts/runtime/run_bridge.gd").new()
+	var setup: Dictionary=bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":226,"mode":1,"stage_id":"B_draco_finale","profile":{},"settings":{"hitstop":false}})
+	check(setup.ok,"決着の固定値と型付き編集値を生成して読む")
+	if not setup.ok:return {}
+	bridge.start(226,{"position":ship_at,"lab_mode":true})
+	var events: Array=[]
+	bridge.subscribe("決着確認",func(frame):events.append_array(frame.events);return true)
+	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"position":ship_at,"invincible":false}})
+	var boss: int=bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(430,-220),"entrance":false}).value
+	bridge.command("dev_edit",{"kind":"camera","payload":{"center":ship_at,"size":size,"zoom":minf(size.x,size.y)/1100.0,"bars":0.0}})
+	bridge._core.set_motion_context(ship_at,ship_at,size/(2.0*(minf(size.x,size.y)/1100.0)))
+	return {"bridge":bridge,"boss":boss,"size":size,"events":events,"package":package}
+
+func finale_body(f: Dictionary) -> Dictionary:
+	return f.bridge.command("dev_boss_body_state").value[-1]
+
+func finale_tick(f: Dictionary,intent: Intent=null) -> bool:
+	if intent==null:intent=Intent.new()
+	return f.bridge.step(1.0/120.0,f.bridge.pack_intent(intent),{"logical_size":f.size}).ok
+
+func finale_to(f: Dictionary,target: String) -> bool:
+	for tick in 2500:
+		var body:=finale_body(f)
+		if body.finale.stage==target:return true
+		var input:=Intent.new()
+		if body.finale.stage=="input":
+			input.press=not body.finale.began;input.has_cursor=true;input.pen=Vector2(200,100);input.pen_release=body.finale.began
+		if not finale_tick(f,input):return false
+	return false
+
+func native_finale() -> void:
+	var group: String="all"
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--finale-group="):group=arg.get_slice("=",1)
+	if group in ["all","motion","pose"]:native_finale_motion()
+	if group in ["all","interrupt"]:native_finale_interrupt()
+	if group in ["all","hud","render","entrance","bars"]:await native_finale_hud()
+	if group in ["all","dedicated"]:native_finale_dedicated()
+	if group in ["all","rifts"]:native_finale_rifts()
+	print("[cpp_draco_finale] group=",group," failures=",failures)
+	get_tree().quit(1 if failures else 0)
+
+func native_finale_motion() -> void:
+	var pose_only: bool="--finale-group=pose" in OS.get_cmdline_user_args()
+	var f:=finale_fixture()
+	if f.is_empty():return
+	var stage: RuntimeStage=ContentManager.runtime_stage(5).duplicate(true)
+	stage.boss_enabled=false
+	var session:=RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":226},false)
+	session.auto_step=false
+	var sim: RunSimulation=session.sim
+	sim.field.bodies.clear();sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2(430,-220))
+	var actor=sim.bosses.actor
+	actor.selection_enabled=false;actor.entrance.cancel();actor.cycle.cancel();actor.cancel_attack()
+	var initial: Dictionary=finale_body(f)
+	actor.table.pos[actor.body]=initial.position;actor.table.facing[actor.body]=float(initial.facing);actor.clock=float(initial.clock);actor.body_trail.clear();actor.body_pose.clear();actor.body_override.clear();actor.reset_pose()
+	sim.ctx.options["view_size"]=f.size
+	sim.state.ship_pos=Vector2(-300,200);sim.state.ship_vel=Vector2.ZERO;sim.state.view_center=sim.state.ship_pos;sim.state.camera_zoom=minf(f.size.x,f.size.y)/1100.0;sim.state.view_half=f.size/(2.0*sim.state.camera_zoom)
+	actor.finale.begin()
+	check(f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"}).ok,"本体の決着を型付き入口から始める")
+	var before: Dictionary=f.bridge.read_lab().value
+	var max_point:=0.0;var max_camera:=0.0;var max_zoom:=0.0
+	var observed: Array[String]=[]
+	var checkpoint_stages: Array[String]=[]
+	for tick in 2500:
+		var body:=finale_body(f)
+		var current: String=body.finale.stage
+		if not current in observed:observed.append(current)
+		if not current in checkpoint_stages and current!="explode":
+			var held: Dictionary=f.bridge.checkpoint()
+			check(pose_only or held.ok,"決着の段階を値保持する: "+current)
+			if held.ok:
+				check(finale_tick(f) and f.bridge.restore(held.value).ok,"決着の途中を保持した段階へ戻す: "+current)
+				f.bridge.release_checkpoint(held.value)
+			checkpoint_stages.append(current)
+		if body.finale.completed:break
+		var input:=Intent.new()
+		if current=="input":input.press=not body.finale.began;input.has_cursor=true;input.pen=Vector2(200,100);input.pen_release=body.finale.began
+		check(finale_tick(f,input),"実時間の決着更新が成功する")
+		actor.finale.advance(1.0/120.0,input)
+		body=finale_body(f)
+		check(pose_only or body.finale.stage==String(actor.finale.stage),"Sourceと決着の段階/発動tickが一致する")
+		if not body.finale.completed:
+			max_point=maxf(max_point,Vector2(body.finale.core).distance_to(actor.finale.core))
+			var source_points: PackedVector2Array=actor.body_points()
+			for j in body.body_points.size():max_point=maxf(max_point,body.body_points[j].distance_to(source_points[j]))
+			var ui: Dictionary=f.bridge.read_frame().value.ui
+			max_camera=maxf(max_camera,ui.view_center.distance_to(sim.state.view_center));max_zoom=maxf(max_zoom,absf(float(f.bridge.read_frame().value.camera.zoom)-sim.state.camera_zoom))
+			check(pose_only or (f.bridge.read_lab().value.clock.time==before.clock.time and f.bridge.read_lab().value.clock.world_time==before.clock.world_time),"決着だけを実時間で進めランと戦闘の時計を止める")
+	check(pose_only or observed==["release","combine","pose","input","strikes","last","sight","split","explode"],"核解放から決着まで全9段階を通る")
+	check(max_point<=0.0001 and max_camera<=0.0001 and max_zoom<=maxf(1e-9,absf(sim.state.camera_zoom)*1e-9),"Sourceと全姿勢/核/カメラの指定許容幅で一致する point=%.12f camera=%.12f zoom=%.12f"%[max_point,max_camera,max_zoom])
+	check(pose_only or (finale_body(f).finale.completed and f.bridge.read_frame().value.ui.draco_finish_done),"完走後に通常クリアへ渡す完了値を立てる")
+	var count: int=f.events.filter(func(e):return e.type=="boss_defeated").size()
+	finale_tick(f);finale_tick(f)
+	check(pose_only or (count==1 and f.events.filter(func(e):return e.type=="boss_defeated").size()==1),"完了通知を二重に出さない")
+	f.bridge.dispose();session.free()
+
+func native_finale_interrupt() -> void:
+	for target in ["release","combine","pose","input","strikes","last","sight","split"]:
+		var f:=finale_fixture()
+		if f.is_empty():return
+		f.bridge._core.step_ship(0.05,0.05,{"has_cursor":true,"cursor":Vector2(1000,200)})
+		var ship: Dictionary=f.bridge._core.ship_snapshot()
+		var before: Dictionary=f.bridge.read_frame().value
+		check(ship.ship_vel.length()>0.0,"中断確認を動いている機体から始める")
+		f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"})
+		check(finale_to(f,target),"中断する段階まで到達する: "+target)
+		if target in ["strikes","last"]:
+			for tick in 14:finale_tick(f)
+			check(f.bridge._core.ship_snapshot().ship_pos!=ship.ship_pos,"連撃の実移動を経て中断する: "+target)
+		f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"cancel"})
+		var after: Dictionary=f.bridge._core.ship_snapshot()
+		var camera: Dictionary=f.bridge.read_frame().value.camera
+		check(after.ship_pos==ship.ship_pos and after.ship_vel==ship.ship_vel,"中断は実際の機体位置と速度を返す: "+target)
+		check(camera==before.camera and not f.bridge.read_frame().value.ui.controls_locked and not f.bridge.read_frame().value.ui.cinematic_camera and float(f.bridge.read_frame().value.ui.world_scale)>0.0,"中断はカメラ/入力/世界の速さを返す: "+target)
+		f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"});f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"cancel"})
+		check(f.bridge._core.ship_snapshot().ship_pos==ship.ship_pos and f.bridge._core.ship_snapshot().ship_vel==ship.ship_vel,"再生と再中断で基準をずらさない")
+		f.bridge.dispose()
+	var f:=finale_fixture()
+	f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"});check(finale_to(f,"input"),"自由描画へ進む")
+	for tick in 600:finale_tick(f)
+	check(finale_body(f).finale.stage=="input" and not f.bridge.read_frame().value.ui.controls_locked,"入力を待つ間に自動で確定しない")
+	for tick in 3000:
+		var input:=Intent.new();input.has_cursor=true;input.pen=Vector2(tick*10,0);input.press=tick==0;finale_tick(f,input)
+	check(finale_body(f).finale.stage=="input" and finale_body(f).finale.strokes.size()==3000,"長い筆跡を切り詰めず入力を待ち続ける")
+	check(not f.bridge.command("skip_finish").ok,"通常決着のskipで最終自由入力を飛ばさない")
+	f.bridge.dispose()
+
+func native_finale_hud() -> void:
+	if "--finale-group=bars" in OS.get_cmdline_user_args():
+		get_window().size=Vector2i(1280,720)
+		await finale_hud_case(Vector2(1280,720),0.0)
+		return
+	var render_only: bool="--finale-group=render" in OS.get_cmdline_user_args() or "--finale-group=bars" in OS.get_cmdline_user_args()
+	var entrance_only: bool="--finale-group=entrance" in OS.get_cmdline_user_args()
+	if not render_only:finale_entrance_hud()
+	if entrance_only:return
+	for size in [Vector2(1280,720),Vector2(900,900),Vector2(720,1280)]:
+		get_window().size=Vector2i(size)
+		await get_tree().process_frame
+		for angle in [0.0,PI*0.5,PI,-PI*0.5]:await finale_hud_case(size,angle)
+
+
+func finale_entrance_hud() -> void:
+	var f:=finale_fixture()
+	if f.is_empty():return
+	var hud=load("res://scripts/ui/hud.gd").new();hud.bridge=f.bridge;hud.size=f.size;add_child(hud)
+	f.bridge.command("dev_draco_intro",{"entity_id":f.boss,"operation":"begin"})
+	f.bridge._core.step(0.5);f.bridge.command("dev_boss_body_state")
+	hud.apply_snapshot(f.bridge.read_frame().value.ui);hud._update_cpp_cinematic()
+	check(hud._entrance_skip.visible and not hud._can_show_draw_button(true),"登場の明示skipと黒帯中の操作表示を保つ")
+	f.bridge.command("skip_boss_entrance")
+	check(not finale_body(f).intro.active,"登場skipで戦闘へ返す")
+	hud.free();f.bridge.dispose()
+
+func finale_hud_case(size: Vector2,angle: float) -> void:
+	var f:=finale_fixture(size,angle)
+	if f.is_empty():return
+	var render_only: bool="--finale-group=render" in OS.get_cmdline_user_args() or "--finale-group=bars" in OS.get_cmdline_user_args()
+	var layer:=CanvasLayer.new();add_child(layer)
+	var hud=load("res://scripts/ui/hud.gd").new();hud.bridge=f.bridge;hud.size=size;layer.add_child(hud)
+	var camera:=Camera2D.new();add_child(camera);camera.make_current()
+	f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"})
+	var parent:=Node2D.new();add_child(parent)
+	var display=load("res://scripts/render/bosses/draco.gd").new();parent.add_child(display)
+	var visible_all:=true
+	for tick in 490:
+		finale_tick(f)
+		var body:=finale_body(f);display.apply_frame(body)
+		var frame: Dictionary=f.bridge.read_frame().value;camera.zoom=Vector2.ONE*float(frame.camera.zoom);camera.position=frame.camera.center
+		if body.finale.stage in ["release","combine"]:
+			for at in [body.position,frame.ui.ship.ship_pos,body.finale.core]:
+				var pixel: Vector2=(at-frame.camera.center)*float(frame.camera.zoom)+size*0.5
+				if not Rect2(size*Vector2(0.04,0.12),size*Vector2(0.92,0.76)).has_point(pixel):visible_all=false
+	hud.apply_snapshot(f.bridge.read_frame().value.ui);hud._update_cpp_cinematic()
+	await get_tree().process_frame
+	if DisplayServer.get_name()!="headless":await RenderingServer.frame_post_draw
+	check(render_only or visible_all,"構図は頭/自機/核を画面内へ収める: "+str(size))
+	check(render_only or (hud._loadout_icons.visible and hud._loadout_icons.get_child_count()==4),"黒帯中も実際の4部品を武器欄へ渡す")
+	check(display._parts.visible,"決着の点列と核/分裂を正式な表示へ渡す")
+	if DisplayServer.get_name()!="headless":
+		var image:=get_viewport().get_texture().get_image()
+		if "--finale-group=bars" in OS.get_cmdline_user_args():
+			var pixel:=image.get_pixel(image.get_width()/2,2)
+			check(pixel.r+pixel.g+pixel.b<0.2,"黒帯を実際の画面へ描画する")
+		image.save_png("/tmp/speed-draco-finale-%dx%d-%s.png"%[size.x,size.y,str(angle)])
+	layer.free();camera.free();parent.free();f.bridge.dispose()
+
+func native_finale_dedicated() -> void:
+	var f:=finale_fixture()
+	if f.is_empty():return
+	f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"})
+	check(finale_to(f,"input"),"専用入力の待機へ進む")
+	var input: Dictionary=f.bridge.pack_intent(Intent.new())
+	input.finale_pressed=true;input.finale_pen=Vector2(200,100);input.pen=Vector2(-200,0)
+	check(f.bridge.step(1.0/120.0,input,{"logical_size":f.size}).ok,"通常入力と独立した決着の押下を受ける")
+	check(finale_body(f).finale.strokes[0]==Vector2(200,100),"専用入力の座標を筆跡へ渡す")
+	input.finale_pressed=false;input.finale_released=true
+	check(f.bridge.step(1.0/120.0,input,{"logical_size":f.size}).ok and finale_body(f).finale.stage=="strikes","専用解放で固定の決着へ進む")
+	f.bridge.dispose()
+
+func native_finale_rifts() -> void:
+	var f:=finale_fixture(Vector2(1280,720),INF,load("res://data/bosses/draco_moves/rifts.tres"))
+	if f.is_empty():return
+	check(f.bridge.command("dev_boss_technique",{"entity_id":f.boss,"definition":1}).ok,"決着前の実在する裂け目を作る")
+	var opened:=false
+	for tick in 2400:
+		f.bridge._core.step(1.0/120.0)
+		if not finale_body(f).rift_walls.is_empty():opened=true;break
+	check(opened,"決着へ渡す裂け目が実際に存在する")
+	f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"})
+	check(int(finale_body(f).closing_walls)>0,"決着の開始で裂け目を修復へ渡す")
+	var before: Dictionary=f.bridge.read_lab().value.clock
+	for tick in 60:finale_tick(f)
+	check(finale_body(f).rift_walls.is_empty() and f.bridge.read_lab().value.clock.world_time==before.world_time,"世界を止めた決着中も裂け目を実時間で修復する")
+	f.bridge.dispose()

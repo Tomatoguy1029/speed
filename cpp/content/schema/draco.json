@@ -796,6 +796,28 @@
           "ref": "EnemyRecord"
         }
       ]
+    },
+    {
+      "name": "DracoFlowGateDefinition",
+      "section": 449,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "condition",
+          "type": "u32",
+          "ref": "BossFlowCondition"
+        },
+        {
+          "name": "maximum_phase",
+          "type": "u32",
+          "min": 1,
+          "max": 3
+        }
+      ]
     }
   ],
   "enums": {}

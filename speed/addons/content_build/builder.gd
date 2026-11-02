@@ -70,7 +70,13 @@ static func build_all(force := false, output := ROOT) -> Error:
 		var index_path := output.path_join("run/stage_%d.json" % source.index)
 		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
 		run_outputs.append_array([index_path,index.binary,index.resources])
-	var outputs := [catalog_path]
+	var intro: Dictionary = load("res://scripts/runtime/intro_sequence.gd").practice_package(load("res://data/config.tres"),load("res://data/visuals/intro_presentation.tres"))
+	var intro_output := output.path_join("run/intro")
+	error = load("res://tools/content/build_run_content.gd").build(intro.stage,intro.config,intro_output,"導入練習".sha256_text(),intro.definitions)
+	if error!=OK: return error
+	var intro_path := intro_output.path_join("stage_1.json")
+	var intro_index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(intro_path))
+	var outputs := [catalog_path,intro_path,intro_index.binary,intro_index.resources]
 	outputs.append_array(run_outputs)
 	var visual_index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	for file in DirAccess.get_files_at(output):

@@ -6,6 +6,7 @@ namespace speed {class DracoBody {public:
     static void step(RunRuntime &,BossBodyState &,double);
     static void update(RunRuntime &,BossBodyState &);
     static void cancel(RunRuntime &,BossBodyState &);
+    static void reset_trial(RunRuntime &,BossBodyState &);
     static void damaged(RunRuntime &,BossBodyState &);
     static bool validate(const godot::RunState &,const ContentBundle &,const BossBodyState &);
     static void snapshot(const RunRuntime &,const BossBodyState &,godot::Dictionary &);

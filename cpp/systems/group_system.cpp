@@ -47,6 +47,12 @@ bool GroupSystem::mark(godot::RunState &state,EnemyHandle actor,double until) {
 bool GroupSystem::release_order(godot::RunState &state,EnemyHandle actor) {auto *o=order(state,actor);if (!o) return false;*o={};return true;}
 bool GroupSystem::warning(const godot::RunState &state,EnemyHandle actor) {const auto *o=order(state,actor);return o && o->warning && o->warning_until>state.world_time;}
 bool GroupSystem::validate(const godot::RunState &state) {
+    if (state.groups.defender_posts_tick< -1 || state.groups.defender_posts_tick>state.ticks) return false;
+    for (const auto &post:state.groups.defender_posts) {
+        if (!post.position.is_finite()) return false;
+        if (state.groups.defender_posts_tick==state.ticks && post.actor.generation &&
+            (!state.enemy_handles.contains(post.actor) || !state.enemy_handles.contains(post.target))) return false;
+    }
     std::unordered_set<int64_t> seen;
     for (const auto &g:state.groups.groups) {
         if (g.value.members.is_empty() || !g.value.target.is_finite()) return false;

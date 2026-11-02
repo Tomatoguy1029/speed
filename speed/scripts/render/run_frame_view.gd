@@ -595,10 +595,6 @@ func _valid(frame: Dictionary) -> bool:
 func apply_frame(frame: Dictionary) -> bool:
 	var begin := Time.get_ticks_usec()
 	if not _valid(frame): return false
-	_finale_overlay={}
-	_finale_rect=Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0).grow(400.0)
-	for body: Dictionary in frame.ui.get("boss_bodies",[]):
-		if body.get("kind",-1)==4:_finale_overlay=body.get("finale",{})
 	_hero_power_visual.petrified = frame.get("petrified_enemies",PackedFloat32Array())
 	_hero_power_visual.queue_redraw()
 	var next_shots := {}
@@ -1034,6 +1030,10 @@ func receive_frame(frame: Dictionary) -> bool:
 	return true
 
 func update_effects(frame: Dictionary, dt: float) -> void:
+	_finale_overlay={}
+	_finale_rect=Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0).grow(400.0)
+	for body: Dictionary in frame.ui.get("boss_bodies",[]):
+		if body.get("kind",-1)==4:_finale_overlay=body.get("finale",{})
 	var equipped_forward: bool = frame.ui.get("weapon_levels",[]).any(func(item): return item.id=="W01")
 	if not equipped_forward:
 		_flashes = ShotFlashes.new()

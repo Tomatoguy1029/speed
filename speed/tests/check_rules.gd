@@ -17,6 +17,9 @@ const GAME_REFS := ["res://scripts", "res://scenes", "res://data", "ContentManag
 var errors: Array[String] = []
 
 func _initialize() -> void:
+	if "--package-runtime" in OS.get_cmdline_user_args() or "--package-missing-runtime" in OS.get_cmdline_user_args():
+		call_deferred("_package_runtime")
+		return
 	_check_autoloads()
 	for path in _files("res://scripts/managers"):
 		_forbid(path, CONTENT_REFS, "Manager がコンテンツを参照している")
@@ -81,3 +84,48 @@ func _files(dir: String) -> Array[String]:
 	for sub in da.get_directories():
 		out.append_array(_files(dir.path_join(sub)))
 	return out
+
+
+## export済みPCKだけを持つ配布エンジンから外部Scriptとして呼ぶ。
+## 生成器・テスト資源・エディターキャッシュは配布へ加えない。
+func _package_runtime() -> void:
+	var missing := "--package-missing-runtime" in OS.get_cmdline_user_args()
+	var loaded := ClassDB.class_exists(&"SpeedRunCore")
+	Engine.max_fps = 60
+	if loaded == missing:
+		push_error("配布拡張の存在と読込結果が一致しません")
+		quit(1)
+		return
+	var manager = root.get_node_or_null("RunManager")
+	if manager==null:
+		push_error("配布のラン入口を読み込めません")
+		quit(1)
+		return
+	var session = manager.create_run()
+	root.add_child(session)
+	session.auto_step = false
+	for frame in range(600):
+		if session.bridge!=null or session.cpp_error!=OK: break
+		await process_frame
+	if missing:
+		var rejected: bool = session.bridge==null and session._sim==null and session.cpp_error!=OK
+		session.free()
+		if rejected: print("[package_missing_runtime] OK")
+		else: push_error("拡張欠落時にランの準備失敗が必要です")
+		quit(0 if rejected else 1)
+		return
+	if session.bridge==null or session._sim!=null:
+		push_error("配布の通常入口がC++ランを開始しません")
+		session.free()
+		quit(1)
+		return
+	var bridge = session.bridge
+	var before: Dictionary = bridge.read_frame()
+	var updated: Dictionary = bridge.step(1.0/120.0,bridge.pack_intent(load("res://scripts/input/intent.gd").new()), {"logical_size":Vector2(1280,720)})
+	var after: Dictionary = bridge.read_frame()
+	var ok: bool = before.ok and updated.ok and after.ok and after.value.tick==before.value.tick+1
+	session.free()
+	await process_frame
+	if ok: print("[package_runtime] OK cpu="+Engine.get_architecture_name())
+	else: push_error("配布ランを最小更新できません")
+	quit(0 if ok else 1)

@@ -1,6 +1,6 @@
 ## 出撃では保存済みの索引と生成物だけを読む。生成器は呼ばない。
 extends RefCounted
-const ResourceList = preload("res://tools/content/run_resources.gd")
+const ResourceList = preload("res://scripts/data_types/run_resources.gd")
 
 static func read_bundle(index_path: String, expected_input: String) -> Dictionary:
 	if expected_input.length()!=64 or not FileAccess.file_exists(index_path): return {}

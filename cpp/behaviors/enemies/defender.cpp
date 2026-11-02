@@ -5,7 +5,7 @@
 #include <map>
 namespace speed {
 void DefenderBehavior::assign(RunRuntime &r) {
-    auto &s=r.state;auto &w=r.workspace;w.defender_posts_tick=s.ticks;w.defender_posts.clear();w.defender_posts.resize(s.enemies.size());
+    auto &s=r.state;auto &w=r.state.groups;w.defender_posts_tick=s.ticks;w.defender_posts.clear();w.defender_posts.resize(s.enemies.size());
     std::vector<uint32_t> strong,ordered;
     for (uint32_t row=0;row<s.enemies.size();++row) {
         const auto &e=s.enemies[row];if (!e.alive || e.dead) continue;const auto &d=r.content->definitions[e.definition];
@@ -29,11 +29,11 @@ void DefenderBehavior::assign(RunRuntime &r) {
     }
 }
 const DefenderPost *DefenderBehavior::post(const RunRuntime &r,EnemyHandle h) {
-    const auto &w=r.workspace;if (w.defender_posts_tick!=r.state.ticks || h.slot>=w.defender_posts.size()) return nullptr;
+    const auto &w=r.state.groups;if (w.defender_posts_tick!=r.state.ticks || h.slot>=w.defender_posts.size()) return nullptr;
     const auto &p=w.defender_posts[h.slot];return same_handle(p.actor,h)?&p:nullptr;
 }
 bool DefenderBehavior::move(RunRuntime &r,EnemyHandle h,double dt,const TrackingPolicy &tracking) {
-    if (r.workspace.defender_posts_tick!=r.state.ticks) assign(r);const auto *p=post(r,h);if (!p) return false;
+    if (r.state.groups.defender_posts_tick!=r.state.ticks) assign(r);const auto *p=post(r,h);if (!p) return false;
     auto &e=r.state.enemies[h.slot];auto goal=p->position;double top=e.speed;auto &boost=std::get<DefenderState>(e.behavior_state).boost;
     e.mode=EnemyMode::Move;e.timer=e.charge=0;
     if (boost.active) {
@@ -52,5 +52,5 @@ bool DefenderBehavior::clear_boost(RunRuntime &r,EnemyHandle h) {
     if (!r.state.enemy_handles.contains(h) || !std::holds_alternative<DefenderState>(r.state.enemies[h.slot].behavior_state)) return false;
     std::get<DefenderState>(r.state.enemies[h.slot].behavior_state).boost={};return true;
 }
-void DefenderBehavior::gone(RunRuntime &r,EnemyHandle h) {r.workspace.defender_posts_tick=-1;clear_boost(r,h);}
+void DefenderBehavior::gone(RunRuntime &r,EnemyHandle h) {r.state.groups.defender_posts_tick=-1;clear_boost(r,h);}
 }

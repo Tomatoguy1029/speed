@@ -1502,7 +1502,7 @@ func native_finish_tail(retry := false) -> void:
 	var scope := ContentResourceScope.new()
 	for entry: Dictionary in f.package.visuals:
 		if entry.get("purpose","") in ["legendary","reveal"]: scope.provide(entry.path,load(entry.path))
-	var resources = load("res://tools/content/run_resources.gd").new()
+	var resources = load("res://scripts/data_types/run_resources.gd").new()
 	resources.visuals.assign(f.package.visuals)
 	var hud = load("res://scripts/ui/hud.gd").new()
 	hud.bridge = bridge

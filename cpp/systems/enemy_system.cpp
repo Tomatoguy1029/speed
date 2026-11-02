@@ -53,7 +53,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Reticle) enemy.behavior_state=ReticleState{};
     if (def.kind==EnemyDefinition::Kind::Split) enemy.behavior_state=SplitState{};
     if (def.kind==EnemyDefinition::Kind::Crow) enemy.behavior_state=CrowState{};
-    if (def.kind==EnemyDefinition::Kind::Defender) {enemy.behavior_state=DefenderState{};run.workspace.defender_posts_tick=-1;}
+    if (def.kind==EnemyDefinition::Kind::Defender) {enemy.behavior_state=DefenderState{};run.state.groups.defender_posts_tick=-1;}
     enemy.origin=p.origin;enemy.role=p.is_boss?SpawnRole::BossBody:(state.field.rock_handles.contains(p.rock)?SpawnRole::Terrain:SpawnRole::Regular);
     enemy.picaro_owner=p.picaro_owner;enemy.source_definition=p.picaro_owner.generation?uint32_t(definition+1):0;
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
