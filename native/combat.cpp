@@ -149,6 +149,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (!fast) {
             enemy.hit_cd = c.contact_cooldown;
             damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction, 160.0, &position);
+            speed::EquipmentSystem::electric_contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));
             continue;
         }
         speed::DamageRequest gate_request;gate_request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));gate_request.cause=speed::Cause::Ram;gate_request.direction=direction;gate_request.impact=position;gate_request.has_impact=true;
@@ -177,7 +178,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
                 const double loss = enemy.dead ? (0.004 + enemy.radius * 0.0006) : (0.1 + enemy.radius * 0.002);
                 runtime.state.ship.vel *= 1.0 - std::min(0.6, loss);
             }
-            speed::EquipmentSystem::contact(runtime,position);
+            speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position);
             speed::RunUpBehavior::contact(runtime,position,direction,result.applied);
             continue;
         }
@@ -194,7 +195,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         runtime.state.ship.boost_t = 0;
         if (gate==speed::GateResult::Allow) damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
         enemy.hit_cd = 0.25;
-        speed::EquipmentSystem::contact(runtime,position);
+        speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position);
         speed::RunUpBehavior::contact(runtime,position,direction,0);
         Dictionary bounce; bounce["pos"] = runtime.state.ship.pos; emit_event("bounce", bounce);
         runtime.state.ship_pos = runtime.state.ship.pos;

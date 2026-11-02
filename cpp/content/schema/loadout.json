@@ -1111,6 +1111,73 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "ContactArcDefinition",
+      "section": 202,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "chains",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "branches",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cooldown",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual_life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

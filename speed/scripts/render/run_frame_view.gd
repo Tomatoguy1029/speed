@@ -89,6 +89,7 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+var _contact_arc_visual: RefCounted
 var _sonic_visual: RefCounted
 var _sonic_world_time := -1.0
 var _contact_wave_visual: RefCounted
@@ -861,6 +862,8 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _vortex_visual!=null: _vortex_visual.dispose()
 		_vortex_visual = null
 		_vortex_world_time = -1.0
+		if _contact_arc_visual!=null: _contact_arc_visual.dispose()
+		_contact_arc_visual = null
 		if _sonic_visual!=null: _sonic_visual.dispose()
 		_sonic_visual = null
 		_sonic_world_time = -1.0
@@ -913,6 +916,13 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_rear_canvas.visible = equipped_rear and _ship_visible
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
 	_rear_canvas.queue_redraw()
+	var equipped_arc: bool = frame.ui.get("contact_arc",{}).get("ready",false)
+	if equipped_arc and _contact_arc_visual==null:
+		_contact_arc_visual = preload("res://scripts/render/equipment/contactArc.gd").new()
+		_contact_arc_visual.setup_frame(_layer(14),_layer(18),_scope.resources.get("res://assets/pixel/airship_electronic_probe.png"),frame.ui.character_scale)
+	if not equipped_arc and _contact_arc_visual!=null:
+		_contact_arc_visual.dispose()
+		_contact_arc_visual = null
 	var equipped_sonic: bool = frame.ui.get("sonic",{}).get("ready",false)
 	if equipped_sonic and _sonic_visual==null:
 		_sonic_visual = preload("res://scripts/render/equipment/sonic.gd").new()
@@ -1192,6 +1202,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	if _contact_arc_visual!=null: _contact_arc_visual.frame_tick(ui.contact_arc,ui.ship,_zoom,_ship_visible)
 	var sonic_dt: float = 0.0 if _sonic_world_time<0.0 else maxf(0.0,ui.world_time-_sonic_world_time)
 	_sonic_world_time = ui.world_time if equipped_sonic else -1.0
 	if _sonic_visual!=null:

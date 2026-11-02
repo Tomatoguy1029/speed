@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w17" in OS.get_cmdline_user_args() or "--cpp-w17-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_w17()
+		print("[cpp_w17] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w08" in OS.get_cmdline_user_args() or "--cpp-w08-fixes" in OS.get_cmdline_user_args():
 		await check_cpp_w08()
 		print("[cpp_w08] failed=%d" % failures)
@@ -3036,3 +3041,86 @@ func check_cpp_w08() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"発進波の状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w17() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	var session = await trait_test_session("W17",config,617)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W17")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,definition.level_steps.size()+1):
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W17","levels":level}).ok,"接触電撃を全段取得する")
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		var roots: Array[int] = []
+		for j in 13:
+			var pos: Vector2 = origin if j==0 else origin+Vector2.from_angle((j-1)*TAU/12.0)*100.0
+			var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":pos}).value
+			core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
+			roots.append(id)
+		core.collide_ship(origin,1.0)
+		bridge.command("set_ui_overlay",{"active":false})
+		check(bridge.read_frame().ok and bridge.delivery_error.ok and bridge._ui.contact_arc.visuals.size()==1,"同期命中と電撃通知を配信する")
+		var arc: Dictionary = bridge._ui.contact_arc.duplicate(true)
+		var visual: Dictionary = arc.visuals[0]
+		check(visual.segments.size()==2*(1+level*int(definition.params.chains_per_level)) and is_equal_approx(arc.ready_at,bridge._ui.world_time+definition.params.cooldown),"全段の追加対象枠と世界時刻の待ちを使う")
+		var hp: float = ContentManager.definition(&"enemies",&"drifter").hp
+		var damage: float = bridge._ui.attack_power*definition.params.damage*(1.0+0.3*(definition.level_steps[level-1]-1))
+		var hit: Array = core.enemies_snapshot().filter(func(v): return v.id!=roots[0] and is_equal_approx(v.hp,hp-damage))
+		check(hit.size()==level*int(definition.params.chains_per_level),"枝分けして同じ敵を重複せず即時命中する")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._contact_arc_visual!=null and presentation.frame_view._contact_arc_visual._frame.size()==1 and presentation.frame_view._contact_arc_visual._probe.visible,"電撃の全線分と機体の装備を本番表示へ渡す")
+		var saved: Dictionary = bridge.checkpoint()
+		if level==1:
+			bridge.command("set_settings",{"hitstop":true})
+			trait_start_trace(bridge,1200.0)
+			bridge.command("dev_damage",{"entity_id":roots[0],"amount":0.01,"cause":"ram","crit":true})
+			var visual_age: float = bridge._ui.contact_arc.visuals[0].age
+			check(bridge._ui.hitstop>0.0,"表示時計を比べるヒットストップを作る")
+			bridge.step(1.0/120.0,idle,viewport)
+			check(is_equal_approx(bridge._ui.contact_arc.visuals[0].age,visual_age+1.0/120.0),"電撃表示は元の実秒に従いヒットストップ中も進む")
+			bridge.restore(saved.value)
+			bridge.collect_frame()
+		bridge.command("pause",{"paused":true})
+		bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.contact_arc==arc,"停止中は待ちと電撃表示を止める")
+		bridge.command("pause",{"paused":false})
+		for tick in 5: bridge.step(1.0/120.0,idle,viewport)
+		var after: Dictionary = bridge._ui.contact_arc.duplicate(true)
+		var enemies: Array = core.enemies_snapshot()
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		for tick in 5: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.contact_arc==after and core.enemies_snapshot()==enemies,"途中復帰で待ち時刻と電撃の表示・命中結果を再現する")
+		var another: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":core.ship_snapshot().ship_pos}).value
+		core.set_enemy_motion(another,{"held":true,"vel":Vector2.ZERO})
+		core.collide_ship(core.ship_snapshot().ship_pos,1.0)
+		bridge.command("set_ui_overlay",{"active":false})
+		check(bridge._ui.contact_arc.ready_at==arc.ready_at and bridge._ui.contact_arc.visuals.size()==1,"待ちの途中の別の接触では再発動しない")
+		if level<definition.level_steps.size():
+			bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W17","levels":1})
+			check(bridge._ui.contact_arc.ready_at==arc.ready_at,"段が変わってもクールダウンを戻さない")
+		bridge.command("dev_remove_weapon",{"id":"W17"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.contact_arc.ready and bridge._ui.contact_arc.visuals.is_empty() and presentation.frame_view._contact_arc_visual==null,"途中解除で電撃の待ちと専用表示を片付ける")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"接触電撃の状態と表示に実行エラーがない: %s" % [errors.messages()])

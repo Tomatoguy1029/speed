@@ -477,6 +477,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var mount: Vector2 = preload("res://scripts/weapons/rear.gd").MOUNT_PIXEL-Vector2(15.5,30.0)
 	for level in rear.level_steps.size():
 		data.RearDefinition.append({"id":level+1,"weapon":rear_id,"level":level+1,"interval":float(rear.params.interval_by_level[level]),"damage":float(rear.params.damage_by_level[level]),"pierce":int(rear.params.pierce_by_level[level]),"life":float(rear.params.life),"spread":float(rear.params.spread_step),"knock":float(rear.params.knock),"color":Color(rear.params.color).to_rgba32(),"mount_x":mount.x,"mount_y":mount.y,"muzzle_distance":12.5})
+	var contact_arc := load("res://data/weapons/W17_contactArc.tres") as WeaponDef
+	if contact_arc==null: return {}
+	var contact_arc_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":contact_arc_id,"kind":0,"maximum_level":contact_arc.level_steps.size(),"external_id":"W17","comet_only":contact_arc.comet_only})
+	var arc_target: Dictionary = config.post_max.target(contact_arc.id)
+	for level in contact_arc.level_steps.size():
+		data.ContactArcDefinition.append({"id":level+1,"weapon":contact_arc_id,"level":level+1,"damage":float(contact_arc.params.damage)*(1.0+0.3*(contact_arc.level_steps[level]-1)),"range":float(contact_arc.params.range),"cooldown":float(contact_arc.params.cooldown),"chains":(level+1)*int(contact_arc.params.chains_per_level),"branches":int(contact_arc.params.branches_by_level[level]),"knock":160.0,"area_increment":float(config.post_max.increments.area) if arc_target.has("area") else 0.0,"knockback_increment":float(config.post_max.increments.knockback) if arc_target.has("knockback") else 0.0,"visual_life":load("res://data/visuals/effect_settings.tres").number("weapon/contactArc","visible_seconds",0.22)})
 	var sonic := load("res://data/weapons/W08_sonic.tres") as WeaponDef
 	if sonic==null: return {}
 	var sonic_id: int = data.LoadoutDefinition.size()+1
@@ -546,6 +553,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":7,"equipment":knockback_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if knockback_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_wave_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if contact_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":sonic_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if sonic_target.has("followup") else 0.0})
+	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_arc_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if arc_target.has("followup") else 0.0})
+	var arc_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W17")
+	if arc_entry==null: return {}
+	for path in arc_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":contact_arc_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":contact_arc_id,"asset":key})
 	var sonic_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W08")
 	if sonic_entry==null: return {}
 	for path in sonic_entry.resources:
@@ -944,6 +959,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.KnockbackDefinition = resolved.KnockbackDefinition
 			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
+			data.ContactArcDefinition = resolved.ContactArcDefinition
 			data.SonicDefinition = resolved.SonicDefinition
 			data.ContactWaveDefinition = resolved.ContactWaveDefinition
 			data.BarrierDefinition = resolved.BarrierDefinition
@@ -1103,7 +1119,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():
 		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
-	for asset in ["res://assets/pixel/airship_blue_flame.png","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]:
+	for asset in ["res://assets/pixel/airship_electronic_probe.png","res://assets/pixel/airship_blue_flame.png","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]:
 		if not paths.has(asset): paths.append(asset)
 	for placement: BackgroundPlacement in stage.backgrounds:
 		for asset: String in [placement.texture_path,placement.fire_preset_path]:

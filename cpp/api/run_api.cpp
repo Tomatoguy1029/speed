@@ -27,6 +27,7 @@ bool presentation_frozen(const speed::RunRuntime &run) {
 }
 void advance_lance_display(speed::RunRuntime &run,double dt,double world_dt) {
     if (presentation_frozen(run)) return;
+    auto &arc=run.state.loadout.contact_arc;for (auto &v:arc.visuals) v.age+=dt;arc.visuals.erase(std::remove_if(arc.visuals.begin(),arc.visuals.end(),[&](const auto &v){return v.age>=arc.visual_life;}),arc.visuals.end());
     auto &marks=run.state.groups.summon_marks;
     for (auto &m:marks) m.age+=dt;
     marks.erase(std::remove_if(marks.begin(),marks.end(),[](const auto &m){return m.age>=m.life;}),marks.end());
@@ -398,6 +399,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["crit_chance"]=runtime.state.combat_config.crit_chance;ui["crit_mult"]=runtime.state.combat_config.crit_mult;
     Dictionary knockback;const auto &k=runtime.state.loadout.knockback;knockback["ready"]=k.ready;knockback["chance"]=k.chance;knockback["chain_limit"]=k.chain_limit;Array shatter_visuals;
     for (const auto &v:k.visuals) {const double age=std::max(0.0,runtime.state.world_time-v.born_world_time);if (age>=(v.hit?0.3:0.8)) continue;Dictionary item;item["id"]=int64_t(v.id);item["hit"]=v.hit;item["pos"]=v.pos;item["age"]=age;shatter_visuals.push_back(item);}knockback["visuals"]=shatter_visuals;ui["knockback"]=knockback;
+    Dictionary arc;const auto &aw=runtime.state.loadout.contact_arc;arc["ready"]=aw.ready;arc["ready_at"]=aw.ready_at;arc["visual_life"]=aw.visual_life;Array arc_visuals;for (const auto &v:aw.visuals) {const double age=v.age;if (age>=aw.visual_life) continue;Dictionary item;item["id"]=int64_t(v.id);item["age"]=age;PackedVector2Array segments;for (auto p:v.segments) segments.push_back(p);item["segments"]=segments;arc_visuals.push_back(item);}arc["visuals"]=arc_visuals;ui["contact_arc"]=arc;
     Dictionary sonic;const auto &sw=runtime.state.loadout.sonic;sonic["ready"]=sw.ready;sonic["active"]=sw.active;sonic["wave_speed"]=sw.wave_speed;sonic["life"]=sw.life;sonic["speed"]=sw.speed;sonic["pulse"]=sw.pulse;sonic["nose"]=sw.nose;sonic["min_speed"]=sw.min_speed;Array sonic_frames,sonic_pending,sonic_visuals;
     for (const auto &f:sw.frames) {Dictionary v;v["pos"]=f.pos;v["age"]=f.age;sonic_frames.push_back(v);}
     for (const auto &h:sw.pending) {Dictionary v;v["id"]=h.id;v["age"]=h.age;v["delay"]=h.delay;v["damage"]=h.damage;v["velocity"]=h.velocity;v["hit"]=h.hit;v["pos"]=runtime.state.enemy_handles.contains(h.target)?runtime.state.enemies[h.target.slot].pos:godot::Vector2();sonic_pending.push_back(v);}

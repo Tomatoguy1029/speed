@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cmath>
 namespace speed {
-std::vector<size_t> CollisionQuery::enemy_rows(const godot::RunState &state,Point lo,Point hi) {
+std::vector<size_t> CollisionQuery::enemy_rows(const godot::RunState &state,Point lo,Point hi,bool include_dead) {
     std::vector<size_t> out;
     if (state.grid.cols == 0 || hi.x < state.grid.origin.x || hi.y < state.grid.origin.y ||
             lo.x > state.grid.origin.x + state.grid.cols * state.grid.cell || lo.y > state.grid.origin.y + state.grid.rows * state.grid.cell) return out;
@@ -15,7 +15,7 @@ std::vector<size_t> CollisionQuery::enemy_rows(const godot::RunState &state,Poin
     for (int64_t y = y0; y <= y1; ++y) for (int64_t x = x0; x <= x1; ++x) {
         int64_t row = state.grid.head[y * state.grid.cols + x];
         while (row != -1) {
-            if (size_t(row) < state.enemies.size() && state.enemies[row].alive && !state.enemies[row].dead) out.push_back(row);
+            if (size_t(row) < state.enemies.size() && state.enemies[row].alive && (include_dead || !state.enemies[row].dead)) out.push_back(row);
             row = state.grid.next[row];
         }
     }

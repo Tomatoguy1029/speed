@@ -2,10 +2,18 @@
 #include "../behaviors/weapons/forward.h"
 #include "../behaviors/weapons/contactWave.h"
 #include "../behaviors/weapons/sonic.h"
+#include "../behaviors/weapons/contactArc.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
-void EquipmentSystem::contact(RunRuntime &run,godot::Vector2 pos) {
+void EquipmentSystem::electric_contact(RunRuntime &run,EnemyHandle target) {
+    for (const auto &owned:run.state.loadout.weapons) {
+        if (run.state.phase!=godot::RunState::Phase::Play) return;
+        if (run.content->equipment[owned.definition-1].external_id=="W17") ContactArcBehavior::contact(run,target);
+    }
+}
+void EquipmentSystem::contact(RunRuntime &run,EnemyHandle target,godot::Vector2 pos) {
+    electric_contact(run,target);
     for (const auto &owned:run.state.loadout.weapons) {
         if (run.state.phase!=godot::RunState::Phase::Play) return;
         if (run.content->equipment[owned.definition-1].external_id=="W04") ContactWaveBehavior::contact(run,pos);
@@ -102,6 +110,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W17") {
+            const auto &v=run.content->contact_arc_levels[next-1];auto &w=run.state.loadout.contact_arc;w.ready=true;w.definition=id;w.chains=v.chains;w.branches=v.branches;w.damage=v.damage;w.range=v.range;w.cooldown=v.cooldown;w.knock=v.knock;w.area_increment=v.area_increment;w.knockback_increment=v.knockback_increment;w.visual_life=v.visual_life;
         } else if (d.external_id=="W08") {
             const auto &v=run.content->sonic_levels[next-1];auto &w=run.state.loadout.sonic;
             w.ready=true;w.definition=id;w.damage=v.damage;w.base_speed=v.speed;w.base_life=v.life;w.emit_spacing=v.emit_spacing;w.min_speed=v.min_speed;w.nose=v.nose;w.pulse_distance=v.distance;w.pulse_time=v.pulse;w.side_speed=v.side_speed;w.back_speed=v.back_speed;w.decay=v.decay;w.damage_delay=v.damage_delay;w.area_increment=v.area_increment;w.duration_increment=v.duration_increment;
@@ -159,6 +169,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W17") run.state.loadout.contact_arc={};
     else if (external=="W08") run.state.loadout.sonic={};
     else if (external=="W04") run.state.loadout.contact_wave={};
     else if (external=="W03") run.state.loadout.knockback={};

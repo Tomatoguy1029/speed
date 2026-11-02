@@ -78,6 +78,8 @@ struct KnockbackState {
     double chance=0,speed=0,life=0,base_damage=0,base_attack=0,base_knock=0,base_life=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0;
     std::vector<KnockbackVisual> visuals;
 };
+struct ContactArcVisual {uint64_t id=0;double age=0;std::vector<godot::Vector2> segments;};
+struct ContactArcState {bool ready=false;uint32_t definition=0,chains=0,branches=0;double ready_at=0,damage=0,range=0,cooldown=0,knock=0,area_increment=0,knockback_increment=0,visual_life=0;uint64_t next_visual=1;std::vector<ContactArcVisual> visuals;};
 struct SonicRing {godot::Vector2 pos;double age=0;};
 struct SonicPending {EnemyHandle target;int64_t id=0;double delay=0,age=0,damage=0;godot::Vector2 velocity;bool hit=false;};
 struct SonicVisual {uint64_t id=0;int64_t target=0;godot::Vector2 pos,direction;double born=0;bool impact=false,dead=false;};
@@ -148,6 +150,7 @@ struct LoadoutState {
     KnockbackState knockback;
     ContactWaveState contact_wave;
     SonicState sonic;
+    ContactArcState contact_arc;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;

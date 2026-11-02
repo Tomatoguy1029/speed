@@ -1420,6 +1420,10 @@
       {
         "name": "Sonic",
         "value": "sonic"
+      },
+      {
+        "name": "ContactArc",
+        "value": "contactArc"
       }
     ],
     "VisualRole": [
@@ -1844,6 +1848,10 @@
       {
         "name": "SonicImpact",
         "value": "sonic_impact"
+      },
+      {
+        "name": "ContactBolt",
+        "value": "bolt"
       }
     ],
     "ResultKind": [
@@ -2421,6 +2429,9 @@
       "pos",
       "dir",
       "dead"
+    ],
+    "bolt": [
+      "segments"
     ]
   },
   "includes": [
