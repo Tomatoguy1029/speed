@@ -37,7 +37,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
             if (!WaveSystem::act(run,handle,dt)) return true;
             EventBuilder::flush_combat(run);
         }
-        if (auto *shape=std::get_if<HydraShapeHazard>(&state.hazards[row].shape)) {shape->before=shape->last_points.empty()?shape->points:shape->last_points;if (time>=delay) for (auto &point:shape->points) point+=shape->velocity*dt;shape->last_points=shape->points;if (!shape->points.empty()) state.hazards[row].pos=shape->points.front();}
+        if (auto *shape=std::get_if<HydraShapeHazard>(&state.hazards[row].shape)) {shape->before=shape->last_points.empty()?shape->points:shape->last_points;if (shape->follow.generation) {if (!state.enemy_handles.contains(shape->follow) || state.enemies[shape->follow.slot].dead) {end(state,handle,AttackEndReason::ParticipantEnd);continue;}const auto at=state.enemies[shape->follow.slot].pos;shape->points={at,at+godot::Vector2(0.1,0)};} else if (time>=delay) for (auto &point:shape->points) point+=shape->velocity*dt;shape->last_points=shape->points;if (!shape->points.empty()) state.hazards[row].pos=shape->points.front();}
         if (!get(state,handle)) continue;
         if (time>=delay && !hazard_act(state,handle,dt)) return true;
         const auto &pending=state.hazards[row];

@@ -1539,6 +1539,10 @@
       {
         "name": "TailSweep",
         "value": "tail_sweep"
+      },
+      {
+        "name": "Rubble",
+        "value": "rubble"
       }
     ],
     "VisualRole": [

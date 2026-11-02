@@ -4,6 +4,7 @@ extends RefCounted
 const RUNNERS := {
 	"res://scripts/data_types/boss_techniques/draco/meteor.gd":"res://scripts/bosses/draco/techniques/meteor.gd",
 	"res://scripts/data_types/boss_techniques/draco/star_fan.gd":"res://scripts/bosses/draco/techniques/star_fan.gd",
+	"res://scripts/data_types/boss_techniques/hydra/rubble_lump.gd":"res://scripts/bosses/hydra/techniques/rubble_lump.gd",
 	"res://scripts/data_types/boss_techniques/draco/tail_sweep.gd":"res://scripts/bosses/draco/techniques/tail_sweep.gd",
 	"res://scripts/data_types/boss_techniques/hydra/grid.gd":"res://scripts/bosses/hydra/techniques/grid.gd",
 	"res://scripts/data_types/boss_techniques/hydra/curve.gd":"res://scripts/bosses/hydra/techniques/curve.gd",

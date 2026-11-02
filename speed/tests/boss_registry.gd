@@ -15,6 +15,15 @@ func _ready() -> void:
 	if "--cpp-hydra-curve" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_curve")
 		return
+	if "--cpp-hydra-rubble-retire" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_rubble_retire")
+		return
+	if "--cpp-hydra-rubble-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_rubble_retry")
+		return
+	if "--cpp-hydra-rubble" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_rubble")
+		return
 	if "--cpp-hydra-blades-origin" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_blades_origin")
 		return
@@ -4850,3 +4859,117 @@ func native_hydra_grid() -> void:
 	c=hydra_major_case("grid",edits,false,{}, {"draw_length":1.0});bridge=c.bridge;hydra_grid_separate(c)
 	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"一筆の長さ予算に経路が入らないと格子を選べない");bridge.dispose()
 	await get_tree().process_frame;print("[cpp_hydra_grid] failures=",failed);get_tree().quit(1 if failed else 0)
+
+## 瓦礫の通常技を、首技の正常・中断と同じ入口で確認する。
+func native_hydra_rubble() -> void:
+	var name := "rubble_fan" if "--fan" in OS.get_cmdline_user_args() else "rubble_lump"
+	var fan := name=="rubble_fan"
+	var move = load("res://data/bosses/hydra_moves/%s.tres" % name)
+	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==StringName(name),"瓦礫の編集値と互換Runnerを分ける")
+	var edits := {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"lump_speed":400.0,"lump_dmg":7.0}
+	if fan: edits.merge({"rubble_count":6,"rubble_spread":1.3,"rubble_small_radius":16.0})
+	else: edits.lump_r=26.0
+	var c := hydra_normal_case(true,{},edits,name)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	bridge._core.set_run_guards({"invincible":false})
+	var events: Array = [];bridge.subscribe("瓦礫の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[2]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*300,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==(81 if fan else 80),"共通フローが瓦礫の首から自然に選ぶ")
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	for tick in 14: bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[2].glow>0.9 and body.effects.is_empty(),"予告時刻は頭だけを発光する")
+	bridge._core.step(0.011);body=bridge.command("dev_boss_body_state").value[0]
+	var count: int = 6 if fan else 1
+	check(body.effects.size()==count and body.effects[0].kind=="rubble" and body.effects[0].width==(32.0 if fan else 52.0),"発動時刻に同じ部品で数・幅・敵の行を作る")
+	var effect: Dictionary = body.effects[0].duplicate(true)
+	var rubble: Array = bridge._core.enemies_snapshot().filter(func(e): return e.type=="hydra_rubble" and not e.dead)
+	check(rubble.size()==count,"各瓦礫は判定だけでなく敵の行を持つ")
+	bridge.command("dev_ship_motion",{"position":effect.points[0],"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step_hazards(0.01);body=bridge.command("dev_boss_body_state").value[0]
+	var expected: Dictionary = body.duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"瓦礫の世代付き参照・点列と時計を途中保持して戻す")
+	bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"復帰後も同じ追従と判定になる");bridge.release_checkpoint(held.value)
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="rubble")
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale) and hits.size()==2 and hits[-1].payload.technique==StringName(name) and hits[-1].payload.source==&"hydra","実HP・倍率1回・rubble原因と技と所有元を保つ")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"正式表示へ瓦礫の敵とshapeを渡す")
+	await get_tree().process_frame
+	bridge._core.step(0.3);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[2].mode=="idle" and body.effects.size()==count,"自然終了でも飛んだ瓦礫が残る")
+	bridge._core.step_hazards(0.01);body=bridge.command("dev_boss_body_state").value[0]
+	var moved: Array = bridge._core.enemies_snapshot().filter(func(e): return e.type=="hydra_rubble" and not e.dead)
+	check(body.effects[0].points[0].distance_to(effect.points[0])>0.01 and body.effects[0].points[0].distance_to(Vector2(moved[0].pos[0],moved[0].pos[1]))<0.001,"減速する敵の行へ点列を追従する")
+	head=body.necks[2]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*500,"velocity":Vector2.ZERO})
+	var first_id: int = actions[0].id
+	for tick in 20: bridge._core.step(0.025)
+	check(bridge.command("dev_boss_state").value.any(func(t): return t.kind==(81 if fan else 80) and t.id>first_id),"待ち後に次の瓦礫技を選ぶ")
+	bridge.command("dev_cancel_flow",{"entity_id":c.id});body=bridge.command("dev_boss_body_state").value[0]
+	count=body.effects.size()
+	check(count>0,"取消でも飛んだ瓦礫を残す")
+	bridge.command("dev_damage",{"entity_id":body.necks[2].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[2].alive and body.effects.size()==count,"参加首の消失後も瓦礫が残る")
+	var broken: Array = bridge._core.enemies_snapshot().filter(func(e): return e.type=="hydra_rubble" and not e.dead)
+	bridge.command("dev_remove",{"entity_id":broken[0].id});bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.size()==count-1,"消失した瓦礫の判定だけを回収し世代再利用へ追従しない")
+	bridge._core.step_hazards(6.1)
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"寿命で瓦礫の判定を回収する")
+	view.queue_free();bridge.dispose();await get_tree().process_frame
+	print("[cpp_hydra_",name,"] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_hydra_rubble_retry() -> void:
+	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"lump_speed":400.0,"lump_dmg":7.0,"lump_r":26.0},"rubble_lump")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[2]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*500,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var first_id: int = bridge.command("dev_boss_state").value[0].id
+	bridge._core.step(0.41)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[2]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*500,"velocity":Vector2.ZERO})
+	for tick in 200:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value.any(func(t): return t.kind==80 and t.id>first_id): break
+	check(bridge.command("dev_boss_state").value.any(func(t): return t.kind==80 and t.id>first_id),"正規の位置条件と待ちを満たして次の瓦礫技を選ぶ")
+	bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	var broken: Array = bridge._core.enemies_snapshot().filter(func(e): return e.type=="hydra_rubble" and not e.dead)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var count: int = body.effects.size()
+	bridge.command("dev_remove",{"entity_id":broken[0].id});bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.size()==count-1,"技の取消後も生存参照を調べ、消失した瓦礫だけを回収する")
+	bridge.dispose();print("[cpp_hydra_rubble_retry] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_rubble_retire() -> void:
+	var c := hydra_normal_case(false,{}, {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"lump_speed":400.0,"lump_dmg":7.0,"lump_r":26.0},"rubble_lump")
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[2]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*500,"velocity":Vector2.ZERO})
+	bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1});bridge._core.step(0.16)
+	var rubble: Array = bridge._core.enemies_snapshot().filter(func(e): return e.type=="hydra_rubble" and not e.dead)
+	bridge.command("dev_remove",{"entity_id":rubble[0].id});bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"消失した瓦礫の世代参照を調べ、その判定を回収する")
+	bridge.dispose();print("[cpp_hydra_rubble_retire] failures=",failed);get_tree().quit(1 if failed else 0)

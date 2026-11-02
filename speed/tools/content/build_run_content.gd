@@ -720,6 +720,22 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		var immortal_definition: int = hydra.immortal
 		hydra.erase("immortal")
 		data.HydraBodyDefinition = [hydra]
+		var rubble_package: Dictionary = chase_package(load("res://data/enemies/hydra_rubble.tres"),config)
+		var rubble_source: Dictionary = rubble_package.records
+		var rubble: Dictionary = rubble_source.EnemyRecord[0].duplicate(true)
+		rubble.id = data.EnemyRecord.size()+1
+		var rubble_visual: Dictionary = rubble_package.visuals[5].duplicate(true)
+		rubble_visual.id = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":rubble_visual.id,"role":rubble_visual.role})
+		package.visuals.append(rubble_visual)
+		rubble.visual_id = rubble_visual.id
+		data.EnemyRecord.append(rubble)
+		var drift: Dictionary = rubble_source.DriftDefinition[0].duplicate(true)
+		drift.id = rubble.id
+		data.DriftDefinition.append(drift)
+		data.StringEntry.append({"id":rubble.id,"value":"hydra_rubble"})
+		data.DefinitionIndex.append({"id":rubble.id,"enemy":rubble.id})
+		data.PopulationType.append({"id":rubble.id,"enemy":rubble.id,"rank":0,"maximum":100,"ranged":false})
 		var regrow := {"id":1,"boss":1,"growth_first":float(definition.params.growth_thresholds[0]),"growth_second":float(definition.params.growth_thresholds[1])}
 		for key in ["regrow","regrow_per_head","regrow_combo","fire_regrow_scale","chance_time","growth_time","debris_dmg"]: regrow[key] = float(definition.params[key])
 		data.HydraRegrowDefinition = [regrow]
@@ -997,12 +1013,12 @@ static func append_draco_cycle(data: Dictionary, definition: BossDef, boss: int)
 	return OK
 ## 首の通常技の編集値を、分離前後で使う同じ型付き定義へ変換する。
 static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique not in [&"bite_thrust",&"bite_sweep",&"beam_bolt",&"beam_fixed",&"wind_blades"] or bite.head_kind not in [&"bite",&"beam",&"vortex"]: return {}
+	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique not in [&"bite_thrust",&"bite_sweep",&"beam_bolt",&"beam_fixed",&"wind_blades",&"rubble_lump"] or bite.head_kind not in [&"bite",&"beam",&"vortex",&"debris"]: return {}
 	var records := {}
 	var values: Dictionary = definition.params.merged(bite.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64 if bite.technique==&"bite_thrust" else 65 if bite.technique==&"bite_sweep" else 66 if bite.technique==&"beam_bolt" else 67 if bite.technique==&"beam_fixed" else 68,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge if bite.technique==&"bite_thrust" else values.sweep_time if bite.technique==&"bite_sweep" else values.beam_time if bite.technique==&"beam_fixed" else 2.0*float(values.blade_interval) if bite.technique==&"wind_blades" else 0.0),"hold":float(values.normal_hold),"damage":float(values.beam_dmg if bite.head_kind==&"beam" else values.bite_dmg),"passes":1,"cuts":1},true)
+	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64 if bite.technique==&"bite_thrust" else 65 if bite.technique==&"bite_sweep" else 66 if bite.technique==&"beam_bolt" else 67 if bite.technique==&"beam_fixed" else 80 if bite.technique==&"rubble_lump" else 68,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge if bite.technique==&"bite_thrust" else values.sweep_time if bite.technique==&"bite_sweep" else values.beam_time if bite.technique==&"beam_fixed" else 2.0*float(values.blade_interval) if bite.technique==&"wind_blades" else 0.0),"hold":float(values.normal_hold),"damage":float(values.beam_dmg if bite.head_kind==&"beam" else values.lump_dmg if bite.head_kind==&"debris" else values.bite_dmg),"passes":1,"cuts":1},true)
 	records.BossTechniqueDefinition = [normal]
 	records.HydraNormalDefinition = [{"id":1,"technique":1,"head_kind":[&"bite",&"vortex",&"debris",&"beam",&"thunder"].find(bite.head_kind),"aim_tracking":float(values.get("aim_tracking",0.0)),"attack_cd":float(values.attack_cd),"bite_radius":float(values.get("bite_radius",0.0)),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(bite.technique)])}]
 	var action_rules: Resource = load("res://data/bosses/ai/hydra_action_rules.tres")
@@ -1054,6 +1070,10 @@ static func hydra_technique_package(definition: BossDef, move: BossTechnique, co
 	for record in Schema.SCHEMA.records:
 		if record.name.begins_with("Hydra") and record.fields.any(func(field):return field.get("ref","")=="BossTechniqueDefinition"): package.records[record.name] = []
 	for key in records: package.records[key] = records[key]
+	if move.technique==&"rubble_lump":
+		var values: Dictionary = definition.params.merged(move.values(),true)
+		var enemy: int = package.records.StringEntry.filter(func(row): return row.value=="hydra_rubble")[0].id
+		package.records.HydraRubbleDefinition = [{"id":1,"technique":1,"enemy":enemy,"radius":float(values.lump_r),"speed":float(values.lump_speed),"life":float(load("res://data/enemies/hydra_rubble.tres").params.life),"count":1,"spread":0.0}]
 	var shot: PackedScene = move.get("shot_visual") if move.has_field("shot_visual") else null
 	if shot!=null:
 		var key: int = package.records.ResourceKey.size()+1
