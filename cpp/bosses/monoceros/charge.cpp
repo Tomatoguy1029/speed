@@ -39,6 +39,10 @@ void damage(RunRuntime &r,TechniqueState &t,const godot::PackedVector2Array &bef
 }
 void recovery(RunRuntime &r,TechniqueState &t) {t.stage=TechniqueStage::Recovery;t.remaining=rule(r,t).recover;r.state.enemies[t.actor.slot].vel={};}
 }
+bool MonocerosCharge::in_reach(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {
+    TechniqueState t;t.actor=actor;t.definition=definition;const auto &p=rule(r,t);const auto &b=boss(r,t);
+    return r.state.enemies[actor.slot].pos.distance_to(strike_aim(r,t,p.warn))<=p.distance+horn_length(r,t)+b.horn_width*0.5+r.state.ship_config.ship_radius;
+}
 bool MonocerosCharge::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {
     if (!r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead || !definition || definition>r.content->boss_techniques.size()) return false;
     TechniqueState t;t.actor=actor;t.definition=definition;const auto &p=rule(r,t);const auto &b=boss(r,t);const auto &e=r.state.enemies[actor.slot];

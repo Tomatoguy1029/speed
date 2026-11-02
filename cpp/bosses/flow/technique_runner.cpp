@@ -88,7 +88,7 @@ godot::Array TechniqueRunner::snapshot(const RunRuntime &run) {
     godot::Array out;
     for (uint32_t row=0;row<run.state.bosses.techniques.size();++row) {
         const auto &t=run.state.bosses.techniques[row];godot::Dictionary item;
-        item["id"]=t.id;item["definition"]=t.definition;item["actor"]=run.state.enemy_handles.entity_id(t.actor);item["stage"]=int(t.stage);
+        item["technique"]=godot::String(run.content->boss_techniques[t.definition-1].external_id.c_str());item["id"]=t.id;item["definition"]=t.definition;item["actor"]=run.state.enemy_handles.entity_id(t.actor);item["stage"]=int(t.stage);
         item["elapsed"]=t.elapsed;item["remaining"]=t.remaining;item["cursor"]=t.command_cursor;item["locked"]=t.locked;item["hit"]=t.hit;item["aim"]=t.aim;item["direction"]=t.direction;item["reposition"]=t.reposition;
         if (run.state.enemy_handles.contains(t.actor)) {item["position"]=run.state.enemies[t.actor.slot].pos;item["horn"]=MonocerosCharge::horn(run,t);item["warning"]=MonocerosCharge::horn(run,t,true);}
         out.push_back(item);

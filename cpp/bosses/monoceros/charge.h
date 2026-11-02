@@ -3,6 +3,7 @@
 namespace speed {
 class MonocerosCharge {
 public:
+    static bool in_reach(const RunRuntime &,EnemyHandle,uint32_t);
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t definition);
     static void begin(RunRuntime &,TechniqueState &);
     static void step(RunRuntime &,TechniqueState &,double dt);

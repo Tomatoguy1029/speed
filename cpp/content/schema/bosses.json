@@ -72,6 +72,21 @@
           "name": "speed",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "approach_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "kick_trigger_arc",
+          "type": "f64",
+          "min": 0
         }
       ]
     },

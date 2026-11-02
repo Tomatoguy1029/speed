@@ -70,6 +70,7 @@ var _telescope_beams: Array[Dictionary] = []
 var _pulser_visual: EnemyVisual
 var _pulser_parent: Node2D
 var _phoenix_visual: EnemyVisual
+var _boss_body_displays := {}
 var _boss_technique_visual: Node2D
 var _marlin_visual: EnemyVisual
 var _gunner_marks: DrawLayer
@@ -314,6 +315,14 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 
 func _valid(frame: Dictionary) -> bool:
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
+	if frame.has("boss_bodies"):
+		if not frame.boss_bodies is Array: return false
+		for body in frame.boss_bodies:
+			if not body is Dictionary or not body.get("mode") is int or body.mode<0 or body.mode>5 or not body.get("kind") is int: return false
+			if body.mode<4:
+				if not body.get("position") is Vector2 or not body.position.is_finite(): return false
+				for key in ["facing","radius","hp","max_hp","clock","phase_progress","horn_length"]:
+					if not (body.get(key) is float or body.get(key) is int) or not is_finite(float(body[key])): return false
 	if frame.has("boss_techniques"):
 		if not frame.boss_techniques is Array: return false
 		for row in frame.boss_techniques:
@@ -736,6 +745,32 @@ func apply_frame(frame: Dictionary) -> bool:
 		_gravity = frame.gravity
 		_gravity_canvas.queue_redraw()
 	if frame.has("boss_techniques"): _boss_technique_visual.apply_frame(frame.boss_techniques)
+	var body_seen := {}
+	for body: Dictionary in frame.get("boss_bodies",[]):
+		if body.kind!=0: continue
+		body_seen[body.id] = true
+		if body.mode>=4:
+			if _boss_body_displays.has(body.id): _boss_body_displays[body.id].hide()
+			continue
+		var entry := {}
+		for asset in visuals.values():
+			if asset.get("boss","")=="monoceros": entry = asset; break
+		if entry.is_empty(): continue
+		if not _boss_body_displays.has(body.id):
+			var scene: PackedScene = _scope.resources.get(entry.path)
+			if scene==null: continue
+			var display = scene.instantiate()
+			display.set_script(preload("res://scripts/render/bosses/monoceros.gd"))
+			_pulser_parent.add_child(display)
+			_boss_body_displays[body.id] = display
+		var attack := {}
+		for value: Dictionary in frame.get("boss_techniques",[]):
+			if value.actor==body.actor and value.stage<5: attack = value; break
+		_boss_body_displays[body.id].apply_frame(body,attack,entry.get("appearance",{}))
+	for id in _boss_body_displays.keys():
+		if not body_seen.has(id):
+			_boss_body_displays[id].queue_free()
+			_boss_body_displays.erase(id)
 	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
 	var ruler: PackedFloat64Array=frame.get("ruler",PackedFloat64Array())
 	if ruler!=_ruler:

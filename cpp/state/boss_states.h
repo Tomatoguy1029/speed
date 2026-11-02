@@ -35,7 +35,14 @@ struct BossFlowState {
     std::unordered_map<uint64_t,double> cooldowns;
 };
 enum class BossMode : uint8_t { Entrance,Idle,Phase,Final,Defeated,Cancelled };
+// 一角獣は単体。本体が唯一の参加者で、HPの参照先・寿命も同じHandle。
+struct ParticipantState {
+    EnemyHandle actor,health_target;
+    int64_t id=0;
+    bool is_body=true,active=true;
+};
 struct BossBodyState {
+    std::vector<ParticipantState> participants;
     int64_t id=0;
     uint32_t definition=0,phase=1;
     EnemyHandle actor;

@@ -1222,6 +1222,14 @@ func _draw_cpp() -> void:
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
 		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
 	draw_set_transform(Vector2.ZERO)
+	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
+		if body.mode>=4 or not body.has("hp"): continue
+		var width := minf(520.0,size.x*0.6)
+		var left := size.x*0.5-width*0.5
+		draw_rect(Rect2(left,60,width,10),Color(0,0,0,0.6))
+		draw_rect(Rect2(left,60,width*clampf(float(body.hp)/maxf(1.0,float(body.max_hp)),0.0,1.0),10),Color("#ff526e"))
+		_draw_edge_arrow_values(body.position,Color("#ff526e"),_cpp_ui.view_center,_cpp_ui.view_half)
+		break
 	for comet in _cpp_ui.get("rare_comets",PackedVector2Array()): _draw_edge_arrow_values(comet,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	_draw_cpp_gauge_ring()
 	_draw_banner()

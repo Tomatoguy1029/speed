@@ -12,7 +12,7 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 	if definition==null or definition.id!=&"monoceros" or move==null or move.technique!=&"charge": return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
 	var boss := {"id":1,"external_id":String(definition.id),"kind":0,"turn":definition.turn,"speed":definition.speed}
-	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed"]:
+	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]:
 		if not definition.params.has(key): return {}
 		boss[key] = float(definition.params[key])
 	var records := {"BossDefinition":[boss],"BossTechniqueDefinition":[],"BossTechniqueStage":[]}
@@ -66,13 +66,17 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	row.gate = 0
 	data.StringEntry[0].value = String(definition.id)
 	var boss := {"id":1,"external_id":String(definition.id),"kind":0 if definition.id==&"monoceros" else 1,"turn":definition.turn,"speed":definition.speed}
-	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed"]: boss[key] = float(definition.params.get(key,0.0))
+	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = float(definition.params.get(key,0.0))
 	data.BossDefinition = [boss]
 	var body := {"id":1,"boss":1,"enemy":1,"hp_floor_enabled":false}
 	for key in ["entrance_time","initial_wait","phase_threshold","phase_time","final_beam_width","final_reach","final_warn_width","final_widen_time"]:
 		if not definition.params.has(key): return {}
 		body[key] = float(definition.params[key])
 	data.BossBodyDefinition = [body]
+	if definition.id==&"monoceros":
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		package.visuals.append({"id":key,"role":7,"path":"res://scenes/bosses/monoceros_presentation.tscn","boss":"monoceros","appearance":definition.part_appearance.duplicate(true)})
 	return package
 
 static func _flow_condition(records: Dictionary, gate: Dictionary) -> int:
