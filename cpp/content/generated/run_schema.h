@@ -4112,7 +4112,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 107) return false;
+    if (out.kind > 108) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 3) return false;
@@ -7137,6 +7137,146 @@ inline bool read(BinaryReader &input, DracoSpiralDefinition &out) {
     if (out.touch_invuln < 0) return false;
     return true;
 }
+struct DracoInhaleDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double inhale_time{};
+    double pull_range{};
+    double pull_speed{};
+    double picaro_pull_speed{};
+    double mouth_radius{};
+    double bite_damage{};
+    double beam_time{};
+    double beam_extend{};
+    double beam_warn{};
+    uint32_t comets_per_star{};
+    uint32_t comet_cap{};
+    double comet_speed{};
+    uint32_t projectile{};
+    uint32_t beam_definition{};
+};
+inline bool read(BinaryReader &input, DracoInhaleDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.inhale_time)) return false;
+    if (out.inhale_time < 0) return false;
+    if (!input.read_f64(out.pull_range)) return false;
+    if (out.pull_range < 0) return false;
+    if (!input.read_f64(out.pull_speed)) return false;
+    if (out.pull_speed < 0) return false;
+    if (!input.read_f64(out.picaro_pull_speed)) return false;
+    if (out.picaro_pull_speed < 0) return false;
+    if (!input.read_f64(out.mouth_radius)) return false;
+    if (out.mouth_radius < 0) return false;
+    if (!input.read_f64(out.bite_damage)) return false;
+    if (out.bite_damage < 0) return false;
+    if (!input.read_f64(out.beam_time)) return false;
+    if (out.beam_time < 0) return false;
+    if (!input.read_f64(out.beam_extend)) return false;
+    if (out.beam_extend < 0) return false;
+    if (!input.read_f64(out.beam_warn)) return false;
+    if (out.beam_warn < 0) return false;
+    if (!input.read_u32(out.comets_per_star)) return false;
+    if (out.comets_per_star > 100000) return false;
+    if (!input.read_u32(out.comet_cap)) return false;
+    if (out.comet_cap > 100000) return false;
+    if (!input.read_f64(out.comet_speed)) return false;
+    if (out.comet_speed < 0) return false;
+    if (!input.read_u32(out.projectile)) return false;
+    if (!input.read_u32(out.beam_definition)) return false;
+    return true;
+}
+struct DracoInhaleArc {
+    uint32_t id{};
+    uint32_t technique{};
+    double offset_x{};
+    double offset_y{};
+    double radius{};
+    double angle_degrees{};
+    double spread_degrees{};
+    uint32_t count{};
+};
+inline bool read(BinaryReader &input, DracoInhaleArc &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.offset_x)) return false;
+    if (!input.read_f64(out.offset_y)) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.angle_degrees)) return false;
+    if (!input.read_f64(out.spread_degrees)) return false;
+    if (out.spread_degrees < 0) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (out.count > 2048) return false;
+    return true;
+}
+struct DracoFinaleDefinition {
+    uint32_t id{};
+    uint32_t boss{};
+    uint32_t finish_passes{};
+    double finish_pass_time{};
+};
+inline bool read(BinaryReader &input, DracoFinaleDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.boss)) return false;
+    if (!input.read_u32(out.finish_passes)) return false;
+    if (out.finish_passes < 1) return false;
+    if (out.finish_passes > 1000000) return false;
+    if (!input.read_f64(out.finish_pass_time)) return false;
+    if (out.finish_pass_time < 0.15) return false;
+    return true;
+}
+struct DracoClonesDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t clone_enemy{};
+    uint32_t part_enemy{};
+    uint32_t bite{};
+    uint32_t wind{};
+    uint32_t rubble{};
+    uint32_t beam{};
+    uint32_t thunder{};
+    double clone_hp{};
+    uint32_t clone_stars{};
+    double neck_rest{};
+    uint32_t hydra_source{};
+};
+inline bool read(BinaryReader &input, DracoClonesDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.clone_enemy)) return false;
+    if (!input.read_u32(out.part_enemy)) return false;
+    if (!input.read_u32(out.bite)) return false;
+    if (!input.read_u32(out.wind)) return false;
+    if (!input.read_u32(out.rubble)) return false;
+    if (!input.read_u32(out.beam)) return false;
+    if (!input.read_u32(out.thunder)) return false;
+    if (!input.read_f64(out.clone_hp)) return false;
+    if (out.clone_hp < 0) return false;
+    if (!input.read_u32(out.clone_stars)) return false;
+    if (!input.read_f64(out.neck_rest)) return false;
+    if (out.neck_rest < 0) return false;
+    if (!input.read_u32(out.hydra_source)) return false;
+    return true;
+}
+struct DracoFlowGateDefinition {
+    uint32_t id{};
+    uint32_t condition{};
+    uint32_t maximum_phase{};
+};
+inline bool read(BinaryReader &input, DracoFlowGateDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.condition)) return false;
+    if (!input.read_u32(out.maximum_phase)) return false;
+    if (out.maximum_phase < 1) return false;
+    if (out.maximum_phase > 3) return false;
+    return true;
+}
 struct ContentRecords {
     std::vector<RunConfig> RunConfig_rows;
     std::vector<StringEntry> StringEntry_rows;
@@ -7359,6 +7499,11 @@ struct ContentRecords {
     std::vector<DracoPicaroWallDefinition> DracoPicaroWallDefinition_rows;
     std::vector<DracoPicaroWallCandidate> DracoPicaroWallCandidate_rows;
     std::vector<DracoSpiralDefinition> DracoSpiralDefinition_rows;
+    std::vector<DracoInhaleDefinition> DracoInhaleDefinition_rows;
+    std::vector<DracoInhaleArc> DracoInhaleArc_rows;
+    std::vector<DracoFinaleDefinition> DracoFinaleDefinition_rows;
+    std::vector<DracoClonesDefinition> DracoClonesDefinition_rows;
+    std::vector<DracoFlowGateDefinition> DracoFlowGateDefinition_rows;
 };
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
@@ -8691,6 +8836,36 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { DracoSpiralDefinition row; if (!read(input,row)) return false; out.DracoSpiralDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 445: {
+        if (version != 1) return false;
+        if (count > input.remaining()/104) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoInhaleDefinition row; if (!read(input,row)) return false; out.DracoInhaleDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 447: {
+        if (version != 1) return false;
+        if (count > input.remaining()/52) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoInhaleArc row; if (!read(input,row)) return false; out.DracoInhaleArc_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 448: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoFinaleDefinition row; if (!read(input,row)) return false; out.DracoFinaleDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 442: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoClonesDefinition row; if (!read(input,row)) return false; out.DracoClonesDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 449: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { DracoFlowGateDefinition row; if (!read(input,row)) return false; out.DracoFlowGateDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     default: return false;
     }
 }
@@ -9137,6 +9312,16 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DracoPicaroWallCandidate_rows) if (!DracoPicaroWallCandidate_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DracoSpiralDefinition_ids;
     for (const auto &row:data.DracoSpiralDefinition_rows) if (!DracoSpiralDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoInhaleDefinition_ids;
+    for (const auto &row:data.DracoInhaleDefinition_rows) if (!DracoInhaleDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoInhaleArc_ids;
+    for (const auto &row:data.DracoInhaleArc_rows) if (!DracoInhaleArc_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoFinaleDefinition_ids;
+    for (const auto &row:data.DracoFinaleDefinition_rows) if (!DracoFinaleDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoClonesDefinition_ids;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!DracoClonesDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> DracoFlowGateDefinition_ids;
+    for (const auto &row:data.DracoFlowGateDefinition_rows) if (!DracoFlowGateDefinition_ids.insert(row.id).second) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.ship_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.shot_visual)) return false;
     for (const auto &row:data.RunConfig_rows) if (!ResourceKey_ids.count(row.crystal_visual)) return false;
@@ -9391,6 +9576,21 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DracoPicaroWallCandidate_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.DracoPicaroWallCandidate_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.DracoSpiralDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.DracoInhaleDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.DracoInhaleDefinition_rows) if (!BoltDefinition_ids.count(row.projectile)) return false;
+    for (const auto &row:data.DracoInhaleDefinition_rows) if (!BeamDefinition_ids.count(row.beam_definition)) return false;
+    for (const auto &row:data.DracoInhaleArc_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.DracoFinaleDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!EnemyRecord_ids.count(row.clone_enemy)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!EnemyRecord_ids.count(row.part_enemy)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.bite)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.wind)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.rubble)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.beam)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.thunder)) return false;
+    for (const auto &row:data.DracoClonesDefinition_rows) if (!EnemyRecord_ids.count(row.hydra_source)) return false;
+    for (const auto &row:data.DracoFlowGateDefinition_rows) if (!BossFlowCondition_ids.count(row.condition)) return false;
     return true;
 }
 inline void apply_config(const RunConfig &config, godot::RunState &state) {
@@ -9517,5 +9717,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=221;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=226;
 }
