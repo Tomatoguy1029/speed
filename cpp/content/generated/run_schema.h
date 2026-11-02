@@ -94,6 +94,8 @@ struct RunConfig {
     uint32_t coin_visual{};
     uint32_t cannon_visual{};
     double enemy_face_move{};
+    double pickup_repair_fraction{};
+    double pickup_life{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -262,6 +264,11 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.cannon_visual)) return false;
     if (!input.read_f64(out.enemy_face_move)) return false;
     if (out.enemy_face_move < 0) return false;
+    if (!input.read_f64(out.pickup_repair_fraction)) return false;
+    if (out.pickup_repair_fraction < 0) return false;
+    if (out.pickup_repair_fraction > 1) return false;
+    if (!input.read_f64(out.pickup_life)) return false;
+    if (out.pickup_life < 0) return false;
     return true;
 }
 struct StringEntry {
@@ -1014,8 +1021,8 @@ struct ContentRecords {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 7) return false;
-        if (count > input.remaining()/648) return false;
+        if (version != 8) return false;
+        if (count > input.remaining()/664) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -1377,6 +1384,8 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.projectile_config.debris_life=config.debris_life;
     state.projectile_config.debris_knock=config.debris_knock;
     state.projectile_config.trail_points=config.trail_points;
+    state.pickup_config.repair_fraction=config.pickup_repair_fraction;
+    state.pickup_config.pickup_life=config.pickup_life;
 }
 inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {
     EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;

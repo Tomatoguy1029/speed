@@ -2,6 +2,7 @@
 #include "../systems/pickup_system.h"
 #include "../runtime/run_runtime.h"
 #include <algorithm>
+#include <cmath>
 namespace speed {
 const char *combat_reason_name(CombatReason reason) {
     switch(reason) {
@@ -154,6 +155,25 @@ godot::Dictionary carried_record(const RunRuntime &run,const CrystalState &cryst
     event["method"]=godot::StringName("crow");event["enemy_id"]=enemy_id;event["enemy"]=definition_name(run,crystal.origin.definition);
     event["spawn_t"]=crystal.origin.run_time;event["spawn_world_t"]=crystal.origin.world_time;return event;
 }
+}
+void EventBuilder::capsule_collected(RunRuntime &run,const CapsuleState &capsule,double applied) {
+    godot::Dictionary event,text;const auto color=godot::Color::html(capsule.kind==CapsuleKind::Heal?"67e8b1":capsule.kind==CapsuleKind::CometWeapon?"ffd24a":"b8a0ff");
+    if (capsule.kind!=CapsuleKind::CometWeapon) {
+        text["pos"]=run.state.ship.pos+godot::Vector2(0,capsule.kind==CapsuleKind::Heal?-40:-45);text["text"]=godot::String(capsule.kind==CapsuleKind::Heal?"HP +":"XP +")+godot::String::num_int64(std::llround(applied));text["color"]=color;text["size"]=capsule.kind==CapsuleKind::Heal?18:22;FrameBuilder::append(run,"text",text);
+    }
+    event["kind"]=godot::StringName(capsule.kind==CapsuleKind::Heal?"heal":capsule.kind==CapsuleKind::Magnet?"magnet":"comet_weapon");FrameBuilder::append(run,"pickup",event);
+    godot::Dictionary ring;ring["pos"]=capsule.pos;ring["radius"]=capsule.kind==CapsuleKind::Heal?70.0:120.0;ring["color"]=color;ring["life"]=0.5;FrameBuilder::append(run,"ring",ring);
+}
+void EventBuilder::crystals_collected(RunRuntime &run,const std::vector<CrystalCollection> &details,double base,double actual,double multiplier,CrystalCollectMethod method) {
+    godot::Dictionary event;godot::Array gems;
+    for (const auto &item:details) {
+        auto record=carried_record(run,item.crystal,-1);record.erase("method");record.erase("enemy_id");record.erase("enemy");record.erase("spawn_t");record.erase("spawn_world_t");
+        record["actual_xp"]=item.actual_xp;record["was_absorber"]=item.was_absorber;gems.push_back(record);
+    }
+    event["method"]=godot::StringName(method==CrystalCollectMethod::Ship?"ship":"magnet");event["base_xp"]=base;event["xp"]=base;event["actual_xp"]=actual;event["multiplier"]=multiplier;event["count"]=int64_t(details.size());event["gems"]=gems;
+    if (details.size()==1) {godot::Dictionary gem=gems[0];event["id"]=gem["id"];event["kind"]=gem["kind"];event["origin"]=gem["origin"];}
+    godot::Dictionary pickup;pickup["kind"]=godot::StringName("gem");FrameBuilder::append(run,"pickup",pickup);
+    FrameBuilder::append(run,"xp_collect",event);
 }
 void EventBuilder::crystal_transferred(RunRuntime &run,const CrystalState &crystal,int64_t enemy_id,bool was_absorber) {
     auto event=carried_record(run,crystal,enemy_id);event["was_absorber"]=was_absorber;FrameBuilder::append(run,"xp_transfer",event);

@@ -95,6 +95,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto &d=bundle->equipment[index];
         if (d.id!=index+1 || !equipment_names.insert(d.external_id).second) return {};
         if (d.id==1) continue;
+        // カプセルは未装備の彗星武器をIDで保持する。実行の登録は武器ごとに確認する。
+        if (d.kind==0 && d.comet_only) continue;
         if (d.kind!=1 || (d.external_id!="T34" && d.external_id!="T35" && d.external_id!="T36")) return {};
         if (d.maximum_level>bundle->numeric_traits.size()) return {};
         for (uint32_t level=1;level<=d.maximum_level;++level) {

@@ -130,6 +130,7 @@ struct RunState {
         double strong_gold_chance=0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;
         double xp_radius = 0, coin_radius = 0, speed_mult = 1;
+        double repair_fraction=0,pickup_life=0;
         std::vector<double> xp, start_weights, end_weights;
     } pickup_config;
     using Gem=speed::CrystalState;

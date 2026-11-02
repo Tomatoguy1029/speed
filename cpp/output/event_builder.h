@@ -6,10 +6,15 @@
 namespace speed {
 class RunRuntime;
 struct CrystalState;
+struct CrystalCollection;
+struct CapsuleState;
+enum class CrystalCollectMethod;
 enum class CrystalRemoval;
 enum class CargoLoss;
 class EventBuilder {
 public:
+    static void capsule_collected(RunRuntime &,const CapsuleState &,double effect_value);
+    static void crystals_collected(RunRuntime &,const std::vector<CrystalCollection> &,double base,double actual,double multiplier,CrystalCollectMethod);
     static void crystal_transferred(RunRuntime &,const CrystalState &,int64_t enemy_id,bool was_absorber);
     static void crystal_lost(RunRuntime &,const CrystalState &,int64_t enemy_id,CargoLoss);
     static void crystal_absorber_selected(RunRuntime &,const CrystalState &,uint8_t before_kind);

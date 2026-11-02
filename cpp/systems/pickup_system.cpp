@@ -1,4 +1,6 @@
 #include "pickup_system.h"
+#include "progression.h"
+#include "../api/run_core.h"
 #include "../runtime/run_runtime.h"
 #include "../output/event_builder.h"
 #include <godot_cpp/core/math.hpp>
@@ -117,6 +119,46 @@ bool PickupSystem::release_crystal(RunRuntime &run,size_t row,CrystalRemoval rea
     }
     if (p.gem_absorber_id==gem.id) {EventBuilder::crystal_absorber_released(run,gem.id,reason);p.gem_absorber=-1;p.gem_absorber_id=0;}
     p.gems[row].alive=false;p.free_gems.push_back(row);--p.live_gems;return true;
+}
+double PickupSystem::collect_rows(godot::SpeedRunCore &core,const std::vector<size_t> &rows,CrystalCollectMethod method) {
+    auto &run=core.runtime;auto &p=run.state.pickups;
+    const double multiplier=run.state.pickup_config.xp_mult*run.state.loadout.xp_gain_mult;
+    std::vector<CrystalCollection> details;double base=0;
+    for (size_t row:rows) {
+        if (row>=p.gems.size() || !p.gems[row].alive) continue;
+        const auto gem=p.gems[row];const double actual=gem.value*multiplier;
+        details.push_back({gem,actual,p.gem_absorber_id==gem.id});base+=gem.value;
+        p.collected[gem.kind].actual_xp+=actual;
+        release_crystal(run,row,CrystalRemoval::Collected);
+    }
+    if (details.empty()) return 0;
+    const double actual=base*multiplier;
+    ProgressionSystem::add_experience(core,actual);p.collected_actual_xp+=actual;
+    EventBuilder::crystals_collected(run,details,base,actual,multiplier,method);return actual;
+}
+double PickupSystem::collect_all(godot::SpeedRunCore &core) {
+    std::vector<size_t> rows;for (size_t row=0;row<core.runtime.state.pickups.gems.size();++row) if (core.runtime.state.pickups.gems[row].alive) rows.push_back(row);
+    return collect_rows(core,rows,CrystalCollectMethod::Magnet);
+}
+void PickupSystem::step_capsules(godot::SpeedRunCore &core,double dt) {
+    auto &run=core.runtime;auto &state=run.state;auto &capsules=state.pickups.capsules;
+    const double reach=22.0+state.ship_config.ship_radius+14.0,pull=state.pickup_config.coin_radius*1.6;
+    for (size_t i=0;i<capsules.size();) {
+        auto &capsule=capsules[i];capsule.age+=dt;
+        const bool can=capsule.kind!=CapsuleKind::Heal || state.ship.hp<state.ship_config.max_hp;
+        const auto direction=state.ship.pos-capsule.pos;const double distance=direction.length();
+        if (capsule.drop && can && distance<pull && distance>1.0) capsule.pos+=direction/distance*std::min((600.0+state.ship.vel.length())*dt,distance);
+        if (can && capsule.pos.distance_squared_to(state.ship.pos)<reach*reach) {
+            const auto collected=capsule;capsules.erase(capsules.begin()+i);double applied=0;
+            if (collected.kind==CapsuleKind::Heal) {
+                const double before=state.ship.hp;state.ship.hp=std::min(state.ship_config.max_hp,state.ship.hp+state.ship_config.max_hp*state.pickup_config.repair_fraction);applied=state.ship.hp-before;
+            } else if (collected.kind==CapsuleKind::Magnet) applied=collect_all(core);
+            else state.loadout.pending_comet_weapons.push_back(collected.weapon);
+            EventBuilder::capsule_collected(run,collected,applied);continue;
+        }
+        if (capsule.drop && capsule.age>state.pickup_config.pickup_life) {capsules.erase(capsules.begin()+i);continue;}
+        ++i;
+    }
 }
 bool PickupSystem::carry(RunRuntime &run,EnemyHandle owner,size_t row) {
     auto &state=run.state;auto &p=state.pickups;

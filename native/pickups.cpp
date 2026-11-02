@@ -60,10 +60,11 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
         Dictionary row; row["pos"] = coin.pos; row["pulled"] = coin.pulled; visible_coins.append(row);
     }
     Array capsules;for (const auto &capsule:runtime.state.pickups.capsules) {Dictionary row;row["kind"]=int(capsule.kind);row["pos"]=capsule.pos;row["age"]=capsule.age;row["weapon"]=capsule.weapon;row["drop"]=capsule.drop;capsules.push_back(row);}
-    Dictionary out;out["capsules"]=capsules;out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.pickups.xp_dropped;
+    Array pending;for (auto weapon:runtime.state.loadout.pending_comet_weapons) pending.push_back(String::utf8(runtime.content->equipment[weapon-1].external_id.c_str()));
+    Dictionary out;out["pending_comet_weapons"]=pending;out["capsules"]=capsules;out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.pickups.xp_dropped;
     if (runtime.state.pickup_config.fixed_rewards) {
         const auto totals=[](const std::array<speed::CrystalTotal,3> &source) {
-            Array values;for (const auto &total:source) {Dictionary value;value["count"]=int64_t(total.count);value["base_xp"]=total.base_xp;values.push_back(value);}return values;
+            Array values;for (const auto &total:source) {Dictionary value;value["count"]=int64_t(total.count);value["base_xp"]=total.base_xp;value["actual_xp"]=total.actual_xp;values.push_back(value);}return values;
         };
         Array cargo;std::array<speed::CrystalTotal,3> ground_totals{},carried_totals{};
         for (const auto &gem:runtime.state.pickups.gems) if (gem.alive) {++ground_totals[gem.kind].count;ground_totals[gem.kind].base_xp+=gem.value;}
@@ -74,7 +75,7 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
         }
         out["cargo"]=cargo;
         Dictionary stats;stats["ground"]=totals(ground_totals);stats["carried"]=totals(carried_totals);stats["supplied"]=totals(runtime.state.pickups.supplied);stats["collected"]=totals(runtime.state.pickups.collected);stats["lost"]=totals(runtime.state.pickups.lost);
-        stats["gold_rolls"]=int64_t(runtime.state.pickups.gold_rolls);stats["gold_won"]=int64_t(runtime.state.pickups.gold_won);out["xp_statistics"]=stats;
+        stats["collected_actual_xp"]=runtime.state.pickups.collected_actual_xp;stats["gold_rolls"]=int64_t(runtime.state.pickups.gold_rolls);stats["gold_won"]=int64_t(runtime.state.pickups.gold_won);out["xp_statistics"]=stats;
         out["absorber_id"]=int64_t(runtime.state.pickups.gem_absorber_id);out["next_ground_order"]=int64_t(runtime.state.pickups.next_ground_order);
 
     }
@@ -100,10 +101,11 @@ bool SpeedRunCore::step_pickups(double world_dt) {
     const double gem_radius = runtime.state.pickup_config.xp_radius;
     const double step = (700.0 + runtime.state.ship.vel.length() * 1.2) * runtime.state.pickup_config.speed_mult * world_dt;
     const double far = std::max(gem_radius, reach), far_sq = far * far;
+    for (auto &gem:runtime.state.pickups.gems) if (gem.alive && gem.wait>0) {gem.pos+=gem.velocity*world_dt;gem.velocity*=std::exp(-world_dt*5.0);gem.wait=speed::remaining_time(gem.wait,world_dt);}
     for (size_t row = 0; row < runtime.state.pickups.gems.size(); ++row) {
         auto &gem = runtime.state.pickups.gems[row];
         if (!gem.alive) continue;
-        if (gem.wait>0) {gem.pos+=gem.velocity*world_dt;gem.velocity*=std::exp(-world_dt*5.0);gem.wait=speed::remaining_time(gem.wait,world_dt);continue;}
+        if (gem.wait>0) continue;
         if (!gem.pulled && runtime.state.ship.pos.distance_squared_to(gem.pos) >= far_sq) continue;
         const Vector2 p = gem.pos, d = runtime.state.ship.pos - p;
         const double distance = d.length();
@@ -112,8 +114,8 @@ bool SpeedRunCore::step_pickups(double world_dt) {
             gem.pos = p + d / std::max(distance, 1.0) * std::min(step, distance);
         }
         if (distance < reach) {
-            collect_pickup("gem", gem.value);
-            speed::PickupSystem::release_crystal(runtime,row,speed::CrystalRemoval::Collected);
+            if (runtime.state.pickup_config.fixed_rewards) speed::PickupSystem::collect_rows(*this,{row},speed::CrystalCollectMethod::Ship);
+            else {collect_pickup("gem",gem.value);speed::PickupSystem::release_crystal(runtime,row,speed::CrystalRemoval::Collected);}
         }
     }
     const double coin_radius = runtime.state.pickup_config.coin_radius * 1.3;
@@ -135,6 +137,7 @@ bool SpeedRunCore::step_pickups(double world_dt) {
             runtime.state.pickups.free_coins.push_back(row);
         }
     }
+    speed::PickupSystem::step_capsules(*this,world_dt);
     return true;
 }
 

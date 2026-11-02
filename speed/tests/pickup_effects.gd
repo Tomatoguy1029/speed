@@ -6,6 +6,21 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-pickups-tail" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_pickups_tail()
+		check(finished,"取得入口の後半を最後まで実施する")
+		print("[cpp_pickups_tail] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
+	if "--cpp-pickups" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_pickups()
+		if finished: finished = await check_cpp_pickups_tail()
+		check(finished,"取得入口の確認を最後まで実施する")
+		print("[cpp_pickups] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
 	if "--cpp-cargo-record" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_cargo_record()
 		check(finished,"運搬記録の出所を最後まで照合する")
@@ -392,5 +407,117 @@ func check_cpp_cargo_record() -> bool:
 	var related: Array = records.filter(func(event): return event.type in [&"xp_drop",&"xp_transfer",&"xp_lost"] and event.payload.id==crystal)
 	check(related.size()==5,"供給・運搬・再配置・再運搬・喪失を同じ結晶IDで記録する")
 	check(related.all(func(event): return event.payload.origin==origin and event.payload.xp==config.xp_crystal_values[1]),"運搬者が変わっても元の供給元・個体・時刻と基準XPを保つ: expected=%s actual=%s" % [var_to_str(origin),var_to_str(related.map(func(event): return event.payload.origin))])
+	bridge.dispose()
+	return true
+
+func pickups_bridge(config: GameConfig):
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var data: Dictionary = builder.chase_records(ContentManager.enemies[&"drifter"],config)
+	var weapon: WeaponDef = load("res://data/weapons/W21_massTow.tres")
+	# 交換のG02より先に、回収して待機する武器IDだけを生成済み定義へ含める。
+	data.LoadoutDefinition.append({"id":data.LoadoutDefinition.size()+1,"kind":0,"maximum_level":weapon.level_steps.size(),"external_id":String(weapon.id),"comet_only":weapon.comet_only})
+	var bytes: PackedByteArray = schema.write_content(data,schema.sha256("固定色の取得入口".to_utf8_buffer()))
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	if not bridge.configure(bytes,{"api_version":1,"run_id":92,"mode":1,"stage_id":"pickups","profile":{},"settings":{}}).ok:
+		check(false,"取得用の結晶・カプセル定義を生成する")
+		return null
+	check(bridge.start(932,{"position":Vector2(-3000,0)}).ok,"共通回収の固定場面を開始する")
+	return bridge
+
+func check_cpp_pickups() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.gem_max = 3
+	config.xp_crystal_values = PackedFloat32Array([0.125,0.375,0.625])
+	config.xp_base = 0.2
+	config.xp_growth = 0.0
+	config.xp_curve = 0.0
+	var bridge = pickups_bridge(config)
+	if bridge==null: return false
+	var records: Array = []
+	bridge.subscribe("pickups",func(frame):
+		records.append_array(frame.events)
+		return true)
+	check(bridge.command("dev_pickup_rates",{"ship":1.5,"run":1.25}).ok,"機体とランの取得倍率を別々に持つ")
+	supply_crystal(bridge,Vector2(-3000,0),0)
+	check(bridge._core.step_pickups(0.001),"通常の吸引と回収を進める")
+	bridge.collect_frame()
+	var first: Dictionary = bridge._core.pickups_snapshot()
+	var single: Array = records.filter(func(event): return event.type==&"xp_collect")
+	check(single.size()==1 and single[0].payload.method==&"ship" and single[0].payload.multiplier==1.875 and single[0].payload.actual_xp==0.234375,"通常回収で2つの倍率を一度だけ掛け、小数XPを保つ")
+	check(first.xp_statistics.collected_actual_xp==0.234375 and records.any(func(event): return event.type==&"levelup"),"取得でレベルが変わっても基準量と実取得量を分ける")
+	# 画面外・吸引待ち・上限の集約先もビーコンの開始時に一括確定する。
+	var carried_id: int = supply_crystal(bridge,Vector2(-2000,500),1)
+	var carrier: int = bridge._core.spawn_enemy(&"drifter",Vector2(-2000,500))
+	bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":carried_id})
+	for kind: int in [0,1,2,0]: supply_crystal(bridge,Vector2(-1000+kind*100,500),kind)
+	var before: Dictionary = bridge._core.pickups_snapshot()
+	var expected: float = base_total(before.gems)*1.875
+	var saved: Dictionary = bridge.checkpoint()
+	records.clear()
+	var beacon: Dictionary = bridge.command("dev_collect_gems",{})
+	var after: Dictionary = bridge._core.pickups_snapshot()
+	var batch: Array = records.filter(func(event): return event.type==&"xp_collect")
+	check(beacon.ok and beacon.value==expected and batch.size()==1 and batch[0].payload.count==3 and batch[0].payload.multiplier==1.875,"ビーコンは全対象と倍率を一度決め、まとめたXPで成長する")
+	check(after.gems.is_empty() and after.absorber_id==0 and after.cargo.size()==1,"ビーコンは地面と集約先だけを回収し、運搬中を含めない")
+	check(is_equal_approx(after.xp_statistics.collected_actual_xp-first.xp_statistics.collected_actual_xp,expected),"ビーコンの実取得XPを累計へ一度だけ足す")
+	check(bridge.restore(saved.value).ok and bridge._core.pickups_snapshot()==before,"集約先・地面・運搬・基準/実取得の累計と倍率を保持して復帰する")
+	bridge.release_checkpoint(saved.value)
+	bridge.collect_frame()
+	bridge.dispose()
+	return true
+
+func check_cpp_pickups_tail() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	config.xp_base = 1000.0
+	var bridge = pickups_bridge(config)
+	if bridge==null: return false
+	bridge.command("dev_pickup_rates",{"ship":1.5,"run":1.25})
+	var final_xp := 0.0625
+	bridge.command("dev_add_xp",{"amount":final_xp})
+	check(is_equal_approx(bridge._ui.xp,final_xp),"開発用XPへ取得倍率を再適用しない")
+	check(bridge._core.pickups_snapshot().xp_statistics.collected_actual_xp==0.0,"開発用の最終XPを結晶回収へ混ぜない")
+	bridge.dispose()
+	# 回復拒否・寿命・コインと、彗星カプセルの待機IDを実際の更新で確認する。
+	config.xp_base = 1000.0
+	bridge = pickups_bridge(config)
+	if bridge==null: return false
+	var ship_pos := Vector2(-3000,0)
+	check(bridge.command("dev_spawn_pickup",{"kind":"heal","position":ship_pos}).ok,"回復カプセルを置く")
+	bridge._core.step_pickups(0.001)
+	check(bridge._core.pickups_snapshot().capsules.size()==1,"HP満タンでは回復を取らない")
+	bridge._core.step_pickups(config.pickup_life+1.0)
+	check(bridge._core.pickups_snapshot().capsules.is_empty(),"取れない回復もドロップの寿命で消える")
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge.command("dev_ship_damage",{"amount":hp*0.25,"cause":"shot"})
+	var hurt: float = bridge._core.ship_snapshot().ship_hp
+	check(hurt<hp,"実際の被弾入口で回復前のHPを作る")
+	bridge.command("dev_spawn_pickup",{"kind":"heal","position":ship_pos})
+	bridge._core.step_pickups(0.001)
+	check(is_equal_approx(bridge._core.ship_snapshot().ship_hp,minf(hp,hurt+hp*config.meteor_heal_frac)),"回復は実効最大HPの回復割合を使う")
+	bridge.command("dev_spawn_pickup",{"kind":"coin","position":ship_pos})
+	bridge._core.step_pickups(0.001)
+	bridge.collect_frame()
+	bridge.command("set_ui_overlay",{"active":false})
+	check(bridge._core.pickups_snapshot().coins.is_empty() and bridge._ui.coins==1,"コインを回収して部品を1つ増やし、地面から外す")
+	supply_crystal(bridge,Vector2(-1000,500),1)
+	bridge.command("dev_spawn_pickup",{"kind":"magnet","position":ship_pos})
+	bridge._core.step_pickups(0.001)
+	check(bridge._core.pickups_snapshot().gems.is_empty(),"磁石カプセルも共通のビーコン取得入口へ通す")
+	check(bridge.command("dev_spawn_pickup",{"kind":"comet_weapon","weapon":"W21","position":Vector2(-1000,0),"drop":false}).ok,"彗星限定カプセルを生成する")
+	bridge._core.step_pickups(config.pickup_life+1.0)
+	var capsule: Dictionary = bridge._core.pickups_snapshot().capsules[0]
+	check(capsule.pos==Vector2(-1000,0),"彗星限定は吸引・寿命で消さない")
+	bridge.command("dev_ship_motion",{"position":capsule.pos,"velocity":Vector2.ZERO})
+	bridge._core.step_pickups(0.001)
+	check(bridge._core.pickups_snapshot().pending_comet_weapons==["W21"],"触れた彗星武器を交換用の待機列へ渡す")
+	var saved: Dictionary = bridge.checkpoint()
+	bridge.command("dev_collect_gems",{})
+	check(bridge.restore(saved.value).ok and bridge._core.pickups_snapshot().pending_comet_weapons==["W21"],"彗星武器の回収済み待機列も保持して復帰する")
+	bridge.release_checkpoint(saved.value)
 	bridge.dispose()
 	return true

@@ -155,6 +155,25 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=changed?success():failure(5,"equipment","装備を変更できません");
     } else if (kind=="dev_benchmark" && runtime.api_development && payload.size()==1 && is(payload,"leveling",Variant::BOOL)) {
         runtime.state.loadout.xp_gain_mult=bool(payload["leveling"])?1.0:0.0;response=success();
+    } else if (kind=="dev_collect_gems" && runtime.api_development && payload.is_empty()) {
+        response=success(speed::PickupSystem::collect_all(*this));
+    } else if (kind=="dev_pickup_rates" && runtime.api_development && payload.size()==2 && is(payload,"ship",Variant::FLOAT) && is(payload,"run",Variant::FLOAT) && std::isfinite(double(payload["ship"])) && std::isfinite(double(payload["run"])) && double(payload["ship"])>=0 && double(payload["run"])>=0 && std::isfinite(double(payload["ship"])*double(payload["run"]))) {
+        runtime.state.pickup_config.xp_mult=payload["ship"];runtime.state.loadout.xp_gain_mult=payload["run"];response=success();
+    } else if (kind=="dev_spawn_pickup" && runtime.api_development && keys(payload,{"kind","position","weapon","drop"}) && is(payload,"kind",Variant::STRING) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite() && (!payload.has("drop") || is(payload,"drop",Variant::BOOL)) && (!payload.has("weapon") || is(payload,"weapon",Variant::STRING))) {
+        const String pickup=payload["kind"];speed::CapsuleState capsule;capsule.pos=payload["position"];capsule.drop=payload.get("drop",true);bool valid=true;
+        if (pickup=="coin") runtime.state.pickups.coins.push_back({capsule.pos,true,false});
+        else {
+            if (pickup=="heal") capsule.kind=speed::CapsuleKind::Heal;
+            else if (pickup=="magnet") capsule.kind=speed::CapsuleKind::Magnet;
+            else if (pickup=="comet_weapon") {
+                capsule.kind=speed::CapsuleKind::CometWeapon;
+                const String id=payload.get("weapon",String());
+                for (const auto &d:runtime.content->equipment) if (d.comet_only && id==String::utf8(d.external_id.c_str())) capsule.weapon=d.id;
+                valid=capsule.weapon!=0;
+            } else valid=false;
+            if (valid) runtime.state.pickups.capsules.push_back(capsule);
+        }
+        response=valid?success():failure(1,"pickup","回収物の種類または武器が不正です");
     } else if (kind=="dev_carry_crystal" && runtime.api_development && payload.size()==2 && is(payload,"entity_id",Variant::INT) && is(payload,"crystal_id",Variant::INT)) {
         const auto found=runtime.state.rows_by_id.find(int64_t(payload["entity_id"]));bool carried=false;
         if (found!=runtime.state.rows_by_id.end()) for (size_t row=0;row<runtime.state.pickups.gems.size();++row) {
@@ -217,7 +236,7 @@ Dictionary SpeedRunCore::frame_run() {
     if (runtime.frame_workspace.invalid) return failure(8,"events","通知の型・項目・番号が不正です");
     const auto &control=runtime.state.control;Dictionary camera;camera["center"]=control.camera_center;camera["zoom"]=control.camera_zoom;camera["half"]=runtime.state.view_half;
     Dictionary value=progress(runtime);value["run_id"]=runtime.api_run_id;value["camera"]=camera;
-    Dictionary ui;ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["max_hp"]=runtime.state.ship_config.max_hp;
+    Dictionary ui;ui["input_enabled"]=runtime.state.phase==Phase::Play && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["coins"]=runtime.state.lifecycle.coins;ui["max_hp"]=runtime.state.ship_config.max_hp;
     const auto shield_source=runtime.state.ship.shield_source_definition;
     ui["ship_shield_visual"]=shield_source?runtime.content->definitions[shield_source-1].visual_id:0;
     ui["ship_radius"]=runtime.state.ship_config.ship_radius;

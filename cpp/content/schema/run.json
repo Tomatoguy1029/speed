@@ -598,9 +598,24 @@
           "type": "f64",
           "min": 0,
           "config": "enemy_face_move"
+        },
+        {
+          "name": "pickup_repair_fraction",
+          "type": "f64",
+          "min": 0,
+          "max": 1,
+          "config": "meteor_heal_frac",
+          "runtime": "pickup_config.repair_fraction"
+        },
+        {
+          "name": "pickup_life",
+          "type": "f64",
+          "min": 0,
+          "config": "pickup_life",
+          "runtime": "pickup_config.pickup_life"
         }
       ],
-      "version": 7
+      "version": 8
     },
     {
       "name": "StringEntry",
@@ -1556,6 +1571,10 @@
       {
         "name": "CrystalLost",
         "value": "xp_lost"
+      },
+      {
+        "name": "CrystalCollect",
+        "value": "xp_collect"
       }
     ],
     "ResultKind": [
@@ -1914,6 +1933,18 @@
       "reason",
       "origin",
       "xp"
+    ],
+    "xp_collect": [
+      "method",
+      "base_xp",
+      "xp",
+      "actual_xp",
+      "multiplier",
+      "count",
+      "gems",
+      "id",
+      "kind",
+      "origin"
     ]
   },
   "includes": [

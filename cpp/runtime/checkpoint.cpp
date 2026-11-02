@@ -102,6 +102,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (gem.alive && gem.kind==2 && gem.id==pickups.gem_absorber_id) {pickups.gem_absorber=int64_t(row);break;}
     }
     if (pickups.gem_absorber<0) pickups.gem_absorber_id=0;
+    for (auto weapon:state.loadout.pending_comet_weapons) if (!weapon || weapon>content.equipment.size() || !content.equipment[weapon-1].comet_only) return false;
+    for (const auto &capsule:pickups.capsules) if (!capsule.pos.is_finite() || !std::isfinite(capsule.age) || capsule.age<0 || (capsule.kind==CapsuleKind::CometWeapon && (!capsule.weapon || capsule.weapon>content.equipment.size() || !content.equipment[capsule.weapon-1].comet_only))) return false;
     if (!FieldSystem::validate(state,content)) return false;
     if (!GroupSystem::validate(state)) return false;
     return AttackSystem::rebuild(state);
