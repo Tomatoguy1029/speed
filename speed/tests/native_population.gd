@@ -9,6 +9,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-seeds" in OS.get_cmdline_user_args():
+		await check_semantics_seeds()
+		print("[semantics_seeds] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-mix" in OS.get_cmdline_user_args():
 		check(await check_cpp_mix(),"混成出現の指定確認を最後まで行う")
 		print("[cpp_mix] failed=%d" % failed)
@@ -384,3 +389,196 @@ func check_cpp_mix() -> bool:
 	bridge.release_checkpoint(held.value)
 	session.free()
 	return true
+
+# 設計15.1の未実施分だけ。固定場面の既存成功をこの入口で繰り返さない。
+func semantics_legacy(config: GameConfig, stage: RuntimeStage, definitions: Dictionary, seed_value: int) -> RunSimulation:
+	var run := RunSimulation.new()
+	run.options = {"config":config.duplicate(true),"stage":stage,"enemies":definitions,"seed":seed_value,"lab":true,"empty":true,"profile":ProfileManager.for_run(true,{})}
+	run.setup()
+	run.state.ship_pos = Vector2(-900,0)
+	run.state.view_center = run.state.ship_pos
+	run.state.view_half = Vector2(640,360)
+	return run
+
+func semantics_bridge(bytes: PackedByteArray, seed_value: int):
+	if not ClassDB.class_exists(&"SpeedRunCore"):
+		var probe = COMPARE.new().create_native()
+		if probe==null: return null
+		probe.close()
+	var bridge = MIX_BRIDGE.new()
+	bridge.subscribe("統計の受領",func(_packet):return true)
+	if not bridge.configure(bytes,{"api_version":1,"run_id":seed_value+1,"mode":1,"stage_id":"semantics","profile":{},"settings":{"hitstop":false}}).ok: return null
+	if not bridge.start(seed_value,{"position":Vector2(-900,0),"lab_mode":true}).ok: return null
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	bridge._core.set_motion_context(Vector2(-900,0),Vector2(-900,0),Vector2(640,360))
+	return bridge
+
+func semantics_observe(bridge) -> Dictionary:
+	var core = bridge._core
+	return {"clock":core.inspect(),"ship":core.ship_snapshot(),"draw":core.draw_snapshot(),"enemies":core.enemies_snapshot(),"motion":core.enemy_motion_snapshot(),"population":core.population_snapshot(),"refill":core.refill_snapshot(),"pickups":core.pickups_snapshot(),"clips":core.clips_snapshot(),"friends":core.projectiles_snapshot(),"hostiles":core.hostiles_snapshot(),"hazards":core.hazards_snapshot()}
+
+func semantics_population_tick(run: RunSimulation, bridge, tick: int) -> void:
+	var dt := 1.0/60.0
+	if run!=null:
+		run.state.time += dt
+		run.state.world_time += dt
+		run.enemies.tick(dt,dt)
+		run.spawn.spawner_tick(dt,dt)
+	if bridge!=null:
+		bridge._core.step(dt)
+		bridge._core.step_population(dt,false)
+	if tick==180:
+		if run!=null:
+			for row in range(0,run.enemies.table.alive.size(),2): run.enemies.mark_dead(row)
+			run.enemies.cleanup()
+		if bridge!=null:
+			var rows: Array = bridge._core.enemies_snapshot()
+			for n in range(0,rows.size(),2): bridge._core.remove_enemy(rows[n].id)
+
+func semantics_histogram(rows: Array, key: String, out: Dictionary) -> void:
+	for row: Dictionary in rows:
+		var id := String(row[key])
+		out[id] = int(out.get(id,0))+1
+
+func semantics_distribution(label: String, reference: Dictionary, migrated: Dictionary) -> void:
+	var a := 0
+	var b := 0
+	for n in reference.values(): a += int(n)
+	for n in migrated.values(): b += int(n)
+	check(a>0 and b>0 and absf(float(a-b))<=float(a)*0.1,label+"の合計機会数の差10%以内")
+	var keys: Array = reference.keys()
+	for key in migrated:
+		if not keys.has(key): keys.append(key)
+	for key in keys:
+		check(reference.get(key,0)>0 and migrated.get(key,0)>0,label+"の必須経路が両版で発生: "+str(key))
+		check(absf(float(reference.get(key,0))/maxi(a,1)-float(migrated.get(key,0))/maxi(b,1))<=0.05,label+"の割合差5ポイント以内: "+str(key))
+
+func check_semantics_seeds() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	config.start_radius=900;config.density_mult=1;config.spawn_total_cap=1;config.spawn_region_cap=0
+	config.comet_interval_min=1e8;config.comet_interval_max=1e8;config.gravity_interval_min=1e8;config.gravity_interval_max=1e8
+	config.reroll_count=64
+	var stage := RuntimeStage.new()
+	stage.index=197;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter","shield"])
+	var phase := PhaseDef.new()
+	phase.id=&"意味の照合";phase.pop_from=24;phase.pop_to=24;phase.rate=12;phase.mix={"drifter":1.0,"shield":1.7}
+	stage.phases=[phase]
+	var definitions := {}
+	for id in stage.resources.enemy_ids:
+		var definition: EnemyDef = ContentManager.enemies[StringName(id)].duplicate(true)
+		definition.speed=0;definition.max_alive=0;definition.rank=3
+		definitions[StringName(id)]=definition
+	var output := "res://.content/dev/semantics_seeds"
+	var builder = load("res://tools/content/build_run_content.gd")
+	if builder.build(stage,config,output,"設計15.1 seed0..63".sha256_text(),definitions)!=OK:
+		check(false,"両版で使うSource定義を正規生成する");return
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_197.json")))
+	var bytes := FileAccess.get_file_as_bytes(index.binary)
+	var populations := [[],[]]
+	for side in 2: populations[side].resize(6);populations[side].fill(0)
+	var spawned := [{},{}]
+	var cards := [{},{}]
+	var gold := [{"won":0,"lost":0},{"won":0,"lost":0}]
+	var xp := [0.0,0.0]
+	var comparison = COMPARE.new()
+	for seed_value in 64:
+		var run := semantics_legacy(config,stage,definitions,seed_value)
+		var bridge = semantics_bridge(bytes,seed_value)
+		var second = semantics_bridge(bytes,seed_value)
+		if bridge==null or second==null: check(false,"seed%dのC++開始"%seed_value);run.dispose();return
+		var seen := [{},{}]
+		var held := 0
+		var future: Array = []
+		for tick in 360:
+			semantics_population_tick(run,bridge,tick)
+			semantics_population_tick(null,second,tick)
+			var legacy: Array = comparison.snapshot(run,[],tick).enemies
+			var migrated: Array = bridge._core.enemies_snapshot()
+			for side in 2:
+				var rows: Array = legacy if side==0 else migrated
+				for enemy: Dictionary in rows:
+					if not seen[side].has(enemy.id):
+						seen[side][enemy.id]=true
+						var key := "refill:"+String(enemy.type)
+						spawned[side][key]=int(spawned[side].get(key,0))+1
+				if tick%60==59: populations[side][tick/60] += rows.size()
+			check(semantics_observe(bridge)==semantics_observe(second),"C++同seedの可変戦闘状態 seed%d tick%d"%[seed_value,tick])
+			var first_events: Array = bridge.read_frame().value.events
+			var second_events: Array = second.read_frame().value.events
+			check(first_events==second_events,"C++同seedの通知列 seed%d tick%d"%[seed_value,tick])
+			bridge.collect_frame();second.collect_frame()
+			if tick==239: held=bridge.checkpoint().value
+			if tick>=240: future.append({"state":semantics_observe(bridge),"events":first_events})
+		check(bridge.restore(held).ok,"統計場面の途中へ復帰 seed%d"%seed_value)
+		for tick in range(240,360):
+			semantics_population_tick(null,bridge,tick)
+			var events: Array = bridge.read_frame().value.events
+			# 外部epoch/配信番号は復元対象外。論理通知だけを照合する。
+			for event: Dictionary in events: event.erase("epoch");event.erase("sequence")
+			var expected: Array = future[tick-240].events.duplicate(true)
+			for event: Dictionary in expected: event.erase("epoch");event.erase("sequence")
+			var state_diff: String=comparison.difference(comparison.plain(future[tick-240].state),comparison.plain(semantics_observe(bridge)))
+			var event_diff: String=comparison.difference(comparison.plain(expected),comparison.plain(events))
+			check(state_diff.is_empty() and event_diff.is_empty(),"C++復帰後の状態と通知列 seed%d tick%d %s %s"%[seed_value,tick,state_diff,event_diff])
+			bridge.collect_frame()
+		bridge.release_checkpoint(held)
+		var notification_rows := [[],[]]
+		for side in 2:
+			var native_bridge = bridge if side==0 else second
+			native_bridge.subscribe("統計通知",func(packet):
+				for item: Dictionary in packet.events:
+					var event: Dictionary=item.duplicate(true)
+					event.erase("epoch");event.erase("sequence")
+					notification_rows[side].append(event)
+				return true)
+		# 同じ敵と撃破機会を通し、基準XPと黄色抽選を通常の報酬入口で比較する。
+		for opportunity in 64:
+			var row: int = run.enemies.spawn(definitions[&"drifter"],Vector2(-900,0))
+			run.pickups.on_enemy_killed(row)
+			run.enemies.mark_dead(row);run.enemies.cleanup()
+			var id: int = bridge._core.spawn_enemy(&"drifter",Vector2(-900,0))
+			bridge.command("dev_kill",{"entity_id":id,"cause":"shot"})
+			var twin_id: int = second._core.spawn_enemy(&"drifter",Vector2(-900,0))
+			second.command("dev_kill",{"entity_id":twin_id,"cause":"shot"})
+		check(semantics_observe(bridge)==semantics_observe(second),"同seedのドロップ・抽選・乱数状態 seed%d"%seed_value)
+		var summary: Dictionary = run.pickups.xp_summary()
+		var native: Dictionary = bridge._core.pickups_snapshot().xp_statistics
+		gold[0].won += int(summary.gold_rolls.won);gold[0].lost += int(summary.gold_rolls.eligible-summary.gold_rolls.won)
+		gold[1].won += int(native.gold_won);gold[1].lost += int(native.gold_rolls-native.gold_won)
+		xp[0] += run.pickups.collect_all_gems()
+		xp[1] += float(bridge.command("dev_collect_gems",{}).value)
+		second.command("dev_collect_gems",{})
+		# 通常候補の有効プールを固定し、32機会/seedを同じ取得状態で比較する。
+		run.loadout.add_xp(100.0);run.loadout.try_open_cards()
+		for native_bridge in [bridge,second]:
+			native_bridge.command("dev_add_xp",{"amount":100.0})
+			native_bridge.step(1.0/120.0,native_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+		var card_hold := 0
+		var card_future: Array=[]
+		for opportunity in 32:
+			check(bridge._ui.cards==second._ui.cards and bridge._core.inspect().rng_state==second._core.inspect().rng_state,"同seedの候補と抽選位置 seed%d opportunity%d"%[seed_value,opportunity])
+			if opportunity==15: card_hold=bridge.checkpoint().value
+			if opportunity>15: card_future.append({"ids":bridge._ui.cards.candidates.map(func(card):return card.id),"rng":bridge._core.inspect().rng_state})
+			semantics_histogram(run.state.cards,"id",cards[0])
+			semantics_histogram(bridge._ui.cards.candidates,"id",cards[1])
+			if opportunity<31:
+				run.loadout.reroll_cards()
+				for native_bridge in [bridge,second]:
+					native_bridge.command("reroll",{"offer_id":native_bridge._ui.cards.offer_id});native_bridge.collect_frame()
+		check(notification_rows[0]==notification_rows[1],"同seedのドロップ・XP・候補通知列 seed%d"%seed_value)
+		check(bridge.restore(card_hold).ok,"候補抽選の途中へ復帰 seed%d"%seed_value)
+		bridge.collect_frame()
+		for expected: Dictionary in card_future:
+			bridge.command("reroll",{"offer_id":bridge._ui.cards.offer_id});bridge.collect_frame()
+			check(bridge._ui.cards.candidates.map(func(card):return card.id)==expected.ids and bridge._core.inspect().rng_state==expected.rng,"候補復帰後の抽選列と乱数 seed%d"%seed_value)
+		bridge.release_checkpoint(card_hold)
+		run.dispose();bridge.dispose();second.dispose()
+		if failed: break
+	for second_index in 6:
+		check(absf(float(populations[0][second_index]-populations[1][second_index]))/64.0<=maxf(float(populations[0][second_index])/64.0*0.1,1.0),"世界秒%dの個体数平均の許容幅"%(second_index+1))
+	semantics_distribution("由来別生成数/敵種",spawned[0],spawned[1])
+	semantics_distribution("通常候補",cards[0],cards[1])
+	semantics_distribution("黄色ドロップ抽選",gold[0],gold[1])
+	check(xp[0]>0 and absf(xp[0]-xp[1])<=xp[0]*0.1,"取得XP平均の差10%以内")
+	print("SEMANTICS_SEEDS ",JSON.stringify({"seeds":[0,63],"world_seconds":6,"population_sums":populations,"spawned":spawned,"cards":cards,"gold":gold,"xp_sums":xp,"replay_ticks_per_seed":120,"failed":failed}))
