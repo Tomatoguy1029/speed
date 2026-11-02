@@ -2387,6 +2387,35 @@ inline bool read(BinaryReader &input, RulerDefinition &out) {
     if (out.admission_duration < 0) return false;
     return true;
 }
+struct TriangleDefinition {
+    uint32_t id{};
+    uint32_t star{};
+    double move_time{};
+    double stop_time{};
+    double span{};
+    double trail_width{};
+    double trail_damage{};
+    double admission_duration{};
+};
+inline bool read(BinaryReader &input, TriangleDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.star)) return false;
+    if (out.star < 1) return false;
+    if (!input.read_f64(out.move_time)) return false;
+    if (out.move_time < 0) return false;
+    if (!input.read_f64(out.stop_time)) return false;
+    if (out.stop_time < 0) return false;
+    if (!input.read_f64(out.span)) return false;
+    if (out.span < 0) return false;
+    if (!input.read_f64(out.trail_width)) return false;
+    if (out.trail_width < 0) return false;
+    if (!input.read_f64(out.trail_damage)) return false;
+    if (out.trail_damage < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -3190,6 +3219,9 @@ struct BossDefinition {
     double extract_speed{};
     double turn{};
     double speed{};
+    double approach_range{};
+    double approach_speed{};
+    double kick_trigger_arc{};
 };
 inline bool read(BinaryReader &input, BossDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -3219,6 +3251,12 @@ inline bool read(BinaryReader &input, BossDefinition &out) {
     if (out.turn < 0) return false;
     if (!input.read_f64(out.speed)) return false;
     if (out.speed < 0) return false;
+    if (!input.read_f64(out.approach_range)) return false;
+    if (out.approach_range < 0) return false;
+    if (!input.read_f64(out.approach_speed)) return false;
+    if (out.approach_speed < 0) return false;
+    if (!input.read_f64(out.kick_trigger_arc)) return false;
+    if (out.kick_trigger_arc < 0) return false;
     return true;
 }
 struct BossTechniqueDefinition {
@@ -3610,6 +3648,7 @@ struct ContentRecords {
     std::vector<CoronaDefinition> CoronaDefinition_rows;
     std::vector<CoronaType> CoronaType_rows;
     std::vector<RulerDefinition> RulerDefinition_rows;
+    std::vector<TriangleDefinition> TriangleDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -4133,6 +4172,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { RulerDefinition row; if (!read(input,row)) return false; out.RulerDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 170: {
+        if (version != 1) return false;
+        if (count > input.remaining()/56) return false;
+        for (uint32_t i=0; i<count; ++i) { TriangleDefinition row; if (!read(input,row)) return false; out.TriangleDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -4303,7 +4348,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 150: {
         if (version != 1) return false;
-        if (count > input.remaining()/100) return false;
+        if (count > input.remaining()/124) return false;
         for (uint32_t i=0; i<count; ++i) { BossDefinition row; if (!read(input,row)) return false; out.BossDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -4541,6 +4586,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CoronaType_rows) if (!CoronaType_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> RulerDefinition_ids;
     for (const auto &row:data.RulerDefinition_rows) if (!RulerDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> TriangleDefinition_ids;
+    for (const auto &row:data.TriangleDefinition_rows) if (!TriangleDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -4702,6 +4749,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CoronaDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.CoronaType_rows) if (!EnemyRecord_ids.count(row.owner)) return false;
     for (const auto &row:data.RulerDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.TriangleDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.TriangleDefinition_rows) if (!EnemyRecord_ids.count(row.star)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -4868,5 +4917,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=120;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=121;
 }
