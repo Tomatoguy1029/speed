@@ -333,7 +333,7 @@
     },
     {
       "name": "PartDefinition",
-      "section": 41,
+      "section": 49,
       "fields": [
         {
           "name": "id",
@@ -345,7 +345,7 @@
     },
     {
       "name": "DashDefinition",
-      "section": 42,
+      "section": 50,
       "fields": [
         {
           "name": "id",
@@ -388,7 +388,7 @@
     },
     {
       "name": "BattleshipDefinition",
-      "section": 43,
+      "section": 57,
       "fields": [
         {
           "name": "id",

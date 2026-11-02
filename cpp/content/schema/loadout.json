@@ -411,7 +411,7 @@
     },
     {
       "name": "BarrierDefinition",
-      "section": 42,
+      "section": 52,
       "fields": [
         {
           "name": "id",
@@ -463,7 +463,7 @@
     },
     {
       "name": "BarrierPostDefinition",
-      "section": 43,
+      "section": 53,
       "fields": [
         {
           "name": "id",
@@ -495,7 +495,7 @@
     },
     {
       "name": "FullChargeDefinition",
-      "section": 44,
+      "section": 56,
       "fields": [
         {
           "name": "id",

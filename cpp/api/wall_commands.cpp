@@ -4,7 +4,7 @@
 #include <cmath>
 using namespace godot;
 namespace {
-Dictionary result(bool ok,Variant value=Variant()) {Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"wall";out["message"]=ok?"":"壁の対象・形・値が不正です";out["value"]=value;return out;}
+Dictionary result(bool ok,Variant value=Variant()) {Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"wall";out["message"]=ok?String():String::utf8("壁の対象・形・値が不正です");out["value"]=value;return out;}
 bool point(const Dictionary &p) {return p.has("position") && p["position"].get_type()==Variant::VECTOR2 && Vector2(p["position"]).is_finite();}
 bool scalar(const Dictionary &p,const char *key,double &value,bool optional=false) {
     if (!p.has(key)) return optional;const Variant v=p[key];if ((v.get_type()!=Variant::INT && v.get_type()!=Variant::FLOAT) || !std::isfinite(double(v))) return false;value=v;return true;

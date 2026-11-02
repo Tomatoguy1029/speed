@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 namespace speed {
-enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Arrow=33,Count};
+enum class Cause : uint32_t {None=0,Ram=1,Touch=2,Bump=3,Shot=4,Debris=5,Fire=6,Blast=7,Afterimage=8,FinalStrike=9,Debug=10,Missile=11,Homing=12,Slash=13,Wave=14,Chain=15,PumpBurst=16,Marlin=17,Collapse=18,Rain=19,ArrowShower=20,InhaleBite=21,SwordFlash=22,HoundLunge=23,Pounce=24,FlameJet=25,Bullet=26,Reflected=27,HullDebris=28,Saw=29,Beam=30,Wall=31,Bolt=32,Arrow=33,StarBolt=34,Barrier=35,Count};
 inline const char *symbol_name(Cause value) {
     switch(value) {
     case Cause::None: return "";
@@ -40,6 +40,8 @@ inline const char *symbol_name(Cause value) {
     case Cause::Wall: return "wall";
     case Cause::Bolt: return "bolt";
     case Cause::Arrow: return "arrow";
+    case Cause::StarBolt: return "star_bolt";
+    case Cause::Barrier: return "barrier";
     default: return "";
     }
 }
@@ -78,9 +80,11 @@ inline bool parse_symbol(std::string_view value, Cause &out) {
     if (value=="wall") {out=Cause::Wall;return true;}
     if (value=="bolt") {out=Cause::Bolt;return true;}
     if (value=="arrow") {out=Cause::Arrow;return true;}
+    if (value=="star_bolt") {out=Cause::StarBolt;return true;}
+    if (value=="barrier") {out=Cause::Barrier;return true;}
     return false;
 }
-enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,ReflectedShot=13,EnemyPolygon=14,Count};
+enum class VisualRole : uint32_t {EnemySprite=0,Ship=1,ForwardShot=2,Crystal=3,Coin=4,Cannon=5,EnemyLook=6,Equipment=7,AttackScene=8,Planet=9,Moon=10,HostileShot=11,StoneShot=12,ReflectedShot=13,EnemyPolygon=14,StarBolt=15,Count};
 inline const char *symbol_name(VisualRole value) {
     switch(value) {
     case VisualRole::EnemySprite: return "enemy_sprite";
@@ -98,6 +102,7 @@ inline const char *symbol_name(VisualRole value) {
     case VisualRole::StoneShot: return "stone_shot";
     case VisualRole::ReflectedShot: return "reflected_shot";
     case VisualRole::EnemyPolygon: return "enemy_polygon";
+    case VisualRole::StarBolt: return "star_bolt";
     default: return "";
     }
 }
@@ -117,9 +122,10 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="stone_shot") {out=VisualRole::StoneShot;return true;}
     if (value=="reflected_shot") {out=VisualRole::ReflectedShot;return true;}
     if (value=="enemy_polygon") {out=VisualRole::EnemyPolygon;return true;}
+    if (value=="star_bolt") {out=VisualRole::StarBolt;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -182,6 +188,8 @@ inline const char *symbol_name(EventType value) {
     case EventType::CrystalTransfer: return "xp_transfer";
     case EventType::CrystalLost: return "xp_lost";
     case EventType::CrystalCollect: return "xp_collect";
+    case EventType::BarrierHit: return "barrier_hit";
+    case EventType::BarrierRestore: return "barrier_restore";
     default: return "";
     }
 }
@@ -246,6 +254,8 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="xp_transfer") {out=EventType::CrystalTransfer;return true;}
     if (value=="xp_lost") {out=EventType::CrystalLost;return true;}
     if (value=="xp_collect") {out=EventType::CrystalCollect;return true;}
+    if (value=="barrier_hit") {out=EventType::BarrierHit;return true;}
+    if (value=="barrier_restore") {out=EventType::BarrierRestore;return true;}
     return false;
 }
 enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
@@ -307,7 +317,7 @@ inline bool parse_symbol(std::string_view value, ContactShapeKind &out) {
     if (value=="tapered_beam") {out=ContactShapeKind::TaperedBeam;return true;}
     return false;
 }
-enum class HostileKind : uint32_t {Bullet=0,Missile=1,Reflected=2,Slash=3,Bolt=4,LightArrow=5,CosmicArrow=6,Count};
+enum class HostileKind : uint32_t {Bullet=0,Missile=1,Reflected=2,Slash=3,Bolt=4,LightArrow=5,CosmicArrow=6,StarBolt=7,Count};
 inline const char *symbol_name(HostileKind value) {
     switch(value) {
     case HostileKind::Bullet: return "bullet";
@@ -317,6 +327,7 @@ inline const char *symbol_name(HostileKind value) {
     case HostileKind::Bolt: return "bolt";
     case HostileKind::LightArrow: return "light_arrow";
     case HostileKind::CosmicArrow: return "cosmic_arrow";
+    case HostileKind::StarBolt: return "star_bolt";
     default: return "";
     }
 }
@@ -328,6 +339,7 @@ inline bool parse_symbol(std::string_view value, HostileKind &out) {
     if (value=="bolt") {out=HostileKind::Bolt;return true;}
     if (value=="light_arrow") {out=HostileKind::LightArrow;return true;}
     if (value=="cosmic_arrow") {out=HostileKind::CosmicArrow;return true;}
+    if (value=="star_bolt") {out=HostileKind::StarBolt;return true;}
     return false;
 }
 enum class FriendKind : uint32_t {Shot=0,Debris=1,Hull=2,Count};
@@ -517,6 +529,8 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::CrystalTransfer: return field=="id" || field=="kind" || field=="base_xp" || field=="method" || field=="enemy_id" || field=="enemy" || field=="spawn_t" || field=="spawn_world_t" || field=="was_absorber" || field=="origin" || field=="xp";
     case EventType::CrystalLost: return field=="id" || field=="kind" || field=="base_xp" || field=="method" || field=="enemy_id" || field=="enemy" || field=="spawn_t" || field=="spawn_world_t" || field=="reason" || field=="origin" || field=="xp";
     case EventType::CrystalCollect: return field=="method" || field=="base_xp" || field=="xp" || field=="actual_xp" || field=="multiplier" || field=="count" || field=="gems" || field=="id" || field=="kind" || field=="origin";
+    case EventType::BarrierHit: return field=="pos" || field=="hit" || field=="angle" || field=="radius" || field=="broken";
+    case EventType::BarrierRestore: return field=="pos";
     default: return false;
     }
 }

@@ -4,7 +4,7 @@
 #include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_slash_command(const Dictionary &p) {
-    const auto result=[](bool ok,Variant value=Variant()) {Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"slash";out["message"]=ok?"":"斬撃の発生元・形・値が不正です";out["value"]=value;return out;};
+    const auto result=[](bool ok,Variant value=Variant()) {Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"slash";out["message"]=ok?String():String::utf8("斬撃の発生元・形・値が不正です");out["value"]=value;return out;};
     if (!runtime.api_development || p.get("position",Variant()).get_type()!=Variant::VECTOR2) return result(false);
     speed::SlashParams params;params.position=p["position"];
     for (const auto &key:p.keys()) {

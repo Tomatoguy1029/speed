@@ -4,7 +4,7 @@
 #include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_ring_hold_command(const Dictionary &p) {
-    const auto result=[](bool ok,Variant value=Variant()) {Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"ring_hold";out["message"]=ok?"":"待機弾の発生元・個数・値が不正です";out["value"]=value;return out;};
+    const auto result=[](bool ok,Variant value=Variant()) {Dictionary out;out["ok"]=ok;out["code"]=ok?0:1;out["field"]=ok?"":"ring_hold";out["message"]=ok?String():String::utf8("待機弾の発生元・個数・値が不正です");out["value"]=value;return out;};
     if (!runtime.api_development || p.get("source_id",Variant()).get_type()!=Variant::INT || p.get("count",Variant()).get_type()!=Variant::INT ||
         int64_t(p["count"])<0 || uint64_t(int64_t(p["count"]))>UINT32_MAX) return result(false);
     const auto source=runtime.state.rows_by_id.find(int64_t(p["source_id"]));if (source==runtime.state.rows_by_id.end()) return result(false);

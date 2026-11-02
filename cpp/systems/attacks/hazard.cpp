@@ -27,8 +27,8 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
             if (!WaveSystem::act(run,handle,dt)) return true;
             EventBuilder::flush_combat(run);
         }
-        if (time>=state.hazards[row].delay && !hazard_act(state,handle,dt)) return true;
         if (!get(state,handle)) continue;
+        if (time>=state.hazards[row].delay && !hazard_act(state,handle,dt)) return true;
         auto &current=state.hazards[row];
         if (time<current.delay || current.hit) continue;
         if (!hazard_before_touch(state,handle)) return true;

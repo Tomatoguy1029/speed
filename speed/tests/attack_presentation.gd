@@ -13,6 +13,13 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-star-role" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_star_role()
+		check(finished,"統合した星弾の表示役割の確認を最後まで実施する")
+		print("[cpp_star_role] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+
 	if "--cpp-render-kinds" in OS.get_cmdline_user_args() or "--cpp-render-kinds-view-fix" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_render_kinds()
 		check(finished,"統合で変わった表示種別の確認を最後まで実施する")
@@ -333,3 +340,20 @@ func check_cpp_lump() -> void:
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_bridge.release_checkpoint(empty.value)
 	cpp_session.free()
+
+func check_cpp_star_role() -> bool:
+	if not await prepare_cpp_attack(91,"star_bolt"): return false
+	const ROLES = preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole
+	check(ROLES.StarBolt!=ROLES.EnemyPolygon,"星弾と画像なしの敵の表示役割を分ける")
+	var fired: Dictionary = cpp_bridge.command("dev_fire_star_bolt",{"position":cpp_origin,"angle":0.0,"speed":100.0,"damage":4.0})
+	if not fired.ok: cpp_session.free(); return false
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1600,-500,1400,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	var stars: Array = frame.batches.filter(func(batch): return presentation.frame_view.visuals[batch.visual_id].role==ROLES.StarBolt)
+	check(stars.size()==1 and presentation.frame_view.apply_frame(frame),"生成済みの星形メッシュを新しい表示役割で通常画面へ渡す")
+	await get_tree().process_frame
+	if stars.size()==1:
+		check(presentation.frame_view.batches.has(stars[0].visual_id),"星弾の専用一括表示を選ぶ")
+	cpp_session.free()
+	await get_tree().process_frame
+	return true

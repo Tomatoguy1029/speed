@@ -383,7 +383,7 @@
     },
     {
       "name": "StarBoltDefinition",
-      "section": 42,
+      "section": 51,
       "fields": [
         {
           "name": "id",
@@ -447,7 +447,7 @@
     },
     {
       "name": "RingHoldDefinition",
-      "section": 43,
+      "section": 54,
       "fields": [
         {
           "name": "id",
@@ -474,7 +474,7 @@
     },
     {
       "name": "LumpDefinition",
-      "section": 44,
+      "section": 55,
       "fields": [
         {
           "name": "id",
