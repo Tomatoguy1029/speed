@@ -70,6 +70,7 @@ struct ContentBundle {
     std::vector<BossFlowFilter> flow_filters;
     std::vector<BossFlowWeight> flow_weights;
     std::vector<BossFlowForbidden> flow_forbidden;
+    std::vector<HydraBodyDefinition> hydra_bodies;
     std::vector<CanisBodyDefinition> canis_bodies;
     std::vector<CanisCommandDefinition> canis_commands;
     std::vector<CanisHowlDefinition> canis_howls;

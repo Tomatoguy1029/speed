@@ -45,6 +45,7 @@ void FieldSystem::collide_enemy(RunRuntime &run,uint32_t row,godot::Vector2 from
     enemy.body_gap=std::max(gap,0.0);enemy.body_gap_pos=enemy.pos;enemy.body_gap_time=now;
     if (gap>=margin) return;
     const auto hit=first_body_hit(run,from,enemy.pos,enemy.radius);if (!hit) return;
+    if (hit->body==UINT32_MAX) {enemy.pos=hit->position;const double vn=enemy.vel.dot(hit->normal);if (vn<0) enemy.vel-=hit->normal*vn;if (enemy.shove_time>0) enemy.shove_vel=enemy.vel;return;}
     const auto &body=run.state.field.bodies[hit->body];
     auto normal=hit->point-body.position;
     if (normal.length_squared()<1e-6) normal=from-body.position;
@@ -60,14 +61,27 @@ std::optional<BodyHit> FieldSystem::first_body_hit(const RunRuntime &run,godot::
         const double t=CollisionQuery::segment_circle_t(from,to,body.position,body.radius+radius);
         if (t>=0 && (!result || t<result->t)) result=BodyHit{i,t,from.lerp(to,t)};
     }
+    const auto wall=arena_hit(run,from,to,radius);if (wall && (!result || wall->t<result->t)) return wall;
     return result;
+}
+std::optional<BodyHit> FieldSystem::arena_hit(const RunRuntime &r,godot::Vector2 from,godot::Vector2 to,double radius) {
+    std::optional<BodyHit> result;
+    for (const auto &a:r.state.field.arenas) {const auto safe=a.bounds.grow(-radius);const auto end=safe.get_end();const auto start=from.clamp(safe.position,end);if (start!=from) return BodyHit{UINT32_MAX,0,from,(from-start).normalized(),from};const auto delta=to-from;for (int axis=0;axis<2;++axis) {if (godot::Math::is_zero_approx(delta[axis])) continue;const double edge=delta[axis]>0?end[axis]:safe.position[axis],t=(edge-from[axis])/delta[axis];if (t<0 || t>1 || (result && t>=result->t)) continue;godot::Vector2 normal;normal[axis]=delta[axis]>0?-1:1;const auto point=from.lerp(to,t);result=BodyHit{UINT32_MAX,t,point,normal,point+normal*0.01};}}
+    return result;
+}
+godot::Vector2 FieldSystem::safe_point(const RunRuntime &r,godot::Rect2 bounds,godot::Vector2 at,double margin) {
+    const auto safe=bounds.grow(-margin);const auto inside=[&](godot::Vector2 p){return p.x>=safe.position.x-0.001 && p.y>=safe.position.y-0.001 && p.x<=safe.get_end().x+0.001 && p.y<=safe.get_end().y+0.001;};auto point=at.clamp(safe.position,safe.get_end());
+    for (int pass=0;pass<4;++pass) {bool changed=false;for (const auto &body:r.state.field.bodies) {const double radius=body.radius+margin+1;if (point.distance_squared_to(body.position)>=radius*radius) continue;auto direction=(at-body.position).normalized();if (direction.is_zero_approx()) direction={1,0};const auto radial=body.position+direction*(radius+0.01);if (inside(radial)) {point=radial;changed=true;continue;}auto best=point;double cost=std::numeric_limits<double>::infinity();for (int axis=0;axis<2;++axis) for (double edge:{double(safe.position[axis]),double(safe.get_end()[axis])}) {const double offset=edge-body.position[axis],squared=(radius+0.01)*(radius+0.01)-offset*offset;if (squared<0) continue;for (double sign:{-1.0,1.0}) {auto candidate=body.position;candidate[axis]=edge;candidate[1-axis]+=std::sqrt(squared)*sign;if (!inside(candidate)) continue;const double distance=candidate.distance_squared_to(at);if (distance<cost) {best=candidate;cost=distance;}}}if (best!=point) {point=best;changed=true;}}if (!changed) break;}
+    return point;
 }
 double FieldSystem::body_gap(const RunRuntime &run,godot::Vector2 point,double radius) {
     double gap=std::numeric_limits<double>::infinity();
+    for (const auto &a:run.state.field.arenas) {const auto end=a.bounds.get_end();gap=std::min(gap,std::min({double(point.x-a.bounds.position.x),double(end.x-point.x),double(point.y-a.bounds.position.y),double(end.y-point.y)})-radius);}
     for (const auto &body:run.state.field.bodies) gap=std::min(gap,double(point.distance_to(body.position))-body.radius-radius);
     return gap;
 }
 godot::Vector2 FieldSystem::push_out(const RunRuntime &run,godot::Vector2 point,double margin) {
+    for (const auto &a:run.state.field.arenas) {const auto safe=a.bounds.grow(-margin);point=point.clamp(safe.position,safe.get_end());}
     for (const auto &body:run.state.field.bodies) {
         const auto delta=point-body.position;const double distance=delta.length(),minimum=body.radius+margin;
         if (distance<minimum) point=body.position+(distance>0.001?delta/distance:godot::Vector2(1,0))*minimum;
@@ -75,6 +89,7 @@ godot::Vector2 FieldSystem::push_out(const RunRuntime &run,godot::Vector2 point,
     return point;
 }
 godot::Vector2 FieldSystem::boundary_accel(const RunRuntime &run,godot::Vector2 point) {
+    if (!run.state.field.arenas.empty()) return {};
     const auto &c=run.state.ship_config;const double radius=point.length();
     return radius<=c.field_radius?godot::Vector2():-point/radius*(c.boundary_push+(radius-c.field_radius)*4.0);
 }
@@ -91,12 +106,14 @@ void FieldSystem::collide_ship(RunRuntime &run) {
         }
     }
     const double radius=ship.pos.length(),wall=c.field_radius+500.0;
-    if (radius>wall) {
+    for (const auto &a:run.state.field.arenas) {const auto safe=a.bounds.grow(-c.ship_radius);const auto at=ship.pos.clamp(safe.position,safe.get_end());if (at!=ship.pos) {const auto inward=(at-ship.pos).normalized();ship.pos=at;const double vn=ship.vel.dot(inward);if (vn<0) ship.vel-=inward*vn*(1+c.crash_restitution);ship.glide=false;}}
+    if (radius>wall && run.state.field.arenas.empty()) {
         ship.glide=false;const auto normal=ship.pos/radius;ship.pos=normal*wall;const double vn=ship.vel.dot(normal);
         if (vn>0) ship.vel-=normal*2.0*vn;
     }
 }
 bool FieldSystem::validate(const godot::RunState &state,const ContentBundle &content) {
+    for (const auto &a:state.field.arenas) if (!state.enemy_handles.contains(a.owner) || state.enemies[a.owner.slot].dead || !a.bounds.position.is_finite() || !a.bounds.size.is_finite() || a.bounds.size.x<=0 || a.bounds.size.y<=0) return false;
     if (!std::isfinite(state.field.body_speed_max) || state.field.body_speed_max<0) return false;
     for (const auto &body:state.field.bodies) if (body.definition>=(body.moon?content.moon_definitions.size():content.field_bodies.size()) ||
         !body.position.is_finite() || !std::isfinite(body.radius) || body.radius<=0 || !std::isfinite(body.orbit) || body.orbit<0 ||

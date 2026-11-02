@@ -868,7 +868,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 41
+          "max": 42
         },
         {
           "name": "turn",
@@ -2804,6 +2804,7 @@
     "boss_flow.json",
     "heroes.json",
     "centaurus.json",
-    "canis_major.json"
+    "canis_major.json",
+    "hydra.json"
   ]
 }

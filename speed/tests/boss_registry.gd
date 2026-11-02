@@ -8,6 +8,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-body" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_body")
+		return
 	if "--cpp-centaurus-finish" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_finish")
 		return
@@ -2436,4 +2439,103 @@ func native_canis_pounce_cue() -> void:
 	c.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_pounce_cue] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_hydra_body() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/hydra.tres")
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	check(not package.is_empty(),"本体と首を正式Resourceから同じ型付き入力へ生成する")
+	if package.is_empty(): get_tree().quit(1); return
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	if bytes.is_empty():
+		for record in builder.Schema.SCHEMA.records:
+			for row in package.records[record.name]:
+				if not builder.Schema._valid_record(row,record): print("生成入力の不一致: ",record.name," ",row)
+	check(not bytes.is_empty(),"本体・首・囲いの全項目と参照を生成する")
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":370,"mode":1,"stage_id":"B_hydra_body","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"ヒドラの種類と参照を厳密に読み込む")
+	if not configured.ok: print(configured); get_tree().quit(1); return
+	bridge.start(370,{"position":Vector2(1600,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(1600,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1600,0),Vector2(1600,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(body.kind==3 and body.participants.size()==4 and body.participants[0].id==id and body.count==3,"本体と初期3首を別の参加者IDへ登録する")
+	check(body.necks.map(func(n): return n.kind)==["bite","vortex","debris"],"正式な首の順序を維持する")
+	check(body.arena.has_point(Vector2.ZERO) and body.arena.has_point(Vector2(1600,0)),"本体と機体を同じ固定外周へ囲む")
+	var wall_hit: Dictionary = bridge.command("dev_field_query",{"action":"hit","from":body.arena.get_center(),"to":body.arena.end+Vector2(100,100),"radius":10.0})
+	check(wall_hit.ok and wall_hit.value is Dictionary and wall_hit.value.id==0,"壁ヒットを天体番号や未命中と区別する")
+	var clear_hit: Dictionary = bridge.command("dev_field_query",{"action":"hit","from":body.arena.get_center(),"to":body.arena.get_center()+Vector2(10,0),"radius":10.0})
+	check(clear_hit.ok and clear_hit.value==null,"囲いの内側の未命中を維持する")
+	check(bridge.command("dev_field_query",{"action":"accel","position":Vector2(20000,0)}).value==Vector2.ZERO,"戦闘外周がある間は円形外周の押し戻しを止める")
+	for n: Dictionary in body.necks:
+		check(is_equal_approx(n.length,float(definition.params.neck_rest)*0.3) and n.points.size()==int(definition.params.neck_segments)+1,"最初の技前の短い首と戦闘の点列を確定する")
+		check(is_equal_approx(n.head_hp,float(definition.params.head_hp)*cfg.enemy_hp_mult),"本体と独立した首HPを確定する")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(package.visuals)
+	view.setup(scope,entries,cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value) and view._boss_body_displays.size()==1,"正式な本体・首・頭・固定瓦礫を表示する")
+	var display = view._boss_body_displays.values()[0]
+	check(display.get_node("NeckArtwork").frame.necks.size()==3 and display.get_node("BodyArtwork").body_texture!=null and display.get_node("HeadArtwork").head_textures.size()==6,"法線付きの同じ正式素材へ点列を渡す")
+	bridge._core.step(0.1)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.velocity.x>0 and body.velocity.length()<definition.speed,"加速を保ち通常移動する")
+	var velocity: Vector2 = body.velocity
+	var hp: float = body.hp
+	for cause in ["ram","touch","wave"]:
+		check(bridge.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":cause,"direction":Vector2.RIGHT,"knock":1500.0}).ok,"本体の被弾を共通戦闘へ接続する")
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.velocity==velocity and is_equal_approx(body.hp,hp-3.0),"本体は装甲0・HPを減らし外力を受けない")
+	var head_id: int = body.necks[0].id
+	bridge.command("dev_damage",{"entity_id":head_id,"amount":10.0,"cause":"bullet","direction":Vector2.LEFT,"knock":1000.0})
+	var target: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(target.hp==body.hp,"首のHPは本体へ暗黙転送しない")
+	view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value)
+	check(display.hit>0.0,"被弾の値を正式表示へ渡す")
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.apply_snapshot(bridge.read_frame().value.ui)
+	check(hud._cpp_ui.boss_bodies[0].actor==id and hud._cpp_ui.boss_bodies[0].hp==target.hp,"本体ID・現在HPをHUDへ渡す")
+	hud.free()
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"首のID・照準・点列と囲いを値として保持する")
+	bridge._core.step(0.2)
+	var after: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(bridge.restore(held.value).ok,"本体と部位の途中状態を復帰する")
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"復帰後も同じ姿勢・通常移動・点列へ進む")
+	bridge.release_checkpoint(held.value)
+	bridge.command("dev_kill",{"entity_id":head_id,"cause":"debug"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(not body.boss_dead and not body.participants[1].active and not body.necks[0].alive,"首の死亡で本体撃破を立てず参加者だけを閉じる")
+	bridge.command("dev_damage",{"entity_id":id,"amount":body.max_hp+1.0,"cause":"bullet"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.hp<0 and body.separation_pending and not body.boss_dead,"本体致死はHPを正へ戻さず分離待ちとする")
+	var before: Dictionary = body.duplicate(true)
+	display.apply_frame(body)
+	check(bridge.command("dev_boss_body_state").value[0]==before,"正式表示から戦闘値を書き戻さない")
+	bridge.command("dev_cancel_boss",{"entity_id":id})
+	body = bridge.command("dev_boss_body_state").value[0]
+	view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value)
+	check(body.participants.all(func(p): return not p.active) and not body.has("arena") and not display.visible,"中断で首・囲い・表示を終了する")
+	var finished: Dictionary = bridge.checkpoint()
+	check(finished.ok,"終了後の参加者寿命も整合する")
+	if finished.ok: bridge.release_checkpoint(finished.value)
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"被弾と中断の通知を最後まで配信する")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	bridge.dispose()
+	view.queue_free()
+	await get_tree().process_frame
+	print("[cpp_hydra_body] failures=",failed)
 	get_tree().quit(1 if failed else 0)

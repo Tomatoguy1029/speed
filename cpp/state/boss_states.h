@@ -1,5 +1,6 @@
 #pragma once
 #include "entity_store.h"
+#include "../content/generated/combat_ids.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <vector>
@@ -92,7 +93,7 @@ struct BossFlowState {
     std::unordered_map<uint64_t,double> cooldown_started;
 };
 enum class BossMode : uint8_t { Entrance,Idle,Phase,Final,Defeated,Cancelled };
-// 単体のボスは本体が唯一の参加者。独立した護衛は敵として別に寿命を持つ。
+// 本体と独立HPの部位を、表示Nodeに依存せず保持する。
 struct ParticipantState {
     EnemyHandle actor,health_target;
     int64_t id=0;
@@ -120,7 +121,18 @@ struct CanisBodyState {
     std::vector<CanisHoundRef> led;
     std::vector<EnemyHandle> lunging;
 };
+struct HydraNeckState {
+    HydraHeadKind kind=HydraHeadKind::Bite;
+    EnemyHandle actor;
+    int64_t id=0;
+    double base_angle=0,angle=0,length=0,head_hp=0,cd=0,aim_wait=0,aim_velocity=0;
+    bool has_aim=false;
+    godot::Vector2 aim_target;
+    std::vector<godot::Vector2> points;
+};
+struct HydraBodyState {bool separation_pending=false;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
+    HydraBodyState hydra;
     CanisBodyState canis;
     CentaurusBodyState centaurus;
     std::vector<ParticipantState> participants;

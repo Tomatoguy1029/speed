@@ -1,0 +1,164 @@
+{
+  "records": [
+    {
+      "name": "HydraBodyDefinition",
+      "section": 370,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "bite",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "vortex",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "debris",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "beam",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "thunder",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "engage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "attack_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_refresh",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_deadzone",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_slack",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_wave_amplitude",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_wave_frequency",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_wave_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_response",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arena_x",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arena_y",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arena_wall_thickness",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_segments",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "neck_iterations",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "HydraHeadKind": [
+      {
+        "name": "Bite",
+        "value": "bite"
+      },
+      {
+        "name": "Vortex",
+        "value": "vortex"
+      },
+      {
+        "name": "Debris",
+        "value": "debris"
+      },
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "Thunder",
+        "value": "thunder"
+      }
+    ]
+  }
+}

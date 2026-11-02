@@ -10,7 +10,19 @@ extends Node2D
 @export var tail_tip: Texture2D
 @export var immortal: Texture2D
 const LIGHTING = preload("res://data/visuals/enemy_lighting.tres")
+var frame := {}
 var host: Node2D
+
+func apply_frame(value: Dictionary) -> void:
+	frame = value
+	queue_redraw()
+
+func _separated() -> bool:
+	return bool(frame.get("separated",false)) if not frame.is_empty() else host.separated
+
+func _origin() -> Vector2:
+	return frame.position if not frame.is_empty() else host.table.pos[host.body]
+
 
 func _ready() -> void:
 	host = get_parent()
@@ -23,6 +35,23 @@ func _ready() -> void:
 		material.set_shader_parameter(entry[0], Vector3(direction.x, direction.y, LIGHTING.height).normalized())
 
 func _draw() -> void:
+	if not frame.is_empty():
+		if body_only:
+			if not _separated() and body_texture!=null:
+				var radius: float = frame.radius
+				draw_texture_rect(body_texture,Rect2(Vector2.ONE*-radius,Vector2.ONE*radius*2.0),false)
+			return
+		var factor: float = float(frame.radius)*2.0/host.body_texture.get_width() if host.body_texture!=null else 1.0
+		for index in frame.necks.size():
+			var neck: Dictionary = frame.necks[index]
+			if heads_only:
+				var texture: Texture2D = head_textures.get(StringName(neck.kind))
+				if neck.alive and texture!=null:
+					draw_set_transform(neck.position-frame.position,float(neck.facing)-PI*0.5,Vector2.ONE*factor)
+					draw_texture(texture,-texture.get_size()*0.5)
+			elif neck.alive or float(neck.length)>0.0: _chain(neck.points,factor,index,false)
+		draw_set_transform(Vector2.ZERO)
+		return
 	if host == null or host.ctx == null or not host.has_body(): return
 	if body_only:
 		if not host.separated and body_texture != null:
@@ -48,7 +77,7 @@ func _chain(points: PackedVector2Array, factor: float, variant: int, special: bo
 	for i in range(1, points.size()): total += points[i - 1].distance_to(points[i])
 	if total < 0.001: return
 	var tail_length := 0.0
-	if host.separated:
+	if _separated():
 		# 尾端は先端→幅の広がる節→通常節。短い点列には収まる倍率で描く。
 		var tail_factor := minf(factor, total / 64.0)
 		_stamp(tail_tip, points, 10.0 * tail_factor, tail_factor)
@@ -76,7 +105,7 @@ func _stamp(texture: Texture2D, points: PackedVector2Array, distance: float, fac
 		if length < 0.001: continue
 		if distance <= length or i == points.size() - 1:
 			var at := points[i - 1] + delta * clampf(distance / length, 0.0, 1.0)
-			draw_set_transform(at - host.table.pos[host.body], delta.angle() - PI * 0.5, Vector2.ONE * factor)
+			draw_set_transform(at - _origin(), delta.angle() - PI * 0.5, Vector2.ONE * factor)
 			draw_texture(texture, -texture.get_size() * 0.5)
 			return
 		distance -= length

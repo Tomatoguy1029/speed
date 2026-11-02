@@ -331,7 +331,7 @@ static func centaurus_set_records(definition: BossDef, moves: Array) -> Dictiona
 
 ## 共通本体の生成入力。技の登録は各ボスの移植経路が追加する。
 static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictionary:
-	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major"]: return {}
+	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"hydra"]: return {}
 	# 機体・装備・接触など共通セクションの生成を既存の入口へそろえる。
 	var package := chase_package(load("res://data/enemies/defender.tres" if definition.id==&"centaurus" else "res://data/enemies/hound.tres" if definition.id==&"canis_major" else "res://data/enemies/drifter.tres"),config)
 	if package.is_empty(): return {}
@@ -346,7 +346,7 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		data.PopulationType.append({"id":2,"enemy":2,"rank":5,"maximum":1,"ranged":false})
 	var hp: float = definition.hp if definition.use_def_stats else config.boss_hp
 	var armor: float = definition.armor if definition.use_def_stats else config.boss_armor
-	row.kind = 39 if definition.id==&"monoceros" else 40 if definition.id==&"centaurus" else 41
+	row.kind = 39 if definition.id==&"monoceros" else 40 if definition.id==&"centaurus" else 41 if definition.id==&"canis_major" else 42
 	row.radius = definition.radius*config.character_scale
 	row.hp = hp*config.enemy_hp_mult
 	row.armor = armor*config.enemy_armor_mult
@@ -365,14 +365,33 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	row.knockback = 0.0
 	row.gate = 0
 	data.StringEntry[row.id-1].value = String(definition.id)
-	var boss := {"id":1,"external_id":String(definition.id),"kind":0 if definition.id==&"monoceros" else 1 if definition.id==&"centaurus" else 2,"turn":definition.turn,"speed":definition.speed}
+	var boss := {"id":1,"external_id":String(definition.id),"kind":0 if definition.id==&"monoceros" else 1 if definition.id==&"centaurus" else 2 if definition.id==&"canis_major" else 3,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = float(definition.params.get(key,0.0))
 	data.BossDefinition = [boss]
 	var body := {"id":1,"boss":1,"enemy":row.id,"hp_floor_enabled":false}
 	for key in ["entrance_time","initial_wait","phase_threshold","phase_time","final_beam_width","final_reach","final_warn_width","final_widen_time"]:
-		if not definition.params.has(key): return {}
-		body[key] = float(definition.params[key])
+		if not definition.params.has(key) and definition.id!=&"hydra": return {}
+		body[key] = float(definition.params.get(key,{"phase_threshold":0.75,"final_reach":1400.0,"final_widen_time":0.35}.get(key,0.0)))
 	data.BossBodyDefinition = [body]
+	if definition.id==&"hydra":
+		row.armor = 0.0
+		row.scaling_armor = 0.0
+		var hydra := {"id":1,"boss":1,"accel":definition.accel,"arena_x":definition.params.arena_size.x,"arena_y":definition.params.arena_size.y}
+		for name in ["bite","vortex","debris","beam","thunder"]:
+			var source: EnemyDef = load("res://data/enemies/hydra_%s.tres" % name)
+			var head: Dictionary = chase_package(source,config).records.EnemyRecord[0].duplicate(true)
+			head.id = data.EnemyRecord.size()+1
+			head.visual_id = row.visual_id
+			data.EnemyRecord.append(head)
+			data.PartDefinition.append({"id":head.id})
+			data.StringEntry.append({"id":head.id,"value":"hydra_"+name})
+			data.DefinitionIndex.append({"id":head.id,"enemy":head.id})
+			data.PopulationType.append({"id":head.id,"enemy":head.id,"rank":5,"maximum":1,"ranged":false})
+			hydra[name] = head.id
+		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="HydraBodyDefinition")[0].fields:
+			if hydra.has(field.name): continue
+			hydra[field.name] = definition.params[field.name]
+		data.HydraBodyDefinition = [hydra]
 	if definition.id==&"centaurus":
 		var centaurus := {"id":1,"body":1,"guard":1}
 		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="CentaurusBodyDefinition")[0].fields:
@@ -428,7 +447,7 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 			hound_visual.merge({"settings":settings,"paint":look.colors_key(hound.armor_colors),"hull_preview":look.preview_key(hound.armor_colors),"biting":false,"pump":false,"biter_parts":""})
 	var key: int = data.ResourceKey.size()+1
 	data.ResourceKey.append({"id":key,"role":7})
-	package.visuals.append({"id":key,"role":7,"path":"res://scenes/bosses/%s_presentation.tscn" % definition.id,"boss":String(definition.id),"appearance":definition.part_appearance.duplicate(true)})
+	package.visuals.append({"id":key,"role":7,"path":("res://scenes/bosses/hydra_frame.tscn" if definition.id==&"hydra" else "res://scenes/bosses/%s_presentation.tscn" % definition.id),"boss":String(definition.id),"appearance":definition.part_appearance.duplicate(true)})
 	return package
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。

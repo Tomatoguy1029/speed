@@ -9,7 +9,7 @@ public:
     static const BossBodyState *find(const RunRuntime &,EnemyHandle);
     static bool can_start(const RunRuntime &,EnemyHandle);
     static void damaged(RunRuntime &,EnemyHandle);
-    static bool can_defeat(const RunRuntime &,EnemyHandle);
+    static bool can_defeat(RunRuntime &,EnemyHandle);
     static void defeated(RunRuntime &,const DeathContext &);
     static void cancel(RunRuntime &,EnemyHandle);
     static bool begin_final(RunRuntime &,EnemyHandle,double charge);

@@ -16,7 +16,7 @@ public:
         bool (*allows)(const RunRuntime &,EnemyHandle,const DamageRequest &)=nullptr;
         double (*ram_damage)(const RunRuntime &,EnemyHandle,double)=nullptr;
         void (*body_damaged)(RunRuntime &,EnemyHandle)=nullptr;
-        bool (*can_defeat)(const RunRuntime &,EnemyHandle)=nullptr;
+        bool (*can_defeat)(RunRuntime &,EnemyHandle)=nullptr;
         DeathHook boss_defeated=nullptr;
         bool (*passes)(const RunRuntime &,EnemyHandle)=nullptr;
     };

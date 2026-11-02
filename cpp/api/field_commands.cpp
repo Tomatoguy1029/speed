@@ -67,7 +67,7 @@ Dictionary SpeedRunCore::development_field_command(const String &kind,const Dict
         if (action=="hit" && p.size()==4 && point(p,"from") && point(p,"to") && radius(p)) {
             const auto hit=speed::FieldSystem::first_body_hit(runtime,p["from"],p["to"],p["radius"]);
             if (!hit) return reply(true);
-            Dictionary value;value["id"]=hit->body+1;value["t"]=hit->t;value["point"]=hit->point;return reply(true,value);
+            Dictionary value;value["id"]=hit->body==UINT32_MAX?0:hit->body+1;value["t"]=hit->t;value["point"]=hit->point;return reply(true,value);
         }
         if (action=="accel" && p.size()==2 && point(p,"position")) return reply(true,speed::FieldSystem::boundary_accel(runtime,p["position"]));
         if (p.size()!=3 || !point(p,"position") || !radius(p)) return reply(false);

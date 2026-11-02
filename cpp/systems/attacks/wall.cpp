@@ -1,5 +1,6 @@
 #include "wall.h"
 #include "../attack_system.h"
+#include "../field.h"
 #include "../../output/frame_builder.h"
 #include <algorithm>
 #include <cmath>
@@ -60,7 +61,7 @@ bool WallSystem::bounce_ship(RunRuntime &run,godot::Vector2 from) {
         const double push=m+1.0-side*d;if (push>=least) continue;least=push;
         const auto normal=godot::Vector2(-u.y,u.x)*side;hit=WallHit{0,from+normal*push,normal};
     }
-    if (!hit) hit=block_hit(run,from,ship.pos,radius);if (!hit) return false;
+    if (!hit) {hit=block_hit(run,from,ship.pos,radius);const auto arena=FieldSystem::arena_hit(run,from,ship.pos,radius);if (arena && (!hit || from.distance_squared_to(arena->position)<from.distance_squared_to(hit->point))) hit=WallHit{arena->t,arena->position,arena->normal};}if (!hit) return false;
     ship.pos=hit->point;const auto normal=hit->normal;const double vn=ship.vel.dot(normal);
     if (vn<0) ship.vel-=normal*2.0*vn;
     ship.vel*=run.state.combat_config.bounce_keep;

@@ -129,6 +129,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_filters=records.BossFlowFilter_rows;
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
+    bundle->hydra_bodies=records.HydraBodyDefinition_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
     bundle->canis_commands=records.CanisCommandDefinition_rows;
     bundle->canis_howls=records.CanisHowlDefinition_rows;
@@ -153,7 +154,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->boss_stages=records.BossTechniqueStage_rows;
     for (size_t i=0;i<bundle->bosses.size();++i) {
         const auto &p=bundle->bosses[i];
-        if (p.id!=i+1 || (p.external_id!=(p.kind==0?"monoceros":p.kind==1?"centaurus":"canis_major")) || (p.kind==0 && (p.horn_length_ratio<=0 || p.horn_length_ratio_p2<=0))) return {};
+        if (p.id!=i+1 || (p.external_id!=(p.kind==0?"monoceros":p.kind==1?"centaurus":p.kind==2?"canis_major":"hydra")) || (p.kind==0 && (p.horn_length_ratio<=0 || p.horn_length_ratio_p2<=0))) return {};
     }
     for (size_t i=0;i<bundle->boss_techniques.size();++i) {
         const auto &p=bundle->boss_techniques[i];
@@ -525,7 +526,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31 && row.kind!=35 && row.kind!=32 && row.kind!=36 && row.kind!=33 && row.kind!=39 && row.kind!=40 && row.kind!=41 && row.kind!=38) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31 && row.kind!=35 && row.kind!=32 && row.kind!=36 && row.kind!=33 && row.kind!=39 && row.kind!=40 && row.kind!=41 && row.kind!=42 && row.kind!=38) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         definition.gate=EnemyDefinition::Gate(row.gate);
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
@@ -811,9 +812,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (size_t i=0;i<bundle->boss_bodies.size();++i) {
         const auto &body=bundle->boss_bodies[i];const auto &boss=bundle->bosses[body.boss-1];
         if (boss.kind==1 && std::none_of(bundle->centaurus_bodies.begin(),bundle->centaurus_bodies.end(),[&](const auto &p){return p.body==body.id;})) return {};
+        if (boss.kind==3 && std::none_of(bundle->hydra_bodies.begin(),bundle->hydra_bodies.end(),[&](const auto &p){return p.boss==body.boss;})) return {};
         if (boss.kind==2 && std::none_of(bundle->canis_bodies.begin(),bundle->canis_bodies.end(),[&](const auto &p){return p.boss==body.boss;})) return {};
-        if (body.id!=i+1 || body.phase_threshold<=0 || body.phase_threshold>=1 || body.final_widen_time<=0 || bundle->definitions[body.enemy-1].kind!=(boss.kind==0?EnemyDefinition::Kind::Monoceros:boss.kind==1?EnemyDefinition::Kind::Centaurus:EnemyDefinition::Kind::CanisMajor)) return {};
+        if (body.id!=i+1 || body.phase_threshold<=0 || body.phase_threshold>=1 || body.final_widen_time<=0 || bundle->definitions[body.enemy-1].kind!=(boss.kind==0?EnemyDefinition::Kind::Monoceros:boss.kind==1?EnemyDefinition::Kind::Centaurus:boss.kind==2?EnemyDefinition::Kind::CanisMajor:EnemyDefinition::Kind::Hydra)) return {};
     }
+    for (size_t i=0;i<bundle->hydra_bodies.size();++i) {const auto &p=bundle->hydra_bodies[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || p.neck_rest<=0 || p.head_hp<=0 || p.neck_segments<4 || p.neck_segments>32 || p.neck_iterations>12 || p.arena_x<=0 || p.arena_y<=0) return {};for (auto head:{p.bite,p.vortex,p.debris,p.beam,p.thunder}) if (bundle->definitions[head-1].kind!=EnemyDefinition::Kind::Part) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_bodies[j].boss==p.boss) return {};}
     for (size_t i=0;i<bundle->canis_bodies.size();++i) {const auto &p=bundle->canis_bodies[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=2 || bundle->definitions[p.hound-1].kind!=EnemyDefinition::Kind::Hound || p.lead_scan<=0) return {};}
     std::unordered_set<std::string> tuning_keys;
     for (const auto &row:records.EnemyTuningValue_rows) {
