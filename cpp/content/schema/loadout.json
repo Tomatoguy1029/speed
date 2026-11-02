@@ -607,7 +607,7 @@
     },
     {
       "name": "EndBlastDefinition",
-      "section": 69,
+      "section": 75,
       "fields": [
         {
           "name": "id",

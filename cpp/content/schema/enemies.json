@@ -818,7 +818,7 @@
     },
     {
       "name": "ClockDefinition",
-      "section": 70,
+      "section": 74,
       "fields": [
         {
           "name": "id",
