@@ -4,6 +4,21 @@ func check(value: bool, message: String) -> void:
 	if not value:
 		failures += 1
 		push_error(message)
+func semantics_strict() -> bool:
+	return "--semantics-strict" in OS.get_cmdline_user_args()
+
+func semantics_number(a: float,b: float) -> bool:
+	return absf(a-b)<=maxf(1e-9,maxf(absf(a),absf(b))*1e-9) if semantics_strict() else is_equal_approx(a,b)
+
+func semantics_vector(a: Vector2,b: Vector2) -> bool:
+	return a.distance_to(b)<=1e-4 if semantics_strict() else a.is_equal_approx(b)
+
+func semantics_session(options: Dictionary):
+	if not semantics_strict():return RunManager.create_session(self,options,false)
+	var session=load("res://tests/draco.gd").SemanticsSession.new()
+	session.sim=RunSimulation.new();session.sim.actor_parent=self;session.sim.options=options.duplicate();session.sim.options["empty"]=true
+	session.sim.setup();add_child(session);return session
+
 func _ready() -> void:
 	if "--cpp-draco-finale" in OS.get_cmdline_user_args():
 		call_deferred("native_finale")
@@ -212,14 +227,16 @@ func native_intro() -> void:
 			bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"begin"})
 			bridge._core.step(1.0)
 			var body: Dictionary = bridge.command("dev_boss_body_state").value[-1]
-			check(is_equal_approx(float(body.facing),PI*0.5),"登場方向を四方から同じ対面構図に揃える")
+			check(semantics_number(float(body.facing),PI*0.5),"登場方向を四方から同じ対面構図に揃える")
 			bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"cancel"})
 			var frame: Dictionary = bridge.read_frame().value
-			check(frame.camera.center.is_equal_approx(Vector2(60,180)) and is_equal_approx(frame.camera.zoom,0.6),"中断はカメラ中心と倍率を復元する")
-			check(frame.camera.half.is_equal_approx(Vector2(800,450)),"中断は入力用の表示範囲を返す")
-			check(bridge.command("dev_boss_body_state").value[-1].position.is_equal_approx(initial),"中断は本体位置を戻す")
+			check(semantics_vector(frame.camera.center,Vector2(60,180)) and semantics_number(frame.camera.zoom,0.6),"中断はカメラ中心と倍率を復元する")
+			check(semantics_vector(frame.camera.half,Vector2(800,450)),"中断は入力用の表示範囲を返す")
+			check(semantics_vector(bridge.command("dev_boss_body_state").value[-1].position,initial),"中断は本体位置を戻す")
 			check(not frame.ui.controls_locked and not frame.ui.cinematic_camera and frame.ui.cinematic_bars==0.0,"中断は操作とHUDを返す")
 			bridge.command("dev_cancel_boss",{"entity_id":boss})
+		if semantics_strict():
+			bridge.dispose();print("SEMANTICS_DRACO_INTRO failures=",failures);get_tree().quit(1 if failures else 0);return
 		boss = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-500,-100),"entrance":true}).value
 		bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"skip"})
 		bridge.command("dev_draco_intro",{"entity_id":boss,"operation":"skip"})
@@ -303,7 +320,7 @@ func native_cycle() -> void:
 	bridge.command("dev_edit",{"kind":"camera","payload":{"center":Vector2(60,180),"size":Vector2(960,540),"zoom":0.6,"bars":0.0}})
 	var boss: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2(-500,-100),"entrance":false}).value
 	var stage: RuntimeStage = ContentManager.runtime_stage(5).duplicate(true);stage.boss_enabled=false
-	var session := RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":1605},false)
+	var session = semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":1605})
 	session.auto_step=false
 	var sim: RunSimulation = session.sim
 	sim.field.bodies.clear();sim.state.ship_pos=Vector2(180,260);sim.state.view_center=Vector2(60,180);sim.state.camera_zoom=0.6;sim.state.view_half=Vector2(800,450)
@@ -317,7 +334,7 @@ func native_cycle() -> void:
 		actor.cycle.tick(1.0/60.0);bridge._core.step(1.0/60.0)
 		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
 		var names := ["","roar","collect","wait_beams","return","generate"]
-		if String(actor.cycle.stage)!=names[body.cycle.stage] or not body.position.is_equal_approx(actor.table.pos[actor.body]) or absf(body.perspective_scale-actor.perspective_scale)>0.00001 or absf(body.cycle.time-actor.cycle.time)>0.00001: matched=false
+		if String(actor.cycle.stage)!=names[body.cycle.stage] or not semantics_vector(body.position,actor.table.pos[actor.body]) or not semantics_number(body.perspective_scale,actor.perspective_scale) or not semantics_number(body.cycle.time,actor.cycle.time): matched=false
 		if actor.cycle.stage==&"": break
 	check(matched,"初回生成はSourceと同じ段階・時刻・位置・命中半径の遠近で進む")
 	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
@@ -328,7 +345,9 @@ func native_cycle() -> void:
 	check(not bridge.read_frame().value.ui.controls_locked and bridge.read_frame().value.ui.cinematic_bars==0.0,"通常採集では操作を止めない")
 	for tick in 90: actor.cycle.tick(1.0/60.0);bridge._core.step(1.0/60.0)
 	body=bridge.command("dev_boss_body_state").value[0]
-	check(body.position.is_equal_approx(actor.table.pos[actor.body]) and absf(body.perspective_scale-actor.perspective_scale)<0.00001,"同じ画面サイズで通常採集の位置と命中半径を保つ")
+	check(semantics_vector(body.position,actor.table.pos[actor.body]) and semantics_number(body.perspective_scale,actor.perspective_scale),"同じ画面サイズで通常採集の位置と命中半径を保つ")
+	if semantics_strict():
+		bridge.dispose();session.dispose_source();session.free();print("SEMANTICS_DRACO_CYCLE failures=",failures);get_tree().quit(1 if failures else 0);return
 	var held: Dictionary = bridge.checkpoint();check(held.ok,"採集中の段階・遠近・所有を保持する")
 	bridge._core.step(0.4)
 	var expected: Dictionary = bridge.command("dev_boss_body_state").value[0]

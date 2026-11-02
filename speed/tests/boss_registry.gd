@@ -10,6 +10,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	for argument:String in OS.get_cmdline_user_args():
+		if argument.begins_with("--semantics-hydra="):
+			call_deferred("semantics_hydra_"+argument.trim_prefix("--semantics-hydra="));return
 	if "--cpp-hydra-finish-cause" in OS.get_cmdline_user_args() or "--cpp-hydra-finish-damage" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_finish_cause")
 		return
@@ -6184,3 +6187,207 @@ func native_hydra_finish_cause() -> void:
 	if "--cpp-hydra-finish-damage" not in OS.get_cmdline_user_args():check(c.events.any(func(e):return e.type=="boss_defeated" and e.payload.cause=="ram"),"ヒドラの勝利通知原因だけをSourceのramへ保つ")
 	check(c.events.any(func(e):return e.type=="combat_damage" and e.payload.cause=="shot"),"首の被弾・観測には実際の原因を保持する")
 	c.bridge.dispose();print("[cpp_hydra_finish_cause] failures=",failed);get_tree().quit(1 if failed else 0)
+
+
+func semantics_number(a: float,b: float) -> bool:
+	return absf(a-b)<=maxf(1e-9,maxf(absf(a),absf(b))*1e-9)
+
+func semantics_hydra_finish(bridge,label: String) -> void:
+	bridge.dispose();print("SEMANTICS_HYDRA ",label," failures=",failed);get_tree().quit(1 if failed else 0)
+
+func semantics_hydra_curve() -> void:
+	var c := hydra_major_case("curve",{"warning_time":0.15,"performance_time":0.55,"curve_delay":0.12,"curve_time":0.35,"curve_turn":0.45,"curve_lag":1.1,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	var events: Array=[];bridge.subscribe("曲線の記録",func(packet):events.append_array(packet.events);return true)
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	check(body.count==5 and body.effects.size()==5 and body.effects.all(func(e):return e.points.size()==25 and semantics_number(e.delay,0.12) and semantics_number(e.life,0.35)),"予告開始で全首に24区間の曲線を作り、独立した遅れと寿命を持つ")
+	var first: Dictionary=body.effects[0].duplicate(true)
+	var angle: float=body.necks[0].angle
+	var at: Vector2=first.points[0]
+	for j in range(1,25):
+		at+=Vector2.from_angle(angle-float(j)/24.0*1.1)*600.0/24.0
+		check(at.distance_to(first.points[j])<=1e-4,"曲線の全点の指定許容幅")
+	check(at.distance_to(first.points[-1])<=1e-4,"ラジアンの軌跡差と24分割の点列がSourceの式に一致する")
+	var facing: float=body.facing
+	bridge._core.step(0.1);bridge._core.step_hazards(0.1);body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.facing,facing) and body.effects[0].age<body.effects[0].delay,"予告中は本体を回さず、形だけの時計を進める")
+	bridge._core.step(0.05);bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
+	semantics_hydra_finish(bridge,"curve")
+
+func semantics_hydra_grid() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.8,"normal_charge":0.1,"grid_time":0.35,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1}
+	var c := hydra_major_case("grid",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":true})
+	hydra_grid_separate(c)
+	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(100,80));bridge._core.step(0.01)
+	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(1400,1000))
+	for tick in 40:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var t: Dictionary=actions[0];var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var source = load("res://data/bosses/hydra.tres")
+	var maximum: float=c.cfg.draw_length*c.cfg.base_max_speed/c.cfg.base_max_speed
+	var reference: Dictionary=load("res://scripts/bosses/hydra_grid.gd").build(Rect2(Vector2(-1400,-1000),Vector2(2800,2000)).intersection(body.arena),Vector2(-200,0),8,source.params,c.cfg.ship_radius,maximum)
+	check(not reference.is_empty() and t.grid_name==String(reference.name) and semantics_number(t.grid_length,reference.length) and t.grid_bearer.distance_to(reference.bearer)<=1e-4,"領域・回転・倍率・経路予算をSourceの配置関数へ照合する")
+	var equal: bool = not reference.is_empty() and reference.beams.size()==t.grid_starts.size()
+	if equal:
+		for i in reference.beams.size():equal=equal and t.grid_starts[i].distance_to(reference.beams[i][0])<=1e-4 and t.grid_ends[i].distance_to(reference.beams[i][1])<=1e-4
+	check(equal,"優先順で選んだ全ビームの始点と終点がSourceに一致する")
+	var ready := false
+	for tick in 600:
+		bridge._core.step(0.02);bridge._core.step_hazards(0.02)
+		t=bridge.command("dev_boss_state").value[0]
+		if t.stage==7:break
+		if not t.positioning and not bridge.command("dev_boss_body_state").value[0].effects.is_empty():ready=true;break
+	body=bridge.command("dev_boss_body_state").value[0]
+	if not ready:print(t);bridge.dispose();get_tree().quit(1);return
+	check(body.effects.all(func(e):return e.points.size()==2 and semantics_number(e.delay,0.1) and semantics_number(e.life,0.35)),"格子は線分・個別の遅れ・寿命を持つ")
+	check(body.necks.all(func(n):return n.points[-1].distance_to(n.position)<=1e-4),"大技の位置を確定した後に首点列を1回だけ同期する")
+	semantics_hydra_finish(bridge,"grid")
+
+func semantics_hydra_pincer() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.7,"pincer_delay":0.1,"pincer_time":0.3,"pincer_open_angle":0.8,"pincer_close_angle":0.12,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("beam_pincer",edits,true,{"combo_cooldown":0.1})
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	hydra_pincer_grow(c)
+	for tick in 40:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var passive_angle: float=body.necks[0].angle
+	for tick in 15:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	var t: Dictionary=bridge.command("dev_boss_state").value[0];body=bridge.command("dev_boss_body_state").value[0]
+	check(t.stage==1 and t.pincer_aims.size()==2 and body.effects.size()==2 and not semantics_number(passive_angle,body.necks[0].angle),"予告後に2本を発射し、非参加首は普段の操舵を続ける")
+	check(body.effects.all(func(e):return e.points.size()==2 and semantics_number(e.delay,0.1) and semantics_number(e.life,0.3)),"挟撃は遅れと寿命が別の2線分として生成する")
+	var from: Array=[body.effects[0].points[0],body.effects[1].points[0]];var aims: PackedFloat64Array=t.pincer_aims.duplicate()
+	bridge.command("dev_ship_motion",{"position":Vector2(900,-600),"velocity":Vector2.ZERO});bridge._core.set_motion_context(Vector2(900,-600),Vector2.ZERO,Vector2(1400,1000))
+	bridge._core.step(0.12);bridge._core.step_hazards(0.12);t=bridge.command("dev_boss_state").value[0];body=bridge.command("dev_boss_body_state").value[0]
+	var fraction: float=clampf((t.performance_time-0.1)/0.3,0.0,1.0)
+	var exact := true
+	for i in 2:
+		var angle: float=aims[i]+(1.0 if i==0 else -1.0)*lerpf(0.8,0.12,fraction)
+		exact=exact and body.effects[i].points[0].distance_to(from[i])<=1e-4 and body.effects[i].points[1].distance_to(from[i]+Vector2.from_angle(angle)*600.0)<=1e-4
+	check(t.pincer_aims==aims and exact,"初回の自機方向を固定し、ラジアンの開始角から終点角へ両側を閉じるSourceの式を保つ")
+	semantics_hydra_finish(bridge,"pincer")
+
+func semantics_hydra_north() -> void:
+	var edits := {"warning_time":0.24,"performance_time":0.5,"north_flight":0.12,"north_lock_time":0.12,"north_spread":90.0,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("north",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_ship_motion",{"position":Vector2(850,180),"velocity":Vector2.ZERO});bridge._core.step(0.05)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var targets: Array=body.north_targets.duplicate(true)
+	var tracking: Dictionary=bridge.command("dev_boss_state").value[0]
+	var direction: Vector2=(Vector2(850,180)-body.position).normalized();var side: Vector2=direction.orthogonal()
+	var center: Vector2=body.position+direction*maxf(Vector2(850,180).distance_to(body.position),body.radius+c.package.records.HydraBodyDefinition[0].neck_rest)
+	var ordered: Array=targets.duplicate(true);ordered.sort_custom(func(a,b):return a.target.dot(side)<b.target.dot(side))
+	var exact := ordered.size()==3
+	for i in ordered.size():exact=exact and ordered[i].target.distance_to(center+side*90.0*(i-1))<=1e-4
+	check(exact,"根元の横位置で並べた三首へ中心と90間隔のSource標的式を使う")
+	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0];targets=body.north_targets.duplicate(true)
+	bridge.command("dev_ship_motion",{"position":Vector2(950,-220),"velocity":Vector2.ZERO});bridge._core.step(0.03)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var view=hydra_move_view(c);await get_tree().process_frame
+	for tick in 20:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value[0].north_burst:break
+	body=bridge.command("dev_boss_body_state").value[0]
+	var from: Array=body.necks.filter(func(n):return n.mode=="north").map(func(n):return n.position)
+	bridge._core.step(0.04);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==3 and body.effects.all(func(e):return e.points.size()==2 and semantics_number(e.width,70.0) and semantics_number(e.life,0.041)),"次の首更新で移動区間を三つの幅付き線分へ出す")
+	semantics_hydra_finish(bridge,"north")
+
+func semantics_hydra_sequence() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.85,"sequence_charge":0.08,"sequence_gap":0.2,"normal_lunge":0.12,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("sequence",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var participants: Array=body.necks.filter(func(n):return n.mode=="sequence")
+	participants.sort_custom(func(a,b):return absf(angle_difference(TAU*float(body.necks.find(a))/body.necks.size()+body.facing,(Vector2(800,0)-body.position).angle()))<absf(angle_difference(TAU*float(body.necks.find(b))/body.necks.size()+body.facing,(Vector2(800,0)-body.position).angle())))
+	var before_facing: float=body.facing
+	bridge.command("dev_ship_motion",{"position":Vector2(800,160),"velocity":Vector2.ZERO})
+	for tick in 25:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value[0].stage==1:break
+	var t: Dictionary=bridge.command("dev_boss_state").value[0];body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(t.performance_time,0.01) and body.effects.is_empty() and not semantics_number(body.facing,before_facing),"発動tickから実行時計へdtを加え、本体は機体へ向け続ける")
+	bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0];t=bridge.command("dev_boss_state").value[0]
+	var first: Dictionary=body.necks.filter(func(n):return n.id==participants[0].id)[0]
+	var fraction: float=clampf((t.performance_time-0.08)/0.12,0.0,1.0)
+	check(body.effects.size()==1 and first.locked and first.position.distance_to(participants[0].position.lerp(Vector2(800,160),fraction))<=1e-4 and body.effects[0].points[0].distance_to(participants[0].position)<=1e-4,"一首目は個別の溜め後に現在の機体へ固定しSourceのlerp区間を出す")
+	check(semantics_number(body.effects[0].width,70.0) and semantics_number(body.effects[0].life,0.081),"順番噛みの線分幅は半径の二倍、寿命はmax(dt,.02)+.001")
+	semantics_hydra_finish(bridge,"sequence")
+
+func semantics_hydra_swarm() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.9,"sequence_charge":0.08,"swarm_gap":0.05,"swarm_flight":0.18,"swarm_reach":1800.0,"bite_radius":35.0,"bite_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("swarm",edits,true)
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	hydra_grid_separate(c)
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var t: Dictionary=actions[0]
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var rect: Rect2=Rect2(Vector2(-1400,-1000),Vector2(2800,2000)).intersection(body.arena).grow(-70.0)
+	var slots: PackedVector2Array=t.swarm_slots
+	var exact: bool = slots.size()==body.necks.size()
+	for i in slots.size():exact=exact and slots[i].distance_to(rect.get_center()+Vector2(cos(TAU*i/slots.size())*rect.size.x*0.45,sin(TAU*i/slots.size())*rect.size.y*0.45))<=1e-4
+	var ready := false
+	for tick in 1200:
+		bridge._core.step(0.02)
+		t=bridge.command("dev_boss_state").value[0]
+		if not t.positioning:ready=true;break
+		if t.stage>=5:break
+	body=bridge.command("dev_boss_body_state").value[0]
+	if not ready:print(t);bridge.dispose();get_tree().quit(1);return
+	var origins := {};var targets := {}
+	for n: Dictionary in body.necks:
+		origins[n.id]=n.position;targets[n.id]=hydra_swarm_expected_target(body,n,Vector2(-200,0),1800.0)
+	for tick in 30:
+		bridge._core.step(0.01)
+		t=bridge.command("dev_boss_state").value[0]
+		if t.stage==1:break
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(t.performance_time,0.01) and body.effects.size()==1 and semantics_number(body.effects[0].width,35.0) and semantics_number(body.effects[0].delay,0.08) and semantics_number(body.effects[0].life,0.001) and body.effects[0].points[1].distance_to(targets[body.necks[0].id])<=1e-4,"発動tickから個別時計を進め、闘技場で切った固定軌道を半径と同じ幅の予告へ出す")
+	bridge.command("dev_ship_motion",{"position":Vector2(600,-500),"velocity":Vector2.ZERO});bridge._core.step(0.08)
+	body=bridge.command("dev_boss_body_state").value[0];t=bridge.command("dev_boss_state").value[0]
+	var offensive: Array=body.effects.filter(func(e):return e.delay==0.0)
+	var first: Dictionary=body.necks[0]
+	var fraction: float=clampf((t.performance_time-0.08)/0.18,0.0,1.0)
+	check(first.locked and first.position.distance_to(Vector2(origins[first.id]).lerp(targets[first.id],fraction))<=1e-4 and offensive.size()==1 and semantics_number(offensive[0].width,35.0) and semantics_number(offensive[0].life,0.081),"配置後に機体が動いても固定軌道を変えず、Sourceの飛行式とdt+.001の区間を出す")
+	check(first.position==first.free_pos and body.necks.all(func(n):return n.points[-1].distance_to(n.position)<=1e-4),"飛行位置をfree_posと首点列へ同じtickに反映する")
+	semantics_hydra_finish(bridge,"swarm")
