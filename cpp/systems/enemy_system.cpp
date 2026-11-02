@@ -71,6 +71,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     const auto &enemy=run.state.enemies[handle.slot];
     const auto &definition=run.content->definitions[enemy.definition];
     if (definition.kind==EnemyDefinition::Kind::Sniper) return true;
+    if (definition.kind==EnemyDefinition::Kind::Dolphin) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
     return enemy.fire_t<=definition.attack_telegraph+dt;
 }

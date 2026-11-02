@@ -29,6 +29,11 @@ func _ready() -> void:
 		print("[cpp_slash] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
+	if "--cpp-dolphin" in OS.get_cmdline_user_args():
+		await check_cpp_dolphin()
+		print("[cpp_dolphin] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-pulser" in OS.get_cmdline_user_args():
 		await check_cpp_pulser()
 		print("[cpp_pulser] failed=%d" % failed)
@@ -928,5 +933,115 @@ func check_cpp_pulser() -> void:
 	core.remove_enemy(owner)
 	core.step(0.1)
 	check(pulse_motion(core,replacement).mode==EnemyTable.Mode.WINDUP,"参照相手が先に消えても古い行へ接続しない")
+	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func dolphin_enemy(core, id: int) -> Dictionary:
+	for item: Dictionary in core.enemies_snapshot():
+		if item.id==id: return item
+	return {}
+
+func check_cpp_dolphin() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 75
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["dolphin","drifter"])
+	stage.enemy_tuning = {"dolphin":{"speed":0.0,"params.telegraph":0.3,"params.fire_interval":1.0,"params.wave_radius":300.0,"params.wave_speed":300.0,"params.enemy_dmg":7.0,"params.bullet_dmg":4.0},"drifter":{"speed":0.0,"hp":100.0,"armor":0.0}}
+	var output := "res://.content/dev/run_dolphin"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"いるか座の予告と敵への波".sha256_text())
+	check(built==OK,"いるか座の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_75.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":759},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"いるか座のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	var position := target-Vector2(400,0)
+	core.set_motion_context(target,target,Vector2(640,360))
+	var id: int = core.spawn_enemy(&"dolphin",position,{"facing":0.0})
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.set_enemy_motion(id,{"fire_t":0.25})
+	core.step(0.1)
+	check(core.attack_budget_snapshot().groups.is_empty() and pulse_motion(core,id).mode==EnemyTable.Mode.MOVE,"予告時間による先取りをせず発射間隔の直前まで待つ")
+	core.step(0.1)
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and core.hazards_snapshot().is_empty(),"予算0では構えと波を開始しない")
+	core.configure_attack_budget({"enabled":true,"budget":2.0,"jitter":0.0})
+	core.step(0.1)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.WINDUP and is_equal_approx(pulse_motion(core,id).timer,0.3),"編集値の構えへ入る")
+	var initial_facing: float = dolphin_enemy(core,id).facing
+	target = position+Vector2(0,600)
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.step(0.1)
+	check(is_equal_approx(dolphin_enemy(core,id).facing,initial_facing+0.2) and is_equal_approx(pulse_motion(core,id).charge,1.0/3.0),"構え中は現在の機体へ旋回速度2で向き直る")
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	var frame: Dictionary = bridge.read_render(Rect2(position-Vector2(300,300),Vector2(800,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var warning := false
+	for batch: Dictionary in frame.batches:
+		if batch.has("dolphin"): warning = batch.dolphin.size()==6 and is_equal_approx(batch.dolphin[5],0.7)
+	check(warning and presentation.frame_view.apply_frame(frame),"向きと扇の切れ目を三層の弧で通常画面へ予告する")
+	await get_tree().process_frame
+	core.step(0.21)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.RECOVER and is_equal_approx(pulse_motion(core,id).timer,0.6) and core.hazards_snapshot().size()==1,"構えの終わりに一発を生成し0.6秒休む")
+	var wave: Dictionary = core.hazards_snapshot()[0]
+	check(wave.style==1 and is_equal_approx(wave.arc,0.7) and wave.enemy_damage==7.0 and not wave.attached and wave.time==0.0,"層状の扇と敵ダメージを持つ独立した波を生成する")
+	var direction := Vector2.from_angle(wave.angle)
+	var ahead: Vector2 = wave.pos+direction*100.0
+	var behind: Vector2 = wave.pos-direction*100.0
+	var victim: int = core.spawn_enemy(&"drifter",ahead,{"size":1.0})
+	var outside: int = core.spawn_enemy(&"drifter",behind,{"size":1.0})
+	var hp: float = dolphin_enemy(core,victim).hp
+	var outside_hp: float = dolphin_enemy(core,outside).hp
+	bridge.command("dev_ship_motion",{"position":ahead,"velocity":Vector2.ZERO})
+	core.rebuild_enemy_grid(cfg.grid_cell)
+	var ship_hp: float = core.ship_snapshot().ship_hp
+	core.step_hazards(0.3)
+	check(is_equal_approx(dolphin_enemy(core,victim).hp,hp-7.0) and is_equal_approx(dolphin_enemy(core,outside).hp,outside_hp),"扇を通った敵へ編集値のダメージを一度与え切れ目側は通さない")
+	check(is_equal_approx(core.ship_snapshot().ship_hp,ship_hp-4.0) and core.hazards_snapshot()[0].hit,"同じ先頭の弧が機体にも一度当たる")
+	core.step_hazards(0.01)
+	check(is_equal_approx(dolphin_enemy(core,victim).hp,hp-7.0),"重なる帯で同じ敵へ二度当てない")
+	frame = bridge.read_render(Rect2(position-Vector2(300,300),Vector2(800,800))).value
+	check(not frame.shapes.is_empty() and presentation.frame_view.apply_frame(frame),"発射済みの丸い端を持つ層状の扇を共通表示へ渡す")
+	await get_tree().process_frame
+	core.step(0.61)
+	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and pulse_motion(core,id).fire_t==1.0,"休みが終わると編集値の間隔で待機へ戻る")
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step_hazards(0.1)
+	check(core.hazards_snapshot().size()==1,"本体を倒しても発射済みの波は残る")
+	core.step_hazards(2.0)
+	check(core.hazards_snapshot().is_empty(),"波が最大半径で自然終了する")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"構え中の向き・溜め・時計を値から復帰する")
+	core.step(0.21)
+	var future: Array = core.hazards_snapshot()
+	bridge.restore(pending.value)
+	core.step(0.21)
+	check(core.hazards_snapshot()==future,"復帰後の発射と扇の向きが一致し保持元を変更しない")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step(0.5)
+	check(core.hazards_snapshot().is_empty(),"構えの途中で倒すと波を残さない")
+	core.remove_enemy(id)
+	var replacement: int = core.spawn_enemy(&"dolphin",position,{})
+	check(replacement!=id and pulse_motion(core,replacement).mode==EnemyTable.Mode.MOVE and pulse_motion(core,replacement).charge==0.0,"行の再利用で古い構えを引き継がない")
+	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.0})
+	core.remove_enemy(owner)
+	core.step(0.1)
+	check(pulse_motion(core,replacement).mode==EnemyTable.Mode.WINDUP,"参照相手が先に消えても古い行を追わず構える")
 	bridge.release_checkpoint(pending.value)
 	session.free()

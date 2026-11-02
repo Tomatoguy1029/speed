@@ -632,6 +632,68 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "DolphinDefinition",
+      "section": 66,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "enemy_damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

@@ -9,17 +9,16 @@ func setup(render: RunPresentation, behavior_name: StringName) -> void:
 func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	if t.mode[i] != EnemyTable.Mode.WINDUP:
 		return
-	var p := t.pos[i]
-	var r := t.r[i]
-	var k := t.charge[i]
-	var dp: Dictionary = t.def[i].params
-	var arc := float(dp.wave_arc)
-	var f := t.facing[i]
-	var col := Color(1.0, 0.3, 0.25)
-	var reach := r * (2.0 + 4.0 * k)
-	for s: float in [-1.0, 1.0]:
-		c.draw_line(p, p + Vector2.from_angle(f + s * arc) * reach, Color(col, 0.25 + 0.4 * k), _px(2.0))
+	draw_view(c,t.pos[i],t.r[i],t.charge[i],t.facing[i],float(t.def[i].params.wave_arc),_px(1.0))
+
+static func draw_frame(c: CanvasItem, values: PackedFloat32Array, pixel: float) -> void:
+	for n in range(0,values.size(),6): draw_view(c,Vector2(values[n],values[n+1]),values[n+2],values[n+4],values[n+3],values[n+5],pixel)
+
+static func draw_view(c: CanvasItem, p: Vector2, r: float, k: float, f: float, arc: float, pixel: float) -> void:
+	var col := Color(1.0,0.3,0.25)
+	var reach := r*(2.0+4.0*k)
+	for side: float in [-1.0,1.0]: c.draw_line(p,p+Vector2.from_angle(f+side*arc)*reach,Color(col,0.25+0.4*k),2.0*pixel)
 	for n in 3:
-		var fr := fmod(k * 2.0 + n / 3.0, 1.0)
-		rm._draw_round_arc(c, p, r * (1.2 + 3.5 * fr), f - arc, f + arc, 24, Color(col, (1.0 - fr) * (0.3 + 0.5 * k)), _px(3.0))
-	c.draw_circle(p + Vector2.from_angle(f) * r, r * (0.2 + 0.25 * k), Color(1, 1, 1, 0.5 + 0.4 * k))
+		var fr := fmod(k*2.0+n/3.0,1.0)
+		preload("res://scripts/render/attacks/wave.gd").draw_round_arc(c,p,r*(1.2+3.5*fr),f-arc,f+arc,24,Color(col,(1.0-fr)*(0.3+0.5*k)),3.0*pixel)
+	c.draw_circle(p+Vector2.from_angle(f)*r,r*(0.2+0.25*k),Color(1,1,1,0.5+0.4*k))

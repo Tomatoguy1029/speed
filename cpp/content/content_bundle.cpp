@@ -73,6 +73,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->snipers=records.SniperDefinition_rows;
     bundle->marlins=records.MarlinDefinition_rows;
     bundle->pulsers=records.PulserDefinition_rows;
+    bundle->dolphins=records.DolphinDefinition_rows;
     bundle->contacts=records.ContactDefinition_rows;
     bundle->hostile_definitions=records.HostileDefinition_rows;
     bundle->beams=records.BeamDefinition_rows;
@@ -228,7 +229,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
         if (row.kind==1) {
@@ -312,6 +313,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{pulser->accel,pulser->keep,pulser->warn,pulser->arc,pulser->radius,pulser->speed,pulser->width,pulser->damage}) if (!std::isfinite(float(value))) return {};
             definition.pulser_definition=uint32_t(pulser-bundle->pulsers.begin()+1);definition.accel=pulser->accel;
         } else if (pulser!=bundle->pulsers.end()) return {};
+        const auto dolphin=std::find_if(bundle->dolphins.begin(),bundle->dolphins.end(),[&](const auto &p){return p.id==row.id;});
+        if (row.kind==18) {
+            if (dolphin==bundle->dolphins.end() || row.fire_interval<=0 || dolphin->warn<=0) return {};
+            for (double value:{dolphin->accel,dolphin->keep,dolphin->warn,dolphin->aim_turn,dolphin->arc,dolphin->radius,dolphin->speed,dolphin->width,dolphin->damage,dolphin->enemy_damage}) if (!std::isfinite(float(value))) return {};
+            definition.dolphin_definition=uint32_t(dolphin-bundle->dolphins.begin()+1);definition.accel=dolphin->accel;
+        } else if (dolphin!=bundle->dolphins.end()) return {};
         bundle->definitions.push_back(std::move(definition));
     }
     return bundle;
