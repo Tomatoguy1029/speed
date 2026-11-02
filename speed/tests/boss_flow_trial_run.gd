@@ -2,15 +2,19 @@
 extends SceneTree
 var failed := 0
 func _initialize() -> void:
-	if "--cpp-boss-tools-combo" in OS.get_cmdline_user_args(): call_deferred("native_combo")
+	if "--cpp-canis-tools-restore" in OS.get_cmdline_user_args(): call_deferred("native_canis_restore")
+	elif "--cpp-boss-tools-combo" in OS.get_cmdline_user_args(): call_deferred("native_combo")
 	else: call_deferred("native_tools")
 func native_check(ok: bool, label: String) -> void:
 	if "--cpp-boss-tools-tail" in OS.get_cmdline_user_args() and (label.ends_with("制作画面からC++ボスを配置する") or label.ends_with("本番のボス表示へ接続する")): return
 	if not ok: failed += 1; push_error(label)
 
 func native_tools() -> void:
-	for boss in ["monoceros","centaurus"]:
-		var selected := "kick" if boss == "monoceros" else "volley"
+	for boss in (["canis_major"] if "--cpp-canis-tools" in OS.get_cmdline_user_args() else ["monoceros","centaurus"]):
+		var selected := "kick" if boss == "monoceros" else "sirius_flame" if boss=="canis_major" else "volley"
+		if boss=="canis_major":
+			var compiled: Dictionary = load("res://tools/content/build_boss_program.gd").build_boss(boss,"res://.content/boss_%s.tres" % boss)
+			native_check(compiled.get("error",FAILED)==OK,"canis_major: 共通変換から制作プログラムを生成する")
 		var rules_path := "res://data/bosses/ai/%s_action_rules.tres" % boss
 		var source_hash := FileAccess.get_sha256(rules_path)
 		var trial = load("res://gyms/boss_flow_trial.tscn").instantiate()
@@ -28,6 +32,7 @@ func native_tools() -> void:
 			continue
 		trial.session.playing = false
 		var body: Dictionary = trial.manual.state()
+		var original_phase: int = trial.manual._saved.get("phase",body.phase)
 		native_check(trial.manual.requested==selected and body.busy and not body.selection,boss+": 選択技を単独再生する / "+trial.manual.message)
 		var presentation = trial.session.scene.view.get_node("RunPresentation")
 		for frame in 2: await process_frame
@@ -50,7 +55,7 @@ func native_tools() -> void:
 		for i in 30: trial.session.step()
 		running = trial.session.bridge.command("dev_boss_state").value
 		current = running.filter(func(item): return item.actor==trial.manual.entity_id and item.stage<5)[0]
-		native_check(trial.manual.state().phase==2 and is_equal_approx(current.windup_progress,current.elapsed/1.75),boss+": 形態と変更後の予告時間をC++へ渡す")
+		native_check(trial.manual.state().phase==2 and is_equal_approx(current.windup_progress,float(current.get("age",current.elapsed))/1.75),boss+": 形態と変更後の予告時間をC++へ渡す")
 		if boss=="monoceros": native_check(trial.manual.execute("horn_wave",2),"monoceros: 残留する角の衝撃波を再生する")
 		for i in 480:
 			trial.session.step()
@@ -62,7 +67,7 @@ func native_tools() -> void:
 		trial._return_to_ai()
 		attack = trial.session.bridge.read_lab().value
 		native_check(attack.hostiles.is_empty() and attack.hazards.is_empty() and not trial.manual.state().busy,boss+": 試行終了時に残留攻撃と技を片付ける")
-		native_check(trial.manual.state().phase==body.phase and trial.manual.state().selection,boss+": 形態と通常AIを復帰する")
+		native_check(trial.manual.state().phase==original_phase and trial.manual.state().selection,boss+": 形態と通常AIを復帰する")
 		var source: Resource = trial._source_move(boss,selected)
 		native_check(is_equal_approx(source.warn,original) and FileAccess.get_sha256(rules_path)==source_hash and not trial.session.spec.has("boss_programs"),boss+": 未保存値をSourceと通常ランへ漏らさない")
 		trial._revert_tuning()
@@ -113,3 +118,26 @@ func native_combo_check(trial) -> void:
 	for i in 600: trial.session.step()
 	var body: Dictionary = trial.manual.state()
 	native_check(body.flow_index==1 and not body.busy,"monoceros: 選んだコンボだけを最後まで実行する")
+
+## 第2形態だけの技でも、終了時には再生前の第1形態へ戻す。
+func native_canis_restore() -> void:
+	var trial = load("res://gyms/boss_flow_trial.tscn").instantiate()
+	trial.set_meta("preview_request",{"boss":"canis_major","technique":"sirius_flame"})
+	trial.set_meta("preview_program","res://.content/boss_canis_major.tres")
+	root.add_child(trial)
+	for frame in 300:
+		await process_frame
+		if trial.manual!=null and not trial._switching: break
+	if trial.manual==null:
+		push_error("形態の復帰確認を開始できません")
+		quit(1)
+		return
+	trial.session.playing = false
+	var before: Dictionary = trial.manual._saved.duplicate(true)
+	trial._return_to_ai()
+	var restored: Dictionary = trial.manual.state()
+	native_check(restored.phase==before.phase and restored.selection==before.selection,"canis_major: 再生前の形態と通常AIを復帰する")
+	trial.queue_free()
+	await process_frame
+	print("[cpp-canis-tools-restore] failures=",failed)
+	quit(1 if failed else 0)

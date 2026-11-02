@@ -2,7 +2,7 @@
 extends RefCounted
 
 const PROGRAM := preload("res://tools/content/build_boss_program.gd")
-const BOSSES: Array[StringName] = [&"monoceros", &"centaurus"]
+const BOSSES: Array[StringName] = [&"monoceros", &"centaurus", &"canis_major"]
 var session
 var boss := ""
 var entity_id := -1
@@ -46,6 +46,7 @@ func attack_playing() -> bool:
 func unavailable(id: String, phase: int) -> String:
 	if not has_body(): return "ボスが不在または決着中です。ボスを選び直してください。"
 	if phase < 1 or phase > 2: return "存在しない形態です。"
+	if boss=="canis_major" and id=="hunt_pounce" and phase!=1: return "この技は第1形態で再生してください。"
 	if not _moves.has(StringName(id)) and not action_rules.combos.has(id): return "未登録の技: " + id
 	return ""
 

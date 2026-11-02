@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 const PROGRAM := preload("res://scripts/data_types/boss_runtime_program.gd")
-const VERSION := 5
+const VERSION := 6
 static var generation_count := 0
 
 ## Resourceの実効値から実行キーを作る。保存済みAnimationの時刻は参照しない。

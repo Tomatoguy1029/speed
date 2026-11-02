@@ -2,6 +2,7 @@
 #include "../bosses/flow/phase_controller.h"
 #include "../bosses/flow/flow_runner.h"
 #include "../bosses/flow/technique_runner.h"
+#include "../bosses/canis_major/body.h"
 #include "../systems/attack_system.h"
 #include <algorithm>
 #include <cmath>
@@ -16,7 +17,7 @@ Dictionary SpeedRunCore::development_boss_trial_command(const Dictionary &p) {
     const auto actor=runtime.state.enemy_handles.at(found->second);auto *body=speed::PhaseController::find(runtime,actor);
     if (!body || body->mode>=speed::BossMode::Final) return reply(false);
     const auto boss=runtime.content->boss_bodies[body->definition-1].boss;
-    if (runtime.content->bosses[boss-1].kind>1) return reply(false);
+    if (runtime.content->bosses[boss-1].kind>2) return reply(false);
     const auto flow=std::find_if(runtime.state.bosses.flows.begin(),runtime.state.bosses.flows.end(),[&](const auto &f){return speed::same_handle(f.actor,actor);});
     if (flow==runtime.state.bosses.flows.end()) return reply(false);
     const String action=p["action"];
@@ -44,6 +45,7 @@ Dictionary SpeedRunCore::development_boss_trial_command(const Dictionary &p) {
     body->mode=speed::BossMode::Idle;body->phase=phase;body->phase_pending=false;body->phase_remaining=0;body->initial_wait=0;body->sweep_side=1;body->has_slash=false;
     body->centaurus.leaping=false;body->centaurus.path_hold=body->centaurus.turn_motion=0;body->centaurus.cooldowns.clear();body->centaurus.leap_ready_at=body->centaurus.retreat_ready_at=body->clock;
     auto &e=runtime.state.enemies[actor.slot];e.pos=origin;e.vel={};e.facing=0;e.charge=0;e.guard=guard;e.mode=EnemyMode::Move;
+    if (runtime.content->bosses[boss-1].kind==2) speed::CanisMajorBody::reset_trial(runtime,*body);
     runtime.state.ship.pos=runtime.state.ship_pos=target;runtime.state.ship.vel={};runtime.state.enemy_aim=target;runtime.state.view_center=target;runtime.state.steering_locked=p["steering_locked"];
     rebuild_enemy_grid(runtime.state.frame_grid_cell);return reply(true);
 }

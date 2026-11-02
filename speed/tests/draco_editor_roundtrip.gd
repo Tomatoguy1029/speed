@@ -48,7 +48,7 @@ func native_technique_roundtrip(parent: Node, boss: String) -> int:
 	var editor = load("res://tools/editor/boss_flow/editor.gd").new()
 	parent.add_child(editor)
 	editor.open_boss("res://data/bosses/ai/%s_action_rules.tres" % boss,"res://data/bosses/ai/%s_flow.tres" % boss)
-	var id := "kick" if boss=="monoceros" else "volley"
+	var id := "kick" if boss=="monoceros" else "sirius_flame" if boss=="canis_major" else "volley"
 	var source_path := "res://data/bosses/%s_moves/%s.tres" % [boss,id]
 	var source: Resource = ResourceLoader.load(source_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 	var path := "res://.content/dev/%s_tools_roundtrip.tres" % boss

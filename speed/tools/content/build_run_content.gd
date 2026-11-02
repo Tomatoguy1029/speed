@@ -338,7 +338,7 @@ static func canis_set_package(definition: BossDef, moves: Array, config: GameCon
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
-		seen[move.technique] = true
+		seen[move.technique] = move
 		var part := canis_technique_package(definition,move,config)
 		if part.is_empty(): return {}
 		sources.append({"move":String(move.technique),"package":part})
@@ -383,6 +383,9 @@ static func canis_set_package(definition: BossDef, moves: Array, config: GameCon
 				registered[key] = true
 				if not records.has(record.name): records[record.name] = []
 				var row := original.duplicate(true)
+				if record.name in ["CanisNovaDefinition","CanisBlazeDefinition"] and seen.has(&"bay"):
+					var steering: Dictionary = seen[&"bay"].values()
+					for field in ["arrive","decel","face_turn","turn_slow","turn_fast","turn_switch","accel"]: row[field] = float(steering[field])
 				row.id = records[record.name].size()+1
 				records[record.name].append(row)
 				for field: Dictionary in record.fields:

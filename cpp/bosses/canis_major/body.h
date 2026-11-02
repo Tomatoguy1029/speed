@@ -7,6 +7,7 @@ namespace speed {class CanisMajorBody {public:
     static void call_tick(RunRuntime &,BossBodyState &,double);
     static void lead(RunRuntime &,BossBodyState &,double);
     static void release(RunRuntime &,BossBodyState &);
+    static void reset_trial(RunRuntime &,BossBodyState &);
     static bool validate(const godot::RunState &,const ContentBundle &,const BossBodyState &);
     static godot::Color color(const RunRuntime &,EnemyHandle,godot::Color);
     static void snapshot(const RunRuntime &,const BossBodyState &,godot::Dictionary &);
