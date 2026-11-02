@@ -135,6 +135,67 @@
           "min": 1
         }
       ]
+    },
+    {
+      "name": "HydraRegrowDefinition",
+      "section": 371,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "regrow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "regrow_per_head",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "regrow_combo",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fire_regrow_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "chance_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "growth_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "growth_first",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "growth_second",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "debris_dmg",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

@@ -2063,6 +2063,10 @@
       {
         "name": "CanisCue",
         "value": "canis_cue"
+      },
+      {
+        "name": "HydraCue",
+        "value": "hydra_cue"
       }
     ],
     "ResultKind": [
@@ -2791,6 +2795,17 @@
       "position",
       "angle",
       "world_time"
+    ],
+    "hydra_cue": [
+      "id",
+      "cue",
+      "technique",
+      "neck",
+      "position",
+      "duration",
+      "damage",
+      "next_count",
+      "target"
     ]
   },
   "includes": [

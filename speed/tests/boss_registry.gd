@@ -8,6 +8,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-regrow-display" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_regrow_display")
+		return
+	if "--cpp-hydra-regrow" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_regrow")
+		return
 	if "--cpp-hydra-body" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_body")
 		return
@@ -2680,4 +2686,141 @@ func native_canis_bay() -> void:
 		gated.view.queue_free()
 	await get_tree().process_frame
 	print("[cpp_canis_bay] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func hydra_regrow_case() -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/hydra.tres").duplicate(true)
+	definition.speed = 0.0
+	definition.params.merge({"head_hp":10.0,"regrow":0.2,"regrow_per_head":0.1,"regrow_combo":0.25,"fire_regrow_scale":3.0,"chance_time":0.3,"growth_time":0.1,"debris_dmg":0.0},true)
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":371,"mode":1,"stage_id":"B_hydra_regrow","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"再生と成長の編集値を正式定義から生成する")
+	if not configured.ok: print(configured);return {}
+	bridge.start(371,{"position":Vector2(1600,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(1600,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1600,0),Vector2(1600,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	return {"bridge":bridge,"package":package,"cfg":cfg,"id":id}
+
+
+func native_hydra_regrow() -> void:
+	var c := hydra_regrow_case()
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var before: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var old_id: int = before.necks[0].id
+	bridge.command("dev_damage",{"entity_id":old_id,"amount":1000.0,"cause":"shot"})
+	bridge.command("dev_damage",{"entity_id":before.necks[1].id,"amount":1000.0,"cause":"fire"})
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	check(not body.necks[0].alive and not body.necks[1].alive and body.necks[1].burned,"死亡hookで炎の命中を行再利用前に確定する")
+	check(is_equal_approx(body.necks[0].regrow,0.4) and is_equal_approx(body.necks[1].regrow,0.6),"倒すたび全ての失った首へ猶予を延ばし炎の待ちも保つ")
+	check(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value.shapes.filter(func(shape): return shape.has("debris_style")).size()==16,"首ごとの破片を同じ更新で8個ずつ生成する")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"首死亡と再生待ち・炎・死亡/生存集合を保持する")
+	bridge._core.step(0.401)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[0].alive and body.necks[0].id!=old_id and not body.necks[1].alive,"再生で新IDを割り当て、炎の待ち中の首は復活させない")
+	var after := body.duplicate(true)
+	check(bridge.restore(held.value).ok,"首の再生前へ値型だけで戻す")
+	bridge._core.step(0.401)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"途中復帰後も同じ首・ID・時計・点列になる")
+	bridge.release_checkpoint(held.value)
+	bridge.dispose()
+	c = hydra_regrow_case();bridge = c.bridge
+	before = bridge.command("dev_boss_body_state").value[0]
+	for n: Dictionary in before.necks: bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.001)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(body.chance_left,0.3) and body.necks.all(func(n): return not n.alive),"全滅を先に確定し、同じ更新で再生しない")
+	bridge._core.step(0.2)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.all(func(n): return not n.alive) and is_equal_approx(body.necks[2].regrow,0.2),"露出中は首ごとの再生時計を進めない")
+	bridge._core.step(0.101)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.all(func(n): return n.alive) and body.chance_left==0.0,"露出が終わった更新で全首を生やす")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value) and view._boss_body_displays.values()[0].get_node("NeckArtwork").frame.necks.all(func(n): return n.alive),"再生した新しい首だけを正式素材へ読み取り専用で表示する")
+	view.queue_free();bridge.dispose()
+	c = hydra_regrow_case();bridge = c.bridge
+	var input: Dictionary = bridge.pack_intent(Intent.new())
+	input.press = true;input.touch = true;input.pen = Vector2(1600,0)
+	check(bridge._core.handle_draw(input,1000,1.0),"首の同一描線撃破を実入力で開始する")
+	input.press = false;input.has_cursor = true;input.pen = Vector2(2000,0);input.pen_release = true
+	check(bridge._core.handle_draw(input,1010,1.0),"同一の突進IDを確定する")
+	before = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":before.necks[0].id,"amount":1000.0,"cause":"ram"})
+	held = bridge.checkpoint()
+	bridge.command("dev_damage",{"entity_id":before.necks[1].id,"amount":1000.0,"cause":"ram"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(is_equal_approx(body.necks[1].regrow,0.375),"同じ線で倒した2首目へ連続撃破の再生猶予を掛ける")
+	after = body.duplicate(true)
+	check(bridge.restore(held.value).ok,"同じ突進の撃破本数を保持する")
+	bridge.command("dev_damage",{"entity_id":before.necks[1].id,"amount":1000.0,"cause":"ram"})
+	check(bridge.command("dev_boss_body_state").value[0]==after,"復帰後の連続撃破も同じ再生待ちになる")
+	bridge.release_checkpoint(held.value);bridge.dispose()
+	c = hydra_regrow_case();bridge = c.bridge
+	before = bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":before.max_hp*0.7,"cause":"shot"})
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.count==5 and is_equal_approx(body.growth_left,0.1) and body.necks.map(func(n): return n.kind)==["bite","vortex","debris","beam","thunder"],"本体のHP閾値で5首へ作り直す")
+	check(body.necks[0].id!=before.necks[0].id and body.necks.all(func(n): return n.alive),"成長前の行と世代を新しい首へ持ち越さない")
+	held = bridge.checkpoint()
+	check(held.ok,"成長の途中の5首と待ちを保持する")
+	bridge._core.step(0.101)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.count==8 and is_equal_approx(body.growth_left,0.1) and body.necks.map(func(n): return n.kind)==["bite","vortex","debris","beam","thunder","bite","beam","vortex"],"成長明けに低HPなら連続で8首へ進む")
+	after = body.duplicate(true)
+	check(bridge.restore(held.value).ok,"成長前の首と参加者を同じ旧世代へ戻す")
+	bridge._core.step(0.101)
+	check(bridge.command("dev_boss_body_state").value[0]==after,"再成長後も同じ乱数・ID・首の順になる")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.101)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.growth_left==0.0 and body.participants.size()==9,"最後の成長が終わると本体と8首の参加者を保つ")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	bridge._core.step(0.5)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.participants.all(func(p): return not p.active) and body.necks.all(func(n): return not n.alive) and not body.has("arena"),"中断で首・囲いを終え、再生させない")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_hydra_regrow] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 初回に準備を欠いた表示条件だけを確認する。
+
+func native_hydra_regrow_display() -> void:
+	var c := hydra_regrow_case()
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var old: int = body.necks[0].id
+	bridge.command("dev_damage",{"entity_id":old,"amount":1000.0,"cause":"shot"})
+	bridge._core.step(0.401)
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value) and view._flame!=null and view._spark!=null and view._boss_body_displays.values()[0].get_node("NeckArtwork").frame.necks[0].id!=old,"新しい首を必要な表示資源と一緒に正式素材へ渡す")
+	view.queue_free();bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_hydra_regrow_display] failures=",failed)
 	get_tree().quit(1 if failed else 0)

@@ -129,11 +129,12 @@ struct HydraNeckState {
     EnemyHandle actor;
     int64_t id=0;
     double base_angle=0,angle=0,length=0,head_hp=0,cd=0,aim_wait=0,aim_velocity=0;
-    bool has_aim=false;
+    bool has_aim=false,burned=false;
+    double regrow=0;
     godot::Vector2 aim_target;
     std::vector<godot::Vector2> points;
 };
-struct HydraBodyState {bool separation_pending=false;std::vector<HydraNeckState> necks;};
+struct HydraBodyState {bool separation_pending=false,separated=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
     HydraBodyState hydra;
     CanisBodyState canis;

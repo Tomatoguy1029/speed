@@ -129,7 +129,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_filters=records.BossFlowFilter_rows;
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
-    bundle->hydra_bodies=records.HydraBodyDefinition_rows;
+    bundle->hydra_bodies=records.HydraBodyDefinition_rows;bundle->hydra_regrow=records.HydraRegrowDefinition_rows;
     bundle->canis_bodies=records.CanisBodyDefinition_rows;
     bundle->canis_commands=records.CanisCommandDefinition_rows;
     bundle->canis_howls=records.CanisHowlDefinition_rows;
@@ -829,6 +829,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (body.id!=i+1 || body.phase_threshold<=0 || body.phase_threshold>=1 || body.final_widen_time<=0 || bundle->definitions[body.enemy-1].kind!=(boss.kind==0?EnemyDefinition::Kind::Monoceros:boss.kind==1?EnemyDefinition::Kind::Centaurus:boss.kind==2?EnemyDefinition::Kind::CanisMajor:EnemyDefinition::Kind::Hydra)) return {};
     }
     for (size_t i=0;i<bundle->hydra_bodies.size();++i) {const auto &p=bundle->hydra_bodies[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || p.neck_rest<=0 || p.head_hp<=0 || p.neck_segments<4 || p.neck_segments>32 || p.neck_iterations>12 || p.arena_x<=0 || p.arena_y<=0) return {};for (auto head:{p.bite,p.vortex,p.debris,p.beam,p.thunder}) if (bundle->definitions[head-1].kind!=EnemyDefinition::Kind::Part) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_bodies[j].boss==p.boss) return {};}
+    if (bundle->hydra_regrow.size()!=bundle->hydra_bodies.size()) return {};
+    for (size_t i=0;i<bundle->hydra_regrow.size();++i) {const auto &p=bundle->hydra_regrow[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=3 || p.growth_first>=1 || p.growth_first<=p.growth_second || p.growth_second<=0) return {};for (size_t j=0;j<i;++j) if (bundle->hydra_regrow[j].boss==p.boss) return {};}
+
     for (size_t i=0;i<bundle->canis_bodies.size();++i) {const auto &p=bundle->canis_bodies[i];if (p.id!=i+1 || bundle->bosses[p.boss-1].kind!=2 || bundle->definitions[p.hound-1].kind!=EnemyDefinition::Kind::Hound || p.lead_scan<=0) return {};}
     std::unordered_set<std::string> tuning_keys;
     for (const auto &row:records.EnemyTuningValue_rows) {

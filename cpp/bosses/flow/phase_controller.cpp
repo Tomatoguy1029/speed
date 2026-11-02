@@ -4,6 +4,7 @@
 #include "../centaurus/finish.h"
 #include "../canis_major/body.h"
 #include "../hydra/body.h"
+#include "../hydra/regrow.h"
 #include "../canis_major/flames.h"
 #include "../canis_major/hound_lunge.h"
 #include "../monoceros/horn_wave.h"
@@ -46,7 +47,7 @@ EnemyHandle PhaseController::spawn(RunRuntime &r,uint32_t definition,godot::Vect
     s.world.boss_spawned=true;godot::Dictionary e;e["pos"]=at;FrameBuilder::append(r,"boss_spawn",e);return actor;
 }
 void PhaseController::damaged(RunRuntime &r,EnemyHandle actor) {
-    auto *b=find(r,actor);if (!b || b->phase!=1) return;if (r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3) {if (r.state.enemies[actor.slot].hp<=0) b->hydra.separation_pending=true;return;}auto &e=r.state.enemies[actor.slot];const auto &p=r.content->boss_bodies[b->definition-1];
+    auto *b=find(r,actor);if (!b || b->phase!=1) return;if (r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3) {HydraRegrow::damaged(r,*b);if (r.state.enemies[actor.slot].hp<=0) b->hydra.separation_pending=true;return;}auto &e=r.state.enemies[actor.slot];const auto &p=r.content->boss_bodies[b->definition-1];
     if (e.hp/e.max_hp<=p.phase_threshold) {if (p.hp_floor_enabled) e.hp=e.max_hp*p.phase_threshold;b->phase_pending=true;}
 }
 bool PhaseController::can_defeat(RunRuntime &r,EnemyHandle actor) {auto *b=find(r,actor);if (b && r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3) {b->hydra.separation_pending=true;return false;}return !b || b->phase!=1 || !r.content->boss_bodies[b->definition-1].hp_floor_enabled;}

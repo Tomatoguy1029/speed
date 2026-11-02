@@ -425,6 +425,9 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 			if hydra.has(field.name): continue
 			hydra[field.name] = definition.params[field.name]
 		data.HydraBodyDefinition = [hydra]
+		var regrow := {"id":1,"boss":1,"growth_first":float(definition.params.growth_thresholds[0]),"growth_second":float(definition.params.growth_thresholds[1])}
+		for key in ["regrow","regrow_per_head","regrow_combo","fire_regrow_scale","chance_time","growth_time","debris_dmg"]: regrow[key] = float(definition.params[key])
+		data.HydraRegrowDefinition = [regrow]
 	if definition.id==&"centaurus":
 		var centaurus := {"id":1,"body":1,"guard":1}
 		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="CentaurusBodyDefinition")[0].fields:
