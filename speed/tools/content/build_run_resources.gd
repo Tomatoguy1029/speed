@@ -52,8 +52,12 @@ static func _folder(directory: String, hashes: Dictionary) -> bool:
 		if not name.begins_with(".") and not _folder(directory.path_join(name),hashes): return false
 	return true
 
+static func _runtime_resource(path: String) -> bool:
+	# 領域の編集元とimport設定は署名だけに使い、出撃では読み込まない。
+	return not path.ends_with(".regions.json") and not path.ends_with(".import") and ResourceLoader.exists(path)
+
 static func _ordered(path: String, seen: Dictionary, paths: PackedStringArray) -> void:
-	if seen.has(path) or not ResourceLoader.exists(path): return
+	if seen.has(path) or not _runtime_resource(path): return
 	seen[path] = true
 	for target in _dependencies(path): _ordered(target,seen,paths)
 	paths.append(path)
@@ -71,7 +75,7 @@ static func collect(startup: PackedStringArray, visuals: Array, catalog: Content
 		if not _visit(path,dependencies,{}): return {}
 		for key in dependencies:
 			hashes[key] = dependencies[key]
-			if ResourceLoader.exists(key): startup_paths[key] = true
+			if _runtime_resource(key): startup_paths[key] = true
 	var keys: Dictionary = previous_keys.duplicate()
 	var by_path := {}
 	for id: int in keys: by_path[keys[id]] = id
@@ -114,7 +118,7 @@ static func collect(startup: PackedStringArray, visuals: Array, catalog: Content
 		var dependencies := {}
 		if not _visit(path,dependencies,{}): return {}
 		for key in dependencies:
-			if ResourceLoader.exists(key): startup_paths[key] = true
+			if _runtime_resource(key): startup_paths[key] = true
 	var paths := PackedStringArray(startup_paths.keys())
 	paths.sort()
 	var order := PackedStringArray()

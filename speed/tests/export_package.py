@@ -68,7 +68,9 @@ def inspect(path: Path, runtime_package=False) -> dict:
             content = files[binary]
             assert content[24:56].hex() == index["input_sha256"] and content[56:88].hex() == index["payload_sha256"], "定義と索引のハッシュが一致する"
             assert hashlib.sha256(files[resources]).hexdigest() == index["resources_sha256"], "資源一覧と索引のハッシュが一致する"
-            for dependency in re.findall(r'"(res://[^"\n]+)"', files[resources].decode()):
+            # dependenciesは制作入力の署名表で、配布時には読み込まない。
+            resource_text = re.sub(r'(?ms)^dependencies = \{\n.*?^\}\n', '', files[resources].decode(), count=1)
+            for dependency in re.findall(r'"(res://[^"\n]+)"', resource_text):
                 name = dependency.replace("res://", "", 1)
                 assert name in files or name + ".remap" in files or name + ".import" in files, f"ランの配布依存から欠落: {dependency}"
     print(f"[export_package] {count} files, 5 stages, OK")
