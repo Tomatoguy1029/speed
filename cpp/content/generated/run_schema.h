@@ -1572,6 +1572,62 @@ inline bool read(BinaryReader &input, LoadoutAsset &out) {
     if (out.asset < 1) return false;
     return true;
 }
+struct PostMaxDefinition {
+    uint32_t id{};
+    std::string external_id{};
+    double increment{};
+    double minimum_ratio{};
+    double minimum_time{};
+    double maximum{};
+};
+inline bool read(BinaryReader &input, PostMaxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_f64(out.increment)) return false;
+    if (out.increment < 0) return false;
+    if (!input.read_f64(out.minimum_ratio)) return false;
+    if (out.minimum_ratio < 0) return false;
+    if (out.minimum_ratio > 1) return false;
+    if (!input.read_f64(out.minimum_time)) return false;
+    if (out.minimum_time < 0) return false;
+    if (!input.read_f64(out.maximum)) return false;
+    if (out.maximum < 0) return false;
+    return true;
+}
+struct PostMaxTarget {
+    uint32_t id{};
+    uint32_t equipment{};
+    uint32_t effect{};
+};
+inline bool read(BinaryReader &input, PostMaxTarget &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_u32(out.effect)) return false;
+    if (out.effect < 1) return false;
+    return true;
+}
+struct PostMaxInterval {
+    uint32_t id{};
+    uint32_t equipment{};
+    uint32_t level{};
+    std::string parameter{};
+    double base{};
+};
+inline bool read(BinaryReader &input, PostMaxInterval &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.equipment)) return false;
+    if (out.equipment < 1) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level < 1) return false;
+    if (!input.read_string(out.parameter)) return false;
+    if (!input.read_f64(out.base)) return false;
+    if (out.base < 0) return false;
+    return true;
+}
 struct HoundDefinition {
     uint32_t id{};
     uint32_t count{};
@@ -5164,6 +5220,9 @@ struct ContentRecords {
     std::vector<EncounterPhase> EncounterPhase_rows;
     std::vector<ProgressionDefinition> ProgressionDefinition_rows;
     std::vector<LoadoutAsset> LoadoutAsset_rows;
+    std::vector<PostMaxDefinition> PostMaxDefinition_rows;
+    std::vector<PostMaxTarget> PostMaxTarget_rows;
+    std::vector<PostMaxInterval> PostMaxInterval_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
     std::vector<ShieldDefinition> ShieldDefinition_rows;
     std::vector<GunnerDefinition> GunnerDefinition_rows;
@@ -5626,6 +5685,24 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/12) return false;
         for (uint32_t i=0; i<count; ++i) { LoadoutAsset row; if (!read(input,row)) return false; out.LoadoutAsset_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 400: {
+        if (version != 1) return false;
+        if (count > input.remaining()/40) return false;
+        for (uint32_t i=0; i<count; ++i) { PostMaxDefinition row; if (!read(input,row)) return false; out.PostMaxDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 401: {
+        if (version != 1) return false;
+        if (count > input.remaining()/12) return false;
+        for (uint32_t i=0; i<count; ++i) { PostMaxTarget row; if (!read(input,row)) return false; out.PostMaxTarget_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 402: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { PostMaxInterval row; if (!read(input,row)) return false; out.PostMaxInterval_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 19: {
@@ -6374,6 +6451,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.ProgressionDefinition_rows) if (!ProgressionDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> LoadoutAsset_ids;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutAsset_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PostMaxDefinition_ids;
+    for (const auto &row:data.PostMaxDefinition_rows) if (!PostMaxDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PostMaxTarget_ids;
+    for (const auto &row:data.PostMaxTarget_rows) if (!PostMaxTarget_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> PostMaxInterval_ids;
+    for (const auto &row:data.PostMaxInterval_rows) if (!PostMaxInterval_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HoundDefinition_ids;
     for (const auto &row:data.HoundDefinition_rows) if (!HoundDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ShieldDefinition_ids;
@@ -6638,6 +6721,9 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.EncounterRegion_rows) if (!EncounterPattern_ids.count(row.pattern)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.LoadoutAsset_rows) if (!ResourceKey_ids.count(row.asset)) return false;
+    for (const auto &row:data.PostMaxTarget_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
+    for (const auto &row:data.PostMaxTarget_rows) if (!PostMaxDefinition_ids.count(row.effect)) return false;
+    for (const auto &row:data.PostMaxInterval_rows) if (!LoadoutDefinition_ids.count(row.equipment)) return false;
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ShieldDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ShieldDefinition_rows) if (!HostileDefinition_ids.count(row.reflected)) return false;
@@ -6876,5 +6962,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=163;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=166;
 }
