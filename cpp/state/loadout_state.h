@@ -36,6 +36,21 @@ struct BarrierWeaponState {
     double durability=-1,restore=0,maximum=0,revive=0,radius=0,damage=0,shell_radius=0,knock=0;
     std::vector<BarrierWaveState> waves;
 };
+struct MineState {
+    godot::Vector2 pos,from,to;
+    uint64_t id=0;
+    double age=0,life=0,damage=0,radius=0;
+    bool detonate=false;
+};
+struct MineVisual {godot::Vector2 pos;double radius=0,age=0;uint64_t id=0;};
+struct MinesWeaponState {
+    bool ready=false,chain=false;
+    uint32_t definition=0,count=0,maximum=0;
+    uint64_t serial=0,next_visual=1;
+    double damage=0,radius=0,life=0,trigger=0,spread=0,range_min=0,range_max=0,duration_increment=0,knockback_increment=0,visual_life=0;
+    std::vector<MineState> items;
+    std::vector<MineVisual> visuals;
+};
 struct EndBlastPending {
     godot::Vector2 pos;
     double radius=0,damage=0,delay=0;
@@ -84,6 +99,7 @@ struct LoadoutState {
     RampageState rampage;
     DuplicatorState duplicator;
     double boost_distance=0,full_charge_maximum=1;
+    MinesWeaponState mines;
     EndBlastWeaponState end_blast;
     ScatterWeaponState scatter;
     RearWeaponState rear;

@@ -62,6 +62,9 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+var _mines_visual: RefCounted
+var _mines_world_time := -1.0
+var _mines_overlay: Sprite2D
 var _run_up_visual: RefCounted
 var _run_up_world_time := -1.0
 var _end_blast_visual: RefCounted
@@ -109,6 +112,12 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_barrier_armor.scale = Vector2.ONE*character_scale
 	_barrier_armor.hide()
 	_layer(18).add_child(_barrier_armor)
+	_mines_overlay = Sprite2D.new()
+	_mines_overlay.texture = _scope.resources.get("res://assets/pixel/airship_mine.png")
+	_mines_overlay.offset = Vector2(0.0,_mines_overlay.texture.get_height()*0.5-30.0) if _mines_overlay.texture!=null else Vector2.ZERO
+	_mines_overlay.scale = Vector2.ONE*character_scale
+	_mines_overlay.hide()
+	_layer(18).add_child(_mines_overlay)
 	_rear_canvas = DrawLayer.new()
 	_layer(18).add_child(_rear_canvas)
 	_rear_canvas.draw_fn = func(canvas: CanvasItem):
@@ -582,6 +591,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _run_up_visual!=null: _run_up_visual.dispose()
 		_run_up_visual = null
 		_run_up_world_time = -1.0
+		if _mines_visual!=null: _mines_visual.dispose()
+		_mines_visual = null
+		_mines_world_time = -1.0
 		_particles.clear()
 		_rings.clear()
 		_debris_trails.clear()
@@ -658,6 +670,19 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rampage_visual.dispose()
 		_rampage_visual = null
 		_rampage_world_time = -1.0
+	var equipped_mines: bool = frame.ui.get("mines",{}).get("ready",false)
+	if equipped_mines and _mines_visual==null:
+		_mines_visual = preload("res://scripts/render/equipment/mines.gd").new()
+		_mines_visual.setup_frame(_layer(18),_pixel)
+	if not equipped_mines and _mines_visual!=null:
+		_mines_visual.dispose()
+		_mines_visual = null
+		_mines_world_time = -1.0
+	_mines_overlay.visible = equipped_mines and _ship_visible
+	_mines_overlay.position = _ship_visual_position
+	_mines_overlay.rotation = frame.ui.ship.ship_heading.angle()+PI/2.0
+	_mines_overlay.modulate = _barrier_armor.modulate
+	_mines_overlay.get_parent().move_child(_mines_overlay,-1)
 	var equipped_run_up: bool = frame.ui.get("run_up",{}).get("ready",false)
 	if equipped_run_up and _run_up_visual==null:
 		_run_up_visual = preload("res://scripts/render/equipment/runUp.gd").new()
@@ -744,7 +769,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 				var layers: Dictionary = library.get_meta("looks",{}).get(event.get("scene",""),{})
 				var phase: String = event.phase
 				_attack_ends.append({"mesh":layers.get(phase),"sprites":layers.get(phase+"_sprites",[]),"pos":event.pos,"duration":event.get("duration",0.25 if phase=="Hit" else 0.2),"age":0.0,"tint":event.get("tint",Color.WHITE)})
-		if event.type==&"explode" and event.get("cause",&"") not in [&"endBlast",&"runUp"]:
+		if event.type==&"explode" and event.get("cause",&"") not in [&"endBlast",&"runUp",&"mine"]:
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":event.life,"max":event.life})
 			if event.radius>=150.0 and pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.4)
 		if event.type==&"debris_trail" and event.get("life",0.0)>0.0:
@@ -832,6 +857,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	var mines_dt: float = 0.0 if _mines_world_time<0.0 else maxf(0.0,ui.world_time-_mines_world_time)
+	_mines_world_time = ui.world_time if equipped_mines else -1.0
+	if _mines_visual!=null:
+		_mines_visual.frame_tick(mines_dt,ui.mines.items,ui.world_time)
+		_mines_visual.sync_frame(ui.mines.visuals)
 	var run_up_dt: float = 0.0 if _run_up_world_time<0.0 else maxf(0.0,ui.world_time-_run_up_world_time)
 	_run_up_world_time = ui.world_time if equipped_run_up else -1.0
 	if _run_up_visual!=null:

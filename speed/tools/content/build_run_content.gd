@@ -257,6 +257,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.LoadoutDefinition.append({"id":end_blast_id,"kind":0,"maximum_level":end_blast.level_steps.size(),"external_id":"W29","comet_only":false})
 	for level in end_blast.level_steps.size():
 		data.EndBlastDefinition.append({"id":level+1,"weapon":end_blast_id,"level":level+1,"radius":float(end_blast.params.radius_by_level[level]),"damage":float(end_blast.params.damage_by_level[level]),"secondary":int(end_blast.params.secondary_by_level[level]),"secondary_radius":float(end_blast.params.secondary_radius),"secondary_damage":float(end_blast.params.secondary_damage),"secondary_delay":float(end_blast.params.secondary_delay),"secondary_step":float(end_blast.params.secondary_step),"knock":float(end_blast.params.knock)})
+	var mines := load("res://data/weapons/W07_mines.tres") as WeaponDef
+	if mines==null or config.post_max==null: return {}
+	var mines_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":mines_id,"kind":0,"maximum_level":mines.level_steps.size(),"external_id":"W07","comet_only":false})
+	var mines_target: Dictionary = config.post_max.target(mines.id)
+	var mine_profile: Dictionary = preload("res://scripts/render/fx/burst_runtime.gd").profile("weapon/mines")
+	for level in mines.level_steps.size():
+		data.MinesDefinition.append({"id":level+1,"weapon":mines_id,"level":level+1,"count":int(mines.params.count_by_level[level]),"damage":float(mines.params.damage_by_level[level]),"radius":float(mines.params.radius_by_level[level]),"life":float(mines.params.life_by_level[level]),"maximum":int(mines.params.max),"trigger":float(mines.params.trigger),"spread":float(mines.params.spread),"range_min":float(mines.params.range_min),"range_max":float(mines.params.range_max),"duration_increment":float(config.post_max.increments.get("duration",0.0)) if "life_by_level" in mines_target.get("duration",[]) else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if mines_target.has("knockback") else 0.0,"visual_life":maxf(float(mine_profile.life),0.4)*float(mine_profile.time_scale)})
 	if config.post_max==null: return {}
 	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
 	var crit_definition := load("res://data/traits/T09_critRate.tres") as TraitDef
@@ -272,6 +280,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.RearPostDefinition = [{"id":1,"interval_increment":float(config.post_max.increments.get("weapon_interval",0.0)) if rear_target.has("interval") else 0.0,"projectile_increment":float(config.post_max.increments.get("projectile_speed",0.0)) if rear_target.has("projectile") else 0.0,"duration_increment":float(config.post_max.increments.get("duration",0.0)) if "life" in rear_target.get("duration",[]) else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if rear_target.has("knockback") else 0.0,"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_interval":config.post_max.minimum_interval}]
 	data.PostMaxWeaponPowerDefinition.append({"id":4,"equipment":barrier_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(barrier.id).has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":5,"equipment":end_blast_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if config.post_max.target(end_blast.id).has("followup") else 0.0})
+	data.PostMaxWeaponPowerDefinition.append({"id":6,"equipment":mines_id,"damage_increment":float(config.post_max.increments.get("weapon_damage",0.0)),"followup_increment":float(config.post_max.increments.get("followup",0.0)) if mines_target.has("followup") else 0.0})
+	var mines_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W07")
+	if mines_entry==null: return {}
+	for path in mines_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":mines_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":mines_id,"asset":key})
 	var end_blast_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W29")
 	if end_blast_entry==null: return {}
 	for path in end_blast_entry.resources:
@@ -551,6 +567,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.ScatterPostDefinition = resolved.ScatterPostDefinition
 			data.RearDefinition = resolved.RearDefinition
 			data.RearPostDefinition = resolved.RearPostDefinition
+			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
 			data.BarrierDefinition = resolved.BarrierDefinition
 			data.BarrierPostDefinition = resolved.BarrierPostDefinition
@@ -651,7 +668,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():
 		if not metadata.biter_parts.is_empty() and not paths.has(metadata.biter_parts): paths.append(metadata.biter_parts)
-	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png","res://assets/pixel/airship_armor.png"]:
+	for asset in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]:
 		if not paths.has(asset): paths.append(asset)
 	for placement: BackgroundPlacement in stage.backgrounds:
 		for asset: String in [placement.texture_path,placement.fire_preset_path]:

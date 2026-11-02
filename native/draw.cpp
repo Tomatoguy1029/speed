@@ -4,6 +4,7 @@
 #include "../cpp/behaviors/traits/rampage.h"
 #include "../cpp/behaviors/traits/runUp.h"
 #include "../cpp/behaviors/weapons/endBlast.h"
+#include "../cpp/behaviors/weapons/mines.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -149,7 +150,11 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
 
 void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
-    speed::EndBlastBehavior::end(runtime);
+    for (const auto &owned:runtime.state.loadout.weapons) {
+        const auto &id=runtime.content->equipment[owned.definition-1].external_id;
+        if (id=="W29") speed::EndBlastBehavior::end(runtime);
+        else if (id=="W07") speed::MinesBehavior::end(runtime);
+    }
     speed::RampageBehavior::end(runtime);
     speed::FullChargeBehavior::end(runtime);
     const double speed = std::max(double(runtime.state.ship.vel.length()), runtime.state.draw.before_speed);

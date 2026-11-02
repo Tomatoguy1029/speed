@@ -4,6 +4,7 @@
 #include "../behaviors/weapons/rear.h"
 #include "../behaviors/weapons/barrier.h"
 #include "../behaviors/weapons/endBlast.h"
+#include "../behaviors/weapons/mines.h"
 #include "../behaviors/traits/rampage.h"
 #include "../behaviors/traits/fullBurst.h"
 #include "../systems/attacks/light_lances.h"
@@ -84,6 +85,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
                 if (id=="W01") core.step_forward(world_dt);
                 else if (id=="W05") BarrierBehavior::step(core.runtime,world_dt);
                 else if (id=="W23") RearBehavior::step(core.runtime,world_dt);
+                else if (id=="W07") MinesBehavior::step(core.runtime,world_dt);
                 else if (id=="W29") EndBlastBehavior::step(core.runtime,world_dt);
                 else if (id=="W02") ScatterBehavior::step(core.runtime,world_dt);
                 if (state.phase!=Phase::Play) break;

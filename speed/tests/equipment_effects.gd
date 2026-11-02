@@ -66,6 +66,12 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w07" in OS.get_cmdline_user_args() or "--cpp-w07-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_w07()
+		print("[cpp_w07] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t32" in OS.get_cmdline_user_args():
 		await check_cpp_t32()
 		print("[cpp_t32] failed=%d" % failures)
@@ -2248,3 +2254,127 @@ func check_cpp_t32() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"助走の状態と表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_w07() -> void:
+	var retry: bool = "--cpp-w07-fixes" in OS.get_cmdline_user_args()
+	var capture := ErrorCapture.new()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.xp_base = 100000.0
+	var session = await trait_test_session("W07",config,607)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("w07",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W07")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(4 if retry else 1,definition.level_steps.size()+1):
+		var should_check: bool = not retry or level>4
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		var granted: Dictionary = bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W07","levels":level})
+		if should_check: check(granted.ok,"機雷を全段取得する")
+		bridge.command("dev_post_scatter",{"interval":0,"projectile":0,"duration":2,"knockback":2})
+		bridge.command("dev_post_weapon_power",{"damage":2,"followup":1})
+		trait_start_trace(bridge,120.0)
+		for tick in 70:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not bridge._ui.draw.tracing: break
+		print("[W07確認Lv] %d" % level)
+		var items: Array = bridge._ui.mines.items.duplicate(true)
+		if should_check: check(items.size()==definition.params.count_by_level[level-1],"各段の数だけ終端に機雷を置く")
+		for mine: Dictionary in items:
+			var delta: Vector2 = mine.to-mine.from
+			if should_check: check(delta.length()>=definition.params.range_min-0.001 and delta.length()<=definition.params.range_max+0.001 and absf(delta.angle())<=deg_to_rad(definition.params.spread)+0.0001,"共通乱数で最後の区間を向いた扇形へ飛ばす")
+			var ease: float = 1.0-pow(1.0-minf(1.0,mine.age/0.14),3.0)
+			if should_check: check(mine.pos.distance_to(mine.from.lerp(mine.to,ease))<0.001 and mine.age<0.14,"起動前の飛び出しを3乗曲線で進める")
+			if should_check: check(is_equal_approx(mine.life+mine.age,definition.params.life_by_level[level-1]*(1.0+2.0*config.post_max.increments.duration)) and is_equal_approx(mine.damage,config.base_attack*(1.0+2.0*config.post_max.increments.weapon_damage+config.post_max.increments.followup)*definition.params.damage_by_level[level-1]),"寿命・威力・追撃の最大段後補正を生成時に固定する")
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._mines_visual!=null and presentation.frame_view._mines_overlay.visible and presentation.frame_view._mines_overlay.texture!=null,"飛び出す機雷と機体の装備を本番表示へ渡す")
+		var saved: Dictionary = bridge.checkpoint()
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(bridge._ui.mines.items==items,"停止中は起動待ちと寿命を進めない")
+		bridge.command("pause",{"paused":false})
+		for tick in 20: bridge.step(1.0/120.0,idle,viewport)
+		var armed: Array = bridge._ui.mines.items.duplicate(true)
+		if should_check: check(armed.size()==items.size() and armed.all(func(item): return item.age>=0.14 and item.pos==item.to),"0.14秒で着地し敵がいなければ爆発せず待つ")
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		for tick in 20: bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(bridge._ui.mines.items==armed,"復帰後も飛行・起動・残り寿命を再現する")
+		var trigger_at: Vector2 = armed[0].pos
+		var far := 0.0
+		for item: Dictionary in armed:
+			var d: float = item.pos.distance_to(core.ship_snapshot().ship_pos)
+			if d>far:
+				far = d
+				trigger_at = item.pos
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":trigger_at}).value
+		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+		var queue: Array[int] = []
+		var queued := {}
+		for k in armed.size():
+			if armed[k].pos.distance_to(trigger_at)<=definition.params.trigger+float(core.enemies_snapshot().filter(func(item): return item.id==enemy)[0].radius):
+				queue.append(k)
+				queued[k] = true
+		var index := 0
+		while index<queue.size():
+			var k: int = queue[index]
+			index += 1
+			if level<3: continue
+			for other in armed.size():
+				if not queued.has(other) and armed[other].pos.distance_to(armed[k].pos)<=armed[k].radius:
+					queued[other] = true
+					queue.append(other)
+		events.clear()
+		bridge.step(1.0/120.0,idle,viewport)
+		var explosions: Array = events.filter(func(event): return event.type==&"explode" and event.payload.cause==&"mine")
+		if should_check: check(explosions.size()==queue.size(),"接近した機雷とLv3以降の誘爆を待ち列で一度ずつ処理する")
+		for k in mini(queue.size(),explosions.size()): check(explosions[k].payload.pos==armed[queue[k]].pos,"誘爆の発動順を元の並びに保つ")
+		if should_check: check(bridge._ui.kills>=1 and bridge._ui.mines.items.size()==armed.size()-queue.size(),"実際に命中して撃破し爆発済みの機雷を除く")
+		presentation._present_cpp(0.01)
+		if should_check: check(not presentation.frame_view._mines_visual.booms.is_empty(),"起爆を制作済みの炎と白い破片へ渡す")
+		var exploded: Dictionary = bridge.checkpoint()
+		bridge.restore(exploded.value)
+		bridge.collect_frame()
+		presentation._present_cpp(0.01)
+		if should_check: check(not presentation.frame_view._mines_visual.booms.is_empty(),"起爆後の残留表示を値型復帰から作り直す")
+		bridge.command("dev_remove_weapon",{"id":"W07"})
+		presentation._present_cpp(0.01)
+		if should_check: check(not bridge._ui.mines.ready and bridge._ui.mines.items.is_empty() and presentation.frame_view._mines_visual==null and not presentation.frame_view._mines_overlay.visible,"途中解除で残る機雷と装備表示を片付ける")
+		bridge.release_checkpoint(exploded.value)
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W07","levels":5})
+	for volley in 4:
+		trait_start_trace(bridge,16.0)
+		for tick in 23: bridge.step(1.0/120.0,idle,viewport)
+	var capped: Array = bridge._ui.mines.items
+	check(capped.size()==definition.params.max and capped.front().id==37 and capped.back().id==96,"上限を超えた古い機雷だけを消して連番を保つ")
+	events.clear()
+	for tick in 800: bridge.step(1.0/120.0,idle,viewport)
+	presentation._present_cpp(0.01)
+	check(bridge._ui.mines.items.is_empty() and events.all(func(event): return event.type!=&"explode" or event.payload.cause!=&"mine"),"寿命切れの機雷は爆発せず自然消滅する")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W07","levels":1})
+	await trait_select_upgrade(session,"W07",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"機雷の状態と表示に実行エラーがない: %s" % [capture.messages()])

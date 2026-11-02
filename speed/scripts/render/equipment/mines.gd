@@ -7,6 +7,36 @@ const TUNED_SHADERS := [preload("res://shaders/mine_burst.gdshader")]
 const EFFECT_KEY := "weapon/mines"
 const BURST_RUNTIME := preload("res://scripts/render/fx/burst_runtime.gd")
 var booms: Array[Dictionary] = []
+var _frame_parent: Node2D
+var _frame_seen := {}
+
+func _effect_key() -> String: return EFFECT_KEY
+
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_frame_parent = parent
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+
+func blasts(shader: Shader = null) -> BlastBursts:
+	if rm!=null: return super.blasts(shader)
+	if _blasts==null:
+		_blasts = BlastBursts.new()
+		_blasts.shader = shader
+		_blasts.setup(_painter.px)
+		_blasts.key = EFFECT_KEY
+		_frame_parent.add_child(_blasts)
+	return _blasts
+
+func sync_frame(values: Array) -> void:
+	var alive := {}
+	for value: Dictionary in values:
+		alive[value.id] = true
+		if _frame_seen.has(value.id): continue
+		on_event({"type":&"explode","cause":&"mine","pos":value.pos,"radius":value.radius})
+		booms[-1].age = value.age
+		_blasts._items[-1].age = value.age
+	_frame_seen = alive
 
 func setup(render: RunPresentation, owner_behavior) -> void:
 	super(render, owner_behavior)
@@ -18,7 +48,7 @@ func claims(ev: Dictionary) -> bool:
 
 func on_event(ev: Dictionary) -> void:
 	if not claims(ev): return
-	var px := painter().px
+	var px: float = (_painter if rm==null else painter()).px
 	# 試作は踏まれた範囲 28 ドットに半径 23 の炎
 	blasts(TUNED_SHADERS[0]).add(ev.pos, blast_radius(ev.radius, px))
 	var debris := explosion_debris()
@@ -26,14 +56,16 @@ func on_event(ev: Dictionary) -> void:
 	if booms.size() > 96: booms.pop_front()
 
 func tick(_dt: float) -> void:
-	var dt := world_dt()
+	frame_tick(world_dt(),behavior.mines,state.world_time)
+
+func frame_tick(dt: float, mines: Array, clock: float) -> void:
 	var fixed := BURST_RUNTIME.profile(EFFECT_KEY)
 	var time_scale := float(fixed.time_scale) if not fixed.is_empty() else ShaderTuning.burst_time_scale(EFFECT_KEY)
 	var energy := float(fixed.glow_energy) if not fixed.is_empty() else visual_number("glow_energy", 1.0)
-	var p := painter()
+	var p: PixelPainter = _painter if rm==null else painter()
 	p.begin()
-	var t := state.world_time
-	for mine in behavior.mines:
+	var t := clock
+	for mine in mines:
 		var age: float = mine.age
 		var pos: Vector2 = mine.pos
 		if age < 0.3: _trail(p, mine, t)

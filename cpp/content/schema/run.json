@@ -1326,6 +1326,10 @@
       {
         "name": "RunUp",
         "value": "runUp"
+      },
+      {
+        "name": "Mine",
+        "value": "mine"
       }
     ],
     "VisualRole": [
