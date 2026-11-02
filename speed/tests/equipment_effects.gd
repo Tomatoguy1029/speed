@@ -66,6 +66,13 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t08" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_t08()
+		check(finished,"大容量チャージの確認を最後まで実施する")
+		print("[cpp_t08] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t07-view" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_t07_view()
 		check(finished,"急速充填の表示と下限を最後まで確認する")
@@ -497,4 +504,58 @@ func check_cpp_t07_view() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"急速充填の状態・HUDに実行エラーがない: %s" % [capture.messages()])
+	return true
+
+func check_cpp_t08() -> bool:
+	OS.add_logger(capture)
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: TraitDef = load("res://data/traits/T08_capacity.tres")
+	var bridge = t07_bridge(config,{})
+	if bridge==null: return false
+	var core = bridge._core
+	check(bridge._ui.capacity==1.0,"取得前は容量1で始まる")
+	# 元からあるゲージの割合を、容量の変更で勝手に入れ替えない。
+	var start := Vector2(-3000,0)
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
+	core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0)
+	core.step_draw(10.0)
+	var gauge: float = core.draw_snapshot().gauge
+	check(gauge<1.0,"実際の描線でゲージを消費しておく")
+	for level in range(1,config.trait_max_stacks+1):
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T08","levels":1}).ok,"T08を共通の取得入口で重ねる")
+		check(is_equal_approx(bridge._ui.capacity,1.0+definition.stack_bonus(level)) and core.draw_snapshot().gauge==gauge,"tresの各段を一度反映し、充填の割合を保つ")
+	var capacity: float = bridge._ui.capacity
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T08","levels":1}).ok and bridge._ui.capacity==capacity,"上限を越えて容量を増やさない")
+	var saved: Dictionary = bridge.checkpoint()
+	bridge.command("dev_post_charge",{"stacks":10000})
+	check(bridge._ui.capacity==capacity,"最大段後の充填短縮を容量の増分へ混ぜない")
+	var position: Vector2 = core.ship_snapshot().ship_pos
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":position},200,1.0)
+	var draw: Dictionary = core.draw_snapshot()
+	check(is_equal_approx(draw.draw_gauge,gauge*capacity) and is_equal_approx(draw.draw_limit,config.draw_length*gauge*capacity),"利用側は容量を含む実充填量から描ける長さを求める")
+	core.handle_draw({"touch":true,"pen_release":true},210,1.0)
+	var charge: float = bridge._ui.charge_time
+	core.step_draw(0.01)
+	check(is_equal_approx(core.draw_snapshot().gauge,minf(1.0,gauge+0.01/(charge*capacity))),"再充填は実充填量で1単位分の速さを保つ")
+	var retained: float = core.draw_snapshot().gauge
+	check(bridge.command("dev_remove_trait",{"id":"T08"}).ok and bridge._ui.capacity==1.0 and core.draw_snapshot().gauge==retained,"解除で容量だけを戻し、ゲージの割合を保つ")
+	check(bridge.restore(saved.value).ok,"取得段と容量とゲージを保持して復帰する")
+	bridge.collect_frame()
+	check(bridge._ui.capacity==capacity and core.draw_snapshot().gauge==gauge,"復帰後も容量と充填量が対応する")
+	bridge.release_checkpoint(saved.value)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(640,480)
+	add_child(hud)
+	bridge.collect_frame()
+	for _frame in range(3): await get_tree().process_frame
+	check(hud._cpp_ui.capacity==capacity and is_equal_approx(hud._ring_amount,gauge*capacity),"HUDは容量と実充填量から追加のリングを描く")
+	check(hud._lap_filled(0.99,1.01,capacity) and not hud._lap_filled(1.5,1.9,capacity),"容量の途中の1周だけでも満充填の境界を判定する")
+	hud.free()
+	bridge.dispose()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"大容量チャージの状態・表示に実行エラーがない: %s" % [capture.messages()])
 	return true

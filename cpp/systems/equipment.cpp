@@ -4,12 +4,13 @@
 namespace speed {
 void EquipmentSystem::refresh_effects(RunRuntime &run) {
     auto &effects=run.state.loadout.effects;
-    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0;
+    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0;
     for (const auto &owned:run.state.loadout.traits) {
         for (const auto &level:run.content->numeric_traits) if (level.equipment==owned.definition && level.level==owned.level) {
-            effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;
+            effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;capacity_bonus+=level.capacity_bonus;
         }
     }
+    run.state.draw_config.capacity=1.0+capacity_bonus;
     const auto &p=run.state.loadout;const auto &post=run.content->post_charge;
     const double base=run.content->config.draw_config_charge_time*p.charge_profile_factor/(1.0+charge_bonus);
     const double floor=std::min(base,std::max(post.minimum_time,base*post.minimum_ratio));

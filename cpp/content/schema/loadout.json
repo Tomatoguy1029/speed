@@ -39,9 +39,14 @@
           "name": "charge_bonus",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "capacity_bonus",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 2
+      "version": 3
     },
     {
       "name": "PostMaxChargeDefinition",
