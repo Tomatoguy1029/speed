@@ -1,4 +1,5 @@
 ## 戦闘の判定・威力から独立した表示用の上書き値。
+@tool
 extends Resource
 
 @export var profiles: Dictionary = {}

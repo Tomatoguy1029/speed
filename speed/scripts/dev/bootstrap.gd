@@ -82,6 +82,7 @@ func _consume_launch_request() -> bool:
 	GameManager.reset_to_main_menu()
 	GameManager.run_start_time = StageLaunchRequest.start_time
 	GameManager.run_start_source = StageLaunchRequest.source
+	GameManager.run_start_content = StageLaunchRequest.content.duplicate(true)
 	GameManager.start_run(stage)
 	return true
 

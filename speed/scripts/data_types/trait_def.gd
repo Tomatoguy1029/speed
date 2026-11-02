@@ -4,6 +4,7 @@
 ## ---
 ## 値の正は res://data/traits/*.tres（一覧 docs/game/catalog/traits.md）。発動する特性の処理は res://scripts/traits/<内部 ID>.gd、
 ## 能力値を変える特性は LoadoutSystem.refresh_stats() が stack_bonus() と max を読む。
+@tool
 class_name TraitDef
 extends Resource
 

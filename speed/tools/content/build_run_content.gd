@@ -1,4 +1,5 @@
 ## Resourceの実効値を解決し、共通スキーマの書込へ渡す。
+@tool
 extends RefCounted
 const Schema = preload("res://tools/content/generated/run_schema.gd")
 const Wave = preload("res://scripts/attacks/wave.gd")
@@ -6,6 +7,29 @@ const Slash = preload("res://scripts/attacks/slash.gd")
 const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 const BossProgram = preload("res://tools/content/build_boss_program.gd")
+
+## エディターの生成では実行中のAutoloadを使わず、保存済み制作資源を読む。
+## ライブ編集は従来どおり、実行中の定義と索引を使う。
+static func _catalog() -> ContentCatalog:
+	return load("res://data/content_catalog.tres") as ContentCatalog if Engine.is_editor_hint() else ContentManager.catalog
+
+static func _definition(category: StringName, id: StringName) -> Resource:
+	if not Engine.is_editor_hint(): return ContentManager.definition(category,id)
+	var entry := _catalog().find(category,id)
+	return load(entry.path) if entry!=null else null
+
+static func _definitions(category: StringName) -> Dictionary:
+	if Engine.is_editor_hint(): return _catalog().table(category)
+	return ContentManager.enemies if category==&"enemies" else ContentManager.bosses
+
+static func _heroes() -> Array:
+	if not Engine.is_editor_hint(): return ContentManager.heroes.values()
+	var result := []
+	for id in _catalog().table(&"heroes"): result.append(_definition(&"heroes",id))
+	return result
+
+static func _visual_index() -> StageResources:
+	return load("res://.content/visual_index.tres") as StageResources if Engine.is_editor_hint() else ContentManager.visual_index
 
 ## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
 static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
@@ -168,10 +192,10 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 		if move.technique in [&"shower_chase",&"shower_wall",&"shower_path"]:
 			visual.visual_profile_key = "boss/move/centaurus/"+str(move.technique)
 			visual.visual_profile_fallback = "res://scenes/attacks/light_arrow.tscn"
-		visual._apply_effect_settings()
+		var visual_tint := AttackVisual.apply_effect_settings_to(visual)
 		var style := {"id":1,"cosmic":move.technique==&"power_shot","contact":1,"flight_scale":visual.flight_scale}
 		for key in ["shot_length_scale","shot_width_scale","core_width","cosmic_speed","cosmic_star_count"]: style[key] = visual.get(key)
-		for color_pair in [["arrow",visual.get("arrow_color")],["cosmic_a",visual.get("cosmic_color_a")],["cosmic_b",visual.get("cosmic_color_b")],["tint",visual.effect_tint]]:
+		for color_pair in [["arrow",visual.get("arrow_color")],["cosmic_a",visual.get("cosmic_color_a")],["cosmic_b",visual.get("cosmic_color_b")],["tint",visual_tint]]:
 			for channel in ["r","g","b","a"]: style[color_pair[0]+"_"+channel] = color_pair[1][channel]
 		visual.free()
 		records.LightArrowDefinition = [style]
@@ -792,7 +816,7 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 	for key in ["replay_window","slow_time","zoom","blast_time","relic_appear_time","relic_hold_time","relic_collect_time","clear_time"]: finish[key] = config.get("boss_finish_"+key)
 	package.records.BossFinishDefinition = [finish]
 	if stage!=null and not stage.legendary_module_id.is_empty():
-		var definition_resource = ContentManager.definition(&"legendary_modules",stage.legendary_module_id)
+		var definition_resource = _definition(&"legendary_modules",stage.legendary_module_id)
 		if definition_resource==null: return {}
 		for value in [{"path":"res://scenes/run/legendary_reveal.tscn","purpose":"reveal"},{"path":definition_resource.resource_path,"purpose":"legendary"}]:
 			var key: int = package.records.ResourceKey.size()+1
@@ -908,7 +932,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var data := {}
 	for record in Schema.SCHEMA.records: data[record.name] = []
 	data.HeroConfig = [{"id":1,"scale":config.hero_scale,"glow_range":config.hero_glow_range,"guard_range":config.hero_guard_range,"star_radius":config.hero_star_radius,"next_time":config.hero_next_time,"spacing":config.landmark_spacing,"first_min":config.landmark_first_window.x,"first_max":config.landmark_first_window.y,"second_min":config.landmark_second_window.x,"second_max":config.landmark_second_window.y,"guards":config.hero_guards}]
-	for definition_hero: HeroDef in ContentManager.heroes.values():
+	for definition_hero: HeroDef in _heroes():
 		var hero_id: int = data.HeroDefinition.size()+1
 		data.HeroDefinition.append({"id":hero_id,"external_id":String(definition_hero.id),"stage":definition_hero.stage,"cooldown":definition_hero.cooldown,"duration":definition_hero.duration})
 		if definition_hero.id==&"hercules":
@@ -950,16 +974,15 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		for sample in points.size():
 			data.SlashDefinition.append({"id":data.SlashDefinition.size()+1,"claw":claw,"sample":sample,"x":points[sample].x,"y":points[sample].y,"thickness":Slash.SLASH_THICK,"contact":7})
 	var bolt_visual: AttackVisual = load("res://scenes/attacks/bolt.tscn").instantiate()
-	bolt_visual._apply_effect_settings()
-	var bolt_tint: Color = bolt_visual.effect_tint
+	var bolt_tint := AttackVisual.apply_effect_settings_to(bolt_visual)
 	data.BoltDefinition = [{"id":1,"radius":7.0,"life":4.0,"flight_scale":bolt_visual.flight_scale,"tint_r":bolt_tint.r,"tint_g":bolt_tint.g,"tint_b":bolt_tint.b,"tint_a":bolt_tint.a,"contact":1}]
 	bolt_visual.free()
 	for cosmic in [false,true]:
 		var arrow: AttackVisual = load("res://scenes/attacks/cosmic_arrow.tscn" if cosmic else "res://scenes/attacks/light_arrow.tscn").instantiate()
-		arrow._apply_effect_settings()
+		var arrow_tint := AttackVisual.apply_effect_settings_to(arrow)
 		var style := {"id":data.LightArrowDefinition.size()+1,"cosmic":cosmic,"contact":1,"flight_scale":arrow.flight_scale}
 		for key in ["shot_length_scale","shot_width_scale","core_width","cosmic_speed","cosmic_star_count"]: style[key] = arrow.get(key)
-		for color_pair in [["arrow",arrow.get("arrow_color")],["cosmic_a",arrow.get("cosmic_color_a")],["cosmic_b",arrow.get("cosmic_color_b")],["tint",arrow.effect_tint]]:
+		for color_pair in [["arrow",arrow.get("arrow_color")],["cosmic_a",arrow.get("cosmic_color_a")],["cosmic_b",arrow.get("cosmic_color_b")],["tint",arrow_tint]]:
 			for channel in ["r","g","b","a"]: style[color_pair[0]+"_"+channel] = color_pair[1][channel]
 		data.LightArrowDefinition.append(style)
 		arrow.free()
@@ -1118,7 +1141,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		row.sprite_angle = 0.0
 	var look: EnemyLook
 	var skin := sprite.get_file().get_basename()
-	var visual_index: StageResources = stage.resources if stage!=null and stage.resources!=null and not stage.resources.look_paths.is_empty() else ContentManager.visual_index
+	var visual_index: StageResources = stage.resources if stage!=null and stage.resources!=null and not stage.resources.look_paths.is_empty() else _visual_index()
 	if visual_index!=null and visual_index.look_paths.has(skin):
 		sprite = visual_index.look_paths[skin]
 		look = load(sprite) as EnemyLook
@@ -1304,8 +1327,8 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.KnockbackDefinition.append({"id":level+1,"weapon":knockback_id,"level":level+1,"chance":float(knockback.params.chance_by_level[level]),"chain_limit":int(knockback.params.chain_limit_by_level[level]),"speed":float(knockback.params.speed),"life":float(knockback.params.life),"base_damage":config.hull_debris_damage,"base_attack":config.base_attack,"base_knock":config.hull_debris_knock,"base_life":config.hull_debris_life,"projectile_increment":float(config.post_max.increments.get("projectile_speed",0.0)) if knockback_target.has("projectile") else 0.0,"duration_increment":float(config.post_max.increments.get("duration",0.0)) if knockback_target.has("duration") else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if knockback_target.has("knockback") else 0.0,"area_increment":float(config.post_max.increments.get("area",0.0)) if knockback_target.has("area") else 0.0})
 	if config.post_max==null: return {}
 	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
-	for comet_id in ContentManager.catalog.table(&"weapons"):
-		var comet_entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(comet_id))
+	for comet_id in _catalog().table(&"weapons"):
+		var comet_entry: ContentEntry = _catalog().find(&"weapons",StringName(comet_id))
 		if not comet_entry.comet_only: continue
 		var comet_weapon: WeaponDef = load(comet_entry.path)
 		if comet_weapon==null: return {}
@@ -1344,7 +1367,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":sonic_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if sonic_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_arc_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if arc_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":flash_slash_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(flash_slash.id).has("followup") else 0.0})
-	var flash_slash_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W28")
+	var flash_slash_entry: ContentEntry = _catalog().find(&"weapons",&"W28")
 	if flash_slash_entry==null: return {}
 	for path in flash_slash_entry.resources:
 		var key: int = data.ResourceKey.size()+1
@@ -1352,7 +1375,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		visuals.append({"id":key,"role":7,"path":path,"equipment":flash_slash_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":flash_slash_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":afterimage_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(afterimage.id).has("followup") else 0.0})
-	var afterimage_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W27")
+	var afterimage_entry: ContentEntry = _catalog().find(&"weapons",&"W27")
 	if afterimage_entry==null: return {}
 	for path in afterimage_entry.resources:
 		var key: int = data.ResourceKey.size()+1
@@ -1360,7 +1383,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		visuals.append({"id":key,"role":7,"path":path,"equipment":afterimage_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":afterimage_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":escort_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(escort.id).has("followup") else 0.0})
-	var escort_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W26")
+	var escort_entry: ContentEntry = _catalog().find(&"weapons",&"W26")
 	if escort_entry==null: return {}
 	for path in escort_entry.resources:
 		var key: int = data.ResourceKey.size()+1
@@ -1368,7 +1391,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		visuals.append({"id":key,"role":7,"path":path,"equipment":escort_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":escort_id,"asset":key})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":interceptor_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if interceptor_target.has("followup") else 0.0})
-	var interceptor_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W25")
+	var interceptor_entry: ContentEntry = _catalog().find(&"weapons",&"W25")
 	if interceptor_entry==null: return {}
 	for path in interceptor_entry.resources:
 		var key: int = data.ResourceKey.size()+1
@@ -1377,7 +1400,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":interceptor_id,"asset":key})
 	var bipolar_weapon: int = data.BipolarDefinition[0].weapon
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":bipolar_weapon,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(&"W22").has("followup") else 0.0})
-	var bipolar_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W22")
+	var bipolar_entry: ContentEntry = _catalog().find(&"weapons",&"W22")
 	if bipolar_entry==null: return {}
 	for path in bipolar_entry.resources:
 		var key: int = data.ResourceKey.size()+1
@@ -1386,49 +1409,49 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":bipolar_weapon,"asset":key})
 	var tow_weapon: int = data.MassTowDefinition[0].weapon
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":tow_weapon,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(&"W21").has("followup") else 0.0})
-	var tow_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W21")
+	var tow_entry: ContentEntry = _catalog().find(&"weapons",&"W21")
 	if tow_entry==null: return {}
 	for path in tow_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":tow_weapon})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":tow_weapon,"asset":key})
-	var arc_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W17")
+	var arc_entry: ContentEntry = _catalog().find(&"weapons",&"W17")
 	if arc_entry==null: return {}
 	for path in arc_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":contact_arc_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":contact_arc_id,"asset":key})
-	var sonic_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W08")
+	var sonic_entry: ContentEntry = _catalog().find(&"weapons",&"W08")
 	if sonic_entry==null: return {}
 	for path in sonic_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":sonic_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":sonic_id,"asset":key})
-	var contact_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W04")
+	var contact_entry: ContentEntry = _catalog().find(&"weapons",&"W04")
 	if contact_entry==null: return {}
 	for path in contact_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":contact_wave_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":contact_wave_id,"asset":key})
-	var knockback_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W03")
+	var knockback_entry: ContentEntry = _catalog().find(&"weapons",&"W03")
 	if knockback_entry==null: return {}
 	for path in knockback_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":knockback_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":knockback_id,"asset":key})
-	var mines_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W07")
+	var mines_entry: ContentEntry = _catalog().find(&"weapons",&"W07")
 	if mines_entry==null: return {}
 	for path in mines_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":mines_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":mines_id,"asset":key})
-	var end_blast_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W29")
+	var end_blast_entry: ContentEntry = _catalog().find(&"weapons",&"W29")
 	if end_blast_entry==null: return {}
 	for path in end_blast_entry.resources:
 		var key: int = data.ResourceKey.size()+1
@@ -1445,84 +1468,84 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		if field.name == "ProgressionDefinition":
 			for item in field.fields:
 				if item.name != "id": data.ProgressionDefinition[0][item.name] = config.get(item.name)
-	var entry: ContentEntry = ContentManager.catalog.find(&"weapons",weapon.id)
+	var entry: ContentEntry = _catalog().find(&"weapons",weapon.id)
 	if entry==null: return {}
 	for path in entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":1,"asset":key})
-	var scatter_entry: ContentEntry = ContentManager.catalog.find(&"weapons",scatter.id)
+	var scatter_entry: ContentEntry = _catalog().find(&"weapons",scatter.id)
 	if scatter_entry==null: return {}
 	for path in scatter_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":scatter_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":scatter_id,"asset":key})
-	var rear_entry: ContentEntry = ContentManager.catalog.find(&"weapons",rear.id)
+	var rear_entry: ContentEntry = _catalog().find(&"weapons",rear.id)
 	if rear_entry==null: return {}
 	for path in rear_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":rear_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":rear_id,"asset":key})
-	var barrier_entry: ContentEntry = ContentManager.catalog.find(&"weapons",barrier.id)
+	var barrier_entry: ContentEntry = _catalog().find(&"weapons",barrier.id)
 	if barrier_entry==null: return {}
 	for path in barrier_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":barrier_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":barrier_id,"asset":key})
-	var gear_entry: ContentEntry = ContentManager.catalog.find(&"traits",gear.id)
+	var gear_entry: ContentEntry = _catalog().find(&"traits",gear.id)
 	if gear_entry==null: return {}
 	for path in gear_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":gear_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":gear_id,"asset":key})
-	var kill_sonic_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T05")
+	var kill_sonic_entry: ContentEntry = _catalog().find(&"traits",&"T05")
 	if kill_sonic_entry==null: return {}
 	for path in kill_sonic_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":kill_sonic_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":kill_sonic_id,"asset":key})
-	var crit_beam_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T06")
+	var crit_beam_entry: ContentEntry = _catalog().find(&"traits",&"T06")
 	if crit_beam_entry==null: return {}
 	for path in crit_beam_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":crit_beam_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":crit_beam_id,"asset":key})
-	var vortex_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T03")
+	var vortex_entry: ContentEntry = _catalog().find(&"traits",&"T03")
 	if vortex_entry==null: return {}
 	for path in vortex_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":vortex_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":vortex_id,"asset":key})
-	var run_up_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T32")
+	var run_up_entry: ContentEntry = _catalog().find(&"traits",&"T32")
 	if run_up_entry==null: return {}
 	for path in run_up_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":run_up_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":run_up_id,"asset":key})
-	var rampage_entry: ContentEntry = ContentManager.catalog.find(&"traits",rampage.id)
+	var rampage_entry: ContentEntry = _catalog().find(&"traits",rampage.id)
 	if rampage_entry==null: return {}
 	for path in rampage_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":rampage_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":rampage_id,"asset":key})
-	var duplicator_entry: ContentEntry = ContentManager.catalog.find(&"traits",duplicator.id)
+	var duplicator_entry: ContentEntry = _catalog().find(&"traits",duplicator.id)
 	if duplicator_entry==null: return {}
 	for path in duplicator_entry.resources:
 		var key: int = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":duplicator_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":duplicator_id,"asset":key})
-	var full_burst_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T36")
+	var full_burst_entry: ContentEntry = _catalog().find(&"traits",&"T36")
 	if full_burst_entry==null: return {}
 	var full_burst_id: int = data.LoadoutDefinition.filter(func(row: Dictionary): return row.external_id=="T36")[0].id
 	for path in full_burst_entry.resources:
@@ -1547,7 +1570,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.ResourceKey.append({"id":bullet_visual+1,"role":12})
 	visuals.append({"id":bullet_visual+1,"role":12,"path":""})
 	var star: AttackVisual = load("res://scenes/attacks/star_bolt.tscn").instantiate()
-	star._apply_effect_settings()
+	var star_tint := AttackVisual.apply_effect_settings_to(star)
 	var star_library: Resource = load("res://.content/attack_visuals.res")
 	if star_library.get_meta("looks",{}).get("res://scenes/attacks/star_bolt.tscn",{}).get("Flight")==null:
 		star.free()
@@ -1556,7 +1579,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.ResourceKey.append({"id":star_visual,"role":Schema.ENUMS.VisualRole.StarBolt})
 	visuals.append({"id":star_visual,"role":Schema.ENUMS.VisualRole.StarBolt,"path":"res://.content/attack_visuals.res","scene":"res://scenes/attacks/star_bolt.tscn"})
 	data.StarBoltDefinition = [{"id":1,"radius":9.0,"life":6.0,"flight_scale":star.flight_scale,"turn_with_velocity":star.turn_with_velocity,
-		"tint_r":star.effect_tint.r,"tint_g":star.effect_tint.g,"tint_b":star.effect_tint.b,"tint_a":star.effect_tint.a,"visual":star_visual,"stone_visual":bullet_visual+1,"contact":1}]
+		"tint_r":star_tint.r,"tint_g":star_tint.g,"tint_b":star_tint.b,"tint_a":star_tint.a,"visual":star_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	star.free()
 	data.LightLanceDefinition = [{"id":1,"life":0.5,"flight_time":0.18,"maximum":220}]
 	var shell_fixed: Dictionary = preload("res://data/visuals/pump_shell_runtime.tres").get_meta("values")
@@ -1572,7 +1595,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		var zone_visual: Node = zone_scene.instantiate()
 		var settings: Resource = load("res://data/visuals/effect_settings.tres")
 		var values: Dictionary = settings.resolved_values("enemy/aquila",path) if style==4 else settings.values_for(path)
-		var tint: Color = values.get("effect_tint",zone_visual.effect_tint)
+		var tint: Color = values.get("effect_tint",Color.WHITE)
 		var meta: Dictionary = star_library.get_meta("looks",{}).get(path,{})
 		var record := {"id":style+1,"style":style,"contact":2,"active":ProjectileSystem.ZONE_FLASH,"hit_duration":zone_visual.hit_duration,"fade_duration":zone_visual.fade_duration,"hit":meta.get("Hit") is Mesh or not meta.get("Hit_sprites",[]).is_empty(),"fade":meta.get("Fade") is Mesh or not meta.get("Fade_sprites",[]).is_empty(),"tint_r":tint.r,"tint_g":tint.g,"tint_b":tint.b,"tint_a":tint.a}
 		for key in ["glow_opacity","ring_opacity","ring_width","arm_count","lightning_reach","lightning_width"]: record[key] = float(values.get(key,zone_visual.get(key) if style==4 else 0.0))
@@ -1603,7 +1626,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			"interval":float(weapon.params.interval_by_level[i]),"damage":float(weapon.params.damage_by_level[i]),
 			"life":float(weapon.params.life),"spread":float(weapon.params.spread_step),"knock":float(weapon.params.knock),
 			"pierce":int(weapon.params.pierce_by_level[i])})
-	preload("res://tools/content/run_progression_data.gd").append(data,config)
+	preload("res://tools/content/run_progression_data.gd").append(data,config,func(id: StringName): return _definition(&"weapons",id))
 	return {"records":data,"visuals":visuals}
 
 static func chase_records(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
@@ -1628,7 +1651,7 @@ static func encounter_records(data: Dictionary, profile: Dictionary, enemy_ids: 
 		for region in source.get("regions",[]):
 			if not region is Dictionary or not region.get("pos",[]) is Array or region.pos.size()!=2: return ERR_INVALID_DATA
 			var type := String(region.get("type",""))
-			if not ContentManager.enemies.has(StringName(type)) and not ContentManager.bosses.has(StringName(type)): return ERR_INVALID_DATA
+			if not _definitions(&"enemies").has(StringName(type)) and not _definitions(&"bosses").has(StringName(type)): return ERR_INVALID_DATA
 			var minimum := clampi(int(region.get("min_count",1)),0,100)
 			data.EncounterRegion.append({"id":data.EncounterRegion.size()+1,"pattern":row.id,"enemy":enemy_ids.find(type)+1,"x":float(region.pos[0]),"y":float(region.pos[1]),"angle":float(region.get("angle",0.0)),"jitter":float(region.get("jitter",0.0)),"min_count":minimum,"max_count":clampi(int(region.get("max_count",1)),minimum,100),"fodder":region.get("role","avoid")=="fodder","elite":bool(region.get("elite",false))})
 	return OK
@@ -1745,7 +1768,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for pattern in encounter_profile.get("patterns",[]):
 			for region in pattern.get("regions",[]):
 				var type := String(region.get("type",""))
-				if ContentManager.enemies.has(StringName(type)) and not enemy_ids.has(type): enemy_ids.append(type)
+				if _definitions(&"enemies").has(StringName(type)) and not enemy_ids.has(type): enemy_ids.append(type)
 
 	for terrain in ["meteor","iron","saw"]:
 		if not terrain in enemy_ids: enemy_ids.append(terrain)
@@ -2171,7 +2194,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	paths.sort()
 	var profiles_error: Error = preload("res://tools/content/build_visuals.gd").validate()
 	if profiles_error!=OK: return profiles_error
-	var manifest := preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,ContentManager.catalog,previous_resources.keys if previous_resources!=null else {})
+	var manifest := preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,_catalog(),previous_resources.keys if previous_resources!=null else {})
 	if manifest.is_empty(): return ERR_INVALID_DATA
 	paths = manifest.paths
 	var resolved_input := source_sha256.to_utf8_buffer()

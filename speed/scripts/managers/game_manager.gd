@@ -25,6 +25,7 @@ var run_endless := false
 ## 次のランの時計を始める時刻（開発用。出現タイムラインの「ここから試す」）。ランが始まると 0 に戻る
 var run_start_time := 0.0
 var run_start_source := "stage_start"
+var run_start_content: Dictionary = {}
 ## 直前のランの結果（結果画面が表示する）
 var last_result: Dictionary = {}
 var _accepted_cpp_results: Dictionary = {}

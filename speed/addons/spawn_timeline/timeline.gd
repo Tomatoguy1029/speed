@@ -316,17 +316,20 @@ func _save() -> void:
 	_save_stage(stage)
 
 ## Undo のあと別のステージを表示していても、編集したステージを保存する。
-func _save_stage(target: Resource) -> void:
+func _save_stage(target: Resource) -> Error:
 	if target is StageDef: FormationPaths.rebind_stage(target)
 	_edit_feedback = ""
 	if target == null or target.resource_path == "":
-		return
+		return ERR_FILE_BAD_PATH
 	for p in target.get("phases"):
 		if p is Resource and p.resource_path != "" and not p.resource_path.contains("::"):
-			ResourceSaver.save(p)
-	ResourceSaver.save(target)
+			var error := ResourceSaver.save(p)
+			if error != OK: return error
+	var error := ResourceSaver.save(target)
+	if error != OK: return error
 	refresh()
 	stage_saved.emit(target)
+	return OK
 
 ## clips の要素の型（プロパティの型の指定から、プロジェクトのクラスを探して作る）。
 func _new_clip() -> Resource:
@@ -495,6 +498,10 @@ func _show_help() -> void:
 func _launch_here() -> void:
 	if stage == null:
 		return
+	var error := _save_stage(stage)
+	if error != OK:
+		report_edit_rejection("保存に失敗しました：" + error_string(error))
+		return
 	var request: GDScript = load("res://addons/stage_launcher/launch_request.gd")
-	request.request(int(stage.get("index")), canvas.playhead, "timeline")
+	request.request(int(stage.get("index")), canvas.playhead, "timeline", stage.resource_path)
 	EditorInterface.play_main_scene()

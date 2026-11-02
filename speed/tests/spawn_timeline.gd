@@ -28,6 +28,10 @@ func _initialize() -> void:
 func _run() -> void:
 	while EditorInterface.get_resource_filesystem().is_scanning():
 		await process_frame
+	if "--cpp-timeline-build" in OS.get_cmdline_user_args():
+		_cpp_timeline_build()
+		quit(1 if failures else 0)
+		return
 	plugin = EditorPlugin.new()
 	manager = plugin.get_undo_redo()
 	panel = Timeline.new()
@@ -414,3 +418,23 @@ func _rule_reasons() -> void:
 	_check(panel.clips()[0].get("length") == 10.0 and panel._details.text.contains("重なります"), "Resize rejection keeps original length and shows reason")
 	panel._names.erase(&"b")
 	completed_sections += 1
+
+## D06のEditorPlugin側だけを確認し、既存の編集検査は再実行しない。
+func _cpp_timeline_build() -> void:
+	var request := preload("res://addons/stage_launcher/launch_request.gd")
+	var builder := preload("res://addons/spawn_timeline/plugin.gd")
+	var path := "res://.content/dev/d06_source.tres"
+	var source := ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
+	_check(source!=null,"途中再生の保存済み制作元をエディターで読む")
+	if source==null: return
+	source.clips[0].groups = 1
+	_check(ResourceSaver.save(source,path)==OK,"編集元を保存する")
+	request.request(source.index,130.0,"timeline",path)
+	_check(builder.prepare_timeline_request()==OK,"Autoloadなしのエディターから同じC++生成を使う")
+	_check(request.consume()==source.index and not request.content.is_empty(),"生成結果を起動予約へ渡す")
+	source.clips[0].groups = -1
+	_check(ResourceSaver.save(source,path)==OK,"無効な編集元を保存する")
+	request.request(source.index,130.0,"timeline",path)
+	_check(builder.prepare_timeline_request()!=OK,"エディターでも無効な生成入力を拒否する")
+	_check(request.consume()==source.index and request.content.is_empty(),"生成失敗時は旧生成物を渡さない")
+	print("[cpp_timeline_editor] %d checks, %d failures" % [checks,failures])

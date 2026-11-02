@@ -1,7 +1,7 @@
 ## 最大後強化の固定定義と、元の武器の間隔基準を生成する。
 extends RefCounted
 
-static func append(data: Dictionary, config: GameConfig) -> void:
+static func append(data: Dictionary, config: GameConfig, definition_source: Callable = Callable()) -> void:
 	var post := config.post_max
 	data.PostMaxDefinition = []
 	data.PostMaxTarget = []
@@ -16,7 +16,7 @@ static func append(data: Dictionary, config: GameConfig) -> void:
 			if target.has(target_key): data.PostMaxTarget.append({"id":data.PostMaxTarget.size()+1,"equipment":equipment.id,"effect":row.id})
 	for equipment: Dictionary in data.LoadoutDefinition:
 		if equipment.kind!=0: continue
-		var definition := ContentManager.definition(&"weapons",StringName(equipment.external_id)) as WeaponDef
+		var definition := (definition_source.call(StringName(equipment.external_id)) if definition_source.is_valid() else ContentManager.definition(&"weapons",StringName(equipment.external_id))) as WeaponDef
 		for key: String in post.target(definition.id).get("interval",[]):
 			var raw: Variant = definition.params.get(key,0.0)
 			for level in range(1,equipment.maximum_level+1):

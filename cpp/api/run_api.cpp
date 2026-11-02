@@ -6,6 +6,7 @@
 #include "../systems/attack_system.h"
 #include "../runtime/run_runner.h"
 #include "../runtime/dev_commands.h"
+#include "../runtime/dev_scenario.h"
 #include "../runtime/lifecycle.h"
 #include "../output/event_builder.h"
 #include "../output/render_builder.h"
@@ -103,8 +104,16 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     const Variant time=options.get("start_time",0.0);
     if ((time.get_type()!=Variant::FLOAT && time.get_type()!=Variant::INT) || !std::isfinite(double(time)) || double(time)!=0 ||
         (options.has("equipment") && (!is(options,"equipment",Variant::ARRAY) || !Array(options["equipment"]).is_empty())) ||
-        (options.has("start_kind") && (!is(options,"start_kind",Variant::STRING) || String(options["start_kind"])!="normal")) ||
-        (options.has("scenario") && (!is(options,"scenario",Variant::DICTIONARY) || !Dictionary(options["scenario"]).is_empty()))) return failure(1,"start","未登録の途中開始・装備・試行入力です");
+        (options.has("start_kind") && (!is(options,"start_kind",Variant::STRING) || String(options["start_kind"])!="normal"))) return failure(1,"start","未登録の途中開始・装備・試行入力です");
+    speed::TimelineScenario timeline;bool timeline_start=false;
+    if (options.has("scenario")) {
+        if (!is(options,"scenario",Variant::DICTIONARY)) return failure(1,"scenario","試行入力の型が不正です");
+        const Dictionary scenario=options["scenario"];
+        if (!scenario.is_empty()) {
+            if (!runtime.api_development || scenario.size()!=2 || !is(scenario,"kind",Variant::STRING) || String(scenario["kind"])!="timeline" || !is(scenario,"params",Variant::DICTIONARY) || !speed::decode_timeline_scenario(scenario["params"],timeline)) return failure(1,"scenario","途中再生の種類・時刻が不正です");
+            timeline_start=true;
+        }
+    }
     auto &state=runtime.state;state.ship={};state.draw={};
     state.ship.pos=options.get("position",Vector2(-state.ship_config.start_radius,0));state.ship_pos=state.ship.pos;
     state.ship.vel=Vector2(0,-state.ship_config.base_max_speed*0.3);state.ship.hp=state.ship_config.max_hp;
@@ -114,6 +123,7 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.frame_ready=true;
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
     if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
+    if (timeline_start) speed::apply_timeline_scenario(runtime,timeline);
     speed::FieldSystem::initialize(runtime);
     speed::HeroesSystem::initialize(runtime);
     speed::ProgressionSystem::initialize(runtime,options.has("equipment"));

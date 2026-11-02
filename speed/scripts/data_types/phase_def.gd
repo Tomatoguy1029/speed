@@ -4,6 +4,7 @@
 ## 敵の数とレベルは、区間の開始の値から終わりの値へ時間とともに変わる。
 ## ---
 ## 値の正は res://data/phases/*.tres と、ステージに埋め込んだ時間帯。使う時間帯はステージのデータで決める。
+@tool
 class_name PhaseDef
 extends Resource
 

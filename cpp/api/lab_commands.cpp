@@ -9,6 +9,7 @@
 #include "../behaviors/traits/rampage.h"
 #include "../systems/heroes.h"
 #include "../runtime/dev_commands.h"
+#include "../runtime/dev_scenario.h"
 #include "../runtime/checkpoint.h"
 #include "../systems/population_system.h"
 #include "../systems/progression.h"
@@ -30,6 +31,11 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
     const String kind=envelope["kind"];const char *body=command=="dev_set_scenario"?"params":"payload";
     if (envelope.get(body,Variant()).get_type()!=Variant::DICTIONARY) return reply(false);
     const Dictionary p=envelope[body];auto &s=runtime.state;auto &c=s.control;
+    if (command=="dev_set_scenario" && kind=="timeline") {
+        speed::TimelineScenario timeline;
+        if (s.phase!=Phase::Paused || !speed::decode_timeline_scenario(p,timeline)) return reply(false);
+        speed::apply_timeline_scenario(runtime,timeline);return reply(true);
+    }
     if (command=="dev_set_scenario" && (kind=="lab" || kind=="intro")) {
         if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty"})) return reply(false);
         for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);

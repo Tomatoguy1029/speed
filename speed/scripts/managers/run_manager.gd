@@ -15,6 +15,8 @@ var current_id := -1
 ## 資源の読み込みを開始して返す。呼び出し側が木へ入れると描画の準備を進める。
 func create_run() -> RunSession:
 	var before := Time.get_ticks_usec()
+	if OS.is_debug_build() and GameManager.run_start_source == "timeline":
+		return _create_timeline_run()
 	var options := {"stage_index": GameManager.run_stage, "endless": GameManager.run_endless,
 		"stage": ContentManager.runtime_stage(GameManager.run_stage), "profile": ProfileManager.for_run(false)}
 	if OS.is_debug_build():
@@ -22,12 +24,28 @@ func create_run() -> RunSession:
 		options.start_source = GameManager.run_start_source
 	GameManager.run_start_time = 0.0
 	GameManager.run_start_source = "stage_start"
+	GameManager.run_start_content = {}
 	var session := _register(RunSession.new(), options)
 	session.loading_timings["stage_and_profile_ms"] = (Time.get_ticks_usec() - before) / 1000.0
 	current_id = session.id
 	session.sim.finished.connect(GameManager.finish_run)
 	session.sim.aborted.connect(GameManager.abort_run)
 	# 暗転中にもI/Oを進める。描画準備は木に入ってから行う。
+	session.start_loading(options)
+	return session
+
+## タイムラインだけをC++へ接続する。生成失敗・予約不足は旧ランへ落とさない。
+func _create_timeline_run() -> RunSession:
+	var prepared := GameManager.run_start_content.duplicate(true)
+	var time := GameManager.run_start_time
+	GameManager.run_start_time = 0.0
+	GameManager.run_start_source = "stage_start"
+	GameManager.run_start_content = {}
+	var options := {"runtime":"cpp","cpp_index":prepared.get("index",""),"cpp_signature":prepared.get("signature",""),
+		"cpp_profile":ProfileManager.for_cpp(false),"seed":randi(),
+		"cpp_start":{"equipment":[],"scenario":{"kind":"timeline","params":{"time":time}}}}
+	var session := _register(RunSession.new(),options)
+	current_id = session.id
 	session.start_loading(options)
 	return session
 

@@ -36,14 +36,18 @@ func _px(px: float) -> float:
 	return rm._px(px)
 
 func _apply_effect_settings() -> void:
+	effect_tint = apply_effect_settings_to(self)
+
+## 制作工程は非toolの弾のインスタンスにも、実行時と同じ値の変換を適用する。
+static func apply_effect_settings_to(target: CanvasItem) -> Color:
 	var values: Dictionary
-	if visual_profile_key.is_empty():
-		EFFECT_SETTINGS.apply_to(self)
-		values = EFFECT_SETTINGS.values_for(scene_file_path)
+	if String(target.get("visual_profile_key")).is_empty():
+		EFFECT_SETTINGS.apply_to(target)
+		values = EFFECT_SETTINGS.values_for(target.scene_file_path)
 	else:
-		values = EFFECT_SETTINGS.component_values(visual_profile_key, visual_component, visual_profile_fallback)
-		EFFECT_SETTINGS.apply_values(self, values)
-	effect_tint = values.get("effect_tint", Color.WHITE)
+		values = EFFECT_SETTINGS.component_values(target.get("visual_profile_key"), target.get("visual_component"), target.get("visual_profile_fallback"))
+		EFFECT_SETTINGS.apply_values(target, values)
+	return values.get("effect_tint", Color.WHITE)
 
 func draw_friend(_c: CanvasItem, _projectiles: ProjectileSystem, _row: int, _pos: Vector2) -> void:
 	pass
