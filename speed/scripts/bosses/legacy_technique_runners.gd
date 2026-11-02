@@ -9,6 +9,7 @@ const RUNNERS := {
 	"res://scripts/data_types/boss_techniques/draco/star_fan.gd":"res://scripts/bosses/draco/techniques/star_fan.gd",
 	"res://scripts/data_types/boss_techniques/hydra/rubble_fan.gd":"res://scripts/bosses/hydra/techniques/rubble_fan.gd",
 	"res://scripts/data_types/boss_techniques/hydra/rubble_lump.gd":"res://scripts/bosses/hydra/techniques/rubble_lump.gd",
+	"res://scripts/data_types/boss_techniques/hydra/thunder_drop.gd":"res://scripts/bosses/hydra/techniques/thunder_drop.gd",
 	"res://scripts/data_types/boss_techniques/draco/tail_sweep.gd":"res://scripts/bosses/draco/techniques/tail_sweep.gd",
 	"res://scripts/data_types/boss_techniques/hydra/beam_pincer.gd":"res://scripts/bosses/hydra/techniques/beam_pincer.gd",
 	"res://scripts/data_types/boss_techniques/hydra/grid.gd":"res://scripts/bosses/hydra/techniques/grid.gd",

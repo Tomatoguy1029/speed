@@ -36,6 +36,12 @@ func _ready() -> void:
 	if "--cpp-hydra-rubble" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_rubble")
 		return
+	if "--cpp-hydra-thunder-hit" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_thunder_hit")
+		return
+	if "--cpp-hydra-thunder" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_thunder")
+		return
 	if "--cpp-hydra-blades-origin" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_blades_origin")
 		return
@@ -5197,3 +5203,131 @@ func native_hydra_shatter_record() -> void:
 	bridge._core.step_hostiles(0.001);bridge.command("dev_boss_body_state")
 	check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bullet" and e.payload.technique=="debris_shatter" and e.payload.source=="hydra"),"破片の原因・技と、共通通知のボス所有元を保つ")
 	bridge.dispose();print("[cpp_hydra_shatter_record] failures=",failed);get_tree().quit(1 if failed else 0)
+
+
+func hydra_thunder_case(flowing := false, overrides := {}) -> Dictionary:
+	var values := {"normal_charge":0.2,"normal_hold":0.1,"attack_cd":0.03,"thunder_radius":50.0,"thunder_flash":0.12,"beam_dmg":7.0,"target_lock_fraction":0.5,"thunder_lead":0.4}
+	values.merge(overrides,true)
+	return hydra_normal_case(flowing,{},values,"thunder_drop")
+
+func hydra_thunder_tick(bridge, dt: float) -> void:
+	bridge._core.step(dt)
+	bridge._core.step_hazards(dt)
+	bridge.command("dev_boss_body_state")
+
+func native_hydra_thunder() -> void:
+	var move = load("res://data/bosses/hydra_moves/thunder_drop.tres")
+	if not "--cpp-hydra-thunder-rest" in OS.get_cmdline_user_args():
+		check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"thunder_drop","落雷の編集値と旧Runnerを分離する")
+	var c := hydra_thunder_case(true)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge = c.bridge
+	var events: Array = [];bridge.subscribe("落雷の記録",func(packet): events.append_array(packet.events);return true)
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary = body.necks[4]
+	var target: Vector2 = head.position+Vector2.from_angle(head.angle)*450
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(30,0)})
+	for tick in 200:
+		hydra_thunder_tick(bridge,0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array = bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==91,"雷の首が通常フローから落雷を選ぶ")
+	if actions.is_empty(): bridge.dispose();get_tree().quit(1);return
+	check(actions[0].aim.distance_to(target+Vector2(12,0))<0.001,"開始時に速度とthunder_leadで一度だけ先読みする")
+	hydra_thunder_tick(bridge,0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and body.effects[0].kind=="lightning" and body.effects[0].points.size()==2 and body.effects[0].width==100.0 and is_equal_approx(body.effects[0].delay,0.19),"最初の首更新でcharge-tの予告と直径を生成する")
+	var held: Dictionary = bridge.checkpoint()
+	for tick in 10: hydra_thunder_tick(bridge,0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks[4].locked and body.effects[0].age<body.effects[0].delay,"chargeの割合で狙いが固定し、まだ命中しない")
+	var expected: Dictionary = body.duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"予告の点・時計・ロックを保持して戻す")
+	for tick in 10: hydra_thunder_tick(bridge,0.01)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"復帰後も同じ落雷予告になる");bridge.release_checkpoint(held.value)
+	var strike: Vector2 = expected.effects[0].points[0]
+	bridge._core.set_run_guards({"invincible":false})
+	bridge.command("dev_ship_motion",{"position":strike,"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	for tick in 11: hydra_thunder_tick(bridge,0.01)
+	var hits: Array = events.filter(func(e): return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="lightning")
+	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale) and hits.size()==1 and hits[0].payload.technique==&"thunder_drop" and hits[0].payload.source==&"hydra","固定した円で実HPへ倍率を一度掛け、雷・技・所有元を記録する")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new();add_child(view)
+	var entries: Array[Dictionary] = [];entries.assign(c.package.visuals);view.setup(scope,entries,c.cfg.character_scale)
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"正式なHydra表示で落雷を描く")
+	await get_tree().process_frame
+	for tick in 21: hydra_thunder_tick(bridge,0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty(),"flashの寿命で落雷を回収する")
+	for tick in 60: hydra_thunder_tick(bridge,0.01)
+	check(bridge.command("dev_boss_state").value.any(func(t): return t.kind==91 and t.id>actions[0].id),"自然終了と待ちのあと次の落雷を選ぶ")
+	bridge.dispose();view.queue_free()
+	for cancel_at in [0.05,0.23,0.35]:
+		var q := hydra_thunder_case()
+		if q.is_empty(): continue
+		var qb=q.bridge;var state: Dictionary=qb.command("dev_boss_body_state").value[0];var n: Dictionary=state.necks[4]
+		qb.command("dev_ship_motion",{"position":n.position+Vector2.from_angle(n.angle)*450,"velocity":Vector2.ZERO})
+		var start: Dictionary=qb.command("dev_boss_technique",{"entity_id":n.id,"definition":1})
+		check(start.ok,"予告・発動・回復の取消用の落雷を開始する")
+		if start.ok:
+			for tick in int(round(cancel_at/0.01)): hydra_thunder_tick(qb,0.01)
+			var keep: Dictionary=qb.checkpoint();check(keep.ok and qb.restore(keep.value).ok,"各段階で落雷を保持して戻す");qb.release_checkpoint(keep.value)
+			check(qb.command("dev_cancel_technique",{"ticket":start.value}).ok and qb.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で予告と継続中の落雷を回収する")
+		qb.dispose()
+	var lost := hydra_thunder_case()
+	if not lost.is_empty():
+		var lb=lost.bridge;var state: Dictionary=lb.command("dev_boss_body_state").value[0];var n: Dictionary=state.necks[4]
+		lb.command("dev_ship_motion",{"position":n.position+Vector2.from_angle(n.angle)*450,"velocity":Vector2.ZERO})
+		lb.command("dev_boss_technique",{"entity_id":n.id,"definition":1});hydra_thunder_tick(lb,0.05)
+		lb.command("dev_remove",{"entity_id":n.id});hydra_thunder_tick(lb,0.01)
+		check(lb.command("dev_boss_body_state").value[0].effects.is_empty(),"参加首の消失で予告を回収する");lb.dispose()
+	var zero := hydra_thunder_case(false,{"normal_charge":0.0})
+	if not zero.is_empty():
+		var zb=zero.bridge;var state: Dictionary=zb.command("dev_boss_body_state").value[0];var n: Dictionary=state.necks[4]
+		zb.command("dev_ship_motion",{"position":n.position+Vector2.from_angle(n.angle)*450,"velocity":Vector2.ZERO})
+		zb.command("dev_boss_technique",{"entity_id":n.id,"definition":1});hydra_thunder_tick(zb,0.01)
+		var z: Dictionary=zb.command("dev_boss_body_state").value[0]
+		check(z.effects.size()==1 and z.effects[0].delay<0.0,"charge0でもSourceの負の余りを0止めせず保持する")
+		var keep: Dictionary=zb.checkpoint();check(keep.ok and zb.restore(keep.value).ok,"負のdelayを持つ落雷も保持・復帰する");zb.release_checkpoint(keep.value);zb.dispose()
+	var separated := hydra_thunder_case()
+	if not separated.is_empty():
+		var sb=separated.bridge;var body_state: Dictionary=sb.command("dev_boss_body_state").value[0]
+		sb.command("dev_damage",{"entity_id":separated.id,"amount":body_state.max_hp+1,"cause":"shot"});sb._core.step(0.001);sb._core.step(1.21)
+		body_state=sb.command("dev_boss_body_state").value[0];var n: Dictionary=body_state.necks[4]
+		sb.command("dev_ship_motion",{"position":n.position+Vector2.from_angle(n.look_angle)*450,"velocity":Vector2.ZERO})
+		check(body_state.separated and sb.command("dev_boss_technique",{"entity_id":n.id,"definition":1}).ok,"分離後も同じ落雷定義を開始する")
+		hydra_thunder_tick(sb,0.05);var saved: Dictionary=sb.checkpoint()
+		check(saved.ok and sb.restore(saved.value).ok,"分離後の予告の所有と時計を復帰する");sb.release_checkpoint(saved.value)
+		hydra_thunder_tick(sb,0.16);body_state=sb.command("dev_boss_body_state").value[0]
+		check(body_state.necks[4].normal_phase==1 and body_state.necks[4].glow==0.0,"分離後は閃光時間がactiveで、予告後は頭の発光を消す")
+		hydra_thunder_tick(sb,0.12);body_state=sb.command("dev_boss_body_state").value[0]
+		check(body_state.necks[4].normal_phase==2 and body_state.effects.is_empty(),"holdに入ると首所有の落雷を消す")
+		sb.command("dev_cancel_boss",{"entity_id":separated.id});check(sb.command("dev_boss_body_state").value[0].effects.is_empty(),"本体終了で落雷の所有を解放する");sb.dispose()
+	await get_tree().process_frame
+	print("[cpp_hydra_thunder] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+
+func native_hydra_thunder_hit() -> void:
+	var c := hydra_thunder_case(true)
+	if c.is_empty(): get_tree().quit(1);return
+	var b=c.bridge;var events: Array=[];b.subscribe("落雷の命中",func(packet):events.append_array(packet.events);return true)
+	var state: Dictionary=b.command("dev_boss_body_state").value[0];var n: Dictionary=state.necks[4]
+	b.command("dev_ship_motion",{"position":n.position+Vector2.from_angle(n.angle)*450,"velocity":Vector2(30,0)})
+	for tick in 200:
+		hydra_thunder_tick(b,0.01)
+		if not b.command("dev_boss_state").value.is_empty(): break
+	for tick in 11:hydra_thunder_tick(b,0.01)
+	state=b.command("dev_boss_body_state").value[0]
+	b._core.set_run_guards({"invincible":false})
+	b.command("dev_ship_motion",{"position":state.effects[0].points[0],"velocity":Vector2.ZERO})
+	var hp:float=b._core.ship_snapshot().ship_hp
+	for tick in 11:hydra_thunder_tick(b,0.01)
+	var hits:Array=events.filter(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="lightning")
+	print("落雷命中値 ",{"before":hp,"after":b._core.ship_snapshot().ship_hp,"scale":c.cfg.atk_scale,"hits":hits,"damage_events":events.filter(func(e):return e.type=="combat_player_damage")})
+	check(hits.size()==1 and hits[0].payload.technique==&"thunder_drop" and hits[0].payload.source==&"hydra","落雷の命中記録を同じtickで受け取る")
+	b.dispose();print("[cpp_hydra_thunder_hit] failures=",failed);get_tree().quit(1 if failed else 0)

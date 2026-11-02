@@ -1628,6 +1628,47 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "HydraThunderDefinition",
+      "section": 403,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flash",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_fraction",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

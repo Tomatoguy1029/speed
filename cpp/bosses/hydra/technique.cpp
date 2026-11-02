@@ -46,7 +46,7 @@ void HydraTechnique::finish(RunRuntime &r,TechniqueState &t,bool cancelled) {
     if (auto *move=std::get_if<HydraTornadoState>(&std::get<HydraTechniqueState>(t.detail).move)) for (auto h:move->rubble) if (r.state.enemy_handles.contains(h) && !r.state.enemies[h.slot].dead) EnemySystem::mark_dead(r,h);
     if (auto *move=std::get_if<HydraShatterState>(&std::get<HydraTechniqueState>(t.detail).move)) for (const auto &stone:move->rubble) if (r.state.enemy_handles.contains(stone.actor) && !r.state.enemies[stone.actor.slot].dead) EnemySystem::mark_dead(r,stone.actor);
     b->hydra.major_padding_left=cancelled?0:v.major_recovery_padding;b->hydra.recovery_left=p.recover;b->hydra.major_cd=v.global_cd;b->hydra.major_until[t.definition]=r.state.world_time+p.cd;
-    for (auto &n:b->hydra.necks) if (n.major==t.definition) {const auto at=if (!b->hydra.separated) n.angle=(at-HydraBody::neck_base(r,*b,n)).angle();n.strike_pos;const auto offset=at-HydraBody::neck_base(r,*b,n);n.angle=offset.angle();n.length=offset.length();n.free_pos=n.strike_pos=at;n.major=0;n.locked=n.extension=false;n.emission={};n.glow=n.elapsed=0;n.step=0;}
+    for (auto &n:b->hydra.necks) if (n.major==t.definition) {const auto at=n.strike_pos;const auto offset=at-HydraBody::neck_base(r,*b,n);n.angle=offset.angle();n.length=offset.length();n.free_pos=n.strike_pos=at;n.major=0;n.locked=n.extension=false;n.emission={};n.glow=n.elapsed=0;n.step=0;}
     if (cancelled) AttackBudgetSystem(r).cancel("boss:"+std::to_string(r.state.enemy_handles.entity_id(t.actor)),r.state.enemy_handles.entity_id(t.actor));
     t.stage=cancelled?TechniqueStage::Cancelled:TechniqueStage::Finished;cue(r,*b,cancelled?"interrupted":"finished",t.definition);cue(r,*b,"recovery_started",t.definition,p.recover);AttackSystem::end_technique(r.state,r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data())),cancelled);
 }
@@ -57,7 +57,6 @@ void HydraTechnique::step(RunRuntime &r,TechniqueState &t,double dt) {
     t.elapsed+=dt;if (t.elapsed>=p.warn+p.active) {finish(r,t,false);return;}
     if ((p.kind==74 && !all_participants_alive(r,v)) || std::none_of(v.participants.begin(),v.participants.end(),[&](auto actor){return r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;})) {finish(r,t,true);return;}
     if ((r.content->boss_techniques[t.definition-1].kind==82 || r.content->boss_techniques[t.definition-1].kind==83) && !all_participants_alive(r,v)) {finish(r,t,true);return;}
-    if (std::none_of(v.participants.begin(),v.participants.end(),[&](auto actor){return r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;})) {finish(r,t,true);return;}
     if (t.elapsed>=p.warn) {if (!v.playing) {v.playing=true;cue(r,*b,"attack_started",t.definition);}v.time+=dt;t.stage=TechniqueStage::Active;if (r.content->boss_techniques[t.definition-1].kind==83) debris_shatter(r,t,dt);else if (p.kind==73) grid(r,t);else if (p.kind==74) pincer(r,t);else if (r.content->boss_techniques[t.definition-1].kind==82) tornado(r,t,dt);else curve(r,t,dt);}
     t.previous_ship=r.state.ship_pos;
 }

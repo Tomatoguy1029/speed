@@ -1017,12 +1017,12 @@ static func append_draco_cycle(data: Dictionary, definition: BossDef, boss: int)
 	return OK
 ## 首の通常技の編集値を、分離前後で使う同じ型付き定義へ変換する。
 static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique not in [&"bite_thrust",&"bite_sweep",&"beam_bolt",&"beam_fixed",&"wind_blades",&"rubble_lump",&"rubble_fan"] or bite.head_kind not in [&"bite",&"beam",&"vortex",&"debris"]: return {}
+	if definition==null or definition.id!=&"hydra" or bite==null or bite.technique not in [&"bite_thrust",&"bite_sweep",&"beam_bolt",&"beam_fixed",&"wind_blades",&"rubble_lump",&"rubble_fan",&"thunder_drop"] or bite.head_kind not in [&"bite",&"beam",&"vortex",&"debris",&"thunder"]: return {}
 	var records := {}
 	var values: Dictionary = definition.params.merged(bite.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
-	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64 if bite.technique==&"bite_thrust" else 65 if bite.technique==&"bite_sweep" else 66 if bite.technique==&"beam_bolt" else 67 if bite.technique==&"beam_fixed" else 81 if bite.technique==&"rubble_fan" else 80 if bite.technique==&"rubble_lump" else 68,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge if bite.technique==&"bite_thrust" else values.sweep_time if bite.technique==&"bite_sweep" else values.beam_time if bite.technique==&"beam_fixed" else 2.0*float(values.blade_interval) if bite.technique==&"wind_blades" else 0.0),"hold":float(values.normal_hold),"damage":float(values.beam_dmg if bite.head_kind==&"beam" else values.lump_dmg if bite.head_kind==&"debris" else values.bite_dmg),"passes":1,"cuts":1},true)
+	normal.merge({"id":1,"boss":1,"external_id":String(bite.technique),"kind":64 if bite.technique==&"bite_thrust" else 65 if bite.technique==&"bite_sweep" else 66 if bite.technique==&"beam_bolt" else 67 if bite.technique==&"beam_fixed" else 81 if bite.technique==&"rubble_fan" else 80 if bite.technique==&"rubble_lump" else 68 if bite.technique==&"wind_blades" else 91,"phase":1,"track_during_warn":bite.track_during_warn,"post_gap":bite.post_gap,"warn":float(values.normal_charge),"active":float(values.normal_lunge if bite.technique==&"bite_thrust" else values.sweep_time if bite.technique==&"bite_sweep" else values.beam_time if bite.technique==&"beam_fixed" else 2.0*float(values.blade_interval) if bite.technique==&"wind_blades" else values.thunder_flash if bite.technique==&"thunder_drop" else 0.0),"hold":float(values.normal_hold),"damage":float(values.beam_dmg if bite.head_kind in [&"beam",&"thunder"] else values.lump_dmg if bite.head_kind==&"debris" else values.bite_dmg),"passes":1,"cuts":1},true)
 	records.BossTechniqueDefinition = [normal]
 	records.HydraNormalDefinition = [{"id":1,"technique":1,"head_kind":[&"bite",&"vortex",&"debris",&"beam",&"thunder"].find(bite.head_kind),"aim_tracking":float(values.get("aim_tracking",0.0)),"attack_cd":float(values.attack_cd),"bite_radius":float(values.get("bite_radius",0.0)),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(bite.technique)])}]
 	var action_rules: Resource = load("res://data/bosses/ai/hydra_action_rules.tres")
@@ -1030,27 +1030,27 @@ static func hydra_normal_records(definition: BossDef, bite: BossTechnique) -> Di
 	if bite.technique==&"beam_bolt": records.HydraBoltDefinition = [{"id":1,"technique":1,"length":float(values.bolt_length),"width":float(values.bolt_width),"speed":float(values.bolt_speed),"life":float(values.bolt_life)}]
 	if bite.technique==&"beam_fixed": records.HydraFixedBeamDefinition = [{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width)}]
 	if bite.technique==&"wind_blades": records.HydraWindBladesDefinition = [{"id":1,"technique":1,"interval":float(values.blade_interval),"size":float(values.blade_size),"width":float(values.blade_width),"life":float(values.blade_life),"speed":float(values.blade_speed),"spread":float(values.blade_spread)}]
+	if bite.technique==&"thunder_drop": records.HydraThunderDefinition = [{"id":1,"technique":1,"radius":float(values.thunder_radius),"flash":float(values.thunder_flash),"lock_fraction":float(values.target_lock_fraction),"lead":float(values.thunder_lead),"damage":float(values.beam_dmg)}]
 	records.HydraNormalGate = []
 	for gate: Dictionary in action_rules.active_gates_for(String(bite.technique)):
 		records.HydraNormalGate.append({"id":records.HydraNormalGate.size()+1,"technique":1,"minimum":float(gate.get("min",0.0)),"maximum":float(gate.get("max",1.7976931348623157e308)),"angle":deg_to_rad(float(gate.get("angle",0.0))),"half_angle":deg_to_rad(float(gate.get("half_angle",180.0))),"distance_origin":int(gate.get("distance_origin",0)),"angle_origin":int(gate.get("angle_origin",0)),"ignore_when_separated":bool(gate.get("ignore_when_separated",false))})
 	return records
 
 static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dictionary:
-	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid",&"beam_pincer"],&"tornado",&"debris_shatter"]: return {}
+	if definition==null or definition.id!=&"hydra" or move==null or move.technique not in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter"]: return {}
 	var values: Dictionary = definition.params.merged(move.values(),true)
 	var normal := {}
 	for field in Schema.SCHEMA.records.filter(func(v): return v.name=="BossTechniqueDefinition")[0].fields: normal[field.name] = false if field.type=="bool" else "" if field.type=="string" else 0
 	normal.merge({"id":1,"boss":1,"external_id":String(move.technique),"kind":83 if move.technique==&"debris_shatter" else 82 if move.technique==&"tornado" else 72 if move.technique==&"curve" else 73 if move.technique==&"grid" else 74,"phase":1,"track_during_warn":move.track_during_warn,"post_gap":move.post_gap,"warn":maxf(0.001,float(values.warning_time)),"active":float(values.performance_time),"recover":float(values.tech_recovery),"cd":float(values.cooldown),"damage":float(values.lump_dmg if move.technique==&"tornado" else values.beam_dmg),"passes":1,"cuts":1},true)
 	var records := {"HydraMajorDefinition":[{"id":1,"technique":1,"combo":move.category==&"combo","timeline_available":load("res://scenes/bosses/hydra_boss_timeline.tres").has_animation(move.technique),"cost":float(load("res://data/bosses/ai/hydra_action_rules.tres").costs[String(move.technique)]),"global_cd":float(values.tech_cd),"combo_cd":float(values.combo_cooldown),"major_recovery_padding":0.2}],"BossTechniqueDefinition":[normal]}
-	if move.technique==&"curve": records.HydraCurveDefinition = [{"id":1,"technique":1,"length":float(values.get("beam_len",0.0)),"width":float(values.beam_width),"delay":float(values.get("curve_delay",0.0)),"time":float(values.get("curve_time",0.0)),"lag":float(values.get("curve_lag",0.0)),"turn":float(values.get("curve_turn",0.0))}]}
+	if move.technique==&"curve": records.HydraCurveDefinition = [{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.curve_delay),"time":float(values.curve_time),"lag":float(values.curve_lag),"turn":float(values.curve_turn)}]
 
 	if move.technique==&"beam_pincer":
 		records.erase("HydraCurveDefinition")
 		records.HydraPincerDefinition=[{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.pincer_delay),"time":float(values.pincer_time),"open_angle":float(values.pincer_open_angle),"close_angle":float(values.pincer_close_angle)}]
 	if move.technique==&"grid":
 		records.erase("HydraCurveDefinition")
-		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"delay":float(values.normal_charge),"time":float(values.grid_time),"planning_width":float(definition.params.beam_width),"clearance":float(definition.params.grid_clearance),"tolerance":float(definition.params.grid_tolerance),"formation_timeout":float(definition.params.formation_timeout),"minimum":int(definition.params.grid_minimum)
-	return records]
+		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"delay":float(values.normal_charge),"time":float(values.grid_time),"planning_width":float(definition.params.beam_width),"clearance":float(definition.params.grid_clearance),"tolerance":float(definition.params.grid_tolerance),"formation_timeout":float(definition.params.formation_timeout),"minimum":int(definition.params.grid_minimum)}]
 		records.HydraGridLayout=[];records.HydraGridSlot=[];records.HydraGridPath=[]
 		var regions := [&"center",&"right",&"left",&"up",&"down"]
 		for name in definition.params.grid_layouts:
@@ -1071,7 +1071,7 @@ static func hydra_major_records(definition: BossDef, move: BossTechnique) -> Dic
 	return records
 
 static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid",&"beam_pincer"],&"tornado",&"debris_shatter"] else hydra_normal_records(definition,move)
+	var records := hydra_major_records(definition,move) if move.technique in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter"] else hydra_normal_records(definition,move)
 	if records.is_empty(): return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
@@ -1099,6 +1099,7 @@ static func hydra_technique_package(definition: BossDef, move: BossTechnique, co
 	return package
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
+
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"draco"]: return {}
 	var package := boss_body_package(definition,config)
