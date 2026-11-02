@@ -11,25 +11,25 @@ const BossProgram = preload("res://tools/content/build_boss_program.gd")
 ## エディターの生成では実行中のAutoloadを使わず、保存済み制作資源を読む。
 ## ライブ編集は従来どおり、実行中の定義と索引を使う。
 static func _catalog() -> ContentCatalog:
-	return load("res://data/content_catalog.tres") as ContentCatalog if Engine.is_editor_hint() else ContentManager.catalog
+	return load("res://data/content_catalog.tres") as ContentCatalog if Engine.is_editor_hint() or ContentManager.catalog==null else ContentManager.catalog
 
 static func _definition(category: StringName, id: StringName) -> Resource:
-	if not Engine.is_editor_hint(): return ContentManager.definition(category,id)
+	if not Engine.is_editor_hint() and ContentManager.catalog!=null: return ContentManager.definition(category,id)
 	var entry := _catalog().find(category,id)
 	return load(entry.path) if entry!=null else null
 
 static func _definitions(category: StringName) -> Dictionary:
-	if Engine.is_editor_hint(): return _catalog().table(category)
+	if Engine.is_editor_hint() or ContentManager.catalog==null: return _catalog().table(category)
 	return ContentManager.enemies if category==&"enemies" else ContentManager.bosses
 
 static func _heroes() -> Array:
-	if not Engine.is_editor_hint(): return ContentManager.heroes.values()
+	if not Engine.is_editor_hint() and ContentManager.catalog!=null: return ContentManager.heroes.values()
 	var result := []
 	for id in _catalog().table(&"heroes"): result.append(_definition(&"heroes",id))
 	return result
 
 static func _visual_index() -> StageResources:
-	return load("res://.content/visual_index.tres") as StageResources if Engine.is_editor_hint() else ContentManager.visual_index
+	return load("res://.content/visual_index.tres") as StageResources if Engine.is_editor_hint() or ContentManager.visual_index==null else ContentManager.visual_index
 
 ## ボスも同じ値型のスキーマへ書く。Scriptと表示シーンは戦闘バイナリへ渡さない。
 static func boss_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
