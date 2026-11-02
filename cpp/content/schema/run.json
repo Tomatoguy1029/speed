@@ -868,7 +868,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 25
+          "max": 28
         },
         {
           "name": "turn",
@@ -1754,6 +1754,10 @@
       {
         "name": "AquariusAim",
         "value": "aquarius_aim"
+      },
+      {
+        "name": "BomberExplode",
+        "value": "bomber_explode"
       }
     ],
     "ResultKind": [
@@ -2255,6 +2259,9 @@
       "color",
       "row",
       "id"
+    ],
+    "bomber_explode": [
+      "pos"
     ]
   },
   "includes": [

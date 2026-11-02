@@ -1050,6 +1050,53 @@
           "multiplier": 0.5
         }
       ]
+    },
+    {
+      "name": "BomberDefinition",
+      "section": 101,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trigger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rush",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

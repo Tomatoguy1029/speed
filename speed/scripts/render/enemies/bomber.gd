@@ -11,3 +11,10 @@ func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	if t.mode[i] != EnemyTable.Mode.WINDUP:
 		c.draw_circle(fuse, maxf(_px(1.5), r * 0.12) * (0.7 + 0.3 * sin(now * 30.0 + float(t.id[i]))), Color("#ffd36b"))
 		return
+
+static func draw_frame(c: CanvasItem, values: PackedFloat32Array, pixel: float) -> void:
+	for i in range(0,values.size(),5):
+		var p := Vector2(values[i],values[i+1])
+		var r := values[i+2]
+		var fuse := p-Vector2.from_angle(values[i+3])*r*0.95
+		c.draw_circle(fuse,maxf(pixel*1.5,r*0.12)*values[i+4],Color("#ffd36b"))

@@ -46,6 +46,7 @@ Dictionary RenderBatchBuffer::value() {
     if (!reticle.is_empty()) out["reticle"]=reticle;
     if (!aquarius.is_empty()) out["aquarius"]=aquarius;
     if (!cross.is_empty()) out["cross"]=cross;
+    if (!bomber.is_empty()) out["bomber"]=bomber;
     if (!battleship.is_empty()) out["battleship"]=battleship;
     if (!missile.is_empty()) out["missile"]=missile;
     if (!beamer.is_empty()) out["beamer"]=beamer;
@@ -71,7 +72,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     auto &groups=run.render_workspace.batches;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
-        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();
+        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();
     }
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
@@ -94,6 +95,9 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         if (definition.kind==EnemyDefinition::Kind::Gunner && enemy.charge>0) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.gunner.push_back(value);
+        }
+        if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode!=EnemyMode::Windup) {
+            for (float v:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(0.7+0.3*std::sin(state.world_time*30.0+double(enemy.id)))}) enemy_batch.bomber.push_back(v);
         }
         if (definition.kind==EnemyDefinition::Kind::Cross && enemy.mode==EnemyMode::Windup) {
             const auto &p=run.content->cross_enemies[definition.cross_definition-1];const auto c=definition.color.lightened(0.2);
@@ -135,7 +139,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         const bool warning=definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {enemy_batch.glows.push_back(pose.position.x);enemy_batch.glows.push_back(pose.position.y);enemy_batch.glows.push_back(radius);}
-        const auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):definition.color):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
+        auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):definition.color):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
+        if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode==EnemyMode::Windup) color.g=std::fmod(enemy.charge*3.0,1.0)>=0.45?1.0:0.0;
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,color,enemy.flash>0 || warning?1:0);
     }
     for (size_t i=0;i<state.friends.size();++i) {

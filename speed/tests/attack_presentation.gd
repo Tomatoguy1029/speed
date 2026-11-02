@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-bomber" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_bomber()
+		check(finished,"自爆する雑魚の指定確認を最後まで実施する")
+		print("[cpp_bomber] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-cross-enemy" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_cross_enemy()
 		check(finished,"みなみじゅうじ座の指定確認を最後まで実施する")
@@ -1151,5 +1157,65 @@ func check_cpp_cross_enemy() -> bool:
 	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
 	check(cpp_core.hazards_snapshot().is_empty(),"照射中に発生元を消しても付いた4辺を残さない")
 	cpp_bridge.release_checkpoint(pending.value)
+	cpp_session.free()
+	return true
+
+func check_cpp_bomber() -> bool:
+	var tuning := {"bomber":{"speed":80.0,"params.blast_delay":0.3,"params.blast_dmg":7.0,"params.blast_radius":150.0,"params.rush":2.0,"params.trigger":200.0}}
+	if not await prepare_cpp_attack(110,"bomber",PackedStringArray(["bomber","drifter"]),tuning): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(400,0),"velocity":Vector2.ZERO})
+	cpp_core.set_attack_formation_mode(true)
+	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"bomber","position":cpp_origin}).value
+	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	cpp_core.step(0.05)
+	var moving: Dictionary = cpp_motion_for(actor)
+	check(moving.mode==EnemyTable.Mode.MOVE and Vector2(cpp_core.enemies_snapshot()[0].vel[0],cpp_core.enemies_snapshot()[0].vel[1]).length()>0.0,"遠い機体へ追跡し、投下型には変えない")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(presentation.frame_view.apply_frame(frame) and presentation.frame_view._bomber.size()==5,"追跡中は導火線の火花を描く")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(120,0),"velocity":Vector2.ZERO})
+	cpp_core.step(0.05)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE,"予算がなければ近距離でも予告を始めない")
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_core.step(0.01)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.3),"編集した近距離と待ち時間で自爆予告へ入る")
+	cpp_core.step(0.05)
+	var warning: Dictionary = cpp_motion_for(actor)
+	check(Vector2(cpp_core.enemies_snapshot()[0].vel[0],cpp_core.enemies_snapshot()[0].vel[1]).length()>80.0 and warning.charge>0.0,"カウントダウン中もrush倍の速さへ加速して接近する")
+	frame = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	check(frame.batches.any(func(b): return b.ids.has(actor) and b.colors[b.ids.find(actor)].g==1.0) and presentation.frame_view.apply_frame(frame) and presentation.frame_view._bomber.is_empty(),"予告は3回の赤い装甲明滅へ切り替える")
+	await get_tree().process_frame
+	var pending: Dictionary = cpp_bridge.checkpoint()
+	var before: Array = cpp_core.enemy_motion_snapshot()
+	cpp_core.step(0.26)
+	var hazards: Array = cpp_core.hazards_snapshot()
+	var events: Array = cpp_bridge.read_frame().value.events
+	check(hazards.size()==1 and hazards[0].radius==150.0 and hazards[0].damage==7.0 and hazards[0].style==ENUMS.ZoneStyle.Bomber,"カウントダウンの終わりに編集した自爆範囲を1つ生成する")
+	check(events.filter(func(e): return e.type==&"bomber_explode").size()==1 and not events.any(func(e): return e.type==&"kill" or e.type==&"xp_drop"),"自爆通知は1回で撃破報酬を出さない")
+	if hazards.size()!=1: cpp_session.free(); return false
+	var center: Vector2 = hazards[0].pos
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"bomber","position":cpp_origin+Vector2(500,300)}).value
+	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0 and cpp_core.hazards_snapshot().size()==1,"発生元を先に解放し同じ行を使い直しても爆風は独立して残る")
+	cpp_bridge.command("dev_ship_motion",{"position":center,"velocity":Vector2.ZERO})
+	cpp_core.step_hazards(0.01)
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-7.0),"発生元の退場後も自爆の当たりを1回だけ処理する")
+	frame = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.apply_frame(frame) and frame.shapes.any(func(shape): return shape.kind==ENUMS.RenderShapeKind.Zone and shape.zone_style==ENUMS.ZoneStyle.Bomber),"通常画面でBomber専用の爆風を描く")
+	await get_tree().process_frame
+	cpp_core.step_hazards(0.4)
+	check(cpp_core.hazards_snapshot().is_empty(),"単体の自爆範囲が寿命で終了する")
+	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before,"自爆途中の時間・向き・加速・chargeを保持から復元する")
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	cpp_core.step(0.4)
+	events = cpp_bridge.read_frame().value.events
+	check(cpp_core.hazards_snapshot().is_empty() and not events.any(func(e): return e.type==&"bomber_explode"),"予告中に倒すと自爆と自爆通知を出さない")
+	cpp_bridge.restore(pending.value)
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	cpp_core.step(0.4)
+	check(cpp_core.hazards_snapshot().is_empty(),"予告中に発生元を先に消しても古い参照から自爆しない")
 	cpp_session.free()
 	return true
