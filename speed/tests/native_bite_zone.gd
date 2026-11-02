@@ -11,6 +11,11 @@ func values(object: Object,keys: Array) -> Dictionary:
 	return out
 func _ready() -> void:
 	comparison = COMPARE.new()
+	if "--cpp-wall" in OS.get_cmdline_user_args():
+		await check_cpp_wall()
+		print("[cpp_wall] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-beamer" in OS.get_cmdline_user_args() or "--cpp-beamer-fixes" in OS.get_cmdline_user_args():
 		beamer_fixes = "--cpp-beamer-fixes" in OS.get_cmdline_user_args()
 		await check_cpp_beamer()
@@ -449,3 +454,98 @@ func check_cpp_beamer() -> void:
 	bridge.release_checkpoint(initial.value)
 	session.free()
 	beamer_finished = true
+
+func check_cpp_wall() -> void:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.start_radius = 900.0
+	config.planet_radius = 100.0
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	config.invuln_time = 0.06
+	var stage := RuntimeStage.new()
+	stage.index = 87
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_wall"
+	var builder = load("res://tools/content/build_run_content.gd")
+	check(builder.build(stage,config,output,"壁の予告・再接触・終了".sha256_text())==OK,"壁の共通定義を生成する")
+	var path := output.path_join("stage_87.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":287},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"壁を表示する通常のC++ランを準備する")
+	if session.bridge==null: session.free(); return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target := Vector2(-900,0)
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(-300,300)}).value
+	var emitted: Dictionary = bridge.command("dev_fire_wall",{"position":target-Vector2(100,0),"angle":0.0,"length":200.0,"width":32.0,"delay":0.25,"active":1.0,"damage":7.0,"owner_id":owner_id})
+	check(emitted.ok,"発生源から残る壁を生成する")
+	if not emitted.ok: session.free(); return
+	var checkpoint: Dictionary = bridge.checkpoint()
+	check(checkpoint.ok,"予告中の壁を保持する")
+	core.step_hazards(0.125)
+	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"残る線は予告中に被弾しない")
+	var frame: Dictionary = bridge.read_render(Rect2(-1600,-400,1200,800)).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(frame.shapes.size()==1 and frame.shapes[0].kind==0 and frame.shapes[0].points.size()==2,"壁の予告は始点から終点まで線で表示する")
+	check(presentation.frame_view.apply_frame(frame),"壁の予告を通常の表示へ渡す")
+	await get_tree().process_frame
+	core.step_hazards(0.125)
+	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-7.0),"残る線に触れると被弾する")
+	core.step_hazards(0.01)
+	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-7.0),"壁の接触中も無敵時間は被弾を防ぐ")
+	core.step_ship(0.08,0.08,{"touch":true})
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
+	core.step_hazards(0.01)
+	check(is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp-14.0),"無敵が切れたあとの再接触でまた被弾する")
+	frame = bridge.read_render(Rect2(-1600,-400,1200,800)).value
+	check(frame.shapes.size()==1 and frame.shapes[0].widths.size()==2 and is_equal_approx(frame.shapes[0].widths[1],32.0),"有効な壁は元の全幅で光と本体を表示する")
+	check(presentation.frame_view.apply_frame(frame),"有効な壁を通常の表示へ渡す")
+	await get_tree().process_frame
+	bridge.command("dev_remove",{"entity_id":owner_id})
+	var replacement: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(500,500)}).value
+	core.step_hazards(0.01)
+	check(core.hazards_snapshot().size()==1 and core.hazards_snapshot()[0].owner_id==owner_id and replacement!=owner_id,"発生元の退場と行再利用でも元の所有者IDで壁が残る")
+	var active: Dictionary = bridge.checkpoint()
+	var active_state: Array = core.hazards_snapshot()
+	check(active.ok,"接触後の残る壁を値で保持する")
+	core.step_hazards(1.0)
+	check(core.hazards_snapshot().is_empty(),"残る線は時間で消える")
+	bridge.restore(active.value)
+	check(core.hazards_snapshot()==active_state,"寿命・幅・所有者ID・接触状態を保持点から復元する")
+	core.step_hazards(1.0)
+	check(core.hazards_snapshot().is_empty(),"復元後も同じ期限で消える")
+	bridge.restore(checkpoint.value)
+	var before: Array = core.hazards_snapshot()
+	check(not bridge.command("dev_fire_wall",{"position":target,"angle":0.0,"length":200.0,"width":-1.0,"delay":0.0,"active":1.0,"damage":7.0}).ok and core.hazards_snapshot()==before,"不正な壁は状態を変えずに拒否する")
+	core.step_hazards(1.25)
+	check(core.hazards_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"期限を飛び越した壁は命中前に終了する")
+	var barrier: Dictionary = bridge.command("dev_fire_wall",{"position":target-Vector2(100,0),"angle":0.0,"length":200.0,"width":32.0,"delay":0.0,"active":1.0,"damage":0.0,"blocking":true,"style":2})
+	check(barrier.ok,"じょうぎ座用の移動を止める壁を生成する")
+	bridge.command("dev_ship_motion",{"position":target+Vector2(0,100),"velocity":Vector2(0,1000)})
+	check(core.collide_ship(target+Vector2(0,-100),config.ship_radius) and core.ship_snapshot().ship_pos.y<0 and core.ship_snapshot().ship_vel.y<0,"壁の手前で機体を止めて弾く")
+	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(0,1000)})
+	check(core.collide_ship(target,config.ship_radius) and core.ship_snapshot().ship_pos.y>16.0+config.ship_radius,"壁の中にいた機体を近い側へ押し出す")
+	bridge.command("dev_ship_motion",{"position":target+Vector2(0,100),"velocity":Vector2.ZERO})
+	bridge.command("dev_emit_attack",{"pool":0,"position":target+Vector2(0,-100),"velocity":Vector2(0,1000),"life":1.0,"radius":5.0,"damage":2.0})
+	core.step_projectiles(0.2)
+	check(core.projectiles_snapshot().is_empty(),"移動を止める壁は味方弾を止める")
+	bridge.command("dev_emit_attack",{"pool":1,"position":target+Vector2(0,-100),"velocity":Vector2(0,1000),"life":1.0,"radius":5.0,"damage":2.0})
+	core.set_motion_context(target+Vector2(0,100),target,Vector2(640,360))
+	core.step_hostiles(0.2)
+	check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"壁が敵弾を機体より先に止める")
+	frame = bridge.read_render(Rect2(-1600,-400,1200,800)).value
+	check(frame.shapes.size()==2 and presentation.frame_view.apply_frame(frame),"じょうぎ座の壁は光の柱と根元の光を表示する")
+	await get_tree().process_frame
+	bridge.command("dev_attack_scope",{"event":"bonus"})
+	check(core.hazards_snapshot().is_empty(),"ボーナス切替で残る壁を回収する")
+	bridge.release_checkpoint(active.value)
+	bridge.release_checkpoint(checkpoint.value)
+	session.free()

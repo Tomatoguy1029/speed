@@ -4,6 +4,7 @@
 #include "../../output/frame_builder.h"
 #include "beam.h"
 #include "wave.h"
+#include "wall.h"
 #include <cmath>
 namespace speed {
 bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
@@ -32,12 +33,12 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         if (time<current.delay || current.hit) continue;
         if (!hazard_before_touch(state,handle)) return true;
         const auto *circle=std::get_if<CircleHazard>(&current.shape);
-        const ContactShape shape=circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):BeamSystem::geometry(current);
+        const ContactShape shape=circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
         if (circle) current.hit=true;
         const auto *contact=get(state,handle);if (!contact) continue;const auto &policy=contact->spec.contact;
         const auto previous=contact->ship_previous_ready?contact->ship_previous:state.ship.pos;
         if (!CollisionQuery::touches(shape,{previous,state.ship.pos,state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) continue;
-        current.hit=true;
+        if (!std::holds_alternative<WallHazard>(current.shape)) current.hit=true;
         if (circle && state.bite_zone_config.hit) {
             godot::Dictionary event;if (state.bite_zone_config.visual_key) event["visual_key"]=state.bite_zone_config.visual_key;else event["scene"]=state.bite_zone_config.scene;
             event["phase"]="Hit";event["pos"]=state.ship.pos;EventBuilder::flush_combat(run);FrameBuilder::append(run,"attack_visual_end",event);

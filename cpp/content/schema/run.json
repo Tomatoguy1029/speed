@@ -1282,6 +1282,10 @@
       {
         "name": "Beam",
         "value": "beam"
+      },
+      {
+        "name": "Wall",
+        "value": "wall"
       }
     ],
     "VisualRole": [

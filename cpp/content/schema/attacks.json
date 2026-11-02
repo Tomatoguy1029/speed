@@ -160,6 +160,23 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "WallDefinition",
+      "section": 38,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {
@@ -251,6 +268,24 @@
       {
         "name": "Pulser",
         "value": "pulser"
+      }
+    ],
+    "WallStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Trail",
+        "value": "trail"
+      },
+      {
+        "name": "Ray",
+        "value": "ray"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
       }
     ]
   }

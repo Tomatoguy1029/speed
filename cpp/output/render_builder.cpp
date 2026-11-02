@@ -3,6 +3,7 @@
 #include "../systems/attack_system.h"
 #include "../systems/attacks/beam.h"
 #include "../systems/attacks/wave.h"
+#include "../systems/attacks/wall.h"
 #include "../runtime/run_runtime.h"
 #include "../systems/motion_math.h"
 #include "../systems/group_system.h"
@@ -105,7 +106,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     Array batches;for (auto &group:groups) if (!group.second.instances.empty()) batches.push_back(group.second.value());
     Array shapes;
-    for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);}
+    for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);WallSystem::render(run,row,view,shapes);}
     const auto &points=state.draw.drawing?state.draw.points:state.draw.path;
     if ((state.draw.drawing || state.draw.tracing) && points.size()>1) {
         Dictionary line;line["kind"]=0;line["layer"]=12;line["order"]=0;line["owner_id"]=0;line["points"]=points;

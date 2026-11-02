@@ -6,6 +6,7 @@
 #include "../../output/event_builder.h"
 #include "../../output/frame_builder.h"
 #include "reflected.h"
+#include "wall.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -23,6 +24,8 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
         const auto processing_handle=shot.attack;
         const Vector2 from = shot.pos, vel = shot.vel, destination = from + vel * world_dt;
         auto body_hit=speed::FieldSystem::first_body_hit(runtime,from,destination,shot.radius);
+        const auto wall=WallSystem::block_hit(runtime,from,destination,shot.radius);
+        if (wall && (!body_hit || wall->t<body_hit->t)) body_hit=BodyHit{UINT32_MAX,wall->t,wall->point};
         const Vector2 to=body_hit?body_hit->point:destination;
         Vector2 position = destination;
         double life = double(shot.life) - world_dt;

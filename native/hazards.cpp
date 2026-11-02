@@ -51,6 +51,11 @@ Array SpeedRunCore::hazards_snapshot() const {
             row["kind"]=0;row["angle"]=beam->angle;row["length"]=beam->length;row["half_width"]=beam->half_width;row["arc"]=beam->arc;
             const auto *record=speed::AttackSystem::get(runtime.state,zone.attack);row["owner_id"]=record?record->spec.owner.source_id:0;
         }
+        if (const auto *wall=std::get_if<speed::WallHazard>(&zone.shape)) {
+            row["kind"]=3;row["angle"]=wall->angle;row["length"]=wall->length;row["half_width"]=wall->half_width;
+            row["style"]=wall->style;row["blocking"]=wall->blocking;
+            const auto *record=speed::AttackSystem::get(runtime.state,zone.attack);row["owner_id"]=record?record->spec.owner.source_id:0;
+        }
         if (const auto *wave=std::get_if<speed::WaveHazard>(&zone.shape)) {
             row["kind"]=2;row["angle"]=wave->angle;row["length"]=wave->radius;row["half_width"]=wave->half_width;row["arc"]=wave->arc;
             row["radius"]=speed::WaveSystem::radius(zone);row["start_radius"]=wave->start_radius;row["speed"]=wave->speed;

@@ -23,6 +23,7 @@ struct ContentBundle {
     std::vector<HostileDefinition> hostile_definitions;
     std::vector<BeamDefinition> beams;
     std::vector<WaveDefinition> waves;
+    std::vector<WallDefinition> walls;
     std::vector<FriendShotDefinition> friend_shots;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;

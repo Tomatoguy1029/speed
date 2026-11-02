@@ -2,6 +2,7 @@
 #include "../cpp/systems/field.h"
 #include "../cpp/systems/attack_system.h"
 #include "../cpp/systems/attacks/missile.h"
+#include "../cpp/systems/attacks/wall.h"
 #include "geometry.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/output/event_builder.h"
@@ -95,6 +96,8 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         double gap=double(shot.gap)-runtime.state.field.body_speed_max*world_dt;
         std::optional<speed::BodyHit> body_hit;
         if (gap<=step) {gap=speed::FieldSystem::body_gap(runtime,from,shot.radius);if (gap<=step) body_hit=speed::FieldSystem::first_body_hit(runtime,from,to,shot.radius);}
+        const auto wall=speed::WallSystem::block_hit(runtime,from,to,shot.radius);
+        if (wall && (!body_hit || wall->t<body_hit->t)) body_hit=speed::BodyHit{UINT32_MAX,wall->t,wall->point};
         const double ship_t=speed::CollisionQuery::segment_circle_t(from,to,runtime.state.ship.pos,double(shot.radius)+body_radius);
         const double reach = double(shot.radius) + body_radius + step;
         if ((!body_hit || (ship_t>=0 && ship_t<body_hit->t)) && (record->spec.contact.ship_sweep || runtime.state.ship.pos.distance_squared_to(to) <= reach * reach)) {
