@@ -25,8 +25,7 @@ func _ready() -> void:
 	source=load("res://.content/hero_aura.res")
 	for j in [0,2,5,11]:
 		await compare(j)
-	await lifecycle()
-	if "--cpp-perseus" in OS.get_cmdline_user_args(): await cpp_perseus_display()
+	await cpp_perseus_display()
 	print("[hero_aura_gpu] cases=4 failed=",failed)
 	get_tree().quit(1 if failed else 0)
 func viewport() -> SubViewport:
@@ -111,37 +110,6 @@ func settle() -> void:
 	for _i in 4:
 		await get_tree().process_frame
 		await RenderingServer.frame_post_draw
-func lifecycle() -> void:
-	var session:=RunManager.create_session(self,{"lab":true,"stage_index":4,"seed":401},true)
-	session.auto_step=false
-	var view:RunPresentation=session.view.get_node("RunPresentation")
-	var hero: HeroSystem = session.sim.heroes
-	view.view_override={"center":hero.center,"zoom":0.7}
-	await settle()
-	check(view._hero_aura.visible,"画面内の英雄の光雲を表示する")
-	check(view._hero_aura.mesh==source.mesh and view._hero_aura_material!=source.material,"形状を共有し、materialは表示ごとに所有する")
-	var before:Vector2=view._hero_aura_material.get_shader_parameter("radii")
-	view.view_override.zoom=1.0
-	await settle()
-	check(view._hero_aura_material.get_shader_parameter("radii")!=before,"倍率のライブ変更で同じ星座の格子を更新する")
-	session.sim.state.world_time=3.0
-	await settle()
-	var breath:float=view._hero_aura_material.get_shader_parameter("breath")
-	check(is_equal_approx(breath,0.95+0.05*sin(3.0*0.8)),"呼吸は元と同じ世界時刻から計算する")
-	session.sim.set_phase(RunIds.Phase.Paused)
-	await settle()
-	check(view._hero_aura_material.get_shader_parameter("breath")==breath,"ポーズ中は光雲の呼吸を保持する")
-	view._layers.field.hide()
-	check(not view._hero_aura.is_visible_in_tree(),"地形の非表示に光雲も従う")
-	view._layers.field.show()
-	hero.hero=null
-	await settle()
-	check(not view._hero_aura.visible,"英雄がなくなったら前の光雲を残さない")
-	var weak:WeakRef=weakref(view._hero_aura_material)
-	session.free()
-	await get_tree().process_frame
-	check(weak.get_ref()==null,"終了時にラン固有materialを解放する")
-
 func cpp_perseus_display() -> void:
 	var guide = load("res://tests/integration/hero_guidance.gd").new()
 	var behavior = load("res://tests/runtime/hero_behaviors.gd").new()

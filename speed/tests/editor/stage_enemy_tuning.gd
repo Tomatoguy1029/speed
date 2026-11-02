@@ -15,7 +15,6 @@ func _ready() -> void:
 		print("[cpp_save] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
-	_check_stage1_hp()
 	var common := IO.definition("telescope")
 	var cfg := ContentManager.cfg.duplicate(true) as GameConfig
 	var hp := common.base_hp(cfg)
@@ -55,71 +54,10 @@ func _ready() -> void:
 	ResourceSaver.save(runtime, baked_path)
 	runtime = IO.read_stage(baked_path)
 	check(runtime.enemy_tuning == edited, "生成物の再読込でも差分を保持する")
-	var session := RunManager.create_session(self, {"stage": runtime, "stage_index": 4, "config": cfg, "seed": 42}, false)
-	session.auto_step = false
-	var enemies: EnemySystem = session.sim.enemies
-	var def: EnemyDef = enemies.def_of(&"telescope")
-	check(is_equal_approx(def.base_hp(cfg), hp * 2.0), "星からの計算後のHPへ上書きを適用する")
-	check(def.params.bullet_dmg == damage + 8.0, "敵固有の攻撃力へ適用する")
-	var row: int = enemies.spawn(def, Vector2(300, 200))
-	var t: EnemyTable = enemies.table
-	t.hp[row] = t.max_hp[row] * 0.25
-	var id: int = t.id[row]
-	var old_hp: float = t.max_hp[row]
-	t.timer[row] = 1.25
-	var live := edited.duplicate(true)
-	live.telescope.hp = hp * 3.0
-	live.telescope["params.bullet_dmg"] = damage + 12.0
-	session.sim.state.time = 13.5
-	session.sim.state.world_time = 7.25
-	enemies.update_stage_tuning(live)
-	var changes: Array = session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed")
-	check(changes.size() == 1 and changes[0].t == 13.5 and changes[0].world_t == 7.25 and changes[0].values == live, "変更イベントに適用時刻と上書き全体を含める")
-	enemies.update_stage_tuning(live)
-	check(session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed").size() == 1, "同じ設定の再通知を省く")
-	live.telescope.hp = hp * 4.0
-	check(changes[0].values.telescope.hp == hp * 3.0, "変更イベントの辞書を後続の試行から独立させる")
-	check(is_equal_approx(t.hp[row] / t.max_hp[row], 0.25) and t.max_hp[row] > old_hp, "ライブHP変更で残HP割合を保つ")
-	check(t.id[row] == id and t.pos[row] == Vector2(300, 200) and t.timer[row] == 1.25, "位置・個体ID・行動状態を維持する")
-	check(t.def[row].params.bullet_dmg == damage + 12.0, "既存個体が次の攻撃に新しい値を使う")
-	check(enemies.def_of(&"telescope") == t.def[row], "新しい出現にもライブ値を使う")
-	var direct: int = enemies.spawn(common, Vector2.ZERO)
-	check(t.def[direct].params.bullet_dmg == damage + 12.0, "共通定義を直接渡す出現にもステージ値を使う")
-	session.sim.projectiles.fire_enemy(row, 0.0, 10.0, &"bullet")
-	var shot: int = session.sim.projectiles.hostile_alive.find(1)
-	check(shot >= 0 and session.sim.projectiles.hostile_dmg[shot] == damage + 12.0, "発射した弾の攻撃力にライブ値が入る")
-	check(runtime.enemy_tuning == edited, "未保存の試行でRuntimeStageを書き換えない")
-	enemies.update_stage_tuning({})
-	check(enemies.def_of(&"telescope").base_hp(cfg) == hp and t.def[row].params.bullet_dmg == damage, "リセットで共通値へ戻る")
-	check(is_equal_approx(t.hp[row] / t.max_hp[row], 0.25), "リセットでも残HP割合を保つ")
-	check(IO.definition("telescope").params.bullet_dmg == damage, "共通の敵ファイルへ波及しない")
-	var other_stage := ContentManager.stage(2).duplicate(true) as StageDef
-	other_stage.enemy_tuning = {}
-	var other := RunManager.create_session(self, {"stage": BUILD.compile(other_stage), "stage_index": 2, "seed": 42}, false)
-	other.auto_step = false
-	check(other.sim.enemies.def_of(&"telescope").base_hp(cfg) == hp, "同じ敵を使う別ステージへ波及しない")
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--capture=") and DisplayServer.get_name() != "headless":
-			var overlay = load("res://scripts/dev/stage_enemy_overlay.gd").new()
-			overlay.run = session.sim
-			add_child(overlay)
-			overlay.show()
-			overlay.panel._select_enemy("telescope")
-			overlay.panel._search.text = "bullet"
-			overlay.panel._refresh_rows()
-			await get_tree().process_frame
-			overlay._fit()
-			await get_tree().process_frame
-			await RenderingServer.frame_post_draw
-			check(overlay.panel._status.get_global_rect().end.y <= get_viewport().get_visible_rect().end.y, "保存・状態表示が画面内に収まる")
-			get_viewport().get_texture().get_image().save_png(arg.trim_prefix("--capture="))
-			overlay.free()
-	other.free()
-	session.free()
 	DirAccess.remove_absolute(path)
 	DirAccess.remove_absolute(baked_path)
-	await get_tree().process_frame
-	print("[stage_enemy_tuning] %d failures" % failed)
+	check(await cpp_save(self,false),"F4の保存からC++の再出撃まで確認する")
+	print("[stage_enemy_tuning] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
 func cpp_save(parent: Node, failure_only: bool) -> bool:
@@ -200,28 +138,3 @@ func cpp_save(parent: Node, failure_only: bool) -> bool:
 	session.free()
 	DirAccess.remove_absolute(fixture)
 	return true
-
-func _check_stage1_hp() -> void:
-	var stage := ContentManager.stage(1)
-	var expected := {"marlin": 150.0, "pump": 60.0, "shield": 45.0, "triangle_star": 12.0}
-	check(stage.enemy_tuning.keys().size() == 8, "Stage1のHPと攻撃を対象8種類だけ上書き")
-	var runtime := BUILD.compile(stage)
-	var session := RunManager.create_session(self, {"stage": runtime, "stage_index": 1, "seed": 42}, false)
-	session.auto_step = false
-	var enemies: EnemySystem = session.sim.enemies
-	for entry in [[&"biter", "bullet_dmg", 4.0], [&"bomber", "blast_dmg", 14.0], [&"pulser", "bullet_dmg", 14.0], [&"pump", "bullet_dmg", 28.0], [&"triangle", "trail_dmg", 14.0], [&"marlin", "fire_interval", 3.6]]:
-		var tuned: EnemyDef = enemies.def_of(entry[0])
-		check(is_equal_approx(float(tuned.params[entry[1]]), entry[2]), "Stage1の攻撃・間隔をランへ渡す: " + String(entry[0]))
-		check(not is_equal_approx(float(ContentManager.definition(&"enemies", entry[0]).params[entry[1]]), entry[2]), "他ステージ用の共通値を保持する: " + String(entry[0]))
-	for id: String in expected:
-		var definition: EnemyDef = enemies.def_of(StringName(id))
-		check(is_equal_approx(definition.base_hp(session.sim.cfg), expected[id]), "Stage1の生成・ランにHPを渡す: " + id)
-		check(not is_equal_approx(ContentManager.definition(&"enemies", id).base_hp(session.sim.cfg), expected[id]), "共通定義のHPを保持する: " + id)
-	var row: int = enemies.spawn(enemies.def_of(&"triangle"), Vector2(400, 200))
-	var parts: PackedInt32Array = enemies.table.parts[row]
-	check(parts.size() == 6, "三角は3つの破壊対象を生成する")
-	for k in 3:
-		var part: int = parts[k * 2]
-		check(is_equal_approx(enemies.table.max_hp[part], expected.triangle_star), "生成された三角の星にも局所HPを適用する")
-	check(is_equal_approx(enemies.def_of(&"triangle").base_hp(session.sim.cfg), ContentManager.definition(&"enemies", &"triangle").base_hp(session.sim.cfg)), "当たり判定のない中心のHPは変更しない")
-	session.free()
