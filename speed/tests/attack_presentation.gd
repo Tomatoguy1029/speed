@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-pump" in OS.get_cmdline_user_args() or "--cpp-pump-fix2" in OS.get_cmdline_user_args() or "--cpp-pump-final" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_pump()
+		check(finished,"ポンプ座の指定確認を最後まで実施する")
+		print("[cpp_pump] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-gates" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_gates()
 		check(finished,"判定ゲートの指定確認を最後まで実施する")
@@ -1517,4 +1523,114 @@ func check_cpp_gates() -> bool:
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(80,0),"velocity":Vector2(3000,0)})
 	check(not cpp_core.collide_ship(cpp_origin-Vector2(80,0),cpp_config.ship_radius) and cpp_core.enemies_snapshot()[0].dead==1,"盾の背後の高速接触は盾を奪って倒す")
 	cpp_session.free()
+	return true
+
+func cpp_enemy_for(id: int) -> Dictionary:
+	var rows: Array = cpp_core.enemies_snapshot().filter(func(row): return row.id==id)
+	return rows[0] if not rows.is_empty() else {}
+
+func check_cpp_pump() -> bool:
+	var final_only := "--cpp-pump-final" in OS.get_cmdline_user_args()
+	var retry := final_only or "--cpp-pump-fix2" in OS.get_cmdline_user_args()
+	mute_checks = retry
+	var edible := (load("res://data/enemies/drifter.tres") as EnemyDef).duplicate(true) as EnemyDef
+	edible.rank = 1
+	var tuning := {"pump":{"hp":5.0,"speed":0.0,"turn":100.0,"params.store_max":2,"params.pull_radius":300.0,"params.pull":200.0,"params.swallow_reach":0.0,"params.swallow_interval":0.1,"params.telegraph":0.3,"params.lock_time":0.1,"params.shell_speed":300.0,"params.shell_r":12.0,"params.shell_range":600.0,"params.burst_radius":80.0,"params.bullet_dmg":7.0,"params.recover":0.2,"params.release_base":2,"params.release_per":1.0,"params.release_speed":100.0,"params.release_dmg":0.5,"params.release_radius":50.0},"drifter":{"speed":0.0},"splitling":{"speed":0.0},"swarm":{"speed":0.0},"bomber":{"hp":100.0,"speed":0.0}}
+	var prepared := await prepare_cpp_attack(115,"pump",PackedStringArray(["pump","drifter","splitling","swarm","hydra_bite","bomber"]),tuning,{&"drifter":edible})
+	mute_checks = final_only
+	if not prepared: mute_checks = false; return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(500,0),"velocity":Vector2.ZERO})
+	cpp_core.set_attack_formation_mode(true)
+	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"pump","position":cpp_origin}).value
+	var base_radius: float = cpp_enemy_for(owner).radius
+	var target: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(200,0)}).value
+	var exclusions: Array[int] = []
+	for flags: Dictionary in [{"held":true},{"stone":1.0},{"shove_time":1.0},{"landmark":true},{"is_boss":true}]:
+		var id: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(10,30)}).value
+		if flags.has("landmark") or flags.has("is_boss"):
+			var command := flags.duplicate(); command.entity_id = id
+			cpp_bridge.command("dev_enemy_combat",command)
+		else: cpp_core.set_enemy_motion(id,flags)
+		exclusions.append(id)
+	exclusions.append(cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(10,30)}).value)
+	exclusions.append(cpp_bridge.command("dev_spawn_part",{"parent_id":owner,"definition_id":"hydra_bite","position":cpp_origin+Vector2(10,30)}).value)
+	var rival: int = cpp_bridge.command("dev_spawn",{"definition_id":"pump","position":cpp_origin-Vector2(50,0)}).value
+	cpp_bridge.command("dev_add_rock",{"kind":0,"position":cpp_origin+Vector2(10,-50),"size":10.0,"manual":true})
+	cpp_bridge.command("dev_stream_rocks",{"center":cpp_origin,"half":Vector2(640,360),"dt":0.01})
+	cpp_core.step(0.05)
+	check(cpp_motion_for(target).pump_owner_id==owner and cpp_enemy_for(target).pos[0]<cpp_origin.x+200.0 and cpp_enemy_for(target).vel==[0.0,0.0],"吸引口へ位置を直接1度進め、速度を0へ戻して所有者IDを結ぶ")
+	if not retry: check(cpp_motion_for(rival).buds==0 and cpp_motion_for(owner).buds==0 and exclusions.all(func(id): return cpp_motion_for(id).pump_owner_id==0 and cpp_enemy_for(id).dead==0),"held・石化・shove・目印・ボス・rank0・部位・別Pumpと他所有の敵を吸い込まない")
+	cpp_bridge.command("dev_remove",{"entity_id":rival})
+	var owned: Dictionary = cpp_bridge.checkpoint()
+	for flag: String in ["held","stone","shove_time"]:
+		cpp_bridge.restore(owned.value)
+		cpp_core.set_enemy_motion(target,{flag:true if flag=="held" else 1.0})
+		cpp_core.step(0.01)
+		if not retry: check(cpp_motion_for(target).pump_owner_id==0,"所有中の相手が%sになると吸引所有を解除する" % flag)
+	cpp_bridge.restore(owned.value)
+	cpp_core.set_enemy_motion(owner,{"held":true})
+	cpp_core.step(0.01)
+	if not retry: check(cpp_motion_for(target).pump_owner_id==0,"発生元が保持されて吸引できなくなると相手を解放する")
+	cpp_bridge.restore(owned.value)
+	cpp_bridge.command("dev_remove",{"entity_id":target})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(500,0)}).value
+	cpp_core.step(0.01)
+	if not retry: check(replacement!=target and cpp_motion_for(replacement).pump_owner_id==0 and cpp_motion_for(owner).buds==0,"吸引相手を先に解放し行を使い直しても古い対象を飲み込まない")
+	cpp_bridge.restore(owned.value)
+	var first: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(10,0)}).value
+	cpp_core.step(0.05)
+	if not retry: check(cpp_motion_for(owner).stored_types==PackedStringArray(["splitling"]) and cpp_enemy_for(first).dead==1 and cpp_core.combat_snapshot().kills==0,"口に届いた種類だけを個体在庫へ入れ、撃破報酬なしで退場させる")
+	var half: Dictionary = cpp_bridge.checkpoint()
+	var half_state: Array = cpp_core.enemy_motion_snapshot()
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	cpp_bridge.collect_frame()
+	presentation._present_cpp(0.0)
+	var pump_displays: Array = presentation.frame_view.enemy_frames.values().filter(func(display): return display._pump!=null)
+	check(pump_displays.size()==1 and pump_displays[0]._pump._bodies.size()==1 and is_equal_approx(pump_displays[0]._pump._bodies[0].material.get_shader_parameter("stored_full"),0.5) and pump_displays[0]._pump._winds[0].visible and pump_displays[0]._pump.swallows.size()==1,"既存の本体・塗装・法線と吸引風・飲み込みの表示を通常画面へつなぐ")
+	await get_tree().process_frame
+	cpp_bridge.command("dev_relocate",{"entity_id":owner,"position":cpp_origin+Vector2(0,100)})
+	if not retry: check(cpp_motion_for(owner).stored_types==PackedStringArray(["splitling"]) and cpp_motion_for(target).pump_owner_id==0,"同じ個体の再配置は収納種類を保ち、吸引中の相手を解放する")
+	cpp_bridge.command("dev_relocate",{"entity_id":owner,"position":cpp_origin})
+	cpp_bridge.command("dev_relocate",{"entity_id":target,"position":cpp_origin+Vector2(10,0)})
+	cpp_core.step(0.11)
+	check(cpp_motion_for(owner).stored_types==PackedStringArray(["splitling","drifter"]) and cpp_motion_for(owner).mode==EnemyTable.Mode.WINDUP,"編集した収納上限で種類の順番を保って発射予告へ入る")
+	cpp_core.step(0.05)
+	check(is_equal_approx(cpp_motion_for(owner).timer,0.3) and cpp_core.hostiles_snapshot().is_empty(),"満杯でも攻撃枠がなければ予告時間と圧縮弾を進めない")
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(0,500),"velocity":Vector2.ZERO})
+	cpp_core.step(0.1)
+	var facing: float = cpp_enemy_for(owner).facing
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	mute_checks = false
+	check(presentation.frame_view.apply_frame(frame) and pump_displays[0]._pump._bodies[0].material.get_shader_parameter("full")==1.0 and not pump_displays[0]._pump._winds[0].visible and cpp_enemy_for(owner).radius>base_radius,"満杯の予告では後部を膨らませて吸引風を止める")
+	mute_checks = final_only
+	await get_tree().process_frame
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(-500,0),"velocity":Vector2.ZERO})
+	cpp_core.step(0.15)
+	check(is_equal_approx(cpp_enemy_for(owner).facing,facing),"lock_timeに入ると向きを固定する")
+	var loaded: Dictionary = cpp_bridge.checkpoint()
+	var loaded_state: Array = cpp_core.enemy_motion_snapshot()
+	cpp_core.step(0.06)
+	var shells: Array = cpp_core.hostiles_snapshot()
+	check(shells.size()==1 and shells[0].contents.size()==2 and shells[0].full==1.0 and shells[0].radius==12.0 and shells[0].burst==80.0 and cpp_motion_for(owner).buds==0 and cpp_motion_for(owner).mode==EnemyTable.Mode.RECOVER,"圧縮弾へ収納列・充填率・口位置を値コピーし、在庫を空にして反動を受ける")
+	if shells.size()!=1: cpp_session.free(); return false
+	cpp_core.step(0.21)
+	mute_checks = false
+	check(cpp_motion_for(owner).mode==EnemyTable.Mode.MOVE and is_equal_approx(cpp_enemy_for(owner).radius,base_radius),"発射後にしぼみ、編集した休止を終えて吸引へ戻る")
+	mute_checks = final_only
+	check(cpp_bridge.restore(loaded.value).ok and cpp_core.enemy_motion_snapshot()==loaded_state,"収納種類・所有参照・残り時間・固定方向を保持から復元する")
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	cpp_core.step(0.4)
+	check(cpp_core.hostiles_snapshot().is_empty(),"満杯の発生元を先に解放しても未発射の圧縮弾を生成しない")
+	check(cpp_bridge.restore(half.value).ok and cpp_core.enemy_motion_snapshot()==half_state,"半分収納した状態も元の種類列と所有参照で復元する")
+	var victim: int = cpp_bridge.command("dev_spawn",{"definition_id":"bomber","position":cpp_origin+Vector2(0,60)}).value
+	var killed: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":owner,"amount":10.0,"cause":"shot"}).value
+	check(killed.killed and cpp_core.projectiles_snapshot().size()==3 and is_equal_approx(cpp_enemy_for(victim).hp,95.0) and cpp_motion_for(target).pump_owner_id==0 and cpp_motion_for(owner).buds==0,"途中撃破で収納量に応じた味方破片3個と円爆発を同期生成し、相手と在庫を解放する")
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	var next_owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"pump","position":cpp_origin}).value
+	check(next_owner!=owner and cpp_motion_for(next_owner).buds==0 and cpp_motion_for(next_owner).stored_types.is_empty() and cpp_motion_for(next_owner).bud_t==0.0,"Pumpの行を使い直した別個体へ収納種類を漏らさない")
+	cpp_session.free()
+	mute_checks = false
 	return true

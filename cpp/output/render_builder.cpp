@@ -50,6 +50,7 @@ Dictionary RenderBatchBuffer::value() {
     if (!cross.is_empty()) out["cross"]=cross;
     if (!bomber.is_empty()) out["bomber"]=bomber;
     if (!crab.is_empty()) out["crab"]=crab;
+    if (!pump.is_empty()) out["pump"]=pump;
     if (!battleship.is_empty()) out["battleship"]=battleship;
     if (!missile.is_empty()) out["missile"]=missile;
     if (!beamer.is_empty()) out["beamer"]=beamer;
@@ -75,7 +76,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     auto &groups=run.render_workspace.batches;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
-        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();
+        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
     PackedFloat32Array comet_values,crow_values;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
@@ -107,6 +108,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         if ((definition.kind==EnemyDefinition::Kind::Gunner || definition.kind==EnemyDefinition::Kind::Defender) && enemy.charge>0) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.gunner.push_back(value);
+        }
+        if (definition.kind==EnemyDefinition::Kind::Pump) {
+            const auto &p=run.content->pumps[definition.pump_definition-1];const double base=definition.radius*(enemy.elite?1.25:1.0);const double full=std::clamp((enemy.radius/std::max(base,0.001)-1.0)/std::max(p.grow,0.001),0.0,1.0);const auto &v=std::get<PumpState>(enemy.behavior_state);
+            for (float value:{pose.position.x,pose.position.y,float(pose.angle+definition.sprite_angle),float(base*definition.sprite_scale/18.5),float(enemy.mode==EnemyMode::Windup?1.0:full),float(double(v.contents.size())/p.store_max),float(state.world_time),float(std::min(1.0,enemy.flash*10.0)),enemy.mode==EnemyMode::Move && v.contents.size()<p.store_max?1.0f:0.0f}) enemy_batch.pump.push_back(value);
         }
         if (definition.kind==EnemyDefinition::Kind::Crab) {
             const auto &p=run.content->crabs[definition.crab_definition-1];const auto c=definition.color;const auto &v=std::get<CrabState>(enemy.behavior_state);

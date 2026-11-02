@@ -88,6 +88,9 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (soldier && (!soldier->formation.anchor.is_finite() || soldier->formation.tier<1 || soldier->formation.tier>3 || (state.enemy_handles.contains(soldier->king) && state.enemy_handles.entity_id(soldier->king)!=soldier->king_id))) return false;
         const auto *lynx=std::get_if<LynxState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr)) return false;
+        const auto *pump=std::get_if<PumpState>(&enemy.behavior_state);
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Pump)!=(pump!=nullptr)) return false;
+        if (pump) {if (!std::isfinite(pump->bud_t) || pump->contents.size()>content.pumps[content.definitions[enemy.definition].pump_definition-1].store_max) return false;for (auto id:pump->contents) if (!id || id>content.definitions.size()) return false;}
         const auto *crab=std::get_if<CrabState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Crab)!=(crab!=nullptr) || (crab && crab->buds!=1 && crab->buds!=-1)) return false;
         if (crab) if (const auto *record=AttackSystem::get(state,crab->sweep)) if (!record->spec.owner.attached || !same_handle(record->spec.owner.live_source,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;

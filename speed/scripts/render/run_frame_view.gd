@@ -406,6 +406,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
 			for value: float in row.gunner:
 				if not is_finite(value): return false
+		if row.has("pump"):
+			if not row.pump is PackedFloat32Array or row.pump.size()!=count*9: return false
+			for value: float in row.pump:
+				if not is_finite(value): return false
 		if row.has("crab"):
 			if not row.crab is PackedFloat32Array or row.crab.size()%14!=0: return false
 			for value: float in row.crab:
@@ -483,6 +487,10 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in enemy_frames.values(): display.begin()
 	for node: Sprite2D in parts.values(): node.hide()
 	for line in _lines: line.hide()
+	var previous_crab := _crab
+	var previous_bomber := _bomber
+	var previous_cross := _cross
+	var previous_aquarius := _aquarius
 	var previous_gunner := _gunner
 	var previous_beamer := _beamer
 	var previous_missile := _missile
@@ -520,7 +528,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		if row.has("dolphin"): _dolphin.append_array(row.dolphin)
 		if row.has("sniper"): _sniper.append_array(row.sniper)
 	# 描画命令はCanvasItemが保持する。変わらない予告は再構築しない。
-	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin or _lynx!=previous_lynx or _soldier!=previous_soldier or _reticle!=previous_reticle: _gunner_marks.queue_redraw()
+	if _crab!=previous_crab or _bomber!=previous_bomber or _cross!=previous_cross or _aquarius!=previous_aquarius or _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin or _lynx!=previous_lynx or _soldier!=previous_soldier or _reticle!=previous_reticle: _gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	var packed_bytes := 0
@@ -707,8 +715,10 @@ func apply_frame(frame: Dictionary) -> bool:
 	if cepheus!=_cepheus:
 		_cepheus=cepheus
 		_gunner_marks.queue_redraw()
+	var previous_aquila := _aquila
 	_aquila = frame.get("aquila",{}).get("values",PackedFloat64Array())
 	_aquila_view = frame.get("aquila",{}).get("view",Rect2())
+	if _aquila!=previous_aquila: _gunner_marks.queue_redraw()
 	if frame.has("phoenix"): _phoenix_visual.apply_frame(frame.phoenix,_sniper_world_time,_zoom)
 	if frame.has("marlin"): _marlin_visual.apply_frame(frame.marlin,_sniper_world_time,_zoom)
 	for row: Dictionary in frame.poses:
@@ -990,6 +1000,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if equipped_end_blast: _end_blast_visual.frame_event(event,frame.ui.end_blast.radius,frame.ui.end_blast.secondary)
 		if equipped_full_burst: _full_burst_visual.frame_event(event,frame.ui.ship.ship_pos,frame.ui.ship.ship_heading,frame.ui.character_scale)
 		if equipped_duplicator and event.type==&"duplicate": _duplicator_visual.on_event(event)
+		if event.type==&"swallow":
+			var entry: Dictionary = visuals.get(event.get("visual_id",0),{})
+			var texture: Texture2D
+			if entry.get("role")==VISUAL_ROLE.EnemyLook:
+				var look: EnemyLook = _scope.resources.get(entry.path)
+				if look!=null: texture = look.previews.get(entry.get("hull_preview",""))
+			else: texture = _scope.resources.get(entry.get("path","")) as Texture2D
+			for display: Node in enemy_frames.values(): display.frame_event(event,texture)
 		if equipped_barrier and not barrier_from_state and event.type in [&"barrier_hit",&"barrier_restore"]: _barrier_visual.on_event(event)
 		if equipped_rear: preload("res://scripts/render/equipment/rear.gd").frame_event(_rear_flashes,_rear_shells,event,frame.ui.ship.ship_heading,frame.ui.rear.mount)
 		if equipped_scatter: preload("res://scripts/render/equipment/scatter.gd").frame_event(_scatter_flashes,event)

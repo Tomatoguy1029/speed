@@ -1467,6 +1467,128 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "PumpDefinition",
+      "section": 131,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "store_max",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "release_base",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swallow_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swallow_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "grow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burst_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_per",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mouth_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

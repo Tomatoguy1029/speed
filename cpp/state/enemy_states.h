@@ -8,6 +8,7 @@
 namespace speed {
 using godot::Vector2;
 enum class EnemyMode { Move, Windup, Dash, Recover };
+struct PumpState {std::vector<uint32_t> contents;double bud_t=0;};
 struct CrabState {int32_t buds=1;AttackHandle sweep;};
 struct AquilaState {Vector2 anchor;double bud_t=0;};
 struct PhoenixState {Vector2 anchor;};
@@ -26,7 +27,7 @@ struct LynxState {int32_t buds=0;};
 struct MarlinState {godot::Vector2 anchor;};
 struct SniperState {std::vector<float> rays;};
 struct Enemy {
-    std::variant<std::monostate,CepheusState,SniperState,MarlinState,LynxState,SoldierState,AurigaState,ClockState,ReticleState,PhoenixState,AquilaState,SplitState,DefenderState,CrabState,CrowState> behavior_state;
+    std::variant<std::monostate,CepheusState,SniperState,MarlinState,LynxState,SoldierState,AurigaState,ClockState,ReticleState,PhoenixState,AquilaState,SplitState,DefenderState,CrabState,CrowState,PumpState> behavior_state;
     int64_t id = 0;
     int64_t attack_group = 0;
     double attack_value = 1, attack_priority = 0;
@@ -50,6 +51,7 @@ struct Enemy {
     Vector2 shove_vel, shove_from;
     double body_gap=-1,body_gap_time=0;
     Vector2 body_gap_pos;
+    bool landmark = false;
     bool held = false, slash_hold = false, shoved = false;
     int64_t group_id = 0;
     bool pursuit_ready = false;

@@ -5,7 +5,7 @@ extends RefCounted
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: StageDef = null) -> Dictionary:
-	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus"]:
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -93,6 +93,15 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 			row.clock[pair[0]] = float(definition.params[pair[1]])
 		for key in row.clock:
 			if not is_finite(row.clock[key]) or (key not in ["long_speed","short_speed"] and row.clock[key]<0.0): return {}
+	if definition.behavior == &"pump":
+		row.pump = {"accel":definition.accel,"store_max":int(definition.params.get("store_max",0)),"release_base":int(definition.params.get("release_base",0)),"mouth_radius":18.5*config.character_scale*definition.visual_value("scale",1.0)}
+		for pair in [["pull_radius","pull_radius"],["pull","pull"],["swallow_reach","swallow_reach"],["swallow_interval","swallow_interval"],["grow","grow"],["telegraph","telegraph"],["lock_time","lock_time"],["shell_speed","shell_speed"],["shell_radius","shell_r"],["shell_range","shell_range"],["burst_radius","burst_radius"],["damage","bullet_dmg"],["recover","recover"],["release_per","release_per"],["release_speed","release_speed"],["release_damage","release_dmg"],["release_radius","release_radius"]]:
+			if not definition.params.has(pair[1]): return {}
+			row.pump[pair[0]] = float(definition.params[pair[1]])
+		row.pump.admission_duration = row.pump.telegraph+0.3
+		for value in row.pump.values():
+			if not is_finite(value) or value<0.0: return {}
+		if row.pump.telegraph<=0.0 or row.pump.store_max<1: return {}
 	if definition.behavior == &"crab":
 		row.crab = {}
 		for pair in [["approach","approach"],["reach","reach"],["telegraph","telegraph"],["open_time","open_time"],["turn_angle","turn_angle"],["damage","bullet_dmg"]]:

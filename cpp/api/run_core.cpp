@@ -20,6 +20,7 @@
 #include "../behaviors/enemies/split.h"
 #include "../behaviors/enemies/crab.h"
 #include "../behaviors/enemies/crow.h"
+#include "../behaviors/enemies/pump.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -240,6 +241,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::AurigaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Clock) {
                 speed::ClockBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Pump) {
+                speed::PumpBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Crab) {
                 speed::CrabBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Aquila) {
@@ -297,6 +300,7 @@ void SpeedRunCore::advance_enemies(double delta) {
       }
     }
     speed::MarlinBehavior::after_tick(runtime,marlins);
+    if (!runtime.content->pumps.empty()) speed::PumpBehavior::after_tick(runtime);
     speed::EnemySystem::flush_spawns(runtime);
 }
 

@@ -81,6 +81,8 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         }
         if (const auto *split=std::get_if<speed::SplitState>(&e->behavior_state)) {row["buds"]=split->buds;row["bud_t"]=split->bud_t;}
         if (const auto *lynx=std::get_if<speed::LynxState>(&e->behavior_state)) row["buds"]=lynx->buds;
+        row["pump_owner_id"]=runtime.state.enemy_handles.entity_id(e->pump_owner);
+        if (const auto *pump=std::get_if<speed::PumpState>(&e->behavior_state)) {godot::PackedStringArray contents;for (auto id:pump->contents) contents.push_back(runtime.content->definitions[id-1].id);row["stored_types"]=contents;row["buds"]=int64_t(pump->contents.size());row["bud_t"]=pump->bud_t;}
         if (const auto *crab=std::get_if<speed::CrabState>(&e->behavior_state)) {row["buds"]=crab->buds;const auto *sweep=speed::AttackSystem::get(runtime.state,crab->sweep);row["sweep"]=sweep?sweep->id:0;}
         if (const auto *aquila=std::get_if<speed::AquilaState>(&e->behavior_state)) {row["anchor"]=aquila->anchor;row["bud_t"]=aquila->bud_t;}
         if (const auto *phoenix=std::get_if<speed::PhoenixState>(&e->behavior_state)) row["anchor"]=phoenix->anchor;

@@ -1,6 +1,7 @@
 ## 生成済み外観とRenderFrameの値だけで、装甲と噛みつきの顎を描く。
 extends Node2D
 var perf := PerfLog.new()
+var _pump: EnemyVisual
 var _canvas: CanvasLayer
 var _parts: Array[Dictionary] = []
 var _sparks: InstanceBatch
@@ -36,7 +37,10 @@ func setup(scope: ContentResourceScope, entry: Dictionary) -> void:
 	var parts_path: String = entry.get("biter_parts","")
 	_biter = not parts_path.is_empty()
 	_biting = entry.get("biting",false)
-	if _biter:
+	if entry.get("pump",false):
+		_pump = preload("res://scripts/render/enemies/pump.gd").new()
+		_pump.setup_frame(_canvas,look,paint,settings)
+	elif _biter:
 		var assets: Resource = scope.resources[parts_path]
 		for part: Dictionary in assets.get_meta("parts",[]):
 			_add_part(part.name,part.base,part.armor,part.normal,part.pivot-Vector2(10,17),paint,settings)
@@ -94,6 +98,7 @@ func _jaw(mode: int, charge: float, timer: float, rest: float) -> float:
 
 func apply_frame(row: Dictionary) -> void:
 	_seen = true
+	if _pump!=null: _pump.apply_frame(row); return
 	if row==_previous_row: return
 	_previous_row = row
 	_dirty = true
@@ -123,6 +128,9 @@ func apply_frame(row: Dictionary) -> void:
 			perf.since(&"enemies.body",began)
 
 func end() -> void:
+	if _pump!=null:
+		if not _seen: _pump.apply_frame({})
+		return
 	if not _seen:
 		if _previous_row.is_empty(): return
 		_previous_row = {}
@@ -150,6 +158,10 @@ func _draw() -> void:
 func set_death_brightness(value: float) -> void:
 	if value==_brightness: return
 	_brightness = value
+	if _pump!=null: _pump.frame_brightness(value)
 	for part: Dictionary in _parts:
 		part.base.material.set_shader_parameter("brightness",value)
 		part.armor.material.set_shader_parameter("brightness",value)
+
+func frame_event(event: Dictionary, texture: Texture2D) -> void:
+	if _pump!=null: _pump.frame_event(event,texture)

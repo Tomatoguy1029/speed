@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 namespace speed {
-bool ZoneSystem::explode(RunRuntime &run,godot::Vector2 center,double radius,double damage,Cause cause,double knock,double life,const godot::Color &color) {
+bool ZoneSystem::explode(RunRuntime &run,godot::Vector2 center,double radius,double damage,Cause cause,double knock,double life,const godot::Color &color,bool no_crit) {
     const double reach=radius+std::max(run.state.combat_config.max_enemy_radius,run.state.grid.max_radius);
     const auto rows=CollisionQuery::enemy_rows(run.state,center-godot::Vector2(reach,reach),center+godot::Vector2(reach,reach));
     std::vector<EnemyHandle> targets;targets.reserve(rows.size());
@@ -15,7 +15,7 @@ bool ZoneSystem::explode(RunRuntime &run,godot::Vector2 center,double radius,dou
         if (!run.state.enemy_handles.contains(target)) continue;
         const auto &enemy=run.state.enemies[target.slot];if (!enemy.alive || enemy.dead) continue;
         const auto delta=enemy.pos-center;if (delta.length_squared()>(radius+enemy.radius)*(radius+enemy.radius)) continue;
-        DamageRequest request;request.struck=target;request.amount=damage;request.cause=cause;request.knock=knock;
+        DamageRequest request;request.struck=target;request.amount=damage;request.cause=cause;request.knock=knock;request.no_crit=no_crit;
         request.direction=delta.length_squared()>0?delta.normalized():godot::Vector2();
         CombatResolver::damage_enemy(run,request);
         if (run.state.phase!=godot::RunState::Phase::Play) return false;

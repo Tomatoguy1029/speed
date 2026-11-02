@@ -1,6 +1,7 @@
 #include "combat_hooks.h"
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/crab.h"
+#include "../behaviors/enemies/pump.h"
 #include "../behaviors/weapons/barrier.h"
 #include "../behaviors/weapons/knockback.h"
 #include "../behaviors/enemies/cepheus.h"
@@ -30,8 +31,8 @@ bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest 
     return !ShieldBehavior::blocks_front(run,target,request.has_impact?request.impact:enemy.pos,request.direction);
 }
 }
-CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);death_marked_hooks.push_back(CepheusBehavior::died);death_marked_hooks.push_back(SniperBehavior::died);death_marked_hooks.push_back(PhoenixBehavior::died);death_marked_hooks.push_back(CrabBehavior::died);
-    death_marked_hooks.push_back(FieldSystem::comet_gravity);barrier_hooks.push_back(BarrierBehavior::block);shatter_hooks.push_back(KnockbackBehavior::defeated);capture_hooks.push_back(development_capture);trait_kill_hooks.push_back(RampageBehavior::kill);critical_hooks.push_back(CritBeamBehavior::critical);enemy_death_hooks.push_back(SplitBehavior::died);enemy_death_hooks.push_back(FriendDebrisSystem::development_death);}
+CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);death_marked_hooks.push_back(CepheusBehavior::died);death_marked_hooks.push_back(SniperBehavior::died);death_marked_hooks.push_back(PhoenixBehavior::died);death_marked_hooks.push_back(CrabBehavior::died);death_marked_hooks.push_back(PumpBehavior::death_marked);
+    death_marked_hooks.push_back(FieldSystem::comet_gravity);barrier_hooks.push_back(BarrierBehavior::block);shatter_hooks.push_back(KnockbackBehavior::defeated);capture_hooks.push_back(development_capture);trait_kill_hooks.push_back(RampageBehavior::kill);critical_hooks.push_back(CritBeamBehavior::critical);enemy_death_hooks.push_back(SplitBehavior::died);enemy_death_hooks.push_back(FriendDebrisSystem::development_death);enemy_death_hooks.push_back(PumpBehavior::died);}
 bool CombatHooks::register_enemy(EnemyDefinition::Kind kind,EnemyPolicy policy) {
     if (dispatch_depth) return false;policies[kind]=policy;return true;
 }

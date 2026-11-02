@@ -105,6 +105,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         }
     }
     for (size_t i=0;i<bundle->boss_stages.size();++i) if (bundle->boss_stages[i].id!=i+1) return {};
+    bundle->pumps=records.PumpDefinition_rows;
     bundle->clocks=records.ClockDefinition_rows;
     bundle->aurigas=records.AurigaDefinition_rows;
     bundle->soldiers=records.SoldierDefinition_rows;bundle->cepheus=records.CepheusDefinition_rows;
@@ -322,7 +323,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         auto index=std::find_if(records.DefinitionIndex_rows.begin(),records.DefinitionIndex_rows.end(),[&](const auto &s){return s.id==row.id && s.enemy==row.id;});
         if (string==records.StringEntry_rows.end() || string->value.empty() || !names.insert(string->value).second ||
             index==records.DefinitionIndex_rows.end() || row.hp<=0 || row.radius<=0) return {};
-        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31) return {};
+        if (row.kind!=0 && row.kind!=1 && row.kind!=2 && row.kind!=3 && row.kind!=4 && row.kind!=5 && row.kind!=6 && row.kind!=7 && row.kind!=8 && row.kind!=9 && row.kind!=10 && row.kind!=11 && row.kind!=12 && row.kind!=13 && row.kind!=14 && row.kind!=15 && row.kind!=16 && row.kind!=17 && row.kind!=18 && row.kind!=19 && row.kind!=20 && row.kind!=21 && row.kind!=22 && row.kind!=23 && row.kind!=24 && row.kind!=25 && row.kind!=28 && row.kind!=29 && row.kind!=30 && row.kind!=26 && row.kind!=27 && row.kind!=34 && row.kind!=37 && row.kind!=31 && row.kind!=35) return {};
         auto definition=to_enemy(row,godot::String::utf8(string->value.c_str(),string->value.size()));
         definition.gate=EnemyDefinition::Gate(row.gate);
         const auto shield=std::find_if(records.ShieldDefinition_rows.begin(),records.ShieldDefinition_rows.end(),[&](const auto &s){return s.id==row.id;});
@@ -443,6 +444,12 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             for (double value:{item_clock->accel,item_clock->warn,item_clock->hand_long,item_clock->hand_short,item_clock->hand_width,item_clock->long_speed,item_clock->short_speed,item_clock->damage}) if (!std::isfinite(float(value))) return {};
             definition.clock_definition=uint32_t(item_clock-bundle->clocks.begin()+1);definition.accel=item_clock->accel;
         } else if (item_clock!=bundle->clocks.end()) return {};
+        const auto pump=std::find_if(bundle->pumps.begin(),bundle->pumps.end(),[&](const auto &p){return p.id==row.id;});
+        if (row.kind==35) {
+            if (pump==bundle->pumps.end() || pump->telegraph<=0 || !pump->store_max) return {};
+            for (double value:{pump->accel,pump->pull_radius,pump->pull,pump->swallow_reach,pump->swallow_interval,pump->grow,pump->telegraph,pump->lock_time,pump->shell_speed,pump->shell_radius,pump->shell_range,pump->burst_radius,pump->damage,pump->recover,pump->release_per,pump->release_speed,pump->release_damage,pump->release_radius,pump->mouth_radius,pump->admission_duration}) if (!std::isfinite(float(value))) return {};
+            definition.pump_definition=uint32_t(pump-bundle->pumps.begin()+1);definition.accel=pump->accel;
+        } else if (pump!=bundle->pumps.end()) return {};
         const auto crab=std::find_if(bundle->crabs.begin(),bundle->crabs.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==34) {
             if (crab==bundle->crabs.end()) return {};
