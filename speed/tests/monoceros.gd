@@ -11,6 +11,12 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-charge-terrain" in OS.get_cmdline_user_args():
+		call_deferred("native_charge_terrain")
+		return
+	if "--cpp-charge" in OS.get_cmdline_user_args():
+		call_deferred("native_charge")
+		return
 	var stage := load("res://tools/content/build_runtime_stage.gd").compile(ContentManager.stage(1)) as RuntimeStage
 	session = RunManager.create_session(self, {"lab": true, "stage": stage, "stage_index": 1, "seed": 42}, "--capture" in OS.get_cmdline_user_args())
 	session.auto_step = false
@@ -412,3 +418,134 @@ func capture() -> void:
 				get_viewport().get_texture().get_image().save_png("/tmp/speed-monoceros-%s-%d.png"%[tech,frame])
 	session.free()
 	get_tree().quit()
+
+## B00で確認済みの時刻・掃引・取消・復帰は繰り返さず、本体と技の残る接続を確認する。
+func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0, moon := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	if planet_x==500.0 or moon: cfg.character_scale = 1.0
+	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.approach_speed = 0.0
+	definition.params.stuck_time = 0.05
+	definition.params.extract_time = 0.05
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	var move = load("res://data/bosses/monoceros_moves/charge.tres").duplicate(true)
+	move.warn = 0.25
+	move.active = 0.2
+	move.active_p2 = 0.2
+	move.recover = 0.05
+	move.cd = 0.0
+	move.distance = 600.0
+	var records: Dictionary = package.records
+	for key in builder.boss_technique_records(definition,move): records[key] = builder.boss_technique_records(definition,move)[key]
+	if flow_enabled:
+		var rules = load("res://data/bosses/ai/monoceros_action_rules.tres").duplicate(true)
+		rules.techniques.assign([move])
+		rules.combos = {}
+		rules.conditions = {"charge":{"min":0.0,"max":1000.0}}
+		rules.selection_bias = {}
+		rules.costs = {"charge":1.0}
+		rules.condition_groups = {}
+		rules.graph_nodes = {}
+		var program = load("res://scripts/data_types/boss_flow_def.gd").new()
+		program.maximum_stamina = 10.0
+		program.sections = [{"request":"normal","weights":{"single":1.0},"cap":1.0,"action_count":1,"next":0}]
+		var flows: Dictionary = builder.boss_flow_records(rules,program,records.BossTechniqueDefinition)
+		for key in flows: records[key] = flows[key]
+	if obstacle:
+		var key: int = records.ResourceKey.size()+1
+		records.ResourceKey.append({"id":key,"role":9})
+		records.FieldBodyDefinition = [{"id":1,"kind":0,"x":planet_x,"y":0.0,"radius":100.0,"visual":key}]
+	if moon:
+		var key: int = records.ResourceKey.size()+1
+		records.ResourceKey.append({"id":key,"role":10})
+		records.MoonDefinition = [{"id":1,"count":1,"orbit_min":500.0,"orbit_max":500.0,"angle_jitter":0.0,"radius_min":100.0,"radius_max":100.0,"angular_speed":0.0,"visual":key}]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var config: Dictionary = bridge.configure(builder.Schema.write_content(records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":154,"mode":1,"stage_id":"B_monoceros_charge","profile":{},"settings":{"hitstop":false}})
+	if not config.ok: return {}
+	bridge.start(154,{"position":Vector2(300,0)})
+	bridge.subscribe("確認",func(_packet): return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(300,0),Vector2(300,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	return {"bridge":bridge,"id":id,"move":move,"definition":definition}
+
+func native_charge() -> void:
+	var fixture := charge_fixture(true)
+	check(not fixture.is_empty(),"分離した編集Resourceを型付きの本体・フロー・突進へ生成する")
+	if fixture.is_empty():
+		get_tree().quit(1)
+		return
+	var bridge = fixture.bridge
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value.size()==1 and bridge.command("dev_boss_state").value[0].stage==0,"本体の通常フローが突進の予告を選ぶ")
+	bridge._core.step(0.25)
+	var attack: Dictionary = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
+	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
+	add_child(view)
+	view.apply_frame(body,attack)
+	check(view.horn.self_modulate.r>1.0 and attack.technique=="charge","本体から選んだ突進の実行中に角を共通色で発光させる")
+	bridge._core.step(0.2)
+	bridge._core.step(0.05)
+	bridge._core.step(0.01)
+	bridge.command("dev_ship_motion",{"position":Vector2(1000,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(1000,0),Vector2(1000,0),Vector2(640,360))
+	bridge._core.step(0.2)
+	check(bridge.command("dev_boss_state").value[0].id>attack.id and bridge.command("dev_boss_state").value[0].stage==0,"自然終了後は次の通常行動の突進を選ぶ")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"選択から次行動までの通知を登録済み契約で配信する")
+	bridge.dispose()
+	view.queue_free()
+	fixture = charge_fixture(false,true)
+	bridge = fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+	bridge._core.step(0.25)
+	attack = bridge.command("dev_boss_state").value[0]
+	check(attack.stage==6 and attack.reposition>0.0 and not bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1}).ok,"地形が発進経路を塞いだ後は位置替え中の再発進を拒否する")
+	bridge._core.step(0.1)
+	body = bridge.command("dev_boss_body_state").value[0]
+	check(body.position.y!=0.0 and bridge.read_frame().ok,"失敗した突進から本体の横への位置替えへ進む")
+	bridge.dispose()
+	fixture = charge_fixture()
+	bridge = fixture.bridge
+	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+	bridge.command("dev_kill",{"entity_id":fixture.id,"cause":"debug"})
+	bridge._core.step(0.01)
+	check(ticket.ok and bridge.command("dev_boss_state").value[0].stage==7 and not bridge.command("dev_boss_body_state").value[0].participants[0].active and bridge.read_frame().ok,"本体参加者が消失した突進は取消で閉じ形状を残さない")
+	bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_monoceros_charge] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 未実施の地形による技の終了だけを、同じ既存検査から確認する。
+func native_charge_terrain() -> void:
+	var fixture := charge_fixture(false,true,500.0)
+	var bridge = fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+	bridge._core.step(0.25)
+	bridge._core.step(0.2)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(state.stage==3 and state.position.x>0.0 and state.position.x<304.0,"発進後に惑星へ角が先に触れると刺さりで停止する")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==4,"刺さり時間が終わると引き抜きへ進む")
+	bridge._core.step(0.05)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==5 and bridge.read_frame().ok,"引き抜きが自然終了し角の形状を閉じる")
+	check(held.ok and bridge.restore(held.value).ok and bridge.command("dev_boss_state").value[0].stage==3,"刺さった地形と相対位置を途中復帰で保つ")
+	bridge.release_checkpoint(held.value)
+	bridge.dispose()
+	fixture = charge_fixture(false,false,450.0,true)
+	bridge = fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+	bridge._core.step(0.25)
+	bridge._core.step(0.2)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==2 and is_equal_approx(state.position.x,304.0) and bridge.read_frame().ok,"月には角が刺さらず本体の接触で回復へ移る")
+	bridge.dispose()
+	get_tree().quit(1 if failed else 0)
+	print("[cpp_monoceros_charge_terrain] failures=",failed)

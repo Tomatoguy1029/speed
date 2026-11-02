@@ -1,5 +1,6 @@
 #include "flow_runner.h"
 #include "technique_runner.h"
+#include "phase_controller.h"
 #include "../monoceros/charge.h"
 #include "../../systems/motion_math.h"
 #include "../../systems/attack_budget.h"
@@ -23,7 +24,7 @@ bool available(const RunRuntime &r,const BossFlowState &f,uint32_t id,unsigned d
     if (!id || id>r.content->flow_nodes.size() || depth>24) return false;const auto &p=r.content->flow_nodes[id-1];const auto list=children(*r.content,id);
     if (p.kind==0) return true;
     if (p.kind==1) {
-        const auto actor=participant(f,p.participant);const auto cool=f.cooldowns.find(uint64_t(p.participant)<<32|p.technique);return !actor_busy(r,actor) && (cool==f.cooldowns.end() || f.clock>=cool->second) && FlowRunner::condition(r,f,p.condition,false,p.participant) && MonocerosCharge::ready(r,actor,phase_technique(r,f,p.technique));
+        const auto actor=participant(f,p.participant);const auto cool=f.cooldowns.find(uint64_t(p.participant)<<32|p.technique);return PhaseController::can_start(r,actor) && !actor_busy(r,actor) && (cool==f.cooldowns.end() || f.clock>=cool->second) && FlowRunner::condition(r,f,p.condition,false,p.participant) && MonocerosCharge::ready(r,actor,phase_technique(r,f,p.technique));
     }
     if (list.empty()) return false;
     if (p.kind==2) return available(r,f,list.front(),depth+1);
