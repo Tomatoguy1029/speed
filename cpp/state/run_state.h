@@ -37,6 +37,7 @@ struct RunState {
     using EnemyMode=speed::EnemyMode;
     using Enemy=speed::Enemy;
     std::deque<Enemy> enemies;
+    std::vector<speed::PendingEnemySpawn> pending_enemies;
     speed::EntityStore<speed::EnemyTag> enemy_handles;
     speed::GroupState groups;
     using AttackBudget=speed::AttackBudgetState;

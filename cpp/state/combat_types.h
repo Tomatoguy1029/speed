@@ -35,6 +35,7 @@ struct Corpse {
     godot::Vector2 pos,vel;double radius=0,facing=0,max_hp=0,xp=0;
     bool elite=false,is_boss=false;
     uint32_t rare_weapon=0;
+    double attack_priority=0;
 };
 struct DeathContext {
     Corpse corpse;

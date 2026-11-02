@@ -123,6 +123,7 @@ KillResult CombatResolver::kill_enemy(RunRuntime &run,const DamageRequest &reque
     const auto enemy=state.enemies[result.target.slot];
     DeathContext death;death.request=request;death.target=result.target;death.one_shot=one_shot;
     death.corpse={enemy.id,uint32_t(enemy.definition+1),enemy.pos,enemy.vel,enemy.radius,enemy.facing,enemy.max_hp,enemy.xp,enemy.elite,enemy.is_boss};
+    death.corpse.attack_priority=enemy.attack_priority;
     if (state.field.rock_handles.contains(enemy.rock)) death.corpse.rare_weapon=state.field.rocks[enemy.rock.slot].rare_weapon;
     const auto policy=run.combat_hooks.enemy_policy(run.content->definitions[enemy.definition].kind);
     if (policy.can_defeat && !policy.can_defeat(run,result.target)) {result.reason=CombatReason::PhaseFloor;return result;}

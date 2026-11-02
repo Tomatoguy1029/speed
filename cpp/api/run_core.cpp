@@ -16,6 +16,7 @@
 #include "../behaviors/enemies/bomber.h"
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/aquila.h"
+#include "../behaviors/enemies/split.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -219,7 +220,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = def.kind!=speed::EnemyDefinition::Kind::Aquila && def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Lynx) {
+            if (def.kind==speed::EnemyDefinition::Kind::Split) {
+                speed::SplitBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Lynx) {
                 speed::LynxBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Soldier) {
                 speed::SoldierBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
@@ -282,6 +285,7 @@ void SpeedRunCore::advance_enemies(double delta) {
       }
     }
     speed::MarlinBehavior::after_tick(runtime,marlins);
+    speed::EnemySystem::flush_spawns(runtime);
 }
 
 void SpeedRunCore::close() {
@@ -293,7 +297,7 @@ void SpeedRunCore::close() {
     runtime.state.legacy_progression = Progression();
     runtime.state.loadout={};runtime.state.lifecycle={};runtime.resource_workspace.requests.clear();
     runtime.state.groups={};runtime.state.field={};
-    runtime.state.enemies.clear(); runtime.state.enemy_handles = {};
+    runtime.state.enemies.clear(); runtime.state.pending_enemies.clear(); runtime.state.enemy_handles = {};
     runtime.state.enemies.shrink_to_fit();
     runtime.state.free_rows.clear();
     runtime.state.behavior_rows.clear(); runtime.state.behavior_kinds.clear();

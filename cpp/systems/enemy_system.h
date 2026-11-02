@@ -11,6 +11,7 @@ struct EnemySpawn {
 };
 class EnemySystem {
 public:
+    static void flush_spawns(RunRuntime &);
     static int64_t spawn_base(RunRuntime &,size_t definition,const EnemySpawn &);
     static int64_t spawn_part(RunRuntime &,EnemyHandle parent,size_t definition,godot::Vector2 position);
     static bool move_part(RunRuntime &,EnemyHandle part,EnemyHandle parent,godot::Vector2 position,double facing);

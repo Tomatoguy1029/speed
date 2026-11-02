@@ -5,6 +5,7 @@
 #include "../behaviors/traits/critBeam.h"
 #include "../behaviors/enemies/shield.h"
 #include "../behaviors/enemies/sniper.h"
+#include "../behaviors/enemies/split.h"
 #include "attack_budget.h"
 #include "attacks/friend_debris.h"
 #include "../runtime/run_runtime.h"
@@ -24,7 +25,7 @@ bool shield_allows(const RunRuntime &run,EnemyHandle target,const DamageRequest 
 }
 }
 CombatHooks::CombatHooks() {policies[EnemyDefinition::Kind::Saw].allows=saw_allows;policies[EnemyDefinition::Kind::Shield].allows=shield_allows;death_marked_hooks.push_back(passive_death);death_marked_hooks.push_back(SniperBehavior::died);death_marked_hooks.push_back(PhoenixBehavior::died);
-    death_marked_hooks.push_back(FieldSystem::comet_gravity);barrier_hooks.push_back(BarrierBehavior::block);trait_kill_hooks.push_back(RampageBehavior::kill);critical_hooks.push_back(CritBeamBehavior::critical);enemy_death_hooks.push_back(FriendDebrisSystem::development_death);}
+    death_marked_hooks.push_back(FieldSystem::comet_gravity);barrier_hooks.push_back(BarrierBehavior::block);trait_kill_hooks.push_back(RampageBehavior::kill);critical_hooks.push_back(CritBeamBehavior::critical);enemy_death_hooks.push_back(SplitBehavior::died);enemy_death_hooks.push_back(FriendDebrisSystem::development_death);}
 bool CombatHooks::register_enemy(EnemyDefinition::Kind kind,EnemyPolicy policy) {
     if (dispatch_depth) return false;policies[kind]=policy;return true;
 }

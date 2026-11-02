@@ -3,14 +3,25 @@ extends Node
 
 var passed := 0
 var failed := 0
+var mute_checks := false
+var split_finished := false
 
 func check(ok: bool, label: String) -> void:
+	if mute_checks: return
 	if ok: passed += 1
 	else:
 		failed += 1
 		push_error("[enemy_generated_spawns] " + label)
 
 func _ready() -> void:
+	if "--cpp-split" in OS.get_cmdline_user_args():
+		mute_checks = "--cpp-split-priority" in OS.get_cmdline_user_args()
+		await check_cpp_split()
+		mute_checks = false
+		check(split_finished,"分裂の確認本体が最後まで進んだ")
+		print("[cpp_split] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	var stage = load("res://tools/content/build_runtime_stage.gd").compile(ContentManager.stage(4))
 	var phase := PhaseDef.new()
 	phase.pop_from = 2
@@ -29,7 +40,7 @@ func _ready() -> void:
 		if arg.begins_with("--capture="): capture = arg.trim_prefix("--capture=")
 	var session := RunManager.create_session(self, {"lab": true, "seed": 42, "stage": stage, "config": cfg}, not capture.is_empty())
 	session.auto_step = false
-	var m := session.sim.enemies
+	var m: EnemySystem = session.sim.enemies
 	m.field.bodies.clear()
 	m.field.planet.pos = Vector2(1e7, 1e7)
 	m.field.planet.r = 0.0
@@ -55,9 +66,9 @@ func _ready() -> void:
 		m.clear_all()
 		m.spawn(m.def_of(&"cepheus"), Vector2(-300, -100))
 		for step in 70: m.tick(0.02, 0.02)
-		var ruler := m.spawn(m.def_of(&"ruler"), Vector2(250, 60))
+		var ruler: int = m.spawn(m.def_of(&"ruler"), Vector2(250, 60))
 		m.behavior(&"ruler")._split_ruler(ruler)
-		var split := m.spawn(m.def_of(&"splitter"), Vector2(0, 150))
+		var split: int = m.spawn(m.def_of(&"splitter"), Vector2(0, 150))
 		session.sim.combat.kill_enemy(split)
 		m._flush_new()
 		await get_tree().process_frame
@@ -255,3 +266,115 @@ func _check_hydra(run: RunSimulation) -> void:
 	run.bosses.remove_boss()
 	m.cleanup()
 	m.clear_all()
+
+func split_entity(core,id: int,motion := false) -> Dictionary:
+	for item: Dictionary in (core.enemy_motion_snapshot() if motion else core.enemies_snapshot()):
+		if item.id==id: return item
+	return {}
+
+func split_children(core) -> Array:
+	return core.enemies_snapshot().filter(func(e): return e.type=="splitling" and not e.dead)
+
+func check_cpp_split() -> void:
+	var cfg := ContentManager.base.duplicate(true) as GameConfig
+	cfg.start_radius = 1200.0
+	cfg.planet_radius = 0.0
+	cfg.world_tick_div = 1
+	cfg.spawn_total_cap = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 95
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["splitter","drifter"])
+	var definition := load("res://data/enemies/splitter.tres").duplicate(true) as EnemyDef
+	definition.params.bud_interval = 0.1
+	definition.params.max_buds = 2
+	var output := "res://.content/dev/run_split"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"分裂と親の先行退場".sha256_text(),{&"splitter":definition})
+	check(built==OK,"分裂の編集値と分裂体の資源を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_95.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":955},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"親と分裂体の通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var at := target+Vector2(220,0)
+	var parent: int = core.spawn_enemy(&"splitter",at,{"facing":0.0,"attack_priority":4.0})
+	core.set_enemy_motion(parent,{"held":true})
+	core.step(0.1)
+	check(split_children(core).is_empty() and split_entity(core,parent,true).bud_t==0.0,"保持中は芽の時計を止める")
+	core.set_enemy_motion(parent,{"held":false,"stone":0.1})
+	core.step(0.1)
+	check(split_children(core).is_empty() and split_entity(core,parent,true).bud_t==0.0,"石化中は芽を出さない")
+	core.set_enemy_motion(parent,{"slash_hold":true})
+	core.step(0.1)
+	check(split_entity(core,parent,true).bud_t==0.0,"斬撃保持中も芽の時計を進めない")
+	core.set_enemy_motion(parent,{"slash_hold":false})
+	var saved: Dictionary = bridge.checkpoint()
+	core.step(0.1)
+	var children := split_children(core)
+	var angle := float(parent)*2.39996322973
+	var radius: float = split_entity(core,parent).radius
+	var expected := at+Vector2.from_angle(angle)*radius*1.2
+	check(children.size()==1 and Vector2(children[0].pos[0],children[0].pos[1]).is_equal_approx(expected) and is_equal_approx(Vector2(children[0].vel[0],children[0].vel[1]).length(),160.0) and split_entity(core,children[0].id,true).age==0.0,"芽を同じ角度と速度で生成しその更新では行動させない")
+	var future: Array = core.enemies_snapshot()
+	check(bridge.restore(saved.value).ok,"途中の芽の数と時間を値から復帰する")
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.step(0.1)
+	check(core.enemies_snapshot()==future,"途中復帰から同じ個体ID・位置の分裂へ進む")
+	core.step(0.1)
+	core.step(0.1)
+	check(split_children(core).size()==2 and split_entity(core,parent,true).buds==2,"生存中の分裂は編集した上限で止まる")
+	var view: Dictionary = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(presentation.frame_view.apply_frame(view) and view.batches.any(func(b): return b.ids.has(parent)) and view.batches.any(func(b): return b.ids.has(children[0].id)),"親と分裂体の画像を通常表示へ渡す")
+	var frame: Dictionary = bridge.read_frame().value
+	check(frame.events.filter(func(e): return e.type==&"bud").size()==2,"芽を出した二回の出来事を表示へ渡す")
+	presentation.frame_view.receive_frame(frame)
+	presentation.frame_view.update_effects(frame,0.0)
+	check(presentation.frame_view._rings.size()>=2,"芽の輪と粒子を通常画面へ表示する")
+	await get_tree().process_frame
+	var before: int = split_children(core).size()
+	var body: Dictionary = split_entity(core,parent)
+	var killed: Dictionary = bridge.command("dev_kill",{"entity_id":parent,"cause":"bullet"})
+	check(killed.ok and killed.value.killed and split_children(core).size()==before,"撃破時は分裂を予約して現在の反復へ追加しない")
+	var pending: Dictionary = bridge.checkpoint()
+	check(pending.ok,"親の死亡後の分裂予約を保持する")
+	bridge.command("dev_retreat",{"entity_id":parent})
+	var replacement: int = core.spawn_enemy(&"splitter",at,{"attack_priority":9.0})
+	core.set_enemy_motion(replacement,{"held":true})
+	check(split_entity(core,replacement,true).buds==0 and split_entity(core,replacement,true).bud_t==0.0,"親の行を再利用しても芽の数と時計を持ち越さない")
+	core.step(0.01)
+	children = split_children(core)
+	check(children.size()==before+2,"親を先に消しても値で保持した撃破分裂を一度だけ生成する")
+	var newborns: Array = children.filter(func(e): return split_entity(core,e.id,true).age==0.0)
+	check(newborns.size()==2 and newborns.all(func(e): return is_equal_approx(Vector2(e.vel[0],e.vel[1]).length(),420.0) and split_entity(core,e.id,true).knock_t==0.5),"撃破分裂の速度と吹き飛び保護を編集値から引き継ぐ")
+	var was_muted := mute_checks
+	mute_checks = false
+	check(newborns.all(func(e): return split_entity(core,e.id,true).guard==0.5 and split_entity(core,e.id,true).hit_cd==0.35 and split_entity(core,e.id,true).attack_priority==4.0),"死亡時に確定した保護・接触待ち・優先度を子へ渡す")
+	mute_checks = was_muted
+	var guarded: Dictionary = bridge.command("dev_damage",{"entity_id":newborns[0].id,"amount":10000.0,"cause":"bullet"})
+	check(guarded.ok and guarded.value.reason=="guard","分裂直後の子は設定した保護時間で守る")
+	core.step(0.01)
+	check(split_children(core).size()==before+2,"予約済み分裂を二度実行しない")
+	check(bridge.restore(pending.value).ok,"死亡後の分裂予約も途中復帰する")
+	core.set_motion_context(target,target,Vector2(640,360))
+	core.step(0.01)
+	check(split_children(core).size()==before+2,"復帰後も死亡分裂を一度だけ出す")
+	var interrupted: int = core.spawn_enemy(&"splitter",at,{})
+	bridge.command("dev_kill",{"entity_id":interrupted,"cause":"bullet"})
+	core.step(0.01)
+	check(split_children(core).size()==before+4,"芽が育つ前の撃破でも死亡分裂を保つ")
+	bridge.release_checkpoint(saved.value)
+	bridge.release_checkpoint(pending.value)
+	split_finished = true
+	session.free()

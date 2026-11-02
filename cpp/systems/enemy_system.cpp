@@ -23,6 +23,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Auriga) enemy.behavior_state=AurigaState{};
     if (def.kind==EnemyDefinition::Kind::Clock) enemy.behavior_state=ClockState{};
     if (def.kind==EnemyDefinition::Kind::Reticle) enemy.behavior_state=ReticleState{};
+    if (def.kind==EnemyDefinition::Kind::Split) enemy.behavior_state=SplitState{};
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;
@@ -47,6 +48,14 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     enemy.fire_t=def.fire_interval*(0.5+state.control.rng.randf()*0.5);enemy.alive=true;
     insert(state,uint32_t(row),enemy);state.rows_by_id[enemy.id]=row;
     return enemy.id;
+}
+void EnemySystem::flush_spawns(RunRuntime &run) {
+    auto pending=std::move(run.state.pending_enemies);run.state.pending_enemies.clear();
+    for (const auto &entry:pending) {
+        EnemySpawn p;p.position=entry.position;p.velocity=entry.velocity;p.facing=entry.facing;p.has_facing=true;
+        p.hit_cd=entry.hit_cd;p.guard=entry.guard;p.knock=entry.knock;p.priority=entry.priority;p.has_priority=true;
+        spawn_base(run,entry.definition-1,p);
+    }
 }
 int64_t EnemySystem::spawn_part(RunRuntime &run,EnemyHandle parent,size_t definition,godot::Vector2 position) {
     auto &state=run.state;

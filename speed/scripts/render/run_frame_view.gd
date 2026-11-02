@@ -920,6 +920,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			if _rings.size()>80: _rings.pop_front()
 			var duration: float = event.life*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":duration,"max":duration})
+		if event.type==&"bud":
+			_rings.append({"pos":event.pos,"radius":20.0,"color":event.color,"life":0.25,"max":0.25})
+			_burst(event.pos,event.color,6,160.0)
 		if event.type==&"gem_burst":
 			if _rings.size()>80: _rings.pop_front()
 			var duration: float = 0.3*EFFECT_SETTINGS.number("","visible_time_scale",1.0)

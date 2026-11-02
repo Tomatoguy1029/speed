@@ -73,6 +73,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Auriga)!=std::holds_alternative<AurigaState>(enemy.behavior_state)) return false;
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Clock)!=std::holds_alternative<ClockState>(enemy.behavior_state)) return false;
         if (const auto *clock=std::get_if<ClockState>(&enemy.behavior_state)) for (auto hand:clock->hands) if (const auto *record=AttackSystem::get(state,hand)) {if (!record->spec.owner.attached || !same_handle(record->spec.owner.live_source,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;}
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Split)!=std::holds_alternative<SplitState>(enemy.behavior_state)) return false;
+        if (const auto *split=std::get_if<SplitState>(&enemy.behavior_state)) if (!std::isfinite(split->bud_t) || split->bud_t<0) return false;
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Reticle)!=std::holds_alternative<ReticleState>(enemy.behavior_state)) return false;
         if (const auto *reticle=std::get_if<ReticleState>(&enemy.behavior_state)) if (state.enemy_handles.contains(reticle->rock) && state.enemy_handles.entity_id(reticle->rock)!=reticle->rock_id) return false;
         const auto *soldier=std::get_if<SoldierState>(&enemy.behavior_state);
@@ -183,6 +185,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (gem.alive && gem.kind==2 && gem.id==pickups.gem_absorber_id) {pickups.gem_absorber=int64_t(row);break;}
     }
     if (pickups.gem_absorber<0) pickups.gem_absorber_id=0;
+    for (const auto &pending:state.pending_enemies) if (!pending.definition || pending.definition>content.definitions.size() || !pending.position.is_finite() || !pending.velocity.is_finite() || !std::isfinite(pending.facing) || !std::isfinite(pending.hit_cd) || pending.hit_cd<0 || !std::isfinite(pending.guard) || pending.guard<0 || !std::isfinite(pending.knock) || pending.knock<0 || !std::isfinite(pending.priority)) return false;
     for (auto weapon:state.loadout.pending_comet_weapons) if (!weapon || weapon>content.equipment.size() || !content.equipment[weapon-1].comet_only) return false;
     for (const auto &capsule:pickups.capsules) if (!capsule.pos.is_finite() || !std::isfinite(capsule.age) || capsule.age<0 || (capsule.kind==CapsuleKind::CometWeapon && (!capsule.weapon || capsule.weapon>content.equipment.size() || !content.equipment[capsule.weapon-1].comet_only))) return false;
     if (!FieldSystem::validate(state,content)) return false;

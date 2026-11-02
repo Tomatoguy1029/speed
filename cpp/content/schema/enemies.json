@@ -1221,6 +1221,57 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "SplitDefinition",
+      "section": 120,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "child",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "bud_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "split_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "split_guard",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "max_buds",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "name": "death_split",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "name": "split_extra",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        }
+      ]
     }
   ],
   "enums": {}
