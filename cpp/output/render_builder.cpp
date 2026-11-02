@@ -47,6 +47,7 @@ Dictionary RenderBatchBuffer::value() {
     if (!aquarius.is_empty()) out["aquarius"]=aquarius;
     if (!cross.is_empty()) out["cross"]=cross;
     if (!bomber.is_empty()) out["bomber"]=bomber;
+    if (!crab.is_empty()) out["crab"]=crab;
     if (!battleship.is_empty()) out["battleship"]=battleship;
     if (!missile.is_empty()) out["missile"]=missile;
     if (!beamer.is_empty()) out["beamer"]=beamer;
@@ -72,7 +73,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     auto &groups=run.render_workspace.batches;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
-        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();
+        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();
     }
     PackedFloat32Array comet_values;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
@@ -100,6 +101,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         if ((definition.kind==EnemyDefinition::Kind::Gunner || definition.kind==EnemyDefinition::Kind::Defender) && enemy.charge>0) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.gunner.push_back(value);
+        }
+        if (definition.kind==EnemyDefinition::Kind::Crab) {
+            const auto &p=run.content->crabs[definition.crab_definition-1];const auto c=definition.color;const auto &v=std::get<CrabState>(enemy.behavior_state);
+            for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle+1.5707963267948966+(v.buds<0?3.141592653589793:0)),float(enemy.mode),float(enemy.charge),float(enemy.timer),float(p.open_time),float(p.reach),c.r,c.g,c.b,c.a,definition.polygon_visual?1.0f:0.0f}) enemy_batch.crab.push_back(value);
         }
         if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode!=EnemyMode::Windup) {
             for (float v:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(0.7+0.3*std::sin(state.world_time*30.0+double(enemy.id)))}) enemy_batch.bomber.push_back(v);

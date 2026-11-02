@@ -1,6 +1,7 @@
 #include "enemy_system.h"
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/defender.h"
+#include "../behaviors/enemies/crab.h"
 #include "attack_system.h"
 #include "attack_budget.h"
 #include "group_system.h"
@@ -19,6 +20,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Marlin) enemy.behavior_state=MarlinState{};
     if (def.kind==EnemyDefinition::Kind::Phoenix) enemy.behavior_state=PhoenixState{};
     if (def.kind==EnemyDefinition::Kind::Aquila) enemy.behavior_state=AquilaState{};
+    if (def.kind==EnemyDefinition::Kind::Crab) enemy.behavior_state=CrabState{};
     if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
     if (def.kind==EnemyDefinition::Kind::Auriga) enemy.behavior_state=AurigaState{};
@@ -49,6 +51,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     auto &rows=state.behavior_rows[enemy.behavior_group];enemy.behavior_slot=rows.size();rows.push_back(row);enemy.id=state.next_id++;
     enemy.fire_t=def.fire_interval*(0.5+state.control.rng.randf()*0.5);enemy.alive=true;
     insert(state,uint32_t(row),enemy);state.rows_by_id[enemy.id]=row;
+    if (def.kind==EnemyDefinition::Kind::Crab && !p.has_facing) CrabBehavior::steer(run,uint32_t(row));
     return enemy.id;
 }
 void EnemySystem::flush_spawns(RunRuntime &run) {
@@ -93,7 +96,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     if (!run.state.enemy_handles.contains(handle)) return false;
     const auto &enemy=run.state.enemies[handle.slot];
     const auto &definition=run.content->definitions[enemy.definition];
-    if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle || definition.kind==EnemyDefinition::Kind::Phoenix) return true;
+    if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle || definition.kind==EnemyDefinition::Kind::Phoenix || definition.kind==EnemyDefinition::Kind::Crab) return true;
     if (definition.kind==EnemyDefinition::Kind::Dolphin || definition.kind==EnemyDefinition::Kind::Aquarius || definition.kind==EnemyDefinition::Kind::Cross) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Bomber) return enemy.pos.distance_to(run.state.ship_pos)<=run.content->bombers[definition.bomber_definition-1].trigger;
     if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
@@ -138,6 +141,7 @@ bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason)
     if (!enemy.alive) return false;
     PhoenixBehavior::cancel(run,handle);
     DefenderBehavior::gone(run,handle);
+    CrabBehavior::clear(run,handle);
     PickupSystem::lose(run,enemy.id,reason==RetireReason::Outside?CargoLoss::Retreat:reason==RetireReason::BonusClear?CargoLoss::Cleared:CargoLoss::Released);
     AttackSystem::source_ended(state,handle,AttackEndReason::ParticipantEnd);
     leave_hound(state,row);

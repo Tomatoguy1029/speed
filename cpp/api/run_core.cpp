@@ -17,6 +17,7 @@
 #include "../behaviors/enemies/phoenix.h"
 #include "../behaviors/enemies/aquila.h"
 #include "../behaviors/enemies/split.h"
+#include "../behaviors/enemies/crab.h"
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
@@ -230,6 +231,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::AurigaBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Clock) {
                 speed::ClockBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Crab) {
+                speed::CrabBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Aquila) {
                 speed::AquilaBehavior::step(runtime,uint32_t(row),delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Phoenix) {

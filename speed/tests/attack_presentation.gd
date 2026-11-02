@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-crab" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_crab()
+		check(finished,"かに座の指定確認を最後まで実施する")
+		print("[cpp_crab] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-aquila" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_aquila()
 		check(finished,"わし座の指定確認を最後まで実施する")
@@ -1381,5 +1387,58 @@ func check_cpp_aquila() -> bool:
 	cpp_core.step(0.2)
 	var stopped: Dictionary = cpp_core.enemies_snapshot()[0]
 	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and is_equal_approx(stopped.pos[0],blocked.x) and cpp_core.hazards_snapshot().all(func(h): return h.pos.x<=blocked.x+0.01),"天体で切った予告と実走行・最後の雷を同じ終点へそろえる")
+	cpp_session.free()
+	return true
+
+func check_cpp_crab() -> bool:
+	var tuning := {"crab":{"speed":40.0,"params.reach":300.0,"params.approach":400.0,"params.telegraph":0.2,"params.open_time":0.15,"params.bullet_dmg":5.0,"params.turn_angle":20.0}}
+	if not await prepare_cpp_attack(113,"crab",PackedStringArray(["crab","drifter"]),tuning): return false
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(600,0),"velocity":Vector2.ZERO})
+	cpp_core.set_attack_formation_mode(true)
+	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"crab","position":cpp_origin}).value
+	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	cpp_core.step(0.1)
+	var walking: Dictionary = cpp_core.enemies_snapshot()[0]
+	check(is_equal_approx(walking.facing,-PI/2.0) and walking.vel==[40.0,0.0] and cpp_motion_for(actor).buds==1,"出現時に横腹を向け、体に直交する方向へ編集した速さで歩く")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(300,0),"velocity":Vector2.ZERO})
+	cpp_core.step(0.1)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.enemies_snapshot()[0].vel==[0.0,0.0],"薙ぎが届く近距離でも予算がなければ止まって待つ")
+	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	cpp_core.step(0.01)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.2),"枠を取ると編集した予告時間で構える")
+	cpp_core.step(0.1)
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(is_equal_approx(cpp_motion_for(actor).charge,0.5) and presentation.frame_view.apply_frame(frame) and presentation.frame_view._crab.size()==14,"本体と装甲を保ち、薙ぎの円と爪の予告を通常画面で描く")
+	await get_tree().process_frame
+	var pending: Dictionary = cpp_bridge.checkpoint()
+	var before: Array = cpp_core.enemy_motion_snapshot()
+	cpp_core.step(0.11)
+	var hazards: Array = cpp_core.hazards_snapshot()
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and hazards.size()==1 and hazards[0].radius==180.0 and hazards[0].damage==5.0 and cpp_core.attack_snapshot()[0].attached,"予告を終えると横歩き方向へ本体に付いた薙ぎ払いを生成する")
+	if hazards.size()!=1: cpp_session.free(); return false
+	cpp_core.step_hazards(0.01)
+	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-5.0),"薙ぎ払いの円が共通の被弾を処理する")
+	frame = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
+	check(presentation.frame_view.apply_frame(frame) and presentation.frame_view._crab[4]==EnemyTable.Mode.RECOVER,"薙ぎの振りと攻撃範囲を通常画面で描く")
+	await get_tree().process_frame
+	cpp_core.step(0.16)
+	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"開いた時間が終わると薙ぎを解放して横歩きへ戻る")
+	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before,"左右の歩行方向・段階・残り時間・薙ぎHandleを保持から復元する")
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	cpp_core.step(0.3)
+	check(cpp_core.hazards_snapshot().is_empty(),"予告中に倒すと未発動の薙ぎを生成しない")
+	cpp_bridge.restore(pending.value)
+	cpp_core.step(0.11)
+	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
+	check(cpp_core.hazards_snapshot().is_empty(),"薙ぎの途中で倒すと付いた攻撃を終了する")
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"crab","position":cpp_origin}).value
+	check(replacement!=actor and cpp_motion_for(replacement).buds==1 and cpp_motion_for(replacement).sweep==0 and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0,"行を再利用した別個体へ薙ぎや予告を漏らさない")
+	cpp_bridge.restore(pending.value)
+	cpp_core.step(0.11)
+	cpp_bridge.command("dev_remove",{"entity_id":actor})
+	check(cpp_core.hazards_snapshot().is_empty(),"参照する発生元を先に解放しても薙ぎを残さない")
 	cpp_session.free()
 	return true

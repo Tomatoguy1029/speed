@@ -84,6 +84,9 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (soldier && (!soldier->formation.anchor.is_finite() || soldier->formation.tier<1 || soldier->formation.tier>3 || (state.enemy_handles.contains(soldier->king) && state.enemy_handles.entity_id(soldier->king)!=soldier->king_id))) return false;
         const auto *lynx=std::get_if<LynxState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr)) return false;
+        const auto *crab=std::get_if<CrabState>(&enemy.behavior_state);
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Crab)!=(crab!=nullptr) || (crab && crab->buds!=1 && crab->buds!=-1)) return false;
+        if (crab) if (const auto *record=AttackSystem::get(state,crab->sweep)) if (!record->spec.owner.attached || !same_handle(record->spec.owner.live_source,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;
         const auto *aquila=std::get_if<AquilaState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Aquila)!=(aquila!=nullptr) || (aquila && (!aquila->anchor.is_finite() || !std::isfinite(aquila->bud_t)))) return false;
         const auto *phoenix=std::get_if<PhoenixState>(&enemy.behavior_state);

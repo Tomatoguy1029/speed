@@ -31,7 +31,7 @@ AttackHandle ZoneSystem::emit(RunRuntime &run,const ZoneParams &p) {
     if (p.style>=ZoneStyle::Count || !std::isfinite(p.enemy_damage) || p.enemy_damage<0) return {};
     const auto found=std::find_if(run.content->zones.begin(),run.content->zones.end(),[&](const auto &d){return d.style==uint32_t(p.style);});
     if (found==run.content->zones.end()) return {};
-    BlastParams blast;blast.position=p.position;blast.color=p.color;blast.source=p.owner;blast.budget=p.budget;
+    BlastParams blast;blast.position=p.position;blast.color=p.color;blast.source=p.owner;blast.attached=p.attached;blast.budget=p.budget;
     blast.source_id=p.source_id;blast.source_definition=p.source_definition;blast.radius=p.radius;blast.damage=p.damage;blast.delay=p.delay;blast.duration=found->active;blast.contact=found->contact;
     const auto handle=BlastSystem::emit(run,blast);const auto *record=AttackSystem::get(run.state,handle);if (!record) return {};
     auto &hazard=run.state.hazards[record->row];hazard.zone_definition=found->id;hazard.enemy_damage=p.enemy_damage;return handle;

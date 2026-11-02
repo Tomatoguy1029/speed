@@ -5,6 +5,7 @@ struct BlastParams {
     godot::Vector2 position;
     godot::Color color;
     EnemyHandle source;
+    bool attached=false;
     BudgetToken budget;
     double radius=0,damage=0,duration=0,delay=0;
     uint32_t contact=0,source_definition=0;

@@ -63,6 +63,7 @@ struct ContentBundle {
     std::vector<BomberDefinition> bombers;
     std::vector<PhoenixDefinition> phoenixes;
     std::vector<AquilaDefinition> aquilas;
+    std::vector<CrabDefinition> crabs;
     std::vector<ShellSource> shell_sources;
     std::vector<FriendHullLook> hull_looks;
     std::vector<FriendSawPoint> saw_points;

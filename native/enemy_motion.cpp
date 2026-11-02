@@ -78,6 +78,7 @@ Array SpeedRunCore::enemy_motion_snapshot() const {
         }
         if (const auto *split=std::get_if<speed::SplitState>(&e->behavior_state)) {row["buds"]=split->buds;row["bud_t"]=split->bud_t;}
         if (const auto *lynx=std::get_if<speed::LynxState>(&e->behavior_state)) row["buds"]=lynx->buds;
+        if (const auto *crab=std::get_if<speed::CrabState>(&e->behavior_state)) {row["buds"]=crab->buds;const auto *sweep=speed::AttackSystem::get(runtime.state,crab->sweep);row["sweep"]=sweep?sweep->id:0;}
         if (const auto *aquila=std::get_if<speed::AquilaState>(&e->behavior_state)) {row["anchor"]=aquila->anchor;row["bud_t"]=aquila->bud_t;}
         if (const auto *phoenix=std::get_if<speed::PhoenixState>(&e->behavior_state)) row["anchor"]=phoenix->anchor;
         if (const auto *marlin=std::get_if<speed::MarlinState>(&e->behavior_state)) row["anchor"]=marlin->anchor;

@@ -1305,6 +1305,53 @@
           "type": "f64"
         }
       ]
+    },
+    {
+      "name": "CrabDefinition",
+      "section": 130,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "approach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "open_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

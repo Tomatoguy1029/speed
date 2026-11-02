@@ -20,6 +20,7 @@ var _lance_flashes: Array = []
 var _lance_hits: Array = []
 var _aquila := PackedFloat64Array()
 var _aquila_view := Rect2()
+var _crab := PackedFloat32Array()
 var _bomber := PackedFloat32Array()
 var _cross := PackedFloat32Array()
 var _aquarius := PackedFloat32Array()
@@ -193,6 +194,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/aquarius.gd").draw_frame(canvas,_aquarius,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/cross.gd").draw_frame(canvas,_cross,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/bomber.gd").draw_frame(canvas,_bomber,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/crab.gd").draw_frame(canvas,_crab,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/aquila.gd").draw_frame(canvas,_aquila,_aquila_view,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
@@ -373,6 +375,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
 			for value: float in row.gunner:
 				if not is_finite(value): return false
+		if row.has("crab"):
+			if not row.crab is PackedFloat32Array or row.crab.size()%14!=0: return false
+			for value: float in row.crab:
+				if not is_finite(value): return false
 		if row.has("bomber"):
 			if not row.bomber is PackedFloat32Array or row.bomber.size()%5!=0: return false
 			for value: float in row.bomber:
@@ -455,6 +461,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	var previous_lynx := _lynx
 	var previous_dolphin := _dolphin
 	var previous_sniper := _sniper
+	_crab = PackedFloat32Array()
 	_bomber = PackedFloat32Array()
 	_cross = PackedFloat32Array()
 	_aquarius = PackedFloat32Array()
@@ -468,6 +475,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	_dolphin = PackedFloat32Array()
 	_sniper = PackedFloat32Array()
 	for row: Dictionary in frame.batches:
+		if row.has("crab"): _crab.append_array(row.crab)
 		if row.has("bomber"): _bomber.append_array(row.bomber)
 		if row.has("cross"): _cross.append_array(row.cross)
 		if row.has("aquarius"): _aquarius.append_array(row.aquarius)

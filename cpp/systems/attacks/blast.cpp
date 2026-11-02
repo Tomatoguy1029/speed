@@ -11,8 +11,9 @@ AttackHandle BlastSystem::emit(RunRuntime &run,const BlastParams &p) {
     for (float channel:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(channel)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.shape=CircleHazard{float(p.radius),CircleHazardKind::Blast};
     hazard.delay=p.delay;hazard.duration=p.duration;hazard.damage=p.damage;hazard.color=p.color;
-    AttackSpec spec;spec.cause=Cause::Blast;spec.owner.live_source=p.source;spec.owner.budget=p.budget;spec.owner.source_id=p.source_id;spec.owner.source_definition=p.source_definition;
+    AttackSpec spec;spec.cause=Cause::Blast;spec.owner.live_source=p.source;spec.owner.attached=p.attached && p.source.generation>0;spec.owner.budget=p.budget;spec.owner.source_id=p.source_id;spec.owner.source_definition=p.source_definition;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
+    if (spec.owner.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);
     if (!AttackSystem::configure_contact(*run.content,p.contact,spec)) return {};
     return AttackSystem::emit_hazard(state,hazard,spec);
 }
