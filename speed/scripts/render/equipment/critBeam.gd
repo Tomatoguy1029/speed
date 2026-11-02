@@ -84,3 +84,24 @@ static func frame_draw(p: PixelPainter, flashes: Array, hits: Array, dt: float, 
 			var d: float = h.r + s.v * (1.0 - pow(1.0 - q, 2.0))
 			p.dot(h.pos + Vector2.from_angle(s.a) * d * p.px, s.c, 2 if q < 0.5 else 1)
 	hits.assign(hits.filter(func(h): return h.age < 0.4))
+
+## 保存した表示値を既存の式へ渡す。火花の乱数は新しい通知値を受けた時だけ作る。
+static func frame_state(cache: Dictionary, flashes: Array, hits: Array, values: Array, pixel: float) -> void:
+	var alive := {}
+	flashes.clear()
+	hits.clear()
+	for value: Dictionary in values:
+		alive[value.id] = true
+		if not cache.has(value.id):
+			var new_flashes: Array = []
+			var new_hits: Array = []
+			var event: Dictionary = value.duplicate()
+			event.type = &"critical_lance_hit" if value.hit else &"critical_lance"
+			frame_event(new_flashes,new_hits,event,pixel)
+			cache[value.id] = new_hits[0] if value.hit else new_flashes[0]
+		var display: Dictionary = cache[value.id]
+		display.age = value.age
+		if value.hit: hits.append(display)
+		else: flashes.append(display)
+	for id in cache.keys():
+		if not alive.has(id): cache.erase(id)

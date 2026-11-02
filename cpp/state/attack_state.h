@@ -56,7 +56,12 @@ struct LightLanceState {
     bool duplicate=false;
     std::unordered_set<int64_t> hits;
 };
+struct LanceVisualState {uint64_t id=0;godot::Vector2 from,to;double width=0,age=0;};
+struct LanceEffectState {uint64_t id=0;bool hit=false;godot::Vector2 pos,direction;double radius=0,age=0;};
 struct AttackState {
+    std::vector<LanceVisualState> lance_visuals;
+    std::vector<LanceEffectState> lance_effects;
+    uint64_t next_lance_effect_id=1;
     std::deque<LightLanceState> lances;
     uint64_t next_lance_id=1;
     std::vector<AttackRecord> records;

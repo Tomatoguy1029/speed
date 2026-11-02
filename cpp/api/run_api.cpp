@@ -20,6 +20,19 @@
 #include <cstring>
 using namespace godot;
 namespace {
+bool presentation_frozen(const speed::RunRuntime &run) {
+    using Phase=RunState::Phase;const auto &s=run.state;const auto &c=s.control;
+    return c.ui_overlay || c.ui_reward || s.phase==Phase::Paused || s.phase==Phase::LevelUp || (s.phase==Phase::Dying && s.sequence_t<s.death_freeze);
+}
+void advance_lance_display(speed::RunRuntime &run,double dt,double world_dt) {
+    if (presentation_frozen(run)) return;
+    auto &attacks=run.state.attacks;
+    const double flight_dt=run.state.hitstop>0?0.0:dt;
+    for (auto &v:attacks.lance_visuals) v.age+=flight_dt;
+    for (auto &v:attacks.lance_effects) v.age+=world_dt;
+    attacks.lance_visuals.erase(std::remove_if(attacks.lance_visuals.begin(),attacks.lance_visuals.end(),[](const auto &v){return v.age>=0.5;}),attacks.lance_visuals.end());
+    attacks.lance_effects.erase(std::remove_if(attacks.lance_effects.begin(),attacks.lance_effects.end(),[](const auto &v){return v.age>=(v.hit?0.4:0.12);}),attacks.lance_effects.end());
+}
 Dictionary success(Variant value=Variant()) {Dictionary out;out["ok"]=true;out["code"]=0;out["message"]="";out["field"]="";out["value"]=value;return out;}
 Dictionary failure(int code,const char *field,const char *message) {Dictionary out;out["ok"]=false;out["code"]=code;out["field"]=field;out["message"]=message;out["value"]=Variant();return out;}
 bool keys(const Dictionary &data,std::initializer_list<const char *> allowed) {
@@ -153,10 +166,12 @@ Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,co
     speed::MetricsTimer measured(runtime.frame_workspace.metrics.sim);
     speed::RenderBuilder::capture_previous(runtime);
     runtime.frame_workspace.publishing_tick=runtime.state.control.tick+1;
+    const double previous_world_time=runtime.state.world_time;
     const bool advanced=speed::RunRunner::step_play(*this,1.0/120.0,input,size);
     speed::EventBuilder::flush_combat(runtime);
     runtime.frame_workspace.publishing_tick=-1;
     if (!advanced) return failure(8,"step","更新の整合を確認してください");
+    advance_lance_display(runtime,1.0/120.0,std::max(0.0,runtime.state.world_time-previous_world_time));
     ++runtime.state.control.tick;++runtime.state.control.revision;
     if (runtime.frame_workspace.metrics.fixed_steps<INT64_MAX) ++runtime.frame_workspace.metrics.fixed_steps;
     return success(progress(runtime));
@@ -366,7 +381,7 @@ Dictionary SpeedRunCore::frame_run() {
     ui["barrier"]=barrier_snapshot();
     Dictionary gear;gear["distance"]=runtime.state.loadout.boost_distance;gear["maximum"]=runtime.state.loadout.full_charge_maximum;gear["burst_power"]=runtime.state.loadout.effects.burst_power;gear["ignore_armor"]=runtime.state.loadout.effects.ignore_armor;ui["full_charge"]=gear;ui["base_draw_length"]=runtime.state.draw_config.length;
     ui["world_scale"]=runtime.state.control.world_scale;ui["hitstop"]=runtime.state.hitstop;ui["base_max_speed"]=runtime.state.ship_config.base_max_speed;
-    ui["presentation_frozen"]=control.ui_overlay || control.ui_reward || runtime.state.phase==Phase::Paused || runtime.state.phase==Phase::LevelUp || (runtime.state.phase==Phase::Dying && runtime.state.sequence_t<runtime.state.death_freeze);
+    ui["presentation_frozen"]=presentation_frozen(runtime);
     ui["death_dim"]=runtime.state.phase==Phase::Dying?runtime.content->lifecycle.death_world_dim:0.0;
     ui["shot_multiplier"]=runtime.state.loadout.effects.shot_amount;
     ui["area_multiplier"]=runtime.state.loadout.effects.area;ui["trace_radius"]=runtime.state.trace_radius;
@@ -375,6 +390,10 @@ Dictionary SpeedRunCore::frame_run() {
     ui["pickup_radius"]=runtime.state.pickup_config.coin_radius;ui["xp_pickup_radius"]=runtime.state.pickup_config.xp_radius;
     ui["attack_mult"]=runtime.state.combat_config.attack_mult;ui["attack_power"]=speed::CombatResolver::attack_power(runtime);
     ui["crit_chance"]=runtime.state.combat_config.crit_chance;ui["crit_mult"]=runtime.state.combat_config.crit_mult;
+    Dictionary crit_beam;const auto &c=runtime.state.loadout.crit_beam;crit_beam["ready"]=c.ready;crit_beam["next_time"]=c.next_time;crit_beam["cooldown"]=c.cooldown;ui["crit_beam"]=crit_beam;
+    Array lance_visuals,lance_effects;
+    for (const auto &v:runtime.state.attacks.lance_visuals) {Dictionary item;item["id"]=int64_t(v.id);item["from"]=v.from;item["to"]=v.to;item["width"]=v.width;item["age"]=v.age;lance_visuals.push_back(item);}
+    for (const auto &v:runtime.state.attacks.lance_effects) {Dictionary item;item["id"]=int64_t(v.id);item["hit"]=v.hit;item["pos"]=v.pos;item["direction"]=v.direction;item["radius"]=v.radius;item["age"]=v.age;lance_effects.push_back(item);}ui["light_lances"]=lance_visuals;ui["lance_effects"]=lance_effects;
     Dictionary vortex;const auto &vortex_state=runtime.state.loadout.vortex;vortex["ready"]=vortex_state.ready;vortex["charge"]=vortex_state.charge;vortex["hold"]=vortex_state.hold;vortex["collapse"]=vortex_state.collapse;vortex["required"]=vortex_state.kills;Array vortex_items,vortex_visuals;
     for (const auto &v:vortex_state.items) {Dictionary item;item["id"]=int64_t(v.id);item["pos"]=v.pos;item["age"]=v.age;item["radius"]=v.radius;item["damage"]=v.damage;item["kills"]=int64_t(v.kills);item["duration"]=v.duration;vortex_items.push_back(item);}
     for (const auto &v:vortex_state.visuals) {Dictionary item;item["id"]=int64_t(v.id);item["kind"]=v.kind;item["pos"]=v.pos;item["radius"]=v.radius;item["age"]=v.age;item["color"]=v.color;item["facing"]=v.facing;item["amount"]=v.amount;item["enemy_type"]=v.definition?runtime.content->definitions[v.definition-1].id:godot::StringName();vortex_visuals.push_back(item);}vortex["items"]=vortex_items;vortex["visuals"]=vortex_visuals;ui["vortex"]=vortex;

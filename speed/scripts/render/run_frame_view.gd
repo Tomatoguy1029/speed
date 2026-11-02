@@ -21,6 +21,7 @@ var _lance_hits: Array = []
 var _aquarius := PackedFloat32Array()
 var _flood_groups: Dictionary = {}
 var _shell_displays: Dictionary = {}
+var _lance_effects := {}
 var _flood_displays: Dictionary = {}
 var _flood_tails: Array[Dictionary] = []
 var _flood_world_time := -1.0
@@ -665,6 +666,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_rings.clear()
 		_debris_trails.clear()
 		_attack_ends.clear()
+		_lance_effects.clear()
 		_lance_flashes.clear()
 		_lance_hits.clear()
 		if is_instance_valid(_critical_lances): _critical_lances.shots.clear()
@@ -823,7 +825,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":40.0,"color":Color(1.0,0.75,0.6),"life":0.22,"max":0.22})
 			_burst(event.pos,Color(1.0,0.5,0.35),10,500.0,direction)
 
-		if event.type in [&"critical_lance",&"critical_lance_hit"]:
+		if event.type in [&"critical_lance",&"critical_lance_hit"] and not frame.ui.has("light_lances"):
 			if not is_instance_valid(_critical_lances):
 				_critical_lances = preload("res://scripts/render/light_lance.gd").new()
 				_critical_lances.name = "CriticalLances"
@@ -875,7 +877,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
-	if is_instance_valid(_critical_lances): _critical_lances.step(effect_dt,ui.character_scale,_zoom)
+	if ui.has("light_lances"):
+		if not ui.light_lances.is_empty() and not is_instance_valid(_critical_lances):
+			_critical_lances = preload("res://scripts/render/light_lance.gd").new()
+			_critical_lances.name = "CriticalLances"
+			_layer(11).add_child(_critical_lances)
+		if is_instance_valid(_critical_lances): _critical_lances.shots.assign(ui.light_lances.duplicate(true))
+		preload("res://scripts/render/equipment/critBeam.gd").frame_state(_lance_effects,_lance_flashes,_lance_hits,ui.lance_effects,_pixel)
+	if is_instance_valid(_critical_lances): _critical_lances.step(0.0 if ui.has("light_lances") else effect_dt,ui.character_scale,_zoom)
 	var flood_dt: float = 0.0 if _flood_world_time<0.0 else maxf(0.0,ui.world_time-_flood_world_time)
 	_flood_world_time = ui.world_time
 	for tail: Dictionary in _flood_tails:
@@ -972,7 +981,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var rear_dt: float = 0.0 if _rear_world_time<0.0 else maxf(0.0,ui.world_time-_rear_world_time)
 	_rear_world_time = ui.world_time if equipped_rear else -1.0
 	preload("res://scripts/render/equipment/rear.gd").frame_draw(_rear_flashes,_rear_shells,_effects,rear_dt,ui.rear.mount,ui.rear.aim,equipped_rear)
-	preload("res://scripts/render/equipment/critBeam.gd").frame_draw(_effects,_lance_flashes,_lance_hits,effect_dt,ui.ship.ship_pos,ui.ship.ship_heading)
+	preload("res://scripts/render/equipment/critBeam.gd").frame_draw(_effects,_lance_flashes,_lance_hits,0.0 if ui.has("lance_effects") else effect_dt,ui.ship.ship_pos,ui.ship.ship_heading)
 	_effects.end()
 	perf.since(&"view_geometry.attacks",draw_start)
 	if active and not ui.draw.drawing and ui.hitstop<=0.0:

@@ -30,6 +30,8 @@ std::vector<uint64_t> LightLancesSystem::fire(RunRuntime &run,const LightLancePa
             }
         }
         const auto direction=lance.velocity.normalized(),to=lance.from+direction*lance.length;godot::Dictionary event;event["from"]=lance.from;event["to"]=to;event["width"]=lance.width;FrameBuilder::append(run,"critical_lance",event);
+        state.attacks.lance_visuals.push_back({lance.id,lance.from,to,lance.width,0});
+        state.attacks.lance_effects.push_back({state.attacks.next_lance_effect_id++,false,lance.from,direction,0,0});
         struct Hit {double fraction;EnemyHandle target;};struct Earlier {bool operator()(const Hit &a,const Hit &b) const{return a.fraction<b.fraction;}};
         std::vector<Hit> hits;const double padding=lance.width*0.5+std::max(state.combat_config.max_enemy_radius,state.grid.max_radius);const auto pad=godot::Vector2(padding,padding);
         for (auto row:CollisionQuery::enemy_rows(state,lance.from.min(to)-pad,lance.from.max(to)+pad)) {
@@ -48,6 +50,7 @@ std::vector<uint64_t> LightLancesSystem::fire(RunRuntime &run,const LightLancePa
     }
     for (const auto &hit:visual_hits) if (state.enemy_handles.contains(hit.target) && !state.enemies[hit.target.slot].dead) {
         godot::Dictionary effect;effect["pos"]=state.enemies[hit.target.slot].pos;effect["radius"]=state.enemies[hit.target.slot].radius;effect["direction"]=hit.direction;FrameBuilder::append(run,"critical_lance_hit",effect);
+        state.attacks.lance_effects.push_back({state.attacks.next_lance_effect_id++,true,state.enemies[hit.target.slot].pos,hit.direction,state.enemies[hit.target.slot].radius,0});
     }
     return created;
 }

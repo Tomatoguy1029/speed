@@ -222,6 +222,12 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.LoadoutDefinition.append({"id":gear_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T04","comet_only":false})
 	for level in range(1,config.trait_max_stacks+1):
 		data.FullChargeDefinition.append({"id":level,"equipment":gear_id,"level":level,"multiplier":float(gear.params.mult_base)+float(gear.params.mult_per)*level})
+	var crit_beam := load("res://data/traits/T06_critBeam.tres") as TraitDef
+	if crit_beam==null: return {}
+	var crit_beam_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":crit_beam_id,"kind":1,"maximum_level":config.trait_max_stacks,"external_id":"T06","comet_only":false})
+	for level in range(1,config.trait_max_stacks+1):
+		data.CritBeamDefinition.append({"id":level,"equipment":crit_beam_id,"level":level,"cooldown":float(crit_beam.params.cooldown),"damage":float(crit_beam.params.damage_base)+float(crit_beam.params.damage_per)*level,"length":float(crit_beam.params.length_base)+float(crit_beam.params.length_per)*level,"width":float(crit_beam.params.width_base)+float(crit_beam.params.width_per)*level,"knock":float(crit_beam.params.knock)})
 	var vortex := load("res://data/traits/T03_vortex.tres") as TraitDef
 	if vortex==null: return {}
 	var vortex_id: int = data.LoadoutDefinition.size()+1
@@ -354,6 +360,13 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.ResourceKey.append({"id":key,"role":7})
 		visuals.append({"id":key,"role":7,"path":path,"equipment":gear_id})
 		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":gear_id,"asset":key})
+	var crit_beam_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T06")
+	if crit_beam_entry==null: return {}
+	for path in crit_beam_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":crit_beam_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":crit_beam_id,"asset":key})
 	var vortex_entry: ContentEntry = ContentManager.catalog.find(&"traits",&"T03")
 	if vortex_entry==null: return {}
 	for path in vortex_entry.resources:
@@ -609,6 +622,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.BarrierDefinition = resolved.BarrierDefinition
 			data.BarrierPostDefinition = resolved.BarrierPostDefinition
 			data.FullChargeDefinition = resolved.FullChargeDefinition
+			data.CritBeamDefinition = resolved.CritBeamDefinition
 			data.VortexDefinition = resolved.VortexDefinition
 			data.RunUpDefinition = resolved.RunUpDefinition
 			data.RampageDefinition = resolved.RampageDefinition

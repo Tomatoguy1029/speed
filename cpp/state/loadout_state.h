@@ -69,6 +69,7 @@ struct EndBlastWeaponState {
     std::vector<EndBlastPending> pending;
     std::vector<EndBlastVisual> visuals;
 };
+struct CritBeamState {bool ready=false;double next_time=0,cooldown=0,damage=0,length=0,width=0,knock=0;};
 struct VortexInstance {
     godot::Vector2 pos;
     uint64_t id=0,kills=0;
@@ -116,6 +117,7 @@ struct EquipmentEffects {
 struct LoadoutState {
     EquipmentEffects effects;
     bool full_burst_owned=false,full_burst_active=false;
+    CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;
     RampageState rampage;

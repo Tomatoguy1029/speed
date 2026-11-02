@@ -66,6 +66,18 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-t06-source-clock" in OS.get_cmdline_user_args():
+		var completed: bool = await check_cpp_t06_source_clock()
+		check(completed,"槍本体と火花の元の時計を最後まで確認する")
+		print("[cpp_t06_source_clock] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+	if "--cpp-t06" in OS.get_cmdline_user_args() or "--cpp-t06-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_t06()
+		print("[cpp_t06] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+
 	if "--cpp-t03" in OS.get_cmdline_user_args() or "--cpp-t03-fixes" in OS.get_cmdline_user_args():
 		await check_cpp_t03()
 		print("[cpp_t03] failed=%d" % failures)
@@ -1665,7 +1677,8 @@ func trait_test_session(id: String, config: GameConfig, seed_value: int):
 	var stage := RuntimeStage.new()
 	stage.index = 84
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"] if id=="T03" else ["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"] if id in ["T03","T06"] else ["drifter"])
+	if id=="T06": stage.enemy_tuning = {"shield":{"hp":200.0}}
 	var output := "res://.content/dev/run_"+id
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder.build(stage,config,output,(id+"の状態と表示").sha256_text())==OK,"行動特性の段ごとの値と資源を生成する")
@@ -2497,3 +2510,167 @@ func check_cpp_t03() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(capture)
 	check(capture.count()==0,"終端の渦の状態と表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_t06() -> void:
+	var retry: bool = "--cpp-t06-fixes" in OS.get_cmdline_user_args()
+	var capture := ErrorCapture.new()
+	OS.add_logger(capture)
+	var config := trait_test_config()
+	config.base_crit_chance = 1.0
+	config.xp_base = 100000.0
+	# 通常候補は固定seed 606の3回目の引き直しでT06を含む。
+	var seed_value := 606
+	var session = await trait_test_session("T06",config,seed_value)
+	if session==null:
+		OS.remove_logger(capture)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("t06",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var definition: TraitDef = ContentManager.definition(&"traits",&"T06")
+	var area: TraitDef = ContentManager.definition(&"traits",&"T34")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,config.trait_max_stacks+1):
+		var should_check: bool = not retry or level>1
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		var granted: Dictionary = bridge.command("dev_grant_equipment",{"kind":"trait","id":"T06","levels":level})
+		if should_check: check(granted.ok,"会心の槍を全段取得する")
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
+		bridge.command("set_settings",{"hitstop":true})
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		for offset in [Vector2(180,0),Vector2(400,0),Vector2(650,0)]:
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"shield" if offset.x==180.0 else "drifter","position":origin+offset}).value
+			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO,"facing":0.0})
+		var tough: int = bridge.command("dev_spawn",{"definition_id":"shield","position":origin+Vector2(500,50)}).value
+		core.set_enemy_motion(tough,{"held":true,"vel":Vector2.ZERO,"facing":0.0})
+		events.clear()
+		trait_start_trace(bridge,800.0)
+		for tick in 70:
+			bridge.step(1.0/120.0,idle,viewport)
+			if not bridge._ui.light_lances.is_empty(): break
+		var lances: Dictionary = bridge.command("dev_light_lances_state",{}).value
+		if should_check: check(lances.items.size()==1,"実際のクリティカルから槍を一度発動する")
+		if lances.items.is_empty(): break
+		var lance: Dictionary = lances.items[0]
+		if should_check: check(is_equal_approx(lance.length,definition.params.length_base+definition.params.length_per*level) and is_equal_approx(lance.width,(definition.params.width_base+definition.params.width_per*level)*(1.0+area.stack_bonus(2))) and is_equal_approx(lance.damage,config.base_attack*(definition.params.damage_base+definition.params.damage_per*level)) and lance.knock==definition.params.knock,"全段の長さ・幅と範囲補正・威力・ノックバックを共通の槍へ渡す")
+		if should_check: check(lance.velocity.normalized().distance_to(Vector2.RIGHT)<0.001 and events.filter(func(event): return event.type==&"kill" and event.payload.cause==&"critBeam").size()>=2,"進む向きへ即時に貫通し連続した敵を撃破する")
+		if should_check: check(events.filter(func(event): return event.type==&"critical_lance").size()==1 and is_equal_approx(bridge._ui.crit_beam.next_time,bridge._ui.run_time-1.0/120.0+definition.params.cooldown),"槍から再発動せずラン秒を基準に次の時刻を保持する")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._critical_lances.shots.size()==1 and not presentation.frame_view._lance_flashes.is_empty() and not presentation.frame_view._lance_hits.is_empty(),"槍・発射の光・生存した命中対象の火花を既存描画へ渡す")
+		bridge.command("dev_relocate",{"entity_id":tough,"position":origin+Vector2(0,3000)})
+		var life_before: float = lance.life
+		var display_age: float = bridge._ui.light_lances[0].age
+		if bridge._ui.hitstop>1.0/120.0:
+			bridge.step(1.0/120.0,idle,viewport)
+			check(bridge.command("dev_light_lances_state",{}).value.items[0].life==life_before and bridge._ui.light_lances[0].age==display_age,"ヒットストップは元の槍表示と世界時計を止める")
+		bridge.command("set_settings",{"hitstop":false})
+		core.set_run_guards({"controls_locked":true})
+		life_before = bridge.command("dev_light_lances_state",{}).value.items[0].life
+		display_age = bridge._ui.light_lances[0].age
+		bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(bridge.command("dev_light_lances_state",{}).value.items[0].life==life_before and is_equal_approx(bridge._ui.light_lances[0].age,display_age+1.0/120.0),"操作ロックでは判定寿命を止め表示の実秒だけを進める")
+		core.set_run_guards({"controls_locked":false})
+		var before: Dictionary = bridge._ui.duplicate(true)
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.2)
+		presentation._present_cpp(0.2)
+		if should_check: check(bridge._ui.light_lances==before.light_lances and bridge._ui.lance_effects==before.lance_effects and presentation.frame_view._critical_lances.shots[0].age==before.light_lances[0].age,"停止中は表示値を保ち表示側でも二重に時間を加算しない")
+		bridge.command("pause",{"paused":false})
+		var saved: Dictionary = bridge.checkpoint()
+		for tick in 5: bridge.step(1.0/120.0,idle,viewport)
+		var expected: Array = bridge._ui.light_lances.duplicate(true)
+		var expected_effects: Array = bridge._ui.lance_effects.duplicate(true)
+		var expected_lances: Dictionary = bridge.command("dev_light_lances_state",{}).value
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		presentation._present_cpp(0.01)
+		if should_check: check(presentation.frame_view._critical_lances.shots.size()==1 and not presentation.frame_view._lance_flashes.is_empty(),"値型復帰から槍と短い光を通知の再発行なしで作り直す")
+		for tick in 5: bridge.step(1.0/120.0,idle,viewport)
+		if should_check: check(bridge._ui.light_lances==expected and bridge._ui.lance_effects==expected_effects and bridge.command("dev_light_lances_state",{}).value==expected_lances,"復帰後も世界秒の判定寿命と実秒の表示を別々に再現する")
+		var trigger: int = bridge.command("dev_spawn",{"definition_id":"shield","position":origin+Vector2(0,2000)}).value
+		core.set_enemy_motion(trigger,{"held":true,"vel":Vector2.ZERO})
+		events.clear()
+		bridge.command("dev_damage",{"entity_id":trigger,"amount":0.1,"crit":true,"knock":0.0,"cause":"bump"})
+		if should_check: check(events.all(func(event): return event.type!=&"critical_lance"),"クールダウン前のクリティカルでは発動しない")
+		while bridge._ui.run_time<bridge._ui.crit_beam.next_time: bridge.step(1.0/120.0,idle,viewport)
+		events.clear()
+		bridge.command("dev_damage",{"entity_id":trigger,"amount":0.1,"crit":true,"no_crit":true,"knock":0.0})
+		if should_check: check(events.all(func(event): return event.type!=&"critical_lance"),"no_critの命中は時刻が満ちても再発動しない")
+		bridge.command("dev_damage",{"entity_id":trigger,"amount":0.1,"crit":true,"knock":0.0,"cause":"bump"})
+		if should_check: check(events.filter(func(event): return event.type==&"critical_lance").size()==1,"クールダウン境界後は弾かれのクリティカルでも発動する")
+		bridge.command("dev_remove_trait",{"id":"T06"})
+		if should_check: check(not bridge._ui.crit_beam.ready and not bridge._ui.light_lances.is_empty(),"解除は次の発動を止め発射済みの槍を自然寿命まで残す")
+		for tick in 70: bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.01)
+		if should_check: check(bridge._ui.light_lances.is_empty() and presentation.frame_view._critical_lances.shots.is_empty(),"短い表示の実秒の寿命で槍を片付ける")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	if not retry:
+		bridge.restore(initial.value)
+		bridge.collect_frame()
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T06","levels":5})
+		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
+		var split := false
+		for attempt in 12:
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"shield","position":core.ship_snapshot().ship_pos+Vector2(0,2000)}).value
+			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+			events.clear()
+			bridge.command("dev_damage",{"entity_id":enemy,"amount":0.1,"crit":true,"knock":0.0})
+			if events.any(func(event): return event.type==&"duplicate"):
+				var lances: Array = bridge.command("dev_light_lances_state",{}).value.items
+				check(lances.filter(func(item): return item.duplicate).size()>=2 and events.filter(func(event): return event.type==&"critical_lance").size()==3,"会心の元の槍から既存の複製2本を同じ入口で発生させる")
+				split = true
+				break
+			for tick in 19: bridge.step(1.0/120.0,idle,viewport)
+		check(split,"会心からの槍で分裂が実際に起きる")
+	bridge.restore(initial.value)
+	bridge.collect_frame()
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T06","levels":1})
+	if not retry: await trait_select_upgrade(session,"T06",config,idle,viewport)
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(capture)
+	check(capture.count()==0,"会心の槍の状態と表示に実行エラーがない: %s" % [capture.messages()])
+
+func check_cpp_t06_source_clock() -> bool:
+	var session = await trait_test_session("T06",trait_test_config(),606)
+	if session==null: return false
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	bridge.command("set_settings",{"hitstop":true})
+	trait_start_trace(bridge,1200.0)
+	var origin: Vector2 = core.ship_snapshot().ship_pos
+	bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(200,0)})
+	var shield: int = bridge.command("dev_spawn",{"definition_id":"shield","position":origin+Vector2(400,0)}).value
+	core.set_enemy_motion(shield,{"held":true,"facing":0.0,"vel":Vector2.ZERO})
+	check(bridge.command("dev_fire_light_lances",{"position":origin,"direction":Vector2.RIGHT,"length":700.0,"width":20.0,"damage":100.0,"knock":0.0}).ok,"元の時計を比べる槍と発射光・命中火花を生成する")
+	bridge.collect_frame()
+	check(bridge._ui.hitstop>1.0/120.0 and bridge._ui.tracing and not bridge._ui.lance_effects.is_empty(),"ヒットストップとなぞり中の時計条件を準備できる")
+	var before: Dictionary = bridge._ui.duplicate(true)
+	bridge.step(1.0/120.0,idle,viewport)
+	check(bridge._ui.light_lances[0].age==before.light_lances[0].age and bridge._ui.lance_effects==before.lance_effects,"元の槍本体と世界秒の光・火花はヒットストップ中に止まる")
+	bridge.command("set_settings",{"hitstop":false})
+	core.set_run_guards({"controls_locked":true})
+	bridge.collect_frame()
+	before = bridge._ui.duplicate(true)
+	bridge.step(1.0/120.0,idle,viewport)
+	var world_dt: float = bridge._ui.world_time-before.world_time
+	check(world_dt>0.0 and world_dt<1.0/120.0,"なぞり中の世界時計が実秒より遅い条件を維持する")
+	check(is_equal_approx(bridge._ui.light_lances[0].age,before.light_lances[0].age+1.0/120.0),"操作ロック中も槍本体は元の実秒で進む")
+	check(is_equal_approx(bridge._ui.lance_effects[0].age,before.lance_effects[0].age+world_dt),"発射光・命中火花は元の世界秒で進む")
+	session.free()
+	return true

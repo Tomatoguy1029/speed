@@ -159,6 +159,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->equipment_assets=records.LoadoutAsset_rows;
     bundle->numeric_traits=records.NumericTraitLevel_rows;
     bundle->full_charge_levels=records.FullChargeDefinition_rows;
+    bundle->crit_beam_levels=records.CritBeamDefinition_rows;
     bundle->vortex_levels=records.VortexDefinition_rows;
     bundle->run_up_levels=records.RunUpDefinition_rows;
     bundle->rampage_levels=records.RampageDefinition_rows;
@@ -197,6 +198,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.external_id=="T37") {
             if (d.kind!=1 || d.maximum_level!=bundle->duplicator_levels.size()) return {};
             for (size_t i=0;i<bundle->duplicator_levels.size();++i) {const auto &level=bundle->duplicator_levels[i];if (level.equipment!=d.id || level.level!=i+1 || level.angle_min>level.angle_max) return {};}
+            continue;
+        }
+        if (d.external_id=="T06") {
+            if (d.kind!=1 || d.maximum_level!=bundle->crit_beam_levels.size() || bundle->light_lances.empty()) return {};
+            for (size_t i=0;i<bundle->crit_beam_levels.size();++i) {const auto &c=bundle->crit_beam_levels[i];if (c.equipment!=d.id || c.level!=i+1 || c.length<=0 || c.width<=0) return {};}
             continue;
         }
         if (d.external_id=="T03") {
