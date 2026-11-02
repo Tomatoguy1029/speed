@@ -8,9 +8,12 @@ func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> boo
 	return true
 
 func draw_claws(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float) -> void:
+	draw_claws_view(c,pos,travel,size,side,a,_px(1.0))
+
+static func draw_claws_view(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float, pixel: float) -> void:
 	var thick := SHAPE.SLASH_THICK * size
 	for k in 3:
 		var pts := SHAPE.slash_points(pos, travel, size, side, k)
 		c.draw_polyline(pts, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
 		c.draw_polyline(pts, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
-		c.draw_polyline(pts.slice(1, pts.size() - 1), Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
+		c.draw_polyline(pts.slice(1, pts.size() - 1), Color(1.0, 0.95, 0.85, a), maxf(pixel*1.5, thick * 0.3))

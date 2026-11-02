@@ -7,11 +7,11 @@ const Missile = preload("res://scripts/attacks/missile.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9,&"rocket":10,&"drift":11,&"part":12,&"dash":13,&"battleship":14,&"sniper":15,&"marlin":16,&"pulser":17,&"dolphin":18}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9,&"rocket":10,&"drift":11,&"part":12,&"dash":13,&"battleship":14,&"sniper":15,&"marlin":16,&"pulser":17,&"dolphin":18,&"lynx":19}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -84,6 +84,10 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			"duration":ProjectileSystem.ZONE_FLASH,"visual_key":7,
 			"hit":visual.get_node_or_null("Hit")!=null,"fade":visual.get_node_or_null("Fade")!=null}]
 		visual.free()
+	if definition.behavior==&"lynx":
+		var item: Dictionary = source.lynx.duplicate()
+		item.id = 1
+		data.LynxDefinition = [item]
 	if definition.behavior==&"dolphin":
 		var dolphin: Dictionary = source.dolphin.duplicate()
 		dolphin.id = 1
@@ -154,7 +158,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	for point in saw_points: data.FriendSawPoint.append({"id":data.FriendSawPoint.size()+1,"x":point.x,"y":point.y})
 	var polygon := PackedVector2Array()
 	if not ResourceLoader.exists(sprite):
-		if definition.behavior not in [&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin"]: return {}
+		if definition.behavior not in [&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx"]: return {}
 		polygon = RunPresentation._placeholder_points(definition.shape)
 		sprite = ""
 		row.sprite_angle = 0.0
@@ -409,6 +413,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		for bite: Dictionary in resolved.BiteDefinition:
 			bite.id = row.id
 			data.BiteDefinition.append(bite)
+		for item: Dictionary in resolved.LynxDefinition:
+			item.id = row.id
+			data.LynxDefinition.append(item)
 		for dolphin: Dictionary in resolved.DolphinDefinition:
 			dolphin.id = row.id
 			data.DolphinDefinition.append(dolphin)

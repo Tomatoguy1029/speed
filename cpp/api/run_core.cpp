@@ -10,6 +10,7 @@
 #include "../behaviors/enemies/marlin.h"
 #include "../behaviors/enemies/pulser.h"
 #include "../behaviors/enemies/dolphin.h"
+#include "../behaviors/enemies/lynx.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
 #include "../systems/field.h"
@@ -209,7 +210,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         const bool far = def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
         if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
-            if (def.kind==speed::EnemyDefinition::Kind::Dolphin) {
+            if (def.kind==speed::EnemyDefinition::Kind::Lynx) {
+                speed::LynxBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Dolphin) {
                 speed::DolphinBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Pulser) {
                 speed::PulserBehavior::step(runtime,uint32_t(row),delta);

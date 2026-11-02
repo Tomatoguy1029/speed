@@ -70,6 +70,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         const auto *sniper=std::get_if<SniperState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Sniper)!=(sniper!=nullptr)) return false;
         if (sniper) {if (!sniper->rays.empty() && sniper->rays.size()!=48) return false;for (float v:sniper->rays) if (!std::isfinite(v) || v<0) return false;}
+        const auto *lynx=std::get_if<LynxState>(&enemy.behavior_state);
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr)) return false;
         const auto *marlin=std::get_if<MarlinState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Marlin)!=(marlin!=nullptr) || (marlin && !marlin->anchor.is_finite())) return false;
         std::unordered_set<uint64_t> parts;

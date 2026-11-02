@@ -34,6 +34,7 @@ struct ContentBundle {
     std::vector<MarlinDefinition> marlins;
     std::vector<PulserDefinition> pulsers;
     std::vector<DolphinDefinition> dolphins;
+    std::vector<LynxDefinition> lynxes;
     std::vector<ContactDefinition> contacts;
     std::vector<HostileDefinition> hostile_definitions;
     std::vector<BeamDefinition> beams;

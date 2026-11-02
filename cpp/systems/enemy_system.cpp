@@ -14,6 +14,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     const auto &def=run.content->definitions[definition];godot::RunState::Enemy enemy;
     if (def.kind==EnemyDefinition::Kind::Sniper) enemy.behavior_state=SniperState{};
     if (def.kind==EnemyDefinition::Kind::Marlin) enemy.behavior_state=MarlinState{};
+    if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
     enemy.definition=definition;enemy.pos=p.position;enemy.vel=p.velocity;enemy.facing=p.facing;enemy.elite=p.elite;enemy.is_boss=p.is_boss;enemy.knock_t=p.knock;enemy.rock=p.rock;
     if (def.kind==EnemyDefinition::Kind::Marlin && !p.has_facing && enemy.vel.length_squared()>0.001) enemy.facing=enemy.vel.angle();
     enemy.spin=p.spin;enemy.guard=p.guard;enemy.hit_cd=p.hit_cd;

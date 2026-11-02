@@ -16,6 +16,11 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-lynx" in OS.get_cmdline_user_args():
+		await check_cpp_lynx()
+		print("[cpp_lynx] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-bolt" in OS.get_cmdline_user_args() or "--cpp-bolt-tail-fix" in OS.get_cmdline_user_args():
 		mute_checks = "--cpp-bolt-tail-fix" in OS.get_cmdline_user_args()
 		var finished: bool = await check_cpp_bolt()
@@ -1041,5 +1046,92 @@ func check_cpp_dolphin() -> void:
 	core.remove_enemy(owner)
 	core.step(0.1)
 	check(pulse_motion(core,replacement).mode==EnemyTable.Mode.WINDUP,"参照相手が先に消えても古い行を追わず構える")
+	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func check_cpp_lynx() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 76
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["lynx","drifter"])
+	stage.enemy_tuning = {"lynx":{"params.telegraph":0.25,"params.fire_interval":1.0}}
+	var output := "res://.content/dev/run_lynx"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"やまねこ座の左右の爪".sha256_text())
+	check(built==OK,"やまねこ座の編集値と外観を生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_76.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":769},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"やまねこ座のランと通常表示を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.set_motion_context(target,target,Vector2(640,360))
+	var position := target-Vector2(600,0)
+	var id: int = core.spawn_enemy(&"lynx",position,{"facing":0.0})
+	core.set_enemy_motion(id,{"fire_t":1.0})
+	core.configure_attack_budget({"enabled":false,"budget":2.0,"jitter":0.0})
+	core.step(0.05)
+	check(dolphin_enemy(core,id).vel[0]>0.0,"画面矩形へ収まる目標へ進み画面外の遠い位置で待たない")
+	core.set_attack_formation_mode(true)
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.set_enemy_motion(id,{"fire_t":0.2})
+	core.step(0.05)
+	check(pulse_motion(core,id).charge==0.0 and pulse_motion(core,id).buds==0 and core.hostiles_snapshot().is_empty(),"予算0では左右の溜めと発射を進めない")
+	core.configure_attack_budget({"enabled":true,"budget":2.0,"jitter":0.0})
+	core.step(0.05)
+	check(pulse_motion(core,id).charge>0.0 and pulse_motion(core,id).buds==0,"許可後に最初の前足を構える")
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(900,400),Vector2(1800,800))).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var side := 0.0
+	for batch: Dictionary in frame.batches:
+		if batch.has("lynx"): side = batch.lynx[5]
+	check(side==1.0 and presentation.frame_view.apply_frame(frame),"次に振る側の前足と三本の爪を通常画面へ表示する")
+	await get_tree().process_frame
+	core.step(0.2)
+	check(core.hostiles_snapshot().size()==1 and core.hostiles_snapshot()[0].side==1.0 and pulse_motion(core,id).buds==1,"最初の片側の爪痕を生成して回数を進める")
+	core.step(0.8)
+	frame = bridge.read_render(Rect2(target-Vector2(900,400),Vector2(1800,800))).value
+	side = 0.0
+	for batch: Dictionary in frame.batches:
+		if batch.has("lynx"): side = batch.lynx[5]
+	check(side==-1.0 and presentation.frame_view.apply_frame(frame),"次の構えでは反対側の前足を光らせる")
+	core.step(0.21)
+	check(core.hostiles_snapshot().size()==2 and core.hostiles_snapshot()[1].side==-1.0 and pulse_motion(core,id).buds==2,"次の爪痕を左右交互に撃つ")
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step_hostiles(0.01)
+	check(core.hostiles_snapshot().size()==2,"本体の撃破後も発射済みの爪痕が進む")
+	core.step_hostiles(8.0)
+	check(core.hostiles_snapshot().is_empty(),"爪痕を自然寿命で終了する")
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"左右の回数・向き・溜めを値から復帰する")
+	core.step(0.2)
+	var future: Array = core.hostiles_snapshot()
+	bridge.restore(pending.value)
+	core.step(0.2)
+	check(core.hostiles_snapshot()==future,"復帰後も同じ側へ撃ち保持元へ変更を漏らさない")
+	bridge.restore(pending.value)
+	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
+	core.step(0.3)
+	check(core.hostiles_snapshot().is_empty(),"溜め中の撃破では新しい爪痕を撃たない")
+	core.remove_enemy(id)
+	var replacement: int = core.spawn_enemy(&"lynx",position,{})
+	check(replacement!=id and pulse_motion(core,replacement).buds==0 and pulse_motion(core,replacement).charge==0.0,"行の再利用で左右と溜めを引き継がない")
+	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.01})
+	core.remove_enemy(owner)
+	core.step(0.1)
+	check(pulse_motion(core,replacement).buds==1 and core.hostiles_snapshot().size()==1,"参照相手が先に消えても古い行を追わず撃つ")
 	bridge.release_checkpoint(pending.value)
 	session.free()

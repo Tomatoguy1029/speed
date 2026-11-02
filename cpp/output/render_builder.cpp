@@ -39,6 +39,7 @@ Dictionary RenderBatchBuffer::value() {
     if (!gunner.is_empty()) out["gunner"]=gunner;
     if (!sniper.is_empty()) out["sniper"]=sniper;
     if (!dolphin.is_empty()) out["dolphin"]=dolphin;
+    if (!lynx.is_empty()) out["lynx"]=lynx;
     if (!battleship.is_empty()) out["battleship"]=battleship;
     if (!missile.is_empty()) out["missile"]=missile;
     if (!beamer.is_empty()) out["beamer"]=beamer;
@@ -64,7 +65,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     auto &groups=run.render_workspace.batches;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
-        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();
+        out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();
     }
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
@@ -87,6 +88,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         if (definition.kind==EnemyDefinition::Kind::Gunner && enemy.charge>0) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.gunner.push_back(value);
+        }
+        if (definition.kind==EnemyDefinition::Kind::Lynx && enemy.charge>0) {
+            const float side=std::get<LynxState>(enemy.behavior_state).buds%2==0?1:-1;
+            for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge),side}) enemy_batch.lynx.push_back(value);
         }
         if (definition.kind==EnemyDefinition::Kind::Dolphin && enemy.mode==EnemyMode::Windup) {
             const auto &p=run.content->dolphins[definition.dolphin_definition-1];

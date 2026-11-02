@@ -29,6 +29,7 @@ var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
 var _battleship := PackedFloat32Array()
+var _lynx := PackedFloat32Array()
 var _dolphin := PackedFloat32Array()
 var _sniper := PackedFloat32Array()
 var _sniper_world_time := 0.0
@@ -130,6 +131,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/beamer.gd").draw_frame(canvas,_beamer,_pixel)
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/lynx.gd").draw_frame(canvas,_lynx,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/dolphin.gd").draw_frame(canvas,_dolphin,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/sniper.gd").draw_frame(canvas,_sniper,_sniper_world_time,1.0/maxf(_zoom,0.01))
 		perf.since(&"view_draw.attacks",began)
@@ -237,6 +239,10 @@ func _valid(frame: Dictionary) -> bool:
 			if not row.beamer is PackedFloat32Array or row.beamer.size()%10!=0: return false
 			for value: float in row.beamer:
 				if not is_finite(value): return false
+		if row.has("lynx"):
+			if not row.lynx is PackedFloat32Array or row.lynx.size()%6!=0: return false
+			for value: float in row.lynx:
+				if not is_finite(value): return false
 		if row.has("dolphin"):
 			if not row.dolphin is PackedFloat32Array or row.dolphin.size()%6!=0: return false
 			for value: float in row.dolphin:
@@ -312,12 +318,14 @@ func apply_frame(frame: Dictionary) -> bool:
 	var previous_beamer := _beamer
 	var previous_missile := _missile
 	var previous_battleship := _battleship
+	var previous_lynx := _lynx
 	var previous_dolphin := _dolphin
 	var previous_sniper := _sniper
 	_gunner = PackedFloat32Array()
 	_beamer = PackedFloat32Array()
 	_missile = PackedFloat32Array()
 	_battleship = PackedFloat32Array()
+	_lynx = PackedFloat32Array()
 	_dolphin = PackedFloat32Array()
 	_sniper = PackedFloat32Array()
 	for row: Dictionary in frame.batches:
@@ -325,10 +333,11 @@ func apply_frame(frame: Dictionary) -> bool:
 		if row.has("beamer"): _beamer.append_array(row.beamer)
 		if row.has("missile"): _missile.append_array(row.missile)
 		if row.has("battleship"): _battleship.append_array(row.battleship)
+		if row.has("lynx"): _lynx.append_array(row.lynx)
 		if row.has("dolphin"): _dolphin.append_array(row.dolphin)
 		if row.has("sniper"): _sniper.append_array(row.sniper)
 	# 描画命令はCanvasItemが保持する。変わらない予告は再構築しない。
-	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin: _gunner_marks.queue_redraw()
+	if _gunner!=previous_gunner or _beamer!=previous_beamer or _missile!=previous_missile or _battleship!=previous_battleship or _sniper!=previous_sniper or _dolphin!=previous_dolphin or _lynx!=previous_lynx: _gunner_marks.queue_redraw()
 	var rows: Array = frame.batches.duplicate()
 	rows.sort_custom(func(a,b): return a.layer<b.layer or (a.layer==b.layer and a.order<b.order))
 	var packed_bytes := 0
