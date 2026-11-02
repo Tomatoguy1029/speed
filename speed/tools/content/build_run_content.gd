@@ -1046,7 +1046,7 @@ static func encounter_records(data: Dictionary, profile: Dictionary, enemy_ids: 
 			data.EncounterRegion.append({"id":data.EncounterRegion.size()+1,"pattern":row.id,"enemy":enemy_ids.find(type)+1,"x":float(region.pos[0]),"y":float(region.pos[1]),"angle":float(region.get("angle",0.0)),"jitter":float(region.get("jitter",0.0)),"min_count":minimum,"max_count":clampi(int(region.get("max_count",1)),minimum,100),"fodder":region.get("role","avoid")=="fodder","elite":bool(region.get("elite",false))})
 	return OK
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}) -> Error:
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = []) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
@@ -1394,6 +1394,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	for enemy in data.StringEntry: formation_enemy_indices[StringName(enemy.value)] = enemy.id
 	var clips := Legacy.compile_spawn_clips(stage,config)
 	if clips.is_empty(): return ERR_INVALID_DATA
+	# 実験場の手動配置の定義は、自動クリップを追加せず同じ生成形式へ通す。
+	for source: Dictionary in extra_formations: clips.formations.append(Legacy.compile_formation(source))
 	for formation: Dictionary in clips.formations:
 		var formation_id: int = data.FormationDefinition.size()+1
 		data.FormationDefinition.append({"id":formation_id,"base_view":config.base_view})

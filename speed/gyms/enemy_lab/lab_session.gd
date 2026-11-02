@@ -17,6 +17,7 @@ var _source: RuntimeStage
 var _definitions := {}
 var _config: GameConfig
 var _output := ""
+var _formation_sources: Array = []
 var _baseline_config: GameConfig
 var _baseline_stage: StageDef
 var _baseline_definitions := {}
@@ -139,6 +140,7 @@ func _rebuild() -> void:
 			_definitions[id] = definition
 			_source.resources.enemy_ids.append(String(id))
 	# 未移行種類は配置時に失敗として返す。旧ランで補完しない。
+	_formation_sources = []
 	_output = "res://.content/dev/lab_%d_%d" % [OS.get_process_id(),get_instance_id()]
 	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions)
 	if built!=OK:
@@ -185,6 +187,7 @@ func _rebuild() -> void:
 	_accumulator = 0
 	events.clear()
 	schedule = spec.get("schedule",[]).duplicate(true)
+	if not String(spec.get("hero","")).is_empty(): _apply("hero",{"id":String(spec.hero)})
 	_apply("schedule",{"entries":schedule})
 	_apply_recorded()
 	_refresh_projection()
@@ -356,6 +359,21 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 				var result: Dictionary = bridge.command("dev_remove",{"entity_id":int(id)})
 				if not result.ok: return result
 			return bridge.command("dev_clear_hostile",{})
+		"formation":
+			var path := String(args.get("path",""))
+			if not ResourceLoader.exists(path): return {"ok":false,"message":"配置の定義がありません"}
+			var source: Dictionary = load("res://tools/content/build_runtime_stage.gd").formation(load(path))
+			if source.is_empty(): return {"ok":false,"message":"配置の形式が不正です"}
+			var next_sources := _formation_sources.duplicate(true)
+			next_sources.append(source)
+			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources)
+			if built!=OK: return {"ok":false,"message":"配置の定義を生成できません"}
+			var bundle := _read_generated()
+			if bundle.is_empty(): return {"ok":false,"message":"配置の生成物を読み込めません"}
+			var result: Dictionary = bridge.replace_scenario("formation",{"layout":int(args.get("layout",0)),"entry":int(args.get("entry",0))},bundle.bytes)
+			if result.ok: _formation_sources = next_sources
+			return result
+		"hero": return bridge.command("dev_set_hero",{"id":String(args.get("id",""))})
 		"individual":
 			var payload := {"entity_id":int(args.get("id",-1))}
 			for key in ["elite","size"]:
@@ -417,9 +435,27 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 		"command": return bridge.command(String(args.get("name","")),args.get("args",{}))
 		"field": return _add_field(String(args.get("kind","")),vector(args.get("pos",[0,0])),float(args.get("radius",0)))
 		"phase_set":
-			# 空の選択は既存の途中再生プリセットでも変更なしとして扱う。
 			if args.get("ids",[]).is_empty(): return {"ok":true}
+			var next := _source.duplicate(true) as RuntimeStage
+			next.phases.clear()
+			for id in args.ids:
+				if not ContentManager.phases.has(StringName(id)): return {"ok":false,"message":"時間帯の定義がありません"}
+				next.phases.append(ContentManager.phases[StringName(id)].duplicate(true))
+			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources)
+			if built!=OK: return {"ok":false,"message":"時間帯の定義を生成できません"}
+			var bundle := _read_generated()
+			if bundle.is_empty(): return {"ok":false,"message":"時間帯の生成物を読み込めません"}
+			var result: Dictionary = bridge.replace_scenario("phase_set",{},bundle.bytes)
+			if result.ok:
+				_source = next
+				run.state.data.stage = next
+			return result
 	return {"ok":false,"message":"この実験命令はまだ移行していません: "+kind}
+
+func _read_generated() -> Dictionary:
+	var path := _output.path_join("stage_%d.json" % _source.index)
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return LOADER.read_bundle(path,index.input_sha256)
 
 func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	var next := _definitions.duplicate(true)
@@ -446,7 +482,7 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		elif key in ["hp","toughness","armor","speed","radius","accel","turn","xp","weak_arc","attack_weight","hitstop_multiplier"]:
 			definition.set(key,clampi(int(args.value),-1,1) if key=="toughness" else maxf(0.01 if key in ["hp","radius"] else 0.0,float(args.value)))
 		else: return {"ok":false}
-	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next)
+	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources)
 	if built!=OK: return {"ok":false,"message":"編集の定義を生成できません"}
 	var path := _output.path_join("stage_%d.json" % _source.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -525,6 +561,8 @@ func seek(target: int, instant := false) -> void:
 			return
 		_definitions = run.enemies.data.definitions
 		_config = run.cfg
+		_source = item.source
+		_formation_sources = item.get("formation_sources",[]).duplicate(true)
 		scene.process_mode = Node.PROCESS_MODE_INHERIT
 		if viewport != null and scene.get_parent() == null:
 			viewport.add_child(scene)
@@ -619,7 +657,7 @@ func _cache_current() -> void:
 	if not held.ok:
 		last_error = held
 		return
-	checkpoints.append({"checkpoint":held.value,"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true), "pinned": pinned,
+	checkpoints.append({"checkpoint":held.value,"formation_sources":_formation_sources.duplicate(true),"source":_source,"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true), "pinned": pinned,
 		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "selected": selected, "key": _state_key})
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	# 表示枠に残すと、保存した過去の場面も重なって描かれる

@@ -11,6 +11,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-formations" in OS.get_cmdline_user_args() or "--cpp-lab-phase" in OS.get_cmdline_user_args():
+		await cpp_lab_formations()
+		print("[cpp_lab_formations] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab-replay" in OS.get_cmdline_user_args() or "--cpp-lab-replay-placement" in OS.get_cmdline_user_args():
 		await cpp_lab_replay()
 		print("[cpp_lab_replay] passed=%d failed=%d" % [passed,failed])
@@ -247,3 +252,25 @@ func cpp_lab_replay() -> void:
 	lab.queue_free()
 	await get_tree().process_frame
 	check(ids.all(func(id): return RunManager.session(id)==null),"画面破棄で現在と保持中の全Sessionを解放する")
+
+func cpp_lab_formations() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"empty":true})
+	var tick: int = lab.tick
+	if "--cpp-lab-phase" not in OS.get_cmdline_user_args():
+		check(lab.perform("formation",{"path":"res://data/formations/aquila.tscn","layout":0,"entry":0}),"配置シーンを共通生成した値から正式命令で追加する")
+		check(lab.run.enemies.count()==1 and lab.run.enemies.table.type[0]==&"aquila" and lab.tick==tick,"配置した敵の種類と現在tickを保つ")
+		var definition: String = lab.bridge.read_recording(true).value.identity.payload_sha256
+		var before: Dictionary = lab.bridge.read_lab().value
+		var history: int = lab.history.size()
+		check(not lab.perform("formation",{"path":"res://data/formations/aquila.tscn","layout":1000,"entry":0}),"不正な並びを拒否する")
+		check(lab.bridge.read_recording(true).value.identity.payload_sha256==definition and lab.bridge.read_lab().value==before and lab.history.size()==history,"失敗した配置は定義・個体・履歴を部分変更しない")
+	else:
+		lab.perform("spawn",{"type":"drifter","pos":[500,300]})
+	var phase: PhaseDef = ContentManager.phases.values()[0]
+	check(lab.perform("phase_set",{"ids":[String(phase.id)]}),"時間帯の選択も共通生成した定義と正式命令で置き換える")
+	check(lab.tick==tick and lab.run.enemies.count()==1 and lab.run.state.stage.phases.size()==1 and lab.run.state.stage.phases[0].id==phase.id,"時間帯編集で時計と配置済みの個体を維持する")
+	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"配置と時間帯編集後の読取・回収・通知配信が成功する")
+	lab.queue_free()
+	await get_tree().process_frame

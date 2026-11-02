@@ -1,5 +1,8 @@
 #include "run_core.h"
 #include "../systems/equipment.h"
+#include "../runtime/dev_commands.h"
+#include "../runtime/checkpoint.h"
+#include "../systems/population_system.h"
 #include "../systems/progression.h"
 #include "../systems/enemy_system.h"
 #include "../systems/field.h"
@@ -28,6 +31,26 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();s.view_center=s.enemy_aim=at;c.camera_center=at;c.camera_ready=false;s.draw.gauge=gauge;s.time=time;s.loadout.level=int64_t(level);speed::EquipmentSystem::refresh_effects(runtime);
         if (bool(p.get("empty",false))) {s.field.bodies.clear();s.field.rocks.clear();s.field.wells.clear();s.field.warp_gone=-1;}
         return reply(true);
+    }
+    if (command=="dev_set_scenario" && (kind=="formation" || kind=="phase_set")) {
+        if (!keys(p,{"replacement","expected_revision","layout","entry"}) || p.get("replacement",Variant()).get_type()!=Variant::PACKED_BYTE_ARRAY || p.get("expected_revision",Variant()).get_type()!=Variant::INT || (kind=="phase_set" && p.size()!=2) || (kind=="formation" && (p.size()!=4 || p["layout"].get_type()!=Variant::INT || p["entry"].get_type()!=Variant::INT))) return reply(false);
+        Ref<SpeedRunCore> candidate;candidate.instantiate();candidate->runtime=runtime;candidate->runtime.state=speed::clone_state(s);
+        Dictionary replacement;replacement["definition_id"]="config";replacement["replacement"]=p["replacement"];replacement["expected_revision"]=p["expected_revision"];
+        const Dictionary edited=speed::DevCommands::replace_definition(candidate->runtime,replacement);if (!bool(edited["ok"])) return edited;
+        auto &target=candidate->runtime.state;Variant value;
+        if (kind=="formation") {
+            if (candidate->runtime.content->formations.empty()) return reply(false);
+            const auto &f=candidate->runtime.content->formations.back();const int64_t layout=p["layout"],entry=p["entry"];
+            if (layout<0 || uint64_t(layout)>=f.layouts.size() || entry<0 || uint64_t(entry)>=f.entries.size()) return reply(false);
+            target.formations=candidate->runtime.content->formations;target.formation_base_view=candidate->runtime.content->formation_base_view;target.motion_ready=true;
+            const auto ids=candidate->spawn_formation(target.formations.size()-1,layout,entry,PackedStringArray(),-1.0,Variant(),Variant());
+            if (ids.size()!=int64_t(f.layouts[layout].types.size())) return reply(false);value=ids;
+        } else {
+            const bool enabled=target.population.frame_enabled;
+            if (!target.population.ready) speed::PopulationSystem::prepare(candidate->runtime);
+            target.population.frame_enabled=enabled;target.spawn_timeline=candidate->runtime.content->population_timeline;target.spawn_timeline_ready=true;
+        }
+        runtime=std::move(candidate->runtime);return reply(true,value);
     }
     if (command!="dev_edit") return reply(false);
     if (kind=="camera") {

@@ -161,6 +161,24 @@ func replace_definition(definition_id: String, replacement: PackedByteArray, edi
 		if result.ok and not resumed.ok: return resumed
 	return result
 
+## 制作中の配置・時間帯も、生成と現在版を照合して一度で適用する。
+func replace_scenario(kind: String, params: Dictionary, replacement: PackedByteArray) -> Dictionary:
+	var frame := read_frame()
+	if not frame.ok: return frame
+	var paused: bool = frame.value.ui.phase==RunState.Phase.PAUSED
+	if not paused:
+		var stopped := command("pause",{"paused":true})
+		if not stopped.ok: return stopped
+	frame = read_frame()
+	var payload: Dictionary = params.duplicate(true)
+	payload.replacement = replacement
+	payload.expected_revision = frame.value.state_revision if frame.ok else -1
+	var result := command("dev_set_scenario",{"kind":kind,"params":payload}) if frame.ok else frame
+	if not paused:
+		var resumed := command("pause",{"paused":false})
+		if result.ok and not resumed.ok: return resumed
+	return result
+
 func checkpoint() -> Dictionary:
 	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"checkpoint","更新中は保持できません")
