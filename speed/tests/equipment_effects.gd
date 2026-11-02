@@ -71,6 +71,12 @@ func _ready() -> void:
 		print("[cpp_w28_boss_visual] failed=%d" % failures)
 		get_tree().quit(1 if failures else 0)
 		return
+	if "--cpp-stats" in OS.get_cmdline_user_args() or "--cpp-stats-boundary" in OS.get_cmdline_user_args():
+		var completed = await check_cpp_stats()
+		check(completed==true,"全装備への特性接続を最後まで確認する")
+		print("[cpp_stats] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-overlap" in OS.get_cmdline_user_args() or "--cpp-overlap-retry" in OS.get_cmdline_user_args():
 		var completed = await check_cpp_overlap()
 		check(completed==true,"同時作用の指定確認を最後まで完了する")
@@ -1760,6 +1766,7 @@ func trait_test_session(id: String, config: GameConfig, seed_value: int):
 	if id=="C_overlap":
 		stage.resources.enemy_ids = PackedStringArray(["drifter","corona","biter"])
 		stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":0.0,"speed":0.0},"corona":{"speed":0.0,"params.spin":0.0,"params.pull":0.0,"params.telegraph":100.0,"params.fire_interval":100.0},"biter":{"hp":1.0,"armor":0.0,"speed":0.0}}
+	if id=="T_stats": stage.enemy_tuning = {"drifter":{"hp":100000.0,"armor":0.0,"speed":0.0}}
 	if id=="W28": stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":0.0}}
 	if id=="T06": stage.enemy_tuning = {"shield":{"hp":200.0}}
 	var output := "res://.content/dev/run_"+id
@@ -4021,4 +4028,149 @@ func check_cpp_overlap() -> bool:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"同時作用と行再利用に実行エラーがない: %s" % [errors.messages()])
+	return true
+
+func check_cpp_stats() -> bool:
+	var boundary_only: bool = "--cpp-stats-boundary" in OS.get_cmdline_user_args()
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	config.trace_radius = 1.0
+	config.weapon_slots = 16
+	config.trait_slots = 18
+	var session = await trait_test_session("T_stats",config,737)
+	if session==null:
+		OS.remove_logger(errors)
+		return false
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var weapons := ["W01","W02","W03","W04","W05","W07","W08","W17","W21","W22","W23","W25","W26","W27","W28","W29"]
+	var traits := ["T03","T04","T05","T06","T07","T08","T09","T10","T11","T12","T14","T31","T32","T33","T34","T35","T36","T37"]
+	for id in weapons: check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":5 if boundary_only else 1}).ok,"数値特性をつなぐ全16武器を登録する")
+	for level in ([5] if boundary_only else range(1,config.trait_max_stacks+1)):
+		for id in traits: check(bridge.command("dev_grant_equipment",{"kind":"trait","id":id,"levels":5 if boundary_only else 1}).ok,"全16武器とともに全18特性を各段で取得する")
+		if boundary_only: continue
+		check(bridge._ui.weapon_levels.size()==16 and bridge._ui.trait_levels.size()==18 and bridge._ui.trait_levels.all(func(t):return t.level==level),"全18特性と全16武器の接続を段ごとに保つ")
+		var fields := {"T07":"charge_time","T08":"capacity","T09":"crit_chance","T10":"max_speed","T11":"attack_mult","T12":"pickup_radius","T14":"length_mult","T31":"glide_duration_mult","T34":"area_multiplier","T35":"shot_multiplier"}
+		for id in fields:
+			var definition: TraitDef = ContentManager.definition(&"traits",StringName(id))
+			var amount: float = 1.0+definition.stack_bonus(level)
+			var expected: float = amount
+			match id:
+				"T07": expected = config.dash_charge_time/amount
+				"T09": expected = minf(float(definition.params.max),config.base_crit_chance+definition.stack_bonus(level))
+				"T10": expected = config.base_max_speed*amount
+				"T12": expected = config.pickup_radius*amount
+			check(is_equal_approx(float(bridge._ui[fields[id]]),expected),"全武器を持つ各段の実効値を一度だけ合成する: %s" % id)
+		check(bridge._ui.vortex.ready and bridge._ui.kill_sonic.ready and bridge._ui.crit_beam.ready and bridge._ui.run_up.ready and bridge._ui.rampage.equipped and bridge._ui.full_burst and bridge._ui.full_charge.maximum>1.0,"行動する特性の実行状態を数値特性と一緒に登録する")
+	var stats: Array = [bridge._ui.attack_mult,bridge._ui.area_multiplier,bridge._ui.shot_multiplier,bridge._ui.charge_time,bridge._ui.capacity,bridge._ui.shooting_rate]
+	if not boundary_only:
+		for id in weapons:
+			check(bridge.command("dev_remove_weapon",{"id":id}).ok,"特性を保持したまま各武器を交換する")
+			var definition: WeaponDef = ContentManager.definition(&"weapons",StringName(id))
+			check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":definition.level_steps.size()}).ok,"交換した武器を最大段で同じ特性へつなぎ直す")
+			check(bridge._ui.weapon_levels.size()==16 and bridge._ui.trait_levels.size()==18 and [bridge._ui.attack_mult,bridge._ui.area_multiplier,bridge._ui.shot_multiplier,bridge._ui.charge_time,bridge._ui.capacity,bridge._ui.shooting_rate]==stats,"交換前後で共有倍率を重ねず全特性を維持する")
+	var full: Dictionary = bridge.checkpoint()
+	var events: Array = []
+	bridge.subscribe("stats_check",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	var duplicates := 0
+	if not boundary_only:
+		for weapon_id in ["W01","W02","W23","W25"]:
+			check(bridge.restore(full.value).ok and bridge.collect_frame().ok,"混成特性の射撃境界へ復帰する")
+			for id in weapons:
+				if id!=weapon_id: bridge.command("dev_remove_weapon",{"id":id})
+			var definition: WeaponDef = ContentManager.definition(&"weapons",StringName(weapon_id))
+			if weapon_id=="W25":
+				var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":core.ship_snapshot().ship_pos+Vector2(250,0)}).value
+				core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
+			var times: Array[float] = []
+			for tick in 200:
+				events.clear()
+				check(bridge.step(1.0/120.0,idle,viewport).ok,"混成特性の通常射撃を短く進める")
+				var fresh: Array = core.projectiles_snapshot().filter(func(p):return p.kind==0 and p.age<0.009)
+				if fresh.is_empty(): continue
+				times.append(bridge._ui.world_time)
+				if times.size()==1:
+					var power: float = bridge._ui.attack_power*float(definition.params.damage_by_level[-1])
+					var parents: Array = fresh.filter(func(p):return is_equal_approx(p.damage,power))
+					var count: int = (int(definition.params.shots_by_level[-1]) if weapon_id=="W02" else 1)*2
+					var copied: int = events.filter(func(e):return e.type==&"duplicate").size()*2
+					duplicates += copied
+					var radius: float = (float(definition.params.shot_radius) if weapon_id=="W25" else 5.0)*bridge._ui.area_multiplier
+					check(parents.size()==count and fresh.size()==count+copied,"弾数の整数境界へ一度だけ補正し複製を別に追加する: %s" % weapon_id)
+					var duplicator: TraitDef = ContentManager.definition(&"traits",&"T37")
+					check(fresh.all(func(p):return is_equal_approx(p.radius,radius) and (is_equal_approx(p.damage,power) or is_equal_approx(p.damage,power*float(duplicator.params.damage_by_level[-1])))),"攻撃力・範囲を元の弾へ適用し複製だけへ専用威力を掛ける: %s" % weapon_id)
+					if weapon_id=="W25":
+						var drone: Dictionary = bridge._ui.interceptor.drones[0]
+						check(is_equal_approx(drone.next-bridge._ui.interceptor.clock,float(definition.params.burst_interval)/bridge._ui.shooting_rate),"連射中の次弾にも満タン特性の間隔を適用する")
+						break
+				if times.size()==2:
+					check(absf(times[1]-times[0]-float(definition.params.interval_by_level[-1])/bridge._ui.shooting_rate)<=1.0/120.0+0.000001,"連射特性の間隔で次の発射へ進む: %s" % weapon_id)
+					break
+			check(not times.is_empty(),"各射撃武器が混成特性から実際の弾を生成する")
+		check(duplicates>0,"T37は数値だけでなく実際の射撃生成時に左右2本の複製を作る")
+	check(bridge.restore(full.value).ok and bridge.collect_frame().ok,"範囲とミラージュ機数の境界へ復帰する")
+	for id in weapons:
+		if id!="W27": bridge.command("dev_remove_weapon",{"id":id})
+	var center: Vector2 = trait_start_trace(bridge,600.0)
+	core.step_draw(0.1)
+	var probe: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(999,999)}).value
+	var enemy_radius: float = core.enemies_snapshot().filter(func(e):return e.id==probe)[0].radius
+	bridge.command("dev_remove",{"entity_id":probe})
+	var inside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,enemy_radius+config.trace_radius*bridge._ui.area_multiplier-0.01)}).value
+	var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,enemy_radius+config.trace_radius*bridge._ui.area_multiplier+0.01)}).value
+	for id in [inside,outside]: core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
+	var hp: float = core.enemies_snapshot().filter(func(e):return e.id==inside)[0].hp
+	for tick in 20: bridge.step(1.0/120.0,idle,viewport)
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"混成特性の射撃と範囲境界を配信する")
+	var enemies: Array = core.enemies_snapshot()
+	check(enemies.filter(func(e):return e.id==inside)[0].hp<hp and enemies.filter(func(e):return e.id==outside)[0].hp==hp,"ミラージュの保存区間にも共通範囲を一度掛けて内外を分ける")
+	check(bridge._ui.afterimage.echoes[0].copies.size()==5,"弾数と複製特性はミラージュの専用機数へ重ねて掛けない")
+	for id in ["W22","W26"]:
+		check(bridge.restore(full.value).ok and bridge.collect_frame().ok,"候補のセル境界へ復帰する")
+		for other in weapons: bridge.command("dev_remove_weapon",{"id":other})
+		bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1})
+		var definition: WeaponDef = ContentManager.definition(&"weapons",StringName(id))
+		center = core.ship_snapshot().ship_pos
+		probe = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(999,999)}).value
+		enemy_radius = core.enemies_snapshot().filter(func(e):return e.id==probe)[0].radius
+		bridge.command("dev_remove",{"entity_id":probe})
+		var y: float = float(definition.params.width)*bridge._ui.area_multiplier*0.5 if id=="W22" else 13.0*1.82*config.character_scale+float(definition.params.drone_hit_radius)*config.character_scale*bridge._ui.area_multiplier
+		if id=="W22":
+			trait_start_trace(bridge,600.0)
+			core.step_draw(1.0)
+		inside = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240,y+enemy_radius-0.01)}).value
+		outside = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240,y+enemy_radius+0.01)}).value
+		for target in [inside,outside]: core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
+		hp = core.enemies_snapshot().filter(func(e):return e.id==inside)[0].hp
+		if id=="W26": trait_start_trace(bridge,600.0)
+		for tick in 55: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"セル境界の通過命中を配信する")
+		enemies = core.enemies_snapshot()
+		check(enemies.filter(func(e):return e.id==inside)[0].hp<hp and enemies.filter(func(e):return e.id==outside)[0].hp==hp,"候補検索は敵半径を含め、判定は武器の半径のまま内外を分ける: %s" % id)
+	var rendered: RunPresentation = session.view.get_node("RunPresentation")
+	rendered._present_cpp(0.01)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = Vector2(1280,720)
+	add_child(hud)
+	hud.apply_snapshot(bridge._ui.duplicate(true))
+	bridge.collect_frame()
+	for frame in 3: await get_tree().process_frame
+	check(hud._cpp_ui.weapon_levels.size()==1 and hud._cpp_ui.trait_levels.size()==18 and hud._cpp_ui.attack_mult==bridge._ui.attack_mult and hud._cpp_ui.area_multiplier==bridge._ui.area_multiplier,"交換後の装備と全18特性の同じ実効値をHUDへ表示する")
+	hud.free()
+	bridge.release_checkpoint(full.value)
+	bridge.unsubscribe("stats_check")
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"全装備への特性接続に実行エラーがない: %s" % [errors.messages()])
 	return true

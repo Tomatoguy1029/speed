@@ -14,7 +14,7 @@ void AfterimageBehavior::trail(RunRuntime &r,godot::Vector2 a,godot::Vector2 b) 
     for (auto &e:w.echoes) if (e.id==w.current) {if (e.legs.size()>=2048 || w.clock-e.start>=4) {end(r);return;}const double start=std::max(w.clock,e.until),finish=start+a.distance_to(b)/std::max(s.draw.rate,1.0);e.legs.push_back({a,b,start,finish,CombatResolver::attack_power(r),r.content->config.trace_radius*s.loadout.effects.area});e.until=finish;return;}
 }
 namespace {
-void hit(RunRuntime &r,AfterimageCopy &c,godot::Vector2 a,godot::Vector2 b,const AfterimageLeg &leg,double share) {auto &s=r.state;const godot::Vector2 pad(leg.radius,leg.radius);
+void hit(RunRuntime &r,AfterimageCopy &c,godot::Vector2 a,godot::Vector2 b,const AfterimageLeg &leg,double share) {auto &s=r.state;const double query_radius=leg.radius+std::max(s.combat_config.max_enemy_radius,s.grid.max_radius);const godot::Vector2 pad(query_radius,query_radius);
     for (auto row:CollisionQuery::enemy_rows(s,a.min(b)-pad,a.max(b)+pad)) {const auto &enemy=s.enemies[row];if (enemy.dead || c.hits.count(enemy.id)) continue;const double t=CollisionQuery::segment_circle_t(a,b,enemy.pos,enemy.radius+leg.radius);if (t<0) continue;c.hits.insert(enemy.id);if (leg.power<enemy.armor) continue;
         DamageRequest q;q.struck=s.enemy_handles.at(uint32_t(row));q.amount=leg.power*share;q.cause=Cause::Afterimage;q.weapon_id=s.loadout.afterimage.definition;q.direction=c.dir;q.impact=a.lerp(b,t);q.has_impact=true;q.knock=0;q.no_crit=true;CombatResolver::damage_enemy(r,q);EventBuilder::flush_combat(r);if (s.phase!=godot::RunState::Phase::Play) return;
     }

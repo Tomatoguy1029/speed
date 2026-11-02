@@ -10,7 +10,7 @@ namespace speed {
 namespace {
 void fire(RunRuntime &r,const BipolarPending &p) {
     auto &s=r.state;auto &w=s.loadout.bipolar;const auto direction=(p.to-p.from).normalized();
-    const double width=w.width*s.loadout.effects.area*(1+w.area_increment*double(s.loadout.post_area_stacks));const godot::Vector2 pad(width/2,width/2);
+    const double width=w.width*s.loadout.effects.area*(1+w.area_increment*double(s.loadout.post_area_stacks));const double query_radius=width/2+std::max(s.combat_config.max_enemy_radius,s.grid.max_radius);const godot::Vector2 pad(query_radius,query_radius);
     const double damage=CombatResolver::attack_power(r)*EquipmentSystem::weapon_damage_factor(r,w.definition)*w.damage;
     for (auto row:CollisionQuery::enemy_rows(s,p.from.min(p.to)-pad,p.from.max(p.to)+pad)) {
         const auto &e=s.enemies[row];if (e.dead || CollisionQuery::segment_circle_t(p.from,p.to,e.pos,e.radius+width/2)<0) continue;
