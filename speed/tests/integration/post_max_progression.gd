@@ -1,5 +1,6 @@
 ## 武器と特性の育成完了への遷移・加算・実際の発射経路・ラン寿命を確認する。
 extends "res://tests/integration/thrill_acceptance.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 func _ready() -> void:
 	if "--cpp" in OS.get_cmdline_user_args():
@@ -40,7 +41,7 @@ func _equip(ids: Array, lv := -1) -> void:
 	for id in ids:
 		_check(run.loadout.grant(&"weapon", id, run.cfg.weapon_max_level if lv < 0 else lv), "装備 %s" % id)
 	run.state.ship_hp = run.state.stats.max_hp
-	run.set_phase(RunState.Phase.PLAY)
+	run.set_phase(RunIds.Phase.Play)
 
 func _complete_traits() -> void:
 	for id in [&"T08", &"T03", &"T04", &"T05"]:
@@ -407,7 +408,7 @@ func _test_selection_lifetime() -> void:
 	_complete_traits()
 	run.state.pending_levels = 3
 	run.loadout.try_open_cards()
-	_check(run.state.phase == RunState.Phase.LEVELUP, "既存LEVELUPフェーズを再利用")
+	_check(run.state.phase == RunIds.Phase.Levelup, "既存LEVELUPフェーズを再利用")
 	var cards := run.state.cards.duplicate(true)
 	var initial := run.state.time
 	run.command(&"pause")
@@ -421,7 +422,7 @@ func _test_selection_lifetime() -> void:
 		_check(not info.name.is_empty() and info.desc.length() <= 24 and (info.desc.contains("+") or info.desc.contains("−")), "カード正面は短い今回の増分")
 		_check(info.tooltip_desc.contains("→") and info.color == Color("#9fe8ff"), "累計詳細をツールチップに残し色を固定")
 		run.command(&"choose_card", {"index": 0})
-	_check(run.state.pending_levels == 0 and run.state.phase == RunState.Phase.PLAY, "保留3レベルを1回ずつ選択して再開")
+	_check(run.state.pending_levels == 0 and run.state.phase == RunIds.Phase.Play, "保留3レベルを1回ずつ選択して再開")
 	var counts := run.state.post_max_stacks.duplicate()
 	run.state.pending_levels = 1
 	run.loadout.try_open_cards()
@@ -535,7 +536,7 @@ func _cpp_ready() -> void:
 	bridge.command("pause",{"paused":false})
 	_check(bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":cards.candidates[0].candidate_id}).ok,"通常の候補IDで最大HPを選ぶ")
 	bridge.step(1.0/120.0,input,viewport)
-	_check(bridge._ui.pending_levels==0 and bridge._ui.phase==RunState.Phase.PLAY and is_equal_approx(bridge._core.ship_snapshot().ship_hp,40.0),"1回だけ強化して現在HPを保ち戦闘を再開する")
+	_check(bridge._ui.pending_levels==0 and bridge._ui.phase==RunIds.Phase.Play and is_equal_approx(bridge._core.ship_snapshot().ship_hp,40.0),"1回だけ強化して現在HPを保ち戦闘を再開する")
 	_cpp_edit(bridge,"post_max_offer",{"ids":PackedStringArray(["heal"])})
 	cards = bridge._ui.cards
 	bridge.command("choose_card",{"offer_id":cards.offer_id,"candidate_id":cards.candidates[0].candidate_id})

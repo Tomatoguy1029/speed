@@ -1,5 +1,6 @@
 ## 猟犬の群れ・欠員・冠からの復帰を、セーブを書かずに確かめる。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 var passed := 0
@@ -108,11 +109,11 @@ func _test_alignment(m: EnemySystem, source: EnemyDef) -> void:
 	m.table.pos[b] = Vector2(0, 40)
 	m.table.vel[a] = Vector2(160, 0)
 	m.table.vel[b] = Vector2(0, 2000)
-	m.table.mode[b] = EnemyTable.Mode.WINDUP
+	m.table.mode[b] = RunIds.EnemyModeId.Windup
 	m.table.timer[b] = 1.0
 	m.tick(0.02, 0.02)
 	check(is_zero_approx(m.table.vel[a].y), "噛みつきを構えた仲間は同期から外れ、攻撃を続ける")
-	m.table.mode[b] = EnemyTable.Mode.MOVE
+	m.table.mode[b] = RunIds.EnemyModeId.Move
 	m.table.pos[b] = Vector2(0, 500)
 	m.table.vel[a] = Vector2(160, 0)
 	m.table.vel[b] = Vector2(0, 40)
@@ -144,12 +145,12 @@ func _test_bite(m: EnemySystem, source: EnemyDef) -> void:
 	m.state.ship_pos = Vector2(25, 0)
 	var row := m.spawn(def, Vector2.ZERO, {"vel": Vector2.ZERO})
 	m.tick(0.01, 0.01)
-	check(m.table.mode[row] == EnemyTable.Mode.WINDUP and m.table.flash[row] > 0.0, "近づくと光って噛みつきを予告する")
+	check(m.table.mode[row] == RunIds.EnemyModeId.Windup and m.table.flash[row] > 0.0, "近づくと光って噛みつきを予告する")
 	m.tick(float(def.params.bite_telegraph), float(def.params.bite_telegraph))
-	check(m.table.mode[row] == EnemyTable.Mode.RECOVER, "予告後に既存噛みつきを出して回復へ進む")
+	check(m.table.mode[row] == RunIds.EnemyModeId.Recover, "予告後に既存噛みつきを出して回復へ進む")
 	var bite := false
 	for i in m.projectiles.hazard_alive.size():
-		if m.projectiles.hazard_alive[i] and m.projectiles.hazard_style[i] == ProjectileSystem.HazardStyle.BITE:
+		if m.projectiles.hazard_alive[i] and m.projectiles.hazard_style[i] == RunIds.HazardStyleId.Bite:
 			bite = is_equal_approx(m.projectiles.hazard_dmg[i], float(def.params.bullet_dmg))
 	check(bite, "噛みつきの既存範囲攻撃・威力を使う")
 	m.clear_all()

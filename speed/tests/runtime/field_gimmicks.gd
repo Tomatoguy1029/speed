@@ -1,5 +1,6 @@
 ## 仕掛けの更新と、フィールドから使う共通の入口を確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var mute_checks := false
 var moons_finished := false
@@ -555,7 +556,7 @@ func check_cpp_gravity() -> void:
 	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
 	var rock: int = bridge.command("dev_field_query",{"action":"rocks"}).value[0].enemy_id
 	var rock_row := run.enemies.spawn(run.enemies.def_of(&"meteor"),point,{"meteor_index":0})
-	var shot := run.projectiles._add_hostile(point,Vector2(0,20),20.0,7.0,4.0,1.0,0.0,0.0,ProjectileSystem.HostileKind.BULLET)
+	var shot := run.projectiles._add_hostile(point,Vector2(0,20),20.0,7.0,4.0,1.0,0.0,0.0,RunIds.HostileKind.Bullet)
 	core.spawn_hostile({"kind":0,"pos":point,"vel":Vector2(0,20),"speed":20.0,"r":7.0,"life":4.0,"dmg":1.0,"slow":0.0,"turn":0.0})
 	run.field.add_well(center,0.5,500.0,1000.0)
 	check(bridge.command("dev_add_well",{"position":center,"life":0.5,"radius":500.0,"pull":1000.0}).ok,"同じ位置と世界寿命の重力を生成する")
@@ -736,7 +737,7 @@ func check_cpp_warp() -> void:
 	fixed_step(bridge)
 	var ui: Dictionary = bridge.read_frame().value.ui
 	mute_checks = false
-	check(ui.phase==RunState.Phase.LEVELUP and ui.cards.offer_id>0,"ボーナス中もレベルアップのカード待ちへ入る")
+	check(ui.phase==RunIds.Phase.Levelup and ui.cards.offer_id>0,"ボーナス中もレベルアップのカード待ちへ入る")
 	mute_checks = phase_only
 	var paused_time: float = core.inspect().world_time
 	var paused_bonus: float = core.inspect().bonus_remaining

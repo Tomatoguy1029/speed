@@ -1,6 +1,7 @@
 ## カードの0.3秒ガードを実際のGUI入力経路で短時間確認する。
 ## Godot --headless --path speed res://tests/integration/card_input_guard.tscn
 extends "res://tests/integration/thrill_acceptance.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var hud: Control
 var point := Vector2.ZERO
@@ -15,14 +16,14 @@ func _ready() -> void:
 	await _open()
 	_check(hud._cards_box.visible, "selection appears immediately")
 	_click_card()
-	_check(run.state.phase == RunState.Phase.LEVELUP, "immediate click cannot choose")
+	_check(run.state.phase == RunIds.Phase.Levelup, "immediate click cannot choose")
 	await _open()
 	_mouse(true)
 	await _wait_real()
 	_mouse(false)
-	_check(run.state.phase == RunState.Phase.LEVELUP, "blocked press cannot choose on late release")
+	_check(run.state.phase == RunIds.Phase.Levelup, "blocked press cannot choose on late release")
 	_click_card()
-	_check(run.state.phase == RunState.Phase.PLAY, "new click after delay can choose")
+	_check(run.state.phase == RunIds.Phase.Play, "new click after delay can choose")
 	_check(not run.input.poll().press, "card click does not leak into gameplay")
 	await _open(2)
 	_key(KEY_1, true)
@@ -38,16 +39,16 @@ func _ready() -> void:
 	_key(KEY_1, false)
 	_key(KEY_1, true)
 	_key(KEY_1, false)
-	_check(run.state.phase == RunState.Phase.PLAY, "fresh hotkey can choose next level")
+	_check(run.state.phase == RunIds.Phase.Play, "fresh hotkey can choose next level")
 	await _open()
 	_key(KEY_ENTER, true)
 	Engine.time_scale = 0.0
 	await _wait_real()
 	_key(KEY_ENTER, false)
-	_check(run.state.phase == RunState.Phase.LEVELUP, "ui_accept begun during lock remains rejected at time scale zero")
+	_check(run.state.phase == RunIds.Phase.Levelup, "ui_accept begun during lock remains rejected at time scale zero")
 	_key(KEY_ENTER, true)
 	_key(KEY_ENTER, false)
-	_check(run.state.phase == RunState.Phase.PLAY, "monotonic deadline expires at time scale zero")
+	_check(run.state.phase == RunIds.Phase.Play, "monotonic deadline expires at time scale zero")
 	Engine.time_scale = 1.0
 	await _open()
 	run.state.rerolls_left = 3
@@ -60,7 +61,7 @@ func _ready() -> void:
 	_key(KEY_R, false)
 	_check(run.state.rerolls_left == before - 1, "fresh reroll works after delay")
 	_click_card()
-	_check(run.state.phase == RunState.Phase.LEVELUP, "rerolled cards restart input guard")
+	_check(run.state.phase == RunIds.Phase.Levelup, "rerolled cards restart input guard")
 	# 本番の割り当てを増やさず、決定へ割り当てた場合だけを確認する。
 	var joy_binding := InputEventJoypadButton.new()
 	joy_binding.button_index = JOY_BUTTON_A
@@ -69,19 +70,19 @@ func _ready() -> void:
 	_joy(true)
 	await _wait_real()
 	_joy(false)
-	_check(run.state.phase == RunState.Phase.LEVELUP, "blocked gamepad accept release cannot choose")
+	_check(run.state.phase == RunIds.Phase.Levelup, "blocked gamepad accept release cannot choose")
 	_joy(true)
 	_joy(false)
-	_check(run.state.phase == RunState.Phase.PLAY, "fresh gamepad accept can choose")
+	_check(run.state.phase == RunIds.Phase.Play, "fresh gamepad accept can choose")
 	InputMap.action_erase_event(&"ui_accept", joy_binding)
 	await _open()
 	_touch(true)
 	await _wait_real()
 	_touch(false)
-	_check(run.state.phase == RunState.Phase.LEVELUP, "blocked touch and emulated mouse release cannot choose")
+	_check(run.state.phase == RunIds.Phase.Levelup, "blocked touch and emulated mouse release cannot choose")
 	_touch(true)
 	_touch(false)
-	_check(run.state.phase == RunState.Phase.PLAY, "fresh touch with emulated mouse chooses once")
+	_check(run.state.phase == RunIds.Phase.Play, "fresh touch with emulated mouse chooses once")
 	_check(not run.input.poll().press and run.input._stick_index == -1, "touch sequence does not leak into gameplay")
 
 	# 開く前の押下を、遅い release や再開後の移動へ持ち越さない。
@@ -96,7 +97,7 @@ func _ready() -> void:
 	touch.pressed = false
 	get_viewport().push_input(touch, true)
 	_mouse(false)
-	_check(run.state.phase == RunState.Phase.LEVELUP, "press before opening cannot choose on late release")
+	_check(run.state.phase == RunIds.Phase.Levelup, "press before opening cannot choose on late release")
 	_click_card()
 	var intent := run.input.poll()
 	_check(not intent.press and not intent.stick_active, "preexisting gameplay gesture is cleared when cards open")
@@ -112,7 +113,7 @@ func _ready() -> void:
 	emulated.pressed = false
 	get_viewport().push_input(emulated, true)
 	_mouse(false)
-	_check(run.state.phase == RunState.Phase.LEVELUP, "emulation pair cannot cross the deadline as a new click")
+	_check(run.state.phase == RunIds.Phase.Levelup, "emulation pair cannot cross the deadline as a new click")
 	# 初期武器選択も同じ保護を使う。
 	run.state.pending_levels = 0
 	run.loadout.reset_loadout()
@@ -131,7 +132,7 @@ func _open(levels := 1) -> void:
 	run.state.start_pick = false
 	run.state.swap_pick = &""
 	run.state.pending_levels = levels
-	run.set_phase(RunState.Phase.PLAY)
+	run.set_phase(RunIds.Phase.Play)
 	run.loadout.try_open_cards()
 	await _position_card()
 

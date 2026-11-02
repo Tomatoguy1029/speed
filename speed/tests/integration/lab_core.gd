@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var passed := 0
 var failed := 0
@@ -58,7 +59,7 @@ func _ready() -> void:
 	var config_before := ContentManager.cfg.enemy_hp_mult
 	await lab.reset({"seed": 932, "empty": true, "stage": 4})
 	check(lab.run.state.stage.boss_id == &"hydra", "実験の基準はステージ4のヒュドラ")
-	check(lab.run.state.phase == RunState.Phase.PLAY, "カード選択なしで実験できる")
+	check(lab.run.state.phase == RunIds.Phase.Play, "カード選択なしで実験できる")
 	check(lab.run.cfg != ContentManager.cfg, "設定を実験ごとに複製する")
 	lab.perform("spawn", {"type": "gunner", "pos": [200, 0], "count": 3})
 	check(lab.run.enemies.count() == 3, "好きな敵を複数出せる")
@@ -154,7 +155,7 @@ func cpp_lab() -> void:
 	if lab.run==null: lab.queue_free(); return
 	check(lab.last_error.get("ok",false),"開始設定が成功する: "+str(lab.last_error))
 	if not lab.last_error.get("ok",false): lab.queue_free(); return
-	check(lab.run.state.stage.boss_id==&"hydra" and lab.run.state.phase==RunState.Phase.PLAY,"元のステージとカード待ちのない入口を保つ")
+	check(lab.run.state.stage.boss_id==&"hydra" and lab.run.state.phase==RunIds.Phase.Play,"元のステージとカード待ちのない入口を保つ")
 	check(lab.perform("spawn",{"type":"gunner","pos":[200,0],"count":3}) and lab.run.enemies.count()==3,"手動配置は通常の生成サービスへ接続する")
 	var id: int = lab.run.enemies.table.id[lab.selected]
 	check(lab.perform("move",{"id":id,"pos":[300,50],"angle":0.25}) and lab.run.enemies.table.pos[lab.selected]==Vector2(300,50),"論理IDで選択と移動を行う")
@@ -248,11 +249,11 @@ func cpp_lab_replay() -> void:
 	check(lab.checkpoints.size()<=3,"保持するSessionとC++保持点の上限を守る")
 	lab.perform("command",{"name":"dev_add_xp","args":{"amount":100.0}})
 	lab.step()
-	check(lab.run.state.phase==RunState.Phase.LEVELUP,"カード待ちを復元対象に含める")
+	check(lab.run.state.phase==RunIds.Phase.Levelup,"カード待ちを復元対象に含める")
 	var card_tick: int = lab.tick
 	lab.perform("spawn",{"type":"drifter","pos":[900,500]})
 	await lab.undo_edit()
-	check(lab.tick==card_tick and lab.run.state.phase==RunState.Phase.LEVELUP,"カード待ちでも配置取消のtickと候補待ちを維持する")
+	check(lab.tick==card_tick and lab.run.state.phase==RunIds.Phase.Levelup,"カード待ちでも配置取消のtickと候補待ちを維持する")
 	lab.cancel_seek()
 	check(not lab.seeking and not lab.playing,"取消後の古いseekを進めない")
 	await lab.reset({"empty":true})

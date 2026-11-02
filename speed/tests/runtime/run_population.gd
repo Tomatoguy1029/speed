@@ -1,5 +1,6 @@
 ## 領域別の人数・上限・画面外の再配置・出現位置と乱数を比較する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const COMPARE := preload("res://tools/compare_runtime.gd")
 const DATA := preload("res://tools/content/build_native_data.gd")
 const CONFIG := ["spawn_recycle_scale", "spawn_region_cap", "spawn_margin", "field_radius", "planet_radius"]
@@ -1337,10 +1338,10 @@ func semantics_hazard_values(run: RunSimulation, core) -> Array:
 	for row in ps.hazard_alive.size():
 		if not ps.hazard_alive[row]:continue
 		var value:={"pos":ps.hazard_pos[row],"angle":ps.hazard_angle[row],"time":ps.hazard_t[row],"delay":ps.hazard_delay[row],"active":ps.hazard_active[row],"damage":ps.hazard_dmg[row],"length":ps.hazard_len[row],"half_width":ps.hazard_width[row]*0.5}
-		if ps.hazard_kind[row]==ProjectileSystem.HazardKind.ZONE:
+		if ps.hazard_kind[row]==RunIds.HazardKind.Zone:
 			value.erase("angle");value.erase("half_width");value.radius=value.length;value.erase("length")
-		if ps.hazard_kind[row]==ProjectileSystem.HazardKind.BEAM:value.arc=ps.hazard_arc[row]
-		if ps.hazard_kind[row]==ProjectileSystem.HazardKind.WAVE:
+		if ps.hazard_kind[row]==RunIds.HazardKind.Beam:value.arc=ps.hazard_arc[row]
+		if ps.hazard_kind[row]==RunIds.HazardKind.Wave:
 			value.radius=ps.wave_radius(row);value.start_radius=ps.hazard_start_radius[row];value.speed=ps.hazard_speed[row];value.arc=ps.hazard_arc[row];value.gap_angle=ps.hazard_gap[row]
 		source.append(value)
 	for row:Dictionary in core.hazards_snapshot():

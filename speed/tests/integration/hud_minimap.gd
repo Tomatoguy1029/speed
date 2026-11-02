@@ -1,5 +1,6 @@
 ## 自機中心地図・円形の切り取り・発見通知を短時間確認する。
 extends "res://tests/integration/thrill_acceptance.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -37,7 +38,7 @@ func _ready() -> void:
 	s.events.clear()
 	run.heroes.tick(0.01, 0.01)
 	run.frame_events.emit(s.events)
-	_check(hud._hero_notice_t > 0 and s.phase == RunState.Phase.PLAY, "real discovery event reaches HUD without pausing")
+	_check(hud._hero_notice_t > 0 and s.phase == RunIds.Phase.Play, "real discovery event reaches HUD without pausing")
 	await _shot("discovered")
 	if shots != "" and DisplayServer.get_name() != "headless":
 		get_window().content_scale_size = Vector2i.ZERO

@@ -1,5 +1,6 @@
 ## 敵別停止時間、実命中、上限と中断後の再開を実際のランで確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failures := 0
 var session: RunSession
@@ -65,8 +66,8 @@ func _ready() -> void:
 		if mode == "guard": sim.enemies.table.guard[row] = 1.0
 		if mode == "locked": sim.state.controls_locked = true
 		if mode == "protected": sim.state.encounter_protected = true
-		if mode == "paused": sim.set_phase(RunState.Phase.PAUSED)
-		if mode == "gate": sim.enemies.table.gate[row] = EnemyTable.Gate.SOLID
+		if mode == "paused": sim.set_phase(RunIds.Phase.Paused)
+		if mode == "gate": sim.enemies.table.gate[row] = RunIds.EnemyGate.Solid
 		var cause := StringName(mode) if mode in ["shot", "touch", "bump"] else &"shot" if mode == "gate" else &"ram"
 		sim.combat.damage_enemy(row, 0.0 if mode == "zero" else -1.0 if mode == "negative" else 0.01, {"cause": cause, "crit": true})
 		check(sim.state.hitstop == 0.0 and sim.combat.dash_stop == 0.0, "拒否された命中・既存対象外の攻撃は停止しない: " + mode)
@@ -112,7 +113,7 @@ func _check_collision() -> void:
 		t.hp[row] = 10000.0
 		t.max_hp[row] = 10000.0
 		if mode == "guard": t.guard[row] = 1.0
-		if mode == "blocked": t.gate[row] = EnemyTable.Gate.SOLID
+		if mode == "blocked": t.gate[row] = RunIds.EnemyGate.Solid
 		if mode == "disabled": sim.state.hitstop_enabled = false
 		sim.state.ship_pos = Vector2(550, 500)
 		sim.state.ship_vel = Vector2(1000, 0)
@@ -133,7 +134,7 @@ func _check_lifecycle() -> void:
 	sim._play_tick(0.02)
 	check(sim.state.world_time > world, "期限後に世界更新が再開する")
 	check(Engine.time_scale == engine_scale, "Engine.time_scaleを変更しない")
-	for phase in [RunState.Phase.PAUSED, RunState.Phase.LEVELUP, RunState.Phase.DYING, RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+	for phase in [RunIds.Phase.Paused, RunIds.Phase.Levelup, RunIds.Phase.Dying, RunIds.Phase.Finishing, RunIds.Phase.Ended]:
 		sim = fresh()
 		kill(sim, enemy(sim))
 		sim.set_phase(phase)

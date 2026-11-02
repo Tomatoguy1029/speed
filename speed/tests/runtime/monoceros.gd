@@ -1,5 +1,6 @@
 ## 合意した攻撃・惑星・形態予約・共通撃破経路の短い受け入れ確認。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var sim: RunSimulation
 var actor: MonocerosBoss
@@ -103,7 +104,7 @@ func _ready() -> void:
 	check(ContentManager.stage(1).boss_id == &"monoceros", "ステージ1は専用ボスを参照する")
 	check(actor.table.max_hp[actor.body] == actor.def.hp * sim.cfg.enemy_hp_mult, "専用HPを共通倍率付きで使う")
 	check(actor.table.armor[actor.body] == actor.def.armor * sim.cfg.enemy_armor_mult, "専用装甲を使う")
-	check(actor.table.gate[actor.body] == EnemyTable.Gate.NONE and actor.table.weak_arc[actor.body] == 0.0, "全方向から本体を攻撃できる")
+	check(actor.table.gate[actor.body] == RunIds.EnemyGate.None and actor.table.weak_arc[actor.body] == 0.0, "全方向から本体を攻撃できる")
 	fresh()
 	sim.state.ship_pos = Vector2(2400, 0)
 	sim.state.enemy_aim = sim.state.ship_pos
@@ -439,7 +440,7 @@ func fresh() -> void:
 	sim.field.battle_arenas.clear()
 	sim.field._build_moon_bands()
 	sim.field.refresh_bodies()
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.boss_dead = false
 	sim.state.lab_mode = true
 	sim.state.ship_pos = Vector2(600, 0)
@@ -1522,7 +1523,7 @@ func native_finish_tail(retry := false) -> void:
 	bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
 	finish_steps(bridge,1)
 	var frame: Dictionary = bridge.read_frame().value
-	check(frame.ui.phase==RunState.Phase.FINISHING and frame.ui.boss_finish.active and frame.result==null,"実撃破のboss_deadから報酬を確定せずクリア演出へ入る")
+	check(frame.ui.phase==RunIds.Phase.Finishing and frame.ui.boss_finish.active and frame.result==null,"実撃破のboss_deadから報酬を確定せずクリア演出へ入る")
 	var scope := ContentResourceScope.new()
 	for entry: Dictionary in f.package.visuals:
 		if entry.get("purpose","") in ["legendary","reveal"]: scope.provide(entry.path,load(entry.path))
@@ -1633,7 +1634,7 @@ func native_finish_source_hp() -> void:
 	check(hit.ok and f.bridge.command("dev_boss_body_state").value[0].mode==4,"第1形態でも致死ダメージは撃破する")
 	check(f.bridge.step(DT,f.bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok,"第1形態の撃破を通常の終了判定へ進める")
 	var frame: Dictionary = f.bridge.read_frame()
-	check(frame.ok and frame.value.ui.phase==RunState.Phase.FINISHING and f.bridge.delivery_error.ok,"致死後に同じクリア演出へ入り配信する")
+	check(frame.ok and frame.value.ui.phase==RunIds.Phase.Finishing and f.bridge.delivery_error.ok,"致死後に同じクリア演出へ入り配信する")
 	f.bridge.dispose()
 	print("[cpp_monoceros_source_hp] failures=",failed)
 	get_tree().quit(1 if failed else 0)

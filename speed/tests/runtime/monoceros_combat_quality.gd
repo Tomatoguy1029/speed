@@ -1,5 +1,6 @@
 ## 実際の選択・予告・角判定へ、独立した自機軌道を流す回帰確認。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const DT := 1.0 / 120.0
 var sim: RunSimulation
 var session: Node
@@ -229,7 +230,7 @@ func fresh(at: Vector2, velocity: Vector2, phase: int, facing: float) -> void:
 	sim.field.battle_arenas.clear()
 	sim.field._build_moon_bands()
 	sim.field.refresh_bodies()
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.boss_dead = false
 	sim.state.lab_mode = true
 	sim.state.ship_pos = at

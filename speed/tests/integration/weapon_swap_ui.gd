@@ -2,6 +2,7 @@
 ## Godot --headless --path speed res://tests/integration/weapon_swap_ui.tscn
 ## 描画付きでは --headless を外し、-- --out=/tmp/speed-swap-ui を付ける。
 extends "res://tests/integration/card_input_guard.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 func _ready() -> void:
 	if "--cpp" in OS.get_cmdline_user_args():
@@ -35,7 +36,7 @@ func _ready() -> void:
 	await _wait_real()
 	point = new_name.get_global_rect().get_center()
 	_click_card()
-	_check(run.state.weapons == before and run.state.phase == RunState.Phase.LEVELUP, "新武器情報はクリックしても選択にならない")
+	_check(run.state.weapons == before and run.state.phase == RunIds.Phase.Levelup, "新武器情報はクリックしても選択にならない")
 	for i in grid.get_child_count():
 		var b: Button = grid.get_child(i)
 		var card: Dictionary = run.state.cards[i]
@@ -46,19 +47,19 @@ func _ready() -> void:
 	var removed: StringName = run.state.cards[1].id
 	point = grid.get_child(1).get_global_rect().get_center()
 	_click_card()
-	_check(run.state.phase == RunState.Phase.PLAY and not run.state.weapons.has(removed) and run.state.weapons.get(&"W22") == run.cfg.weapon_max_level, "選んだ所持武器だけを新武器と交換する")
+	_check(run.state.phase == RunIds.Phase.Play and not run.state.weapons.has(removed) and run.state.weapons.get(&"W22") == run.cfg.weapon_max_level, "選んだ所持武器だけを新武器と交換する")
 	for id in before:
 		if id != removed:
 			_check(run.state.weapons[id] == before[id], "交換しない所持武器のLvを保つ")
-	_check(not run.loadout._receive_comet_weapon(&"W22") and run.state.phase == RunState.Phase.PLAY, "同じ彗星武器を受け取ったときの既存ルールを保つ")
+	_check(not run.loadout._receive_comet_weapon(&"W22") and run.state.phase == RunIds.Phase.Play, "同じ彗星武器を受け取ったときの既存ルールを保つ")
 	await _open_swap()
 	before = run.state.weapons.duplicate()
 	point = hud.get("_swap_keep").get_global_rect().get_center()
 	_click_card()
-	_check(run.state.phase == RunState.Phase.LEVELUP and run.state.weapons == before, "交換画面にも0.3秒ガードを適用する")
+	_check(run.state.phase == RunIds.Phase.Levelup and run.state.weapons == before, "交換画面にも0.3秒ガードを適用する")
 	await _wait_real()
 	_click_card()
-	_check(run.state.phase == RunState.Phase.PLAY and run.state.weapons == before, "新武器を破棄すると現在の装備を保つ")
+	_check(run.state.phase == RunIds.Phase.Play and run.state.weapons == before, "新武器を破棄すると現在の装備を保つ")
 	await _open_swap()
 	# サイズ確認はHUDを対象にし、世界側のエフェクトは静止したまま描く。
 	scene.view.get_node("RunPresentation").set_process(false)
@@ -81,7 +82,7 @@ func _ready() -> void:
 	_touch(true)
 	_touch(false)
 	Input.emulate_touch_from_mouse = emulating_touch
-	_check(run.state.phase == RunState.Phase.PLAY and run.state.weapons.has(&"W22"), "小さい画面でも所持武器の枠をタッチして交換できる")
+	_check(run.state.phase == RunIds.Phase.Play and run.state.weapons.has(&"W22"), "小さい画面でも所持武器の枠をタッチして交換できる")
 	TranslationServer.set_locale("en")
 	await _open_swap()
 	await _shot("swap_en_small")
@@ -107,7 +108,7 @@ func _open_swap() -> void:
 	run.state.start_pick = false
 	run.state.pending_levels = 0
 	run.state.swap_pick = &""
-	run.set_phase(RunState.Phase.PLAY)
+	run.set_phase(RunIds.Phase.Play)
 	_check(run.loadout._receive_comet_weapon(&"W22"), "装備満杯で交換画面を開く")
 	await _settle()
 
@@ -153,11 +154,11 @@ func _cpp_ready() -> void:
 			session.cpp_choices.poll()
 			step.call()
 			await get_tree().process_frame
-			if int(bridge._ui.phase)==RunState.Phase.PLAY: break
+			if int(bridge._ui.phase)==RunIds.Phase.Play: break
 		_check(bridge._ui.weapon_levels.any(func(v): return v.id=="W22" and v.level==config.weapon_max_level),"空枠の彗星武器は最大段で取得する")
 		bridge.command("dev_edit",{"kind":"comet_weapon","payload":{"id":"W22"}})
 		step.call()
-		_check(int(bridge._ui.phase)==RunState.Phase.PLAY,"取得済み彗星武器は重複取得しない")
+		_check(int(bridge._ui.phase)==RunIds.Phase.Play,"取得済み彗星武器は重複取得しない")
 		bridge.command("dev_remove_weapon",{"id":"W22"})
 		for i in config.weapon_slots: bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W%02d" % (i+1),"levels":i+1})
 		bridge.command("dev_edit",{"kind":"progression","payload":{"pending_levels":1}})
@@ -210,7 +211,7 @@ func _cpp_ready() -> void:
 	await get_tree().create_timer(0.35).timeout
 	hud.get("_swap_keep").pressed.emit()
 	step.call()
-	_check(bridge._ui.weapon_levels==before and int(bridge._ui.phase)==RunState.Phase.PLAY,"正式HUDの維持ボタンは資源を待たず元の装備で再開する")
+	_check(bridge._ui.weapon_levels==before and int(bridge._ui.phase)==RunIds.Phase.Play,"正式HUDの維持ボタンは資源を待たず元の装備で再開する")
 	for i in 125: step.call()
 	_check(bridge._ui.weapon_levels==before,"交換直後の攻撃更新でも所持装備を保つ")
 	session.free()

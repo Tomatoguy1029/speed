@@ -1,5 +1,6 @@
 ## ラン終了の確認だけを、保存を伴わない Viewport 入力で確認する。
 extends "res://tests/integration/selection_menus.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var aborts := 0
 
@@ -24,7 +25,7 @@ func _ready() -> void:
 	var quit: Button = hud._pause_box.get_child(3)
 	quit.grab_focus()
 	_tap(KEY_SPACE)
-	_check(aborts == 0 and run.state.phase == RunState.Phase.PAUSED, "quit button requests confirmation without aborting")
+	_check(aborts == 0 and run.state.phase == RunIds.Phase.Paused, "quit button requests confirmation without aborting")
 	if hud._menu_overlay == null:
 		_check(false, "quit confirmation is visible")
 		await _finish_test()
@@ -46,10 +47,10 @@ func _ready() -> void:
 	var intent := run.input.poll()
 	_check(not intent.press and not intent.alt_press and not intent.hero_press, "confirmation blocks gameplay input")
 	_tap(KEY_ESCAPE)
-	_check(hud._menu_overlay == null and hud._pause_box.visible and run.state.phase == RunState.Phase.PAUSED, "Esc returns only to pause")
+	_check(hud._menu_overlay == null and hud._pause_box.visible and run.state.phase == RunIds.Phase.Paused, "Esc returns only to pause")
 	_key(KEY_ESCAPE, true, true)
 	_key(KEY_ESCAPE, false)
-	_check(run.state.phase == RunState.Phase.PAUSED, "Esc echo cannot resume underneath")
+	_check(run.state.phase == RunIds.Phase.Paused, "Esc echo cannot resume underneath")
 	for i in 3:
 		await get_tree().process_frame
 		_click(quit.get_global_rect().get_center())
@@ -65,7 +66,7 @@ func _ready() -> void:
 		_check(hud._pause_box.visible and hud._menu_overlay == null and aborts == 0, "cancel returns to pause (%d)" % i)
 	await get_tree().process_frame
 	_tap(KEY_ESCAPE)
-	_check(run.state.phase == RunState.Phase.LEVELUP and run.state.cards == cards and run.state.start_pick, "cancel and resume preserve initial selection")
+	_check(run.state.phase == RunIds.Phase.Levelup and run.state.cards == cards and run.state.start_pick, "cancel and resume preserve initial selection")
 	hud._rewards.enqueue_bonus({"type": &"level_bonus", "kind": &"weapon", "id": &"W01", "level": 2, "count": 1})
 	_tap(KEY_ESCAPE)
 	quit.pressed.emit()
@@ -74,13 +75,13 @@ func _ready() -> void:
 	var before := run.state.time
 	await _ready_cards()
 	run.physics_step(1.0)
-	_check(run.state.time == before and hud._rewards._elapsed == elapsed and run.state.phase == RunState.Phase.PAUSED, "confirmation keeps world and reward paused")
+	_check(run.state.time == before and hud._rewards._elapsed == elapsed and run.state.phase == RunIds.Phase.Paused, "confirmation keeps world and reward paused")
 	_tap(KEY_ESCAPE)
 	await get_tree().process_frame
 	_tap(KEY_ESCAPE)
-	_check(hud._rewards.visible and run.state.phase == RunState.Phase.LEVELUP and run.state.cards == cards, "reward and selection return after cancelling")
+	_check(hud._rewards.visible and run.state.phase == RunIds.Phase.Levelup and run.state.cards == cards, "reward and selection return after cancelling")
 	hud._rewards.cancel()
-	run.set_phase(RunState.Phase.PLAY)
+	run.set_phase(RunIds.Phase.Play)
 	_tap(KEY_ESCAPE)
 	quit.pressed.emit()
 	await _ready_cards()
@@ -92,11 +93,11 @@ func _ready() -> void:
 	dialog = hud._menu_overlay
 	var confirm := dialog.find_child("Confirm", true, false) as Button
 	_click(confirm.get_global_rect().get_center())
-	_check(aborts == 1 and run.state.phase == RunState.Phase.ENDED, "confirm invokes existing abort exactly once")
+	_check(aborts == 1 and run.state.phase == RunIds.Phase.Ended, "confirm invokes existing abort exactly once")
 	confirm.pressed.emit()
 	_tap(KEY_SPACE)
 	_tap(KEY_ESCAPE)
-	_check(aborts == 1 and run.state.phase == RunState.Phase.ENDED, "repeat confirm and shortcuts cannot trigger a second transition")
+	_check(aborts == 1 and run.state.phase == RunIds.Phase.Ended, "repeat confirm and shortcuts cannot trigger a second transition")
 	await _close()
 	# 通常起動と同じ接続で、承諾からメインメニューへ到達する。
 	GameManager.screen = GameManager.Screen.TITLE

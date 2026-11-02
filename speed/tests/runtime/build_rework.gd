@@ -1,5 +1,6 @@
 ## ビルドの組み合わせ・一撃・分裂・耐久の重要な境界を確認する。
 extends "res://tests/integration/thrill_acceptance.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 func _ready() -> void:
 	var settings: Dictionary = SaveManager.settings.duplicate(true)
@@ -101,7 +102,7 @@ func _test_one_shot() -> void:
 	run.combat.damage_enemy(weak, 7.99, {"cause": &"shot"})
 	_check(run.projectiles.friend_count() == before, "8割未満のとどめでは砕かない")
 	while run.projectiles.debris_count() < 199:
-		run.projectiles._add_friend(ProjectileSystem.FriendKind.DEBRIS, &"hullDebris", Vector2.ZERO, Vector2.RIGHT, 1.0, 1.0, 1.0, false, 0, Color.WHITE, true, 0.0, 0.0, 0.0, -1)
+		run.projectiles._add_friend(RunIds.FriendKind.Debris, &"hullDebris", Vector2.ZERO, Vector2.RIGHT, 1.0, 1.0, 1.0, false, 0, Color.WHITE, true, 0.0, 0.0, 0.0, -1)
 	var last := _enemy(&"armored", Vector2(300, 100))
 	t.max_hp[last] = 10.0
 	t.hp[last] = 10.0

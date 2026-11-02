@@ -1,5 +1,6 @@
 ## かじき座の停止予告・現在位置の固定照準・高速掃引・共通撃破との接続。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var sim: RunSimulation
 var t: EnemyTable
@@ -60,17 +61,17 @@ func _ready() -> void:
 		var prior_facing := t.facing[row]
 		sim.enemies.tick(0.05, 0.05)
 		var travel := t.pos[row] - prior
-		check(t.mode[row] == EnemyTable.Mode.MOVE and absf(Geom.angle_diff(t.facing[row], prior_facing)) <= t.turn[row] * 0.05 + 0.002, "回遊は旋回速度を守る")
+		check(t.mode[row] == RunIds.EnemyModeId.Move and absf(Geom.angle_diff(t.facing[row], prior_facing)) <= t.turn[row] * 0.05 + 0.002, "回遊は旋回速度を守る")
 		check(t.vel[row].length() > 0.0 and absf(Geom.angle_diff(t.vel[row].angle(), t.facing[row])) < 0.002, "回遊の顔と速度を一致させる")
 		check(travel.length() > 0.0 and absf(Geom.angle_diff(travel.angle(), t.facing[row])) < 0.002, "回遊の顔と移動軌跡を一致させる")
 	check(absf(Geom.angle_diff(t.facing[row], initial_facing)) > 0.5, "回遊中は目標へ向けて実際に旋回する")
-	check(t.pos[row] != from and t.mode[row] == EnemyTable.Mode.MOVE, "回遊中は移動する")
+	check(t.pos[row] != from and t.mode[row] == RunIds.EnemyModeId.Move, "回遊中は移動する")
 	sim.state.ship_pos = t.pos[row] + Vector2(600, 0)
 	sim.state.enemy_aim = t.pos[row] + Vector2(0, 600)
 	t.fire_t[row] = float(def.params.telegraph) + 0.05
 	from = t.pos[row]
 	sim.enemies.tick(0.1, 0.1)
-	check(t.mode[row] == EnemyTable.Mode.WINDUP and t.pos[row] == from and t.vel[row] == Vector2.ZERO, "回遊から急停止して予告へ入る")
+	check(t.mode[row] == RunIds.EnemyModeId.Windup and t.pos[row] == from and t.vel[row] == Vector2.ZERO, "回遊から急停止して予告へ入る")
 	check(t.anchor[row] == sim.state.ship_pos and absf(t.facing[row]) < 0.001, "遅延照準と違う現在位置を停止時に固定する")
 	sim.state.ship_pos += Vector2(0, 800)
 	sim.state.enemy_aim = sim.state.ship_pos
@@ -79,23 +80,23 @@ func _ready() -> void:
 		check(t.pos[row] == from and t.charge[row] > 0.0, "予告の全期間で停止して光る")
 	for frame in 3:
 		sim.enemies.tick(0.05, 0.05)
-		if t.mode[row] == EnemyTable.Mode.DASH: break
-	check(t.mode[row] == EnemyTable.Mode.DASH and t.vel[row].x > 0.0 and absf(t.vel[row].y) < 0.001, "停止時の方向へ直線突進する")
+		if t.mode[row] == RunIds.EnemyModeId.Dash: break
+	check(t.mode[row] == RunIds.EnemyModeId.Dash and t.vel[row].x > 0.0 and absf(t.vel[row].y) < 0.001, "停止時の方向へ直線突進する")
 	var direction := t.vel[row].normalized()
 	sim.state.ship_pos = t.pos[row] - Vector2(600, 500)
 	sim.enemies.tick(0.1, 0.1)
 	check(t.vel[row].normalized().is_equal_approx(direction), "発進後も自機を追尾しない")
 	for frame in 20:
 		sim.enemies.tick(0.1, 0.1)
-		if t.mode[row] == EnemyTable.Mode.RECOVER: break
+		if t.mode[row] == RunIds.EnemyModeId.Recover: break
 	check(sim.projectiles.hostile_alive.count(1) == 0, "突進で左右弾を発射しない")
-	check(t.mode[row] == EnemyTable.Mode.RECOVER and t.charge[row] == 0.0, "突進後に予告を残さず休む")
+	check(t.mode[row] == RunIds.EnemyModeId.Recover and t.charge[row] == 0.0, "突進後に予告を残さず休む")
 	check(t.vel[row] == Vector2.ZERO, "突進終了時に古い高速速度を残さない")
 	check(t.fire_t[row] == float(def.params.fire_interval), "既存の攻撃間隔を保つ")
 	for frame in 20:
 		sim.enemies.tick(0.05, 0.05)
-		if t.mode[row] == EnemyTable.Mode.MOVE: break
-	check(t.mode[row] == EnemyTable.Mode.MOVE and t.vel[row] == Vector2.ZERO, "休みの終わりまで静止する")
+		if t.mode[row] == RunIds.EnemyModeId.Move: break
+	check(t.mode[row] == RunIds.EnemyModeId.Move and t.vel[row] == Vector2.ZERO, "休みの終わりまで静止する")
 	sim.enemies.tick(0.05, 0.05)
 	check(t.vel[row].length() > 0.0 and absf(Geom.angle_diff(t.vel[row].angle(), t.facing[row])) < 0.002, "休み明けも顔の方向へ加速する")
 
@@ -144,7 +145,7 @@ func _ready() -> void:
 	sim.field.refresh_bodies()
 	check(sim.field.bodies.has(planet) and sim.field.near_body(planet.pos, 1.0), "次の地形更新後も惑星を保持する")
 	check(sim.state.events.filter(func(event): return event.type == &"explode" and event.get("cause") == &"marlin").is_empty(), "惑星の破壊演出を発生させない")
-	check(t.mode[row] == EnemyTable.Mode.DASH, "地形接触で専用の行動遷移を追加しない")
+	check(t.mode[row] == RunIds.EnemyModeId.Dash, "地形接触で専用の行動遷移を追加しない")
 
 	# 同じフレームに二体が通っても、同じ敵を二重に倒さない。
 	reset()
@@ -204,10 +205,10 @@ func _ready() -> void:
 	t.fire_t[row] = float(def.params.telegraph)
 	sim.projectiles.director.configure({"enabled": true, "budget": 0.0, "jitter": 0.0})
 	sim.enemies.tick(0.1, 0.1)
-	check(t.mode[row] == EnemyTable.Mode.MOVE and t.vel[row] != Vector2.ZERO, "攻撃枠を待つ間は回遊を続ける")
+	check(t.mode[row] == RunIds.EnemyModeId.Move and t.vel[row] != Vector2.ZERO, "攻撃枠を待つ間は回遊を続ける")
 	sim.projectiles.director.configure({"enabled": false})
 	sim.enemies.tick(0.1, 0.1)
-	check(t.mode[row] == EnemyTable.Mode.WINDUP and t.vel[row] == Vector2.ZERO, "許可後に停止予告へ入る")
+	check(t.mode[row] == RunIds.EnemyModeId.Windup and t.vel[row] == Vector2.ZERO, "許可後に停止予告へ入る")
 	for stopped in ["stone", "knock"]:
 		reset()
 		row = dash(Vector2.ZERO, 10000.0, 0.2)
@@ -221,7 +222,7 @@ func _ready() -> void:
 	sim.enemies.mark_dead(row)
 	sim.enemies.cleanup()
 	row = sim.enemies.spawn(def, Vector2.ZERO)
-	check(t.mode[row] == EnemyTable.Mode.MOVE and t.charge[row] == 0.0, "再利用した行へ予告と突進を引き継がない")
+	check(t.mode[row] == RunIds.EnemyModeId.Move and t.charge[row] == 0.0, "再利用した行へ予告と突進を引き継がない")
 	session.free()
 	await get_tree().process_frame
 	print("[marlin] %d failures" % failed)
@@ -239,7 +240,7 @@ func reset() -> void:
 	sim.field.refresh_bodies()
 	sim.state.ship_pos = Vector2(2000, 2000)
 	sim.state.enemy_aim = Vector2.ZERO
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.events.clear()
 
 func dash(pos: Vector2, speed: float, duration: float) -> int:
@@ -247,7 +248,7 @@ func dash(pos: Vector2, speed: float, duration: float) -> int:
 	def.params.dash_speed = speed
 	var row := sim.enemies.spawn(def, pos)
 	b = sim.enemies.behavior(&"marlin")
-	t.mode[row] = EnemyTable.Mode.DASH
+	t.mode[row] = RunIds.EnemyModeId.Dash
 	t.timer[row] = duration
 	t.facing[row] = 0.0
 	return row
@@ -304,14 +305,14 @@ func _capture(stage: RuntimeStage) -> void:
 		var dt := 1.0 / 60.0
 		sim.state.world_time += dt
 		sim.enemies.tick(dt, dt)
-		if t.mode[row] == EnemyTable.Mode.WINDUP and not placed:
+		if t.mode[row] == RunIds.EnemyModeId.Windup and not placed:
 			placed = true
 			for fraction in [0.25, 0.7]: victim(t.pos[row].lerp(t.anchor[row], fraction))
 			meteor(t.pos[row].lerp(t.anchor[row], 0.48))
 			body(Vector2(0, -240), 65.0, true)
 			sim.field.planet.pos = Vector2(1e7, 1e7)
-		label.text = {EnemyTable.Mode.MOVE: "高速回遊", EnemyTable.Mode.WINDUP: "急停止 → キランと予告（惑星は保持）",
-			EnemyTable.Mode.DASH: "直線突進・敵と隕石を破壊", EnemyTable.Mode.RECOVER: "突進終了"}.get(t.mode[row], "")
+		label.text = {RunIds.EnemyModeId.Move: "高速回遊", RunIds.EnemyModeId.Windup: "急停止 → キランと予告（惑星は保持）",
+			RunIds.EnemyModeId.Dash: "直線突進・敵と隕石を破壊", RunIds.EnemyModeId.Recover: "突進終了"}.get(t.mode[row], "")
 		sim.combat.rebuild_grid()
 		sim.projectiles.tick(dt, dt)
 		sim.enemies.cleanup()
@@ -336,7 +337,7 @@ func _capture_warnings(session: Node, render: RunPresentation) -> void:
 		if sample == "off-top": t.pos[row] = Vector2(-100, render.view_rect().position.y - 150.0)
 		t.facing[row] = (sim.state.ship_pos - t.pos[row]).angle()
 		t.anchor[row] = sim.state.ship_pos
-		t.mode[row] = EnemyTable.Mode.WINDUP
+		t.mode[row] = RunIds.EnemyModeId.Windup
 		t.charge[row] = 0.01 if sample == "on-early" else 0.9
 		for frame in 30: await get_tree().process_frame
 		await RenderingServer.frame_post_draw
@@ -411,7 +412,7 @@ func check_cpp_marlin() -> void:
 	core.set_enemy_motion(id,{"fire_t":0.85})
 	run.enemies.tick(0.1,0.1)
 	core.step(0.1)
-	check(cpp_motion(core,id).mode==EnemyTable.Mode.WINDUP and cpp_motion(core,id).anchor==target and cpp_motion(core,id).charge==0.01,"停止した現在位置を固定し予告を開始する")
+	check(cpp_motion(core,id).mode==RunIds.EnemyModeId.Windup and cpp_motion(core,id).anchor==target and cpp_motion(core,id).charge==0.01,"停止した現在位置を固定し予告を開始する")
 	var pending: Dictionary = bridge.checkpoint()
 	var pending_motion: Array = core.enemy_motion_snapshot()
 	var frame: Dictionary = bridge.read_render(Rect2(position-Vector2(100,300),Vector2(1400,600))).value
@@ -427,8 +428,8 @@ func check_cpp_marlin() -> void:
 	core.set_motion_context(target+Vector2(0,800),target,Vector2(640,360))
 	for tick in 9:
 		core.step(0.1)
-		if cpp_motion(core,id).mode==EnemyTable.Mode.DASH: break
-	check(cpp_motion(core,id).mode==EnemyTable.Mode.DASH and absf(cpp_enemy(core,id).facing)<0.001,"発進後も停止時の方向を固定する")
+		if cpp_motion(core,id).mode==RunIds.EnemyModeId.Dash: break
+	check(cpp_motion(core,id).mode==RunIds.EnemyModeId.Dash and absf(cpp_enemy(core,id).facing)<0.001,"発進後も停止時の方向を固定する")
 	frame = bridge.read_render(Rect2(position-Vector2(100,300),Vector2(1400,600))).value
 	check(presentation.frame_view.apply_frame(frame),"突進の筋を同じシェーダーと通常画面へ表示する")
 	await get_tree().process_frame
@@ -438,9 +439,9 @@ func check_cpp_marlin() -> void:
 	var end := cpp_enemy(core,id)
 	check(absf(Vector2(end.pos[0],end.pos[1]).distance_to(position)-1170.0)<0.03,"更新の余り時間で突進距離を伸ばさない")
 	core.step(0.1)
-	check(cpp_motion(core,id).mode==EnemyTable.Mode.RECOVER and cpp_motion(core,id).charge==0.0,"突進終了時に静止して休む")
+	check(cpp_motion(core,id).mode==RunIds.EnemyModeId.Recover and cpp_motion(core,id).charge==0.0,"突進終了時に静止して休む")
 	core.step(1.4)
-	check(cpp_motion(core,id).mode==EnemyTable.Mode.MOVE and Vector2(cpp_enemy(core,id).vel[0],cpp_enemy(core,id).vel[1])==Vector2.ZERO,"休み終了で巡航へ戻る")
+	check(cpp_motion(core,id).mode==RunIds.EnemyModeId.Move and Vector2(cpp_enemy(core,id).vel[0],cpp_enemy(core,id).vel[1])==Vector2.ZERO,"休み終了で巡航へ戻る")
 	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==pending_motion,"固定照準・予告の時計を値から復帰する")
 	core.step(0.1)
 	var next: Array = core.enemy_motion_snapshot()
@@ -450,7 +451,7 @@ func check_cpp_marlin() -> void:
 	bridge.restore(pending.value)
 	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
 	core.step(1.0)
-	check(cpp_enemy(core,id).dead and cpp_motion(core,id).mode!=EnemyTable.Mode.DASH,"途中撃破で新しい突進を始めない")
+	check(cpp_enemy(core,id).dead and cpp_motion(core,id).mode!=RunIds.EnemyModeId.Dash,"途中撃破で新しい突進を始めない")
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"marlin",position,{})
 	check(replacement!=id and cpp_motion(core,replacement).anchor==Vector2.ZERO and cpp_motion(core,replacement).charge==0.0,"行の再利用で固定照準・溜めを引き継がない")
@@ -458,7 +459,7 @@ func check_cpp_marlin() -> void:
 	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.8})
 	core.remove_enemy(owner)
 	core.step(0.1)
-	check(cpp_motion(core,replacement).mode==EnemyTable.Mode.WINDUP,"参照相手が先に消えても古い行を参照せず予告へ進む")
+	check(cpp_motion(core,replacement).mode==RunIds.EnemyModeId.Windup,"参照相手が先に消えても古い行を参照せず予告へ進む")
 	bridge.release_checkpoint(pending.value)
 	lab.free()
 	session.free()

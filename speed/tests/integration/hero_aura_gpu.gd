@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var source: HeroAuraAssets
 func _ready() -> void:
@@ -127,7 +128,7 @@ func lifecycle() -> void:
 	await settle()
 	var breath:float=view._hero_aura_material.get_shader_parameter("breath")
 	check(is_equal_approx(breath,0.95+0.05*sin(3.0*0.8)),"呼吸は元と同じ世界時刻から計算する")
-	session.sim.set_phase(RunState.Phase.PAUSED)
+	session.sim.set_phase(RunIds.Phase.Paused)
 	await settle()
 	check(view._hero_aura_material.get_shader_parameter("breath")==breath,"ポーズ中は光雲の呼吸を保持する")
 	view._layers.field.hide()

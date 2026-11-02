@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failures := 0
 func check(ok: bool,label: String) -> void:
 	if not ok:
@@ -13,7 +14,7 @@ func _ready() -> void:
 	var session:=RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":710},false)
 	session.auto_step=false
 	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY
+	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var a=sim.bosses.actor
 	a.selection_enabled=false

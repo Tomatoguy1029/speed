@@ -1,5 +1,6 @@
 ## 守る雑魚の整列・攻撃切替・対象の失効を、短い独立ランで確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 var passed := 0
@@ -20,7 +21,7 @@ func advance(seconds: float) -> void:
 func bites() -> int:
 	var result := 0
 	for h in run.projectiles.hazard_alive.size():
-		if run.projectiles.hazard_alive[h] != 0 and run.projectiles.hazard_style[h] == ProjectileSystem.HazardStyle.BITE:
+		if run.projectiles.hazard_alive[h] != 0 and run.projectiles.hazard_style[h] == RunIds.HazardStyleId.Bite:
 			result += 1
 	return result
 
@@ -63,7 +64,7 @@ func _ready() -> void:
 	var lone := enemies.spawn(definition, Vector2(140, 0))
 	advance(1.5)
 	check(bites() > 0, "強敵がいないと追跡して予告後に噛みつく")
-	check(t.gate[lone] == EnemyTable.Gate.NONE, "特殊な防御条件を追加しない")
+	check(t.gate[lone] == RunIds.EnemyGate.None, "特殊な防御条件を追加しない")
 
 	reset()
 	var guards: Array[int] = []
@@ -71,7 +72,7 @@ func _ready() -> void:
 		guards.append(enemies.spawn(definition, Vector2(240, y)))
 	var strong := strong_at(Vector2(420, 0))
 	# 攻撃の予告中でも、強敵を見つけたら噛みつきを取り消す。
-	t.mode[guards[1]] = EnemyTable.Mode.WINDUP
+	t.mode[guards[1]] = RunIds.EnemyModeId.Windup
 	t.timer[guards[1]] = 0.001
 	t.charge[guards[1]] = 0.9
 	advance(3.0)
@@ -104,7 +105,7 @@ func _ready() -> void:
 	advance(1.5)
 	check(bites() > 0, "クリアと行再利用の後に古い整列先を引き継がない")
 	var victim := enemies.behavior(&"defender").rows()[0]
-	run.state.phase = RunState.Phase.PLAY
+	run.state.phase = RunIds.Phase.Play
 	run.combat.damage_enemy(victim, t.max_hp[victim] + 1.0, {"cause": &"test"})
 	check(t.dead[victim] != 0, "通常の攻撃で倒せる")
 	check("params.guard_distance" in StageEnemyTuning.keys_for(definition), "ステージ別の整列距離を調整できる")

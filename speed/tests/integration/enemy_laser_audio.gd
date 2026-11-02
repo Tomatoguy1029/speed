@@ -1,5 +1,6 @@
 ## 予告の中断・再開と、複数方向の同時照射で音声の寿命を確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 
@@ -30,10 +31,10 @@ func _ready() -> void:
 		var def := run.enemies.def_of(type)
 		var row := run.enemies.spawn(def, Vector2(0, -float(def.params.get("approach", 200.0))))
 		t.fire_t[row] = 0.0
-		t.mode[row] = EnemyTable.Mode.MOVE
+		t.mode[row] = RunIds.EnemyModeId.Move
 		if type == &"ruler":
 			t.buds[row] = 1
-			t.mode[row] = EnemyTable.Mode.DASH
+			t.mode[row] = RunIds.EnemyModeId.Dash
 			t.timer[row] = 0.0
 		var behavior := run.enemies.behaviors[t.beh[row]]
 		run.state.events.clear()
@@ -50,7 +51,7 @@ func _ready() -> void:
 	t.attack_managed[row] = 0
 	var id := t.id[row]
 	var behavior := run.enemies.behaviors[t.beh[row]]
-	t.mode[row] = EnemyTable.Mode.MOVE
+	t.mode[row] = RunIds.EnemyModeId.Move
 	t.facing[row] = PI
 	t.charge[row] = 1.0
 	run.state.events.clear()
@@ -67,17 +68,17 @@ func _ready() -> void:
 	check(deliver(run, audio).has(&"enemy_laser_cancel"), "望遠鏡座の照準解除を通知する")
 	check(not first.playing and not audio._voices.has(id), "解除で音を即座に停止する")
 	check(AudioManager._next == before, "取り消した攻撃の発射音を鳴らさない")
-	t.mode[row] = EnemyTable.Mode.WINDUP
+	t.mode[row] = RunIds.EnemyModeId.Windup
 	audio.handle({"type": &"enemy_laser_charge", "id": id, "row": row})
 	var second: AudioStreamPlayer = audio._voices[id].player
 	check(second != first and second.playing, "再チャージは新しい再生口で先頭から開始する")
 	run.state.drawing = true
 	audio.sync(run)
 	check(is_equal_approx(second.pitch_scale, run.draw.world_scale()), "スロー中はチャージ音も遅く進む")
-	run.state.phase = RunState.Phase.PAUSED
+	run.state.phase = RunIds.Phase.Paused
 	audio.sync(run)
 	check(second.stream_paused, "ポーズ中はチャージ音を止める")
-	run.state.phase = RunState.Phase.PLAY
+	run.state.phase = RunIds.Phase.Play
 	run.state.drawing = false
 	audio.sync(run)
 	check(not second.stream_paused and is_equal_approx(second.pitch_scale, 1.0), "再開で通常の再生へ戻す")

@@ -1,5 +1,6 @@
 ## 敵の技・構成員生成は通常出現の上限でも成立し、通常補充は止まる。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var passed := 0
 var failed := 0
@@ -146,7 +147,7 @@ func _summon(m: EnemySystem, king: int) -> void:
 	b.step(king, 0.01)
 	b.step(king, float(m.table.def[king].params.summon_time))
 	# 再編された既存兵が配置に着く。
-	for j in b._soldiers_of(king): m.table.mode[j] = EnemyTable.Mode.MOVE
+	for j in b._soldiers_of(king): m.table.mode[j] = RunIds.EnemyModeId.Move
 	b.step(king, 0.01)
 
 func _check_cepheus(run: RunSimulation) -> void:
@@ -171,7 +172,7 @@ func _check_cepheus(run: RunSimulation) -> void:
 	m.cleanup()
 	m.spawn(m.def_of(&"cepheus"), Vector2(300, 0))
 	for j in soldiers:
-		check(t.mode[j] == EnemyTable.Mode.RECOVER, "王の削除・行再利用後も旧兵は崩壊")
+		check(t.mode[j] == RunIds.EnemyModeId.Recover, "王の削除・行再利用後も旧兵は崩壊")
 	for step in 50:
 		for j in soldiers:
 			if t.alive[j] and not t.dead[j]: m.behavior(&"soldier").step(j, 0.1)

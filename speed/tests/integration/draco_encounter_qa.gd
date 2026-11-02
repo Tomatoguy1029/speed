@@ -1,5 +1,6 @@
 ## 実際の役者・攻撃・被弾経路を進めるシナリオ行列。証拠はリポジトリ外へ保存する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const STEP := 1.0 / 120.0
 const IDS: Array[StringName] = [&"bite", &"tail_sweep", &"star_fan", &"tail_slam", &"meteor", &"breath", &"charge", &"leap", &"rifts", &"picaro_wall", &"clones", &"inhale", &"spiral"]
 var failures := 0
@@ -46,7 +47,7 @@ func _session(seed_value: int) -> RunSession:
 	var sim := session.sim
 	sim.field.bodies.clear()
 	sim.field.rocks.clear()
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.ship_hp = 100000.0
 	sim.state.ship_shield_t = 0.0
 	sim.state.ship_invuln = 0.0

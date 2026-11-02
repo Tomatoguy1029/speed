@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const CHECK := preload("res://scripts/encounters/route_constraints.gd")
 const IO := preload("res://gyms/enemy_lab/lab_io.gd")
 var failed := 0
@@ -37,7 +38,7 @@ func _ready() -> void:
 	lab.run.projectiles.fire_beam(Vector2(-300, 0), 0, 600, 20, 0.5, 1, 10)
 	check(not CHECK.validate(lab, route, 20, 1).valid, "未来に発動するビームもルートとの重なりを拒否する")
 	lab.run.projectiles.clear_hostile()
-	lab.run.projectiles._add_hostile(Vector2(0, -400), Vector2(0, 400), 400, 7, 4, 10, 0, 0, ProjectileSystem.HostileKind.BULLET)
+	lab.run.projectiles._add_hostile(Vector2(0, -400), Vector2(0, 400), 400, 7, 4, 10, 0, 0, RunIds.HostileKind.Bullet)
 	check(not CHECK.validate(lab, route, 20, 1).valid, "現在は離れていても途中で線を横切る弾を検出する")
 	lab.run.projectiles.clear_hostile()
 	lab.perform("spawn", {"type": "swarm", "pos": [400, 0]})

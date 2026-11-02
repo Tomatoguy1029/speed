@@ -1,5 +1,6 @@
 ## 二つのネイティブランの寿命と、無効な更新で状態が壊れないことを確かめる。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 func check(ok: bool, label: String) -> void:
 	if not ok:
@@ -1027,7 +1028,7 @@ func check_run_choices() -> bool:
 	bridge.command("set_ui_reward",{"active":false})
 	clock_step(bridge)
 	ui = bridge.read_frame().value.ui
-	check(ui.weapon_levels[0].level==2 and ui.cards.offer_id==0 and ui.phase==RunState.Phase.PLAY,"停止条件を通過したLEVELUPで一度だけ確定し戦闘へ戻る")
+	check(ui.weapon_levels[0].level==2 and ui.cards.offer_id==0 and ui.phase==RunIds.Phase.Play,"停止条件を通過したLEVELUPで一度だけ確定し戦闘へ戻る")
 	check(not bridge.command("choose_card",{"offer_id":offer,"candidate_id":candidate}).ok and not bridge.command("resources_complete",{"request_id":retry,"status":1}).ok,"確定後の重複選択と通知で二重取得しない")
 	bridge.command("dev_add_xp",{"amount":10.0})
 	clock_step(bridge)
@@ -1234,16 +1235,16 @@ func check_run_lifecycle(display_only := false) -> bool:
 		session.cpp_finished.connect(func(value: Dictionary): terminal.append(value))
 		bridge.command("pause",{"paused":true})
 		bridge.command("pause",{"paused":false})
-		check(bridge.read_frame().value.ui.phase==RunState.Phase.PLAY,"停止前のPLAYへ戻す")
+		check(bridge.read_frame().value.ui.phase==RunIds.Phase.Play,"停止前のPLAYへ戻す")
 		if kind=="Death":
 			check(bridge.command("dev_ship_damage",{"amount":1000000.0,"cause":"shot"}).ok,"致死被弾を共通ダメージへ通す")
 			clock_step(bridge)
-			check(bridge.read_frame().value.ui.phase==RunState.Phase.DYING,"C++が敗北の演出へ移る")
+			check(bridge.read_frame().value.ui.phase==RunIds.Phase.Dying,"C++が敗北の演出へ移る")
 			var frozen: Dictionary = bridge.read_frame().value.ui
 			bridge.command("pause",{"paused":true})
 			clock_step(bridge)
 			bridge.command("pause",{"paused":false})
-			check(bridge.read_frame().value.ui.phase==RunState.Phase.DYING,"停止前のDYINGへ戻す")
+			check(bridge.read_frame().value.ui.phase==RunIds.Phase.Dying,"停止前のDYINGへ戻す")
 			for tick in 10: clock_step(bridge)
 			check(bridge.read_frame().value.ui.run_time==frozen.run_time and bridge.read_frame().value.ui.world_time==frozen.world_time,"敗北の演出中に戦闘の時計を進めない")
 		elif kind=="Abort":
@@ -1251,7 +1252,7 @@ func check_run_lifecycle(display_only := false) -> bool:
 		else:
 			check(bridge.command("dev_finish",{"cleared":true}).ok,"通常クリアの確定境界を通す")
 		var result: Dictionary = bridge.read_frame().value.result
-		check(result.kind==kind and result.result_id>0 and bridge.read_frame().value.ui.phase==RunState.Phase.ENDED,"種類を区別したResultIdで終了する")
+		check(result.kind==kind and result.result_id>0 and bridge.read_frame().value.ui.phase==RunIds.Phase.Ended,"種類を区別したResultIdで終了する")
 		check(not bridge.command("abort",{"reason":0}).ok and not bridge.command("dev_finish",{"cleared":true}).ok,"確定後の終了命令で結果を書き換えない")
 		if kind=="Death": check(result.last_damage.cause=="shot" and result.last_damage.accepted,"最後の致死被弾を結果へ残す")
 		check(terminal.is_empty(),"Bridge配信中に画面遷移を呼ばない")

@@ -1,5 +1,6 @@
 ## 攻撃の表示を読み込めることと、水流の資源を初回使用時だけ準備することを確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const ENUMS = preload("res://tools/content/generated/run_schema.gd").ENUMS
 
 var failed := 0
@@ -1081,11 +1082,11 @@ func check_cpp_aquarius() -> bool:
 	var initial: Dictionary = cpp_bridge.checkpoint()
 	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	cpp_core.step(0.7)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"予算がなければみずがめ座は予告を始めない")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and cpp_core.hazards_snapshot().is_empty(),"予算がなければみずがめ座は予告を始めない")
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	cpp_core.step(0.7)
 	var hazards: Array = cpp_core.hazards_snapshot()
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and hazards.size()==4 and is_equal_approx(cpp_motion_for(actor).timer,0.7),"編集した4方向と予告・照射時間で攻撃を始める")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Windup and hazards.size()==4 and is_equal_approx(cpp_motion_for(actor).timer,0.7),"編集した4方向と予告・照射時間で攻撃を始める")
 	if hazards.size()!=4: cpp_session.free(); return false
 	for k in 4:
 		check(is_equal_approx(hazards[k].angle,k*PI/2.0) and is_equal_approx(hazards[k].length,500.0) and is_equal_approx(hazards[k].half_width,5.0) and is_equal_approx(hazards[k].arc,0.2),"水流%dの方向・長さ・片側幅・広がりを編集値から生成する" % k)
@@ -1119,9 +1120,9 @@ func check_cpp_aquarius() -> bool:
 	check(presentation.frame_view._flood_groups.size()==1 and presentation.pipeline._waves.size()==previous_waves+1,"復帰後の一斉照射も演出を1回だけ再開する")
 	cpp_core.step(0.4)
 	cpp_core.step_hazards(0.4)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and cpp_core.hazards_snapshot().is_empty(),"照射を終えると水流を消して編集した休みに入る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Recover and cpp_core.hazards_snapshot().is_empty(),"照射を終えると水流を消して編集した休みに入る")
 	cpp_core.step(0.25)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE,"休みを終えると接近へ戻る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move,"休みを終えると接近へ戻る")
 	cpp_bridge.restore(initial.value)
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	cpp_core.step(0.7)
@@ -1129,7 +1130,7 @@ func check_cpp_aquarius() -> bool:
 	check(cpp_core.hazards_snapshot().is_empty(),"予告中にみずがめ座を倒すと付いた水流をすべて消す")
 	cpp_bridge.command("dev_remove",{"entity_id":actor})
 	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"aquarius","position":cpp_origin}).value
-	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0,"行を使い直した別個体へ予告やchargeを漏らさない")
+	check(replacement!=actor and cpp_motion_for(replacement).mode==RunIds.EnemyModeId.Move and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0,"行を使い直した別個体へ予告やchargeを漏らさない")
 	cpp_bridge.restore(pending.value)
 	cpp_core.step(0.2)
 	cpp_core.step_hazards(0.2)
@@ -1149,14 +1150,14 @@ func check_cpp_cross_enemy() -> bool:
 	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"cross","position":cpp_origin}).value
 	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	cpp_core.step(0.6)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"予算がなければ十字の予告を始めない")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and cpp_core.hazards_snapshot().is_empty(),"予算がなければ十字の予告を始めない")
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	cpp_core.step(0.6)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"機体と縦横がそろう前は射撃へ進まない")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and cpp_core.hazards_snapshot().is_empty(),"機体と縦横がそろう前は射撃へ進まない")
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(180,0),"velocity":Vector2.ZERO})
 	cpp_core.step(0.01)
 	var hazards: Array = cpp_core.hazards_snapshot()
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and hazards.size()==4,"機体とそろうと4辺の予告を生成する")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Windup and hazards.size()==4,"機体とそろうと4辺の予告を生成する")
 	if hazards.size()!=4: cpp_session.free(); return false
 	for k in 4:
 		check(is_equal_approx(hazards[k].angle,k*PI/2.0) and is_equal_approx(hazards[k].length,500.0) and is_equal_approx(hazards[k].half_width,10.0) and is_equal_approx(hazards[k].delay,0.2) and is_equal_approx(hazards[k].active,0.3),"辺%dは編集値を使って固定の縦横へ伸びる" % k)
@@ -1175,7 +1176,7 @@ func check_cpp_cross_enemy() -> bool:
 	cpp_core.step(0.11)
 	cpp_core.step_hazards(0.11)
 	var events: Array = cpp_bridge.read_frame().value.events
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-6.0) and events.filter(func(e): return e.type==&"enemy_laser_fire" and e.payload.id==actor).size()==1,"予告後に一度照射し攻撃中の休みに入る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Recover and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-6.0) and events.filter(func(e): return e.type==&"enemy_laser_fire" and e.payload.id==actor).size()==1,"予告後に一度照射し攻撃中の休みに入る")
 	frame = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
 	check(frame.shapes.size()==4 and frame.shapes.all(func(h): return h.kind==ENUMS.RenderShapeKind.Polyline) and presentation.frame_view.apply_frame(frame),"4辺のビームを通常画面で描く")
 	await get_tree().process_frame
@@ -1184,15 +1185,15 @@ func check_cpp_cross_enemy() -> bool:
 	cpp_core.step_hazards(0.11)
 	cpp_core.step(0.31)
 	cpp_core.step_hazards(0.31)
-	check(cpp_core.hazards_snapshot().is_empty() and cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER,"ビームの終了後も編集した休みの残りを保つ")
+	check(cpp_core.hazards_snapshot().is_empty() and cpp_motion_for(actor).mode==RunIds.EnemyModeId.Recover,"ビームの終了後も編集した休みの残りを保つ")
 	cpp_core.step(0.1)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and is_equal_approx(cpp_motion_for(actor).fire_t,0.5),"休みの終わりから編集した射撃間隔で再開する")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and is_equal_approx(cpp_motion_for(actor).fire_t,0.5),"休みの終わりから編集した射撃間隔で再開する")
 	cpp_bridge.restore(pending.value)
 	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
 	check(cpp_core.hazards_snapshot().is_empty(),"予告中に発生元を先に倒すと4辺を掃除する")
 	cpp_bridge.command("dev_remove",{"entity_id":actor})
 	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"cross","position":cpp_origin}).value
-	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0,"行を再利用した別個体へ予告や攻撃状態を漏らさない")
+	check(replacement!=actor and cpp_motion_for(replacement).mode==RunIds.EnemyModeId.Move and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0,"行を再利用した別個体へ予告や攻撃状態を漏らさない")
 	cpp_bridge.restore(pending.value)
 	cpp_core.step(0.11)
 	cpp_core.step_hazards(0.11)
@@ -1212,16 +1213,16 @@ func check_cpp_bomber() -> bool:
 	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	cpp_core.step(0.05)
 	var moving: Dictionary = cpp_motion_for(actor)
-	check(moving.mode==EnemyTable.Mode.MOVE and Vector2(cpp_core.enemies_snapshot()[0].vel[0],cpp_core.enemies_snapshot()[0].vel[1]).length()>0.0,"遠い機体へ追跡し、投下型には変えない")
+	check(moving.mode==RunIds.EnemyModeId.Move and Vector2(cpp_core.enemies_snapshot()[0].vel[0],cpp_core.enemies_snapshot()[0].vel[1]).length()>0.0,"遠い機体へ追跡し、投下型には変えない")
 	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
 	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
 	check(presentation.frame_view.apply_frame(frame) and presentation.frame_view._bomber.size()==5,"追跡中は導火線の火花を描く")
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(120,0),"velocity":Vector2.ZERO})
 	cpp_core.step(0.05)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE,"予算がなければ近距離でも予告を始めない")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move,"予算がなければ近距離でも予告を始めない")
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	cpp_core.step(0.01)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.3),"編集した近距離と待ち時間で自爆予告へ入る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Windup and is_equal_approx(cpp_motion_for(actor).timer,0.3),"編集した近距離と待ち時間で自爆予告へ入る")
 	cpp_core.step(0.05)
 	var warning: Dictionary = cpp_motion_for(actor)
 	check(Vector2(cpp_core.enemies_snapshot()[0].vel[0],cpp_core.enemies_snapshot()[0].vel[1]).length()>80.0 and warning.charge>0.0,"カウントダウン中もrush倍の速さへ加速して接近する")
@@ -1239,7 +1240,7 @@ func check_cpp_bomber() -> bool:
 	var center: Vector2 = hazards[0].pos
 	cpp_bridge.command("dev_remove",{"entity_id":actor})
 	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"bomber","position":cpp_origin+Vector2(500,300)}).value
-	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0 and cpp_core.hazards_snapshot().size()==1,"発生元を先に解放し同じ行を使い直しても爆風は独立して残る")
+	check(replacement!=actor and cpp_motion_for(replacement).mode==RunIds.EnemyModeId.Move and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0 and cpp_core.hazards_snapshot().size()==1,"発生元を先に解放し同じ行を使い直しても爆風は独立して残る")
 	cpp_bridge.command("dev_ship_motion",{"position":center,"velocity":Vector2.ZERO})
 	cpp_core.step_hazards(0.01)
 	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-7.0),"発生元の退場後も自爆の当たりを1回だけ処理する")
@@ -1278,14 +1279,14 @@ func check_cpp_phoenix() -> bool:
 	var actor: int = cpp_bridge.command("dev_spawn",{"definition_id":"phoenix","position":cpp_origin}).value
 	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	cpp_core.step(0.05)
-	if not retry: check(cpp_core.enemies_snapshot()[0].pos==[cpp_origin.x,cpp_origin.y] and cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_motion_for(actor).timer==0.0,"予算を待つほうおう座は位置を保つ")
+	if not retry: check(cpp_core.enemies_snapshot()[0].pos==[cpp_origin.x,cpp_origin.y] and cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and cpp_motion_for(actor).timer==0.0,"予算を待つほうおう座は位置を保つ")
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	cpp_core.step(0.1)
-	if not retry2: check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and is_equal_approx(Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1]).distance_to(cpp_origin),500.0) and cpp_core.enemies_snapshot()[0].vel==[0.0,0.0],"編集した離脱距離を残り時間の補間で進み、速度加算しない")
+	if not retry2: check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and is_equal_approx(Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1]).distance_to(cpp_origin),500.0) and cpp_core.enemies_snapshot()[0].vel==[0.0,0.0],"編集した離脱距離を残り時間の補間で進み、速度加算しない")
 	if not retry: check(cpp_core.attack_budget_snapshot().groups.size()==1 and cpp_core.attack_budget_snapshot().used==1.0,"離脱中も同じ攻撃枠を保持する")
 	cpp_core.step(0.1)
 	var warning: Dictionary = cpp_motion_for(actor)
-	if not retry2: check(warning.mode==EnemyTable.Mode.WINDUP and warning.anchor.is_finite() and warning.anchor.distance_to(aim)>0.01 and is_equal_approx(warning.timer,0.3),"離脱を終えると遅れた照準の着地点を固定して予告する")
+	if not retry2: check(warning.mode==RunIds.EnemyModeId.Windup and warning.anchor.is_finite() and warning.anchor.distance_to(aim)>0.01 and is_equal_approx(warning.timer,0.3),"離脱を終えると遅れた照準の着地点を固定して予告する")
 	var fixed: Vector2 = warning.anchor
 	var retreated := Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1])
 	var pending: Dictionary = cpp_bridge.checkpoint()
@@ -1298,12 +1299,12 @@ func check_cpp_phoenix() -> bool:
 	if not retry: check(frame.batches.all(func(b): return not b.ids.has(actor)) and frame.phoenix.size()==7 and presentation.frame_view.apply_frame(frame) and presentation.frame_view._phoenix_visual._frame_values==frame.phoenix,"本体が画面外でも着地点の影と専用shaderの火の粉を描く")
 	await get_tree().process_frame
 	cpp_core.step(0.16)
-	if not retry: check(cpp_motion_for(actor).mode==EnemyTable.Mode.DASH and is_equal_approx(cpp_motion_for(actor).timer,0.2),"編集した予告が終わると突入へ切り替える")
+	if not retry: check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Dash and is_equal_approx(cpp_motion_for(actor).timer,0.2),"編集した予告が終わると突入へ切り替える")
 	cpp_core.step(0.1)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.DASH and Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1]).is_equal_approx(retreated.lerp(fixed,0.5)),"突入も固定点まで残り時間に合わせて補間する")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Dash and Vector2(cpp_core.enemies_snapshot()[0].pos[0],cpp_core.enemies_snapshot()[0].pos[1]).is_equal_approx(retreated.lerp(fixed,0.5)),"突入も固定点まで残り時間に合わせて補間する")
 	cpp_core.step(0.1)
 	var hazards: Array = cpp_core.hazards_snapshot()
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and hazards.size()==1 and hazards[0].pos==fixed and hazards[0].radius==150.0 and is_equal_approx(hazards[0].active,0.5),"着地で編集した範囲と有効時間の炎を生成して停止する")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Recover and hazards.size()==1 and hazards[0].pos==fixed and hazards[0].radius==150.0 and is_equal_approx(hazards[0].active,0.5),"着地で編集した範囲と有効時間の炎を生成して停止する")
 	if hazards.size()!=1: cpp_session.free(); return false
 	cpp_bridge.command("dev_ship_motion",{"position":fixed,"velocity":Vector2.ZERO})
 	cpp_core.step_hazards(0.01)
@@ -1314,11 +1315,11 @@ func check_cpp_phoenix() -> bool:
 	check(presentation.frame_view.apply_frame(frame) and frame.shapes.any(func(shape): return shape.kind==ENUMS.RenderShapeKind.Zone and shape.zone_style==ENUMS.ZoneStyle.Phoenix),"着地の炎を通常画面で表示する")
 	await get_tree().process_frame
 	cpp_core.step(0.21)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE,"休みが終わると次の離脱へ戻る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move,"休みが終わると次の離脱へ戻る")
 	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
 	cpp_bridge.command("dev_remove",{"entity_id":actor})
 	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"phoenix","position":cpp_origin+Vector2(300,300)}).value
-	check(replacement!=actor and cpp_motion_for(replacement).mode==EnemyTable.Mode.MOVE and cpp_motion_for(replacement).anchor==Vector2.ZERO and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0 and cpp_core.hazards_snapshot().size()==1,"着地後の元個体を先に消し行を再利用しても炎は独立し着地点を漏らさない")
+	check(replacement!=actor and cpp_motion_for(replacement).mode==RunIds.EnemyModeId.Move and cpp_motion_for(replacement).anchor==Vector2.ZERO and cpp_motion_for(replacement).timer==0.0 and cpp_motion_for(replacement).charge==0.0 and cpp_core.hazards_snapshot().size()==1,"着地後の元個体を先に消し行を再利用しても炎は独立し着地点を漏らさない")
 	cpp_core.step_hazards(0.5)
 	check(cpp_core.hazards_snapshot().is_empty() and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-9.0),"余韻は追加命中せず指定した有効時間で終了する")
 	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before,"離脱先・固定着地点・段階・残り時間を保持から復元する")
@@ -1348,11 +1349,11 @@ func check_cpp_aquila() -> bool:
 	cpp_core.step(0.4)
 	var waiting: Dictionary = cpp_motion_for(actor)
 	var cruising: Dictionary = cpp_core.enemies_snapshot()[0]
-	check(waiting.mode==EnemyTable.Mode.MOVE and cruising.vel!=[0.0,0.0] and absf(cruising.facing)>0.01,"予算待ちも現在の機体へ直進せず旋回巡航する")
+	check(waiting.mode==RunIds.EnemyModeId.Move and cruising.vel!=[0.0,0.0] and absf(cruising.facing)>0.01,"予算待ちも現在の機体へ直進せず旋回巡航する")
 	cpp_bridge.command("dev_relocate",{"entity_id":actor,"position":cpp_origin})
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	cpp_core.step(0.31)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.4),"編集した間隔の後に照準と固定待ちの予告へ入る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Windup and is_equal_approx(cpp_motion_for(actor).timer,0.4),"編集した間隔の後に照準と固定待ちの予告へ入る")
 	cpp_core.step(0.1)
 	check(cpp_motion_for(actor).charge==0.0,"照準中はまだ進路を固定しない")
 	cpp_core.step(0.11)
@@ -1369,15 +1370,15 @@ func check_cpp_aquila() -> bool:
 	cpp_core.step(0.1)
 	check(cpp_motion_for(actor).anchor.is_equal_approx(anchor),"進路固定後に相手が動いても追い直さない")
 	cpp_core.step(0.1)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.DASH and is_equal_approx(cpp_core.enemies_snapshot()[0].pos[0],cpp_origin.x+50.0) and cpp_core.hazards_snapshot().size()==2,"突入に入ったフレームから実dtだけ進み始点と50先へ雷を置く")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Dash and is_equal_approx(cpp_core.enemies_snapshot()[0].pos[0],cpp_origin.x+50.0) and cpp_core.hazards_snapshot().size()==2,"突入に入ったフレームから実dtだけ進み始点と50先へ雷を置く")
 	cpp_core.step(0.3)
 	var hazards: Array = cpp_core.hazards_snapshot()
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and is_equal_approx(cpp_core.enemies_snapshot()[0].pos[0],anchor.x) and hazards.size()==5,"固定終点で止まり50間隔で5個の雷を置く")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Recover and is_equal_approx(cpp_core.enemies_snapshot()[0].pos[0],anchor.x) and hazards.size()==5,"固定終点で止まり50間隔で5個の雷を置く")
 	if hazards.size()!=5: cpp_session.free(); return false
 	for k in 5:
 		check(hazards[k].pos.is_equal_approx(cpp_origin+Vector2(k*50,0)) and is_equal_approx(hazards[k].delay,0.2) and hazards[k].radius==80.0 and hazards[k].damage==6.0 and hazards[k].style==ENUMS.ZoneStyle.Aquila,"雷%dの実位置・予告時間・半径・威力を編集値から生成する" % k)
 	cpp_core.step(0.21)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and is_equal_approx(cpp_motion_for(actor).fire_t,0.3),"休止を終えると編集した間隔で巡航へ戻る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and is_equal_approx(cpp_motion_for(actor).fire_t,0.3),"休止を終えると編集した間隔で巡航へ戻る")
 	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
 	cpp_bridge.command("dev_remove",{"entity_id":actor})
 	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"aquila","position":cpp_origin+Vector2(600,300)}).value
@@ -1407,10 +1408,10 @@ func check_cpp_aquila() -> bool:
 	cpp_core.step(0.31)
 	cpp_core.step(0.21)
 	var blocked: Vector2 = cpp_motion_for(actor).anchor
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.19) and blocked.x> -260.0 and blocked.x< -100.0,"画面外でも実時間で予告し天体に当たる手前へ終点を切る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Windup and is_equal_approx(cpp_motion_for(actor).timer,0.19) and blocked.x> -260.0 and blocked.x< -100.0,"画面外でも実時間で予告し天体に当たる手前へ終点を切る")
 	cpp_core.step(0.2)
 	var stopped: Dictionary = cpp_core.enemies_snapshot()[0]
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and is_equal_approx(stopped.pos[0],blocked.x) and cpp_core.hazards_snapshot().all(func(h): return h.pos.x<=blocked.x+0.01),"天体で切った予告と実走行・最後の雷を同じ終点へそろえる")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Recover and is_equal_approx(stopped.pos[0],blocked.x) and cpp_core.hazards_snapshot().all(func(h): return h.pos.x<=blocked.x+0.01),"天体で切った予告と実走行・最後の雷を同じ終点へそろえる")
 	cpp_session.free()
 	return true
 
@@ -1427,10 +1428,10 @@ func check_cpp_crab() -> bool:
 	check(is_equal_approx(walking.facing,-PI/2.0) and walking.vel==[40.0,0.0] and cpp_motion_for(actor).buds==1,"出現時に横腹を向け、体に直交する方向へ編集した速さで歩く")
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(300,0),"velocity":Vector2.ZERO})
 	cpp_core.step(0.1)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.enemies_snapshot()[0].vel==[0.0,0.0],"薙ぎが届く近距離でも予算がなければ止まって待つ")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and cpp_core.enemies_snapshot()[0].vel==[0.0,0.0],"薙ぎが届く近距離でも予算がなければ止まって待つ")
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	cpp_core.step(0.01)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.WINDUP and is_equal_approx(cpp_motion_for(actor).timer,0.2),"枠を取ると編集した予告時間で構える")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Windup and is_equal_approx(cpp_motion_for(actor).timer,0.2),"枠を取ると編集した予告時間で構える")
 	cpp_core.step(0.1)
 	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
 	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
@@ -1440,15 +1441,15 @@ func check_cpp_crab() -> bool:
 	var before: Array = cpp_core.enemy_motion_snapshot()
 	cpp_core.step(0.11)
 	var hazards: Array = cpp_core.hazards_snapshot()
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.RECOVER and hazards.size()==1 and hazards[0].radius==180.0 and hazards[0].damage==5.0 and cpp_core.attack_snapshot()[0].attached,"予告を終えると横歩き方向へ本体に付いた薙ぎ払いを生成する")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Recover and hazards.size()==1 and hazards[0].radius==180.0 and hazards[0].damage==5.0 and cpp_core.attack_snapshot()[0].attached,"予告を終えると横歩き方向へ本体に付いた薙ぎ払いを生成する")
 	if hazards.size()!=1: cpp_session.free(); return false
 	cpp_core.step_hazards(0.01)
 	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-5.0),"薙ぎ払いの円が共通の被弾を処理する")
 	frame = cpp_bridge.read_render(Rect2(-1700,-700,1500,1400)).value
-	check(presentation.frame_view.apply_frame(frame) and presentation.frame_view._crab[4]==EnemyTable.Mode.RECOVER,"薙ぎの振りと攻撃範囲を通常画面で描く")
+	check(presentation.frame_view.apply_frame(frame) and presentation.frame_view._crab[4]==RunIds.EnemyModeId.Recover,"薙ぎの振りと攻撃範囲を通常画面で描く")
 	await get_tree().process_frame
 	cpp_core.step(0.16)
-	check(cpp_motion_for(actor).mode==EnemyTable.Mode.MOVE and cpp_core.hazards_snapshot().is_empty(),"開いた時間が終わると薙ぎを解放して横歩きへ戻る")
+	check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Move and cpp_core.hazards_snapshot().is_empty(),"開いた時間が終わると薙ぎを解放して横歩きへ戻る")
 	check(cpp_bridge.restore(pending.value).ok and cpp_core.enemy_motion_snapshot()==before,"左右の歩行方向・段階・残り時間・薙ぎHandleを保持から復元する")
 	cpp_bridge.command("dev_kill",{"entity_id":actor,"cause":"debug"})
 	cpp_core.step(0.3)
@@ -1511,7 +1512,7 @@ func check_cpp_gates() -> bool:
 			check(cpp_core.collide_ship(cpp_origin+Vector2(80,0),cpp_config.ship_radius) and cpp_core.enemies_snapshot()[0].hp==hp,"%sの閉じた正面の体当たりは弾く" % gate_name)
 		if gate_name in ["membrane","claw"]:
 			cpp_bridge.restore(spawned.value)
-			check(cpp_bridge.command("dev_enemy_combat",{"entity_id":actor,"mode":EnemyTable.Mode.RECOVER}).ok,"%sの開いた状態を構成する" % gate_name)
+			check(cpp_bridge.command("dev_enemy_combat",{"entity_id":actor,"mode":RunIds.EnemyModeId.Recover}).ok,"%sの開いた状態を構成する" % gate_name)
 			var opened: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":actor,"amount":5.0,"cause":"shot","direction":Vector2.LEFT}).value
 			check(opened.reason=="applied" and opened.applied==5.0,"%sは開いている間に正面からも攻撃が通る" % gate_name)
 	cpp_bridge.restore(empty.value)
@@ -1607,7 +1608,7 @@ func check_cpp_pump() -> bool:
 	cpp_bridge.command("dev_relocate",{"entity_id":owner,"position":cpp_origin})
 	cpp_bridge.command("dev_relocate",{"entity_id":target,"position":cpp_origin+Vector2(10,0)})
 	cpp_core.step(0.11)
-	check(cpp_motion_for(owner).stored_types==PackedStringArray(["splitling","drifter"]) and cpp_motion_for(owner).mode==EnemyTable.Mode.WINDUP,"編集した収納上限で種類の順番を保って発射予告へ入る")
+	check(cpp_motion_for(owner).stored_types==PackedStringArray(["splitling","drifter"]) and cpp_motion_for(owner).mode==RunIds.EnemyModeId.Windup,"編集した収納上限で種類の順番を保って発射予告へ入る")
 	cpp_core.step(0.05)
 	check(is_equal_approx(cpp_motion_for(owner).timer,0.3) and cpp_core.hostiles_snapshot().is_empty(),"満杯でも攻撃枠がなければ予告時間と圧縮弾を進めない")
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
@@ -1626,11 +1627,11 @@ func check_cpp_pump() -> bool:
 	var loaded_state: Array = cpp_core.enemy_motion_snapshot()
 	cpp_core.step(0.06)
 	var shells: Array = cpp_core.hostiles_snapshot()
-	check(shells.size()==1 and shells[0].contents.size()==2 and shells[0].full==1.0 and shells[0].radius==12.0 and shells[0].burst==80.0 and cpp_motion_for(owner).buds==0 and cpp_motion_for(owner).mode==EnemyTable.Mode.RECOVER,"圧縮弾へ収納列・充填率・口位置を値コピーし、在庫を空にして反動を受ける")
+	check(shells.size()==1 and shells[0].contents.size()==2 and shells[0].full==1.0 and shells[0].radius==12.0 and shells[0].burst==80.0 and cpp_motion_for(owner).buds==0 and cpp_motion_for(owner).mode==RunIds.EnemyModeId.Recover,"圧縮弾へ収納列・充填率・口位置を値コピーし、在庫を空にして反動を受ける")
 	if shells.size()!=1: cpp_session.free(); return false
 	cpp_core.step(0.21)
 	mute_checks = false
-	check(cpp_motion_for(owner).mode==EnemyTable.Mode.MOVE and is_equal_approx(cpp_enemy_for(owner).radius,base_radius),"発射後にしぼみ、編集した休止を終えて吸引へ戻る")
+	check(cpp_motion_for(owner).mode==RunIds.EnemyModeId.Move and is_equal_approx(cpp_enemy_for(owner).radius,base_radius),"発射後にしぼみ、編集した休止を終えて吸引へ戻る")
 	mute_checks = final_only
 	check(cpp_bridge.restore(loaded.value).ok and cpp_core.enemy_motion_snapshot()==loaded_state,"収納種類・所有参照・残り時間・固定方向を保持から復元する")
 	cpp_bridge.command("dev_remove",{"entity_id":owner})
@@ -1706,7 +1707,7 @@ func check_cpp_corona() -> bool:
 	check(cpp_motion_for(first).held==0 and cpp_motion_for(second).held==0 and cpp_motion_for(owner).corona_count==0,"冠の再配置は捕捉した相手をすべて解放する")
 	cpp_bridge.restore(held.value)
 	cpp_bridge.command("dev_kill",{"entity_id":owner,"cause":"debug"})
-	check(cpp_motion_for(first).held==0 and cpp_motion_for(second).held==0 and cpp_motion_for(first).timer==0.0 and cpp_motion_for(first).mode==EnemyTable.Mode.MOVE,"冠の途中撃破で相手の保持と攻撃状態を解除する")
+	check(cpp_motion_for(first).held==0 and cpp_motion_for(second).held==0 and cpp_motion_for(first).timer==0.0 and cpp_motion_for(first).mode==RunIds.EnemyModeId.Move,"冠の途中撃破で相手の保持と攻撃状態を解除する")
 	cpp_bridge.command("dev_remove",{"entity_id":owner})
 	var next_owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"corona","position":cpp_origin}).value
 	check(next_owner!=owner and cpp_motion_for(next_owner).corona_count==0 and cpp_motion_for(next_owner).corona_selected==0,"冠の行を使い直した別個体へ所属と選択を漏らさない")

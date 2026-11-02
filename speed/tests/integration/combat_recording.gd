@@ -1,5 +1,6 @@
 ## Headless real actor / JSONL regression. Files are confined to /tmp; no saves or input replay.
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const DT := 1.0 / 120.0
 class Recorder:
 	extends "res://scripts/dev/play_recorder.gd"
@@ -32,7 +33,7 @@ func fresh(stage_index := 1, enabled := true) -> void:
 	session = RunManager.create_session(self, {"lab": true, "stage": stage, "stage_index": stage_index, "seed": 718, "hud": false}, false)
 	session.auto_step = false
 	sim = session.sim
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.ship_hp = 10000.0
 	sim.state.ship_invuln = 0.0
 	sim.state.ship_shield_t = 0.0
@@ -163,7 +164,7 @@ func _ready() -> void:
 		if reason == "debug_invincible": sim.ship.invincible = true
 		if reason == "controls_locked": sim.state.controls_locked = true
 		if reason == "encounter_protected": sim.state.encounter_protected = true
-		if reason == "run_phase": sim.state.phase = RunState.Phase.PAUSED
+		if reason == "run_phase": sim.state.phase = RunIds.Phase.Paused
 		if reason == "boss_defeated": sim.state.boss_dead = true
 		var before := sim.state.ship_hp
 		check(not sim.ship.damage(7.0, 0.0, &"test", &"monoceros") and sim.state.ship_hp == before, "damage remains blocked: " + reason)

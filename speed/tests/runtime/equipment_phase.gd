@@ -1,5 +1,6 @@
 ## 終了時の装備処理をLoadoutSystemへ通知し、通常の選択タイミングを保つ。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 func check(ok: bool, message: String) -> void:
 	if not ok:
@@ -15,7 +16,7 @@ func _ready() -> void:
 	check(not echo.echoes.is_empty(), "突進開始で残像の経路を作る")
 	check(loadout.has_method("on_phase_changed"), "装備管理がランの状態変更を受け取る")
 	if loadout.has_method("on_phase_changed"):
-		loadout.on_phase_changed(RunState.Phase.FINISHING)
+		loadout.on_phase_changed(RunIds.Phase.Finishing)
 		check(echo.echoes.is_empty(), "終了演出の開始で残像の攻撃を終了する")
 	loadout.open_start_cards()
 	check(session.sim.state.start_pick and session.sim.state.cards.size() == session.sim.cfg.start_weapon_choices,

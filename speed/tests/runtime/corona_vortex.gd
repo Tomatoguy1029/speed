@@ -1,5 +1,6 @@
 ## 冠だけの短い機構確認。実験用セッションを使い、本番のセーブ・録画へ書かない。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var passed := 0
 
@@ -68,7 +69,7 @@ func _ready() -> void:
 		and not m.behavior(&"corona").vortex.members.has(selected), "予告中の撃破で弾薬と選択を即座に除去する")
 	m.state.ship_pos = t.pos[crown]
 	for step in 60: m.tick(0.02, 0.02)
-	check(t.mode[crown] == EnemyTable.Mode.MOVE and m.behavior(&"corona").vortex.owners[crown].selected == -1, "軌道の内側では投擲も追加攻撃も始めない")
+	check(t.mode[crown] == RunIds.EnemyModeId.Move and m.behavior(&"corona").vortex.owners[crown].selected == -1, "軌道の内側では投擲も追加攻撃も始めない")
 	var survivor := second if selected == ammo else ammo
 	m.mark_dead(crown)
 	check(m.behavior(&"corona").vortex.members.is_empty() and m.behavior(&"corona").vortex.owners.is_empty() and t.dead[survivor] == 0, "冠の撃破で残りの個体を生存した通常敵へ解放する")

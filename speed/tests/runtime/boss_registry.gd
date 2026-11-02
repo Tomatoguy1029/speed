@@ -1,5 +1,6 @@
 ## 1つのBossSystemが複数の役者を管理し、1体の削除を他へ波及させない。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 func check(ok: bool, message: String) -> void:
 	if semantics_strict():return
@@ -2447,7 +2448,7 @@ func native_centaurus_finish() -> void:
 	f = centaurus_finish_case()
 	bridge = f.bridge
 	bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
-	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunState.Phase.FINISHING and bridge.read_frame().value.result==null,"第1形態の実撃破から報酬未確定の決着へ進む")
+	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunIds.Phase.Finishing and bridge.read_frame().value.result==null,"第1形態の実撃破から報酬未確定の決着へ進む")
 	held = bridge.checkpoint()
 	centaurus_finish_steps(bridge,3)
 	var expected: Dictionary = bridge.read_frame().value.ui.boss_finish
@@ -4765,7 +4766,7 @@ func native_canis_finish() -> void:
 	bridge._core.step(0.01)
 	bridge._core.step(0.02)
 	check(bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"}).ok,"低HP形態の本体を撃破できる")
-	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunState.Phase.FINISHING,"撃破から共通の決着へ進む")
+	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunIds.Phase.Finishing,"撃破から共通の決着へ進む")
 	check(bridge.command("dev_boss_body_state").value[0].flames.is_empty() and bridge.command("dev_boss_body_state").value[0].nova.is_empty(),"撃破で残留炎と閃光を解放する")
 	centaurus_finish_steps(bridge,23)
 	var frame: Dictionary = bridge.read_frame().value
@@ -6175,7 +6176,7 @@ func native_hydra_finish() -> void:
 	var bridge=c.bridge
 	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
 	bridge.command("dev_damage",{"entity_id":body.bearer.id,"amount":body.bearer.hp+1.0,"cause":"shot"});bridge._core.step(0.01)
-	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunState.Phase.FINISHING,"不死首の撃破から共通の決着へ進む")
+	check(centaurus_finish_steps(bridge,1) and bridge.read_frame().value.ui.phase==RunIds.Phase.Finishing,"不死首の撃破から共通の決着へ進む")
 	body=bridge.command("dev_boss_body_state").value[0]
 	check(body.mode==4 and body.effects.is_empty() and not body.has("arena") and body.necks.all(func(n):return not n.alive),"撃破で全首・残留攻撃・闘技場を回収する")
 	centaurus_finish_steps(bridge,30)

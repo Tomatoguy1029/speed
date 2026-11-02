@@ -1,5 +1,6 @@
 ## 二体のポンプの取り合いと、所有者・対象の寿命を確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var sim: RunSimulation
 var t: EnemyTable
@@ -45,7 +46,7 @@ func _ready() -> void:
 	# 範囲外、満杯、構え、石化、牽引、吹き飛ばしで所有者が吸えない。
 	for reason in ["range", "full", "windup", "stone", "held", "knock", "shove"]:
 		t.pos[b] = Vector2(180, 0)
-		t.mode[b] = EnemyTable.Mode.MOVE
+		t.mode[b] = RunIds.EnemyModeId.Move
 		t.buds[b] = 0
 		t.stone[b] = 0.0
 		t.held[b] = 0
@@ -55,7 +56,7 @@ func _ready() -> void:
 		match reason:
 			"range": t.pos[b] = Vector2(3000, 0)
 			"full": t.buds[b] = int(t.def[b].params.store_max)
-			"windup": t.mode[b] = EnemyTable.Mode.WINDUP
+			"windup": t.mode[b] = RunIds.EnemyModeId.Windup
 			"stone": t.stone[b] = 1.0
 			"held": t.held[b] = 1
 			"knock": t.knock_t[b] = 1.0
@@ -64,9 +65,9 @@ func _ready() -> void:
 		pull(a)
 		check(t.vel[target].x < 0.0, "%sで所有を解放する" % reason)
 		# 次の条件を同じ所有者Bで始める。
-		t.mode[a] = EnemyTable.Mode.WINDUP
+		t.mode[a] = RunIds.EnemyModeId.Windup
 		pump.after_tick(0.1)
-		t.mode[a] = EnemyTable.Mode.MOVE
+		t.mode[a] = RunIds.EnemyModeId.Move
 	sim.enemies.mark_dead(target)
 	sim.enemies.cleanup()
 	target = sim.enemies.spawn(prey, Vector2.ZERO)

@@ -1,5 +1,6 @@
 ## 敵弾の移動、誘導、被弾、無敵時間、画面外と寿命の終了を現行処理へ照合する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const COMPARE := preload("res://tools/compare_runtime.gd")
 const SHIP := preload("res://tests/runtime/run_ship.gd")
 var failed := 0
@@ -508,7 +509,7 @@ func check_cpp_missile() -> bool:
 func wave_emit_pair(run: RunSimulation,bridge,params: Dictionary) -> Dictionary:
 	var row := run.projectiles.fire_wave(params.position,params.angle,params.arc,params.radius,params.speed,params.width,params.delay,
 		params.damage,params.get("gap",0.0),params.get("gap_arc",0.0),params.get("color",Color("#9ad8ff")),params.get("start_radius",0.0))
-	var styles := [ProjectileSystem.HazardStyle.PLAIN,ProjectileSystem.HazardStyle.RIPPLE,ProjectileSystem.HazardStyle.LIGHTNING,ProjectileSystem.HazardStyle.PULSER]
+	var styles := [RunIds.HazardStyleId.Plain,RunIds.HazardStyleId.Ripple,RunIds.HazardStyleId.Lightning,RunIds.HazardStyleId.Pulser]
 	run.projectiles.hazard_style[row] = styles[params.get("style",0)]
 	run.projectiles.hazard_edmg[row] = params.get("enemy_damage",0.0)
 	var emitted: Dictionary = bridge.command("dev_fire_wave",params)
@@ -939,10 +940,10 @@ func check_cpp_pulser() -> void:
 	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	core.set_enemy_motion(id,{"fire_t":0.0})
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and core.hazards_snapshot().is_empty(),"予算0では予告と波を開始しない")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Move and core.hazards_snapshot().is_empty(),"予算0では予告と波を開始しない")
 	core.configure_attack_budget({"enabled":true,"budget":2.0,"jitter":0.0})
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.WINDUP and is_equal_approx(pulse_motion(core,id).timer,0.25),"予算取得後に編集値の予告へ入る")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Windup and is_equal_approx(pulse_motion(core,id).timer,0.25),"予算取得後に編集値の予告へ入る")
 	core.step(0.1)
 	var pending: Dictionary = bridge.checkpoint()
 	var before: Array = core.enemy_motion_snapshot()
@@ -951,7 +952,7 @@ func check_cpp_pulser() -> void:
 	check(frame.pulser.size()==6 and is_equal_approx(frame.pulser[4],0.4) and presentation.frame_view.apply_frame(frame),"停止予告の輪と84本の光筋を通常画面へ表示する")
 	await get_tree().process_frame
 	core.step(0.2)
-	check(core.hazards_snapshot().size()==1 and pulse_motion(core,id).mode==EnemyTable.Mode.MOVE,"予告終了で一つの波を生成して待機へ戻る")
+	check(core.hazards_snapshot().size()==1 and pulse_motion(core,id).mode==RunIds.EnemyModeId.Move,"予告終了で一つの波を生成して待機へ戻る")
 	var wave: Dictionary = core.hazards_snapshot()[0]
 	var expected: float = frame.pulser[2]
 	check(is_equal_approx(wave.start_radius,expected) and is_equal_approx(wave.time,-0.15) and wave.attached,"完成輪の初期半径と端数時間を持ち発射直前まで所有する")
@@ -980,12 +981,12 @@ func check_cpp_pulser() -> void:
 	check(core.hazards_snapshot().is_empty(),"予告中の撃破では遅延した波を残さない")
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"pulser",position,{})
-	check(replacement!=id and pulse_motion(core,replacement).mode==EnemyTable.Mode.MOVE and pulse_motion(core,replacement).charge==0.0,"行の再利用で予告を引き継がない")
+	check(replacement!=id and pulse_motion(core,replacement).mode==RunIds.EnemyModeId.Move and pulse_motion(core,replacement).charge==0.0,"行の再利用で予告を引き継がない")
 	var owner: int = core.spawn_enemy(&"drifter",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.0})
 	core.remove_enemy(owner)
 	core.step(0.1)
-	check(pulse_motion(core,replacement).mode==EnemyTable.Mode.WINDUP,"参照相手が先に消えても古い行へ接続しない")
+	check(pulse_motion(core,replacement).mode==RunIds.EnemyModeId.Windup,"参照相手が先に消えても古い行へ接続しない")
 	bridge.release_checkpoint(pending.value)
 	session.free()
 
@@ -1028,13 +1029,13 @@ func check_cpp_dolphin() -> void:
 	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	core.set_enemy_motion(id,{"fire_t":0.25})
 	core.step(0.1)
-	check(core.attack_budget_snapshot().groups.is_empty() and pulse_motion(core,id).mode==EnemyTable.Mode.MOVE,"予告時間による先取りをせず発射間隔の直前まで待つ")
+	check(core.attack_budget_snapshot().groups.is_empty() and pulse_motion(core,id).mode==RunIds.EnemyModeId.Move,"予告時間による先取りをせず発射間隔の直前まで待つ")
 	core.step(0.1)
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and core.hazards_snapshot().is_empty(),"予算0では構えと波を開始しない")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Move and core.hazards_snapshot().is_empty(),"予算0では構えと波を開始しない")
 	core.configure_attack_budget({"enabled":true,"budget":2.0,"jitter":0.0})
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.WINDUP and is_equal_approx(pulse_motion(core,id).timer,0.3),"編集値の構えへ入る")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Windup and is_equal_approx(pulse_motion(core,id).timer,0.3),"編集値の構えへ入る")
 	var initial_facing: float = dolphin_enemy(core,id).facing
 	target = position+Vector2(0,600)
 	core.set_motion_context(target,target,Vector2(640,360))
@@ -1050,7 +1051,7 @@ func check_cpp_dolphin() -> void:
 	check(warning and presentation.frame_view.apply_frame(frame),"向きと扇の切れ目を三層の弧で通常画面へ予告する")
 	await get_tree().process_frame
 	core.step(0.21)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.RECOVER and is_equal_approx(pulse_motion(core,id).timer,0.6) and core.hazards_snapshot().size()==1,"構えの終わりに一発を生成し0.6秒休む")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Recover and is_equal_approx(pulse_motion(core,id).timer,0.6) and core.hazards_snapshot().size()==1,"構えの終わりに一発を生成し0.6秒休む")
 	var wave: Dictionary = core.hazards_snapshot()[0]
 	check(wave.style==1 and is_equal_approx(wave.arc,0.7) and wave.enemy_damage==7.0 and not wave.attached and wave.time==0.0,"層状の扇と敵ダメージを持つ独立した波を生成する")
 	var direction := Vector2.from_angle(wave.angle)
@@ -1072,7 +1073,7 @@ func check_cpp_dolphin() -> void:
 	check(not frame.shapes.is_empty() and presentation.frame_view.apply_frame(frame),"発射済みの丸い端を持つ層状の扇を共通表示へ渡す")
 	await get_tree().process_frame
 	core.step(0.61)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and pulse_motion(core,id).fire_t==1.0,"休みが終わると編集値の間隔で待機へ戻る")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Move and pulse_motion(core,id).fire_t==1.0,"休みが終わると編集値の間隔で待機へ戻る")
 	bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
 	core.step_hazards(0.1)
 	check(core.hazards_snapshot().size()==1,"本体を倒しても発射済みの波は残る")
@@ -1090,12 +1091,12 @@ func check_cpp_dolphin() -> void:
 	check(core.hazards_snapshot().is_empty(),"構えの途中で倒すと波を残さない")
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"dolphin",position,{})
-	check(replacement!=id and pulse_motion(core,replacement).mode==EnemyTable.Mode.MOVE and pulse_motion(core,replacement).charge==0.0,"行の再利用で古い構えを引き継がない")
+	check(replacement!=id and pulse_motion(core,replacement).mode==RunIds.EnemyModeId.Move and pulse_motion(core,replacement).charge==0.0,"行の再利用で古い構えを引き継がない")
 	var owner: int = core.spawn_enemy(&"drifter",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.0})
 	core.remove_enemy(owner)
 	core.step(0.1)
-	check(pulse_motion(core,replacement).mode==EnemyTable.Mode.WINDUP,"参照相手が先に消えても古い行を追わず構える")
+	check(pulse_motion(core,replacement).mode==RunIds.EnemyModeId.Windup,"参照相手が先に消えても古い行を追わず構える")
 	bridge.release_checkpoint(pending.value)
 	session.free()
 
@@ -1225,7 +1226,7 @@ func check_cpp_soldier() -> void:
 	var formation := {"king_id":king,"tier":1,"anchor":anchor,"values":PackedFloat64Array([60,120,230,190,0.42])}
 	check(bridge.command("dev_soldier_formation",formation.merged({"entity_id":a,"slot":0})).ok and bridge.command("dev_soldier_formation",formation.merged({"entity_id":b,"slot":2})).ok,"王Handleと隊列の値を兵へ渡す")
 	core.step(0.01)
-	check(pulse_motion(core,a).mode==EnemyTable.Mode.MOVE and Vector2(dolphin_enemy(core,a).pos[0],dolphin_enemy(core,a).pos[1]).is_equal_approx(a_goal),"隊列へ移動し距離8未満で固定位置へ着く")
+	check(pulse_motion(core,a).mode==RunIds.EnemyModeId.Move and Vector2(dolphin_enemy(core,a).pos[0],dolphin_enemy(core,a).pos[1]).is_equal_approx(a_goal),"隊列へ移動し距離8未満で固定位置へ着く")
 	core.set_enemy_motion(a,{"charge":1.0})
 	var pending: Dictionary = bridge.checkpoint()
 	var before: Array = core.enemy_motion_snapshot()
@@ -1239,7 +1240,7 @@ func check_cpp_soldier() -> void:
 	check(bridge.command("dev_soldier_fire",{"entity_id":a}).ok and core.hostiles_snapshot().size()==1,"王からの射撃入口で編集値の光弾を生成する")
 	core.remove_enemy(king)
 	core.step(0.01)
-	check(pulse_motion(core,a).mode==EnemyTable.Mode.RECOVER and is_equal_approx(pulse_motion(core,a).timer,0.4),"王を先に消すと古い行を参照せず反乱を始める")
+	check(pulse_motion(core,a).mode==RunIds.EnemyModeId.Recover and is_equal_approx(pulse_motion(core,a).timer,0.4),"王を先に消すと古い行を参照せず反乱を始める")
 	var hp: float = dolphin_enemy(core,b).hp
 	core.set_enemy_motion(a,{"fire_t":0.0})
 	core.set_enemy_motion(b,{"fire_t":0.0})
@@ -1485,10 +1486,10 @@ func check_cpp_reticle() -> void:
 	core.set_attack_formation_mode(true)
 	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and not dolphin_enemy(core,rock).dead,"予算0では遮蔽岩へ照準を始めない")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Move and not dolphin_enemy(core,rock).dead,"予算0では遮蔽岩へ照準を始めない")
 	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.WINDUP and pulse_motion(core,id).target_id==rock and is_equal_approx(pulse_motion(core,id).timer,0.2),"望遠鏡のレンズと機体の間の小隕石だけを狙う")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Windup and pulse_motion(core,id).target_id==rock and is_equal_approx(pulse_motion(core,id).timer,0.2),"望遠鏡のレンズと機体の間の小隕石だけを狙う")
 	var pending: Dictionary = bridge.checkpoint()
 	var before: Array = core.enemy_motion_snapshot()
 	core.step(0.1)
@@ -1503,7 +1504,7 @@ func check_cpp_reticle() -> void:
 	var xp: float = core.pickups_snapshot().xp_dropped
 	var ship_hp: float = core.ship_snapshot().ship_hp
 	core.step(0.11)
-	check(dolphin_enemy(core,rock).dead and not dolphin_enemy(core,outside).dead and pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and pulse_motion(core,id).fire_t==0.3,"予告後に狙った岩だけを破壊して編集値の間隔へ戻る")
+	check(dolphin_enemy(core,rock).dead and not dolphin_enemy(core,outside).dead and pulse_motion(core,id).mode==RunIds.EnemyModeId.Move and pulse_motion(core,id).fire_t==0.3,"予告後に狙った岩だけを破壊して編集値の間隔へ戻る")
 	check(core.combat_snapshot().kills==kills and core.pickups_snapshot().xp_dropped==xp and core.ship_snapshot().ship_hp==ship_hp,"岩の破壊を撃破・経験値・機体ダメージへ数えない")
 	var output_frame: Dictionary = bridge.read_frame().value
 	check(output_frame.events.any(func(event): return event.type==&"beam") and output_frame.events.any(func(event): return event.type==&"rock_break"),"ビームと岩の破片を共通イベントへ渡す")
@@ -1523,11 +1524,11 @@ func check_cpp_reticle() -> void:
 	bridge.restore(pending.value)
 	bridge.command("dev_kill",{"entity_id":rock,"cause":"bullet"})
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.MOVE and not pulse_motion(core,id).target_alive,"照準中の岩を先に壊すと発射を取り消す")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Move and not pulse_motion(core,id).target_alive,"照準中の岩を先に壊すと発射を取り消す")
 	bridge.restore(pending.value)
 	core.remove_enemy(telescope_id)
 	core.step(0.1)
-	check(pulse_motion(core,id).mode==EnemyTable.Mode.DASH and not dolphin_enemy(core,rock).dead,"支援先を先に消すと岩を撃たず退却する")
+	check(pulse_motion(core,id).mode==RunIds.EnemyModeId.Dash and not dolphin_enemy(core,rock).dead,"支援先を先に消すと岩を撃たず退却する")
 	var kills_before_exit: int = core.combat_snapshot().kills
 	bridge.command("dev_relocate",{"entity_id":id,"position":target-Vector2(700,0)})
 	core.step(0.1)
@@ -1543,7 +1544,7 @@ func check_cpp_reticle() -> void:
 	session.free()
 
 func cepheus_soldiers(core, king: int) -> Array:
-	return core.enemy_motion_snapshot().filter(func(row): return row.get("king_id",0)==king and not dolphin_enemy(core,row.id).dead and row.mode!=EnemyTable.Mode.RECOVER)
+	return core.enemy_motion_snapshot().filter(func(row): return row.get("king_id",0)==king and not dolphin_enemy(core,row.id).dead and row.mode!=RunIds.EnemyModeId.Recover)
 
 func check_cpp_cepheus() -> void:
 	var cfg: GameConfig = ContentManager.base.duplicate(true)
@@ -1576,7 +1577,7 @@ func check_cpp_cepheus() -> void:
 	core.set_motion_context(target,target,Vector2(640,360))
 	var king: int = core.spawn_enemy(&"cepheus",target-Vector2(400,0),{"facing":0.0})
 	core.step(0.05)
-	check(pulse_motion(core,king).tier==1 and pulse_motion(core,king).mode==EnemyTable.Mode.WINDUP,"初回は3体隊列の召喚予告を始める")
+	check(pulse_motion(core,king).tier==1 and pulse_motion(core,king).mode==RunIds.EnemyModeId.Windup,"初回は3体隊列の召喚予告を始める")
 	var pending: Dictionary = bridge.checkpoint()
 	var before: Array = core.enemy_motion_snapshot()
 	var view := Rect2(target-Vector2(1000,600),Vector2(2000,1200))
@@ -1590,7 +1591,7 @@ func check_cpp_cepheus() -> void:
 	check(soldiers.size()==3 and soldiers.all(func(row): return row.age==0.0),"召喚は即時登録し新しい兵の行動は次tickから始める")
 	for n in 18: core.step(0.05)
 	check(core.hostiles_snapshot().size()==3,"画面内で予告を終えた3体が一斉射撃する")
-	check(soldiers.all(func(row): return pulse_motion(core,row.id).mode==EnemyTable.Mode.MOVE),"兵は指定された隊列の位置に整列する")
+	check(soldiers.all(func(row): return pulse_motion(core,row.id).mode==RunIds.EnemyModeId.Move),"兵は指定された隊列の位置に整列する")
 	var future: Array = core.enemy_motion_snapshot()
 	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"召喚途中の群れと隊列を値から復帰する")
 	for n in 20: core.step(0.05)
@@ -1603,7 +1604,7 @@ func check_cpp_cepheus() -> void:
 		core.set_enemy_motion(king,{"fire_t":0.0})
 		for n in 90:
 			core.step(0.05)
-			if pulse_motion(core,king).tier==tier and pulse_motion(core,king).mode==EnemyTable.Mode.MOVE: break
+			if pulse_motion(core,king).tier==tier and pulse_motion(core,king).mode==RunIds.EnemyModeId.Move: break
 		check(cepheus_soldiers(core,king).size()==(5 if tier==2 else 7),"増援で%d体の隊列へ組み直す" % (5 if tier==2 else 7))
 	var seven: Dictionary = bridge.checkpoint()
 	core.set_motion_context(target+Vector2(10000,0),target,Vector2(100,100))
@@ -1625,7 +1626,7 @@ func check_cpp_cepheus() -> void:
 	bridge.restore(seven.value)
 	soldiers = cepheus_soldiers(core,king)
 	bridge.command("dev_kill",{"entity_id":king,"cause":"bullet"})
-	check(soldiers.all(func(row): return pulse_motion(core,row.id).mode==EnemyTable.Mode.RECOVER and pulse_motion(core,row.id).timer>=0.4 and pulse_motion(core,row.id).timer<1.0),"王の途中撃破で生存兵全員が乱数付きの反乱へ入る")
+	check(soldiers.all(func(row): return pulse_motion(core,row.id).mode==RunIds.EnemyModeId.Recover and pulse_motion(core,row.id).timer>=0.4 and pulse_motion(core,row.id).timer<1.0),"王の途中撃破で生存兵全員が乱数付きの反乱へ入る")
 	core.set_enemy_motion(soldiers[0].id,{"fire_t":0.0})
 	core.step(0.01)
 	var events: Array = bridge.read_frame().value.events
@@ -1638,7 +1639,7 @@ func check_cpp_cepheus() -> void:
 	var replacement: int = core.spawn_enemy(&"cepheus",target-Vector2(400,0),{})
 	core.remove_enemy(soldiers[1].id)
 	core.step(0.01)
-	check(pulse_motion(core,replacement).tier==1 and pulse_motion(core,soldiers[0].id).mode==EnemyTable.Mode.RECOVER,"王と相手の先行削除・王の行再利用でも古い兵を再所属させない")
+	check(pulse_motion(core,replacement).tier==1 and pulse_motion(core,soldiers[0].id).mode==RunIds.EnemyModeId.Recover,"王と相手の先行削除・王の行再利用でも古い兵を再所属させない")
 	bridge.command("dev_kill",{"entity_id":replacement,"cause":"bullet"})
 	for n in 150: core.step(0.01)
 	check(cepheus_soldiers(core,replacement).is_empty(),"召喚途中で王を倒すと兵を後から生成しない")
@@ -1689,7 +1690,7 @@ func check_cpp_triangle_star() -> void:
 	check(hit.ok and hit.value.applied==0.5,"親が止まっている間は星へ通常の攻撃が通る")
 	core.step(0.05)
 	core.step(0.05)
-	check(pulse_motion(core,parent).mode==EnemyTable.Mode.DASH and Vector2(dolphin_enemy(core,star).vel[0],dolphin_enemy(core,star).vel[1])==Vector2.ZERO,"星は独自に進まず親の辺移動を参照する")
+	check(pulse_motion(core,parent).mode==RunIds.EnemyModeId.Dash and Vector2(dolphin_enemy(core,star).vel[0],dolphin_enemy(core,star).vel[1])==Vector2.ZERO,"星は独自に進まず親の辺移動を参照する")
 	core.set_enemy_motion(parent,{"held":true})
 	hit = bridge.command("dev_damage",{"entity_id":star,"amount":0.5,"cause":"shot","no_crit":true})
 	check(hit.ok and hit.value.applied==0.0 and hit.value.reason==&"damage_gate","親が辺を移動中は星のゲートがダメージを止める")
@@ -1820,7 +1821,7 @@ func check_cpp_ruler() -> bool:
 	var second: int=rows[1].id
 	check(is_equal_approx(rows[0].facing,PI) and rows[0].facing==rows[1].facing and rows.all(func(row): return row.attack_priority==3.0),"機体への縦横の大きい軸と親の攻撃設定を両側へ引き継ぐ")
 	for n in 3: ruler_tick(core,0.05)
-	check(pulse_motion(core,first).mode==EnemyTable.Mode.WINDUP and pulse_motion(core,first).charge>0.0,"展開から予告に入り編集された予告時間で構える")
+	check(pulse_motion(core,first).mode==RunIds.EnemyModeId.Windup and pulse_motion(core,first).charge>0.0,"展開から予告に入り編集された予告時間で構える")
 	var pending: Dictionary=bridge.checkpoint()
 	var before: Array=core.enemy_motion_snapshot()
 	frame=bridge.read_render(view).value
@@ -1861,7 +1862,7 @@ func check_cpp_ruler() -> bool:
 	var future_walls: Array=core.hazards_snapshot()
 	mute_checks=false
 	for n in 5: ruler_tick(core,0.05)
-	check(core.hazards_snapshot().is_empty() and float(core.attack_budget_snapshot().used)==0.0 and pulse_motion(core,first).mode==EnemyTable.Mode.DASH,"照射の正常終了で壁と攻撃予算を解放し再展開する")
+	check(core.hazards_snapshot().is_empty() and float(core.attack_budget_snapshot().used)==0.0 and pulse_motion(core,first).mode==RunIds.EnemyModeId.Dash,"照射の正常終了で壁と攻撃予算を解放し再展開する")
 	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"分裂後の左右・予告・予算を値から復帰する")
 	ruler_tick(core,0.05)
 	check(core.enemy_motion_snapshot()==future and core.hazards_snapshot()==future_walls,"復帰後の発射・壁の所有・乱数消費が一致する")
@@ -1938,7 +1939,7 @@ func check_cpp_triangle() -> bool:
 	var body: Dictionary=dolphin_enemy(core,parent)
 	check(Vector2(body.pos[0],body.pos[1]).distance_to(target)<Vector2(original.pos[0],original.pos[1]).distance_to(target) and triangle_vertices(core,parent,parts,0.0,150.0),"中心はゆっくり機体へ寄り星の停止位置も中心と一緒に動く")
 	ruler_tick(core,0.05)
-	check(pulse_motion(core,parent).mode==EnemyTable.Mode.DASH and core.hazards_snapshot().size()==3,"停止時間の終了で生存する星へ3本の軌跡を付ける")
+	check(pulse_motion(core,parent).mode==RunIds.EnemyModeId.Dash and core.hazards_snapshot().size()==3,"停止時間の終了で生存する星へ3本の軌跡を付ける")
 	ruler_tick(core,0.05)
 	check(triangle_vertices(core,parent,parts,0.25,150.0) and core.hazards_snapshot().all(func(wall): return wall.length>0 and wall.style==1 and wall.token>0),"星は辺の四分の一へ進みその後ろへ実際の長さの軌跡を伸ばす")
 	var pending: Dictionary=bridge.checkpoint()
@@ -1956,7 +1957,7 @@ func check_cpp_triangle() -> bool:
 	ruler_tick(core,0.05)
 	check(core.enemy_motion_snapshot()==future and core.enemies_snapshot()==future_enemies and core.hazards_snapshot()==future_walls,"復帰後も同じ順で辺を進み保持元を変更しない")
 	for n in 8:
-		if pulse_motion(core,parent).mode==EnemyTable.Mode.MOVE: break
+		if pulse_motion(core,parent).mode==RunIds.EnemyModeId.Move: break
 		ruler_tick(core,0.05)
 	check(pulse_motion(core,parent).buds==1 and core.hazards_snapshot().is_empty() and triangle_vertices(core,parent,parts,0.0,150.0),"次の頂点に着くと線を終了して星を停止する")
 	bridge.command("dev_kill",{"entity_id":parts[0].id,"cause":"shot"})
@@ -1967,7 +1968,7 @@ func check_cpp_triangle() -> bool:
 		if not core.hazards_snapshot().is_empty(): break
 	check(triangle_parts(core,parent).size()==2 and core.hazards_snapshot().size()==2 and not pulse_motion(core,unrelated).has("parent_id"),"星の先行撃破と行再利用後は元の2星だけが辺を進む")
 	for n in 8:
-		if pulse_motion(core,parent).mode==EnemyTable.Mode.MOVE: break
+		if pulse_motion(core,parent).mode==RunIds.EnemyModeId.Move: break
 		ruler_tick(core,0.05)
 	for k in [1,2]: bridge.command("dev_kill",{"entity_id":parts[k].id,"cause":"shot"})
 	ruler_tick(core,0.01)

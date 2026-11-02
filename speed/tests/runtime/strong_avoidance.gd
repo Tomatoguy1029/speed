@@ -1,5 +1,6 @@
 ## 雑魚だけの局所回避。密集、動くボス、吸引、内部出現、固定行動を検査する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 var checks := 0
@@ -88,12 +89,12 @@ func _ready() -> void:
 	enemies._capture_avoidance_starts()
 	enemies.avoid_strong(dt)
 	check(t.pos[normal] == Vector2(500, 0), "吸引可能なPumpへ近づく雑魚も妨げない")
-	t.mode[normal] = EnemyTable.Mode.WINDUP
+	t.mode[normal] = RunIds.EnemyModeId.Windup
 	t.pos[normal] = Vector2(300, 0)
 	enemies._capture_avoidance_starts()
 	enemies.avoid_strong(dt)
 	check(t.pos[normal] == Vector2(300, 0), "予告中の固定行動は動かさない")
-	t.mode[normal] = EnemyTable.Mode.MOVE
+	t.mode[normal] = RunIds.EnemyModeId.Move
 
 	# 実際の固定更新順（敵→ボス→回避→戦闘格子）でも回避が働く。
 	var runner := enemies.spawn(enemies.def_of(&"biter"), Vector2(2000, 2000))

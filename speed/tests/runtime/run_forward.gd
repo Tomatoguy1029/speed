@@ -1,5 +1,6 @@
 ## W01の周期と弾の更新を、描線・世界時間の間引きを含む実ランへ照合する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const COMPARE := preload("res://tools/compare_runtime.gd")
 const DATA := preload("res://tools/content/build_native_data.gd")
 const SHIP := preload("res://tests/runtime/run_ship.gd")
@@ -151,7 +152,7 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 				else: run.state.set(key, guards[key])
 			check(core.set_run_guards(guards), "操作・被弾の保護期間を渡す")
 			if tick in [40,50]:
-				run.set_phase(RunState.Phase.PAUSED if tick == 40 else RunState.Phase.PLAY)
+				run.set_phase(RunIds.Phase.Paused if tick == 40 else RunIds.Phase.Play)
 				check(core.set_paused(tick == 40), "ポーズと再開を受け付ける")
 			if tick in [60,80,95,100,160,200,220]:
 				var direct := hostile.merged({"kind": 0, "pos": run.state.ship_pos, "vel": Vector2.ZERO, "speed": 0.0, "turn": 0.0}, true)
@@ -178,7 +179,7 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 				if accepted: permitted += 1
 				else: denied += 1
 				break
-		if run.state.phase == RunState.Phase.PLAY: run._play_tick(1.0/60.0)
+		if run.state.phase == RunIds.Phase.Play: run._play_tick(1.0/60.0)
 		check(core.step_frame(1.0/60.0, command, center, half, zoom), "射撃も含めて一回の呼出しで更新する")
 		if budgeting:
 			check(comparison.difference(budget_helper.snapshot(run.projectiles.director),core.attack_budget_snapshot()).is_empty(),"攻撃枠の時計と寿命を停止・間引き・撃破に合わせる")

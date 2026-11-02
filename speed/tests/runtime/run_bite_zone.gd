@@ -1,5 +1,6 @@
 ## 噛みつきの円形判定・一度だけの被弾・残留する枠と表示状態を比較する。
 extends "res://tests/runtime/run_attack_budget.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const SHIP := preload("res://tests/runtime/run_ship.gd")
 var beam_finished := false
 var beam_retry := false
@@ -46,7 +47,7 @@ func hazard_snapshot(ps: ProjectileSystem) -> Array:
 	return comparison.plain(out)
 func add_zone(run: RunSimulation,core,at: Vector2,radius: float,delay: float,token: int) -> void:
 	run.projectiles.lab_context = token
-	var row := run.projectiles.fire_zone(at,radius,delay,3.0,ProjectileSystem.HazardStyle.BITE,Color(0.7,0.3,0.1,0.8))
+	var row := run.projectiles.fire_zone(at,radius,delay,3.0,RunIds.HazardStyleId.Bite,Color(0.7,0.3,0.1,0.8))
 	check(core.fire_bite_zone(at,radius,delay,3.0,Color(0.7,0.3,0.1,0.8),token) == row,"噛みつきの判定を同じ順で生成・再利用する")
 func compare_zones(effects: bool) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()

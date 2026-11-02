@@ -1,6 +1,7 @@
 ## スリルと寄り道の受け入れ確認。セーブはメモリだけで扱う。
 ## Godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/integration/thrill_acceptance.tscn
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 class MemorySave:
 	extends "res://scripts/managers/save_manager.gd"
@@ -180,7 +181,7 @@ func _clear() -> void:
 	run.field.wells.clear()
 	run.combat.rebuild_grid()
 	run.state.events.clear()
-	run.state.phase = RunState.Phase.PLAY
+	run.state.phase = RunIds.Phase.Play
 	run.state.ship_invuln = 0.0
 	run.state.ship_vel = Vector2.ZERO
 	run.state.ship_hp = run.state.stats.max_hp
@@ -264,7 +265,7 @@ func _test_foundation() -> void:
 	_test_boss_time_fallback()
 	s.time = 36000.0
 	run._check_end()
-	_check(s.phase == RunState.Phase.PLAY, "タスク3：時間切れで終了しない")
+	_check(s.phase == RunIds.Phase.Play, "タスク3：時間切れで終了しない")
 	s.time = 599.0
 	var before: Dictionary = run.spawn.target()
 	s.time = 660.0
@@ -368,7 +369,7 @@ func _advance_enemies(seconds: float, observed_row: int = -1) -> Dictionary:
 		if observed_row >= 0:
 			var t := run.enemies.table
 			if not peaks.modes.has(t.mode[observed_row]): peaks.modes.append(t.mode[observed_row])
-			if t.mode[observed_row] == EnemyTable.Mode.DASH:
+			if t.mode[observed_row] == RunIds.EnemyModeId.Dash:
 				peaks.dash_distance += t.pos[observed_row].distance_to(from)
 	return peaks
 
@@ -411,12 +412,12 @@ func _test_enemy_roster() -> void:
 		elif type == &"crow":
 			_check(t.dead[i] != 0 or t.pos[i].distance_to(from) > 1, "からす座は群れで横断して退場する")
 		elif type == &"reticle":
-			_check(t.dead[i] != 0 or t.mode[i] == EnemyTable.Mode.DASH, "支援先のいないレチクル座は退却する")
+			_check(t.dead[i] != 0 or t.mode[i] == RunIds.EnemyModeId.Dash, "支援先のいないレチクル座は退却する")
 		elif type == &"aquarius":
 			_check(peaks.hazards > 0, "みずがめ座は広がる水流の当たりを出す")
 		elif type == &"marlin":
 			# かじき座の攻撃は本体の突進。弾の有無だけでは停止した本体も通してしまう。
-			_check([EnemyTable.Mode.WINDUP, EnemyTable.Mode.DASH, EnemyTable.Mode.RECOVER].all(func(mode): return mode in peaks.modes)
+			_check([RunIds.EnemyModeId.Windup, RunIds.EnemyModeId.Dash, RunIds.EnemyModeId.Recover].all(func(mode): return mode in peaks.modes)
 				and peaks.dash_distance > t.r[i], "タスク7〜12：marlinは停止予告から本体で突進して休む")
 			_check(peaks.hazards == 0 and peaks.hostile == 0 and peaks.wells == 0, "かじき座は突進で左右弾や別の攻撃領域を出さない")
 		else:
@@ -492,17 +493,17 @@ func _test_enemy_gates() -> void:
 	triangles.step(triangle, 0.01)
 	var parts := t.parts[triangle].duplicate()
 	_check(run.enemies.parts_alive(triangle) == 3 and run.projectiles.hazard_count() == 0 \
-		and run.enemies.gate_check(triangle, at, Vector2.RIGHT, &"ram") == EnemyTable.GateResult.PASS,
+		and run.enemies.gate_check(triangle, at, Vector2.RIGHT, &"ram") == RunIds.EnemyGateResult.Pass,
 		"三角：停止中は3頂点を持ち、中心の当たりと膜を持たない")
 	triangles._start_travel(triangle)
 	_check(run.projectiles.hazard_count() == 3, "三角：頂点が移動し始めると3本の軌跡を出す")
 	for k in range(0, parts.size(), 2):
-		_check(run.enemies.gate_check(parts[k], t.pos[parts[k]], Vector2.RIGHT, &"ram") == EnemyTable.GateResult.PASS,
+		_check(run.enemies.gate_check(parts[k], t.pos[parts[k]], Vector2.RIGHT, &"ram") == RunIds.EnemyGateResult.Pass,
 			"三角：移動中の頂点には攻撃が通らない")
 	triangles.step(triangle, float(t.def[triangle].params.move_time) + 0.01)
 	_check(run.projectiles.hazard_count() == 0, "三角：移動が終わると軌跡を消す")
 	for k in range(0, parts.size(), 2):
-		_check(run.enemies.gate_check(parts[k], t.pos[parts[k]], Vector2.RIGHT, &"ram") == EnemyTable.GateResult.ALLOW,
+		_check(run.enemies.gate_check(parts[k], t.pos[parts[k]], Vector2.RIGHT, &"ram") == RunIds.EnemyGateResult.Allow,
 			"三角：止まった頂点には通常攻撃が通る")
 	run.combat.damage_enemy(parts[0], 1e6, {"cause": &"shot", "no_crit": true})
 	triangles.after_tick(0.01)
@@ -519,7 +520,7 @@ func _test_enemy_gates() -> void:
 	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "かに座は通常時も正面から攻撃できる")
 	_clear()
 	crab=_enemy(&"crab",at)
-	t.mode[crab] = EnemyTable.Mode.RECOVER
+	t.mode[crab] = RunIds.EnemyModeId.Recover
 	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "タスク11：かに座の挟んだ直後は正面から倒せる")
 	_clear()
 	var corona := _enemy(&"corona", at)
@@ -626,7 +627,7 @@ func _test_field() -> void:
 			break
 		_resume_for_check()
 		run._play_tick(0.1)
-		if s.phase == RunState.Phase.LEVELUP:
+		if s.phase == RunIds.Phase.Levelup:
 			await _choose_for_check()
 		if tick == 150:
 			var valid := true
@@ -905,24 +906,24 @@ func _test_hydra_techniques() -> void:
 ## 非同期の装備読込とGPUウォームアップは、ゲーム時計を進めず通常のフレームで完了させる。
 func _choose_for_check() -> void:
 	var deadline := Time.get_ticks_msec() + 10000
-	while run.state.phase == RunState.Phase.LEVELUP and Time.get_ticks_msec() < deadline:
+	while run.state.phase == RunIds.Phase.Levelup and Time.get_ticks_msec() < deadline:
 		run.flush_events()
 		scene.view.get_node("Hud/HudRoot")._rewards.cancel()
 		_resume_for_check()
 		run.command(&"choose_card", {"index": 0})
-		if run.state.phase != RunState.Phase.LEVELUP: return
+		if run.state.phase != RunIds.Phase.Levelup: return
 		await get_tree().process_frame
 		run.physics_step(0.0)
-	_check(run.state.phase != RunState.Phase.LEVELUP, "選択fixture：装備資源の準備を完了してゲームへ戻る")
+	_check(run.state.phase != RunIds.Phase.Levelup, "選択fixture：装備資源の準備を完了してゲームへ戻る")
 
 func _play_steps(count: int, dt: float) -> void:
 	for tick in count:
 		_resume_for_check()
 		run.flush_events()
 		scene.view.get_node("Hud/HudRoot")._rewards.cancel()
-		if run.state.phase == RunState.Phase.LEVELUP:
+		if run.state.phase == RunIds.Phase.Levelup:
 			await _choose_for_check()
-		if run.state.phase == RunState.Phase.PLAY:
+		if run.state.phase == RunIds.Phase.Play:
 			run._play_tick(dt)
 		else:
 			run.physics_step(dt)
@@ -953,7 +954,7 @@ func _test_app_flow() -> void:
 		run.command(&"choose_card", {"index": 0})
 		run.command(&"debug_invincible")
 		run.state.hitstop_enabled = false
-		_check(run.state.phase == RunState.Phase.PLAY and run.state.hero_power == &"", "通し確認：ステージ%dは初期装備選択から始まり英雄の力を持ち越さない" % stage)
+		_check(run.state.phase == RunIds.Phase.Play and run.state.hero_power == &"", "通し確認：ステージ%dは初期装備選択から始まり英雄の力を持ち越さない" % stage)
 		for clock in [0.0, 100.0, 250.0, 378.0, 550.0]:
 			run.command(&"debug_time", {"seconds": maxf(0.0, clock - run.state.time)})
 			await _play_steps(60, 0.05)
@@ -1000,7 +1001,7 @@ func _test_app_flow() -> void:
 		for attempt in 100:
 			if run.state.boss_dead:
 				break
-			if run.state.phase == RunState.Phase.LEVELUP:
+			if run.state.phase == RunIds.Phase.Levelup:
 				run.command(&"choose_card", {"index": 0})
 			# 攻めどきと当たりの確認用に、調整機能と同じ実行時の強さを使う。
 			run.state.stats.attack_mult = 1000.0
@@ -1133,7 +1134,7 @@ func _test_surge() -> void:
 
 ## 描画付きの確認では、Codexへフォーカスを戻したときのポーズを計測に混ぜない。
 func _resume_for_check() -> void:
-	if run.state.phase == RunState.Phase.PAUSED:
+	if run.state.phase == RunIds.Phase.Paused:
 		run.command(&"resume")
 
 func _test_head_world_steps() -> void:
@@ -1202,7 +1203,7 @@ func _cpp_open(stage: int, check_entry := true) -> RunSession:
 	return owner
 
 func _cpp_choose(owner: RunSession, frame: Dictionary) -> bool:
-	if frame.ui.phase==RunState.Phase.PAUSED: return owner.bridge.command("pause",{"paused":false}).ok
+	if frame.ui.phase==RunIds.Phase.Paused: return owner.bridge.command("pause",{"paused":false}).ok
 	var cards: Dictionary = frame.ui.cards
 	if cards.offer_id==0 or cards.selected_id!=0: return true
 	if cards.candidates.is_empty(): return false
@@ -1238,7 +1239,7 @@ func _cpp_route_input(frame: Dictionary, driver: Dictionary, owner: RunSession) 
 	intent.cursor = ahead*2400.0
 	intent.hero_press = int(frame.tick)%120==0
 	if driver.smart:
-		if frame.ui.phase==RunState.Phase.PLAY and not draw.drawing and not draw.tracing and int(frame.tick)>=int(driver.scan):
+		if frame.ui.phase==RunIds.Phase.Play and not draw.drawing and not draw.tracing and int(frame.tick)>=int(driver.scan):
 			var path := _cpp_safer_path(owner,frame,(intent.cursor-at).normalized(),450.0,driver)
 			driver.cursor = path[-1]
 			driver.scan = int(frame.tick)+30
@@ -1354,7 +1355,7 @@ func _test_cpp_diagnostic(stage: int, definition: StageDef) -> void:
 			owner.cpp_choices.poll()
 			owner.bridge.step(1.0/120.0,input, {"logical_size":Vector2(1280,720)})
 			frame = owner.bridge.read_frame().value
-			if frame.ui.phase==RunState.Phase.PLAY: break
+			if frame.ui.phase==RunIds.Phase.Play: break
 			await get_tree().process_frame
 		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"invincible","args":{}}})
 		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"time","args":{"seconds":definition.boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1}}})

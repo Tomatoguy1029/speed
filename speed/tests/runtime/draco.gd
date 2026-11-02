@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 func check(ok: bool, label: String) -> void:
 	if not ok:
@@ -86,7 +87,7 @@ func _ready() -> void:
 	session.auto_step = false
 	var sim: RunSimulation = session.sim
 	sim.field.bodies.clear()
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.ship_pos = Vector2(300,0)
 	sim.state.enemy_aim = sim.state.ship_pos
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"), Vector2.ZERO)
@@ -341,7 +342,7 @@ func native_draco_move(move_id: String) -> void:
 	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
 	session.auto_step=false
 	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var a=sim.bosses.actor
 	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
@@ -467,7 +468,7 @@ func native_tail_slam() -> void:
 	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
 	session.auto_step=false
 	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var a=sim.bosses.actor
 	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
@@ -583,7 +584,7 @@ func native_breath() -> void:
 	var session = semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
 	session.auto_step=false
 	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var actor=sim.bosses.actor
 	actor.selection_enabled=false;actor.clock=0.0;actor.cycle.cancel();actor.cancel_attack()
@@ -705,7 +706,7 @@ func native_tail_sweep() -> void:
 	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
 	session.auto_step=false
 	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var a=sim.bosses.actor
 	a.selection_enabled=false;a.cycle.cancel();a.cancel_attack();a.clock=0.0;a.table.facing[a.body]=0.0;a.body_trail.clear();a.body_pose.clear();a.body_override.clear();a.reset_pose()
@@ -774,7 +775,7 @@ func source_draco_fixture(target: Vector2) -> Dictionary:
 	var session=semantics_session({"lab":true,"stage":stage,"stage_index":5,"seed":105})
 	session.auto_step=false
 	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
+	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play;sim.ship.invincible=false
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var actor=sim.bosses.actor
 	actor.selection_enabled=false;actor.cycle.cancel();actor.cancel_attack();actor.clock=0.0;actor.table.facing[actor.body]=0.0;actor.body_trail.clear();actor.body_pose.clear();actor.body_override.clear();actor.reset_pose()
@@ -1717,7 +1718,7 @@ func native_finish() -> void:
 		if not f.is_empty():
 			for tick in 4:check(finish_frame(f),"時間切れの固定更新を受理する")
 			var body: Dictionary=f.bridge.command("dev_boss_body_state").value[0]
-			check(f.captured.any(func(e):return e.type=="time_limit_reached") and f.bridge.read_frame().value.ui.phase==RunState.Phase.DYING,"Sourceと同じく時間切れの一撃は溜めを挟まず機体を倒す")
+			check(f.captured.any(func(e):return e.type=="time_limit_reached") and f.bridge.read_frame().value.ui.phase==RunIds.Phase.Dying,"Sourceと同じく時間切れの一撃は溜めを挟まず機体を倒す")
 			for tick in 8:finish_frame(f)
 			var result: Variant=f.bridge.read_frame().value.result
 			check(result!=null and result.kind=="Death" and not f.captured.any(func(e):return e.type=="clear_banner"),"時間切れは勝利を付けず敗北で確定する")

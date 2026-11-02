@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failures := 0
 func check(ok: bool,label: String) -> void:
 	if not ok:failures+=1;push_error(label)
@@ -8,7 +9,7 @@ func _ready() -> void:
 	var session:=RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":711},false)
 	session.auto_step=false
 	var sim: RunSimulation=session.sim
-	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY
+	sim.field.bodies.clear();sim.state.phase=RunIds.Phase.Play
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var a=sim.bosses.actor
 	a.selection_enabled=false
@@ -18,7 +19,7 @@ func _ready() -> void:
 				a.cancel_attack();a.cycle.cancel();sim.projectiles.clear_hostile()
 				a.table.pos[a.body]=Vector2.ZERO;a.table.facing[a.body]=angle
 				a.body_trail.clear();a.body_pose.clear();a.reset_pose()
-				sim.state.phase=RunState.Phase.PLAY;sim.state.ship_hp=10000.0;sim.state.ship_invuln=0.0
+				sim.state.phase=RunIds.Phase.Play;sim.state.ship_hp=10000.0;sim.state.ship_invuln=0.0
 				sim.state.ship_pos=Vector2.from_angle(angle)*(300.0 if id==&"bite" else 600.0)
 				sim.state.ship_vel=Vector2.from_angle(angle).orthogonal()*500.0
 				sim.state.enemy_aim=Vector2(-900,-900)

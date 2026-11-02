@@ -1,5 +1,6 @@
 ## ほうおう座の予告・着地・隙と、中断時の安全を確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 
@@ -39,7 +40,7 @@ func _ready() -> void:
 	b.step(row, 0.01)
 	check(t.pos[row].distance_to(Vector2.ZERO) > initial.length(), "最初に機体から離脱する")
 	b.step(row, float(p.retreat_time))
-	check(t.mode[row] == EnemyTable.Mode.WINDUP, "離脱後に着地点の予告へ進む")
+	check(t.mode[row] == RunIds.EnemyModeId.Windup, "離脱後に着地点の予告へ進む")
 	var landing := t.anchor[row]
 	var away := t.pos[row]
 	sim.state.enemy_aim = Vector2(900, 300)
@@ -47,18 +48,18 @@ func _ready() -> void:
 	check(t.anchor[row] == landing and t.pos[row] == away, "予告中は着地点と本体位置を固定する")
 	check(_hazards(sim.projectiles) == 0, "予告はまだ攻撃判定を持たない")
 	b.step(row, float(p.telegraph))
-	check(t.mode[row] == EnemyTable.Mode.DASH, "予告を終えて飛び込む")
+	check(t.mode[row] == RunIds.EnemyModeId.Dash, "予告を終えて飛び込む")
 	b.step(row, float(p.dive_time) * 0.5)
 	check(t.pos[row].distance_to(landing) < away.distance_to(landing), "予告した着地点へ向かう")
 	b.step(row, float(p.dive_time))
-	check(t.pos[row].is_equal_approx(landing) and t.mode[row] == EnemyTable.Mode.RECOVER, "着地後は停止して隙を作る")
+	check(t.pos[row].is_equal_approx(landing) and t.mode[row] == RunIds.EnemyModeId.Recover, "着地後は停止して隙を作る")
 	check(_hazards(sim.projectiles) == 1, "着地で広域炎を1回だけ出す")
 	var pr := sim.projectiles
 	for h in pr.hazard_alive.size():
 		if pr.hazard_alive[h]:
 			check(pr.hazard_pos[h] == landing and pr.hazard_len[h] > t.r[row], "炎は予告した位置で体より広い範囲を持つ")
 			check(pr.hazard_dmg[h] == float(p.impact_dmg) and pr.hazard_delay[h] == 0.0, "着地時に設定した威力で発動する")
-			check(pr.hazard_style[h] == ProjectileSystem.HazardStyle.PHOENIX and is_equal_approx(pr.hazard_active[h], float(p.impact_time)), "専用shaderの炎を設定した表示時間で出す")
+			check(pr.hazard_style[h] == RunIds.HazardStyleId.Phoenix and is_equal_approx(pr.hazard_active[h], float(p.impact_time)), "専用shaderの炎を設定した表示時間で出す")
 	b.step(row, float(p.recover_time) * 0.5)
 	check(t.pos[row] == landing and t.vel[row] == Vector2.ZERO and _hazards(pr) == 1, "停止中は追跡と追加攻撃を行わない")
 	sim.state.ship_pos = landing
@@ -74,14 +75,14 @@ func _ready() -> void:
 	check(not def.params.has("chain_power"), "仕様外の撃破時誘爆を持たない")
 
 	# 離脱・予告・飛び込みの各段階で倒しても、遅れた着地攻撃を残さない。
-	for phase in [EnemyTable.Mode.MOVE, EnemyTable.Mode.WINDUP, EnemyTable.Mode.DASH]:
+	for phase in [RunIds.EnemyModeId.Move, RunIds.EnemyModeId.Windup, RunIds.EnemyModeId.Dash]:
 		pr.clear_hostile()
 		enemies.clear_all()
 		row = enemies.spawn(def, Vector2(200, 0))
 		b.step(row, 0.01)
-		if phase != EnemyTable.Mode.MOVE:
+		if phase != RunIds.EnemyModeId.Move:
 			b.step(row, float(p.retreat_time))
-		if phase == EnemyTable.Mode.DASH:
+		if phase == RunIds.EnemyModeId.Dash:
 			b.step(row, float(p.telegraph))
 		enemies.on_enemy_death(row, 100.0)
 		enemies.mark_dead(row)
@@ -89,7 +90,7 @@ func _ready() -> void:
 		enemies.tick(1.0, 1.0)
 		check(_hazards(pr) == 0, "攻撃中撃破で着地攻撃を残さない: %d" % phase)
 		var reused := enemies.spawn(def, Vector2(200, 0))
-		check(t.mode[reused] == EnemyTable.Mode.MOVE and t.timer[reused] == 0.0 and t.charge[reused] == 0.0, "解放した行を初期状態で再利用する")
+		check(t.mode[reused] == RunIds.EnemyModeId.Move and t.timer[reused] == 0.0 and t.charge[reused] == 0.0, "解放した行を初期状態で再利用する")
 
 	pr.clear_hostile()
 	enemies.clear_all()
@@ -107,12 +108,12 @@ func _ready() -> void:
 		sim.state.world_time += 1.0 / 60.0
 		pr.director.advance(sim.state.world_time, enemies)
 		enemies.tick(1.0 / 60.0, 1.0 / 60.0)
-		if t.mode[row] == EnemyTable.Mode.WINDUP:
+		if t.mode[row] == RunIds.EnemyModeId.Windup:
 			saw_warning = true
 			fixed = t.anchor[row]
-		if t.mode[row] == EnemyTable.Mode.DASH:
+		if t.mode[row] == RunIds.EnemyModeId.Dash:
 			saw_dive = true
-		if t.mode[row] == EnemyTable.Mode.RECOVER:
+		if t.mode[row] == RunIds.EnemyModeId.Recover:
 			saw_recovery = true
 			check(t.pos[row].is_equal_approx(fixed) and t.vel[row] == Vector2.ZERO, "実更新でも予告位置で停止する")
 			break

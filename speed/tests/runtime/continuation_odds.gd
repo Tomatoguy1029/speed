@@ -1,6 +1,7 @@
 ## 通常カード選択から自動強化の段数分布と、継続画面の「4連続」を独立して確認する。
 ## Godot --headless --log-file /tmp/speed-continuation.log --path speed res://tests/runtime/continuation_odds.tscn
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 func _ready() -> void:
 	_check()
@@ -47,7 +48,7 @@ func _check() -> void:
 	run.loadout.grant(&"weapon", &"W01")
 	run.state.cards = [{"kind": &"weapon", "id": &"W01", "level": 2}]
 	run.state.pending_levels = 2
-	run.set_phase(RunState.Phase.LEVELUP)
+	run.set_phase(RunIds.Phase.Levelup)
 	run.command(&"choose_card", {"index": 0})
 	run.flush_events()
 	var rewards = hud._rewards

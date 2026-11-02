@@ -1,5 +1,6 @@
 ## 本番の線入力と戦闘更新で、一戦と共通の勝利入口を確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed:=0
 func check(ok: bool,label: String)->void:
 	print("[hydra-battle] ","PASS " if ok else "FAIL ",label)
@@ -59,7 +60,7 @@ func _ready()->void:
 	a.sim_tick(0.01,0.01)
 	check(lab.run.state.boss_dead,"campaign bearer defeat raises final victory")
 	lab.run._begin_finish()
-	check(lab.run.state.phase==RunState.Phase.FINISHING and lab.run.finish_legendary()!=null,"final victory enters common finish with stage legendary module")
+	check(lab.run.state.phase==RunIds.Phase.Finishing and lab.run.finish_legendary()!=null,"final victory enters common finish with stage legendary module")
 	lab.run._finish_blast()
 	check(not lab.run.bosses.has_boss(),"common final blast cleans remaining encounter")
 	check(JSON.stringify(SaveManager.data)==saved,"finish preview does not grant or persist duplicate rewards")

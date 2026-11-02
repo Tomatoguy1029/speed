@@ -1,5 +1,6 @@
 ## 回収物ごとの取得効果を同じ入口で適用できる。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 func check(ok: bool, message: String) -> void:
 	if not ok:
@@ -62,12 +63,12 @@ func _ready() -> void:
 		check(sim.state.xp_gained > xp, "結晶の経験値を反映する")
 		sim.state.ship_hp = 1.0
 		var capsule := Pickup.new()
-		capsule.kind = Pickup.Kind.HEAL
+		capsule.kind = RunIds.PickupKind.Heal
 		pickups._apply(capsule)
 		check(sim.state.ship_hp > 1.0, "回復カプセルがHPを回復する")
 		sim.state.ship_hp = sim.state.stats.max_hp
 		check(not pickups.effect(&"heal").can_collect(capsule), "HP満タンでは回復カプセルを吸い寄せない")
-		capsule.kind = Pickup.Kind.COMET_WEAPON
+		capsule.kind = RunIds.PickupKind.CometWeapon
 		capsule.weapon_id = &"W21"
 		pickups._apply(capsule)
 		check(sim.state.pending_comet_weapons.has(&"W21"), "彗星武器の受け取りを予約する")

@@ -1,6 +1,7 @@
 ## 録画の開始経路・成長の保全と既存の計測を確認する。JSONL は /tmp の専用フォルダだけへ書く。
 ## Godot --headless --path speed res://tests/integration/play_recorder.tscn
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 const RECORDER := preload("res://scripts/dev/play_recorder.gd")
 
@@ -117,7 +118,7 @@ func verify_mid_run_start() -> void:
 	run.state.xp_dropped = 1200.0
 	run.state.weapons[&"W01"] = 2
 	run.state.kills = 10
-	var existing_row := run.pickups.drop_crystal(Vector2.ZERO, PickupSystem.GemKind.MID)
+	var existing_row := run.pickups.drop_crystal(Vector2.ZERO, RunIds.GemKind.Mid)
 	var existing_id := run.pickups.gem_seq[existing_row]
 	run.state.emit(&"hurt", {"amount": 99.0, "cause": &"before_recording"})
 	var initial_profile: Dictionary = scene.recording_initial.profile.duplicate(true)
@@ -142,7 +143,7 @@ func verify_mid_run_start() -> void:
 		check(start.recording_start.weapons.W01 == 2 and start.recording_start.xp_gained == 1000.0, "録画開始時の装備と累計を保存する")
 		check(start.missing_prefix and start.recording_start.trigger == "during_run", "同じ通常ランでも前半欠落を明示する")
 		var existing: Dictionary = read_rows(path).filter(func(row):return row.type=="xp_existing")[0]
-		check(existing.type == "xp_existing" and existing.origin == "unobserved" and int(existing.ground[0].id) == existing_id and existing.ground[0].kind == "mid" and existing.ground[0].base_xp == run.cfg.xp_crystal_values[PickupSystem.GemKind.MID], "途中開始の残存結晶IDと値を生成不明として記録する")
+		check(existing.type == "xp_existing" and existing.origin == "unobserved" and int(existing.ground[0].id) == existing_id and existing.ground[0].kind == "mid" and existing.ground[0].base_xp == run.cfg.xp_crystal_values[RunIds.GemKind.Mid], "途中開始の残存結晶IDと値を生成不明として記録する")
 		check(start.run_start.conditions.profile == RECORDER.IDENTITY.plain(initial_profile) and start.recording_start.conditions.profile.mult.xp == 9.0, "開始時の強化と途中録画時の強化を区別する")
 		check(rec._offered.size() == run.state.cards.size(), "既に表示中のカード候補を引き継ぐ")
 		var previous_rows := read_rows(path).size()
@@ -168,7 +169,7 @@ func verify_mid_run_start() -> void:
 		rec._input(key)
 		check(rec._file != null and rec._file.get_path() != path, "すぐ再開しても別のファイルへ記録する")
 		check(FileAccess.get_file_as_bytes(path) == closed, "再開で既存ファイルを上書きしない")
-		run.set_phase(RunState.Phase.ENDED)
+		run.set_phase(RunIds.Phase.Ended)
 		check(rec._file == null and rec.armed, "ラン終了後も次のランの待機は続く")
 		rec._set_armed(false)
 		rec._set_armed(true)
@@ -278,7 +279,7 @@ func scenario(recording: bool) -> Dictionary:
 		rec._xp_start_summary = pk.xp_summary().duplicate(true)
 		rec._last_xp_summary = rec._xp_start_summary.duplicate(true)
 		pk.xp_recorded.connect(rec._write)
-		check(rec._xp_config().xp_crystal_values.mid == run.cfg.xp_crystal_values[PickupSystem.GemKind.MID], "開始時の固定色の基準XPを取得できる")
+		check(rec._xp_config().xp_crystal_values.mid == run.cfg.xp_crystal_values[RunIds.GemKind.Mid], "開始時の固定色の基準XPを取得できる")
 		run.phase_changed.connect(rec._on_phase_changed)
 		lab.scene.tree_exiting.connect(rec._end.bind("quit"))
 	# 実際の敵ドロップ経路。雑魚は水色1個、レチクルは紫2個と確率1にした黄色1個。
@@ -290,7 +291,7 @@ func scenario(recording: bool) -> Dictionary:
 	var outcome := {"xp": s.xp_gained, "level": s.level, "rng": s.rng.state, "gems": pk.gem_slots.live}
 	if recording:
 		s.time = 8.0
-		rec._on_phase_changed(RunState.Phase.ENDED)
+		rec._on_phase_changed(RunIds.Phase.Ended)
 		check(rec._file == null and rec._run == null, "ラン終了でファイルを閉じる")
 	check(not pk.xp_recorded.has_connections(), "記録 OFF/終了後は購読が残らない")
 	rec.queue_free()
@@ -328,7 +329,7 @@ func verify_ui_pause_performance() -> void:
 	rec._file = FileAccess.open(path, FileAccess.WRITE)
 	rec._run = run
 	rec._session = lab.scene
-	run.state.phase = RunState.Phase.PLAY
+	run.state.phase = RunIds.Phase.Play
 	var stamp := Time.get_ticks_usec()
 	run.ui_reward_active = true
 	rec._perf_start(stamp)
@@ -374,7 +375,7 @@ func verify_performance() -> void:
 	await lab.reset({'seed':932,'empty':true,'stage':4})
 	var run: RunSimulation = lab.run
 	lab.scene.auto_step = false
-	run.state.phase = RunState.Phase.PLAY
+	run.state.phase = RunIds.Phase.Play
 	run.state.time = 300.0
 	var rec = RECORDER.new()
 	add_child(rec)
@@ -398,12 +399,12 @@ func verify_performance() -> void:
 	rec._perf_tick(stamp)
 	rec._flush_performance(stamp)
 	run.state.hitstop = 0.0
-	run.state.phase = RunState.Phase.PAUSED
+	run.state.phase = RunIds.Phase.Paused
 	stamp += 16667
 	rec._perf_tick(stamp)
 	stamp += 100000000
 	rec._perf_tick(stamp)
-	run.state.phase = RunState.Phase.PLAY
+	run.state.phase = RunIds.Phase.Play
 	stamp += 16667
 	rec._perf_tick(stamp)
 	for k in 60:
@@ -479,7 +480,7 @@ func measurement_scenario(recording: bool) -> Dictionary:
 	var replaced: StringName = s.cards[0].id
 	run.loadout.choose_card(0)
 	# 各被弾を、無敵で拒否した攻撃と区別する。書込時には時計を進めておく。
-	s.phase = RunState.Phase.PLAY
+	s.phase = RunIds.Phase.Play
 	s.ship_hp = 100.0
 	s.ship_shield_t = 0.0
 	s.ship_invuln = 0.0
@@ -493,13 +494,13 @@ func measurement_scenario(recording: bool) -> Dictionary:
 	run.flush_events()
 	# 結晶の生成・通常回収・上限合流・ビーコン回収。
 	s.ship_pos = Vector2(1000, 0)
-	var row := pk.drop_crystal(s.ship_pos, PickupSystem.GemKind.LOW, &"enemy", &"biter", 101)
+	var row := pk.drop_crystal(s.ship_pos, RunIds.GemKind.Low, &"enemy", &"biter", 101)
 	var ship_id := pk.gem_seq[row]
 	pk._collect_gems(0.01)
-	row = pk.drop_crystal(Vector2.ZERO, PickupSystem.GemKind.MID, &"enemy", &"reticle", 102)
+	row = pk.drop_crystal(Vector2.ZERO, RunIds.GemKind.Mid, &"enemy", &"reticle", 102)
 	var first := pk.gem_seq[row]
-	pk.drop_crystal(Vector2.ZERO, PickupSystem.GemKind.LOW, &"enemy", &"biter", 103)
-	pk.drop_crystal(Vector2.ZERO, PickupSystem.GemKind.MID, &"enemy", &"biter", 104)
+	pk.drop_crystal(Vector2.ZERO, RunIds.GemKind.Low, &"enemy", &"biter", 103)
+	pk.drop_crystal(Vector2.ZERO, RunIds.GemKind.Mid, &"enemy", &"biter", 104)
 	s.time = 14.0
 	pk.collect(&"magnet")
 	# からす座の実際の回収経路と、運搬XPの再ドロップ。
@@ -507,7 +508,7 @@ func measurement_scenario(recording: bool) -> Dictionary:
 	crow_def.params.flock = 1
 	var crow := run.enemies.spawn(crow_def, Vector2.ZERO)
 	run.enemies.table.facing[crow] = 0.0
-	row = pk.drop_crystal(Vector2(-run.enemies.table.r[crow] * 0.62, 0), PickupSystem.GemKind.MID, &"enemy", &"biter", 105)
+	row = pk.drop_crystal(Vector2(-run.enemies.table.r[crow] * 0.62, 0), RunIds.GemKind.Mid, &"enemy", &"biter", 105)
 	var carried := pk.gem_seq[row]
 	run.enemies.behavior(&"crow").gather_pickups(pk, 1.0)
 	check(run.enemies.table.carry[crow] == 50.0, "からす座が実際に結晶を回収する")

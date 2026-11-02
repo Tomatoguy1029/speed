@@ -1,5 +1,6 @@
 ## 追加成長の武器弾を共有戦闘経路から両ボスへ当て、実HP減少と表示だけの反応を確認する。
 extends "res://tests/integration/post_max_progression.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 func _ready() -> void:
 	SaveManager.set_script(MemorySave)
@@ -38,7 +39,7 @@ func _ready() -> void:
 		_check(float(actor.hit_feedback.sample(actor.body_id).white) > 0.0, "実際に命中したボスだけが反応: " + boss_id)
 		_check(run.enemies.table.pos[row] == origin and run.enemies.table.facing[row] == facing, "被弾表示で判定と照準を変えない: " + boss_id)
 		_check(is_equal_approx(run.state.stats.crit_chance, 0.3), "武器命中後もT09予約と追加上限を維持")
-		run.set_phase(RunState.Phase.PAUSED)
+		run.set_phase(RunIds.Phase.Paused)
 		scene._process(0.13)
 		_check(actor.hit_feedback.remaining.is_empty(), "停止した世界でも表示パルスを解放: " + boss_id)
 		_check(run.state.post_max_stacks[&"weapon_damage"] == 5, "表示の更新で追加成長を変えない")

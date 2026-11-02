@@ -1,5 +1,6 @@
 ## 共通フローを止めず、登場からHP三段階・決着まで進む結合確認。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const DT := 1.0/60.0
 var failures := 0
 func check(ok: bool, text: String) -> void:
@@ -17,7 +18,7 @@ func _ready() -> void:
 	sim.state.ship_hp = 100000.0
 	sim.state.ship_vel = Vector2.ZERO
 	sim.state.ship_pos = Vector2(300,0)
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.camera_zoom = 720.0/1100.0
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	var actor = sim.bosses.actor

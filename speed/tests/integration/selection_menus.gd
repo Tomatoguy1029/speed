@@ -1,5 +1,6 @@
 ## 選択待ちに重ねるメニューを実際の Viewport 入力で確認する。セーブはメモリだけで扱う。
 extends "res://tests/integration/thrill_acceptance.gd"
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var hud: Control
 var panel: Control
@@ -28,13 +29,13 @@ func _ready() -> void:
 	await _shot("selection")
 	for i in 3:
 		_tap(KEY_ESCAPE)
-		_check(run.state.phase == RunState.Phase.PAUSED and hud._pause_box.visible, "Esc opens pause during initial choice (%d)" % i)
+		_check(run.state.phase == RunIds.Phase.Paused and hud._pause_box.visible, "Esc opens pause during initial choice (%d)" % i)
 		if i == 0: await _shot("selection_pause")
 		_key(KEY_ESCAPE, true, true)
-		_check(run.state.phase == RunState.Phase.PAUSED, "Esc echo does not close pause")
+		_check(run.state.phase == RunIds.Phase.Paused, "Esc echo does not close pause")
 		_key(KEY_ESCAPE, false)
 		_tap(KEY_ESCAPE)
-		_check(run.state.phase == RunState.Phase.LEVELUP and hud._cards_box.visible, "Esc restores initial choice")
+		_check(run.state.phase == RunIds.Phase.Levelup and hud._cards_box.visible, "Esc restores initial choice")
 	_check(run.state.start_pick and run.state.cards == cards and run.state.weapons.is_empty(), "pause preserves initial candidates and choice state")
 	await _ready_cards()
 	for i in 3:
@@ -53,11 +54,11 @@ func _ready() -> void:
 		var intent := run.input.poll()
 		_check(not intent.press and not intent.alt_press and not intent.hero_press, "debug blocks gameplay input")
 		_tap(KEY_ESCAPE)
-		_check(not panel.visible and run.state.phase == RunState.Phase.LEVELUP and hud._cards_box.visible, "Esc closes debug and restores choice")
+		_check(not panel.visible and run.state.phase == RunIds.Phase.Levelup and hud._cards_box.visible, "Esc closes debug and restores choice")
 	_tap(KEY_ESCAPE)
 	_tap(KEY_P)
 	_tap(KEY_ESCAPE)
-	_check(not panel.visible and hud._pause_box.visible and run.state.phase == RunState.Phase.PAUSED, "Esc closes debug before underlying pause")
+	_check(not panel.visible and hud._pause_box.visible and run.state.phase == RunIds.Phase.Paused, "Esc closes debug before underlying pause")
 	hud._pause_box.get_child(2).pressed.emit()
 	# 設定のキー割り当てには、メニューのショートカットを割り込ませない。
 	hud._settings._wait_for_key(&"debug_perf")
@@ -67,7 +68,7 @@ func _ready() -> void:
 	_tap(KEY_ESCAPE)
 	_check(hud._settings == null and hud._pause_box.visible, "Esc closes settings before pause")
 	_tap(KEY_ESCAPE)
-	_check(run.state.phase == RunState.Phase.LEVELUP, "Esc after settings restores selection")
+	_check(run.state.phase == RunIds.Phase.Levelup, "Esc after settings restores selection")
 	# 報酬中にも開き、閉じるまで演出も選択も進めない。
 	hud._rewards.enqueue_bonus({"type": &"level_bonus", "kind": &"weapon", "id": &"W01", "level": 2, "count": 1})
 	_tap(KEY_P)
@@ -82,7 +83,7 @@ func _ready() -> void:
 	_tap(KEY_ESCAPE)
 	_check(hud._pause_box.visible, "pause opens during reward presentation")
 	_tap(KEY_ESCAPE)
-	_check(hud._rewards.visible and run.state.phase == RunState.Phase.LEVELUP, "pause restores reward and selection phase")
+	_check(hud._rewards.visible and run.state.phase == RunIds.Phase.Levelup, "pause restores reward and selection phase")
 	hud._rewards.cancel()
 	await _ready_cards()
 	# 資源待ちで既に選んだカードは、メニュー中に準備が終わっても確定を保留する。
@@ -99,7 +100,7 @@ func _ready() -> void:
 	_check(run.state.start_pick, "pause suspends resource pending choice")
 	_tap(KEY_ESCAPE)
 	await _settle_choice()
-	_check(not run.state.start_pick and run.state.phase == RunState.Phase.PLAY, "pending choice completes after menu closes")
+	_check(not run.state.start_pick and run.state.phase == RunIds.Phase.Play, "pending choice completes after menu closes")
 	run.loadout.reset_loadout()
 	run.loadout.open_start_cards()
 	await _ready_cards()
@@ -112,13 +113,13 @@ func _ready() -> void:
 	_check(run.state.start_pick, "menu accept release cannot choose underlying card")
 	_tap(KEY_1)
 	await _settle_choice()
-	_check(run.state.phase == RunState.Phase.PLAY and not run.state.start_pick, "fresh choice still works after menus")
+	_check(run.state.phase == RunIds.Phase.Play and not run.state.start_pick, "fresh choice still works after menus")
 	run.state.pending_levels = 2
 	run.loadout.try_open_cards()
 	cards = run.state.cards.duplicate(true)
 	_tap(KEY_ESCAPE)
 	hud._pause_box.get_child(1).pressed.emit()
-	_check(run.state.phase == RunState.Phase.LEVELUP and run.state.pending_levels == 2 and run.state.cards == cards, "resume button restores queued level choices")
+	_check(run.state.phase == RunIds.Phase.Levelup and run.state.pending_levels == 2 and run.state.cards == cards, "resume button restores queued level choices")
 	# 実際のカード領域へのクリックも隠れたカードを確定しない。
 	var point: Vector2 = hud._cards_row.get_child(2).get_global_rect().get_center()
 	_tap(KEY_P)
@@ -138,13 +139,13 @@ func _ready() -> void:
 	_tap(KEY_P)
 	_tap(KEY_ESCAPE)
 	_check(swap == &"W17" and run.state.swap_pick == swap and run.state.cards == cards and hud._swap_box.visible, "menus preserve weapon swap choice")
-	run.set_phase(RunState.Phase.PLAY)
+	run.set_phase(RunIds.Phase.Play)
 	_tap(KEY_P)
 	var before := run.state.time
 	run.physics_step(1.0)
 	_check(run.state.time == before, "debug suspends gameplay clock")
 	_tap(KEY_P)
-	_check(run.state.phase == RunState.Phase.PLAY and not panel.visible, "debug close preserves gameplay phase")
+	_check(run.state.phase == RunIds.Phase.Play and not panel.visible, "debug close preserves gameplay phase")
 	await _close()
 	print("[selection_menus] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)

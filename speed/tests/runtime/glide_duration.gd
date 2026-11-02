@@ -2,6 +2,7 @@
 ## Godot --headless --path speed res://tests/runtime/glide_duration.tscn
 ## 描画付き確認: --headless を外し -- --out=/tmp/speed-glide-captures を付ける。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 var checks := 0
@@ -25,7 +26,7 @@ func _ready() -> void:
 	add_child(scene)
 	if scene.sim.state == null: await scene.started
 	scene.auto_step = false
-	run.state.phase = RunState.Phase.PLAY
+	run.state.phase = RunIds.Phase.Play
 	var s := run.state
 	var cfg := run.cfg
 	var baseline_vel := s.ship_vel
@@ -77,7 +78,7 @@ func _ready() -> void:
 	s.traits = {&"T31": 5}
 	run.loadout.refresh_stats()
 	s.cards = [{"kind": &"trait", "id": &"T31", "level": 5}]
-	run.set_phase(RunState.Phase.LEVELUP)
+	run.set_phase(RunIds.Phase.Levelup)
 	run.cards_changed.emit()
 	check(scene.view.get_node("Hud/HudRoot").card_info(s.cards[0]).name.ends_with("5/5"), "Trait card displays the configured stack cap")
 	await _capture("card_and_loadout")

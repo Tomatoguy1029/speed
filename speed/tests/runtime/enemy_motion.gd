@@ -1,5 +1,6 @@
 ## 移動・旋回・発射時刻の共通処理は、種類の追加と独立した補助へ置く。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var gunner_finished := false
 var gunner_cycle := false
@@ -392,7 +393,7 @@ func check_cpp_rocket() -> void:
 		run.enemies.tick(0.01,0.01)
 		core.step(0.01)
 		rocket_state(run,core,row,id,kind+"の予算待機")
-		check(run.enemies.table.mode[row]==EnemyTable.Mode.MOVE and core.hazards_snapshot().is_empty(),"予算を待つ間は飛行と起爆を始めない")
+		check(run.enemies.table.mode[row]==RunIds.EnemyModeId.Move and core.hazards_snapshot().is_empty(),"予算を待つ間は飛行と起爆を始めない")
 		director.configure({"enabled":true,"budget":1.0,"jitter":0.0})
 		core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 		run.state.world_time += 0.01
@@ -704,7 +705,7 @@ func check_cpp_dash() -> void:
 		core.set_attack_formation_mode(true)
 		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
 		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
-		var modes := [EnemyTable.Mode.MOVE]
+		var modes := [RunIds.EnemyModeId.Move]
 		var pending: Dictionary = {}
 		var pending_state: Array = []
 		var next_state: Array = []
@@ -734,7 +735,7 @@ func check_cpp_dash() -> void:
 				if enemy.id==id: check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001 and enemy.dead==run.enemies.table.dead[row],"突進する敵の姿勢・移動・生死が一致する: %s/%d" % [kind,tick])
 			for item: Dictionary in core.enemy_motion_snapshot():
 				if item.id==id: check(item.mode==run.enemies.table.mode[row] and is_equal_approx(item.timer,run.enemies.table.timer[row]),"予告・突進・硬直の状態と時間が一致する: %s/%d" % [kind,tick])
-			if tick==0: check(run.enemies.table.mode[row]==EnemyTable.Mode.MOVE,"予算0では予告を始めず追跡する")
+			if tick==0: check(run.enemies.table.mode[row]==RunIds.EnemyModeId.Move,"予算0では予告を始めず追跡する")
 			if tick==2 and kind=="normal":
 				pending = bridge.checkpoint()
 				pending_state = core.enemy_motion_snapshot()
@@ -744,7 +745,7 @@ func check_cpp_dash() -> void:
 				await get_tree().process_frame
 			if tick==3 and kind=="normal": next_state = core.enemy_motion_snapshot()
 		if kind=="normal":
-			check(modes.has(EnemyTable.Mode.WINDUP) and modes.has(EnemyTable.Mode.DASH) and modes.has(EnemyTable.Mode.RECOVER) and modes[-1]==EnemyTable.Mode.MOVE,"追跡・予告・突進・硬直を一巡する")
+			check(modes.has(RunIds.EnemyModeId.Windup) and modes.has(RunIds.EnemyModeId.Dash) and modes.has(RunIds.EnemyModeId.Recover) and modes[-1]==RunIds.EnemyModeId.Move,"追跡・予告・突進・硬直を一巡する")
 			check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==pending_state,"予告中の向きと残り時間を値で復帰する")
 			core.step(0.125)
 			check(core.enemy_motion_snapshot()==next_state,"予告中の復帰後に同じ突進へ進む")

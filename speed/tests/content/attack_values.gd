@@ -1,6 +1,7 @@
 ## 個体・共有overrideの会計、小数、整数保存の互換読み込み、表示用合計だけを確認する。
 ## godot --headless --path speed res://tests/content/attack_values.tscn
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 var checks := 0
@@ -169,7 +170,7 @@ func _check_light_attacks(lab) -> void:
 	var b := em.spawn(em.def_of(&"pulser"), Vector2(260, 30))
 	for row in [a, b]: em.table.fire_t[row] = 0.0
 	em.tick(0.016, 0.016)
-	check(em.table.mode[a] == EnemyTable.Mode.WINDUP and em.table.mode[b] == EnemyTable.Mode.MOVE,
+	check(em.table.mode[a] == RunIds.EnemyModeId.Windup and em.table.mode[b] == RunIds.EnemyModeId.Move,
 		"星2の波動もvalue 0.5で予約し、次の波動は空くまで予告を出さない")
 	check(d.used_cost() == 0.5 and d.waiting.size() == 1, "波動の予約と待機を同じ予算へ計上する")
 	var token: int = d.token(em._lab_owner(a))
@@ -177,12 +178,12 @@ func _check_light_attacks(lab) -> void:
 	d.settings.budget = 0.0
 	var timer := em.table.timer[a]
 	em.tick(0.016, 0.016)
-	check(em.table.timer[a] < timer and em.table.mode[a] == EnemyTable.Mode.WINDUP,
+	check(em.table.timer[a] < timer and em.table.mode[a] == RunIds.EnemyModeId.Windup,
 		"予算が0へ下がっても開始済みの予告を続ける")
 	d.advance(100.0, em)
 	check(d.used_cost() == 0.5, "予算減少後も残っている波動の枠を保持する")
 	pm.clear_hostile()
-	em.table.mode[a] = EnemyTable.Mode.MOVE
+	em.table.mode[a] = RunIds.EnemyModeId.Move
 	d.advance(101.0, em)
 	check(d.used_cost() == 0.0, "予告と波動が終わった後にだけ枠を返す")
 	d.waiting.clear()
@@ -190,7 +191,7 @@ func _check_light_attacks(lab) -> void:
 	var zero := em.spawn(em.def_of(&"biter"), Vector2(25, 0))
 	var bomber := em.spawn(em.def_of(&"bomber"), Vector2(30, 0))
 	em.tick(0.016, 0.016)
-	check(em.table.mode[zero] == EnemyTable.Mode.WINDUP and em.table.mode[bomber] == EnemyTable.Mode.WINDUP,
+	check(em.table.mode[zero] == RunIds.EnemyModeId.Windup and em.table.mode[bomber] == RunIds.EnemyModeId.Windup,
 		"value 0の雑魚は予算0でも予告へ進む")
 	check(not d.waiting.has(em._lab_owner(zero)) and not d.waiting.has(em._lab_owner(bomber)),
 		"value 0の雑魚を待機列へ登録しない")
@@ -209,11 +210,11 @@ func _check_light_attacks(lab) -> void:
 	stage.enemy_attack_values.biter = 0.5
 	var paid := em.spawn(em.def_of(&"biter"), Vector2(25, 0))
 	em.tick(0.016, 0.016)
-	check(em.table.mode[paid] == EnemyTable.Mode.MOVE and d.waiting.has(em._lab_owner(paid)),
+	check(em.table.mode[paid] == RunIds.EnemyModeId.Move and d.waiting.has(em._lab_owner(paid)),
 		"噛みつきも正のvalueなら予算0で開始を待つ")
 	d.settings.budget = 0.5
 	em.tick(0.016, 0.016)
-	check(em.table.mode[paid] == EnemyTable.Mode.WINDUP and d.used_cost() == 0.5,
+	check(em.table.mode[paid] == RunIds.EnemyModeId.Windup and d.used_cost() == 0.5,
 		"噛みつきも予算が空けば同じ規則で開始する")
 
 	em.clear_all()

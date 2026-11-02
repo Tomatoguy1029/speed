@@ -1,5 +1,6 @@
 ## 攻撃優先度・予算予約・照準の開始条件と取消の対象チェック。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var checks := 0
 func check(ok: bool, message: String) -> void:
@@ -69,7 +70,7 @@ func _ready() -> void:
 	for row in [a,b,c]:
 		em.table.pos[row] = Vector2(400,0)
 		em.table.facing[row] = PI
-		em.table.mode[row] = EnemyTable.Mode.MOVE
+		em.table.mode[row] = RunIds.EnemyModeId.Move
 		em.table.charge[row] = 0.0
 	lab.run.combat.rebuild_grid()
 	for row in [a,b,c]: em.behavior(&"sniper").step(row,0.01)
@@ -152,10 +153,10 @@ func _ready() -> void:
 		and crow_director.waiting.is_empty(), "Crow flies at zero attack budget without requesting a slot")
 	var pickups: PickupSystem = lab.run.pickups
 	var foot := em.table.pos[crow] - Vector2.from_angle(em.table.facing[crow]) * em.table.r[crow] * 0.62
-	var gem: int = pickups.drop_crystal(foot, PickupSystem.GemKind.MID)
+	var gem: int = pickups.drop_crystal(foot, RunIds.GemKind.Mid)
 	pickups.gem_pos[gem] = foot
 	em.gather_pickups(pickups, 0.1)
-	check(em.table.carry[crow] >= lab.run.cfg.xp_crystal_values[PickupSystem.GemKind.MID] and pickups.gem_alive[gem] == 0,
+	check(em.table.carry[crow] >= lab.run.cfg.xp_crystal_values[RunIds.GemKind.Mid] and pickups.gem_alive[gem] == 0,
 		"Crow collects experience with zero attack budget")
 	crow_director.settings.budget = 1.0
 	var blocker := em.spawn(em.def_of(&"telescope"), Vector2(400, 0))
@@ -338,7 +339,7 @@ func check_cpp_sniper() -> void:
 			check(same,"判定と表示で使う48光線が一致する: %d" % tick)
 		if tick==0: check(run.enemies.table.charge[row]==0.0 and core.attack_budget_snapshot().groups.is_empty(),"予算0では照準の進行と表示を始めない")
 		if tick==4: check(run.enemies.table.charge[row]==0.0 and core.enemy_motion_snapshot()[0].charge==0.0,"岩陰で照準と未発射の予約を取り消す")
-		if run.enemies.table.mode[row]==EnemyTable.Mode.WINDUP and pending.is_empty():
+		if run.enemies.table.mode[row]==RunIds.EnemyModeId.Windup and pending.is_empty():
 			pending = bridge.checkpoint()
 			pending_motion = core.enemy_motion_snapshot()
 			var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(1100,500),Vector2(1600,1000))).value
@@ -352,7 +353,7 @@ func check_cpp_sniper() -> void:
 		elif not pending.is_empty() and next_motion.is_empty(): next_motion = core.enemy_motion_snapshot()
 		if not core.hazards_snapshot().is_empty():
 			fired = true
-			check(run.projectiles.hazard_slots.live==1 and run.enemies.table.mode[row]==EnemyTable.Mode.RECOVER,"遮蔽が先に消えると再照準しレーザーを撃つ")
+			check(run.projectiles.hazard_slots.live==1 and run.enemies.table.mode[row]==RunIds.EnemyModeId.Recover,"遮蔽が先に消えると再照準しレーザーを撃つ")
 			break
 	check(fired and not pending.is_empty(),"照準から独立したレーザーの発射まで進む")
 	if fired:
@@ -375,7 +376,7 @@ func check_cpp_sniper() -> void:
 		var replacement: int = core.spawn_enemy(&"telescope",position,{})
 		var clean := false
 		for item: Dictionary in core.enemy_motion_snapshot():
-			if item.id==replacement: clean = item.sight_rays.is_empty() and item.charge==0.0 and item.mode==EnemyTable.Mode.MOVE
+			if item.id==replacement: clean = item.sight_rays.is_empty() and item.charge==0.0 and item.mode==RunIds.EnemyModeId.Move
 		check(replacement!=id and clean and not core.set_enemy_motion(id,{"held":true}),"行の再利用で古い照準・ID・光線を引き継がない")
 		bridge.release_checkpoint(pending.value)
 	lab.free()

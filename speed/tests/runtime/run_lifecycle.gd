@@ -1,5 +1,6 @@
 ## 致死被弾後の時計・攻撃・回収の停止と敗北演出を現行ランへ照合する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const COMPARE := preload("res://tools/compare_runtime.gd")
 const DATA := preload("res://tools/content/build_native_data.gd")
 const SHIP := preload("res://tests/runtime/run_ship.gd")
@@ -77,7 +78,7 @@ func compare_death(comparison, mode: String) -> void:
 		if tick > 0 and mode == "large_step": dt = 4.0
 		delivered.clear()
 		run.state.events.clear()
-		if run.state.phase == RunState.Phase.PLAY: run._play_tick(dt)
+		if run.state.phase == RunIds.Phase.Play: run._play_tick(dt)
 		else: run.physics_step(dt)
 		check(core.step_frame(dt, {"touch": true}, run.state.view_center, run.state.view_half, run.state.camera_zoom), "敗北演出の時間を進める")
 		var expected_events: Array = delivered.duplicate()
@@ -92,9 +93,9 @@ func compare_death(comparison, mode: String) -> void:
 		for event in expected_events:
 			if event.type in [&"ship_death", &"ship_explode", &"game_over"]: sequence_events.append(event.type)
 		if tick == 0:
-			check(run.state.phase == RunState.Phase.DYING and run.state.kills == 1, "撃破直後の致死被弾で敗北を開始する")
+			check(run.state.phase == RunIds.Phase.Dying and run.state.kills == 1, "撃破直後の致死被弾で敗北を開始する")
 			check(not core.enemies_snapshot().is_empty(), "敗北開始後は死亡行の整理へ進まない")
-		if run.state.phase == RunState.Phase.ENDED:
+		if run.state.phase == RunIds.Phase.Ended:
 			check(not core.set_paused(false), "終了したランをポーズ解除で再開しない")
 			if tick > 180 or mode != "normal": break
 		if not difference.is_empty(): break

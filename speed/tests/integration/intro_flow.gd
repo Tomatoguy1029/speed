@@ -1,5 +1,6 @@
 ## 導入の最小確認。既存のセーブと設定は書き込まない。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 class MemorySave:
 	extends "res://scripts/managers/save_manager.gd"
@@ -224,7 +225,7 @@ func _test_practice(intro: Node) -> void:
 	intro._pause()
 	var time: float = intro.beat_time
 	_elapse(intro, 1.0)
-	_check(intro.beat_time == time and run.state.phase == RunState.Phase.PAUSED, "ポーズ中は映像と練習を停止")
+	_check(intro.beat_time == time and run.state.phase == RunIds.Phase.Paused, "ポーズ中は映像と練習を停止")
 	intro._resume()
 	_check(intro.practice.enemies.size() == 4, "練習相手を複数体配置")
 	var first: Dictionary=intro.practice.enemies.values()[0]
@@ -395,7 +396,7 @@ func _test_run_transitions(app: Node) -> void:
 		_check(not session.sim.state.lab_mode and session.sim.state.stage_index == stage_index and RunManager.current_id == id and session.view.has_node("Hud"), "通常ランの状態と HUD を接続: ステージ%d" % stage_index)
 		await _frame_ready()
 		RunManager.command(id, &"pause")
-		_check(session.sim.state.phase == RunState.Phase.PAUSED, "通常ランをポーズ: ステージ%d" % stage_index)
+		_check(session.sim.state.phase == RunIds.Phase.Paused, "通常ランをポーズ: ステージ%d" % stage_index)
 		RunManager.command(id, &"resume")
 		RunManager.command(id, &"abort")
 		await _frame_ready()

@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const MOTION = preload("res://scripts/bosses/draco_attack_motion.gd")
 var failures := 0
 func check(ok: bool, label: String) -> void:
@@ -12,7 +13,7 @@ func _ready() -> void:
 	session.auto_step = false
 	var sim: RunSimulation = session.sim
 	sim.field.bodies.clear()
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"), Vector2.ZERO)
 	var actor = sim.bosses.actor
 	actor.entrance.cancel()

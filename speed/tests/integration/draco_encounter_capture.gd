@@ -1,6 +1,7 @@
 ## 非表示の独立ウィンドウ内SubViewportで実際のGPU描画を保存する。
 ## ユーザーのエディター・実行中ラン・セーブは使わない。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 const STEP := 1.0 / 120.0
 const IDS: Array[StringName] = [&"bite", &"tail_sweep", &"star_fan", &"tail_slam", &"meteor", &"breath", &"charge", &"leap", &"rifts", &"picaro_wall", &"clones", &"inhale", &"spiral"]
 var output := "/tmp/draco-qa-evidence/render"
@@ -80,7 +81,7 @@ func _fresh(size: Vector2i, with_hud := false) -> RunSimulation:
 	sim.state.lab_mode = false # 実験場の独自fit倍率を外し、通常ランのカメラで描く。
 	sim.field.bodies.clear()
 	sim.field.rocks.clear()
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.state.ship_hp = 100000.0
 	sim.state.ship_vel = Vector2.ZERO
 	sim.state.ship_shield_t = 0.0

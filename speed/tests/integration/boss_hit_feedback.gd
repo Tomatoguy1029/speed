@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failures := 0
 var session: RunSession
 func check(ok: bool, message: String) -> void:
@@ -10,7 +11,7 @@ func fresh() -> RunSimulation:
 	session = RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":5405,"hud":false},false)
 	session.auto_step = false
 	var sim := session.sim
-	sim.state.phase = RunState.Phase.PLAY
+	sim.state.phase = RunIds.Phase.Play
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"),Vector2.ZERO)
 	sim.bosses.actor.selection_enabled = false
 	sim.enemies.table.guard[sim.bosses.actor.body] = 0.0
@@ -50,7 +51,7 @@ func _ready() -> void:
 		if blocked=="guard": actor.table.guard[actor.body]=1.0
 		if blocked=="locked": sim.state.controls_locked=true
 		if blocked=="protected": sim.state.encounter_protected=true
-		if blocked=="paused": sim.state.phase=RunState.Phase.PAUSED
+		if blocked=="paused": sim.state.phase=RunIds.Phase.Paused
 		var hp: float = actor.table.hp[actor.body]
 		sim.combat.damage_enemy(actor.body,0.0 if blocked=="zero" else -5.0 if blocked=="negative" else 10.0,{"cause":&"shot"})
 		check(actor.table.hp[actor.body]==hp and white(actor)==0.0,"Blocked or zero damage has no feedback: "+blocked)

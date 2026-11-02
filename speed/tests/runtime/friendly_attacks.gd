@@ -1,5 +1,6 @@
 ## 弾は直進し、破片だけが航跡を残す。解放した行の命中処理を次の弾へ持ち越さない。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 func check(ok: bool, message: String) -> void:
@@ -13,7 +14,7 @@ func _ready() -> void:
 	var pr := session.sim.projectiles
 	pr.fire_shot(Vector2.ZERO, 0.0, 2.0)
 	var shot := 0
-	var debris := pr._add_friend(ProjectileSystem.FriendKind.DEBRIS, &"corpse", Vector2.ZERO,
+	var debris := pr._add_friend(RunIds.FriendKind.Debris, &"corpse", Vector2.ZERO,
 		Vector2(100, 0), 2.0, 2.0, 1.0, true, 0, Color.WHITE, true, 0.0, 0.0, 1.0, -1)
 	check(pr.has_method("_friend_shape"), "味方の弾の動きを種類ごとに取得できる")
 	if pr.has_method("_friend_shape"):

@@ -1,5 +1,6 @@
 ## ケフェウス座の射撃元が見える時だけ、予告を経て新しい弾を撃つことを確認する。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 var failed := 0
 
@@ -67,7 +68,7 @@ func _ready() -> void:
 func _king(m: EnemySystem, pos: Vector2) -> int:
 	var i := m.spawn(m.def_of(&"cepheus"), pos)
 	m.table.buds[i] = 1
-	m.table.mode[i] = EnemyTable.Mode.MOVE
+	m.table.mode[i] = RunIds.EnemyModeId.Move
 	m.table.timer[i] = 0.4
 	m.table.fire_t[i] = 100.0
 	return i
@@ -76,7 +77,7 @@ func _soldier(m: EnemySystem, king: int, pos: Vector2) -> int:
 	var j := m.spawn(m.def_of(&"cepheus_soldier"), pos)
 	m.table.target[j] = king
 	m.table.target_id[j] = m.table.id[king]
-	m.table.mode[j] = EnemyTable.Mode.MOVE
+	m.table.mode[j] = RunIds.EnemyModeId.Move
 	return j
 
 func _step_volley(b: EnemyBehavior, king: int, count: int) -> void:
@@ -86,6 +87,6 @@ func _step_volley(b: EnemyBehavior, king: int, count: int) -> void:
 func _bolts(m: EnemySystem) -> int:
 	var total := 0
 	for i in m.projectiles.hostile_alive.size():
-		if m.projectiles.hostile_alive[i] and m.projectiles.hostile_kind[i] == ProjectileSystem.HostileKind.BOLT:
+		if m.projectiles.hostile_alive[i] and m.projectiles.hostile_kind[i] == RunIds.HostileKind.Bolt:
 			total += 1
 	return total

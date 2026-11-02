@@ -1,4 +1,5 @@
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 
 const INDICATOR := preload("res://scripts/ui/speed_indicator.gd")
 var failed := 0
@@ -105,10 +106,10 @@ func _ready() -> void:
 
 	var value_before_pause: float = indicator.value
 	before_color = indicator.fill_color
-	state.phase = RunState.Phase.PAUSED
+	state.phase = RunIds.Phase.Paused
 	hud._update_speed_indicator(1.0)
 	check(indicator.value == value_before_pause and indicator.fill_color == before_color, "ポーズ中は針と内部色を保つ")
-	state.phase = RunState.Phase.PLAY
+	state.phase = RunIds.Phase.Play
 	hud.run.ui_overlay_active = true
 	hud._update_speed_indicator(1.0)
 	check(indicator.value == value_before_pause, "メニュー中は揺れの時計も止める")

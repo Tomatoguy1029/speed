@@ -1,5 +1,6 @@
 ## 3択の間に候補を準備し、選ばなかった資源の保持を外す。
 extends Node
+const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 func check(ok: bool, label: String) -> void:
 	if not ok:
@@ -25,11 +26,11 @@ func _ready() -> void:
 		# ディスクの速度に依存せず、読込待ちの間だけ進行を保留することを確認する。
 		scopes[0].pending.append("test_delay")
 		session.sim.choose_card(0)
-		check(session.sim.state.phase == RunState.Phase.LEVELUP and session.sim.state.weapons.is_empty(), "資源が揃うまで戦闘へ戻らない")
+		check(session.sim.state.phase == RunIds.Phase.Levelup and session.sim.state.weapons.is_empty(), "資源が揃うまで戦闘へ戻らない")
 		scopes[0].provide("test_delay", Resource.new())
 		session.sim.state.lab_mode = false
 		session.sim.physics_step(0.0)
-		check(session.sim.state.phase == RunState.Phase.PLAY and session.sim.state.weapons.has(cards[0].id), "準備完了後に選択を反映して戦闘へ戻る")
+		check(session.sim.state.phase == RunIds.Phase.Play and session.sim.state.weapons.has(cards[0].id), "準備完了後に選択を反映して戦闘へ戻る")
 		check(not scopes[0].cancelled, "選んだ装備の資源を引き継ぐ")
 		for index in range(1, scopes.size()): check(scopes[index].cancelled and scopes[index].resources.is_empty(), "選ばなかった候補を解放する")
 	session.free()
