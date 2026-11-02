@@ -270,6 +270,7 @@ func read_metrics() -> Dictionary:
 	var result: Dictionary = _core.metrics_run()
 	if result.ok:
 		var timing: Dictionary = result.value.timings
+		result.value["clocks"] = _core.inspect()
 		timing["bridge_copy"] = _metrics_record.get(&"bridge_copy",[0,0,0]).duplicate()
 		var wait: Array = _metrics_record.get(&"resource_wait",[0,0,0]).duplicate()
 		if _resource_wait_started>0:

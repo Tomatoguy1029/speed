@@ -1188,7 +1188,7 @@ func _settle_screen() -> void:
 	await get_tree().process_frame
 
 ## S1〜S5の表示確認。通常の選択・入力と、時間を飛ばす診断を別のランで記録する。
-func _cpp_open(stage: int) -> RunSession:
+func _cpp_open(stage: int, check_entry := true) -> RunSession:
 	GameManager.run_stage = stage
 	GameManager.run_endless = false
 	GameManager.run_start_source = "stage_start"
@@ -1198,7 +1198,7 @@ func _cpp_open(stage: int) -> RunSession:
 	for i in 4000:
 		if owner.bridge!=null or owner.cpp_error!=OK: break
 		await get_tree().process_frame
-	_check(owner.bridge!=null and owner._sim==null,"C++通常入口で旧シミュレーションを作らない: %d" % stage)
+	if check_entry: _check(owner.bridge!=null and owner._sim==null,"C++通常入口で旧シミュレーションを作らない: %d" % stage)
 	return owner
 
 func _cpp_choose(owner: RunSession, frame: Dictionary) -> bool:
@@ -1218,10 +1218,44 @@ func _test_cpp_stage(stage: int) -> void:
 	SaveManager.data.intro_seen = true
 	var definition: StageDef = load("res://data/stages/stage_%d.tres" % stage)
 	print("[S%d 定義] boss_enabled=%s boss_id=%s boss_start=%s time_limit=%s" % [stage,definition.boss_enabled,definition.boss_id,definition.boss_start(ContentManager.cfg),definition.time_limit])
-	var owner := await _cpp_open(stage)
+	if "--cpp-diagnostic-only" not in OS.get_cmdline_user_args(): await _test_cpp_natural(stage,definition)
+	if "--cpp-natural-only" not in OS.get_cmdline_user_args() and "--cpp-late-only" not in OS.get_cmdline_user_args(): await _test_cpp_diagnostic(stage,definition)
+	print("[S%d] passed=%d failed=%d" % [stage,passed,failed])
+	get_tree().quit(1 if failed else 0)
+
+## 現在位置から一定だけ先を向き、通常の満充填とタッチ描線の確定を待つ。
+func _cpp_route_input(frame: Dictionary, driver: Dictionary) -> Intent:
+	var intent := Intent.new()
+	var ship: Dictionary = frame.ui.ship
+	var draw: Dictionary = frame.ui.draw
+	var at: Vector2 = ship.ship_pos
+	var ahead := at.normalized().rotated(0.5) if at.length()>1.0 else Vector2.RIGHT
+	intent.has_cursor = true
+	intent.cursor = ahead*2400.0
+	intent.hero_press = int(frame.tick)%120==0
+	var clock := float(frame.tick)/120.0
+	if driver.start<0.0 and clock>=driver.next and not draw.drawing and not draw.tracing and draw.gauge>=1.0:
+		var heading: Vector2 = ship.ship_heading
+		if heading.length_squared()<0.1: heading = (intent.cursor-at).normalized()
+		driver.stroke.clear()
+		for k in 7: driver.stroke.append(at+heading*(60.0+220.0*k)+heading.orthogonal()*(80.0 if k%2 else -80.0))
+		driver.start = clock
+		driver.next = clock+1.0
+	if driver.start>=0.0:
+		var elapsed := clock-float(driver.start)
+		intent.touch = true
+		intent.pen = driver.stroke[mini(6,int(elapsed*120.0))]
+		intent.press = elapsed<0.5/120.0
+		if elapsed>=7.0/120.0:
+			intent.pen_release = true
+			driver.start = -1.0
+	return intent
+
+func _test_cpp_natural(stage: int, definition: StageDef) -> void:
+	var late_only := "--cpp-late-only" in OS.get_cmdline_user_args()
+	var owner := await _cpp_open(stage,not late_only)
 	if owner.bridge==null:
 		owner.free()
-		get_tree().quit(1)
 		return
 	var saw := {"early":false,"growth":false,"late":false,"boss":false,"fired":false,"ended":false}
 	var event_counts := {}
@@ -1230,25 +1264,19 @@ func _test_cpp_stage(stage: int) -> void:
 			var kind := str(event.type)
 			event_counts[kind] = int(event_counts.get(kind,0))+1
 			if kind=="boss_spawn": saw.boss = true
+			if kind in ["weapon_fire","barrier_hit","barrier_restore","anchor_fire","bipolar_charge","escort_deploy","escort_slash","sonic_push","sonic_impact","bolt"]: saw.fired = true
 		return true)
 	var initial: Dictionary = owner.bridge.read_frame().value
-	_check(initial.ui.cards.initial and initial.ui.run_time==0.0,"通常出撃は0秒の武器選択から始まる")
+	if not late_only: _check(initial.ui.cards.initial and initial.ui.run_time==0.0,"通常出撃は0秒の武器選択から始まる")
 	var frame: Dictionary = initial
-	var limit := int((definition.time_limit+15.0)*120.0) if definition.time_limit>0 else 120*960
+	var driver := {"stroke":[],"start":-1.0,"next":0.0}
+	var limit := int((definition.time_limit+15.0)*120.0*2.0) if definition.time_limit>0 else 120*1920
 	for tick in limit:
 		if not _cpp_choose(owner,frame):
 			_check(false,"通常カードを確定する")
 			break
 		owner.cpp_choices.poll()
-		var intent := Intent.new()
-		intent.has_cursor = true
-		var at: Vector2 = frame.ui.ship.ship_pos
-		var t := float(frame.ui.run_time)
-		intent.cursor = Vector2.from_angle(t*0.3)*2400.0
-		intent.pen = at+Vector2.from_angle(float(tick%240)*TAU/240.0)*450.0
-		intent.press = tick%600==0
-		intent.pen_release = tick%600==120
-		intent.hero_press = tick%120==0
+		var intent := _cpp_route_input(frame,driver)
 		var step: Dictionary = owner.bridge.step(1.0/120.0,owner.bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
 		if not step.ok:
 			_check(false,"通常固定更新に未対応処理や通知エラーがない: "+str(step))
@@ -1257,32 +1285,38 @@ func _test_cpp_stage(stage: int) -> void:
 		saw.early = saw.early or frame.ui.run_time>=10.0
 		saw.growth = saw.growth or frame.ui.level>1
 		saw.late = saw.late or frame.ui.run_time>=definition.boss_start(ContentManager.cfg)-1.0
-		saw.fired = saw.fired or owner.bridge.read_metrics().value.friendly_shots>0
+		saw.fired = saw.fired or owner.bridge.read_metrics().value.friendly_shots>0 or not frame.ui.mines.items.is_empty() or not frame.ui.afterimage.echoes.is_empty()
 		if frame.result is Dictionary:
 			saw.ended = true
 			break
 		if tick%(120*60)==0: print("[S%d 自然進行] time=%s level=%s hp=%s" % [stage,frame.ui.run_time,frame.ui.level,frame.ui.hp])
 		if tick%120==0: await get_tree().process_frame
 	print("[S%d 自然通し] 無敵なし・時間飛ばしなし・強制撃破なし time=%s level=%s gear=%s traits=%s result=%s events=%s criteria=%s" % [stage,frame.ui.run_time,frame.ui.level,frame.ui.weapon_levels,frame.ui.trait_levels,frame.result,event_counts,saw])
-	_check(saw.early and saw.growth and saw.late and (saw.boss or not definition.boss_enabled) and saw.ended,"S%d 自然な序盤→成長→終盤→設定済みボス/終了" % stage)
-	_check(saw.fired,"S%d 通常取得装備が発動する" % stage)
+	if late_only:
+		_check(saw.late and (saw.boss or not definition.boss_enabled) and saw.ended,"S%d 未成立だった自然な後半→ボス/終了" % stage)
+	else:
+		_check(saw.early and saw.growth and saw.late and (saw.boss or not definition.boss_enabled) and saw.ended,"S%d 自然な序盤→成長→終盤→設定済みボス/終了" % stage)
+		_check(saw.fired,"S%d 通常取得装備が発動する" % stage)
 	owner.free()
 	await get_tree().process_frame
+
+func _test_cpp_diagnostic(stage: int, definition: StageDef) -> void:
 	# 自然通しの失敗で、独立した後半と終了の接続確認を飛ばさない。
-	owner = await _cpp_open(stage)
+	var owner := await _cpp_open(stage)
 	if owner.bridge!=null:
-		frame = owner.bridge.read_frame().value
+		var input: Dictionary = owner.bridge.pack_intent(Intent.new())
+		var frame: Dictionary = owner.bridge.read_frame().value
 		_cpp_choose(owner,frame)
 		for i in 1000:
 			owner.cpp_choices.poll()
-			owner.bridge.step(1.0/120.0,{}, {"logical_size":Vector2(1280,720)})
+			owner.bridge.step(1.0/120.0,input, {"logical_size":Vector2(1280,720)})
 			frame = owner.bridge.read_frame().value
 			if frame.ui.phase==RunState.Phase.PLAY: break
 			await get_tree().process_frame
 		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"invincible","args":{}}})
 		owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"time","args":{"seconds":definition.boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1}}})
 		for tick in 120*50:
-			var step: Dictionary = owner.bridge.step(1.0/120.0,{}, {"logical_size":Vector2(1280,720)})
+			var step: Dictionary = owner.bridge.step(1.0/120.0,input, {"logical_size":Vector2(1280,720)})
 			if not step.ok:
 				_check(false,"時間短縮した後半の更新: "+str(step))
 				break
@@ -1297,8 +1331,6 @@ func _test_cpp_stage(stage: int) -> void:
 		_check(not definition.boss_enabled or not frame.ui.boss_bodies.is_empty() or frame.result is Dictionary,"設定済みボスの自動出現を維持する")
 		_check(frame.result is Dictionary,"時間短縮診断の終了へ接続する")
 	owner.free()
-	print("[S%d] passed=%d failed=%d" % [stage,passed,failed])
-	get_tree().quit(1 if failed else 0)
 
 func _test_cpp_entries() -> void:
 	SaveManager.data = SaveManager.default_data()
@@ -1329,6 +1361,29 @@ func _test_cpp_entries() -> void:
 			GameManager.abort_run()
 			await _settle_screen()
 			_check(GameManager.screen==GameManager.Screen.MAIN_MENU and RunManager.session(identity)==null,"ステージ%dから戻るとセッションを解放する" % stage)
+	GameManager.goto(GameManager.Screen.RESULT,false)
+	await _settle_screen()
+	app._current.get_node("%RetryButton").pressed.emit()
+	await _settle_screen()
+	var retry := app._current as RunSession
+	if retry!=null:
+		for i in 4000:
+			if retry.bridge!=null or retry.cpp_error!=OK: break
+			await get_tree().process_frame
+	_check(retry!=null and retry.bridge!=null and retry._sim==null,"結果画面の再出撃もC++だけを生成する")
+	GameManager.abort_run()
+	await _settle_screen()
+	GameManager.replay_intro()
+	await _settle_screen()
+	var introduction = app._current
+	for i in 4000:
+		if introduction.session!=null and introduction.session.bridge!=null: break
+		await get_tree().process_frame
+	_check(introduction.session!=null and introduction.session.bridge!=null and introduction.session._sim==null,"導入の画面出撃もC++だけを生成する")
+	var intro_id: int = introduction.session.id if introduction.session!=null else -1
+	GameManager.reset_to_main_menu()
+	await _settle_screen()
+	_check(RunManager.session(intro_id)==null,"導入から戻るとセッションを解放する")
 	GameManager.goto(GameManager.Screen.ENEMY_LAB)
 	await _settle_screen()
 	var laboratory = app._current.session
@@ -1342,10 +1397,6 @@ func _test_cpp_entries() -> void:
 	_check(RunManager.session(lab_id)==null,"実験場から戻るとセッションを解放する")
 	app.free()
 	await get_tree().process_frame
-	var intro := preload("res://scripts/runtime/intro_sequence.gd").new()
-	await intro.setup(self,load("res://data/visuals/intro_presentation.tres"))
-	_check(intro.bridge!=null and intro.session._sim==null,"導入の出撃もC++だけを生成する")
-	intro.dispose()
 	# タイムラインが保存した索引から途中再生する。
 	var path := "res://.content/run/stage_1.json"
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))

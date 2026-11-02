@@ -9,6 +9,21 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--semantics-hero-values" in OS.get_cmdline_user_args():
+		check_semantics_hero_values()
+		print("[semantics_hero_values] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--semantics-shot-values" in OS.get_cmdline_user_args():
+		check_semantics_shot_values()
+		print("[semantics_shot_values] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--semantics-tracking" in OS.get_cmdline_user_args() or "--semantics-tracking-tail" in OS.get_cmdline_user_args() or "--semantics-tracking-rocket" in OS.get_cmdline_user_args() or "--semantics-tracking-extra" in OS.get_cmdline_user_args() or "--semantics-tracking-extra-tail" in OS.get_cmdline_user_args() or "--semantics-tracking-telescope-tail" in OS.get_cmdline_user_args():
+		await check_semantics_tracking()
+		print("[semantics_tracking] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--semantics-fixed-values" in OS.get_cmdline_user_args():
 		await check_semantics_fixed_values()
 		print("[semantics_fixed_values] failed=%d" % failed)
@@ -735,3 +750,192 @@ func check_semantics_fixed_values() -> void:
 	OS.remove_logger(capture)
 	check(capture.count()==0,"固定場面の両実装に実行時エラーがない")
 	print("SEMANTICS_FIXED_VALUES ",JSON.stringify({"cases":cases,"ticks_per_level":64,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"numeric_values":comparison.semantics_numeric_values,"failed":failed,"scope":"全武器/特性の各段の共通実効値・機体移動・時計。種類固有の発火・命中の厳密幅は別"}))
+
+# 既存ranged比較で幅が広かった移動・旋回・時計だけを直接採取する。
+# 発射前の固定時刻を使い、乱数が効く弾の配置を比較対象へ混ぜない。
+func check_semantics_tracking() -> void:
+	var tail:= "--semantics-tracking-tail" in OS.get_cmdline_user_args()
+	var rocket_only:="--semantics-tracking-rocket" in OS.get_cmdline_user_args()
+	var extra_tail:="--semantics-tracking-extra-tail" in OS.get_cmdline_user_args()
+	var telescope_tail:="--semantics-tracking-telescope-tail" in OS.get_cmdline_user_args()
+	var extra:="--semantics-tracking-extra" in OS.get_cmdline_user_args() or extra_tail or telescope_tail
+	var config:GameConfig=ContentManager.base.duplicate(true)
+	config.start_radius=900;config.planet_radius=100 if extra else 0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	var stage:=RuntimeStage.new()
+	stage.index=200;stage.resources=StageResources.new()
+	stage.resources.enemy_ids=PackedStringArray(["darter","telescope"] if extra else ["gunner","missile","battleship","spreader","beamer","rocket"])
+	var phase:=PhaseDef.new()
+	phase.id=&"追跡の固定場面";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0;stage.phases=[phase]
+	var output:="res://.content/dev/semantics_tracking"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1追跡の不足値".sha256_text())!=OK:
+		check(false,"追跡のSource定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_200.json")))
+	var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new()
+	var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new()
+	OS.add_logger(capture)
+	var cases:=0
+	for type in stage.resources.enemy_ids:
+		if rocket_only and type!="rocket":continue
+		if telescope_tail and type!="telescope":continue
+		if tail and type in ["gunner","missile"]:continue
+		var offsets:Array=[Vector2(300,100)] if type=="darter" else ([Vector2(600,50),Vector2(1350,50)] if type=="telescope" else [Vector2(320,120),Vector2(900,120)])
+		for offset:Vector2 in offsets:
+			if tail and type=="battleship" and offset.x==320:continue
+			var run:=semantics_legacy(config,stage,{},29)
+			# 移行開始時のLabSessionと同じ空場面。半径0の惑星も衝突候補から外す。
+			if config.planet_radius==0:
+				run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies()
+			var bridge=semantics_bridge(bytes,29)
+			if bridge==null:check(false,"追跡のC++ランを開始する");run.dispose();OS.remove_logger(capture);return
+			check(bridge._core.configure_attack_budget({"enabled":false}),"基準版の実験モードと同じ予算なしに揃える")
+			var at:Vector2=run.state.ship_pos+offset
+			var definition:EnemyDef=run.enemies.def_of(StringName(type))
+			var opts={"size":definition.radius,"facing":(-offset).angle() if type=="telescope" else 0.125,"vel":Vector2.ZERO}
+			# 基準版の起動時sanity検査が使ったIDを、本番開始と同じ1へ揃える。
+			run.enemies._next_id=1
+			var row:int=run.enemies.spawn(definition,at,opts)
+			var id:int=bridge._core.spawn_enemy(StringName(type),at,opts)
+			check(run.enemies.table.id[row]==id,"個体IDも同じ固定場面を使う")
+			run.enemies.table.fire_t[row]=2.0;run.enemies.table.charge[row]=0.0
+			check(bridge._core.set_enemy_motion(id,{"fire_t":2.0,"charge":0.0}),"同じ発射前の時刻を固定する")
+			if type=="darter":
+				run.projectiles.director.formation_mode=true;bridge._core.set_attack_formation_mode(true)
+				run.projectiles.director.configure({"enabled":true,"budget":0.0,"jitter":0.0});bridge._core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+			var dt:=0.125 if type=="darter" else (0.05 if type=="telescope" else 0.01)
+			for tick in (21 if type=="darter" else (64 if type=="telescope" else 16)):
+				if type=="darter" and tick==1:
+					run.projectiles.director.configure({"enabled":true,"budget":1.0,"jitter":0.0});bridge._core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+				run.state.time+=dt;run.state.world_time+=dt
+				if type=="darter":
+					run.projectiles.director.advance(run.state.world_time,run.enemies);bridge._core.advance_attack_budget(run.state.world_time)
+				run.enemies.tick(dt,dt)
+				check(bridge._core.step(dt),"追跡の固定更新を進める")
+				if capture.count()>0:check(false,"追跡の実行時エラー: %s"%capture.messages());break
+				if extra_tail and type=="darter" and tick<20:continue
+				if telescope_tail and offset.x==600 and tick<29:continue
+				var rows:Array=bridge._core.enemies_snapshot().filter(func(enemy):return enemy.id==id)
+				var motion:Array=bridge._core.enemy_motion_snapshot().filter(func(enemy):return enemy.id==id)
+				if rows.size()!=1 or motion.size()!=1:check(false,"追跡対象の個体が残る");break
+				var table:=run.enemies.table
+				var expected={"pos":table.pos[row],"vel":table.vel[row],"hp":table.hp[row],"armor":table.armor[row],"radius":table.r[row],"facing":table.facing[row],"dead":bool(table.dead[row]),"mode":int(table.mode[row]),"timer":table.timer[row],"fire_t":table.fire_t[row],"charge":table.charge[row]}
+				var actual={"pos":Vector2(rows[0].pos[0],rows[0].pos[1]),"vel":Vector2(rows[0].vel[0],rows[0].vel[1]),"hp":rows[0].hp,"armor":rows[0].armor,"radius":rows[0].radius,"facing":rows[0].facing,"dead":bool(rows[0].dead),"mode":int(motion[0].mode),"timer":motion[0].timer,"fire_t":motion[0].fire_t,"charge":motion[0].charge}
+				if type=="telescope":
+					expected.rays=Array(run.enemies.behavior(&"sniper").telescope_rays(row));actual.rays=Array(motion[0].sight_rays)
+				var found:String=comparison.semantics_difference(expected,actual)
+				check(found.is_empty(),"追跡・旋回・時計の指定許容幅 %s offset%s tick%d: %s"%[type,offset,tick,found])
+				if not found.is_empty():break
+			cases+=1
+			run.dispose();bridge.dispose()
+			if failed:break
+		if failed:break
+	OS.remove_logger(capture)
+	check(capture.count()==0,"追跡の両実装に実行時エラーがない")
+	print("SEMANTICS_TRACKING ",JSON.stringify({"cases":cases,"prior_successful_cases":10 if rocket_only else (5 if tail else 0),"extra":extra,"extra_tail":extra_tail,"telescope_tail":telescope_tail,"ticks_per_case":16 if not extra else "darter21/telescope64","numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+# 全Lvの発射・命中・復帰は既存成功を保持し、発射された数値の未証明の幅だけ採取する。
+func check_semantics_shot_values() -> void:
+	var config: GameConfig=ContentManager.base.duplicate(true)
+	config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	config.comet_interval_min=1e8;config.comet_interval_max=1e8;config.gravity_interval_min=1e8;config.gravity_interval_max=1e8
+	config.start_radius=900
+	var stage:=RuntimeStage.new()
+	stage.index=201;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter"])
+	var phase:=PhaseDef.new()
+	phase.id=&"射撃の数値";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0;stage.phases=[phase]
+	var output:="res://.content/dev/semantics_shot_values"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1射撃の不足値".sha256_text())!=OK:
+		check(false,"射撃のSource定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_201.json")))
+	var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new()
+	var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new()
+	OS.add_logger(capture)
+	var cases:=0
+	for id in [&"W01",&"W02",&"W23"]:
+		if "--semantics-shot-tail" in OS.get_cmdline_user_args() and id==&"W01":continue
+		var run:=semantics_legacy(config,stage,{},17)
+		var intent:=Intent.new()
+		intent.has_cursor=true;intent.cursor=Vector2(500,250)
+		run.input_source=func():return intent
+		run.view_size_source=func():return Vector2(1280,720)
+		var bridge=semantics_bridge(bytes,17)
+		if bridge==null:check(false,"射撃数値のC++ランを開始する");run.dispose();break
+		for level in range(1,config.weapon_max_level+1):
+			check(run.loadout.grant(&"weapon",id,1) and bridge.command("dev_grant_equipment",{"kind":"weapon","id":String(id),"levels":1}).ok,"数値を読む装備を同じ段へ進める")
+			var observed:=0
+			for tick in (170 if id==&"W02" else 110):
+				run._play_tick(1.0/120.0)
+				var stepped:Dictionary=bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+				if not stepped.ok or capture.count()>0:check(false,"射撃の数値採取中に実行エラー: "+str(capture.messages()));break
+				if "--semantics-shot-tail" in OS.get_cmdline_user_args() and id==&"W02" and level==1 and tick<64:continue
+				var expected: Array=[]
+				for row in run.projectiles.friend_alive.size():
+					if run.projectiles.friend_alive[row]:
+						expected.append({"pos":run.projectiles.friend_pos[row],"vel":run.projectiles.friend_vel[row],"radius":run.projectiles.friend_r[row],"damage":run.projectiles.friend_dmg[row],"life":run.projectiles.friend_life[row]})
+				var actual: Array=[]
+				for shot: Dictionary in bridge._core.projectiles_snapshot():actual.append({"pos":shot.pos,"vel":shot.vel,"radius":shot.radius,"damage":shot.damage,"life":shot.life})
+				var weapon=run.loadout.weapon_behaviors[id]
+				var timing: Dictionary=bridge._core.forward_snapshot() if id==&"W01" else bridge._core.scatter_snapshot() if id==&"W02" else bridge._core.rear_snapshot()
+				var source: Dictionary={"shots":expected,"elapsed":weapon._t,"recoil":weapon.recoil}
+				var native: Dictionary={"shots":actual,"elapsed":timing.elapsed,"recoil":timing.recoil}
+				if id==&"W23":
+					source.mount=weapon.mount_position();source.aim=weapon.aim_direction();native.mount=timing.mount;native.aim=timing.aim
+				var found: String=comparison.semantics_difference(source,native)
+				check(found.is_empty(),"射撃のf64/Vector2指定許容幅 %s Lv%d tick%d: %s"%[id,level,tick,found])
+				observed+=actual.size()
+				if failed:break
+			check(observed>0,"数値を読む実弾が存在する %s Lv%d"%[id,level])
+			cases+=1
+			print("SEMANTICS_SHOT_CASE ",id," Lv",level," failed=",failed)
+			if failed:break
+		run.dispose();bridge.dispose()
+		if failed:break
+	OS.remove_logger(capture)
+	check(capture.count()==0,"射撃の両実装に実行時エラーがない")
+	print("SEMANTICS_SHOT_VALUES ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+func check_semantics_hero_values() -> void:
+	var config: GameConfig=ContentManager.base.duplicate(true)
+	config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	config.comet_interval_min=1e8;config.comet_interval_max=1e8;config.gravity_interval_min=1e8;config.gravity_interval_max=1e8
+	config.start_radius=900
+	var stage:=RuntimeStage.new()
+	stage.index=202;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["drifter"])
+	var phase:=PhaseDef.new()
+	phase.id=&"英雄の時計";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0;stage.phases=[phase]
+	var output:="res://.content/dev/semantics_hero_values"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1英雄の不足値".sha256_text())!=OK:
+		check(false,"英雄のSource定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_202.json")))
+	var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new()
+	var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new()
+	OS.add_logger(capture)
+	for id in [&"perseus",&"leo",&"gemini",&"hercules"]:
+		var run:=semantics_legacy(config,stage,{},17)
+		var intent:=Intent.new()
+		run.input_source=func():return intent
+		run.view_size_source=func():return Vector2(1280,720)
+		run.loadout.reset_loadout()
+		run.state.hero_power=id
+		var bridge=semantics_bridge(bytes,17)
+		if bridge==null:check(false,"英雄数値のC++ランを開始する");run.dispose();break
+		bridge.command("dev_set_hero",{"id":String(id)})
+		for tick in 64:
+			intent.hero_press=tick==0
+			run._play_tick(1.0/120.0)
+			var stepped:Dictionary=bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+			if not stepped.ok or capture.count()>0:check(false,"英雄の数値採取中に実行エラー: "+str(capture.messages()));break
+			var hero: Dictionary=bridge.read_frame().value.ui.hero
+			var source: Dictionary={"active":run.state.hero_active_t,"cooldown":run.state.hero_cd,"boss_stun":run.state.boss_stun,"width":run.heroes.trace_width()}
+			var native: Dictionary={"active":hero.active,"cooldown":hero.cooldown,"boss_stun":hero.boss_stun,"width":hero.trace_width}
+			var found: String=comparison.semantics_difference(source,native)
+			check(found.is_empty(),"英雄のf64指定許容幅 %s tick%d: %s"%[id,tick,found])
+			if failed:break
+		run.dispose();bridge.dispose()
+		print("SEMANTICS_HERO_CASE ",id," failed=",failed)
+		if failed:break
+	OS.remove_logger(capture)
+	check(capture.count()==0,"英雄の両実装に実行時エラーがない")
+	print("SEMANTICS_HERO_VALUES ",JSON.stringify({"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"failed":failed,"scope":"全4英雄の実秒持続時間/CD/ボス停止/実効描線幅。乱数座標と固有攻撃は含めない"}))

@@ -48,7 +48,7 @@ bool DracoFinale::tick(RunRuntime &r,double dt,const InputFrame &input,godot::Ve
     case Stage::Last:v.line={v.center+godot::Vector2(0,v.radius+750),v.center-godot::Vector2(0,v.radius+750)};s.ship_pos=s.ship.pos=v.line[0].lerp(v.line[1],smooth(0,0.3,v.time));s.ship.heading={0,-1};v.dim=0.95*smooth(0.03,0.16,v.time);if(v.time>=0.4) next(v,Stage::Sight);break;
     case Stage::Sight:v.dim=0.95*(1-smooth(0,1.6,v.time));if(v.time>=1.6) next(v,Stage::Split);break;
     case Stage::Split:v.split=smooth(0,0.5,v.time);if(v.time>=0.65) {next(v,Stage::Explode);cue(r,"cosmic_collapse",v.center,v.radius+b.draco.width);}break;
-    case Stage::Explode:if(v.time>=1.1) {v.completed=true;s.control.draco_finish_done=true;v.active=false;dispose(r,b);DeathContext death;death.target=b.actor;death.corpse.pos=s.enemies[b.actor.slot].pos;death.request.cause=Cause::DracoFinale;PhaseController::defeated(r,death);return true;}break;
+    case Stage::Explode:if(v.time>=1.1) {v.completed=true;s.control.draco_finish_done=true;v.active=false;dispose(r,b);DeathContext death;death.target=b.actor;death.corpse.id=s.enemies[b.actor.slot].id;death.corpse.pos=s.enemies[b.actor.slot].pos;death.request.cause=Cause::DracoFinale;PhaseController::defeated(r,death);return true;}break;
     default:break;
     }
     frame(r,b,*p);DracoBody::update(r,b);return true;
