@@ -1796,6 +1796,23 @@ inline bool read(BinaryReader &input, RockFieldDefinition &out) {
     if (out.meteor_radius_1 < 0) return false;
     return true;
 }
+struct GravityDefinition {
+    uint32_t id{};
+    double life{};
+    double radius{};
+    double pull{};
+};
+inline bool read(BinaryReader &input, GravityDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.life)) return false;
+    if (out.life < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.pull)) return false;
+    if (out.pull < 0) return false;
+    return true;
+}
 struct NumericTraitLevel {
     uint32_t id{};
     uint32_t equipment{};
@@ -2350,6 +2367,7 @@ struct ContentRecords {
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
+    std::vector<GravityDefinition> GravityDefinition_rows;
     std::vector<NumericTraitLevel> NumericTraitLevel_rows;
     std::vector<PostMaxChargeDefinition> PostMaxChargeDefinition_rows;
     std::vector<PostMaxCritDefinition> PostMaxCritDefinition_rows;
@@ -2732,6 +2750,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { RockFieldDefinition row; if (!read(input,row)) return false; out.RockFieldDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 77: {
+        if (version != 1) return false;
+        if (count > input.remaining()/28) return false;
+        for (uint32_t i=0; i<count; ++i) { GravityDefinition row; if (!read(input,row)) return false; out.GravityDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 30: {
         if (version != 9) return false;
         if (count > input.remaining()/100) return false;
@@ -2968,6 +2992,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.MoonDefinition_rows) if (!MoonDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> RockFieldDefinition_ids;
     for (const auto &row:data.RockFieldDefinition_rows) if (!RockFieldDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> GravityDefinition_ids;
+    for (const auto &row:data.GravityDefinition_rows) if (!GravityDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> NumericTraitLevel_ids;
     for (const auto &row:data.NumericTraitLevel_rows) if (!NumericTraitLevel_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PostMaxChargeDefinition_ids;
@@ -3208,5 +3234,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=78;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=79;
 }
