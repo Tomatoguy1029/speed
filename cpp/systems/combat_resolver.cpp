@@ -120,6 +120,9 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
         fresh=enemy.dash_fresh;
     }
     state.enemies[result.target.slot].hp-=result.resolved;
+    // 計測の間だけ、次の固定更新のHP復元までにボスが消えないようにする。
+    if (run.api_development && run.benchmark_boss_hp>0 && state.enemies[result.target.slot].is_boss)
+        state.enemies[result.target.slot].hp=std::max(1.0,state.enemies[result.target.slot].hp);
     if (policy.body_damaged) policy.body_damaged(run,result.target);
     if (!state.enemy_handles.contains(result.target)) {result.reason=CombatReason::Invalid;EventBuilder::enemy_damage(run,request,result);return result;}
     result.hp_after=state.enemies[result.target.slot].hp;
@@ -202,6 +205,8 @@ ShipDamageResult CombatResolver::ship_damage(RunRuntime &run,const ShipDamageReq
         state.ship.invuln=state.ship_config.invulnerability;result.reason=CombatReason::Barrier;
     } else {
         state.ship.hp-=result.amount;
+        if (run.api_development && run.benchmark_survive && request.cause!=Cause::FinalStrike)
+            state.ship.hp=std::max(1.0,state.ship.hp);
         if (request.slow>0) state.ship.glide=false;
         state.ship.vel*=1.0-std::min(0.9,request.slow);
         state.ship.invuln=state.ship_config.invulnerability;state.ship.hurt=state.ship_config.ship_hurt_time;

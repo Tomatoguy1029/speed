@@ -223,8 +223,19 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         runtime.state.loadout.post_crit_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
     } else if (kind=="dev_post_charge" && runtime.api_development && payload.size()==1 && is(payload,"stacks",Variant::INT) && int64_t(payload["stacks"])>=0) {
         runtime.state.loadout.post_charge_stacks=uint64_t(int64_t(payload["stacks"]));speed::EquipmentSystem::refresh_effects(runtime);response=success();
-    } else if (kind=="dev_benchmark" && runtime.api_development && payload.size()==1 && is(payload,"leveling",Variant::BOOL)) {
-        runtime.state.loadout.xp_gain_mult=bool(payload["leveling"])?1.0:0.0;response=success();
+    } else if (kind=="dev_benchmark" && runtime.api_development && !payload.is_empty() && keys(payload,{"leveling","bonus","boss_hp","survive"})) {
+        const Variant hp=payload.get("boss_hp",-1.0);
+        if ((payload.has("leveling") && !is(payload,"leveling",Variant::BOOL)) || (payload.has("survive") && !is(payload,"survive",Variant::BOOL)) ||
+            (payload.has("bonus") && (!is(payload,"bonus",Variant::BOOL) || !bool(payload["bonus"]) || runtime.state.phase!=Phase::Play || runtime.state.control.bonus_remaining>0)) ||
+            (payload.has("boss_hp") && ((hp.get_type()!=Variant::FLOAT && hp.get_type()!=Variant::INT) || !std::isfinite(double(hp)) || (double(hp)!=-1.0 && (double(hp)<=0 || double(hp)>1)))))
+            response=failure(1,"benchmark","計測条件が不正です");
+        else {
+            if (payload.has("leveling")) runtime.state.loadout.xp_gain_mult=bool(payload["leveling"])?1.0:0.0;
+            if (payload.has("boss_hp")) runtime.benchmark_boss_hp=hp;
+            if (payload.has("survive")) runtime.benchmark_survive=payload["survive"];
+            if (payload.has("bonus")) speed::RunRunner::enter_bonus(*this);
+            response=success();
+        }
     } else if (kind=="dev_collect_gems" && runtime.api_development && payload.is_empty()) {
         response=success(speed::PickupSystem::collect_all(*this));
     } else if (kind=="dev_pickup_rates" && runtime.api_development && payload.size()==2 && is(payload,"ship",Variant::FLOAT) && is(payload,"run",Variant::FLOAT) && std::isfinite(double(payload["ship"])) && std::isfinite(double(payload["run"])) && double(payload["ship"])>=0 && double(payload["run"])>=0 && std::isfinite(double(payload["ship"])*double(payload["run"]))) {

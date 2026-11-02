@@ -59,6 +59,9 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.phase==Phase::Finishing) {BossFinish::step(core.runtime,dt);return true;}
     if (state.phase==Phase::Dying) {core.step_death(dt);return true;}
     if (state.phase!=Phase::Play) return true;
+    if (core.runtime.api_development && core.runtime.benchmark_boss_hp>0)
+        for (auto &enemy:state.enemies) if (enemy.alive && !enemy.dead && enemy.is_boss)
+            enemy.hp=enemy.max_hp*core.runtime.benchmark_boss_hp;
     if (DracoFinale::tick(core.runtime,dt,raw_input,size)) {core.check_run_end();return true;}
     if (state.controls_locked || state.encounter_protected) state.hitstop=0;
     // 制作側に乱数や出現判断を置かず、同じ固定tickで予定配置を実行する。

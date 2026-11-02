@@ -27,6 +27,9 @@ public:
     bool api_configured=false, api_development=false, busy=false;
     godot::Dictionary last_command_response;
     bool full_output_dirty=false, pending_resource_rebuild=false;
+    // 開発計測のHP保持。通常ランと保存状態には含めず、明示命令のときだけ有効にする。
+    double benchmark_boss_hp=-1;
+    bool benchmark_survive=false;
     void replace_definitions(std::vector<EnemyDefinition> definitions) {
         auto next = std::make_shared<ContentBundle>();
         next->definitions = std::move(definitions);
