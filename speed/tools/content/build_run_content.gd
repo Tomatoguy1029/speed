@@ -37,6 +37,26 @@ static func boss_technique_records(definition: BossDef, move: BossTechnique) -> 
 			records.BossTechniqueStage.append(command)
 	return records
 
+## 複数の技を同じボスの定義表へまとめる。実行は既存の型付きフローへ任せる。
+static func boss_technique_set_records(definition: BossDef, moves: Array) -> Dictionary:
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[]}
+	var seen := {}
+	for move: BossTechnique in moves:
+		if move==null or seen.has(move.technique): return {}
+		seen[move.technique] = true
+		var source := boss_technique_records(definition,move)
+		if source.is_empty(): return {}
+		var offset: int = records.BossTechniqueDefinition.size()
+		if records.BossDefinition.is_empty(): records.BossDefinition = source.BossDefinition
+		for row: Dictionary in source.BossTechniqueDefinition:
+			row.id += offset
+			records.BossTechniqueDefinition.append(row)
+		for row: Dictionary in source.BossTechniqueStage:
+			row.id = records.BossTechniqueStage.size()+1
+			row.technique += offset
+			records.BossTechniqueStage.append(row)
+	return records
+
 ## 共通本体の生成入力。技の登録は各ボスの移植経路が追加する。
 static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus"]: return {}

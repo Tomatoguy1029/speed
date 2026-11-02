@@ -11,6 +11,12 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-combo-tail" in OS.get_cmdline_user_args() or "--cpp-combo-cancel" in OS.get_cmdline_user_args():
+		call_deferred("native_combo_tail")
+		return
+	if "--cpp-combo" in OS.get_cmdline_user_args() or "--cpp-combo-retry" in OS.get_cmdline_user_args():
+		call_deferred("native_combo")
+		return
 	if "--cpp-lance" in OS.get_cmdline_user_args() or "--cpp-lance-retry" in OS.get_cmdline_user_args():
 		call_deferred("native_lance")
 		return
@@ -897,4 +903,113 @@ func native_lance() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_monoceros_lance] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 連撃専用の旧Runnerは存在せず、編集側のsequenceを共通フローで進める。
+func combo_fixture() -> Dictionary:
+	var f := charge_fixture()
+	f.bridge.dispose()
+	var builder = load("res://tools/content/build_run_content.gd")
+	var sweep = load("res://data/bosses/monoceros_moves/sweep.tres").duplicate(true)
+	sweep.approach_speed_start = 0.0
+	sweep.approach_speed_max = 0.0
+	sweep.approach_min = 0.0
+	sweep.approach_max = 0.01
+	sweep.stop_time = 0.01
+	sweep.active = 0.01
+	sweep.hold = 0.01
+	sweep.return_time = 0.01
+	sweep.recover = 0.01
+	sweep.cd = 0.0
+	f.move.distance = 1.0
+	f.move.warn = 0.02
+	f.move.active = 0.02
+	f.move.recover = 0.02
+	var records: Dictionary = f.records
+	var techniques: Dictionary = builder.boss_technique_set_records(f.definition,[f.move,sweep])
+	for key in techniques: records[key] = techniques[key]
+	var rules = load("res://scripts/data_types/boss_action_rules.gd").new()
+	rules.adapter = &"monoceros"
+	rules.techniques.assign([f.move,sweep])
+	rules.combos = {"charge_sweep":{"type":"sequence","children":[{"type":"action","id":"charge"},{"type":"action","id":"sweep"}]}}
+	rules.costs = {"charge_sweep":1.0}
+	var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
+	flow.maximum_stamina = 10.0
+	flow.sections = [{"request":"any","weights":{"combo":1.0},"allowed_techniques":["charge_sweep"],"cap":1.0,"action_count":1,"next":0}]
+	var compiled: Dictionary = builder.boss_flow_records(rules,flow,techniques.BossTechniqueDefinition)
+	for key in compiled: records[key] = compiled[key]
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	if not bridge.configure(builder.Schema.write_content(records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":184,"mode":1,"stage_id":"B_monoceros_combo","profile":{},"settings":{"hitstop":false}}).ok: return {}
+	bridge.start(184,{"position":Vector2(100,0)})
+	bridge.subscribe("確認",func(_packet): return true)
+	bridge.command("dev_ship_motion",{"position":Vector2(100,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(100,0),Vector2(100,0),Vector2(640,360))
+	f.id = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	f.bridge = bridge
+	return f
+
+func native_combo() -> void:
+	var f := combo_fixture()
+	if "--cpp-combo-retry" not in OS.get_cmdline_user_args(): check(not f.is_empty(),"突進と薙ぎを一つの技表へ生成しsequenceとして読み込む")
+	if f.is_empty(): get_tree().quit(1); return
+	var bridge = f.bridge
+	bridge._core.step(0.01)
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].technique=="charge","連撃を自然選択し最初の突進を開始する")
+	var finished := false
+	for i in 20:
+		bridge._core.step(0.02)
+		var flow: Dictionary = bridge.command("dev_boss_flow_state").value[0]
+		if flow.nodes[0].cursor==1:
+			finished = true
+			break
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(finished and state.stage==5 and state.technique=="charge","突進の回復終了tickでは次の薙ぎを始めない")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.01)
+	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(expected.technique=="sweep" and expected.stage==0 and expected.id>state.id,"次tickで薙ぎの独立した段階時計を始める")
+	var render: Dictionary = bridge.read_render(Rect2(-1000,-1000,2000,2000),1.0)
+	check(render.ok and render.value.boss_techniques[0].technique=="sweep" and render.value.boss_techniques[0].horn.size()==2,"連撃中の表示は実行中の薙ぎとその判定線だけを読む")
+	check(held.ok and bridge.restore(held.value).ok,"子の切替境界で連撃カーソルと技チケットを復帰する")
+	bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0]==expected,"境界復帰後も同じ薙ぎを開始する")
+	bridge.release_checkpoint(held.value)
+	for i in 20: bridge._core.step(0.02)
+	check(bridge.command("dev_boss_state").value[0].id>expected.id,"薙ぎ終了後に連撃が自然終了して次の行動へ進む")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"連撃の通知を共通配信へ渡す")
+	bridge.dispose()
+	for disappear in [false,true]:
+		f = combo_fixture()
+		bridge = f.bridge
+		bridge._core.step(0.01)
+		bridge._core.step(0.01)
+		if disappear: bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_flow",{"entity_id":f.id})
+		bridge._core.step(0.02)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and state.technique=="charge" and bridge.read_frame().ok,"参加者消失で後続の薙ぎを始めない" if disappear else "連撃の取消で後続の薙ぎを始めない")
+		bridge.dispose()
+	print("[cpp_monoceros_combo] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func native_combo_tail() -> void:
+	var f := combo_fixture()
+	var bridge = f.bridge
+	bridge._core.step(0.01)
+	if "--cpp-combo-cancel" not in OS.get_cmdline_user_args(): check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"連撃の通知を共通配信へ渡す")
+	bridge.dispose()
+	var state: Dictionary
+	for disappear in ([false] if "--cpp-combo-cancel" in OS.get_cmdline_user_args() else [false,true]):
+		f = combo_fixture()
+		bridge = f.bridge
+		bridge._core.step(0.01)
+		bridge._core.step(0.01)
+		if disappear: bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_flow",{"entity_id":f.id})
+		bridge._core.step(0.02)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and state.technique=="charge" and bridge.read_frame().ok,"参加者消失で後続の薙ぎを始めない" if disappear else "連撃の取消で後続の薙ぎを始めない")
+		bridge.dispose()
+	print("[cpp_monoceros_combo] failures=",failed)
 	get_tree().quit(1 if failed else 0)
