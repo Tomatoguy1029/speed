@@ -8,6 +8,7 @@ static var _saved_split := 200
 static var _saved_nav_split := 160
 signal tuning_changed(values: Dictionary)
 signal saved(stage: StageDef)
+signal generated(stage: StageDef)
 
 var stage_path := ""
 var values: Dictionary = {}
@@ -47,6 +48,7 @@ var _stages: Array[String] = []
 var _row_controls: Dictionary = {}
 var _live := false
 var definition_source: Callable
+var generate_saved: Callable
 
 func _ready() -> void:
 	var toolbar := HFlowContainer.new()
@@ -405,7 +407,8 @@ func _save() -> void:
 		return
 	baseline = values.duplicate(true)
 	saved.emit(result.stage)
-	var error: Error = load("res://addons/content_build/builder.gd").build_all()
+	var error: Error = generate_saved.call(result.stage) if generate_saved.is_valid() else load("res://addons/content_build/builder.gd").build_all()
 	_changed()
 	_status.text = "保存・実行用データの生成完了" if error == OK else "保存済み / 生成失敗: %s" % error_string(error)
+	if error==OK: generated.emit(result.stage)
 	_refresh_rows()

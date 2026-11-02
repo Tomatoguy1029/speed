@@ -10,6 +10,11 @@ func check(ok: bool, label: String) -> void:
 		push_error(label)
 
 func _ready() -> void:
+	if "--cpp-save" in OS.get_cmdline_user_args():
+		check(await cpp_save(self,false),"F4の保存からC++の再出撃まで確認する")
+		print("[cpp_save] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	_check_stage1_hp()
 	var common := IO.definition("telescope")
 	var cfg := ContentManager.cfg.duplicate(true) as GameConfig
@@ -52,15 +57,15 @@ func _ready() -> void:
 	check(runtime.enemy_tuning == edited, "生成物の再読込でも差分を保持する")
 	var session := RunManager.create_session(self, {"stage": runtime, "stage_index": 4, "config": cfg, "seed": 42}, false)
 	session.auto_step = false
-	var enemies := session.sim.enemies
-	var def := enemies.def_of(&"telescope")
+	var enemies: EnemySystem = session.sim.enemies
+	var def: EnemyDef = enemies.def_of(&"telescope")
 	check(is_equal_approx(def.base_hp(cfg), hp * 2.0), "星からの計算後のHPへ上書きを適用する")
 	check(def.params.bullet_dmg == damage + 8.0, "敵固有の攻撃力へ適用する")
-	var row := enemies.spawn(def, Vector2(300, 200))
-	var t := enemies.table
+	var row: int = enemies.spawn(def, Vector2(300, 200))
+	var t: EnemyTable = enemies.table
 	t.hp[row] = t.max_hp[row] * 0.25
-	var id := t.id[row]
-	var old_hp := t.max_hp[row]
+	var id: int = t.id[row]
+	var old_hp: float = t.max_hp[row]
 	t.timer[row] = 1.25
 	var live := edited.duplicate(true)
 	live.telescope.hp = hp * 3.0
@@ -68,7 +73,7 @@ func _ready() -> void:
 	session.sim.state.time = 13.5
 	session.sim.state.world_time = 7.25
 	enemies.update_stage_tuning(live)
-	var changes := session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed")
+	var changes: Array = session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed")
 	check(changes.size() == 1 and changes[0].t == 13.5 and changes[0].world_t == 7.25 and changes[0].values == live, "変更イベントに適用時刻と上書き全体を含める")
 	enemies.update_stage_tuning(live)
 	check(session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed").size() == 1, "同じ設定の再通知を省く")
@@ -78,10 +83,10 @@ func _ready() -> void:
 	check(t.id[row] == id and t.pos[row] == Vector2(300, 200) and t.timer[row] == 1.25, "位置・個体ID・行動状態を維持する")
 	check(t.def[row].params.bullet_dmg == damage + 12.0, "既存個体が次の攻撃に新しい値を使う")
 	check(enemies.def_of(&"telescope") == t.def[row], "新しい出現にもライブ値を使う")
-	var direct := enemies.spawn(common, Vector2.ZERO)
+	var direct: int = enemies.spawn(common, Vector2.ZERO)
 	check(t.def[direct].params.bullet_dmg == damage + 12.0, "共通定義を直接渡す出現にもステージ値を使う")
 	session.sim.projectiles.fire_enemy(row, 0.0, 10.0, &"bullet")
-	var shot := session.sim.projectiles.hostile_alive.find(1)
+	var shot: int = session.sim.projectiles.hostile_alive.find(1)
 	check(shot >= 0 and session.sim.projectiles.hostile_dmg[shot] == damage + 12.0, "発射した弾の攻撃力にライブ値が入る")
 	check(runtime.enemy_tuning == edited, "未保存の試行でRuntimeStageを書き換えない")
 	enemies.update_stage_tuning({})
@@ -117,6 +122,85 @@ func _ready() -> void:
 	print("[stage_enemy_tuning] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)
 
+func cpp_save(parent: Node, failure_only: bool) -> bool:
+	var source := StageDef.new()
+	source.index = 196 if failure_only else 197
+	source.enemies = [&"drifter"]
+	var fixture := "/tmp/speed-cpp-save-%d.tres" % source.index
+	if ResourceSaver.save(source,fixture)!=OK: return false
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	# 共通生成で準備済みの外観索引と同じ出力ルートを使う。
+	var output := "res://.content"
+	var generator = load("res://addons/content_build/builder.gd")
+	if generator.build_cpp_stage(source,config,output)!=OK: return false
+	var path := output.path_join("run/stage_%d.json" % source.index)
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var runtime := BUILD.compile(source,output,config)
+	var session: RunSession = RunManager.create_session(parent,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":53,"cpp_edit_source":{"stage":runtime,"config":config}},false)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await parent.get_tree().process_frame
+	if session.bridge==null: return false
+	var bridge = session.bridge
+	if not bridge.command("dev_remove_weapon",{"id":"W01"}).ok or not bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-500,300)}).ok: return false
+	var original: Dictionary = bridge._core.enemies_snapshot()[0]
+	var layer := CanvasLayer.new()
+	parent.add_child(layer)
+	var overlay = load("res://scripts/dev/stage_enemy_overlay.gd").new()
+	overlay.cpp_session = session
+	layer.add_child(overlay)
+	overlay.show()
+	await parent.get_tree().process_frame
+	if overlay.content_edit==null: return false
+	var panel: Control = overlay.panel
+	panel.stage_path = fixture
+	panel._select_enemy("drifter")
+	panel.generate_saved = func(stage): return overlay.content_edit.generate_saved(stage,output)
+	var base: float = ContentManager.enemies[&"drifter"].base_hp(config)
+	panel._edit_value(base*2.0,"hp",base)
+	if failure_only:
+		overlay.hide()
+		overlay.show()
+		check(overlay.panel==panel and panel.is_dirty() and panel.values.drifter.hp==base*2.0 and IO.read_stage(fixture).enemy_tuning.is_empty(),"F4を閉じても未保存値を保持し編集元には書かない")
+		var previous := FileAccess.get_sha256(path)
+		var generated: Array = []
+		panel.generated.connect(func(_stage): generated.append(true))
+		panel.generate_saved = func(_stage): return ERR_INVALID_DATA
+		panel._save()
+		check(panel._status.text.contains("生成失敗") and generated.is_empty() and overlay.content_edit.saved_index_path.is_empty(),"生成失敗を成功表示や生成完了通知に変えない")
+		check(IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0 and FileAccess.get_sha256(path)==previous,"保存済みの編集元と古い生成物を区別する")
+		panel.values = {"drifter":{"hp":NAN}}
+		panel._save()
+		check(IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0 and FileAccess.get_sha256(path)==previous and not panel._status.text.contains("生成完了"),"不正な保存値で編集元と生成物を変更しない")
+	else:
+		var notifications: Array = []
+		bridge.subscribe("保存確認",func(frame: Dictionary) -> bool:
+			notifications.append_array(frame.events)
+			return true)
+		panel._save()
+		check(panel._status.text.contains("生成完了") and not panel.is_dirty() and IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0,"Saveが編集元へ保存して共通生成の完了を表示する")
+		var saved_path: String = overlay.content_edit.saved_index_path
+		if saved_path.is_empty(): return false
+		var saved_index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(saved_path))
+		var next: RunSession = RunManager.create_session(parent,{"runtime":"cpp","cpp_index":saved_path,"cpp_signature":saved_index.input_sha256,"seed":53},false)
+		next.auto_step = false
+		while next.bridge==null and next.cpp_error==OK: await parent.get_tree().process_frame
+		if next.bridge==null: return false
+		if not next.bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-500,300)}).ok: return false
+		check(is_equal_approx(next.bridge._core.enemies_snapshot()[0].max_hp,original.max_hp*2.0),"保存後の生成物で次のC++ランを起動する")
+		check(notifications.any(func(event): return event.type==&"enemy_tuning_saved" and event.payload.path==fixture and event.payload.values.drifter.hp==base*2.0),"保存内容を生成済みの型付き定義から通知する")
+		check(next.bridge.read_frame().ok and next.bridge.collect_frame().ok and next.bridge.delivery_error.get("ok",false),"再出撃のフレーム回収と通知配信が成功する")
+		next.free()
+	var stepped: Dictionary = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+	check(stepped.ok and bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.get("ok",false),"保存操作後も固定更新と通知配信が成功する")
+	layer.free()
+	session.free()
+	DirAccess.remove_absolute(fixture)
+	return true
+
 func _check_stage1_hp() -> void:
 	var stage := ContentManager.stage(1)
 	var expected := {"marlin": 150.0, "pump": 60.0, "shield": 45.0, "triangle_star": 12.0}
@@ -124,17 +208,17 @@ func _check_stage1_hp() -> void:
 	var runtime := BUILD.compile(stage)
 	var session := RunManager.create_session(self, {"stage": runtime, "stage_index": 1, "seed": 42}, false)
 	session.auto_step = false
-	var enemies := session.sim.enemies
+	var enemies: EnemySystem = session.sim.enemies
 	for entry in [[&"biter", "bullet_dmg", 4.0], [&"bomber", "blast_dmg", 14.0], [&"pulser", "bullet_dmg", 14.0], [&"pump", "bullet_dmg", 28.0], [&"triangle", "trail_dmg", 14.0], [&"marlin", "fire_interval", 3.6]]:
-		var tuned := enemies.def_of(entry[0])
+		var tuned: EnemyDef = enemies.def_of(entry[0])
 		check(is_equal_approx(float(tuned.params[entry[1]]), entry[2]), "Stage1の攻撃・間隔をランへ渡す: " + String(entry[0]))
 		check(not is_equal_approx(float(ContentManager.definition(&"enemies", entry[0]).params[entry[1]]), entry[2]), "他ステージ用の共通値を保持する: " + String(entry[0]))
 	for id: String in expected:
-		var definition := enemies.def_of(StringName(id))
+		var definition: EnemyDef = enemies.def_of(StringName(id))
 		check(is_equal_approx(definition.base_hp(session.sim.cfg), expected[id]), "Stage1の生成・ランにHPを渡す: " + id)
 		check(not is_equal_approx(ContentManager.definition(&"enemies", id).base_hp(session.sim.cfg), expected[id]), "共通定義のHPを保持する: " + id)
-	var row := enemies.spawn(enemies.def_of(&"triangle"), Vector2(400, 200))
-	var parts := enemies.table.parts[row]
+	var row: int = enemies.spawn(enemies.def_of(&"triangle"), Vector2(400, 200))
+	var parts: PackedInt32Array = enemies.table.parts[row]
 	check(parts.size() == 6, "三角は3つの破壊対象を生成する")
 	for k in 3:
 		var part: int = parts[k * 2]

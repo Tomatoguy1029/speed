@@ -10,6 +10,8 @@ var definitions: Dictionary = {}
 var values: Dictionary = {}
 var signature := ""
 var error := ""
+var saved_index_path := ""
+var _saved_bytes := PackedByteArray()
 
 func attach(owner: RunSession) -> bool:
 	session = weakref(owner)
@@ -30,7 +32,8 @@ func attach(owner: RunSession) -> bool:
 		if index.get("source_sha256","")!=builder.signature():
 			error = "開始後に編集元が変わっています。保存値を使うには出撃し直してください。"
 			return false
-		var stage := ContentManager.stage(int(index.stage_id))
+		var stage_path := "res://data/stages/stage_%d.tres" % int(index.stage_id)
+		var stage: StageDef = ResourceLoader.load(stage_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) if ResourceLoader.exists(stage_path) else null
 		if stage==null:
 			error = "このランに対応するステージがありません。"
 			return false
@@ -84,3 +87,23 @@ func apply(tuning: Dictionary) -> Dictionary:
 func _failure(message: String) -> Dictionary:
 	error = message
 	return {"ok":false,"code":1,"field":"tuning","message":message,"value":null}
+
+## 保存済みの編集元を、正規のC++生成入口から次のラン用に作る。
+func generate_saved(stage: StageDef, output := "res://.content") -> Error:
+	_saved_bytes = PackedByteArray()
+	saved_index_path = ""
+	var built: Error = load("res://addons/content_build/builder.gd").build_cpp_stage(stage,config,output)
+	if built!=OK: return built
+	var path := output.path_join("run/stage_%d.json" % stage.index)
+	var index = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not index is Dictionary: return ERR_FILE_CORRUPT
+	var prepared := LOADER.read_bundle(path,index.input_sha256)
+	if prepared.is_empty(): return ERR_FILE_CORRUPT
+	_saved_bytes = prepared.bytes
+	saved_index_path = path
+	return OK
+
+func notify_saved(path: String) -> Dictionary:
+	var owner: RunSession = session.get_ref() if session!=null else null
+	if owner==null or owner.bridge==null or _saved_bytes.is_empty(): return _failure("保存済みの生成物を通知できません。")
+	return owner.bridge.command("dev_tuning_saved",{"path":path,"bundle":_saved_bytes})

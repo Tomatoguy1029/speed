@@ -20,6 +20,11 @@ bool same_layout(const ContentBundle &a,const ContentBundle &b) {
     for (size_t i=0;i<a.visuals.size();++i) if (a.visuals[i].id!=b.visuals[i].id || a.visuals[i].role!=b.visuals[i].role) return false;
     return true;
 }
+godot::Dictionary tuning_values(const ContentBundle &content) {
+    godot::Dictionary values;
+    for (const auto &v:content.enemy_tuning) {const godot::String id=content.definitions[v.enemy-1].id;godot::Dictionary fields=values.get(id,godot::Dictionary());fields[godot::String::utf8(v.key.c_str())]=v.value;values[id]=fields;}
+    return values;
+}
 bool migrate_enemy(godot::RunState::Enemy &e,const EnemyDefinition &old,const EnemyDefinition &next) {
     const double old_hp=old.scaling.ready?old.scaling.hp:old.hp,new_hp=next.scaling.ready?next.scaling.hp:next.hp;
     const double old_armor=old.scaling.ready?old.scaling.armor:old.armor,new_armor=next.scaling.ready?next.scaling.armor:next.armor;
@@ -51,12 +56,15 @@ godot::Dictionary DevCommands::replace_definition(RunRuntime &run,const godot::D
     if (!rebuild_state_indexes(candidate.state,*next)) return reply(false,2,"現在の状態を変換できないため再開始してください");
     // 検査が全て成功してから公開する。旧ContentBundleは保持点が所有し続ける。
     run.state=std::move(candidate.state);run.content=std::move(next);run.workspace.defender_posts_tick=-1;run.full_output_dirty=true;
-    godot::Dictionary values;
-    for (const auto &v:run.content->enemy_tuning) {
-        const auto id=run.content->definitions[v.enemy-1].id;
-        godot::Dictionary fields=values.get(id,godot::Dictionary());fields[godot::String::utf8(v.key.c_str())]=v.value;values[id]=fields;
-    }
-    godot::Dictionary changed;changed["values"]=values;FrameBuilder::append(run,"enemy_tuning_changed",changed);
+    godot::Dictionary changed;changed["values"]=tuning_values(*run.content);FrameBuilder::append(run,"enemy_tuning_changed",changed);
+    return reply(true);
+}
+godot::Dictionary DevCommands::tuning_saved(RunRuntime &run,const godot::Dictionary &payload) {
+    using godot::Variant;
+    if (!run.api_development) return reply(false,4);
+    if (payload.size()!=2 || payload.get("path",Variant()).get_type()!=Variant::STRING || payload.get("bundle",Variant()).get_type()!=Variant::PACKED_BYTE_ARRAY) return reply(false);
+    const auto saved=ContentBundle::read(payload["bundle"]);if (!saved) return reply(false);
+    godot::Dictionary event;event["path"]=payload["path"];event["values"]=tuning_values(*saved);FrameBuilder::append(run,"enemy_tuning_saved",event);
     return reply(true);
 }
 }

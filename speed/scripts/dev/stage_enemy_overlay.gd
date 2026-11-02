@@ -72,6 +72,7 @@ func _ensure_contents() -> void:
 			content_edit = null
 			return
 		panel.definition_source = func(id): return content_edit.definitions[StringName(id)] if content_edit.definitions.has(StringName(id)) else PANEL.IO.definition(id)
+		panel.generate_saved = content_edit.generate_saved
 		panel.bind_run(content_edit.source,content_edit.config,content_edit.values)
 	else: panel.bind_run(run.state.stage, run.cfg, run.enemies.stage_tuning)
 	box.add_child(panel)
@@ -82,6 +83,10 @@ func _ensure_contents() -> void:
 		else: run.enemies.update_stage_tuning(values))
 	panel.saved.connect(func(stage):
 		if cpp_session==null: run.state.emit(&"enemy_tuning_saved", {"path": panel.stage_path, "values": stage.enemy_tuning.duplicate(true)}))
+	panel.generated.connect(func(_stage):
+		if cpp_session!=null:
+			var notified: Dictionary = content_edit.notify_saved(panel.stage_path)
+			if not notified.ok: panel._status.text = "保存・生成済み / 通知失敗: "+notified.message)
 	_grip = Control.new()
 	_grip.top_level = true
 	_grip.size = Vector2(22, 22)

@@ -42,6 +42,14 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="): output = arg.trim_prefix("--out=")
 	if not output.is_empty(): DirAccess.make_dir_recursive_absolute(output)
+	if "--cpp-save-failure" in OS.get_cmdline_user_args():
+		var fixture = load("res://tests/stage_enemy_tuning.gd").new()
+		check(await fixture.cpp_save(self,true),"F4の未保存保持と生成失敗を確認する")
+		failed += fixture.failed
+		fixture.free()
+		print("[cpp_save_failure] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-live" in OS.get_cmdline_user_args():
 		check(await cpp_live(), "C++ランのF4指定確認を最後まで行う")
 		print("[cpp_live] failed=%d" % failed)

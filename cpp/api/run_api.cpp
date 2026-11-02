@@ -323,6 +323,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         if (removed) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=removed?success():failure(5,"entity_id","対象がありません");
     } else if (kind=="dev_replace_definition") response=speed::DevCommands::replace_definition(runtime,payload);
+    else if (kind=="dev_tuning_saved") response=speed::DevCommands::tuning_saved(runtime,payload);
     else if (kind=="dev_tune" && payload.size()==3 && is(payload,"target_id",Variant::STRING) && is(payload,"revision",Variant::INT) && is(payload,"values",Variant::PACKED_BYTE_ARRAY)) {
         Dictionary replace;replace["definition_id"]=payload["target_id"];replace["expected_revision"]=payload["revision"];replace["replacement"]=payload["values"];
         response=speed::DevCommands::replace_definition(runtime,replace);
