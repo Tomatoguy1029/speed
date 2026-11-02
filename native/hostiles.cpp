@@ -4,6 +4,7 @@
 #include "../cpp/systems/attacks/missile.h"
 #include "../cpp/systems/attacks/wall.h"
 #include "../cpp/systems/attacks/slash.h"
+#include "../cpp/systems/attacks/light_arrow.h"
 #include "geometry.h"
 #include "../cpp/systems/combat_resolver.h"
 #include "../cpp/output/event_builder.h"
@@ -102,9 +103,14 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         if (shot.kind==int64_t(speed::HostileKind::Slash)) {
             if (speed::SlashSystem::contact(runtime,processing_handle,to)) {end_reason=speed::AttackEndReason::Hit;life=0;body_hit.reset();}
         }
+        const bool long_arrow=shot.arrow.definition && shot.arrow.length>0;
+        if (long_arrow) {
+            const auto t=speed::LightArrowSystem::contact(runtime,processing_handle,from,to,step,body_hit?std::optional<double>(body_hit->t):std::nullopt);
+            if (t) {to=from.lerp(to,*t);end_reason=speed::AttackEndReason::Hit;life=0;body_hit.reset();}
+        }
         const double ship_t=speed::CollisionQuery::segment_circle_t(from,to,runtime.state.ship.pos,double(shot.radius)+body_radius);
         const double reach = double(shot.radius) + body_radius + step;
-        if (shot.kind!=int64_t(speed::HostileKind::Slash) && (!body_hit || (ship_t>=0 && ship_t<body_hit->t)) && (record->spec.contact.ship_sweep || runtime.state.ship.pos.distance_squared_to(to) <= reach * reach)) {
+        if (!long_arrow && shot.kind!=int64_t(speed::HostileKind::Slash) && (!body_hit || (ship_t>=0 && ship_t<body_hit->t)) && (record->spec.contact.ship_sweep || runtime.state.ship.pos.distance_squared_to(to) <= reach * reach)) {
             const auto contact=speed::CombatResolver::attack_ship_damage(runtime,processing_handle,speed::SegmentCircle{from,to,double(shot.radius)},shot.damage,shot.slow);
             speed::EventBuilder::flush_combat(runtime);
             if (contact.touching) {
@@ -131,6 +137,7 @@ Array SpeedRunCore::hostiles_snapshot() const {
         if (!shot.alive) continue;
         Dictionary item;
         item["row"] = int64_t(row); item["kind"] = shot.kind; item["pos"] = shot.pos; item["vel"] = shot.vel;
+        if (shot.arrow.definition) item["length"]=shot.arrow.length;
         if (shot.slash.definition) {item["size"]=shot.radius;item["side"]=shot.slash.side;}
         item["life"] = shot.life; item["gap"] = shot.gap; item["stone"] = shot.stone; item["wait"] = shot.wait;
         out.append(item);

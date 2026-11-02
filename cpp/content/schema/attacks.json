@@ -265,6 +265,121 @@
           "ref": "ContactDefinition"
         }
       ]
+    },
+    {
+      "name": "LightArrowDefinition",
+      "section": 41,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "cosmic",
+          "type": "bool"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_length_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_width_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "core_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cosmic_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cosmic_star_count",
+          "type": "u32",
+          "max": 8
+        },
+        {
+          "name": "arrow_r",
+          "type": "f32"
+        },
+        {
+          "name": "arrow_g",
+          "type": "f32"
+        },
+        {
+          "name": "arrow_b",
+          "type": "f32"
+        },
+        {
+          "name": "arrow_a",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_r",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_g",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_b",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_a",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_r",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_g",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_b",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_a",
+          "type": "f32"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
     }
   ],
   "enums": {
@@ -322,6 +437,14 @@
       {
         "name": "Bolt",
         "value": "bolt"
+      },
+      {
+        "name": "LightArrow",
+        "value": "light_arrow"
+      },
+      {
+        "name": "CosmicArrow",
+        "value": "cosmic_arrow"
       }
     ],
     "FriendKind": [

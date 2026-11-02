@@ -33,6 +33,7 @@ struct ContentBundle {
     std::vector<WallDefinition> walls;
     std::vector<SlashDefinition> slashes;
     std::vector<BoltDefinition> bolts;
+    std::vector<LightArrowDefinition> light_arrows;
     std::vector<FriendShotDefinition> friend_shots;
     std::vector<BudgetPhase> budget_phases;
     ProgressionDefinition progression;

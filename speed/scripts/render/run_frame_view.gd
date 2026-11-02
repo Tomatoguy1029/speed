@@ -11,6 +11,7 @@ var _layers: Dictionary = {}
 var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
+var _arrow_displays: Dictionary = {}
 var _scope: ContentResourceScope
 var _pixel := 1.82
 var _shot_transforms: Dictionary = {}
@@ -182,9 +183,15 @@ func _valid(frame: Dictionary) -> bool:
 		for flag: int in row.flags:
 			if flag & ~1: return false
 	for row in frame.shapes:
-		if not row is Dictionary or row.get("kind") not in [0,1,2,3] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
+		if not row is Dictionary or row.get("kind") not in [0,1,2,3,4] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
 		if row.offsets.size()<2 or row.offsets[0]!=0 or row.offsets[-1]!=row.points.size() or row.widths.size()!=row.offsets.size()-1 or row.colors.size()!=row.widths.size(): return false
+		if row.kind==4:
+			if row.points.size()!=1 or row.widths.size()!=1 or not row.get("cosmic") is bool or not row.get("cosmic_star_count") is int: return false
+			for key in ["angle","length","world_time","shot_length_scale","shot_width_scale","core_width","cosmic_speed"]:
+				if not row.get(key) is float or not is_finite(row[key]): return false
+			for key in ["arrow_color","cosmic_color_a","cosmic_color_b"]:
+				if not row.get(key) is Color: return false
 		if row.kind==2:
 			if row.points.size()!=1 or row.widths.size()!=1 or row.get("wave_style") not in [0,1,2,3]: return false
 			for key in ["radius","max_radius","angle","arc","gap","gap_arc","time","delay"]:
@@ -258,10 +265,20 @@ func apply_frame(frame: Dictionary) -> bool:
 		display.previous_circles = display.circles.duplicate()
 		display.circles.clear()
 	for display: Node in _wave_displays.values(): display.hide()
+	for display: Node in _arrow_displays.values(): display.hide()
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
 		var parent: Node2D = _layer(row.layer)
+		if row.kind==4:
+			var key := "%d:%d" % [row.layer,row.order]
+			if not _arrow_displays.has(key):
+				var arrow := preload("res://scripts/render/attacks/light_arrow.gd").new()
+				parent.add_child(arrow)
+				_arrow_displays[key] = arrow
+			_arrow_displays[key].apply_frame(row)
+			_arrow_displays[key].show()
+			continue
 		if row.kind==2:
 			var key := "%d:%d" % [row.layer,row.order]
 			if not _wave_displays.has(key):

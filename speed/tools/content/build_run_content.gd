@@ -63,6 +63,15 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var bolt_tint: Color = bolt_visual.effect_tint
 	data.BoltDefinition = [{"id":1,"radius":7.0,"life":4.0,"flight_scale":bolt_visual.flight_scale,"tint_r":bolt_tint.r,"tint_g":bolt_tint.g,"tint_b":bolt_tint.b,"tint_a":bolt_tint.a,"contact":1}]
 	bolt_visual.free()
+	for cosmic in [false,true]:
+		var arrow: AttackVisual = load("res://scenes/attacks/cosmic_arrow.tscn" if cosmic else "res://scenes/attacks/light_arrow.tscn").instantiate()
+		arrow._apply_effect_settings()
+		var style := {"id":data.LightArrowDefinition.size()+1,"cosmic":cosmic,"contact":1,"flight_scale":arrow.flight_scale}
+		for key in ["shot_length_scale","shot_width_scale","core_width","cosmic_speed","cosmic_star_count"]: style[key] = arrow.get(key)
+		for color_pair in [["arrow",arrow.get("arrow_color")],["cosmic_a",arrow.get("cosmic_color_a")],["cosmic_b",arrow.get("cosmic_color_b")],["tint",arrow.effect_tint]]:
+			for channel in ["r","g","b","a"]: style[color_pair[0]+"_"+channel] = color_pair[1][channel]
+		data.LightArrowDefinition.append(style)
+		arrow.free()
 	data.FriendShotDefinition = [{"id":1,"contact":4}]
 	data.StringEntry = [{"id":1,"value":String(definition.id)}]
 	data.DefinitionIndex = [{"id":1,"enemy":1}]
@@ -304,6 +313,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.WallDefinition = resolved.WallDefinition
 		data.SlashDefinition = resolved.SlashDefinition
 		data.BoltDefinition = resolved.BoltDefinition
+		data.LightArrowDefinition = resolved.LightArrowDefinition
 		data.FriendShotDefinition = resolved.FriendShotDefinition
 		data.BudgetPhase = resolved.BudgetPhase
 		if data.ResourceKey.is_empty():
@@ -398,6 +408,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")
+	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")
 	for visual: Dictionary in visuals:
 		if visual.role!=7 and not visual.path.is_empty() and not paths.has(visual.path): paths.append(visual.path)
 	for metadata: Dictionary in appearance_metadata.values():

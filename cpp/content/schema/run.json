@@ -1290,6 +1290,10 @@
       {
         "name": "Bolt",
         "value": "bolt"
+      },
+      {
+        "name": "Arrow",
+        "value": "arrow"
       }
     ],
     "VisualRole": [
@@ -1626,6 +1630,10 @@
       {
         "name": "Blast",
         "value": "blast"
+      },
+      {
+        "name": "LightArrow",
+        "value": "light_arrow"
       }
     ]
   },

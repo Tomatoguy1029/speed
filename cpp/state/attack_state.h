@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 namespace speed {
+struct LightArrowState {uint32_t definition=0;float length=0;};
 struct BoltState {uint32_t definition=0;};
 struct SlashState {uint32_t definition=0;float side=1;};
 struct BudgetToken {int64_t value=0;};

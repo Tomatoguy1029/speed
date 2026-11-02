@@ -167,6 +167,7 @@ struct RunState {
     struct Hostile {
         speed::SlashState slash;
         speed::BoltState bolt;
+        speed::LightArrowState arrow;
         uint32_t definition=0;
         bool alive = true;
         int64_t kind = 0;

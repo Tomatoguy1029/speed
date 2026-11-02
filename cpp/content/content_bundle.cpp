@@ -72,6 +72,10 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->walls=records.WallDefinition_rows;
     bundle->slashes=records.SlashDefinition_rows;
     bundle->bolts=records.BoltDefinition_rows;
+    bundle->light_arrows=records.LightArrowDefinition_rows;
+    for (size_t i=0;i<bundle->light_arrows.size();++i) {
+        const auto &arrow=bundle->light_arrows[i];if (arrow.id!=i+1 || arrow.flight_scale<=0 || arrow.shot_length_scale<=0 || arrow.shot_width_scale<=0) return {};
+    }
     for (size_t i=0;i<bundle->bolts.size();++i) {
         const auto &bolt=bundle->bolts[i];
         if (bolt.id!=i+1 || bolt.radius<=0 || bolt.life<=0 || bolt.flight_scale<=0 ||
