@@ -53,6 +53,7 @@ func _ready() -> void:
 
 ## 噛みつきの既存四方向・正常終了・横避け・中断を同じSourceへ照合する。
 func native_bite() -> void:
+	var strict:="--semantics-strict" in OS.get_cmdline_user_args()
 	var event_only := "--cpp-draco-bite-events" in OS.get_cmdline_user_args()
 	var hit_only := "--cpp-draco-bite-hit" in OS.get_cmdline_user_args() or event_only
 	var builder = load("res://tools/content/build_run_content.gd")
@@ -63,7 +64,10 @@ func native_bite() -> void:
 	check(package.records.BossTechniqueDefinition.size()==3 and package.records.BossTechniqueDefinition[2].phase==3,"Sourceと同じ3形態の噛みつき値を生成する")
 	var stage: RuntimeStage = ContentManager.runtime_stage(5).duplicate(true)
 	stage.boss_enabled = false
-	var session := RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":709},false)
+	var session
+	if strict:
+		session=load("res://tests/draco.gd").SemanticsSession.new();session.sim=RunSimulation.new();session.sim.actor_parent=self;session.sim.options={"lab":true,"stage":stage,"stage_index":5,"seed":709,"empty":true};session.sim.setup();add_child(session)
+	else:session=RunManager.create_session(self,{"lab":true,"stage":stage,"stage_index":5,"seed":709},false)
 	session.auto_step = false
 	var sim: RunSimulation = session.sim
 	sim.field.bodies.clear();sim.state.phase=RunState.Phase.PLAY;sim.ship.invincible=false
@@ -108,7 +112,7 @@ func native_bite() -> void:
 			stage_equal = stage_equal and attack.stage==expected
 			var source_points: PackedVector2Array = a.body_points()
 			for j in source_points.size(): max_shape_error=maxf(max_shape_error,source_points[j].distance_to(body.body_points[j]))
-			if frame==40:
+			if not strict and frame==40:
 				var held: Dictionary = bridge.checkpoint()
 				check(held.ok,"予告途中の首姿勢と固定照準を保持する")
 				bridge._core.step(1.0/120.0)
@@ -117,7 +121,7 @@ func native_bite() -> void:
 				bridge._core.step(1.0/120.0)
 				check(bridge.command("dev_boss_state").value==future,"復帰後も同じ首姿勢・段階・照準で進む")
 				bridge.restore(held.value);bridge.release_checkpoint(held.value)
-			if frame==100:
+			if not strict and frame==100:
 				var display = load("res://scripts/render/bosses/draco.gd").new()
 				add_child(display)
 				display.apply_frame(body,attack,package.visuals[-1].appearance)
@@ -125,7 +129,9 @@ func native_bite() -> void:
 				rendered=display._parts.visible and attack.attack_points.size()==2 and attack.mouth_open==1.0
 				display.free()
 		check(stage_equal,"Sourceの予告→実行→回復→待機と開始・終了tickが一致する")
-		check(max_position_error<0.1 and max_shape_error<0.1,"Sourceの首と全身の判定点列が一致する: %s/%s"%[max_position_error,max_shape_error])
+		check(max_position_error<=(1e-4 if strict else 0.1) and max_shape_error<=(1e-4 if strict else 0.1),"Sourceの首と全身の判定点列が一致する: %s/%s"%[max_position_error,max_shape_error])
+		if strict:
+			print("SEMANTICS_DRACO_BITE ",angle," errors=",[max_position_error,max_shape_error]," failures=",failures);bridge.dispose();continue
 		check(rendered,"予告と同じ技状態から体と口の攻撃軌跡を描画する")
 		var attack: Dictionary = bridge.command("dev_boss_state").value[0]
 		check(attack.stage==5 and attack.hit,"四方向の静止対象に1回命中して自然終了する")
@@ -145,6 +151,7 @@ func native_bite() -> void:
 		bridge.command("dev_cancel_boss",{"entity_id":boss})
 		check(bridge.command("dev_boss_state").value[0].stage==7,"本体消失で参加中の噛みつきを取消す")
 		bridge.dispose()
+	if strict:session.dispose_source()
 	session.free()
 	if event_only: native_bite_flow(builder,package,cfg,definition,move)
 	print("[cpp_draco_bite] failures=",failures)

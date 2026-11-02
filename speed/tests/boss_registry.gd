@@ -11,6 +11,9 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 func _ready() -> void:
 	for argument:String in OS.get_cmdline_user_args():
+		if argument.begins_with("--semantics-draco="):
+			call_deferred("semantics_draco_"+argument.trim_prefix("--semantics-draco="));return
+	for argument:String in OS.get_cmdline_user_args():
 		if argument.begins_with("--semantics-hydra="):
 			call_deferred("semantics_hydra_"+argument.trim_prefix("--semantics-hydra="));return
 	if "--cpp-hydra-finish-cause" in OS.get_cmdline_user_args() or "--cpp-hydra-finish-damage" in OS.get_cmdline_user_args():
@@ -6865,3 +6868,148 @@ func semantics_hydra_regrow() -> void:
 	bridge._core.step(0.101);body=bridge.command("dev_boss_body_state").value[0]
 	check(semantics_number(body.growth_left,0.1),"8首成長時計の指定許容幅")
 	semantics_hydra_finish(bridge,"regrow")
+
+func semantics_draco_body() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/draco.tres")
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	if package.is_empty(): get_tree().quit(1); return
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":146,"mode":1,"stage_id":"B_draco_body","profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); get_tree().quit(1); return
+	bridge.start(146,{"position":Vector2(1800,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	bridge._core.set_motion_context(Vector2(1800,0),Vector2(-900,0),Vector2(640,360))
+	var spawned: Dictionary = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false})
+	if not spawned.ok: get_tree().quit(1); return
+	var id: int = spawned.value
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var ids := {}
+	for part: Dictionary in body.participants:
+		ids[part.id] = true
+
+	bridge._core.step(0.1);body=bridge.command("dev_boss_body_state").value[0]
+	var tail_id:int=body.participants[-1].id
+	for target in [id,tail_id]:bridge.command("dev_damage",{"entity_id":target,"amount":10.0,"cause":"bullet","direction":Vector2.RIGHT,"knock":1500.0})
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.hp,body.max_hp-20.0) and semantics_number(body.segments[-1].hp,definition.hp),"胴から本体への共有HPの指定許容幅")
+	bridge.command("dev_damage",{"entity_id":tail_id,"amount":1.0e8,"cause":"bullet"});body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.hp,body.max_hp*0.7),"第2形態のSource HP下限の指定許容幅")
+	bridge._core.step(1.01);bridge.command("dev_damage",{"entity_id":id,"amount":1.0e8,"cause":"bullet"});body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.hp,body.max_hp*0.4),"第3形態のSource HP下限の指定許容幅")
+	semantics_hydra_finish(bridge,"draco_body")
+
+func semantics_draco_pose() -> void:
+	var form = load("res://scripts/bosses/draco_form.gd")
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	var definition = load("res://data/bosses/draco.tres")
+	var package: Dictionary = builder.boss_body_package(definition,cfg)
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var bytes: PackedByteArray = builder.Schema.write_content(package.records,"0".repeat(64).hex_decode())
+	check(bridge.configure(bytes,{"api_version":1,"run_id":151,"mode":1,"stage_id":"B_draco_pose","profile":{},"settings":{"hitstop":false}}).ok,"姿勢と寸法の編集値をC++へ読む")
+	bridge.start(151,{"position":Vector2(500,0)})
+	bridge.subscribe("確認",func(_frame): return true)
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var neutral := PackedVector2Array([Vector2.ZERO])
+	for j in int(definition.params.body_segments):
+		var t := float(j+1)/float(definition.params.body_segments)
+		neutral.append(Vector2(-t*float(definition.params.body_length),sin(t*TAU*1.25)*float(definition.params.body_wave)*sin(t*PI*0.8)))
+	var original_length: float = form.length(neutral)
+	for j in neutral.size(): neutral[j] *= float(definition.params.body_length)/original_length
+	var same: bool = body.body_points.size()==neutral.size()
+	for j in neutral.size(): same = same and body.body_points[j].distance_to(neutral[j])<=1e-4
+	check(same,"最初の姿勢は既存と同じ波と長さの点列を使う")
+	var base_radius: float = body.radius
+	check(semantics_number(base_radius,definition.radius*float(definition.params.head_scale)),"頭の半径にキャラクター倍率を重ねない")
+	for depth in [0.25,0.1,1.0]:
+		check(bridge.command("dev_draco_pose",{"entity_id":id,"operation":"depth","depth":depth,"alpha":0.4}).ok,"深度と透明度を適用する")
+		body = bridge.command("dev_boss_body_state").value[0]
+		check(semantics_number(body.radius,base_radius*depth) and semantics_number(body.alpha,0.4),"深度は頭の命中半径と表示の両方へ同じ倍率を渡す")
+		for j in body.segments.size():
+			var fraction := float(j+1)/float(body.segments.size())
+			check(body.segments[j].position.distance_to(form.sample(body.body_points,fraction))<=1e-4 and semantics_number(body.segments[j].radius,float(definition.params.body_width)*0.5*form.taper(fraction)*depth),"描画と部位は同じ距離分率と尾の太さを使う")
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"reset"})
+	var override := PackedVector2Array([Vector2.ZERO,Vector2(80,0),Vector2(80,500),Vector2(900,500)])
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"override","points":override})
+	body = bridge.command("dev_boss_body_state").value[0]
+	for j in body.segments.size():
+		check(body.segments[j].position.distance_to(form.sample(override,float(j+1)/float(body.segments.size())))<=1e-4,"違う点数の姿勢でも部位を距離で配置する")
+
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"depth","depth":0.25,"alpha":0.4})
+	bridge.command("dev_draco_pose",{"entity_id":id,"operation":"reset"});body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.perspective_scale,1.0) and semantics_number(body.alpha,1.0) and semantics_number(body.radius,base_radius),"取消時の寸法の指定許容幅")
+	semantics_hydra_finish(bridge,"draco_pose")
+
+func semantics_hydra_detached() -> void:
+	var kind:="bite_sweep"
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--move="):kind=arg.trim_prefix("--move=")
+	var edits:={"normal_charge":0.15,"normal_hold":0.3,"attack_cd":0.05,"sweep_time":0.4,"sweep_arc":1.8,"sweep_reach":350.0,"bite_radius":150.0,"wind_time":0.4,"wind_length":300.0,"wind_width":90.0,"wind_force":400.0,"blade_interval":0.08,"blade_size":60.0,"blade_width":40.0,"blade_speed":300.0,"blade_life":3.0,"blade_spread":1.0,"bite_dmg":7.0,"lump_speed":400.0,"lump_dmg":7.0,"rubble_count":6,"rubble_spread":1.3,"rubble_small_radius":16.0,"lump_r":26.0}
+	var move=load("res://data/bosses/hydra_moves/%s.tres"%kind)
+	var allowed:Dictionary=move.values();var selected:={}
+	for key in edits:
+		if allowed.has(key):selected[key]=edits[key]
+	var c:=hydra_normal_case(false,{},selected,kind)
+	if c.is_empty():check(false,"分離後の数値場面を準備する");get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_attack_formation_mode(true)
+	var body:Dictionary=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var row:int=2 if kind.begins_with("rubble") else 0 if kind=="bite_sweep" else 1
+	var head:Dictionary=body.necks[row]
+	if head.cd>0:bridge._core.step(head.cd+0.001)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[row]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.look_angle)*400.0,"velocity":Vector2.ZERO})
+	check(bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1}).ok,"分離後の数値対象の技を開始する")
+	if kind=="wind_band":bridge._core.step(0.08);bridge._core.step_hazards(0.08);bridge._core.step(0.08);bridge._core.step_hazards(0.08)
+	else:bridge._core.step(0.16)
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[row]
+	var effects:Array=body.effects.filter(func(e):return e.technique==kind)
+	check(not effects.is_empty(),"分離後の実際の攻撃値を採取する")
+	if effects.is_empty():semantics_hydra_finish(bridge,"detached_"+kind);return
+	if kind=="bite_sweep":check(semantics_number(effects[-1].life,0.1),"分離後の薙ぎ区間の寿命の指定許容幅")
+	elif kind=="wind_band":
+		check(effects[0].points[0].distance_to(head.position)<=1e-4,"分離後の風の初期起点の指定許容幅")
+		bridge._core.step(0.05);bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
+		check(body.effects[0].points[0].distance_to(body.necks[row].position)<=1e-4,"分離後の風の頭追従の指定許容幅")
+	elif kind=="wind_blades":
+		check(((effects[0].points[0]+effects[0].points[12])*0.5).distance_to(head.position)<=1e-4,"分離後の風刃1枚目の起点の指定許容幅")
+		bridge._core.step(0.08);body=bridge.command("dev_boss_body_state").value[0]
+		check(((body.effects[-1].points[0]+body.effects[-1].points[12])*0.5).distance_to(body.necks[row].position)<=1e-4,"分離後の風刃2枚目の起点の指定許容幅")
+	else:
+		var stones:Array=bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead)
+		for j in stones.size():
+			var angle:float=head.look_angle+(float(j)/5.0-0.5)*1.3 if kind=="rubble_fan" else head.look_angle
+			check(Vector2(stones[j].pos[0],stones[j].pos[1]).distance_to(head.position)<=1e-4 and Vector2(stones[j].vel[0],stones[j].vel[1]).distance_to(Vector2.from_angle(angle)*400.0)<=1e-4,"分離後の瓦礫の起点と視線方向速度の指定許容幅")
+	semantics_hydra_finish(bridge,"detached_"+kind)
+
+func semantics_hydra_lifecycle() -> void:
+	var edits:={"normal_charge":0.15,"blade_interval":0.08,"normal_hold":0.2,"attack_cd":0.05,"blade_size":60.0,"blade_width":40.0,"blade_speed":300.0,"blade_life":3.0,"blade_spread":1.0,"bite_dmg":7.0}
+	var c:=hydra_regrow_case(false,{},edits,"wind_blades");var bridge=c.bridge
+	bridge._core.set_attack_formation_mode(true);bridge._core.set_motion_context(Vector2(1600,0),Vector2.ZERO,Vector2(2500,1800));bridge._core.step(4.0)
+	var body:Dictionary=bridge.command("dev_boss_body_state").value[0];var head:Dictionary=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(body.facing+TAU/3)*400,"velocity":Vector2.ZERO})
+	check(bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1}).ok,"成長前の風刃の数値場面を開始する")
+	bridge._core.step(0.16);body=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp*(1.0-c.package.records.HydraRegrowDefinition[0].growth_first+0.01),"cause":"shot"})
+	bridge._core.step(0.01);bridge._core.step_hazards(0.05)
+	bridge._core.step(0.11);bridge._core.step(0.01);bridge._core.step_hazards(0.01);body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==1 and semantics_number(body.effects[0].age,0.01),"成長後に再開した風刃時計の指定許容幅")
+	bridge.dispose()
+	c=hydra_normal_case(true,{}, {"normal_charge":0.15,"wind_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"wind_length":300.0,"wind_width":90.0,"wind_force":400.0},"wind_band");bridge=c.bridge
+	body=bridge.command("dev_boss_body_state").value[0];head=body.necks[1]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*200.0,"velocity":Vector2.ZERO})
+	for tick in 100:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	bridge._core.step(0.08);bridge._core.step_hazards(0.08);bridge._core.step(0.08);bridge._core.step_hazards(0.08)
+	bridge.command("dev_ship_motion",{"position":Vector2(900,-600),"velocity":Vector2.ZERO});bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	bridge._core.step(0.5);bridge._core.step_hazards(0.5);body=bridge.command("dev_boss_body_state").value[0]
+	check(semantics_number(body.necks[1].cd,0.05),"自然終了したtickの再使用待ちの指定許容幅")
+	semantics_hydra_finish(bridge,"lifecycle")

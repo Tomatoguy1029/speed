@@ -31,6 +31,9 @@ func semantics_finish(bridge,session,label: String,errors: Array) -> void:
 	bridge.dispose();session.dispose_source();session.free();get_tree().quit(1 if failed else 0)
 
 func _ready() -> void:
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-draco-damage="):
+			call_deferred("semantics_damage",arg.trim_prefix("--semantics-draco-damage="));return
 	if "--cpp-draco-finish" in OS.get_cmdline_user_args():
 		call_deferred("native_finish")
 		return
@@ -1081,7 +1084,7 @@ func native_picaro_wall() -> void:
 	var impacts_equal:=true
 	var members_equal:=true
 	var member_diagnostic:=false
-	var remaining_only:= "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args()
+	var remaining_only:= semantics_strict() or "--cpp-draco-picaro-wall-remaining" in OS.get_cmdline_user_args()
 	var saved: Array=[]
 	var shown:=false
 	for frame in 1050:
@@ -1097,11 +1100,11 @@ func native_picaro_wall() -> void:
 				for j in attack.arrow_impacts.size():
 					var native: Dictionary=attack.arrow_impacts[j]
 					var old: Dictionary=a._runner.impacts[j]
-					impacts_equal=impacts_equal and is_equal_approx(native.age,old.age) and is_equal_approx(native.wait,old.wait) and native.locked==(old.pos!=Vector2.INF) and (not native.locked or native.position.distance_to(old.pos)<0.01)
+					impacts_equal=impacts_equal and semantics_number(native.age,old.age) and semantics_number(native.wait,old.wait) and native.locked==(old.pos!=Vector2.INF) and (not native.locked or native.position.distance_to(old.pos)<=(1e-4 if semantics_strict() else 0.01))
 		members_equal=members_equal and body.picaro.size()==a.picaro.alive().size()
 		for j in mini(body.picaro.size(),a.picaro.alive().size()):
 			var m: Dictionary=a.picaro.alive()[j]
-			var match_member: bool=body.picaro[j].position.distance_to(a.table.pos[m.row])<0.1 and body.picaro[j].held==(a.table.held[m.row]!=0)
+			var match_member: bool=body.picaro[j].position.distance_to(a.table.pos[m.row])<=(1e-4 if semantics_strict() else 0.1) and body.picaro[j].held==(a.table.held[m.row]!=0)
 			if not match_member and not member_diagnostic:
 				member_diagnostic=true;print("隊列差 frame=",frame," native=",body.picaro[j]," source_position=",a.table.pos[m.row]," held=",a.table.held[m.row]," clock=",a.clock)
 			members_equal=members_equal and match_member
@@ -1121,6 +1124,9 @@ func native_picaro_wall() -> void:
 			shown=true
 			await show_native_draco(fixture,body,attack)
 		if attack.stage==5:break
+	if semantics_strict():
+		check(times_equal and impacts_equal and members_equal,"隊列と矢の時計と位置の指定許容幅")
+		semantics_finish(bridge,source.session,"picaro_wall",[]);return
 	if not remaining_only:check(times_equal and impacts_equal,"Sourceと予告・発射・画面上端による待ち・照準固定・着弾・終了のtickが一致する")
 	check(members_equal and (remaining_only or saved.size()==4 and shown),"隊列の配置・生成保護・停止と全段階の保持復帰・表示を通る")
 
@@ -1260,7 +1266,7 @@ func native_spiral_contact() -> void:
 		if attack.trapped_hit:break
 	var hits: Array=fixture.captured.filter(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"spiral")
 	if hits.size()!=1:print("収縮の被弾=",fixture.captured.filter(func(e):return e.type==&"combat_player_damage"))
-	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and is_equal_approx(hits[0].payload.hp_before-hits[0].payload.hp_after,35.0),"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
+	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and semantics_number(hits[0].payload.hp_before-hits[0].payload.hp_after,35.0),"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
 	bridge.dispose()
 	print("[cpp_draco_spiral_contact] failures=",failed);get_tree().quit(1 if failed else 0)
 
@@ -1754,3 +1760,27 @@ func native_finish() -> void:
 			bridge.dispose()
 	print("[cpp_draco_finish] group=",group," failures=",failed)
 	get_tree().quit(1 if failed else 0)
+
+func semantics_damage(kind: String) -> void:
+	var move:BossTechnique=load("res://data/bosses/draco_moves/%s.tres"%kind).duplicate(true)
+	if kind=="picaro_wall":move.count=0
+	var fixture:=breath_fixture(move);var bridge=fixture.bridge
+	bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+	if kind=="clones":
+		var action:Dictionary=bridge.command("dev_boss_state").value[0]
+		check(action.clones.size()>1 and not action.clones[1].parts.is_empty(),"複製の実HPの数値を採取する")
+		if action.clones.size()>1 and not action.clones[1].parts.is_empty():
+			var parts:PackedInt64Array=action.clones[1].parts
+			bridge.command("dev_damage",{"entity_id":parts[parts.size()/2],"amount":25.0,"cause":"shot"})
+			var hp:float=bridge.command("dev_boss_state").value[0].clones[1].hp
+			check(semantics_number(hp,float(move.clone_hp)-25.0),"複製の独立HPの指定許容幅")
+	else:
+		var cause:String="blast" if kind=="picaro_wall" else "inhale_bite"
+		for tick in (400 if kind=="picaro_wall" else 1500):
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0);bridge.command("dev_boss_state")
+			if fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==StringName(cause)):break
+		var hits:Array=fixture.captured.filter(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==StringName(cause))
+		check(not hits.is_empty(),"実HPの数値を採取する: "+kind)
+		var damage:float=(move.damage if kind=="picaro_wall" else move.bite_damage)*float(load("res://data/config.tres").atk_scale)
+		for hit:Dictionary in hits:check(semantics_number(hit.payload.hp_before-hit.payload.hp_after,damage),"ドラコ固有命中の実HPの指定許容幅: "+kind)
+	bridge.dispose();print("SEMANTICS_DRACO_DAMAGE ",kind," failures=",failed);get_tree().quit(1 if failed else 0)
