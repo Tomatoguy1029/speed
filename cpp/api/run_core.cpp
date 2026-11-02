@@ -595,6 +595,7 @@ Array SpeedRunCore::enemies_snapshot() const {
         row["pos"] = Array::make(enemy.pos.x, enemy.pos.y);
         row["vel"] = Array::make(enemy.vel.x, enemy.vel.y);
         row["hp"] = enemy.hp; row["armor"] = enemy.armor;
+        row["max_hp"]=enemy.max_hp;row["speed"]=enemy.speed;
         row["radius"] = enemy.radius; row["facing"] = enemy.facing; row["dead"] = enemy.dead ? 1 : 0;row["hull_scattered"]=enemy.hull_scattered;
         out.append(row);
     }

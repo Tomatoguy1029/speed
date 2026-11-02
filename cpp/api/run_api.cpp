@@ -3,6 +3,7 @@
 #include "../behaviors/enemies/soldier.h"
 #include "../systems/attack_system.h"
 #include "../runtime/run_runner.h"
+#include "../runtime/dev_commands.h"
 #include "../runtime/lifecycle.h"
 #include "../output/event_builder.h"
 #include "../output/render_builder.h"
@@ -321,7 +322,12 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         const bool removed=remove_enemy(int64_t(payload["entity_id"]));
         if (removed) rebuild_enemy_grid(runtime.state.frame_grid_cell);
         response=removed?success():failure(5,"entity_id","対象がありません");
-    } else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat" || kind=="dev_corona_after_combat") response=development_combat_command(kind,payload);
+    } else if (kind=="dev_replace_definition") response=speed::DevCommands::replace_definition(runtime,payload);
+    else if (kind=="dev_tune" && payload.size()==3 && is(payload,"target_id",Variant::STRING) && is(payload,"revision",Variant::INT) && is(payload,"values",Variant::PACKED_BYTE_ARRAY)) {
+        Dictionary replace;replace["definition_id"]=payload["target_id"];replace["expected_revision"]=payload["revision"];replace["replacement"]=payload["values"];
+        response=speed::DevCommands::replace_definition(runtime,replace);
+    } else if (kind=="dev_edit" && payload.size()==2 && is(payload,"kind",Variant::STRING) && is(payload,"payload",Variant::DICTIONARY) && (String(payload["kind"])=="parameter" || String(payload["kind"])=="boss_parameter" || String(payload["kind"])=="config")) response=speed::DevCommands::replace_definition(runtime,payload["payload"]);
+    else if (kind=="dev_damage" || kind=="dev_kill" || kind=="dev_ship_damage" || kind=="dev_enemy_combat" || kind=="dev_corona_after_combat") response=development_combat_command(kind,payload);
     else if (kind=="dev_friend_births" || kind=="dev_friend_reserve") response=development_friend_command(kind,payload);
     else if (kind=="dev_emit_attack" || kind=="dev_end_attack" || kind=="dev_attack_scope" || kind=="dev_clear_hostile" || kind=="dev_attack_update") response=development_attack_command(kind,payload);
     else if (kind=="dev_fire_light_arrow") response=development_light_arrow_command(payload);
@@ -346,6 +352,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else response=failure(1,"kind/payload","未登録の命令または引数です");
     speed::EventBuilder::flush_combat(runtime);
     if (bool(response["ok"])) {
+        if (kind=="dev_replace_definition" || kind=="dev_tune" || kind=="dev_edit") rebuild_enemy_grid(runtime.state.frame_grid_cell);
         ++runtime.state.control.revision;
         if (runtime.frame_workspace.metrics.commands<INT64_MAX) ++runtime.frame_workspace.metrics.commands;
     }

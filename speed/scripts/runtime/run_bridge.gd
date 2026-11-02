@@ -140,6 +140,22 @@ func query_route(points: PackedVector2Array, parameters := {}) -> Dictionary:
 	if _core==null: return _error(4,"route","開始していないランです")
 	return _core.query_route_run(points,parameters)
 
+## 編集の間だけ停止し、編集直前の版を照合する。固定tickと元の停止状態を保つ。
+## replacementは通常生成器が検証した戦闘バイナリで、ResourceをC++へ渡さない。
+func replace_definition(definition_id: String, replacement: PackedByteArray, edit_kind := "parameter") -> Dictionary:
+	var frame := read_frame()
+	if not frame.ok: return frame
+	var was_paused: bool = frame.value.ui.phase==RunState.Phase.PAUSED
+	if not was_paused:
+		var paused := command("pause",{"paused":true})
+		if not paused.ok: return paused
+	frame = read_frame()
+	var result := command("dev_edit",{"kind":edit_kind,"payload":{"definition_id":definition_id,"expected_revision":frame.value.state_revision,"replacement":replacement}}) if frame.ok else frame
+	if not was_paused:
+		var resumed := command("pause",{"paused":false})
+		if result.ok and not resumed.ok: return resumed
+	return result
+
 func checkpoint() -> Dictionary:
 	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"checkpoint","更新中は保持できません")
