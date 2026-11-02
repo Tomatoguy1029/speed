@@ -86,7 +86,7 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         libraries = list(path.glob("*.app/Contents/Frameworks/*speed_runtime*.dylib"))
         assert len(libraries) == 1, "Mac配布にはUniversalライブラリを1つ含める"
         library = libraries[0]
-        subprocess.run(["lipo", "-verify_arch", "arm64", "x86_64", str(library)], check=True)
+        subprocess.run(["lipo", str(library), "-verify_arch", "arm64", "x86_64"], check=True)
         assert config.count(".template_release.universal.dylib") == 2, "両CPUの参照先がUniversalで一致する"
         executables = list(path.glob("*.app/Contents/MacOS/*"))
         assert len(executables) == 1, "配布エンジンを確認する"
@@ -108,7 +108,7 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         executable = shutil.which("godot-bg")
         assert executable, "描画付きの確認にはgodot-bgが必要"
         environment["GODOT"] = str(engine)
-    command = [executable, *([] if rendered else ["--headless"]), "--main-pack", str(packs[0]), "--script", str(script.resolve()), "--log-file", str(path.parent / "runtime.log"), "--"]
+    command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "runtime.log"), "--"]
     result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
     print(result.stdout)
     assert result.returncode == 0 and "[package_runtime] OK" in result.stdout, "通常ランの開始と最小更新を最後まで実施する"
@@ -119,7 +119,7 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         (missing / library.relative_to(path)).unlink()
         missing_engine = missing / engine.relative_to(path)
         missing_pack = missing / packs[0].relative_to(path)
-        result = subprocess.run([str(missing_engine), "--headless", "--main-pack", str(missing_pack), "--script", str(script.resolve()), "--log-file", str(path.parent / "missing-runtime.log"), "--", "--package-missing-runtime"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=missing)
+        result = subprocess.run([str(missing_engine), "--headless", "--log-file", str(path.parent / "missing-runtime.log"), "--", "--package-missing-runtime"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=missing)
         print(result.stdout)
         assert result.returncode == 0 and "[package_missing_runtime] OK" in result.stdout, "拡張欠落を開始失敗として確認する"
 

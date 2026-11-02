@@ -108,13 +108,13 @@ func _package_runtime() -> void:
 		if session.bridge!=null or session.cpp_error!=OK: break
 		await process_frame
 	if missing:
-		var rejected: bool = session.bridge==null and session._sim==null and session.cpp_error!=OK
+		var rejected: bool = session.bridge==null and not _package_has_legacy(session) and session.cpp_error!=OK
 		session.free()
 		if rejected: print("[package_missing_runtime] OK")
 		else: push_error("拡張欠落時にランの準備失敗が必要です")
 		quit(0 if rejected else 1)
 		return
-	if session.bridge==null or session._sim!=null:
+	if session.bridge==null or _package_has_legacy(session):
 		push_error("配布の通常入口がC++ランを開始しません")
 		session.free()
 		quit(1)
@@ -129,3 +129,8 @@ func _package_runtime() -> void:
 	if ok: print("[package_runtime] OK cpu="+Engine.get_architecture_name())
 	else: push_error("配布ランを最小更新できません")
 	quit(0 if ok else 1)
+
+func _package_has_legacy(session: Object) -> bool:
+	for property: Dictionary in session.get_property_list():
+		if property.name=="_sim": return session.get("_sim")!=null
+	return false

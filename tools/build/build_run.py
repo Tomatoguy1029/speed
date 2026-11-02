@@ -28,6 +28,29 @@ def build(root, lock, args, arch, output):
          'output_dir=' + str(output), 'build_dir=' + str(args.build_dir.resolve())])
 
 
+def prepare_verification(root, project):
+    # 公式配布エンジンは外部script/PCKへの切替を無効にするため、
+    # 既存確認の本文だけを独立した確認用コピーの起動Scriptへ載せる。
+    checks = (root / 'speed/tests/check_rules.gd').read_text()
+    methods = []
+    for name in ['_package_runtime', '_package_has_legacy']:
+        match = re.search(r'^func ' + name + r'\([^\n]*\n.*?(?=^func |\Z)', checks, re.M | re.S)
+        if not match:
+            raise ValueError('既存の配布確認がありません: ' + name)
+        method = re.sub(r'\broot\b', 'get_tree().root', match[0])
+        method = re.sub(r'(?<![\w.])quit\(', 'get_tree().quit(', method)
+        method = re.sub(r'\bprocess_frame\b', 'get_tree().process_frame', method)
+        methods.append(method.rstrip())
+    path = project / 'scripts/ui/main.gd'
+    text = path.read_text()
+    ready = 'func _ready() -> void:\n'
+    if ready not in text or 'func _package_runtime(' in text:
+        raise ValueError('確認用の起動Scriptを安全に準備できません')
+    hook = ('\tif "--package-runtime" in OS.get_cmdline_user_args() or "--package-missing-runtime" in OS.get_cmdline_user_args():\n'
+            '\t\tcall_deferred("_package_runtime")\n\t\treturn\n')
+    path.write_text(text.replace(ready, ready + hook, 1) + '\n\n' + '\n\n'.join(methods) + '\n')
+
+
 def package(root, lock, args):
     destination = args.package_dir.resolve()
     if destination == root or root in destination.parents:
@@ -57,6 +80,8 @@ def package(root, lock, args):
             raise ValueError('保存先の隔離対象を確認できません: ' + key)
         source = source.replace(before, f'const {key} := {json.dumps(str(destination / filename))}', 1)
     save.write_text(source)
+    if args.verify:
+        prepare_verification(root, project)
     libraries = project / 'extensions/run/bin'
     libraries.mkdir(parents=True, exist_ok=True)
     arches = ['arm64', 'x86_64'] if args.platform == 'macos' else ['x86_64']

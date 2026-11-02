@@ -81,7 +81,7 @@ def generate():
     enum_values={name:{entry['name']:index for index,entry in enumerate(entries)} for name,entries in schema['enums'].items()}
     gd += ['const ENUMS = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS', GD_WRITER]
     runtime_ids = '## 共通スキーマから生成。直接編集しない。\nextends RefCounted\nconst ENUMS = ' + json.dumps(enum_values,ensure_ascii=False) + '\n'
-    return {'cpp/content/generated/combat_ids.h':'\n'.join(enums)+'\n','cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd)+'\n','speed/scripts/data_types/generated/run_ids.gd':runtime_ids}
+    return {'cpp/content/generated/combat_ids.h':'\n'.join(enums)+'\n','cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd).rstrip()+'\n','speed/scripts/data_types/generated/run_ids.gd':runtime_ids}
 
 GD_WRITER = r'''
 static func write_content(data: Dictionary, input_sha256: PackedByteArray) -> PackedByteArray:
