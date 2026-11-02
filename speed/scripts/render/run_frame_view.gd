@@ -22,6 +22,7 @@ var ruler_shake:=0.0
 var _ruler:=PackedFloat64Array()
 var _triangle_star := PackedFloat64Array()
 var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
+var _hero_power_visual: Node2D
 var _hero_canvas: DrawLayer
 var _hero_frame := {}
 var _hero_aura: MeshInstance2D
@@ -165,6 +166,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	for entry in entries: visuals[int(entry.id)] = entry
 	for entry: Dictionary in entries:
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
+	_hero_power_visual = preload("res://scripts/render/equipment/heroes.gd").new()
+	_layer(9).add_child(_hero_power_visual)
 	_hero_canvas = DrawLayer.new()
 	_hero_canvas.draw_fn = _draw_hero_values
 	_layer(2).add_child(_hero_canvas)
@@ -361,6 +364,10 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 	return batch
 
 func _valid(frame: Dictionary) -> bool:
+	if frame.has("petrified_enemies"):
+		if not frame.petrified_enemies is PackedFloat32Array or frame.petrified_enemies.size()%3: return false
+		for value: float in frame.petrified_enemies:
+			if not is_finite(value): return false
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
 	if frame.has("boss_bodies"):
 		if not frame.boss_bodies is Array: return false
@@ -557,6 +564,8 @@ func _valid(frame: Dictionary) -> bool:
 func apply_frame(frame: Dictionary) -> bool:
 	var begin := Time.get_ticks_usec()
 	if not _valid(frame): return false
+	_hero_power_visual.petrified = frame.get("petrified_enemies",PackedFloat32Array())
+	_hero_power_visual.queue_redraw()
 	var next_shots := {}
 	for row: Dictionary in frame.batches:
 		if visuals[row.visual_id].role==2: next_shots[row.visual_id] = row.transforms
@@ -984,6 +993,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rear_flashes = ShotFlashes.new()
 		_rear_shells.clear()
 		_rear_world_time = -1.0
+	_hero_power_visual.unit = 1.0/maxf(0.01,float(frame.camera.zoom))
 	_hero_frame = frame.ui.duplicate()
 	_hero_frame.camera_zoom = frame.camera.zoom
 	_hero_canvas.queue_redraw()

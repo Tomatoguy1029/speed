@@ -112,6 +112,27 @@
           "type": "u32"
         }
       ]
+    },
+    {
+      "name": "PerseusDefinition",
+      "section": 283,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "boss_stun",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

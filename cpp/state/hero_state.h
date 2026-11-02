@@ -14,6 +14,7 @@ struct HeroState {
     std::array<EnemyHandle,2> carriers{};
     std::array<int64_t,2> carrier_ids{};
     std::array<bool,2> done{};
+    double boss_stun=0;
     double cooldown=0,active=0,next=-1;
     int64_t last_dash=-1,last_star=-1;
     bool guarded=false,seen=false,announced=false;

@@ -203,9 +203,15 @@ bool SpeedRunCore::step(double delta) {
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
-    speed::MonocerosHornWave::advance_waves(runtime,delta);
-    speed::PhaseController::step(runtime,delta);
-    speed::FlowRunner::step(runtime,delta);
+    if (runtime.state.heroes.boss_stun>0) {
+        const double real_dt=runtime.state.control.last_world_real_dt>0?runtime.state.control.last_world_real_dt:delta;
+        runtime.state.heroes.boss_stun=std::max(0.0,runtime.state.heroes.boss_stun-real_dt);
+        for (const auto &body:runtime.state.bosses.bodies) if (runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) runtime.state.enemies[body.actor.slot].vel=Vector2();
+    } else {
+        speed::MonocerosHornWave::advance_waves(runtime,delta);
+        speed::PhaseController::step(runtime,delta);
+        speed::FlowRunner::step(runtime,delta);
+    }
     capture_avoidance();
     ++runtime.state.ticks;
     if (runtime.state.aim_ready && !runtime.state.draw.tracing) {

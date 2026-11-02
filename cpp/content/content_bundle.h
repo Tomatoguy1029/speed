@@ -14,6 +14,7 @@ struct ContentBundle {
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};
     RunConfig config;
     HeroConfig hero_config;
+    std::vector<PerseusDefinition> perseus;
     struct Hero { HeroDefinition definition;std::vector<godot::Vector2> stars;std::vector<std::pair<uint32_t,uint32_t>> links; };
     std::vector<Hero> heroes;
     std::array<double,3> crystal_values{};

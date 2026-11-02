@@ -84,7 +84,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         auto &out=group.second;out.instances.clear();out.biter=false;
         out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
-    PackedFloat32Array comet_values,crow_values;
+    PackedFloat32Array comet_values,crow_values,petrified_enemies;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -103,6 +103,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         const double radius=meteor?FieldSystem::rock_sprite_radius(run,uint32_t(i)):enemy.radius*definition.sprite_scale;
         if (!view.grow(radius*1.4142135623730951).has_point(pose.position)) continue;
+        if (enemy.stone>0) for (float v:{pose.position.x,pose.position.y,float(enemy.radius)}) petrified_enemies.push_back(v);
         auto &enemy_batch=batch(FieldSystem::rock_visual(run,uint32_t(i)),meteor?7:8,int32_t(enemy.definition));
         if (definition.kind==EnemyDefinition::Kind::Crow) {
             const auto cargo=CrowBehavior::cargo(run,state.enemy_handles.at(uint32_t(i)));
@@ -288,6 +289,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;return out;
+    out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;return out;
 }
 }

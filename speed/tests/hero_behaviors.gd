@@ -6,6 +6,14 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-perseus-boss" in OS.get_cmdline_user_args():
+		_cpp_perseus_boss()
+		print("[cpp_H_perseus_boss] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--cpp-perseus" in OS.get_cmdline_user_args():
+		_cpp_perseus()
+		return
 	var session := RunManager.create_session(self, {"lab": true, "seed": 42}, false)
 	session.auto_step = false
 	var sim := session.sim
@@ -34,3 +42,115 @@ func _ready() -> void:
 	await get_tree().process_frame
 	print("[hero_behaviors] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)
+
+func _cpp_read(bridge) -> Dictionary:
+	var frame: Dictionary = bridge.read_frame()
+	check(frame.ok,"英雄の状態と登録通知を読む")
+	var delivered: Dictionary = bridge.collect_frame()
+	check(delivered.ok and bridge.delivery_error.get("ok",true),"英雄の通知を失わず配信する")
+	return frame.value if frame.ok else {}
+
+func _cpp_rescue(bridge,id: String) -> Dictionary:
+	check(bridge.command("dev_hero_place",{"id":id}).ok,"%sの星座を配置する" % id)
+	var h: Dictionary = _cpp_read(bridge).ui.hero
+	for i in range(0,h.links.size(),2): check(bridge.command("dev_hero_pass",{"from":h.stars[h.links[i]],"to":h.stars[h.links[i+1]],"dash":i}).ok,"星座線を通って救出する")
+	h = _cpp_read(bridge).ui.hero
+	check(h.power==StringName(id) and not h.captive,"救出した力が特別な枠へ入る")
+	return h
+
+func _cpp_step(bridge,intent: Intent = null) -> Dictionary:
+	if intent==null: intent = Intent.new()
+	var stepped: Dictionary = bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+	check(stepped.ok,"固定更新で英雄の入力と時計を進める")
+	return _cpp_read(bridge)
+
+func _cpp_enemy(bridge,id: int) -> Dictionary:
+	for enemy: Dictionary in bridge._core.enemy_motion_snapshot():
+		if enemy.id==id: return enemy
+	return {}
+
+func _cpp_perseus() -> void:
+	var fixture = load("res://tests/hero_guidance.gd").new()
+	var bridge = fixture._cpp_fixture(true)
+	_cpp_rescue(bridge,"perseus")
+	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
+	var inside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)}).value
+	var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(50000,0)}).value
+	var source: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(250,80)}).value
+	check(bridge.command("dev_fire_enemy",{"source_id":source,"angle":0.0,"speed":100.0}).ok,"画面内の敵弾を用意する")
+	var input := Intent.new()
+	input.hero_press = true
+	var frame := _cpp_step(bridge,input)
+	check(frame.ui.hero.power==&"perseus" and is_equal_approx(frame.ui.hero.active,6.0-1.0/120.0) and frame.ui.hero.cooldown>59.0,"救出後の通常入力で持続時間とクールダウンを始める")
+	check(_cpp_enemy(bridge,inside).stone==6.0 and _cpp_enemy(bridge,outside).stone==0.0,"画面内の敵だけを石化する")
+	check(bridge._core.hostiles_snapshot()[0].stone==6.0,"画面内の弾も同じ期間で石化する")
+	var held: Dictionary = bridge.checkpoint()
+	check(held.ok,"石化中のランを保持する")
+	bridge._core.step(1.0)
+	bridge._core.step_hostiles(1.0)
+	check(_cpp_enemy(bridge,inside).stone==5.0 and bridge._core.hostiles_snapshot()[0].stone==5.0,"敵と弾の石化は世界時間で減る")
+	bridge.command("dev_tick_heroes",{"dt":2.0,"run_time":2.0})
+	frame = _cpp_read(bridge)
+	check(is_equal_approx(frame.ui.hero.active,4.0-1.0/120.0) and _cpp_enemy(bridge,inside).stone==5.0,"力の実秒と石化の世界秒を分ける")
+	check(bridge.restore(held.value).ok,"石化の途中へ復帰する")
+	frame = _cpp_read(bridge)
+	check(is_equal_approx(frame.ui.hero.active,6.0-1.0/120.0) and _cpp_enemy(bridge,inside).stone==6.0 and bridge._core.hostiles_snapshot()[0].stone==6.0,"復帰で力・敵・弾の残り時間が戻る")
+	var render: Dictionary = bridge.read_render(Rect2(-640,-360,1280,720),1.0)
+	check(render.ok and render.value.petrified_enemies.size()==6,"石化した敵の円を表示配列へ出す")
+	bridge.command("dev_ship_motion",{"position":Vector2(120,0),"velocity":Vector2.ZERO})
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.collide_ship(Vector2(120,0),1.0)
+	frame = _cpp_read(bridge)
+	check(fixture._cpp_events.any(func(e): return e.type=="kill" and e.payload.id==inside),"石化した敵は接触で砕ける")
+	var shot: Dictionary = bridge._core.hostiles_snapshot()[0]
+	bridge.command("dev_ship_motion",{"position":shot.pos,"velocity":Vector2.ZERO})
+	bridge._core.step_hostiles(0.01)
+	check(bridge._core.hostiles_snapshot().is_empty() and bridge._core.ship_snapshot().ship_hp==hp,"石化した弾は触れても被弾せず砕ける")
+	bridge.command("dev_tick_heroes",{"dt":6.0,"run_time":6.0})
+	frame = _cpp_read(bridge)
+	check(frame.ui.hero.active==0.0 and fixture._cpp_events.any(func(e): return e.type=="hero_power_end"),"効果終了を通知する")
+	bridge._core.step(6.0)
+	check(_cpp_enemy(bridge,source).stone==0.0,"世界時間の期限で石化が解除される")
+	bridge.dispose()
+	failed += fixture.failed
+	fixture.free()
+	_cpp_perseus_boss()
+	print("[cpp_H_perseus] failed=%d" % failed)
+	get_tree().quit(1 if failed else 0)
+
+func _cpp_perseus_boss() -> void:
+	var fixture = load("res://tests/monoceros.gd").new()
+	var scene: Dictionary = fixture.charge_fixture(true,false,450.0,false,"horn_wave")
+	check(not scene.is_empty(),"ボスの衝撃波と英雄を同じランで準備する")
+	if scene.is_empty(): fixture.free(); return
+	var bridge = scene.bridge
+	_cpp_rescue(bridge,"perseus")
+	bridge._core.step(0.01)
+	bridge._core.step(0.1)
+	bridge._core.step(0.05)
+	check(fixture.wave_rows(bridge).size()==1,"停止の確認に使う角の衝撃波を放つ")
+	var input := Intent.new()
+	input.hero_press = true
+	var frame := _cpp_step(bridge,input)
+	check(frame.ui.hero.boss_stun==1.5,"ボスの停止時間を英雄定義から設定する")
+	var radius: float = fixture.wave_rows(bridge)[0].radius
+	var clock: float = bridge.command("dev_boss_body_state").value[0].clock
+	var world: float = frame.ui.world_time
+	var drawing := Intent.new()
+	drawing.press = true
+	drawing.pen = Vector2(300,0)
+	frame = _cpp_step(bridge,drawing)
+	var advanced := true
+	for i in 178:
+		var result: Dictionary = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+		advanced = advanced and result.ok and bridge.delivery_error.get("ok",true)
+	check(advanced,"停止期限までの固定更新と通知配信を通す")
+	frame = _cpp_read(bridge)
+	check(frame.ui.hero.boss_stun>0.0 and frame.ui.hero.boss_stun<=1.0/120.0+0.00001,"スロー中もボス停止だけ実秒で減る")
+	check(frame.ui.world_time-world<1.0 and fixture.wave_rows(bridge)[0].radius==radius and bridge.command("dev_boss_body_state").value[0].clock==clock,"ボス停止中は本体と本体所有の衝撃波を進めない")
+	for i in 4: _cpp_step(bridge)
+	frame = _cpp_step(bridge)
+	check(frame.ui.hero.boss_stun==0.0 and fixture.wave_rows(bridge)[0].radius>radius,"停止期限後に衝撃波とボスを再開する")
+	bridge.dispose()
+	failed += fixture.failed
+	fixture.free()

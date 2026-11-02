@@ -1,3 +1,4 @@
+#include "../behaviors/heroes/perseus.h"
 #include "heroes.h"
 #include "enemy_system.h"
 #include "field.h"
@@ -119,9 +120,10 @@ void HeroesSystem::recovered(RunRuntime &run,EnemyHandle enemy) {
 }
 void HeroesSystem::activate(RunRuntime &run) {
     auto &h=run.state.heroes;if (!h.power || h.cooldown>0) return;const auto &d=run.content->heroes[h.power-1].definition;h.cooldown=d.cooldown;h.active=d.duration;Dictionary data;data["id"]=name(run,h.power);data["pos"]=run.state.ship.pos;emit(run,"hero_power",data);
+    if (d.external_id=="perseus") PerseusBehavior::activate(run,d.duration);
 }
 Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
-    const auto &h=run.state.heroes;Dictionary out;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;
+    const auto &h=run.state.heroes;Dictionary out;out["boss_stun"]=h.boss_stun;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;
     godot::PackedVector2Array stars,landmarks;godot::PackedByteArray lit,done;godot::PackedInt32Array links;godot::PackedInt64Array ids;godot::PackedFloat64Array times;
     for (auto p:h.stars) stars.push_back(p);for (auto p:h.landmarks) landmarks.push_back(p);for (auto v:h.lit) lit.push_back(v);
     if (h.hero) for (auto [a,b]:run.content->heroes[h.hero-1].links) {links.push_back(a);links.push_back(b);}
@@ -129,7 +131,7 @@ Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
     out["stars"]=stars;out["links"]=links;out["lit"]=lit;out["landmarks"]=landmarks;out["carriers"]=ids;out["times"]=times;out["done"]=done;return out;
 }
 bool HeroesSystem::validate(const godot::RunState &s,const ContentBundle &c) {
-    const auto &h=s.heroes;if (h.hero>c.heroes.size() || h.power>c.heroes.size() || !h.center.is_finite() || !h.previous.is_finite() || !std::isfinite(h.cooldown) || !std::isfinite(h.active) || !std::isfinite(h.next) || h.cooldown<0 || h.active<0 || h.landmarks.size()>2) return false;
+    const auto &h=s.heroes;if (h.hero>c.heroes.size() || h.power>c.heroes.size() || !h.center.is_finite() || !h.previous.is_finite() || !std::isfinite(h.cooldown) || !std::isfinite(h.active) || !std::isfinite(h.next) || !std::isfinite(h.boss_stun) || h.boss_stun<0 || h.cooldown<0 || h.active<0 || h.landmarks.size()>2) return false;
     if (h.hero && (h.stars.size()!=c.heroes[h.hero-1].stars.size() || h.lit.size()!=c.heroes[h.hero-1].links.size())) return false;
     for (auto p:h.stars) if (!p.is_finite()) return false;for (auto p:h.landmarks) if (!p.is_finite()) return false;for (auto v:h.lit) if (v>1) return false;
     for (size_t i=0;i<2;++i) if (!std::isfinite(h.landmark_times[i]) || h.carrier_ids[i]<0 || (s.enemy_handles.contains(h.carriers[i]) && s.enemy_handles.entity_id(h.carriers[i])!=h.carrier_ids[i])) return false;return true;

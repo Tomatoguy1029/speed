@@ -52,6 +52,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->config=records.RunConfig_rows[0];
     if (records.HeroConfig_rows.size()!=1) return {};
     bundle->hero_config=records.HeroConfig_rows.front();
+    bundle->perseus=records.PerseusDefinition_rows;
     if (bundle->hero_config.first_max<bundle->hero_config.first_min || bundle->hero_config.second_max<bundle->hero_config.second_min) return {};
     std::unordered_set<std::string> hero_names;
     for (const auto &row:records.HeroDefinition_rows) {
@@ -64,7 +65,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (row.a>=hero.stars.size() || row.b>=hero.stars.size()) return {};
         hero.links.emplace_back(row.a,row.b);
     }
-    for (const auto &hero:bundle->heroes) if (hero.stars.empty() || hero.links.empty()) return {};
+    for (const auto &hero:bundle->heroes) {
+        if (hero.stars.empty() || hero.links.empty()) return {};
+        const auto count=std::count_if(bundle->perseus.begin(),bundle->perseus.end(),[&](const auto &p){return p.hero==hero.definition.id;});
+        if (count!=(hero.definition.external_id=="perseus"?1:0)) return {};
+    }
 
     bundle->aim_lag=records.RunConfig_rows[0].aim_lag;bundle->aim_speed=records.RunConfig_rows[0].aim_speed;
     bundle->crystal_values={records.RunConfig_rows[0].crystal_low,records.RunConfig_rows[0].crystal_mid,records.RunConfig_rows[0].crystal_high};

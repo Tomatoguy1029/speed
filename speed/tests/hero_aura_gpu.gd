@@ -10,6 +10,7 @@ func _ready() -> void:
 	for j in [0,2,5,11]:
 		await compare(j)
 	await lifecycle()
+	if "--cpp-perseus" in OS.get_cmdline_user_args(): await cpp_perseus_display()
 	print("[hero_aura_gpu] cases=4 failed=",failed)
 	get_tree().quit(1 if failed else 0)
 func viewport() -> SubViewport:
@@ -98,7 +99,7 @@ func lifecycle() -> void:
 	var session:=RunManager.create_session(self,{"lab":true,"stage_index":4,"seed":401},true)
 	session.auto_step=false
 	var view:RunPresentation=session.view.get_node("RunPresentation")
-	var hero:=session.sim.heroes
+	var hero: HeroSystem = session.sim.heroes
 	view.view_override={"center":hero.center,"zoom":0.7}
 	await settle()
 	check(view._hero_aura.visible,"画面内の英雄の光雲を表示する")
@@ -124,3 +125,56 @@ func lifecycle() -> void:
 	session.free()
 	await get_tree().process_frame
 	check(weak.get_ref()==null,"終了時にラン固有materialを解放する")
+
+func cpp_perseus_display() -> void:
+	var guide = load("res://tests/hero_guidance.gd").new()
+	var behavior = load("res://tests/hero_behaviors.gd").new()
+	var bridge = guide._cpp_fixture(true)
+	behavior._cpp_rescue(bridge,"perseus")
+	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
+	var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)}).value
+	bridge.command("dev_fire_enemy",{"source_id":enemy,"angle":0.0,"speed":100.0})
+	var intent := Intent.new()
+	intent.hero_press = true
+	var frame: Dictionary = behavior._cpp_step(bridge,intent)
+	var held: Dictionary = bridge.checkpoint()
+	var v := viewport()
+	var camera := Camera2D.new()
+	v.add_child(camera)
+	var scope := ContentResourceScope.new()
+	for path in ["res://.content/hero_aura.res","res://.content/meteor_pieces.res","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png"]: scope.provide(path,load(path))
+	for visual: Dictionary in guide._cpp_visuals:
+		if not String(visual.get("path","")).is_empty(): scope.provide(visual.path,load(visual.path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	v.add_child(view)
+	view.setup(scope,guide._cpp_visuals,frame.ui.character_scale)
+	view.update_effects(frame,0.0)
+	var rect := Rect2(-512,-384,1024,768)
+	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.size()==3,"救出して発動した敵の石化表示を受け取る")
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	v.add_child(layer)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = bridge
+	hud.size = v.size
+	layer.add_child(hud)
+	hud.apply_snapshot(frame.ui)
+	await settle()
+	bridge._core.step(6.0)
+	bridge.command("dev_tick_heroes",{"dt":6.0,"run_time":6.0})
+	frame = behavior._cpp_read(bridge)
+	view.update_effects(frame,0.0)
+	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.is_empty(),"効果終了後に石の表示を残さない")
+	check(bridge.restore(held.value).ok,"石化表示の途中保持へ戻す")
+	frame = behavior._cpp_read(bridge)
+	view.update_effects(frame,0.0)
+	hud.apply_snapshot(frame.ui)
+	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.size()==3 and frame.ui.hero.active>5.0,"復帰で残り時間・石の円・使用中の枠が戻る")
+	await settle()
+	check(v.get_texture().get_image().save_png("/tmp/speed-heroes-perseus.png")==OK,"ペルセウスの実表示を保存する")
+	v.queue_free()
+	await get_tree().process_frame
+	bridge.dispose()
+	failed += guide.failed+behavior.failed
+	guide.free()
+	behavior.free()

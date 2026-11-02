@@ -248,6 +248,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	for definition_hero: HeroDef in ContentManager.heroes.values():
 		var hero_id: int = data.HeroDefinition.size()+1
 		data.HeroDefinition.append({"id":hero_id,"external_id":String(definition_hero.id),"stage":definition_hero.stage,"cooldown":definition_hero.cooldown,"duration":definition_hero.duration})
+		if definition_hero.id==&"perseus": data.PerseusDefinition.append({"id":data.PerseusDefinition.size()+1,"hero":hero_id,"boss_stun":float(definition_hero.params.boss_stun)})
 		for star in definition_hero.stars: data.HeroStar.append({"id":data.HeroStar.size()+1,"hero":hero_id,"x":star.x,"y":star.y})
 		for link in range(0,definition_hero.links.size(),2): data.HeroLink.append({"id":data.HeroLink.size()+1,"hero":hero_id,"a":definition_hero.links[link],"b":definition_hero.links[link+1]})
 	data.PopulationDefinition = [{"id":1,"active":false,"density":config.density_mult,"bonus_pop":config.bonus_pop,"boss_start":0.0,"recycle_scale":config.spawn_recycle_scale,"region_cap":config.spawn_region_cap,"margin":config.spawn_margin,"field_radius":config.field_radius,"planet_radius":config.planet_radius,"total_cap":config.spawn_total_cap,"refill_time":config.spawn_refill_time}]
@@ -1135,6 +1136,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
 		data.NumericTraitLevel = resolved.NumericTraitLevel
 		data.HeroConfig = resolved.HeroConfig
+		data.PerseusDefinition = resolved.PerseusDefinition
 		data.HeroDefinition = resolved.HeroDefinition
 		data.HeroStar = resolved.HeroStar
 		data.HeroLink = resolved.HeroLink
