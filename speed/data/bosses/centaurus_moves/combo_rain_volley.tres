@@ -1,6 +1,6 @@
 [gd_resource type="Resource" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/combo_rain_volley.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/centaurus/combo_rain_volley.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

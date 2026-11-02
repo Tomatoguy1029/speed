@@ -63,6 +63,7 @@ bool CentaurusBody::validate(const godot::RunState &s,const ContentBundle &c,con
     if (!v.guard_point.is_finite() || !v.leap_from.is_finite() || !v.leap_to.is_finite() || (v.path_side!=1 && v.path_side!=-1) || (v.sail_side!=1 && v.sail_side!=-1) || !std::isfinite(v.turn_motion)) return false;
     for (double value:{v.guard_refill,v.path_hold,v.leap_ready_at,v.leap_elapsed,v.retreat_ready_at}) if (!std::isfinite(value) || value<0) return false;
     if (!std::isfinite(v.guard_scan)) return false;
+    for (const auto &entry:v.cooldowns) if (!entry.first || entry.first>c.boss_techniques.size() || c.boss_techniques[entry.first-1].phase!=1 || !std::isfinite(entry.second) || entry.second<0) return false;
     for (const auto &g:v.guards) if (!std::isfinite(g.scale) || !std::isfinite(g.phase) || g.scale<0 || (s.enemy_handles.contains(g.actor) && c.definitions[s.enemies[g.actor.slot].definition].kind!=EnemyDefinition::Kind::Defender)) return false;
     return true;
 }

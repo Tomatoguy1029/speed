@@ -7,6 +7,7 @@ public:
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static TechniqueHandle begin(RunRuntime &,EnemyHandle,uint32_t definition);
     static void step(RunRuntime &,double dt);
+    static void begin_part(RunRuntime &,TechniqueState &,uint32_t);
     static bool running(const RunRuntime &,TechniqueHandle);
     static void cancel(RunRuntime &,TechniqueHandle);
     static bool owns(const RunRuntime &,EnemyHandle);

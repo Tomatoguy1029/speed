@@ -6,6 +6,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-centaurus-combo-rain" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_combo_rain")
+		return
 	if "--cpp-centaurus-sail" in OS.get_cmdline_user_args() or "--cpp-centaurus-sail-boundary" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_sail")
 		return
@@ -1847,4 +1850,121 @@ func native_centaurus_sail() -> void:
 	bridge.dispose()
 	await get_tree().process_frame
 	print("[cpp_centaurus_sail] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 連携でも部品の値と取消規約をそのまま使う。
+func centaurus_combo_case(shower := false) -> Dictionary:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var cfg = load("res://data/config.tres").duplicate(true)
+	cfg.planet_radius = 0.0
+	cfg.character_scale = 1.0
+	var definition = load("res://data/bosses/centaurus.tres").duplicate(true)
+	definition.params.initial_wait = 0.0
+	definition.params.guard_count = 0
+	definition.params.guard_min = 0
+	definition.speed = 0.0
+	var name := "combo_shower_shot" if shower else "combo_rain_volley"
+	var move = load("res://data/bosses/centaurus_moves/"+name+".tres").duplicate(true)
+	move.gap = 0.05
+	var first = load("res://data/bosses/centaurus_moves/"+("shower_chase" if shower else "rain")+".tres").duplicate(true)
+	var last = load("res://data/bosses/centaurus_moves/"+("power_shot" if shower else "volley")+".tres").duplicate(true)
+	first.warn = 0.02
+	first.recover = 10.0
+	first.cd = 0.5
+	last.warn = 0.02
+	last.recover = 0.03
+	last.cd = 0.5
+	if shower:
+		first.count = 1
+		first.mark_time = 0.03
+		first.rain_time = 0.03
+		last.alert = 0.01
+	else:
+		first.traces = 1
+		first.trace_length = 60.0
+		first.trace_speed = 600.0
+		first.arrow_gap = 30.0
+		first.drop_delay = 0.02
+		first.fall = 0.02
+		first.linger = 0.01
+		last.count = 2
+		last.count_p2 = 2
+		last.interval = 0.02
+	var package: Dictionary = builder.centaurus_technique_package(definition,move,cfg,[first,last])
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = bridge.configure(builder.Schema.write_content(package.records,"0".repeat(64).hex_decode()),{"api_version":1,"run_id":158,"mode":1,"stage_id":name,"profile":{},"settings":{"hitstop":false}})
+	if not configured.ok: print(configured); return {}
+	bridge.start(158,{"position":Vector2(600,0)})
+	var events: Array = []
+	bridge.subscribe("確認",func(packet): events.append_array(packet.events); return true)
+	bridge._core.set_motion_context(Vector2(600,0),Vector2(600,0),Vector2(640,360))
+	var id: int = bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false}).value
+	bridge.command("dev_ship_motion",{"position":Vector2(600,0),"velocity":Vector2.ZERO})
+	return {"bridge":bridge,"id":id,"package":package,"events":events}
+
+func native_centaurus_combo_rain() -> void:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var move = load("res://data/bosses/centaurus_moves/combo_rain_volley.tres")
+	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
+	check(records.CentaurusComboDefinition.size()==2 and records.CentaurusComboDefinition[0].gap==move.gap and records.CentaurusComboDefinition[0].first==1 and records.CentaurusComboDefinition[0].second==3 and records.BossTechniqueDefinition[4].cd==move.cd and move.make_runner()==null,"連携Resourceの全値と形態ごとの部品参照を生成する")
+	var c := centaurus_combo_case()
+	check(not c.is_empty(),"矢の雨と速射の部品・外観・連携を同じ制作入口で読む")
+	if c.is_empty(): get_tree().quit(1); return
+	var bridge = c.bridge
+	var ticket: PackedInt64Array = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":5}).value
+	bridge._core.step(0.02)
+	bridge._core.step(0.01)
+	var t: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(t.technique=="rain" and t.combo=="combo_rain_volley" and t.combo_step==0 and t.stage==1 and not t.rain.traces.is_empty(),"連携の前半は矢の雨そのものの時計・軌跡・命中を使う")
+	for i in 40:
+		if bridge.command("dev_boss_state").value[0].get("combo_waiting",false): break
+		bridge._core.step(0.01)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.combo_waiting and t.stage==2 and is_equal_approx(t.remaining,0.05) and t.rain.traces.is_empty(),"前半の硬直10秒を使わず、雨を閉じて世界時間のgapへ移る")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.03)
+	check(bridge.command("dev_boss_state").value[0].combo_waiting and bridge._core.hostiles_snapshot().is_empty(),"gapが残る間は後半を始めない")
+	bridge._core.step(0.03)
+	t = bridge.command("dev_boss_state").value[0]
+	var after: Dictionary = t.duplicate(true)
+	check(t.technique=="volley" and t.combo_step==1 and t.stage==0 and is_zero_approx(t.elapsed) and t.id==1,"次の更新で同じ技チケットのまま速射の予告を始める")
+	check(bridge.restore(held.value).ok,"前半終了後のgapと子の状態を保持・復帰する")
+	bridge._core.step(0.03)
+	bridge._core.step(0.03)
+	check(bridge.command("dev_boss_state").value[0]==after,"復帰後も同じ更新境界で後半を始める")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.041)
+	t = bridge.command("dev_boss_state").value[0]
+	check(t.technique=="volley" and t.released==2 and bridge._core.hostiles_snapshot().size()==2,"後半は速射自身の予告・間隔・本数で射る")
+	var scope := ContentResourceScope.new()
+	for asset: Dictionary in c.package.visuals:
+		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	var view = load("res://scripts/render/run_frame_view.gd").new()
+	add_child(view)
+	var entries: Array[Dictionary] = []
+	entries.assign(c.package.visuals)
+	view.setup(scope,entries,1.0)
+	check(view.apply_frame(bridge.read_render(Rect2(-2000,-2000,4000,4000)).value) and view._boss_body_displays.values()[0].technique.technique=="volley","連携の現在の部品を正式表示へ渡す")
+	bridge._core.step(0.06)
+	bridge._core.step(0.03)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge._core.hostiles_snapshot().size()==2,"後半の硬直で連携全体を終え、発射済みの矢は残す")
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":5}).ok,"連携と部品の再使用待ちを開始時に確定する")
+	check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"両部品の戦闘通知とcueを配信する")
+	bridge.dispose()
+	view.queue_free()
+	for remove in [false,true]:
+		c = centaurus_combo_case()
+		bridge = c.bridge
+		ticket = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":5}).value
+		bridge._core.step(0.02)
+		bridge._core.step(0.01)
+		if remove: bridge.command("dev_remove",{"entity_id":c.id})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket})
+		bridge._core.step(0.6)
+		t = bridge.command("dev_boss_state").value[0]
+		check(t.stage==7 and t.rain.traces.is_empty() and bridge._core.hostiles_snapshot().is_empty(),"前半の取消・参加者消失で雨を消し、後半を始めない")
+		bridge.dispose()
+	await get_tree().process_frame
+	print("[cpp_centaurus_combo_rain] failures=",failed)
 	get_tree().quit(1 if failed else 0)

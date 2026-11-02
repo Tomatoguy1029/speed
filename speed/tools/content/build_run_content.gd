@@ -92,9 +92,10 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
 static func centaurus_technique_records(definition: BossDef, move: BossTechnique) -> Dictionary:
+	if move!=null and move.technique==&"combo_rain_volley": return centaurus_combo_records(definition,move)
 	if move==null or move.technique not in [&"volley",&"rear_attack",&"rain",&"power_shot",&"stomp",&"fan_volley",&"sail_run",&"shower_chase",&"shower_wall",&"shower_path"]: return {}
 	var source: BossTechnique = BossProgram.snapshot(move)
-	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusShowerDefinition":[],"CentaurusFanDefinition":[],"CentaurusSailDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
+	var records := {"BossDefinition":[],"BossTechniqueDefinition":[],"BossTechniqueStage":[],"CentaurusVolleyDefinition":[],"CentaurusRearDefinition":[],"CentaurusRainDefinition":[],"CentaurusPowerDefinition":[],"CentaurusShowerDefinition":[],"CentaurusFanDefinition":[],"CentaurusSailDefinition":[],"CentaurusComboDefinition":[],"CentaurusStompDefinition":[],"CentaurusStompFoot":[],"LightArrowDefinition":[]}
 	var boss := {"id":1,"external_id":"centaurus","kind":1,"turn":definition.turn,"speed":definition.speed}
 	for key in ["lock_lead","horn_width","horn_length_ratio","horn_length_ratio_p2","near_clearance","reposition_time","stuck_time","extract_time","extract_speed","approach_range","approach_speed","kick_trigger_arc"]: boss[key] = 0.0
 	records.BossDefinition = [boss]
@@ -186,6 +187,39 @@ static func centaurus_technique_records(definition: BossDef, move: BossTechnique
 			records.BossTechniqueStage.append({"id":records.BossTechniqueStage.size()+1,"technique":phase,"command":4,"at":row.warn+row.active})
 	return records
 
+## 種類別の索引と参照を共通スキーマから付け替え、複数技を一つへまとめる。
+static func merge_centaurus_records(target: Dictionary, source: Dictionary) -> void:
+	var offsets := {}
+	for key in source: offsets[key] = target.get(key,[]).size() if key!="BossDefinition" else 0
+	for record in Schema.SCHEMA.records:
+		if record.name not in source or record.name=="BossDefinition": continue
+		if not target.has(record.name): target[record.name] = []
+		for original: Dictionary in source[record.name]:
+			var row: Dictionary = original.duplicate(true)
+			row.id += offsets[record.name]
+			for field in record.fields:
+				if field.has("ref"): row[field.name] += int(offsets.get(field.ref,0))
+			target[record.name].append(row)
+	if target.get("BossDefinition",[]).is_empty(): target.BossDefinition = source.BossDefinition
+
+## 連携は子の値を保持し、前半の硬直を挟まずgapから後半へ進む。
+static func centaurus_combo_records(definition: BossDef, move: BossTechnique, parts: Array = []) -> Dictionary:
+	if move.technique!=&"combo_rain_volley": return {}
+	if parts.is_empty(): parts = [load("res://data/bosses/centaurus_moves/rain.tres"),load("res://data/bosses/centaurus_moves/volley.tres")]
+	if parts.size()!=2 or parts[0].technique!=&"rain" or parts[1].technique!=&"volley": return {}
+	var records := centaurus_technique_records(definition,parts[0])
+	var second := centaurus_technique_records(definition,parts[1])
+	if records.is_empty() or second.is_empty(): return {}
+	merge_centaurus_records(records,second)
+	for phase in [1,2]:
+		var first: Dictionary = records.BossTechniqueDefinition[phase-1]
+		var last: Dictionary = records.BossTechniqueDefinition[phase+1]
+		var row := first.duplicate(true)
+		row.merge({"id":records.BossTechniqueDefinition.size()+1,"external_id":str(move.technique),"kind":16,"warn":0.0,"active":first.warn+first.active+float(move.gap)+last.warn+last.active+last.recover,"recover":0.0,"cd":float(move.cd),"track_during_warn":move.track_during_warn,"post_gap":move.post_gap},true)
+		records.BossTechniqueDefinition.append(row)
+		records.CentaurusComboDefinition.append({"id":phase,"technique":row.id,"first":first.id,"second":last.id,"gap":float(move.gap)})
+	return records
+
 ## 脚のコマと補間値を生成し、実行中に表示Resourceを参照しない。
 static func centaurus_stomp_feet(animation: Resource, technique: int) -> Array:
 	var frames: Array = animation.clips.get("stomp",[])
@@ -206,9 +240,9 @@ static func centaurus_stomp_feet(animation: Resource, technique: int) -> Array:
 	return out
 
 ## 個別移行済みの技を、共通本体と同じ制作入口へまとめる。
-static func centaurus_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
+static func centaurus_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, parts: Array = []) -> Dictionary:
 	var package := boss_body_package(definition,config)
-	var records := centaurus_technique_records(definition,move)
+	var records := centaurus_combo_records(definition,move,parts) if move.technique==&"combo_rain_volley" else centaurus_technique_records(definition,move)
 	if package.is_empty() or records.is_empty(): return {}
 	var offset: int = package.records.LightArrowDefinition.size()
 	for style in records.LightArrowDefinition:
@@ -224,7 +258,11 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 		if key!="LightArrowDefinition": package.records[key] = records[key]
 	var arrow_scene: PackedScene = move.get("shot_visual")
 	if move.technique in [&"shower_chase",&"shower_wall",&"shower_path"]: arrow_scene = load("res://data/bosses/centaurus_moves/fan_volley.tres").shot_visual
-	for scene: PackedScene in [arrow_scene,move.visual]:
+	var scenes: Array = [arrow_scene,move.visual]
+	if move.technique==&"combo_rain_volley":
+		if parts.is_empty(): parts = [load("res://data/bosses/centaurus_moves/rain.tres"),load("res://data/bosses/centaurus_moves/volley.tres")]
+		for part in parts: scenes.append_array([part.get("shot_visual"),part.visual])
+	for scene: PackedScene in scenes:
 		if scene==null: continue
 		var asset: int = package.records.ResourceKey.size()+1
 		package.records.ResourceKey.append({"id":asset,"role":7})

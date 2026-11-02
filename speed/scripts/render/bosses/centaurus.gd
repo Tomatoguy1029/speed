@@ -72,6 +72,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	queue_redraw()
 
 func _mode() -> StringName:
+	if technique.get("combo_waiting",false) and int(technique.get("stage",5))<5: return &"combo_gap"
 	if state.mode==0: return &"entrance"
 	if state.mode==2: return &"phase"
 	if state.mode==3: return &"final"

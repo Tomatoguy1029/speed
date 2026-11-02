@@ -62,7 +62,8 @@ struct CanisCommandState {std::vector<EnemyHandle> warned;};
 struct TechniqueState {
     std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState> detail;
     int64_t id=0;
-    uint32_t definition=0,command_cursor=0,ticket_refs=0;
+    uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
+    bool combo_waiting=false;
     EnemyHandle actor;
     TechniqueStage stage=TechniqueStage::Windup;
     double elapsed=0,remaining=0,reposition=0,started_at=0;
@@ -98,6 +99,7 @@ struct ParticipantState {
 struct CentaurusGuardState {EnemyHandle actor;double scale=1,phase=0;};
 struct CentaurusBodyState {
     std::vector<CentaurusGuardState> guards;
+    std::unordered_map<uint32_t,double> cooldowns;
     godot::Vector2 guard_point,leap_from,leap_to;
     bool has_guard_point=false,leaping=false;
     double guard_scan=0,guard_refill=0,path_hold=0,turn_motion=0,leap_ready_at=0,leap_elapsed=0,retreat_ready_at=0;
