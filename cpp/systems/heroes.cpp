@@ -65,7 +65,13 @@ int64_t spawn_carrier(RunRuntime &run) {
 }
 void guards(RunRuntime &run) {
     auto &s=run.state;auto &h=s.heroes;h.guarded=true;std::vector<size_t> defs;
-    for (const auto &phase:s.spawn_timeline.phases) for (const auto &[type,weight]:phase.mix) for (size_t i=0;i<run.content->definitions.size();++i) {const auto &d=run.content->definitions[i];if (d.id==type && std::any_of(s.spawn_timeline.types.begin(),s.spawn_timeline.types.end(),[&](const auto &t){return t.id==type && t.maximum>0;}) && d.scaling.radius<50 && std::find(defs.begin(),defs.end(),i)==defs.end()) defs.push_back(i);}
+    for (const auto &phase:s.spawn_timeline.phases) for (const auto &mix:phase.mix) {
+        const auto &type=mix.first;
+        for (size_t i=0;i<run.content->definitions.size();++i) {
+            const auto &d=run.content->definitions[i];
+            if (d.id==type && std::any_of(s.spawn_timeline.types.begin(),s.spawn_timeline.types.end(),[&](const auto &t){return t.id==type && t.maximum>0;}) && d.scaling.radius<50 && std::find(defs.begin(),defs.end(),i)==defs.end()) defs.push_back(i);
+        }
+    }
     if (defs.empty()) return;
     for (uint32_t i=0;i<run.content->hero_config.guards;++i) {const auto def=defs[*s.control.rng.randi_range(0,defs.size()-1)];EnemySpawn spawn;spawn.position=h.center+direction(TAU*i/run.content->hero_config.guards)*420;spawn.facing=(s.ship.pos-spawn.position).angle();spawn.has_facing=true;spawn.origin=SpawnOrigin::Summon;EnemySystem::spawn(run,def,spawn);}
 }
