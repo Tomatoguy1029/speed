@@ -4056,7 +4056,7 @@ inline bool read(BinaryReader &input, BossTechniqueDefinition &out) {
     if (!input.read_u32(out.boss)) return false;
     if (!input.read_string(out.external_id)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 11) return false;
+    if (out.kind > 13) return false;
     if (!input.read_u32(out.phase)) return false;
     if (out.phase < 1) return false;
     if (out.phase > 2) return false;
@@ -4873,6 +4873,100 @@ inline bool read(BinaryReader &input, CentaurusPowerDefinition &out) {
     if (!input.read_u32(out.projectile)) return false;
     return true;
 }
+struct CentaurusStompDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    double radius{};
+    double half_angle{};
+};
+inline bool read(BinaryReader &input, CentaurusStompDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.half_angle)) return false;
+    if (out.half_angle < 0) return false;
+    return true;
+}
+struct CentaurusStompFoot {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t frame{};
+    uint32_t leg{};
+    double duration{};
+    bool interpolate{};
+    bool pivot{};
+    double x{};
+    double y{};
+    double scale_x{};
+    double scale_y{};
+    double rotation{};
+    double skew{};
+    double pivot_x{};
+    double pivot_y{};
+    double origin_x{};
+    double origin_y{};
+    double contact_x{};
+    double contact_y{};
+};
+inline bool read(BinaryReader &input, CentaurusStompFoot &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.frame)) return false;
+    if (!input.read_u32(out.leg)) return false;
+    if (out.leg > 1) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (out.duration < 0.02) return false;
+    if (!input.read_bool(out.interpolate)) return false;
+    if (!input.read_bool(out.pivot)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_f64(out.pivot_x)) return false;
+    if (!input.read_f64(out.pivot_y)) return false;
+    if (!input.read_f64(out.origin_x)) return false;
+    if (!input.read_f64(out.origin_y)) return false;
+    if (!input.read_f64(out.contact_x)) return false;
+    if (!input.read_f64(out.contact_y)) return false;
+    return true;
+}
+struct CentaurusFanDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    uint32_t shots{};
+    uint32_t count{};
+    double interval{};
+    double spread{};
+    double radius{};
+    double length{};
+    double travel{};
+    uint32_t projectile{};
+};
+inline bool read(BinaryReader &input, CentaurusFanDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (!input.read_u32(out.shots)) return false;
+    if (out.shots < 1) return false;
+    if (!input.read_u32(out.count)) return false;
+    if (!input.read_f64(out.interval)) return false;
+    if (out.interval < 0) return false;
+    if (!input.read_f64(out.spread)) return false;
+    if (out.spread < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
+    if (!input.read_f64(out.length)) return false;
+    if (out.length < 0) return false;
+    if (!input.read_f64(out.travel)) return false;
+    if (out.travel < 0) return false;
+    if (!input.read_u32(out.projectile)) return false;
+    return true;
+}
 struct CanisBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -5169,6 +5263,9 @@ struct ContentRecords {
     std::vector<CentaurusRearDefinition> CentaurusRearDefinition_rows;
     std::vector<CentaurusRainDefinition> CentaurusRainDefinition_rows;
     std::vector<CentaurusPowerDefinition> CentaurusPowerDefinition_rows;
+    std::vector<CentaurusStompDefinition> CentaurusStompDefinition_rows;
+    std::vector<CentaurusStompFoot> CentaurusStompFoot_rows;
+    std::vector<CentaurusFanDefinition> CentaurusFanDefinition_rows;
     std::vector<CanisBodyDefinition> CanisBodyDefinition_rows;
     std::vector<CanisFlameDefinition> CanisFlameDefinition_rows;
 };
@@ -5976,7 +6073,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 151: {
-        if (version != 12) return false;
+        if (version != 14) return false;
         if (count > input.remaining()/637) return false;
         for (uint32_t i=0; i<count; ++i) { BossTechniqueDefinition row; if (!read(input,row)) return false; out.BossTechniqueDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -6123,6 +6220,24 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/48) return false;
         for (uint32_t i=0; i<count; ++i) { CentaurusPowerDefinition row; if (!read(input,row)) return false; out.CentaurusPowerDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 325: {
+        if (version != 1) return false;
+        if (count > input.remaining()/24) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusStompDefinition row; if (!read(input,row)) return false; out.CentaurusStompDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 326: {
+        if (version != 1) return false;
+        if (count > input.remaining()/122) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusStompFoot row; if (!read(input,row)) return false; out.CentaurusStompFoot_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 327: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusFanDefinition row; if (!read(input,row)) return false; out.CentaurusFanDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 340: {
@@ -6457,6 +6572,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusRainDefinition_rows) if (!CentaurusRainDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusPowerDefinition_ids;
     for (const auto &row:data.CentaurusPowerDefinition_rows) if (!CentaurusPowerDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusStompDefinition_ids;
+    for (const auto &row:data.CentaurusStompDefinition_rows) if (!CentaurusStompDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusStompFoot_ids;
+    for (const auto &row:data.CentaurusStompFoot_rows) if (!CentaurusStompFoot_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusFanDefinition_ids;
+    for (const auto &row:data.CentaurusFanDefinition_rows) if (!CentaurusFanDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisBodyDefinition_ids;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!CanisBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisFlameDefinition_ids;
@@ -6622,6 +6743,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusRainDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
     for (const auto &row:data.CentaurusPowerDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CentaurusPowerDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
+    for (const auto &row:data.CentaurusStompDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusStompFoot_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusFanDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CentaurusFanDefinition_rows) if (!LightArrowDefinition_ids.count(row.projectile)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!EnemyRecord_ids.count(row.hound)) return false;
     for (const auto &row:data.CanisFlameDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -6751,5 +6876,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=160;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=163;
 }
