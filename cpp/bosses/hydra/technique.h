@@ -2,13 +2,14 @@
 #include "../../runtime/run_runtime.h"
 #include <optional>
 namespace speed {class HydraTechnique {public:
-    static bool supports(uint32_t kind) {return kind==72 || kind==73 || kind==74;}
+    static bool supports(uint32_t kind) {return kind==72 || kind==73 || kind==74 || kind==82;}
     static const HydraMajorDefinition &rule(const RunRuntime &,uint32_t);
     static void cue(RunRuntime &,const BossBodyState &,const char *,uint32_t,double=0);
     static bool busy(const RunRuntime &,const BossBodyState &);
     static std::vector<EnemyHandle> participants(const RunRuntime &,const BossBodyState &,std::initializer_list<HydraHeadKind>);
     static bool all_participants_alive(const RunRuntime &,const HydraTechniqueState &);
     static void pincer(RunRuntime &,TechniqueState &);
+    static void tornado(RunRuntime &,TechniqueState &,double);
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static bool reserve(RunRuntime &,EnemyHandle,uint32_t);
     static void begin(RunRuntime &,TechniqueState &);

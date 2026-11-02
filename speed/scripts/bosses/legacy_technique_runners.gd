@@ -2,6 +2,7 @@
 ## C++の状態や技実行へは渡さない。
 extends RefCounted
 const RUNNERS := {
+	"res://scripts/data_types/boss_techniques/hydra/tornado.gd":"res://scripts/bosses/hydra/techniques/tornado.gd",
 	"res://scripts/data_types/boss_techniques/draco/rifts.gd":"res://scripts/bosses/draco/techniques/rifts.gd",
 	"res://scripts/data_types/boss_techniques/draco/meteor.gd":"res://scripts/bosses/draco/techniques/meteor.gd",
 	"res://scripts/data_types/boss_techniques/draco/star_fan.gd":"res://scripts/bosses/draco/techniques/star_fan.gd",

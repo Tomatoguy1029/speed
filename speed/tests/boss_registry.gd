@@ -15,6 +15,9 @@ func _ready() -> void:
 	if "--cpp-hydra-grid" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_grid")
 		return
+	if "--cpp-hydra-tornado" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_tornado")
+		return
 	if "--cpp-hydra-curve" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_curve")
 		return
@@ -4702,6 +4705,7 @@ func hydra_major_case(selected_move: String, edits: Dictionary, flowing := false
 	var definition = load("res://data/bosses/hydra.tres").duplicate(true);definition.speed=0.0
 	definition.params.merge({"head_hp":10.0,"growth_time":0.1,"tech_cd":0.05,"debris_dmg":0.0},true)
 	definition.params.merge(body_changes,true)
+	if selected_move!="curve": definition.params.combo_cooldown=0.05
 	var move = load("res://data/bosses/hydra_moves/%s.tres" % selected_move).duplicate(true);move.assign_values(edits)
 	var package: Dictionary = builder.hydra_technique_package(definition,move,cfg)
 	if package.is_empty(): check(false,"大技の編集値を生成する");return {}
@@ -4712,6 +4716,7 @@ func hydra_major_case(selected_move: String, edits: Dictionary, flowing := false
 		flow.sections=flow.sections.slice(0,1) if move.category==&"combo" else flow.sections.slice(2,3)
 		flow.sections[0].next=0;flow.sections[0].fallback=0
 		if move.category==&"combo":flow.sections[0].weights={"combo":100.0}
+		if move.category==&"combo": flow.sections[0].request="any";flow.sections[0].weights={"combo":100.0,"major":100.0}
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		if records.is_empty(): check(false,"大技の共通フローを生成する");return {}
 		for key in records: package.records[key]=records[key]
@@ -5054,3 +5059,56 @@ func native_hydra_pincer() -> void:
 	check(bridge.command("dev_boss_body_state").value[0].effects.size()==2,"短い実行時間でも発動時点に2本を生成する");bridge._core.step(0.05)
 	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"自然終了は長い寿命が残ったビームも消す");bridge.dispose()
 	await get_tree().process_frame;print("[cpp_hydra_pincer] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_tornado() -> void:
+	var c := hydra_major_case("tornado",{"warning_time":0.15,"performance_time":0.65,"tornado_charge":0.2,"tornado_life":0.3,"tornado_speed":400.0,"tornado_width":120.0,"lump_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
+	if c.is_empty(): get_tree().quit(1);return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
+	var events: Array=[];bridge.subscribe("竜巻の記録",func(packet):events.append_array(packet.events);return true)
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"tornado","竜巻の編集Resourceを互換Runnerから分ける")
+	for tick in 30:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty(): break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==82,"共通フローから2首の竜巻を自然に選ぶ")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var heads: Array=body.necks.filter(func(n):return n.mode=="tornado")
+	check(heads.size()==2 and heads[0].kind=="vortex" and heads[1].kind=="debris" and body.effects.is_empty(),"渦・瓦礫の2首だけ参加し、全体予告中は形を出さない")
+	bridge._core.step(0.15);body=bridge.command("dev_boss_body_state").value[0]
+	var feed: Array=body.effects.filter(func(e):return e.kind=="tornado_charge")
+	check(feed.size()==1 and feed[0].width==96.0 and feed[0].feed.size()==3 and feed[0].fill>0.0,"発動後は無害な溜め円と3個の投入瓦礫を正式表示へ出す")
+	bridge.command("dev_ship_motion",{"position":feed[0].points[0],"velocity":Vector2.ZERO})
+	bridge._core.step_hazards(0.01)
+	check(bridge._core.ship_snapshot().ship_invuln==0.0 and bridge._core.ship_snapshot().ship_hurt==0.0,"無害な溜め円に触れても無敵時間や被弾表示を付けない")
+	var gathered: Dictionary=bridge.checkpoint()
+	var view=hydra_move_view(c);await get_tree().process_frame
+	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
+	var active: Array=body.effects.filter(func(e):return e.kind=="tornado")
+	check(active.size()==1 and active[0].width==120.0 and is_equal_approx(active[0].points[0].distance_to(active[0].points[1]),90.0) and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"個別溜めの時刻に瓦礫を回収し、長さ90の竜巻を放つ")
+	if active.is_empty():bridge.dispose();get_tree().quit(1);return
+	var effect: Dictionary=active[0].duplicate(true);var direction: Vector2=(effect.points[1]-effect.points[0]).normalized()
+	bridge.command("dev_ship_motion",{"position":effect.points[1]+direction*10,"velocity":Vector2.ZERO})
+	var hp: float=bridge._core.ship_snapshot().ship_hp
+	var launched: Dictionary=bridge.checkpoint();bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
+	var expected: Dictionary=body.duplicate(true)
+	check(body.effects[0].points[0].distance_to(effect.points[0]+direction*20)<0.001 and is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"竜巻は等速掃引し実HPへ倍率を一度だけ掛ける")
+	check(launched.ok and bridge.restore(launched.value).ok,"竜巻の別時計・参加首・発射状態を途中保持して戻す")
+	bridge._core.step_hazards(0.05);check(bridge.command("dev_boss_body_state").value[0]==expected,"途中復帰後も点列と寿命が一致する")
+	check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="tornado" and e.payload.technique=="tornado" and e.payload.source=="hydra"),"竜巻の原因・技・所有元を共通通知へ記録する")
+	bridge.restore(gathered.value);bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"溜め中の取消は予告と投入瓦礫を回収する")
+	bridge.restore(gathered.value);bridge.command("dev_damage",{"entity_id":heads[0].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"参加首は2本とも必要で、片方消失なら溜めを中断する")
+	bridge.restore(launched.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});bridge.command("dev_damage",{"entity_id":heads[0].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.size()==1,"放った竜巻は取消と参加首消失後も残る")
+	bridge._core.step_hazards(0.31);check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"放った竜巻は独立した寿命で終わる")
+	bridge.restore(launched.value);bridge._core.step(0.61)
+	check(bridge.command("dev_boss_state").value[0].stage==5,"実行時間の終了で大技を自然終了する")
+	for tick in 80:
+		bridge._core.step(0.01)
+		if bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==82):break
+	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==82),"回復とコンボ待ちの後に次の技を自然に選ぶ")
+	bridge.release_checkpoint(gathered.value);bridge.release_checkpoint(launched.value);bridge.dispose();view.queue_free();await get_tree().process_frame
+	print("[cpp_hydra_tornado] failures=",failed);get_tree().quit(1 if failed else 0)
