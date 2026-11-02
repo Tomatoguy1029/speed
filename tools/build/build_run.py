@@ -31,7 +31,7 @@ def build(root, lock, args, arch, output):
 def prepare_verification(root, project):
     # 公式配布エンジンは外部script/PCKへの切替を無効にするため、
     # 既存確認の本文だけを独立した確認用コピーの起動Scriptへ載せる。
-    checks = (root / 'speed/tests/check_rules.gd').read_text()
+    checks = (root / 'speed/tests/content/check_rules.gd').read_text()
     methods = []
     for name in ['_package_runtime', '_package_has_legacy']:
         match = re.search(r'^func ' + name + r'\([^\n]*\n.*?(?=^func |\Z)', checks, re.M | re.S)
