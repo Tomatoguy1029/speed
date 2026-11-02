@@ -193,6 +193,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
             if (combo==bundle->centaurus_combos.end() || bundle->bosses[p.boss-1].kind!=1 || (p.external_id!="combo_rain_volley" && p.external_id!="combo_shower_shot") || !stages.empty()) return {};
             const auto &a=bundle->boss_techniques[combo->first-1],&b=bundle->boss_techniques[combo->second-1];
             if ((p.external_id=="combo_rain_volley"?(a.kind!=10 || b.kind!=8):(a.kind!=14 || a.external_id!="shower_chase" || b.kind!=11)) || a.boss!=p.boss || b.boss!=p.boss || a.phase!=p.phase || b.phase!=p.phase) return {};continue;
+        }
         if (p.kind>=64 && p.kind<=68) {
             const auto v=std::find_if(bundle->hydra_normals.begin(),bundle->hydra_normals.end(),[&](const auto &v){return v.technique==p.id;});
             if (v==bundle->hydra_normals.end() || p.external_id!=(p.kind==64?"bite_thrust":p.kind==65?"bite_sweep":p.kind==66?"beam_bolt":p.kind==67?"beam_fixed":"wind_blades") || bundle->bosses[p.boss-1].kind!=3 || !stages.empty() || (p.kind==68 && std::none_of(bundle->hydra_wind_blades.begin(),bundle->hydra_wind_blades.end(),[&](const auto &x){return x.technique==p.id;})) || (p.kind==67 && std::none_of(bundle->hydra_fixed_beams.begin(),bundle->hydra_fixed_beams.end(),[&](const auto &x){return x.technique==p.id;})) || (p.active<=0 && p.kind!=66 && p.kind!=68) || (p.kind==66 && std::none_of(bundle->hydra_bolts.begin(),bundle->hydra_bolts.end(),[&](const auto &x){return x.technique==p.id;})) || (p.kind==65 && std::none_of(bundle->hydra_sweeps.begin(),bundle->hydra_sweeps.end(),[&](const auto &x){return x.technique==p.id;}))) return {};continue;
@@ -200,7 +201,6 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (p.kind==15) {
             const auto sail=std::find_if(bundle->centaurus_sails.begin(),bundle->centaurus_sails.end(),[&](const auto &v){return v.technique==p.id;});
             if (sail==bundle->centaurus_sails.end() || bundle->bosses[p.boss-1].kind!=1 || sail->radius_min>sail->radius_max || p.speed<=0 || !stages.empty() || p.active!=std::max(0.001,sail->duration)) return {};continue;
-        }
         }
         if (p.kind==51) {const auto v=std::find_if(bundle->canis_sirius_flames.begin(),bundle->canis_sirius_flames.end(),[&](const auto &v){return v.technique==p.id;});if (v==bundle->canis_sirius_flames.end() || bundle->bosses[p.boss-1].kind!=2 || bundle->canis_flames[v->flame-1].kind!=1 || bundle->canis_flames[v->flame-1].phase!=p.phase || !stages.empty()) return {};continue;}
         if (p.kind==50) {const auto v=std::find_if(bundle->canis_relays.begin(),bundle->canis_relays.end(),[&](const auto &v){return v.technique==p.id;});if (v==bundle->canis_relays.end() || bundle->bosses[p.boss-1].kind!=2 || bundle->canis_flames[v->hound_flame-1].kind!=0 || bundle->canis_flames[v->final_flame-1].kind!=0 || bundle->canis_flames[v->hound_flame-1].phase!=p.phase || bundle->canis_flames[v->final_flame-1].phase!=p.phase || !stages.empty()) return {};continue;}
