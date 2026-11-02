@@ -61,7 +61,7 @@ Dictionary SpeedRunCore::development_debug_command(const Dictionary &p) {
     else if (action=="level_up") return reply(speed::ProgressionSystem::add_experience(*this,speed::ProgressionSystem::next_xp(runtime)-s.loadout.xp+0.01));
     else if (action=="gauge_full") s.draw.gauge=1;
     else if (action=="heal") s.ship.hp=s.ship_config.max_hp;
-    else if (action=="clear_enemies") {for (uint32_t i=0;i<s.enemies.size();++i) if (s.enemies[i].alive && !s.enemies[i].is_boss) speed::EnemySystem::mark_dead(runtime,s.enemy_handles.at(i));rebuild_enemy_grid(s.frame_grid_cell);}
+    else if (action=="clear_enemies") {speed::EnemySystem::clear_regular(runtime);rebuild_enemy_grid(s.frame_grid_cell);}
     else if (action=="hurt" || action=="die") {
         const bool keep=s.invincible;const double shield=s.ship.shield_t;s.invincible=false;s.ship.invuln=s.ship.shield_t=0;
         speed::ShipDamageRequest hit;hit.amount=action=="hurt"?1:s.ship.hp+1;hit.cause=speed::Cause::Debug;speed::CombatResolver::ship_damage(runtime,hit);
