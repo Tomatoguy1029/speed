@@ -137,6 +137,7 @@ Array SpeedRunCore::hostiles_snapshot() const {
         if (!shot.alive) continue;
         Dictionary item;
         item["row"] = int64_t(row); item["kind"] = shot.kind; item["pos"] = shot.pos; item["vel"] = shot.vel;
+        if (shot.star_bolt.definition) item["radius"]=shot.radius;
         if (shot.arrow.definition) item["length"]=shot.arrow.length;
         if (shot.slash.definition) {item["size"]=shot.radius;item["side"]=shot.slash.side;}
         item["life"] = shot.life; item["gap"] = shot.gap; item["stone"] = shot.stone; item["wait"] = shot.wait;

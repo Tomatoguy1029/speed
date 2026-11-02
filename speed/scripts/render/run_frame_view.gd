@@ -1,5 +1,6 @@
 ## RenderFrameの値だけを描画へ渡す。敵表や武器の実体は参照しない。
 extends Node2D
+const VISUAL_ROLE = preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole
 const SHAPE_KIND = preload("res://tools/content/generated/run_schema.gd").ENUMS.RenderShapeKind
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
 var perf := PerfLog.new()
@@ -144,8 +145,9 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 		if entry.role==4: batch.setup_polygon(InstanceBatch.circle_points(24))
 		elif entry.role==11: preload("res://scripts/render/attacks/bullet.gd").setup_batch(batch)
 		elif entry.role==12: batch.setup_polygon(InstanceBatch.circle_points(32))
+		elif entry.role==VISUAL_ROLE.StarBolt: preload("res://scripts/render/attacks/star_bolt.gd").setup_batch(batch,_scope.resources.get(entry.path),entry.scene)
 		elif entry.role==13: preload("res://scripts/render/attacks/reflected.gd").setup_batch(batch)
-		elif entry.role==14: batch.setup_polygon(entry.points)
+		elif entry.role==VISUAL_ROLE.EnemyPolygon: batch.setup_polygon(entry.points)
 		else:
 			batch.setup_texture(_scope.resources.get(entry.path) as Texture2D,entry.get("rect",Rect2()))
 			var material := ShaderMaterial.new()

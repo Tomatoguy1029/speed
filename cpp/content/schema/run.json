@@ -1003,10 +1003,10 @@
         {
           "name": "role",
           "type": "u32",
-          "max": 14
+          "max": 15
         }
       ],
-      "version": 9
+      "version": 11
     },
     {
       "name": "ForwardDefinition",
@@ -1294,6 +1294,10 @@
       {
         "name": "Arrow",
         "value": "arrow"
+      },
+      {
+        "name": "StarBolt",
+        "value": "star_bolt"
       }
     ],
     "VisualRole": [
@@ -1356,6 +1360,10 @@
       {
         "name": "EnemyPolygon",
         "value": "enemy_polygon"
+      },
+      {
+        "name": "StarBolt",
+        "value": "star_bolt"
       }
     ],
     "EventType": [

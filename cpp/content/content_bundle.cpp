@@ -73,6 +73,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->walls=records.WallDefinition_rows;
     bundle->slashes=records.SlashDefinition_rows;
     bundle->bolts=records.BoltDefinition_rows;
+    bundle->star_bolts=records.StarBoltDefinition_rows;
+    for (size_t i=0;i<bundle->star_bolts.size();++i) {
+        const auto &s=bundle->star_bolts[i];if (s.id!=i+1 || s.radius<=0 || s.life<=0 || s.flight_scale<=0 ||
+            !std::isfinite(float(s.radius)) || !std::isfinite(float(s.life)) || !std::isfinite(float(s.flight_scale))) return {};
+    }
     bundle->light_arrows=records.LightArrowDefinition_rows;
     for (size_t i=0;i<bundle->light_arrows.size();++i) {
         const auto &arrow=bundle->light_arrows[i];if (arrow.id!=i+1 || arrow.flight_scale<=0 || arrow.shot_length_scale<=0 || arrow.shot_width_scale<=0) return {};
@@ -171,7 +176,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         if (d.kind!=1 || v.level>d.maximum_level) return {};
     }
     for (const auto &visual:bundle->visuals) {
-        if (visual.role>14) return {};
+        if (visual.role>=uint32_t(VisualRole::Count)) return {};
     }
     std::unordered_set<std::string> names;
     for (const auto &row:records.EnemyRecord_rows) {

@@ -380,6 +380,70 @@
           "type": "f32"
         }
       ]
+    },
+    {
+      "name": "StarBoltDefinition",
+      "section": 42,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        },
+        {
+          "name": "turn_with_velocity",
+          "type": "bool"
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "stone_visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
     }
   ],
   "enums": {
@@ -445,6 +509,10 @@
       {
         "name": "CosmicArrow",
         "value": "cosmic_arrow"
+      },
+      {
+        "name": "StarBolt",
+        "value": "star_bolt"
       }
     ],
     "FriendKind": [

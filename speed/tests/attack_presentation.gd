@@ -19,6 +19,12 @@ func _ready() -> void:
 		get_tree().quit(1 if failed else 0)
 		return
 
+
+	if "--cpp-star-bolt" in OS.get_cmdline_user_args():
+		await check_cpp_star_bolt()
+		print("[cpp_star_bolt] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-light-arrow" in OS.get_cmdline_user_args() or "--cpp-light-arrow-fixes" in OS.get_cmdline_user_args():
 		arrow_fixes = "--cpp-light-arrow-fixes" in OS.get_cmdline_user_args()
 		mute_checks = arrow_fixes
@@ -168,3 +174,47 @@ func check_cpp_render_kinds() -> bool:
 	cpp_session.free()
 	await get_tree().process_frame
 	return true
+
+func check_cpp_star_bolt() -> void:
+	if not await prepare_cpp_attack(91,"star_bolt"): return
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(-300,300)}).value
+	var empty: Dictionary = cpp_bridge.checkpoint()
+	var params := {"position":cpp_origin,"angle":PI*0.5,"speed":100.0,"damage":8.0,"owner_id":owner}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_star_bolt",params)
+	check(fired.ok,"発生元から星弾を生成する")
+	if not fired.ok: cpp_session.free(); return
+	cpp_core.step_hostiles(0.1)
+	var state: Array = cpp_core.hostiles_snapshot()
+	check(state[0].pos.distance_to(cpp_origin+Vector2(0,10))<0.001 and state[0].radius==9.0 and is_equal_approx(state[0].life,5.9),"星弾は半径9・寿命6秒で直進する")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1600,-500,1400,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	check(presentation.frame_view.apply_frame(frame),"星弾の生成済みメッシュを通常画面へ渡す")
+	var stars: Array = frame.batches.filter(func(b): return presentation.frame_view.visuals[b.visual_id].role==preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole.StarBolt)
+	check(stars.size()==1 and stars[0].ids.size()==1 and presentation.frame_view.batches[stars[0].visual_id].multimesh.mesh!=null,"星と芯の生成済みFlightメッシュをバッチで描く")
+	await get_tree().process_frame
+	cpp_bridge.command("dev_remove",{"entity_id":owner})
+	var active: Dictionary = cpp_bridge.checkpoint()
+	check(active.ok and cpp_core.attack_snapshot()[0].source_id==owner,"発射元退場後も星弾を元のIDで保持する")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(0,60),"velocity":Vector2.ZERO})
+	cpp_core.step_hostiles(0.5)
+	check(cpp_core.hostiles_snapshot().is_empty() and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"星弾が共通被弾へ通って消える")
+	var events: Array = cpp_bridge.read_frame().value.events
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.cause==&"star_bolt"),"星弾の原因名を共通記録へ残す")
+	cpp_bridge.restore(active.value)
+	check(cpp_core.hostiles_snapshot()==state,"星弾の飛行途中の値を復元する")
+	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(300,0),"velocity":Vector2.ZERO})
+	cpp_core.step_hostiles(6.0)
+	check(cpp_core.hostiles_snapshot().is_empty(),"星弾は寿命で消える")
+	cpp_bridge.restore(empty.value)
+	params.position = Vector2(-300,0)
+	params.angle = 0.0
+	params.speed = 1000.0
+	check(cpp_bridge.command("dev_fire_star_bolt",params).ok,"天体へ向かう星弾を生成する")
+	cpp_core.step_hostiles(0.5)
+	check(cpp_core.hostiles_snapshot().is_empty(),"星弾は天体に当たって消える")
+	frame = cpp_bridge.read_render(Rect2(-1600,-500,2000,1000)).value
+	check(not frame.batches.any(func(b): return presentation.frame_view.visuals[b.visual_id].role==preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole.StarBolt),"終了した星弾のFlight表示を回収する")
+	cpp_bridge.release_checkpoint(active.value)
+	cpp_bridge.release_checkpoint(empty.value)
+	cpp_session.free()

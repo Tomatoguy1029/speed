@@ -7,6 +7,7 @@
 #include "../systems/attacks/wall.h"
 #include "../systems/attacks/slash.h"
 #include "../systems/attacks/bolt.h"
+#include "../systems/attacks/star_bolt.h"
 #include "../systems/attacks/light_arrow.h"
 #include "../runtime/run_runtime.h"
 #include "../systems/motion_math.h"
@@ -98,7 +99,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (saw && !run.content->rock_fields.empty()) batch(run.content->definitions[run.content->rock_fields.front().saw-1].visual_id,10,0).add(shot.id,pose.position,pose.angle,radius,Color(0,0,0,1));
         else batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1),shot.visual==StringName("weapon/scatter")?(shot.life<0.09?2:1):0);
     }
-    for (const auto &shot:state.hostiles) {
+    for (uint32_t row=0;row<state.hostiles.size();++row) {
+        const auto &shot=state.hostiles[row];
+        if (shot.alive && shot.star_bolt.definition && view.has_point(shot.pos)) {
+            const auto &d=run.content->star_bolts[shot.star_bolt.definition-1];StarBoltSystem::render(run,row,batch(d.visual,10,0),batch(d.stone_visual,10,1));continue;
+        }
         if (!shot.alive || !shot.definition || !view.grow(40.0).has_point(shot.pos)) continue;
         const auto &definition=run.content->hostile_definitions[shot.definition-1];const auto *record=AttackSystem::get(state,shot.attack);if (!record) continue;
         batch(definition.visual,10,0).add(record->id,shot.pos,shot.kind==int64_t(HostileKind::Reflected)?shot.vel.angle():0.0,shot.radius,Color(1,1,1,1));

@@ -136,7 +136,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var visuals := [{"id":1,"role":1,"path":"res://assets/pixel/airship.png"},
 		{"id":2,"role":2,"path":""},{"id":3,"role":3,"path":"res://assets/pixel/xp_crystal_facets.tres"},
 		{"id":4,"role":4,"path":""},{"id":5,"role":5,"path":"res://assets/pixel/airship_canon.png"},
-		{"id":6,"role":14 if not polygon.is_empty() else (6 if look!=null else 0),"path":sprite}]
+		{"id":6,"role":Schema.ENUMS.VisualRole.EnemyPolygon if not polygon.is_empty() else (6 if look!=null else 0),"path":sprite}]
 	if not polygon.is_empty(): visuals[5].points = polygon
 	if not data.BiteDefinition.is_empty(): visuals.append({"id":7,"role":8,"path":"res://scenes/attacks/zone_biter.tscn"})
 	for visual: Dictionary in visuals: data.ResourceKey.append({"id":visual.id,"role":visual.role})
@@ -232,6 +232,18 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	visuals.append({"id":bullet_visual,"role":11,"path":""})
 	data.ResourceKey.append({"id":bullet_visual+1,"role":12})
 	visuals.append({"id":bullet_visual+1,"role":12,"path":""})
+	var star: AttackVisual = load("res://scenes/attacks/star_bolt.tscn").instantiate()
+	star._apply_effect_settings()
+	var star_library: Resource = load("res://.content/attack_visuals.res")
+	if star_library.get_meta("looks",{}).get("res://scenes/attacks/star_bolt.tscn",{}).get("Flight")==null:
+		star.free()
+		return {}
+	var star_visual: int = data.ResourceKey.size()+1
+	data.ResourceKey.append({"id":star_visual,"role":Schema.ENUMS.VisualRole.StarBolt})
+	visuals.append({"id":star_visual,"role":Schema.ENUMS.VisualRole.StarBolt,"path":"res://.content/attack_visuals.res","scene":"res://scenes/attacks/star_bolt.tscn"})
+	data.StarBoltDefinition = [{"id":1,"radius":9.0,"life":6.0,"flight_scale":star.flight_scale,"turn_with_velocity":star.turn_with_velocity,
+		"tint_r":star.effect_tint.r,"tint_g":star.effect_tint.g,"tint_b":star.effect_tint.b,"tint_a":star.effect_tint.a,"visual":star_visual,"stone_visual":bullet_visual+1,"contact":1}]
+	star.free()
 	data.HostileDefinition = [{"id":1,"kind":0,"radius":7.0,"life":4.0,"damage":7.0,"slow":0.0,"turn":0.0,
 		"visual":bullet_visual,"stone_visual":bullet_visual+1,"contact":1}]
 	if definition.behavior==&"shield":
@@ -330,6 +342,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if data.ResourceKey.is_empty():
 			data.ResourceKey = resolved.ResourceKey.slice(0,5)
 			visuals.assign(package.visuals.slice(0,5))
+			data.StarBoltDefinition = resolved.StarBoltDefinition.duplicate(true)
 			data.LoadoutDefinition = resolved.LoadoutDefinition
 			data.ForwardDefinition = resolved.ForwardDefinition
 			data.ScatterDefinition = resolved.ScatterDefinition
@@ -349,7 +362,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 				attack.id = data.HostileDefinition.size()+1
 				data.HostileDefinition.append(attack)
 			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [9,10])
-			attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12,13])
+			attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12,13,Schema.ENUMS.VisualRole.StarBolt])
 		for attack_visual: Dictionary in package.visuals:
 			if attack_visual.role==13 and not attack_visuals.any(func(value: Dictionary): return value.role==13): attack_visuals.append(attack_visual)
 		for shield_source: Dictionary in resolved.ShieldDefinition:
@@ -397,6 +410,9 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		row.id = data.ResourceKey.size()+1
 		data.ResourceKey.append({"id":row.id,"role":row.role})
 		visuals.append(row)
+		for star: Dictionary in data.StarBoltDefinition:
+			if row.role==Schema.ENUMS.VisualRole.StarBolt: star.visual = row.id
+			elif row.role==12: star.stone_visual = row.id
 		for attack: Dictionary in data.HostileDefinition:
 			if row.role==12: attack.stone_visual = row.id
 			elif (row.role==13 and attack.kind==2) or (row.role==11 and attack.kind!=2): attack.visual = row.id
