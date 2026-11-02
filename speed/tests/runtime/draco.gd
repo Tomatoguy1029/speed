@@ -750,7 +750,7 @@ func native_spiral_contact() -> void:
 		if attack.trapped_hit:break
 	var hits: Array=fixture.captured.filter(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"spiral")
 	if hits.size()!=1:print("収縮の被弾=",fixture.captured.filter(func(e):return e.type==&"combat_player_damage"))
-	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and is_equal_approx(hits[0].payload.hp_before-hits[0].payload.hp_after,35.0),"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
+	check(hits.size()==1 and hits[0].payload.source==&"draco" and hits[0].payload.technique==&"spiral" and absf(float(hits[0].payload.hp_before-hits[0].payload.hp_after)-35.0)<=35.0*1e-9,"収縮中の接触は1回だけ実HPを減らし、原因・出所・技名を記録する")
 	bridge.dispose()
 	print("[cpp_draco_spiral_contact] failures=",failed);get_tree().quit(1 if failed else 0)
 
