@@ -1480,6 +1480,52 @@
           "min": 1
         }
       ]
+    },
+    {
+      "name": "HydraPincerDefinition",
+      "section": 382,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "open_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "close_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {

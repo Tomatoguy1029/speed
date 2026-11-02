@@ -9,6 +9,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-pincer" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_pincer")
+		return
 	if "--cpp-hydra-grid" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_grid")
 		return
@@ -4705,7 +4708,10 @@ func hydra_major_case(selected_move: String, edits: Dictionary, flowing := false
 	if flowing:
 		var rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
 		rules.techniques.assign([move]);rules.combos={};rules.conditions={selected_move:{}};rules.condition_groups={};rules.graph_nodes={};rules.selection_bias={}
-		var flow = load("res://data/bosses/ai/hydra_flow.tres").duplicate(true);flow.sections=flow.sections.slice(2,3);flow.sections[0].next=0;flow.sections[0].fallback=0
+		var flow = load("res://data/bosses/ai/hydra_flow.tres").duplicate(true)
+		flow.sections=flow.sections.slice(0,1) if move.category==&"combo" else flow.sections.slice(2,3)
+		flow.sections[0].next=0;flow.sections[0].fallback=0
+		if move.category==&"combo":flow.sections[0].weights={"combo":100.0}
 		var records: Dictionary = builder.boss_flow_records(rules,flow,package.records.BossTechniqueDefinition)
 		if records.is_empty(): check(false,"大技の共通フローを生成する");return {}
 		for key in records: package.records[key]=records[key]
@@ -4977,3 +4983,74 @@ func native_hydra_rubble_retire() -> void:
 	bridge.command("dev_remove",{"entity_id":rubble[0].id});bridge._core.step_hazards(0.01)
 	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"消失した瓦礫の世代参照を調べ、その判定を回収する")
 	bridge.dispose();print("[cpp_hydra_rubble_retire] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func hydra_pincer_grow(c: Dictionary) -> void:
+	var body: Dictionary=c.bridge.command("dev_boss_body_state").value[0]
+	c.bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp*0.3,"cause":"shot"});c.bridge._core.step(0.11)
+
+func native_hydra_pincer() -> void:
+	var edits := {"warning_time":0.15,"performance_time":0.7,"pincer_delay":0.1,"pincer_time":0.3,"pincer_open_angle":0.8,"pincer_close_angle":0.12,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
+	var c := hydra_major_case("beam_pincer",edits,true,{"combo_cooldown":0.1})
+	if c.is_empty():get_tree().quit(1);return
+	var bridge=c.bridge
+	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"beam_pincer","挟撃の編集Resourceと互換Runnerを分けてUID参照を維持する")
+	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"ビームの首が1本だけなら挟撃を開始しない")
+	hydra_pincer_grow(c)
+	for tick in 40:
+		bridge._core.step(0.01)
+		if not bridge.command("dev_boss_state").value.is_empty():break
+	var actions: Array=bridge.command("dev_boss_state").value
+	check(not actions.is_empty() and actions[0].kind==74,"コンボ区間の共通フローから挟撃を自然に選ぶ")
+	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
+	var first_id: int=actions[0].id
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.filter(func(n):return n.mode=="beam_pincer").size()==2 and body.necks[3].mode=="beam_pincer" and body.necks[6].mode=="beam_pincer" and body.effects.is_empty(),"首順で異なる2本のビーム首だけを参加させ、予告中は形を出さない")
+	var passive_angle: float=body.necks[0].angle
+	for tick in 15:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	var t: Dictionary=bridge.command("dev_boss_state").value[0];body=bridge.command("dev_boss_body_state").value[0]
+	check(t.stage==1 and t.pincer_aims.size()==2 and body.effects.size()==2 and not is_equal_approx(passive_angle,body.necks[0].angle),"予告後に2本を発射し、非参加首は普段の操舵を続ける")
+	check(body.effects.all(func(e):return e.points.size()==2 and is_equal_approx(e.delay,0.1) and is_equal_approx(e.life,0.3)),"挟撃は遅れと寿命が別の2線分として生成する")
+	var from: Array=[body.effects[0].points[0],body.effects[1].points[0]];var aims: PackedFloat64Array=t.pincer_aims.duplicate()
+	bridge.command("dev_ship_motion",{"position":Vector2(900,-600),"velocity":Vector2.ZERO});bridge._core.set_motion_context(Vector2(900,-600),Vector2.ZERO,Vector2(1400,1000))
+	bridge._core.step(0.12);bridge._core.step_hazards(0.12);t=bridge.command("dev_boss_state").value[0];body=bridge.command("dev_boss_body_state").value[0]
+	var fraction: float=clampf((t.performance_time-0.1)/0.3,0.0,1.0)
+	var exact := true
+	for i in 2:
+		var angle: float=aims[i]+(1.0 if i==0 else -1.0)*lerpf(0.8,0.12,fraction)
+		exact=exact and body.effects[i].points[0].distance_to(from[i])<0.001 and body.effects[i].points[1].distance_to(from[i]+Vector2.from_angle(angle)*600.0)<0.001
+	check(t.pincer_aims==aims and exact,"初回の自機方向を固定し、ラジアンの開始角から終点角へ両側を閉じるSourceの式を保つ")
+	var held: Dictionary=bridge.checkpoint();bridge._core.step(0.01);bridge._core.step_hazards(0.01);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(held.ok and bridge.restore(held.value).ok,"2本の参加首・狙い・形・時計を保持して戻す");bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,"途中復帰後も同じ挟撃の角度と点列へ進む")
+	var events: Array=[];bridge.subscribe("挟撃の記録",func(packet):events.append_array(packet.events);return true)
+	bridge._core.set_run_guards({"invincible":false});body=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_ship_motion",{"position":body.effects[0].points[0].lerp(body.effects[0].points[1],0.5),"velocity":Vector2.ZERO})
+	var hp: float=bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.01);bridge._core.step_hazards(0.01);bridge.command("dev_boss_body_state")
+	check(hp>bridge._core.ship_snapshot().ship_hp and events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="beam" and e.payload.technique=="beam_pincer" and e.payload.source=="hydra"),"閉じる線分の実命中と原因・技・所有元を共通の記録へ渡す")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	bridge.restore(held.value);body=bridge.command("dev_boss_body_state").value[0];bridge.command("dev_damage",{"entity_id":body.necks[3].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"片方の参加首が倒れると両方のビームを中断する")
+	bridge.restore(held.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で2本の持続ビームを同時に回収する")
+	bridge.restore(held.value)
+	for tick in 50:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.is_empty(),"挟撃の寿命を過ぎると線分を消す")
+	for tick in 60:bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(a):return a.id>first_id and a.kind==74),"自然終了とコンボの待ち後に次の行動を選べる")
+	bridge.restore(held.value);body=bridge.command("dev_boss_body_state").value[0]
+	bridge.command("dev_damage",{"entity_id":c.id,"amount":body.max_hp+1.0,"cause":"shot"});bridge._core.step(0.001);bridge._core.step(1.21)
+	bridge.command("dev_cancel_flow",{"entity_id":c.id});bridge._core.step(0.21);body=bridge.command("dev_boss_body_state").value[0]
+	var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
+	check(started.ok,"分離後も2本のビーム首で同じ挟撃を開始できる")
+	if started.ok:
+		bridge._core.step(0.16);body=bridge.command("dev_boss_body_state").value[0]
+		var anchored: Array=[body.effects[0].points[0],body.effects[1].points[0]];bridge._core.step(0.1);body=bridge.command("dev_boss_body_state").value[0]
+		check(body.effects[0].points[0]==anchored[0] and body.effects[1].points[0]==anchored[1],"分離後も参加首の配置とビームの起点を固定する")
+	bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free()
+	var short_edits: Dictionary=edits.duplicate();short_edits.performance_time=0.05
+	c=hydra_major_case("beam_pincer",short_edits,false,{"combo_cooldown":0.1});bridge=c.bridge;hydra_pincer_grow(c)
+	check(bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"寿命より先に技が終わる挟撃を開始する");bridge._core.step(0.16)
+	check(bridge.command("dev_boss_body_state").value[0].effects.size()==2,"短い実行時間でも発動時点に2本を生成する");bridge._core.step(0.05)
+	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"自然終了は長い寿命が残ったビームも消す");bridge.dispose()
+	await get_tree().process_frame;print("[cpp_hydra_pincer] failures=",failed);get_tree().quit(1 if failed else 0)
