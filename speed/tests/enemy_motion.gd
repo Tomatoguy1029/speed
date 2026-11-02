@@ -4,12 +4,27 @@ var failed := 0
 var gunner_finished := false
 var gunner_cycle := false
 var missile_enemy := false
+var battleship_enemy := false
+var ranged_type_override := ""
+var ranged_retry := false
 func check(ok: bool, label: String) -> void:
+	if ranged_retry and "発射位置・向き・弾" not in label and "戦艦の確認が最後まで進んだ" not in label: return
 	if gunner_cycle and label not in ["周期を過ぎる大きな更新でも1更新に1回ずつ発射する","射撃型の確認が最後まで進んだ"]: return
 	if not ok:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-battleship-enemy" in OS.get_cmdline_user_args():
+		battleship_enemy = true
+		ranged_type_override = "battleship"
+		ranged_retry = "--cpp-battleship-reuse-fixes" in OS.get_cmdline_user_args()
+		for argument in OS.get_cmdline_user_args():
+			if argument.begins_with("--cpp-ranged-type="): ranged_type_override = argument.get_slice("=",1)
+		await check_cpp_gunner()
+		check(gunner_finished,"戦艦の確認が最後まで進んだ: "+ranged_type_override)
+		print("[cpp_battleship_enemy] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-dash-enemy" in OS.get_cmdline_user_args():
 		await check_cpp_dash()
 		print("[cpp_dash_enemy] failed=%d" % failed)
@@ -81,6 +96,9 @@ func _ready() -> void:
 	get_tree().quit(1 if failed else 0)
 
 func gunner_states(run: RunSimulation, core, row: int, id: int, comparison, label: String) -> void:
+	if ranged_retry:
+		if label in ["normal/6","normal/7"]: ranged_shot_states(run,core,comparison,label)
+		return
 	if gunner_cycle: return
 	var found := false
 	for enemy: Dictionary in core.enemies_snapshot():
@@ -94,6 +112,9 @@ func gunner_states(run: RunSimulation, core, row: int, id: int, comparison, labe
 		if motion.id!=id: continue
 		check(is_equal_approx(motion.fire_t,run.enemies.table.fire_t[row]) and is_equal_approx(motion.charge,run.enemies.table.charge[row]),label+"の発射周期と予告")
 	check(found,label+"の個体IDが有効")
+	ranged_shot_states(run,core,comparison,label)
+
+func ranged_shot_states(run: RunSimulation, core, comparison, label: String) -> void:
 	var shots := []
 	var ps := run.projectiles
 	for i in ps.hostile_alive.size():
@@ -115,7 +136,7 @@ func check_cpp_gunner() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 84
 	stage.resources = StageResources.new()
-	var type := "missile" if missile_enemy else "gunner"
+	var type: String = ranged_type_override if not ranged_type_override.is_empty() else ("missile" if missile_enemy else "gunner")
 	stage.resources.enemy_ids = PackedStringArray([type])
 	var output := "res://.content/dev/run_gunner"
 	var builder = load("res://tools/content/build_run_content.gd")
@@ -127,7 +148,7 @@ func check_cpp_gunner() -> void:
 	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":976},true)
 	session.auto_step = false
 	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
-	check(session.bridge!=null,"射撃型の通常のランと表示を準備する")
+	check(session.bridge!=null,"射撃型の通常のランと表示を準備する: %s / %s" % [type,session.cpp_error])
 	if session.bridge==null:
 		session.free()
 		return
@@ -138,7 +159,7 @@ func check_cpp_gunner() -> void:
 	var initial: Dictionary = bridge.checkpoint()
 	var comparison = preload("res://tools/compare_runtime.gd").new()
 	var budget_probe = preload("res://tests/native_attack_budget.gd").new()
-	for kind in (["normal"] if gunner_cycle else ["normal","death","reuse"]):
+	for kind in (["normal"] if gunner_cycle or ranged_retry else ["normal","death","reuse"]):
 		bridge.restore(initial.value)
 		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 		add_child(lab)
@@ -160,6 +181,7 @@ func check_cpp_gunner() -> void:
 		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
 		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 		var definition := run.enemies.def_of(StringName(type))
+		var expected_volley := int(definition.params.volley) if battleship_enemy else 1
 		var position := target+Vector2(480,120)
 		var row := run.enemies.spawn(definition,position)
 		var id: int = bridge.command("dev_spawn",{"definition_id":type,"position":position}).value
@@ -204,42 +226,47 @@ func check_cpp_gunner() -> void:
 			emitted_count += maxi(0,core.hostiles_snapshot().size()-previous_count)
 			previous_count = core.hostiles_snapshot().size()
 			gunner_states(run,core,row,id,comparison,"%s/%d" % [kind,step])
-			if step<2:
+			if step<2 and not ranged_retry:
 				check(core.hostiles_snapshot().is_empty() and run.enemies.table.charge[row]==0.0,"枠を待つ間は予告と射撃を始めず追跡する: %s/%d" % [kind,step])
-			if missile_enemy:
+			if (missile_enemy or battleship_enemy) and not ranged_retry:
 				var budget_diff: String = comparison.difference(budget_probe.snapshot(director),core.attack_budget_snapshot())
-				check(budget_diff.is_empty(),"ミサイル艇の予算と待機・残留枠が一致する: "+budget_diff)
-			if step==2 and kind=="normal" and not gunner_cycle:
+				check(budget_diff.is_empty(),"射撃する敵の予算と待機・残留枠が一致する: "+budget_diff)
+			if step==2 and kind=="normal" and not gunner_cycle and not ranged_retry:
 				warning = bridge.checkpoint()
 				warning_state = core.enemy_motion_snapshot()
 				var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
 				var marked := false
 				for batch: Dictionary in frame.batches:
-					var mark_name := "missile" if missile_enemy else "gunner"
-					if batch.has(mark_name): marked = batch[mark_name].size()==5 and batch[mark_name][4]>0.0
+					var mark_name := "battleship" if battleship_enemy else ("missile" if missile_enemy else "gunner")
+					if batch.has(mark_name): marked = batch[mark_name].size()==(6 if battleship_enemy else 5) and batch[mark_name][4]>0.0
 				check(marked,"射撃の予告を表示用の値へ渡す")
+				if battleship_enemy:
+					for batch: Dictionary in frame.batches:
+						if batch.has("battleship"): check(is_equal_approx(batch.battleship[2],run.enemies.table.r[row]) and is_equal_approx(batch.battleship[5],definition.weak_arc),"大型の当たり半径と背面の弱点を同じ本体へ渡す")
 				var presentation: RunPresentation = session.view.get_node("RunPresentation")
 				presentation._present_cpp(0.0)
-				check(presentation.frame_view.apply_frame(frame) and presentation.frame_view.get("_missile" if missile_enemy else "_gunner").size()==5,"射撃型の本体と砲口の光を通常画面へ表示する")
+				check(presentation.frame_view.apply_frame(frame) and presentation.frame_view.get("_battleship" if battleship_enemy else ("_missile" if missile_enemy else "_gunner")).size()==(6 if battleship_enemy else 5),"射撃型の本体と砲口の光を通常画面へ表示する")
 				await get_tree().process_frame
-		if kind=="normal":
-			check(emitted_count==2 and core.hostiles_snapshot().size()==run.projectiles.hostile_slots.live,"周期を過ぎる大きな更新でも1更新に1回ずつ発射する")
+		if kind=="normal" and not ranged_retry:
+			check(emitted_count==2*expected_volley and core.hostiles_snapshot().size()==run.projectiles.hostile_slots.live,"周期を過ぎる大きな更新でも1更新に1回ずつ発射する")
 			if not gunner_cycle:
 				bridge.restore(warning.value)
 				check(core.enemy_motion_snapshot()==warning_state,"予告中の位置と射撃状態を復元する")
 				core.step(0.125)
-				check(core.hostiles_snapshot().size()==1,"予告中の保持点から同じ発射へ進む")
-				if missile_enemy:
+				check(core.hostiles_snapshot().size()==expected_volley,"予告中の保持点から同じ発射へ進む")
+				if missile_enemy or battleship_enemy:
 					var fired: Dictionary = bridge.checkpoint()
-					var shot_id: int = core.attack_snapshot()[0].id
-					check(bridge.command("dev_kill",{"entity_id":id,"cause":"ram"}).ok,"飛行中にミサイル艇を倒す")
-					var parent_gone := false
+					check(bridge.command("dev_kill",{"entity_id":id,"cause":"ram"}).ok,"弾の飛行中に発生元を倒す")
+					var parent_gone := true
+					var source_count := 0
 					for attack: Dictionary in core.attack_snapshot():
-						if attack.id==shot_id: parent_gone = attack.source_id==id and not attack.source_alive
-					check(parent_gone and core.hostiles_snapshot().size()==1,"親消失後も発射済みの誘導弾と出どころを保つ")
+						if attack.source_id==id:
+							source_count += 1
+							parent_gone = parent_gone and not attack.source_alive
+					check(parent_gone and source_count==expected_volley and core.hostiles_snapshot().size()==expected_volley,"親消失後も発射済みの弾と出どころを保つ")
 					core.step_hostiles(5.0)
-					check(core.hostiles_snapshot().is_empty(),"誘導弾を命中または寿命で終了する")
-					check(bridge.restore(fired.value).ok,"発射済みの敵と誘導弾を値から復帰する")
+					check(core.hostiles_snapshot().is_empty(),"発射済みの弾を命中または寿命で終了する")
+					check(bridge.restore(fired.value).ok,"発射済みの敵と弾を値から復帰する")
 					var pending_shots: Array = core.hostiles_snapshot()
 					core.step_hostiles(0.125)
 					var advanced_shots: Array = core.hostiles_snapshot()
@@ -248,8 +275,8 @@ func check_cpp_gunner() -> void:
 					check(core.hostiles_snapshot()==advanced_shots,"復帰後も同じ追尾と飛行になる")
 					var restored_id := id
 					var old_handle: PackedInt64Array = core.enemy_handle(restored_id)
-					check(bridge.command("dev_remove",{"entity_id":restored_id}).ok,"ミサイル艇を撃破と別の退場で片付ける")
-					check(not core.valid_enemy_handle(old_handle) and core.hostiles_snapshot().size()==1,"退場は旧個体の参照を失効し発射済み弾を保つ")
+					check(bridge.command("dev_remove",{"entity_id":restored_id}).ok,"発生元を撃破と別の退場で片付ける")
+					check(not core.valid_enemy_handle(old_handle) and core.hostiles_snapshot().size()==expected_volley,"退場は旧個体の参照を失効し発射済み弾を保つ")
 					bridge.release_checkpoint(fired.value)
 				bridge.release_checkpoint(warning.value)
 		elif kind=="death": check(core.hostiles_snapshot().is_empty(),"予告中に倒れた敵は発射しない")

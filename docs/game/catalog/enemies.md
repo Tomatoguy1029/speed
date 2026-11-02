@@ -239,6 +239,8 @@
 | `gunner` | 射撃型 | 採用 | 実装済み | 距離を保って回り込み、予告のあと弾を撃つ | 圧力期以降（無双期を除く）、危険地帯 | `data/enemies/gunner.tres` |
 | `missile` | ミサイル艇 | 採用 | 実装済み（C++の生成・行動・表示・復帰に対応） | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `data/enemies/missile.tres` |
 | `titan` | タイタン | 採用 | 実装済み | 大型の追跡敵。生成時に大きさが変わる | 無双期以外。同時に出る数に上限 | `data/enemies/titan.tres` |
-| `battleship` | 戦艦 | 採用 | 実装済み | 追跡し、予告のあと本体の正面へ扇状に弾を撃つ。背面が弱点 | 緊張期・脱出期 | `data/enemies/battleship.tres` |
+| `battleship` | 戦艦 | 採用 | C++の追跡・扇状射撃・大型判定・復帰に対応 | 追跡し、予告のあと本体の正面へ扇状に弾を撃つ。背面が弱点 | 緊張期・脱出期 | `data/enemies/battleship.tres` |
 
 `missile` は試遊用のスプライトを使う。
+
+未使用の `spreader` は戦艦と同じ扇状射撃を使い、C++の生成・追跡・表示・復帰に対応する。定義は `data/enemies/spreader.tres` に置く。

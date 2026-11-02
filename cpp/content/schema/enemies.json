@@ -385,6 +385,59 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "BattleshipDefinition",
+      "section": 43,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "telegraph"
+        },
+        {
+          "name": "bullet_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "weak_arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "volley",
+          "type": "u32",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

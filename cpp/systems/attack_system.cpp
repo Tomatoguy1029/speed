@@ -163,6 +163,7 @@ void AttackSystem::clear_bonus(State &state) {
     for (auto handle:handles) end(state,handle,AttackEndReason::BonusClear);
 }
 void AttackSystem::clear_hostile(State &state,AttackEndReason reason) {
+    if (state.attacks.hostile_updating) {state.attacks.hostile_clear_pending=true;state.attacks.clear_reason=reason;}
     std::vector<AttackHandle> handles;
     for (uint32_t i=0;i<state.attacks.records.size();++i) {
         const auto &record=state.attacks.records[i];if (!record.alive || record.pool==AttackPool::Friendly) continue;
@@ -170,6 +171,8 @@ void AttackSystem::clear_hostile(State &state,AttackEndReason reason) {
         else handles.push_back(state.attacks.handles.at(i));
     }
     for (auto handle:handles) end(state,handle,reason);
+    state.hazards.clear();state.free_hazards.clear();
+    if (!state.attacks.hostile_updating) {state.hostiles.clear();state.free_hostiles.clear();}
 }
 bool AttackSystem::begin_hostile_update(State &state) {
     if (state.attacks.hostile_updating) return false;state.attacks.hostile_updating=true;return true;

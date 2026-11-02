@@ -29,6 +29,7 @@ struct ContentBundle {
     std::vector<RocketDefinition> rockets;
     std::vector<DriftDefinition> drifts;
     std::vector<DashDefinition> dashes;
+    std::vector<BattleshipDefinition> battleships;
     std::vector<ContactDefinition> contacts;
     std::vector<HostileDefinition> hostile_definitions;
     std::vector<BeamDefinition> beams;
