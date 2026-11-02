@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -73,7 +74,7 @@ def inspect(path: Path, runtime_package=False) -> dict:
     return files
 
 
-def package(path: Path, platform: str, runtime: bool, script: Path) -> None:
+def package(path: Path, platform: str, runtime: bool, script: Path, rendered=False) -> None:
     packs = list(path.rglob("*.pck"))
     assert len(packs) == 1, "配布物にはPCKが1つ必要"
     files = inspect(packs[0], True)
@@ -93,13 +94,21 @@ def package(path: Path, platform: str, runtime: bool, script: Path) -> None:
         library = libraries[0]
         engine = path / "Speed.exe"
         assert engine.is_file(), "配布エンジンを確認する"
+        wrappers = list(path.glob("*console.exe"))
+        if wrappers: engine = wrappers[0]
     print(f"[export_package] {platform} 拡張・生成物・ライセンス OK")
     if not runtime:
         return
-    command = [str(engine), "--headless", "--main-pack", str(packs[0]), "--script", str(script.resolve()), "--"]
-    result = subprocess.run([*command, "--package-runtime"], check=True, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
+    environment = os.environ.copy()
+    executable = str(engine)
+    if rendered:
+        executable = shutil.which("godot-bg")
+        assert executable, "描画付きの確認にはgodot-bgが必要"
+        environment["GODOT"] = str(engine)
+    command = [executable, *([] if rendered else ["--headless"]), "--main-pack", str(packs[0]), "--script", str(script.resolve()), "--log-file", str(path.parent / "runtime.log"), "--"]
+    result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
     print(result.stdout)
-    assert "[package_runtime] OK" in result.stdout, "通常ランの開始と最小更新を最後まで実施する"
+    assert result.returncode == 0 and "[package_runtime] OK" in result.stdout, "通常ランの開始と最小更新を最後まで実施する"
     # 元の配布物を保ち、DLLを抜いた別コピーで旧実装へのfallbackがないことを確かめる。
     with tempfile.TemporaryDirectory(prefix="speed-package-missing-") as temporary:
         missing = Path(temporary) / "export"
@@ -107,7 +116,7 @@ def package(path: Path, platform: str, runtime: bool, script: Path) -> None:
         (missing / library.relative_to(path)).unlink()
         missing_engine = missing / engine.relative_to(path)
         missing_pack = missing / packs[0].relative_to(path)
-        result = subprocess.run([str(missing_engine), "--headless", "--main-pack", str(missing_pack), "--script", str(script.resolve()), "--", "--package-missing-runtime"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=missing)
+        result = subprocess.run([str(missing_engine), "--headless", "--main-pack", str(missing_pack), "--script", str(script.resolve()), "--log-file", str(path.parent / "missing-runtime.log"), "--", "--package-missing-runtime"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=missing)
         print(result.stdout)
         assert result.returncode == 0 and "[package_missing_runtime] OK" in result.stdout, "拡張欠落を開始失敗として確認する"
 
@@ -117,9 +126,12 @@ if __name__ == "__main__":
     parser.add_argument("path", type=Path)
     parser.add_argument("--platform", choices=["macos", "windows"])
     parser.add_argument("--runtime", action="store_true")
+    parser.add_argument("--rendered", action="store_true")
     parser.add_argument("--script", type=Path, default=Path(__file__).with_name("check_rules.gd"))
     args = parser.parse_args()
+    if args.rendered and (args.platform != "macos" or not args.runtime):
+        parser.error("--rendered はMacの --runtime と合わせて指定してください")
     if args.platform:
-        package(args.path.resolve(), args.platform, args.runtime, args.script)
+        package(args.path.resolve(), args.platform, args.runtime, args.script, args.rendered)
     else:
         inspect(args.path)

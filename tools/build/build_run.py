@@ -79,12 +79,12 @@ def package(root, lock, args):
     presets = project / 'export_presets.cfg'
     config = presets.read_text()
     section = '[preset.0.options]' if args.platform == 'macos' else '[preset.1.options]'
-    config = config.replace(section, section + '\n\ncustom_template/release=' + json.dumps(str(template)), 1)
+    config = config.replace(section, section + '\n\ncustom_template/release=' + json.dumps(str(template)) + ('\ndebug/export_console_wrapper=2' if args.platform == 'windows' and args.verify else ''), 1)
     presets.write_text(config)
     engine = [args.godot, '--headless', '--path', project]
     # importで型・資源索引を準備してから、正規の共通生成へ渡す。
     run([*engine, '--editor', '--import', '--log-file', destination / 'import.log'])
-    run([*engine, '--script', 'res://tools/content/build_all.gd', '--log-file', destination / 'generate.log', '--', '--force'])
+    run([*engine, '--editor', '--script', 'res://tools/content/build_all.gd', '--log-file', destination / 'generate.log', '--', '--force'])
     if not args.verify:
         save.write_text(original_save)
     output = destination / 'export'
@@ -98,7 +98,7 @@ def package(root, lock, args):
         for executable in output.glob('*.app/Contents/MacOS/*'):
             executable.chmod(executable.stat().st_mode | 0o111)
     run([sys.executable, root / 'speed/tests/export_package.py', output, '--platform', args.platform,
-         *(['--runtime'] if args.verify else []), '--script', root / 'speed/tests/check_rules.gd'])
+         *(['--runtime'] if args.verify else []), *(['--rendered'] if args.rendered else []), '--script', root / 'speed/tests/check_rules.gd'])
     print('配布物: ' + str(artifact))
 
 
@@ -116,8 +116,11 @@ def main():
     parser.add_argument('--godot', help='dependencies.jsonと一致するGodot本体')
     parser.add_argument('--templates', type=Path, help='version.txtを持つ固定版export templateディレクトリ')
     parser.add_argument('--verify', action='store_true', help='配布エンジンで最小ランとライブラリ欠落時の失敗を確認する')
+    parser.add_argument('--rendered', action='store_true', help='Macの配布確認をgodot-bgで描画付き起動する')
     parser.add_argument('--jobs', type=int, default=4)
     args = parser.parse_args()
+    if args.rendered and (args.platform != 'macos' or not args.verify):
+        parser.error('--rendered はMacの --verify と合わせて指定してください')
     if args.platform == 'windows' and args.arch not in (None, 'x86_64'):
         parser.error('Windowsの対象はx86_64です')
     if not args.sdk.is_dir():
