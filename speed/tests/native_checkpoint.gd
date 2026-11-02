@@ -53,6 +53,11 @@ func advance(core, tick: int) -> void:
 		if not state.cards.is_empty(): core.choose_card(0,state.revision)
 	core.step_frame(1.0/60.0,input,Vector2.ZERO,Vector2(640,360),1.0)
 func _ready() -> void:
+	if "--restore-draco-final" in OS.get_cmdline_user_args():
+		check_restore_draco_final()
+		print("[restore_draco_final] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--restore-outputs" in OS.get_cmdline_user_args() or "--restore-state-only" in OS.get_cmdline_user_args():
 		restore_state_only="--restore-state-only" in OS.get_cmdline_user_args()
 		await check_restore_outputs()
@@ -250,3 +255,63 @@ func check_restore_outputs() -> void:
 	AudioManager.consume_cpp_frame(result_frame)
 	check(results.size()==1 and result_frame.result.result_id==result_id and result_frame.events.is_empty() and AudioManager._next==voices_before,"確定済み結果の復帰で結果通知と過去音を再発行しない")
 	ended.release_checkpoint(result_point.value);ended.dispose();session.free();helper.free()
+
+func draco_restore_state(bridge) -> Dictionary:
+	var core=bridge._core
+	return {"run":core.inspect(),"ship":core.ship_snapshot(),"draw":core.draw_snapshot(),"enemies":core.enemies_snapshot(),"motion":core.enemy_motion_snapshot(),"friends":core.projectiles_snapshot(),"hostiles":core.hostiles_snapshot(),"hazards":core.hazards_snapshot(),"body":bridge.command("dev_boss_body_state").value,"lab":bridge.read_lab().value}
+
+func check_restore_draco_final() -> void:
+	var helper=load("res://tests/draco_cinematics.gd").new()
+	if not helper.has_method("finale_fixture"):
+		check(false,"最終決着を含む統合版の検査入口を使う");helper.free();return
+	var f: Dictionary=helper.finale_fixture(Vector2(1280,720),INF,load("res://data/bosses/draco_moves/rifts.tres"))
+	if f.is_empty():check(false,"最終決着の保持場面を開始する");helper.free();return
+	f.bridge.command("dev_boss_technique",{"entity_id":f.boss,"definition":1})
+	for tick in 2400:
+		f.bridge._core.step(1.0/120.0)
+		if not helper.finale_body(f).rift_walls.is_empty():break
+	f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"})
+	check(int(helper.finale_body(f).closing_walls)>0,"復元用の核解放に実在する裂け目の修復状態を含める")
+	var start:=0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--restore-draco-from="):start=int(arg.get_slice("=",1))
+	var stages: Array[String]=["release","combine","pose","input","strikes","last","sight","split","explode"]
+	for index in stages.size():
+		var stage: String=stages[index]
+		if not helper.finale_to(f,stage):check(false,"保持する決着の段階へ進む: "+stage);break
+		# 段階の途中の姿勢・カメラ・筆跡を保持する。入力待ちは解放せず筆跡を残す。
+		for tick in 3:
+			var input:=Intent.new()
+			if stage=="input":input.press=tick==0;input.pen=Vector2(180+tick*20,80+tick*15);input.has_cursor=true
+			helper.finale_tick(f,input)
+		if index<start:continue
+		var before: Dictionary=draco_restore_state(f.bridge)
+		var render: Array=restored_render(f.bridge)
+		var ui: Dictionary=f.bridge.read_frame().value.ui.duplicate(true)
+		var point: Dictionary=f.bridge.checkpoint()
+		if not point.ok:check(false,"最終決着の途中を保持する: "+stage);break
+		f.events.clear()
+		for tick in 3:helper.finale_tick(f)
+		var future: Dictionary=draco_restore_state(f.bridge)
+		var future_events: Array=f.events.duplicate(true)
+		f.bridge.dispose()
+		var restored: Dictionary=helper.finale_fixture(Vector2(1280,720),INF,load("res://data/bosses/draco_moves/rifts.tres"))
+		var voices: int=AudioManager._next
+		if not restored.bridge.restore(point.value).ok:check(false,"元ラン破棄後に決着を独立復元する: "+stage);restored.bridge.dispose();break
+		var actual: Dictionary=draco_restore_state(restored.bridge)
+		var diff: String=COMPARE.new().difference(COMPARE.new().plain(before),COMPARE.new().plain(actual))
+		var frame: Dictionary=restored.bridge.read_frame().value
+		var exact: bool=before==actual
+		check(exact,"決着の全状態を値として独立復元する: "+stage+" "+diff)
+		check(restored_render(restored.bridge)==render,"決着のPreviousPoseと表示補間を独立復元する: "+stage)
+		check(restore_logical(frame.ui)==restore_logical(ui),"決着の全UIとカメラを独立復元して再送する: "+stage)
+		AudioManager.consume_cpp_frame(frame)
+		check(frame.events.is_empty() and frame.result==null and AudioManager._next==voices,"決着の過去通知・結果・音を再送しない: "+stage)
+		restored.events.clear()
+		for tick in 3:helper.finale_tick(restored)
+		check(draco_restore_state(restored.bridge)==future and restored.events==future_events,"決着の復元後の状態と論理通知を同じ入力で再現する: "+stage)
+		restored.bridge.release_checkpoint(point.value)
+		f=restored
+		print("RESTORE_DRACO_STAGE ",stage," failed=",failed)
+		if failed:break
+	f.bridge.dispose();helper.free()
