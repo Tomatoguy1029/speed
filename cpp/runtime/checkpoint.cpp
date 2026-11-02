@@ -47,6 +47,9 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
     for (const auto &v:state.loadout.kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
+    const auto &interceptor=state.loadout.interceptor;if (!std::isfinite(interceptor.clock) || interceptor.clock<0) return false;
+    for (const auto &[id,deadline]:interceptor.target_after) if (id<=0 || !std::isfinite(deadline)) return false;
+    for (const auto &v:interceptor.drones) if (!v.pos.is_finite() || !std::isfinite(v.angle) || !std::isfinite(v.flash) || !std::isfinite(v.kick) || !std::isfinite(v.next) || v.flash<0 || v.kick<0 || (state.enemy_handles.contains(v.target) && state.enemy_handles.entity_id(v.target)!=v.target_id)) return false;
     const auto &bipolar=state.loadout.bipolar;if (!bipolar.origin.is_finite() || !std::isfinite(bipolar.started)) return false;
     for (const auto &v:bipolar.pending) if (!v.from.is_finite() || !v.to.is_finite() || !std::isfinite(v.delay) || v.delay<=0 || !v.id || v.id>=bipolar.next_id) return false;
     for (const auto &v:bipolar.beams) if (!v.from.is_finite() || !v.to.is_finite() || !std::isfinite(v.age) || v.age<0 || !v.id || v.id>=bipolar.next_id || !std::isfinite(v.width_scale) || v.width_scale<=0) return false;

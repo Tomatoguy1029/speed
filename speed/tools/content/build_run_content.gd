@@ -512,6 +512,16 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	var mount: Vector2 = preload("res://scripts/weapons/rear.gd").MOUNT_PIXEL-Vector2(15.5,30.0)
 	for level in rear.level_steps.size():
 		data.RearDefinition.append({"id":level+1,"weapon":rear_id,"level":level+1,"interval":float(rear.params.interval_by_level[level]),"damage":float(rear.params.damage_by_level[level]),"pierce":int(rear.params.pierce_by_level[level]),"life":float(rear.params.life),"spread":float(rear.params.spread_step),"knock":float(rear.params.knock),"color":Color(rear.params.color).to_rgba32(),"mount_x":mount.x,"mount_y":mount.y,"muzzle_distance":12.5})
+	var interceptor := load("res://data/weapons/W25_interceptor.tres") as WeaponDef
+	if interceptor==null: return {}
+	var interceptor_id: int = data.LoadoutDefinition.size()+1
+	data.LoadoutDefinition.append({"id":interceptor_id,"kind":0,"maximum_level":interceptor.level_steps.size(),"external_id":"W25","comet_only":false})
+	var interceptor_target: Dictionary = config.post_max.target(interceptor.id)
+	for level in interceptor.level_steps.size():
+		var values := {"id":level+1,"weapon":interceptor_id,"level":level+1,"damage":float(interceptor.params.damage_by_level[level]),"interval":float(interceptor.params.interval_by_level[level]),"count":int(interceptor.params.drones_by_level[level]),"burst":int(interceptor.params.burst_by_level[level]),"color":Color(interceptor.params.color).to_rgba32(),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_interval":config.post_max.minimum_interval}
+		for key in ["burst_interval","range","orbit","orbit_speed","target_interval","shot_radius","shot_speed","life"]: values[key] = float(interceptor.params[key])
+		for key in ["projectile","duration","interval"]: values[key+"_increment"] = float(config.post_max.increments.get({"projectile":"projectile_speed","interval":"weapon_interval"}.get(key,key),0.0)) if interceptor_target.has(key) else 0.0
+		data.InterceptorDefinition.append(values)
 	var contact_arc := load("res://data/weapons/W17_contactArc.tres") as WeaponDef
 	if contact_arc==null: return {}
 	var contact_arc_id: int = data.LoadoutDefinition.size()+1
@@ -604,6 +614,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_wave_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if contact_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":sonic_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if sonic_target.has("followup") else 0.0})
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":contact_arc_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if arc_target.has("followup") else 0.0})
+	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":interceptor_id,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if interceptor_target.has("followup") else 0.0})
+	var interceptor_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W25")
+	if interceptor_entry==null: return {}
+	for path in interceptor_entry.resources:
+		var key: int = data.ResourceKey.size()+1
+		data.ResourceKey.append({"id":key,"role":7})
+		visuals.append({"id":key,"role":7,"path":path,"equipment":interceptor_id})
+		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":interceptor_id,"asset":key})
 	var bipolar_weapon: int = data.BipolarDefinition[0].weapon
 	data.PostMaxWeaponPowerDefinition.append({"id":data.PostMaxWeaponPowerDefinition.size()+1,"equipment":bipolar_weapon,"damage_increment":float(config.post_max.increments.weapon_damage),"followup_increment":float(config.post_max.increments.followup) if config.post_max.target(&"W22").has("followup") else 0.0})
 	var bipolar_entry: ContentEntry = ContentManager.catalog.find(&"weapons",&"W22")
@@ -1068,6 +1086,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.KnockbackDefinition = resolved.KnockbackDefinition
 			data.MinesDefinition = resolved.MinesDefinition
 			data.EndBlastDefinition = resolved.EndBlastDefinition
+			data.InterceptorDefinition = resolved.InterceptorDefinition
 			data.BipolarDefinition = resolved.BipolarDefinition
 			data.MassTowDefinition = resolved.MassTowDefinition
 			data.ContactArcDefinition = resolved.ContactArcDefinition

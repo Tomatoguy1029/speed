@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
 namespace speed {
@@ -78,6 +79,8 @@ struct KnockbackState {
     double chance=0,speed=0,life=0,base_damage=0,base_attack=0,base_knock=0,base_life=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0;
     std::vector<KnockbackVisual> visuals;
 };
+struct InterceptorDrone {godot::Vector2 pos;EnemyHandle target;int64_t target_id=-1;double angle=0,flash=0,kick=0,next=0;uint32_t left=0;};
+struct InterceptorState {bool ready=false;uint32_t definition=0,count=0,burst=0,color=0;double clock=0,damage=0,interval=0,burst_interval=0,range=0,orbit=0,orbit_speed=0,target_interval=0,shot_radius=0,shot_speed=0,life=0,projectile_increment=0,duration_increment=0,interval_increment=0,minimum_ratio=0,minimum_interval=0;std::vector<InterceptorDrone> drones;std::unordered_map<int64_t,double> target_after;};
 struct BipolarPending {godot::Vector2 from,to;uint64_t id=0;double delay=0;};
 struct BipolarBeam {godot::Vector2 from,to;uint64_t id=0;double age=0,width_scale=1;};
 struct BipolarState {bool ready=false,active=false;uint32_t definition=0,color=0;godot::Vector2 origin;uint64_t next_id=1;double started=0,damage=0,width=0,radius_factor=1,life=0,knock=0,min_length=0,delay=0,visual_life=0,area_increment=0,knockback_increment=0;std::vector<BipolarPending> pending;std::vector<BipolarBeam> beams;};
@@ -163,6 +166,7 @@ struct LoadoutState {
     KillSonicState kill_sonic;
     MassTowState mass_tow;
     BipolarState bipolar;
+    InterceptorState interceptor;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;

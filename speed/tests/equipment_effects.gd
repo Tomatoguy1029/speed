@@ -66,6 +66,16 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-weapon-world-clock" in OS.get_cmdline_user_args():
+		await check_cpp_weapon_world_clock()
+		print("[cpp_weapon_world_clock] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
+	if "--cpp-w25" in OS.get_cmdline_user_args() or "--cpp-w25-fixes" in OS.get_cmdline_user_args():
+		await check_cpp_w25()
+		print("[cpp_w25] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w22" in OS.get_cmdline_user_args():
 		await check_cpp_w22()
 		print("[cpp_w22] failed=%d" % failures)
@@ -3497,3 +3507,117 @@ func check_cpp_w22() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"双極ビームの状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w25() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	var session = await trait_test_session("W25",config,625)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W25")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	for level in range(1,definition.level_steps.size()+1):
+		var verify := func(condition: bool, message: String):
+			if level!=1 or "--cpp-w25-fixes" not in OS.get_cmdline_user_args() or message=="ウィングの実弾が共通衝突から敵へ同期命中する": check(condition,message)
+		verify.call(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"ウィングの全段の基準を復元する")
+		verify.call(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W25","levels":level}).ok,"ウィングを全段取得する")
+		var center: Vector2 = core.ship_snapshot().ship_pos
+		for j in 16:
+			var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2.from_angle(TAU*j/16.0)*230.0}).value
+			core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
+		verify.call(bridge.step(1.0/120.0,idle,viewport).ok,"編隊を配置して最初の射撃を行う")
+		var wing: Dictionary = bridge._ui.interceptor
+		verify.call(wing.drones.size()==definition.params.drones_by_level[level-1] and wing.drones[0].left==definition.params.burst_by_level[level-1]-1,"全段の機数と連射数を読み取る")
+		var original: Dictionary = wing.drones[0].duplicate(true)
+		var first: Array = core.projectiles_snapshot()
+		verify.call(first.size()==1 and is_equal_approx(first[0].damage,bridge._ui.attack_power*definition.params.damage_by_level[level-1]) and first[0].callback=="interceptor" and first[0].callback_no_crit,"全段の実弾威力と同期命中hookを使う")
+		verify.call(core.remove_enemy(original.target_id),"連射の途中で標的を消す")
+		bridge.command("set_ui_overlay",{"active":false})
+		var prior: Dictionary = bridge._ui.interceptor.drones[0].duplicate(true)
+		for tick in 12:
+			prior = bridge._ui.interceptor.drones[0].duplicate(true)
+			verify.call(bridge.step(1.0/120.0,idle,viewport).ok,"標的消失後の連射を更新する")
+			if bridge._ui.interceptor.drones[0].left==0: break
+		var current: Dictionary = bridge._ui.interceptor.drones[0]
+		var target: Array = core.enemies_snapshot().filter(func(e): return e.id==current.target_id)
+		verify.call(current.target_id!=original.target_id and not target.is_empty(),"消えた標的の行を使わず再捕捉する")
+		if target.is_empty(): break
+		verify.call(absf(angle_difference(current.angle,(Vector2(target[0].pos[0],target[0].pos[1])-current.pos).angle()))<0.0001,"再捕捉と同じ更新で砲口を新しい相手へ向ける")
+		var radial: Vector2 = Vector2.from_angle(bridge._ui.interceptor.clock*definition.params.orbit_speed)
+		var expected: Vector2 = bridge._ui.ship.ship_pos+radial*definition.params.orbit-Vector2.from_angle(prior.angle)*prior.kick
+		verify.call(current.pos.distance_to(expected)<0.001,"前の射撃の反動を次の機体位置へ反映する")
+		var muzzle: Vector2 = current.pos+Vector2.from_angle(current.angle)*15.0*config.character_scale
+		var fresh: Array = core.projectiles_snapshot().filter(func(shot): return (shot.pos-shot.vel*(1.0/120.0)).distance_to(muzzle)<0.01)
+		verify.call(fresh.size()==1 and (fresh[0].vel as Vector2).normalized().is_equal_approx(Vector2.from_angle(current.angle)),"更新した砲口から現在の標的へ実弾を出す")
+		presentation._present_cpp(0.01)
+		verify.call(presentation.frame_view._interceptor_visual!=null and presentation.frame_view._interceptor_visual._frame.size()==definition.params.drones_by_level[level-1],"全機の位置・向き・反動・砲口の光を本番表示へ渡す")
+		var saved: Dictionary = bridge.checkpoint()
+		bridge.command("pause",{"paused":true})
+		var paused: Dictionary = bridge._ui.interceptor.duplicate(true)
+		bridge.step(1.0/120.0,idle,viewport)
+		verify.call(bridge._ui.interceptor==paused,"停止中は編隊・連射・再捕捉期限を止める")
+		bridge.command("pause",{"paused":false})
+		for tick in 35: bridge.step(1.0/120.0,idle,viewport)
+		verify.call(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"実弾の命中と表示を配信する")
+		var enemies: Array = core.enemies_snapshot()
+		var shots: Array = core.projectiles_snapshot()
+		var after: Dictionary = bridge._ui.interceptor.duplicate(true)
+		verify.call(enemies.any(func(e): return e.hp<ContentManager.definition(&"enemies",&"drifter").hp),"ウィングの実弾が共通衝突から敵へ同期命中する")
+		verify.call(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"編隊と連射の途中へ復帰する")
+		for tick in 35: bridge.step(1.0/120.0,idle,viewport)
+		verify.call(bridge._ui.interceptor==after and core.projectiles_snapshot()==shots and core.enemies_snapshot()==enemies,"機体・標的/期限・連射・発射済みの弾と命中を再現する")
+		bridge.command("dev_remove_weapon",{"id":"W25"})
+		presentation._present_cpp(0.01)
+		verify.call(not bridge._ui.interceptor.ready and bridge._ui.interceptor.drones.is_empty() and presentation.frame_view._interceptor_visual==null,"途中解除で編隊と専用表示を回収する")
+		verify.call(core.projectiles_snapshot()==shots,"解除後も発射済みの弾を自然寿命まで残す")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"ウィングの状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_weapon_world_clock() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	for id: String in ["W21","W22","W25"]:
+		var session = await trait_test_session(id,trait_test_config(),625)
+		if session==null: continue
+		var bridge = session.bridge
+		var idle: Dictionary = bridge.pack_intent(Intent.new())
+		var viewport := {"logical_size":Vector2(1280,720)}
+		bridge.step(1.0/120.0,idle,viewport)
+		bridge.command("dev_remove_weapon",{"id":"W01"})
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1}).ok,"世界時計確認の対象だけを取得する")
+		var presentation: RunPresentation = session.view.get_node("RunPresentation")
+		presentation._present_cpp(0.01)
+		var key: String = {"W21":"mass_tow","W22":"bipolar","W25":"interceptor"}[id]
+		var visual = presentation.frame_view.get("_"+key+"_visual")
+		var position: Vector2 = bridge._ui.ship.ship_pos
+		visual.sparks.add(position,1,0.0,0.0,1.0,1.0,2.0,[Color.WHITE])
+		if id!="W25": visual._fires.add(position,2.0,0.45)
+		check(bridge.step(1.0/120.0,idle,viewport).ok and bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"W01なしで対象の世界更新と表示配信を進める")
+		presentation._present_cpp(0.01)
+		check(visual.sparks._items[0].age>0.008,"W01なしでも%sの火花が自身の世界秒で進む" % id)
+		if id!="W25": check(visual._fires._items[0].age>0.008,"W01なしでも%sの炎が自身の世界秒で進む" % id)
+		var age: float = visual.sparks._items[0].age
+		bridge.command("pause",{"paused":true})
+		bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.01)
+		check(visual.sparks._items[0].age==age,"停止中は%sの火花時計を止める" % id)
+		session.free()
+		await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"W01なしの専用表示時計に実行エラーがない: %s" % [errors.messages()])

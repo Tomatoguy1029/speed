@@ -91,8 +91,15 @@ var _full_charge_visual: RefCounted
 var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
+<<<<<<< HEAD
 var _kill_sonic_visual: RefCounted
+=======
+var _interceptor_world_time := -1.0
+var _interceptor_visual: RefCounted
+var _bipolar_world_time := -1.0
+>>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 var _bipolar_visual: RefCounted
+var _mass_tow_world_time := -1.0
 var _mass_tow_visual: RefCounted
 var _contact_arc_visual: RefCounted
 var _sonic_visual: RefCounted
@@ -879,12 +886,20 @@ func receive_frame(frame: Dictionary) -> bool:
 		if _vortex_visual!=null: _vortex_visual.dispose()
 		_vortex_visual = null
 		_vortex_world_time = -1.0
+<<<<<<< HEAD
 		if _kill_sonic_visual!=null: _kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+=======
+		if _interceptor_visual!=null: _interceptor_visual.dispose()
+		_interceptor_visual = null
+		_interceptor_world_time = -1.0
+>>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 		if _bipolar_visual!=null: _bipolar_visual.dispose()
 		_bipolar_visual = null
+		_bipolar_world_time = -1.0
 		if _mass_tow_visual!=null: _mass_tow_visual.dispose()
 		_mass_tow_visual = null
+		_mass_tow_world_time = -1.0
 		if _contact_arc_visual!=null: _contact_arc_visual.dispose()
 		_contact_arc_visual = null
 		if _sonic_visual!=null: _sonic_visual.dispose()
@@ -939,6 +954,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_rear_canvas.visible = equipped_rear and _ship_visible
 	_rear_canvas.get_parent().move_child(_rear_canvas,-1)
 	_rear_canvas.queue_redraw()
+<<<<<<< HEAD
 	var equipped_kill_sonic: bool = frame.ui.get("kill_sonic",{}).get("ready",false)
 	if equipped_kill_sonic and _kill_sonic_visual==null:
 		_kill_sonic_visual = preload("res://scripts/render/equipment/killSonic.gd").new()
@@ -946,6 +962,16 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_kill_sonic and _kill_sonic_visual!=null:
 		_kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+=======
+	var equipped_interceptor: bool = frame.ui.get("interceptor",{}).get("ready",false)
+	if equipped_interceptor and _interceptor_visual==null:
+		_interceptor_visual = preload("res://scripts/render/equipment/interceptor.gd").new()
+		_interceptor_visual.setup_frame(_layer(14),_layer(18),_pixel,frame.ui.character_scale)
+	if not equipped_interceptor and _interceptor_visual!=null:
+		_interceptor_visual.dispose()
+		_interceptor_visual = null
+		_interceptor_world_time = -1.0
+>>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 	var equipped_bipolar: bool = frame.ui.get("bipolar",{}).get("ready",false)
 	if equipped_bipolar and _bipolar_visual==null:
 		_bipolar_visual = preload("res://scripts/render/equipment/bipolar.gd").new()
@@ -953,6 +979,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_bipolar and _bipolar_visual!=null:
 		_bipolar_visual.dispose()
 		_bipolar_visual = null
+		_bipolar_world_time = -1.0
 	var equipped_tow: bool = frame.ui.get("mass_tow",{}).get("ready",false)
 	if equipped_tow and _mass_tow_visual==null:
 		_mass_tow_visual = preload("res://scripts/render/equipment/massTow.gd").new()
@@ -960,6 +987,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_tow and _mass_tow_visual!=null:
 		_mass_tow_visual.dispose()
 		_mass_tow_visual = null
+		_mass_tow_world_time = -1.0
 	var equipped_arc: bool = frame.ui.get("contact_arc",{}).get("ready",false)
 	if equipped_arc and _contact_arc_visual==null:
 		_contact_arc_visual = preload("res://scripts/render/equipment/contactArc.gd").new()
@@ -1085,7 +1113,11 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	for event: Dictionary in _queued_events:
 		_boss_lance_visual.frame_event(event)
+<<<<<<< HEAD
 		_boss_wave_visual.frame_event(event)
+=======
+		if _interceptor_visual!=null: _interceptor_visual.on_event(event)
+>>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 		if _bipolar_visual!=null: _bipolar_visual.frame_event(event)
 		if event.type==&"beam" and event.get("visual_key","")=="weapon/bipolar": ruler_shake = maxf(ruler_shake,5.0)
 		if _mass_tow_visual!=null and (event.type in [&"anchor_capture",&"anchor_fire"] or event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow"): _mass_tow_visual.frame_event(event)
@@ -1253,15 +1285,25 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
 	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+<<<<<<< HEAD
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
+=======
+	var interceptor_dt: float = 0.0 if _interceptor_world_time<0.0 else maxf(0.0,ui.world_time-_interceptor_world_time)
+	_interceptor_world_time = ui.world_time if equipped_interceptor else -1.0
+	if _interceptor_visual!=null: _interceptor_visual.frame_tick(ui.interceptor.drones,interceptor_dt)
+	var bipolar_dt: float = 0.0 if _bipolar_world_time<0.0 else maxf(0.0,ui.world_time-_bipolar_world_time)
+	_bipolar_world_time = ui.world_time if equipped_bipolar else -1.0
+>>>>>>> 9c9ce155 (W25の編隊・再捕捉・連射をC++ランへ接続)
 	if _bipolar_visual!=null:
 		_bipolar_visual.sync_frame(ui.bipolar,ui.ship,ui.world_time,_dim_rect)
-		_bipolar_visual.frame_tick(world_dt)
+		_bipolar_visual.frame_tick(bipolar_dt)
+	var mass_tow_dt: float = 0.0 if _mass_tow_world_time<0.0 else maxf(0.0,ui.world_time-_mass_tow_world_time)
+	_mass_tow_world_time = ui.world_time if equipped_tow else -1.0
 	if _mass_tow_visual!=null:
 		_mass_tow_visual.sync_frame(ui.mass_tow,ui.ship,ui.world_time)
-		_mass_tow_visual.frame_tick(world_dt)
+		_mass_tow_visual.frame_tick(mass_tow_dt)
 	if _contact_arc_visual!=null: _contact_arc_visual.frame_tick(ui.contact_arc,ui.ship,_zoom,_ship_visible)
 	var sonic_dt: float = 0.0 if _sonic_world_time<0.0 else maxf(0.0,ui.world_time-_sonic_world_time)
 	_sonic_world_time = ui.world_time if equipped_sonic else -1.0

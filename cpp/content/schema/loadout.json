@@ -1426,6 +1426,117 @@
           "type": "u32"
         }
       ]
+    },
+    {
+      "name": "InterceptorDefinition",
+      "section": 205,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burst_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "orbit",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "orbit_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "target_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "burst",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "color",
+          "type": "u32"
+        }
+      ]
     }
   ],
   "enums": {
