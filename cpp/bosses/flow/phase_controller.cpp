@@ -60,7 +60,7 @@ void PhaseController::damaged(RunRuntime &r,EnemyHandle actor) {
 bool PhaseController::can_defeat(RunRuntime &r,EnemyHandle actor) {auto *b=find(r,actor);if (b && r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==4) return false;if (b && r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3) {if (b->hydra.separated) return !HydraRegrow::alive(r,b->hydra.bearer);b->hydra.separation_pending=true;return false;}return !b || b->phase!=1 || !r.content->boss_bodies[b->definition-1].hp_floor_enabled;}
 void PhaseController::defeated(RunRuntime &r,const DeathContext &death) {
     auto *b=find(r,death.target);if (!b || b->mode==BossMode::Defeated || b->mode==BossMode::Cancelled) return;end_actions(r,*b);HydraBody::release(r,*b);b->mode=BossMode::Defeated;for (auto &p:b->participants) p.active=false;r.state.enemies[death.target.slot].hp=0;r.state.boss_dead=true;
-    godot::Dictionary p;p["pos"]=death.corpse.pos;p["id"]=death.corpse.id;p["dir"]=death.request.direction;p["cause"]=symbol_name(death.request.cause);FrameBuilder::append(r,"boss_defeated",p);
+    godot::Dictionary p;p["pos"]=death.corpse.pos;p["id"]=death.corpse.id;p["dir"]=death.request.direction;p["cause"]=symbol_name(r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3?Cause::Ram:death.request.cause);FrameBuilder::append(r,"boss_defeated",p);
 }
 void PhaseController::cancel(RunRuntime &r,EnemyHandle actor) {
     auto *b=find(r,actor);if (!b || b->mode==BossMode::Cancelled || b->mode==BossMode::Defeated) return;end_actions(r,*b);HydraBody::release(r,*b);b->mode=BossMode::Cancelled;for (auto &p:b->participants) p.active=false;event(r,"boss_cancelled",*b);

@@ -10,6 +10,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-finish-cause" in OS.get_cmdline_user_args() or "--cpp-hydra-finish-damage" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_finish_cause")
+		return
 	if "--cpp-hydra-finish-pending" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_finish_pending")
 		return
@@ -6172,3 +6175,12 @@ func native_hydra_finish_pending() -> void:
 		check(bridge.command("dev_boss_body_state").value[0]==expected,"復帰後も同じ首別ビームと幅へ進む: %d"%count)
 		bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free()
 	await get_tree().process_frame;print("[cpp_hydra_finish_pending] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func native_hydra_finish_cause() -> void:
+	var c := hydra_finish_case("",9)
+	if c.is_empty():check(false,"勝利通知確認の全技パッケージを生成する");get_tree().quit(1);return
+	var body: Dictionary=c.bridge.command("dev_boss_body_state").value[0]
+	c.bridge.command("dev_damage",{"entity_id":body.bearer.id,"amount":body.bearer.hp+1.0,"cause":"shot"});c.bridge._core.step(0.01);c.bridge.command("dev_boss_body_state")
+	if "--cpp-hydra-finish-damage" not in OS.get_cmdline_user_args():check(c.events.any(func(e):return e.type=="boss_defeated" and e.payload.cause=="ram"),"ヒドラの勝利通知原因だけをSourceのramへ保つ")
+	check(c.events.any(func(e):return e.type=="combat_damage" and e.payload.cause=="shot"),"首の被弾・観測には実際の原因を保持する")
+	c.bridge.dispose();print("[cpp_hydra_finish_cause] failures=",failed);get_tree().quit(1 if failed else 0)
