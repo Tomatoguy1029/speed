@@ -1358,6 +1358,13 @@ func _show_cpp_cards() -> void:
 	_reroll_button.disabled = remaining<=0 or swap
 	_cpp_retry.visible = int(state.get("error_code",0))==-1
 	_cpp_cancel.visible = int(state.get("selected_id",0))!=0
+	_cards_title.visible = not swap or state.get("preparing",false) or int(state.get("error_code",0))<0
+	_cards_title.position.y = 219 if swap else 61
+	_cpp_retry.position = Vector2(136,327) if swap else Vector2(160,320)
+	_cpp_cancel.position = Vector2(392,327) if swap else Vector2(330,320)
+	for button in [_cpp_retry,_cpp_cancel]:
+		button.size = Vector2(112,29) if swap else Vector2(150,26)
+		button.add_theme_font_size_override("font_size",9 if swap else 14)
 	_cpp_card_visibility()
 
 func _input_cpp(event: InputEvent) -> void:
