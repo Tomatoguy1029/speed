@@ -1,6 +1,6 @@
 ## 収納内容と位置の値だけを、制作済みの圧縮弾shaderへ渡す。
 extends Node2D
-const ROLE = preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole
+const ROLE = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.VisualRole
 var _scope: ContentResourceScope
 var _visuals: Dictionary
 var _textures: Dictionary = {}

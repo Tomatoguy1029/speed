@@ -16,8 +16,9 @@ def inspect(path: Path, runtime_package=False) -> dict:
     data = path.read_bytes()
     assert data[:4] == b"GDPC", "PCKの先頭にヘッダーが必要"
     version, _, _, _, flags, base = struct.unpack_from("<5IQ", data, 4)
-    assert version in (2, 3) and not flags & 1, "暗号化なしのPCK v2/v3を検査する"
-    position = struct.unpack_from("<Q", data, 32)[0] if version == 3 else 96
+    # Godot 4.7の通常PCK v4はv3と同じファイル索引を使う。
+    assert version in (2, 3, 4) and not flags & 5, "暗号化・sparse bundleなしのPCK v2/v3/v4を検査する"
+    position = struct.unpack_from("<Q", data, 32)[0] if version >= 3 else 96
     count = struct.unpack_from("<I", data, position)[0]
     position += 4
     files = {}

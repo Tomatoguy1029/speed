@@ -1,6 +1,6 @@
 ## 元の敵の外観と丸鋸の固定形を、表示用の値だけから描く。
 extends Node2D
-const ROLE = preload("res://tools/content/generated/run_schema.gd").ENUMS.VisualRole
+const ROLE = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.VisualRole
 var _row: Dictionary = {}
 var _texture: Texture2D
 var _polygon := PackedVector2Array()
