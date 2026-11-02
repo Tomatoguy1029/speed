@@ -9,6 +9,9 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-hydra-debris-separated" in OS.get_cmdline_user_args():
+		call_deferred("native_hydra_debris_separated")
+		return
 	if "--cpp-hydra-wind-resource" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_wind_resource")
 		return
@@ -5516,3 +5519,133 @@ func hydra_wind_resource_check() -> void:
 func native_hydra_wind_resource() -> void:
 	hydra_wind_resource_check()
 	print("[cpp_hydra_wind_resource] failures=",failed);get_tree().quit(1 if failed else 0)
+
+func hydra_separated_live(bridge, kind: int) -> Array:
+	return bridge.command("dev_boss_state").value.filter(func(t):return t.kind==kind and t.stage<5)
+
+
+func native_hydra_debris_separated() -> void:
+	for name in ["rubble_lump","rubble_fan","tornado","debris_shatter"]:
+		var only := ""
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--move="):only=arg.trim_prefix("--move=")
+		if not only.is_empty() and only!=name:continue
+		if name in ["rubble_lump","rubble_fan"]:await hydra_separated_rubble(name)
+		else:await hydra_separated_debris_combo(name)
+	print("[cpp_hydra_debris_separated] failures=",failed);get_tree().quit(1 if failed else 0)
+
+
+func hydra_separated_rubble(name: String) -> void:
+	var fan := name=="rubble_fan"
+	var edits := {"normal_charge":0.15,"normal_hold":0.3,"attack_cd":0.05,"lump_speed":400.0,"lump_dmg":7.0}
+	if fan:edits.merge({"rubble_count":6,"rubble_spread":1.3,"rubble_small_radius":16.0})
+	else:edits.lump_r=26.0
+	var c := hydra_normal_case(true,{},edits,name)
+	if c.is_empty():return
+	var bridge=c.bridge;bridge._core.set_attack_formation_mode(true)
+	hydra_grid_separate(c)
+	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(2500,1800))
+	var kind: int=81 if fan else 80
+	var actions: Array=[]
+	for tick in 240:
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+		var candidate: Dictionary=body.necks.filter(func(n):return n.kind=="debris" and n.alive)[0]
+		bridge.command("dev_ship_motion",{"position":candidate.position+Vector2.from_angle(candidate.look_angle)*500,"velocity":Vector2.ZERO})
+		bridge._core.step(0.025);actions=hydra_separated_live(bridge,kind)
+		if not actions.is_empty():break
+	check(not actions.is_empty(),name+"：分離後の共通フローから首ごとの通常技を始める")
+	if actions.is_empty():bridge.dispose();return
+	var actor: int=actions[0].actor
+	bridge._core.step(0.16)
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var head: Dictionary=body.necks.filter(func(n):return n.id==actor)[0]
+	var effects: Array=body.effects.filter(func(e):return e.technique==name)
+	var count: int=6 if fan else 1
+	var primary_effects: Array=effects.filter(func(e):return e.points[0].distance_to(head.position)<0.001)
+	check(body.separated and head.normal_phase==2 and head.glow==0.0 and primary_effects.size()==count,name+"：分離後は発動した更新でholdへ入り発光を消す")
+	if primary_effects.size()!=count:bridge.dispose();return
+	check(primary_effects.all(func(e):return e.points[0].distance_to(head.position)<0.001),name+"：泳いでいる頭の現在位置から瓦礫を放つ")
+	var stones: Array=bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead and Vector2(e.pos[0],e.pos[1]).distance_to(head.position)<0.001)
+	var velocity := Vector2(stones[0].vel[0],stones[0].vel[1]).rotated(0.65 if fan else 0.0)
+	check(absf(angle_difference(velocity.angle(),head.look_angle))<0.0001,name+"：分離後の視線を発射方向へ固定する")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	var held: Dictionary=bridge.checkpoint();bridge._core.step(0.04);bridge._core.step_hazards(0.04)
+	var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	var expected_stones: Array=bridge._core.enemies_snapshot()
+	check(held.ok and bridge.restore(held.value).ok,name+"：分離した首と瓦礫の途中状態を戻せる")
+	bridge._core.step(0.04);bridge._core.step_hazards(0.04)
+	check(bridge.command("dev_boss_body_state").value[0]==expected and bridge._core.enemies_snapshot()==expected_stones,name+"：復帰後も共通finish_frameの首点列と追従判定が一致する")
+	bridge.restore(held.value)
+	var ids: Array=effects.map(func(e):return e.id)
+	check(bridge.command("dev_cancel_flow",{"entity_id":c.id}).ok,name+"：分離後の実行中フローを取消できる")
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.map(func(e):return e.id)==ids and body.necks.filter(func(n):return n.id==actor)[0].mode=="idle",name+"：取消は首の所有だけを外し発射済み瓦礫を残す")
+	bridge.command("dev_damage",{"entity_id":actor,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01);bridge._core.step_hazards(0.01)
+	check(bridge.command("dev_boss_body_state").value[0].effects.map(func(e):return e.id)==ids,name+"：分離した参加首が消えても瓦礫の所有を引き継がない")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),name+"：本体の取消では残った判定を回収する")
+	bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free();await get_tree().process_frame
+
+
+func hydra_separated_debris_combo(name: String) -> void:
+	var tornado := name=="tornado"
+	var edits := {"warning_time":0.15,"performance_time":1.0,"tech_recovery":0.05,"cooldown":0.1}
+	if tornado:edits.merge({"tornado_charge":0.25,"tornado_life":0.8,"tornado_speed":400.0,"tornado_width":120.0,"lump_dmg":7.0})
+	else:edits.merge({"shatter_deploy":0.25,"shatter_time":0.4,"shatter_arc":1.8,"rubble_count":3,"beam_len":800.0,"beam_width":80.0,"beam_dmg":7.0,"shard_dmg":9.0,"shard_speed":300.0})
+	var c := hydra_major_case(name,edits,true)
+	if c.is_empty():return
+	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":true})
+	hydra_grid_separate(c)
+	var kind: int=82 if tornado else 83
+	var actions: Array=[]
+	for tick in 160:
+		actions=hydra_separated_live(bridge,kind)
+		if not actions.is_empty():break
+		bridge._core.step(0.025)
+	check(not actions.is_empty(),name+"：分離後も共通フローから2首のコンボを始める")
+	if actions.is_empty():bridge.dispose();return
+	bridge._core.step(0.15)
+	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
+	var heads: Array=body.necks.filter(func(n):return n.mode==name)
+	check(body.separated and heads.size()==2 and heads[0].kind==("vortex" if tornado else "debris") and heads[1].kind==("debris" if tornado else "beam"),name+"：必要な種類の2首だけが参加する")
+	if heads.size()!=2:bridge.dispose();return
+	var gathered: Dictionary=bridge.checkpoint()
+	var anchors: Array=heads.map(func(n):return n.position)
+	bridge._core.step(0.04);bridge._core.step_hazards(0.04)
+	var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	check(bridge.restore(gathered.value).ok,name+"：分離した参加首と展開中の瓦礫を保持して戻す")
+	bridge._core.step(0.04);bridge._core.step_hazards(0.04)
+	check(bridge.command("dev_boss_body_state").value[0]==expected,name+"：展開中の復帰後も首点列と攻撃の時計が一致する")
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.necks.filter(func(n):return n.mode==name).map(func(n):return n.position)==anchors,name+"：分離後も共通busy中は参加首の位置を固定する")
+	var view=hydra_move_view(c);await get_tree().process_frame
+	bridge.restore(gathered.value);bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),name+"：分離後の展開取消で予告と所有する瓦礫を回収する")
+	bridge.restore(gathered.value);bridge.command("dev_damage",{"entity_id":heads[0].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	check(bridge.command("dev_boss_state").value.any(func(t):return t.kind==kind and t.stage==7) and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),name+"：分離した片方の参加首の消失で展開を中断する")
+	bridge.restore(gathered.value);bridge._core.step(0.11)
+	if not tornado:
+		for tick in 14:
+			if not bridge._core.hostiles_snapshot().is_empty():break
+			bridge._core.step(0.025)
+	body=bridge.command("dev_boss_body_state").value[0]
+	var effects: Array=body.effects.filter(func(e):return e.technique==name)
+	var shots: Array=bridge._core.hostiles_snapshot()
+	check(effects.size()==1 and effects[0].kind==("tornado" if tornado else "beam") and (tornado or shots.size()>0),name+"：分離した固定起点から実行し発射済みの攻撃を持つ")
+	if effects.is_empty():bridge.release_checkpoint(gathered.value);bridge.dispose();view.queue_free();return
+	check(view.apply_frame(bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),name+"：分離した首と実行中の形を正式表示へ渡す")
+	var firing: Dictionary=bridge.checkpoint();bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	expected=bridge.command("dev_boss_body_state").value[0].duplicate(true)
+	var expected_shots: Array=bridge._core.hostiles_snapshot()
+	check(bridge.restore(firing.value).ok,name+"：分離後の発射・掃引状態を保持して戻す")
+	bridge._core.step(0.025);bridge._core.step_hazards(0.025)
+	check(bridge.command("dev_boss_body_state").value[0]==expected and bridge._core.hostiles_snapshot()==expected_shots,name+"：実行中の復帰後も形・所有・破片が一致する")
+	bridge.restore(firing.value);bridge.command("dev_cancel_flow",{"entity_id":c.id})
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==(1 if tornado else 0) and bridge._core.hostiles_snapshot().size()==shots.size(),name+"：実行取消は持続形を消し発射済みの攻撃だけを残す")
+	bridge.restore(firing.value);bridge.command("dev_damage",{"entity_id":heads[1].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
+	body=bridge.command("dev_boss_body_state").value[0]
+	check(body.effects.size()==(1 if tornado else 0) and bridge._core.hostiles_snapshot().size()==shots.size(),name+"：参加首消失でも発射済みの所有と残留規則を保つ")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),name+"：分離後の本体取消で持続する判定を回収する")
+	bridge.release_checkpoint(gathered.value);bridge.release_checkpoint(firing.value);bridge.dispose();view.queue_free();await get_tree().process_frame
