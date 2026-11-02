@@ -11,6 +11,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-sweep" in OS.get_cmdline_user_args():
+		call_deferred("native_sweep")
+		return
 	if "--cpp-kick-retry" in OS.get_cmdline_user_args():
 		call_deferred("native_kick_retry")
 		return
@@ -433,7 +436,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	if planet_x==500.0 or moon or name=="kick": cfg.character_scale = 1.0
+	if planet_x==500.0 or moon or name in ["kick","sweep"]: cfg.character_scale = 1.0
 	var definition = load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.params.initial_wait = 0.0
 	definition.params.approach_speed = 0.0
@@ -441,7 +444,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 	definition.params.extract_time = 0.05
 	var package: Dictionary = builder.boss_body_package(definition,cfg)
 	var move = load("res://data/bosses/monoceros_moves/%s.tres"%name).duplicate(true)
-	move.warn = 0.25
+	if move.has_field("warn"): move.warn = 0.25
 	move.active = 0.2
 	if move.has_field("active_p2"): move.active_p2 = 0.2
 	move.recover = 0.05
@@ -451,6 +454,23 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		move.reach = 240.0
 		move.hold = 0.1
 		move.return_speed = TAU
+	if name=="sweep":
+		move.active = 0.1
+		move.approach_speed_start = 100.0
+		move.approach_accel = 1000.0
+		move.approach_speed_max = 200.0
+		move.approach_turn = 1.0
+		move.approach_min = 0.1
+		move.approach_max = 0.3
+		move.stop_range = 300.0
+		move.twist_time = 0.2
+		move.twist = 0.6
+		move.stop_time = 0.2
+		move.stop_decel = 1000.0
+		move.windup_twist = 0.8
+		move.arc = 1.6
+		move.hold = 0.1
+		move.return_time = 0.2
 	var records: Dictionary = package.records
 	for key in builder.boss_technique_records(definition,move): records[key] = builder.boss_technique_records(definition,move)[key]
 	if flow_enabled:
@@ -458,7 +478,7 @@ func charge_fixture(flow_enabled := false, obstacle := false, planet_x := 450.0,
 		rules.techniques.assign([move])
 		rules.combos = {}
 		rules.conditions = {}
-		rules.conditions[name] = {"min":0.0,"max":1000.0} if name=="charge" else {"min":0.0,"max":260.0,"angle":180.0,"half_angle":37.24225668350351}
+		rules.conditions[name] = {"min":0.0,"max":1000.0} if name!="kick" else {"min":0.0,"max":260.0,"angle":180.0,"half_angle":37.24225668350351}
 		rules.selection_bias = {}
 		rules.costs = {}
 		rules.costs[name] = 1.0
@@ -696,4 +716,91 @@ func native_kick_retry() -> void:
 	check(next.id>state.id and next.stage==0,"姿勢戻しと回復が終わったら次の蹴りを自然選択する")
 	bridge.dispose()
 	print("[cpp_monoceros_kick_retry] failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+func sweep_fixture(automatic := false) -> Dictionary:
+	var f := charge_fixture(automatic,false,450.0,false,"sweep")
+	f.bridge.command("dev_ship_motion",{"position":Vector2(150,0),"velocity":Vector2.ZERO})
+	f.bridge._core.set_motion_context(Vector2(150,0),Vector2(150,0),Vector2(640,360))
+	return f
+
+func native_sweep() -> void:
+	var fixture := sweep_fixture(true)
+	var bridge = fixture.bridge
+	var definition: Dictionary = fixture.records.BossTechniqueDefinition[0]
+	check(definition.kind==2 and definition.approach_accel==1000.0 and definition.arc==1.6 and fixture.records.BossTechniqueStage.is_empty(),"薙ぎの固有値を生成し戦闘method trackを使わない")
+	var legacy = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(fixture.move)
+	check(is_equal_approx(legacy.attack_length(),0.9) and is_equal_approx(legacy.reach_limit(177.6),232.6) and fixture.move.make_runner()==null,"PureDataを保ち旧入口の攻撃長と加速積分の到達距離を解決する")
+	bridge._core.step(0.01)
+	var state: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(state.stage==0 and state.sequence_stage==0 and state.side==1,"本体フローから最初の方向の踏み込みを自然選択する")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==0 and state.speed==200.0 and state.position.is_equal_approx(Vector2(20,0)),"踏み込みは加速上限で進み最短時間と同値では止まらない")
+	bridge._core.step(0.01)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==1 and state.locked and state.sequence_elapsed==0.0,"距離と最短時間を満たしたtickで停止へ進み方向を固定する")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.speed==100.0 and state.position.is_equal_approx(Vector2(32,0)) and is_equal_approx(state.angle,-0.75) and state.booster==0.3,"停止中は線形減速と首の溜めを同じ時計で進める")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.stage==1 and state.sequence_stage==2 and state.sequence_elapsed==0.0 and state.position.is_equal_approx(Vector2(32,0)),"停止時刻で振り抜きへ入り同じtickでは振らない")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.hit and state.sequence_stage==3 and is_equal_approx(state.angle,0.8),"0.008秒ごとの回転掃引で角の通過を一回命中させ保持へ進む")
+	check(fixture.events.any(func(event): return event.type==&"combat_player_damage" and event.payload.technique==&"sweep" and event.payload.cause==&"horn" and event.payload.source==&"monoceros"),"回転掃引の原因と出所・技IDを配信先へ渡す")
+	var hp: float = bridge._core.ship_snapshot().ship_hp
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.sequence_stage==4 and state.angle==0.8 and bridge._core.ship_snapshot().ship_hp==hp,"振り切った姿勢を保持し追加の被弾を起こさず戻しへ進む")
+	bridge._core.step(0.1)
+	state = bridge.command("dev_boss_state").value[0]
+	var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+	var view = load("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
+	view.set_script(load("res://scripts/render/bosses/monoceros.gd"))
+	add_child(view)
+	view.apply_frame(body,state)
+	check(is_equal_approx(state.angle,0.4) and is_equal_approx(view.parts.get_node("Head").rotation,0.4) and view.horn.self_modulate.r>1.0,"途中から作った本体表示も薙ぎの首の角度と金色の発光へ合わせる")
+	var held: Dictionary = bridge.checkpoint()
+	bridge._core.step(0.11)
+	var expected: Dictionary = bridge.command("dev_boss_state").value[0]
+	check(expected.stage==2 and is_equal_approx(expected.remaining,0.05),"戻しが終わったら回復へ進む")
+	check(held.ok and bridge.restore(held.value).ok,"戻し途中の段階・角度・左右と命中済み状態を保持復帰する")
+	bridge._core.step(0.11)
+	check(bridge.command("dev_boss_state").value[0]==expected,"途中復帰後も同じ戻し終了の状態へ進む")
+	bridge.release_checkpoint(held.value)
+	bridge._core.step(0.051)
+	bridge._core.step(0.01)
+	bridge._core.step(0.2)
+	state = bridge.command("dev_boss_state").value[0]
+	check(state.id>expected.id and state.side==-1 and state.sequence_stage==0,"自然終了後の次の薙ぎは逆向きから踏み込む")
+	check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"薙ぎの段階と命中の通知を共通配信へ渡す")
+	bridge.dispose()
+	view.queue_free()
+	for disappear in [false,true]:
+		fixture = sweep_fixture()
+		bridge = fixture.bridge
+		var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":fixture.id,"definition":1})
+		bridge._core.step(0.11)
+		bridge._core.step(0.2)
+		if disappear: bridge.command("dev_kill",{"entity_id":fixture.id,"cause":"debug"})
+		else: bridge.command("dev_cancel_technique",{"ticket":ticket.value})
+		bridge._core.step(0.2)
+		state = bridge.command("dev_boss_state").value[0]
+		check(state.stage==7 and not state.hit and bridge.read_frame().ok,"本体消失で回転掃引を閉じる" if disappear else "振り抜きの取消後は掃引の命中を残さない")
+		bridge.dispose()
+	var compiler = load("res://tools/content/build_boss_program.gd")
+	var program: Dictionary = compiler.build_boss("monoceros","res://.content/tests/monoceros_sweep_pure_data.tres")
+	check(program.error==OK,"薙ぎのPureDataを含む既存の通常生成を完了する")
+	if program.error==OK:
+		var owner := MonocerosBoss.new()
+		owner.def = load("res://data/bosses/monoceros.tres")
+		owner.ctx = RunContext.new()
+		owner.ctx.state = RunState.new()
+		owner.configure_flow(program.program)
+		check(owner._move_kinds[&"sweep"]==&"sweep" and owner._attack_length(&"sweep")>0.0,"通常Actorの設定と攻撃長も分離した薙ぎへ接続する")
+		owner.free()
+	await get_tree().process_frame
+	print("[cpp_monoceros_sweep] failures=",failed)
 	get_tree().quit(1 if failed else 0)

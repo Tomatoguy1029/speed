@@ -112,7 +112,7 @@
         {
           "name": "kind",
           "type": "u32",
-          "max": 1
+          "max": 2
         },
         {
           "name": "phase",
@@ -173,9 +173,79 @@
           "name": "return_speed",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "approach_speed_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_speed_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "twist_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "twist",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_decel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "windup_twist",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "return_time",
+          "type": "f64",
+          "min": 0
         }
       ],
-      "version": 2
+      "version": 3
     },
     {
       "name": "BossTechniqueStage",

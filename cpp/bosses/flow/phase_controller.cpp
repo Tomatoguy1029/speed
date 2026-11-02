@@ -79,7 +79,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
 }
 bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) {
     for (uint32_t row=0;row<s.bosses.bodies.size();++row) {const auto &b=s.bosses.bodies[row];if (b.id<=0 || b.id>=s.bosses.next_body_id || s.bosses.body_handles.entity_id(s.bosses.body_handles.at(row))!=b.id || !b.definition || b.definition>c.boss_bodies.size() || b.mode>BossMode::Cancelled || b.phase<1 || b.phase>2 || !b.entrance_from.is_finite() || !b.entrance_target.is_finite() || !b.final_to.is_finite()) return false;
-        if (b.participants.size()!=1 || b.participants[0].id<=0 || !same_handle(b.participants[0].actor,b.actor) || !same_handle(b.participants[0].health_target,b.actor) || !b.participants[0].is_body || b.participants[0].active!=(b.mode<BossMode::Defeated)) return false;
+        if ((b.sweep_side!=1 && b.sweep_side!=-1) || b.participants.size()!=1 || b.participants[0].id<=0 || !same_handle(b.participants[0].actor,b.actor) || !same_handle(b.participants[0].health_target,b.actor) || !b.participants[0].is_body || b.participants[0].active!=(b.mode<BossMode::Defeated)) return false;
         for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width}) if (!std::isfinite(value) || value<0) return false;
         if (!std::isfinite(b.final_started) || (b.mode<BossMode::Defeated && (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead))) return false;
     }return true;

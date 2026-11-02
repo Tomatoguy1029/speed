@@ -162,7 +162,6 @@ func _horn_glow() -> float:
 	return float(state.charge) if _mode()==&"windup" else 0.0
 
 func _update_turn(dt: float) -> void:
-	if dt <= 0.0: return
 	var target := float(state.facing)
 	var attacking := _mode() == &"active" or _mode() == &"stuck" or (_mode() == &"windup" and bool(technique.get("locked",false)))
 	var sweeping: bool = StringName(technique.get("technique","")) == &"sweep" and _mode() in [&"windup", &"active"]
@@ -197,6 +196,7 @@ func _body_point(world_point: Vector2) -> Vector2:
 func booster_strength() -> float:
 	if state.is_empty() or _mode() == &"defeated": return 0.0
 	if _mode() == &"entrance": return 2.0
+	if technique.has("booster"): return float(technique.booster)
 	return 2.5 if _mode() == &"active" and StringName(technique.get("technique","")) in [&"charge", &"return_charge"] else 0.55
 
 func _booster() -> void:

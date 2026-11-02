@@ -21,7 +21,20 @@ func apply_frame(values: Array) -> void:
 
 func _draw_frame() -> void:
 	for row: Dictionary in _frame:
-		if row.stage==0:
+		if row.get("technique","")=="sweep":
+			if row.stage==0 and row.get("sequence_stage",-1)==1:
+				var forward := Vector2.from_angle(float(row.facing))
+				var at: Vector2 = row.position+forward*float(row.radius)*0.65
+				var k: float = row.stop_progress
+				for j in 3:
+					var offset := forward*float(j)*8.0+forward.orthogonal()*float(j-1)*8.0
+					draw_circle(at+offset,lerpf(10.0,24.0,k)*jet_radius_scale,Color(ENERGY,jet_opacity*(1.0-k)))
+			continue
+		if row.stage==0 and row.get("technique","")=="kick":
+			draw_line(row.horn[0],row.horn[1],Color(WARNING,warning_opacity),float(row.width),false)
+			draw_line(row.horn[0],row.horn[1],WARNING,locked_line_width,false)
+			if row.locked: draw_rect(Rect2(row.horn[1]-Vector2(6,6),Vector2(12,12)),WARNING)
+		elif row.stage==0:
 			draw_line(row.horn[0],row.warning[1],Color(WARNING,warning_opacity),telegraph_line_width,false)
 		elif row.stage==3:
 			var at: Vector2 = row.horn[1]

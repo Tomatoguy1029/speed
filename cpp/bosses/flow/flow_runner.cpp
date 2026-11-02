@@ -50,7 +50,7 @@ FlowStatus tick_node(RunRuntime &r,BossFlowState &f,uint32_t row,double dt) {
             if (!available(r,f,p.id)) n.status=FlowStatus::Failed;
             else {
                 const auto &rule=r.content->boss_techniques[technique-1];const auto actor=participant(f,p.participant);const auto id=r.state.enemy_handles.entity_id(actor);
-                bool admitted=true;if (!r.state.world.attack_formation_mode && r.state.world.attack_budget.enabled) admitted=AttackBudgetSystem(r).request({"boss:"+std::to_string(id),{AttackCategory::Aimed},actor,rule.warn+rule.active,1.5,1});
+                bool admitted=true;if (!r.state.world.attack_formation_mode && r.state.world.attack_budget.enabled) admitted=AttackBudgetSystem(r).request({"boss:"+std::to_string(id),{AttackCategory::Aimed},actor,TechniqueRunner::attack_length(rule),1.5,1});
                 if (admitted) n.ticket=TechniqueRunner::begin(r,actor,technique);
                 if (!r.state.bosses.handles.contains(n.ticket)) n.status=FlowStatus::Failed;
                 else {++r.state.bosses.techniques[n.ticket.slot].ticket_refs;f.cooldowns[uint64_t(p.participant)<<32|p.technique]=f.clock+rule.cd;}

@@ -247,7 +247,7 @@ func technique_rejection(attack: StringName, gate: Dictionary) -> String:
 	var distance := table.pos[body].distance_to(run_state.ship_pos)
 	if distance < float(gate.get("min", 0.0)): return "distance_below_min"
 	if distance > float(gate.get("max", INF)): return "distance_above_max"
-	var reach: float = _moves[attack].reach_limit(horn_length()) if is_sequenced(attack) else _reach(attack)
+	var reach: float = preload("res://scripts/bosses/legacy_technique_runners.gd").definition(_moves[attack]).reach_limit(horn_length()) if is_sequenced(attack) else _reach(attack)
 	if distance > reach: return "out_of_reach"
 	if not _gate_allows(gate): return "direction_or_range_gate"
 	if is_sequenced(attack): return ""
@@ -307,7 +307,7 @@ func start_attack(attack: StringName) -> bool:
 func _attack_length(attack: StringName) -> float:
 	if is_sequenced(attack):
 		if tech_kind(attack) == &"return_charge": return _moves[attack].attack_length(_values_of(attack))
-		return _moves[attack].attack_length()
+		return preload("res://scripts/bosses/legacy_technique_runners.gd").definition(_moves[attack]).attack_length()
 	var r: Dictionary = _values_of(attack)
 	return float(r.warn) + float(r.active)
 

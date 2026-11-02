@@ -2,11 +2,19 @@
 #include "entity_store.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <vector>
+#include <variant>
 #include <unordered_map>
 namespace speed {
 enum class TechniqueStage : uint8_t { Windup,Active,Recovery,Stuck,Extract,Finished,Failed,Cancelled };
 enum class TechniqueCommand : uint8_t { LockAim,LaunchStrike,EndStrike };
+struct MonocerosSweepState {
+    enum class Stage : uint8_t { Approach,Stop,Swing,Hold,Return };
+    Stage stage=Stage::Approach;
+    double elapsed=0,angle=0,glow=0,base=0,speed=0;
+    int32_t side=1;
+};
 struct TechniqueState {
+    std::variant<std::monostate,MonocerosSweepState> detail;
     int64_t id=0;
     uint32_t definition=0,command_cursor=0,ticket_refs=0;
     EnemyHandle actor;
@@ -45,6 +53,7 @@ struct BossBodyState {
     std::vector<ParticipantState> participants;
     int64_t id=0;
     uint32_t definition=0,phase=1;
+    int32_t sweep_side=1;
     EnemyHandle actor;
     BossMode mode=BossMode::Idle;
     bool phase_pending=false,final_landed=false;
