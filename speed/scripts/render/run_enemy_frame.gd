@@ -7,6 +7,10 @@ var _sparks: InstanceBatch
 var _biter := false
 var _biting := false
 var _glows := PackedFloat32Array()
+var _previous_row: Dictionary = {}
+var _seen := false
+var _dirty := false
+var _brightness := -1.0
 const SNAP := 0.034
 const CLOSED_HOLD := 0.051
 const RETURN_TIME := 0.12
@@ -68,16 +72,17 @@ func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, 
 	_parts.append({"name":name,"base":base,"armor":armor,"pivot":pivot})
 
 func begin() -> void:
-	_glows.clear()
-	queue_redraw()
-	for part: Dictionary in _parts:
-		var began := Time.get_ticks_usec() if perf.active else 0
-		part.base.begin()
-		perf.since(&"enemies.body",began)
-		began = Time.get_ticks_usec() if perf.active else 0
-		part.armor.begin()
-		perf.since(&"enemies.armor",began)
+	_seen = false
+	_dirty = false
+
+func _begin_buffers() -> void:
+	for part: Dictionary in _parts: part.base.begin()
 	if _sparks!=null: _sparks.begin()
+
+func _set_glows(values: PackedFloat32Array) -> void:
+	if values==_glows: return
+	_glows = values
+	queue_redraw()
 
 func _jaw(mode: int, charge: float, timer: float, rest: float) -> float:
 	if mode==1: return -8.0*smoothstep(0.0,1.0,charge)
@@ -88,8 +93,12 @@ func _jaw(mode: int, charge: float, timer: float, rest: float) -> float:
 	return 12.0*(1.0-smoothstep(SNAP+CLOSED_HOLD,SNAP+CLOSED_HOLD+RETURN_TIME,age))
 
 func apply_frame(row: Dictionary) -> void:
-	_glows = row.get("glows",PackedFloat32Array())
-	queue_redraw()
+	_seen = true
+	if row==_previous_row: return
+	_previous_row = row
+	_dirty = true
+	_begin_buffers()
+	_set_glows(row.get("glows",PackedFloat32Array()))
 	for i in row.ids.size():
 		var n: int = i*6
 		var radius := Vector2(row.transforms[n],row.transforms[n+1]).length()
@@ -112,17 +121,21 @@ func apply_frame(row: Dictionary) -> void:
 			var began := Time.get_ticks_usec() if perf.active else 0
 			part.base.add(center,angle+turn,radius,row.colors[i])
 			perf.since(&"enemies.body",began)
-			began = Time.get_ticks_usec() if perf.active else 0
-			part.armor.add(center,angle+turn,radius,row.colors[i])
-			perf.since(&"enemies.armor",began)
 
 func end() -> void:
+	if not _seen:
+		if _previous_row.is_empty(): return
+		_previous_row = {}
+		_dirty = true
+		_begin_buffers()
+		_set_glows(PackedFloat32Array())
+	if not _dirty: return
 	for part: Dictionary in _parts:
 		var began := Time.get_ticks_usec() if perf.active else 0
 		part.base.end()
 		perf.since(&"enemies.body",began)
 		began = Time.get_ticks_usec() if perf.active else 0
-		part.armor.end()
+		part.armor.apply_shared_frame(part.base)
 		perf.since(&"enemies.armor",began)
 	if _sparks!=null: _sparks.end()
 
@@ -135,6 +148,8 @@ func _draw() -> void:
 	perf.since(&"view_draw.enemy_decorations",began)
 
 func set_death_brightness(value: float) -> void:
+	if value==_brightness: return
+	_brightness = value
 	for part: Dictionary in _parts:
 		part.base.material.set_shader_parameter("brightness",value)
 		part.armor.material.set_shader_parameter("brightness",value)

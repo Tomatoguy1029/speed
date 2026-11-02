@@ -174,3 +174,16 @@ func apply_frame(transforms: PackedFloat32Array, colors: PackedColorArray) -> vo
 		_buf[target+9] = colors[i].g
 		_buf[target+10] = colors[i].b
 		_buf[target+11] = colors[i].a
+
+## 本体と装甲のように同じ変換・色を使う束は、作成済みの配列を共有する。
+## source.end()のあとに呼ぶ。画像・法線・材質と描画順はそれぞれの束が持つ。
+func apply_shared_frame(source: InstanceBatch) -> void:
+	_count = source._count
+	_buf = source._buf
+	var mm := multimesh
+	if _count==0:
+		if mm.visible_instance_count!=0: mm.visible_instance_count=0
+		return
+	if mm.instance_count!=source.multimesh.instance_count: mm.instance_count=source.multimesh.instance_count
+	mm.buffer = _buf
+	mm.visible_instance_count = _count
