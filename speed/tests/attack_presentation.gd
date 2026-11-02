@@ -23,6 +23,11 @@ func _ready() -> void:
 		return
 
 
+	if "--cpp-cross" in OS.get_cmdline_user_args():
+		await check_cpp_cross()
+		print("[cpp_cross] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-zone" in OS.get_cmdline_user_args() or "--cpp-zone-fade-fix" in OS.get_cmdline_user_args():
 		zone_fade_only = "--cpp-zone-fade-fix" in OS.get_cmdline_user_args()
 		mute_checks = zone_fade_only
@@ -564,3 +569,43 @@ func check_cpp_zone() -> void:
 	cpp_bridge.release_checkpoint(held.value)
 	cpp_session.free()
 	library.set_meta("looks",original)
+
+func check_cpp_cross() -> void:
+	if not await prepare_cpp_attack(98,"cross"): return
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(300,0)}).value
+	var token: int = cpp_core.passive_attack("cross_owner",source)
+	var params := {"position":cpp_origin,"angle":0.23,"length":280.0,"width":12.0,"delay":0.2,"active":0.4,"damage":8.0,"owner_id":source,"budget":token}
+	var fired: Dictionary = cpp_bridge.command("dev_fire_cross",params)
+	check(fired.ok,"発生元から4本の十字ビームを生成する")
+	if not fired.ok: cpp_session.free(); return
+	var beams: Array = cpp_core.hazards_snapshot()
+	check(beams.size()==4 and fired.value.size()==4,"十字の4辺を独立したビーム行にする")
+	for k in 4:
+		check(beams[k].pos==cpp_origin and is_equal_approx(beams[k].angle,params.angle+k*PI/2.0) and is_equal_approx(beams[k].length,params.length),"辺%dの発生位置・向き・長さを保つ" % k)
+	cpp_core.step_hazards(0.1)
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	check(frame.shapes.size()==4 and frame.shapes.all(func(s): return s.kind==ENUMS.RenderShapeKind.Circle) and presentation.frame_view.apply_frame(frame),"4辺の予告を通常画面へ渡す")
+	await get_tree().process_frame
+	var saved: Array = cpp_core.hazards_snapshot()
+	var held: Dictionary = cpp_bridge.checkpoint()
+	for k in 4:
+		if k>0: cpp_bridge.restore(held.value)
+		cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2.from_angle(params.angle+k*PI/2.0)*200.0,"velocity":Vector2.ZERO})
+		cpp_core.step_hazards(0.15)
+		check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0) and cpp_core.hazards_snapshot().filter(func(h): return h.hit).size()==1,"有効時間に辺%dだけが命中する" % k)
+		if k==0:
+			frame = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000)).value
+			check(frame.shapes.size()==4 and frame.shapes.all(func(s): return s.kind==ENUMS.RenderShapeKind.Polyline) and presentation.frame_view.apply_frame(frame),"発動した十字の4本の光を通常画面で描く")
+			await get_tree().process_frame
+	cpp_bridge.restore(held.value)
+	check(cpp_core.hazards_snapshot()==saved,"4辺の時刻・向き・未命中・所有枠をまとめて復元する")
+	cpp_bridge.command("dev_remove",{"entity_id":source})
+	check(cpp_core.hazards_snapshot().is_empty(),"発生元が退場したら4辺とも掃除する")
+	cpp_bridge.restore(held.value)
+	cpp_core.step_hazards(0.6)
+	check(cpp_core.hazards_snapshot().is_empty(),"有効時間の終わりに十字の4辺を掃除する")
+	cpp_core.advance_attack_budget(2.0)
+	check(cpp_core.attack_budget_snapshot().groups.is_empty(),"4辺の残留枠をすべて解放する")
+	cpp_bridge.release_checkpoint(held.value)
+	cpp_session.free()

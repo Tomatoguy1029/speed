@@ -299,7 +299,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     else if (kind=="dev_fire_slash") response=development_slash_command(payload);
     else if (kind=="dev_fire_wall" || kind=="dev_move_wall") response=development_wall_command(kind,payload);
     else if (kind=="dev_fire_wave") response=development_wave_command(payload);
-    else if (kind=="dev_fire_beam" || kind=="dev_move_beam") response=development_beam_command(kind,payload);
+    else if (kind=="dev_fire_beam" || kind=="dev_move_beam" || kind=="dev_fire_cross") response=development_beam_command(kind,payload);
     else if (kind=="dev_fire_enemy" || kind=="dev_fire_missile" || kind=="dev_stone_hostiles") response=development_hostile_command(kind,payload);
     else if (kind=="dev_hound_order") response=development_hound_command(payload);
     else if (kind=="dev_field_query" || kind=="dev_field_collide" || kind=="dev_ship_motion" || kind=="dev_add_rock" || kind=="dev_stream_rocks") response=development_field_command(kind,payload);

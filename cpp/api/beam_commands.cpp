@@ -1,5 +1,6 @@
 #include "run_core.h"
 #include "../systems/attacks/beam.h"
+#include "../systems/attacks/cross.h"
 #include "../systems/attack_system.h"
 #include <cmath>
 using namespace godot;
@@ -30,11 +31,17 @@ Dictionary SpeedRunCore::development_beam_command(const String &kind,const Dicti
     if (!scalar(p,"length",params.length) || !scalar(p,"width",width) || width<0 || !scalar(p,"arc",params.arc,true) ||
         !scalar(p,"delay",params.delay) || !scalar(p,"active",params.active) || !scalar(p,"damage",params.damage)) return result(false);
     params.half_width=width*0.5;
+    if (kind=="dev_fire_cross") {if (p.has("arc")) return result(false);params.color=Color::html("ffe0a0");}
     if (p.has("color")) {if (p["color"].get_type()!=Variant::COLOR) return result(false);params.color=p["color"];}
     if (p.has("budget")) {if (p["budget"].get_type()!=Variant::INT || int64_t(p["budget"])<0) return result(false);params.budget.value=p["budget"];}
     if (p.has("owner_id")) {
         if (p["owner_id"].get_type()!=Variant::INT) return result(false);const auto found=runtime.state.rows_by_id.find(int64_t(p["owner_id"]));
         if (found==runtime.state.rows_by_id.end()) return result(false);params.owner=runtime.state.enemy_handles.at(uint32_t(found->second));
+    }
+    if (kind=="dev_fire_cross") {
+        const auto handles=speed::CrossSystem::emit(runtime,params);Array rows;
+        for (auto handle:handles) {const auto *record=speed::AttackSystem::get(runtime.state,handle);Dictionary row;row["id"]=record->id;row["row"]=record->row;rows.push_back(row);}
+        return result(handles.size()==4,rows);
     }
     const auto handle=speed::BeamSystem::emit(runtime,params);const auto *record=speed::AttackSystem::get(runtime.state,handle);if (!record) return result(false);
     Dictionary value;value["id"]=record->id;value["row"]=record->row;return result(true,value);
