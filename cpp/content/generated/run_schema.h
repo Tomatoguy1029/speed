@@ -336,6 +336,8 @@ struct EnemyRecord {
     double turn{};
     bool reward_scattered{};
     bool reward_burst{};
+    uint32_t gate{};
+    double gate_arc{};
 };
 inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (!input.read_u32(out.id)) return false;
@@ -397,11 +399,15 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.sprite_scale < 0) return false;
     if (!input.read_f64(out.sprite_angle)) return false;
     if (!input.read_u32(out.kind)) return false;
-    if (out.kind > 30) return false;
+    if (out.kind > 34) return false;
     if (!input.read_f64(out.turn)) return false;
     if (out.turn < 0) return false;
     if (!input.read_bool(out.reward_scattered)) return false;
     if (!input.read_bool(out.reward_burst)) return false;
+    if (!input.read_u32(out.gate)) return false;
+    if (out.gate > 7) return false;
+    if (!input.read_f64(out.gate_arc)) return false;
+    if (out.gate_arc < 0) return false;
     return true;
 }
 struct LoadoutDefinition {
@@ -2090,6 +2096,35 @@ inline bool read(BinaryReader &input, DefenderDefinition &out) {
     if (!input.read_f64(out.guard_spacing)) return false;
     return true;
 }
+struct CrabDefinition {
+    uint32_t id{};
+    double approach{};
+    double reach{};
+    double telegraph{};
+    double open_time{};
+    double turn_angle{};
+    double damage{};
+    double admission_duration{};
+};
+inline bool read(BinaryReader &input, CrabDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.approach)) return false;
+    if (out.approach < 0) return false;
+    if (!input.read_f64(out.reach)) return false;
+    if (out.reach < 0) return false;
+    if (!input.read_f64(out.telegraph)) return false;
+    if (out.telegraph < 0) return false;
+    if (!input.read_f64(out.open_time)) return false;
+    if (out.open_time < 0) return false;
+    if (!input.read_f64(out.turn_angle)) return false;
+    if (out.turn_angle < 0) return false;
+    if (!input.read_f64(out.damage)) return false;
+    if (out.damage < 0) return false;
+    if (!input.read_f64(out.admission_duration)) return false;
+    if (out.admission_duration < 0) return false;
+    return true;
+}
 struct FieldBodyDefinition {
     uint32_t id{};
     uint32_t kind{};
@@ -2899,6 +2934,7 @@ struct ContentRecords {
     std::vector<AquilaDefinition> AquilaDefinition_rows;
     std::vector<SplitDefinition> SplitDefinition_rows;
     std::vector<DefenderDefinition> DefenderDefinition_rows;
+    std::vector<CrabDefinition> CrabDefinition_rows;
     std::vector<FieldBodyDefinition> FieldBodyDefinition_rows;
     std::vector<MoonDefinition> MoonDefinition_rows;
     std::vector<RockFieldDefinition> RockFieldDefinition_rows;
@@ -2948,8 +2984,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 8) return false;
-        if (count > input.remaining()/238) return false;
+        if (version != 9) return false;
+        if (count > input.remaining()/250) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -3360,6 +3396,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { DefenderDefinition row; if (!read(input,row)) return false; out.DefenderDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 130: {
+        if (version != 1) return false;
+        if (count > input.remaining()/60) return false;
+        for (uint32_t i=0; i<count; ++i) { CrabDefinition row; if (!read(input,row)) return false; out.CrabDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 21: {
         if (version != 1) return false;
         if (count > input.remaining()/36) return false;
@@ -3668,6 +3710,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.SplitDefinition_rows) if (!SplitDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> DefenderDefinition_ids;
     for (const auto &row:data.DefenderDefinition_rows) if (!DefenderDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CrabDefinition_ids;
+    for (const auto &row:data.CrabDefinition_rows) if (!CrabDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> FieldBodyDefinition_ids;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!FieldBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MoonDefinition_ids;
@@ -3792,6 +3836,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.SplitDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.SplitDefinition_rows) if (!EnemyRecord_ids.count(row.child)) return false;
     for (const auto &row:data.DefenderDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
+    for (const auto &row:data.CrabDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.FieldBodyDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.MoonDefinition_rows) if (!ResourceKey_ids.count(row.visual)) return false;
     for (const auto &row:data.RockFieldDefinition_rows) if (!EnemyRecord_ids.count(row.meteor)) return false;
@@ -3938,8 +3983,9 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.turn=row.turn;
     out.reward_scattered=row.reward_scattered;
     out.reward_burst=row.reward_burst;
+    out.gate_arc=row.gate_arc;
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=98;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=99;
 }
