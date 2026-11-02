@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../cpp/behaviors/weapons/afterimage.h"
 #include "../cpp/runtime/lifecycle.h"
 #include <cmath>
 using namespace godot;
@@ -25,6 +26,7 @@ bool SpeedRunCore::check_run_end() {
         runtime.state.sequence_t = 0;
         Dictionary event; event["pos"] = runtime.state.ship.pos; emit_event("ship_death", event);
         runtime.state.phase = Phase::Dying;
+        speed::AfterimageBehavior::clear(runtime);
         runtime.state.hitstop = 0;
     }
     return runtime.state.phase != Phase::Play;

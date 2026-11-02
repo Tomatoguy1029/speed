@@ -117,6 +117,8 @@ bool EquipmentSystem::grant(RunRuntime &run,uint32_t id,uint32_t levels) {
             else {rear={};rear.base_interval=rear.interval=rear.fire.remaining=level.interval;}
             rear.definition=id;rear.damage=level.damage;rear.pierce=level.pierce;rear.life=level.life;rear.spread=level.spread;rear.knock=level.knock;
             rear.character_scale=run.content->config.character_scale;rear.color=level.color;rear.mount_x=level.mount_x;rear.mount_y=level.mount_y;rear.muzzle_distance=level.muzzle_distance;rear.ready=true;
+        } else if (d.external_id=="W27") {
+            const auto &v=run.content->afterimage_levels[next-1];auto &w=run.state.loadout.afterimage;w.ready=true;w.definition=id;w.count=v.count;w.total=v.total;w.delay=v.delay;
         } else if (d.external_id=="W26") {
             const auto &v=run.content->escort_levels[next-1];auto &w=run.state.loadout.escort;w.ready=true;w.definition=id;w.count=v.count;w.damage=v.damage;w.tail=v.tail;w.hit_radius=v.hit_radius;w.area_increment=v.area_increment;w.deploy_distance=v.deploy_distance;w.idle_spacing=v.idle_spacing;w.idle_back=v.idle_back;w.return_rate=v.return_rate;
         } else if (d.external_id=="W25") {
@@ -190,6 +192,7 @@ bool EquipmentSystem::remove_weapon(RunRuntime &run,uint32_t id) {
     if (external=="W01") run.state.forward={};
     else if (external=="W05") run.state.loadout.barrier={};
     else if (external=="W23") run.state.loadout.rear={};
+    else if (external=="W27") run.state.loadout.afterimage={};
     else if (external=="W26") run.state.loadout.escort={};
     else if (external=="W25") run.state.loadout.interceptor={};
     else if (external=="W22") run.state.loadout.bipolar={};

@@ -93,6 +93,8 @@ var _full_charge_world_time := -1.0
 var _rampage_visual: RefCounted
 var _rampage_world_time := -1.0
 var _kill_sonic_visual: RefCounted
+var _afterimage_clock := -1.0
+var _afterimage_visual: RefCounted
 var _escort_world_time := -1.0
 var _escort_visual: RefCounted
 var _interceptor_world_time := -1.0
@@ -892,6 +894,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		_vortex_world_time = -1.0
 		if _kill_sonic_visual!=null: _kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+		if _afterimage_visual!=null: _afterimage_visual.dispose()
+		_afterimage_visual = null
+		_afterimage_clock = -1.0
 		if _escort_visual!=null: _escort_visual.dispose()
 		_escort_visual = null
 		_escort_world_time = -1.0
@@ -965,6 +970,14 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if not equipped_kill_sonic and _kill_sonic_visual!=null:
 		_kill_sonic_visual.dispose()
 		_kill_sonic_visual = null
+	var equipped_afterimage: bool = frame.ui.get("afterimage",{}).get("ready",false)
+	if equipped_afterimage and _afterimage_visual==null:
+		_afterimage_visual = preload("res://scripts/render/equipment/afterimage.gd").new()
+		_afterimage_visual.setup_frame(_layer(13))
+	if not equipped_afterimage and _afterimage_visual!=null:
+		_afterimage_visual.dispose()
+		_afterimage_visual = null
+		_afterimage_clock = -1.0
 	var equipped_escort: bool = frame.ui.get("escort",{}).get("ready",false)
 	if equipped_escort and _escort_visual==null:
 		_escort_visual = preload("res://scripts/render/equipment/dashRangeDrone.gd").new()
@@ -1296,6 +1309,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
+	var afterimage_dt: float = 0.0 if _afterimage_clock<0.0 else maxf(0.0,ui.afterimage.clock-_afterimage_clock)
+	_afterimage_clock = ui.afterimage.clock if equipped_afterimage else -1.0
+	if _afterimage_visual!=null: _afterimage_visual.frame_tick(ui.afterimage,ui.character_scale,afterimage_dt)
 	var escort_dt: float = 0.0 if _escort_world_time<0.0 else maxf(0.0,ui.world_time-_escort_world_time)
 	_escort_world_time = ui.world_time if equipped_escort else -1.0
 	if _escort_visual!=null: _escort_visual.frame_tick(ui.escort,ui.character_scale,_zoom,ui.ship,ui.draw.tracing,escort_dt)

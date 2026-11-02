@@ -66,6 +66,11 @@ func measure_white_square(viewport: SubViewport) -> int:
 	return largest*4
 
 func _ready() -> void:
+	if "--cpp-w27" in OS.get_cmdline_user_args() or "--cpp-w27-retry" in OS.get_cmdline_user_args():
+		await check_cpp_w27()
+		print("[cpp_w27] failed=%d" % failures)
+		get_tree().quit(1 if failures else 0)
+		return
 	if "--cpp-w26" in OS.get_cmdline_user_args() or "--cpp-w26-post" in OS.get_cmdline_user_args():
 		await check_cpp_w26()
 		print("[cpp_w26] failed=%d" % failures)
@@ -3720,3 +3725,76 @@ func check_cpp_w26() -> void:
 	await get_tree().process_frame
 	OS.remove_logger(errors)
 	check(errors.count()==0,"編隊の状態と表示に実行エラーがない: %s" % [errors.messages()])
+
+func check_cpp_w27() -> void:
+	var errors := ErrorCapture.new()
+	OS.add_logger(errors)
+	var config := trait_test_config()
+	config.xp_base = 1000000.0
+	var session = await trait_test_session("W27",config,627)
+	if session==null:
+		OS.remove_logger(errors)
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	var idle: Dictionary = bridge.pack_intent(Intent.new())
+	var viewport := {"logical_size":Vector2(1280,720)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	bridge.command("dev_remove_weapon",{"id":"W01"})
+	var initial: Dictionary = bridge.checkpoint()
+	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W27")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	var events: Array = []
+	bridge.subscribe("w27_check",func(frame: Dictionary):
+		events.append_array(frame.events)
+		return true)
+	for level in range(1,definition.level_steps.size()+1):
+		var retry: bool = level==1 and "--cpp-w27-retry" in OS.get_cmdline_user_args()
+		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"ミラージュの全段の基準を復元する")
+		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W27","levels":level}).ok,"ミラージュを全段取得する")
+		var center: Vector2 = trait_start_trace(bridge,600.0)
+		check(bridge._ui.afterimage.echoes.size()==1 and bridge._ui.afterimage.echoes[0].copies.size()==level,"全段の機数で経路の記録を始める")
+		for tick in 8: check(bridge.step(1.0/120.0,idle,viewport).ok,"実秒で軌跡を記録する")
+		var echoes: Dictionary = bridge._ui.afterimage
+		check(echoes.echoes[0].legs>0 and is_equal_approx(echoes.echoes[0].share,float(definition.params.echo_total_by_level[level-1])/level),"各段の通常突進の合計予算を機数へ分配する")
+		var hit: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,0)}).value
+		core.set_enemy_motion(hit,{"held":true,"vel":Vector2.ZERO})
+		events.clear()
+		for tick in 12: check(bridge.step(1.0/120.0,idle,viewport).ok,"世界の減速中も分身を実秒で再生する")
+		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"分身の状態と命中通知を表示へ配信する")
+		var frame: Dictionary = bridge._ui.afterimage
+		var copy: Dictionary = frame.echoes[0].copies[0]
+		check(copy.alpha>0.0 and copy.pos.x>center.x+10.0 and frame.clock>bridge._ui.world_time,"遅延した分身が実秒で記録区間を通過する")
+		check(events.any(func(e):return e.type==&"combat_damage" and e.payload.cause=="afterimage"),"分身が専用の原因で通常突進の分配ダメージを与える")
+		if retry: continue
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._afterimage_visual!=null and presentation.frame_view._afterimage_visual._frame_node._body.multimesh.visible_instance_count>0,"既存の機体画像と市松の残光で分身を表示する")
+		var saved: Dictionary = bridge.checkpoint()
+		for command in ["pause","set_ui_overlay"]:
+			bridge.command(command,{"paused":true} if command=="pause" else {"active":true})
+			var before: Dictionary = bridge._ui.afterimage.duplicate(true)
+			bridge.step(1.0/120.0,idle,viewport)
+			presentation._present_cpp(0.1)
+			check(bridge._ui.afterimage==before,"停止中は記録と分身の実秒を止める")
+			bridge.command(command,{"paused":false} if command=="pause" else {"active":false})
+		for tick in 30: bridge.step(1.0/120.0,idle,viewport)
+		var after: Dictionary = bridge._ui.afterimage.duplicate(true)
+		var enemies: Array = core.enemies_snapshot()
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"保存した経路と分身の途中へ復帰する")
+		for tick in 30: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.afterimage==after and core.enemies_snapshot()==enemies,"途中復帰で経路・進み・命中済みID・固定予算を再現する")
+		bridge.command("dev_remove_weapon",{"id":"W27"})
+		presentation._present_cpp(0.01)
+		check(bridge._ui.afterimage.echoes.is_empty() and presentation.frame_view._afterimage_visual==null,"途中解除で保存軌跡と分身と専用表示を回収する")
+		check(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"終了時の回収の基準へ復帰する")
+		bridge.command("dev_finish",{"cleared":false})
+		check(bridge._ui.afterimage.echoes.is_empty(),"ラン終了で残像の攻撃を終了する")
+		bridge.release_checkpoint(saved.value)
+		if failures: break
+	bridge.release_checkpoint(initial.value)
+	bridge.unsubscribe("w27_check")
+	session.free()
+	await get_tree().process_frame
+	OS.remove_logger(errors)
+	check(errors.count()==0,"ミラージュの状態と表示に実行エラーがない: %s" % [errors.messages()])

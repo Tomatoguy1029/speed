@@ -3,6 +3,7 @@
 #include "../behaviors/weapons/dashRangeDrone.h"
 #include "../behaviors/weapons/massTow.h"
 #include "run_runner.h"
+#include "../behaviors/weapons/afterimage.h"
 #include "../behaviors/enemies/corona_vortex.h"
 #include "../systems/attack_system.h"
 #include "../behaviors/weapons/scatter.h"
@@ -93,6 +94,11 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (!core.step_ship_input(dt,world_dt,input)) return false;
     if (state.phase==Phase::Play && !state.controls_locked) {
         LightLancesSystem::step(core.runtime,world_dt);
+        for (const auto &owned:state.loadout.weapons) {
+            if (core.runtime.content->equipment[owned.definition-1].external_id=="W27") AfterimageBehavior::step(core.runtime,dt);
+            if (state.phase!=Phase::Play) break;
+        }
+        if (state.phase!=Phase::Play) return true;
         // 取得順で更新し、各武器の後に進行状態を確認する。
         if (state.loadout.ready) {
             for (const auto &owned:state.loadout.weapons) {

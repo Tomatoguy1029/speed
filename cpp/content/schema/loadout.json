@@ -1605,6 +1605,44 @@
         }
       ],
       "version": 2
+    },
+    {
+      "name": "AfterimageDefinition",
+      "section": 207,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1,
+          "max": 8
+        },
+        {
+          "name": "total",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0.02,
+          "max": 0.5
+        }
+      ]
     }
   ],
   "enums": {

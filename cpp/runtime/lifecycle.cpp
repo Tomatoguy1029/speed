@@ -1,4 +1,5 @@
 #include "lifecycle.h"
+#include "../behaviors/weapons/afterimage.h"
 #include "../output/frame_builder.h"
 #include "../output/event_builder.h"
 #include <climits>
@@ -18,7 +19,7 @@ bool Lifecycle::finish(RunRuntime &run,ResultKind kind) {
     for (auto id:lifecycle.obtained) result.rewards.push_back({id,1});
     result.last_request=lifecycle.last_request;result.last_damage=lifecycle.last_damage;result.has_damage=lifecycle.has_damage;
     lifecycle.result=std::move(result);
-    state.draw.drawing=state.draw.tracing=false;state.ship.vel=Vector2();state.phase=RunState::Phase::Ended;state.hitstop=0;
+    state.draw.drawing=state.draw.tracing=false;state.ship.vel=Vector2();state.phase=RunState::Phase::Ended;AfterimageBehavior::clear(run);state.hitstop=0;
     state.control.world_real_accum=state.control.world_dt_accum=0;state.control.world_steps=0;
     state.loadout.candidates.clear();state.loadout.offer_id=state.loadout.selected_id=0;run.resource_workspace.requests.clear();
     Dictionary event;event["result_id"]=lifecycle.result->id;event["kind"]=symbol_name(kind);FrameBuilder::append(run,"run_finished",event);return true;

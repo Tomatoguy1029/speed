@@ -47,6 +47,13 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
     for (const auto &v:state.loadout.kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
+    const auto &afterimage=state.loadout.afterimage;if (!std::isfinite(afterimage.clock) || afterimage.clock<0 || afterimage.echoes.size()>8) return false;
+    bool current_found=afterimage.current==0;
+    for (const auto &echo:afterimage.echoes) {if (!echo.id || echo.id>=afterimage.next_id || !std::isfinite(echo.start) || !std::isfinite(echo.until) || !std::isfinite(echo.share) || echo.share<0 || echo.legs.size()>2048 || echo.copies.empty() || echo.copies.size()>8) return false;if (echo.id==afterimage.current) {if (echo.ended) return false;current_found=true;}
+        for (const auto &leg:echo.legs) if (!leg.a.is_finite() || !leg.b.is_finite() || !std::isfinite(leg.start) || !std::isfinite(leg.finish) || leg.finish<leg.start || !std::isfinite(leg.power) || !std::isfinite(leg.radius) || leg.radius<0) return false;
+        for (const auto &copy:echo.copies) if (!copy.pos.is_finite() || !copy.dir.is_finite() || !std::isfinite(copy.delay) || copy.delay<=0 || !std::isfinite(copy.progress) || copy.progress<0 || copy.progress>1 || !std::isfinite(copy.alpha) || copy.alpha<0 || copy.alpha>1 || copy.cursor>echo.legs.size()) return false;
+    }
+    if (!current_found) return false;
     const auto &escort=state.loadout.escort;if (!std::isfinite(escort.distance) || escort.distance<0) return false;
     for (const auto &v:escort.normals) if (!v.is_finite()) return false;
     for (const auto &v:escort.drones) {if (!v.pos.is_finite() || !v.dir.is_finite() || v.trail.size()>96) return false;for (const auto &p:v.trail) if (!p.pos.is_finite() || !std::isfinite(p.life) || p.life<0) return false;}

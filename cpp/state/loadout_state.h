@@ -79,6 +79,10 @@ struct KnockbackState {
     double chance=0,speed=0,life=0,base_damage=0,base_attack=0,base_knock=0,base_life=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0;
     std::vector<KnockbackVisual> visuals;
 };
+struct AfterimageLeg {godot::Vector2 a,b;double start=0,finish=0,power=0,radius=0;};
+struct AfterimageCopy {godot::Vector2 pos,dir;double delay=0,progress=0,alpha=0;size_t cursor=0;std::unordered_set<int64_t> hits;};
+struct AfterimageEcho {uint64_t id=0;double start=0,until=0,share=0;bool ended=false;std::vector<AfterimageLeg> legs;std::vector<AfterimageCopy> copies;};
+struct AfterimageState {bool ready=false;uint32_t definition=0,count=0;uint64_t next_id=1,current=0;double clock=0,total=0,delay=0;std::vector<AfterimageEcho> echoes;};
 struct EscortTrailPoint {godot::Vector2 pos;double life=0.22;bool join=false;};
 struct EscortDrone {godot::Vector2 pos,dir;std::vector<EscortTrailPoint> trail;bool break_trail=true;};
 struct DashRangeDroneState {bool ready=false,active=false;uint32_t definition=0,count=0;int64_t dash_id=-1;double distance=0,damage=0,tail=0,hit_radius=0,area_increment=0,deploy_distance=0,idle_spacing=0,idle_back=0,return_rate=0;std::vector<EscortDrone> drones;std::vector<godot::Vector2> normals;std::unordered_set<int64_t> hits;};
@@ -171,6 +175,7 @@ struct LoadoutState {
     BipolarState bipolar;
     InterceptorState interceptor;
     DashRangeDroneState escort;
+    AfterimageState afterimage;
     CritBeamState crit_beam;
     VortexState vortex;
     RunUpState run_up;

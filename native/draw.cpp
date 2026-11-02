@@ -2,6 +2,7 @@
 #include "../cpp/behaviors/weapons/dashRangeDrone.h"
 #include "../cpp/behaviors/weapons/massTow.h"
 #include "run_core.h"
+#include "../cpp/behaviors/weapons/afterimage.h"
 #include "../cpp/systems/field.h"
 #include "../cpp/behaviors/traits/fullCharge.h"
 #include "../cpp/behaviors/traits/rampage.h"
@@ -125,7 +126,8 @@ void SpeedRunCore::commit_draw() {
     speed::KillSonicBehavior::launch(runtime);
     for (const auto &owned:runtime.state.loadout.weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
-        if (id=="W22") speed::BipolarBehavior::launch(runtime);
+        if (id=="W27") speed::AfterimageBehavior::launch(runtime);
+        else if (id=="W22") speed::BipolarBehavior::launch(runtime);
         else if (id=="W26") speed::DashRangeDroneBehavior::launch(runtime);
     }
     runtime.state.draw.inside.clear(); runtime.state.draw.passes.clear(); runtime.state.dash_stop = 0;
@@ -165,7 +167,8 @@ void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
     for (const auto &owned:runtime.state.loadout.weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
-        if (id=="W26") speed::DashRangeDroneBehavior::end(runtime);
+        if (id=="W27") speed::AfterimageBehavior::end(runtime);
+        else if (id=="W26") speed::DashRangeDroneBehavior::end(runtime);
         else if (id=="W22") speed::BipolarBehavior::end(runtime);
         else if (id=="W21") speed::MassTowBehavior::end(runtime);
         else if (id=="W29") speed::EndBlastBehavior::end(runtime);
@@ -207,7 +210,8 @@ bool SpeedRunCore::step_draw(double real_dt) {
         speed::FullChargeBehavior::trail(runtime,from,runtime.state.ship.pos);
         for (const auto &owned:runtime.state.loadout.weapons) {
             if (runtime.state.phase!=RunState::Phase::Play) return;
-            if (runtime.content->equipment[owned.definition-1].external_id=="W26") speed::DashRangeDroneBehavior::trail(runtime,from,runtime.state.ship.pos);
+            if (runtime.content->equipment[owned.definition-1].external_id=="W27") speed::AfterimageBehavior::trail(runtime,from,runtime.state.ship.pos);
+            else if (runtime.content->equipment[owned.definition-1].external_id=="W26") speed::DashRangeDroneBehavior::trail(runtime,from,runtime.state.ship.pos);
         }
     };
     double dist = runtime.state.draw.rate * real_dt;
