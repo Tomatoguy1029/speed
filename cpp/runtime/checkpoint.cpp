@@ -43,6 +43,7 @@ godot::RunState clone_state(const godot::RunState &source) {
 }
 bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) {
     if (!HeroesSystem::validate(state,content)) return false;
+    if (state.loadout.scatter.ready && (!std::isfinite(state.loadout.scatter.elapsed) || state.loadout.scatter.elapsed<0)) return false;
     if (state.ship.shield_source_definition>content.definitions.size()) return false;
     if (!state.started || state.closed || state.next_id<=0 ||
         !std::isfinite(state.time) || !std::isfinite(state.world_time) || !std::isfinite(state.sim_time) ||

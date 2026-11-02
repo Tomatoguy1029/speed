@@ -15,10 +15,10 @@ void ScatterBehavior::step(RunRuntime &run,double dt) {
     const double rate=state.draw.gauge<1?1:1+effects.full_gauge_rate*state.draw.gauge;
     const double floor=std::min(weapon.base_interval,std::max(post.minimum_interval,weapon.base_interval*post.minimum_ratio));
     const double interval=std::max(floor,weapon.base_interval*(1-post.interval_increment*double(loadout.post_weapon_interval_stacks)))/rate;
-    weapon.fire.remaining+=interval-weapon.interval;weapon.interval=interval;
-    weapon.fire.advance(dt);
-    if (!weapon.fire.due()) return;
-    weapon.fire.fired(interval);weapon.fire.skip_missed(interval);
+    // Sourceは経過時間を加算してからfmodする。残り時間の減算へ変換すると境界tickがずれる。
+    weapon.interval=interval;weapon.elapsed+=dt;weapon.fire.remaining=interval-weapon.elapsed;
+    if (weapon.elapsed<interval) return;
+    weapon.elapsed=std::fmod(weapon.elapsed,interval);weapon.fire.remaining=interval-weapon.elapsed;
     const int64_t count=EquipmentSystem::shot_count(run,weapon.shots);
     const double angle=state.ship.heading.angle();
     const auto origin=state.ship.pos+state.ship.heading*16.0*1.82*run.content->config.character_scale;

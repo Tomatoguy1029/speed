@@ -24,7 +24,7 @@ struct ScatterWeaponState {
     bool ready=false;
     uint32_t definition=0,shots=0;
     IntervalTimer fire;
-    double recoil=0,base_interval=0,interval=0,damage=0,life=0,spread=0,knock=0;
+    double recoil=0,elapsed=0,base_interval=0,interval=0,damage=0,life=0,spread=0,knock=0;
 };
 struct BarrierWaveState {
     godot::Vector2 pos;

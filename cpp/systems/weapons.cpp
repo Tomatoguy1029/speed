@@ -48,7 +48,7 @@ Dictionary SpeedRunCore::forward_snapshot() const {
 
 Dictionary SpeedRunCore::scatter_snapshot() const {
     const auto &weapon=runtime.state.loadout.scatter;
-    Dictionary out;out["elapsed"]=weapon.interval-weapon.fire.remaining;out["recoil"]=weapon.recoil;return out;
+    Dictionary out;out["elapsed"]=weapon.elapsed;out["recoil"]=weapon.recoil;return out;
 }
 
 Dictionary SpeedRunCore::rear_snapshot() const {

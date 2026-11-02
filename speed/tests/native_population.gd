@@ -9,7 +9,12 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
-	if "--semantics-hero-special" in OS.get_cmdline_user_args():
+	if "--semantics-enemy-support" in OS.get_cmdline_user_args():
+		check_semantics_enemy_support()
+		print("[semantics_enemy_support] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--semantics-hero-special" in OS.get_cmdline_user_args() or "--semantics-hero-end-hold" in OS.get_cmdline_user_args():
 		check_semantics_hero_special()
 		print("[semantics_hero_special] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
@@ -24,17 +29,17 @@ func _ready() -> void:
 		print("[semantics_trait_boundaries] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
-	if "--semantics-attack-values" in OS.get_cmdline_user_args():
+	if "--semantics-attack-values" in OS.get_cmdline_user_args() or "--semantics-more-attack-values" in OS.get_cmdline_user_args():
 		check_semantics_attack_values()
 		print("[semantics_attack_values] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
-	if "--semantics-new-enemies" in OS.get_cmdline_user_args():
+	if "--semantics-new-enemies" in OS.get_cmdline_user_args() or "--semantics-more-enemies" in OS.get_cmdline_user_args():
 		check_semantics_new_enemies()
 		print("[semantics_new_enemies] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
-	if ("--semantics-equipment-hits" in OS.get_cmdline_user_args() or "--semantics-equipment-hits-tail" in OS.get_cmdline_user_args()):
+	if ("--semantics-equipment-hits" in OS.get_cmdline_user_args() or "--semantics-equipment-hits-tail" in OS.get_cmdline_user_args() or "--semantics-equipment-post" in OS.get_cmdline_user_args()):
 		check_semantics_equipment_hits()
 		print("[semantics_equipment_hits] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
@@ -1132,6 +1137,8 @@ func semantics_hit_values(run: RunSimulation, bridge, id: String) -> Array:
 				if run.projectiles.friend_alive[row]:old.append({"life":run.projectiles.friend_life[row],"damage":run.projectiles.friend_dmg[row],"knock":run.projectiles.friend_knock[row],"radius":run.projectiles.friend_r[row]})
 			for shot:Dictionary in bridge._core.projectiles_snapshot():actual.append(semantics_fields(shot,["life","damage","knock","radius"]))
 			source.shots=old;native.shots=actual
+		"W07":
+			source.mines=semantics_rows(behavior.mines,["pos","life","age","damage","radius"]);native.mines=semantics_rows(ui.mines.items,["pos","life","age","damage","radius"])
 		"W04":
 			source.waves=semantics_rows(behavior.waves,["radius","damage","age"]);native.waves=semantics_rows(ui.contact_wave.waves,["radius","damage","age"])
 		"W05":
@@ -1146,10 +1153,18 @@ func semantics_hit_values(run: RunSimulation, bridge, id: String) -> Array:
 			source.cargo=semantics_rows(behavior.cargo,["pos","rel","angle"]);native.cargo=semantics_rows(ui.mass_tow.cargo,["pos","rel","angle"])
 		"W25":
 			var values:=semantics_equipment_values(run,bridge,id);source.drone=values[0];native.drone=values[1]
+		"W27":
+			var values:=semantics_equipment_values(run,bridge,id);source.echoes=values[0];native.echoes=values[1]
 		"W28":
 			source.marks=semantics_rows(behavior.marks,["damage","time","distance"]);native.marks=semantics_rows(ui.flash_slash.marks,["damage","time","distance"])
+		"T04":
+			var values:=semantics_equipment_values(run,bridge,id);source.gear=values[0];native.gear=values[1]
+			source.waves=semantics_rows(run.loadout.weapon_behaviors[&"W05"].waves,["damage"]);native.waves=semantics_rows(ui.barrier.waves,["damage"])
+		"T36":
+			source.rate=run.loadout.shooting_rate();native.rate=ui.shooting_rate
+			source.elapsed=run.loadout.weapon_behaviors[&"W02"]._t;native.elapsed=bridge._core.scatter_snapshot().elapsed
 		"T03":source.gauge=run.state.gauge;native.gauge=ui.draw.gauge
-		"T05":source.waves=semantics_rows(behavior.waves,["radius","damage","age"]);native.waves=semantics_rows(ui.kill_sonic.waves,["radius","damage","age"])
+		"T05":source.waves=semantics_rows(behavior.waves.slice(1) if "--semantics-equipment-post" in OS.get_cmdline_user_args() else behavior.waves,["radius","damage","age"]);native.waves=semantics_rows(ui.kill_sonic.waves.slice(1) if "--semantics-equipment-post" in OS.get_cmdline_user_args() else ui.kill_sonic.waves,["radius","damage","age"])
 		"T06":
 			var keys:=["from","velocity","length","width","damage","knock","life"]
 			source.lances=semantics_rows(run.projectiles.attached_attack(&"light_lances").items,keys)
@@ -1168,6 +1183,10 @@ func semantics_hit_values(run: RunSimulation, bridge, id: String) -> Array:
 	return [source,native]
 
 func check_semantics_equipment_hits() -> void:
+	var post_mode:="--semantics-equipment-post" in OS.get_cmdline_user_args()
+	var post_from:=""
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-equipment-post-from="):post_from=arg.trim_prefix("--semantics-equipment-post-from=")
 	var probe=COMPARE.new().create_native()
 	if probe==null:check(false,"固有命中のC++拡張を読む");return
 	probe.close()
@@ -1185,10 +1204,13 @@ func check_semantics_equipment_hits() -> void:
 	var bytes:=FileAccess.get_file_as_bytes(index.binary)
 	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
 	var cases:=0
-	for id:String in ["W03","W04","W05","W08","W17","W21","W22","W25","W26","W28","W29","T03","T05","T06","T32","T33"]:
+	for id:String in (["W03","W04","W05","W07","W08","W17","W21","W22","W25","W26","W27","W28","W29","T04","T05","T36"] if post_mode else ["W03","W04","W05","W08","W17","W21","W22","W25","W26","W28","W29","T03","T05","T06","T32","T33"]):
+		if post_mode and not post_from.is_empty() and ["W03","W04","W05","W07","W08","W17","W21","W22","W25","W26","W27","W28","W29","T04","T05","T36"].find(id)<["W03","W04","W05","W07","W08","W17","W21","W22","W25","W26","W27","W28","W29","T04","T05","T36"].find(post_from):continue
 		if "--semantics-equipment-hits-tail" in OS.get_cmdline_user_args() and id not in ["T06","T32","T33"]:continue
 		for level in range(1,6):
 			if "--semantics-equipment-hits-tail" in OS.get_cmdline_user_args() and id=="T06" and level<3:continue
+			if post_mode and id not in ["T05","T36"] and level<5:continue
+			if post_mode and post_from=="T36" and level<3:continue
 			var run:=semantics_legacy(config,stage,definitions,3490)
 			run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies()
 			run.loadout.reset_loadout();run.enemies._next_id=1
@@ -1200,9 +1222,18 @@ func check_semantics_equipment_hits() -> void:
 			if id in ["T32","T33"]:
 				run.loadout.grant(&"trait",&"T04",5);bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
 			var behavior=(run.loadout.weapon_behaviors if kind==&"weapon" else run.loadout.trait_behaviors)[StringName(id)]
+			if post_mode:
+				run.state.post_max_stacks={&"weapon_damage":2,&"followup":2,&"projectile_speed":2,&"duration":2,&"knockback":2,&"area":2}
+				run.loadout.grant(&"trait",&"T34",2);run.loadout.grant(&"trait",&"T11",2)
+				bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2});bridge.command("dev_grant_equipment",{"kind":"trait","id":"T11","levels":2})
+				bridge.command("dev_post_weapon_power",{"damage":2,"followup":2});bridge.command("dev_post_scatter",{"interval":0,"projectile":2,"duration":2,"knockback":2,"area":2})
+				if id=="T04":
+					run.loadout.grant(&"weapon",&"W05",5);bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W05","levels":5})
+				if id=="T36":
+					run.loadout.grant(&"weapon",&"W02",1);bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W02","levels":1})
 			var origin:=run.state.ship_pos
 			var pair:=[]
-			if id not in ["W07","W22","T05","T33"]:
+			if id not in (["W07","W08","W22","W27","T04","T05","T33","T36"] if post_mode else ["W07","W22","T05","T33"]):
 				pair=semantics_spawn_pair(run,bridge,origin+(Vector2(300,60) if id=="W25" else (Vector2(600,80) if id in ["W29","T03"] else Vector2(100,0))))
 			if id=="W03":
 				var found:String=comparison.semantics_difference(behavior.at_level("chance_by_level"),bridge.read_frame().value.ui.knockback.chance);check(found.is_empty(),"星砕きの全段の発動率を厳密幅で保つ: "+found)
@@ -1214,29 +1245,65 @@ func check_semantics_equipment_hits() -> void:
 			elif id=="T06":
 				behavior.on_critical(origin)
 				bridge.command("dev_edit",{"kind":"equipment_preview","payload":{"id":id,"heading":Vector2.RIGHT,"targets":PackedInt64Array([pair[1]])}})
-			elif id!="W25":semantics_start_trace(run,bridge,600.0)
+			elif id not in ["W25","T36"]:semantics_start_trace(run,bridge,1200.0 if post_mode and id=="W08" else 600.0)
 			if id=="W21":
 				run.combat.damage_enemy(pair[0],100.0,{"cause":&"shot","dir":Vector2.RIGHT,"no_crit":true,"knock":0.0})
 				bridge.command("dev_damage",{"entity_id":pair[1],"amount":100.0,"cause":"shot","direction":Vector2.RIGHT,"knock":0.0,"no_crit":true})
 			if id in ["T05","T33"]:
-				for n in (10 if id=="T05" else 150):
+				for n in (80 if post_mode and id=="T05" else (10 if id=="T05" else 150)):
 					run.loadout.kill_position=origin+Vector2(100,0);behavior.on_kill(&"shot")
-				bridge.command("dev_edit",{"kind":"equipment_seed","payload":{"id":id}})
+				for n in (8 if post_mode and id=="T05" else 1):bridge.command("dev_edit",{"kind":"equipment_seed","payload":{"id":id}})
 			if id=="T03":
 				run.combat.damage_enemy(pair[0],99.0,{"cause":&"debug","no_crit":true,"knock":0.0})
 				bridge.command("dev_damage",{"entity_id":pair[1],"amount":99.0,"cause":"debug","knock":0.0,"no_crit":true})
 			var iterations:=ceili(behavior.restore*120.0)+2 if id=="W05" else 300
-			var placed:=false
+			var placed:=false;var aligned_mines:=false;var observed_pending:=false
 			for tick in iterations:
+				if post_mode and id=="T36" and tick==120:semantics_start_trace(run,bridge,16.0)
+				if post_mode and id=="T04" and tick==25:
+					run.loadout.weapon_behaviors[&"W05"].block_damage(1.0,run.state.ship_pos);bridge.command("dev_ship_damage",{"amount":1.0,"cause":"bullet"})
 				if id=="W22" and not placed and not behavior.pending.is_empty():
 					semantics_spawn_pair(run,bridge,origin+Vector2(300,0));placed=true
 				run._play_tick(1.0/120.0)
 				var stepped:Dictionary=bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
 				if not stepped.ok or capture.count()>0:check(false,"固有命中の更新エラー %s/%d: %s"%[id,level,capture.messages()]);break
+				if post_mode and id=="W07" and not aligned_mines and not behavior.mines.is_empty():
+					var items:Array=bridge.read_frame().value.ui.mines.items
+					for n in behavior.mines.size():
+						behavior.mines[n].from=items[n].from;behavior.mines[n].to=items[n].to
+						behavior.mines[n].pos=items[n].from.lerp(items[n].to,1.0-pow(1.0-minf(1.0,behavior.mines[n].age/0.14),3.0))
+					aligned_mines=true
+				if post_mode and id=="W07" and not placed and not behavior.mines.is_empty() and behavior.mines[0].age>=0.14:
+					semantics_spawn_pair(run,bridge,behavior.mines[0].pos);placed=true
+				if post_mode and id=="W08":
+					if not placed and behavior.pulse>0.05:
+						for ring:Dictionary in behavior.frames:
+							if ring.age<0.4:continue
+							var candidate:Vector2=ring.pos+Vector2(0,behavior.wave_speed()*ring.age)
+							var ship_distance:=candidate.distance_to(run.state.ship_pos)
+							if ship_distance<150.0 or ship_distance>behavior.wave_speed()*behavior.wave_life()+run.state.ship_vel.length()*behavior.wave_life()-50.0:continue
+							var overlaps:=0
+							for other:Dictionary in behavior.frames:
+								if behavior.wave_speed()*other.age>2.0*1.82*config.character_scale and absf(candidate.distance_to(other.pos)-behavior.wave_speed()*other.age)<4.0*1.82*config.character_scale+definition.radius:overlaps+=1
+							if overlaps>=3:semantics_spawn_pair(run,bridge,candidate);placed=true;break
+					observed_pending=observed_pending or not behavior.pending.is_empty()
 				var values:=semantics_hit_values(run,bridge,id)
+				if post_mode and post_from=="T36" and level==3 and tick<163:continue
 				var found:String=comparison.semantics_difference(values[0],values[1])
 				check(found.is_empty(),"固有命中の指定許容幅 %s Lv%d tick%d: %s"%[id,level,tick,found])
 				if not found.is_empty():break
+				if post_mode and id=="T36" and level==3 and post_from=="T36" and tick==163:
+					var held:Dictionary=bridge.checkpoint()
+					var before:Dictionary=bridge._core.scatter_snapshot()
+					bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+					var after:Dictionary=bridge._core.scatter_snapshot()
+					check(held.ok and bridge.restore(held.value).ok and bridge._core.scatter_snapshot()==before,"境界で保持したW02経過時間を復元する")
+					bridge.step(1.0/120.0,bridge.pack_intent(intent),{"logical_size":Vector2(1280,720)})
+					check(bridge._core.scatter_snapshot()==after,"経過時間から次の射撃分岐を厳密に再現する")
+					bridge.restore(held.value)
+					bridge.release_checkpoint(held.value)
+			if post_mode and id=="W08":check(observed_pending,"音の輪の重なりから実際の遅延命中を数値照合する")
+			if post_mode and id=="W07":check(placed,"誘爆の実命中を数値照合する")
 			cases+=1;print("SEMANTICS_EQUIPMENT_HIT_CASE %s Lv%d failed=%d"%[id,level,failed])
 			run.dispose();bridge.dispose()
 			if failed:break
@@ -1265,11 +1332,15 @@ func semantics_hazard_values(run: RunSimulation, core) -> Array:
 	for row in ps.hazard_alive.size():
 		if not ps.hazard_alive[row]:continue
 		var value:={"pos":ps.hazard_pos[row],"angle":ps.hazard_angle[row],"time":ps.hazard_t[row],"delay":ps.hazard_delay[row],"active":ps.hazard_active[row],"damage":ps.hazard_dmg[row],"length":ps.hazard_len[row],"half_width":ps.hazard_width[row]*0.5}
+		if ps.hazard_kind[row]==ProjectileSystem.HazardKind.ZONE:
+			value.erase("angle");value.erase("half_width");value.radius=value.length;value.erase("length")
+		if ps.hazard_kind[row]==ProjectileSystem.HazardKind.BEAM:value.arc=ps.hazard_arc[row]
 		if ps.hazard_kind[row]==ProjectileSystem.HazardKind.WAVE:
 			value.radius=ps.wave_radius(row);value.start_radius=ps.hazard_start_radius[row];value.speed=ps.hazard_speed[row];value.arc=ps.hazard_arc[row];value.gap_angle=ps.hazard_gap[row]
 		source.append(value)
 	for row:Dictionary in core.hazards_snapshot():
-		var value:=semantics_fields(row,["pos","angle","time","delay","active","damage","length","half_width"])
+		var value:=semantics_fields(row,["pos","time","delay","active","damage","radius"] if row.kind==1 else ["pos","angle","time","delay","active","damage","length","half_width"])
+		if row.kind==0:value.arc=row.arc
 		if row.kind==2:value.merge(semantics_fields(row,["radius","start_radius","speed","arc","gap_angle"]))
 		actual.append(value)
 	return [source,actual]
@@ -1280,9 +1351,9 @@ func check_semantics_new_enemies() -> void:
 	probe.close()
 	var config:GameConfig=ContentManager.base.duplicate(true)
 	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
-	var types:=["pulser","dolphin","lynx","auriga","clock","reticle","cepheus","cepheus_soldier","ruler","triangle"]
+	var types:=["aquarius","cross","bomber","phoenix","aquila","crab","pump","corona","crow","splitter","defender","marlin"] if "--semantics-more-enemies" in OS.get_cmdline_user_args() else ["pulser","dolphin","lynx","auriga","clock","reticle","cepheus","cepheus_soldier","ruler","triangle"]
 	var definitions:={}
-	for id:String in types+["triangle_star"]:
+	for id:String in types+["triangle_star","cepheus","ruler","triangle"]:
 		var definition:EnemyDef=ContentManager.enemies[StringName(id)].duplicate(true);definition.size_var=false;definitions[StringName(id)]=definition
 	definitions[&"cepheus"].params.summon_time=0.1
 	definitions[&"cepheus"].params.reinforce_interval=1.0
@@ -1290,6 +1361,7 @@ func check_semantics_new_enemies() -> void:
 	definitions[&"ruler"].params.deploy_time=0.2
 	definitions[&"ruler"].params.telegraph=0.2
 	definitions[&"triangle"].params.move_time=0.2;definitions[&"triangle"].params.stop_time=0.1
+	if definitions.has(&"crow"):definitions[&"crow"].params.aim_spread=0.0
 	var stage:=RuntimeStage.new();stage.boss_enabled=false;stage.index=205;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(types)
 	var phase:=PhaseDef.new();phase.id=&"新敵の固有値";phase.pop_from=0;phase.pop_to=0;phase.rate=0;phase.attack_budget=0;stage.phases=[phase]
 	var output:="res://.content/dev/semantics_new_enemies"
@@ -1363,7 +1435,11 @@ func check_semantics_attack_values() -> void:
 	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_206.json")))
 	var bytes:=FileAccess.get_file_as_bytes(index.binary)
 	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
-	var cases:=0;var kinds:=["bullet","missile","wave","beam","wall","slash","bolt","reflected"]
+	var more_mode:="--semantics-more-attack-values" in OS.get_cmdline_user_args()
+	var first_tick:=0
+	for arg:String in OS.get_cmdline_user_args():
+		if arg.begins_with("--semantics-attack-tick="):first_tick=int(arg.trim_prefix("--semantics-attack-tick="))
+	var cases:=0;var kinds:=["light_arrow","star_bolt","ring_hold","lump","zone","cross","flood","shell","fling_corpse","saw"] if more_mode else ["bullet","missile","wave","beam","wall","slash","bolt","reflected"]
 	var from_kind:=""
 	for arg:String in OS.get_cmdline_user_args():
 		if arg.begins_with("--semantics-attack-from="):from_kind=arg.trim_prefix("--semantics-attack-from=")
@@ -1378,7 +1454,40 @@ func check_semantics_attack_values() -> void:
 		var source_pos:=origin-Vector2(100,0)
 		var source:=[] if kind=="reflected" else semantics_spawn_pair(run,bridge,source_pos)
 		var hazard:=-1
+		if more_mode and kind not in ["zone","cross","flood"]:
+			run.state.ship_pos=origin+Vector2(0,300);bridge.command("dev_ship_motion",{"position":run.state.ship_pos,"velocity":Vector2(100,0)})
 		match kind:
+			"light_arrow":
+				run.projectiles.emit_attack(&"light_arrow",[origin,0.0,100.0,12.0,400.0,8.0,false,60.0])
+				check(bridge.command("dev_fire_light_arrow",{"position":origin,"angle":0.0,"speed":100.0,"radius":12.0,"travel":400.0,"damage":8.0,"length":60.0,"owner_id":source[1]}).ok,"光矢の固定入力を生成する")
+			"star_bolt":
+				run.projectiles.emit_attack(&"star_bolt",[origin,PI*0.5,100.0,8.0])
+				check(bridge.command("dev_fire_star_bolt",{"position":origin,"angle":PI*0.5,"speed":100.0,"damage":8.0,"owner_id":source[1]}).ok,"星弾の固定入力を生成する")
+			"ring_hold":
+				run.projectiles.fire_ring_hold(source[0],4,100.0,0.25,100.0,8.0)
+				check(bridge.command("dev_fire_ring_hold",{"source_id":source[1],"count":4,"radius":100.0,"wait":0.25,"speed":100.0,"damage":8.0}).ok,"待機輪の固定入力を生成する")
+			"lump":
+				run.projectiles.fire_lump(source[0],PI*0.5,100.0,18.0,10.0)
+				check(bridge.command("dev_fire_lump",{"source_id":source[1],"angle":PI*0.5,"speed":100.0,"radius":18.0,"damage":10.0}).ok,"塊の固定入力を生成する")
+			"zone":
+				run.projectiles.fire_zone(origin,80.0,0.2,8.0)
+				check(bridge.command("dev_fire_zone",{"position":origin,"radius":80.0,"delay":0.2,"damage":8.0}).ok,"円の固定入力を生成する")
+			"cross":
+				run.projectiles.fire_cross(origin-Vector2(100,0),0.0,200.0,32.0,0.2,0.3,8.0)
+				check(bridge.command("dev_fire_cross",{"position":origin-Vector2(100,0),"angle":0.0,"length":200.0,"width":32.0,"delay":0.2,"active":0.3,"damage":8.0}).ok,"十字の固定入力を生成する")
+			"flood":
+				run.projectiles.fire_flood(origin-Vector2(100,0),0.0,200.0,32.0,0.2,0.2,0.3,8.0)
+				check(bridge.command("dev_fire_flood",{"position":origin-Vector2(100,0),"angle":0.0,"length":200.0,"width":32.0,"spread":0.2,"delay":0.2,"active":0.3,"damage":8.0}).ok,"水流の固定入力を生成する")
+			"shell":
+				run.projectiles.fire_shell(source[0],0.0,100.0,12.0,80.0,80.0,8.0)
+				check(bridge.command("dev_fire_shell",{"source_id":source[1],"angle":0.0,"speed":100.0,"radius":12.0,"range":80.0,"burst":80.0,"damage":8.0}).ok,"圧縮弾の固定入力を生成する")
+			"fling_corpse":
+				run.combat.kill_enemy(source[0],{"cause":&"debug"});bridge.command("dev_kill",{"entity_id":source[1],"cause":"debug"})
+				run.projectiles.fling_corpse(source[0],Vector2(100,0),2.0,1.5,0.0,0.5)
+				check(bridge.command("dev_fling_corpse",{"source_id":source[1],"velocity":Vector2(100,0),"damage":2.0,"radius_mult":1.5,"knock_mult":0.0,"life_mult":0.5}).ok,"死体弾の固定入力を生成する")
+			"saw":
+				run.projectiles.fire_saw(origin,Vector2(100,0),18.0,2.0,1.2)
+				check(bridge.command("dev_fire_saw",{"position":origin,"velocity":Vector2(100,0),"radius":18.0,"damage":2.0,"life":1.2}).ok,"丸鋸の固定入力を生成する")
 			"bullet","missile":
 				run.projectiles.fire_enemy(source[0],0.0,600.0,StringName(kind),{"bullet_dmg":7.0,"slow":0.3,"missile_turn":0.0})
 				var params:={"source_id":source[1],"angle":0.0,"speed":600.0,"damage":7.0,"slow":0.3}
@@ -1412,15 +1521,28 @@ func check_semantics_attack_values() -> void:
 				run.projectiles._update_friendly(0.5);core.step_projectiles(0.5)
 		var checked_geometry:=false
 		for tick in (8 if kind not in ["slash","bolt"] else 1):
-			if kind in ["wave","beam","wall"]:
+			if kind in ["fling_corpse","saw"]:
+				run.projectiles._update_friendly(0.1);core.step_projectiles(0.1)
+			elif kind in ["wave","beam","wall","zone","cross","flood"]:
 				run.projectiles._update_hazards(0.1);core.step_hazards(0.1)
 			else:
 				run.projectiles._update_hostile(0.1);core.step_hostiles(0.1)
 			if capture.count()>0:check(false,"攻撃の更新エラー %s: %s"%[kind,capture.messages()]);break
 			var source_values:={"hp":run.state.ship_hp,"velocity":run.state.ship_vel,"shield_t":run.state.ship_shield_t}
 			var actual_values:={"hp":core.ship_snapshot().ship_hp,"velocity":core.ship_snapshot().ship_vel,"shield_t":core.ship_snapshot().ship_shield_t}
-			if kind in ["wave","beam","wall"]:
+			if kind in ["wave","beam","wall","zone","cross","flood","shell"]:
 				var hazards:=semantics_hazard_values(run,core);source_values.hazards=hazards[0];actual_values.hazards=hazards[1]
+			if more_mode and kind not in ["zone","cross","flood"]:
+				var old:=[];var current:=[];var ps:=run.projectiles
+				if kind in ["fling_corpse","saw"]:
+					for row in ps.friend_alive.size():
+						if ps.friend_alive[row]:old.append({"pos":ps.friend_pos[row],"vel":ps.friend_vel[row],"radius":ps.friend_r[row],"damage":ps.friend_dmg[row],"life":ps.friend_life[row],"knock":ps.friend_knock[row]})
+					for shot:Dictionary in core.projectiles_snapshot():current.append(semantics_fields(shot,["pos","vel","radius","damage","life","knock"]))
+				else:
+					for row in ps.hostile_alive.size():
+						if ps.hostile_alive[row]:old.append({"pos":ps.hostile_pos[row],"vel":ps.hostile_vel[row],"life":float(ps.hostile_life[row]),"wait":maxf(0.0,float(ps.hostile_wait[row]))})
+					for shot:Dictionary in core.hostiles_snapshot():current.append(semantics_fields(shot,["pos","vel","life","wait"]))
+				source_values.shots=old;actual_values.shots=current
 			if kind in ["slash","bolt","reflected"]:
 				var life:=[];var actual_life:=[]
 				for row in run.projectiles.hostile_alive.size():
@@ -1441,6 +1563,7 @@ func check_semantics_attack_values() -> void:
 					var at:=origin+Vector2(0,10);points=[at-Vector2(0,34),at+Vector2(0,6)]
 					if frame.shapes.size()>0:rendered=Array(frame.shapes[0].points.slice(0,2))
 				source_values.points=points;actual_values.points=rendered;checked_geometry=true
+			if kind==from_kind and tick<first_tick:continue
 			var found:String=comparison.semantics_difference(source_values,actual_values)
 			if not found.is_empty():print("ATTACK_DIFFERENCE ",source_values,actual_values," HOSTILES=",core.hostiles_snapshot())
 			check(found.is_empty(),"攻撃の指定許容幅 %s tick%d: %s"%[kind,tick,found])
@@ -1451,6 +1574,16 @@ func check_semantics_attack_values() -> void:
 			run.projectiles._update_hostile(0.1);core.step_hostiles(0.1)
 			var found:String=comparison.semantics_difference(run.state.ship_hp,core.ship_snapshot().ship_hp)
 			check(found.is_empty() and run.state.ship_hp<config.base_hp,"爪痕/光弾の実命中HP %s: %s"%[kind,found])
+		if not failed and more_mode and kind in ["light_arrow","star_bolt","ring_hold","lump"]:
+			var row:=0
+			while row<run.projectiles.hostile_alive.size() and not run.projectiles.hostile_alive[row]:row+=1
+			if row>=run.projectiles.hostile_alive.size():check(false,"実命中の対象となる飛行中の弾が残る")
+			else:
+				var at:Vector2=run.projectiles.hostile_pos[row]+run.projectiles.hostile_vel[row]*0.1
+				run.state.ship_pos=at;bridge.command("dev_ship_motion",{"position":at,"velocity":run.state.ship_vel})
+				run.projectiles._update_hostile(0.1);core.step_hostiles(0.1)
+				var found:String=comparison.semantics_difference(run.state.ship_hp,core.ship_snapshot().ship_hp)
+				check(found.is_empty() and run.state.ship_hp<config.base_hp,"追加攻撃の実命中HP %s: %s"%[kind,found])
 		cases+=1;print("SEMANTICS_ATTACK_CASE %s geometry=%s failed=%d"%[kind,checked_geometry,failed]);run.dispose();bridge.dispose()
 		if failed:break
 	OS.remove_logger(capture);check(capture.count()==0,"攻撃のSource/C++に実行エラーがない")
@@ -1554,7 +1687,8 @@ func check_semantics_hero_special() -> void:
 	var cases:=0;var from_id:=""
 	for arg:String in OS.get_cmdline_user_args():
 		if arg.begins_with("--semantics-hero-from="):from_id=arg.trim_prefix("--semantics-hero-from=")
-	var ids:=["gemini","hercules","perseus"]
+	var end_hold:="--semantics-hero-end-hold" in OS.get_cmdline_user_args()
+	var ids:=["perseus"] if end_hold else ["gemini","hercules","perseus"]
 	for id:String in ids:
 		if not from_id.is_empty() and ids.find(id)<ids.find(from_id):continue
 		var run:=semantics_legacy(config,stage,definitions,79)
@@ -1592,13 +1726,100 @@ func check_semantics_hero_special() -> void:
 				actual={"falls":native_falls,"burns":native_burns,"fire_t":fire.fire_time,"burn_tick":fire.burn_tick,"hp":bridge._core.enemies_snapshot()[0].hp}
 			else:
 				run.bosses.tick(0.1,0.0);bridge._core.step(0.1);bridge.command("set_ui_overlay",{"active":false})
-				expected.stun=run.state.boss_stun;actual.stun=bridge.read_frame().value.ui.hero.boss_stun
+				# 付録A/設計19.4。次の間隔へ使わない残り時間は0で止める。
+				expected.stun=maxf(0.0,run.state.boss_stun);actual.stun=bridge.read_frame().value.ui.hero.boss_stun
+			if end_hold:continue
 			if id=="hercules" and "--semantics-hero-from=hercules" in OS.get_cmdline_user_args() and tick<1:continue
 			if capture.count()>0:check(false,"英雄固有値の更新エラー %s tick%d: %s"%[id,tick,capture.messages()]);break
 			var found:String=comparison.semantics_difference(expected,actual)
 			check(found.is_empty(),"英雄固有値の指定許容幅 %s tick%d: %s"%[id,tick,found])
 			if not found.is_empty():break
+		if end_hold:
+			var held:Dictionary=bridge.checkpoint()
+			check(bridge.read_frame().value.ui.hero.boss_stun==0.0 and held.ok,"採用済みの0止めでボス停止を終え、その値を保持する")
+			var expected:Dictionary=semantics_observe(bridge)
+			bridge._core.step(0.1)
+			check(bridge.restore(held.value).ok and semantics_observe(bridge)==expected,"ボス停止の終端から負の時間を作らず復元する")
+			bridge.release_checkpoint(held.value)
 		cases+=1;print("SEMANTICS_HERO_SPECIAL_CASE %s failed=%d"%[id,failed]);run.dispose();bridge.dispose()
 		if failed:break
 	OS.remove_logger(capture);check(capture.count()==0,"英雄固有値のSource/C++に実行エラーがない")
 	print("SEMANTICS_HERO_SPECIAL ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
+
+func check_semantics_enemy_support() -> void:
+	var probe=COMPARE.new().create_native()
+	if probe==null:check(false,"敵の支援と反乱のC++拡張を読む");return
+	probe.close()
+	var config:GameConfig=ContentManager.base.duplicate(true)
+	config.start_radius=900;config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
+	var definitions:={}
+	for id in [&"reticle",&"telescope",&"cepheus",&"cepheus_soldier"]:
+		definitions[id]=ContentManager.enemies[id].duplicate(true);definitions[id].size_var=false
+	definitions[&"reticle"].speed=0;definitions[&"telescope"].speed=0
+	definitions[&"reticle"].params.aim_time=0.2;definitions[&"reticle"].params.break_interval=0.3;definitions[&"reticle"].params.small_r=90.0
+	definitions[&"cepheus"].speed=0;definitions[&"cepheus"].params.summon_time=0.1;definitions[&"cepheus"].params.reinforce_interval=100.0
+	definitions[&"cepheus_soldier"].armor=0
+	var stage:=RuntimeStage.new();stage.boss_enabled=false;stage.index=208;stage.resources=StageResources.new();stage.resources.enemy_ids=PackedStringArray(["reticle","telescope","cepheus"])
+	var output:="res://.content/dev/semantics_enemy_support"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"設計15.1支援と反乱の固有値".sha256_text(),definitions)!=OK:check(false,"支援と反乱の定義を生成する");return
+	var index:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_208.json")));var bytes:=FileAccess.get_file_as_bytes(index.binary)
+	var comparison=COMPARE.new();var capture=load("res://tests/equipment_effects.gd").ErrorCapture.new();OS.add_logger(capture)
+	var cases:=0
+	for kind in ["reticle","mutiny"]:
+		if kind=="reticle" and "--semantics-support-mutiny-only" in OS.get_cmdline_user_args():continue
+		var run:=semantics_legacy(config,stage,definitions,83)
+		run.field.bodies.clear();run.field.moons.clear();run.field.planet.pos=Vector2(1e7,1e7);run.field.planet.r=0;run.field.refresh_bodies();run.enemies._next_id=1;run.state.enemy_aim=run.state.ship_pos
+		var bridge=semantics_bridge(bytes,83)
+		if bridge==null:check(false,"支援と反乱のC++ランを開始する");run.dispose();OS.remove_logger(capture);return
+		var core=bridge._core;core.configure_attack_budget({"enabled":false})
+		var origin:=run.state.ship_pos;var primary:=-1;var native_primary:=-1
+		if kind=="reticle":
+			var tel:=origin-Vector2(600,0)
+			var old:=run.enemies.spawn(run.enemies.def_of(&"telescope"),tel,{"facing":0.0});var id:int=core.spawn_enemy(&"telescope",tel,{"facing":0.0})
+			run.enemies.table.held[old]=1;core.set_enemy_motion(id,{"held":true})
+			primary=run.enemies.spawn(run.enemies.def_of(&"reticle"),tel+Vector2(-30,-150),{"facing":0.0});native_primary=core.spawn_enemy(&"reticle",tel+Vector2(-30,-150),{"facing":0.0})
+			var rock:=FieldSystem.Rock.new();rock.kind=&"belt";rock.pos=origin-Vector2(220,0);rock.size=40.0;rock.lab_manual=true;run.field.rocks.append(rock)
+			run.field.gimmick(&"meteors")._stream_rocks(0.3)
+			bridge.command("dev_add_rock",{"position":rock.pos,"kind":0,"manual":true,"size":40.0,"facing":0.0,"spin":0.0})
+			bridge.command("dev_stream_rocks",{"center":origin,"half":Vector2(640,360),"dt":0.3})
+		else:
+			primary=run.enemies.spawn(run.enemies.def_of(&"cepheus"),origin-Vector2(400,0),{"facing":0.0});native_primary=core.spawn_enemy(&"cepheus",origin-Vector2(400,0),{"facing":0.0})
+		var beam_count:=0;var damaged:=false;var native_events:=[]
+		bridge.subscribe("支援の値",func(packet):native_events.append_array(packet.events);return true)
+		for tick in 32:
+			if kind=="mutiny" and tick==4:
+				run.combat.damage_enemy(primary,run.enemies.table.hp[primary],{"cause":&"shot","no_crit":true,"knock":0.0})
+				bridge.command("dev_kill",{"entity_id":native_primary,"cause":"shot"})
+				# 反乱開始時の乱数で選ばれた時刻を固定し、以後の射撃・HPをSourceと比較する。
+				for row in run.enemies.table.alive.size():
+					if run.enemies.table.alive[row] and run.enemies.table.type[row]==&"cepheus_soldier":
+						var native:Dictionary=core.enemy_motion_snapshot().filter(func(v):return v.id==run.enemies.table.id[row])[0]
+						run.enemies.table.timer[row]=native.timer;run.enemies.table.fire_t[row]=native.fire_t
+			run.state.events.clear();native_events.clear()
+			run.state.time+=0.05;run.state.world_time+=0.05;run.enemies.tick(0.05,0.05);core.step(0.05);bridge.command("set_ui_overlay",{"active":false})
+			if kind=="reticle" and "--semantics-support-reticle-tail" in OS.get_cmdline_user_args() and tick<5:continue
+			if capture.count()>0:check(false,"支援と反乱の更新エラー %s tick%d: %s"%[kind,tick,capture.messages()]);break
+			var expected:=[];var actual:=[]
+			for row in run.enemies.table.alive.size():
+				if run.enemies.table.alive[row] and run.enemies.table.type[row] in ([&"reticle"] if kind=="reticle" else [&"cepheus_soldier"]):
+					expected.append({"id":run.enemies.table.id[row],"hp":run.enemies.table.hp[row],"facing":run.enemies.table.facing[row],"timer":run.enemies.table.timer[row],"fire_t":run.enemies.table.fire_t[row],"charge":run.enemies.table.charge[row]})
+			for row:Dictionary in core.enemies_snapshot():
+				if row.type in (["reticle"] if kind=="reticle" else ["cepheus_soldier"]):
+					var motion:Dictionary=core.enemy_motion_snapshot().filter(func(v):return v.id==row.id)[0]
+					actual.append({"id":row.id,"hp":row.hp,"facing":row.facing,"timer":motion.timer,"fire_t":motion.fire_t,"charge":motion.charge})
+			var old_beams:=[];var new_beams:=[]
+			for event:Dictionary in run.state.events:
+				if event.type==&"beam":old_beams.append(semantics_fields(event,["from","to","width","life"]))
+			for event:Dictionary in native_events:
+				if event.type==&"beam":new_beams.append(semantics_fields(event.payload,["from","to","width","life"]))
+			beam_count+=old_beams.size()
+			var found:String=comparison.semantics_difference({"enemies":expected,"beams":old_beams},{"enemies":actual,"beams":new_beams})
+			check(found.is_empty(),"支援と反乱の指定許容幅 %s tick%d: %s"%[kind,tick,found])
+			if not found.is_empty():break
+			for value:Dictionary in expected:damaged=damaged or value.hp<run.enemies.def_of(&"cepheus_soldier").hp
+		check(beam_count>0,"支援と反乱の実際の発射を数値照合する: "+kind)
+		if kind=="mutiny":check(damaged,"反乱の35%ダメージを実HPで数値照合する")
+		cases+=1;print("SEMANTICS_SUPPORT_CASE %s beams=%d failed=%d"%[kind,beam_count,failed]);run.dispose();bridge.dispose()
+		if failed:break
+	OS.remove_logger(capture);check(capture.count()==0,"支援と反乱のSource/C++に実行エラーがない")
+	print("SEMANTICS_ENEMY_SUPPORT ",JSON.stringify({"cases":cases,"numeric_values":comparison.semantics_numeric_values,"f64_absolute_error_max":comparison.semantics_f64_error,"vector_error_max":comparison.semantics_vector_error,"failed":failed}))
