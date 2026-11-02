@@ -22,6 +22,21 @@ func _ready() -> void:
 		return
 
 
+	if "--cpp-friendly-angle-fix" in OS.get_cmdline_user_args():
+		mute_checks = true
+		var ready: bool = await prepare_cpp_attack(96,"friendly_angle")
+		mute_checks = false
+		check(ready,"回転の前角度を確認するランを準備する")
+		if ready:
+			cpp_bridge.command("dev_fire_saw",{"position":cpp_origin,"velocity":Vector2(500,0),"radius":18.0,"damage":10.0,"life":1.0})
+			cpp_core.step_projectiles(0.1)
+			cpp_bridge.step(1.0/120.0,cpp_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+			var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-500,1500,1000),0.0).value
+			check(frame.shapes.any(func(s): return s.kind==ENUMS.RenderShapeKind.FriendHull and s.saw and is_equal_approx(s.angle,1.4)),"回転する味方弾は描画補間の前角度にもangleを保持する")
+			cpp_session.free()
+		print("[cpp_friendly_angle] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-friend-hull" in OS.get_cmdline_user_args():
 		await check_cpp_friend_hull()
 		print("[cpp_friend_hull] failed=%d" % failed)

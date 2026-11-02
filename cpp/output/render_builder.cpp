@@ -55,7 +55,7 @@ void RenderBuilder::capture_previous(RunRuntime &run) {
     previous.enemies.resize(state.enemies.size());
     for (size_t i=0;i<state.enemies.size();++i) {const auto &enemy=state.enemies[i];previous.enemies[i]={enemy.alive?enemy.id:0,enemy.pos,enemy.facing};}
     previous.friendly.resize(state.friends.size());
-    for (size_t i=0;i<state.friends.size();++i) {const auto &shot=state.friends[i];previous.friendly[i]={shot.alive?shot.id:0,shot.pos,shot.vel.angle()};}
+    for (size_t i=0;i<state.friends.size();++i) {const auto &shot=state.friends[i];previous.friendly[i]={shot.alive?shot.id:0,shot.pos,shot.kind==int64_t(FriendKind::Shot)?double(shot.vel.angle()):double(shot.angle)};}
 }
 Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     const auto &state=run.state;const auto &config=run.content->config;const auto &previous=state.previous_poses;
