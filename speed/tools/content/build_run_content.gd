@@ -1089,7 +1089,53 @@ static func encounter_records(data: Dictionary, profile: Dictionary, enemy_ids: 
 			data.EncounterRegion.append({"id":data.EncounterRegion.size()+1,"pattern":row.id,"enemy":enemy_ids.find(type)+1,"x":float(region.pos[0]),"y":float(region.pos[1]),"angle":float(region.get("angle",0.0)),"jitter":float(region.get("jitter",0.0)),"min_count":minimum,"max_count":clampi(int(region.get("max_count",1)),minimum,100),"fodder":region.get("role","avoid")=="fodder","elite":bool(region.get("elite",false))})
 	return OK
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = []) -> Error:
+## 実験場のボスも、個別制作で使う型付きパッケージを同じ表へ加える。
+static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definitions: Dictionary, config: GameConfig, stage: RuntimeStage) -> Error:
+	var ids := definitions.keys()
+	ids.sort()
+	for id in ids:
+		var package := boss_package(definitions[id],config,stage)
+		if package.is_empty(): return ERR_UNAVAILABLE
+		var source: Dictionary = package.records
+		var maps := {"EnemyRecord":{}}
+		for body: Dictionary in source.BossBodyDefinition:
+			var enemy: Dictionary = source.EnemyRecord[body.enemy-1].duplicate(true)
+			var index: int = data.EnemyRecord.size()+1
+			maps.EnemyRecord[enemy.id] = index
+			enemy.id = index
+			enemy.visual_id = data.EnemyRecord[0].visual_id
+			data.EnemyRecord.append(enemy)
+			data.StringEntry.append({"id":index,"value":String(id)})
+			data.DefinitionIndex.append({"id":index,"enemy":index})
+			data.PopulationType.append({"id":data.PopulationType.size()+1,"enemy":index,"rank":5,"maximum":1,"ranged":false})
+			var hull: Dictionary = source.FriendHullLook[0].duplicate(true)
+			hull.id = data.FriendHullLook.size()+1
+			hull.enemy = index
+			data.FriendHullLook.append(hull)
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not String(record.name).begins_with("Boss"): continue
+			maps[record.name] = {}
+			for row: Dictionary in source[record.name]: maps[record.name][row.id] = data[record.name].size()+maps[record.name].size()+1
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not String(record.name).begins_with("Boss"): continue
+			for original: Dictionary in source[record.name]:
+				var row := original.duplicate(true)
+				row.id = maps[record.name][row.id]
+				for field: Dictionary in record.fields:
+					if field.has("ref"): row[field.name] = maps[field.ref][row[field.name]]
+				if record.name=="BossFlowNode":
+					if row.technique>0: row.technique = maps.BossTechniqueDefinition[row.technique]
+					if row.condition>0: row.condition = maps.BossFlowCondition[row.condition]
+				data[record.name].append(row)
+		for original: Dictionary in package.visuals:
+			if not original.has("boss") and original.role!=Schema.ENUMS.VisualRole.BossFinish: continue
+			var visual := original.duplicate(true)
+			visual.id = data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":visual.id,"role":visual.role})
+			visuals.append(visual)
+	return OK
+
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
@@ -1467,6 +1513,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 
 	var encounter_error := encounter_records(data,encounter_profile,enemy_ids)
 	if encounter_error!=OK: return encounter_error
+	var bosses_error := append_bosses(data,visuals,boss_definitions,config,stage)
+	if bosses_error!=OK: return bosses_error
 	var source_sha256 := input_sha256
 	var paths := stage.resources.paths.duplicate()
 	paths.append("res://.content/meteor_pieces.res")

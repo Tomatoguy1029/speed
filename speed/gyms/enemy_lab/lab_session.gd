@@ -15,6 +15,8 @@ var bridge: RefCounted
 var last_error := {}
 var _source: RuntimeStage
 var _definitions := {}
+var _boss_definitions := {}
+var _baseline_bosses := {}
 var _config: GameConfig
 var _output := ""
 var _formation_sources: Array = []
@@ -98,6 +100,7 @@ func reset(settings := {}) -> void:
 	_baseline_config = ContentManager.base.duplicate(true)
 	_baseline_stage = ContentManager.stage(int(spec.get("stage",1))).duplicate(true)
 	_baseline_definitions = ContentManager.enemies.duplicate(true)
+	_baseline_bosses = ContentManager.bosses.duplicate(true)
 	baseline = FORMAT.baseline()
 	furthest = 0
 	await _rebuild()
@@ -139,10 +142,23 @@ func _rebuild() -> void:
 		if not BUILDER.chase_package(definition,_config,_source).is_empty():
 			_definitions[id] = definition
 			_source.resources.enemy_ids.append(String(id))
+	_boss_definitions = {}
+	for id in _baseline_bosses:
+		var boss: BossDef = _baseline_bosses[id].duplicate(true)
+		for key in spec.get("boss_overrides",{}).get(String(id),{}):
+			if key=="params":
+				for param in spec.boss_overrides[String(id)].params: boss.params[param] = safe_parameter(param,spec.boss_overrides[String(id)].params[param])
+			else: boss.set(key,spec.boss_overrides[String(id)][key])
+		if not BUILDER.boss_package(boss,_config,_source).is_empty(): _boss_definitions[id] = boss
+	for id in spec.get("boss_overrides",{}):
+		if not _boss_definitions.has(StringName(id)):
+			last_error = {"ok":false,"message":"このボスの編集はまだ移行していません: "+String(id)}
+			run = null
+			return
 	# 未移行種類は配置時に失敗として返す。旧ランで補完しない。
 	_formation_sources = []
 	_output = "res://.content/dev/lab_%d_%d" % [OS.get_process_id(),get_instance_id()]
-	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions)
+	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions)
 	if built!=OK:
 		last_error = {"ok":false,"message":"実験の定義を生成できません: "+error_string(built)}
 		run = null
@@ -162,7 +178,7 @@ func _rebuild() -> void:
 	run = PROJECTION.new()
 	run.cfg = _config
 	run.enemies.data.definitions = _definitions
-	run.bosses.definitions = ContentManager.bosses.duplicate(true)
+	run.bosses.definitions = _boss_definitions
 	run.state.data.stage = stage
 	run.input = scene.cpp_input_source.get_object()
 	bridge.subscribe("実験の履歴",_consume_frame)
@@ -354,6 +370,16 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			_refresh_projection()
 			_selected_row = row_for_id(_selected_id)
 			return {"ok":true}
+		"boss":
+			var id := StringName(args.get("type","hydra"))
+			if not _boss_definitions.has(id): return {"ok":false,"message":"このボスはまだ移行していません: "+String(id)}
+			var ids := _boss_definitions.keys()
+			ids.sort()
+			for k in clampi(int(args.get("count",1)),1,32):
+				var result: Dictionary = bridge.command("dev_spawn_boss",{"definition":ids.find(id)+1,"position":vector(args.get("pos",[0,0]))+Vector2(k*400,0),"entrance":false})
+				if not result.ok: return result
+				_selected_id = result.value
+			return {"ok":true}
 		"delete": return bridge.command("dev_remove",{"entity_id":int(args.get("id",-1))})
 		"clear":
 			for id in run.enemies.table.id:
@@ -367,7 +393,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			if source.is_empty(): return {"ok":false,"message":"配置の形式が不正です"}
 			var next_sources := _formation_sources.duplicate(true)
 			next_sources.append(source)
-			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources)
+			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources,_boss_definitions)
 			if built!=OK: return {"ok":false,"message":"配置の定義を生成できません"}
 			var bundle := _read_generated()
 			if bundle.is_empty(): return {"ok":false,"message":"配置の生成物を読み込めません"}
@@ -430,7 +456,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			var result: Dictionary = bridge.command("dev_edit",{"kind":"schedule","payload":{"entries":entries}})
 			if result.ok: schedule = args.get("entries",[]).duplicate(true)
 			return result
-		"parameter","armor_paint","config": return _edit_definition(args,kind)
+		"parameter","armor_paint","config","boss_parameter","boss_appearance": return _edit_definition(args,kind)
 		"loadout":
 			if args.get("reset",false):
 				for item in [["weapon",run.state.weapons],["trait",run.state.traits]]:
@@ -446,7 +472,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			for id in args.ids:
 				if not ContentManager.phases.has(StringName(id)): return {"ok":false,"message":"時間帯の定義がありません"}
 				next.phases.append(ContentManager.phases[StringName(id)].duplicate(true))
-			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources)
+			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources,_boss_definitions)
 			if built!=OK: return {"ok":false,"message":"時間帯の定義を生成できません"}
 			var bundle := _read_generated()
 			if bundle.is_empty(): return {"ok":false,"message":"時間帯の生成物を読み込めません"}
@@ -471,12 +497,26 @@ func _read_generated() -> Dictionary:
 
 func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	var next := _definitions.duplicate(true)
+	var bosses := _boss_definitions.duplicate(true)
 	var config := _config.duplicate(true) as GameConfig
 	var type := StringName(args.get("type",""))
 	var key := String(args.get("key",""))
 	if kind=="config":
 		if key not in ["base_attack","base_max_speed","draw_length","draw_confirm_delay","draw_time_scale","trace_radius","boss_hp","boss_armor"]: return {"ok":false}
 		config.set(key,maxf(0.001,float(args.get("value",0.0))))
+	elif kind in ["boss_parameter","boss_appearance"]:
+		if kind=="boss_parameter" and (not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT,TYPE_BOOL]): return {"ok":false}
+		if not bosses.has(type): return {"ok":false,"message":"このボスの編集はまだ移行していません"}
+		var definition: BossDef = bosses[type]
+		if kind=="boss_appearance":
+			if not BossDef.valid_part_appearance(args.get("parts")): return {"ok":false}
+			definition.part_appearance = args.parts.duplicate(true)
+		elif key.begins_with("params.") and definition.params.has(key.trim_prefix("params.")):
+			definition.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."),args.get("value",0))
+		elif key in ["speed","radius","accel","turn","xp","weak_arc","hitstop_multiplier"]:
+			definition.set(key,maxf(0.0 if key=="hitstop_multiplier" else 0.01,float(args.get("value",0))))
+		else: return {"ok":false}
+
 	else:
 		if not next.has(type): return {"ok":false}
 		var definition: EnemyDef = next[type]
@@ -494,15 +534,17 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		elif key in ["hp","toughness","armor","speed","radius","accel","turn","xp","weak_arc","attack_weight","hitstop_multiplier"]:
 			definition.set(key,clampi(int(args.value),-1,1) if key=="toughness" else maxf(0.01 if key in ["hp","radius"] else 0.0,float(args.value)))
 		else: return {"ok":false}
-	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources)
+	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources,bosses)
 	if built!=OK: return {"ok":false,"message":"編集の定義を生成できません"}
 	var path := _output.path_join("stage_%d.json" % _source.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var bundle: Dictionary = LOADER.read_bundle(path,index.input_sha256)
 	if bundle.is_empty(): return {"ok":false,"message":"編集の定義を読み込めません"}
-	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "parameter")
+	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "boss_parameter" if kind in ["boss_parameter","boss_appearance"] else "parameter")
 	if result.ok:
 		_definitions = next
+		_boss_definitions = bosses
+		run.bosses.definitions = bosses
 		_config = config
 		run.cfg = config
 		run.enemies.data.definitions = next
@@ -572,6 +614,7 @@ func seek(target: int, instant := false) -> void:
 			_restore_seek_view()
 			return
 		_definitions = run.enemies.data.definitions
+		_boss_definitions = run.bosses.definitions
 		_config = run.cfg
 		_source = item.source
 		_formation_sources = item.get("formation_sources",[]).duplicate(true)
@@ -684,12 +727,6 @@ func _cache_current() -> void:
 func definition_for_row(row: int) -> Resource:
 	var t = run.enemies.table
 	return run.bosses.definitions.get(t.type[row]) if t.is_boss[row] else t.def[row]
-
-func _edit_boss_appearance(_args: Dictionary) -> void:
-	last_error = {"ok":false,"message":"このボスの外観編集はまだ移行していません"}
-
-func _edit_boss_definition(_args: Dictionary) -> void:
-	last_error = {"ok":false,"message":"このボスの定義編集はまだ移行していません"}
 
 static func safe_parameter(key: String, value):
 	if value is bool: return value

@@ -11,6 +11,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-boss" in OS.get_cmdline_user_args():
+		await cpp_lab_boss()
+		print("[cpp_lab_boss] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab-settings" in OS.get_cmdline_user_args():
 		await cpp_lab_settings()
 		print("[cpp_lab_settings] passed=%d failed=%d" % [passed,failed])
@@ -309,4 +314,32 @@ func cpp_lab_settings() -> void:
 	check(first.bridge.restore(held.value).ok and first.bridge.read_lab().value.hero.power=="hercules" and first.bridge.read_lab().value.meta_levels[2]==2,"保持点へ英雄と永続強化を復元する")
 	first.bridge.release_checkpoint(held.value)
 	for lab in [first,second]: lab.queue_free()
+	await get_tree().process_frame
+
+func cpp_lab_boss() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"empty":true,"boss_overrides":{"monoceros":{"speed":21.0}}})
+	check(lab.run!=null and lab.last_error.get("ok",false),"ボス上書きを通常の生成形式へ通して開始する: "+str(lab.last_error))
+	if lab.run==null: return
+	check(lab.perform("boss",{"type":"monoceros","pos":[700,0]}),"型付き本体とフローからボスを配置する")
+	if lab.selected<0: lab.queue_free(); return
+	var id: int = lab.run.enemies.table.id[lab.selected]
+	var tick: int = lab.tick
+	check(lab.run.enemies.table.is_boss[lab.selected] and lab.run.enemies.table.speed[lab.selected]==21.0,"ボスの論理IDと開始時上書きを読み取る")
+	check(lab.perform("boss_parameter",{"type":"monoceros","key":"speed","value":42.0}) and lab.run.enemies.table.speed[lab.row_for_id(id)]==42.0 and lab.tick==tick,"生存中のボスも同じtickで定義を置換する")
+	await lab.undo_edit()
+	check(lab.run.enemies.table.speed[lab.row_for_id(id)]==21.0 and lab.tick==tick,"ボスの値の取消は時計を戻さない")
+	var old: Dictionary = lab.run.bosses.definitions[&"monoceros"].part_appearance.duplicate(true)
+	check(lab.perform("boss_appearance",{"type":"monoceros","parts":{"body":{"color":"ff8844","offset":[2,3]}}}),"ボス外観を戦闘定義と同じ命令境界へ通す")
+	check(lab.scene.cpp_resources.visuals.any(func(entry): return entry.get("boss","")=="monoceros" and entry.appearance.body.color=="ff8844"),"外観はGodotの表示資源へ反映する")
+	await lab.undo_edit()
+	check(lab.run.bosses.definitions[&"monoceros"].part_appearance==old,"ボス外観の取消で元の版へ戻す")
+	var before: Dictionary = lab.bridge.read_lab().value
+	var history: int = lab.history.size()
+	var signature: String = lab.bridge.read_recording(true).value.identity.payload_sha256
+	check(not lab.perform("boss",{"type":"hydra","pos":[0,0]}) and not lab.perform("boss_parameter",{"type":"hydra","key":"speed","value":2.0}),"未移行のボスを別の実装で補完しない")
+	check(lab.bridge.read_lab().value==before and lab.history.size()==history and lab.bridge.read_recording(true).value.identity.payload_sha256==signature,"拒否した編集は個体・定義・履歴を部分変更しない")
+	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"ボス編集後の読取と通知配信が成功する")
+	lab.queue_free()
 	await get_tree().process_frame
