@@ -1,5 +1,5 @@
-#include "run_core.h"
-#include "../cpp/systems/population_system.h"
+#include "../api/run_core.h"
+#include "population_system.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

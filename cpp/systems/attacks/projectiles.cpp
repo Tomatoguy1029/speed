@@ -1,9 +1,9 @@
-#include "run_core.h"
-#include "../cpp/systems/field.h"
-#include "../cpp/systems/attacks/friend_shot.h"
-#include "../cpp/systems/attacks/reflected.h"
-#include "../cpp/systems/combat_resolver.h"
-#include "../cpp/systems/attack_system.h"
+#include "../../api/run_core.h"
+#include "../field.h"
+#include "friend_shot.h"
+#include "reflected.h"
+#include "../combat_resolver.h"
+#include "../attack_system.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>

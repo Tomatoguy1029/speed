@@ -1,5 +1,5 @@
 #include "run_core.h"
-#include "../cpp/behaviors/weapons/forward.h"
+#include "../behaviors/weapons/forward.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

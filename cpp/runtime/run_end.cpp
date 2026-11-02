@@ -1,7 +1,7 @@
-#include "run_core.h"
-#include "../cpp/behaviors/weapons/afterimage.h"
-#include "../cpp/runtime/lifecycle.h"
-#include "../cpp/bosses/monoceros/finish.h"
+#include "../api/run_core.h"
+#include "../behaviors/weapons/afterimage.h"
+#include "lifecycle.h"
+#include "../bosses/monoceros/finish.h"
 #include <cmath>
 using namespace godot;
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "../../native/runtime_data.h"
+#include "../content/runtime_data.h"
 #include "../content/population_data.h"
 #include "entity_store.h"
 #include "enemy_states.h"

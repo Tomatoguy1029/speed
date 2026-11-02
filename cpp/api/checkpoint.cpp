@@ -1,6 +1,6 @@
 #include "run_core.h"
-#include "../cpp/runtime/checkpoint.h"
-#include "../cpp/systems/progression.h"
+#include "../runtime/checkpoint.h"
+#include "../systems/progression.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

@@ -1,2 +1,0 @@
-# ビルドの正本はcpp/。先行入口からも同じ固定条件を使う。
-SConscript('../cpp/SConstruct')

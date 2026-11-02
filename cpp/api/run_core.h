@@ -1,5 +1,5 @@
 #pragma once
-#include "../../native/runtime_data.h"
+#include "../content/runtime_data.h"
 #include "../runtime/run_runtime.h"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/classes/ref.hpp>
