@@ -16,6 +16,11 @@ func values(object: Object, keys: Array) -> Dictionary:
 	for key in keys: out[key] = object.get(key)
 	return out
 func _ready() -> void:
+	if "--cpp-cepheus" in OS.get_cmdline_user_args():
+		await check_cpp_cepheus()
+		print("[cpp_cepheus] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-reticle" in OS.get_cmdline_user_args():
 		await check_cpp_reticle()
 		print("[cpp_reticle] failed=%d" % failed)
@@ -1511,4 +1516,108 @@ func check_cpp_reticle() -> void:
 	var replacement: int = core.spawn_enemy(&"reticle",position,{})
 	check(replacement!=id and pulse_motion(core,replacement).target_id==0 and pulse_motion(core,replacement).charge==0.0,"行の再利用で古い岩と照準を引き継がない")
 	bridge.release_checkpoint(pending.value)
+	session.free()
+
+func cepheus_soldiers(core, king: int) -> Array:
+	return core.enemy_motion_snapshot().filter(func(row): return row.get("king_id",0)==king and not dolphin_enemy(core,row.id).dead and row.mode!=EnemyTable.Mode.RECOVER)
+
+func check_cpp_cepheus() -> void:
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.start_radius = 900.0
+	cfg.planet_radius = 0.0
+	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
+	var stage := RuntimeStage.new()
+	stage.index = 93
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["cepheus","drifter"])
+	stage.enemy_tuning = {"cepheus":{"speed":0.0,"armor":0.0,"params.summon_time":0.1,"params.reinforce_interval":10.0,"params.mutiny_time":0.4},"cepheus_soldier":{"armor":0.0}}
+	var output := "res://.content/dev/run_cepheus"
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"ケフェウスの召喚と号令".sha256_text())
+	check(built==OK,"ケフェウスと参照する兵を編集値から生成する")
+	if built!=OK: return
+	var path := output.path_join("stage_93.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":931},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	check(session.bridge!=null,"ケフェウスのランと専用画像を準備する")
+	if session.bridge==null:
+		session.free()
+		return
+	var bridge = session.bridge
+	var core = bridge._core
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+	var target: Vector2 = core.ship_snapshot().ship_pos
+	core.configure_attack_budget({"enabled":false,"budget":4.0,"jitter":0.0})
+	core.set_motion_context(target,target,Vector2(640,360))
+	var king: int = core.spawn_enemy(&"cepheus",target-Vector2(400,0),{"facing":0.0})
+	core.step(0.05)
+	check(pulse_motion(core,king).tier==1 and pulse_motion(core,king).mode==EnemyTable.Mode.WINDUP,"初回は3体隊列の召喚予告を始める")
+	var pending: Dictionary = bridge.checkpoint()
+	var before: Array = core.enemy_motion_snapshot()
+	var view := Rect2(target-Vector2(1000,600),Vector2(2000,1200))
+	var frame: Dictionary = bridge.read_render(view).value
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	check(frame.cepheus.marks.size()==3*10 and presentation.frame_view.apply_frame(frame),"王冠と3か所の召喚予告を共通表示へ渡す")
+	await get_tree().process_frame
+	core.step(0.05)
+	core.step(0.05)
+	var soldiers: Array = cepheus_soldiers(core,king)
+	check(soldiers.size()==3 and soldiers.all(func(row): return row.age==0.0),"召喚は即時登録し新しい兵の行動は次tickから始める")
+	for n in 18: core.step(0.05)
+	check(core.hostiles_snapshot().size()==3,"画面内で予告を終えた3体が一斉射撃する")
+	check(soldiers.all(func(row): return pulse_motion(core,row.id).mode==EnemyTable.Mode.MOVE),"兵は指定された隊列の位置に整列する")
+	var future: Array = core.enemy_motion_snapshot()
+	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"召喚途中の群れと隊列を値から復帰する")
+	for n in 20: core.step(0.05)
+	check(core.enemy_motion_snapshot()==future,"復帰後の召喚・号令と乱数消費が一致する")
+	soldiers = cepheus_soldiers(core,king)
+	bridge.command("dev_kill",{"entity_id":soldiers[0].id,"cause":"bullet"})
+	for n in 4: core.step(0.05)
+	check(cepheus_soldiers(core,king).size()==2,"倒れた兵の穴は次の増援まで残す")
+	for tier in [2,3]:
+		core.set_enemy_motion(king,{"fire_t":0.0})
+		for n in 90:
+			core.step(0.05)
+			if pulse_motion(core,king).tier==tier and pulse_motion(core,king).mode==EnemyTable.Mode.MOVE: break
+		check(cepheus_soldiers(core,king).size()==(5 if tier==2 else 7),"増援で%d体の隊列へ組み直す" % (5 if tier==2 else 7))
+	var seven: Dictionary = bridge.checkpoint()
+	core.set_motion_context(target+Vector2(10000,0),target,Vector2(100,100))
+	var bolt_count: int = core.hostiles_snapshot().size()
+	for n in 20: core.step(0.05)
+	check(core.hostiles_snapshot().size()==bolt_count and cepheus_soldiers(core,king).all(func(row): return row.charge==0.0),"画面外の兵は予告をためず新しい弾を撃たない")
+	bridge.restore(seven.value)
+	core.set_motion_context(target,target,Vector2(640,360))
+	bolt_count = core.hostiles_snapshot().size()
+	var shots: Array[int] = []
+	for n in 40:
+		core.step(0.05)
+		var count: int = core.hostiles_snapshot().size()
+		if count>bolt_count:
+			shots.append(count-bolt_count)
+			bolt_count=count
+			if shots.size()==2: break
+	check(shots==[4,3],"7体隊列は前列4体と後列3体が交互に撃つ")
+	bridge.restore(seven.value)
+	soldiers = cepheus_soldiers(core,king)
+	bridge.command("dev_kill",{"entity_id":king,"cause":"bullet"})
+	check(soldiers.all(func(row): return pulse_motion(core,row.id).mode==EnemyTable.Mode.RECOVER and pulse_motion(core,row.id).timer>=0.4 and pulse_motion(core,row.id).timer<1.0),"王の途中撃破で生存兵全員が乱数付きの反乱へ入る")
+	core.set_enemy_motion(soldiers[0].id,{"fire_t":0.0})
+	core.step(0.01)
+	var events: Array = bridge.read_frame().value.events
+	check(events.any(func(event): return event.type==&"beam"),"反乱の射撃を既存の表示通知へ渡す")
+	for n in 24: core.step(0.05)
+	check(soldiers.all(func(row): return dolphin_enemy(core,row.id).dead),"反乱は正常に崩壊し兵の撃破で終了する")
+	bridge.restore(seven.value)
+	soldiers=cepheus_soldiers(core,king)
+	core.remove_enemy(king)
+	var replacement: int = core.spawn_enemy(&"cepheus",target-Vector2(400,0),{})
+	core.remove_enemy(soldiers[1].id)
+	core.step(0.01)
+	check(pulse_motion(core,replacement).tier==1 and pulse_motion(core,soldiers[0].id).mode==EnemyTable.Mode.RECOVER,"王と相手の先行削除・王の行再利用でも古い兵を再所属させない")
+	bridge.command("dev_kill",{"entity_id":replacement,"cause":"bullet"})
+	for n in 150: core.step(0.01)
+	check(cepheus_soldiers(core,replacement).is_empty(),"召喚途中で王を倒すと兵を後から生成しない")
+	bridge.release_checkpoint(pending.value)
+	bridge.release_checkpoint(seven.value)
 	session.free()

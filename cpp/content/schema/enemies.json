@@ -1394,6 +1394,79 @@
           "type": "f64"
         }
       ]
+    },
+    {
+      "name": "CepheusDefinition",
+      "section": 110,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "soldier",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fire_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reinforce_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "summon_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mutiny_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "row_near",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "row_far",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fan_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fan_step",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

@@ -80,6 +80,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (const auto *split=std::get_if<SplitState>(&enemy.behavior_state)) if (!std::isfinite(split->bud_t) || split->bud_t<0) return false;
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Reticle)!=std::holds_alternative<ReticleState>(enemy.behavior_state)) return false;
         if (const auto *reticle=std::get_if<ReticleState>(&enemy.behavior_state)) if (state.enemy_handles.contains(reticle->rock) && state.enemy_handles.entity_id(reticle->rock)!=reticle->rock_id) return false;
+        const auto *cepheus=std::get_if<CepheusState>(&enemy.behavior_state);
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Cepheus)!=(cepheus!=nullptr) || (cepheus && (cepheus->tier>3 || !cepheus->anchor.is_finite() || !std::isfinite(cepheus->volley)))) return false;
         const auto *soldier=std::get_if<SoldierState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Soldier)!=(soldier!=nullptr)) return false;
         if (soldier && (!soldier->formation.anchor.is_finite() || soldier->formation.tier<1 || soldier->formation.tier>3 || (state.enemy_handles.contains(soldier->king) && state.enemy_handles.entity_id(soldier->king)!=soldier->king_id))) return false;

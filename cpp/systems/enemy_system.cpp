@@ -23,6 +23,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Aquila) enemy.behavior_state=AquilaState{};
     if (def.kind==EnemyDefinition::Kind::Crab) enemy.behavior_state=CrabState{};
     if (def.kind==EnemyDefinition::Kind::Lynx) enemy.behavior_state=LynxState{};
+    if (def.kind==EnemyDefinition::Kind::Cepheus) enemy.behavior_state=CepheusState{};
     if (def.kind==EnemyDefinition::Kind::Soldier) enemy.behavior_state=SoldierState{};
     if (def.kind==EnemyDefinition::Kind::Auriga) enemy.behavior_state=AurigaState{};
     if (def.kind==EnemyDefinition::Kind::Clock) enemy.behavior_state=ClockState{};
@@ -101,6 +102,7 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     const auto &definition=run.content->definitions[enemy.definition];
     if (definition.kind==EnemyDefinition::Kind::Sniper || definition.kind==EnemyDefinition::Kind::Clock || definition.kind==EnemyDefinition::Kind::Reticle || definition.kind==EnemyDefinition::Kind::Phoenix || definition.kind==EnemyDefinition::Kind::Crab) return true;
     if (definition.kind==EnemyDefinition::Kind::Dolphin || definition.kind==EnemyDefinition::Kind::Aquarius || definition.kind==EnemyDefinition::Kind::Cross) return enemy.fire_t<=dt;
+    if (definition.kind==EnemyDefinition::Kind::Cepheus) return std::get<CepheusState>(enemy.behavior_state).tier>0 && enemy.mode==EnemyMode::Move && enemy.timer<=dt;
     if (definition.kind==EnemyDefinition::Kind::Bomber) return enemy.pos.distance_to(run.state.ship_pos)<=run.content->bombers[definition.bomber_definition-1].trigger;
     if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
     return enemy.fire_t<=definition.attack_telegraph+dt;

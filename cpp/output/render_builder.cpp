@@ -200,6 +200,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary gravity;PackedFloat64Array well_values;
     for (const auto &well:state.field.wells) for (double value:{double(well.position.x),double(well.position.y),well.born,well.life,well.radius}) well_values.push_back(value);
     gravity["time"]=state.world_time;gravity["wells"]=well_values;
+    Dictionary cepheus;PackedFloat64Array cepheus_values,cepheus_marks;
+    for (const auto &e:state.enemies) if (e.alive && !e.dead && std::holds_alternative<CepheusState>(e.behavior_state) && e.mode==EnemyMode::Windup) for (double v:{double(e.pos.x),double(e.pos.y),e.radius,e.facing,e.charge}) cepheus_values.push_back(v);
+    for (const auto &m:state.groups.summon_marks) {const double age=m.age;if (age>=m.life) continue;for (double v:{double(m.pos.x),double(m.pos.y),double(m.king.x),double(m.king.y),double(m.color.r),double(m.color.g),double(m.color.b),double(m.color.a),age/m.life,state.world_time}) cepheus_marks.push_back(v);}
+    cepheus["values"]=cepheus_values;cepheus["marks"]=cepheus_marks;
     Dictionary aquila;PackedFloat64Array aquila_values;
     for (const auto &e:state.enemies) {
         if (!e.alive || e.dead || e.mode!=EnemyMode::Windup) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Aquila) continue;
@@ -249,6 +253,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;return out;
+    out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;return out;
 }
 }

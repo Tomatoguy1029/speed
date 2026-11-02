@@ -18,6 +18,7 @@ var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
 var _lance_hits: Array = []
+var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
 var _aquila := PackedFloat64Array()
 var _aquila_view := Rect2()
 var _crab := PackedFloat32Array()
@@ -204,6 +205,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/cross.gd").draw_frame(canvas,_cross,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/bomber.gd").draw_frame(canvas,_bomber,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/crab.gd").draw_frame(canvas,_crab,1.0/maxf(_zoom,0.01))
+		preload("res://scripts/render/enemies/cepheus.gd").draw_frame(canvas,_cepheus,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/aquila.gd").draw_frame(canvas,_aquila,_aquila_view,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/missile.gd").draw_frame(canvas,_missile,_pixel)
 		preload("res://scripts/render/enemies/battleship.gd").draw_frame(canvas,_battleship,1.0/maxf(_zoom,0.01))
@@ -324,6 +326,13 @@ func _valid(frame: Dictionary) -> bool:
 		if not frame.pulser is PackedFloat64Array or frame.pulser.size()%6!=0: return false
 		for value in frame.pulser:
 			if not is_finite(value): return false
+	if frame.has("cepheus"):
+		if not frame.cepheus is Dictionary: return false
+		for pair in [["values",5],["marks",10]]:
+			var values = frame.cepheus.get(pair[0])
+			if not values is PackedFloat64Array or values.size()%int(pair[1])!=0: return false
+			for value: float in values:
+				if not is_finite(value): return false
 	if frame.has("aquila"):
 		var data = frame.aquila
 		if not data is Dictionary or not data.get("values") is PackedFloat64Array or not data.get("view") is Rect2 or data.values.size()%9!=0: return false
@@ -680,6 +689,10 @@ func apply_frame(frame: Dictionary) -> bool:
 		_gravity = frame.gravity
 		_gravity_canvas.queue_redraw()
 	if frame.has("pulser"): _pulser_visual.apply_frame(_pulser_parent,frame.pulser)
+	var cepheus: Dictionary = frame.get("cepheus",{"values":PackedFloat64Array(),"marks":PackedFloat64Array()})
+	if cepheus!=_cepheus:
+		_cepheus=cepheus
+		_gunner_marks.queue_redraw()
 	_aquila = frame.get("aquila",{}).get("values",PackedFloat64Array())
 	_aquila_view = frame.get("aquila",{}).get("view",Rect2())
 	if frame.has("phoenix"): _phoenix_visual.apply_frame(frame.phoenix,_sniper_world_time,_zoom)

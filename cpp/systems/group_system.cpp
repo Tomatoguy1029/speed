@@ -1,5 +1,6 @@
 #include "group_system.h"
 #include <unordered_set>
+#include <cmath>
 namespace speed {
 void GroupSystem::join(godot::RunState &state,EnemyHandle actor,int64_t group) {
     if (!state.enemy_handles.contains(actor)) return;
@@ -49,11 +50,13 @@ bool GroupSystem::validate(const godot::RunState &state) {
     std::unordered_set<int64_t> seen;
     for (const auto &g:state.groups.groups) {
         if (g.value.members.is_empty()) return false;
+        if (g.value.kind==Group::Kind::Cepheus && (!g.value.formation.anchor.is_finite() || g.value.formation.tier<1 || g.value.formation.tier>3)) return false;
         for (const auto &m:g.value.members) if (!state.enemy_handles.contains(m.value.actor) ||
             state.enemy_handles.entity_id(m.value.actor)!=m.key || !seen.insert(m.key).second ||
             state.enemies[m.value.actor.slot].group_id!=g.key) return false;
     }
     for (const auto &e:state.enemies) if (e.alive && e.group_id && !seen.count(e.id)) return false;
+    for (const auto &m:state.groups.summon_marks) if (!m.pos.is_finite() || !m.king.is_finite() || !std::isfinite(m.age) || m.age<0 || !std::isfinite(m.life) || m.life<=0) return false;
     return true;
 }
 }

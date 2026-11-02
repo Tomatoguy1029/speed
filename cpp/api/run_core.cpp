@@ -22,6 +22,7 @@
 #include "../behaviors/enemies/clock.h"
 #include "../behaviors/enemies/auriga.h"
 #include "../behaviors/enemies/soldier.h"
+#include "../behaviors/enemies/cepheus.h"
 #include "../behaviors/enemies/lynx.h"
 #include "../behaviors/enemies/beamer.h"
 #include "../behaviors/enemies/shield.h"
@@ -229,6 +230,8 @@ void SpeedRunCore::advance_enemies(double delta) {
                 speed::SplitBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Lynx) {
                 speed::LynxBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
+            } else if (def.kind==speed::EnemyDefinition::Kind::Cepheus) {
+                speed::CepheusBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Soldier) {
                 speed::SoldierBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Auriga) {

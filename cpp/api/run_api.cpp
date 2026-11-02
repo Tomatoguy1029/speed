@@ -26,6 +26,9 @@ bool presentation_frozen(const speed::RunRuntime &run) {
 }
 void advance_lance_display(speed::RunRuntime &run,double dt,double world_dt) {
     if (presentation_frozen(run)) return;
+    auto &marks=run.state.groups.summon_marks;
+    for (auto &m:marks) m.age+=dt;
+    marks.erase(std::remove_if(marks.begin(),marks.end(),[](const auto &m){return m.age>=m.life;}),marks.end());
     auto &attacks=run.state.attacks;
     const double flight_dt=run.state.hitstop>0?0.0:dt;
     for (auto &v:attacks.lance_visuals) v.age+=flight_dt;
