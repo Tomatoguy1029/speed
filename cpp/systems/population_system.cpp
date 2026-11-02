@@ -16,7 +16,7 @@ double PopulationSystem::sample_curve(const SpawnTimeline::Curve &curve, double 
 }
 void PopulationSystem::prepare(RunRuntime &run) {
     const auto &cfg=run.content->population;if (!cfg.active) return;auto &s=run.state;s.spawn_timeline=run.content->population_timeline;s.spawn_timeline_ready=true;
-    auto &p=s.population;p={};p.ready=p.refill_ready=true;p.frame_enabled=!run.api_development;p.recycle_scale=cfg.recycle_scale;p.region_cap=cfg.region_cap;p.margin=cfg.margin;p.field_radius=cfg.field_radius;p.planet_radius=cfg.planet_radius;p.total_cap=cfg.total_cap;p.refill_time=cfg.refill_time;
+    auto &p=s.population;p={};p.ready=p.refill_ready=true;p.frame_enabled=!s.control.lab_mode;p.recycle_scale=cfg.recycle_scale;p.region_cap=cfg.region_cap;p.margin=cfg.margin;p.field_radius=cfg.field_radius;p.planet_radius=cfg.planet_radius;p.total_cap=cfg.total_cap;p.refill_time=cfg.refill_time;
     s.formations=run.content->formations;s.formation_base_view=run.content->formation_base_view;s.clips.clear();
     for (const auto &source:run.content->population_clips) {godot::RunState::Clip clip;static_cast<PopulationClipData &>(clip)=source;s.clips.push_back(std::move(clip));}s.clips_ready=true;
     const size_t count=run.content->definitions.size();p.maximum.resize(count);p.type_counts.resize(count);p.effective.resize(count);p.region_types.resize(count*5);

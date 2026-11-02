@@ -59,7 +59,19 @@ static func build_all(force := false, output := ROOT) -> Error:
 	if error != OK: return error
 	error = load("res://tools/content/build_native_data.gd").build_spawn_timelines(output)
 	if error != OK: return error
+	var run_outputs := []
+	var input_signature := signature()
+	for name in DirAccess.get_files_at("res://data/stages"):
+		if not name.ends_with(".tres"): continue
+		var source := ResourceLoader.load("res://data/stages/"+name,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
+		var stage := ResourceLoader.load(output.path_join("stage_%d.tres" % source.index),"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
+		error = preload("res://tools/content/build_run_content.gd").build(stage,load("res://data/config.tres"),output.path_join("run"),input_signature)
+		if error!=OK: return error
+		var index_path := output.path_join("run/stage_%d.json" % source.index)
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
+		run_outputs.append_array([index_path,index.binary,index.resources])
 	var outputs := [catalog_path]
+	outputs.append_array(run_outputs)
 	var visual_index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	for file in DirAccess.get_files_at(output):
 		if file.begins_with("look_") and not output.path_join(file) in visual_index.look_paths.values(): continue
