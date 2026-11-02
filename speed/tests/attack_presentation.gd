@@ -17,6 +17,12 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-scatter-hull" in OS.get_cmdline_user_args():
+		var finished: bool = await check_cpp_scatter_hull()
+		check(finished,"船体散開の不足条件を最後まで確認する")
+		print("[cpp_scatter_hull] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-burst-debris" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_burst_debris()
 		check(finished,"破砕片の不足条件を最後まで確認する")
@@ -779,5 +785,19 @@ func check_cpp_burst_debris() -> bool:
 	var events: Array = cpp_bridge.latest_frame().value.events
 	check(events.size()==3 and events[0].type==&"hull_scatter" and events[1].type==&"duplicate" and events[1].payload.pos==state[0].pos and events[2].payload.pos==state[1].pos,"全生成後の破砕通知から元ごとの分裂通知へ順に進む")
 	check(cpp_core.attack_budget_snapshot().groups.is_empty(),"味方の破砕片は敵の攻撃予算を使わない")
+	cpp_session.free()
+	return true
+
+func check_cpp_scatter_hull() -> bool:
+	if not await prepare_cpp_attack(102,"scatter_hull"): return false
+	for kind in [2,3]:
+		cpp_bridge.command("dev_add_rock",{"position":cpp_origin+Vector2(0,kind*100),"kind":kind,"size":20.0,"manual":true})
+	cpp_bridge.command("dev_stream_rocks",{"center":cpp_origin,"half":Vector2(640,480),"dt":0.1})
+	var rocks: Array = cpp_bridge.command("dev_field_query",{"action":"rocks"}).value
+	for rock: Dictionary in rocks:
+		var scattered: Dictionary = cpp_bridge.command("dev_scatter_hull",{"source_id":rock.enemy_id,"direction":Vector2.RIGHT,"speed":100.0,"damage":1.0})
+		check(not scattered.ok and cpp_core.projectiles_snapshot().is_empty(),"フィールド由来の岩を船体の破片へ変えない: %d" % rock.kind)
+	var raw: int = cpp_bridge.command("dev_spawn",{"definition_id":"meteor","position":cpp_origin-Vector2(100,0)}).value
+	check(cpp_bridge.command("dev_scatter_hull",{"source_id":raw,"direction":Vector2.RIGHT,"speed":100.0,"damage":1.0}).ok,"フィールド番号のない生成個体は定義名だけで除外しない")
 	cpp_session.free()
 	return true

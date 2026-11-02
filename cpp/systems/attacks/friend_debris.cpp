@@ -44,7 +44,7 @@ bool FriendDebrisSystem::burst(RunRuntime &run,const DebrisBurstParams &p) {
 bool FriendDebrisSystem::scatter(RunRuntime &run,const DebrisScatterParams &p) {
     auto &state=run.state;if (!state.enemy_handles.contains(p.source) || !p.direction.is_finite() || p.shatter_depth<0 || !std::isfinite(p.damage) || p.damage<0 || !std::isfinite(p.knock)) return false;
     for (double v:{p.speed,p.radius_mult,p.life_mult}) if (!std::isfinite(float(v)) || v<0) return false;
-    auto &enemy=state.enemies[p.source.slot];const auto &definition=run.content->definitions[enemy.definition];if (enemy.is_boss || definition.kind==EnemyDefinition::Kind::Meteor) return false;
+    auto &enemy=state.enemies[p.source.slot];const auto &definition=run.content->definitions[enemy.definition];if (enemy.is_boss || state.field.rock_handles.contains(enemy.rock)) return false;
     enemy.hull_scattered=true;const auto d=settings(run);const int64_t count=std::min(std::min(int64_t(16),std::max(int64_t(2),definition.rank*2)),int64_t(d.maximum)-int64_t(state.live_debris));if (count<=0) return false;
     const bool directed=p.direction.length()>0.01;const double base=directed?p.direction.angle():enemy.facing,spread=directed?d.spread:godot::Math::TAU;
     FriendlyBirthScope births(run);
