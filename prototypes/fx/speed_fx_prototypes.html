@@ -2937,7 +2937,8 @@ function mkRng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s
 
 // ---------- キャンバス
 const cv = document.getElementById('stage');
-const g = cv.getContext('2d');
+// ポスプロへ渡す画素の読み取りで、描画先の切替を待たないようにする。
+const g = cv.getContext('2d', { willReadFrequently: true });
 cv.width = W; cv.height = H;
 g.imageSmoothingEnabled = false;
 // pixelFX のフレーム（後ろ・前）を論理ピクセルの解像度で持ち、色は通常合成・光は加算合成する
@@ -4962,92 +4963,58 @@ function bossSlash(R, A0, B0, width, age, life = 0.5, seed = 1) {
   }
 }
 
-// ===== 咆哮：口元の白い乱流と、描画済みの景色にかける圧力・放射ブラー =====
-// pixelFX ground-slam.js の圧力の立ち上がりと、薄い雲がほぐれる手法を参考にした。
-// 丸い線は描かず、密度にむらのある空気の面を描く。判定・役者の座標には触れない。
+// ===== 咆哮：本体をぼかさず、周囲の景色だけを外へ流す =====
+// 参照：G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」
+// https://note.com/g2studios/n/n7b7a0c068a1c
+// サンプリング位置のディザで残像の段差を散らす。白い面・集光粒子は描かない。
 const CANIS_ROARS = new Set(['command', 'stream', 'howl', 'bay', 'relay', 'hunt', 'hunt_pounce']);
 const ROAR_LEVELS = {
-  1: { reach: 0.42, air: 0.5, life: 0.4, post: 0 },
-  2: { reach: 0.72, air: 0.8, life: 0.62, post: 0.38 },
-  3: { reach: 1, air: 1, life: 0.85, post: 1 },
+  1: { life: 0.24, blur: 0.028, reach: 3.2, mix: 0.55 },
+  2: { life: 0.36, blur: 0.075, reach: 5, mix: 0.8 },
+  3: { life: 0.52, blur: 0.17, reach: 8, mix: 1 },
 };
 const roarLevel = P => ROAR_LEVELS[P.roarLevel] || ROAR_LEVELS[1];
-function roarEvents(S, P) {
-  return S.shouts.map(e => ({ ...e, age: (S.t - e.t) / P.timing }))
-    .filter(e => e.age >= 0 && e.age < (e.small ? 0.38 : roarLevel(P).life)).slice(-8);
+function activeRoar(S, P) {
+  const e = S.shouts.findLast(e => !e.small), age = e ? (S.t - e.t) / P.timing : -1;
+  return age >= 0 && age < roarLevel(P).life ? { ...e, age } : null;
 }
-function drawRoar(R, e) {
-  const P = R.P, level = e.small ? ROAR_LEVELS[1] : roarLevel(P), gain = P.roarFX * P.intensity * level.air;
-  if (gain <= 0) return;
-  const a = toL(e.at), age = e.age, small = e.small, span = small ? 0.38 : level.life;
-  const rise = smooth(0, 0.045, age), fade = rise * (1 - smooth(span * 0.32, span, age));
-  const reach = (small ? 38 : 118) * P.size * level.reach, radius = (9 + reach * Math.sqrt(age / span)) * (small ? 0.55 : 1);
-  const white = hexc('#edf5ff'), pale = FX.ramp(P.color)[3], phase = Math.floor(age * 30) / 30;
-  const x0 = Math.max(0, Math.floor(a.x - radius)), x1 = Math.min(LW, Math.ceil(a.x + radius));
-  const y0 = Math.max(0, Math.floor(a.y - radius)), y1 = Math.min(LH, Math.ceil(a.y + radius));
-  // 白い空気が外へ伸びてほぐれる。放射方向に長いむらを作り、輪郭は閉じない。
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-    const dx = x - a.x, dy = y - a.y, d = Math.hypot(dx, dy), k = d / radius;
-    if (k > 1 || k < 0.04) continue;
-    const angle = Math.atan2(dy, dx), forward = 0.65 + 0.35 * Math.cos(angle - e.a);
-    const flow = Math.sin(angle * 11 + Math.sin(angle * 5 + e.seed) * 2 + k * 3 - phase * 2);
-    const curl = Math.sin(dx * 0.13 + Math.sin(dy * 0.09) * 2 - phase * 11 + e.seed);
-    const density = smooth(-0.65, 0.85, flow * 0.7 + curl * 0.3);
-    const envelope = Math.sin(k * Math.PI) ** 1.2 * (1 - smooth(0.7, 1, k));
-    const alpha = density * envelope * fade * gain * forward * (small ? 0.10 : 0.19);
-    R.front.blend(x, y, density > 0.65 ? white : pale, alpha);
-    if ((x & 3) === 0 && (y & 3) === 0) R.front.light(x, y, pale, alpha * 0.42);
-  }
-  // 吐き出した息の濃い芯だけを短く残す。
-  R.front.glow(a.x, a.y, (small ? 4 : 13) * P.size * level.reach, white, fade * gain * 0.24 * (1 - smooth(0.05, 0.3, age)));
+// 攻撃の時刻は動かさず、その前の予告中に咆哮を終える。強さのつまみでは順序を変えない。
+function canisOrderCue(S) {
+  if (!CANIS_ROARS.has(S.tech) || S.shouted) return;
+  const warn = ['hunt', 'hunt_pounce'].includes(S.tech) ? bossRule('canis_major', 'stream', S.B.phase).warn : S.r.warn;
+  const lead = Math.min(warn * 0.65, S.tech === 'howl' ? 0.55 : 0.32);
+  if (S.age >= warn - lead) { canisShout(S); S.shouted = true; }
 }
 
 let roarScreen = null;
 function makeRoarScreen() {
-  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
-  const source = document.createElement('canvas'); source.width = W; source.height = H;
-  const sourceG = source.getContext('2d');
-  const gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: false, preserveDrawingBuffer: false });
-  const out = { canvas, source, sourceG, gl: null };
+  // ブラーだけを縦横1/2で処理し、元の高解像度の絵へ重ねる。中心は透明のまま。
+  const canvas = document.createElement('canvas'); canvas.width = W / 2; canvas.height = H / 2;
+  const source = document.createElement('canvas'); source.width = W / 2; source.height = H / 2;
+  const out = { canvas, source, sourceG: source.getContext('2d', { willReadFrequently: true }), gl: null };
+  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false });
   if (!gl) return out;
   const vertex = `attribute vec2 position; varying vec2 uv;
     void main(){ uv=position*.5+.5; gl_Position=vec4(position,0.,1.); }`;
   const fragment = `precision highp float;
-    uniform sampler2D scene; uniform vec2 resolution; uniform int count;
-    uniform vec4 waves[8]; uniform vec2 shake; uniform float impact;
+    uniform sampler2D scene; uniform vec2 center; uniform vec2 resolution;
+    uniform vec2 radii; uniform float intensity; uniform float opacity;
     varying vec2 uv;
-    vec3 readScene(vec2 p) { return texture2D(scene,clamp(vec2(p.x,1.-p.y),vec2(.001),vec2(.999))).rgb; }
     void main(){
-      vec2 point=vec2(uv.x,1.-uv.y), pixel=point*resolution;
-      vec2 displacement=vec2(0.), blur=vec2(0.); float fog=0.;
-      for(int i=0;i<8;i++) {
-        if(i>=count) break;
-        vec4 w=waves[i]; vec2 delta=pixel-w.xy;
-        float d=length(delta), age=w.z, strength=w.w;
-        vec2 direction=delta/max(d,1.);
-        float angle=atan(delta.y,delta.x);
-        float irregular=sin(angle*7.+sin(angle*3.)*1.8+age*6.)*15.;
-        float front=35.+age*950.+irregular;
-        float width=55.+age*100.;
-        float pressure=exp(-pow((d-front)/width,2.))*pow(max(0.,1.-age/.85),1.5)*strength;
-        float near=exp(-d*d/85000.)*(1.-smoothstep(.12,.6,age))*strength;
-        displacement+=direction*pressure*16.;
-        blur+=direction*(pressure*24.+near*12.);
-        fog+=near*.14;
+      vec2 delta=uv-center;
+      float distance=length(delta*resolution);
+      float outside=smoothstep(radii.x,radii.x*1.55,distance);
+      float mask=outside*(1.-smoothstep(radii.y*.72,radii.y,distance))*opacity;
+      if(mask<.001){ gl_FragColor=vec4(0.); return; }
+      // ディザは像を抜くためではなく、各画素のサンプリング位置をずらすために使う。
+      float jitter=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))));
+      vec3 color=vec3(0.);
+      for(int i=0;i<3;i++){
+        float phase=(float(i)+jitter)/3.;
+        vec2 sampleUV=center+delta*(1.-intensity*outside*phase);
+        color+=texture2D(scene,clamp(vec2(sampleUV.x,1.-sampleUV.y),vec2(.001),vec2(.999))).rgb;
       }
-      // 圧力が通った景色自体をずらし、中心から外へにじませる。
-      displacement=clamp(displacement,vec2(-28.),vec2(28.));
-      blur=clamp(blur,vec2(-40.),vec2(40.));
-      vec2 at=point-(displacement+shake)/resolution;
-      vec3 color=readScene(at)*.30;
-      color+=readScene(at-blur/resolution*.25)*.24;
-      color+=readScene(at-blur/resolution*.50)*.20;
-      color+=readScene(at-blur/resolution*.75)*.15;
-      color+=readScene(at-blur/resolution)*.11;
-      float edge=clamp(length(point-vec2(.5))*.95,0.,1.);
-      color*=1.-impact*edge*.21;
-      color=mix(color,vec3(.76,.85,.89),clamp(fog,0.,.24));
-      gl_FragColor=vec4(color,1.);
+      gl_FragColor=vec4(color*(mask/3.),mask);
     }`;
   const shaders = [];
   try {
@@ -5066,48 +5033,67 @@ function makeRoarScreen() {
     const texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    const locations = {}; for (const key of ['resolution','count','waves[0]','shake','impact']) locations[key] = gl.getUniformLocation(program, key);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W / 2, H / 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const locations = {}; for (const key of ['resolution','center','radii','intensity','opacity']) locations[key] = gl.getUniformLocation(program, key);
     gl.uniform2f(locations.resolution, W, H); gl.uniform1i(gl.getUniformLocation(program, 'scene'), 0);
     Object.assign(out, { gl, locations });
     canvas.addEventListener('webglcontextlost', event => { event.preventDefault(); out.gl = null; });
-  } catch (error) {
-    // GPUが使えない環境でも、描画済みの景色の放射ブラーと短い揺れは残す。
-    out.gl = null; out.unavailableReason = error.message;
-  } finally { for (const shader of shaders) gl.deleteShader(shader); }
+  } catch (error) { out.unavailableReason = error.message; }
+  finally { for (const shader of shaders) gl.deleteShader(shader); }
   return out;
 }
-function postCanisRoar(S, R) {
-  const P = R.P, level = roarLevel(P);
-  if (level.post === 0 || !CANIS_ROARS.has(S.tech) || P.roarPost <= 0 || P.intensity <= 0) return;
-  // 猟犬の細かな吠えは口元だけ。全画面を繰り返し揺らさない。
-  const events = roarEvents(S, P).filter(e => !e.small);
-  if (!events.length) return;
-  const processor = roarScreen ||= makeRoarScreen(), waves = new Float32Array(32);
-  let impact = 0, shakeX = 0, shakeY = 0;
-  events.forEach((e, i) => {
-    const point = toL(e.at), strength = P.roarPost * P.intensity * level.post;
-    waves.set([point.x * LP, point.y * LP, e.age * 0.85 / level.life, strength], i * 4);
-    const kick = smooth(0, 0.025, e.age) * (1 - smooth(0.06, 0.28, e.age)) * strength;
-    impact = Math.max(impact, kick);
-    shakeX += Math.sin(e.age * 93 + e.seed) * kick * 6;
-    shakeY += Math.cos(e.age * 77 + e.seed) * kick * 4;
-  });
-  g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
-  const gl = processor.gl;
-  if (gl) {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
-    gl.uniform1i(processor.locations.count, events.length); gl.uniform4fv(processor.locations['waves[0]'], waves);
-    gl.uniform2f(processor.locations.shake, shakeX, shakeY); gl.uniform1f(processor.locations.impact, Math.min(1.5, impact));
-    gl.drawArrays(gl.TRIANGLES, 0, 6); g.drawImage(processor.canvas, 0, 0);
-  } else {
-    processor.sourceG.drawImage(cv, 0, 0);
-    g.fillStyle = '#05060f'; g.fillRect(0, 0, W, H); g.drawImage(processor.source, shakeX, shakeY);
-    const e = events[0], point = toL(e.at), cx = point.x * LP, cy = point.y * LP;
-    const strength = Math.min(1.5, P.roarPost * P.intensity * level.post) * (1 - smooth(0.1, level.life, e.age)) * smooth(0, 0.03, e.age);
-    for (let i = 1; i <= 4; i++) { const scale = 1 + strength * i * 0.012; g.globalAlpha = strength * 0.10; g.drawImage(processor.source, cx * (1 - scale) + shakeX, cy * (1 - scale) + shakeY, W * scale, H * scale); }
-    g.globalAlpha = strength * 0.035; g.fillStyle = '#d5e7ef'; g.fillRect(0, 0, W, H);
+// GPUが使えない場合も同じ中心除外とサンプリング位置のディザを使う。処理面は縦横1/4。
+function fallbackRoar(processor, center, radii, intensity, opacity) {
+  if (!processor.fallback) {
+    const source = document.createElement('canvas'); source.width = W / 4; source.height = H / 4;
+    const canvas = document.createElement('canvas'); canvas.width = W / 4; canvas.height = H / 4;
+    const ctx = canvas.getContext('2d');
+    processor.fallback = { source, sourceG: source.getContext('2d', { willReadFrequently: true }), canvas, ctx, pixels: ctx.createImageData(canvas.width, canvas.height) };
   }
+  const f = processor.fallback, w = f.canvas.width, h = f.canvas.height;
+  f.sourceG.drawImage(cv, 0, 0, w, h);
+  const src = f.sourceG.getImageData(0, 0, w, h).data, dst = f.pixels.data;
+  const cx = center.x / 4, cy = center.y / 4, fract = x => x - Math.floor(x);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const index = (y * w + x) * 4, dx = x + 0.5 - cx, dy = y + 0.5 - cy, distance = Math.hypot(dx, dy) * 4;
+    const outside = smooth(radii.x, radii.x * 1.55, distance), alpha = outside * (1 - smooth(radii.y * 0.72, radii.y, distance)) * opacity;
+    dst[index + 3] = Math.round(alpha * 255); if (alpha < 0.001) continue;
+    const jitter = fract(52.9829189 * fract((x + 0.5) * 0.06711056 + (h - y - 0.5) * 0.00583715));
+    let red = 0, green = 0, blue = 0;
+    for (let i = 0; i < 3; i++) {
+      const scale = 1 - intensity * outside * (i + jitter) / 3;
+      const sx = clamp(Math.floor(cx + dx * scale), 0, w - 1), sy = clamp(Math.floor(cy + dy * scale), 0, h - 1), at = (sy * w + sx) * 4;
+      red += src[at]; green += src[at + 1]; blue += src[at + 2];
+    }
+    dst[index] = red / 3; dst[index + 1] = green / 3; dst[index + 2] = blue / 3;
+  }
+  f.ctx.putImageData(f.pixels, 0, 0); g.drawImage(f.canvas, 0, 0, W, H);
+}
+function postCanisRoar(S, R) {
+  const P = R.P;
+  if (!CANIS_ROARS.has(S.tech) || P.roarPost <= 0 || P.intensity <= 0) return;
+  const e = activeRoar(S, P); if (!e) return;
+  const level = roarLevel(P), u = e.age / level.life;
+  const envelope = smooth(0, 0.14, u) * (1 - smooth(0.28, 1, u));
+  if (envelope <= 0.001) return;
+  const center = mul(toL(e.at), LP);
+  // 口元から本体の後ろまで、元の素材がある中心域には処理をかけない。
+  const clearRadius = (S.B.r * 1.84) * Z * cam.zoom * 1.15;
+  const radii = V(clearRadius, clearRadius * level.reach * P.size);
+  const intensity = Math.min(0.35, level.blur * P.roarPost * P.intensity) * envelope;
+  const opacity = Math.min(1, level.mix * P.roarPost * P.intensity) * envelope;
+  const processor = roarScreen ||= makeRoarScreen(), gl = processor.gl;
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = true;
+  if (gl) {
+    processor.sourceG.drawImage(cv, 0, 0, W / 2, H / 2);
+    const pixels = processor.sourceG.getImageData(0, 0, W / 2, H / 2);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, W / 2, H / 2, gl.RGBA, gl.UNSIGNED_BYTE, pixels.data);
+    gl.uniform2f(processor.locations.center, center.x / W, 1 - center.y / H);
+    gl.uniform2f(processor.locations.radii, radii.x, radii.y);
+    gl.uniform1f(processor.locations.intensity, intensity); gl.uniform1f(processor.locations.opacity, opacity);
+    gl.drawArrays(gl.TRIANGLES, 0, 6); g.drawImage(processor.canvas, 0, 0, W, H);
+  } else fallbackRoar(processor, center, radii, intensity, opacity);
   g.restore();
 }
 
@@ -5123,7 +5109,13 @@ function canisPose(B, t, opts = {}) {
   if (opts.proto) {
     // 見た目の部位だけで、静かな構えから咆哮の反動へ移す。役者の位置・方向は保つ。
     const charge = B.mode === 'windup' ? B.charge : 0, release = opts.releaseAge >= 0 ? Math.max(0, 1 - opts.releaseAge / 0.22) : 0;
-    if (B.pose.shout || B.pose.gather || B.pose.bay || release > 0) { edits.Head.rotation += -0.12 * charge + Math.sin(release * Math.PI) * 0.11; edits.Head.position = V(0, 42 - charge * 3 + release * 4); edits.Body = { position: V(0, -charge * 2 + release * 2) }; }
+    if (opts.orderRoar) {
+      const age = opts.releaseAge, inhale = age >= 0 ? 0 : clamp(charge * 2);
+      const push = age >= 0 ? smooth(0, 0.035, age) * (1 - smooth(0.09, 0.24, age)) : 0;
+      // 横へ首を振るのでなく、体を縮めて踏ん張り、頭と胸を前へ押し出して戻す。
+      edits.Head = { rotation: -0.045 * inhale, position: V(0, 42 - inhale * 9 + push * 13), scale: V(1 + push * 0.035, 1 + push * 0.09) };
+      edits.Body = { position: V(0, -inhale * 4 - push * 3), scale: V(1 + inhale * 0.025 - push * 0.02, 1 - inhale * 0.055 + push * 0.04) };
+    } else if (B.pose.shout || B.pose.gather || B.pose.bay || release > 0) { edits.Head.rotation += -0.12 * charge + Math.sin(release * Math.PI) * 0.11; edits.Head.position = V(0, 42 - charge * 3 + release * 4); edits.Body = { position: V(0, -charge * 2 + release * 2) }; }
     if (B.pose.flame && B.mode === 'active') { edits.Head.rotation += Math.sin(t * 23) * 0.018; edits.Head.position = V(0, 42 + Math.sin(t * 16) * 1.2); }
   }
   return edits;
@@ -5133,7 +5125,7 @@ function drawCanis(B, t, opts = {}) {
   const rig = drawBossParts(B, canisPose(B, t, opts), { ...opts, root: M.mk(-Math.PI / 2, k * (1 + c * 0.15), k * (B.pose.stretch || 1), 0, 0) });
   if (opts.shadow || !rig['Head/Sirius']) return;
   const at = M.pt(rig['Head/Sirius'], V(0, 0)), q = IMG['canis_major/star'];
-  const charge = Math.max(B.charge, B.pose.glow || 0), large = IMG['canis_major/large_star'];
+  const charge = opts.proto && opts.orderRoar && !B.pose.glow ? 0 : Math.max(B.charge, B.pose.glow || 0), large = IMG['canis_major/large_star'];
   g.save(); g.translate(at.x, at.y); g.rotate(B.facing + Math.sin(t * 2.1) * 0.04); g.scale(k, k);
   if (large) { g.globalAlpha = Math.floor(clamp((B.phase > 1 ? 0.75 : 0) + charge * 0.7, 0, 0.95) * 4) / 4; g.drawImage(large, -large.width / 2, 1 - large.height / 2); }
   g.globalAlpha = 1; if (q) g.drawImage(q, -q.width / 2 + 0.5, -q.height / 2 - 0.5); g.restore();
@@ -5142,6 +5134,7 @@ function canisSetup(S, id) {
   S.tech = id; S.B = bossActor('canis_major', V(-500, 0)); S.B.phase = Math.round(P().phase); S.r = bossRule('canis_major', id, S.B.phase);
   S.age = -0.4; S.stageAge = 0; S.stage = 'start'; S.ship = shipState(V(130, 0), Math.PI / 2, 35); S.shipVel = V(0, 35);
   S.pack = []; S.jets = []; S.flames = []; S.trails = []; S.shouts = []; S.transfers = []; S.bursts = []; S.shadows = [];
+  if (mode === 'proto' && CANIS_ROARS.has(id)) roarScreen ||= makeRoarScreen();
   const count = Math.round(P().pack), B = S.B;
   for (let i = 0, row = 1, column = 0; i < count; i++) {
     const q = mkE('hound', add(B.pos, V(B.r + 20 + row * 50, (column - row * 0.5) * 55)), 0, { idx: i, vel: V(0, 0), trail: [], warning: -1, dead: false }); S.pack.push(q);
@@ -5205,6 +5198,7 @@ function canisStep(S, dt) {
   S.age += dt; const B = S.B, r = S.r, id = S.tech, age = S.age, was = { ...B.pos };
   S.ship.pos = V(130, Math.sin(S.t * 0.5) * 70); S.shipVel = V(0, Math.cos(S.t * 0.5) * 35);
   if (age < 0) return;
+  canisOrderCue(S);
   B.gait += dt * (B.mode === 'active' ? 18 : 9);
   if (B.mode === 'recovery') { S.recover -= dt; if (S.recover <= 0) B.mode = 'idle'; }
   if (!['recovery', 'idle'].includes(B.mode)) {
@@ -5215,7 +5209,7 @@ function canisStep(S, dt) {
       const sr = ['hunt', 'hunt_pounce'].includes(id) ? bossRule('canis_major', 'stream', B.phase) : r;
       if (age < sr.warn) { canisFace(S, dt); B.pose = { shout: true }; if (id === 'command') for (const q of S.pack) q.warning = 0.4 + sr.warn; }
       else {
-        if (!S.shouted) { canisShout(S); S.shouted = true; B.mode = 'active'; }
+        if (!S.orderStarted) { S.orderStarted = true; B.mode = 'active'; }
         let last;
         if (id === 'command') { for (const q of S.pack) if (q.sent !== 'command') { q.sent = 'command'; canisLaunchHound(S, q, r.lunge_speed, r.lunge_time); } last = sr.warn; }
         else last = canisSequence(S, dt, sr, sr.warn, S.order, 'stream');
@@ -5247,7 +5241,6 @@ function canisStep(S, dt) {
       if (age >= Math.max(r.warn, r.ignite_at + Math.max(0, S.chosen.length - 1) * r.ignite_step)) canisFinish(S);
     } else if (id === 'relay') {
       if (age < r.warn) { canisFace(S, dt); B.pose = { shout: true }; }
-      else if (!S.shouted) { canisShout(S); S.shouted = true; }
       S.order.forEach((q, i) => { const mark = r.warn + i * r.interval, at = mark + r.each_warn;
         if (age >= mark && !q.relay) { q.relay = { from: { ...q.pos }, a: angOf(sub(S.ship.pos, q.pos)) }; q.warning = 0.4 + at; q.facing = q.relay.a; }
         if (age >= at && !q.relayFired) { q.relayFired = true; canisStartJet(S, add(q.pos, mul(fromA(q.relay.a), q.r)), q.relay.a, r.hound_beam_length, r.hound_beam_width, r.hound_beam_time); }
@@ -5258,7 +5251,7 @@ function canisStep(S, dt) {
       if (age < r.warn) { canisFace(S, dt); B.pose = { howl: true }; }
       else {
         B.mode = 'active';
-        if (!S.ringCenter) { S.ringCenter = { ...S.ship.pos }; canisShout(S); const total = r.ring_count + r.gaps * r.gap_slots, angles = []; for (let slot = 0; slot < total; slot++) if (slot % (total / r.gaps) >= r.gap_slots) angles.push(slot * TAU / total + 0.3);
+        if (!S.ringCenter) { S.ringCenter = { ...S.ship.pos }; const total = r.ring_count + r.gaps * r.gap_slots, angles = []; for (let slot = 0; slot < total; slot++) if (slot % (total / r.gaps) >= r.gap_slots) angles.push(slot * TAU / total + 0.3);
           for (let i = 0; i < angles.length; i++) { let q = S.pack[i]; if (!q) { q = mkE('hound', add(S.ringCenter, mul(fromA(angles[i]), r.ring_radius + r.spawn_out)), angles[i] + Math.PI, { idx: i, trail: [], vel: V(0, 0), warning: -1 }); S.pack.push(q); } q.ringA = angles[i]; }
           S.order = S.pack.slice().sort((a, b) => a.ringA - b.ringA);
         }
@@ -5270,7 +5263,6 @@ function canisStep(S, dt) {
     } else if (id === 'bay') {
       if (age < r.warn) { canisFace(S, dt); B.pose = { bay: true, shout: true }; }
       else {
-        if (!S.shouted) { canisShout(S); S.shouted = true; }
         B.mode = S.jump ? B.mode : 'bay'; B.pose = { bay: true };
         if (!S.jump && age < r.warn + r.pounce_at && dist(B.pos, S.ship.pos) > r.approach_stop) { canisFace(S, dt); B.pos = add(B.pos, mul(fromA(B.facing), BOSSES.canis_major.def.speed * dt)); }
         if (age >= r.warn + r.pounce_at) { const jr = { ...bossRule('canis_major', 'pounce', B.phase), alone_hounds: 0 }; if (!S.jump) canisJump(S, 0, jr, true); if (canisJump(S, dt, jr)) canisFinish(S, jr.recover); }
@@ -5324,9 +5316,8 @@ function canisDraw(S, R) {
   const B = S.B, r = S.r, t = S.t, id = S.tech, P = R.P, mouth = canisMouth(B), pal = FX.ramp(P.color);
   if (R.proto) {
     for (const q of S.pack) bossTrail(R, q.trail, q.until > t ? 0 : Math.max(0, t - (q.until || 0)));
-    if (S.jump && !S.jump.active && S.aim) { const shadow = { ...B, pos: S.aim, pose: {}, vel: V(0, 0) }; g.save(); g.filter = 'brightness(0) blur(5px)'; g.globalAlpha = 0.28 * B.charge; drawCanis(shadow, t, { shadow: true }); g.restore(); bossGather(R, B.pos, B.r * 1.4, B.charge, t, 51); }
+    if (S.jump && !S.jump.active && S.aim) { const shadow = { ...B, pos: S.aim, pose: {}, vel: V(0, 0) }; g.save(); g.filter = 'brightness(0) blur(5px)'; g.globalAlpha = 0.28 * B.charge; drawCanis(shadow, t, { shadow: true }); g.restore(); }
     if (S.land) bossBreath(R, S.land.at, B.facing, t - S.land.t, 91, Math.PI, 120);
-    for (const e of roarEvents(S, P)) drawRoar(R, e);
     if (S.warning) { const w = S.warning; bossGather(R, w.at, B.r, w.k, t); const A = toL(w.at), u = fromA(w.a), n = orth(u);
       for (let i = 0; i < 65; i++) { const phase = (hash(i * 7) + t * 0.4) % 1, d = phase * w.length * WL, width = w.width * WL * (0.5 + hash(i + 1)), q = add(add(A, mul(u, d)), mul(n, (hash(i + 8) - 0.5) * width)); R.back.glow(q.x, q.y, 1.5 + hash(i) * 2, pal[2], (0.06 + w.k * 0.12) * P.intensity); }
     }
@@ -5343,16 +5334,16 @@ function canisDraw(S, R) {
   bossFire(R.front, S.flames.map(f => ({ pos: f.pos, radius: lerp(f.r0, f.r1, f.age / f.life), age: f.age / f.life, seed: f.seed })), t, R.proto ? P.color : '#8acbff', R.proto ? P.intensity : 1, R.proto ? P.size : 1);
   for (const q of S.pack) if (!q.dead) {
     if (q.burn) { const samples = []; for (let i = 0; i < 12; i++) samples.push({ pos: add(q.pos, rotateV(V(-i * q.r * 0.3, Math.sin(i * 2 + t * 18) * q.r * 0.4), q.facing)), radius: q.r * (1.4 - i * 0.08), seed: i }); bossFire(R.back, samples, t, R.proto ? P.color : '#8acbff', P.intensity, P.size); }
-    if (q.warning > t) { const glow = clamp(1 - (q.warning - t) / (r.each_warn || r.nip_warn || r.warn || 0.3)); if (R.proto) bossGather(R, q.pos, q.r * 3, glow, t, q.idx + 21); else D2.circle(q.pos, q.r * 1.5, rgba('#fff', glow * 0.5)); }
+    if (q.warning > t) { const glow = clamp(1 - (q.warning - t) / (r.each_warn || r.nip_warn || r.warn || 0.3)); if (!R.proto) D2.circle(q.pos, q.r * 1.5, rgba('#fff', glow * 0.5)); }
     if (!R.proto && id === 'command' && q.until > t) { for (let i = 1; i < q.trail.length; i++) D2.line(q.trail[i - 1], q.trail[i], rgba('#ff667d', i / q.trail.length * 0.7), q.r); D2.circle(q.pos, q.r * 1.9, rgba('#ff667d', 0.22)); }
   }
   R.blitBack();
   const mainShout = S.shouts.findLast(e => !e.small);
-  drawCanis(B, t, { proto: R.proto, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
   for (const q of S.pack) if (!q.dead) drawEnemy(q, { white: R.proto && q.warning > t ? clamp(1 - (q.warning - t) / 0.6) * 0.25 : 0 });
   if (R.proto) {
     for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); bossFire(R.front, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, P.color, P.intensity, P.size); }
-    if (B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
+    if (!CANIS_ROARS.has(id) && B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
   }
   for (const b of S.bursts) { const age = (t - b.t) / P.timing; if (age < 0 || age > 0.65) continue; const samples = []; for (let i = 0; i < 18; i++) samples.push({ pos: add(b.at, mul(fromA(hash(i * 9) * TAU), Math.sqrt(age) * b.radius * hash(i + 3))), radius: b.radius * (0.3 + hash(i) * 0.2) * (1 - age / 0.65), seed: i }); bossFire(R.front, samples, t, P.color, P.intensity, P.size); }
   drawShip(S.ship);
@@ -5377,10 +5368,10 @@ const tFix = t => Math.floor(t * 30) / 30;
 for (const id of Object.keys(CANIS_IDS)) {
   const r = bossRule('canis_major', id);
   DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, duration: id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5, color: '#80c8ff',
-    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: 8, step: 1, def: 8 }, ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（画面は揺らさない）' }, { value: 2, label: '中：強い号令（弱いゆがみ）' }, { value: 3, label: '大：大技（強いゆがみ・ブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarFX', label: '咆哮の白い空気', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }, { k: 'roarPost', label: '咆哮のゆがみ・ブラー', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
-    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。通常の号令は小で、画面の揺れ・ブラーなし。遠吠えは中。画像のような大は大技用の比較として右側で選べる。猟犬の吠えは口元だけ' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? 'O15の遮蔽仕様は未決。現行の2体をまとめた遮蔽域を維持し、判定の変更案を採用していない' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
-    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX fire/flamethrower.js・impacts/ground-slam.js の流れと雲、SPEED pixel_fire の密度場', ...(CANIS_ROARS.has(id) ? ['SPEED shockwave.gdshader の画面屈折を下敷きに、提示画像の放射ブラーと白い空気を追加'] : [])],
-    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { return bossPhase(S.B); }
+    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: 8, step: 1, def: 8 }, ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
+    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? 'O15の遮蔽仕様は未決。現行の2体をまとめた遮蔽域を維持し、判定の変更案を採用していない' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
+    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX fire/flamethrower.js の炎の流れ、SPEED pixel_fire の密度場', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
+    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
   });
 }
 
@@ -6007,7 +5998,7 @@ for (const id of Object.keys(DRACO.moves)) {
 const CAT_ORDER = ['ボスへの命中 G10', '鳳凰 G11', '敵（ステージ1以外）G12', 'ケンタウルス座（C）', 'おおいぬ座（O）', 'いっかくじゅう座（I）', 'うみへび座（H）', 'りゅう座（D）', '参照（ステージ1）'];
 DEMOS.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));
 
-const LICENSE_TEXT = "■ pixelFX（MIT） https://github.com/patch-gg/pixelfx\nMIT License\n\nCopyright (c) 2026 Patch\nCopyright (c) 2026 Hugo Duprez\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n# Notices\n\n**Hugo Duprez.** `src/core/sim.js` and the effects that say so at the top of their file adapt Sprite Fusion's\nopen-source pixel art VFX (https://www.spritefusion.com/pixel-art-vfx), Copyright (c) 2026 Hugo Duprez, MIT License.\n\n**Hollow Crown.** `src/core/act.js` adapts how Hollow Crown plays its skills (poses on 12 fps steps, hit-stops, the springy\nstraw target), from\nhttps://github.com/rehan-remade/hollow-crown, Copyright (c) 2026 rehan-remade, MIT License.\n\n**Patch Pixel.** The font in `gallery/fonts` is Patch's own and is not covered by this repository's MIT license. See\n`gallery/fonts/NOTICE.md`.\n\n■ 試作で同梱・利用した pixelFX のコード：src/core（Painter・フレーム・色・数学など）。効果の形は arcane-beam.js・laser-bolt.js・sword-slash.js・heavy-cleave.js・ground-slam.js の手法を参考に SPEED 向けに書き直した（src/fx のファイルは同梱していない）。pixelFX の Patch Pixel フォントは使っていない。\n\n■ SPEED の素材・データ（このリポジトリの speed/assets・speed/data・speed/shaders・speed/scenes を読み取り、塗装・照明を焼き込んで埋め込み）。プロジェクトの素材の扱いに従う。";
+const LICENSE_TEXT = "■ pixelFX（MIT） https://github.com/patch-gg/pixelfx\nMIT License\n\nCopyright (c) 2026 Patch\nCopyright (c) 2026 Hugo Duprez\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n# Notices\n\n**Hugo Duprez.** `src/core/sim.js` and the effects that say so at the top of their file adapt Sprite Fusion's\nopen-source pixel art VFX (https://www.spritefusion.com/pixel-art-vfx), Copyright (c) 2026 Hugo Duprez, MIT License.\n\n**Hollow Crown.** `src/core/act.js` adapts how Hollow Crown plays its skills (poses on 12 fps steps, hit-stops, the springy\nstraw target), from\nhttps://github.com/rehan-remade/hollow-crown, Copyright (c) 2026 rehan-remade, MIT License.\n\n**Patch Pixel.** The font in `gallery/fonts` is Patch's own and is not covered by this repository's MIT license. See\n`gallery/fonts/NOTICE.md`.\n\n■ 試作で同梱・利用した pixelFX のコード：src/core（Painter・フレーム・色・数学など）。効果の形は arcane-beam.js・laser-bolt.js・sword-slash.js・heavy-cleave.js の手法を参考に SPEED 向けに書き直した（src/fx のファイルは同梱していない）。pixelFX の Patch Pixel フォントは使っていない。\n\n■ SPEED の素材・データ（このリポジトリの speed/assets・speed/data・speed/shaders・speed/scenes を読み取り、塗装・照明を焼き込んで埋め込み）。プロジェクトの素材の扱いに従う。";
 </script>
 <script>
 if (typeof G12_ENEMIES === 'undefined') {

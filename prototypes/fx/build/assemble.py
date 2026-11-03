@@ -15,7 +15,7 @@ app = '\n'.join(open(f'{B}/app/{f}', encoding='utf-8').read() for f in order)
 app += "\nconst CAT_ORDER = ['ボスへの命中 G10', '鳳凰 G11', '敵（ステージ1以外）G12', 'ケンタウルス座（C）', 'おおいぬ座（O）', 'いっかくじゅう座（I）', 'うみへび座（H）', 'りゅう座（D）', '参照（ステージ1）'];\nDEMOS.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));\n"
 lic = ('■ pixelFX（MIT） https://github.com/patch-gg/pixelfx\n' + open(f'{pixelfx_dir}/LICENSE', encoding='utf-8').read()
        + '\n' + open(f'{pixelfx_dir}/NOTICE.md', encoding='utf-8').read()
-       + '\n■ 試作で同梱・利用した pixelFX のコード：src/core（Painter・フレーム・色・数学など）。効果の形は arcane-beam.js・laser-bolt.js・sword-slash.js・heavy-cleave.js・ground-slam.js の手法を参考に SPEED 向けに書き直した（src/fx のファイルは同梱していない）。pixelFX の Patch Pixel フォントは使っていない。'
+       + '\n■ 試作で同梱・利用した pixelFX のコード：src/core（Painter・フレーム・色・数学など）。効果の形は arcane-beam.js・laser-bolt.js・sword-slash.js・heavy-cleave.js の手法を参考に SPEED 向けに書き直した（src/fx のファイルは同梱していない）。pixelFX の Patch Pixel フォントは使っていない。'
        + '\n\n■ SPEED の素材・データ（このリポジトリの speed/assets・speed/data・speed/shaders・speed/scenes を読み取り、塗装・照明を焼き込んで埋め込み）。プロジェクトの素材の扱いに従う。')
 app += '\nconst LICENSE_TEXT = ' + json.dumps(lic, ensure_ascii=False) + ';\n'
 html = shell.replace('/*DATA*/', 'const DATA = ' + data + ';').replace('/*PIXELFX*/', px.replace('</script', '<\\/script')).replace('/*APP*/', app.replace('</script', '<\\/script'))

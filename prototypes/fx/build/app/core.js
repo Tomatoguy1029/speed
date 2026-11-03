@@ -34,7 +34,8 @@ function mkRng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s
 
 // ---------- キャンバス
 const cv = document.getElementById('stage');
-const g = cv.getContext('2d');
+// ポスプロへ渡す画素の読み取りで、描画先の切替を待たないようにする。
+const g = cv.getContext('2d', { willReadFrequently: true });
 cv.width = W; cv.height = H;
 g.imageSmoothingEnabled = false;
 // pixelFX のフレーム（後ろ・前）を論理ピクセルの解像度で持ち、色は通常合成・光は加算合成する
