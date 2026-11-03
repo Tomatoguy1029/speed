@@ -139,6 +139,47 @@ function drawPhxShadow(at, angle, scale, blurPx, alpha) {
   g.save(); g.translate(at.x, at.y); g.rotate(angle); g.filter = `blur(${blurPx.toFixed(1)}px)`; g.globalAlpha = alpha; g.globalCompositeOperation = 'source-over';
   g.drawImage(c, -c.width * s / 2, -c.height * s / 2, c.width * s, c.height * s); g.restore();
 }
+// 炎と煙の粒を丸く描かない：pixelFX の FIRE／SMOKE の描き方（色・明るさ・寿命の段階）はそのままに、
+// 円を重ねる代わりに、粒ごとの乱数で縁をぎざぎざに削り、動く向きと上へ伸ばして先をとがらせた形で塗る。燃え尽きる前は虫食い状に崩れる
+function phxBlob(p, cx, cy, r, c, a, q, opaque, erode) {
+  if (r < 0.6) return opaque ? p.px(cx, cy, c) : p.blend(cx, cy, c, a);
+  let ux = q.vx * 0.012, uy = q.vy * 0.012 - 1; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul; // 上へ、勢いがあればその向きへ
+  const st = 0.45 + Math.min(0.5, Math.hypot(q.vx, q.vy) * 0.004), R2 = r * (1 + st);
+  p.each(cx - R2, cy - R2, cx + R2, cy + R2, (x, y, sx, sy) => {
+    const dx = x - cx, dy = y - cy, al = dx * ux + dy * uy, ac = -dx * uy + dy * ux, fw = al > 0 ? al / (1 + st) : al;
+    const acw = ac * (1 + Math.max(0, fw / r) * 0.9); // 先ほど細く
+    const d = Math.hypot(acw, fw) / r; if (d > 1.15) return;
+    const an = Math.atan2(ac, al), sec = an * 1.6 + q.seed, i0 = Math.floor(sec), f = sec - i0, edge = 0.72 + 0.4 * lerp(hash(i0 + q.seed * 3.1), hash(i0 + 1 + q.seed * 3.1), f * f * (3 - 2 * f));
+    const cell = hash(Math.round(dx) * 7.13 + Math.round(dy) * 3.71 + q.seed * 11.3);
+    if (d > edge - 0.08 * cell) return;
+    if (erode > 0 && cell < erode * (0.6 + d)) return;
+    opaque ? p.put(sx, sy, c, 1) : p.blendPx(sx, sy, c, a);
+  });
+}
+function phxDrawParticles(ps, p, layer) {
+  const own = [], rest = [];
+  for (const q of ps.list) (q.k === PX.P.FIRE || q.k === PX.P.SMOKE ? own : rest).push(q);
+  const keep = ps.list; ps.list = rest; try { ps.draw(p, layer); } finally { ps.list = keep; }
+  for (const q of own) {
+    if (q.delay > 0) continue; const isSmoke = q.k === PX.P.SMOKE; if ((isSmoke || q.flag & PX.PF.BACK ? 'back' : 'front') !== layer) continue;
+    const k = q.life / q.max, age = 1 - k, x = q.x, y = q.y;
+    if (!isSmoke) { // pixelFX の FIRE と同じ冷え方：暗い縁、明るい芯、上の舌
+      const F = PX.FIRE_RAMP, n = F.length, heat = Math.min(0.999, Math.pow(age, 0.62) + (q.seed % 1) * 0.1), idx = Math.min(n - 2, Math.floor(heat * (n - 1)));
+      const r = q.size * (0.55 + 0.45 * Math.min(1, age * 7)) * (1 - age * 0.55), c = F[idx], er = Math.max(0, (age - 0.55) / 0.45);
+      if (idx >= n - 2) { phxBlob(p, x, y, r, c, Math.min(1, k * 3) * 0.85, q, false, er); continue; }
+      phxBlob(p, x, y, r, F[Math.min(n - 1, idx + 2)], 1, q, true, er);
+      phxBlob(p, x - r * 0.12, y - r * 0.2, r * 0.74, c, 1, { ...q, seed: q.seed + 17 }, true, er * 0.8);
+      if (idx <= 3 && r > 1.8) phxBlob(p, x - r * 0.2, y - r * 0.32, r * 0.38, F[Math.max(0, idx - 1)], 1, { ...q, seed: q.seed + 41 }, true, 0);
+      if (idx < 6) p.glow(x, y, r * 2.4 + 2, c, 0.18 * k);
+    } else { // pixelFX の SMOKE と同じ色と濃さ（体・低い芯・若いうちの明るい頂）
+      const big = q.flag & PX.PF.BIG, r = q.size * (0.65 + Math.min(1, age * 2.5) * 0.45 + age * (big ? 0.5 : 0.4)), a = Math.min(1, age * 12) * Math.min(1, k * 2.4) * (big ? 0.7 : 0.58);
+      const SR = PX.SMOKE_RAMP, at = (t) => SR[Math.min(SR.length - 1, Math.max(0, Math.floor(t * SR.length)))], c = q.col ? PX.mix(q.col, at(age), age) : at(age * 1.05), er = Math.max(0, (age - 0.6) / 0.4) * 0.7;
+      phxBlob(p, x, y, r, c, a * 0.45, q, false, er);
+      phxBlob(p, x + r * 0.05, y + r * 0.06, r * 0.74, c, a * 0.62, { ...q, seed: q.seed + 23 }, false, er);
+      if (age < 0.5) phxBlob(p, x - r * 0.22, y - r * 0.3, r * 0.5, PX.mix(c, PX.WHITE, 0.12), a * 0.4 * (1 - age * 2), { ...q, seed: q.seed + 5 }, false, 0);
+    }
+  }
+}
 function withPhxRamp(fn) { const F = PX.FIRE_RAMP, saved = F.slice(); F.splice(0, F.length, ...PHX_FIRE.map(hexc)); try { fn(); } finally { F.splice(0, F.length, ...saved); } }
 // 落ちてくる火の粉（決定的）：着地点のまわりへ、中心ほど濃い分布で上空から降り、地面で弾けて消える
 function phxEmbers(R, center, rad, t0, t, k, density, P) {
@@ -151,11 +192,10 @@ function phxEmbers(R, center, rad, t0, t, k, density, P) {
   }
 }
 // 着地のあとに残る焦げ跡：縁はセルごとの乱数で崩し、熱い割れ目が冷えていく（pixelFX small-explosion の scorch を上から見た形に）
-function phxScorch(p, rad, t, fade, tongues = []) {
-  const reach = (an) => 0.5 + tongues.reduce((m, q) => Math.max(m, q.L * 0.6 * Math.max(0, Math.cos(an - q.a)) ** 5), 0); // 舌の向きへ焼け跡が伸びる
+function phxScorch(p, rad, t, fade) {
   if (fade <= 0) return; const r = rad * Math.min(1, t / 0.12), heat = PHX_FIRE.slice().reverse().map(hexc), SOOT = hexc('#140a0e'), SOOT2 = hexc('#22131a');
-  const r2 = r * 1.3; for (let y = Math.floor(-r2); y <= r2; y++) for (let x = Math.floor(-r2); x <= r2; x++) {
-    const d = Math.hypot(x + 0.5, (y + 0.5) / 0.9) / r, k = hash(x * 31.7 + y * 7.3), an = Math.atan2(y / 0.9, x), edge = reach(an) * (0.85 + 0.25 * hash(Math.floor(an * 5) * 3.3 + 1));
+  for (let y = Math.floor(-r); y <= r; y++) for (let x = Math.floor(-r); x <= r; x++) {
+    const d = Math.hypot(x + 0.5, (y + 0.5) / 0.9) / r, k = hash(x * 31.7 + y * 7.3), edge = 0.78 + 0.32 * hash(Math.floor(Math.atan2(y, x) * 5) * 3.3 + 1);
     if (d > edge) continue;
     const T = Math.pow(clamp(1 - t / 1.4), 1.3) * (1.2 - d) - k * 0.4;
     if (T > 0.08) { p.px(x, y, heat[Math.min(heat.length - 1, Math.floor((1 - Math.min(1, T)) * (heat.length - 1)))]); if ((x & 3) === 0 && (y & 3) === 0) p.glow(x, y, 5, heat[5], 0.2 * T * fade); }
@@ -163,20 +203,14 @@ function phxScorch(p, rad, t, fade, tongues = []) {
   }
 }
 function phxBurst(fx, rad) { // 着地の爆発：pixelFX Particles に炎・煙・火の粉・燃え残りを入れる（座標は着地点からの論理ピクセル）
-  // 外形を丸くしない：長さのそろわない炎の舌をばらばらの向きへ伸ばし、上（画面の上）へ炎の柱を立てる。炎の粒は横の勢いが約1/5秒で抜けるので、届く距離≒初速/5
-  const ps = fx.ps, R = fx.R, tongues = [];
-  for (let a = R.range(0, TAU), i = 0; i < 6; i++) { a += R.range(0.55, 1.6); tongues.push({ a, L: (i % 2 ? R.range(0.35, 0.65) : R.range(0.75, 1.1)) * (1 + 0.3 * Math.max(0, -Math.sin(a))), w: R.range(0.6, 1.3), bend: R.range(-0.5, 0.5) }); }
-  for (let i = 0; i < 5; i++) ps.spawn(PX.P.FIRE, R.range(-4, 4), R.range(-6, 0), R.range(-20, 20), R.range(-60, -20), R.range(0.22, 0.34), 0, R.range(rad * 0.28, rad * 0.38));
-  for (const t of tongues) for (let j = 0; j < 16; j++) { // 1本の舌：根元は太く遅く、先は曲がりながら広がって崩れる。少しずつ遅れて伸びる
-    const u = j / 15, a = t.a + t.bend * u * u + R.range(-0.18, 0.18) * t.w * (0.4 + u), sp = rad * t.L * lerp(0.3, 1.25, u) * 5.5 * R.range(0.85, 1.1), d = R.range(0, rad * 0.12), side = R.range(-1, 1) * rad * 0.6 * t.w * u;
-    ps.spawn(PX.P.FIRE, Math.cos(a) * d, Math.sin(a) * d * 0.9, Math.cos(a) * sp - Math.sin(a) * side, (Math.sin(a) * sp + Math.cos(a) * side) * 0.9 - 20, R.range(0.5, 0.95) * lerp(1.1, 0.75, u), 0, rad * lerp(0.24, 0.12, u) * t.w * R.range(0.7, 1.25), u * 0.06, R.chance(0.35) ? PX.PF.SMOKES | PX.PF.BIG : 0); }
-  for (let i = 0; i < 14; i++) { const a = R.range(0, TAU), d = R.range(0, rad * 0.25), sp = R.range(0.2, 0.6) * rad * 5 * (R.chance(0.3) ? 0.3 : 1); ps.spawn(PX.P.FIRE, Math.cos(a) * d, Math.sin(a) * d * 0.9, Math.cos(a) * sp, Math.sin(a) * sp * 0.9 - 40, R.range(0.5, 0.9), 0, R.range(rad * 0.12, rad * 0.22), R.range(0.02, 0.12), R.chance(0.4) ? PX.PF.SMOKES : 0); }
-  for (let i = 0; i < 10; i++) { const u = i / 9; ps.spawn(PX.P.FIRE, R.range(-rad * 0.15, rad * 0.15), R.range(-rad * 0.1, rad * 0.05), R.range(-12, 12), -rad * lerp(1.2, 3.4, u), R.range(0.7, 1.1), 0, rad * lerp(0.26, 0.1, u), R.range(0.04, 0.16), PX.PF.SMOKES | PX.PF.BIG); } // 立ち上がる炎の柱
-  for (let i = 0; i < 80; i++) { const t = tongues[i % tongues.length], a = i < 50 ? t.a + R.range(-0.25, 0.25) : R.range(0, TAU), sp = R.range(120, 330) * (i < 50 ? t.L : 0.7); ps.spawn(PX.P.SPARK, 0, 0, Math.cos(a) * sp, Math.sin(a) * sp * 0.85 - 60, R.range(0.2, 0.6)); }
+  const ps = fx.ps, R = fx.R;
+  for (let i = 0; i < 6; i++) ps.spawn(PX.P.FIRE, R.range(-3, 3), R.range(-3, 3), R.range(-20, 20), R.range(-50, -10), R.range(0.22, 0.34), 0, R.range(rad * 0.38, rad * 0.5));
+  for (let i = 0; i < 46; i++) { const a = R.range(0, TAU), d = R.range(0, rad * 0.3), sp = R.range(0.35, 1) * rad * 5; ps.spawn(PX.P.FIRE, Math.cos(a) * d, Math.sin(a) * d * 0.9, Math.cos(a) * sp, Math.sin(a) * sp * 0.85 - 30, R.range(0.55, 1.1), 0, R.range(rad * 0.16, rad * 0.32), R.range(0, 0.06), R.chance(0.5) ? PX.PF.SMOKES | PX.PF.BIG : 0); }
+  for (let i = 0; i < 8; i++) ps.spawn(PX.P.FIRE, R.range(-rad * 0.3, rad * 0.3), R.range(-rad * 0.2, rad * 0.2), R.range(-10, 10), R.range(-150, -90), R.range(0.8, 1.2), 0, R.range(rad * 0.2, rad * 0.3), R.range(0.05, 0.15), PX.PF.SMOKES | PX.PF.BIG);
+  for (let i = 0; i < 90; i++) { const a = R.range(0, TAU), sp = R.range(120, 330); ps.spawn(PX.P.SPARK, 0, 0, Math.cos(a) * sp, Math.sin(a) * sp * 0.85 - 60, R.range(0.2, 0.6)); }
   for (let i = 0; i < 40; i++) { const a = R.range(0, TAU), sp = R.range(30, 140); ps.spawn(PX.P.EMBER, Math.cos(a) * rad * 0.4, Math.sin(a) * rad * 0.36, Math.cos(a) * sp, Math.sin(a) * sp - 60, R.range(1.0, 2.2), PHX_SPARK[1]); }
-  for (const t of tongues) for (let i = 0; i < 2; i++) { const d = R.range(0.35, 0.9) * rad * t.L, a = t.a + R.range(-0.2, 0.2); fx.blazes.add(Math.cos(a) * d, Math.sin(a) * d * 0.9, R.range(0.9, 1.8), R.range(0.5, 1.0)); } // 燃え残りは舌の跡に沿って
+  for (let i = 0; i < 10; i++) { const a = R.range(0, TAU), d = R.range(0.25, 0.85) * rad; fx.blazes.add(Math.cos(a) * d, Math.sin(a) * d * 0.9, R.range(0.9, 1.8), R.range(0.6, 1.0)); }
   for (let i = 0; i < 12; i++) { const a = R.range(0, TAU), d = R.range(0.1, 0.6) * rad; ps.spawn(PX.P.SMOKE, Math.cos(a) * d, Math.sin(a) * d, Math.cos(a) * 25, Math.sin(a) * 18 - 30, R.range(1.6, 2.6), hexc('#3a2230'), R.range(rad * 0.22, rad * 0.36), R.range(0.15, 0.45), PX.PF.BIG); }
-  return tongues;
 }
 const phxRadius = (e) => Math.max(e.r * 1.1, PARAMS['G11-phoenix']?.radius ?? prm('phoenix').impact_radius); // 比較用の範囲（既定は現行の impact_radius）
 DEMOS.push({
@@ -191,7 +225,7 @@ DEMOS.push({
     if (e.mode === 'MOVE') { if (!e.anchor) { e.anchor = add(e.pos, mul(norm(sub(e.pos, S.ship.pos)), p.retreat_distance)); e.timer = p.retreat_time; } adv(e.anchor); if (e.timer <= 0 && dt > 0) { e.anchor = { ...S.ship.pos }; e.mode = 'WINDUP'; e.timer = p.telegraph; e.facing = angOf(sub(e.anchor, e.pos)); S.tele0 = S.t; } }
     else if (e.mode === 'WINDUP') { e.timer = Math.max(0, e.timer - dt); e.charge = 1 - e.timer / p.telegraph; if (e.timer <= 0) { e.mode = 'DASH'; e.timer = p.dive_time; e.charge = 0; } }
     else if (e.mode === 'DASH') { adv(e.anchor); const L = toLocal(e.pos, e.anchor), R = S.fx.trail; const back = norm(sub(e.anchor, e.pos)); for (let i = 0; i < 7; i++) { const j = R.range(0, 1); S.fx.ps.spawn(PX.P.FIRE, L.x - back.x * j * 6 + R.range(-3, 3), L.y - back.y * j * 6 + R.range(-3, 3), -back.x * R.range(20, 60) + R.range(-15, 15), -back.y * R.range(20, 60) + R.range(-25, 0), R.range(0.12, 0.3), 0, R.range(1.2, 3.4), 0, R.chance(0.25) ? PX.PF.SMOKES : 0); } if (R.chance(0.7)) S.fx.ps.spawn(PX.P.SPARK, L.x, L.y, -back.x * R.range(60, 160) + R.range(-40, 40), -back.y * R.range(60, 160) + R.range(-40, 40), R.range(0.15, 0.35));
-      if (e.timer <= 0) { S.flame = { pos: { ...e.anchor }, r: phxRadius(e), t0: S.t, life: p.impact_time }; S.fx.tongues = phxBurst(S.fx, S.flame.r * WL); e.mode = 'RECOVER'; e.timer = p.recover_time; } }
+      if (e.timer <= 0) { S.flame = { pos: { ...e.anchor }, r: phxRadius(e), t0: S.t, life: p.impact_time }; phxBurst(S.fx, S.flame.r * WL); e.mode = 'RECOVER'; e.timer = p.recover_time; } }
     else if (e.mode === 'RECOVER') e.timer = Math.max(0, e.timer - dt);
     if (dt > 0) { S.fx.ps.update(dt); S.fx.blazes.update(dt); }
     S.ship.pos.x = 200 + Math.sin(S.t * 0.8) * 20;
@@ -218,11 +252,11 @@ DEMOS.push({
       phxEmbers(R, anchor, rad, S.tele0 || S.t, S.t, k, Math.round(90 * P.intensity), P);
     }
     // 着地のあと：焦げ跡と燃え残り（背面）、煙
-    if (S.flame) { const t = S.t - S.flame.t0, Lf = toL(S.flame.pos); R.back.place(Lf.x, Lf.y); phxScorch(R.back, S.flame.r * WL * 0.85 * P.size, t / P.timing, 1 - smooth(2.4, 3.2, t / P.timing), S.fx.tongues); R.back.place(0, 0); }
-    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.back.place(Lf.x, Lf.y); withPhxRamp(() => { S.fx.ps.draw(R.back, 'back'); S.fx.blazes.drawBack(R.back); }); R.back.place(0, 0); }
+    if (S.flame) { const t = S.t - S.flame.t0, Lf = toL(S.flame.pos); R.back.place(Lf.x, Lf.y); phxScorch(R.back, S.flame.r * WL * 0.85 * P.size, t / P.timing, 1 - smooth(2.4, 3.2, t / P.timing)); R.back.place(0, 0); }
+    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.back.place(Lf.x, Lf.y); withPhxRamp(() => { phxDrawParticles(S.fx.ps, R.back, 'back'); S.fx.blazes.drawBack(R.back); }); R.back.place(0, 0); }
     R.blitBack();
     drawEnemy(e); drawShip(S.ship);
-    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.front.place(Lf.x, Lf.y); withPhxRamp(() => S.fx.ps.draw(R.front, 'front'));
+    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.front.place(Lf.x, Lf.y); withPhxRamp(() => phxDrawParticles(S.fx.ps, R.front, 'front'));
       if (S.flame) { const t = S.t - S.flame.t0; if (t < 0.12) { R.front.glow(0, 0, r * 1.3, hexc('#fff1c4'), (1 - t / 0.12) * P.intensity); R.front.glow(0, 0, r * 0.6, hexc('#ffffff'), (1 - t / 0.12) * 0.8 * P.intensity); } if (t < 0.8) R.front.glow(0, 0, r * 1.1, hexc('#ff6a3a'), 0.35 * (1 - t / 0.8) * P.intensity); }
       R.front.place(0, 0); }
     if (P.playerRef && S.flame) drawPlayerBlastRef(S, R, add(S.flame.pos, V(-460, 40)), S.flame.t0);
