@@ -1,5 +1,7 @@
 ## 開発命令をC++のラン窓口へ渡す。
 extends RefCounted
+var _cpp: WeakRef
+var _cpp_busy := false
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 func setup_cpp(owner: RunSession) -> void:
 	_cpp = weakref(owner)

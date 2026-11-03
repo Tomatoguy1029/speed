@@ -1775,7 +1775,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			var post: Dictionary = config.post_max.target(comet_weapon.id)
 			for level in comet_weapon.level_steps.size():
 				var factor: float = 1.0+0.1*(comet_weapon.level_steps[level]-1)
-				var values := {"id":level+1,"weapon":comet_equipment,"level":level+1,"damage":float(comet_weapon.params.damage)*(1.0+0.3*(comet_weapon.level_steps[level]-1)),"width":float(comet_weapon.params.width)*factor,"radius_factor":factor,"delay":0.18,"visual_life":preload("res://scripts/render/equipment/bipolar.gd").BEAM_SECONDS,"color":Color(comet_weapon.params.color).to_rgba32(),"area_increment":float(config.post_max.increments.area) if post.has("area") else 0.0,"knockback_increment":float(config.post_max.increments.knockback) if post.has("knockback") else 0.0}
+				var values := {"id":level+1,"weapon":comet_equipment,"level":level+1,"damage":float(comet_weapon.params.damage)*(1.0+0.3*(comet_weapon.level_steps[level]-1)),"width":float(comet_weapon.params.width)*factor,"radius_factor":factor,"delay":0.18,"visual_life":preload("res://scripts/data_types/attack_defaults.gd").BIPOLAR_BEAM_SECONDS,"color":Color(comet_weapon.params.color).to_rgba32(),"area_increment":float(config.post_max.increments.area) if post.has("area") else 0.0,"knockback_increment":float(config.post_max.increments.knockback) if post.has("knockback") else 0.0}
 				for key in ["life","knock","min_length"]: values[key] = float(comet_weapon.params[key])
 				data.BipolarDefinition.append(values)
 		if comet_weapon.id==&"W21":

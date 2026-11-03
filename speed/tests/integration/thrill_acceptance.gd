@@ -67,7 +67,7 @@ func _cpp_open(stage: int, check_entry := true) -> RunSession:
 	for i in 4000:
 		if owner.bridge!=null or owner.cpp_error!=OK: break
 		await get_tree().process_frame
-	if check_entry: _check(owner.bridge!=null and owner._sim==null,"C++通常入口で旧シミュレーションを作らない: %d" % stage)
+	if check_entry: _check(owner.bridge!=null and not _cpp_has_legacy(owner),"C++通常入口で旧シミュレーションを作らない: %d" % stage)
 	return owner
 
 func _cpp_choose(owner: RunSession, frame: Dictionary) -> bool:
@@ -267,7 +267,7 @@ func _test_cpp_entries() -> void:
 			for i in 4000:
 				if owner.bridge!=null or owner.cpp_error!=OK: break
 				await get_tree().process_frame
-		_check(owner!=null and owner.bridge!=null and owner._sim==null,"ステージ%dの通常出撃がC++だけを生成する" % stage)
+		_check(owner!=null and owner.bridge!=null and not _cpp_has_legacy(owner),"ステージ%dの通常出撃がC++だけを生成する" % stage)
 		if owner!=null and owner.bridge!=null:
 			var identity := owner.id
 			GameManager.abort_run()
@@ -282,7 +282,7 @@ func _test_cpp_entries() -> void:
 		for i in 4000:
 			if retry.bridge!=null or retry.cpp_error!=OK: break
 			await get_tree().process_frame
-	_check(retry!=null and retry.bridge!=null and retry._sim==null,"結果画面の再出撃もC++だけを生成する")
+	_check(retry!=null and retry.bridge!=null and not _cpp_has_legacy(retry),"結果画面の再出撃もC++だけを生成する")
 	GameManager.abort_run()
 	await _settle_screen()
 	GameManager.replay_intro()
@@ -291,7 +291,7 @@ func _test_cpp_entries() -> void:
 	for i in 4000:
 		if introduction.session!=null and introduction.session.bridge!=null: break
 		await get_tree().process_frame
-	_check(introduction.session!=null and introduction.session.bridge!=null and introduction.session._sim==null,"導入の画面出撃もC++だけを生成する")
+	_check(introduction.session!=null and introduction.session.bridge!=null and not _cpp_has_legacy(introduction.session),"導入の画面出撃もC++だけを生成する")
 	var intro_id: int = introduction.session.id if introduction.session!=null else -1
 	GameManager.reset_to_main_menu()
 	await _settle_screen()
@@ -302,7 +302,7 @@ func _test_cpp_entries() -> void:
 	for i in 4000:
 		if laboratory.scene!=null and laboratory.scene.bridge!=null: break
 		await get_tree().process_frame
-	_check(laboratory.scene!=null and laboratory.scene.bridge!=null and laboratory.scene._sim==null,"実験場の画面出撃もC++だけを生成する")
+	_check(laboratory.scene!=null and laboratory.scene.bridge!=null and not _cpp_has_legacy(laboratory.scene),"実験場の画面出撃もC++だけを生成する")
 	if laboratory.scene!=null and laboratory.scene.bridge!=null:
 		var lab_bridge: RefCounted = laboratory.scene.bridge
 		var input: Dictionary = lab_bridge.pack_intent(Intent.new())
@@ -332,8 +332,13 @@ func _test_cpp_entries() -> void:
 	for i in 4000:
 		if owner.bridge!=null or owner.cpp_error!=OK: break
 		await get_tree().process_frame
-	_check(owner.bridge!=null and owner._sim==null and owner.bridge.read_frame().value.ui.run_time==30.0,"タイムラインの途中開始もC++だけを生成する")
+	_check(owner.bridge!=null and not _cpp_has_legacy(owner) and owner.bridge.read_frame().value.ui.run_time==30.0,"タイムラインの途中開始もC++だけを生成する")
 	owner.free()
 	_check(RunManager._sessions.is_empty(),"全入口から戻った後にランを残さない")
 	print("[P01] passed=%d failed=%d" % [passed,failed])
 	get_tree().quit(1 if failed else 0)
+
+func _cpp_has_legacy(owner: Object) -> bool:
+	for property: Dictionary in owner.get_property_list():
+		if property.name == "_sim": return owner.get("_sim") != null
+	return false

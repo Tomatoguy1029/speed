@@ -17,7 +17,6 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export_range(0.5, 3.0, 0.05) var burst_pixel_scale := 1.0
 @export var technique_id: StringName
 var hydra: Node
-	set(value): hydra = value
 var retained: bool:
 	get: return not slots.is_empty() or not flashes.is_empty()
 var slots: Dictionary = {}

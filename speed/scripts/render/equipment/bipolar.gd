@@ -5,7 +5,7 @@ extends WeaponVisual
 ## 縁から火花が散る。しばらく保ってから細くなり、光の粒になって左右へ散る。帯に触れて倒れた敵は小さな炎の爆発で消える。
 
 const TEAL := [Color.WHITE, Color("#cffff9"), Color("#69fff0"), Color("#1f7f86")]
-const BEAM_SECONDS := 0.7
+const BEAM_SECONDS := preload("res://scripts/data_types/attack_defaults.gd").BIPOLAR_BEAM_SECONDS
 const CHARGE_SECONDS := 0.18
 const SHADER := preload("res://shaders/bipolar_beam.gdshader")
 ## 戦闘エフェクトツールで調整する shader と、演出が渡す既定値

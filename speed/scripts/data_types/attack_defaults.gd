@@ -1,6 +1,7 @@
 ## 生成で使う攻撃の固定値と形状。実行中の状態は持たない。
 @tool
 extends RefCounted
+const BIPOLAR_BEAM_SECONDS := 0.7
 const ENEMY_MIN_DISTANCE := 30.0
 const ENEMY_KNOCK := 300.0
 const RADIUS := 9.0
