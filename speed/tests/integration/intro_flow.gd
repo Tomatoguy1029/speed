@@ -32,6 +32,11 @@ func _ready() -> void:
 	SaveManager.set_script(MemorySave)
 	SaveManager.settings = settings
 	TranslationServer.set_locale("ja")
+	if "--operation-input" in OS.get_cmdline_user_args() or "--operation-input-tail" in OS.get_cmdline_user_args():
+		await _operation_input()
+		print("[導入の実操作] 失敗=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-isolation-only" in OS.get_cmdline_user_args():
 		await _test_cpp_isolation()
 		return
@@ -164,6 +169,54 @@ func _test_replay_only() -> void:
 		player.stop()
 	print("[intro replay] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
+
+func _operation_input() -> void:
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
+	GameManager.boot_request = Callable()
+	GameManager.screen = GameManager.Screen.MAIN_MENU
+	var app = load("res://scenes/app/main.tscn").instantiate()
+	app_under_test = app
+	add_child(app)
+	await _frame_ready()
+	var tail_only := "--operation-input-tail" in OS.get_cmdline_user_args()
+	if tail_only: GameManager.replay_intro()
+	else: _operation_click(app._current.find_child("ReplayIntroButton",true,false))
+	await _frame_ready()
+	if not tail_only: _check(GameManager.screen==GameManager.Screen.INTRO and app._current.run!=null,"導入の再生ボタンを実クリックして専用ランを始める")
+	if app._current.get("run")==null: app.free();return
+	for down in [true,false]:
+		var key := InputEventKey.new()
+		key.keycode = InputActions.key_of(&"pause")
+		key.physical_keycode = key.keycode
+		key.pressed = down
+		get_viewport().push_input(key,true)
+	if not tail_only: _check(app._current._paused,"導入中の実キー入力でポーズを開く")
+	await get_tree().process_frame
+	_operation_click(app._current._hud.get_node("Pause").get_child(0).get_child(0))
+	_check(GameManager.screen==GameManager.Screen.INTRO and not app._current._paused,"導入の再開ボタンを実クリックして再開する")
+	_operation_click(app._current.find_child("SkipIntro",true,false))
+	await _frame_ready()
+	_check(GameManager.screen==GameManager.Screen.STAGE_SELECT and RunManager._sessions.is_empty(),"導入のスキップを実クリックして専用ランを閉じステージ選択へ戻る")
+	app.free()
+
+func _operation_click(button: Control) -> void:
+	var point := button.get_global_transform_with_canvas()*(button.size*0.5)
+	var target := button.get_viewport()
+	if target is SubViewport and target.get_parent() is SubViewportContainer:
+		var container := target.get_parent() as SubViewportContainer
+		point = container.get_global_transform_with_canvas()*(point*container.stretch_shrink)
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	get_viewport().push_input(motion,true)
+	for down in [true,false]:
+		var event := InputEventMouseButton.new()
+		event.position = point
+		event.global_position = point
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		event.pressed = down
+		get_viewport().push_input(event,true)
 
 func _check(ok: bool, label: String) -> void:
 	if label in _confirmed: return

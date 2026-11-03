@@ -21,9 +21,22 @@ func _ready() -> void:
 	if not await _open_session():
 		get_tree().quit(1)
 		return
-	if "--cpp-operation-menus" in OS.get_cmdline_user_args() or "--cpp-operation-choice" in OS.get_cmdline_user_args():
+	if _operation_only():
 		if "--cpp-operation-menus" in OS.get_cmdline_user_args(): await _operation_menus()
-		else: await _operation_choice()
+		elif "--cpp-operation-choice" in OS.get_cmdline_user_args(): await _operation_choice()
+		elif "--cpp-operation-runtime" in OS.get_cmdline_user_args() or "--cpp-operation-input" in OS.get_cmdline_user_args(): await _operation_runtime()
+		elif "--cpp-operation-debug" in OS.get_cmdline_user_args(): await _operation_debug()
+		elif "--cpp-operation-settings" in OS.get_cmdline_user_args(): await _operation_settings()
+		elif "--cpp-operation-spawn" in OS.get_cmdline_user_args():
+			_clear_choice()
+			_tap(KEY_P)
+			await _operation_spawn()
+		elif "--cpp-operation-release" in OS.get_cmdline_user_args():
+			_clear_choice()
+			bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"gauge_full","args":{}}})
+			_pointer(Vector2(500,220),true)
+			_input_step()
+			_operation_release()
 		await _close()
 		print("[操作経路] 成功=%d 失敗=%d" % [passed,failed])
 		get_tree().quit(1 if failed else 0)
@@ -158,6 +171,192 @@ func _ready_cards() -> void:
 	while Time.get_ticks_usec() < deadline:
 		await get_tree().process_frame
 
+func _operation_only() -> bool:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--cpp-operation-"): return true
+	return false
+
+func _pointer(point: Vector2, down: bool, button := MOUSE_BUTTON_LEFT) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	get_viewport().push_input(motion,true)
+	var event := InputEventMouseButton.new()
+	event.position = point
+	event.global_position = point
+	event.button_index = button
+	event.pressed = down
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if down and button==MOUSE_BUTTON_LEFT else 0
+	get_viewport().push_input(event,true)
+
+func _input_step() -> void:
+	var response: Dictionary = bridge.poll_and_step(1.0/120.0,scene.cpp_input_source,get_viewport().get_visible_rect().size)
+	_check(response.ok,"本番の入力取得と更新を通す")
+
+func _operation_runtime() -> void:
+	if "--cpp-operation-input" in OS.get_cmdline_user_args():
+		_clear_choice()
+	else:
+		await _operation_runtime_buttons()
+	hud._rewards.ult_cutin_seconds = 0.01
+	hud._rewards.ult_details_seconds = 0.01
+	bridge.command("dev_hero_place",{"id":"perseus"})
+	var hero: Dictionary = bridge.read_frame().value.ui.hero
+	for i in range(0,hero.links.size(),2): bridge.command("dev_hero_pass",{"from":hero.stars[hero.links[i]],"to":hero.stars[hero.links[i+1]],"dash":i})
+	for i in 180:
+		await get_tree().process_frame
+		if not hud._rewards.is_active(): break
+	_check(not hud._rewards.is_active() and not bridge.read_frame().value.ui.presentation_frozen,"英雄の獲得表示が自動で終わり入力を戻す")
+	_tap(InputActions.key_of(&"hero"))
+	_input_step()
+	_check(float(bridge.read_frame().value.ui.hero.active)>0.0,"ULTキーから本番の入力経路で英雄を発動する")
+	bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"gauge_full","args":{}}})
+	var held: Dictionary = bridge.checkpoint()
+	_pointer(Vector2(500,220),true)
+	_input_step()
+	_check(bridge.read_frame().value.ui.draw.drawing,"マウスの押下で描線を開始する")
+	_operation_release()
+	bridge.restore(held.value)
+	bridge.collect_frame()
+	router.cancel_gesture()
+	_tap(InputActions.key_of(&"draw_alt"))
+	_input_step()
+	_check(bridge.read_frame().value.ui.draw.drawing,"描画補助キーから描線を開始する")
+	bridge.restore(held.value)
+	bridge.collect_frame()
+	router.cancel_gesture()
+	# 描くボタンはタッチ端末で表示される。同じButtonへ実ポインターを送る。
+	hud._draw_button.show()
+	_click(hud._draw_button.get_global_rect().get_center())
+	_input_step()
+	_check(bridge.read_frame().value.ui.draw.drawing,"タッチ用の描くボタンから描線を開始する")
+	bridge.release_checkpoint(held.value)
+
+func _operation_release() -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = Vector2(850,220)
+	get_viewport().push_input(motion,true)
+	_input_step()
+	_pointer(motion.position,false)
+	_input_step()
+	# マウスは次のクリックで確定する。タッチの指離しとは区別する。
+	for i in 30: bridge.poll_and_step(1.0/120.0,scene.cpp_input_source,get_viewport().get_visible_rect().size)
+	_pointer(motion.position,true)
+	_input_step()
+	_pointer(motion.position,false)
+	_input_step()
+	_check(not bridge.read_frame().value.ui.draw.drawing and bridge.read_frame().value.ui.draw.tracing,"描線後の次のクリックで突進を開始する")
+
+func _operation_runtime_buttons() -> void:
+	await _ready_cards()
+	var rerolls: int = bridge.read_frame().value.ui.rerolls_left
+	_click(hud._reroll_button.get_global_rect().get_center())
+	_check(bridge.read_frame().value.ui.rerolls_left==rerolls-1,"引き直すボタンの実クリックで候補を更新する")
+	for n in [1,2]: hud._rewards.enqueue_bonus({"type":&"level_bonus","kind":&"weapon","id":&"W01","level":n+1,"count":n})
+	await get_tree().process_frame
+	_click(Vector2(600,120))
+	_check(hud._rewards.is_active() and hud._rewards._current.count==2,"継続の実クリックは待ち時間なしで次の継続へ進む")
+	await get_tree().process_frame
+	_click(Vector2(600,120))
+	await get_tree().process_frame
+	_check(not hud._rewards.is_active() and hud._cards_box.visible,"最後の継続をクリックすると候補へ戻る")
+	_tap(KEY_ESCAPE)
+	await get_tree().process_frame
+	_click(hud._pause_box.get_child(1).get_global_rect().get_center())
+	_check(_state().phase==MenuIds.Phase.Levelup,"再開ボタンの実クリックで元の選択へ戻る")
+	_clear_choice()
+	for id in ["W01","W02","W03","W04"]: bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1})
+	bridge.command("dev_edit",{"kind":"comet_weapon","payload":{"id":"W22"}})
+	_step(1.0/120.0)
+	await _ready_cards()
+	var weapons: Array = bridge.read_frame().value.ui.weapon_levels.duplicate(true)
+	_click(hud._swap_keep.get_global_rect().get_center())
+	_step(1.0/120.0)
+	_check(_state().phase==MenuIds.Phase.Play and bridge.read_frame().value.ui.weapon_levels==weapons,"維持ボタンの実クリックで交換せず戦闘へ戻る")
+
+func _operation_debug() -> void:
+	_clear_choice()
+	_tap(KEY_P)
+	await get_tree().process_frame
+	var invincible: bool = bridge.read_frame().value.ui.invincible
+	await _click_panel_button("無敵の切り替え")
+	_check(bridge.read_frame().value.ui.invincible!=invincible,"無敵ボタンから状態を切り替える")
+	await _operation_spawn()
+	panel._module.select(0)
+	panel._levels.value = 2
+	var id: String = panel._module.get_item_metadata(0)
+	await _click_panel_button("入手")
+	for i in 300:
+		if bridge.read_frame().value.ui.weapon_levels.any(func(v):return v.id==id): break
+		await get_tree().process_frame
+	_check(bridge.read_frame().value.ui.weapon_levels.any(func(v):return v.id==id and v.level==2),"入手ボタンから選んだ装備と段を取得する")
+	await _click_panel_button("装備をリセット")
+	_check(bridge.read_frame().value.ui.weapon_levels.is_empty(),"リセットボタンから装備を外す")
+	_tap(KEY_P)
+	var overlay = scene.view.get_node("Hud/PerfOverlay")
+	for expected in [1,2,0]:
+		_tap(InputActions.key_of(&"debug_perf"))
+		_check(overlay.mode==expected,"F3の実入力で性能表示を切り替える: %d" % expected)
+	for recorder in get_tree().get_nodes_in_group("cpp_recorders"): recorder.set_process_input(false)
+	var rec = load("res://tests/integration/play_recorder.gd").TempRecorder.new()
+	add_child(rec)
+	_record_key()
+	_check(rec.armed and rec._file!=null and rec._cpp_session_id==scene.id,"Ctrl+F9の実入力で現在のランを録画する")
+	var path: String = rec._file.get_path() if rec._file!=null else ""
+	_record_key()
+	_check(not rec.armed and rec._file==null and FileAccess.file_exists(path),"Ctrl+F9の実入力で録画を閉じてファイルを残す")
+	rec.free()
+
+func _operation_spawn() -> void:
+	var count: int = bridge.read_metrics().value.enemies
+	panel._enemy_count.value = 1
+	await _click_panel_button("敵を生成")
+	for i in 600:
+		if bridge.read_metrics().value.enemies>count: break
+		await get_tree().process_frame
+	_check(bridge.read_metrics().value.enemies==count+1,"敵生成ボタンから指定した数を追加する: %d → %d / %s" % [count,bridge.read_metrics().value.enemies,panel._status.text])
+
+func _record_key() -> void:
+	for down in [true,false]:
+		var key := InputEventKey.new()
+		key.keycode = KEY_F9
+		key.physical_keycode = KEY_F9
+		key.ctrl_pressed = true
+		key.pressed = down
+		get_viewport().push_input(key,true)
+
+func _operation_settings() -> void:
+	_tap(KEY_ESCAPE)
+	await get_tree().process_frame
+	_click(hud._pause_box.get_child(2).get_global_rect().get_center())
+	await get_tree().process_frame
+	var settings: Control = hud._settings
+	var checks := settings.find_children("*","CheckBox",true,false)
+	for i in 2:
+		var key := "muted" if i==0 else "hitstop"
+		var before: bool = SaveManager.settings[key]
+		_click(checks[i].get_global_rect().get_center())
+		_check(SaveManager.settings[key]!=before,"設定の実クリックで値を変更する: "+key)
+	var button: Button = settings._bind_buttons[&"hero"]
+	var parent := button.get_parent()
+	while parent!=null:
+		if parent is ScrollContainer: parent.ensure_control_visible(button)
+		parent = parent.get_parent()
+	await get_tree().process_frame
+	_click(button.get_global_rect().get_center())
+	_tap(KEY_F8)
+	_check(InputActions.key_of(&"hero")==KEY_F8,"キー設定ボタンの実クリックと押下で割り当てる")
+	_click(settings.get_node("%BackButton").get_global_rect().get_center())
+	_check(hud._settings==null and _state().phase==MenuIds.Phase.Paused,"設定の戻るボタンを実クリックしてポーズへ戻る")
+
+func _click_panel_button(text: String) -> void:
+	for button in panel.find_children("*","Button",true,false):
+		if button.text!=text: continue
+		panel.get_child(0).ensure_control_visible(button)
+		await get_tree().process_frame
+		_click(button.get_global_rect().get_center())
+		return
+	_check(false,"操作するボタンがある: "+text)
+
 ## 表示の確認やsignalの直接発火ではなく、Viewportから操作を最後まで通す。
 func _operation_menus() -> void:
 	_tap(KEY_ESCAPE)
@@ -257,7 +456,7 @@ func _click(point: Vector2) -> void:
 		get_viewport().push_input(ev, true)
 
 func _open_session() -> bool:
-	if "--cpp-operation-menus" in OS.get_cmdline_user_args() or "--cpp-operation-choice" in OS.get_cmdline_user_args():
+	if _operation_only():
 		var config: GameConfig = ContentManager.base.duplicate(true)
 		config.planet_radius = 0.0
 		config.moon_count = 0
@@ -273,7 +472,7 @@ func _open_session() -> bool:
 		if generated!=OK: return false
 		var path := output.path_join("stage_88.json")
 		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-		scene = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":932,"cpp_start":{"equipment":[],"lab_mode":false}},true)
+		scene = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":932,"cpp_start":{"equipment":[],"lab_mode":false},"cpp_edit_source":{"stage":stage,"config":config,"definitions":{}}},true)
 		scene.auto_step = false
 		while scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
 	else:

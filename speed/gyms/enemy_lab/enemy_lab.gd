@@ -690,7 +690,7 @@ func _sync_view() -> void:
 	# HDRの本番映像を通常のUIへ重ねるときだけ、表示用の色へ変換する。
 	(game_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", session.viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	# 本番の画面のうち HUD・ミニマップ・背景の星は、表示メニューで選んだときだけ出す
-	render.show_background = canvas.show_background
+	if render.cpp_background!=null: render.cpp_background.set_details_visible(canvas.show_background)
 	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud") if session.scene.view != null else null
 	if hud != null:
 		hud.visible = canvas.show_hud or canvas.show_minimap
@@ -777,8 +777,6 @@ func _undo(redo := false, route_edit := false) -> void:
 		canvas.cancel_gesture()
 		if redo: await session.redo_edit()
 		else: await session.undo_edit()
-		var render: RunPresentation = controls._render()
-		if render != null: render._apply_lighting()
 	_refresh()
 
 func _notification(what: int) -> void:

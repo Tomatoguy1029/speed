@@ -71,9 +71,10 @@ func refresh(snapshot: Dictionary, ui: Dictionary) -> void:
 	state.data = values
 	ship.data = {"invincible":snapshot.invincible}
 	var table := {}
-	for key in ["id","type","pos","vel","hp","max_hp","armor","speed","r","facing","dead","elite","gate","mode","charge","parent","is_boss","alive","def","parts","links","attack_managed","attack_value","attack_priority"]: table[key] = []
+	for key in ["id","type","pos","vel","hp","max_hp","armor","speed","r","facing","dead","elite","gate","mode","charge","parent","is_boss","meteor_index","alive","def","parts","links","attack_managed","attack_value","attack_priority"]: table[key] = []
 	for enemy: Dictionary in snapshot.enemies:
 		for key in enemy: table[key].append(StringName(enemy[key]) if key=="type" else int(enemy[key]) if key in ["dead","elite","is_boss"] else enemy[key])
+		if not enemy.has("meteor_index"): table.meteor_index.append(-1)
 		table.alive.append(true)
 		table.def.append(enemies.def_of(StringName(enemy.type)))
 		table.parts.append([])

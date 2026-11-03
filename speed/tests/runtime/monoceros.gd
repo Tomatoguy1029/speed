@@ -31,6 +31,9 @@ func _exit_tree() -> void:
 	if semantics_strict():print("SEMANTICS_FIELDS ",semantics_fields," failures=",failed)
 
 func _ready() -> void:
+	if "--cpp-finish-click" in OS.get_cmdline_user_args():
+		call_deferred("native_finish_click")
+		return
 	if "--cpp-finish-source-hp" in OS.get_cmdline_user_args():
 		call_deferred("native_finish_source_hp")
 		return
@@ -986,12 +989,13 @@ func native_sword() -> void:
 	print("[cpp_monoceros_sword] failures=",failed)
 	get_tree().quit(1 if failed else 0)
 
-func finish_fixture(limit := -1.0, automatic := false) -> Dictionary:
+func finish_fixture(limit := -1.0, automatic := false, normal_finish_times := false) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
 	cfg.character_scale = 1.0
-	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
+	if not normal_finish_times:
+		for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
 	cfg.death_freeze_time = 0.01
 	cfg.death_explosion_time = 0.01
 	cfg.death_game_over_time = 0.01
@@ -1021,6 +1025,44 @@ func finish_low_hp(f: Dictionary) -> void:
 	f.bridge.command("dev_damage",{"entity_id":f.id,"amount":amount,"cause":"debug","no_crit":true})
 	f.bridge._core.step(0.01)
 	f.bridge._core.step(0.01)
+
+func native_finish_click() -> void:
+	var f := finish_fixture(-1.0,false,true)
+	if f.is_empty(): get_tree().quit(1);return
+	finish_low_hp(f)
+	f.bridge.command("dev_kill",{"entity_id":f.id,"cause":"debug"})
+	finish_steps(f.bridge,1)
+	finish_steps(f.bridge,48)
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = f.bridge
+	hud.size = get_viewport().get_visible_rect().size
+	add_child(hud)
+	hud.apply_snapshot(f.bridge.read_frame().value.ui)
+	hud._update_cpp_finish()
+	await get_tree().process_frame
+	var button: Button = hud._finish_skip
+	check(button.is_visible_in_tree(),"撃破演出のスキップを正式HUDへ表示する")
+	var point := button.get_global_rect().get_center()
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	get_viewport().push_input(motion,true)
+	for down in [true,false]:
+		var event := InputEventMouseButton.new()
+		event.position = point
+		event.global_position = point
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		event.pressed = down
+		get_viewport().push_input(event,true)
+	var finish: Dictionary = f.bridge.read_frame().value.ui.boss_finish
+	check(finish.elapsed>=finish.reveal_start+finish.reveal_duration,"撃破演出の実クリックで報酬演出を飛ばしてCLEARへ進む")
+	for i in ceili(f.cfg.boss_finish_clear_time*120.0)+2:
+		f.bridge.step(DT,f.bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)})
+	check(not f.bridge.read_frame().value.ui.boss_finish.active and f.bridge.read_frame().value.result!=null,"スキップ後のCLEAR表示を終えて結果を確定する")
+	hud.free()
+	f.bridge.dispose()
+	print("[撃破スキップの実操作] 失敗=%d" % failed)
+	get_tree().quit(1 if failed else 0)
 
 func finish_steps(bridge, count: int) -> void:
 	for i in count: check(bridge.step(DT,bridge.pack_intent(Intent.new()), {"logical_size":Vector2(640,360)}).ok,"決着を公開APIの固定更新で進める")

@@ -233,8 +233,10 @@ func _poll_cpp_loading() -> void:
 	loading_timings["presentation_setup_ms"] = (Time.get_ticks_usec()-scene_started)/1000.0
 	for recorder: Node in get_tree().get_nodes_in_group("cpp_recorders"):
 		recorder.attach_cpp(self)
-	if OS.is_debug_build():
-		bridge.recording_origin["conditions"] = preload("res://scripts/dev/recording_identity.gd").capture(self)
+	# 配布では開発用スクリプトを除くため、エディター実行時だけ取得する。
+	if OS.has_feature("editor"):
+		var identity = load("res://scripts/dev/recording_identity.gd")
+		bridge.recording_origin["conditions"] = identity.capture(self)
 		bridge.recording_origin.merge(bridge.recording_origin.conditions.run_state,true)
 	started.emit()
 	_apply_cpp_settings()

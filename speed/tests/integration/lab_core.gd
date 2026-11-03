@@ -12,6 +12,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-operation-ui" in OS.get_cmdline_user_args() or "--cpp-lab-undo-only" in OS.get_cmdline_user_args() or "--cpp-lab-appearance-only" in OS.get_cmdline_user_args() or "--cpp-lab-paint-display" in OS.get_cmdline_user_args():
+		await cpp_lab_operation_ui()
+		print("[実験場の実操作] 成功=%d 失敗=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab-actions" in OS.get_cmdline_user_args():
 		await cpp_lab_actions()
 		print("[cpp_lab_actions] passed=%d failed=%d" % [passed,failed])
@@ -103,6 +108,121 @@ func _ready() -> void:
 	await get_tree().process_frame
 	print("[lab_core] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
+
+func cpp_lab_operation_ui() -> void:
+	get_window().content_scale_size = Vector2i.ZERO
+	get_window().size = Vector2i(1920,1080)
+	var lab = load("res://gyms/enemy_lab/enemy_lab.tscn").instantiate()
+	add_child(lab)
+	for i in 1200:
+		if lab.session!=null and lab.session.run!=null: break
+		await get_tree().process_frame
+	var paint_display := "--cpp-lab-paint-display" in OS.get_cmdline_user_args()
+	var appearance_only := "--cpp-lab-appearance-only" in OS.get_cmdline_user_args() or paint_display
+	var undo_only := "--cpp-lab-undo-only" in OS.get_cmdline_user_args() or appearance_only
+	if not undo_only: check(lab.session.run!=null,"実験場の画面を開始する")
+	if lab.session.run==null: lab.free();return
+	if not paint_display: check(lab.controls._attack_meter!=null,"ラン生成前に攻撃一覧とメーターまで画面を構築する")
+	await get_tree().process_frame
+	var button: Control = lab.workspace.palette_buttons.biter
+	ui_click(button)
+	if not undo_only: check(lab.canvas.mode==1 and lab.canvas.spawn_type=="biter","敵パレットの実クリックで配置する敵を選ぶ")
+	var before: int = lab.session.bridge.read_metrics().value.enemies
+	ui_click(lab.canvas)
+	if not undo_only: check(lab.session.bridge.read_metrics().value.enemies==before+1,"フィールドの実クリックで選んだ敵を置く")
+	if appearance_only:
+		await lab_appearance_operations(lab)
+		lab.free()
+		return
+	ui_key(KEY_Z,true)
+	for i in 1200:
+		if not lab.session.seeking: break
+		await get_tree().process_frame
+	check(lab.session.bridge.read_metrics().value.enemies==before,"Ctrl+Zの実入力で配置を取り消す")
+	ui_key(KEY_Z,true,true)
+	for i in 1200:
+		if not lab.session.seeking: break
+		await get_tree().process_frame
+	check(lab.session.bridge.read_metrics().value.enemies==before+1,"Ctrl+Shift+Zの実入力で配置を戻す")
+	ui_click(lab._play)
+	if not undo_only: check(lab.session.playing,"再生ボタンの実クリックで試遊を始める")
+	ui_key(KEY_SPACE)
+	if not undo_only: check(not lab.session.playing,"Spaceの実入力で試遊を停止する")
+	lab.free()
+
+func ui_click(control: Control) -> void:
+	var point := control.get_global_transform_with_canvas()*(control.size*0.5)
+	ui_click_point(point)
+
+func ui_click_point(point: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	get_viewport().push_input(motion,true)
+	for down in [true,false]:
+		var event := InputEventMouseButton.new()
+		event.position = point
+		event.global_position = point
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		event.pressed = down
+		get_viewport().push_input(event,true)
+
+func show_control(control: Control) -> void:
+	var parent := control.get_parent()
+	while parent!=null:
+		if parent is ScrollContainer: parent.ensure_control_visible(control)
+		parent = parent.get_parent()
+	await get_tree().process_frame
+
+func lab_appearance_operations(lab) -> void:
+	var display_only := "--cpp-lab-paint-display" in OS.get_cmdline_user_args()
+	var controls = lab.controls
+	for button in lab.find_children("*","Button",true,false):
+		if button.text==tr("lab.appearance.title") and button.is_visible_in_tree():
+			ui_click(button)
+			break
+	await get_tree().process_frame
+	if not display_only: check(controls.current_tab==5,"外観タブへ実クリックで切り替える")
+	for button in controls.find_children("*","Button",true,false):
+		if button.text!=tr("lab.appearance.focus"): continue
+		await show_control(button)
+		ui_click(button)
+		break
+	if not display_only: check(lab.canvas.center==lab.session.run.enemies.table.pos[lab.session.selected] and is_finite(lab.canvas.zoom),"拡大ボタンの実クリックで選んだ敵に表示を合わせる")
+	var armor: Control = controls._armor_view
+	await show_control(armor)
+	var colors: Dictionary = lab.session.run.enemies.def_of(&"biter").armor_colors.duplicate(true)
+	var rect: Rect2 = armor._image_rect()
+	var pixel: int = armor.data.regions.values()[0][0]
+	var local: Vector2 = rect.position+(Vector2(pixel%int(armor.data.width),pixel/int(armor.data.width))+Vector2.ONE*0.5)*rect.size/armor.source.get_size()
+	var presentation: RunPresentation = controls._render()
+	var previous_scope := presentation.cpp_scope
+	ui_click_point(armor.get_global_transform_with_canvas()*local)
+	if not display_only: check(lab.session.run.enemies.def_of(&"biter").armor_colors!=colors,"装甲片の実クリックでその片だけ塗り替える")
+	if not display_only: check(presentation.cpp_scope!=previous_scope,"塗り替えた表示資源を現在のランへ渡す")
+	await get_tree().process_frame
+	var view = presentation.frame_view
+	check(not view.enemy_frames.is_empty(),"塗り替えた敵の描画実体がある")
+	if not view.enemy_frames.is_empty():
+		var id: int = view.enemy_frames.keys()[0]
+		var entry: Dictionary = view.visuals[id]
+		var look: EnemyLook = presentation.cpp_scope.resources[entry.path]
+		var display = view.enemy_frames[id]
+		var material: ShaderMaterial = display._parts[0].armor.material
+		check(material.get_shader_parameter("paint_tex")==look.painted_armors[entry.paint],"実クリックで塗った色を描画中の材質へ反映する")
+	ui_key(KEY_Z,true)
+	if not display_only: check(lab.session.run.enemies.def_of(&"biter").armor_colors==colors,"装甲の塗り替えを実キー操作で取り消す")
+
+func ui_key(code: Key, ctrl := false, shift := false) -> void:
+	for down in [true,false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.physical_keycode = code
+		event.pressed = down
+		event.ctrl_pressed = ctrl and OS.get_name()!="macOS"
+		event.meta_pressed = ctrl and OS.get_name()=="macOS"
+		event.shift_pressed = shift
+		get_viewport().push_input(event,true)
 
 func cpp_lab_actions() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()

@@ -137,17 +137,11 @@ func _paint_armor_piece(region: int, restore: bool) -> void:
 	if colors == def.armor_colors:
 		return
 	lab.session.perform("armor_paint", {"type": String(_appearance_type), "colors": colors})
-	var render := _render()
-	if render != null:
-		render._apply_lighting()
 
 func _set_visual(value: float, key: String) -> void:
 	if _appearance_type == &"":
 		return
 	lab.session.perform("parameter", {"type": String(_appearance_type), "key": "visual." + key, "value": value})
-	var render := _render()
-	if render != null:
-		render._apply_lighting()
 
 ## 実験場の表示付きのランの描画（表示のない試行では null）。
 func _render() -> RunPresentation:
@@ -325,13 +319,21 @@ func _focus_appearance() -> void:
 	lab.canvas.follow = false
 	lab.canvas.center = table.pos[i]
 	var available: float = maxf(40.0, minf(lab.canvas.size.x, lab.canvas.size.y) - 80.0)
-	lab.canvas.zoom = minf(8.0, available / maxf(1.0, _render().enemy_sprite_radius(table.type[i], table.r[i]) * 2.0 * sqrt(2.0)))
+	lab.canvas.zoom = minf(8.0, available / maxf(1.0, _appearance_radius(table.type[i], table.r[i]) * 2.0 * sqrt(2.0)))
 	lab.canvas.show_ranges = false
 	lab.canvas.show_ids = false
 	lab.canvas.selection.assign([table.id[i]])
 	_appearance_angle.set_value_no_signal(wrapf(rad_to_deg(table.facing[i]), -180, 180))
 	lab._sync_view()
 	lab._refresh()
+
+func _appearance_radius(type: StringName, collision_radius: float) -> float:
+	var run = lab.session.run
+	var definition: EnemyDef = run.enemies.def_of(type)
+	var look := RunPresentation.load_look(type,run.state.stage)
+	var radius := collision_radius/(definition.visual_value("collision_scale",1.0) if definition!=null else 1.0)
+	if look==null or look.size_from_collision: return radius
+	return maxf(look.base.get_width(),look.base.get_height())*0.5*radius/maxf(definition.radius if definition!=null else radius,0.001)
 
 func _rotate_appearance(degrees: float) -> void:
 	if not is_instance_valid(lab.session.run):
@@ -496,8 +498,10 @@ func _attacks(box: Node) -> void:
 	_number(box, tr("lab.attack.jitter"), 0.3, 0, 3, 0.05, func(value): _settings.jitter = value; _apply_director())
 	# 通常敵の攻撃の重さ（種類ごと。正の値だけ予算管理へ入る）
 	var heavy = UI.fold(box, tr("lab.attack.danger"))
+	# 分類は固定の表示用定義。ランを生成する前の画面構築でも使う。
+	var director := preload("res://scripts/runtime/run_read_model.gd").Values.new()
 	for def in ContentManager.sorted(ContentManager.enemies):
-		if not lab.session.run.projectiles.director.categories(def.behavior).is_empty():
+		if not director.categories(def.behavior).is_empty():
 			_number(heavy, "%s %s" % [def.display_name, def.id], def.attack_weight, 0, 20, 0.25,
 				func(value): lab.session.perform("parameter", {"type": String(def.id), "key": "attack_weight", "value": value}))
 	var meter = load("res://gyms/enemy_lab/lab_attack_meter.gd").new()

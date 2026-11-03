@@ -54,6 +54,11 @@ func update_frame(camera: Dictionary) -> void:
 func _draw() -> void:
 	draw_rect(area,color)
 
+## 実験場の表示メニューでは、地の色を保って星・画像・炎を切り替える。
+func set_details_visible(enabled: bool) -> void:
+	for child in get_children():
+		if child is CanvasItem: child.visible = enabled
+
 ## 制作プレビューは一時停止・コマ送りの時計で炎も動かす。
 func set_manual(value: bool) -> void:
 	for row: Dictionary in fires: row.node.manual = value
