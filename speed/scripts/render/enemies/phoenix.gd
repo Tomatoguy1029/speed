@@ -39,7 +39,8 @@ func apply_frame(values: PackedFloat64Array, clock: float, zoom: float) -> void:
 	_frame_pixel = 1.0/maxf(zoom,0.01)
 	flame_settings = COMPONENTS.phoenix("enemy/phoenix",preload("res://data/visuals/phoenix_flames.tres"))
 	var material := _frame_flames.material as ShaderMaterial
-	flame_settings.apply(material)
+	for key in ["ember_color", "flame_color", "hot_color", "smoke_color", "amount", "speed", "pixel_size", "turbulence", "sparks", "opacity", "emission", "stretch", "lift"]:
+		material.set_shader_parameter(key,flame_settings.get(key))
 	material.set_shader_parameter("linear_colors",_frame_flames.get_viewport().use_hdr_2d)
 	material.set_shader_parameter("clock",clock)
 	_frame_marks.queue_redraw()

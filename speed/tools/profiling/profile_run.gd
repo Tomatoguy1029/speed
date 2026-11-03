@@ -156,17 +156,17 @@ func _ready() -> void:
 	session.cpp_finished.connect(func(result: Dictionary): run_result=result.duplicate(true))
 	view = session.view.get_node("RunPresentation").frame_view
 	bridge.subscribe("final_profile",_receive)
-	if not _command("dev_debug",{"action":"reset_loadout","args":{}}): return
+	if not _command("dev_edit",{"kind":"debug_action","payload":{"action":"reset_loadout","args":{}}}): return
 	for id: String in expected_equipment:
 		if not _command("dev_grant_equipment",{"kind":"trait" if id.begins_with("T") else "weapon","id":id,"levels":expected_equipment[id]}): return
 	if not _command("dev_benchmark",{"leveling":options.levels=="on"}): return
 	if not _command("set_settings",{"hitstop":options.hitstop=="on"}): return
 	if options.mode=="condition" and not _command("dev_benchmark",{"survive":true}): return
-	if options.mode=="condition" and not _command("dev_debug",{"action":"time","args":{"seconds":float(options.time)}}): return
+	if options.mode=="condition" and not _command("dev_edit",{"kind":"debug_action","payload":{"action":"time","args":{"seconds":float(options.time)}}}): return
 	if options.has("boss_hp") and not _command("dev_benchmark",{"boss_hp":float(options.boss_hp)}): return
 	position_rng.seed = int(options.seed)
 	drive_center = bridge.latest_frame().value.ui.ship.ship_pos
-	session.cpp_input_source = _input
+	session.cpp_input_source = _drive_intent
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(),true)
 	ready_us = Time.get_ticks_usec()
 	configured = true
@@ -174,7 +174,7 @@ func _ready() -> void:
 	await get_tree().create_timer(float(options.warmup)).timeout
 	if finished: return
 	if options.has("mixed_target"):
-		if not _command("dev_debug",{"action":"clear_enemies","args":{}}): return
+		if not _command("dev_edit",{"kind":"debug_action","payload":{"action":"clear_enemies","args":{}}}): return
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		_refill()
@@ -224,7 +224,7 @@ func _command(kind: String, payload: Dictionary) -> bool:
 	if not reply.ok: _fail("条件を設定できません: "+kind+" "+str(reply))
 	return reply.ok
 
-func _input() -> Intent:
+func _drive_intent() -> Intent:
 	var packet: Dictionary = bridge.latest_frame().value
 	var ship: Dictionary = packet.ui.ship
 	var draw: Dictionary = packet.ui.draw
