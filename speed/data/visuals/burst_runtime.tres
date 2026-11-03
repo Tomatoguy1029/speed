@@ -1,134 +1,236 @@
-[gd_resource type="Resource" load_steps=24 format=3]
+[gd_resource type="Resource" format=3 uid="uid://dyr6fuimpd05e"]
 
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/pump_p0.gdshader" id="s1"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/pump_p2.gdshader" id="s2"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/pump_p3.gdshader" id="s3"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/bomber_p1.gdshader" id="s4"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/bomber_p0.gdshader" id="s5"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/bomber_p2.gdshader" id="s6"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/bomber_p3.gdshader" id="s7"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/mine_p1.gdshader" id="s8"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/mine_p0.gdshader" id="s9"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/mine_p2.gdshader" id="s10"]
-[ext_resource type="Shader" path="res://shaders/runtime_bursts/mine_p3.gdshader" id="s11"]
-[ext_resource type="Texture3D" path="res://assets/effects/build/burst_noise_volume.png" id="noise"]
-
-[sub_resource type="ShaderMaterial" id="m1"]
-shader = ExtResource("s1")
-shader_parameter/value_noise = ExtResource("noise")
-
-[sub_resource type="ShaderMaterial" id="m2"]
-shader = ExtResource("s2")
-
-[sub_resource type="ShaderMaterial" id="m3"]
-shader = ExtResource("s3")
+[ext_resource type="CompressedTexture3D" uid="uid://nfwn64pvffwt" path="res://assets/effects/build/burst_noise_volume.png" id="noise"]
+[ext_resource type="Shader" uid="uid://deuqcad21b1qn" path="res://shaders/runtime_bursts/pump_p0.gdshader" id="s1"]
+[ext_resource type="Shader" uid="uid://ots4uooy5i5x" path="res://shaders/runtime_bursts/pump_p2.gdshader" id="s2"]
+[ext_resource type="Shader" uid="uid://6wt5j0xwa182" path="res://shaders/runtime_bursts/pump_p3.gdshader" id="s3"]
+[ext_resource type="Shader" uid="uid://ddc2j8lwcef2l" path="res://shaders/runtime_bursts/bomber_p1.gdshader" id="s4"]
+[ext_resource type="Shader" uid="uid://ejmo81dq8gfq" path="res://shaders/runtime_bursts/bomber_p0.gdshader" id="s5"]
+[ext_resource type="Shader" uid="uid://hiygeht5qadd" path="res://shaders/runtime_bursts/bomber_p2.gdshader" id="s6"]
+[ext_resource type="Shader" uid="uid://dfdqr3m8t6bjb" path="res://shaders/runtime_bursts/bomber_p3.gdshader" id="s7"]
+[ext_resource type="Shader" uid="uid://cxue1ex5ep8d6" path="res://shaders/runtime_bursts/mine_p1.gdshader" id="s8"]
+[ext_resource type="Shader" uid="uid://b2q5pn8pega7" path="res://shaders/runtime_bursts/mine_p0.gdshader" id="s9"]
+[ext_resource type="Shader" uid="uid://bekjhxgag20bf" path="res://shaders/runtime_bursts/mine_p2.gdshader" id="s10"]
+[ext_resource type="Shader" uid="uid://bf77m6j3ageu8" path="res://shaders/runtime_bursts/mine_p3.gdshader" id="s11"]
 
 [sub_resource type="ShaderMaterial" id="m4"]
 shader = ExtResource("s4")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
 
 [sub_resource type="ShaderMaterial" id="m5"]
 shader = ExtResource("s5")
+shader_parameter/linear_colors = true
 shader_parameter/value_noise = ExtResource("noise")
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/origin = Vector2(0, 0)
+shader_parameter/seed = 0.0
 
 [sub_resource type="ShaderMaterial" id="m6"]
 shader = ExtResource("s6")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
 
 [sub_resource type="ShaderMaterial" id="m7"]
 shader = ExtResource("s7")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
+
+[sub_resource type="ShaderMaterial" id="m1"]
+shader = ExtResource("s1")
+shader_parameter/linear_colors = true
+shader_parameter/value_noise = ExtResource("noise")
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/origin = Vector2(0, 0)
+shader_parameter/seed = 0.0
+
+[sub_resource type="ShaderMaterial" id="m2"]
+shader = ExtResource("s2")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
+
+[sub_resource type="ShaderMaterial" id="m3"]
+shader = ExtResource("s3")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
 
 [sub_resource type="ShaderMaterial" id="m8"]
 shader = ExtResource("s8")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
 
 [sub_resource type="ShaderMaterial" id="m9"]
 shader = ExtResource("s9")
+shader_parameter/linear_colors = true
 shader_parameter/value_noise = ExtResource("noise")
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/origin = Vector2(0, 0)
+shader_parameter/seed = 0.0
 
 [sub_resource type="ShaderMaterial" id="m10"]
 shader = ExtResource("s10")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
 
 [sub_resource type="ShaderMaterial" id="m11"]
 shader = ExtResource("s11")
+shader_parameter/linear_colors = true
+shader_parameter/half_cells = 120.0
+shader_parameter/radius = 38.0
+shader_parameter/age = 0.0
+shader_parameter/seed = 0.0
 
 [resource]
 metadata/bake_version = 2
 metadata/source_sha256 = "c3c6e9c39db28ce69674eceb1d9813abec088314fb0e3b3a06cc30c39914aec7"
 metadata/profiles = {
-"res://scenes/attacks/zone_pump.tscn": {
-"passes": [{"material": SubResource("m1"), "mode": 0, "count": 1, "parameters": ["linear_colors", "half_cells", "radius", "age", "origin", "seed"]}, {"material": SubResource("m2"), "mode": 2, "count": 35, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}, {"material": SubResource("m3"), "mode": 3, "count": 30, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}],
-"time_scale": 1.8,
-"pixel_scale": 1.0,
-"effect_scale": 0.8333333333333333,
-"glow_energy": 1.0,
-"effect_tint": Color(1.0, 1.0, 1.0, 1.0),
-"life": 0.6675000074506,
-"reach": [2.3843885249922643, 1.46, 1.3394736885240317, 1.3657894736842107],
-"removed_layers": ["ring", "smoke"]
-},
 "res://scenes/attacks/zone_bomber.tscn": {
-"passes": [{"material": SubResource("m4"), "mode": 1, "count": 8, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}, {"material": SubResource("m5"), "mode": 0, "count": 1, "parameters": ["linear_colors", "half_cells", "radius", "age", "origin", "seed"]}, {"material": SubResource("m6"), "mode": 2, "count": 30, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}, {"material": SubResource("m7"), "mode": 3, "count": 20, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}],
-"time_scale": 0.7999999999999999,
-"pixel_scale": 1.0,
 "effect_scale": 0.6,
+"effect_tint": Color(1, 1, 1, 1),
 "glow_energy": 1.0,
-"effect_tint": Color(1.0, 1.0, 1.0, 1.0),
 "life": 1.0025000074506,
+"passes": [{
+"count": 8,
+"material": SubResource("m4"),
+"mode": 1,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}, {
+"count": 1,
+"material": SubResource("m5"),
+"mode": 0,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "origin", "seed"]
+}, {
+"count": 30,
+"material": SubResource("m6"),
+"mode": 2,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}, {
+"count": 20,
+"material": SubResource("m7"),
+"mode": 3,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}],
+"pixel_scale": 1.0,
 "reach": [3.2991459179412574, 1.46, 1.3394736885240317, 1.628947373126695],
-"removed_layers": ["ring"]
+"removed_layers": ["ring"],
+"time_scale": 0.7999999999999999
+},
+"res://scenes/attacks/zone_pump.tscn": {
+"effect_scale": 0.8333333333333333,
+"effect_tint": Color(1, 1, 1, 1),
+"glow_energy": 1.0,
+"life": 0.6675000074506,
+"passes": [{
+"count": 1,
+"material": SubResource("m1"),
+"mode": 0,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "origin", "seed"]
+}, {
+"count": 35,
+"material": SubResource("m2"),
+"mode": 2,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}, {
+"count": 30,
+"material": SubResource("m3"),
+"mode": 3,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}],
+"pixel_scale": 1.0,
+"reach": [2.3843885249922643, 1.46, 1.3394736885240317, 1.3657894736842109],
+"removed_layers": ["ring", "smoke"],
+"time_scale": 1.8
 },
 "weapon/mines": {
-"passes": [{"material": SubResource("m8"), "mode": 1, "count": 13, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}, {"material": SubResource("m9"), "mode": 0, "count": 1, "parameters": ["linear_colors", "half_cells", "radius", "age", "origin", "seed"]}, {"material": SubResource("m10"), "mode": 2, "count": 60, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}, {"material": SubResource("m11"), "mode": 3, "count": 40, "parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]}],
-"time_scale": 1.1,
-"pixel_scale": 1.0,
 "effect_scale": 0.8333333333333334,
+"effect_tint": Color(1, 1, 1, 1),
 "glow_energy": 0.9,
-"effect_tint": Color(1.0, 1.0, 1.0, 1.0),
 "life": 1.20000001341108,
-"reach": [2.2969117350069905, 1.2100000149012, 1.2236842157025223, 1.7868421123216214],
-"removed_layers": []
+"passes": [{
+"count": 13,
+"material": SubResource("m8"),
+"mode": 1,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}, {
+"count": 1,
+"material": SubResource("m9"),
+"mode": 0,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "origin", "seed"]
+}, {
+"count": 60,
+"material": SubResource("m10"),
+"mode": 2,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}, {
+"count": 40,
+"material": SubResource("m11"),
+"mode": 3,
+"parameters": ["linear_colors", "half_cells", "radius", "age", "seed"]
+}],
+"pixel_scale": 1.0,
+"reach": [2.2969117350069905, 1.2100000149012, 1.2236842157025225, 1.7868421123216214],
+"removed_layers": [],
+"time_scale": 1.1
 }
 }
 metadata/inputs = {
-    "res://tools/art/bake_burst_profiles.py": "99883e4dee605b129cfb700713e2a6957b32e040e3fa033b8dc0b1922a312eae",
-    "res://shaders/burst_noise.gdshaderinc": "8f2c53fdc0424ea13d411ebdc9e0e628fd632f982eb78af98a915420de701a75",
-    "res://scripts/render/fx/blast_bursts.gd": "470f69f0a8039f686a08e439bfdbb8d05d068b8f30f2666a829844d2a23fb6e5",
-    "res://scripts/render/fx/burst_runtime.gd": "a2edde6bf9ed307606cf08a7e4d202c3ba03c789aa6a538898bf5a2a3bee977b",
-    "res://scripts/render/attacks/zone_bomber.gd": "0f5e6c5ca5dc99956bace457da08c5d5133d2da9c2e863efa92932b586b691f4",
-    "res://scripts/render/attacks/zone_pump.gd": "6a5e7f31efa431e3e813b807093387448eb9e53189c3f60e9e3747adcdc01805",
-    "res://scripts/render/equipment/mines.gd": "c0bbe62e5c7154d64bf90bbe3364178dcb1caa0488f19472b05c9298f7a66d0a",
-    "res://shaders/blast_burst_body.gdshaderinc": "d94de33e6f4bd06309de41ff0300864ede44f3350f599f35de74484906fa2fa7",
-    "res://shaders/blast_burst.gdshader": "946b0c69987d670d0807523fdc4c66da6e1df925bf51490707b25d5bcec3f62f",
-    "res://shaders/bomber_burst.gdshader": "b21ebf7be2633831b32293c8e5ae24a5f658a2fec69b772a20a6772ce149b848",
-    "res://shaders/mine_burst.gdshader": "0047c3cc096207d8ddd295b4490090dcc163a553ff7e46e8680882e3253db247"
+"res://scripts/render/attacks/zone_bomber.gd": "0f5e6c5ca5dc99956bace457da08c5d5133d2da9c2e863efa92932b586b691f4",
+"res://scripts/render/attacks/zone_pump.gd": "6a5e7f31efa431e3e813b807093387448eb9e53189c3f60e9e3747adcdc01805",
+"res://scripts/render/equipment/mines.gd": "c0bbe62e5c7154d64bf90bbe3364178dcb1caa0488f19472b05c9298f7a66d0a",
+"res://scripts/render/fx/blast_bursts.gd": "470f69f0a8039f686a08e439bfdbb8d05d068b8f30f2666a829844d2a23fb6e5",
+"res://scripts/render/fx/burst_runtime.gd": "a2edde6bf9ed307606cf08a7e4d202c3ba03c789aa6a538898bf5a2a3bee977b",
+"res://shaders/blast_burst.gdshader": "946b0c69987d670d0807523fdc4c66da6e1df925bf51490707b25d5bcec3f62f",
+"res://shaders/blast_burst_body.gdshaderinc": "d94de33e6f4bd06309de41ff0300864ede44f3350f599f35de74484906fa2fa7",
+"res://shaders/bomber_burst.gdshader": "b21ebf7be2633831b32293c8e5ae24a5f658a2fec69b772a20a6772ce149b848",
+"res://shaders/burst_noise.gdshaderinc": "8f2c53fdc0424ea13d411ebdc9e0e628fd632f982eb78af98a915420de701a75",
+"res://shaders/mine_burst.gdshader": "0047c3cc096207d8ddd295b4490090dcc163a553ff7e46e8680882e3253db247",
+"res://tools/art/bake_burst_profiles.py": "99883e4dee605b129cfb700713e2a6957b32e040e3fa033b8dc0b1922a312eae"
 }
 metadata/saved_profiles = {
-    "res://scenes/attacks/zone_pump.tscn": "b7f6c2630cc9dd8b7c26a893322819d18cc4e585654abaa2a9ac56b604e1dd00",
-    "res://scenes/attacks/zone_bomber.tscn": "826f1753880666b54d141e6ceea4b135c5a25345c8a38cd20374ace4dafa0afd",
-    "weapon/mines": "444a689c6913360f1c08331f383f952d20dd98c5a62f708925a69296a8ed42f0"
+"res://scenes/attacks/zone_bomber.tscn": "826f1753880666b54d141e6ceea4b135c5a25345c8a38cd20374ace4dafa0afd",
+"res://scenes/attacks/zone_pump.tscn": "b7f6c2630cc9dd8b7c26a893322819d18cc4e585654abaa2a9ac56b604e1dd00",
+"weapon/mines": "444a689c6913360f1c08331f383f952d20dd98c5a62f708925a69296a8ed42f0"
 }
 metadata/inactive_fields = {
-    "res://scenes/attacks/zone_bomber.tscn": [
-        "shader/fire_burst/burn_speed",
-        "shader/fire_burst/c0",
-        "shader/fire_burst/c1",
-        "shader/fire_burst/c2",
-        "shader/fire_burst/c3",
-        "shader/fire_burst/flash_boost",
-        "shader/fire_burst/noise_scale",
-        "shader/fire_burst/outer_dither",
-        "shader/fire_burst/roughness",
-        "shader/fire_burst/start_size"
-    ]
+"res://scenes/attacks/zone_bomber.tscn": ["shader/fire_burst/burn_speed", "shader/fire_burst/c0", "shader/fire_burst/c1", "shader/fire_burst/c2", "shader/fire_burst/c3", "shader/fire_burst/flash_boost", "shader/fire_burst/noise_scale", "shader/fire_burst/outer_dither", "shader/fire_burst/roughness", "shader/fire_burst/start_size"]
 }
 metadata/outputs = {
-    "res://shaders/runtime_bursts/pump_p0.gdshader": "5872c0a11c173ce2ac32fa6ee2869f7c128fb2fb20a677a30861b925bfd51c69",
-    "res://shaders/runtime_bursts/pump_p2.gdshader": "bafe162cd6fcc6f2b9601dd6860809a01b269644ac868af74072b12a91645abf",
-    "res://shaders/runtime_bursts/pump_p3.gdshader": "2fc3303edc5800ca051059e12068b05892b376d60c12a0cdeaea0dad75ab1ea1",
-    "res://shaders/runtime_bursts/bomber_p1.gdshader": "5412b6f16caee983686eae4adf460d7f21f39682b1741fae22b45abbeaac1e15",
-    "res://shaders/runtime_bursts/bomber_p0.gdshader": "393b6dba0fa2ed285bc4e5f300e7f4ef00d7c2e57d450b3ce8b52fcf4d47d011",
-    "res://shaders/runtime_bursts/bomber_p2.gdshader": "aa2fdcda7d70124e65920891dfe8165ce0f03e59b5ec836b81f062e41ad08494",
-    "res://shaders/runtime_bursts/bomber_p3.gdshader": "c9c6d0f6093c51a3aca2ed58efd4d34d49b08f2a38255ded18293e8ae2439452",
-    "res://shaders/runtime_bursts/mine_p1.gdshader": "a74b8e200e189412134b746411623e1a48aa494461ad48bcf82d983aaa60c633",
-    "res://shaders/runtime_bursts/mine_p0.gdshader": "a662a91540f3ec81b81f690a0b0a33c8b11f90166d43b7f1a74deecf44c7b24b",
-    "res://shaders/runtime_bursts/mine_p2.gdshader": "360f1b4d47e75ce40af562ac1a8ee1f82dd6518d787ab2bb91ff5d212f3d37c8",
-    "res://shaders/runtime_bursts/mine_p3.gdshader": "6c91ee7c91df360bb3574b927b3c6e39a9b4ca2a41a89b95e27f0bac139ab0f1"
+"res://shaders/runtime_bursts/bomber_p0.gdshader": "393b6dba0fa2ed285bc4e5f300e7f4ef00d7c2e57d450b3ce8b52fcf4d47d011",
+"res://shaders/runtime_bursts/bomber_p1.gdshader": "5412b6f16caee983686eae4adf460d7f21f39682b1741fae22b45abbeaac1e15",
+"res://shaders/runtime_bursts/bomber_p2.gdshader": "aa2fdcda7d70124e65920891dfe8165ce0f03e59b5ec836b81f062e41ad08494",
+"res://shaders/runtime_bursts/bomber_p3.gdshader": "c9c6d0f6093c51a3aca2ed58efd4d34d49b08f2a38255ded18293e8ae2439452",
+"res://shaders/runtime_bursts/mine_p0.gdshader": "a662a91540f3ec81b81f690a0b0a33c8b11f90166d43b7f1a74deecf44c7b24b",
+"res://shaders/runtime_bursts/mine_p1.gdshader": "a74b8e200e189412134b746411623e1a48aa494461ad48bcf82d983aaa60c633",
+"res://shaders/runtime_bursts/mine_p2.gdshader": "360f1b4d47e75ce40af562ac1a8ee1f82dd6518d787ab2bb91ff5d212f3d37c8",
+"res://shaders/runtime_bursts/mine_p3.gdshader": "6c91ee7c91df360bb3574b927b3c6e39a9b4ca2a41a89b95e27f0bac139ab0f1",
+"res://shaders/runtime_bursts/pump_p0.gdshader": "5872c0a11c173ce2ac32fa6ee2869f7c128fb2fb20a677a30861b925bfd51c69",
+"res://shaders/runtime_bursts/pump_p2.gdshader": "bafe162cd6fcc6f2b9601dd6860809a01b269644ac868af74072b12a91645abf",
+"res://shaders/runtime_bursts/pump_p3.gdshader": "2fc3303edc5800ca051059e12068b05892b376d60c12a0cdeaea0dad75ab1ea1"
 }
