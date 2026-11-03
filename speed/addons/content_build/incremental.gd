@@ -59,7 +59,9 @@ func run(key: String, inputs: PackedStringArray, build: Callable, force := false
 		report.append({"unit":key,"rebuilt":false,"ms":(Time.get_ticks_usec()-started)/1000.0})
 		return OK
 	var result: Dictionary = build.call()
-	if result.error != OK: return result.error
+	if result.error != OK:
+		report.append({"unit":key,"rebuilt":false,"error":result.error,"ms":(Time.get_ticks_usec()-started)/1000.0})
+		return result.error
 	var outputs: PackedStringArray = result.outputs
 	if outputs.is_empty(): return ERR_INVALID_DATA
 	for path in outputs:

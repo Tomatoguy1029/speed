@@ -39,6 +39,26 @@ static func is_current(output := ROOT) -> bool:
 		if not FileAccess.file_exists(path): return false
 	return true
 static var last_build_report: Array[Dictionary] = []
+const EDITOR_RESULT_PREFIX := "SPEED_CONTENT_BUILD_RESULT:"
+
+## エディターが保持した古いC++拡張・Resourceを、生成に使わない。
+static func build_for_editor() -> Error:
+	last_build_report = []
+	var output := []
+	var args := PackedStringArray(["--headless","--path",ProjectSettings.globalize_path("res://"),"--quit-after","1",
+		"--script","res://tools/content/build_all.gd","--","--editor-build-report"])
+	var exit_code := OS.execute(OS.get_executable_path(),args,output,true)
+	var result_error: Error = FAILED
+	for chunk: String in output:
+		for line: String in chunk.split("\n"):
+			if line.begins_with(EDITOR_RESULT_PREFIX):
+				var result: Variant = JSON.parse_string(line.trim_prefix(EDITOR_RESULT_PREFIX))
+				if result is Dictionary and (result.get("error") is float or result.get("error") is int) and result.get("report") is Array:
+					result_error = int(result.error)
+					last_build_report.assign(result.report)
+			elif not line.is_empty() and not line.begins_with("Godot Engine "):
+				print(line)
+	return FAILED if exit_code!=0 and result_error==OK else result_error
 
 static func _select(files: PackedStringArray, prefixes: Array) -> PackedStringArray:
 	var chosen := PackedStringArray(["res://project.godot", "res://addons/content_build/builder.gd", "res://addons/content_build/incremental.gd"])
@@ -139,6 +159,7 @@ static func _build_units(force: bool, output: String) -> Error:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output.path_join("dev")))
 	var cache := preload("res://addons/content_build/incremental.gd").new()
 	cache.open(output.path_join("dev/build_cache.json"))
+	last_build_report = cache.report
 	var files := PackedStringArray()
 	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
 	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle"]: files.append("res://tools/art/"+name+".py")
@@ -208,7 +229,6 @@ static func _build_units(force: bool, output: String) -> Error:
 	if stamp == null: return FileAccess.get_open_error()
 	stamp.store_string(JSON.stringify({"signature":input_signature,"outputs":outputs,"input_fingerprint":input_fingerprint if _file_signature(all_inputs)==input_fingerprint else ""}))
 	stamp.close()
-	last_build_report.assign(cache.report)
 	return OK
 
 ## 開発用C++入口。通常入口の切替までは明示して呼ぶ。
