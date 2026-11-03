@@ -171,6 +171,11 @@ out['images']['water_noise'] = durl(Image.open(P('assets/fx/water_noise.png')).c
 # ---------- 効果設定（矢の見た目の上書きなど）
 eff = gdres.resource('data/visuals/effect_settings.tres')['res']
 out['effect_settings'] = jsonable({k: v for k, v in (eff or {}).items() if k != 'script'})
+# pixelFX原本を変更せず、青い配色で tools/render.mjs --sheet 出力した炎。
+fx_assets = os.path.normpath(os.path.join(os.path.dirname(__file__), '../assets'))
+for stem in ['canis_breath', 'canis_fireball', 'canis_trail', 'hydra_wind']:
+    out['images'][stem] = durl(Image.open(fx_assets + '/' + stem + '.png').convert('RGBA'))
+    out[stem + '_sheet'] = json.load(open(fx_assets + '/' + stem + '.json'))
 from boss_data import extract_bosses
 extract_bosses(out, durl, lit, Image)
 if __name__ == '__main__': json.dump(out, open(sys.argv[1], 'w'), ensure_ascii=False)

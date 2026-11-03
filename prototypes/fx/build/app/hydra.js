@@ -40,9 +40,90 @@ function hStamp(key, region, pos, angle, factor, brightness = 1, alpha = 1) {
   const r = region || { x: 0, y: 0, w: im.width, h: im.height };
   g.save(); g.translate(pos.x, pos.y); g.rotate(angle); g.scale(factor, factor); g.globalAlpha *= alpha; g.drawImage(im, r.x, r.y, r.w, r.h, -r.w / 2, -r.h / 2, r.w, r.h); g.restore();
 }
+// 姿勢は描画だけで作り、技の点列・時刻・速度へ戻さない。
+function hHeadKey(n) { return n.kind === 'bite' ? 'head0' : ['debris', 'beam'].includes(n.kind) ? 'head2' : 'head1'; }
+function hMouthOffset(S, n) { return mul(fromA(n.angle), ((hHeadKey(n) === 'head2' ? 41 : 36) - 24.5) * S.B.r * 2 / HYDRA.body_source_width); }
+function hMouth(S, n) { return add(n.pos, hMouthOffset(S, n)); }
+function hSchedule(S, n) {
+  const r = S.r, id = S.tech, i = S.participants.indexOf(n);
+  if (i < 0 || ['destroy', 'visibility'].includes(id) || S.positioning) return null;
+  let start = 0, fire = r.normal_charge || r.warning_time || 0.6, end;
+  if (S.combo) {
+    fire = r.warning_time;
+    if (['sequence', 'swarm'].includes(id)) { start = r.warning_time + i * (id === 'sequence' ? r.sequence_gap : r.swarm_gap); fire = start + r.sequence_charge; }
+    if (id === 'beam_pincer') fire += r.pincer_delay;
+    if (id === 'curve') fire += r.curve_delay;
+    if (id === 'grid') fire += r.normal_charge;
+    if (id === 'tornado') fire += r.tornado_charge;
+    if (id === 'debris_shatter' && n.kind === 'beam') fire += r.shatter_deploy;
+    end = r.warning_time + Math.max(r.performance_time, r.north_flight || 0);
+  } else {
+    const duration = id === 'beam_fixed' ? r.beam_time : id === 'wind_band' ? r.wind_time : id === 'bite_sweep' ? r.sweep_time : ['bite_thrust', 'thunder_headbutt'].includes(id) ? r.normal_lunge : id === 'wind_blades' ? 2 * r.blade_interval : id === 'thunder_drop' ? r.thunder_flash : 0;
+    end = fire + duration;
+  }
+  return { start, fire, end };
+}
+function hPose(S, n) {
+  const timing = hSchedule(S, n); if (!timing || S.age < timing.start) return { prepare: 0, kick: 0, charge: 0, release: -1 };
+  const u = clamp((S.age - timing.start) / Math.max(0.01, timing.fire - timing.start)), release = S.age - timing.fire;
+  const prepare = release < 0 ? smooth(0.08, 0.72, u) : Math.exp(-release / 0.055);
+  const kick = release < 0 ? 0 : (1 - Math.exp(-release / 0.012)) * Math.exp(-release / 0.13);
+  return { prepare, kick, charge: release < 0 ? u : 0, release, timing };
+}
+function hHeadPose(S, n, proto) {
+  const pose = proto ? hPose(S, n) : { prepare: 0, kick: 0 }, f = S.B.r * 2 / HYDRA.body_source_width;
+  const sy = 1 - pose.prepare * 0.09 + pose.kick * 0.10, sx = 1 + pose.prepare * 0.06 - pose.kick * 0.03;
+  // 口を支点にするので、頭を縮めても噴出口は動かない。
+  const mouth = hMouth(S, n), center = sub(mouth, mul(hMouthOffset(S, n), sy));
+  return { ...pose, sx, sy, center, mouth, f };
+}
+function hVisualNeck(S, n, proto) {
+  if (!proto) return n.points;
+  const pose = hHeadPose(S, n, true), dir = fromA(n.angle), side = orth(dir), sign = Math.sin(n.baseAngle * 2.4) >= 0 ? 1 : -1;
+  return n.points.map((p, i, a) => {
+    const u = i / (a.length - 1), w = 6.75 * u * u * (1 - u);
+    let basePoint = p;
+    if (n.visualBrace) {
+      const braced = n.visualBrace, rootShift = sub(n.points[0], braced[0]), headShift = sub(n.pos, braced[braced.length - 1]);
+      const held = add(braced[i], lerpV(rootShift, headShift, u)), hold = pose.release < 0 ? smooth(0.55, 0.75, pose.charge) : Math.exp(-pose.release / 0.07);
+      basePoint = lerpV(p, held, hold);
+    }
+    let at = add(basePoint, add(mul(dir, (-28 * pose.prepare + 19 * pose.kick) * w), mul(side, sign * (22 * pose.prepare - 13 * pose.kick) * w)));
+    if (i === a.length - 1) at = pose.center;
+    return at;
+  });
+}
+function hDrawHead(S, n, proto) {
+  const key = hHeadKey(n), im = IMG['hydra/' + key]; if (!im) return;
+  const pose = hHeadPose(S, n, proto);
+  g.save(); g.translate(pose.center.x, pose.center.y); g.rotate(n.angle - Math.PI / 2); g.scale(pose.f * pose.sx, pose.f * pose.sy);
+  g.drawImage(im, -im.width / 2, -im.height / 2); g.restore();
+}
+// 原本 ice/frost-breath を配色だけ変更して30fpsで書き出したatlas。
+function hWindAtlas(S, R, at, direction, length, width, age, life, alpha = 1, bodyOnly = false) {
+  const im = IMG.hydra_wind; if (!im || age < 0 || age >= life) return;
+  const sheet = DATA.hydra_wind_sheet, meta = sheet.meta.pixelfx, frame = Math.floor(age * meta.fps) % meta.frames, cell = sheet.frames[frame].frame, pivot = meta.pivot, fade = Math.min(1, age / 0.04 + 0.22) * clamp((life - age) / 0.16) * alpha;
+  g.save(); g.translate(at.x, at.y); g.rotate(direction); g.globalAlpha *= fade;
+  g.beginPath(); g.rect(-3, -width * 0.5, length + 3, width); g.clip();
+  const crop = bodyOnly ? 34 : 0;
+  g.scale(length / 170, width / 88); g.drawImage(im, cell.x + crop, cell.y, cell.w - crop, cell.h, crop - pivot[0], -pivot[1], cell.w - crop, cell.h); g.restore();
+}
+function hDrawCharge(S, R, n) {
+  const pose = hPose(S, n); if (!pose.charge) return;
+  const mouth = hMouth(S, n), radius = lerp(46, 14, smooth(0.35, 1, pose.charge));
+  bossGather(R, mouth, radius, pose.charge, S.t, S.necks.indexOf(n) + 17);
+}
+function hPhase(S) {
+  if (S.positioning) return '配置中（現行の準備段階）';
+  if (['destroy', 'visibility'].includes(S.tech) || S.finished) return bossPhase(S.B);
+  const poses = S.participants.map(n => hPose(S, n));
+  if (poses.every(p => p.timing && S.age >= p.timing.end)) return '終了・硬直';
+  if (poses.every(p => p.release < 0)) return poses.some(p => p.charge >= 0.75) ? '構えを止める（発動直前）' : '溜める';
+  return poses.some(p => p.release >= 0 && p.release < 0.16) ? '解放・反動' : '攻撃中';
+}
 function hDrawBody(S, R) {
   const factor = S.B.r * 2 / HYDRA.body_source_width;
-  for (let index = 0; index < S.necks.length; index++) { const n = S.necks[index], points = n.points, total = pathLength(points); if (total < 0.1) continue; let tailLength = 0;
+  for (let index = 0; index < S.necks.length; index++) { const n = S.necks[index], points = hVisualNeck(S, n, R.proto), total = pathLength(points); if (total < 0.1) continue; let tailLength = 0;
     const brightness = R.proto ? R.P.neckDark : 1;
     if (S.separated) { const f = Math.min(factor, total / 64); for (const [distance, region] of [[10 * f, { x: 104, y: 0, w: 16, h: 32 }], [30 * f, { x: 130, y: 0, w: 28, h: 32 }]]) { const q = pathAt(points, distance); hStamp('neck', region, q.pos, q.angle - Math.PI / 2, f, brightness); } tailLength = 38 * f; }
     let tile = 0; const end = n.kind === 'immortal' ? Math.max(tailLength, total - 58 * factor) : total;
@@ -51,8 +132,7 @@ function hDrawBody(S, R) {
   }
   if (!S.separated) { const im = IMG['hydra/body']; hStamp('body', null, S.B.pos, 0, S.B.r * 2 / im.width); }
   for (const n of S.necks) {
-    if (n.dead) continue; const head = ['bite'].includes(n.kind) ? 'head0' : ['debris', 'beam'].includes(n.kind) ? 'head2' : 'head1';
-    hStamp(head, null, n.pos, n.angle - Math.PI / 2, factor);
+    if (n.dead) continue; hDrawHead(S, n, R.proto);
     if (!R.proto) { if (n.glow > 0) D2.circle(n.pos, S.B.r * 0.5, rgba('#ffdb80', n.glow * 0.45));
       if (n.active) for (let i = 0; i < 4; i++) { const d = V(i % 2 ? 1 : -1, i < 2 ? -1 : 1), at = add(n.pos, mul(d, 42)); D2.polyline([sub(at, V(d.x * 12, 0)), at, sub(at, V(0, d.y * 12))], '#ffd16c', 3); }
     }
@@ -77,8 +157,8 @@ function hSetup(S, id) {
   }
   for (const n of S.necks) hChain(S, n, 0);
 }
-function hEffect(S, kind, points, width, delay, life, vel = V(0, 0)) { const e = { kind, points: points.map(q => ({ ...q })), width, delay, life, vel, t: S.t, seed: S.effects.length + 1 }; S.effects.push(e); return e; }
-function hShot(S, n, angle, radius) { const r = S.r; S.projectiles.push({ pos: { ...n.pos }, vel: mul(fromA(angle), r.lump_speed), radius, t: S.t, life: 6, kind: 'rubble', seed: S.projectiles.length }); }
+function hEffect(S, kind, points, width, delay, life, vel = V(0, 0)) { const e = { kind, points: points.map(q => ({ ...q })), width, delay, life, vel, t: S.t, seed: S.effects.length + 1 }; const source = S.participants?.reduce((best, n) => !best || dist(n.pos, points[0]) < dist(best.pos, points[0]) ? n : best, null); if (source) { e.source = S.necks.indexOf(source); e.mouthOffset = hMouthOffset(S, source); } S.effects.push(e); return e; }
+function hShot(S, n, angle, radius) { const r = S.r; S.projectiles.push({ pos: { ...n.pos }, vel: mul(fromA(angle), r.lump_speed), radius, t: S.t, life: 6, kind: 'rubble', mouthOffset: hMouthOffset(S, n), seed: S.projectiles.length }); }
 function hSnakeSteer(n, target, dt, scale = 1) {
   const offset = sub(target, n.pos), old = n.angle; if (len(offset) > 1) n.angle = rotToward(n.angle, angOf(offset), HP.snake_turn * dt);
   let speed = HP.snake_speed * scale * clamp(len(offset) / 100); speed *= 0.3 + 0.7 * Math.max(0, Math.cos(angDiff(n.angle, angOf(offset)))); n.vel = lerpV(n.vel, mul(fromA(n.angle), speed), 1 - Math.exp(-HP.snake_accel * dt)); n.pos = add(n.pos, mul(n.vel, dt)); n.turn = angDiff(n.angle, old) / Math.max(dt, 0.001);
@@ -160,6 +240,9 @@ function hStep(S, dt) {
   for (const n of S.necks) {
     if (!n.active && !S.separated && !n.dead) { const base = hBase(S, n), facing = n.baseAngle + S.B.facing, offset = sub(S.ship.pos, base), f = fromA(facing), local = Math.atan2(offset.x * -f.y + offset.y * f.x, Math.max(HP.aim_deadzone, offset.x * f.x + offset.y * f.y)); hAim(n, facing + clamp(local, -0.8, 0.8) + Math.sin(S.t + n.baseAngle) * 0.06, dt, false); n.length = moveToward(n.length, HP.neck_rest, HP.neck_rest * dt); n.pos = add(base, mul(fromA(n.angle), n.length)); }
     hChain(S, n, dt);
+    // 溜め終盤だけ描画用の節を保持する。攻撃の状態・首の計算には使わない。
+    const visualPhase = hPose(S, n);
+    if (visualPhase.charge >= 0.55 && !n.visualBrace) n.visualBrace = n.points.map(p => ({ ...p }));
   }
   for (const e of S.effects) if (S.t - e.t >= e.delay) e.points = e.points.map(p => add(p, mul(e.vel, dt)));
   S.effects = S.effects.filter(e => S.t - e.t < e.delay + e.life);
@@ -187,37 +270,86 @@ function hLightning(S, R, e, warning) {
   for (let i = 0; i < (warning ? 4 : 11); i++) { const a = hash(i * 17 + tick * 3) * TAU, end = add(A, mul(fromA(a), radius * WL * (0.5 + hash(i + tick) * 0.5))); if (warning) { const from = lerpV(A, end, 0.65); paths.push(...zigzag(new PX.Rng(i * 31 + tick + 1), from.x, from.y, end.x, end.y, 0.3, 0.15, 0.5)); } else paths.push(...zigzag(new PX.Rng(i * 31 + tick + 1), A.x, A.y, end.x, end.y, 0.3, 0.5)); }
   voltInk(R.front, paths, warning ? 0.35 : 1 - clamp(age / e.life) * 0.5, C, R.P.size, warning, R.P.intensity * 0.4);
 }
+function hReleaseParticles(R, mouth, direction, age, seed, power = 1) {
+  if (age < 0 || age > 0.3) return;
+  const random = new PX.Rng(seed), ps = new PX.Particles({ rng: random, ground: () => 10000 }), pal = FX.ramp(R.P.color);
+  for (let i = 0; i < 9; i++) {
+    const a = random.range(-0.36, 0.36), speed = random.range(30, 68) * power;
+    ps.spawn(PX.P.MOTE, 0, 0, Math.cos(a) * speed, Math.sin(a) * speed, random.range(0.12, 0.26), pal[2 + i % 2], random.range(0.6, 1.1));
+  }
+  let t = 0; while (t < age) { const dt = Math.min(1 / 60, age - t); ps.update(dt); t += dt; }
+  const p = new PX.Painter(FR.front), at = toL(mouth); p.place(at.x, at.y, false, direction); p.lightK = R.P.intensity * 0.4; ps.draw(p);
+}
 function hDrawEffect(S, R, e) {
   const age = S.t - e.t, warning = age < e.delay, on = age - e.delay, P = R.P;
   if (e.kind === 'lightning') return hLightning(S, R, e, warning);
   if (!R.proto && e.kind !== 'tornado') return hEnergyCurrent(R, e, warning, S.t);
   if (e.kind === 'tornado') {
-    const center = lerpV(e.points[0], e.points[1], 0.5), L = toL(center), rad = e.width * WL * 0.5, pal = FX.ramp(R.proto ? P.color : '#4dd9b8');
-    for (let i = 0; i < 100; i++) { const phase = (S.t * (0.8 + hash(i) * 0.6) + hash(i * 7)) % 1, a = S.t * 12 + i * 2.4, r = rad * (0.2 + phase * 0.8), x = L.x + Math.cos(a) * r, y = L.y + Math.sin(a) * r * 0.7 - phase * rad; R.front.glow(x, y, 1.5, pal[2], (1 - phase) * 0.15 * P.intensity); if (i % 4 === 0) R.front.px(x, y, pal[2]); }
+    const center = lerpV(e.points[0], e.points[1], 0.5), L = toL(center), rad = e.width * 0.5, pal = FX.ramp(R.proto ? P.color : '#4dd9b8');
+    if (R.proto) {
+      const fade = clamp(on / 0.07 + 0.2) * clamp((e.life - on) / 0.23);
+      // 原本の風の塊をそのまま重ねる。細切れに曲げて輪郭の輪を作らない。
+      g.save(); g.globalCompositeOperation = 'screen'; g.filter = 'brightness(2.1) saturate(1.5)';
+      for (let i = 0; i < 3; i++) {
+        const a = i * 2.3 - on * 6, at = add(center, V(Math.cos(a) * rad * 0.26, Math.sin(a) * rad * 0.18));
+        const direction = a + Math.PI * 0.62, start = sub(at, mul(fromA(direction), rad * 0.5));
+        hWindAtlas(S, R, start, direction, e.width * 0.82, e.width * 1.12, Math.max(0, on), e.life, fade, true);
+      }
+      g.restore();
+    } else {
+      for (let i = 0; i < 100; i++) { const phase = (S.t * (0.8 + hash(i) * 0.6) + hash(i * 7)) % 1, a = S.t * 12 + i * 2.4, r = rad * WL * (0.2 + phase * 0.8), x = L.x + Math.cos(a) * r, y = L.y + Math.sin(a) * r * 0.7 - phase * rad * WL; R.front.glow(x, y, 1.5, pal[2], (1 - phase) * 0.15 * P.intensity); if (i % 4 === 0) R.front.px(x, y, pal[2]); }
+    }
     for (let i = 0; i < 4; i++) { const a = S.t * 8 + i * 2.4, at = add(center, V(Math.cos(a) * e.width * 0.25, Math.sin(a) * e.width * 0.15)); drawImg('meteor_0', at, a, 13 + i * 2); } return;
   }
-  if (warning) { const p = e.points[0]; bossGather(R, p, Math.max(60, e.width), clamp(age / Math.max(0.01, e.delay)), S.t, e.seed); return; }
+
+  const source = S.necks[e.source], points = e.points.map(p => ({ ...p }));
+  if (e.kind === 'bolt' || e.kind === 'wind_blade') for (const p of points) { p.x += e.mouthOffset?.x || 0; p.y += e.mouthOffset?.y || 0; }
+  else if (source && ['beam', 'wind'].includes(e.kind)) points[0] = hMouth(S, source);
+  if (warning) return; // 予告は頭ごとの段階に合わせ、一度だけ口へ集める。
   if (['beam', 'bolt'].includes(e.kind)) {
-    const a = clamp(1 - smooth(Math.max(0, e.life - 0.12), e.life, on));
-    for (let i = 1; i < e.points.length; i++) FXW.beam(R.front, e.points[i - 1], e.points[i], { w: e.width * 0.5 * P.size, color: P.color, time: S.t, alpha: a, intensity: P.intensity, taper: i === e.points.length - 1 ? Math.min(5, dist(e.points[i - 1], e.points[i]) * WL * 0.3) : 0, source: false });
-  } else if (e.kind === 'bite') { bossBreath(R, e.points[e.points.length - 1], angOf(sub(e.points[e.points.length - 1], e.points[0])), on, e.seed, 0.7, 110); }
-  else if (e.kind === 'wind_blade') { for (let i = 1; i < e.points.length; i++) bossSlash(R, e.points[i - 1], e.points[i], e.width, 0.08 + on * 0.04, e.life + 1, e.seed + i); }
-  else if (e.kind === 'wind') {
-    const A = toL(e.points[0]), B = toL(e.points[e.points.length - 1]), u = norm(sub(B, A)), side = orth(u), L = dist(A, B), pal = FX.ramp(P.color), width = e.width * WL * P.size;
-    for (let i = 0; i < 32; i++) { const phase = ((S.t * 1.5 + hash(i * 7)) % 1), begin = phase * L, lateral = (hash(i * 13) - 0.5) * width;
-      for (let j = 0; j < 10; j++) { const d = begin - j; if (d < 0 || d > L) continue; const off = lateral + Math.sin(d * 0.12 - S.t * 6 + i) * 1.5, at = add(add(A, mul(u, d)), mul(side, off)); R.front.px(at.x, at.y, pal[j < 3 ? 3 : 1]); R.front.light(at.x, at.y, pal[2], (1 - j / 10) * 0.10 * P.intensity); }
-    }
+    const fade = clamp(1 - smooth(Math.max(0, e.life - 0.12), e.life, on)), burst = Math.exp(-on / 0.075);
+    for (let i = 1; i < points.length; i++) FXW.beam(R.front, points[i - 1], points[i], { w: e.width * (0.42 + 0.12 * burst) * P.size, color: P.color, time: S.t, alpha: fade, intensity: P.intensity, taper: i === points.length - 1 ? Math.min(5, dist(points[i - 1], points[i]) * WL * 0.3) : 0, source: false });
+
+  } else if (e.kind === 'bite') {
+    // 噛みつきは首が主役。毎フレーム新しい息を重ねず、口の短い粒だけにする。
+    return;
+  } else if (e.kind === 'wind_blade') {
+    const melee = PIXELFX.fx['src/fx/melee/_lib.js'], center = lerpV(points[0], points[points.length - 1], 0.5), front = points[Math.floor(points.length / 2)];
+    const A = toL(center), radius = dist(points[0], points[points.length - 1]) * WL * 0.5, broad = dist(center, front) * WL;
+    const p = new PX.Painter(FR.front), pal = FX.ramp(P.color);
+    // 原本slashに一続きの楕円弧を渡し、区間ごとの継ぎ目と明滅をなくす。
+    const swing = melee.swing({ cx: A.x, cy: A.y, R: radius, sy: broad / Math.max(0.1, radius), rot: angOf(sub(front, center)) + Math.PI / 2, a0: -Math.PI, dir: 1, span: Math.PI,
+      W: e.width * WL * P.size * 1.25, t0: -0.06, sweep: 0.06, hold: Math.max(0.01, e.life - 0.24), trail: 0.24, ramp: pal, lens: true, hot: Math.exp(-on / 0.08) * 0.35 });
+    p.lightK = P.intensity * 0.55; melee.slash(p, swing, on);
+    // 原本のshavingsで刃から不揃いの切れ端を飛ばす。弾や判定は増やさない。
+    const random = new PX.Rng(e.seed + 61), dust = new PX.Particles({ rng: random, ground: () => 10000 });
+    melee.shavings(dust, random, swing, 13, [pal[1], pal[2], pal[3]]);
+    let elapsed = 0; while (elapsed < on) { const dt = Math.min(1 / 60, on - elapsed); dust.update(dt); elapsed += dt; }
+    dust.draw(p);
+  } else if (e.kind === 'wind') {
+    const mouth = points[0], end = points[points.length - 1], direction = angOf(sub(end, mouth));
+    hWindAtlas(S, R, mouth, direction, dist(mouth, end), e.width * 1.2 * P.size, on, e.life, Math.min(1, 0.75 + P.intensity * 0.25));
   }
+
 }
 function hDraw(S, R) {
   R = bossView(R, '#80baff');
   const P = R.P;
-  for (const e of S.effects) hDrawEffect(S, R, e);
-  if (S.vortex?.feed) for (const q of S.vortex.feed) { if (R.proto) drawImg('meteor_0', q.pos, S.t * 2, q.radius); else D2.circle(q.pos, q.radius, '#8c704c'); }
-  if (S.rocks) for (const q of S.rocks) if (!q.dead) { if (R.proto) drawImg('meteor_0', q.pos, q.seed, q.radius); else D2.circle(q.pos, q.radius, '#8c704c'); }
-  for (const q of S.projectiles) { if (R.proto) { const tail = [sub(q.pos, mul(norm(q.vel), 55)), q.pos]; bossTrail(R, tail); drawImg('meteor_0', q.pos, q.seed + S.t * (q.kind === 'shard' ? 5 : 1), q.radius); } else D2.circle(q.pos, q.radius, q.kind === 'shard' ? '#ffd16c' : '#8c704c'); }
+  for (const e of S.effects) if (!R.proto || e.kind !== 'tornado') hDrawEffect(S, R, e);
+  if (S.vortex?.feed) for (const q of S.vortex.feed) { if (R.proto) { const debris = S.participants[1], fraction = clamp(dist(q.pos, S.vortex.center) / Math.max(1, dist(debris.from, S.vortex.center))), at = add(q.pos, mul(hMouthOffset(S, debris), fraction)); drawImg('meteor_0', at, S.t * 2, q.radius); } else D2.circle(q.pos, q.radius, '#8c704c'); }
+  if (S.rocks) for (const q of S.rocks) if (!q.dead) { if (R.proto) { const fraction = 1 - clamp((S.age - S.r.warning_time) / S.r.shatter_deploy), at = add(q.pos, mul(hMouthOffset(S, S.participants[0]), fraction)); drawImg('meteor_0', at, q.seed, q.radius); } else D2.circle(q.pos, q.radius, '#8c704c'); }
+  for (const q of S.projectiles) { if (R.proto) { const visualPos = add(q.pos, q.mouthOffset || V(0, 0)), tail = [sub(visualPos, mul(norm(q.vel), 55)), visualPos]; bossTrail(R, tail); drawImg('meteor_0', visualPos, q.seed + S.t * (q.kind === 'shard' ? 5 : 1), q.radius); } else D2.circle(q.pos, q.radius, q.kind === 'shard' ? '#ffd16c' : '#8c704c'); }
   R.blitBack(); hDrawBody(S, R);
-  for (const n of S.necks) if (n.active && n.glow > 0 && R.proto) bossGather(R, n.pos, 65, n.glow, S.t, S.necks.indexOf(n) + 17);
+  if (R.proto && S.vortex && S.tech === 'tornado') {
+    const local = S.age - S.r.warning_time, wind = S.participants[0], mouth = hMouth(S, wind);
+    if (local >= 0 && local < S.r.tornado_charge) {
+      g.save(); g.globalCompositeOperation = 'screen'; g.filter = 'brightness(1.8) saturate(1.5)';
+      hWindAtlas(S, R, mouth, angOf(sub(S.vortex.center, mouth)), dist(mouth, S.vortex.center), 94, local, S.r.tornado_charge, 1);
+      g.restore();
+    }
+    for (const e of S.effects) if (e.kind === 'tornado') hDrawEffect(S, R, e);
+  }
+  if (R.proto) for (const n of S.participants) { hDrawCharge(S, R, n); const pose = hPose(S, n); if (pose.release >= 0 && pose.release < 0.3) hReleaseParticles(R, hMouth(S, n), n.angle, pose.release, S.necks.indexOf(n) + 73, n.kind === 'bite' ? 0.45 : 0.8); }
   if (S.destroyed) { const e = S.destroyed, age = (S.t - e.t) / P.timing;
     if (R.proto && age < 0.55) {
       // 元の頭の絵を、その場でマスごとに消す。破片や別の絵へ置き換えない。
@@ -236,7 +368,7 @@ for (const id of [...Object.keys(H_IDS), 'destroy', 'visibility']) {
   DEMOS.push({ id: 'H-' + id, ids: H_IDS[id] || (id === 'destroy' ? ['H03'] : ['H02', 'H20']), cat: 'うみへび座（H）', group: 'うみへび座', title: id === 'destroy' ? '首の撃破' : id === 'visibility' ? '分離後の首・胴・頭の見え方' : r.display_name, duration: ['grid', 'swarm'].includes(id) ? 16 : id === 'visibility' ? 7 : Math.max(5, (r.warning_time || 0) + (r.performance_time || 0) + 2.5), color: r.head_kind === 'thunder' ? '#80baff' : r.head_kind === 'vortex' || id === 'tornado' ? '#70dfce' : '#ef78ad',
     params: [{ k: 'separated', label: '分離後の体（0／1）', type: 'range', min: 0, max: 1, step: 1, def: 0 }, { k: 'neckDark', label: '首の明るさ', type: 'range', min: 0.35, max: 1.2, step: 0.01, def: 0.72 }],
     status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '全身': '現行の頭・胴・首の節を使用。つながった首のFABRIKと分離後の経路追従を移植。照明・現行shaderはHTMLで近似', '判定・動作': '技の時刻・速度・軌道・範囲は現行値。障害物のない単独比較場面。群れのAIによる自然選択・回避・地形干渉は対象外', '未決・保留': id === 'grid' ? '現行の仮格子配置を使用。正式な5配置は未決のまま' : id === 'visibility' ? '分離後の見えにくさの原因は断定しない。首の明るさだけを比較する。群れの戦い方・配置仕様は変更しない' : 'H22のULTは対象未特定。H05の実験場不具合、H09・H21等の本番ロジック変更は保留' },
-    refs: ['scenes/bosses/hydra_boss.tscn・hydra_neck_art.tscn（現行の画像）', 'scripts/bosses/hydra_neck.gd・hydra_snake_motion.gd・hydra_neck_art.gd（首と全身）', 'data/bosses/hydra_moves/' + (id === 'destroy' || id === 'visibility' ? 'bite_thrust' : id) + '.tres', 'scripts/bosses/hydra/techniques/*.gd・normal_swim.gd・hydra_boss.gd（技進行）', 'shaders/hydra_energy.gdshader・hydra_area.gdshader（現行表示の近似）', 'pixelFX lightning のzigzag・voltInk、SPEEDの現行meteor画像を瓦礫の試作へ使用'],
-    setup(S) { hSetup(S, id); }, step: hStep, draw: hDraw, phase(S) { return S.positioning ? '配置中（現行の準備段階）' : bossPhase(S.B); }
+    refs: ['scenes/bosses/hydra_boss.tscn・hydra_neck_art.tscn（現行の画像）', 'scripts/bosses/hydra_neck.gd・hydra_snake_motion.gd・hydra_neck_art.gd（首と全身）', 'data/bosses/hydra_moves/' + (id === 'destroy' || id === 'visibility' ? 'bite_thrust' : id) + '.tres', 'scripts/bosses/hydra/techniques/*.gd・normal_swim.gd・hydra_boss.gd（技進行）', 'shaders/hydra_energy.gdshader・hydra_area.gdshader（現行表示の近似）', 'pixelFX ice/frost-breath の原本atlas（配色だけ変更）、melee/_lib.js の連続斬撃、lightning のzigzag・voltInk、現行meteor画像を使用'],
+    setup(S) { hSetup(S, id); }, step: hStep, draw: hDraw, phase: hPhase
   });
 }

@@ -197,7 +197,7 @@ function phxSplat(field, W, H, ox, oy, x, y, r, ch, w = 1) { // pixel_fire_densi
   if (r < 0.3) return; const x0 = Math.max(0, Math.floor(x - r - ox)), x1 = Math.min(W - 1, Math.ceil(x + r - ox)), y0 = Math.max(0, Math.floor(y - r - oy)), y1 = Math.min(H - 1, Math.ceil(y + r - oy));
   for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const dx = (i + ox + 0.5 - x) / r, dy = (j + oy + 0.5 - y) / r, d2 = dx * dx + dy * dy; if (d2 >= 1) continue; const d = Math.sqrt(d2); field[(j * W + i) * 3 + ch] += w * Math.exp(-d2 * 3.2) * (1 - smooth(0.72, 1, d)); }
 }
-function phxDrawParticles(ps, p, layer, time, burstAge) {
+function phxDrawParticles(ps, p, layer, time, burstAge, settings = null) {
   const own = [], rest = [];
   for (const q of ps.list) (q.k === PX.P.FIRE || q.k === PX.P.SMOKE ? own : rest).push(q);
   const keep = ps.list; ps.list = rest; try { ps.draw(p, layer); } finally { ps.list = keep; }
@@ -206,10 +206,11 @@ function phxDrawParticles(ps, p, layer, time, burstAge) {
   for (const q of list) { const r = q.size * 2; x0 = Math.min(x0, q.x - r); y0 = Math.min(y0, q.y - r); x1 = Math.max(x1, q.x + r); y1 = Math.max(y1, q.y + r); }
   const pad = PHX_FIELD.pad, ox = Math.floor(x0) - pad, oy = Math.floor(y0) - pad, W = Math.ceil(x1) - ox + pad, H = Math.ceil(y1) - oy + pad, field = new Float32Array(W * H * 3);
   for (const q of list) { const age = 1 - q.life / q.max;
-    if (want === PX.P.FIRE) { const base = q.size * 1.25 * Math.pow(1 - age, 0.6) * (0.7 + 0.3 * smooth(0, 0.08, age)); // pixel_fire.gd の大きさの変化
+    if (q.channel != null) { phxSplat(field, W, H, ox, oy, q.x, q.y, q.size, q.channel); }
+    else if (want === PX.P.FIRE) { const base = q.size * 1.25 * Math.pow(1 - age, 0.6) * (0.7 + 0.3 * smooth(0, 0.08, age)); // pixel_fire.gd の大きさの変化
       phxSplat(field, W, H, ox, oy, q.x, q.y, base, 0); if (age < 0.62) phxSplat(field, W, H, ox, oy, q.x, q.y - base * 0.1, base * 0.7, 1); if (age < 0.3) phxSplat(field, W, H, ox, oy, q.x, q.y - base * 0.15, base * 0.44, 2); }
     else { const big = q.flag & PX.PF.BIG, r = q.size * (0.65 + Math.min(1, age * 2.5) * 0.45 + age * (big ? 0.5 : 0.4)) * 1.2; phxSplat(field, W, H, ox, oy, q.x, q.y, r, 0, 1); if (age < 0.5) phxSplat(field, W, H, ox, oy, q.x, q.y, r * 0.6, 1, 1); phxSplat(field, W, H, ox, oy, q.x, q.y, r, 2, age); } }
-  const clock = Math.floor(time * PHX_FIELD.fps) / PHX_FIELD.fps, def = PHX_FIELD.deformation, th = PHX_FIELD.threshold;
+  const fps = settings?.update_fps || PHX_FIELD.fps, clock = Math.floor(time * fps) / fps, def = settings ? settings.deformation / LP : PHX_FIELD.deformation, th = settings?.merge_threshold ?? PHX_FIELD.threshold;
   const read = (i, j, ch) => { i = Math.max(0, Math.min(W - 1, Math.round(i))); j = Math.max(0, Math.min(H - 1, Math.round(j))); return field[(j * W + i) * 3 + ch]; };
   const cool = clamp(burstAge / 1.3);
   const FC = PHXC.flame, cOuter = PX.mix(hexc(FC.outer[0]), hexc(FC.outer[1]), cool), cInner = PX.mix(hexc(FC.inner[0]), hexc(FC.inner[1]), cool), cCore = PX.mix(hexc(FC.core[0]), hexc(FC.core[1]), cool);

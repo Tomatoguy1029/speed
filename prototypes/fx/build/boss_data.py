@@ -40,6 +40,8 @@ def extract_bosses(out, image_url, lit, Image):
             for filename in sorted(os.listdir(folder)):
                 if filename.endswith('.tres'):
                     boss['moves'][filename[:-5]] = resource('data/bosses/' + name + '_moves/' + filename)
+        if name == 'canis_major':
+            boss['fire'] = {kind: resource('data/visuals/canis_fire_' + kind + '.tres') for kind in ['flame', 'jet', 'trail', 'hound', 'burst', 'ignite']}
         scene_path = 'scenes/bosses/' + name + '_parts.tscn'
         if os.path.exists(root + '/' + scene_path):
             scene = gdres.resource(scene_path)

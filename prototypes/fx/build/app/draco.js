@@ -26,21 +26,65 @@ function dBlend(S, from, to, k) { S.override = dFit(from.map((p, i) => lerpV(p, 
 function dPart(key, pos, angle, scale, offset = null, alpha = 1, flip = false) {
   const im = IMG['draco/' + key]; if (!im) return; g.save(); g.translate(pos.x, pos.y); g.rotate(angle); g.scale(scale * (flip ? -1 : 1), scale); g.globalAlpha *= alpha; g.drawImage(im, offset ? offset.x : -im.width / 2, offset ? offset.y : -im.height / 2); g.restore();
 }
-function drawDraco(points, facing, alpha = 1, width = DP.body_width) {
+function dArmFrame(points, width, total, index, turn = 0) {
+  const d = index < 2 ? Math.min(total, width * 0.9) : total * 0.66, at = pathAt(points, d), next = pathAt(points, Math.min(total, d + 2)), tangent = norm(sub(next.pos, at.pos)), normal = orth(tangent), unit = width * dTaper(d / Math.max(1, total)) / 57, side = index % 2 === 0 ? -1 : 1, direction = norm(sub(mul(normal, side), mul(tangent, 0.3))), wrist = V(16 * -side, 28), angle = angOf(direction) - angOf(wrist) + turn, pos = add(at.pos, mul(normal, side * width * dTaper(d / total) * 0.32));
+  return { pos, angle, unit, side, claw: add(pos, mul(rotateV(wrist, angle), unit)) };
+}
+function drawDraco(points, facing, alpha = 1, width = DP.body_width, armTurns = []) {
   if (points.length < 2 || alpha <= 0) return;
   const total = pathLength(points), bodyEnd = Math.max(0, total - width * 0.7), distances = []; let cursor = Math.min(bodyEnd, width * 0.43);
   while (cursor < bodyEnd) { distances.push(cursor); cursor += Math.max(1, width * 0.43 * dTaper(cursor / Math.max(1, total))); }
   if (!distances.length || bodyEnd - distances[distances.length - 1] > width * 0.08) distances.push(bodyEnd);
   distances.push(Math.max(bodyEnd, total - width * 0.42), total);
   // 腕の根元と爪先は現行のARM_ROOT・ARM_WRISTと背骨上の距離から求める。
-  for (let i = 0; i < 4; i++) { const d = i < 2 ? Math.min(total, width * 0.9) : total * 0.66, at = pathAt(points, d), next = pathAt(points, Math.min(total, d + 2)), tangent = norm(sub(next.pos, at.pos)), normal = orth(tangent), unit = width * dTaper(d / Math.max(1, total)) / 57, side = i % 2 === 0 ? -1 : 1, direction = norm(sub(mul(normal, side), mul(tangent, 0.3))), wrist = V(16 * -side, 28), angle = angOf(direction) - angOf(wrist), pos = add(at.pos, mul(normal, side * width * dTaper(d / total) * 0.32));
-    dPart('arm', pos, angle, unit, V(-11, -5), alpha, side > 0); dPart('claw', add(pos, mul(rotateV(wrist, angle), unit)), angle, unit, V(-13, -16), alpha, side > 0); }
+  for (let i = 0; i < 4; i++) { const arm = dArmFrame(points, width, total, i, armTurns[i] || 0);
+    dPart('arm', arm.pos, arm.angle, arm.unit, V(-11, -5), alpha, arm.side > 0); dPart('claw', arm.claw, arm.angle, arm.unit, V(-13, -16), alpha, arm.side > 0); }
   let previous = points[0];
   distances.forEach((distance, i) => { const at = pathAt(points, distance), last = i === distances.length - 1, key = last ? 'tail_tip' : i === distances.length - 2 ? 'tail_joint' : ['body_e', 'body_c', 'body_b', 'body_a', 'body_d'][Math.min(4, Math.floor(i * 5 / Math.max(1, distances.length - 2)))], im = IMG['draco/' + key], angle = angOf(sub(at.pos, previous)) + (last ? Math.PI / 2 : -Math.PI / 2), scale = width * dTaper(distance / Math.max(1, total)) / im.width;
     dPart(key, at.pos, angle, scale, last ? V(-im.width / 2, 0) : null, alpha); previous = at.pos; });
   const im = IMG['draco/head']; dPart('head', points[0], facing - Math.PI / 2, DP.head_scale * 2, V(-im.width / 2, -im.height / 2 + 14), alpha);
 }
 const dMouth = S => add(S.B.pos, mul(fromA(S.B.facing), 120 * DP.head_scale));
+// 戦闘用の背骨と時計は保ち、見た目だけに溜め・静止・解放・反動を加える。
+function dPresentation(S) {
+  const B = S.B, r = S.r, windup = B.mode === 'windup', active = B.mode === 'active', releasing = active || B.mode === 'recovery', releaseTime = active ? S.elapsed : r.active + S.elapsed, ready = !S.staging || S.staging.phase === 'ready', k = windup && ready ? smooth(0.05, Math.max(0.06, r.warn * 0.82), S.elapsed) : 0;
+  const recoil = t => (1 - smooth(0, 0.1, t)) - 0.46 * smooth(0.025, 0.075, t) * (1 - smooth(0.075, 0.26, t));
+  let facing = B.facing, points = S.points, charge = windup ? k : releasing ? recoil(releaseTime) : 0;
+  if (S.staging && ready && windup) { const entryFacing = S.staging.side < 0 ? 0 : Math.PI; facing = entryFacing + angDiff(B.facing, entryFacing) * smooth(0, r.warn * 0.6, S.elapsed); }
+  if (S.tech === 'breath' && windup) facing = S.axis - r.sweep * smooth(r.warn * 0.35, r.warn * 0.9, S.elapsed);
+  if (S.tech === 'breath' && active && !S.fan) facing = S.axis - r.sweep;
+  const still = ['breath', 'meteor', 'star_fan'].includes(S.tech);
+  if (still) points = S.base.map(p => add(p, sub(B.pos, S.base[0])));
+  if (ready && !['spiral', 'clones'].includes(S.tech)) {
+    const head = points[0], originalAngle = angOf(sub(head, points[1])), turn = angDiff(facing, originalAngle), u = fromA(facing), side = orth(u), bodyWeight = ['bite', 'tail_sweep', 'tail_slam'].includes(S.tech) ? 0.3 : 1;
+    const desired = points.map((p, i) => { const s = i / (points.length - 1), neck = 1 - smooth(0.04, 0.37, s), bend = smooth(0.02, 0.16, s) * (1 - smooth(0.3, 0.73, s));
+      const strength = releasing ? recoil(Math.max(0, releaseTime - s * 0.13)) : charge;
+      return add(add(head, rotateV(sub(p, head), turn * neck)), add(mul(u, 44 * bend * strength * bodyWeight), mul(side, 64 * bend * strength * bodyWeight))); });
+    points = dFit(desired, points, ['tail_sweep', 'tail_slam'].includes(S.tech));
+  }
+  const total = pathLength(points), arms = Array.from({ length: 4 }, (_, i) => (i % 2 ? 1 : -1) * charge * (i < 2 ? 0.42 : 0.16));
+  if (S.tech === 'rifts' && ready && (windup || active)) for (let i = 0; i < 2; i++) {
+    const arm = dArmFrame(points, DP.body_width, total, i), side = arm.side, baseAngle = angOf(sub(arm.claw, arm.pos)), folded = facing + Math.PI - side * 0.3, strike = S.axis - side * r.claw_angle, local = active ? S.elapsed - i * r.interval : -1;
+    const reach = active ? smooth(0, r.scratch_time, local) : 0, settle = active ? smooth(r.scratch_time + 0.06, r.scratch_time + 0.48, local) : 0;
+    const desired = folded + angDiff(strike, folded) * reach;
+    arms[i] = angDiff(desired, baseAngle) * (windup ? k : 1 - settle);
+  }
+  const claws = arms.map((turn, i) => dArmFrame(points, DP.body_width, total, i, turn).claw);
+  return { points, facing, charge, arms, claws, mouth: add(points[0], mul(fromA(facing), 120 * DP.head_scale)), chest: pathAt(points, Math.min(total, DP.body_width * 0.9)).pos };
+}
+// 光は部位から部位へ運ぶ。等間隔の線や、全技で同じ口の円を置かない。
+function dSupply(R, from, to, strength, time, seed = 1, bend = 0) {
+  if (strength <= 0) return;
+  const pal = FX.ramp(R.P.color), u = norm(sub(to, from)), n = orth(u), control = add(lerpV(from, to, 0.5), mul(n, bend));
+  for (let i = 0; i < 9; i++) { if (hash(seed + i * 13) > strength) continue; const phase = (time * 1.65 + hash(seed + i * 17)) % 1, at = lerpV(lerpV(from, control, phase), lerpV(control, to, phase), phase), q = toL(at), bright = strength * (0.25 + phase * 0.6);
+    R.front.glow(q.x, q.y, 1.2 + phase, pal[2], bright * R.P.intensity * 0.17); if (phase > 0.28) R.front.px(q.x, q.y, pal[phase > 0.82 ? 3 : 1]); }
+}
+function dJetPicture(S, R) {
+  if (!S.fan || S.B.mode !== 'active' || !R.proto) return;
+  g.save(); g.beginPath(); S.fan.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.clip();
+  canisJetImage(S.fan[0], S.fanAngle, S.r.reach * R.P.size, S.r.reach * Math.tan(S.r.half_angle) * R.P.size, S.elapsed, Math.min(1, R.P.intensity));
+  g.restore();
+}
 function dPredict(S, seconds, cap = DP.aim_lead_cap) { const lead = mul(S.shipVel, Math.max(0, seconds)), l = len(lead); return add(S.ship.pos, l > cap ? mul(lead, cap / l) : lead); }
 function dTailPose(S, offset) { const r = S.r, points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(S.origin, mul(fromA(S.axis + Math.PI + offset * t * t), r.reach * t)); }); return dFit(points, S.base, true); }
 function dTailCurve(S, tip) { const back = mul(fromA(S.axis), -1), side = orth(back), c1 = add(S.origin, mul(back, DP.body_length * 0.7)), c2 = add(add(tip, mul(back, 220)), mul(side, DP.body_length * 0.35)); return dFit(Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(mul(S.origin, (1 - t) ** 3), mul(c1, 3 * (1 - t) ** 2 * t)), add(mul(c2, 3 * (1 - t) * t * t), mul(tip, t ** 3))); }), S.base, true); }
@@ -186,7 +230,7 @@ function dStep(S, dt) {
   for (const q of S.projectiles) q.pos = add(q.pos, mul(q.vel, dt)); S.projectiles = S.projectiles.filter(q => S.t - q.t < q.life);
   for (const e of S.effects) if (S.t - e.t >= e.delay) e.points = e.points.map(p => add(p, mul(e.vel, dt))); S.effects = S.effects.filter(e => S.t - e.t < e.delay + e.life);
 }
-function dTellDraw(S, R) {
+function dTellDraw(S, R, pose) {
   const k = clamp(S.elapsed / Math.max(0.01, S.r.warn));
   for (const path of S.tell) {
     if (!R.proto) { D2.polyline(path, rgba('#f8b05b', 0.42 + k * 0.4), 3); continue; }
@@ -194,16 +238,20 @@ function dTellDraw(S, R) {
     const total = pathLength(path), samples = Math.min(70, Math.ceil(total / 24)), pal = FX.ramp(R.P.color);
     for (let i = 0; i < samples; i++) { const q = pathAt(path, total * i / Math.max(1, samples - 1)), lateral = (hash(i * 7) - 0.5) * (S.r.width || 45), at = toL(add(q.pos, mul(orth(fromA(q.angle)), lateral))); R.back.glow(at.x, at.y, 2 + Math.sin(i + S.t * 8) * 0.4, pal[2], (0.08 + k * 0.15) * R.P.intensity); }
   }
-  if (S.B.mode === 'windup' && R.proto) bossGather(R, dMouth(S), 140, k, S.t, 191);
+  if (S.B.mode === 'windup' && R.proto && (!S.staging || S.staging.phase === 'ready')) {
+    const id = S.tech;
+    if (id === 'rifts') for (let i = 0; i < 2; i++) { bossGather(R, pose.claws[i], 66, k, S.t, 191 + i); dSupply(R, pose.chest, pose.claws[i], k, S.t, 211 + i, i ? 32 : -32); }
+    else if (['tail_sweep', 'tail_slam'].includes(id)) { const end = pose.points[pose.points.length - 1]; bossGather(R, end, 100, k, S.t, 193); dSupply(R, pathAt(pose.points, pathLength(pose.points) * 0.72).pos, end, k, S.t, 213); }
+    else if (['charge', 'leap', 'spiral', 'clones'].includes(id)) bossGather(R, pose.chest, 100, k, S.t, 194);
+    else { bossGather(R, pose.mouth, 85, k, S.t, 191); dSupply(R, pose.chest, pose.mouth, k, S.t, 215, 30); }
+  }
   if (S.tech === 'tail_slam' && S.B.mode === 'windup' && S.target) { if (R.proto) bossGather(R, S.target, S.r.radius * 1.2, k, S.t, 121); else D2.arc(S.target, S.r.radius, 0, TAU, '#f8b05b', 3); }
-  if (S.tech === 'star_fan' && S.B.mode === 'windup') for (const q of S.starPositions || []) { if (R.proto) bossGather(R, q.pos, 28, k, S.t, Math.floor(q.a * 100) + 123); else D2.circle(q.pos, 8 + k * 4, '#ffca7a'); }
+  if (S.tech === 'star_fan' && S.B.mode === 'windup') for (const [i, q] of (S.starPositions || []).entries()) { if (R.proto) { dSupply(R, pose.mouth, q.pos, smooth(0.15, 0.8, k), S.t, 230 + i, (i - S.starPositions.length * 0.5) * 7); bossGather(R, q.pos, 28, k, S.t, Math.floor(q.a * 100) + 123); } else D2.circle(q.pos, 8 + k * 4, '#ffca7a'); }
 }
 function dDraw(S, R) {
   R = bossView(R, '#ab9cff');
-  const r = S.r, B = S.B, P = R.P, id = S.tech, t = S.t; dTellDraw(S, R);
-  if (S.fan && B.mode === 'active') { if (!R.proto) { D2.poly(S.fan, rgba('#5775ff', 0.5)); D2.polyline(S.fan, '#addbff', 4); }
-    else { const mouth = S.fan[0], samples = []; for (let i = 1; i < S.fan.length; i += 3) { const end = S.fan[i], L = dist(mouth, end); for (let d = 20; d < L; d += 35) { const phase = ((d / 140 - t * 6 + i * 0.1) % 1 + 1) % 1, at = lerpV(mouth, end, d / L); samples.push({ pos: at, radius: (12 + d * 0.018) * (0.7 + phase * 0.4), seed: i * 9 + d }); } } bossFire(R.front, samples, t, P.color, P.intensity, P.size); }
-  }
+  const r = S.r, B = S.B, P = R.P, id = S.tech, t = S.t, pose = R.proto ? dPresentation(S) : null; dTellDraw(S, R, pose);
+  if (S.fan && B.mode === 'active' && !R.proto) { D2.poly(S.fan, rgba('#5775ff', 0.5)); D2.polyline(S.fan, '#addbff', 4); }
   if (id === 'inhale' && B.mode === 'active' && S.elapsed < r.inhale_time && R.proto) { const mouth = dMouth(S), A = toL(mouth), pal = FX.ramp(P.color); for (let i = 0; i < 80; i++) { const phase = (hash(i * 17) + t * (0.5 + hash(i))) % 1, angle = hash(i * 31) * TAU, rad = r.pull_range * (1 - phase), world = add(mouth, mul(fromA(angle), rad)); const q = toL(world); R.back.glow(q.x, q.y, 1.5, pal[2], phase * 0.20 * P.intensity); if (phase > 0.6) R.back.px(q.x, q.y, pal[2]); } }
   if (S.exhale && B.mode === 'active') { const e = S.exhale, age = t - e.t, end = add(e.at, mul(fromA(e.a), r.reach));
     if (age < r.beam_warn) { if (R.proto) bossGather(R, e.at, 150, clamp(age / r.beam_warn), t, 21); else D2.line(e.at, end, rgba('#d4bbff', 0.35), 4); }
@@ -215,9 +263,12 @@ function dDraw(S, R) {
   for (const q of S.rifts) { if (!q) continue; if (R.proto) { if (q.age < r.scratch_time + 0.4) bossSlash(R, q.a, q.b, r.scratch_width, Math.max(0, q.age - r.scratch_time * 0.5), 0.7, q.seed); const pal = FX.ramp(P.color), length = dist(q.a, q.b), u = norm(sub(q.b, q.a)), side = orth(u); for (let d = 0; d < length; d += 6) { const at = toL(add(add(q.a, mul(u, d)), mul(side, Math.sin(d * 0.12) * 2))); R.back.px(at.x, at.y, pal[0]); R.back.glow(at.x, at.y, 2, pal[2], 0.08 * P.intensity); } } else D2.line(q.a, q.b, '#34224d', r.width); }
   R.blitBack();
   if (id === 'clones' && B.mode === 'active') { for (const unit of S.units) drawDraco(unit.points, unit.angle, unit.index > 0 ? 0.85 : 1); }
+  else if (R.proto) drawDraco(pose.points, pose.facing, 1, DP.body_width, pose.arms);
   else drawDraco(S.points, B.facing);
+  dJetPicture(S, R);
+  if (id === 'rifts' && B.mode === 'active' && R.proto) for (let hand = 0; hand < 2; hand++) { const local = S.elapsed - hand * r.interval, path = S.paths?.[hand * r.claw_count]; if (path && local >= 0 && local < 0.18) dSupply(R, pose.claws[hand], path[0], 1 - local / 0.18, t * 3, 311 + hand, hand ? 22 : -22); }
   if (S.picaro) for (const q of S.picaro) drawEnemy(q, { white: clamp(1 - S.age) * 0.6 });
-  const chest = toL(sub(B.pos, mul(fromA(B.facing), 110 * DP.head_scale))); R.front.glow(chest.x, chest.y, 10, hexc('#8dbdff'), 0.35);
+  const chest = toL(R.proto ? pose.chest : sub(B.pos, mul(fromA(B.facing), 110 * DP.head_scale))); R.front.glow(chest.x, chest.y, 10, hexc('#8dbdff'), 0.35 + (R.proto ? Math.max(0, pose.charge) * 0.25 : 0));
   for (const q of S.shots) {
     if (R.proto) { bossTrail(R, [sub(q.pos, mul(fromA(q.a), q.kind === 'comet' ? 90 : 45)), q.pos], 0, P.color); const A = toL(q.pos); R.front.glow(A.x, A.y, q.radius * WL * 2 + 2, hexc(P.color), 0.65 * P.intensity); R.front.px(A.x, A.y, hexc('#ffffff')); }
     else if (q.kind === 'arrow') drawArrow(q.pos, q.a, q.radius); else { const u = fromA(q.a), side = orth(u), points = [add(q.pos, mul(u, q.radius * 1.5)), add(q.pos, mul(side, q.radius)), sub(q.pos, mul(u, q.radius * 1.5)), sub(q.pos, mul(side, q.radius))]; D2.poly(points, '#d4bbff'); }
@@ -230,8 +281,8 @@ for (const id of Object.keys(DRACO.moves)) {
   const r = bossRule('draco', id);
   DEMOS.push({ id: 'D-' + id, ids: id === 'inhale' ? ['D03', 'D04'] : ['D04'], cat: 'りゅう座（D）', group: 'りゅう座', title: r.display_name, duration: id === 'spiral' ? 17 : ['charge', 'leap', 'rifts'].includes(id) ? r.warn + r.active + r.recover + 6 : r.warn + r.active + r.recover + 1.2, color: '#ab9cff',
     params: id === 'inhale' ? [{ k: 'stars', label: '実験場：吸い込んだ星の数', type: 'range', min: 0, max: 12, step: 1, def: 12 }] : [],
-    status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '全身': '現行の背骨、節長の補正、通過した経路をたどる体、装甲・腕・爪・尾の配置を移植。現行画像と法線の照明焼込みを使用', '動作': '技の時刻・射数・範囲・速度は現行値。退場と再登場を含めて再生。単独の比較場面で共通AIの自然選択は省略', '未決・保留': id === 'spiral' ? 'D01の新しい挙動案は入れず、現行の2周・収縮・退出を再現。カメラも現行の0.82倍まで引く' : id === 'inhale' ? '本番のactiveは6秒。吸引3秒→予告1秒のあと、残りの攻撃時間内だけ照射する現行の時間関係を維持。D02の移動仕様変更は保留' : id === 'clones' ? '現行の3体と各技を独立再生。D05のGodot実験場エラーは、このHTMLの再生成功で解決扱いにしない' : 'D01・D02の本番の移動仕様、D05の実験場不具合は未変更。ピカロの通常AIと地形への干渉は比較対象外' },
-    refs: ['scripts/bosses/draco_parts.gd・draco_form.gd（全身のパーツと経路追従）', 'scripts/bosses/draco_attack_motion.gd・draco_screen_staging.gd（首・尾・退場）', 'data/bosses/draco_moves/' + id + '.tres・scripts/bosses/draco/techniques/' + id + '.gd', 'scripts/bosses/draco/technique_visual.gd（現行の予告・着弾）', 'pixelFXの光の密度・冷える斬撃・光粒の手法、SPEEDの現行画像'],
+    status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '全身': '現行画像と節長を保ち、胸と首を縮めて溜め、発動で解放する。腕と爪は一緒に振り、頭と首の向きをつなぐ', '動作': '技の時刻・射数・範囲・速度は現行値。退場と再登場を含めて再生。単独の比較場面で共通AIの自然選択は省略', '未決・保留': id === 'spiral' ? 'D01の新しい挙動案は入れず、現行の2周・収縮・退出を再現。カメラも現行の0.82倍まで引く' : id === 'inhale' ? '本番のactiveは6秒。吸引3秒→予告1秒のあと、残りの攻撃時間内だけ照射する現行の時間関係を維持。D02の移動仕様変更は保留' : id === 'clones' ? '現行の3体と各技を独立再生。D05のGodot実験場エラーは、このHTMLの再生成功で解決扱いにしない' : 'D01・D02の本番の移動仕様、D05の実験場不具合は未変更。ピカロの通常AIと地形への干渉は比較対象外' },
+    refs: ['scripts/bosses/draco_parts.gd・draco_form.gd（全身のパーツと経路追従）', 'scripts/bosses/draco_attack_motion.gd・draco_screen_staging.gd（首・尾・退場）', 'data/bosses/draco_moves/' + id + '.tres・scripts/bosses/draco/techniques/' + id + '.gd', 'scripts/bosses/draco/technique_visual.gd（現行の予告・着弾）', 'pixelFX原本 fire/fire-breath の青いスプライト、冷える斬撃・光粒の手法、SPEEDの現行画像'],
     setup(S) { dSetup(S, id); }, step: dStep, draw: dDraw, phase(S) { return S.staging && S.staging.phase !== 'ready' ? '全身の退場・再登場' : S.spiral && S.B.mode === 'windup' ? '全身の退場・巻く位置へ入る' : bossPhase(S.B); }
   });
 }

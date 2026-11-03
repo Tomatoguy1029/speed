@@ -5,6 +5,10 @@ const canisMouth = B => add(B.pos, mul(fromA(B.facing), B.r * 0.84));
 function canisPose(B, t, opts = {}) {
   const edits = {}, moving = len(B.vel) > 5;
   ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => edits[path] = { rotation: Math.sin(B.gait + (i === 0 || i === 3 ? 0 : Math.PI)) * (moving ? 0.16 : 0.015) });
+  if (opts.proto) {
+    const phases = [0, 0.5, 0.25, 0.75];
+    ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => { const node = BOSSES.canis_major.nodes.find(n => n.name === path), phase = ((B.walkPhase || 0) / TAU + phases[i]) % 1, stance = phase < 0.72, stroke = stance ? 1 - 2 * phase / 0.72 : -1 + 2 * smooth(0.72, 1, phase); edits[path] = { rotation: moving ? stroke * 0.11 : 0, position: V(node.position.x, node.position.y + (moving ? stroke * 4 : 0)), scale: V(1, moving && !stance ? 1 - Math.sin((phase - 0.72) / 0.28 * Math.PI) * 0.13 : 1) }; });
+  }
   edits.Tail = { rotation: Math.sin(B.gait * 0.4) * 0.07 };
   edits.Head = { rotation: B.pose.howl ? -0.45 * smooth(0, 0.65, B.charge) : 0 };
   if (opts.proto) {
@@ -25,7 +29,7 @@ function drawCanis(B, t, opts = {}) {
   const c = B.pose.crouch || 0, k = B.r / 100;
   const rig = drawBossParts(B, canisPose(B, t, opts), { ...opts, root: M.mk(-Math.PI / 2, k * (1 + c * 0.15), k * (B.pose.stretch || 1), 0, 0) });
   if (opts.shadow || !rig['Head/Sirius']) return;
-  const at = M.pt(rig['Head/Sirius'], V(0, 0)), q = IMG['canis_major/star'];
+  const at = M.pt(rig['Head/Sirius'], V(0, 0)); B.visualMouth = { ...at }; const q = IMG['canis_major/star'];
   const charge = opts.proto && opts.orderRoar && !B.pose.glow ? 0 : Math.max(B.charge, B.pose.glow || 0), large = IMG['canis_major/large_star'];
   g.save(); g.translate(at.x, at.y); g.rotate(B.facing + Math.sin(t * 2.1) * 0.04); g.scale(k, k);
   if (large) { g.globalAlpha = Math.floor(clamp((B.phase > 1 ? 0.75 : 0) + charge * 0.7, 0, 0.95) * 4) / 4; g.drawImage(large, -large.width / 2, 1 - large.height / 2); }
@@ -34,9 +38,9 @@ function drawCanis(B, t, opts = {}) {
 function canisSetup(S, id) {
   S.tech = id; S.B = bossActor('canis_major', V(-500, 0)); S.B.phase = Math.round(P().phase); S.r = bossRule('canis_major', id, S.B.phase);
   S.age = -0.4; S.stageAge = 0; S.stage = 'start'; S.ship = shipState(V(130, 0), Math.PI / 2, 35); S.shipVel = V(0, 35);
-  S.pack = []; S.jets = []; S.flames = []; S.trails = []; S.shouts = []; S.transfers = []; S.bursts = []; S.shadows = [];
+  S.pack = []; S.jetVisuals = []; S.jets = []; S.flames = []; S.trails = []; S.shouts = []; S.transfers = []; S.bursts = []; S.shadows = [];
   if (mode === 'proto' && CANIS_ROARS.has(id)) roarScreen ||= makeRoarScreen();
-  const count = Math.round(P().pack), B = S.B;
+  const count = id === 'nova' && mode === 'current' ? 8 : Math.round(P().pack), B = S.B;
   for (let i = 0, row = 1, column = 0; i < count; i++) {
     const q = mkE('hound', add(B.pos, V(B.r + 20 + row * 50, (column - row * 0.5) * 55)), 0, { idx: i, vel: V(0, 0), trail: [], warning: -1, dead: false }); S.pack.push(q);
     column++; if (column > row) { row++; column = 0; }
@@ -70,10 +74,10 @@ function canisJump(S, dt, rule, start = false) {
   S.land = { at: { ...B.pos }, t: S.t }; j.left--; if (j.left <= 0) return true;
   j.t = 0; j.warn = rule.chain_warn; j.locked = false; j.active = false; B.mode = 'windup'; return false;
 }
-function canisStartJet(S, at, angle, length, width, duration, trail = false) {
+function canisStartJet(S, at, angle, length, width, duration, trail = false, owner = 'boss') {
   const jet = { at: { ...at }, a: angle, length, width, duration, age: 0, emit: 0, life: S.r.beam_particle_life ?? 0.65, trail: null };
   if (trail) { jet.trail = { at: { ...at }, a: angle, length: 0, maximum: length, t: S.t, life: S.r.trail_time, width: S.r.trail_width }; S.trails.push(jet.trail); }
-  S.jets.push(jet); return jet;
+  S.jets.push(jet); S.jetVisuals.push({ ...jet, owner, t: S.t }); return jet;
 }
 function canisFlameAim(S, dt, cfg) {
   const B = S.B;
@@ -97,7 +101,7 @@ function canisSequence(S, dt, r, startAt, order = S.order, prefix = '') {
 }
 function canisStep(S, dt) {
   S.age += dt; const B = S.B, r = S.r, id = S.tech, age = S.age, was = { ...B.pos };
-  S.ship.pos = V(130, Math.sin(S.t * 0.5) * 70); S.shipVel = V(0, Math.cos(S.t * 0.5) * 35);
+  S.ship.pos = id === 'nova' && mode === 'proto' ? V(P().playerX, P().playerY) : V(130, Math.sin(S.t * 0.5) * 70); S.shipVel = V(0, Math.cos(S.t * 0.5) * 35);
   if (age < 0) return;
   canisOrderCue(S);
   B.gait += dt * (B.mode === 'active' ? 18 : 9);
@@ -144,7 +148,7 @@ function canisStep(S, dt) {
       if (age < r.warn) { canisFace(S, dt); B.pose = { shout: true }; }
       S.order.forEach((q, i) => { const mark = r.warn + i * r.interval, at = mark + r.each_warn;
         if (age >= mark && !q.relay) { q.relay = { from: { ...q.pos }, a: angOf(sub(S.ship.pos, q.pos)) }; q.warning = 0.4 + at; q.facing = q.relay.a; }
-        if (age >= at && !q.relayFired) { q.relayFired = true; canisStartJet(S, add(q.pos, mul(fromA(q.relay.a), q.r)), q.relay.a, r.hound_beam_length, r.hound_beam_width, r.hound_beam_time); }
+        if (age >= at && !q.relayFired) { q.relayFired = true; canisStartJet(S, add(q.pos, mul(fromA(q.relay.a), q.r)), q.relay.a, r.hound_beam_length, r.hound_beam_width, r.hound_beam_time, false, 'hound'); }
       });
       const finalAt = r.warn + Math.max(0, S.order.length - 1) * r.interval + r.each_warn + r.interval + 0.3;
       if (age >= finalAt) { if (canisFlameAim(S, dt, { warn: r.final_warn, lock: r.final_lock, turn: r.final_turn, remaining: true, length: r.final_length, width: r.final_width, time: r.final_time })) canisFinish(S); B.pose = { glow: B.charge }; }
@@ -177,6 +181,8 @@ function canisStep(S, dt) {
           q.steer = { goal: add(add(S.ship.pos, mul(fromA(m.angle), rad)), wobble), face: S.ship.pos, cfg: r };
         });
       }
+    } else if (id === 'nova' && mode === 'proto') {
+      canisWallStep(S); B.pose = { glow: age < r.warn ? age / r.warn : Math.max(0, 1 - (age - r.warn) / r.after) }; if (age >= r.warn) B.mode = 'active'; if (age >= r.warn + r.after) canisFinish(S);
     } else if (id === 'nova') {
       if (!S.pairs) { S.pairs = S.order.slice(0, r.count).map((q, i) => ({ q, group: Math.floor(i / 2), angle: Math.PI / 3 + Math.floor(i / 2) * TAU / 3, side: i % 2 ? -1 : 1 })); }
       const source = canisMouth(B), cfg = { ...bossRule('canis_major', 'bay'), max_speed: r.gather_speed };
@@ -192,13 +198,13 @@ function canisStep(S, dt) {
       B.pose = { glow: age < r.warn ? age / r.warn : Math.max(0, 1 - (age - r.warn) / r.after) }; if (age >= r.warn) B.mode = 'active'; if (age >= r.warn + r.after) canisFinish(S);
     }
   }
-  if (dt > 0) B.vel = mul(sub(B.pos, was), 1 / dt);
+  if (dt > 0) { B.vel = mul(sub(B.pos, was), 1 / dt); B.walkPhase = (B.walkPhase || 0) + dist(B.pos, was) / (B.r * 0.95) * TAU; }
   for (const q of S.pack) {
     if (q.dead) continue;
     if (q.burn) { const c = bossRule('canis_major', 'blaze'), cfg = { ...bossRule('canis_major', 'bay'), max_speed: c.run_speed };
       if (q.burn.blink < 0 && (dist(q.pos, S.ship.pos) < c.stop_dist || S.t - q.burn.at >= c.max_run)) q.burn.blink = S.t;
       canisSteer(q, q.burn.blink >= 0 ? q.pos : S.ship.pos, S.ship.pos, cfg, dt);
-      if (q.burn.blink >= 0 && S.t - q.burn.blink >= c.blink) { q.dead = true; S.bursts.push({ at: { ...q.pos }, t: S.t, radius: c.explode_radius }); }
+      if (q.burn.blink >= 0 && S.t - q.burn.blink >= c.blink) { q.dead = true; const burst = { at: { ...q.pos }, t: S.t, radius: c.explode_radius }; S.bursts.push(burst); canisBurstStart(S, burst); }
     } else if (q.until > S.t) { q.pos = add(q.pos, mul(q.vel, dt)); q.trail.push({ ...q.pos }); if (q.trail.length > 14) q.trail.shift(); }
     else if (q.steer) { canisSteer(q, q.steer.goal, q.steer.face, q.steer.cfg, dt); q.steer = null; }
     else if (q.goal) { const to = sub(q.goal, q.pos), speed = Math.min(enemyDef('hound').speed * (q.followScale || 1), len(to) / 0.25); q.vel = lerpV(q.vel, mul(norm(to), speed), clamp(enemyDef('hound').accel * dt)); q.pos = add(q.pos, mul(q.vel, dt)); q.facing = angOf(q.vel); }
@@ -211,6 +217,7 @@ function canisStep(S, dt) {
   S.jets = S.jets.filter(j => j.age < j.duration);
   for (const f of S.flames) { f.age += dt; f.vel = mul(f.vel, Math.exp(-f.drag * dt)); f.pos = add(f.pos, mul(f.vel, dt)); if (f.range && dist(f.pos, f.origin) >= f.range) f.age = f.life; if (f.trail) f.trail.length = Math.min(f.trail.maximum, Math.max(f.trail.length, dist(f.pos, f.origin))); }
   S.flames = S.flames.filter(f => f.age < f.life);
+  for (const b of S.bursts) if (b.fx && S.t - b.t < 2.8 && dt > 0) { b.fx.ps.update(dt); b.fx.blazes.update(dt); }
 }
 function canisDraw(S, R) {
   R = bossView(R, '#80c8ff');
@@ -222,8 +229,6 @@ function canisDraw(S, R) {
     if (S.warning) { const w = S.warning; bossGather(R, w.at, B.r, w.k, t); const A = toL(w.at), u = fromA(w.a), n = orth(u);
       for (let i = 0; i < 65; i++) { const phase = (hash(i * 7) + t * 0.4) % 1, d = phase * w.length * WL, width = w.width * WL * (0.5 + hash(i + 1)), q = add(add(A, mul(u, d)), mul(n, (hash(i + 8) - 0.5) * width)); R.back.glow(q.x, q.y, 1.5 + hash(i) * 2, pal[2], (0.06 + w.k * 0.12) * P.intensity); }
     }
-    for (const trail of S.trails) { const age = t - trail.t, fade = 1 - smooth(trail.life * 0.5, trail.life, age); if (fade <= 0) continue;
-      const samples = []; for (let d = 0; d < trail.length; d += 18) if (hash(d * 0.1) > 1 - fade) samples.push({ pos: add(trail.at, rotateV(V(d, Math.sin(d * 0.13) * trail.width * 0.3), trail.a)), radius: trail.width * (0.55 + hash(d) * 0.4) * fade, seed: d }); bossFire(R.back, samples, t, P.color, P.intensity, P.size); }
   } else {
     if (S.jump && !S.jump.active && S.aim) { D2.line(add(B.pos, mul(fromA(B.facing), B.r)), S.aim, rgba(S.jump.locked ? '#ff667d' : '#f2b567', 0.35 + B.charge * 0.4), S.jump.locked ? 6 : 3); D2.arc(S.aim, B.r * 0.5, 0, TAU, rgba('#ff667d', 0.6), 3); }
     if (B.mode === 'recovery') D2.arc(B.pos, 106 * B.r / 100, 0, TAU, rgba('#9fe8ff', 0.45 + Math.sin(t * 14) * 0.25), 6);
@@ -232,34 +237,35 @@ function canisDraw(S, R) {
   }
   if (id === 'nova') canisNovaDraw(S, R);
   // 現行の炎も同じ粒の位置・半径で描く。密度場の焼込み描画はHTML側での再現。
-  bossFire(R.front, S.flames.map(f => ({ pos: f.pos, radius: lerp(f.r0, f.r1, f.age / f.life), age: f.age / f.life, seed: f.seed })), t, R.proto ? P.color : '#8acbff', R.proto ? P.intensity : 1, R.proto ? P.size : 1);
+  const fireSamples = S.flames.map(f => ({ pos: f.pos, radius: lerp(f.r0, f.r1, f.age / f.life), age: f.age, life: f.life, seed: f.seed }));
+  if (R.proto && !['sirius_flame', 'sirius', 'relay', 'hunt'].includes(id)) canisFire(R, fireSamples, t, 'flame'); if (!R.proto) bossFire(R.front, fireSamples, t, '#8acbff');
+  if (R.proto) for (const b of S.bursts) canisBurstDraw(S, R, b, 'back');
   for (const q of S.pack) if (!q.dead) {
-    if (q.burn) { const samples = []; for (let i = 0; i < 12; i++) samples.push({ pos: add(q.pos, rotateV(V(-i * q.r * 0.3, Math.sin(i * 2 + t * 18) * q.r * 0.4), q.facing)), radius: q.r * (1.4 - i * 0.08), seed: i }); bossFire(R.back, samples, t, R.proto ? P.color : '#8acbff', P.intensity, P.size); }
+    if (q.burn) { const samples = []; for (let i = 0; i < 12; i++) samples.push({ pos: add(q.pos, rotateV(V(-i * q.r * 0.3, Math.sin(i * 2 + t * 18) * q.r * 0.4), q.facing)), radius: q.r * (1.4 - i * 0.08), seed: i }); if (R.proto) canisFire(R, samples, t, 'hound'); else bossFire(R.back, samples, t, '#8acbff', P.intensity, P.size); }
     if (q.warning > t) { const glow = clamp(1 - (q.warning - t) / (r.each_warn || r.nip_warn || r.warn || 0.3)); if (!R.proto) D2.circle(q.pos, q.r * 1.5, rgba('#fff', glow * 0.5)); }
     if (!R.proto && id === 'command' && q.until > t) { for (let i = 1; i < q.trail.length; i++) D2.line(q.trail[i - 1], q.trail[i], rgba('#ff667d', i / q.trail.length * 0.7), q.r); D2.circle(q.pos, q.r * 1.9, rgba('#ff667d', 0.22)); }
   }
   R.blitBack();
+  if (R.proto) canisTrailPictures(S, R);
   const mainShout = S.shouts.findLast(e => !e.small);
-  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
-  for (const q of S.pack) if (!q.dead) drawEnemy(q, { white: R.proto && q.warning > t ? clamp(1 - (q.warning - t) / 0.6) * 0.25 : 0 });
+  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.5 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  for (const q of S.pack) if (!q.dead) { drawEnemy(q); if (R.proto && q.warning > t) canisHoundWarning(q, clamp(1 - (q.warning - t) / 0.6)); }
   if (R.proto) {
-    for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); bossFire(R.front, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, P.color, P.intensity, P.size); }
+    for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); canisFire(R, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, 'ignite'); }
     if (!CANIS_ROARS.has(id) && B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
   }
+  if (R.proto) for (const b of S.bursts) canisBurstDraw(S, R, b, 'front');
+  else {
   for (const b of S.bursts) { const age = (t - b.t) / P.timing; if (age < 0 || age > 0.65) continue; const samples = []; for (let i = 0; i < 18; i++) samples.push({ pos: add(b.at, mul(fromA(hash(i * 9) * TAU), Math.sqrt(age) * b.radius * hash(i + 3))), radius: b.radius * (0.3 + hash(i) * 0.2) * (1 - age / 0.65), seed: i }); bossFire(R.front, samples, t, P.color, P.intensity, P.size); }
+  }
   drawShip(S.ship);
+  if (R.proto) canisJetPictures(S, R);
 }
 function canisNovaDraw(S, R) {
   const r = S.r, age = S.age, source = canisMouth(S.B), A = toL(source), P = R.P, pal = FX.ramp(P.color), shadowAt = (point) => { const to = sub(point, source), d = len(to); return S.shadows.some(s => d > s.near && Math.abs(angDiff(angOf(to), s.a)) <= s.half); };
   const light = age < r.warn ? clamp(age / r.warn) : Math.max(0, 1 - (age - r.warn) / r.after);
   if (R.proto) {
-    // 光の面をマスごとに描き、現行の遮蔽域の内側を暗くする。O15の判定は不変更。
-    for (let y = 0; y < LH; y += 2) for (let x = 0; x < LW; x += 2) { const world = V((x - LW / 2) / WL + cam.x, (y - LH / 2) / WL + cam.y), d = dist(world, source); if (d > r.ring_end || shadowAt(world)) continue; const c = parseCol(P.color); const alpha = light * 0.10 * (1 - d / r.ring_end) * P.intensity; R.back.blend(x, y, pal[2], alpha); R.back.blend(x + 1, y, pal[2], alpha); R.back.blend(x, y + 1, pal[2], alpha); R.back.blend(x + 1, y + 1, pal[2], alpha); }
-    for (let k = 0; k < r.rings; k++) { const e = age - r.warn - k * r.ring_gap, radius = 30 + r.ring_speed * e; if (e < 0 || radius > r.ring_end) continue;
-      const steps = Math.max(40, Math.ceil(TAU * radius * WL)); for (let i = 0; i < steps; i++) { const a = i / steps * TAU, w = add(source, mul(fromA(a), radius)); if (shadowAt(w)) continue; const q = toL(w), n = hash(Math.floor(i / 5) * 13 + k * 19), jitter = Math.sin(i * 0.13 + tFix(S.t) * 9) * 1.7;
-        for (let j = 0; j < 3; j++) { const off = jitter - j * (1.2 + n), pt = add(q, mul(fromA(a), off)); if (n + j * 0.2 > 0.28) R.front.px(pt.x, pt.y, pal[j === 0 ? 3 : 1]); R.front.light(pt.x, pt.y, pal[2], 0.15 * P.intensity); }
-      }
-    }
+    canisNovaLight(S, R);
   } else {
     for (const s of S.shadows) { const pts = []; for (let j = 0; j <= 12; j++) pts.push(add(source, mul(fromA(s.a + lerp(-s.half, s.half, j / 12)), s.near))); for (let j = 12; j >= 0; j--) pts.push(add(source, mul(fromA(s.a + lerp(-s.half, s.half, j / 12)), r.ring_end))); D2.poly(pts, rgba('#000104', light * 0.9)); }
     for (let k = 0; k < r.rings; k++) { const e = age - r.warn - k * r.ring_gap, radius = 30 + r.ring_speed * e; if (e < 0 || radius > r.ring_end) continue; for (let i = 0; i < 256; i++) { const a = i / 256 * TAU, b = (i + 1) / 256 * TAU; if (shadowAt(add(source, mul(fromA((a + b) / 2), radius)))) continue; D2.line(add(source, mul(fromA(a), radius)), add(source, mul(fromA(b), radius)), '#65baff', r.ring_band * 2); } }
@@ -269,9 +275,9 @@ const tFix = t => Math.floor(t * 30) / 30;
 for (const id of Object.keys(CANIS_IDS)) {
   const r = bossRule('canis_major', id);
   DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, duration: id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5, color: '#80c8ff',
-    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: 8, step: 1, def: 8 }, ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
-    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? 'O15の遮蔽仕様は未決。現行の2体をまとめた遮蔽域を維持し、判定の変更案を採用していない' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
-    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX fire/flamethrower.js の炎の流れ、SPEED pixel_fire の密度場', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
-    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
+    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: id === 'nova' ? 18 : 8, step: 1, def: id === 'nova' ? 12 : 8 }, ...(id === 'nova' ? [{ k: 'playerX', label: '機体の位置（横）', type: 'range', min: -850, max: 850, step: 5, def: 130 }, { k: 'playerY', label: '機体の位置（縦）', type: 'range', min: -450, max: 450, step: 5, def: 0 }] : []), ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
+    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。波動ではなく瞬間的な閃光へ変更。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
+    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX原本 fire/fire-breath・fire/fireball・fire/spirit-flame の青い出力、鳳凰と共通のpixel_fire密度場・爆発粒子', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
+    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { if (S.tech === 'nova' && mode === 'proto') return (canisFlash(S) > 0.6 ? '閃光発動／' : '') + (S.novaSafe ? '機体全体が影の中（安全）' : '光が届く（危険）'); const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
   });
 }
