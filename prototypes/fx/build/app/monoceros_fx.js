@@ -126,12 +126,8 @@ function monoRecordSlash(S, dt) {
   slash.points.push({ center, tip: { ...rig.hornTip }, v: clamp((S.angle - slash.angle) / S.r.arc), t: S.t + dt - slash.start });
   if (S.stage !== 'swing') {
     slash.finished = true;
-    const points = slash.points, tip = points[points.length - 1], prior = points[points.length - 2];
-    const tangent = angOf(sub(tip.tip, prior.tip)), rng = slash.rng, unit = Z / LP, scale = 42 / 12 * unit;
-    for (let i = 0; i < 10; i++) {
-      const a = tangent + rng.range(-0.5, 0.5), sp = rng.range(150, 400) * scale;
-      slash.particles.spawn(PX.P.SPARK, tip.tip.x * unit, tip.tip.y * unit, Math.cos(a) * sp, Math.sin(a) * sp, rng.range(0.12, 0.35));
-    }
+    const points = slash.points, rng = slash.rng, unit = Z / LP, scale = 42 / 12 * unit;
+    // 弧から放射状に散る粒だけ残す。先端の火花は命中時の演出として分ける。
     const ramp = FX.ramp(P().color);
     for (let i = 0; i < 16; i++) {
       const point = points[Math.round(rng.range(0.3, 1) * (points.length - 1))], outward = norm(sub(point.tip, point.center)), sp = rng.range(30, 100) * scale;
@@ -141,17 +137,22 @@ function monoRecordSlash(S, dt) {
 }
 function monoSlashCrescent(p, points, head, tail, W, ramp, age, radiusScale = 1) {
   if (head - tail < 0.005 || W < 0.3) return;
-  // 原本の三日月の輪郭・太さ・配色を保ち、楕円の座標だけを角先の円弧へ置き換える。
+  // 全区間で同じ原点を使い、角先の実軌道の半径を連続的につなぐ。
+  // 区間ごとに中心と半径を切り替えると、境目で斬撃が段状にずれる。
+  const center = points[0].center, C = toL(center);
   for (let i = 0; i < points.length - 1; i++) {
     const A = points[i], B = points[i + 1];
     if (B.v <= tail || A.v >= head || B.v - A.v < 0.00001) continue;
-    const C = toL(B.center), a = angOf(sub(A.tip, A.center)), span = angDiff(angOf(sub(B.tip, B.center)), a);
-    const radius = dist(B.tip, B.center) * WL * radiusScale, bounds = radius + 2, n = ramp.length;
+    const a = angOf(sub(A.tip, center)), span = angDiff(angOf(sub(B.tip, center)), a);
+    if (Math.abs(span) < 0.00001) continue;
+    const radiusA = dist(A.tip, center) * WL * radiusScale, radiusB = dist(B.tip, center) * WL * radiusScale;
+    const bounds = Math.max(radiusA, radiusB) + 2, n = ramp.length;
     p.shade(C.x - bounds, C.y - bounds, C.x + bounds, C.y + bounds, (x, y, out) => {
       const dx = x - C.x, dy = y - C.y, r = Math.hypot(dx, dy);
-      if (r > radius + 0.5 || r < radius - W - 1) return;
       const f = angDiff(Math.atan2(dy, dx), a) / span;
       if (f < 0 || f >= 1) return;
+      const radius = lerp(radiusA, radiusB, f);
+      if (r > radius + 0.5 || r < radius - W - 1) return;
       const along = lerp(A.v, B.v, f);
       if (along < tail || along > head) return;
       const v = (along - tail) / (head - tail), w = W * Math.pow(Math.sin(Math.PI * Math.pow(v, 2.2)), 0.6);
@@ -188,10 +189,6 @@ function monoSweepSlash(S, R) {
   if (t < 0.3 * P.timing) {
     const tip = toL(last.tip), inward = norm(sub(toL(last.center), tip)), at = add(tip, mul(inward, W / 3));
     p.glow(at.x, at.y, 40 * W / 12, ramp[3], 0.5 * (1 - t / (0.3 * P.timing)));
-  }
-  if (slash.finished) {
-    const tip = toL(last.tip), inward = norm(sub(toL(last.center), tip)), at = add(tip, mul(inward, W * 0.3)), g = t - sweep;
-    if (g >= 0 && g < 0.22 * P.timing) PX.sparkle(p, at.x, at.y, 9 * W / 12 * PX.ease.outBack(Math.min(1, g / (0.05 * P.timing))) * (1 - g / (0.22 * P.timing)), ramp[5], ramp[3], 0.6);
   }
   // 粒の位置はワールドで保管し、カメラ移動に合わせて描画だけを変換する。
   const origin = toL(V(0, 0)), cs = p.cs, sn = p.sn, fx = p.fx, tx = p.tx, ty = p.ty;
