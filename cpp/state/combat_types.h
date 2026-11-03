@@ -54,6 +54,7 @@ struct ShipDamageRequest {
     Cause cause=Cause::None;
     DefinitionId source=0;
     TechniqueId technique=0;
+    TechniqueId borrowed_technique=0;
     HitPolicy hit_policy=HitPolicy::EveryTick;
 };
 struct ShipDamageResult { bool accepted=false;CombatReason reason=CombatReason::Invalid;double hp_before=0,hp_after=0,amount=0; };
@@ -80,6 +81,7 @@ struct CombatEvent {
     DefinitionId definition=0,source=0;
     WeaponId weapon_id=0;
     TechniqueId technique=0;
+    TechniqueId borrowed_technique=0;
     godot::Vector2 pos,impact,direction;
     double requested=0,resolved=0,applied=0,overkill=0,hp_before=0,hp_after=0;
     double radius=0,facing=0,time=0,world_time=0;
