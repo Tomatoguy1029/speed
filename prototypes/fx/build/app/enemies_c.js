@@ -198,15 +198,22 @@ function phxEmbers(R, center, rad, t0, t, k, density, P) {
     else if (age < fall + 0.35) { const q = (age - fall) / 0.35; R.back.px(tx, ty, q < 0.3 ? pal[0] : q < 0.6 ? pal[1] : pal[2]); if (q < 0.5) { R.back.px(tx - 1, ty, pal[2]); R.back.px(tx + 1, ty, pal[2]); } R.back.glow(tx, ty, 5, pal[1], 0.4 * (1 - q) * P.intensity); }
   }
 }
-// 着地のあとに残る焦げ跡：縁はセルごとの乱数で崩し、熱い割れ目が冷えていく（pixelFX small-explosion の scorch を上から見た形に）
-function phxScorch(p, rad, t, fade) {
-  if (fade <= 0) return; const r = rad * Math.min(1, t / 0.12), heat = PHXC.fire.slice().reverse().map(hexc), SOOT = hexc('#140a0e'), SOOT2 = hexc('#22131a');
-  for (let y = Math.floor(-r); y <= r; y++) for (let x = Math.floor(-r); x <= r; x++) {
-    const d = Math.hypot(x + 0.5, (y + 0.5) / 0.9) / r, k = hash(x * 31.7 + y * 7.3), edge = 0.78 + 0.32 * hash(Math.floor(Math.atan2(y, x) * 5) * 3.3 + 1);
-    if (d > edge) continue;
-    const T = Math.pow(clamp(1 - t / 1.4), 1.3) * (1.2 - d) - k * 0.4;
-    if (T > 0.08) { p.px(x, y, heat[Math.min(heat.length - 1, Math.floor((1 - Math.min(1, T)) * (heat.length - 1)))]); if ((x & 3) === 0 && (y & 3) === 0) p.glow(x, y, 5, heat[5], 0.2 * T * fade); }
-    else if (k < 0.85 * fade * (1 - d * 0.6)) p.px(x, y, d < 0.5 ? SOOT : SOOT2);
+// 着地のあとに残る焦げ跡：円で決めず、着地から炎の粒が実際に通った所を写し取った形（mask）にする。
+// 熱い所ほど長く赤く光り、冷えるとすすになり、最後はマスごとのノイズで虫食い状に消える（輪郭を丸くしない）
+function phxStampScorch(S) {
+  const sc = S.scorch; if (!sc) return;
+  for (const q of S.fx.ps.list) { if (q.k !== PX.P.FIRE || q.delay > 0) continue; const r = q.size * 0.9, cx = q.x + sc.R, cy = q.y + sc.R;
+    for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(sc.N - 1, Math.ceil(cy + r)); y++) for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(sc.N - 1, Math.ceil(cx + r)); x++) {
+      const d2 = ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2) / (r * r); if (d2 < 1) sc.m[y * sc.N + x] += (1 - d2) * 0.08; } }
+}
+function phxScorch(p, sc, t, fade) {
+  if (!sc || fade <= 0) return; const heat = PHXC.fire.slice().reverse().map(hexc), SOOT = hexc('#140a0e'), SOOT2 = hexc('#22131a');
+  for (let y = 0; y < sc.N; y++) for (let x = 0; x < sc.N; x++) {
+    const m = sc.m[y * sc.N + x]; if (m < 0.35) continue; const lx = x - sc.R, ly = y - sc.R, k = hash(lx * 31.7 + ly * 7.3);
+    if (k > fade * Math.min(1, (m - 0.35) * 2.5)) continue; // 薄い所・時間がたった所から消える
+    const T = Math.pow(clamp(1 - t / 1.4), 1.3) * Math.min(1.2, m * 0.5) - k * 0.4;
+    if (T > 0.08) { p.px(lx, ly, heat[Math.min(heat.length - 1, Math.floor((1 - Math.min(1, T)) * (heat.length - 1)))]); if ((lx & 3) === 0 && (ly & 3) === 0) p.glow(lx, ly, 5, heat[5], 0.2 * T * fade); }
+    else p.blend(lx, ly, k < 0.5 ? SOOT : SOOT2, 0.7);
   }
 }
 function phxBurst(fx, rad) { // 着地の爆発：pixelFX Particles に炎・煙・火の粉・燃え残りを入れる（座標は着地点からの論理ピクセル）
@@ -232,9 +239,9 @@ DEMOS.push({
     if (e.mode === 'MOVE') { if (!e.anchor) { e.anchor = add(e.pos, mul(norm(sub(e.pos, S.ship.pos)), p.retreat_distance)); e.timer = p.retreat_time; } adv(e.anchor); if (e.timer <= 0 && dt > 0) { e.anchor = { ...S.ship.pos }; e.mode = 'WINDUP'; e.timer = p.telegraph; e.facing = angOf(sub(e.anchor, e.pos)); S.tele0 = S.t; } }
     else if (e.mode === 'WINDUP') { e.timer = Math.max(0, e.timer - dt); e.charge = 1 - e.timer / p.telegraph; if (e.timer <= 0) { e.mode = 'DASH'; e.timer = p.dive_time; e.charge = 0; } }
     else if (e.mode === 'DASH') { adv(e.anchor); const L = toLocal(e.pos, e.anchor), R = S.fx.trail; const back = norm(sub(e.anchor, e.pos)); for (let i = 0; i < 7; i++) { const j = R.range(0, 1); S.fx.ps.spawn(PX.P.FIRE, L.x - back.x * j * 6 + R.range(-3, 3), L.y - back.y * j * 6 + R.range(-3, 3), -back.x * R.range(20, 60) + R.range(-15, 15), -back.y * R.range(20, 60) + R.range(-25, 0), R.range(0.12, 0.3), 0, R.range(1.2, 3.4), 0, R.chance(0.25) ? PX.PF.SMOKES : 0); } if (R.chance(0.7)) S.fx.ps.spawn(PX.P.SPARK, L.x, L.y, -back.x * R.range(60, 160) + R.range(-40, 40), -back.y * R.range(60, 160) + R.range(-40, 40), R.range(0.15, 0.35));
-      if (e.timer <= 0) { S.flame = { pos: { ...e.anchor }, r: phxRadius(e), t0: S.t, life: p.impact_time }; phxBurst(S.fx, S.flame.r * WL); e.mode = 'RECOVER'; e.timer = p.recover_time; } }
+      if (e.timer <= 0) { S.flame = { pos: { ...e.anchor }, r: phxRadius(e), t0: S.t, life: p.impact_time }; phxBurst(S.fx, S.flame.r * WL); const RR = Math.ceil(S.flame.r * WL * 1.8); S.scorch = { R: RR, N: RR * 2 + 1, m: new Float32Array((RR * 2 + 1) ** 2) }; e.mode = 'RECOVER'; e.timer = p.recover_time; } }
     else if (e.mode === 'RECOVER') e.timer = Math.max(0, e.timer - dt);
-    if (dt > 0) { S.fx.ps.update(dt); S.fx.blazes.update(dt); }
+    if (dt > 0) { S.fx.ps.update(dt); S.fx.blazes.update(dt); if (S.flame && S.t - S.flame.t0 < 1.2) phxStampScorch(S); }
     S.ship.pos.x = 200 + Math.sin(S.t * 0.8) * 20;
   },
   phase(S) { const m = S.e.mode; return m === 'MOVE' ? '離脱' : m === 'WINDUP' ? PH.WINDUP + '（影と火の粉）' : m === 'DASH' ? '飛び込み' : S.flame && S.t - S.flame.t0 < S.flame.life ? PH.DASH + '（着地の炎・判定0.6s）' : PH.RECOVER + '（燃え残り）'; },
@@ -259,7 +266,7 @@ DEMOS.push({
       phxEmbers(R, anchor, rad, S.tele0 || S.t, S.t, k, Math.round(90 * P.intensity), P);
     }
     // 着地のあと：焦げ跡と燃え残り（背面）、煙
-    if (S.flame) { const t = S.t - S.flame.t0, Lf = toL(S.flame.pos); R.back.place(Lf.x, Lf.y); phxScorch(R.back, S.flame.r * WL * 0.85 * P.size, t / P.timing, 1 - smooth(2.4, 3.2, t / P.timing)); R.back.place(0, 0); }
+    if (S.flame) { const t = S.t - S.flame.t0, Lf = toL(S.flame.pos); R.back.place(Lf.x, Lf.y); phxScorch(R.back, S.scorch, t / P.timing, 1 - smooth(1.6, 3.2, t / P.timing)); R.back.place(0, 0); }
     if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.back.place(Lf.x, Lf.y); withPhxRamp(() => { phxDrawParticles(S.fx.ps, R.back, 'back', S.t, S.flame ? S.t - S.flame.t0 : 0); S.fx.blazes.drawBack(R.back); }); R.back.place(0, 0); }
     R.blitBack();
     drawEnemy(e); drawShip(S.ship);
