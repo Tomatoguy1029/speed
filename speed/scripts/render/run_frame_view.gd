@@ -4,6 +4,7 @@ const VISUAL_ROLE = preload("res://scripts/data_types/generated/run_ids.gd").ENU
 const SHAPE_KIND = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.RenderShapeKind
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
 var perf := PerfLog.new()
+var boss_hit_feedback := preload("res://scripts/bosses/boss_hit_feedback.gd").new()
 var metrics_record := {}
 var visuals: Dictionary = {}
 var batches: Dictionary = {}
@@ -947,6 +948,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			_pulser_parent.add_child(display)
 			if body.kind==2: display.setup_flames(_scope,visuals)
 			if body.kind in [3,4]: display.setup_effects(_scope,visuals)
+			if body.kind==4: display.hit_feedback = boss_hit_feedback
 			_boss_body_displays[body.id] = display
 		var attack := {}
 		for value: Dictionary in frame.get("boss_techniques",[]):
@@ -1006,6 +1008,7 @@ func receive_frame(frame: Dictionary) -> bool:
 	_mark_clock = float(frame.ui.world_time)
 	if frame.epoch!=_epoch:
 		_epoch = frame.epoch
+		boss_hit_feedback.clear()
 		ruler_shake=0.0
 		_queued_events.clear()
 		for display in _boss_body_displays.values():
@@ -1098,8 +1101,15 @@ func receive_frame(frame: Dictionary) -> bool:
 		_zone_bursts.clear()
 		_meteor_shards.clear()
 		_shield_transfers.clear()
+	var draco_targets := {}
+	for body: Dictionary in frame.ui.get("boss_bodies",[]):
+		if int(body.kind)!=4:continue
+		draco_targets[int(body.actor)]=true
+		for clone: Dictionary in body.get("clones",[]):draco_targets[int(clone.id)]=true
 	for event: Dictionary in frame.events:
 		var payload: Dictionary = event.payload.duplicate(true)
+		if event.type=="combat_damage" and payload.get("target","")=="enemy" and float(payload.get("applied",0.0))>0.0 and draco_targets.has(int(payload.get("target_id",0))):
+			boss_hit_feedback.pulse(int(payload.target_id))
 		payload["type"] = event.type
 		_queued_events.append(payload)
 	return true

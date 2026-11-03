@@ -6,6 +6,7 @@ var attack := {}
 var _move_style := {}
 var _styles := {}
 var hit := 0.0
+var hit_feedback: RefCounted
 var _clones := {}
 var _field: Node2D
 func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
@@ -30,11 +31,15 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	var intro: Dictionary = body.get("intro",{})
 	var intro_active: bool = intro.get("active",false)
 	_parts.visible = not intro_active or intro.time>=float(body.get("entrance_quiet",2.5))
-	hit = float(body.flash)
+	var feedback := {"white":0.0,"offset":Vector2.ZERO,"angle":0.0}
+	if hit_feedback!=null: feedback=hit_feedback.sample(int(body.actor))
+	hit = float(feedback.white)
 	var points := PackedVector2Array()
 	for point: Vector2 in body.body_points: points.append(to_local(point))
 	var finale: Dictionary=body.get("finale",{})
 	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" else float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
+	_parts.position = Vector2(feedback.offset).rotated(-float(body.facing))
+	_parts.rotation = float(feedback.angle)
 	var live := {}
 	for clone: Dictionary in body.get("clones",[]):
 		live[clone.id]=true
@@ -44,11 +49,13 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 			parts.material=ShaderMaterial.new();parts.material.shader=preload("res://shaders/picaro.gdshader")
 			_clones[clone.id]=parts
 		var parts: Node2D=_clones[clone.id]
-		parts.position=clone.position;parts.rotation=clone.angle
+		var clone_feedback := {"white":0.0,"offset":Vector2.ZERO,"angle":0.0}
+		if hit_feedback!=null: clone_feedback=hit_feedback.sample(int(clone.id))
+		parts.position=clone.position+clone_feedback.offset;parts.rotation=float(clone.angle)+float(clone_feedback.angle)
 		parts.visible=not body.get("cinematic_hide_enemies",false)
 		var posed := PackedVector2Array()
 		for point: Vector2 in clone.points:posed.append((point-clone.position).rotated(-float(clone.angle)))
-		parts.pose(posed,float(body.body_width),float(body.head_scale),1.0,true,0.0)
+		parts.pose(posed,float(body.body_width),float(body.head_scale),1.0,true,float(clone_feedback.white))
 	for id in _clones.keys():
 		if not live.has(id):_clones[id].queue_free();_clones.erase(id)
 	if _field!=null:_field.apply_frame(body)

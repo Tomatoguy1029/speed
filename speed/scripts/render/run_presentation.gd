@@ -177,6 +177,7 @@ func _present_cpp(delta: float) -> void:
 	var began := Time.get_ticks_usec()
 	var render: Dictionary = bridge.read_render(Rect2(cam_center-half,half*2.0),1.0)
 	frame_view.build_us = Time.get_ticks_usec()-began
+	frame_view.boss_hit_feedback.tick(0.0 if frame_view.authoring_paused or frame.ui.get("presentation_frozen",false) else delta)
 	if not render.ok or not frame_view.apply_frame(render.value):
 		frame_view.hide()
 		return
