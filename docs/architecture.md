@@ -141,7 +141,9 @@ tools/build/              共通スキーマ生成と拡張・配布ビルド
 5. 撃破済みの行を解放し、世界側の更新回に遭遇・補充・回収を進める。
 6. ワープ、カメラ、勝敗、保留中のカード選択を扱う。
 
-入力・UIは `RunBridge.command()` と `poll_and_step()` を使う。命令の封筒はランID・epoch・単調な命令番号・種類・payloadを持ち、C++側が版・値・実行可能状態を検証する。公開窓口は更新中の再入を拒否する。出力はUI差分・出来事・資源要求・描画・記録・計測の値として読む。出来事はsequenceを持ち、RunBridgeが購読者へ同じ列を渡してから受領を通知する。
+入力・UIは `RunBridge.command()` と `poll_and_step()` を使う。命令の封筒はランID・epoch・単調な命令番号・種類・payloadを持ち、C++側が版・値・実行可能状態を検証する。公開窓口は更新中の再入を拒否する。出力は現在のUI・出来事・資源要求・描画・記録・計測の値として読む。出来事はsequenceを持ち、RunBridgeが購読者へ同じ列を渡してから受領を通知する。
+
+通常のRunBridgeは `frame_snapshot_run()` で現在の全UIを読み、UI差分の比較と比較元の保存を省く。直接C++の差分を読む道具向けの `frame_run()` と、UIの組立て・通知・資源要求・結果の処理を共有する。両方ともUIを深く複製して返し、呼出元の書込みからラン状態を保護する。現在のライブラリに完全スナップショットの読取がない場合は、開始前に再ビルドを求めるエラーを返す。
 
 #### ランの所有と参照
 
@@ -462,7 +464,7 @@ RunPresentationがRunBridgeの出力を受け取り、2Dの層とシェーダー
 
 ### 10.1 出来事と状態から描画まで
 
-固定更新で積んだ出来事は `FrameBuilder` の配信列に保持し、RunBridgeがUI差分・資源要求と一緒に購読者へ渡す。位置・線・攻撃形状は `read_render(view, alpha)` で取得し、表示側がバッチ・技シーン・演出を更新する。
+固定更新で積んだ出来事は `FrameBuilder` の配信列に保持し、RunBridgeが現在UI・資源要求と一緒に購読者へ渡す。位置・線・攻撃形状は `read_render(view, alpha)` で取得し、表示側がバッチ・技シーン・演出を更新する。
 
 ```mermaid
 sequenceDiagram
@@ -476,8 +478,8 @@ sequenceDiagram
   B->>C: step_run(dt, intent, viewport)
   C->>C: 同じランの値を順に更新
   C->>O: 出来事・UI・資源要求を用意
-  B->>C: frame_run()
-  C-->>B: frame / events / UI差分
+  B->>C: frame_snapshot_run()
+  C-->>B: frame / events / 現在の全UI
   B->>P: 同じframeを各購読者へ配信
   B->>C: ack_frame_run(epoch, sequence)
   P->>B: read_render(view, alpha)

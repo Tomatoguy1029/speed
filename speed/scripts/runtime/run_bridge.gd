@@ -34,6 +34,9 @@ func configure(bytes: PackedByteArray, options: Dictionary) -> Dictionary:
 	if _core == null:
 		if not ClassDB.class_exists(&"SpeedRunCore"): return _error(2,"extension","C++拡張を読み込めません")
 		_core = ClassDB.instantiate(&"SpeedRunCore")
+	if not _core.has_method(&"frame_snapshot_run"):
+		_core = null
+		return _error(2,"extension","C++拡張を現在のコードでビルドしてください")
 	_busy = true
 	var result: Dictionary = _core.configure_run(bytes,options)
 	_busy = false
@@ -248,7 +251,7 @@ func dispose() -> Dictionary:
 ## UIの差分は窓口内で合成する。外側へ戦闘の可変参照を渡さない。
 func _read_locked() -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
-	var result: Dictionary = _core.frame_run()
+	var result: Dictionary = _core.frame_snapshot_run()
 	perf.since(&"output_build",began)
 	began = Time.get_ticks_usec() if perf.active else 0
 	if not result.ok: return result

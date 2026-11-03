@@ -22,6 +22,7 @@ namespace godot {
 class SpeedRunCore : public RefCounted {
     GDCLASS(SpeedRunCore, RefCounted)
     speed::RunRuntime runtime;
+    Dictionary read_frame_value(bool full_snapshot);
     friend class speed::RunRunner;
     friend class speed::ProgressionSystem;
     friend class speed::PickupSystem;
@@ -187,6 +188,7 @@ public:
     Dictionary step_run(const Variant &dt,const Dictionary &input,const Dictionary &viewport);
     Dictionary command_run(const Dictionary &envelope);
     Dictionary frame_run();
+    Dictionary frame_snapshot_run();
     Dictionary ack_frame_run(int64_t epoch,int64_t sequence);
     Dictionary metrics_run() const;
     Dictionary recording_run(bool initial) const;

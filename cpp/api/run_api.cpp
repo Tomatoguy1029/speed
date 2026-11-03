@@ -417,6 +417,12 @@ Dictionary SpeedRunCore::render_run(const Rect2 &view,const Variant &alpha) cons
     return success(speed::RenderBuilder::read(runtime,view,double(alpha)));
 }
 Dictionary SpeedRunCore::frame_run() {
+    return read_frame_value(false);
+}
+Dictionary SpeedRunCore::frame_snapshot_run() {
+    return read_frame_value(true);
+}
+Dictionary SpeedRunCore::read_frame_value(bool full_snapshot) {
     speed::MetricsTimer measured(runtime.frame_workspace.metrics.output_build);
     if (runtime.busy) return failure(7,"read_frame","更新中は再入できません");
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_frame","開始していないランです");
@@ -489,7 +495,8 @@ Dictionary SpeedRunCore::frame_run() {
     Array pending_blasts,blast_visuals;for (const auto &p:blast.pending) {Dictionary item;item["pos"]=p.pos;item["radius"]=p.radius;item["damage"]=p.damage;item["delay"]=p.delay;pending_blasts.push_back(item);}
     for (const auto &v:blast.visuals) {Dictionary item;item["id"]=int64_t(v.id);item["pos"]=v.pos;item["radius"]=v.radius;item["age"]=v.age;blast_visuals.push_back(item);}end_blast["pending"]=pending_blasts;end_blast["visuals"]=blast_visuals;ui["end_blast"]=end_blast;
     ui["capacity"]=runtime.state.draw_config.capacity;ui["charge_time"]=runtime.state.draw_config.charge_time;ui["min_charge"]=runtime.state.draw_config.min_charge;ui["full_burst"]=runtime.state.loadout.full_burst_owned;ui["full_burst_active"]=runtime.state.loadout.full_burst_active;ui["shooting_rate"]=runtime.state.draw.gauge<1.0?1.0:1.0+runtime.state.loadout.effects.full_gauge_rate*runtime.state.draw.gauge;
-    ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);value["ui"]=speed::FrameBuilder::ui_delta(runtime,ui);
+    ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);
+    value["ui"]=full_snapshot?ui.duplicate(true):speed::FrameBuilder::ui_delta(runtime,ui);
     value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=speed::ProgressionSystem::requests(runtime);value["result"]=speed::Lifecycle::result(runtime);return success(value);
 }
 Dictionary SpeedRunCore::ack_frame_run(int64_t epoch,int64_t sequence) {

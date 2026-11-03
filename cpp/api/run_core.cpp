@@ -101,6 +101,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("command_run", "envelope"), &SpeedRunCore::command_run);
     ClassDB::bind_method(D_METHOD("lab_state_run"), &SpeedRunCore::lab_state_run);
     ClassDB::bind_method(D_METHOD("frame_run"), &SpeedRunCore::frame_run);
+    ClassDB::bind_method(D_METHOD("frame_snapshot_run"), &SpeedRunCore::frame_snapshot_run);
     ClassDB::bind_method(D_METHOD("ack_frame_run","epoch","sequence"), &SpeedRunCore::ack_frame_run);
     ClassDB::bind_method(D_METHOD("metrics_run"), &SpeedRunCore::metrics_run);
     ClassDB::bind_method(D_METHOD("recording_run","initial"), &SpeedRunCore::recording_run);
