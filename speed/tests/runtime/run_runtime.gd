@@ -868,6 +868,34 @@ func check_run_events() -> bool:
 	check(bridge.restore(saved).ok and bridge.ack_frame(epoch,last).code==3,"復帰前のepochのackを拒否する")
 	check(bridge.read_metrics().value.events_emitted==metrics.value.events_emitted,"復帰で観測の累積値を巻き戻さない")
 	bridge.release_checkpoint(saved)
+	var isolated = clock_fixture(config,definition)
+	var waiting := [true]
+	var early := []
+	var replayed := []
+	isolated.subscribe("先に受け取る出力",func(frame: Dictionary) -> bool:
+		early.append(frame)
+		return true)
+	isolated.subscribe("保持する出力",func(frame: Dictionary) -> bool:
+		if waiting[0]: return false
+		replayed.append(frame)
+		return true)
+	check(not isolated.collect_frame().ok,"受理待ちの初期出力を保持する")
+	clock_step(isolated)
+	var exposed: Dictionary = isolated.read_frame().value
+	check(exposed.tick==1,"配信失敗中も成功した固定更新を再実行しない")
+	var actual_position: Vector2 = exposed.ui.ship.ship_pos
+	exposed.ui.ship.ship_pos = Vector2(123456789,-123456789)
+	exposed.ui.hero.clear()
+	check(isolated.latest_frame().value.ui.ship.ship_pos==actual_position,"公開読取の変更を窓口の出力へ漏らさない")
+	waiting[0] = false
+	var collected: Dictionary = isolated.collect_frame()
+	check(collected.ok and replayed.size()==2 and replayed[0].tick==0 and replayed[1].tick==1,"保持した出力と次の出力を順番に一度ずつ届ける")
+	if replayed.size()==2 and early.size()==2:
+		check(replayed[0].ui==early[0].ui and replayed[1].ui==early[1].ui,"新しい公開読取で再送待ちの古いUIを書き換えない")
+	if collected.ok:
+		collected.value.ui.ship.ship_pos = Vector2(123456789,-123456789)
+		check(isolated.latest_frame().value.ui.ship.ship_pos==actual_position,"公開collectの変更を窓口の出力へ漏らさない")
+	isolated.dispose()
 	var core = bridge._core
 	check(bridge.dispose().ok and not bridge.read_frame().ok and not bridge.read_metrics().ok and not core.frame_run().ok and not core.ack_frame_run(epoch,last).ok,"破棄後の読取とackを拒否する")
 	recorder._file.flush()
@@ -876,7 +904,7 @@ func check_run_events() -> bool:
 	var recorded_hits := 0
 	for line in FileAccess.get_file_as_string("/tmp/speed-cpp-m02-events.jsonl").split("\n",false):
 		var row: Dictionary = JSON.parse_string(line)
-		if row.type=="hit" and row.payload.id==target: recorded_hits += 1
+		if row.type=="hit" and int(row.get("id",-1))==target: recorded_hits += 1
 	check(recorded_hits==1,"録画ファイルにも一命中を一度だけ残す")
 	recorder._cpp_session_id = 0
 	recorder.free()

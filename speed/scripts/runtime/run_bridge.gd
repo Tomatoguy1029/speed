@@ -77,7 +77,7 @@ func step(dt: float, input: Dictionary, viewport: Dictionary) -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.step_run(dt,input,viewport)
 	perf.since(&"sim",began)
-	if result.ok: _collect_locked()
+	if result.ok: _collect_locked(false)
 	_busy = false
 	return result
 
@@ -92,7 +92,7 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 		return _error(1,"input","入力元がありません")
 	# 成功した更新と命令の出力を既に保持している。入力には可否と描線中だけを読む。
 	# 初回・復帰直後・配信失敗では従来どおり本体から読み直す。
-	var frame: Dictionary = _read_locked() if _latest.is_empty() or (not delivery_error.is_empty() and not delivery_error.ok) else _ok(_latest)
+	var frame: Dictionary = _read_locked(false) if _latest.is_empty() or (not delivery_error.is_empty() and not delivery_error.ok) else _ok(_latest)
 	var router := source.get_object() as InputRouter
 	if router!=null and frame.ok: router.drawing = frame.value.ui.draw.drawing
 	var intent = source.call() if frame.ok and frame.value.ui.input_enabled else Intent.new()
@@ -102,7 +102,7 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.step_run(dt,pack_intent(intent),{"logical_size":logical_size})
 	perf.since(&"sim",began)
-	if result.ok: _collect_locked()
+	if result.ok: _collect_locked(false)
 	_busy = false
 	return result
 
@@ -128,7 +128,7 @@ func send_envelope(envelope: Dictionary) -> Dictionary:
 	if _core == null: return _error(4,"command","破棄済みです")
 	_busy = true
 	var result: Dictionary = _core.command_run(envelope)
-	if result.ok: _collect_locked()
+	if result.ok: _collect_locked(false)
 	_busy = false
 	if result.ok and envelope.get("run_id") == _run_id and envelope.get("epoch") == _epoch and envelope.get("command_id",0) < 9223372036854775807:
 		_next_command = maxi(_next_command,int(envelope.command_id)+1)
@@ -249,25 +249,30 @@ func dispose() -> Dictionary:
 	return result
 
 ## 現在UIは窓口だけが所有する。外側へ戦闘の可変参照を渡さない。
-func _read_locked() -> Dictionary:
+func _read_locked(public_copy := true) -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.frame_snapshot_run()
 	perf.since(&"output_build",began)
 	began = Time.get_ticks_usec() if perf.active else 0
 	if not result.ok: return result
-	if not _latest.is_empty() and _latest.epoch!=result.value.epoch: _ui = {}
 	preload("res://scripts/runtime/post_max_card_view.gd").format_frame(result.value)
 	for event: Dictionary in result.value.events:
 		if event.type=="text":
 			var entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(event.payload.get("text","")))
 			if entry!=null: event.payload.text = entry.get_display_name()
-	_ui.merge(result.value.ui,true)
+	# 完全読取なのでUI全体を置き換える。再送中の古い封筒は書き換えない。
+	_ui = result.value.ui
 	# 本体が返した外側DictionaryとUIは窓口だけが所有する。
 	# 公開読取と各購読者への深い複製は返却/配信の境界で行う。
 	_latest = result.value
 	_latest.ui = _ui
+	_latest_bytes = _packed_bytes(_latest)
+	perf.since(&"bridge_copy",began)
+	return _copy_latest() if public_copy else _ok(_latest)
+
+func _copy_latest() -> Dictionary:
+	var began := Time.get_ticks_usec() if perf.active else 0
 	var snapshot := _ok(_latest.duplicate(true))
-	_latest_bytes = _packed_bytes(snapshot.value)
 	_metrics_bytes += _latest_bytes
 	perf.since(&"bridge_copy",began)
 	return snapshot
@@ -276,11 +281,7 @@ func latest_frame() -> Dictionary:
 	if _busy: return _error(7,"latest_frame","配信中は読めません")
 	if _core==null: return _error(4,"latest_frame","破棄済みです")
 	if _latest.is_empty(): return read_frame()
-	var began := Time.get_ticks_usec() if perf.active else 0
-	var snapshot := _ok(_latest.duplicate(true))
-	_metrics_bytes += _latest_bytes
-	perf.since(&"bridge_copy",began)
-	return snapshot
+	return _copy_latest()
 
 func read_metrics() -> Dictionary:
 	if _busy: return _error(7,"read_metrics","更新中は読めません")
@@ -390,17 +391,18 @@ func _deliver_locked() -> Dictionary:
 	_delivery = {}
 	return _ok()
 
-func _collect_locked() -> Dictionary:
+func _collect_locked(public_copy := true) -> Dictionary:
 	if not _delivery.is_empty():
 		delivery_error = _deliver_locked()
 		if not delivery_error.ok: return delivery_error
-	var snapshot := _read_locked()
+	var snapshot := _read_locked(false)
 	if not snapshot.ok:
 		delivery_error = snapshot
 		return snapshot
-	if _subscribers.is_empty(): return snapshot
+	if _subscribers.is_empty(): return _copy_latest() if public_copy else _ok()
 	_delivery = snapshot.value
 	_delivery_bytes = _latest_bytes
 	_delivery_sizes = {}
 	delivery_error = _deliver_locked()
-	return snapshot if delivery_error.ok else delivery_error
+	if not delivery_error.ok: return delivery_error
+	return _copy_latest() if public_copy else _ok()
