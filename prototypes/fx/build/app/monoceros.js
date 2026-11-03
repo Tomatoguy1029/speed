@@ -25,7 +25,7 @@ function monoEdits(S, R) {
     }
   }
   if (S.tech === 'kick' && R.proto) monoKickPose(S, edits);
-  if (R.proto) monoChargePose(S, edits);
+  if (R.proto) { monoChargePose(S, edits); monoWavePose(S, edits); }
   const hornNode = MONO.nodes.find(n => n.name === 'Horn'), lengths = hornNode.texture.metadata.core_lengths, frame = B.phase > 1 ? 14 : 0;
   // horn.global_position を同じパーツ変換で求める。絵の根元から現行の判定先まで延ばす。
   const rootRot = bodyAngle - Math.PI / 2, rootOff = mul(rotateV(V(0, 37), rootRot), k), root = M.mul(M.mk(B.facing, 1, 1, B.pos.x, B.pos.y), M.mk(rootRot - B.facing, k, k, rotateV(rootOff, -B.facing).x, rotateV(rootOff, -B.facing).y));
@@ -78,7 +78,7 @@ function monoStep(S, dt) {
       if (S.stage === 'approach') { S.v = Math.min(r.approach_speed_max, S.v + r.approach_accel * dt); monoFace(S, r.approach_turn, dt); S.direction = fromA(B.facing); B.pos = add(B.pos, mul(S.direction, S.v * dt)); const q = clamp(S.st / r.twist_time); S.angle = B.facing - r.twist * (1 - (1 - q) ** 2); S.glow = q;
         if ((dist(B.pos, S.ship.pos) < r.stop_range && S.st > r.approach_min) || S.st > r.approach_max) { S.base = B.facing; monoEnter(S, 'stop'); }
       } else if (S.stage === 'stop') { S.v = Math.max(0, S.v - r.stop_decel * dt); B.pos = add(B.pos, mul(fromA(S.base), S.v * dt)); S.angle = S.base - lerp(r.twist, r.windup_twist, 1 - (1 - clamp(S.st / r.stop_time)) ** 2); if (S.st >= r.stop_time) { B.mode = 'active'; monoEnter(S, 'swing'); } }
-      else if (S.stage === 'swing') { const q = clamp(S.st / r.active); S.angle = S.base - r.windup_twist + r.arc * q * q * (1.6 - 0.6 * q); if (q >= 1) monoEnter(S, 'hold'); }
+      else if (S.stage === 'swing') { if (S.st === 0 || !S.slashStart) S.slashStart = S.t - S.st; const q = clamp(S.st / r.active); S.angle = S.base - r.windup_twist + r.arc * q * q * (1.6 - 0.6 * q); if (q >= 1) monoEnter(S, 'hold'); }
       else if (S.stage === 'hold') { if (S.st >= r.hold) monoEnter(S, 'return'); }
       else if (S.stage === 'return') { S.angle = lerp(S.base - r.windup_twist + r.arc, S.base, smooth(0, r.return_time, S.st)); if (S.st >= r.return_time) monoFinish(S); }
     } else if (id === 'sword_flash') {
@@ -104,6 +104,7 @@ function monoStep(S, dt) {
   S.bodyAngle += angDiff(B.facing, S.bodyAngle) * follow; S.bodyAngle = B.facing + clamp(angDiff(S.bodyAngle, B.facing), -24 * Math.PI / 180, 24 * Math.PI / 180);
   S.neckAngle = S.angle; S.headAngle = S.angle; S.tailAngle += angDiff(S.bodyAngle, S.tailAngle) * (1 - Math.exp(-dt / 0.14)); S.flameAngle = (S.flameAngle ?? S.tailAngle) + angDiff(S.tailAngle, S.flameAngle ?? S.tailAngle) * (1 - Math.exp(-dt / 0.22)); S.tailAngle = S.bodyAngle + clamp(angDiff(S.tailAngle, S.bodyAngle), -Math.PI / 10, Math.PI / 10);
   S.glowVisual = S.glow > S.glowVisual ? S.glow : Math.max(S.glow, S.glowVisual - dt / 0.22);
+  if (id === 'horn_dance' && ['run', 'circle'].includes(S.stage) && (!S.burn?.length || dist(S.burn[S.burn.length - 1].pos, B.pos) > 14)) (S.burn ||= []).push({ pos: { ...B.pos }, t: S.t }); // 乱舞の燃え跡を置く
   if (len(B.vel) > 400) { S.track.push({ ...B.pos }); if (S.track.length > 22) S.track.shift(); if (id === 'horn_dance' && S.stage === 'run' && (!S.scorch.length || dist(S.scorch[S.scorch.length - 1].at, B.pos) > 18)) S.scorch.push({ at: { ...B.pos }, t: S.t }); }
   monoWaveAir(S, dt);
   if (mode === 'proto' && id === 'horn_dance') { cam.x = 0; cam.y = 0; cam.zoom = 0.8; } else { cam.x = (B.pos.x + S.ship.pos.x) * 0.5; cam.y = (B.pos.y + S.ship.pos.y) * 0.5; }
@@ -112,9 +113,9 @@ function monoDraw(S, R) {
   R = bossView(R, '#ffd27a');
   const B = S.B, r = S.r, id = S.tech, P = R.P, u = fromA(S.angle), tip = monoTip(S), pal = FX.ramp(P.color), rig = monoEdits(S, R);
   if (R.proto) {
-    bossTrail(R, S.track, ['run', 'circle'].includes(S.stage) ? 0 : S.st);
+    // 移動の軌跡の光（点線に見える）は出さない。突進・踏み込みは尾のジェット、乱舞は燃え跡
     if (B.mode === 'windup' && ['charge', 'return_charge', 'horn_dance'].includes(id)) monoChargeTell(S, R, rig);
-    monoBurntTrail(S, R);
+    monoDanceBurn(S, R);
   } else if (B.mode === 'windup' && ['charge', 'return_charge', 'kick'].includes(id)) { const dir = id === 'kick' ? S.direction : u, end = add(B.pos, mul(dir, (id === 'kick' ? r.reach : monoHornLength(B) + r.distance))); D2.line(add(B.pos, mul(dir, B.r * 0.65)), end, rgba('#f2b567', 0.3), id === 'kick' ? 30 : 6); }
   for (const w of S.waves) { const age = S.t - w.t, radius = r.wave_start + age * r.wave_speed; if (radius > r.wave_max) continue;
     if (!R.proto) D2.arc(w.center, radius, w.a - r.wave_half_angle, w.a + r.wave_half_angle, rgba('#cfffef', 1 - radius / r.wave_max), r.wave_width);
@@ -123,7 +124,7 @@ function monoDraw(S, R) {
   for (const slash of S.slashes) { const age = S.t - slash.t; if (R.proto) bossSlash(R, slash.a, slash.b, r.slash_width, age, 0.6, S.slashes.indexOf(slash) + 1); else if (age < 0.6) { const d = norm(sub(slash.b, slash.a)), n = mul(orth(d), r.slash_width * 0.8 * (1 - age / 0.6)); const mid = lerpV(slash.a, slash.b, 0.5); D2.poly([slash.a, add(mid, n), slash.b, sub(mid, n)], rgba('#c9a6ff', 1 - (age / 0.6) ** 2)); } }
   for (const boom of S.booms) { const age = S.t - boom.t; if (R.proto) bossBreath(R, boom.at, B.facing + Math.PI, age, 83, 0.7, 200); else if (age < 0.4) D2.arc(boom.at, lerp(40, 190, age / 0.4), B.facing + Math.PI - 0.9, B.facing + Math.PI + 0.9, rgba('#9fe8ff', (1 - age / 0.4) * 0.5), 3); }
   monoOriginalBooster(S, rig);
-  if (R.proto) monoTailJet(S, R); // 突進中は尾から強いジェットの炎
+  if (R.proto) { monoTailJet(S, R); monoSweepSlash(S, R); } // 突進・踏み込み中は尾のジェット、薙ぎ払いは斬撃
   R.blitBack(); drawBossParts(B, rig.edits, { root: rig.root });
   if (id === 'lance' && S.form > 0) monoOriginalLance(S, rig);
   if (S.shattered && R.proto) FXW.sparks(R.front, S.shattered.at, (S.t - S.shattered.t) / P.timing, 31, 22, P.color, 55, 0.7);

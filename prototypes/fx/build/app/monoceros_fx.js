@@ -68,16 +68,13 @@ function monoWaveAir(S, dt) {
     wave.air.update(dt);
   }
 }
-// 突進専用の予兆：角は光が集まって光る（炎は出さない）。光の粒がまわりから角へ集まり、溜まるほど角が強く光る。前足が地面を蹴って金の火花が後ろへ散り、
+// 突進専用の予兆：角は光が集まって光る（炎は出さない。角の発光は本番の実装のまま）。前足が地面を蹴って金の火花が後ろへ散り、
 // 尾の噴射口の青い炎が脈打って膨らむ。溜めの最後は動きを止めて見せる（姿勢は monoChargePose）
 const MONO_GOLD = ['#ffffff', '#fff3c0', '#ffe08a', '#ffc457', '#f2a03a', '#d8782a', '#a8521e', '#6e3214', '#3a1a0c'];
 function monoChargeTell(S, R, rig) {
   const duration = S.tech === 'horn_dance' ? S.r.aim_time : S.r.warn, charge = smooth(0, duration * 0.62, S.st), H = MONO_GOLD.map(hexc);
   const B = S.B, u = fromA(S.angle), tip = toL(rig.hornTip), root = toL(rig.horn), back = V(-u.x, -u.y);
-  for (let i = 0; i < 22; i++) { const f = (hash(i * 3.1) + S.t * (0.9 + hash(i) * 0.6)) % 1, a = hash(i * 7.7) * TAU, d = (1 - f) * (14 + 10 * hash(i * 5.3)), on = lerpV(root, tip, hash(i * 2.9)); // 光の粒が角へ集まる
-    const x = on.x + Math.cos(a) * d, y = on.y + Math.sin(a) * d; R.front.dot(x, y, f > 0.7 ? H[0] : H[2], charge * (0.3 + 0.7 * f)); }
-  for (let s = 0; s <= 1; s += 0.08) { const q = lerpV(root, tip, s); R.front.glow(q.x, q.y, 1.2 + 1.6 * charge, H[2], (0.05 + 0.12 * charge) * (0.6 + 0.4 * s)); } // 角そのものが光る（塊にしない）
-  R.front.glow(tip.x, tip.y, 4 + charge * 6, H[3], 0.25 + charge * 0.45);
+  // 角の発光は本番の実装（角の白い発光）のまま。ここでは足さない
   for (const path of ['FrontLeftLeg/Foot', 'FrontRightLeg/Foot']) { const mat = rig.mats[path]; if (!mat) continue; const f = toL(M.pt(mat, V(0, 0))); // 前足が地面を蹴る火花
     R.back.glow(f.x, f.y, 3, H[4], charge * 0.35);
     for (let j = 0; j < 5; j++) { const q = new PX.Rng(Math.floor(S.t * 12) * 13 + j + (path.length * 7)), ag = ((S.t * 12) % 1) / 12 + j * 0.02, d = q.range(4, 14) * charge, a = Math.atan2(back.y, back.x) + q.range(-0.6, 0.6), x = f.x + Math.cos(a) * d, y = f.y + Math.sin(a) * d; if (charge > 0.15) R.back.line(x - Math.cos(a) * 2, y - Math.sin(a) * 2, x, y, (w) => w > 0.5 ? H[1] : H[4], charge * (1 - ag * 4)); } }
@@ -94,7 +91,36 @@ function monoBurntTrail(S, R) {
 
 // 突進中の尾のジェット：予兆で脈打った尾の噴射口から、飛び出す瞬間に強い青い炎を噴く（おおいぬの噴射と同じ作り canisJetStream を使う）
 function monoTailJet(S, R) {
-  if (S.stage !== 'run' || !['charge', 'return_charge', 'horn_dance', 'lance'].includes(S.tech)) { S.jetT = null; return; }
-  S.jetT ??= S.t; const B = S.B, u = fromA(S.angle), age = S.t - S.jetT, burst = 1 + 0.5 * (1 - smooth(0, 0.18, age));
-  canisJetStream(R, add(B.pos, mul(u, -B.r * 0.95)), S.angle + Math.PI, B.r * 2.6 * burst * R.P.size * (R.P.tailJet ?? 1), 1.1 * burst * (R.P.tailJetWidth ?? 1), age + 0.3, Infinity, Math.min(1, R.P.intensity), 77); // 長さ・太さはつまみ
+  const dashing = (S.stage === 'run' && ['charge', 'return_charge', 'horn_dance', 'lance'].includes(S.tech)) || (S.tech === 'sweep' && ['approach', 'stop'].includes(S.stage));
+  if (!dashing) { S.jetT = null; return; }
+  S.jetT ??= S.t; const B = S.B, u = S.tech === 'sweep' ? fromA(S.stage === 'stop' ? S.base : B.facing) : fromA(S.angle), age = S.t - S.jetT, burst = 1 + 0.5 * (1 - smooth(0, 0.18, age));
+  // 移動距離に応じた大きさ：突進は進む距離（S.travel、700 で 1 倍）、踏み込みは今の速さ（最高速で 1 倍）
+  const move = S.tech === 'sweep' ? clamp((S.v || 0) / (S.r.approach_speed_max || 1), 0, 1.2) : clamp((S.travel || 700) / 700, 0.4, 2);
+  canisJetStream(R, add(B.pos, mul(u, -B.r * 0.95)), S.angle + Math.PI, B.r * 2.6 * burst * move * R.P.size * (R.P.tailJet ?? 1), 1.1 * burst * Math.sqrt(Math.max(0.2, move)) * (R.P.tailJetWidth ?? 1), age + 0.3, Infinity, Math.min(1, R.P.intensity), 77); // 長さ・太さはつまみ
+}
+
+// 角の衝撃波の体の動き（絵の姿勢だけ。攻撃の時刻と向きの計算は変えない）：溜めで頭を引いて体を縮め、最後は力んで震えながら止まる（静）→ 振り抜く瞬間に頭と体が前へ突き出る（動）→ 戻る
+function monoWavePose(S, edits) {
+  if (S.tech !== 'horn_wave') return; const r = S.r, head = MONO.nodes.find(n => n.name === 'Head'), body = MONO.nodes.find(n => n.name === 'Body');
+  let pull = 0, thrust = 0, shake = 0;
+  if (S.stage === 'windup' || S.stage === 'recharge') { const dur = S.stage === 'windup' ? r.windup : r.recharge, w = smooth(0, dur * 0.7, S.st); pull = w; shake = smooth(dur * 0.7, dur, S.st) * Math.sin(S.t * 70) * 1.6; }
+  else if (S.stage === 'swing') { const q = clamp(S.st / r.swing_time); thrust = Math.sin(Math.PI * Math.min(1, q * 1.3)); pull = 1 - smooth(0, 0.25, q); }
+  else if (S.stage === 'return') pull = 0;
+  edits.Head.position = add(head.position, V(shake, -pull * 16 + thrust * 15));
+  edits.Body = { position: add(body.position, V(shake * 0.5, -pull * 8 + thrust * 8)), scale: V(1 + pull * 0.05, 1 - pull * 0.07 + thrust * 0.05) };
+}
+// 踏み込み薙ぎの斬撃（pixelFX melee/sword-slash.js の、白から冷えていく三日月。dash strike の斬撃部分）：薙ぎ払う角の先の軌跡に沿って出す。色は角の発光の色
+function monoSweepSlash(S, R) {
+  if (S.tech !== 'sweep' || !S.slashStart) return; const r = S.r, B = S.B, age = S.t - S.slashStart, linger = 0.32 * R.P.timing;
+  const a0 = S.base - r.windup_twist, swing = S.stage === 'swing' ? clamp(S.st / r.active) : 1, aNow = a0 + r.arc * swing * swing * (1.6 - 0.6 * swing), endAge = S.stage === 'swing' ? 0 : age - r.active;
+  if (endAge > linger) return; const fade = 1 - smooth(0, linger, endAge), reach = monoHornLength(B) * 1.05;
+  FXW.crescent(R.front, B.pos, reach, a0, aNow, 1, Math.min(0.85, endAge / linger), 42 * R.P.size, R.P.color, Math.min(1, fade * R.P.intensity));
+  if (endAge <= 0) { const tip = add(B.pos, mul(fromA(aNow), reach)); FXW.sparks(R.front, tip, (age % 0.12), Math.floor(age / 0.12) + 7, 4, R.P.color, 35, 0.2, aNow + Math.PI / 2, 0.6); }
+}
+// 光角の乱舞の燃え跡：通った道に沿って、熱く光ってから煤へ冷えていく、まだらな跡（2.5 秒で消える）
+function monoDanceBurn(S, R) {
+  if (S.tech !== 'horn_dance' || !S.burn?.length) return; const heat = MONO_GOLD.slice(1).map(hexc), soot = [hexc('#120c08'), hexc('#1f160f')];
+  for (const b of S.burn) { const age = S.t - b.t; if (age > 2.5) continue; const L = toL(b.pos), rr = 3.2 * R.P.size, fade = 1 - smooth(1.4, 2.5, age);
+    for (let y = -Math.ceil(rr); y <= rr; y++) for (let x = -Math.ceil(rr); x <= rr; x++) { const k = hash((Math.round(L.x) + x) * 12.9898 + (Math.round(L.y) + y) * 78.233), d = Math.hypot(x, y) / rr; if (d > 0.7 + 0.5 * k || k > fade * 0.95) continue;
+      const T = Math.pow(clamp(1 - age / 0.9), 1.3) * (1.1 - d) - k * 0.35; if (T > 0.1) R.back.px(L.x + x, L.y + y, heat[Math.min(heat.length - 1, Math.floor((1 - Math.min(1, T)) * (heat.length - 1)))]); else R.back.blend(L.x + x, L.y + y, soot[k < 0.5 ? 0 : 1], 0.7); } }
 }
