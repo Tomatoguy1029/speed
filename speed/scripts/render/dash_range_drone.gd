@@ -13,7 +13,6 @@ var _ship_trail: Array[Dictionary] = []
 var _cell := 2.366
 
 func step_frame(values: Dictionary, scale_value: float, zoom: float, ship: Dictionary, tracing: bool, dt: float) -> void:
-	_weapon = null
 	_frame = values
 	_scale = scale_value
 	_pixel = maxf(_scale*2.0,2.0/maxf(zoom,0.01))
@@ -26,12 +25,12 @@ func step_frame(values: Dictionary, scale_value: float, zoom: float, ship: Dicti
 	queue_redraw()
 
 func _draw() -> void:
-	if _weapon == null and _frame.is_empty():
+	if _frame.is_empty():
 		return
 	_draw_ship_trail()
-	for d in (_weapon.drones if _weapon!=null else _frame.drones):
+	for d in _frame.drones:
 		var points: Array = d.trail
-		var remaining: float = (_weapon.level_value("tail_by_level") if _weapon!=null else _frame.tail) * _scale
+		var remaining: float = float(_frame.tail) * _scale
 		for i in range(points.size() - 1, 0, -1):
 			if not points[i].join:
 				continue
@@ -58,7 +57,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2.ZERO)
 		# 機体のすぐ後ろの噴射の点（展開中は白く2ドット、待機中は青緑の1ドット）
 		var back: Vector2 = d.pos - dir * 5.0 * _cell
-		var active: bool = _weapon.active if _weapon!=null else _frame.active
+		var active: bool = _frame.active
 		draw_rect(Rect2((back / _cell).round() * _cell, Vector2(2.0 if active else 1.0, 1.0) * _cell), CORE if active else MID)
 
 ## 機体の光跡：各機と同じ3段の光で、各機より太く（外側6・中2.2倍の幅）、長く（80ドット・0.3秒）。

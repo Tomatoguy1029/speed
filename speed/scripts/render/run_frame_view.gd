@@ -626,7 +626,7 @@ func _update_marks(frame: Dictionary) -> void:
 		var look: EnemyLook = _scope.resources.get(entry.get("path","")) as EnemyLook
 		for i in row.ids.size():
 			if marks[i] == 0: continue
-			var n := i*6
+			var n: int = i*6
 			var pose := Transform2D(Vector2(row.transforms[n],row.transforms[n+1]),Vector2(row.transforms[n+2],row.transforms[n+3]),Vector2(row.transforms[n+4],row.transforms[n+5]))
 			var key: String = look.source_path if look != null else entry.get("mark_key","")
 			if look != null and look.split_other != null:

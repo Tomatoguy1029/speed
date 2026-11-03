@@ -25,6 +25,6 @@ func visual_color(original: Color) -> Color:
 func visual_number(field: String, original: float) -> float:
 	return EFFECT_SETTINGS.number(_effect_key(), field, original)
 func _effect_key() -> String:
-	var code := get_script().resource_path.get_file().get_basename()
+	var code: String = get_script().resource_path.get_file().get_basename()
 	var category := "trait/" if code in ["fullCharge","rampage","runUp","critBeam","killSonic","fullBurst","vortex","duplicator"] else "weapon/"
 	return category+code

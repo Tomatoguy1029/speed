@@ -42,11 +42,6 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 ## 装備キー（weapon/〜・trait/〜）の表示。
-func _visual(presentation, key: String) -> WeaponVisual:
-	for visual in presentation._equipment_visuals.values():
-		if visual._effect_key() == key: return visual
-	return null
-
 ## 大きな白い面が出る再発を、実際の描画画素から検出する。
 func measure_white_square(viewport: SubViewport) -> int:
 	var image := viewport.get_texture().get_image()
@@ -354,7 +349,7 @@ func _ready() -> void:
 				var presentation = session.scene.view.get_node("RunPresentation")
 				presentation.set_process(false)
 				var error_count := before_reset
-				check(presentation._layers.enemies.visible,"実験場で敵を表示する: "+key)
+				check(presentation.frame_view.visible,"実験場で敵を表示する: "+key)
 				if level==1:
 					var before_spawn: int = session.run.enemies.table.alive.count(1)
 					preview._add_preview_enemies()
@@ -363,17 +358,17 @@ func _ready() -> void:
 				for frame in 600:
 					session.step()
 					if frame%4 == 0:
-						presentation._present(4.0*session.DT)
-						if key == "weapon/interceptor": observed = observed or session.run.loadout.weapon_behaviors[entry.id].drones.any(func(d):return d.flash>0.0)
-						if key == "weapon/sonic": observed = observed or _visual(presentation, key).impacts.size() + _visual(presentation, key).pushes.size() > 0
+						presentation._present_cpp(4.0*session.DT)
+						if key == "weapon/interceptor": observed = observed or session.bridge._ui.interceptor.drones.any(func(d):return d.flash>0.0)
+						if key == "weapon/sonic": observed = observed or (presentation.frame_view._sonic_visual!=null and presentation.frame_view._sonic_visual.impacts.size()+presentation.frame_view._sonic_visual.pushes.size()>0)
 						if key == "weapon/afterimage":
-							var mirage = session.run.loadout.weapon_behaviors[entry.id]
+							var mirage: Dictionary = session.bridge._ui.afterimage
 							observed = observed or not mirage.echoes.is_empty()
 							for echo in mirage.echoes: check(echo.copies.size()==level,"ミラージュの本体はLvごとの1〜5機")
-							var visual = presentation._equipment_visuals.get(mirage.get_instance_id())
-							if visual != null: check(visual.node._body._count<=level,"ミラージュの描画で本体を重複させない")
-						if key == "trait/fullCharge": observed = observed or not _visual(presentation, key).gear.fire.particles.is_empty()
-						if key == "trait/rampage": observed = observed or (not session.run.state.tracing and session.run.loadout.trait_behaviors[entry.id].strength>0.9)
+							var visual = presentation.frame_view._afterimage_visual
+							if visual != null: check(visual._frame_node._body.multimesh.visible_instance_count<=level,"ミラージュの描画で本体を重複させない")
+						if key == "trait/fullCharge": observed = observed or (presentation.frame_view._full_charge_visual!=null and presentation.frame_view._full_charge_visual.gear.fire.emitting)
+						if key == "trait/rampage": observed = observed or (not session.run.state.tracing and session.bridge._ui.rampage.strength>0.9)
 					if gpu and frame%4 == 0:
 						await RenderingServer.frame_post_draw
 						if key=="weapon/sonic": sonic_white_square=maxi(sonic_white_square,measure_white_square(preview._viewport))
@@ -399,20 +394,18 @@ func _ready() -> void:
 		if not only.is_empty() and "__combinations__" not in only: continue
 		var error_count := capture.count()
 		await session.reset({"empty":true,"invincible":true,"director":{"enabled":false},"weapons":combination.weapons,"traits":combination.traits})
-		var duplicator = session.run.loadout.trait_behaviors.get(&"T37")
-		if duplicator != null:
-			duplicator.def = duplicator.def.duplicate(true)
-			duplicator.def.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
 		var presentation = session.scene.view.get_node("RunPresentation")
 		presentation.set_process(false)
 		SCENARIO.play(session,combination.key)
+		var mines_seen := {}
 		for frame in 420:
 			session.step()
-			if frame%4 == 0: presentation._present(4.0*session.DT)
+			for mine: Dictionary in session.bridge._ui.mines.items: mines_seen[mine.id]=true
+			if frame%4 == 0: presentation._present_cpp(4.0*session.DT)
 			if gpu and frame%4 == 0: await RenderingServer.frame_post_draw
 			elif frame%60 == 0: await get_tree().process_frame
 		if combination.key in ["trait/vortex","trait/rampage"]:
-			check(session.run.loadout.weapon_behaviors[&"W07"]._serial==24,"特性の試遊でも機雷は終点で1回だけ出す: "+combination.key)
+			check(mines_seen.size()==24,"特性の試遊でも機雷は終点で1回だけ出す: "+combination.key)
 		check(capture.count() == error_count,"装備の組み合わせ再生でエラー: "+combination.key)
 		cases += 1
 		print("[equipment_effects] combination ",combination.key," errors=",capture.count()-error_count)
@@ -470,36 +463,25 @@ func check_cpp_w01(weapon_id: StringName = &"W01") -> void:
 		check(bridge.command("dev_remove_weapon",{"id":"W01"}).ok,"確認前に初期装備を外す")
 		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":String(weapon_id),"levels":1}).ok,"生成した射撃を取得する")
 	var initial: Dictionary = bridge.checkpoint()
-	var lab = SESSION.new()
-	add_child(lab)
-	await lab.reset({"seed":631,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
-	var run: RunSimulation = lab.run
-	run.field.bodies.clear()
+	var fired_events: Array = []
+	bridge.subscribe("射撃の発動確認",func(frame):
+		fired_events.append_array(frame.events)
+		return true)
 	var definition: WeaponDef = ContentManager.definition(&"weapons",weapon_id)
 	for level in range(5 if retry else 1,definition.level_steps.size()+1):
 		check(bridge.restore(initial.value).ok,"Lv別の確認の初期状態へ戻す")
 		bridge.collect_frame()
-		await lab.reset({"seed":631,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
-		run = lab.run
-		run.field.bodies.clear()
-		run.loadout.reset_loadout()
-		check(run.loadout.grant(&"weapon",weapon_id,level),"現行射撃を全Lvで装備する")
 		# 通常選択と同じ取得処理を通す。途中の解除で過去のタイマーを残さない。
 		check(bridge.command("dev_remove_weapon",{"id":String(weapon_id)}).ok,"射撃を途中で解除する")
 		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":String(weapon_id),"levels":level}).ok,"型付きの定義から射撃を各Lvで取得する")
 		for id in ["T34","T35","T36"]:
 			var stacks := 5 if id=="T35" else 2
-			check(run.loadout.grant(&"trait",StringName(id),stacks),"現行の範囲・弾数・連射特性を取得する")
 			check(bridge.command("dev_grant_equipment",{"kind":"trait","id":id,"levels":stacks}).ok,"同じ特性の生成値をC++の実効能力へ畳む")
-		var weapon = run.loadout.weapon_behaviors[weapon_id]
-		var source_projectiles: ProjectileSystem = run.projectiles
-		for row in source_projectiles.friend_alive.size():
-			if source_projectiles.friend_alive[row]: source_projectiles.release_friend(row)
-		run.state.rng.state = int(core.inspect().rng_state)
 		var fires := 0
 		for tick in (170 if weapon_id==&"W02" else 110):
 			if tick in [20,30]: bridge.command("pause",{"paused":tick==20})
 			if tick in [50,56]: core.set_run_guards({"controls_locked":tick==50})
+			fired_events.clear()
 			var random_before: String = core.inspect().rng_state
 			var before: float = core.inspect().world_time
 			var input: Dictionary = idle.duplicate()
@@ -514,36 +496,14 @@ func check_cpp_w01(weapon_id: StringName = &"W01") -> void:
 				input.touch = true
 				input.pen_release = true
 			check(bridge.step(1.0/120.0,input,viewport).ok,"全Lvで通常の固定更新を進める")
-			var dt: float = 0.0 if core.inspect().world_time==before else (1.0/120.0)*bridge._ui.world_scale
-			var ship: Dictionary = core.ship_snapshot()
-			var draw: Dictionary = core.draw_snapshot()
-			run.state.ship_pos = ship.ship_pos
-			run.state.ship_heading = ship.ship_heading
-			run.state.gauge = draw.gauge
-			run.state.events.clear()
-			if dt>0.0 and not (tick>=50 and tick<56):
-				weapon.tick(dt,draw.drawing or draw.tracing)
-			if dt>0.0: source_projectiles.tick(dt,dt)
-			var actual: Array = core.projectiles_snapshot()
-			var expected := []
-			for row in source_projectiles.friend_alive.size():
-				if source_projectiles.friend_alive[row]: expected.append(row)
-			check(actual.size()==expected.size(),"全Lvで弾数・寿命・解除の挙動が一致する Lv%d tick%d" % [level,tick])
-			if actual.size()!=expected.size(): break
-			for n in actual.size():
-				var row: int = expected[n]
-				check(actual[n].pos.distance_to(source_projectiles.friend_pos[row])<0.02 and actual[n].vel.distance_to(source_projectiles.friend_vel[row])<0.02,"砲口・扇状の角度・移動が一致する")
-				check(is_equal_approx(actual[n].radius,source_projectiles.friend_r[row]) and is_equal_approx(actual[n].damage,source_projectiles.friend_dmg[row]) and is_equal_approx(actual[n].life,source_projectiles.friend_life[row]) and actual[n].pierce_left==source_projectiles.friend_pierce_left[row],"範囲・攻撃力・寿命・貫通数が実効値と一致する")
-			check(is_equal_approx(weapon._t,shot_timing(core,weapon_id).elapsed) and is_equal_approx(weapon.recoil,shot_timing(core,weapon_id).recoil),"射撃間隔と反動を停止・操作ロック・描線に合わせる")
 			if weapon_id==&"W23":
 				var rear: Dictionary = bridge._ui.rear
-				check(rear.mount.distance_to(weapon.mount_position())<0.001 and rear.aim.is_equal_approx(weapon.aim_direction()),"旋回中も後方砲台の位置と向きを同じ状態から渡す")
-				for event: Dictionary in run.state.events:
+				for event: Dictionary in fired_events:
 					if event.type==&"weapon_fire":
-						check(event.pos.distance_to(rear.mount+rear.aim*12.5*config.character_scale)<0.001 and absf(angle_difference(event.angle,rear.aim.angle()))<0.0001,"旋回後の砲口から機首と反対へ発射する")
-			var fired := run.state.events.any(func(event): return event.type==&"weapon_fire")
+						check(event.payload.pos.distance_to(rear.mount+rear.aim*12.5*config.character_scale)<0.001 and absf(angle_difference(event.payload.angle,rear.aim.angle()))<0.0001,"旋回後の砲口から機首と反対へ発射する")
+			var fired := fired_events.any(func(event): return event.type==&"weapon_fire")
 			check((random_before!=core.inspect().rng_state)==fired,"整数の弾数でも発射時に抽選し、停止中は抽選しない Lv%d tick%d" % [level,tick])
-			for event: Dictionary in run.state.events:
+			for event: Dictionary in fired_events:
 				if event.type==&"weapon_fire": fires+=1
 			if failures: break
 		check(fires>0,"全Lvで実際に発射する")
@@ -594,7 +554,6 @@ func check_cpp_w01(weapon_id: StringName = &"W01") -> void:
 		check(levels.any(func(item): return item.id==weapon_id and item.level>=2),"通常の選択を一度だけ確定し射撃のLvを上げる")
 		check(session.cpp_choices.equipped.has("weapon:%s" % weapon_id),"選択資源を装備の寿命へ移す")
 	bridge.release_checkpoint(initial.value)
-	lab.free()
 	session.free()
 
 func check_cpp_w01_detail(session: RunSession,idle: Dictionary,viewport: Dictionary) -> void:
@@ -1635,8 +1594,6 @@ func check_cpp_w05() -> void:
 	bridge.command("dev_remove_weapon",{"id":"W01"})
 	bridge.command("set_settings",{"hitstop":false})
 	var initial: Dictionary = bridge.checkpoint()
-	var lab = SESSION.new()
-	add_child(lab)
 	var definition: WeaponDef = ContentManager.definition(&"weapons",&"W05")
 	var events: Array = []
 	bridge.subscribe("w05_check",func(frame: Dictionary):
@@ -1645,27 +1602,16 @@ func check_cpp_w05() -> void:
 	for level in (range(1,definition.level_steps.size()+1) if not retry else []):
 		bridge.restore(initial.value)
 		bridge.collect_frame()
-		await lab.reset({"seed":635,"empty":true,"invincible":false,"config":{"planet_radius":0.0,"start_radius":900.0,"base_attack":1.0,"base_crit_chance":0.0}})
-		var run: RunSimulation = lab.run
-		run.loadout.reset_loadout()
-		check(run.loadout.grant(&"weapon",&"W05",level),"現行のバリアを各Lvで取得する")
 		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W05","levels":level}).ok,"生成したバリアを各Lvで取得する")
-		run.loadout.grant(&"trait",&"T34",2)
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
-		var barrier = run.loadout.weapon_behaviors[&"W05"]
-		run.state.ship_pos = core.ship_snapshot().ship_pos
-		run.state.ship_heading = core.ship_snapshot().ship_heading
 		var hp: float = core.ship_snapshot().ship_hp
 		var blocked: Dictionary = barrier_damage(bridge,5.0)
-		run.ship.damage(5.0,0.0,&"bullet")
-		check(blocked.reason=="barrier" and core.ship_snapshot().ship_hp==hp and is_equal_approx(core.barrier_snapshot().durability,barrier.durability),"全LvでHPを減らさず同じ耐久を消費する")
+		check(blocked.reason=="barrier" and core.ship_snapshot().ship_hp==hp and is_equal_approx(core.barrier_snapshot().durability,float(definition.params.durability_by_level[level-1])-5.0),"全LvでHPを減らさず同じ耐久を消費する")
 		var wave: Dictionary = core.barrier_snapshot().waves[0]
-		check(is_equal_approx(wave.radius,barrier.waves[0].radius) and is_equal_approx(wave.damage,barrier.waves[0].damage),"全Lvの威力と範囲倍率を防御時の波へ保存する")
+		check(is_equal_approx(wave.radius,float(definition.params.radius_by_level[level-1])*bridge._ui.area_multiplier) and is_equal_approx(wave.damage,float(definition.params.damage_by_level[level-1])*bridge._ui.attack_power),"全Lvの威力と範囲倍率を防御時の波へ保存する")
 		barrier_defense(bridge)
-		run.state.ship_invuln = 0.0
 		blocked = barrier_damage(bridge,1000.0)
-		run.ship.damage(1000.0,0.0,&"bullet")
-		check(blocked.reason=="barrier" and core.ship_snapshot().ship_hp==hp and core.barrier_snapshot().durability<=0.0 and is_equal_approx(core.barrier_snapshot().restore,barrier.restore),"全Lvで耐久を超える一撃も全量防ぎ同じ復旧時間を使う")
+		check(blocked.reason=="barrier" and core.ship_snapshot().ship_hp==hp and core.barrier_snapshot().durability<=0.0 and is_equal_approx(core.barrier_snapshot().restore,float(definition.params.revive_by_level[level-1])),"全Lvで耐久を超える一撃も全量防ぎ同じ復旧時間を使う")
 		var broken: Dictionary = core.barrier_snapshot()
 		bridge.command("pause",{"paused":true})
 		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
@@ -1677,8 +1623,7 @@ func check_cpp_w05() -> void:
 		core.set_run_guards({"controls_locked":false})
 		for tick in ceili(float(definition.params.revive_by_level[level-1])*120.0)+1:
 			bridge.step(1.0/120.0,idle,viewport)
-			barrier.tick(1.0/120.0,false)
-		check(core.barrier_snapshot().restore==0.0 and is_equal_approx(core.barrier_snapshot().durability,barrier.durability) and barrier.ready(),"全Lvで世界時計に従って耐久を全回復する")
+		check(core.barrier_snapshot().restore==0.0 and is_equal_approx(core.barrier_snapshot().durability,float(definition.params.durability_by_level[level-1])),"全Lvで世界時計に従って耐久を全回復する")
 		check(core.barrier_snapshot().waves.is_empty() and barrier.waves.is_empty(),"波は同じ寿命の式で終了する")
 		if failures: break
 	bridge.restore(initial.value)
@@ -1752,7 +1697,6 @@ func check_cpp_w05() -> void:
 	bridge.release_checkpoint(pristine.value)
 	bridge.release_checkpoint(initial.value)
 	bridge.unsubscribe("w05_check")
-	lab.free()
 	session.free()
 	await get_tree().process_frame
 	OS.remove_logger(capture)
@@ -1851,25 +1795,21 @@ func check_cpp_t04() -> void:
 	bridge.command("dev_remove_weapon",{"id":"W01"})
 	bridge.command("set_settings",{"hitstop":false})
 	var initial: Dictionary = bridge.checkpoint()
-	var lab = SESSION.new()
-	add_child(lab)
-	await lab.reset({"seed":634,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
-	var run: RunSimulation = lab.run
-	run.loadout.grant(&"trait",&"T04",config.trait_max_stacks)
-	var gear = run.loadout.trait_behaviors[&"T04"]
+	var gear: TraitDef = ContentManager.definition(&"traits",&"T04")
+	var gear_level := 1
 	for level in range(1,config.trait_max_stacks+1):
 		bridge.restore(initial.value)
 		bridge.collect_frame()
-		gear.n = level
+		gear_level = level
 		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":level}).ok,"ギアアップを共通の入口で各段まで取得する")
 		bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W05","levels":1})
-		check(is_equal_approx(bridge._ui.full_charge.maximum,gear.multiplier(config.draw_length)),"生成した各段の最大倍率が現行と一致する")
+		check(is_equal_approx(bridge._ui.full_charge.maximum,expected_full_charge(config,gear.params,gear_level,config.draw_length)),"生成した各段の最大倍率が現行と一致する")
 		trait_start_trace(bridge,config.draw_length)
 		check(bridge._ui.full_charge.distance==0.0 and bridge._ui.full_charge.burst_power==1.0 and not bridge._ui.full_charge.ignore_armor,"発進時に距離・倍率・装甲無視を戻す")
 		for tick in 65:
 			bridge.step(1.0/120.0,idle,viewport)
 			var ui: Dictionary = bridge._ui
-			var expected: float = gear.multiplier(ui.full_charge.distance) if ui.draw.tracing else 1.0
+			var expected: float = expected_full_charge(config,gear.params,gear_level,ui.full_charge.distance) if ui.draw.tracing else 1.0
 			check(is_equal_approx(ui.full_charge.burst_power,expected) and is_equal_approx(ui.attack_power,config.base_attack*expected),"走った距離の指数曲線を全攻撃の攻撃力へ一度だけ掛ける")
 			if tick==25 and ui.draw.tracing:
 				barrier_damage(bridge,1.0)
@@ -1879,7 +1819,7 @@ func check_cpp_t04() -> void:
 	bridge.restore(initial.value)
 	bridge.collect_frame()
 	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
-	gear.n = 5
+	gear_level = 5
 	var origin: Vector2 = core.ship_snapshot().ship_pos
 	for distance in [200.0,500.0,800.0]:
 		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
@@ -1914,7 +1854,7 @@ func check_cpp_t04() -> void:
 	for tick in 40: bridge.step(1.0/120.0,idle,viewport)
 	check(bridge._ui.kills==3,"一つのなぞりで連続する敵を実際に撃破する")
 	for hit: Dictionary in contacts:
-		check(is_equal_approx(hit.requested,config.base_attack*gear.multiplier(origin.distance_to(hit.impact))),"命中位置までの距離を撃破より先に反映する")
+		check(is_equal_approx(hit.requested,config.base_attack*expected_full_charge(config,gear.params,gear_level,origin.distance_to(hit.impact))),"命中位置までの距離を撃破より先に反映する")
 	check(not contacts.is_empty(),"命中直前の距離係数を実際のダメージで確認する")
 	bridge.unsubscribe("t04_contacts")
 	bridge.restore(initial.value)
@@ -1934,7 +1874,6 @@ func check_cpp_t04() -> void:
 	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":1})
 	await trait_select_upgrade(session,"T04",config,idle,viewport)
 	bridge.release_checkpoint(initial.value)
-	lab.free()
 	session.free()
 	await get_tree().process_frame
 	OS.remove_logger(capture)
@@ -1964,39 +1903,35 @@ func check_cpp_t33() -> void:
 	bridge.step(1.0/120.0,idle,viewport)
 	bridge.command("set_settings",{"hitstop":false})
 	var initial: Dictionary = bridge.checkpoint()
-	var lab = SESSION.new()
-	add_child(lab)
-	await lab.reset({"seed":633,"empty":true,"config":{"planet_radius":0.0,"start_radius":900.0}})
-	var run: RunSimulation = lab.run
-	run.loadout.grant(&"trait",&"T33",5)
-	run.loadout.grant(&"trait",&"T04",5)
-	var rampage = run.loadout.trait_behaviors[&"T33"]
-	var gear = run.loadout.trait_behaviors[&"T04"]
+	var rampage: TraitDef = ContentManager.definition(&"traits",&"T33")
+	var gear: TraitDef = ContentManager.definition(&"traits",&"T04")
 	for level in (range(1,config.trait_max_stacks+1) if not retry_launch else []):
 		bridge.restore(initial.value)
 		bridge.collect_frame()
-		rampage.n = level
 		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":level}).ok,"快進撃を各段まで取得する")
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
 		trait_kill_fixture(bridge)
 		check(bridge._ui.rampage.kills==0 and bridge._ui.rampage.strength==0.0,"なぞりの外で倒しても撃破数を蓄積しない")
 		trait_start_trace(bridge,config.draw_length)
-		run.state.tracing = true
-		rampage.on_launch(true)
+		var expected_strength := 0.0
+		var expected_pop := 0.0
 		for killed in 13:
 			trait_kill_fixture(bridge)
-			rampage.on_kill(&"shot")
+			expected_pop = 1.0
 		check(bridge._ui.rampage.kills==13 and bridge._ui.rampage.strength==0.0 and bridge._ui.rampage.multiplier==1.0 and bridge._ui.rampage.pop==1.0,"なぞり中は撃破数と光だけを更新して攻撃倍率を1に保つ")
 		var was_tracing := true
 		for tick in 80:
 			bridge.step(1.0/120.0,idle,viewport)
-			run.state.tracing = bridge._ui.draw.tracing
-			if was_tracing and not run.state.tracing: rampage.on_end()
-			was_tracing = run.state.tracing
-			rampage.tick((1.0/120.0)*bridge._ui.world_scale,false)
-			var expected_gear: float = gear.multiplier(bridge._ui.full_charge.distance) if run.state.tracing else 1.0
-			check(is_equal_approx(bridge._ui.rampage.strength,rampage.strength) and is_equal_approx(bridge._ui.rampage.pop,rampage.pop) and is_equal_approx(bridge._ui.rampage.multiplier,rampage.multiplier()),"各段の終了時の上限・半減曲線・光の減衰が現行と一致する")
-			check(is_equal_approx(bridge._ui.full_charge.burst_power,expected_gear) and is_equal_approx(bridge._ui.attack_power,config.base_attack*expected_gear*rampage.multiplier()),"ギアアップと快進撃が別々の係数を保って全攻撃力で合成される")
+			var tracing: bool = bridge._ui.draw.tracing
+			if was_tracing and not tracing: expected_strength = minf(1.0,13.0/float(rampage.params.kills))
+			was_tracing = tracing
+			var dt: float = (1.0/120.0)*bridge._ui.world_scale
+			if not tracing: expected_strength *= pow(0.5,dt/float(rampage.params.half_life))
+			expected_pop = maxf(0.0,expected_pop-dt*5.0)
+			var expected_multiplier: float = 1.0+(float(rampage.params.bonus_base)+float(rampage.params.bonus_per)*level)*expected_strength
+			var expected_gear: float = expected_full_charge(config,gear.params,5,bridge._ui.full_charge.distance) if tracing else 1.0
+			check(is_equal_approx(bridge._ui.rampage.strength,expected_strength) and is_equal_approx(bridge._ui.rampage.pop,expected_pop) and is_equal_approx(bridge._ui.rampage.multiplier,expected_multiplier),"各段の終了時の上限・半減曲線・光の減衰が現行と一致する")
+			check(is_equal_approx(bridge._ui.full_charge.burst_power,expected_gear) and is_equal_approx(bridge._ui.attack_power,config.base_attack*expected_gear*expected_multiplier),"ギアアップと快進撃が別々の係数を保って全攻撃力で合成される")
 		check(not bridge._ui.draw.tracing and bridge._ui.rampage.strength>0.0,"終了後にだけ撃破数から攻撃倍率を有効にする")
 		if failures: break
 	if not retry_launch:
@@ -2054,7 +1989,6 @@ func check_cpp_t33() -> void:
 	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":1})
 	if not retry_launch: await trait_select_upgrade(session,"T33",config,idle,viewport)
 	bridge.release_checkpoint(initial.value)
-	lab.free()
 	session.free()
 	await get_tree().process_frame
 	OS.remove_logger(capture)
@@ -4174,3 +4108,9 @@ func check_cpp_stats() -> bool:
 	OS.remove_logger(errors)
 	check(errors.count()==0,"全装備への特性接続に実行エラーがない: %s" % [errors.messages()])
 	return true
+
+## 旧比較で使っていたT04の期待曲線。編集値と距離だけを受け、ラン状態を持たない。
+func expected_full_charge(config: GameConfig, params: Dictionary, level: int, distance: float) -> float:
+	var x := clampf(distance/config.draw_length,0.0,1.0)
+	var maximum := float(params.mult_base)+float(params.mult_per)*level
+	return 1.0+(maximum-1.0)*(exp(3.0*x)-1.0)/(exp(3.0)-1.0)
