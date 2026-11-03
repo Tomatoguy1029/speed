@@ -7029,7 +7029,10 @@ function monoSweepSlash(S, R) {
 }
 // 光角の乱舞の燃え跡：通った道に沿って、熱く光ってから煤へ冷えていく、まだらな跡（2.5 秒で消える）
 function monoDanceBurn(S, R) {
-  if (S.tech !== 'horn_dance' || !S.burn?.length) return; const heat = MONO_GOLD.slice(1).map(hexc), soot = [hexc('#120c08'), hexc('#1f160f')];
+  if (S.tech !== 'horn_dance' || !S.burn?.length) return;
+  const outer = hexc(R.P.tailOuterColor), inner = hexc(R.P.tailJetColor), core = hexc(R.P.tailCoreColor), black = hexc('#05030a');
+  const heat = [core, PX.mix(core, inner, 0.5), inner, PX.mix(inner, outer, 0.5), outer, PX.mix(outer, black, 0.3), PX.mix(outer, black, 0.6), PX.mix(outer, black, 0.8)];
+  const soot = [PX.mix(outer, black, 0.88), PX.mix(outer, black, 0.78)];
   for (const b of S.burn) { const age = S.t - b.t; if (age > 2.5) continue; const L = toL(b.pos), rr = 3.2 * R.P.size, fade = 1 - smooth(1.4, 2.5, age);
     for (let y = -Math.ceil(rr); y <= rr; y++) for (let x = -Math.ceil(rr); x <= rr; x++) { const k = hash((Math.round(L.x) + x) * 12.9898 + (Math.round(L.y) + y) * 78.233), d = Math.hypot(x, y) / rr; if (d > 0.7 + 0.5 * k || k > fade * 0.95) continue;
       const T = Math.pow(clamp(1 - age / 0.9), 1.3) * (1.1 - d) - k * 0.35; if (T > 0.1) R.back.px(L.x + x, L.y + y, heat[Math.min(heat.length - 1, Math.floor((1 - Math.min(1, T)) * (heat.length - 1)))]); else R.back.blend(L.x + x, L.y + y, soot[k < 0.5 ? 0 : 1], 0.7); } }
