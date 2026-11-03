@@ -48,6 +48,7 @@ func _show_loading() -> void:
 	if _loading!=null: return
 	_loading = CanvasLayer.new()
 	add_child(_loading)
+	preload("res://scripts/ui/canvas_order.gd").register(_loading,1)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_loading.add_child(center)

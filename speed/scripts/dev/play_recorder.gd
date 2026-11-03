@@ -66,6 +66,7 @@ func _ready() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 120
 	add_child(layer)
+	preload("res://scripts/ui/canvas_order.gd").register(layer,2)
 	_label = Label.new()
 	_label.anchor_left = 1.0
 	_label.anchor_right = 1.0

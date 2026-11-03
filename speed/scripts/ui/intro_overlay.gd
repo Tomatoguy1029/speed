@@ -10,6 +10,7 @@ var _bottom_bar: ColorRect
 
 func _ready() -> void:
 	layer = 80
+	preload("res://scripts/ui/canvas_order.gd").register(self,1)
 	var root := Control.new()
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)

@@ -168,6 +168,7 @@ func sync_canvas_layers() -> void:
 	if pipeline!=null: pipeline.set_overlay_layer(overlay_layer)
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	if hud!=null: hud.layer = maxi(hud.layer,overlay_layer+3)
+	preload("res://scripts/ui/canvas_order.gd").world_changed(self,hud.layer if hud!=null else overlay_layer+3)
 
 func _present_cpp(delta: float) -> void:
 	if frame_view==null: return

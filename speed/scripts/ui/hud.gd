@@ -599,6 +599,10 @@ func apply_snapshot(ui: Dictionary) -> void:
 		_card_discard.merge(_card_held)
 		_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 	if _cards_box==null: return
+	if phase!=int(ui.phase) and int(ui.phase)==Phase.Finishing:
+		_rewards.cancel()
+		_warning_t = 0.0
+		_hero_notice_t = 0.0
 	var cards: Dictionary = ui.get("cards",{})
 	if previous!=cards or rerolls!=int(ui.get("rerolls_left",0)):
 		if previous.get("offer_id",0)!=cards.get("offer_id",0):
@@ -608,6 +612,8 @@ func apply_snapshot(ui: Dictionary) -> void:
 		_show_cpp_cards()
 	elif phase!=int(ui.phase): _cpp_card_visibility()
 	_sync_menu_visibility()
+	if phase!=int(ui.phase) and _pause_box.visible:
+		_pause_box.get_child(1).grab_focus()
 
 
 func _ready_cpp() -> void:
