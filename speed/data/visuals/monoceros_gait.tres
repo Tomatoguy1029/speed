@@ -70,7 +70,7 @@ animations = [{
 "duration": 0.18,
 "texture": SubResource("armor_1")
 }],
-"loop": true,
+"loop": 1,
 "name": &"armor",
 "speed": 1.0
 }, {
@@ -93,7 +93,7 @@ animations = [{
 "duration": 0.18,
 "texture": SubResource("leg_base_1")
 }],
-"loop": true,
+"loop": 1,
 "name": &"run",
 "speed": 1.0
 }]
