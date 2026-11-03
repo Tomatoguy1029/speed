@@ -382,6 +382,14 @@ index = 3
 scene_path = "res://scenes/stages/stage_3.tscn"
 phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u"), SubResource("Resource_uagtc")]
 enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
+enemy_tuning = {
+"lynx": {
+"hp": 35.0
+},
+"phoenix": {
+"hp": 80.0
+}
+}
 enemy_attack_values = {
 "bomber": 0.0,
 "hound": 0.0,

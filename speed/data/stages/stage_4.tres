@@ -494,7 +494,7 @@ phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResou
 enemies = Array[StringName]([&"aquarius", &"biter", &"bomber", &"cross", &"dolphin", &"reticle", &"splitter", &"telescope", &"corona"])
 enemy_tuning = {
 "aquarius": {
-"hp": 240.0
+"hp": 420.0
 },
 "corona": {
 "hp": 110.0
@@ -509,7 +509,7 @@ enemy_tuning = {
 "hp": 55.0
 },
 "telescope": {
-"hp": 35.0
+"hp": 45.0
 }
 }
 enemy_attack_values = {

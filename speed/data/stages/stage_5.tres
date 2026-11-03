@@ -493,6 +493,9 @@ enemy_tuning = {
 "cepheus": {
 "hp": 160.0
 },
+"crab": {
+"hp": 60.0
+},
 "cross": {
 "hp": 60.0
 }
