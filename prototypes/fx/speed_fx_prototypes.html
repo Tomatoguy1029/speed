@@ -4441,11 +4441,12 @@ function phxBurst(fx, rad) { // 着地の爆発：pixelFX Particles に炎・煙
   for (let i = 0; i < 12; i++) { const a = R.range(0, TAU), d = R.range(0.1, 0.6) * rad; ps.spawn(PX.P.SMOKE, Math.cos(a) * d, Math.sin(a) * d, Math.cos(a) * 25, Math.sin(a) * 18 - 30, R.range(1.6, 2.6), hexc('#3a2230'), R.range(rad * 0.22, rad * 0.36), R.range(0.15, 0.45), PX.PF.BIG); }
   return tongues;
 }
+const phxRadius = (e) => Math.max(e.r * 1.1, PARAMS['G11-phoenix']?.radius ?? prm('phoenix').impact_radius); // 比較用の範囲（既定は現行の impact_radius）
 DEMOS.push({
   id: 'G11-phoenix', ids: ['G11', 'G12'], cat: '鳳凰 G11', group: 'ほうおう座（phoenix）', title: '影を落として着地→爆発的な炎', duration: 6.4, color: '#ff6a3a', cam: { x: 60, y: -40 },
-  params: [{ k: 'playerRef', label: 'プレイヤーの爆発を並べる(0/1)', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
+  params: [{ k: 'playerRef', label: 'プレイヤーの爆発を並べる(0/1)', type: 'range', min: 0, max: 1, step: 1, def: 0 }, { k: 'radius', label: '比較用：着地の範囲(半径・試作内のみ)', type: 'range', min: 150, max: 450, step: 10, def: prm('phoenix').impact_radius }],
   refs: ['scripts/enemies/phoenix.gd（retreat 0.9/700・telegraph 1.4・dive 0.4・impact 半径220/0.6s・recover 1.8）', 'render/enemies/phoenix.gd（影の大きさ r×(0.5+0.5k)・火の粉の専用shader）・render/attacks/zone_phoenix.gd（blast_bursts）', 'data/visuals/phoenix_flames.tres（flame/hot/ember/smoke の色の方向）', 'pixelFX src/core/sim.js の Particles・Blazes（炎の塊が煙へ冷える・火の粉・燃え残り）を本体ごと使用、explosions/small-explosion.js の配合と焦げ跡を上から見た形へ改変', 'assets/pixel/phoenix/*（影は現行スプライトの形から作る）'],
-  status: { '状態': '試作のみ（作り直し2回目）', '判定': '変更なし（着地点＝予告開始時の自機位置、半径220、炎0.6秒）。範囲は火の粉と炎の広がりで示し、円は描かない', '図形': '円・輪・輪郭線は使っていない（影は実際の絵の形をぼかしたもの）', '炎・爆発': '芯は main と同じ橙〜金、外側を紅〜深紅、煙は紫がかった茶。プレイヤーのエンドブラスト（橙の点が散る）とは形（膨らむ炎の塊・煙・燃え残り）と色で区別。「プレイヤーの爆発を並べる」で比較できる', '近似': '現行（main）表示の火の粉shaderと点の爆発は形・時間を簡略化して再現' },
+  status: { '状態': '試作のみ（作り直し2回目）', '判定': '変更なし（着地点＝予告開始時の自機位置、半径220、炎0.6秒）。範囲は火の粉と炎の広がりで示し、円は描かない', '比較用操作': '「着地の範囲」は広さを比べるための試作内だけの操作。予告の光だまり・火の粉・炎・焼け跡が一緒に広がる。本番の impact_radius は変えていない', '図形': '円・輪・輪郭線は使っていない（影は実際の絵の形をぼかしたもの）', '炎・爆発': '芯は main と同じ橙〜金、外側を紅〜深紅、煙は紫がかった茶。プレイヤーのエンドブラスト（橙の点が散る）とは形（膨らむ炎の塊・煙・燃え残り）と色で区別。「プレイヤーの爆発を並べる」で比較できる', '近似': '現行（main）表示の火の粉shaderと点の爆発は形・時間を簡略化して再現' },
   setup(S) { S.e = mkE('phoenix', V(-120, -220), 0); S.ship = shipState(V(200, 120)); S.e.timer = 0; const R = new PX.Rng(23); S.fx = { R, ps: new PX.Particles({ rng: R, sparks: PHX_SPARK }), trail: new PX.Rng(5) }; S.fx.blazes = new PX.Blazes(S.fx.ps); },
   step(S, dt) {
     const e = S.e, p = prm('phoenix');
@@ -4453,14 +4454,14 @@ DEMOS.push({
     if (e.mode === 'MOVE') { if (!e.anchor) { e.anchor = add(e.pos, mul(norm(sub(e.pos, S.ship.pos)), p.retreat_distance)); e.timer = p.retreat_time; } adv(e.anchor); if (e.timer <= 0 && dt > 0) { e.anchor = { ...S.ship.pos }; e.mode = 'WINDUP'; e.timer = p.telegraph; e.facing = angOf(sub(e.anchor, e.pos)); S.tele0 = S.t; } }
     else if (e.mode === 'WINDUP') { e.timer = Math.max(0, e.timer - dt); e.charge = 1 - e.timer / p.telegraph; if (e.timer <= 0) { e.mode = 'DASH'; e.timer = p.dive_time; e.charge = 0; } }
     else if (e.mode === 'DASH') { adv(e.anchor); const L = toLocal(e.pos, e.anchor), R = S.fx.trail; const back = norm(sub(e.anchor, e.pos)); for (let i = 0; i < 7; i++) { const j = R.range(0, 1); S.fx.ps.spawn(PX.P.FIRE, L.x - back.x * j * 6 + R.range(-3, 3), L.y - back.y * j * 6 + R.range(-3, 3), -back.x * R.range(20, 60) + R.range(-15, 15), -back.y * R.range(20, 60) + R.range(-25, 0), R.range(0.12, 0.3), 0, R.range(1.2, 3.4), 0, R.chance(0.25) ? PX.PF.SMOKES : 0); } if (R.chance(0.7)) S.fx.ps.spawn(PX.P.SPARK, L.x, L.y, -back.x * R.range(60, 160) + R.range(-40, 40), -back.y * R.range(60, 160) + R.range(-40, 40), R.range(0.15, 0.35));
-      if (e.timer <= 0) { S.flame = { pos: { ...e.anchor }, r: Math.max(e.r * 1.1, p.impact_radius), t0: S.t, life: p.impact_time }; S.fx.tongues = phxBurst(S.fx, S.flame.r * WL); e.mode = 'RECOVER'; e.timer = p.recover_time; } }
+      if (e.timer <= 0) { S.flame = { pos: { ...e.anchor }, r: phxRadius(e), t0: S.t, life: p.impact_time }; S.fx.tongues = phxBurst(S.fx, S.flame.r * WL); e.mode = 'RECOVER'; e.timer = p.recover_time; } }
     else if (e.mode === 'RECOVER') e.timer = Math.max(0, e.timer - dt);
     if (dt > 0) { S.fx.ps.update(dt); S.fx.blazes.update(dt); }
     S.ship.pos.x = 200 + Math.sin(S.t * 0.8) * 20;
   },
   phase(S) { const m = S.e.mode; return m === 'MOVE' ? '離脱' : m === 'WINDUP' ? PH.WINDUP + '（影と火の粉）' : m === 'DASH' ? '飛び込み' : S.flame && S.t - S.flame.t0 < S.flame.life ? PH.DASH + '（着地の炎・判定0.6s）' : PH.RECOVER + '（燃え残り）'; },
   draw(S, R) {
-    const e = S.e, P = R.P, p = prm('phoenix'), FLAME = '#ff6a2a', rad = Math.max(e.r * 1.1, p.impact_radius);
+    const e = S.e, P = R.P, p = prm('phoenix'), FLAME = '#ff6a2a', rad = phxRadius(e);
     if (!R.proto) { // 現行（main）：render/enemies/phoenix.gd の影・輪＋火の粉、zone_phoenix.gd の点の爆発（近似）
       if (e.mode === 'WINDUP' || e.mode === 'DASH') { const c = e.anchor, k = e.mode === 'WINDUP' ? e.charge : 1; D2.circle(c, rad, rgba(FLAME, 0.025 + 0.035 * k)); D2.arc(c, rad, 0, TAU, rgba(FLAME, 0.3 + 0.5 * k), px(2)); const ss = e.r * (0.5 + 0.5 * k), pts = [[0, -1], [0.28, -0.15], [1.2, 0.4], [0.3, 0.22], [0, 0.9], [-0.3, 0.22], [-1.2, 0.4], [-0.28, -0.15]].map(([x, y]) => { const a = e.facing + Math.PI / 2, q = V(x * ss, y * ss); return add(c, V(q.x * Math.cos(a) - q.y * Math.sin(a), q.x * Math.sin(a) + q.y * Math.cos(a))); }); D2.poly(pts, `rgba(23,9,4,${0.5 + 0.35 * k})`); D2.polyline([...pts, pts[0]], rgba(FLAME, 0.3 + 0.6 * k), px(1.5)); for (let i = 0; i < 24; i++) { const a = hash(i) * TAU, d = rad * Math.sqrt(hash(i + 7)), y = ((hash(i * 3) + S.t * 0.7) % 1); D2.circle(add(c, V(Math.cos(a) * d, Math.sin(a) * d - y * 90 * k)), 3, rgba('#ffb35a', (1 - y) * k)); } }
       if (S.flame) { const t = S.t - S.flame.t0, L = toL(S.flame.pos), r = S.flame.r * WL; if (t < 0.9) { const f = 1 - smooth(0.3, 0.9, t), pal = FX.ramp('#ff9a3c'); for (let i = 0; i < 160; i++) { const a = hash(i) * TAU, d = r * Math.sqrt(hash(i * 3.3)) * clamp(t / 0.15) ** 0.5; R.front.circle(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d, 1.8 * f + 0.5, pal[d / r < 0.35 ? 4 : d / r < 0.7 ? 3 : 2], f); } R.front.glow(L.x, L.y, r * 1.2, pal[3], 0.6 * f); } }
