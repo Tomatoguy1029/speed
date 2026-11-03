@@ -18,6 +18,7 @@ var sparks := PixelSparks.new()
 var _frame := {}
 var _ship := {}
 var _frame_seen := {}
+var _pending_targets := {}
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	_painter = PixelPainter.new()
 	_painter.setup_painter(pixel)
@@ -28,6 +29,9 @@ func setup_frame(parent: Node2D, pixel: float) -> void:
 func sync_frame(values: Dictionary, ship: Dictionary, dt: float) -> void:
 	_frame = values
 	_ship = ship
+	_pending_targets.clear()
+	for hit: Dictionary in values.pending:
+		if not _pending_targets.has(hit.id): _pending_targets[hit.id] = hit.pos
 	var alive := {}
 	for value: Dictionary in values.visuals:
 		alive[value.id] = true
@@ -37,9 +41,7 @@ func sync_frame(values: Dictionary, ship: Dictionary, dt: float) -> void:
 		else: pushes[-1].age = value.age-dt
 	_frame_seen = alive
 func _target(row: int, id: int):
-	for hit: Dictionary in _frame.pending:
-		if hit.id==id: return hit.pos
-	return null
+	return _pending_targets.get(id)
 
 func dispose() -> void:
 	if is_instance_valid(_rings): _rings.queue_free()
