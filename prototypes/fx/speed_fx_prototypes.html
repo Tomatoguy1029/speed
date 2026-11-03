@@ -3899,24 +3899,33 @@ function drawClawsCur(pos, travel, size, side, a) { // render/attacks/slash.gd d
   for (let k = 0; k < 3; k++) { const pts = slashPts(pos, travel, size, side, k); D2.polyline(pts, `rgba(255,115,38,${0.28 * a})`, th * 2.2); D2.polyline(pts, `rgba(255,140,56,${0.95 * a})`, th); D2.polyline(pts.slice(1, -1), `rgba(255,242,217,${a})`, Math.max(px(1.5), th * 0.3)); }
 }
 // 試作の引っかき傷：爪で外側から内側へ引っかいた3本の平行な傷を、そのまま前へ飛ばす。
-// 傷の通り道は slash.gd の楕円（判定と同じ中心と半径の比）。外側の端（爪が入る所）は鋭く始まってすぐ太くなり、内側（爪が抜ける所）へ細く消える。
-// cut：外側から刻まれた割合（0〜1）。縁は傷ごとの乱数で少しがたつかせる
-function lynxScratch(p, pos, travel, size, side, k, span, cut, pal, a, gap = 0) { // gap：傷を自分の側へずらす量（×size）。真ん中に道を空ける
-  const u = fromA(travel), across = mul(orth(u), side), ax = 1 + SLASH.STEP * k, ay = SLASH.TALL + (SLASH.STEP + SLASH.STRETCH) * k;
-  const C = add(pos, mul(sub(mul(across, SLASH.INNER + gap), mul(u, SLASH.TALL + SLASH.STRETCH * k)), size)), sp = span * (k === 1 ? 1.08 : 1);
-  const at = (s) => { const phi = -Math.PI / 2 + sp * (1 - s); return toL(add(C, mul(add(mul(across, ax * Math.cos(phi)), mul(u, -ay * Math.sin(phi))), size))); }; // s=0 外側の端 → s=1 内側の端
-  const n = Math.max(10, Math.round(sp * ax * size * WL * 1.2)), th = SLASH.THICK * size * WL * 0.9;
-  for (let i = 0; i < n * cut; i++) {
-    const s0 = i / n, A = at(s0), B = at(Math.min(cut, (i + 1) / n)), w = th * smooth(0, 0.1, s0) * Math.pow(1 - s0, 0.7) * (0.85 + 0.3 * hash(k * 17 + Math.floor(s0 * 9)));
+// 真ん中の傷の通り道を1本決め（slash.gd の真ん中の楕円）、残りの2本はその通り道から垂直に間隔ぶんずらして平行に引く。
+// 間隔は引っかき始めが狭く、抜ける側へ向かって広がる（爪が開いていく）。3本の始まりと終わりは少しずつずらし、真ん中が一番長い。
+// 外側の端（爪が入る所）は鋭く始まってすぐ太くなり、内側（爪が抜ける所）へ細く消える。cut：外側から刻まれた割合（0〜1）
+const LYNX_MARK = { from: [0.03, 0, 0.05], to: [0.9, 1, 0.86] }; // 傷ごとの始まりと終わり（通り道の割合）
+function lynxPath(pos, travel, size, side, span, gap) { // s=0 外側の端 → s=1 内側の端（世界座標）と、その点での通り道の法線
+  const u = fromA(travel), across = mul(orth(u), side), ax = 1 + SLASH.STEP, ay = SLASH.TALL + SLASH.STEP + SLASH.STRETCH;
+  const C = add(pos, mul(sub(mul(across, SLASH.INNER + gap), mul(u, SLASH.TALL + SLASH.STRETCH)), size));
+  const at = (s) => { const phi = -Math.PI / 2 + span * (1 - s); return add(C, mul(add(mul(across, ax * Math.cos(phi)), mul(u, -ay * Math.sin(phi))), size)); };
+  const nrm = (s) => { const d = sub(at(Math.min(1, s + 0.01)), at(Math.max(0, s - 0.01))), l = Math.hypot(d.x, d.y) || 1; return V(-d.y / l, d.x / l); };
+  return { at, nrm };
+}
+function lynxMarkPoint(path, k, s, size, sp0, sp1) { return add(path.at(s), mul(path.nrm(s), (k - 1) * lerp(sp0, sp1, s) * size)); }
+function lynxScratch(p, path, size, k, cut, pal, a, sp0, sp1) {
+  const f0 = LYNX_MARK.from[k], f1 = LYNX_MARK.to[k], n = Math.max(10, Math.round(size * WL * 1.6)), th = SLASH.THICK * size * WL * 0.9;
+  for (let i = 0; i < n; i++) {
+    const s0 = lerp(f0, f1, i / n), s1 = lerp(f0, f1, (i + 1) / n); if (s0 > cut) break; // 刻まれた所まで
+    const m = i / n, A = toL(lynxMarkPoint(path, k, s0, size, sp0, sp1)), B = toL(lynxMarkPoint(path, k, Math.min(cut, s1), size, sp0, sp1));
+    const w = th * smooth(0, 0.1, m) * Math.pow(1 - m, 0.7) * (0.85 + 0.3 * hash(k * 17 + Math.floor(m * 9)));
     if (w < 0.25) { p.dot(A.x, A.y, pal[3], a * 0.8); continue; }
     const nx = -(B.y - A.y), ny = B.x - A.x, nl = Math.hypot(nx, ny) || 1;
     for (let q = -w; q <= w; q += 0.5) { const e = Math.abs(q) / w; p.dot(A.x + nx / nl * q, A.y + ny / nl * q, e < 0.4 ? pal[4] : e < 0.75 ? pal[3] : pal[2], a); }
     if (i % 3 === 0) p.light(A.x, A.y, pal[2], 0.25 * a);
   }
-  if (cut < 1) { const tip = at(cut); p.glow(tip.x, tip.y, 4, pal[4], 0.6 * a); } // 刻んでいる最中の爪先
+  if (cut < f1 && cut > f0) { const tip = toL(lynxMarkPoint(path, k, cut, size, sp0, sp1)); p.glow(tip.x, tip.y, 4, pal[4], 0.6 * a); } // 刻んでいる最中の爪先
 }
 function drawClawsProto(R, pos, travel, size, side, a, P, span, cut = 1) {
-  const pal = FX.ramp(P.color); for (let k = 0; k < 3; k++) lynxScratch(R.front, pos, travel, size, side, k, span, cut, pal, a, P.gap ?? 0.3);
+  const pal = FX.ramp(P.color), path = lynxPath(pos, travel, size, side, span, P.gap ?? 0.3); for (let k = 0; k < 3; k++) lynxScratch(R.front, path, size, k, cut, pal, a, P.space0 ?? 0.05, P.space1 ?? 0.1);
 }
 // 試作：本体の静と動（絵の位置と向きだけ。本番の位置・移動・発射の向きは変えない）。
 // 予兆の前半で振りかぶる側へひねって少し引き、後半はぴたりと止まる → 発射の瞬間に前へ踏み込みながら外側から内側へ振り抜く → ゆっくり戻る
@@ -3932,8 +3941,8 @@ function lynxPose(e, S, side, cutT) {
 DEMOS.push({
   id: 'G12-lynx', ids: ['G12'], cat: G12, group: 'やまねこ座（lynx）', title: '爪痕の斬撃（左右交互）', duration: 4.6, color: '#ff8a38', cam: { x: -40, y: 0 },
   refs: ['scripts/enemies/lynx.gd・enemy_motion.gd _gun_timer（fire_interval 0.9、telegraph 0.35 で charge）', 'scripts/attacks/slash.gd（爪痕の形・太さ＝判定）', 'scripts/render/attacks/slash.gd・render/enemies/lynx.gd（現行描画）', 'pixelFX painter.beam・melee/dagger-flurry.js の白い芯と火花'],
-  params: [{ k: 'span', label: '試作：1本の傷の角度(度)', type: 'range', min: 60, max: 180, step: 1, def: 110 }, { k: 'maxSize', label: '試作：最大の大きさ(×slash_size)', type: 'range', min: 0.3, max: 2, step: 0.01, def: 1 }, { k: 'start', label: '試作：引っかいた直後の大きさ(×最大)', type: 'range', min: 0.15, max: 1, step: 0.01, def: 0.35 }, { k: 'grow', label: '試作：最大の大きさまでの時間(秒)', type: 'range', min: 0.05, max: 1.2, step: 0.01, def: 0.4 }, { k: 'cutT', label: '試作：引っかく時間(秒)', type: 'range', min: 0.03, max: 0.3, step: 0.01, def: 0.09 }, { k: 'gap', label: '試作：中心の空き(片側・×大きさ)', type: 'range', min: 0, max: 0.8, step: 0.01, def: 0.3 }],
-  status: { '状態': '試作のみ（作り直し2回目）', '動き': '予兆は引っかき始める外側の位置で爪先が光るだけ。発射の瞬間に外側から内側へ3本の傷を刻み、刻みながらそのまま前へ飛ぶ。左右交互', '本体の動き': '予兆は振りかぶる側へひねって少し引き、ぴたりと止まる（静）。発射の瞬間に前へ踏み込みながら外側から内側へ振り抜き（動・残像つき）、ゆっくり戻る。絵の位置と向きだけで、本番の位置・移動・発射の向きは変えていない', '中心の道': '傷をそれぞれの側へ「中心の空き」（×大きさ）だけずらし、進む向きの真ん中に道を空ける。大きくなるほど道も広がる。本番の判定は内側の端が真ん中に来るので、合わせるには移行後の変更が要る', '形': '本物の引っかき傷：細い傷3本が平行。爪が入る外側は鋭くすぐ太く、抜ける内側へ細く消える。傷の通り道は slash.gd の楕円', '位置': '引っかき始めの外側の端が体の前の爪の位置に来るよう、絵の置き場所をずらしている（本番の判定の位置とは少しずれる）', '大きさ': '引っかいた直後の大きさから最大まで途切れずに大きくなる（最大の大きさ・時間・直後の大きさはつまみ）。本番の判定は発射の瞬間から slash_size なので、合わせるには移行後に判定の処理の変更が要る', '判定': '速さ380・直進・追尾なしは変えていない' },
+  params: [{ k: 'span', label: '試作：1本の傷の角度(度)', type: 'range', min: 60, max: 180, step: 1, def: 110 }, { k: 'maxSize', label: '試作：最大の大きさ(×slash_size)', type: 'range', min: 0.3, max: 2, step: 0.01, def: 1 }, { k: 'start', label: '試作：引っかいた直後の大きさ(×最大)', type: 'range', min: 0.15, max: 1, step: 0.01, def: 0.35 }, { k: 'grow', label: '試作：最大の大きさまでの時間(秒)', type: 'range', min: 0.05, max: 1.2, step: 0.01, def: 0.4 }, { k: 'cutT', label: '試作：引っかく時間(秒)', type: 'range', min: 0.03, max: 0.3, step: 0.01, def: 0.09 }, { k: 'space0', label: '試作：傷の間隔・引っかき始め(×大きさ)', type: 'range', min: 0.01, max: 0.2, step: 0.005, def: 0.05 }, { k: 'space1', label: '試作：傷の間隔・抜ける側(×大きさ)', type: 'range', min: 0.01, max: 0.3, step: 0.005, def: 0.1 }, { k: 'gap', label: '試作：中心の空き(片側・×大きさ)', type: 'range', min: 0, max: 0.8, step: 0.01, def: 0.3 }],
+  status: { '状態': '試作のみ（作り直し2回目）', '動き': '予兆は引っかき始める外側の位置で爪先が光るだけ。発射の瞬間に外側から内側へ3本の傷を刻み、刻みながらそのまま前へ飛ぶ。左右交互', '本体の動き': '予兆は振りかぶる側へひねって少し引き、ぴたりと止まる（静）。発射の瞬間に前へ踏み込みながら外側から内側へ振り抜き（動・残像つき）、ゆっくり戻る。絵の位置と向きだけで、本番の位置・移動・発射の向きは変えていない', '中心の道': '傷をそれぞれの側へ「中心の空き」（×大きさ）だけずらし、進む向きの真ん中に道を空ける。大きくなるほど道も広がる。本番の判定は内側の端が真ん中に来るので、合わせるには移行後の変更が要る', '形': '本物の引っかき傷：真ん中の傷の通り道に、残り2本を垂直に間隔ぶんずらして平行に引く。間隔は引っかき始めが狭く抜ける側で広がる（つまみ）。始まりはほぼそろい、端は少しずつずれ、真ん中が一番長い。細い傷3本が平行。爪が入る外側は鋭くすぐ太く、抜ける内側へ細く消える。傷の通り道は slash.gd の楕円', '位置': '引っかき始めの外側の端が体の前の爪の位置に来るよう、絵の置き場所をずらしている（本番の判定の位置とは少しずれる）', '大きさ': '引っかいた直後の大きさから最大まで途切れずに大きくなる（最大の大きさ・時間・直後の大きさはつまみ）。本番の判定は発射の瞬間から slash_size なので、合わせるには移行後に判定の処理の変更が要る', '判定': '速さ380・直進・追尾なしは変えていない' },
   setup(S) { S.e = mkE('lynx', V(-520, -60), 0, { fire_t: 0.6 }); S.ship = shipState(V(260, 90)); S.shots = []; },
   step(S, dt) {
     const e = S.e, p = prm('lynx'); S.ship.pos.y = 90 + Math.sin(S.t * 0.9) * 60;
@@ -3952,7 +3961,7 @@ DEMOS.push({
     drawEnemy(B); drawShip(S.ship);
     const ease = (x) => 1 - Math.pow(1 - clamp(x), 3); // 途切れずに減速しながら大きくなる
     // 引っかき始めの外側の端（真ん中の傷）が、体の前の爪（render/enemies/lynx.gd の paw：前へ r×0.55・横へ r×0.6）に来るよう、絵の置き場所をずらす
-    const outerOff = (a, sd, sz) => { const uu = fromA(a), ac = mul(orth(uu), sd), phi = -Math.PI / 2 + span * 1.08, ax = 1 + SLASH.STEP, ay = SLASH.TALL + SLASH.STEP + SLASH.STRETCH; return mul(add(mul(ac, SLASH.INNER + ax * Math.cos(phi)), mul(uu, -(SLASH.TALL + SLASH.STRETCH) - ay * Math.sin(phi))), sz); };
+    const outerOff = (a, sd, sz) => sub(lynxPath(V(0, 0), a, sz, sd, span, 0).at(0), V(0, 0)); // 空き0の通り道の始まり（口から見た）
     const shift = (a, sd, paw) => sub(paw ?? (() => { const uu = fromA(a); return add(mul(uu, -e.r * 0.45), mul(orth(uu), sd * e.r * 0.6)); })(), outerOff(a, sd, full * g0)); // 口（pos＋u×r）から見たずれ
     // 爪への固定は空き0の形で計算し、引っかいた直後だけ効かせる（大きくなるほど外す）。中心の空きは発射の瞬間から常にそのぶん外へずらす
     for (const s of S.shots) { const age = S.t - s.t0, sz = full * lerp(g0, 1, ease(age / grow)); if (R.proto) drawClawsProto(R, add(s.pos, mul(shift(s.a, s.side, s.paw), full * g0 / sz)), s.a, sz, s.side, Math.min(1, P.intensity), P, span, Math.min(1, age / cutT)); else drawClawsCur(s.pos, s.a, p.slash_size, s.side, 1); }
@@ -3960,9 +3969,8 @@ DEMOS.push({
     const u = fromA(B.facing), paw = add(add(B.pos, mul(u, e.r * 0.55)), mul(orth(u), side * e.r * 0.6));
     if (!R.proto) { D2.circle(paw, e.r * (0.25 + 0.35 * k), `rgba(255,140,51,${0.25 * k})`); drawClawsCur(paw, e.facing, e.r * (0.5 + 0.5 * k), side, 0.3 + 0.7 * k); }
     else { // 予兆：傷の形は出さず、引っかき始める外側の端（3本ぶん）で爪先が光るだけ
-      const sz = full * g0, mouth = add(add(B.pos, mul(u, e.r)), shift(B.facing, side, sub(paw, add(B.pos, mul(u, e.r))))), pal = FX.ramp(P.color), ac = mul(orth(u), side);
-      for (let c = 0; c < 3; c++) { const ax = 1 + SLASH.STEP * c, ay = SLASH.TALL + (SLASH.STEP + SLASH.STRETCH) * c, phi = -Math.PI / 2 + span * (c === 1 ? 1.08 : 1), Cc = add(mouth, mul(sub(mul(ac, SLASH.INNER + (P.gap ?? 0.3)), mul(u, SLASH.TALL + SLASH.STRETCH * c)), sz));
-        const tip = toL(add(Cc, mul(add(mul(ac, ax * Math.cos(phi)), mul(u, -ay * Math.sin(phi))), sz))), fl = 0.6 + 0.4 * Math.sin(S.t * 40 + c * 2); R.front.glow(tip.x, tip.y, 3 + 3 * k, pal[4], k * fl * P.intensity); R.front.px(tip.x, tip.y, pal[k > 0.6 ? 4 : 3]); } }
+      const sz = full * g0, mouth = add(add(B.pos, mul(u, e.r)), shift(B.facing, side, sub(paw, add(B.pos, mul(u, e.r))))), pal = FX.ramp(P.color);
+      const path = lynxPath(mouth, B.facing, sz, side, span, P.gap ?? 0.3); for (let c = 0; c < 3; c++) { const tip = toL(lynxMarkPoint(path, c, LYNX_MARK.from[c], sz, P.space0 ?? 0.05, P.space1 ?? 0.1)), fl = 0.6 + 0.4 * Math.sin(S.t * 40 + c * 2); R.front.glow(tip.x, tip.y, 3 + 3 * k, pal[4], k * fl * P.intensity); R.front.px(tip.x, tip.y, pal[k > 0.6 ? 4 : 3]); } }
   },
 });
 
