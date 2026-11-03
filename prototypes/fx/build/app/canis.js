@@ -266,6 +266,7 @@ function canisStep(S, dt) {
       canisSteer(q, q.burn.blink >= 0 ? q.pos : S.ship.pos, S.ship.pos, cfg, dt, mode === 'proto' ? (P().houndAttackSpeed ?? 1) : 1);
       if (q.burn.blink >= 0 && S.t - q.burn.blink >= c.blink) { q.dead = true; const burst = { at: { ...q.pos }, t: S.t, radius: c.explode_radius }; S.bursts.push(burst); canisBurstStart(S, burst); }
     } else if (q.until > S.t) { q.pos = add(q.pos, mul(q.vel, dt)); q.trail.push({ ...q.pos }); if (q.trail.length > 14) q.trail.shift(); }
+    else if (mode === 'proto' && id === 'howl' && q.sent === 'howl') { q.goal = null; q.vel = V(0, 0); }
     else if (q.steer) { canisSteer(q, q.steer.goal, q.steer.face, q.steer.cfg, dt); q.steer = null; }
     else if (q.goal) { const to = sub(q.goal, q.pos), speed = Math.min(enemyDef('hound').speed * (q.followScale || 1), len(to) / 0.25); q.vel = lerpV(q.vel, mul(norm(to), speed), clamp(enemyDef('hound').accel * dt)); q.pos = add(q.pos, mul(q.vel, dt)); q.facing = angOf(q.vel); }
     else if (!(q.relay && !q.relayFired)) { q.vel = mul(q.vel, Math.exp(-8 * dt)); q.pos = add(q.pos, mul(q.vel, dt)); }
