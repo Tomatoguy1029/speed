@@ -1,7 +1,10 @@
 // ===== 再生・切り替え・調整値・対応表 =====
 const DEMOS = [];
 const DT = 1 / 60;
-const PARAMS = {};               // { demoId: { key: value } }
+const PARAMS = {};               // { demoId: { key: value } }。調整した値はこのブラウザに自動で残す（読み込み直しても消えない）
+const PARAMS_KEY = 'speed-fx-params';
+try { Object.assign(PARAMS, JSON.parse(localStorage.getItem(PARAMS_KEY) || '{}')); } catch (e) { }
+function saveParams() { try { localStorage.setItem(PARAMS_KEY, JSON.stringify(PARAMS)); } catch (e) { } }
 let demo = null, S = null, playT = 0, playing = true, loop = true, speed = 1, mode = 'proto', bgMode = 'game', showPlayerRef = false;
 const STD_PARAMS = [
   { k: 'color', label: '主色', type: 'color' },
@@ -9,7 +12,13 @@ const STD_PARAMS = [
   { k: 'intensity', label: '強度', type: 'range', min: 0, max: 2, step: 0.01, def: 1 },
   { k: 'timing', label: 'FXの時間倍率', type: 'range', min: 0.5, max: 2, step: 0.01, def: 1 },
 ];
-function paramDefs(d) { return [...STD_PARAMS.map(p => p.k === 'color' ? { ...p, def: d.color || '#ffffff' } : p), ...(d.params || [])]; }
+function paramDefs(d) { return [...STD_PARAMS.map(p => p.k === 'color' ? { ...p, def: d.color || '#ffffff' } : d.defaults?.[p.k] != null ? { ...p, def: d.defaults[p.k] } : p), ...(d.params || [])]; }
+// 初期値と違う値だけを、試作ごとにまとめた文字列にする（貼り付けて渡せば初期値に入れられる）
+function changedParamsText() {
+  const out = {};
+  for (const d of DEMOS) { const cur = PARAMS[d.id]; if (!cur) continue; for (const p of paramDefs(d)) if (cur[p.k] != null && cur[p.k] !== p.def) (out[d.id] ||= {})[p.k] = cur[p.k]; }
+  return Object.keys(out).length ? 'FX試作の調整値\n' + JSON.stringify(out, null, 1) : '';
+}
 function P() { const out = {}; for (const p of paramDefs(demo)) out[p.k] = PARAMS[demo.id]?.[p.k] ?? p.def; return out; }
 function resetSim() { S = { t: 0, ev: [], ents: [], hz: [], fx: [], rng: mkRng(7) }; cam.x = demo.cam?.x ?? 0; cam.y = demo.cam?.y ?? 0; demo.setup(S); demo.step(S, 0); } // 最初のコマを描く前に状態を整える（t=0 で描画が落ちないように）
 function simTo(t) {
@@ -86,10 +95,12 @@ function buildParams() {
     const v = PARAMS[demo.id]?.[p.k] ?? p.def;
     const inp = p.type === 'color' ? el('input', { type: 'color', value: v }) : el('input', { type: 'range', min: p.min, max: p.max, step: p.step, value: v });
     const out = el('span', { class: 'val' }, p.type === 'color' ? '' : (+v).toFixed(2));
-    inp.addEventListener('input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = p.type === 'color' ? '' : (+inp.value).toFixed(2); resetSim(); });
+    inp.addEventListener('input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = p.type === 'color' ? '' : (+inp.value).toFixed(2); saveParams(); resetSim(); });
     box.append(el('label', {}, el('span', { class: 'pl' }, p.label), inp, out));
   }
-  box.append(el('button', { onclick: () => { delete PARAMS[demo.id]; buildParams(); } }, 'この試作の値を初期値へ'));
+  const copied = el('span', { class: 'val' }, '');
+  box.append(el('button', { onclick: () => { const t = changedParamsText(); if (!t) { copied.textContent = '初期値から変えた値はありません'; return; } const done = () => { copied.textContent = 'コピーしました（全部の試作の分）'; }; (navigator.clipboard?.writeText(t) || Promise.reject()).then(done, () => { window.prompt('この文字列をコピーしてください', t.replace(/\n/g, ' ')); }); } }, '調整した値をコピー'), copied);
+  box.append(el('button', { onclick: () => { delete PARAMS[demo.id]; saveParams(); buildParams(); resetSim(); } }, 'この試作を元の初期値に戻す'));
 }
 function buildInfo() {
   const i = $('#info'); i.innerHTML = '';

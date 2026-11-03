@@ -286,13 +286,13 @@ function cenCut(B, from, dir) {
   return enter && { enter, exit };
 }
 DEMOS.push({
-  id: 'G10-boss-hit', ids: ['G10'], cat: 'ボスへの命中 G10', group: 'プレイヤー→ボス', title: '体当たり：ヒットストップ→反対側へ抜ける', duration: 2.6, color: '#fff2c8', cam: { x: 0, y: 0 },
-  params: [{ k: 'hitstop', label: 'ヒットストップ(秒・試作内のみ)', type: 'range', min: 0, max: 0.15, step: 0.005, def: 0.07 }, { k: 'variant', label: '比較用：0=体当たり 1=弾', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
+  id: 'G10-boss-hit', ids: ['G10'], cat: 'ボスへの命中 G10', group: 'プレイヤー→ボス', title: '体当たり：ヒットストップ→反対側へ抜ける', duration: 2.6, color: '#fff2c8', cam: { x: 0, y: 0 }, defaults: { size: 0.9, intensity: 0.9 },
+  params: [{ k: 'hitstop', label: 'ヒットストップ(秒・試作内のみ)', type: 'range', min: 0, max: 0.15, step: 0.005, def: 0.11 }, { k: 'variant', label: '比較用：0=体当たり 1=弾', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
   refs: [...CEN_REFS, 'scripts/bosses/boss_hit_feedback.gd（現行：白0.28を0.12秒・2.5pxの揺れ・0.0035radの傾き）', 'centaurus_presentation.gd hit（明るさ1.6倍を0.18秒）', 'scripts/render/ship_visual.gd（機体：airship.png、原画y=30が位置、×1.3）', 'pixelFX core（painter の火花・光）、explosions 系の火花と破片の飛び方'],
   status: { '状態': '試作のみ（2回目）', '対象': 'プレイヤーからボスへの命中。ボスからの攻撃や予兆ではない', 'ヒットストップ・瞬間移動': '試作の中だけの見せ方の提案。本番のヒットストップ値（G14/G15）と機体の移動・すり抜けの処理は変えていない。採用する場合は移行後に本番の処理として検討', '比較用操作': '体当たり／弾の切り替えは比較のための操作で、承認済みの仕様ではない' },
   setup(S) { S.B = mkBoss(V(0, 0), Math.PI * 0.9); S.ship = shipState(V(-900, 300), 0, 1500); S.hits = []; S.shots = []; S.B.mode = 'idle'; },
   step(S, dt) {
-    const B = S.B, v = (PARAMS[demo.id]?.variant ?? 0) | 0, proto = mode === 'proto', hs = PARAMS[demo.id]?.hitstop ?? 0.07, reach = B.r + DATA.config.ship_radius;
+    const B = S.B, v = (PARAMS[demo.id]?.variant ?? 0) | 0, proto = mode === 'proto', hs = PARAMS[demo.id]?.hitstop ?? 0.11, reach = B.r + DATA.config.ship_radius;
     if (!v && proto) { // 試作：接触→ヒットストップ→反対側へ
       const dir = norm(V(1, -0.32)); S.ship.heading = angOf(dir); S.ship.speed = 1500;
       if (S.stopUntil != null && S.t < S.stopUntil) { B.hitPulse = 0.12; return; } // 世界ごと止める（ボスのアニメーションも進めない）
