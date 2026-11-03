@@ -17,7 +17,8 @@ function canisHoundShape(q) {
 }
 const canisNovaOrigin = S => S.B.visualMouth || add(S.B.pos, mul(fromA(S.B.facing), S.B.r * 1.01));
 function canisFlash(S) {
-  let power = 0; for (let k = 0; k < S.r.rings; k++) { const age = S.age - S.r.warn - k * S.r.ring_gap; if (age >= 0 && age < 0.28) power = Math.max(power, (1 - smooth(0.025, 0.12, age)) + (1 - smooth(0.03, 0.28, age)) * 0.3); } return power;
+  const t = S.age - S.r.warn;
+  return smooth(0, 0.09, t) * (1 - smooth(0.22, 0.98, t));
 }
 function canisWallLayout(S) {
   const source = canisNovaOrigin(S), groups = Math.min(3, Math.floor(S.pack.length / 2)); S.wall = [];
@@ -74,15 +75,26 @@ function canisNovaSafe(S, point, radius = DATA.config.ship_radius) {
 }
 function canisNovaLight(S, R) {
   const field = canisNovaField(S), origin = canisNovaOrigin(S), source = toL(origin), p = R.P, charge = S.age < S.r.warn ? smooth(0, S.r.warn, S.age) : 0, flash = canisFlash(S);
-  const color = flash > 0.6 ? hexc('#f2fbff') : hexc('#42a8ff');
-  // 広がる波面は作らない。発動時に光が同時に届き、影だけが暗く残る。
-  for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) {
-    const distance = Math.hypot(x - source.x, y - source.y) / WL, visibility = 1 - field.pixels[(y * LW + x) * 4 + 3] / 255;
-    if (visibility < 0.01) continue;
-    const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 1050) ** 2);
-    const energy = (charge * 0.025 + flash * 0.68) * falloff;
-    if (energy > 0.001) R.back.light(x, y, color, energy * visibility * p.intensity);
+  const t = S.age - S.r.warn;
+  const tell = t < 0 ? charge : 1 - smooth(0.22, 0.98, t);
+  const tint = hexc('#759ab2'), rays = hexc('#adc4d2');
+  const gain = Math.min(p.intensity, 1);
+  if (tell || flash) for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) {
+    const dx = x - source.x, dy = y - source.y, distance = Math.hypot(dx, dy) / WL;
+    const visible = 1 - field.pixels[(y * LW + x) * 4 + 3] / 255;
+    if (visible < 0.01 || distance > S.r.ring_end) continue;
+    const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 760) ** 2);
+    const strength = visible * gain * falloff;
+    R.back.light(x, y, tint, strength * (tell * 0.13 + flash * 0.10));
+    if (flash > 0) {
+      // 星から同時に伸びる光条。角度を固定し、発動中に明滅させない。
+      const angle = Math.atan2(dy, dx);
+      const spread = angle * 7 + 0.68 * Math.sin(angle * 3) + 0.28 * Math.cos(angle * 5);
+      const shaft = Math.pow(Math.max(0, Math.cos(spread)), 18);
+      R.back.light(x, y, rays, strength * flash * shaft * 0.54);
+    }
   }
-  if (flash > 0) { const image = IMG['canis_major/large_star'], extent = S.B.r * (0.35 + flash * 0.3); g.save(); g.globalCompositeOperation = 'lighter'; drawImg('canis_major/large_star', origin, S.B.facing, extent, Math.min(1, flash)); g.restore(); R.front.glow(source.x, source.y, 11 + flash * 14, hexc('#e7faff'), flash * p.intensity * 0.35); }
-  S.novaSafe = canisNovaSafe(S, S.ship.pos); S.novaHit = flash > 0.6 && !S.novaSafe;
+  R.front.glow(source.x, source.y, 4 + tell * 6 + flash * 9, hexc('#bedbe8'), gain * (tell * 0.12 + flash * 0.25));
+  S.novaSafe = canisNovaSafe(S, S.ship.pos);
+  S.novaHit = t >= 0.09 && t < 0.42 && !S.novaSafe;
 }

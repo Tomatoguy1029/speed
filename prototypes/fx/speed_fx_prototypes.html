@@ -5653,7 +5653,8 @@ function canisHoundShape(q) {
 }
 const canisNovaOrigin = S => S.B.visualMouth || add(S.B.pos, mul(fromA(S.B.facing), S.B.r * 1.01));
 function canisFlash(S) {
-  let power = 0; for (let k = 0; k < S.r.rings; k++) { const age = S.age - S.r.warn - k * S.r.ring_gap; if (age >= 0 && age < 0.28) power = Math.max(power, (1 - smooth(0.025, 0.12, age)) + (1 - smooth(0.03, 0.28, age)) * 0.3); } return power;
+  const t = S.age - S.r.warn;
+  return smooth(0, 0.09, t) * (1 - smooth(0.22, 0.98, t));
 }
 function canisWallLayout(S) {
   const source = canisNovaOrigin(S), groups = Math.min(3, Math.floor(S.pack.length / 2)); S.wall = [];
@@ -5710,17 +5711,28 @@ function canisNovaSafe(S, point, radius = DATA.config.ship_radius) {
 }
 function canisNovaLight(S, R) {
   const field = canisNovaField(S), origin = canisNovaOrigin(S), source = toL(origin), p = R.P, charge = S.age < S.r.warn ? smooth(0, S.r.warn, S.age) : 0, flash = canisFlash(S);
-  const color = flash > 0.6 ? hexc('#f2fbff') : hexc('#42a8ff');
-  // 広がる波面は作らない。発動時に光が同時に届き、影だけが暗く残る。
-  for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) {
-    const distance = Math.hypot(x - source.x, y - source.y) / WL, visibility = 1 - field.pixels[(y * LW + x) * 4 + 3] / 255;
-    if (visibility < 0.01) continue;
-    const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 1050) ** 2);
-    const energy = (charge * 0.025 + flash * 0.68) * falloff;
-    if (energy > 0.001) R.back.light(x, y, color, energy * visibility * p.intensity);
+  const t = S.age - S.r.warn;
+  const tell = t < 0 ? charge : 1 - smooth(0.22, 0.98, t);
+  const tint = hexc('#759ab2'), rays = hexc('#adc4d2');
+  const gain = Math.min(p.intensity, 1);
+  if (tell || flash) for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) {
+    const dx = x - source.x, dy = y - source.y, distance = Math.hypot(dx, dy) / WL;
+    const visible = 1 - field.pixels[(y * LW + x) * 4 + 3] / 255;
+    if (visible < 0.01 || distance > S.r.ring_end) continue;
+    const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 760) ** 2);
+    const strength = visible * gain * falloff;
+    R.back.light(x, y, tint, strength * (tell * 0.13 + flash * 0.10));
+    if (flash > 0) {
+      // 星から同時に伸びる光条。角度を固定し、発動中に明滅させない。
+      const angle = Math.atan2(dy, dx);
+      const spread = angle * 7 + 0.68 * Math.sin(angle * 3) + 0.28 * Math.cos(angle * 5);
+      const shaft = Math.pow(Math.max(0, Math.cos(spread)), 18);
+      R.back.light(x, y, rays, strength * flash * shaft * 0.54);
+    }
   }
-  if (flash > 0) { const image = IMG['canis_major/large_star'], extent = S.B.r * (0.35 + flash * 0.3); g.save(); g.globalCompositeOperation = 'lighter'; drawImg('canis_major/large_star', origin, S.B.facing, extent, Math.min(1, flash)); g.restore(); R.front.glow(source.x, source.y, 11 + flash * 14, hexc('#e7faff'), flash * p.intensity * 0.35); }
-  S.novaSafe = canisNovaSafe(S, S.ship.pos); S.novaHit = flash > 0.6 && !S.novaSafe;
+  R.front.glow(source.x, source.y, 4 + tell * 6 + flash * 9, hexc('#bedbe8'), gain * (tell * 0.12 + flash * 0.25));
+  S.novaSafe = canisNovaSafe(S, S.ship.pos);
+  S.novaHit = t >= 0.09 && t < 0.42 && !S.novaSafe;
 }
 
 // ===== おおいぬ：techniques/*.gd・hound.gd の技進行を独立再生 =====
@@ -5762,6 +5774,7 @@ function drawCanis(B, t, opts = {}) {
 }
 function canisSetup(S, id) {
   S.tech = id; S.B = bossActor('canis_major', V(-500, 0)); S.B.phase = Math.round(P().phase); S.r = bossRule('canis_major', id, S.B.phase);
+  if (id === 'nova' && mode === 'proto') S.r = { ...S.r, warn: 3.2, after: 1.15 };
   S.age = -0.4; S.stageAge = 0; S.stage = 'start'; S.ship = shipState(V(130, 0), Math.PI / 2, 35); S.shipVel = V(0, 35);
   S.pack = []; S.jetVisuals = []; S.jets = []; S.flames = []; S.trails = []; S.shouts = []; S.transfers = []; S.bursts = []; S.shadows = [];
   if (mode === 'proto' && CANIS_ROARS.has(id)) roarScreen ||= makeRoarScreen();
@@ -5973,11 +5986,11 @@ function canisDraw(S, R) {
   R.blitBack();
   if (R.proto) canisTrailPictures(S, R);
   const mainShout = S.shouts.findLast(e => !e.small);
-  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.5 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.10 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
   for (const q of S.pack) if (!q.dead) { drawEnemy(q); if (R.proto && q.warning > t) canisHoundWarning(q, clamp(1 - (q.warning - t) / 0.6)); }
   if (R.proto) {
     for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); canisFire(R, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, 'ignite'); }
-    if (!CANIS_ROARS.has(id) && B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
+    if (id !== 'nova' && !CANIS_ROARS.has(id) && B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
   }
   if (R.proto) for (const b of S.bursts) canisBurstDraw(S, R, b, 'front');
   else {
@@ -6001,9 +6014,9 @@ for (const id of Object.keys(CANIS_IDS)) {
   const r = bossRule('canis_major', id);
   DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, duration: id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5, color: '#80c8ff',
     params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: id === 'nova' ? 18 : 8, step: 1, def: id === 'nova' ? 12 : 8 }, ...(id === 'nova' ? [{ k: 'playerX', label: '機体の位置（横）', type: 'range', min: -850, max: 850, step: 5, def: 130 }, { k: 'playerY', label: '機体の位置（縦）', type: 'range', min: -450, max: 450, step: 5, def: 0 }] : []), ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
-    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。波動ではなく瞬間的な閃光へ変更。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
+    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。3.2秒かけて影を見せ、一度だけ閃光を放つ。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
     refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX原本 fire/fire-breath・fire/fireball・fire/spirit-flame の青い出力、鳳凰と共通のpixel_fire密度場・爆発粒子', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
-    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { if (S.tech === 'nova' && mode === 'proto') return (canisFlash(S) > 0.6 ? '閃光発動／' : '') + (S.novaSafe ? '機体全体が影の中（安全）' : '光が届く（危険）'); const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
+    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { if (S.tech === 'nova' && mode === 'proto') return (S.age < S.r.warn ? '予兆・猟犬の影へ／' : S.age < S.r.warn + 0.42 ? '閃光発動／' : '照射終了／') + (S.novaSafe ? '機体全体が影の中（安全）' : '光が届く（危険）'); const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
   });
 }
 

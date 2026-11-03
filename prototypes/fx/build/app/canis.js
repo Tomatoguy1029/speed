@@ -37,6 +37,7 @@ function drawCanis(B, t, opts = {}) {
 }
 function canisSetup(S, id) {
   S.tech = id; S.B = bossActor('canis_major', V(-500, 0)); S.B.phase = Math.round(P().phase); S.r = bossRule('canis_major', id, S.B.phase);
+  if (id === 'nova' && mode === 'proto') S.r = { ...S.r, warn: 3.2, after: 1.15 };
   S.age = -0.4; S.stageAge = 0; S.stage = 'start'; S.ship = shipState(V(130, 0), Math.PI / 2, 35); S.shipVel = V(0, 35);
   S.pack = []; S.jetVisuals = []; S.jets = []; S.flames = []; S.trails = []; S.shouts = []; S.transfers = []; S.bursts = []; S.shadows = [];
   if (mode === 'proto' && CANIS_ROARS.has(id)) roarScreen ||= makeRoarScreen();
@@ -248,11 +249,11 @@ function canisDraw(S, R) {
   R.blitBack();
   if (R.proto) canisTrailPictures(S, R);
   const mainShout = S.shouts.findLast(e => !e.small);
-  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.5 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.10 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
   for (const q of S.pack) if (!q.dead) { drawEnemy(q); if (R.proto && q.warning > t) canisHoundWarning(q, clamp(1 - (q.warning - t) / 0.6)); }
   if (R.proto) {
     for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); canisFire(R, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, 'ignite'); }
-    if (!CANIS_ROARS.has(id) && B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
+    if (id !== 'nova' && !CANIS_ROARS.has(id) && B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
   }
   if (R.proto) for (const b of S.bursts) canisBurstDraw(S, R, b, 'front');
   else {
@@ -276,8 +277,8 @@ for (const id of Object.keys(CANIS_IDS)) {
   const r = bossRule('canis_major', id);
   DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, duration: id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5, color: '#80c8ff',
     params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: id === 'nova' ? 18 : 8, step: 1, def: id === 'nova' ? 12 : 8 }, ...(id === 'nova' ? [{ k: 'playerX', label: '機体の位置（横）', type: 'range', min: -850, max: 850, step: 5, def: 130 }, { k: 'playerY', label: '機体の位置（縦）', type: 'range', min: -450, max: 450, step: 5, def: 0 }] : []), ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
-    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。波動ではなく瞬間的な閃光へ変更。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
+    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。3.2秒かけて影を見せ、一度だけ閃光を放つ。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
     refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX原本 fire/fire-breath・fire/fireball・fire/spirit-flame の青い出力、鳳凰と共通のpixel_fire密度場・爆発粒子', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
-    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { if (S.tech === 'nova' && mode === 'proto') return (canisFlash(S) > 0.6 ? '閃光発動／' : '') + (S.novaSafe ? '機体全体が影の中（安全）' : '光が届く（危険）'); const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
+    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { if (S.tech === 'nova' && mode === 'proto') return (S.age < S.r.warn ? '予兆・猟犬の影へ／' : S.age < S.r.warn + 0.42 ? '閃光発動／' : '照射終了／') + (S.novaSafe ? '機体全体が影の中（安全）' : '光が届く（危険）'); const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
   });
 }
