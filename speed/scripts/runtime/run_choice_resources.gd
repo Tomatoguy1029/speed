@@ -14,7 +14,7 @@ func attach(next_bridge: RefCounted, index: Resource, owner: Node) -> void:
 	bridge = next_bridge
 	resources = index
 	parent = owner
-	bridge.subscribe("choice_resources",consume_frame,["cards","weapon_levels","trait_levels"])
+	bridge.subscribe("choice_resources",consume_frame,["cards","weapon_levels","trait_levels"],[])
 
 ## 配信中は命令を返さず、到着した状態だけ覚える。
 func consume_frame(frame: Dictionary) -> bool:
