@@ -5976,10 +5976,10 @@ function canisJetStream(R, at, angle, length, width, age, duration, alpha, seed)
 // おおいぬ専用の火炎放射。GIFの形状計算と本番pixel_fire_density／shapeの式をHTMLでも使う。
 // pixelFX fire/_lib.js由来のノイズ・炎の舌：MIT License, Copyright (c) 2026 Hugo Duprez。
 // 一角獣の尾は別の形・動きなので、従来のcanisJetStreamから切り離しておく。
-function canisPixelFireStream(R, at, angle, length, width, age, duration, alpha, seed) {
+function canisPixelFireStream(R, at, angle, length, width, age, duration, alpha, seed, speedRate = 1) {
   if (alpha <= 0 || length < 4) return;
   const fire = PIXELFX.fx['src/fx/fire/_lib.js'], NL = fire.noiseFor(0), N = (rate, n = 0, off = 0) => NL(age, rate, n + seed, off);
-  const L = length * WL, speed = L / 0.22, front = Math.min(L, age * speed), back = age > duration ? Math.min(L, (age - duration) * speed) : 0;
+  const L = length * WL, speed = L / 0.22 * speedRate, front = Math.min(L, age * speed), back = age > duration ? Math.min(L, (age - duration) * speed) : 0;
   if (front <= back + 1) return;
   const W0 = Math.max(0.04, L * 0.014 * width), samples = [];
   const flow = te => 1 - 0.35 * Math.exp(-Math.pow(((((te % 1.6) + 1.6) % 1.6) - 0.55) / 0.05, 2));
@@ -6063,7 +6063,7 @@ function canisPixelFireField(R, at, angle, clock, alpha, samples) {
       // pixel_fire_shape.gdshaderのthreshold 0.32＋edge_softness 0.04の中点。
       if (field[k] < 0.34) continue;
       const inner = field[k + 1] >= 0.34, core = inner && field[k + 2] >= 0.34, col = cols[core ? 2 : inner ? 1 : 0];
-      if (R.stampState) { canisStampSiriusPixel(R.stampState, i, j); continue; }
+      if (R.stampState) { canisStampFirePixel(R.stampState, R.stampTrail, i, j); continue; }
       p.px(i, j, col);
       if ((i & 3) === 0 && (j & 3) === 0) p.glow(i, j, 2, col, core ? 0.10 : inner ? 0.05 : 0.02);
     }
@@ -6082,10 +6082,10 @@ function canisSiriusStream(S, R) {
   canisPixelFireStream(R, mouth, S.B.facing, reach * P.size, P.size * (P.jetWidth ?? 1), S.t - started, Infinity, Math.min(1, P.intensity), 11);
 }
 function canisRecordSiriusFootprint(S) {
-  if (S.siriusFlameTrail) canisSiriusStream(S, { P: P(), stampState: S });
+  if (S.siriusFlameTrail) canisSiriusStream(S, { P: P(), stampState: S, stampTrail: S.siriusFlameTrail });
 }
-function canisStampSiriusPixel(S, x, y) {
-  const tr = S.siriusFlameTrail, cell = tr.pixelCell ||= 1 / WL;
+function canisStampFirePixel(S, tr, x, y) {
+  const cell = tr.pixelCell ||= 1 / WL;
   const pos = V(cam.x + (x + 0.5 - LW / 2) / WL, cam.y + (y + 0.5 - LH / 2) / WL);
   const key = Math.floor(pos.x / cell) + ':' + Math.floor(pos.y / cell);
   if (tr.visualFootprint.has(key)) return;
@@ -6093,8 +6093,19 @@ function canisStampSiriusPixel(S, x, y) {
   const deposit = canisDepositFlame(S, { trail: tr, pos, age: 0, life: 1, visualPixel: true });
   if (deposit) (deposit.pixels ||= []).push(pos);
 }
+function canisRecordRelayFootprints(S) {
+  const P0 = P();
+  for (const jet of S.jetVisuals) {
+    if (!jet.trail?.visualFootprint) continue;
+    const age = S.t - jet.t;
+    if (age < 0 || S.t > jet.trail.fireEndAt) continue;
+    const source = jet.owner === 'boss' && age <= jet.duration ? canisSiriusMouth(S) : jet.at;
+    canisPixelFireStream({ P: P0, stampState: S, stampTrail: jet.trail }, source, jet.a, jet.length * P0.size, P0.size * (jet.owner === 'hound' ? (P0.houndJetWidth ?? 1) : (P0.jetWidth ?? 1)), age, jet.duration, Math.min(1, P0.intensity), 5 + jet.id * 13, jet.speedRate ?? 1);
+  }
+}
 function canisSiriusFootprintContains(tr, x, y) {
-  if (!tr?.visualFootprint || !tr.pixelCell) return true;
+  if (!tr?.visualFootprint) return true;
+  if (!tr.pixelCell) return false;
   const wx = cam.x + (x + 0.5 - LW / 2) / WL, wy = cam.y + (y + 0.5 - LH / 2) / WL;
   return tr.visualFootprint.has(Math.floor(wx / tr.pixelCell) + ':' + Math.floor(wy / tr.pixelCell));
 }
@@ -6103,7 +6114,7 @@ function canisJetPictures(S, R) {
   const B = S.B, P = R.P, Wm = P.jetWidth ?? 1, Wh = P.houndJetWidth ?? 1; // 長さは判定と同じ値（canisStartJet で掛け済み）
   if (S.tech === 'sirius_flame') canisSiriusStream(S, R);
   for (const jet of S.jetVisuals) { const age = S.t - jet.t, source = jet.owner === 'boss' && age <= jet.duration ? (B.visualMouth || jet.at) : jet.at;
-    canisPixelFireStream(R, source, jet.a, jet.length * P.size, P.size * (jet.owner === 'hound' ? Wh : Wm), age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13); }
+    canisPixelFireStream(R, source, jet.a, jet.length * P.size, P.size * (jet.owner === 'hound' ? Wh : Wm), age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13, jet.speedRate ?? 1); }
 }
 
 // 残り火：噴射開始から共通の待ち時間で出す。噴射中は保持し、火が消えた時点から冷えて消える。粒を密度の場へ足し込み、
@@ -6111,7 +6122,7 @@ function canisJetPictures(S, R) {
 function canisEmbers(S, R) {
   const P = R.P, frame = canisEmbers.frame ||= PX.createFrame(LW, LH); PX.clearFrame(frame); const p = new PX.Painter(frame), H = SIRIUS_H.map(hexc), sp = [];
   const soot = [hexc('#0c1420'), hexc('#142238')], cell = 45 * WL, wMul = (P.jetWidth ?? 1) * P.size; // 残り火の太さは噴射の太さと同じつまみ
-  const footprint = S.tech === 'sirius_flame' ? S.siriusFlameTrail : null;
+  const footprints = ['sirius_flame', 'relay'].includes(S.tech) ? S.trails.filter(tr => tr.visualFootprint) : [];
   for (const tr of S.trails) for (const d of tr.deposits || []) {
     const wait = clamp(P.emberDelay ?? 0.2, 0, tr.jetDuration ?? 1.1), bornAge = S.t - tr.t - wait, a = Math.max(0, S.t - (tr.fireEndAt ?? tr.t)), life = 1.0 + hash(d.seed + 5) * 1.8; if (bornAge < 0 || a > life + 0.8) continue; const L = toL(d.pos);
     for (let j = 0; j < 7; j++) { const point = d.pixels?.length ? toL(d.pixels[Math.floor(hash(d.seed + j * 7) * d.pixels.length)]) : null, sx = point ? point.x : L.x + (hash(d.seed + j * 7) - 0.5) * cell * 1.2, sy = point ? point.y : L.y + (hash(d.seed + j * 11) - 0.5) * cell * 1.2, hs = hash(d.seed + j * 13 + 1); if (hs < 0.35) continue; // すすは燃えた所にまだらに残る
@@ -6127,7 +6138,7 @@ function canisEmbers(S, R) {
       for (const q of sp) { phxSplat(field, Wd, Hd, ox, oy, q.x, q.y, q.r * 1.25, 0); if (q.age < 0.55) phxSplat(field, Wd, Hd, ox, oy, q.x, q.y - q.r * 0.15, q.r * 0.8, 1); if (q.age < 0.25) phxSplat(field, Wd, Hd, ox, oy, q.x, q.y - q.r * 0.2, q.r * 0.5, 2); }
       const clock = Math.floor(S.t * 30) / 30, th = 0.32, read = (i, j, ch) => { i = Math.max(0, Math.min(Wd - 1, Math.round(i))); j = Math.max(0, Math.min(Hd - 1, Math.round(j))); return field[(j * Wd + i) * 3 + ch]; };
       for (let j = 0; j < Hd; j++) for (let i = 0; i < Wd; i++) { const wx = (i + ox) * LP, wy = (j + oy) * LP, u2 = (Math.sin(wy * 0.075 - clock * 4.4) + Math.sin(wx * 0.11 + wy * 0.033 + clock * 2.1)) * 1.2, v2 = Math.cos(wx * 0.08 + clock * 3) * 0.66;
-        if (!canisSiriusFootprintContains(footprint, i + ox, j + oy) || read(i + u2, j + v2, 0) < th) continue; const g1 = read(i + u2, j + v2, 1) >= th, b1 = g1 && read(i + u2, j + v2, 2) >= th, c = b1 ? H[1] : g1 ? H[4] : H[6]; p.px(i + ox, j + oy, c); if (((i + ox) & 3) === 0 && ((j + oy) & 3) === 0) p.glow(i + ox, j + oy, 4, c, 0.18 * P.intensity); } } }
+        if ((footprints.length && !footprints.some(tr => canisSiriusFootprintContains(tr, i + ox, j + oy))) || read(i + u2, j + v2, 0) < th) continue; const g1 = read(i + u2, j + v2, 1) >= th, b1 = g1 && read(i + u2, j + v2, 2) >= th, c = b1 ? H[1] : g1 ? H[4] : H[6]; p.px(i + ox, j + oy, c); if (((i + ox) & 3) === 0 && ((j + oy) & 3) === 0) p.glow(i + ox, j + oy, 4, c, 0.18 * P.intensity); } } }
   g.save(); blitFrame(frame); g.restore(); worldTransform();
 }
 function canisSpriteFX(name, point, time, scaleX, scaleY, angle = 0, alpha = 1) {
@@ -6137,7 +6148,7 @@ function canisSpriteFX(name, point, time, scaleX, scaleY, angle = 0, alpha = 1) 
 }
 function canisTrailPictures(S, R) {
   for (const q of S.pack) if (q.burn && !q.dead) canisSpriteFX('canis_fireball', q.pos, S.t + q.idx * 0.13, q.r * 7 / 100, q.r * 3.2 / 18, q.facing, 0.88);
-  if (!['sirius', 'sirius_flame'].includes(S.tech)) return;
+  if (!['sirius', 'sirius_flame', 'relay'].includes(S.tech)) return;
   canisEmbers(S, R); return; // 残り火は canisEmbers（密度の場）で描く
   const fire = PIXELFX.fx['src/fx/fire/_lib.js'], P = R.P;
   const frame = canisTrailPictures.floorFrame ||= PX.createFrame(LW, LH);
@@ -6466,8 +6477,10 @@ function canisStartJet(S, at, angle, length, width, duration, trail = false, own
   const localSirius = mode === 'proto' && S.tech === 'sirius' && owner === 'boss';
   if (localSirius) at = canisSiriusMouth(S);
   if (mode === 'proto') { const q = P(); length *= owner === 'hound' ? (q.houndJetLength ?? 1) : (q.jetLength ?? 1); width *= owner === 'hound' ? (q.houndJetWidth ?? 1) : (q.jetWidth ?? 1); } // 長さ・太さのつまみは、見た目・当たり判定（炎の粒）・残り火に同じく効く
-  const jet = { id: S.jetVisuals.length, at: { ...at }, a: angle, length, width, duration, age: 0, emit: 0, life: S.r.beam_particle_life ?? 0.65, trail: null };
-  if (trail) { jet.trail = { at: { ...at }, a: angle, length: 0, maximum: length, t: S.t, life: S.r.trail_time, width: S.r.trail_width, ...(localSirius ? { deposits: [], _depositCells: new Map(), jetDuration: duration, fireEndAt: S.t + duration + 0.22 } : {}) }; S.trails.push(jet.trail); }
+  const relay = mode === 'proto' && S.tech === 'relay';
+  const speedRate = relay && owner === 'hound' ? (P().houndAttackSpeed ?? 0.5) : 1;
+  const jet = { id: S.jetVisuals.length, at: { ...at }, a: angle, length, width, duration, speedRate, age: 0, emit: 0, life: (S.r.beam_particle_life ?? 0.65) / speedRate, trail: null };
+  if (trail || relay) { jet.trail = { at: { ...at }, a: angle, length: 0, maximum: length, t: S.t, life: S.r.trail_time, width: S.r.trail_width, ...((localSirius || relay) ? { deposits: [], _depositCells: new Map(), jetDuration: duration, fireEndAt: S.t + duration + 0.22 / speedRate, ...(relay ? { visualFootprint: new Set() } : {}) } : {}) }; S.trails.push(jet.trail); }
   S.jets.push(jet); S.jetVisuals.push({ ...jet, owner, t: S.t }); return jet;
 }
 function canisDepositFlame(S, f) {
@@ -6638,6 +6651,7 @@ function canisStep(S, dt) {
   }
   S.flames = S.flames.filter(f => f.age < f.life);
   if (mode === 'proto' && id === 'sirius_flame') canisRecordSiriusFootprint(S);
+  if (mode === 'proto' && id === 'relay') canisRecordRelayFootprints(S);
   for (const b of S.bursts) if (b.fx && S.t - b.t < 2.8 && dt > 0) { b.fx.ps.update(dt); b.fx.blazes.update(dt); }
 }
 function canisDraw(S, R) {
@@ -6698,7 +6712,7 @@ const tFix = t => Math.floor(t * 30) / 30;
 for (const id of Object.keys(CANIS_IDS)) {
   const r = bossRule('canis_major', id);
   DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, get duration() { const base = id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5; return base + (mode === 'proto' && CANIS_ROARS.has(id) ? 5 : mode === 'proto' && id === 'sirius' ? 2.5 : 0); }, color: '#80c8ff',
-    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: id === 'nova' ? 18 : 8, step: 1, def: id === 'nova' ? 12 : 8 }, ...(['sirius', 'sirius_flame', 'relay'].includes(id) ? [{ k: 'jetLength', label: 'ボスの噴射の長さ（当たり判定・残り火も）', type: 'range', min: 0.4, max: 1.8, step: 0.05, def: 1 }, { k: 'jetWidth', label: 'ボスの噴射の太さ（当たり判定・残り火も）', type: 'range', min: 0.05, max: 2.5, step: 0.01, def: 1 }, { k: 'jetSpikes', label: '噴射の横の炎の舌の大きさ（0で無し）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 }] : []), ...(['sirius', 'sirius_flame'].includes(id) ? [{ k: 'emberDelay', label: '炎が出てから残り火が出るまで（秒）', type: 'range', min: 0, max: id === 'sirius' ? 1.1 : r.duration, step: 0.05, def: 0.2 }] : []), ...(id === 'relay' ? [{ k: 'houndJetLength', label: '猟犬の噴射の長さ（当たり判定も）', type: 'range', min: 0.4, max: 1.8, step: 0.05, def: 1 }, { k: 'houndJetWidth', label: '猟犬の噴射の太さ（当たり判定も）', type: 'range', min: 0.4, max: 2.5, step: 0.05, def: 1 }] : []), ...(['command', 'stream', 'howl', 'bay', 'hunt', 'hunt_pounce', 'blaze'].includes(id) ? [{ k: 'houndAttackSpeed', label: '猟犬の攻撃スピード（倍率）', type: 'range', min: 0.25, max: 3, step: 0.05, def: 0.5 }] : []), ...(id === 'nova' ? [{ k: 'playerX', label: '機体の位置（横）', type: 'range', min: -850, max: 850, step: 5, def: 130 }, { k: 'playerY', label: '機体の位置（縦）', type: 'range', min: -450, max: 450, step: 5, def: 170 }] : []), ...(CANIS_ROARS.has(id) || id === 'nova' ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : id === 'nova' ? 3 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }, ...CANIS_ROAR_VISUAL_PARAMS, { k: 'orderWait', label: '咆哮後の待ち（秒）', type: 'range', min: 0, max: 1.5, step: 0.05, def: 0.2 }, { k: 'houndWarn', label: '猟犬の攻撃予兆（秒）', type: 'range', min: 0.1, max: 1.5, step: 0.05, def: 0.6 }] : [])],
+    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: id === 'nova' ? 18 : 8, step: 1, def: id === 'nova' ? 12 : 8 }, ...(['sirius', 'sirius_flame', 'relay'].includes(id) ? [{ k: 'jetLength', label: 'ボスの噴射の長さ（当たり判定・残り火も）', type: 'range', min: 0.4, max: 1.8, step: 0.05, def: 1 }, { k: 'jetWidth', label: 'ボスの噴射の太さ（当たり判定・残り火も）', type: 'range', min: 0.05, max: 2.5, step: 0.01, def: 1 }, { k: 'jetSpikes', label: '噴射の横の炎の舌の大きさ（0で無し）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 }] : []), ...(['sirius', 'sirius_flame', 'relay'].includes(id) ? [{ k: 'emberDelay', label: '炎が出てから残り火が出るまで（秒）', type: 'range', min: 0, max: id === 'sirius' ? 1.1 : id === 'relay' ? r.hound_beam_time : r.duration, step: 0.05, def: 0.2 }] : []), ...(id === 'relay' ? [{ k: 'houndJetLength', label: '猟犬の噴射の長さ（当たり判定も）', type: 'range', min: 0.4, max: 1.8, step: 0.05, def: 1 }, { k: 'houndJetWidth', label: '猟犬の噴射の太さ（当たり判定も）', type: 'range', min: 0.4, max: 2.5, step: 0.05, def: 1 }] : []), ...(['command', 'stream', 'howl', 'bay', 'hunt', 'hunt_pounce', 'blaze', 'relay'].includes(id) ? [{ k: 'houndAttackSpeed', label: id === 'relay' ? '猟犬の炎が進む速さ（倍率）' : '猟犬の攻撃スピード（倍率）', type: 'range', min: 0.25, max: 3, step: 0.05, def: 0.5 }] : []), ...(id === 'nova' ? [{ k: 'playerX', label: '機体の位置（横）', type: 'range', min: -850, max: 850, step: 5, def: 130 }, { k: 'playerY', label: '機体の位置（縦）', type: 'range', min: -450, max: 450, step: 5, def: 170 }] : []), ...(CANIS_ROARS.has(id) || id === 'nova' ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : id === 'nova' ? 3 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }, ...CANIS_ROAR_VISUAL_PARAMS, { k: 'orderWait', label: '咆哮後の待ち（秒）', type: 'range', min: 0, max: 1.5, step: 0.05, def: 0.2 }, { k: 'houndWarn', label: '猟犬の攻撃予兆（秒）', type: 'range', min: 0.1, max: 1.5, step: 0.05, def: 0.6 }] : [])],
     status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。顔の中心を残し、すぐ外側に空気の濃淡とブラーが広がる。右パネルで色・サイズ・内側と外側の範囲を調整できる。通常の号令は小、遠吠えは中' } : {}), ...(id === 'sirius' ? { '噴射と着火': '試作は噴射距離1600・維持1.1秒。口から出た実炎粒が通った地点だけを記録し、右パネルで噴射開始から残り火が出るまでを調整する。通った地点の残り火は共通の時刻で出し、火が消える前に出そろう。残り火の寿命は火が消えてから数える。長さの調整でも未到達の床へ先に着火しない。現行表示の距離と時間は維持' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '試作は構える→咆哮→少し待つ→猟犬の予兆→攻撃。待ちと猟犬の予兆を右のパネルで別々に調整する。遠吠えと追い吠えは位置取りのあと各攻撃を予告。現行表示の時刻は維持' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。光が当たる場所全体が攻撃範囲。3.2秒の予兆の後、シリウスの光が一度だけ弾ける。機体の縦位置を0にすると正面の猟犬の影を比較できる。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の待ちと猟犬の予兆は試作内で調整可能。本番への反映はC++移行後' : CANIS_ROARS.has(id) ? '号令後の待ちと猟犬の予兆は試作だけで変更。本番への反映はC++移行後' : '本番の攻撃数値・軌道・範囲は変更していない' },
     refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', id === 'sirius' ? 'pixelFX fire/flamethrower の噴射と、fire/_lib.js の炎・熾火' : 'pixelFX原本 fire/fire-breath・fire/fireball の青い出力、鳳凰と共通のpixel_fire密度場・爆発粒子', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
     levelDefaults() { const lp = this.params.find(q => q.k === 'roarLevel'); return lp ? ROAR_LEVEL_DEFAULTS[PARAMS[this.id]?.roarLevel ?? lp.def] : null; },
