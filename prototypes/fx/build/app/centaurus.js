@@ -36,15 +36,15 @@ function cenRig(boss, pose) {
   return { root, world, info, scale };
 }
 function drawCentaurus(boss, pose, opts = {}) {
-  const rig = cenRig(boss, pose), sprites = [];
+  const cx = opts.ctx || g, rig = cenRig(boss, pose), sprites = [];
   CEN_NODES.forEach((n, idx) => { if (!n.texture) return; const parentPath = n.parent; const W0 = rig.world[parentPath]; if (!W0 || rig.info[parentPath].visible === false) return;
     let region = n.texture.region, tex = n.texture.tex, pos = n.position;
     if (parentPath === 'Bow') { const f = clamp(rig.info.Bow.bow >= 0 ? rig.info.Bow.bow : 0, 0, 10); const r = BOW_REGIONS[f]; region = { x: r[0], y: r[1], w: r[2], h: r[3] }; pos = V(5 - BOW_GRIPS[f][0], 34 - BOW_GRIPS[f][1]); }
     const isBase = n.name === 'Base'; sprites.push({ m: M.mul(W0, M.mk(0, 1, 1, pos.x, pos.y)), region, img: isBase ? 'centaurus/base' : tex === 'bow' ? 'centaurus/bow_lit' : 'centaurus/armor_lit', flip: n.flip_h, z: isBase ? -9999 : rig.info[parentPath].z + (n.z_index || 0), idx }); });
   sprites.sort((a, b) => a.z - b.z || a.idx - b.idx);
-  for (const s of sprites) { const im = IMG[s.img]; if (!im) continue; g.save(); g.transform(s.m[0], s.m[1], s.m[2], s.m[3], s.m[4], s.m[5]); if (s.flip) { g.translate(s.region.w, 0); g.scale(-1, 1); } g.imageSmoothingEnabled = false; g.drawImage(im, s.region.x, s.region.y, s.region.w, s.region.h, 0, 0, s.region.w, s.region.h);
-    if (opts.white > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = opts.white; g.filter = 'brightness(0) invert(1)'; g.drawImage(im, s.region.x, s.region.y, s.region.w, s.region.h, 0, 0, s.region.w, s.region.h); g.filter = 'none'; }
-    g.restore(); }
+  for (const s of sprites) { const im = IMG[s.img]; if (!im) continue; cx.save(); cx.transform(s.m[0], s.m[1], s.m[2], s.m[3], s.m[4], s.m[5]); if (s.flip) { cx.translate(s.region.w, 0); cx.scale(-1, 1); } cx.imageSmoothingEnabled = false; cx.drawImage(im, s.region.x, s.region.y, s.region.w, s.region.h, 0, 0, s.region.w, s.region.h);
+    if (opts.white > 0) { cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = opts.white; cx.filter = 'brightness(0) invert(1)'; cx.drawImage(im, s.region.x, s.region.y, s.region.w, s.region.h, 0, 0, s.region.w, s.region.h); cx.filter = 'none'; }
+    cx.restore(); }
   return rig;
 }
 // centaurus_parts.gd set_bow_pose（クリップの選択と時刻）
@@ -275,8 +275,16 @@ function drawPowder(center, radius, age, strength, salt = 0) { // additional_tec
 
 // ---------- G10 プレイヤー → ボスの命中フィードバック
 // 試作（体当たり）：接触した瞬間に世界ごと短く止め（ヒットストップ）、止まり終わりで機体をボスの反対側へ瞬間移動させる。
-// 入った点と抜けた点で火花。間をつなぐ線は描かない。本番のヒットストップ値・機体の移動処理は変えない（試作の中だけの提案）。
-function segCircleExit(a, dir, c, r) { const f = sub(a, c), b = f.x * dir.x + f.y * dir.y, cc = f.x * f.x + f.y * f.y - r * r, disc = b * b - cc; if (disc < 0) return null; return -b + Math.sqrt(disc); }
+// 入った点と抜けた点（進路が本体の絵の縁と交わる点）で火花。間をつなぐ線は描かない。本番のヒットストップ値・機体の移動処理は変えない（試作の中だけの提案）。
+// 進路が本体の絵（不透明な画素）に入る点と出る点。絵を別の画面へ描いて、直線に沿って調べる
+function cenCut(B, from, dir) {
+  const R = B.r * 2, size = Math.ceil(R * 2), cv2 = document.createElement('canvas'); cv2.width = cv2.height = size;
+  const c = cv2.getContext('2d'); c.setTransform(1, 0, 0, 1, R - B.pos.x, R - B.pos.y); drawCentaurus(B, B.pose, { ctx: c });
+  const px = c.getImageData(0, 0, size, size).data, solid = (q) => { const x = Math.floor(q.x - B.pos.x + R), y = Math.floor(q.y - B.pos.y + R); return x >= 0 && y >= 0 && x < size && y < size && px[(y * size + x) * 4 + 3] > 60; };
+  let enter = null, exit = null; const L = dist(from, B.pos) + R;
+  for (let d = 0; d <= L * 2; d += 1) { const q = add(from, mul(dir, d)); if (solid(q)) { if (!enter) enter = q; exit = q; } }
+  return enter && { enter, exit };
+}
 DEMOS.push({
   id: 'G10-boss-hit', ids: ['G10'], cat: 'ボスへの命中 G10', group: 'プレイヤー→ボス', title: '体当たり：ヒットストップ→反対側へ抜ける', duration: 2.6, color: '#fff2c8', cam: { x: 0, y: 0 },
   params: [{ k: 'hitstop', label: 'ヒットストップ(秒・試作内のみ)', type: 'range', min: 0, max: 0.15, step: 0.005, def: 0.07 }, { k: 'variant', label: '比較用：0=体当たり 1=弾', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
@@ -288,10 +296,12 @@ DEMOS.push({
     if (!v && proto) { // 試作：接触→ヒットストップ→反対側へ
       const dir = norm(V(1, -0.32)); S.ship.heading = angOf(dir); S.ship.speed = 1500;
       if (S.stopUntil != null && S.t < S.stopUntil) { B.hitPulse = 0.12; return; } // 世界ごと止める（ボスのアニメーションも進めない）
-      if (S.stopUntil != null && !S.warped) { S.warped = true; S.ship.pos = { ...S.exitAt }; S.hits.push({ t: S.t, at: { ...S.exitAt }, a: S.ship.heading, kind: 'out' }); }
-      if (S.t > 0.3) { const before = { ...S.ship.pos }, next = add(before, mul(dir, 1500 * dt));
-        if (S.stopUntil == null && dist(next, B.pos) <= reach) { const enter = segCircleExit(before, mul(dir, -1), B.pos, reach), hit = enter != null ? sub(before, mul(dir, -enter)) : next; // 接触点
-          S.ship.pos = hit; const ex = segCircleExit(hit, dir, B.pos, reach); S.exitAt = add(hit, mul(dir, (ex ?? 0) + 4)); S.stopUntil = S.t + hs; B.hit = 0.18; S.hits.push({ t: S.t, at: { ...hit }, a: S.ship.heading, kind: 'in' }); return; }
+      if (S.stopUntil != null && !S.warped) { S.warped = true; S.ship.pos = { ...S.exitAt }; S.hits.push({ t: S.t, at: { ...S.cut.exit }, a: S.ship.heading, kind: 'out' }); }
+      if (S.t > 0.3) { const before = { ...S.ship.pos }, next = add(before, mul(dir, 1500 * dt)), sr = DATA.config.ship_radius;
+        if (S.cut === undefined && dist(next, B.pos) <= reach + 300) S.cut = cenCut(B, before, dir); // 当たり判定の円ではなく、見えている絵の縁で触れる
+        const touch = S.cut && sub(S.cut.enter, mul(dir, sr)); // 機体の先端が絵の縁に届いたときの機体の中心
+        if (S.stopUntil == null && touch && (next.x - touch.x) * dir.x + (next.y - touch.y) * dir.y >= 0) {
+          S.ship.pos = touch; S.exitAt = add(S.cut.exit, mul(dir, sr + 4)); S.stopUntil = S.t + hs; B.hit = 0.18; S.hits.push({ t: S.t, at: { ...S.cut.enter }, a: S.ship.heading, kind: 'in' }); return; }
         S.ship.pos = next; }
     } else if (!v) { const dir = norm(V(1, -0.32)), before = { ...S.ship.pos }; if (S.t > 0.3) S.ship.pos = add(S.ship.pos, mul(dir, 1500 * dt)); S.ship.heading = angOf(dir); S.ship.speed = 1500;
       const inNow = dist(S.ship.pos, B.pos) <= reach, wasIn = dist(before, B.pos) <= reach; if (inNow && (S.lastTick == null || S.t - S.lastTick > 0.06)) { S.lastTick = S.t; B.hitPulse = 0.12; B.hit = 0.18; S.hits.push({ t: S.t, at: { ...S.ship.pos }, a: S.ship.heading, kind: 'tick' }); } if (!inNow && wasIn) S.hits.push({ t: S.t, at: { ...S.ship.pos }, a: S.ship.heading, kind: 'out' }); }
