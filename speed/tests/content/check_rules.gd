@@ -301,12 +301,14 @@ func _package_final_runtime() -> void:
 	var observed := {"results":0,"saves":0,"result":{}}
 	var on_save := func(): observed.saves += 1
 	SaveManager.save_changed.connect(on_save)
+	_package_measure("最終配布の既定起動",{"main_in_tree":root.get_node_or_null("Main")!=null,"headless":DisplayServer.get_name()=="headless"})
 	GameManager.start_run(1)
 	var session: RunSession = RunManager.current()
 	if session==null or not await _package_ready(session):
 		push_error("最終配布確認の通常出撃を開始できません")
 		quit(1)
 		return
+	_package_measure("最終配布の通常出撃準備",{"loading_timings":session.loading_timings,"ready":session.bridge!=null})
 	var id := session.id
 	# 通常configureのmode=0を保ち、同じランの本番結果通知だけを観測する。
 	var normal_mode: bool = int(session.bridge.recording_origin.options.mode)==0

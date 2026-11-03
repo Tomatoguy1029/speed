@@ -108,6 +108,21 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         executable = shutil.which("godot-bg")
         assert executable, "描画付きの確認にはgodot-bgが必要"
         environment["GODOT"] = str(engine)
+    if runtime:
+        command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "runtime.log"), "--"]
+        result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
+        print(result.stdout)
+        assert result.returncode == 0 and "[package_runtime] OK" in result.stdout, "通常ランの開始と最小更新を最後まで実施する"
+        # 元の配布物を保ち、DLLを抜いた別コピーで旧実装へのfallbackがないことを確かめる。
+        with tempfile.TemporaryDirectory(prefix="speed-package-missing-") as temporary:
+            missing = Path(temporary) / "export"
+            shutil.copytree(path, missing)
+            (missing / library.relative_to(path)).unlink()
+            missing_engine = missing / engine.relative_to(path)
+            missing_pack = missing / packs[0].relative_to(path)
+            result = subprocess.run([str(missing_engine), "--headless", "--log-file", str(path.parent / "missing-runtime.log"), "--", "--package-missing-runtime"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=missing)
+            print(result.stdout)
+            assert result.returncode == 0 and "[package_missing_runtime] OK" in result.stdout, "拡張欠落を開始失敗として確認する"
     if final_runtime:
         command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "final-runtime.log"), "--", "--package-final-runtime"]
         result = subprocess.run(command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
@@ -118,22 +133,7 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         result = subprocess.run(loading_command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
         print(result.stdout)
         assert result.returncode == 0 and "[package_loading] OK" in result.stdout, "描画付き配布版で出撃準備と資源回収を確認する"
-    if not runtime:
-        return
-    command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "runtime.log"), "--"]
-    result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
-    print(result.stdout)
-    assert result.returncode == 0 and "[package_runtime] OK" in result.stdout, "通常ランの開始と最小更新を最後まで実施する"
-    # 元の配布物を保ち、DLLを抜いた別コピーで旧実装へのfallbackがないことを確かめる。
-    with tempfile.TemporaryDirectory(prefix="speed-package-missing-") as temporary:
-        missing = Path(temporary) / "export"
-        shutil.copytree(path, missing)
-        (missing / library.relative_to(path)).unlink()
-        missing_engine = missing / engine.relative_to(path)
-        missing_pack = missing / packs[0].relative_to(path)
-        result = subprocess.run([str(missing_engine), "--headless", "--log-file", str(path.parent / "missing-runtime.log"), "--", "--package-missing-runtime"], text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=missing)
-        print(result.stdout)
-        assert result.returncode == 0 and "[package_missing_runtime] OK" in result.stdout, "拡張欠落を開始失敗として確認する"
+
 
 
 if __name__ == "__main__":
