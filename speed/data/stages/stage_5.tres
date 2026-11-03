@@ -246,7 +246,7 @@ layouts = Array[StringName]([&"aquila/1体"])
 attack_priority = 1
 time = 290.0
 length = 75.0
-interval = 30.0
+interval = 80.0
 
 [sub_resource type="Resource" id="Clip_21"]
 script = ExtResource("clip")
@@ -329,7 +329,7 @@ attack_priority = 1
 time = 438.0
 length = 34.0
 groups = 2
-interval = 30.0
+interval = 40.0
 
 [sub_resource type="Resource" id="Clip_29"]
 script = ExtResource("clip")

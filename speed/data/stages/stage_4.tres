@@ -253,20 +253,9 @@ types = Array[StringName]([&"cross"])
 formations = Array[PackedScene]([ExtResource("6_3vyts")])
 layouts = Array[StringName]([&"cross_solo/1体"])
 time = 296.0
-length = 21.0
+length = 46.0
 groups = 2
-interval = 15.0
-
-[sub_resource type="Resource" id="Resource_dnw1w"]
-script = ExtResource("1_3ghul")
-label = "みなみじゅうじ座"
-track = 2
-types = Array[StringName]([&"cross"])
-formations = Array[PackedScene]([ExtResource("6_3vyts")])
-time = 317.0
-length = 25.0
-groups = 2
-interval = 15.0
+interval = 20.0
 
 [sub_resource type="Resource" id="Resource_dwf6q"]
 script = ExtResource("1_3ghul")
@@ -500,7 +489,9 @@ enemy_tuning = {
 "hp": 110.0
 },
 "cross": {
-"hp": 60.0
+"hp": 60.0,
+"params.rest": 1.0,
+"params.stand_off": 320.0
 },
 "dolphin": {
 "hp": 90.0
@@ -524,7 +515,7 @@ enemy_attack_values = {
 "telescope": 1.0
 }
 zako_curves = Array[ExtResource("8_xsgcl")]([SubResource("Resource_mpbfx"), SubResource("Resource_vh3c5"), SubResource("Resource_02yv8")])
-clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_3ghul"), SubResource("Resource_xsgcl"), SubResource("Resource_pea44"), SubResource("Resource_blxf3"), SubResource("Resource_ha4ve"), SubResource("Resource_3vyts"), SubResource("Resource_gbu6c"), SubResource("Resource_xt0ms"), SubResource("Resource_d1wmn"), SubResource("Resource_wfwh2"), SubResource("Resource_4pws0"), SubResource("Resource_0yv7r"), SubResource("Resource_8suf3"), SubResource("Resource_s8ssi"), SubResource("Resource_axvyk"), SubResource("Resource_dsm8w"), SubResource("Resource_dnw1w"), SubResource("Resource_dwf6q"), SubResource("Resource_hou8i"), SubResource("Resource_10w7m"), SubResource("Resource_corona_intro"), SubResource("Resource_corona_late_audit")])
+clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_3ghul"), SubResource("Resource_xsgcl"), SubResource("Resource_pea44"), SubResource("Resource_blxf3"), SubResource("Resource_ha4ve"), SubResource("Resource_3vyts"), SubResource("Resource_gbu6c"), SubResource("Resource_xt0ms"), SubResource("Resource_d1wmn"), SubResource("Resource_wfwh2"), SubResource("Resource_4pws0"), SubResource("Resource_0yv7r"), SubResource("Resource_8suf3"), SubResource("Resource_s8ssi"), SubResource("Resource_axvyk"), SubResource("Resource_dsm8w"), SubResource("Resource_dwf6q"), SubResource("Resource_hou8i"), SubResource("Resource_10w7m"), SubResource("Resource_corona_intro"), SubResource("Resource_corona_late_audit")])
 track_names = PackedStringArray("望遠鏡&レティクル", "いるか", "南十字", "冠", "水瓶", "")
 boss_time = 495.0
 surge_start = 601.0
