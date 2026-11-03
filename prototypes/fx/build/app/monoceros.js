@@ -109,6 +109,7 @@ function monoStep(S, dt) {
   monoWaveAir(S, dt);
   if (mode === 'proto' && dt > 0) monoRecordSlash(S, dt);
   if (mode === 'proto' && id === 'horn_dance') { cam.x = 0; cam.y = 0; cam.zoom = 0.8; } else { cam.x = (B.pos.x + S.ship.pos.x) * 0.5; cam.y = (B.pos.y + S.ship.pos.y) * 0.5; }
+  if (mode === 'proto') monoBoostStep(S, dt);
 }
 function monoDraw(S, R) {
   R = bossView(R, '#ffd27a');
@@ -124,9 +125,11 @@ function monoDraw(S, R) {
   }
   for (const slash of S.slashes) { const age = S.t - slash.t; if (R.proto) bossSlash(R, slash.a, slash.b, r.slash_width, age, 0.6, S.slashes.indexOf(slash) + 1); else if (age < 0.6) { const d = norm(sub(slash.b, slash.a)), n = mul(orth(d), r.slash_width * 0.8 * (1 - age / 0.6)); const mid = lerpV(slash.a, slash.b, 0.5); D2.poly([slash.a, add(mid, n), slash.b, sub(mid, n)], rgba('#c9a6ff', 1 - (age / 0.6) ** 2)); } }
   for (const boom of S.booms) { const age = S.t - boom.t; if (R.proto) bossBreath(R, boom.at, B.facing + Math.PI, age, 83, 0.7, 200); else if (age < 0.4) D2.arc(boom.at, lerp(40, 190, age / 0.4), B.facing + Math.PI - 0.9, B.facing + Math.PI + 0.9, rgba('#9fe8ff', (1 - age / 0.4) * 0.5), 3); }
-  monoOriginalBooster(S, rig);
-  if (R.proto) { monoTailJet(S, R); monoSweepSlash(S, R); } // 突進・踏み込み中は尾のジェット、薙ぎ払いは斬撃
-  R.blitBack(); drawBossParts(B, rig.edits, { root: rig.root });
+  if (R.proto) monoSweepSlash(S, R);
+  else monoOriginalBooster(S, rig);
+  R.blitBack();
+  if (R.proto) monoPixelBooster(S, R, rig);
+  drawBossParts(B, rig.edits, { root: rig.root });
   if (id === 'lance' && S.form > 0) monoOriginalLance(S, rig);
   if (S.shattered && R.proto) FXW.sparks(R.front, S.shattered.at, (S.t - S.shattered.t) / P.timing, 31, 22, P.color, 55, 0.7);
   if (id === 'kick' && S.kickAt && R.proto) bossBreath(R, add(B.pos, mul(S.direction, r.reach)), angOf(S.direction), S.t - S.kickAt, 39, 0.9, 120);
@@ -135,8 +138,8 @@ function monoDraw(S, R) {
 for (const id of Object.keys(MONO.moves)) {
   const ids = id === 'horn_wave' ? ['I02', 'I04'] : id === 'horn_dance' ? ['I01', 'I04', 'I05'] : ['I01', 'I03', 'I04'];
   DEMOS.push({ id: 'I-' + id, ids, cat: 'いっかくじゅう座（I）', group: 'いっかくじゅう座', title: MONO.moves[id].display_name, duration: id === 'horn_dance' ? 16 : id === 'return_charge' ? 10 : 6, color: '#ffd27a',
-    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'tailJet', label: '突進：尾のジェットの長さ', type: 'range', min: 0, max: 3, step: 0.05, def: 1 }, { k: 'tailJetWidth', label: '突進：尾のジェットの太さ', type: 'range', min: 0.3, max: 3, step: 0.05, def: 1 }, { k: 'hornBright', label: '第2形態の角の明るさ', type: 'range', min: 0, max: 1.5, step: 0.01, def: 0.8 }],
-    status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '現行表示': '現行の8技の段階・時刻・距離、歩きコマ、角の15コマと伸び、首・胴・尾の旋回を移植。照明は焼込みで近似', '試作': '角・炎・槍は現行の描き方を保つ。突進は足を踏ん張り、頭を引いて止める動きで予告。衝撃波はpixelFXの圧力の面を使用。後ろ蹴りは脚の一周回転と過度な伸びを廃止。乱舞には燃え跡を残す', '本番との違い': id === 'horn_dance' ? '試作だけ、体全体が見える範囲へ移動を制限し、カメラを固定。移行後に本番の移動範囲の変更が要る。乱舞の自然選択条件は変更せず単独再生する' : '障害物のない比較場面。地形への角刺さり・共通AIの技選択は再現対象外。攻撃の数値・軌道は不変更' },
+    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'tailJet', label: 'ブースト：長さ', type: 'range', min: 0, max: 4, step: 0.05, def: 1 }, { k: 'tailJetResponse', label: 'ブースト：伸びる速さ', type: 'range', min: 0.1, max: 4, step: 0.05, def: 1 }, { k: 'tailJetWidth', label: 'ブースト：太さ', type: 'range', min: 0.05, max: 4, step: 0.01, def: 1 }, { k: 'tailOuterColor', label: 'ブースト：外側の色', type: 'color', def: '#245c96' }, { k: 'tailJetColor', label: 'ブースト：内側の色', type: 'color', def: '#61c9ff' }, { k: 'tailCoreColor', label: 'ブースト：芯の色', type: 'color', def: '#e0fbff' }, { k: 'hornBright', label: '第2形態の角の明るさ', type: 'range', min: 0, max: 1.5, step: 0.01, def: 0.8 }],
+    status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '現行表示': '現行の8技の段階・時刻・距離、歩きコマ、角の15コマと伸び、首・胴・尾の旋回を移植。照明は焼込みで近似', '試作': '角と槍は現行の見た目を保つ。尾のブーストは承認した直進版。長さ・伸びる速さ・太さ・外側/内側/芯の色を右パネルで調整できる。突進は足を踏ん張り、頭を引いて止める動きで予告。衝撃波はpixelFXの圧力の面を使用。後ろ蹴りは脚の一周回転と過度な伸びを廃止。乱舞には燃え跡を残す', '本番との違い': id === 'horn_dance' ? '試作だけ、体全体が見える範囲へ移動を制限し、カメラを固定。移行後に本番の移動範囲の変更が要る。乱舞の自然選択条件は変更せず単独再生する' : '障害物のない比較場面。地形への角刺さり・共通AIの技選択は再現対象外。攻撃の数値・軌道は不変更' },
     refs: ['scenes/bosses/monoceros_parts.tscn・monoceros_presentation.tscn', 'data/visuals/monoceros_gait.tres・assets/pixel/monoceros/horn/horn.tres', 'scripts/bosses/monoceros_presentation.gd・monoceros_parts.gd', 'data/bosses/monoceros_moves/' + id + '.tres・scripts/bosses/monoceros/techniques/' + id + '.gd', 'pixelFX impacts/_lib.js の dustRing・core/sim.js の VAPOUR（角の衝撃波）'],
     setup(S) { monoSetup(S, id); }, step: monoStep, draw: monoDraw, phase(S) { return bossPhase(S.B); }
   });
