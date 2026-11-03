@@ -33,26 +33,26 @@ func _ready() -> void:
 		GameManager.run_stage = 4
 		var session := RunManager.create_run()
 		add_child(session)
-		check(session.sim.state == null, "読込中は戦闘を開始しない")
+		check(session.bridge == null, "読込中は戦闘を開始しない")
 		session.free()
 		while ContentManager.pending_resources() > 0: await get_tree().process_frame
 		check(RunManager.current() == null, "読込中に画面を離れてもセッションを解放する")
 
 		var loaded := RunManager.create_run()
 		add_child(loaded)
-		if loaded.sim.state == null: await loaded.started
+		if loaded.bridge == null: await loaded.started
 		await _check_debug_spawns(loaded, 2)
 		await _check_debug_spawns(loaded, 600)
 		await _check_debug_spawns(loaded, 600)
 		await get_tree().process_frame
-		var stage_reference: WeakRef = weakref(loaded.resources.resources["res://data/enemies/aquarius.tres"])
+		var stage_reference: WeakRef = weakref(loaded.cpp_resources)
 		loaded.free()
 		await get_tree().process_frame
-		check(stage_reference.get_ref() == null, "ラン終了後にステージ専用の敵定義を解放する")
+		check(stage_reference.get_ref() == null, "ラン終了後にステージ専用の資源一覧を解放する")
 		GameManager.run_stage = 4
 		var switched := RunManager.create_run()
 		add_child(switched)
-		if switched.sim.state == null: await switched.started
+		if switched.bridge == null: await switched.started
 		await _check_debug_spawns(switched, 2)
 		switched.free()
 
@@ -60,16 +60,10 @@ func _ready() -> void:
 	get_tree().quit(1 if failed else 0)
 
 func _check_debug_spawns(session: RunSession, amount: int) -> void:
-	var run := session.sim
-	var before := run.enemies.count()
-	run.command(&"debug_spawn_enemies", {"count": amount})
-	check(run.enemies.count() >= before + amount, "デバッグ命令で指定数を生成: %d" % amount)
-	var scope := session.resources
-	for id in ContentManager.enemies:
-		var type := StringName(id)
-		var skin := run.state.stage.enemy_sprite_path(type).get_file().get_basename()
-		var path: String = run.state.stage.resources.look_paths.get(skin,
-			run.state.stage.resources.look_paths.get(String(type), ""))
-		if not path.is_empty():
-			check(scope.resources.has(path), "派生体を含む敵外観をランのScopeに保持: " + String(type))
+	var bridge = session.bridge
+	var before: int = bridge.read_metrics().value.enemies
+	var reply: Dictionary = bridge.command("dev_edit", {"kind":"debug_action","payload":{"action":"random","args":{"count":amount,"ids":PackedStringArray(["drifter"])}}})
+	check(reply.ok and bridge.read_metrics().value.enemies >= before + amount, "デバッグ命令で指定数を生成: %d" % amount)
+	for path in session.cpp_resources.paths:
+		check(session.resources.resources.has(path), "生成済みの依存資源をランのScopeに保持: " + path)
 	await get_tree().process_frame

@@ -17,7 +17,7 @@ func _ready() -> void:
 		return
 	scene.cpp_finished.connect(func(result):
 		if result.kind == "Abort": aborts += 1)
-	var cards := _state().cards.duplicate(true)
+	var cards: Array = _state().cards.duplicate(true)
 	_tap(KEY_ESCAPE)
 	var quit: Button = hud._pause_box.get_child(3)
 	quit.grab_focus()
@@ -69,7 +69,7 @@ func _ready() -> void:
 	quit.pressed.emit()
 	dialog = hud._menu_overlay
 	var elapsed: float = hud._rewards._elapsed
-	var before := _state().time
+	var before: float = _state().time
 	await _ready_cards()
 	_step(1.0)
 	_check(_state().time == before and hud._rewards._elapsed == elapsed and _state().phase == ExitIds.Phase.Paused, "confirmation keeps world and reward paused")

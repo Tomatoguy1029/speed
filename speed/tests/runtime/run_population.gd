@@ -1,5 +1,7 @@
 ## 領域別の人数・上限・画面外の再配置・出現位置と乱数を比較する。
 extends Node
+const MIX_BRIDGE := preload("res://scripts/runtime/run_bridge.gd")
+const MIX_SCHEMA := preload("res://tools/content/generated/run_schema.gd")
 const COMPARE := preload("res://tools/compare_runtime.gd")
 var failed := 0
 func check(ok: bool, label: String) -> void:

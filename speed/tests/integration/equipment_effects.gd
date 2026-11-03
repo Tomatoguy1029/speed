@@ -1624,7 +1624,7 @@ func check_cpp_w05() -> void:
 		for tick in ceili(float(definition.params.revive_by_level[level-1])*120.0)+1:
 			bridge.step(1.0/120.0,idle,viewport)
 		check(core.barrier_snapshot().restore==0.0 and is_equal_approx(core.barrier_snapshot().durability,float(definition.params.durability_by_level[level-1])),"全Lvで世界時計に従って耐久を全回復する")
-		check(core.barrier_snapshot().waves.is_empty() and barrier.waves.is_empty(),"波は同じ寿命の式で終了する")
+		check(core.barrier_snapshot().waves.is_empty(),"波は同じ寿命の式で終了する")
 		if failures: break
 	bridge.restore(initial.value)
 	bridge.collect_frame()

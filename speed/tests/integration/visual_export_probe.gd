@@ -24,14 +24,14 @@ func _ready() -> void:
 		add_child(session)
 		await session.started
 		var render := session.view.get_node("RunPresentation") as RunPresentation
-		for id in stage.resources.enemy_ids:
-			var look := render.look_of(StringName(id))
+		for entry: Dictionary in session.cpp_resources.visuals:
+			if not String(entry.get("path", "")).begins_with("res://.content/look_"): continue
+			var look: EnemyLook = session.resources.resources.get(entry.path)
+			check(look != null and look.prepared, "Scope内の生成済み外観を使用")
 			if look == null: continue
 			look_count += 1
-			check(session.resources.resources.has(look.resource_path) and look.prepared, "Scope内の生成済み外観を使用")
 			check(not ResourceLoader.has_cached(look.source_path), "編集用外観を読み込まない")
-			render._ensure_enemy_batch(StringName(id))
-			check(render._enemy_texture(StringName(id)) != null, "固定塗装と船体合成を解析なしで取得")
+			check(render.frame_view.visuals.has(int(entry.id)) and render.frame_view.visuals[int(entry.id)].path == entry.path, "生成済み外観をC++の表示キーへ登録")
 		for placement in stage.backgrounds:
 			check(session.resources.resources.has(placement.texture_path), "背景画像のScope準備を完了")
 		await get_tree().process_frame

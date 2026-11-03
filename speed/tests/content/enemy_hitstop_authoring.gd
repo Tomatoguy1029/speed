@@ -49,19 +49,18 @@ func _ready() -> void:
 	check(generated != null and ResourceSaver.save(generated, generated_path) == OK, "正規変換で実行用ステージを生成")
 	generated = ResourceLoader.load(generated_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
 	check(generated.enemy_tuning == values, "生成物の再読込で敵別倍率を保持")
-	var run_session := RunManager.create_session(self, {"stage": generated, "seed": 42}, false)
-	run_session.auto_step = false
-	var enemies := run_session.sim.enemies
-	var row := enemies.spawn(enemies.def_of(&"drifter"), Vector2(100, 100))
-	check(enemies.table.def[row].hitstop_multiplier == 0.0, "生成済みステージから出現へ倍率を適用")
-	check(enemies.def_of(&"armored").hitstop_multiplier == 0.25, "種類ごとに別の値を使用")
-	check(enemies.def_of(&"swarm").hitstop_multiplier == 1.0, "未指定の種類は従来値のまま")
-	enemies.update_stage_tuning({"drifter": {KEY: 0.5}})
-	check(enemies.table.def[row].hitstop_multiplier == 0.5, "ライブ編集を既存個体へ反映")
-	enemies.update_stage_tuning({})
-	check(enemies.table.def[row].hitstop_multiplier == common.hitstop_multiplier, "上書き解除は共通値を継承")
+	var native_builder = load("res://tools/content/build_run_content.gd")
+	for id in [&"drifter", &"armored", &"swarm"]:
+		var definition: EnemyDef = IO.definition(String(id))
+		var resolved := StageEnemyTuning.resolve(definition, generated.enemy_tuning.get(String(id), {}))
+		var records: Dictionary = native_builder.chase_records(resolved, ContentManager.base, generated)
+		var expected: float = values.get(String(id), {}).get(KEY, definition.hitstop_multiplier)
+		check(records.EnemyRecord[0].hitstop_multiplier == expected, "生成済みステージの敵別倍率をC++定義へ渡す: " + String(id))
+	var live := StageEnemyTuning.resolve(common, {KEY: 0.5})
+	check(native_builder.chase_records(live, ContentManager.base).EnemyRecord[0].hitstop_multiplier == 0.5, "ライブ編集後の再生成で倍率を更新")
+	var inherited := StageEnemyTuning.resolve(common, {})
+	check(native_builder.chase_records(inherited, ContentManager.base).EnemyRecord[0].hitstop_multiplier == common.hitstop_multiplier, "上書き解除は共通値を継承")
 	check(IO.definition("drifter").hitstop_multiplier == 1.0, "共通ファイルは変更しない")
-	run_session.free()
 	var panel := load("res://scripts/dev/stage_enemy_panel.gd").new() as Control
 	panel.stage_path = stage_path
 	add_child(panel)

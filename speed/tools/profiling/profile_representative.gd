@@ -22,6 +22,7 @@ var previous_us := 0
 var startup_us := 0
 var ready_us := 0
 var physics_steps := 0
+var next_refill_tick := 0
 var strokes := 0
 var samples: Array[Dictionary] = []
 var events := {}
@@ -212,7 +213,9 @@ func _delta_records(records: Dictionary,prefix: String) -> Dictionary:
 
 func _process(_dt: float) -> void:
 	if not configured: return
-	if Engine.get_process_frames()%ENTRY.REFILL_FRAMES==0: _refill()
+	if physics_steps>=next_refill_tick:
+		_refill()
+		next_refill_tick=physics_steps+ENTRY.REFILL_TICKS
 	if not measuring: return
 	var before := Time.get_ticks_usec()
 	var metrics: Dictionary = bridge.read_metrics().value

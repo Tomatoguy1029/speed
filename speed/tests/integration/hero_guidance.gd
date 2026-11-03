@@ -3,6 +3,8 @@
 extends Node
 
 var failed := 0
+var _cpp_events: Array = []
+var _cpp_visuals: Array = []
 
 func _ready() -> void:
 	if "--cpp-h00-view" in OS.get_cmdline_user_args():

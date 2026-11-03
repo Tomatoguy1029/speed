@@ -39,8 +39,8 @@ func apply_snapshot(ui: Dictionary) -> void:
 		_cpp_ui.capacity = 1.0
 		var capacity_level := int(preview_owned.get("traits",{}).get(&"T08",0))
 		if capacity_level>0:
-			var trait: TraitDef = ContentManager.definition(&"traits",&"T08")
-			_cpp_ui.capacity += trait.stack_bonus(capacity_level)
+			var definition: TraitDef = ContentManager.definition(&"traits",&"T08")
+			_cpp_ui.capacity += definition.stack_bonus(capacity_level)
 		_cpp_ui.draw.gauge = 1.0
 
 func _process(delta: float) -> void:

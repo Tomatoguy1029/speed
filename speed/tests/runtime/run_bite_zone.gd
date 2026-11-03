@@ -1,6 +1,8 @@
 ## 噛みつきの円形判定・一度だけの被弾・残留する枠と表示状態を確認する。
 extends "res://tests/runtime/run_attack_budget.gd"
 const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
+const COMPARE := preload("res://tools/compare_runtime.gd")
+const DATA := preload("res://tools/content/build_native_data.gd")
 const SHIP := preload("res://tests/runtime/run_ship.gd")
 var beam_finished := false
 var beam_retry := false

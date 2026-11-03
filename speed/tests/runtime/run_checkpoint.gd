@@ -1,5 +1,6 @@
 ## 保持したC++ランを複製し、隠れた待機・時計・集合を含む先の結果を比較する。
 extends Node
+const COMPARE := preload("res://tools/compare_runtime.gd")
 var failed := 0
 var restore_state_only := false
 func check(ok: bool, label: String) -> void:

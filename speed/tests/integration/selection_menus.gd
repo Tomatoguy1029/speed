@@ -21,7 +21,7 @@ func _ready() -> void:
 	if not await _open_session():
 		get_tree().quit(1)
 		return
-	var cards := _state().cards.duplicate(true)
+	var cards: Array = _state().cards.duplicate(true)
 	await _shot("selection")
 	for i in 3:
 		_tap(KEY_ESCAPE)
@@ -128,7 +128,7 @@ func _ready() -> void:
 	for equipment in ["W01", "W02", "W03", "W04"]:
 		_check(bridge.command("dev_grant_equipment", {"kind":"weapon","id":equipment,"levels":1}).ok, "交換前に通常の装備枠を埋める")
 	_check(bridge.command("dev_edit", {"kind":"comet_weapon","payload":{"id":"W22"}}).ok, "交換候補を開く")
-	var swap := _state().swap_pick
+	var swap: StringName = _state().swap_pick
 	cards = _state().cards.duplicate(true)
 	_tap(KEY_ESCAPE)
 	_tap(KEY_ESCAPE)
@@ -137,7 +137,7 @@ func _ready() -> void:
 	_check(swap == &"W22" and _state().swap_pick == swap and _state().cards == cards and hud._swap_box.visible, "menus preserve weapon swap choice")
 	_clear_choice()
 	_tap(KEY_P)
-	var before := _state().time
+	var before: float = _state().time
 	_step(1.0)
 	_check(_state().time == before, "debug suspends gameplay clock")
 	_tap(KEY_P)

@@ -106,7 +106,7 @@ func _open_boss_parts() -> void:
 		return
 	lab.session.playing = false
 	var table = lab.session.run.enemies.table
-	var row := table.type.find(&"monoceros")
+	var row: int = table.type.find(&"monoceros")
 	if row < 0:
 		var point: Vector2 = lab.session.run.state.ship_pos + Vector2(260,0)
 		lab.session.perform("boss",{"type":"monoceros","pos":[point.x,point.y]})
