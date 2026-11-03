@@ -183,10 +183,42 @@ function drawWater(strips, t, quant, P) {
 }
 const WATER_RAMP = (h) => { const c = parseCol(h); return [[c.r * 0.25, c.g * 0.35, c.b * 0.55], [c.r * 0.5, c.g * 0.65, c.b * 0.85], [c.r * 0.85, c.g * 0.95, c.b], [lerp(c.r, 1, 0.55), lerp(c.g, 1, 0.55), lerp(c.b, 1, 0.55)], [1, 1, 1]]; };
 const hexMulR = (h) => 0.6 + 0.4 * parseCol(h).r / 0.5, hexMulG = (h) => 0.6 + 0.4 * parseCol(h).g / 0.85, hexMulB = (h) => 0.6 + 0.4 * parseCol(h).b;
+// 試作の照射中の水流：pixelFX water/water-jet.js の作り（白い芯→外ほど深い色の帯、流れに沿って走る筋、通り抜ける膨らみ、
+// 先ほど荒れる縁、ちぎれる先端、側面から飛ぶ尾つきの水滴、先端の霧、吹き出し口の光）を、上から見た広がる水流へ当てはめる
+function aquaRamp(hex) { const b = hexc(hex), W = PX.WHITE, K = hexc('#04101e'); return [PX.mix(K, b, 0.12), PX.mix(K, b, 0.25), PX.mix(K, b, 0.45), PX.mix(K, b, 0.7), b, PX.mix(b, W, 0.35), PX.mix(b, W, 0.7), W]; }
+function aquaJet(p, origin, a, len, half0, slope, t, g, seed, C, alpha) {
+  const O = toL(origin), ux = Math.cos(a), uy = Math.sin(a), Lend = len * WL * Math.min(1, 0.25 + 0.75 * g), view = Math.hypot(LW, LH), Dmax = Math.min(Lend, view * 1.2);
+  const N = Math.ceil(Dmax) + 1, UP = new Float32Array(N), DN = new Float32Array(N); // 列（流れの向きの距離）ごとの上下の縁
+  for (let d = 0; d < N; d++) { const u = d / Lend, rough = smooth(0.1, 1, u), sd = ((((d - t * 520) % 150) + 150) % 150) - 75; // 通り抜ける膨らみ
+    const h0 = Math.max(1.2, (half0 + d / WL * slope) * WL) * (0.55 + 0.45 * g) * (1 + Math.exp(-(sd * sd) / 160) * 0.12 * (1 - u * 0.5));
+    UP[d] = h0 * (1 + PX.tileNoise(d * 0.09 - t * 30, 9, 0, 0, seed + 1) * 0.16 * rough); DN[d] = h0 * (1 + PX.tileNoise(d * 0.09 - t * 30, 3, 0, 0, seed + 1) * 0.16 * rough); }
+  const ends = [O, V(O.x + ux * Dmax - uy * UP[N - 1], O.y + uy * Dmax + ux * UP[N - 1]), V(O.x + ux * Dmax + uy * DN[N - 1], O.y + uy * Dmax - ux * DN[N - 1])];
+  const bx0 = Math.max(0, Math.min(...ends.map(e => e.x)) - 2), bx1 = Math.min(LW, Math.max(...ends.map(e => e.x)) + 2), by0 = Math.max(0, Math.min(...ends.map(e => e.y)) - 2), by1 = Math.min(LH, Math.max(...ends.map(e => e.y)) + 2);
+  for (let y = Math.floor(by0); y < by1; y++) for (let x = Math.floor(bx0); x < bx1; x++) { // 画面のマスごとに流れの座標へ戻して塗る（穴を空けない）
+    const rx = x + 0.5 - O.x, ry = y + 0.5 - O.y, d = rx * ux + ry * uy; if (d < 1 || d >= Dmax) continue;
+    const q = -rx * uy + ry * ux, di = Math.floor(d), edge = q < 0 ? DN[di] : UP[di], aq = Math.abs(q) / Math.max(0.8, edge); if (aq > 1) continue;
+    const u = d / Lend; if (u > 0.5 && PX.tileNoise(d * 0.1 - t * 25, q * 0.18, 0, 0, seed + 2) < -0.95 + 1.7 * smooth(0.5, 1, u) + (1 - g) * 0.8) continue; // 先がちぎれる
+    const streak = PX.tileNoise(d * 0.045 - t * 46, q * 0.55, 0, 0, seed), body = PX.tileNoise(d * 0.02 - t * 12, q * 0.06, 0, 0, seed + 5);
+    let lv = aq > 0.9 ? 2 : aq > 0.72 ? 3 : body > 0.2 ? 5 : 4; // 本体は主色、縁ほど深い色
+    if (aq < 0.07 + 0.05 * (1 - u)) lv = 7; else if (streak > 0.42) lv = Math.min(7, lv + 2); else if (streak > 0.25) lv = Math.min(6, lv + 1); // 芯と走る筋だけ白い
+    p.dot(x, y, C[lv], alpha * (aq > 0.9 ? 0.75 : 1)); if (lv === 7 && (x & 3) === 0 && (y & 3) === 0) p.light(x, y, C[5], 0.12 * alpha);
+  }
+  PX.cycle(t, 0.6, 46, seed + 3, (r) => r.range(0.25, 0.5), (age, life, r) => { // 側面と先端から飛ぶ水滴
+    const f = Math.sqrt(r.next()), d0 = Lend * (0.15 + 0.85 * f), side = r.next() < 0.5 ? -1 : 1, h = (half0 + d0 / WL * slope) * WL * (0.55 + 0.45 * g);
+    const vA = r.range(160, 300), vS = side * r.range(20, 110) * (0.4 + f), x0 = O.x + ux * d0 - uy * side * h, y0 = O.y + uy * d0 + ux * side * h;
+    const k = age / life, vx = ux * vA - uy * vS, vy = uy * vA + ux * vS, x = x0 + vx * age * 0.25, y = y0 + vy * age * 0.25; if (k > 0.8 && r.next() < (k - 0.8) * 5) return;
+    const sp = Math.hypot(vx, vy), tl = Math.min(4, sp * 0.012); p.line(x - vx / sp * tl, y - vy / sp * tl, x, y, (w) => w < 0.5 ? C[4] : C[6], alpha); p.dot(x, y, k < 0.4 ? C[7] : C[6], alpha);
+  });
+  PX.cycle(t, 1.2, 10, seed + 4, (r) => r.range(0.8, 1.2), (age, life, r) => { // 先端の霧
+    const k = age / life, d = Lend * r.range(0.75, 1) + age * 30, q = r.range(-1, 1) * (half0 + d / WL * slope) * WL * 0.8, rad = r.range(4, 7) + k * 8;
+    p.disc(O.x + ux * d - uy * q, O.y + uy * d + ux * q, rad, C[6], (dd) => 0.16 * alpha * Math.min(1, k / 0.15) * Math.pow(1 - k, 1.5) * (1 - dd * dd));
+  });
+  for (let d = 0; d < Math.min(Lend, view); d += 12) p.glow(O.x + ux * d, O.y + uy * d, 10 + d * 0.06, C[4], 0.18 * alpha * (1 - d / Lend * 0.6)); // 芯の光
+}
 DEMOS.push({
   id: 'G12-aquarius', ids: ['G12'], cat: G12, group: 'みずがめ座（aquarius）', title: '全方位の極太水流', duration: 9.0, color: '#7fd8ff', cam: { x: -120, y: 0 },
   refs: ['scripts/enemies/aquarius.gd（approach 380・telegraph 4.0・beam_time 3.0・6本・広がり0.32・rest 1.2）', 'scripts/render/attacks/flood.gd・shaders/water_flood.gdshader（ripples・rushing・mist を論理ピクセルでCPU移植）', 'assets/fx/water_noise.png（焼き込み済みノイズ）'],
-  status: { '状態': '試作のみ（現行shaderを基に段階化）', '判定': '変更なし（幅は half0+along×tan(0.32)）', '近似': '照射時の画面揺れ・衝撃の粒（rm._burst）・波紋（pipeline.add_wave）は未再現。現行の色はHDRの白を0.85倍で表示' },
+  status: { '照射中の水': 'pixelFX water-jet の作り（白い芯→深い色の帯・走る筋・通り抜ける膨らみ・荒れる縁・ちぎれる先端・尾つきの水滴・霧）。予告の波紋と終わりの霧は現行shaderのまま', '状態': '試作のみ（現行shaderを基に段階化）', '判定': '変更なし（幅は half0+along×tan(0.32)）', '近似': '照射時の画面揺れ・衝撃の粒（rm._burst）・波紋（pipeline.add_wave）は未再現。現行の色はHDRの白を0.85倍で表示' },
   setup(S) { S.e = mkE('aquarius', V(-320, -40), 0, { fire_t: 0.2 }); S.ship = shipState(V(130, 90)); S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); },
   step(S, dt) {
     const e = S.e, p = prm('aquarius');
@@ -198,14 +230,15 @@ DEMOS.push({
   draw(S, R) {
     const e = S.e, p = prm('aquarius'), P = R.P;
     if (S.fl) {
-      const t = S.t - S.fl.t0, strips = [], n = p.beams;
+      const t = S.t - S.fl.t0, strips = [], jets = [], n = p.beams;
       for (let k = 0; k < n; k++) {
         const a = S.fl.a + k * TAU / n, base = { p: e.pos, ux: Math.cos(a), uy: Math.sin(a), len: p.beam_len, half0: p.beam_width * 0.5 * (R.proto ? P.size : 1), slope: Math.tan(p.beam_spread), seed: ((k * 7) % 17) / 17 * 97, a: R.proto ? Math.min(1, P.intensity) : 1 };
         if (t < S.fl.delay) strips.push({ ...base, mode: 0, g: clamp(t / S.fl.delay) });
-        else if (t < S.fl.delay + S.fl.active) strips.push({ ...base, mode: 1, g: 1 });
-        else { const age = t - S.fl.delay - S.fl.active, coll = clamp(1 - age / (0.35 * (R.proto ? P.timing : 1))), life = clamp(1 - age / (1.4 * (R.proto ? P.timing : 1))); if (coll > 0) strips.push({ ...base, mode: 1, g: coll }); if (life > 0) strips.push({ ...base, mode: 2, g: life * (1 - coll * 0.6) }); }
+        else if (t < S.fl.delay + S.fl.active) (R.proto ? jets : strips).push({ ...base, mode: 1, g: 1, k });
+        else { const age = t - S.fl.delay - S.fl.active, coll = clamp(1 - age / (0.35 * (R.proto ? P.timing : 1))), life = clamp(1 - age / (1.4 * (R.proto ? P.timing : 1))); if (coll > 0) (R.proto ? jets : strips).push({ ...base, mode: 1, g: coll, k }); if (life > 0) strips.push({ ...base, mode: 2, g: life * (1 - coll * 0.6) }); }
       }
       drawWater(strips, S.t, R.proto, R.proto ? P : null);
+      if (jets.length) { const C = aquaRamp(P.color); for (const j of jets) aquaJet(R.front, j.p, Math.atan2(j.uy, j.ux), j.len, j.half0, j.slope, S.t, j.g, 7 + j.k * 13, C, j.a); }
       if (R.proto && t < S.fl.delay) FXW.gather(R.front, e.pos, e.r * 1.6 * P.size, clamp(t / S.fl.delay) * P.intensity, P.color, S.t, 14, 4);
       if (R.proto && t >= S.fl.delay && t < S.fl.delay + 0.25) FXW.shock(R.front, e.pos, (t - S.fl.delay) * 900, 10, P.color, 1 - (t - S.fl.delay) / 0.25);
     }
