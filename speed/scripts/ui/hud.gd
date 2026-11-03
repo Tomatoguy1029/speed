@@ -5,6 +5,7 @@
 extends Control
 
 ## 描けるようになったときに広がる輪の時間（実秒）
+const PickupKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.PickupKind
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 const RING_PULSE_TIME := 0.35
 ## リングが1周溜まりきったときに白く光る時間（実秒）
@@ -130,6 +131,7 @@ func show_menu_overlay(overlay: Control) -> bool:
 	_overlay_focus = weakref(focus) if focus != null else null
 	_menu_overlay = overlay
 	bridge.command("set_ui_overlay",{"active":true})
+	if input_router != null: input_router.cancel_gesture()
 	_card_discard.merge(_card_held)
 	_sync_menu_visibility()
 	return true
@@ -139,6 +141,7 @@ func close_menu_overlay(overlay: Control) -> void:
 		return
 	_menu_overlay = null
 	bridge.command("set_ui_overlay",{"active":false})
+	if input_router != null: input_router.cancel_gesture()
 	_card_discard.merge(_card_held)
 	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 	_sync_menu_visibility()
@@ -509,21 +512,31 @@ func _draw_slot_row(origin: Vector2, weapon: bool, slots: int, max_level: int, o
 		for j in max_level:
 			draw_rect(Rect2(rect.position.x + 2 + j * pip_w, rect.end.y - 3, maxf(1, pip_w - 1), 1), col if j < lv else Color(1, 1, 1, 0.15))
 
-func _draw_edge_arrow_values(p: Vector2, col: Color, view_center: Vector2, view_half: Vector2) -> void:
+## 矢印の先端は画面座標。地図は素材座標から同じ画面座標へ移す。
+func _edge_arrow_tip(p: Vector2, view_center: Vector2, view_half: Vector2) -> Vector2:
 	var rel := p - view_center
 	if absf(rel.x) <= view_half.x and absf(rel.y) <= view_half.y:
-		return
+		return Vector2.INF
 	var center := size / 2.0
 	var dir := rel.normalized()
 	var to_side := (size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001)
 	var to_top := (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001)
 	var tip := center + dir * minf(to_side, to_top)
-	# 右上のミニマップに重なるときは、画面の端に沿ってミニマップの外へずらす
-	if _minimap_r > 0.0 and tip.distance_to(_minimap_at) < _minimap_r + 24.0:
+	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
+	var minimap_at := (size - ART_SIZE * factor) * 0.5 + MINIMAP_CENTER * factor
+	var minimap_r := (MINIMAP_R + 12.0) * factor if show_minimap else 0.0
+	if minimap_r > 0.0 and tip.distance_to(minimap_at) < minimap_r + 24.0:
 		if to_side <= to_top:
-			tip.y = _minimap_at.y + _minimap_r + 24.0
+			tip.y = minimap_at.y + minimap_r + 24.0
 		else:
-			tip.x = _minimap_at.x - _minimap_r - 24.0
+			tip.x = minimap_at.x - minimap_r - 24.0
+	return tip
+
+func _draw_edge_arrow_values(p: Vector2, col: Color, view_center: Vector2, view_half: Vector2) -> void:
+	var tip := _edge_arrow_tip(p, view_center, view_half)
+	if not tip.is_finite():
+		return
+	var dir := (p - view_center).normalized()
 	var side := Vector2(-dir.y, dir.x) * 12.0
 	draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), col)
 
@@ -577,12 +590,17 @@ func apply_snapshot(ui: Dictionary) -> void:
 	var rerolls := int(_cpp_ui.get("rerolls_left",0))
 	var phase := int(_cpp_ui.get("phase",-1))
 	_cpp_ui = ui
+	if phase != int(ui.phase):
+		if input_router != null: input_router.cancel_gesture()
+		_card_discard.merge(_card_held)
+		_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 	if _cards_box==null: return
 	var cards: Dictionary = ui.get("cards",{})
 	if previous!=cards or rerolls!=int(ui.get("rerolls_left",0)):
 		if previous.get("offer_id",0)!=cards.get("offer_id",0):
 			_cards_accept_at = Time.get_ticks_usec()+roundi(card_input_delay*1_000_000.0)
 			_card_discard.merge(_card_held)
+			if input_router != null: input_router.cancel_gesture()
 		_show_cpp_cards()
 	elif phase!=int(ui.phase): _cpp_card_visibility()
 	_sync_menu_visibility()
@@ -608,7 +626,13 @@ func _ready_cpp() -> void:
 	_rewards.ult_cutin_scene = ult_cutin_scene
 	_rewards.add_module_icon = _add_icon
 	add_child(_rewards)
-	_rewards.active_changed.connect(func(active: bool): bridge.call_deferred("command","set_ui_reward",{"active":active}))
+	_rewards.active_changed.connect(func(active: bool):
+		if input_router != null: input_router.cancel_gesture()
+		_card_discard.merge(_card_held)
+		if not active:
+			_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+		_sync_menu_visibility()
+		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
 	bridge.subscribe("hud",_receive_cpp_frame)
 	_font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -795,6 +819,9 @@ func _show_cpp_cards() -> void:
 		button.size = Vector2(112,29) if swap else Vector2(150,26)
 		button.add_theme_font_size_override("font_size",9 if swap else 14)
 	_cpp_card_visibility()
+	var row: Control = _swap_grid if swap else _cards_row
+	if row.get_child_count() > 0:
+		_focus_card.call_deferred(weakref(row.get_child(0)))
 
 func _input_cpp(event: InputEvent) -> void:
 	if _cpp_ui.is_empty(): return
@@ -810,6 +837,13 @@ func _input_cpp(event: InputEvent) -> void:
 		return
 	var choosing := int(_cpp_ui.phase)==Phase.Levelup
 	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec()<_cards_accept_at)
+	# 擬似イベントと元の入力の間で期限を越えても同じ押下を破棄する。
+	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
+		if event.device == -1 and blocked:
+			_card_blocked_pointer_frame = Engine.get_process_frames()
+			_card_blocked_pointer_pos = event.position
+		elif event.device != -1 and _card_blocked_pointer_frame == Engine.get_process_frames() and event.position == _card_blocked_pointer_pos:
+			blocked = true
 	if not event is InputEventScreenDrag:
 		if event.is_pressed():
 			_card_held[id] = true
@@ -817,7 +851,7 @@ func _input_cpp(event: InputEvent) -> void:
 		else:
 			_card_held.erase(id)
 			_card_discard.erase(id)
-	if blocked:
+	if blocked or (choosing and (event is InputEventScreenTouch or event is InputEventScreenDrag)):
 		get_viewport().set_input_as_handled()
 		return
 	if not choosing or event.is_echo(): return
@@ -845,26 +879,63 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			_banner_color = Color("#ffe46b")
 	return true
 
+## 地図は自機を原点にして、世界の方角と縮尺を保つ。
+func _minimap_offset(world_pos: Vector2) -> Vector2:
+	var ship: Vector2 = _cpp_ui.ship.ship_pos
+	var radius: float = _cpp_ui.hero.field_radius
+	return (world_pos - ship) * MINIMAP_R / maxf(1.0, radius)
+
+func _minimap_marker(world_pos: Vector2, radius: float) -> Vector2:
+	return _minimap_offset(world_pos).limit_length(MINIMAP_R - radius)
+
+static func _minimap_pickup_color(kind: int) -> Color:
+	match kind:
+		PickupKind.Heal: return Color("#67e8b1")
+		PickupKind.Magnet: return Color("#b8a0ff")
+		_: return Color("#5fd8ff")
+
 func _draw_cpp_hero_map(hero: Dictionary) -> void:
 	var gold := Color("#ffe8a0")
-	var scale_factor := MINIMAP_R/maxf(1.0,float(hero.get("field_radius",1.0)))
-	var ship: Vector2 = _cpp_ui.ship.ship_pos
-	draw_texture(RADAR,Vector2.ZERO)
+	var scale_factor := MINIMAP_R / maxf(1.0, float(hero.field_radius))
+	var map: Dictionary = _cpp_ui.get("minimap", {})
+	draw_texture(RADAR, Vector2.ZERO)
+	var world_center := _minimap_offset(Vector2.ZERO)
+	for n in 96:
+		var a := world_center + Vector2.from_angle(n * TAU / 96.0) * MINIMAP_R
+		var b := world_center + Vector2.from_angle((n + 1) * TAU / 96.0) * MINIMAP_R
+		var segment := _minimap_segment(a, b)
+		if segment.size() == 2:
+			draw_line(MINIMAP_CENTER + segment[0], MINIMAP_CENTER + segment[1], Color(0.7, 0.8, 1.0, 0.35), 1.0)
+	for planet: Dictionary in map.get("planets", []):
+		for polygon: PackedVector2Array in _minimap_disk(_minimap_offset(planet.position), float(planet.radius) * scale_factor):
+			draw_colored_polygon(Transform2D(0.0, MINIMAP_CENTER) * polygon, Color(0.45, 0.5, 0.65, 0.6))
+	for point: Vector2 in map.get("dense", PackedVector2Array()):
+		var offset := _minimap_offset(point)
+		if offset.length() <= MINIMAP_R - 3.5:
+			draw_circle(MINIMAP_CENTER + offset, 3.5, Color(1.0, 0.35, 0.35, 0.35))
+	for capsule: Dictionary in map.get("capsules", []):
+		draw_circle(MINIMAP_CENTER + _minimap_marker(capsule.position, 2.0), 2.0, _minimap_pickup_color(int(capsule.kind)))
 	if hero.guidance and hero.captive:
 		for point: Vector2 in hero.landmarks:
-			var a := (point-ship)*scale_factor
-			var u: Vector2 = (hero.center-point).normalized()
+			var a := _minimap_offset(point)
+			var u: Vector2 = (hero.center - point).normalized()
 			var b := a.dot(u)
-			var disc := b*b-a.length_squared()+MINIMAP_R*MINIMAP_R
-			if disc>0.0 and hero.landmarks.size()<2:
+			var disc := b * b - a.length_squared() + MINIMAP_R * MINIMAP_R
+			if disc > 0.0 and hero.landmarks.size() < 2:
 				var root := sqrt(disc)
-				draw_line(MINIMAP_CENTER+a+u*(-b-root),MINIMAP_CENTER+a+u*(-b+root),Color(gold,0.7),1.5)
-			draw_circle(MINIMAP_CENTER+a.limit_length(MINIMAP_R-3.0),3.0,gold)
+				draw_line(MINIMAP_CENTER + a + u * (-b - root), MINIMAP_CENTER + a + u * (-b + root), Color(gold, 0.7), 1.5)
+			draw_circle(MINIMAP_CENTER + _minimap_marker(point, 3.0), 3.0, gold)
 	if hero.guidance and hero.revealed:
-		var at: Vector2 = MINIMAP_CENTER+((hero.center-ship)*scale_factor).limit_length(MINIMAP_R-6.0)
-		draw_circle(at,6.0*(0.7+0.3*sin(Time.get_ticks_msec()/200.0)),Color(gold,0.35))
-		draw_circle(at,3.0,gold if hero.captive else Color(gold,0.45))
-	draw_circle(MINIMAP_CENTER,2.0,Color.WHITE)
+		var at := MINIMAP_CENTER + _minimap_marker(hero.center, 6.0)
+		draw_circle(at, 6.0 * (0.7 + 0.3 * sin(Time.get_ticks_msec() / 200.0)), Color(gold, 0.35))
+		draw_circle(at, 3.0, gold if hero.captive else Color(gold, 0.45))
+	for point: Vector2 in map.get("bosses", PackedVector2Array()):
+		draw_circle(MINIMAP_CENTER + _minimap_marker(point, 4.0), 4.0, Color("#ff526e"))
+	var head: Vector2 = _cpp_ui.ship.ship_heading
+	if head == Vector2.ZERO:
+		head = Vector2.UP
+	var side := Vector2(-head.y, head.x)
+	draw_colored_polygon(PackedVector2Array([MINIMAP_CENTER + head * 6.0, MINIMAP_CENTER - head * 4.0 + side * 4.0, MINIMAP_CENTER - head * 4.0 - side * 4.0]), Color.WHITE)
 
 func _update_cpp_cinematic() -> void:
 	if _cpp_ui.is_empty() or _loadout_icons==null:return

@@ -23,9 +23,36 @@
 #include <cmath>
 #include <climits>
 #include <algorithm>
+#include <array>
 #include <cstring>
 using namespace godot;
 namespace {
+// 地図に必要な表示値だけを出す。敵の表と密集判定はC++の状態から読み取る。
+Dictionary minimap_snapshot(const speed::RunRuntime &run) {
+    const auto &s=run.state;
+    Dictionary out;Array planets,capsules;PackedVector2Array dense,bosses;
+    for (const auto &body:s.field.bodies) if (!body.moon) {
+        Dictionary planet;planet["position"]=body.position;planet["radius"]=body.radius;planets.push_back(planet);
+    }
+    for (const auto &capsule:s.pickups.capsules) {
+        Dictionary item;item["position"]=capsule.pos;item["kind"]=int(capsule.kind);capsules.push_back(item);
+    }
+    const double radius=std::max(1.0,s.ship_config.field_radius),cell=radius*2.0/16.0;
+    std::array<uint64_t,16*16> counts{};
+    for (const auto &enemy:s.enemies) {
+        if (!enemy.alive || enemy.dead || enemy.role==speed::SpawnRole::Terrain) continue;
+        const auto x=std::clamp(int((enemy.pos.x+radius)/cell),0,15);
+        const auto y=std::clamp(int((enemy.pos.y+radius)/cell),0,15);
+        ++counts[y*16+x];
+    }
+    for (int g=0;g<16*16;++g) if (counts[g]>=12) dense.push_back(Vector2((g%16+0.5)*cell-radius,(g/16+0.5)*cell-radius));
+    for (const auto &body:s.bosses.bodies) if (s.enemy_handles.contains(body.actor)) {
+        const auto &enemy=s.enemies[body.actor.slot];
+        if (enemy.alive && !enemy.dead) bosses.push_back(enemy.pos);
+    }
+    out["planets"]=planets;out["capsules"]=capsules;out["dense"]=dense;out["bosses"]=bosses;
+    return out;
+}
 bool presentation_frozen(const speed::RunRuntime &run) {
     using Phase=RunState::Phase;const auto &s=run.state;const auto &c=s.control;
     return c.ui_overlay || c.ui_reward || s.phase==Phase::Paused || s.phase==Phase::LevelUp || (s.phase==Phase::Dying && s.sequence_t<s.death_freeze);
@@ -393,6 +420,7 @@ Dictionary SpeedRunCore::frame_run() {
         }
     }
     ui["laser_voices"]=voices;
+    ui["minimap"]=minimap_snapshot(runtime);
     const auto &rampage=runtime.state.loadout.rampage;Dictionary aura;aura["equipped"]=rampage.ready;aura["kills"]=int64_t(rampage.kills);aura["strength"]=rampage.strength;aura["pop"]=rampage.pop;aura["bonus"]=rampage.bonus;aura["target_kills"]=rampage.target_kills;aura["half_life"]=rampage.half_life;aura["multiplier"]=runtime.state.loadout.effects.damage_multiplier;ui["rampage"]=aura;
     ui["rear"]=rear_snapshot();
     ui["barrier"]=barrier_snapshot();
