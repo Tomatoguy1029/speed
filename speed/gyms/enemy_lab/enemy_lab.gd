@@ -1,5 +1,6 @@
 ## デバッグ専用の敵・ルート実験場。
 extends Control
+const GemKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.GemKind
 
 const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 const CANVAS := preload("res://gyms/enemy_lab/lab_canvas.gd")
@@ -154,7 +155,7 @@ func build_hitstop_controls(parent: Node, header: Node) -> void:
 
 func _hitstop_target() -> Dictionary:
 	if not is_instance_valid(session.run): return {}
-	var id := StringName(session.run.enemies.table.type[session.selected]) if session.selected >= 0 else StringName(canvas.spawn_type)
+	var id = StringName(session.run.enemies.table.type[session.selected]) if session.selected >= 0 else StringName(canvas.spawn_type)
 	if ContentManager.bosses.has(id): return {"id": String(id), "boss": true}
 	if ContentManager.enemies.has(id): return {"id": String(id), "boss": false}
 	return {}
@@ -284,7 +285,7 @@ func _refresh_hitstop() -> void:
 		_hitstop_status.text = ""
 		_hitstop_inherit_button.disabled = true
 		return
-	var target_key := "%s:stage-%s" % [_hitstop_source_key(target, false), session.spec.get("stage", 1)]
+	var target_key = "%s:stage-%s" % [_hitstop_source_key(target, false), session.spec.get("stage", 1)]
 	if target_key != _hitstop_last_target:
 		_hitstop_last_target = target_key
 		var stage: StageDef = ContentManager.stage(int(session.spec.get("stage", 1)))
@@ -364,7 +365,7 @@ func field_items() -> Array:
 			FIELD_ITEM.make(&"field_comet", tr("lab.field.comet"), &"comet", 45.0, Color("#9fd6ff")),
 			FIELD_ITEM.make(&"field_gravity", tr("lab.field.gravity"), &"gravity", 0.0, Color("#a98cff")),
 			FIELD_ITEM.make(&"field_warp", tr("lab.field.warp"), &"warp", 0.0, Color("#d6a8ff")),
-			FIELD_ITEM.make(&"field_gem", tr("lab.field.gem"), &"gem", 140.0, RunPresentation.CRYSTAL_COLORS[PickupSystem.GemKind.LOW]),
+			FIELD_ITEM.make(&"field_gem", tr("lab.field.gem"), &"gem", 140.0, RunPresentation.CRYSTAL_COLORS[GemKind.Low]),
 		]
 	return _field_items
 
@@ -438,7 +439,7 @@ func _reset() -> void:
 func _select_branch(index: int) -> void:
 	if index == 0 or session.seeking:
 		return
-	var current := {"name": TranslationServer.translate("lab.message_549e9c3c03") % (session.branches.size() + 1), "history": session.history.duplicate(true), "end": session.furthest}
+	var current = {"name": TranslationServer.translate("lab.message_549e9c3c03") % (session.branches.size() + 1), "history": session.history.duplicate(true), "end": session.furthest}
 	var branch: Dictionary = session.branches[index - 1]
 	session.current_branch = branch.name
 	session.history.assign(branch.history)
@@ -689,7 +690,7 @@ func _sync_view() -> void:
 	# HDRの本番映像を通常のUIへ重ねるときだけ、表示用の色へ変換する。
 	(game_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", session.viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	# 本番の画面のうち HUD・ミニマップ・背景の星は、表示メニューで選んだときだけ出す
-	render.show_background = canvas.show_background
+	if render.cpp_background!=null: render.cpp_background.set_details_visible(canvas.show_background)
 	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud") if session.scene.view != null else null
 	if hud != null:
 		hud.visible = canvas.show_hud or canvas.show_minimap
@@ -776,8 +777,6 @@ func _undo(redo := false, route_edit := false) -> void:
 		canvas.cancel_gesture()
 		if redo: await session.redo_edit()
 		else: await session.undo_edit()
-		var render: RunPresentation = controls._render()
-		if render != null: render._apply_lighting()
 	_refresh()
 
 func _notification(what: int) -> void:
@@ -796,7 +795,7 @@ func _select_comparison(index: int) -> void:
 	_show_result(canvas.result)
 
 func _status_title(value: Dictionary) -> String:
-	var labels := {"static": TranslationServer.translate("lab.message_9ec7700849"), "window": TranslationServer.translate("lab.message_0df05349ff"), "unsupported": TranslationServer.translate("lab.message_af33e7e17b"), "unfound": TranslationServer.translate("lab.message_3aee526f77"), "invalid": TranslationServer.translate("lab.message_aa259c678f"), "replayed": TranslationServer.translate("lab.message_dd16bfc556") if value.get("success", false) else TranslationServer.translate("lab.message_b8f8f95d8c"), "cancelled": TranslationServer.translate("lab.message_67847e89ae"), "stale": TranslationServer.translate("lab.message_94deee7e2e")}
+	var labels = {"static": TranslationServer.translate("lab.message_9ec7700849"), "window": TranslationServer.translate("lab.message_0df05349ff"), "unsupported": TranslationServer.translate("lab.message_af33e7e17b"), "unfound": TranslationServer.translate("lab.message_3aee526f77"), "invalid": TranslationServer.translate("lab.message_aa259c678f"), "replayed": TranslationServer.translate("lab.message_dd16bfc556") if value.get("success", false) else TranslationServer.translate("lab.message_b8f8f95d8c"), "cancelled": TranslationServer.translate("lab.message_67847e89ae"), "stale": TranslationServer.translate("lab.message_94deee7e2e")}
 	return String(labels.get(value.get("status", ""), TranslationServer.translate("lab.message_68dc5e1c46")))
 
 func _leave() -> void:

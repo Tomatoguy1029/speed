@@ -1,6 +1,6 @@
 [gd_resource type="Resource" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/sail_run.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/centaurus/sail_run.gd" id="1"]
 
 [ext_resource type="PackedScene" path="res://scenes/attacks/owned/centaurus_sail_run.tscn" id="effect_owner"]
 

@@ -4,24 +4,22 @@ extends WeaponVisual
 var deploys: Array[Dictionary] = []
 var slashes: Array[Dictionary] = []
 var sparks := PixelSparks.new()
+var _frame_node: Node2D
+func setup_frame(parent: Node2D, effects: Node2D, pixel: float) -> void:
+	_frame_node = preload("res://scripts/render/dash_range_drone.gd").new()
+	parent.add_child(_frame_node)
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	effects.add_child(_painter)
+func frame_tick(values: Dictionary, scale_value: float, zoom: float, ship: Dictionary, tracing: bool, dt: float) -> void:
+	_frame_node.step_frame(values,scale_value,zoom,ship,tracing,dt)
+	_draw_effects(_painter,dt)
+func dispose() -> void:
+	if is_instance_valid(_frame_node): _frame_node.queue_free()
+	super()
 
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	attach("res://scripts/render/dash_range_drone.gd", "DashRangeDrone", 0)
 
-func on_event(ev: Dictionary) -> void:
-	match ev.type:
-		&"escort_deploy":
-			for target in ev.targets: deploys.append({"from": ev.pos, "to": target, "age": 0.0})
-		&"escort_slash":
-			slashes.append({"pos": ev.pos, "dir": ev.dir, "age": 0.0})
-			var side := 1.0 if randf() < 0.5 else -1.0
-			sparks.add(ev.pos, 5, ev.dir.angle() + PI * 0.5 * side, 1.4, 25.0, 70.0, 0.2, [Color.WHITE, Color("#7ff3ff"), Color("#3fd0e8")])
-
-func tick(_dt: float) -> void:
-	var dt := world_dt()
-	node.step(behavior if active else null, cfg, rm.cam_zoom, state, dt)
-	var p := painter()
+func _draw_effects(p: PixelPainter, dt: float) -> void:
 	p.begin()
 	for d in deploys:
 		d.age += dt
@@ -50,3 +48,12 @@ func tick(_dt: float) -> void:
 	slashes = slashes.filter(func(s): return s.age < 0.16)
 	sparks.draw(p, dt)
 	p.end()
+
+func on_event(ev: Dictionary) -> void:
+	match ev.type:
+		&"escort_deploy":
+			for target in ev.targets: deploys.append({"from": ev.pos, "to": target, "age": 0.0})
+		&"escort_slash":
+			slashes.append({"pos": ev.pos, "dir": ev.dir, "age": 0.0})
+			var side := 1.0 if randf() < 0.5 else -1.0
+			sparks.add(ev.pos, 5, ev.dir.angle() + PI * 0.5 * side, 1.4, 25.0, 70.0, 0.2, [Color.WHITE, Color("#7ff3ff"), Color("#3fd0e8")])

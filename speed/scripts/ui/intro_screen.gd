@@ -1,6 +1,7 @@
 ## 導入の画面。場面の状態を表示し、操作は既存のセッション命令へ渡す。
 ## 尺と差し替え用の仮素材は data/visuals/intro_presentation.tres。
 extends Node
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 const SEQUENCE := preload("res://scripts/runtime/intro_sequence.gd")
 const Beat = SEQUENCE.Beat
@@ -10,7 +11,7 @@ const Beat = SEQUENCE.Beat
 var sequence := SEQUENCE.new()
 var session: RunSession:
 	get: return sequence.session
-var run: RunSimulation:
+var run: RefCounted:
 	get: return sequence.run
 var practice: RefCounted:
 	get: return sequence.practice
@@ -19,7 +20,7 @@ var beat: int:
 var beat_time: float:
 	get: return sequence.beat_time
 var _paused: bool:
-	get: return run != null and run.state.phase == RunState.Phase.PAUSED
+	get: return run != null and run.state.phase == Phase.Paused
 
 var visual: Node2D
 var sky: Node2D
@@ -32,7 +33,8 @@ var _touch := false
 func _ready() -> void:
 	sequence.beat_changed.connect(_on_beat_changed)
 	sequence.completed.connect(GameManager.finish_intro)
-	sequence.setup(self, presentation)
+	await sequence.setup(self,presentation)
+	if run==null: return
 	run.input.process_mode = Node.PROCESS_MODE_DISABLED
 	run.frame_events.connect(_on_events)
 	visual = preload("res://scripts/render/intro_visual.gd").new()
@@ -71,7 +73,7 @@ func _on_beat_changed(next: int) -> void:
 	if next == Beat.RESTORE:
 		run.input.process_mode = Node.PROCESS_MODE_DISABLED
 		var renderer: RunPresentation = session.view.get_node("RunPresentation")
-		renderer._layers.pickups.hide()
+		if renderer.frame_view!=null: renderer.frame_view._layer(6).hide()
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for event in events:
@@ -100,14 +102,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _pause() -> void:
 	if run != null:
-		RunManager.command(session.id, &"pause")
+		sequence.command("pause",{"paused":true})
+		run.input.cancel_gesture()
 		run.input.process_mode = Node.PROCESS_MODE_DISABLED
 		_hud.get_node("Pause").show()
 		_hud.get_node("Pause").get_child(0).get_child(0).grab_focus()
 
 func _resume() -> void:
 	_hud.get_node("Pause").hide()
-	RunManager.command(session.id, &"resume")
+	sequence.command("pause",{"paused":false})
 	run.input.process_mode = Node.PROCESS_MODE_INHERIT if beat in [Beat.FLIGHT,Beat.PRACTICE] else Node.PROCESS_MODE_DISABLED
 
 func _exit_tree() -> void:

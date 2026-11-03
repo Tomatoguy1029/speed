@@ -6,32 +6,31 @@ const DRONE := preload("res://assets/pixel/drone.png")
 const GLOW := Color("#5ff6ff")
 const MID := Color("#3fd0e8")
 const CORE := Color("#f2ffff")
-var _weapon: WeaponBehavior
+var _frame: Dictionary = {}
 var _scale := 1.0
 var _pixel := 2.0
 var _ship_trail: Array[Dictionary] = []
 var _cell := 2.366
 
-func step(weapon: WeaponBehavior, cfg: GameConfig, zoom: float, state: RunState = null, world_dt := 0.0) -> void:
-	_weapon = weapon
-	_scale = cfg.character_scale
-	_pixel = maxf(_scale * 2.0, 2.0 / maxf(zoom, 0.01))
-	_cell = 1.82 * cfg.character_scale
-	for p in _ship_trail: p.age += world_dt
-	_ship_trail = _ship_trail.filter(func(p): return p.age < 0.3)
-	if weapon != null and state != null and weapon.active and state.tracing:
-		var tail := state.ship_pos - state.ship_heading * 9.0 * _cell
-		if _ship_trail.is_empty() or tail.distance_to(_ship_trail.back().pos) > _cell:
-			_ship_trail.append({"pos": tail, "age": 0.0})
+func step_frame(values: Dictionary, scale_value: float, zoom: float, ship: Dictionary, tracing: bool, dt: float) -> void:
+	_frame = values
+	_scale = scale_value
+	_pixel = maxf(_scale*2.0,2.0/maxf(zoom,0.01))
+	_cell = 1.82*_scale
+	for p in _ship_trail: p.age += dt
+	_ship_trail = _ship_trail.filter(func(p): return p.age<0.3)
+	if values.active and tracing:
+		var tail: Vector2 = ship.ship_pos-ship.ship_heading*9.0*_cell
+		if _ship_trail.is_empty() or tail.distance_to(_ship_trail.back().pos)>_cell: _ship_trail.append({"pos":tail,"age":0.0})
 	queue_redraw()
 
 func _draw() -> void:
-	if _weapon == null:
+	if _frame.is_empty():
 		return
 	_draw_ship_trail()
-	for d in _weapon.drones:
+	for d in _frame.drones:
 		var points: Array = d.trail
-		var remaining: float = _weapon.level_value("tail_by_level") * _scale
+		var remaining: float = float(_frame.tail) * _scale
 		for i in range(points.size() - 1, 0, -1):
 			if not points[i].join:
 				continue
@@ -58,7 +57,8 @@ func _draw() -> void:
 		draw_set_transform(Vector2.ZERO)
 		# 機体のすぐ後ろの噴射の点（展開中は白く2ドット、待機中は青緑の1ドット）
 		var back: Vector2 = d.pos - dir * 5.0 * _cell
-		draw_rect(Rect2((back / _cell).round() * _cell, Vector2(2.0 if _weapon.active else 1.0, 1.0) * _cell), CORE if _weapon.active else MID)
+		var active: bool = _frame.active
+		draw_rect(Rect2((back / _cell).round() * _cell, Vector2(2.0 if active else 1.0, 1.0) * _cell), CORE if active else MID)
 
 ## 機体の光跡：各機と同じ3段の光で、各機より太く（外側6・中2.2倍の幅）、長く（80ドット・0.3秒）。
 func _draw_ship_trail() -> void:

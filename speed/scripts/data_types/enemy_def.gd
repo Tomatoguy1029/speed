@@ -352,3 +352,12 @@ func knockback_scale(cfg: GameConfig) -> float:
 	if rank <= cfg.rank_knockback.size():
 		return cfg.rank_knockback[rank - 1]
 	return 0.0
+
+## 制作時と出現前で同じ固定報酬を解決する。
+func resolve_xp_reward() -> Dictionary:
+	if not xp_reward_counts.is_empty() and xp_reward_counts.size() != 3: return {}
+	if resolved_xp_reward.is_empty() or resolved_xp_reward.rank != rank or resolved_xp_reward.override != xp_reward_counts:
+		var counts := default_xp_reward_counts(rank) if xp_reward_counts.is_empty() else xp_reward_counts.duplicate()
+		for kind in counts.size(): counts[kind] = maxi(0, counts[kind])
+		resolved_xp_reward = {"rank":rank,"counts":counts,"gold_eligible":rank>=3 and rank<=10 and counts[1]>0,"override":xp_reward_counts.duplicate()}
+	return resolved_xp_reward

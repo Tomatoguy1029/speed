@@ -1,0 +1,222 @@
+{
+  "records": [
+    {
+      "name": "HeroStar",
+      "section": 280,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "HeroLink",
+      "section": 281,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "a",
+          "type": "u32"
+        },
+        {
+          "name": "b",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "HeroConfig",
+      "section": 282,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "glow_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "star_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "next_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "first_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "first_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "second_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "second_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guards",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "PerseusDefinition",
+      "section": 283,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "boss_stun",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "LeoDefinition",
+      "section": 284,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "width_mult",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "GeminiDefinition",
+      "section": 285,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        }
+      ]
+    },
+    {
+      "name": "HerculesDefinition",
+      "section": 286,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "hero",
+          "type": "u32",
+          "ref": "HeroDefinition"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fall_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burn_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burn_power",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://ba2ex12u0acdl"]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra/techniques/beam_pincer.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/hydra/beam_pincer.gd" id="1"]
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/hydra/beam_pincer_visual.tscn" id="visual"]
 

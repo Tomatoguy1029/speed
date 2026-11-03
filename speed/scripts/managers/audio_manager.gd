@@ -46,6 +46,27 @@ func _ready() -> void:
 	SaveManager.settings_changed.connect(_apply_volumes)
 	_apply_volumes()
 
+## 再生口を捨てる前に、音声サーバーへ停止とストリーム解放を渡す。
+func _exit_tree() -> void:
+	_music_request += 1
+	if _music_fade!=null: _music_fade.kill()
+	if _slow_fade!=null: _slow_fade.kill()
+	for player: AudioStreamPlayer in find_children("*","AudioStreamPlayer",true,false):
+		player.stop()
+		player.stream = null
+	_menu_music_positions.clear()
+	_sounds.clear()
+	_music.clear()
+	# stop()は次の音声ミックスで再生参照を解放する。終了処理が先に
+	# 音声スレッドを止めないよう、停止要求より後のミックス完了を待つ。
+	# 出力デバイスが止まっていても、終了自体は待ち続けない。
+	var stopped_at := Time.get_ticks_usec()
+	while Time.get_ticks_usec() - stopped_at < 250000:
+		var sampled_at := Time.get_ticks_usec()
+		var since_mix := roundi(AudioServer.get_time_since_last_mix() * 1000000.0)
+		if sampled_at - since_mix > stopped_at: break
+		OS.delay_usec(1000)
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"mute"):
 		toggle_mute()
@@ -210,3 +231,27 @@ func _ensure_bus(bus: StringName) -> void:
 	var idx := AudioServer.bus_count - 1
 	AudioServer.set_bus_name(idx, bus)
 	AudioServer.set_bus_send(idx, &"Master")
+
+## C++側の通知を読むだけで、戦闘の更新や乱数には触れない。
+func consume_cpp_frame(frame: Dictionary) -> bool:
+	for event: Dictionary in frame.events:
+		var data: Dictionary = event.payload
+		match event.type:
+			&"levelup": play(&"levelup_notice",-6.0)
+			&"kill":
+				if not data.get("silent",false): play(&"kill",-10.0,randf_range(0.9,1.2))
+			&"hurt": play(&"hurt",-4.0)
+			&"weapon_fire":
+				if data.id in [&"W01",&"W23"]: play(&"blaster",-12.0)
+			&"launch": play(&"dash",-6.0)
+			&"trace_end": end_dash()
+			&"game_over":
+				end_dash()
+				play_music(&"game_over",1.0,self)
+			&"block_impact": play(&"bounce",-8.0)
+			&"shield_reflect": play(&"block",-10.0,1.8)
+			&"shield_stolen": play(&"pickup",-5.0,0.7)
+			&"shield_block": play(&"block",-10.0,1.3)
+			&"boss_explode": play(&"boom")
+			&"bomber_explode": play(&"bomber_explode",-12.0)
+	return true

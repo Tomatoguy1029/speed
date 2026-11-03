@@ -1,7 +1,6 @@
 ## 1つのランの寿命の持ち主（設計書 4.3）。RunManager が作り、消えるとランも終わる。
 ##
-## シミュレーション（RunSimulation）と、任意の表示（scenes/run/run.tscn）を持つ。
-## 表示のない試行は表示を作らず、ボスの役者は見えないノードの下に置く。
+## C++のラン接続と、任意の表示（scenes/run/run.tscn）を持つ。
 class_name RunSession
 extends Node
 
@@ -9,32 +8,47 @@ const VIEW_PATH := "res://scenes/run/run.tscn"
 
 ## RunManager が振る番号。破棄したあとの命令を見分ける
 var id := 0
-var sim := RunSimulation.new()
+var _pending_cpp: Dictionary = {}
+var _pending_cpp_bridge: RefCounted
+var cpp_error: Error = OK
+var cpp_index_path := ""
+## 明示した開発試行だけが保持する制作元。通常ランは最初にF4を開くときに参照する。
+var cpp_edit_source: Dictionary = {}
+var cpp_prepare: Callable
+signal loading_failed(error: Error)
 ## 表示（表示のない試行では null）
 var view: Node
-## 固定更新を自分で進めるか。実験場は自分の時計で sim を進める
+## 固定更新を自分で進めるか。実験場は自分の時計でC++を進める
 var auto_step := true
-## 開発用の録画条件。途中録画でもラン初期化時の実効値を保持する。
-var recording_initial: Dictionary = {}
+var bridge: RefCounted
+var cpp_choices: RefCounted
+var cpp_laser_audio: Node
+var cpp_input_source: Callable
 
 signal started
+signal cpp_finished(result: Dictionary)
+signal closing(reason: String)
+var _cpp_accepting := true
+var _cpp_pending_result: Dictionary = {}
+var _cpp_published_result := 0
 var resources: ContentResourceScope
-var _pending_options: Dictionary = {}
 var _loading: CanvasLayer
 ## resource_wait_msは要求の投入と暗転中の経過を含む。ほかの区間と単純合算しない。
 var loading_timings: Dictionary = {}
 var _load_started_us := 0
 var _warm_started_us := 0
+var _start_started_us := 0
 var _progress: ProgressBar
 
 ## 通常の出撃は資源を別スレッドで準備し、準備が終わるまで戦闘の時計を始めない。
 func start_loading(options: Dictionary) -> void:
-	var stage: RuntimeStage = options.get("stage")
-	if stage == null: return
-	_load_started_us = Time.get_ticks_usec()
-	_pending_options = options
+	start(options,true)
+
+func _show_loading() -> void:
+	if _loading!=null: return
 	_loading = CanvasLayer.new()
 	add_child(_loading)
+	preload("res://scripts/ui/canvas_order.gd").register(_loading,1)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_loading.add_child(center)
@@ -47,100 +61,214 @@ func start_loading(options: Dictionary) -> void:
 	back.text = tr("common.back")
 	back.pressed.connect(GameManager.abort_run)
 	column.add_child(back)
-	# 描画を持たないDummy rendererはテクスチャ生成を主スレッドで行う。
-	resources = ContentManager.prepare_resources(stage.resources.paths, DisplayServer.get_name() != "headless")
-	loading_timings["resource_request_ms"] = (Time.get_ticks_usec() - _load_started_us) / 1000.0
 
 ## 木に入ったあとに呼ぶ。表示を作る場合は、シミュレーションを組み立ててから表示を木に入れる。
 ## options.hud が false なら通常 HUD を省き、利用側が専用 UI を接続する。
 func start(options: Dictionary, with_view: bool) -> void:
-	options = options.duplicate()
-	if not options.has("stage"):
-		options.stage = ContentManager.runtime_stage(int(options.get("stage_index", 1)))
-	if options.stage == null: return
-	if resources == null:
-		var paths := PackedStringArray()
-		if with_view:
-			for placement: BackgroundPlacement in options.stage.backgrounds:
-				if not placement.texture_path.is_empty(): paths.append(placement.texture_path)
-				if not placement.fire_preset_path.is_empty(): paths.append(placement.fire_preset_path)
-			for fire_use: Dictionary in options.stage.fire_uses.values():
-				var preset_path := str(fire_use.get("preset", ""))
-				if not preset_path.is_empty(): paths.append(preset_path)
-		resources = ContentManager.prepare_resources(paths, false)
-	sim.ctx.resources = resources
-	sim.options = options
-	sim.view_size_source = func(): return get_viewport().get_visible_rect().size
-	var before := Time.get_ticks_usec()
-	if with_view:
-		view = load(VIEW_PATH).instantiate()
-		loading_timings["view_instantiate_ms"] = (Time.get_ticks_usec() - before) / 1000.0
-		view.get_node("RunPresentation").run = sim
-		if options.get("hud", true):
-			view.get_node("Hud/HudRoot").run = sim
-		else:
-			view.get_node("Hud").free()
-		sim.input = view.get_node("World/InputRouter")
-		sim.actor_parent = view.get_node("World")
-	else:
-		var actors := Node2D.new()
-		actors.name = "Actors"
-		actors.visible = false
-		add_child(actors)
-		sim.actor_parent = actors
-	before = Time.get_ticks_usec()
-	sim.setup()
-	loading_timings["simulation_setup_ms"] = (Time.get_ticks_usec() - before) / 1000.0
-	before = Time.get_ticks_usec()
-	var identity_path := "res://scripts/dev/recording_identity.gd"
-	if OS.is_debug_build() and not sim.state.lab_mode and ResourceLoader.exists(identity_path):
-		recording_initial = load(identity_path).capture(sim)
-	loading_timings["recording_identity_ms"] = (Time.get_ticks_usec() - before) / 1000.0
-	before = Time.get_ticks_usec()
-	if view != null:
-		add_child(view)
-	loading_timings["view_ready_ms"] = (Time.get_ticks_usec() - before) / 1000.0
-	before = Time.get_ticks_usec()
-	started.emit()
-	loading_timings["started_callbacks_ms"] = (Time.get_ticks_usec() - before) / 1000.0
+	var error := start_cpp_content(options.get("cpp_index",""),options.get("cpp_signature",""),options.get("seed",0),with_view,options)
+	if error != OK:
+		if cpp_error!=error:
+			cpp_error = error
+			loading_failed.emit(error)
+		push_error("C++ランの開始に失敗: %s" % error_string(error))
 
 func _physics_process(delta: float) -> void:
-	if auto_step and sim.state != null:
-		sim.physics_step(delta)
-
-func _process(delta: float) -> void:
-	if sim.state == null:
-		if resources == null or _pending_options.is_empty(): return
-		_progress.value = resources.progress() * 100.0
-		if not resources.is_ready(): return
-		if resources.failed or resources.cancelled:
-			_pending_options.clear()
-			sim.aborted.emit()
-			return
-		if _warm_started_us == 0:
-			_warm_started_us = Time.get_ticks_usec()
-			loading_timings["resource_wait_ms"] = (_warm_started_us - _load_started_us) / 1000.0
-		if not resources.warmup_complete:
-			load("res://scripts/render/run_presentation.gd").warm_resources(self, resources)
-			return
-		loading_timings["shader_warmup_ms"] = (Time.get_ticks_usec() - _warm_started_us) / 1000.0
-		_loading.queue_free()
-		_loading = null
-		var options := _pending_options
-		_pending_options = {}
-		start(options, true)
+	if bridge != null:
+		if _cpp_accepting and auto_step and cpp_input_source.is_valid():
+			var response: Dictionary = bridge.poll_and_step(delta,cpp_input_source,get_viewport().get_visible_rect().size)
+			if not response.ok:
+				auto_step = false
+				push_error("C++ランの更新に失敗: %s (%s)" % [response.message,response.field])
 		return
-	if sim.bosses != null: sim.bosses.tick_feedback(delta)
-	sim.flush_events()
-
-## 実験場はチェックポイントのために木から外して持つので、片付けは消えるときに行う。
+func _process(_delta: float) -> void:
+	if not _pending_cpp.is_empty():
+		_poll_cpp_loading()
+		return
+	if bridge != null:
+		if not _cpp_accepting: return
+		if cpp_choices!=null: cpp_choices.poll()
+		flush_cpp_result()
+		return
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
-		# 記録の終了と役者の退出は、シミュレーションの参照が使える間に済ませる。
+		# 受付停止後、記録・資源・表示・C++・登録の順に片付ける。
+		_cpp_accepting = false
+		if SaveManager.settings_changed.is_connected(_on_cpp_settings_changed): SaveManager.settings_changed.disconnect(_on_cpp_settings_changed)
+		auto_step = false
+		if bridge!=null: bridge.begin_close()
+		closing.emit(str(_cpp_pending_result.get("kind","quit")))
 		if is_inside_tree():
 			get_parent().remove_child(self)
+		if cpp_choices!=null: cpp_choices.close()
+		cpp_choices = null
+		if _pending_cpp_bridge!=null: _pending_cpp_bridge.dispose()
+		_pending_cpp_bridge = null
+		_pending_cpp.clear()
+		if cpp_laser_audio!=null: cpp_laser_audio.clear()
 		if resources != null: resources.cancel()
-		_pending_options.clear()
-		sim.dispose()
+		if bridge!=null and is_instance_valid(view):
+			view.free()
+			view = null
+		if bridge != null: bridge.dispose()
+		elif cpp_core != null: cpp_core.close()
+		bridge = null
+		cpp_core = null
+		cpp_resources = null
 		if is_instance_valid(RunManager):
 			RunManager.unregister(self)
+
+## 開発用。開始までに生成・解析を呼ばず、保存済みの同じ版を使う。
+var cpp_core: RefCounted
+var cpp_resources: Resource
+func start_cpp_content(index_path: String, input_sha256: String, seed_value: int, with_view := false, options := {}) -> Error:
+	if cpp_core != null or not _pending_cpp.is_empty(): return ERR_ALREADY_IN_USE
+	cpp_index_path = index_path
+	cpp_edit_source = options.get("cpp_edit_source",{}).duplicate(true)
+	cpp_error = OK
+	_warm_started_us = 0
+	_start_started_us = Time.get_ticks_usec()
+	var prepared := preload("res://scripts/runtime/run_content_loader.gd").read_bundle(index_path,input_sha256)
+	loading_timings["bundle_read_ms"] = (Time.get_ticks_usec()-_start_started_us)/1000.0
+	if prepared.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
+	if not RunManager.ensure_registered(self): return ERR_OUT_OF_MEMORY
+	var configure_started := Time.get_ticks_usec()
+	var next_bridge = preload("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":1 if OS.is_debug_build() or options.get("cpp_start",{}).get("lab_mode",false) else 0,
+		"stage_id":prepared.index.get("stage_id",""),"profile":options.get("cpp_profile",{}),"settings":{"hitstop":bool(SaveManager.settings.get("hitstop",true))}})
+	loading_timings["core_configure_ms"] = (Time.get_ticks_usec()-configure_started)/1000.0
+	if not configured.ok:
+		next_bridge.dispose()
+		return ERR_INVALID_DATA
+	# 資源の読込中は、開始していないC++をSession内だけで保持する。
+	cpp_resources = prepared.resources
+	_pending_cpp_bridge = next_bridge
+	_pending_cpp = {"seed":seed_value,"options":options.duplicate(true),"with_view":with_view}
+	if not SaveManager.settings_changed.is_connected(_on_cpp_settings_changed): SaveManager.settings_changed.connect(_on_cpp_settings_changed)
+	_load_started_us = Time.get_ticks_usec()
+	next_bridge.begin_resource_wait()
+	if with_view:
+		_show_loading()
+		resources = cpp_prepare.call(cpp_resources.paths) if cpp_prepare.is_valid() else ContentManager.prepare_resources(cpp_resources.paths,DisplayServer.get_name()!="headless",cpp_resources.signatures)
+	else:
+		resources = ContentResourceScope.new()
+		resources.warmup_complete = true
+	loading_timings["resource_request_ms"] = (Time.get_ticks_usec()-_load_started_us)/1000.0
+	_poll_cpp_loading()
+	return cpp_error
+
+func _on_cpp_settings_changed() -> void:
+	_apply_cpp_settings.call_deferred()
+
+func _apply_cpp_settings() -> void:
+	if not _cpp_accepting or bridge==null: return
+	bridge.command("set_settings",{"hitstop":bool(SaveManager.settings.get("hitstop",true))})
+
+func _poll_cpp_loading() -> void:
+	if _pending_cpp.is_empty() or not _cpp_accepting: return
+	# create_runは木へ入れる前に資源を準備する。同期読込でも開始と表示は追加後に行う。
+	if not is_inside_tree(): return
+	if is_instance_valid(_progress): _progress.value = resources.progress()*100.0
+	if resources.failed or resources.cancelled:
+		_fail_cpp_loading(ERR_CANT_OPEN)
+		return
+	if not resources.is_ready(): return
+	if _warm_started_us==0:
+		_warm_started_us = Time.get_ticks_usec()
+		loading_timings["resource_wait_ms"] = (_warm_started_us-_load_started_us)/1000.0
+	if not resources.warmup_complete:
+		load("res://scripts/render/run_presentation.gd").warm_resources(self,resources)
+		return
+	loading_timings["shader_warmup_ms"] = (Time.get_ticks_usec()-_warm_started_us)/1000.0
+	var pending := _pending_cpp
+	var next_bridge: RefCounted = _pending_cpp_bridge
+	_pending_cpp = {}
+	_pending_cpp_bridge = null
+	var options: Dictionary = pending.options
+	var with_view: bool = pending.with_view
+	var start_options: Dictionary = options.get("cpp_start",{}).duplicate(true)
+	start_options.endless = options.get("endless",false)
+	var initialize_started := Time.get_ticks_usec()
+	if not next_bridge.start(pending.seed,start_options).ok:
+		next_bridge.dispose()
+		_fail_cpp_loading(ERR_INVALID_DATA)
+		return
+	loading_timings["simulation_initialize_ms"] = (Time.get_ticks_usec()-initialize_started)/1000.0
+	if _loading!=null:
+		_loading.queue_free()
+		_loading = null
+	next_bridge.end_resource_wait()
+	bridge = next_bridge
+	bridge.recording_origin["source"] = str(options.get("cpp_source","unknown"))
+	bridge.subscribe("result",_consume_cpp_result,[],[])
+	if RunManager.current_id==id or options.get("manage_result",false): cpp_finished.connect(GameManager.finish_cpp_run)
+	cpp_core = bridge._core
+	cpp_choices = preload("res://scripts/runtime/run_choice_resources.gd").new()
+	cpp_choices.attach(bridge,cpp_resources,self)
+	var scene_started := Time.get_ticks_usec()
+	if with_view:
+		view = (resources.resources[VIEW_PATH] as PackedScene).instantiate()
+		loading_timings["scene_instantiate_ms"] = (Time.get_ticks_usec()-scene_started)/1000.0
+		scene_started = Time.get_ticks_usec()
+		var presentation: Node = view.get_node("RunPresentation")
+		presentation.bridge = bridge
+		presentation.cpp_resources = cpp_resources
+		presentation.cpp_scope = resources
+		if options.get("hud",true):
+			var hud: Node = view.get_node("Hud/HudRoot")
+			hud.input_router = view.get_node("World/InputRouter")
+			hud.bridge = bridge
+			hud.cpp_scope = resources
+			hud.cpp_resources = cpp_resources
+		else: view.get_node("Hud").free()
+		cpp_input_source = view.get_node("World/InputRouter").poll
+		add_child(view)
+		bridge.subscribe("audio",AudioManager.consume_cpp_frame,[],["levelup","kill","hurt","weapon_fire","launch","trace_end","game_over","block_impact","shield_reflect","shield_stolen","shield_block","boss_explode","bomber_explode"])
+		cpp_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
+		add_child(cpp_laser_audio)
+		bridge.subscribe("laser_audio",cpp_laser_audio.consume_cpp_frame,["laser_voices","world_scale"],["enemy_laser_charge","enemy_laser_cancel","enemy_laser_fire"])
+	else:
+		var router = preload("res://scripts/input/input_router.gd").new()
+		add_child(router)
+		cpp_input_source = router.poll
+	loading_timings["presentation_setup_ms"] = (Time.get_ticks_usec()-scene_started)/1000.0
+	for recorder: Node in get_tree().get_nodes_in_group("cpp_recorders"):
+		recorder.attach_cpp(self)
+	# 配布では開発用スクリプトを除くため、エディター実行時だけ取得する。
+	if OS.has_feature("editor"):
+		var identity = load("res://scripts/dev/recording_identity.gd")
+		bridge.recording_origin["conditions"] = identity.capture(self)
+		bridge.recording_origin.merge(bridge.recording_origin.conditions.run_state,true)
+	started.emit()
+	_apply_cpp_settings()
+	var publish_started := Time.get_ticks_usec()
+	var delivered: Dictionary = bridge.collect_frame()
+	loading_timings["initial_publish_ms"] = (Time.get_ticks_usec()-publish_started)/1000.0
+	# 総時間とresource_request_msは内包区間を持つ。項目を足して総時間にしない。
+	loading_timings["loading_total_ms"] = (Time.get_ticks_usec()-_start_started_us)/1000.0
+	if not delivered.ok: push_warning(delivered.message)
+
+func _fail_cpp_loading(error: Error) -> void:
+	cpp_error = error
+	if _pending_cpp_bridge!=null: _pending_cpp_bridge.dispose()
+	_pending_cpp_bridge = null
+	_pending_cpp.clear()
+	if resources!=null: resources.cancel()
+	cpp_resources = null
+	if _loading!=null:
+		_loading.queue_free()
+		_loading = null
+	loading_failed.emit(error)
+
+func _consume_cpp_result(frame: Dictionary) -> bool:
+	_cpp_pending_result = frame.result if frame.result is Dictionary else {}
+	return true
+
+## 画面遷移の通知は、Bridgeの配信を抜けた後に一度だけ返す。
+func flush_cpp_result() -> void:
+	if not _cpp_accepting or _cpp_pending_result.is_empty(): return
+	var result_id := int(_cpp_pending_result.result_id)
+	if result_id==_cpp_published_result: return
+	_cpp_published_result = result_id
+	cpp_finished.emit(_cpp_pending_result.duplicate(true))
+
+## 旧入口だけが旧シミュレーションを作る。通常入口の切替後に撤去する。

@@ -45,6 +45,9 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 |  | キーが空の行はこの説明と見出しで、ゲームは読まない。 |  |
 |  | ■ 共通 |  |
 | common.back | 戻る | Back |
+| loading.resources | データを読み込んでいます… | Loading resources… |
+| loading.graphics | 画面を準備しています… | Preparing graphics… |
+| loading.failed | 準備できませんでした。ゲームを終了して、もう一度起動してください。 | Preparation failed. Please close the game and try again. |
 | common.cancel | キャンセル | Cancel |
 | common.to&#95;main&#95;menu | メインメニューに戻る | Back to Main Menu |
 | common.parts | 部品 {n} | Parts {n} |

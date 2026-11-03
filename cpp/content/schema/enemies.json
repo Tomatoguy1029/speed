@@ -1,0 +1,1839 @@
+{
+  "records": [
+    {
+      "name": "HoundDefinition",
+      "section": 19,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "alignment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cohesion",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "separation",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "ShieldDefinition",
+      "section": 25,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "weak_arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "front_arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reflect_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reflect_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shield_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reflected",
+          "type": "u32",
+          "min": 1,
+          "ref": "HostileDefinition"
+        }
+      ]
+    },
+    {
+      "name": "GunnerDefinition",
+      "section": 28,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bullet_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bullet_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BeamerDefinition",
+      "section": 29,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_width",
+          "type": "f64",
+          "min": 0,
+          "source": "beam_width",
+          "multiplier": 0.5
+        },
+        {
+          "name": "cross",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "MissileEnemyDefinition",
+      "section": 39,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "telegraph"
+        },
+        {
+          "name": "missile_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "missile_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "RocketDefinition",
+      "section": 44,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fuse",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "DriftDefinition",
+      "section": 47,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "has_life",
+          "type": "bool"
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ram_guard",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "PartDefinition",
+      "section": 49,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "DashDefinition",
+      "section": 50,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "windup"
+        },
+        {
+          "name": "dash_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "dash_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BattleshipDefinition",
+      "section": 57,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "telegraph"
+        },
+        {
+          "name": "bullet_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "weak_arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "volley",
+          "type": "u32",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "SniperDefinition",
+      "section": 59,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "band_len",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "band_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "band_narrow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "track_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "search_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "search_sway",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "search_period",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_fill",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "laser_half_width",
+          "type": "f64",
+          "min": 0,
+          "source": "laser_width",
+          "multiplier": 0.5
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cooldown",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "MarlinDefinition",
+      "section": 64,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0,
+          "source": "telegraph"
+        },
+        {
+          "name": "dash_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "dash_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PulserDefinition",
+      "section": 65,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DolphinDefinition",
+      "section": 66,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "enemy_damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "LynxDefinition",
+      "section": 69,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_size",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "SoldierDefinition",
+      "section": 71,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bolt_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mutiny_shot",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "AurigaDefinition",
+      "section": 73,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_step",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wheel_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "ClockDefinition",
+      "section": 74,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hand_long",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hand_short",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hand_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "long_speed",
+          "type": "f64"
+        },
+        {
+          "name": "short_speed",
+          "type": "f64"
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "ReticleDefinition",
+      "section": 76,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "break_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "exit_margin",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "follow_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "follow_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "small_r",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "AquariusDefinition",
+      "section": 104,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_width",
+          "source": "beam_width",
+          "type": "f64",
+          "min": 0,
+          "multiplier": 0.5
+        },
+        {
+          "name": "beams",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "CrossEnemyDefinition",
+      "section": 100,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stand_off",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_tol",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_width",
+          "source": "beam_width",
+          "type": "f64",
+          "min": 0,
+          "multiplier": 0.5
+        }
+      ]
+    },
+    {
+      "name": "BomberDefinition",
+      "section": 101,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trigger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rush",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PhoenixDefinition",
+      "section": 102,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "retreat_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "dive_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "AquilaDefinition",
+      "section": 103,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 1e-06
+        },
+        {
+          "name": "dash_speed",
+          "type": "f64",
+          "min": 1e-06
+        },
+        {
+          "name": "dash_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "drop_step",
+          "type": "f64",
+          "min": 1e-06
+        },
+        {
+          "name": "blast_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "SplitDefinition",
+      "section": 120,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "child",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "bud_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "split_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "split_guard",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "max_buds",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "name": "death_split",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "name": "split_extra",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        }
+      ]
+    },
+    {
+      "name": "DefenderDefinition",
+      "section": 121,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_arrive",
+          "type": "f64"
+        },
+        {
+          "name": "guard_distance",
+          "type": "f64"
+        },
+        {
+          "name": "guard_radius",
+          "type": "f64"
+        },
+        {
+          "name": "guard_spacing",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "CrabDefinition",
+      "section": 130,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "approach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "open_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CrowDefinition",
+      "section": 140,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "flock",
+          "type": "u32",
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "name": "aim_spread",
+          "type": "f64"
+        },
+        {
+          "name": "flock_gap",
+          "type": "f64"
+        },
+        {
+          "name": "gather_width",
+          "type": "f64"
+        },
+        {
+          "name": "gather_behind",
+          "type": "f64"
+        },
+        {
+          "name": "gather_speed",
+          "type": "f64"
+        },
+        {
+          "name": "exit_margin",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "CepheusDefinition",
+      "section": 110,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "soldier",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fire_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reinforce_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "summon_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mutiny_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "row_near",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "row_far",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fan_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fan_step",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PumpDefinition",
+      "section": 131,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "store_max",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "release_base",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swallow_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swallow_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "grow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burst_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_per",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mouth_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "TriangleStarDefinition",
+      "section": 112,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "CoronaDefinition",
+      "section": 132,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "capture_max",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "capture_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spin",
+          "type": "f64"
+        },
+        {
+          "name": "telegraph",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "throw_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "throw_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "effect",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CoronaType",
+      "section": 133,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "owner",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "RulerDefinition",
+      "section": 113,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "split_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "emit_back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_len",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_start_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "TriangleDefinition",
+      "section": 170,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "star",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "move_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "span",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

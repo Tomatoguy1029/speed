@@ -25,8 +25,10 @@ var run_endless := false
 ## 次のランの時計を始める時刻（開発用。出現タイムラインの「ここから試す」）。ランが始まると 0 に戻る
 var run_start_time := 0.0
 var run_start_source := "stage_start"
+var run_start_content: Dictionary = {}
 ## 直前のランの結果（結果画面が表示する）
 var last_result: Dictionary = {}
+var _accepted_cpp_results: Dictionary = {}
 
 ## 画面を移る。push が true なら、戻る操作で今の画面へ戻れるように覚えておく。
 func goto(next: Screen, push := true) -> void:
@@ -73,12 +75,18 @@ func start_run(stage: int, endless := false) -> void:
 
 ## ランを最後まで終えた。結果を保存して結果画面へ（仕様書 3）。
 func finish_run(result: Dictionary) -> void:
+	if not SaveManager.record_run(result): return
 	last_result = result
-	SaveManager.record_run(result)
 	goto(Screen.RESULT, false)
 
 ## ランを途中でやめてメインメニューへ戻る。そのランの部品と記録は残さない（仕様書 3）。
 func abort_run() -> void:
+	var active: RunSession = RunManager.current()
+	if active!=null and active.bridge!=null:
+		var response: Dictionary = active.bridge.command("abort",{"reason":0})
+		if response.ok:
+			active.flush_cpp_result()
+			return
 	last_result = {}
 	reset_to_main_menu()
 
@@ -88,3 +96,20 @@ func retry_run() -> void:
 
 func quit_game() -> void:
 	get_tree().quit()
+
+## C++の結果を、今の結果画面と永続保存の入力へ合わせる。
+func finish_cpp_run(result: Dictionary) -> void:
+	var id := int(result.get("result_id",0))
+	if id<=0 or _accepted_cpp_results.has(id): return
+	_accepted_cpp_results[id] = true
+	if result.kind=="Abort":
+		last_result = {}
+		reset_to_main_menu()
+		return
+	var modules: Array[String] = []
+	for reward: Dictionary in result.rewards:
+		if int(reward.amount)>0: modules.append(str(reward.id))
+	finish_run({"result_id":id,"kind":result.kind,"stage":str(result.stage_id).to_int(),"endless":result.get("endless",false),
+		"cleared":result.kind=="Clear","time":result.run_time,"world_time":result.world_time,"kills":result.kills,
+		"level":result.level,"coins":result.coins,"peak_speed":result.peak_speed,"modules":modules,
+		"legendary":result.get("legendary",""),"weapons":result.weapons,"traits":result.traits,"last_damage":result.last_damage})

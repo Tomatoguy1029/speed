@@ -1,5 +1,6 @@
 ## おおいぬ座を置いた試遊用の実験場。共有ステージ・セーブ・本番の強さを変更しない。
 extends "res://gyms/enemy_lab/enemy_lab.gd"
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 
 @export var trial_ship_position := Vector2(700, 0)
 @export_range(1.0, 20.0) var trial_attack_multiplier := 6.0
@@ -15,6 +16,10 @@ var capture_path := ""
 var capture_at := 3.0
 var _clock := 0.0
 var _capturing := false
+const MANUAL := preload("res://gyms/boss_technique_debug.gd")
+var manual
+var _repeat_started := false
+var _phase_requested := false
 var _repeat_id: StringName = &""
 
 func _ready() -> void:
@@ -23,6 +28,7 @@ func _ready() -> void:
 	await session.reset({"empty": true, "stage": 3, "ship_pos": [trial_ship_position.x, trial_ship_position.y],
 		"invincible": trial_invincible, "config": {"base_attack": ContentManager.base.base_attack * trial_attack_multiplier}})
 	session.perform("boss", {"type": "canis_major", "pos": [0, 0]})
+	var boss_entity: int = session._selected_id
 	for j in trial_extra_packs:
 		var at := Vector2.from_angle(TAU * j / maxf(trial_extra_packs, 1)) * 350.0
 		session.perform("spawn", {"type": "hound", "pos": [at.x, at.y]})
@@ -37,8 +43,14 @@ func _ready() -> void:
 			for j in int(arg.trim_prefix("--canis-packs=")):
 				var at := Vector2.from_angle(TAU * j / 8.0) * 350.0
 				session.perform("spawn", {"type": "hound", "pos": [at.x, at.y]})
-		if arg == "--canis-pin": session.pinned = trial_ship_position
+		if arg == "--canis-pin": session.perform("pin",{"value":true,"pos":trial_ship_position})
 		if arg == "--canis-phase2": _phase_two()
+	session._selected_id = boss_entity
+	manual = MANUAL.new()
+	if not manual.bind(session,"canis_major"):
+		push_error("おおいぬ座の試行を準備できません")
+		return
+	if _phase_requested: manual.action("phase_two")
 	_set_mode(3)
 	_refresh()
 
@@ -47,36 +59,32 @@ func _process(delta: float) -> void:
 	_repeat_technique()
 	if capture_path.is_empty() or _capturing: return
 	session.playing = true
-	if session.run.state.phase == RunState.Phase.PAUSED: session.run.command(&"resume")
+	if session.run.state.phase == Phase.Paused: session.bridge.command("resume",{})
 	_clock += delta
 	if _clock < capture_at: return
 	_capturing = true
 	await RenderingServer.frame_post_draw
 	var error := get_viewport().get_texture().get_image().save_png(capture_path)
-	var actor = session.run.bosses.actor
-	var alive: bool = actor != null and actor.has_body()
-	var distance: float = actor.table.pos[actor.body].distance_to(session.run.state.ship_pos) if alive else -1.0
-	print("[canis-visual] ", "PASS " if error == OK else "FAIL ", capture_path, " mode=", actor.mode if alive else &"", " tech=", actor.technique if alive else &"",
-		" distance=", roundi(distance), " led=", actor.led.size() if alive else 0, " led_hound_max_hp=", actor.table.max_hp[actor.led[0]] if alive and not actor.led.is_empty() else 0.0,
-		" ram_power=", actor.ram_power() if alive else 0.0, " ship_hp=", session.run.state.ship_hp)
+	var body: Dictionary = manual.body_snapshot() if manual != null else {}
+	var distance: float = body.get("position",session.run.state.ship_pos).distance_to(session.run.state.ship_pos)
+	print("[canis-visual] ", "PASS " if error == OK else "FAIL ", capture_path,
+		" mode=",body.get("mode",-1)," tech=",manual.state().get("technique","") if manual!=null else "",
+		" distance=",roundi(distance)," led=",body.get("led",[]).size(),
+		" led_hound_max_hp=",body.led[0].max_hp if not body.get("led",[]).is_empty() else 0.0," ship_hp=",session.run.state.ship_hp)
 	get_tree().quit(0 if error == OK else 1)
 
-## 編集元を変更せず、選んだ技だけが候補になる試遊用のフローにする。
+## 選択した技は制作コピーと本番C++の手動入口で繰り返す。
 func _only(id: StringName) -> void:
-	var actor := session.run.bosses.actor as CanisMajorBoss
-	if actor == null: return
 	_repeat_id = id
-	actor.selection_enabled = false
 	if id in [&"sirius_flame", &"sirius", &"blaze", &"relay", &"hunt", &"nova"]: _phase_two()
 
 func _repeat_technique() -> void:
-	if _repeat_id.is_empty() or not session.playing or session.run == null: return
-	var actor := session.run.bosses.actor as CanisMajorBoss
-	if actor == null or not actor.body_alive() or actor.mode != &"idle" or actor.phase_pending: return
-	if session.run.state.phase != RunState.Phase.PLAY: return
-	actor.start_attack(_repeat_id)
+	if _repeat_id.is_empty() or manual == null or not session.playing: return
+	if session.run.state.phase != Phase.Play or manual.attack_playing(): return
+	if not _repeat_started:
+		_repeat_started = manual.execute(String(_repeat_id),2 if _phase_requested else 1)
+	else: manual.repeat()
 
-## HPを変えずに、次の追跡で第2形態へ移らせる。
+## HPを変えず、本番の形態移行を依頼する。
 func _phase_two() -> void:
-	var actor: BossActor = session.run.bosses.actor
-	if actor != null: actor.phase_pending = true
+	_phase_requested = true

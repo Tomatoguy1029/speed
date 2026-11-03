@@ -8,18 +8,32 @@ const LIFE := 0.5
 const TUNED_SHADERS := [preload("res://shaders/space_ripple.gdshader")]
 var quakes: Array[Dictionary] = []
 var sparks := PixelSparks.new()
+var _frame_seen := {}
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+func sync_frame(values: Array, dt: float) -> void:
+	var alive := {}
+	for value: Dictionary in values:
+		alive[value.id] = true
+		if not _frame_seen.has(value.id):
+			on_event({"type":&"space_quake","pos":value.pos,"radius":value.radius})
+			quakes[-1].id = value.id
+		for quake: Dictionary in quakes:
+			if quake.get("id",0)==value.id: quake.age = value.visual_age-dt
+	_frame_seen = alive
+	quakes = quakes.filter(func(quake): return alive.has(quake.get("id",0)))
 
 func on_event(ev: Dictionary) -> void:
 	if ev.type != &"space_quake": return
 	var spikes: Array[Dictionary] = []
 	for i in 9: spikes.append({"a": i / 9.0 * TAU + randf() * 0.5, "l": 8.0 + randf() * 10.0})
 	quakes.append({"pos": ev.pos, "age": 0.0, "spikes": spikes, "burst": false})
-	rm.pipeline.add_ripple(ev.pos, float(ev.radius), 1.82 * cfg.character_scale)
 
-func tick(_dt: float) -> void:
-	var dt := world_dt()
-	tune(rm.pipeline.ripple_material())
-	var p := painter()
+
+func frame_tick(dt: float) -> void:
+	var p: PixelPainter = _painter
 	p.begin()
 	for w in quakes:
 		w.age += dt

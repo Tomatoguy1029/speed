@@ -1,5 +1,6 @@
 ## 編集元から再構築した隔離ランで本番の描画・突進判定を実行する。
 extends Node
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 signal progress(value: float)
 const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 var cancelled := false
@@ -32,8 +33,8 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 		return await _finish({"status": "cancelled"})
 	for n in clampi(start_offset, 0, roundi(60.0 / worker.DT)):
 		worker.step()
-	var run: RunSimulation = worker.run
-	if run.state.tracing or run.state.phase != RunState.Phase.PLAY:
+	var run = worker.run
+	if run.state.tracing or run.state.phase != Phase.Play:
 		return await _finish({"status": "invalid", "reason": tr("lab.trace_in_progress")})
 	if run.state.gauge_amount() < run.cfg.draw_min_charge:
 		return await _finish({"status": "invalid", "reason": tr("lab.low_charge")})
@@ -41,36 +42,19 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 	worker._cursor = worker.history.size()
 	worker._intent = Intent.new()
 	# 被弾を測るため、評価側では無敵を解除する。
-	run.ship.invincible = false
+	worker.perform("invincible",{"value":false})
 	worker.events.clear()
-	var initial_hp := run.state.ship_hp
-	var it := Intent.new()
-	it.press = true
-	it.pen = path[0]
-	it.has_cursor = true
-	it.cursor = path[0]
-	run.draw._start(it)
-	var frames: int = clampi(ceili(maxf(draw_seconds, run.cfg.draw_confirm_delay) / worker.DT), 1, roundi(30.0 / worker.DT))
-	for n in frames:
-		if cancelled:
-			return await _finish({"status": "cancelled"})
-		var index := clampf(float(n + 1) / frames * (path.size() - 1), 0, path.size() - 1)
-		var lo := mini(floori(index), path.size() - 2)
-		# 頂点を飛ばさない。通常と同じ長さ・地形制限と角の補正を適用する。
-		var previous := float(n) / frames * (path.size() - 1)
-		for k in range(ceili(previous), floori(index) + 1):
-			if k > 0 and k < path.size():
-				run.draw._extend(path[k])
-		run.draw._extend(path[lo].lerp(path[lo + 1], index - lo))
+	var initial_hp = run.state.ship_hp
+	var frames: int = clampi(ceili(maxf(draw_seconds,run.cfg.draw_confirm_delay)/worker.DT),1,3600)
+	if not worker.perform("route",{"points":path,"draw_seconds":draw_seconds}):
+		return await _finish({"status":"invalid","reason":worker.last_error.get("message","")})
+	for n in frames+1:
+		if cancelled: return await _finish({"status":"cancelled"})
 		worker.step()
-		if not run.state.drawing:
-			break
-		if n % 60 == 0:
-			progress.emit(0.5 + 0.15 * float(n) / frames)
+		if n%60==0:
+			progress.emit(0.5+0.15*float(n)/frames)
 			await get_tree().process_frame
-	var accepted := run.state.draw_points.duplicate()
-	if run.state.drawing:
-		run.draw._commit(it)
+	var accepted: PackedVector2Array = run.state.draw_points.duplicate()
 	var trajectory := []
 	var completed := false
 	for n in roundi(60.0 / worker.DT):

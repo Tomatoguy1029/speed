@@ -26,7 +26,7 @@ static func clip(source: SpawnClip) -> RuntimeClip:
 			result.prepared.append({"layouts": layouts, "entries": data.entries})
 	return result
 
-static func compile(source: StageDef, output := "res://.content") -> RuntimeStage:
+static func compile(source: StageDef, output := "res://.content", config: GameConfig = null) -> RuntimeStage:
 	var result := RuntimeStage.new()
 	for property in source.get_property_list():
 		if property.usage & PROPERTY_USAGE_STORAGE == 0: continue
@@ -45,7 +45,7 @@ static func compile(source: StageDef, output := "res://.content") -> RuntimeStag
 		copy.display_name = ""
 		result.phases.append(copy)
 	for item in source.clips: result.clips.append(clip(item))
-	result.resources = load("res://tools/content/build_stage_resources.gd").build(result, output)
+	result.resources = load("res://tools/content/build_stage_resources.gd").build(result, output, config)
 	# 実行用にも局所上書きを保持し、未知の敵・項目・不正な数値を生成時に止める。
 	for id in result.enemy_tuning:
 		var path := "res://data/enemies/%s.tres" % String(id)
@@ -60,7 +60,9 @@ static func compile(source: StageDef, output := "res://.content") -> RuntimeStag
 	return result if result.resources != null else null
 
 static func names(source: StageDef) -> Dictionary:
-	var result := {"phases": {}, "clips": {}}
+	var ranks := {}
+	for stars in range(11): ranks[str(stars)] = Array(EnemyDef.default_xp_reward_counts(stars))
+	var result := {"phases": {}, "clips": {},"xp_rank_counts":ranks,"stage_file":source.resource_path,"stage_file_sha256":FileAccess.get_sha256(source.resource_path)}
 	for phase: PhaseDef in source.phases: result.phases[String(phase.id)] = phase.display_name
 	for index in source.clips.size(): result.clips[index] = source.clips[index].label
 	return result

@@ -1,5 +1,5 @@
-## ボス共通の技の編集元。実行コードと内部Timelineが同じ値を読む。
-## 技のスクリプトはこれを継承し、使う値を @export で並べ、動きを Runner で返す。
+## ボス共通の技の編集元。C++の生成入力と制作プレビューが同じ値を読む。
+## 技のスクリプトはこれを継承し、使う値を@exportで並べる。
 @tool
 extends Resource
 class_name BossTechnique
@@ -17,15 +17,6 @@ var _values := {}
 var _values_dirty := true
 ## 継承した技のスクリプトが値として並べた名前。
 var _field_cache: Array[String] = []
-
-## 技の実行状態。Resourceを共有しても、再生ごとに新しいRunnerを作る。
-class Runner extends RefCounted:
-	func begin(_actor: BossActor) -> void: pass
-	func windup(_actor: BossActor, _dt: float) -> void: pass
-	func tick(_actor: BossActor, _dt: float) -> void: pass
-	func end(_actor: BossActor, _cancelled: bool) -> void: pass
-	func recover(_actor: BossActor, _dt: float) -> void: pass
-	func pose(_actor: BossActor) -> void: pass
 
 ## エディターと実験場が使う @export の型・範囲・単位。
 func field_property(name: String) -> Dictionary:
@@ -49,10 +40,6 @@ func field_description(name: String) -> String:
 				lines.clear()
 		script = script.get_base_script()
 	return ""
-
-## 技の動きを1回分作る。技のスクリプトが Runner を返す。
-func make_runner() -> RefCounted:
-	return null
 
 ## 技のスクリプトで値を並べた技か。
 func is_scripted() -> bool:

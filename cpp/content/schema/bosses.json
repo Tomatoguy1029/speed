@@ -1,0 +1,696 @@
+{
+  "records": [
+    {
+      "name": "BossDefinition",
+      "section": 150,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 4
+        },
+        {
+          "name": "lock_lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "horn_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "horn_length_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "horn_length_ratio_p2",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "near_clearance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reposition_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stuck_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "extract_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "extract_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "kick_trigger_arc",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "BossTechniqueDefinition",
+      "section": 151,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 108
+        },
+        {
+          "name": "phase",
+          "type": "u32",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "name": "track_during_warn",
+          "type": "bool"
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "active",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recover",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "post_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "return_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_speed_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_speed_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "twist_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "twist",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_decel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "windup_twist",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "return_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "back_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boom_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boom_ahead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stop_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shatter_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "passes",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "overshoot",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "brake_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "brake_speed_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "windup_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swing_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "swing_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "release_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recharge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_half_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wave_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_lock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "min_run",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_late_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_speed_late",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_decel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_min_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "align_min_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_max_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "glow_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "end_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "end_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cuts",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "first_windup",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slash_hit_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cut_gap",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 24
+    },
+    {
+      "name": "BossTechniqueStage",
+      "section": 152,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "command",
+          "type": "u32",
+          "max": 7
+        },
+        {
+          "name": "at",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 5
+    },
+    {
+      "name": "BossBodyDefinition",
+      "section": 162,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "hp_floor_enabled",
+          "type": "bool"
+        },
+        {
+          "name": "entrance_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "initial_wait",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "phase_threshold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "phase_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_beam_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_warn_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "final_widen_time",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BossFinishDefinition",
+      "section": 163,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "replay_window",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "zoom",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "blast_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "relic_appear_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "relic_hold_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "relic_collect_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clear_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time_up_charge_time",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "StageBossDefinition",
+      "section": 450,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "body",
+          "type": "u32",
+          "ref": "BossBodyDefinition"
+        },
+        {
+          "name": "start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

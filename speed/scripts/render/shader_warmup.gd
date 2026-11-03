@@ -2,6 +2,10 @@
 extends SubViewport
 var _scope: ContentResourceScope
 var _frames := 0
+var _material_index := 0
+var _layers: Array[CanvasLayer] = []
+var _texture: Texture2D
+var _lit_texture: CanvasTexture
 func prepare(scope: ContentResourceScope) -> void:
 	_scope = scope
 	scope.warming = true
@@ -21,6 +25,8 @@ func prepare(scope: ContentResourceScope) -> void:
 	var lit_texture := CanvasTexture.new()
 	lit_texture.diffuse_texture = texture
 	lit_texture.normal_texture = normal
+	_texture = texture
+	_lit_texture = lit_texture
 	var materials: Array[Material] = [null]
 	var additive := CanvasItemMaterial.new()
 	additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -39,6 +45,7 @@ func prepare(scope: ContentResourceScope) -> void:
 		var layer := CanvasLayer.new()
 		layer.layer = 1 if lit else 0
 		add_child(layer)
+		_layers.append(layer)
 		if lit:
 			for index in 2:
 				var light := DirectionalLight2D.new()
@@ -46,8 +53,6 @@ func prepare(scope: ContentResourceScope) -> void:
 				light.range_layer_max = 1
 				light.rotation = index * PI
 				layer.add_child(light)
-		for material in materials:
-			_geometry(layer, material, lit_texture if lit else texture)
 func _geometry(parent: Node, material: Material, texture: Texture2D) -> void:
 	# ボスの首と地形は、個体のバッチを使わず頂点色付きのmeshを描く。
 	var meshes: Array[ArrayMesh] = []
@@ -109,10 +114,28 @@ func _process(_dt: float) -> void:
 		_scope = null
 		queue_free()
 		return
-	_frames += 1
-	if _frames >= 3: _finish()
+	# 一度に全materialを投入すると、最初の描画だけでロード表示まで止まる。
+	# 同じ幾何と照明の組をmaterialごとに描き、各組の描画を終えてから次へ進む。
+	if _frames > 0:
+		_frames += 1
+		if _frames < 3: return
+		for layer in _layers:
+			for child in layer.get_children():
+				if child is DirectionalLight2D: continue
+				layer.remove_child(child)
+				child.queue_free()
+		_material_index += 1
+		_frames = 0
+		_scope.warmup_progress = float(_material_index) / _scope.warm_materials.size()
+	if _material_index == _scope.warm_materials.size():
+		_finish()
+		return
+	for index in _layers.size():
+		_geometry(_layers[index], _scope.warm_materials[_material_index], _lit_texture if index == 1 else _texture)
+	_frames = 1
 func _finish() -> void:
 	_scope.warmup_complete = true
+	_scope.warmup_progress = 1.0
 	_scope.warming = false
 	_scope = null
 	render_target_update_mode = SubViewport.UPDATE_DISABLED

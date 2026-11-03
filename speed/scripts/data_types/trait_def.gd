@@ -2,8 +2,9 @@
 ## レベルアップの3択で手に入る特性。同じ特性を重ねるほど効果が強くなる。持てる種類と重ねられる数は調整値の「成長」で決まる。
 ## 「（基本）」と「（Lvごと）」の組の値は、効果 ＝ 基本 ＋ Lvごと × Lv で決まる。
 ## ---
-## 値の正は res://data/traits/*.tres（一覧 docs/game/catalog/traits.md）。発動する特性の処理は res://scripts/traits/<内部 ID>.gd、
-## 能力値を変える特性は LoadoutSystem.refresh_stats() が stack_bonus() と max を読む。
+## 値の正は res://data/traits/*.tres（一覧 docs/game/catalog/traits.md）。発動する特性の処理は C++の特性処理、
+## 能力値を変える特性は C++の装備処理.refresh_stats() が stack_bonus() と max を読む。
+@tool
 class_name TraitDef
 extends Resource
 

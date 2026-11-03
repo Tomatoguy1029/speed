@@ -1,0 +1,336 @@
+{
+  "records": [
+    {
+      "name": "FieldBodyDefinition",
+      "section": 21,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 0
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        }
+      ]
+    },
+    {
+      "name": "MoonDefinition",
+      "section": 22,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32"
+        },
+        {
+          "name": "orbit_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "orbit_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle_jitter",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angular_speed",
+          "type": "f64"
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        }
+      ]
+    },
+    {
+      "name": "RockFieldDefinition",
+      "section": 23,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "meteor_count",
+          "type": "u32"
+        },
+        {
+          "name": "iron_count",
+          "type": "u32"
+        },
+        {
+          "name": "saw_count",
+          "type": "u32"
+        },
+        {
+          "name": "planet_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_coin_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_heal_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_magnet_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "iron",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "saw",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "meteor_visual_0",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_1",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_2",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_3",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_4",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_visual_5",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "meteor_radius_0",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "meteor_radius_1",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "GravityDefinition",
+      "section": 77,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0,
+          "config": "gravity_life"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0,
+          "config": "gravity_radius"
+        },
+        {
+          "name": "pull",
+          "type": "f64",
+          "min": 0,
+          "config": "gravity_pull"
+        }
+      ]
+    },
+    {
+      "name": "WarpDefinition",
+      "section": 83,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bonus_time",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CometDefinition",
+      "section": 90,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rare_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rare_after",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rare_hp_mult",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warp_chance",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "RockKind": [
+      {
+        "name": "Belt",
+        "value": "belt"
+      },
+      {
+        "name": "Drift",
+        "value": "drift"
+      },
+      {
+        "name": "Iron",
+        "value": "iron"
+      },
+      {
+        "name": "Saw",
+        "value": "saw"
+      },
+      {
+        "name": "Comet",
+        "value": "comet"
+      }
+    ]
+  }
+}

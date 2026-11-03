@@ -2,35 +2,16 @@
 extends EnemyVisual
 
 const LASER = preload("res://scripts/render/pulser_laser.gd")
-const PULSER = preload("res://scripts/enemies/pulser.gd")
 var _rings: Array[LASER] = []
 var _count := 0
 
-func draw_marks(_c: CanvasItem, _t: EnemyTable, _i: int) -> void:
-	pass
-
-## 装甲のCanvasLayerより前に置く。通常の白い被弾表示には触れない。
-func draw_layer(_c: CanvasItem, view: Rect2) -> void:
+func apply_frame(parent: CanvasItem, values: PackedFloat64Array) -> void:
 	_count = 0
-	var t: EnemyTable = run.enemies.table
-	if not state.cinematic_hide_enemies:
-		for i in behavior.rows():
-			if t.dead[i] != 0 or t.held[i] != 0 or t.stone[i] > 0.0 or t.pump_owner[i] >= 0:
-				continue
-			if t.mode[i] != EnemyTable.Mode.WINDUP:
-				continue
-			var radius: float = PULSER.ring_radius(t, i)
-			var p: Dictionary = t.def[i].params
-			var width: float = float(p.wave_width)
-			# 最遠120pixelの光筋と端の発光まで含めて予兆を表示する。
-			if not view.grow(radius + width * 26.0).has_point(t.pos[i]):
-				continue
-			if _count == _rings.size():
-				var ring: LASER = LASER.new()
-				ring.setup(rm._lit_enemy_marks)
-				_rings.append(ring)
-			var progress: float = 1.0 - clampf(t.timer[i] / maxf(float(p.telegraph), 0.001), 0.0, 1.0)
-			_rings[_count].show_ring(t.pos[i], radius, width, progress, t.id[i] % 4093)
-			_count += 1
-	for i in range(_count, _rings.size()):
-		_rings[i].visible = false
+	for n in range(0,values.size(),6):
+		if _count==_rings.size():
+			var ring: LASER = LASER.new()
+			ring.setup(parent)
+			_rings.append(ring)
+		_rings[_count].show_ring(Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],int(values[n+5]))
+		_count += 1
+	for i in range(_count,_rings.size()): _rings[i].visible = false

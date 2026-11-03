@@ -15,6 +15,8 @@ const LANGUAGES := ["ja", "en"]
 const SAVE_VERSION := 1
 
 var data: Dictionary = {}
+## ResultIdは実行中に再利用しない。保存の互換形式には追加しない。
+var _recorded_cpp_results: Dictionary = {}
 var settings: Dictionary = {}
 ## 開発版だけ：ランで使う強化の段の上書き（ID → 段）。調整パネルで決め、セーブには書かない。
 var dev_meta_override: Dictionary = {}
@@ -133,7 +135,12 @@ func is_module_known(id: StringName) -> bool:
 	return data.encyclopedia.has(String(id)) or (id == &"W29" and data.encyclopedia.has("T01"))
 
 ## ランの結果を記録する。途中でやめたランは呼ばない（仕様書 3）。
-func record_run(result: Dictionary) -> void:
+func record_run(result: Dictionary) -> bool:
+	if result.get("kind","")=="Abort": return false
+	if result.has("result_id"):
+		var id := int(result.result_id)
+		if id<=0 or _recorded_cpp_results.has(id): return false
+		_recorded_cpp_results[id] = true
 	var best: Dictionary = data.best
 	best.runs = int(best.runs) + 1
 	best.top_speed = maxf(float(best.top_speed), float(result.get("peak_speed", 0.0)))
@@ -150,6 +157,7 @@ func record_run(result: Dictionary) -> void:
 		unlock_module(StringName(id))
 	data.coins = coins() + int(result.get("coins", 0))
 	save()
+	return true
 
 func _load_save() -> Dictionary:
 	var d := default_data()

@@ -10,7 +10,28 @@ Godot のプロジェクトは [speed/project.godot](speed/project.godot) です
 
 開発用の入口はメニューバーの **プロジェクト → ツール → SPEED** にまとめています。データ編集・ボス行動・出現タイムライン／編成・ステージ敵調整、ステージ起動・各実験場、ビジュアル／背景編集、素材確認・性能計測をここから開けます。既存のツールバーボタンとショートカットも使えます。無効にしたエディタープラグインの項目は表示されません。
 
-Godot 4.7.2・Forward Plus で開発します。タイトル・ステージ選択・ゲーム本体を実装済みで、メインシーンは `scenes/app/main.tscn` です。Godot 4.7.2 でインポートし、**F5 → ゲームスタート → ステージ選択 → 任意のステージ**で遊べます。エディタからの実行とデバッグ用のビルドでは、全ステージを選べます。調整機能は [仕様書](docs/spec.md#20-調整機能) を参照してください。
+Godot 4.7.2・Forward Plus で開発します。ランの状態と戦闘処理は C++ の GDExtension、制作画面・入力・資源読み込み・表示・UI は Godot が担当します。初回の起動前に、固定SDKで拡張をビルドし、実行用データを生成してください。
+
+依存の正は [cpp/dependencies.json](cpp/dependencies.json) です。Godot 4.7.2、API 4.7、export template `4.7.2.stable`、SCons 4.11.1、単精度を使います。macOSではXcode Command Line Tools、WindowsではC++コンパイラーを用意します。SDKと中間ファイルはソースの外に置きます。以下はApple Siliconの例です。
+
+```bash
+python3 -m venv /tmp/speed-build-python
+/tmp/speed-build-python/bin/pip install scons==4.11.1
+git clone https://github.com/godotengine/godot-cpp.git /tmp/speed-godot-cpp
+git -C /tmp/speed-godot-cpp checkout e103d348c4b2d8df7b819126d855e19381cb9a87
+python3 tools/build/build_run.py --sdk /tmp/speed-godot-cpp --scons /tmp/speed-build-python/bin/scons --platform macos --arch arm64
+```
+
+Intel Macは `--arch x86_64`、Windowsは `--platform windows --arch x86_64` を使います。拡張は `speed/extensions/run/bin/` へ出力します。SDKの完全コミット・APIハッシュ・SConsの版が一致しない場合はビルドを止めます。
+
+拡張を用意したら、Godotのimportと共通生成を順に実行します。
+
+```bash
+godot --headless --editor --import --path speed
+godot --headless --path speed --script res://tools/content/build_all.gd -- --force
+```
+
+`.content/run/` に戦闘バイナリ・索引・表示用資源表がそろってから起動できます。生成失敗時はGodotの出力を確認し、古い生成物のまま進めないでください。タイトル・ステージ選択・ゲーム本体のメインシーンは `scenes/app/main.tscn` です。Godot 4.7.2 で開き、**F5 → ゲームスタート → ステージ選択 → 任意のステージ**で遊べます。エディタからの実行とデバッグ用ビルドでは全ステージを選べます。調整機能は [仕様書](docs/spec.md#20-調整機能) を参照してください。
 
 開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/spec.md#201-敵ルート実験場) を参照してください。
 
@@ -24,35 +45,35 @@ Godot 4.7.2・Forward Plus で開発します。タイトル・ステージ選�
 
 敵・隕石・月・惑星・自機は、素材のある種類を透過ピクセルスプライトで、素材が未制作の敵を仮の図形で表示します。マウスへ機体が向き、左クリックで経路を描き始め、もう一度クリックするとその経路を突進します。Escでポーズ、Pで開発用調整パネルです。アート確認用の静止シーンは `tools/preview_pixel_assets.tscn`（F6で実行）。素材と再生成手順は [ピクセル素材](speed/assets/pixel/README.md) を参照してください。
 
-Godot の CLI が利用できる環境では、リポジトリのルートから次のコマンドでエディタを開けます。
+macOSで描画付きのGodotを起動するときは、フォーカスを奪わない `godot-bg` を使います。リポジトリのルートから次のコマンドでエディタを開けます。`--headless` の実行は `godot` を使います。
 
 ```bash
-godot --editor --path speed
+godot-bg --editor --path speed
 ```
 
 ゲーム中の名前・説明・UI 文言は [ゲーム内文言](docs/game/text.md) で編集し、記載の手順で CSV とリソース表示名へ反映します。
 
-`.godot/` と `.content/` は生成物としてGit管理から除外します。エディター実行・タイムライン保存・exportで、編集元から実行用ステージと音源を生成します。CLIで生成するときは次を実行します。
+`.godot/`・`.content/`・拡張の共有ライブラリは生成物としてGit管理から除外します。編集元の保存と、実行用データの生成を分けて扱います。エディタの実行前・CLI・exportは同じ生成入口を使います。
+
+配布用のビルドはソースの外に新しい作業先を指定します。以下はMacの例です。Macでは `godot-bg` をPATHへ用意します。importと共通生成はheadlessで行い、シェーダー事前変換を使うexportは `godot-bg` で行います。`--templates` は `version.txt` を持つGodot 4.7.2のexport templateフォルダへ置き換えてください。
 
 ```bash
-godot --headless --path speed --script res://tools/content/build_all.gd -- --force
+python3 tools/build/build_run.py --sdk /tmp/speed-godot-cpp --scons /tmp/speed-build-python/bin/scons --platform macos --package-dir /tmp/speed-package --godot godot --templates /path/to/4.7.2.stable
 ```
 
-macOSのローカル確認用アプリは `godot --headless --path speed --export-release macOS /tmp/SPEED.app` で作れます。開発用ファイルの除外と製品公開の設定範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
+この入口はMacのarm64・x86_64拡張をuniversalへまとめ、独立コピーでimport・共通生成・export・配布構成の確認まで行います。Windowsは `--platform windows` を使います。`--verify` を付けると保存先を隔離した確認用パッケージで最小ランと拡張欠落時の拒否を確認し、Macでは `--rendered` を併用すると `godot-bg` で描画付きの確認を行います。`--verify-final` は隔離した保存先で通常出撃から自然な終了・結果保存・戻るを確認します。Macの出撃準備・初期装備・交換・取消の計測は `--verify-loading --verify-final --rendered` を使います。配布構成と署名・公証の範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
-接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
+検査は `/tmp` の独立コピーで、変更に関係する既存の入口だけ使います。C++の人数・出現の確認は `res://tests/runtime/run_population.tscn`、制作・生成・UI・配布は `speed/tests/` の各対象を参照します。検査を行う範囲は [AGENTS.md](AGENTS.md#検証) に従います。
 
-全武器MAX後の成長は `godot --headless --path speed res://tests/post_max_progression.tscn`、同じ3択UIとポーズ入力は `res://tests/post_max_ui.tscn` で確認できます。描画付きの確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-postmax-captures` を付けます。
-
-敵の出現の仕組み（時間帯・強敵の群れ・出現のクリップ・攻撃の予算）の確認は `godot --headless --path speed res://tests/spawn_formations.tscn`。
-
-短時間の性能計測は `godot --path speed --disable-vsync res://tools/profile_run.tscn -- --time=350`。セーブへ書き込まず、ゲームの進行を指定秒へ進めて6秒準備・6秒計測します。
+性能計測の入口は `res://tools/profiling/profile_run.tscn`。生成済みのラン定義がある `/tmp` の独立コピーを使い、`SaveManager.SAVE_PATH` と `SETTINGS_PATH` を両方 `/tmp` 内へ隔離してから `godot-bg` で起動します。`--time` で開始ラン秒、`--seconds` で60秒以上の計測区間、`--revision` で確認したコミットID、`--out` で結果の保存先を指定します。通常の出撃・C++ラン・入力・描画を使い、条件の未成立と性能未達を分けて出力します。
 
 ## 構成
 
 | パス | 用途 |
 |---|---|
-| `speed/` | Godot 本番プロジェクト |
+| `speed/` | Godot 本番プロジェクト。制作・入力・資源・表示・UI・保存 |
+| `cpp/` | C++ランの状態・時計・乱数・戦闘・ボスと公開API |
+| `tools/build/` | 共通スキーマ生成、固定SDKの拡張ビルド、独立コピーでの配布 |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
 | `docs/README.md` | [文書の運用規定](docs/README.md)。文書を触る前に必ず読む |
 | `docs/` | ゲーム全体を定義する同じ階層の文書：[企画書](docs/treatment.md)・[仕様書](docs/spec.md)・[設計書](docs/architecture.md) |

@@ -11,12 +11,12 @@ static func create(adapter: String, id: String, title: String, script_path: Stri
 	var path := "res://data/bosses/%s_moves/%s.tres" % [adapter, id]
 	if FileAccess.file_exists(path): return {"error": ERR_ALREADY_EXISTS, "message": "同じIDの技がすでにあります。"}
 	if from_template:
-		script_path = "res://scripts/bosses/%s/techniques/%s.gd" % [adapter, id]
+		script_path = "res://scripts/data_types/boss_techniques/%s/%s.gd" % [adapter, id]
 		if FileAccess.file_exists(script_path): return {"error": ERR_ALREADY_EXISTS, "message": "同じ名前のスクリプトがあります。既存を選んでください。"}
-		var base := "res://scripts/bosses/%s/techniques/%s.gd" % [adapter, PROTOTYPES[adapter]]
+		var base := "res://scripts/data_types/boss_techniques/%s/%s.gd" % [adapter, PROTOTYPES[adapter]]
 		var file := FileAccess.open(script_path, FileAccess.WRITE)
 		if file == null: return {"error": FileAccess.get_open_error(), "message": "スクリプトを保存できません。"}
-		file.store_string("## 技の値と動き。必要な値は @export で追加する。\n@tool\nextends \"%s\"\n\nfunc make_runner() -> RefCounted:\n\treturn Runner.new()\n\nclass Runner extends \"%s\".Runner:\n\tpass\n" % [base, base])
+		file.store_string("## 技の編集値。必要な値は@exportで追加する。\n@tool\nextends \"%s\"\n" % base)
 		file.close()
 	if script_path.is_empty() or not ResourceLoader.exists(script_path): return {"error": ERR_FILE_NOT_FOUND, "message": "技のスクリプトを選んでください。"}
 	var script := load(script_path) as Script
@@ -24,13 +24,11 @@ static func create(adapter: String, id: String, title: String, script_path: Stri
 	var ancestor := script
 	var belongs_to_boss := false
 	while ancestor != null:
-		if ancestor.resource_path.begins_with("res://scripts/bosses/" + adapter + "/"): belongs_to_boss = true
+		if ancestor.resource_path.begins_with("res://scripts/data_types/boss_techniques/" + adapter + "/"): belongs_to_boss = true
 		ancestor = ancestor.get_base_script()
 	if not belongs_to_boss: return {"error": ERR_INVALID_DATA, "message": "選択したボスの技スクリプトを選んでください。"}
 	var move: Variant = script.new()
 	if not move is BossTechnique: return {"error": ERR_INVALID_DATA, "message": "BossTechniqueを継承するスクリプトを選んでください。"}
-	var runner: RefCounted = move.make_runner()
-	if runner == null or not runner.has_method("kind"): return {"error": ERR_INVALID_DATA, "message": "実行するRunnerを持つ技スクリプトを選んでください。"}
 	if adapter != "hydra" and not move.has_field("warn"): return {"error": ERR_INVALID_DATA, "message": "予告と実行処理を持つ技スクリプトを選んでください。"}
 	var prototype: Resource
 	for file in DirAccess.get_files_at("res://data/bosses/%s_moves" % adapter):
@@ -50,4 +48,4 @@ static func create(adapter: String, id: String, title: String, script_path: Stri
 	if adapter == "hydra": move.head_kind = prototype.head_kind if prototype != null else &"bite"
 	var error := ResourceSaver.save(move, path)
 	if error == OK: move = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	return {"error": error, "move": move, "path": path, "script": script_path, "message": "作成しました。条件をつなぐとAIが使います。" if error == OK else "技を保存できません。"}
+	return {"error": error, "move": move, "path": path, "script": script_path, "message": "作成しました。C++の技登録を用意してから条件をつなぎます。" if error == OK else "技を保存できません。"}

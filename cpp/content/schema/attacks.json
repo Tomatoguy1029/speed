@@ -1,0 +1,1069 @@
+{
+  "records": [
+    {
+      "name": "ContactDefinition",
+      "section": 15,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "shape",
+          "type": "u32",
+          "max": 7
+        },
+        {
+          "name": "scale",
+          "type": "u32",
+          "max": 1
+        },
+        {
+          "name": "hit_policy",
+          "type": "u32",
+          "max": 3
+        },
+        {
+          "name": "add_ship_radius",
+          "type": "bool"
+        },
+        {
+          "name": "ship_sweep",
+          "type": "bool"
+        },
+        {
+          "name": "half_width",
+          "source": "width",
+          "type": "f64",
+          "min": 0,
+          "multiplier": 0.5
+        }
+      ]
+    },
+    {
+      "name": "HostileDefinition",
+      "section": 24,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "slow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "stone_visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "BeamDefinition",
+      "section": 26,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "FriendShotDefinition",
+      "section": 27,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "WaveDefinition",
+      "section": 37,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "enemy_min_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "enemy_knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "WallDefinition",
+      "section": 38,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "SlashDefinition",
+      "section": 42,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "claw",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "sample",
+          "type": "u32",
+          "max": 16
+        },
+        {
+          "name": "x",
+          "type": "f32"
+        },
+        {
+          "name": "y",
+          "type": "f32"
+        },
+        {
+          "name": "thickness",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "BoltDefinition",
+      "section": 43,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "LightArrowDefinition",
+      "section": 48,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "cosmic",
+          "type": "bool"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_length_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_width_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "core_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cosmic_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cosmic_star_count",
+          "type": "u32",
+          "max": 8
+        },
+        {
+          "name": "arrow_r",
+          "type": "f32"
+        },
+        {
+          "name": "arrow_g",
+          "type": "f32"
+        },
+        {
+          "name": "arrow_b",
+          "type": "f32"
+        },
+        {
+          "name": "arrow_a",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_r",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_g",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_b",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_a_a",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_r",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_g",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_b",
+          "type": "f32"
+        },
+        {
+          "name": "cosmic_b_a",
+          "type": "f32"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "StarBoltDefinition",
+      "section": 51,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        },
+        {
+          "name": "turn_with_velocity",
+          "type": "bool"
+        },
+        {
+          "name": "visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "stone_visual",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        }
+      ]
+    },
+    {
+      "name": "RingHoldDefinition",
+      "section": 54,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "projectile_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "min": 1,
+          "ref": "HostileDefinition"
+        }
+      ]
+    },
+    {
+      "name": "LumpDefinition",
+      "section": 55,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "min": 1,
+          "ref": "HostileDefinition"
+        }
+      ]
+    },
+    {
+      "name": "FriendDebrisDefinition",
+      "section": 60,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "character_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trail_points",
+          "type": "u32"
+        },
+        {
+          "name": "maximum",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "FriendHullDefinition",
+      "section": 61,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "saw_knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "saw_spin",
+          "type": "f64"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "FriendHullLook",
+      "section": 62,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle",
+          "type": "f64"
+        },
+        {
+          "name": "fixed_angle",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "FriendSawPoint",
+      "section": 63,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "x",
+          "type": "f32"
+        },
+        {
+          "name": "y",
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "ZoneDefinition",
+      "section": 68,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "style",
+          "type": "u32",
+          "max": 7
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "active",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit",
+          "type": "bool"
+        },
+        {
+          "name": "fade",
+          "type": "bool"
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        },
+        {
+          "name": "glow_opacity",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_opacity",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ring_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arm_count",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lightning_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lightning_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fade_duration",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "FloodDefinition",
+      "section": 70,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "beam",
+          "type": "u32",
+          "min": 1,
+          "ref": "BeamDefinition"
+        },
+        {
+          "name": "tail",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "collapse",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "margin",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "LightLanceDefinition",
+      "section": 72,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "ShellDefinition",
+      "section": 80,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "contact",
+          "type": "u32",
+          "min": 1,
+          "ref": "ContactDefinition"
+        },
+        {
+          "name": "flight_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tint_r",
+          "type": "f32"
+        },
+        {
+          "name": "tint_g",
+          "type": "f32"
+        },
+        {
+          "name": "tint_b",
+          "type": "f32"
+        },
+        {
+          "name": "tint_a",
+          "type": "f32"
+        }
+      ]
+    },
+    {
+      "name": "ShellSource",
+      "section": 81,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "mouth_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "store_max",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "ContactShapeKind": [
+      {
+        "name": "PointCircle",
+        "value": "point_circle"
+      },
+      {
+        "name": "SegmentCircle",
+        "value": "segment_circle"
+      },
+      {
+        "name": "SweptSegment",
+        "value": "sweep_segment"
+      },
+      {
+        "name": "Polyline",
+        "value": "polyline"
+      },
+      {
+        "name": "Fan",
+        "value": "fan"
+      },
+      {
+        "name": "RingBand",
+        "value": "ring_band"
+      },
+      {
+        "name": "Rect",
+        "value": "rect"
+      },
+      {
+        "name": "TaperedBeam",
+        "value": "tapered_beam"
+      }
+    ],
+    "HostileKind": [
+      {
+        "name": "Bullet",
+        "value": "bullet"
+      },
+      {
+        "name": "Missile",
+        "value": "missile"
+      },
+      {
+        "name": "Reflected",
+        "value": "reflected"
+      },
+      {
+        "name": "Slash",
+        "value": "slash"
+      },
+      {
+        "name": "Bolt",
+        "value": "bolt"
+      },
+      {
+        "name": "LightArrow",
+        "value": "light_arrow"
+      },
+      {
+        "name": "CosmicArrow",
+        "value": "cosmic_arrow"
+      },
+      {
+        "name": "StarBolt",
+        "value": "star_bolt"
+      },
+      {
+        "name": "Shell",
+        "value": "shell"
+      }
+    ],
+    "FriendKind": [
+      {
+        "name": "Shot",
+        "value": "shot"
+      },
+      {
+        "name": "Debris",
+        "value": "debris"
+      },
+      {
+        "name": "Hull",
+        "value": "hull"
+      }
+    ],
+    "BeamStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Guide",
+        "value": "guide"
+      },
+      {
+        "name": "Telescope",
+        "value": "telescope"
+      },
+      {
+        "name": "Flood",
+        "value": "flood"
+      },
+      {
+        "name": "Draco",
+        "value": "draco"
+      }
+    ],
+    "WaveStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Ripple",
+        "value": "ripple"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      },
+      {
+        "name": "Pulser",
+        "value": "pulser"
+      }
+    ],
+    "WallStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Trail",
+        "value": "trail"
+      },
+      {
+        "name": "Ray",
+        "value": "ray"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      }
+    ],
+    "DebrisStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Stardust",
+        "value": "stardust"
+      },
+      {
+        "name": "Pump",
+        "value": "pump"
+      }
+    ],
+    "ZoneStyle": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Reticle",
+        "value": "reticle"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      },
+      {
+        "name": "Bite",
+        "value": "bite"
+      },
+      {
+        "name": "Aquila",
+        "value": "aquila"
+      },
+      {
+        "name": "Phoenix",
+        "value": "phoenix"
+      },
+      {
+        "name": "Bomber",
+        "value": "bomber"
+      },
+      {
+        "name": "Pump",
+        "value": "pump"
+      }
+    ]
+  }
+}

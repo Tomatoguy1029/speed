@@ -8,6 +8,7 @@ const GROUPS := {
 	"移動": ["速度・旋回", "距離・隊列"],
 	"攻撃": ["威力・効果", "予告・頻度", "照準・追尾", "範囲・形状", "弾速・軌道"],
 	"固有行動": ["分裂・召喚", "捕捉・投擲", "その他の行動"],
+	"報酬": ["星と結晶"],
 }
 const BASICS := {
 	"hitstop_multiplier": ["ヒットストップ時間倍率", "一撃撃破・体当たりクリティカルの停止実時間に掛ける。1で共通時間、0で停止なし。共通の累積上限内で停止。", "倍"],
@@ -20,11 +21,14 @@ const BASICS := {
 }
 
 static func docs(key: String) -> Array:
+	if key=="rank": return ["星の数","HPの星計算と、上書きのない固定報酬へ反映する。","個"]
+	if key.begins_with("xp_reward_counts."): return [StageEnemyTuning.label(key),"撃破時に供給する固定報酬の数。","個"]
 	if BASICS.has(key): return BASICS[key]
 	var name := key.trim_prefix("params.")
 	return EnemyDef.PARAMS_DOCS.get(name, [name, "敵固有の行動が参照する値。", "—"])
 
 static func category(key: String) -> String:
+	if key=="rank" or key.begins_with("xp_reward_counts."): return "星と結晶"
 	if key == "hitstop_multiplier": return "ヒットストップ"
 	if key in ["hp", "armor"]: return "耐久・装甲"
 	if key == "weak_arc" or key == "params.front_arc": return "弱点"
@@ -104,7 +108,7 @@ static func editor(controls: Array) -> SpinBox:
 	var spin := SpinBox.new()
 	spin.name = "Value"
 	spin.min_value = minf(data.base, StageEnemyTuning.minimum(data.key))
-	spin.max_value = maxf(data.base, 100000.0)
+	spin.max_value = 10.0 if data.key=="rank" else maxf(data.base, 100000.0)
 	spin.step = 1.0 if data.integer else 0.01
 	spin.value = data.value
 	spin.custom_minimum_size.x = 100

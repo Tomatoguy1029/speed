@@ -21,6 +21,12 @@ var _shock: ColorRect
 var _ripple: ColorRect
 ## 震空の歪み：pos（世界）、radius（世界）、age、cell（世界の1ドット）
 var _ripples: Array = []
+var _ripples_from_frame := false
+func sync_contact_ripples(values: Array, cell: float) -> void:
+	_ripples_from_frame = true
+	_ripples.clear()
+	for value: Dictionary in values.slice(-8):
+		_ripples.append({"pos":value.pos,"radius":value.radius,"age":value.age,"cell":cell})
 ## 衝撃波：pos、radius（世界）、life、max
 var _waves: Array = []
 
@@ -36,6 +42,13 @@ func setup(world: Node2D, camera: Camera2D, glow_layers: Array, overlay_layer :=
 		_setup_bloom_pass(glow_layers)
 	_setup_shockwave()
 	_setup_sparks()
+
+## 外観の追加で敵の照明層が増えたら、画面効果の順序をまとめて移す。
+func set_overlay_layer(value: int) -> void:
+	var offset := value-_overlay_layer
+	_overlay_layer = value
+	for child in get_children():
+		if child is CanvasLayer: child.layer += offset
 
 func _setup_hdr_glow(glow_layers: Array) -> void:
 	get_viewport().use_hdr_2d = true
@@ -163,8 +176,8 @@ func _update_waves(dt: float, view_center: Vector2, zoom: float) -> void:
 	mat.set_shader_parameter("aspect", size.x / size.y)
 
 func _update_ripples(dt: float, view_center: Vector2, zoom: float) -> void:
-	for r in _ripples:
-		r.age += dt
+	if not _ripples_from_frame:
+		for r in _ripples: r.age += dt
 	_ripples = _ripples.filter(func(r): return r.age < 0.58)
 	_ripple.visible = not _ripples.is_empty()
 	if _ripples.is_empty():

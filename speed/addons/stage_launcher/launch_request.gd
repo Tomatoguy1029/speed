@@ -21,15 +21,19 @@ const STAGE_PREFIX := "stage_"
 static var start_time := 0.0
 ## 起動の入口。旧形式の予約は unknown として受け取る。
 static var source := "unknown"
+## 途中再生の生成結果。予約を消費するときだけ受け取り、次の起動へ残さない。
+static var content: Dictionary = {}
 
 ## 起動を予約する（エディタ側から呼ぶ）。start は、ランの時計をこの時刻から始める（出現タイムラインの「ここから試す」）。
-static func request(stage: int, start := 0.0, entry := "stage_launcher") -> void:
+static func request(stage: int, start := 0.0, entry := "stage_launcher", source_path := "") -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(PATH)  # 直前のステージの記録を残したいので、失敗しても続ける
 	cfg.set_value(SECTION, "pending", true)
 	cfg.set_value(SECTION, "stage", stage)
 	cfg.set_value(SECTION, "start", start)
 	cfg.set_value(SECTION, "source", entry)
+	cfg.set_value(SECTION, "source_path", source_path)
+	cfg.set_value(SECTION, "content", {})
 	cfg.set_value(SECTION, "last_stage", stage)
 	cfg.save(PATH)
 
@@ -37,6 +41,7 @@ static func request(stage: int, start := 0.0, entry := "stage_launcher") -> void
 static func consume() -> int:
 	start_time = 0.0
 	source = "unknown"
+	content = {}
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) != OK:
 		return 0
@@ -45,10 +50,27 @@ static func consume() -> int:
 	var stage := int(cfg.get_value(SECTION, "stage", 0))
 	start_time = float(cfg.get_value(SECTION, "start", 0.0))
 	source = str(cfg.get_value(SECTION, "source", "unknown"))
+	var prepared: Variant = cfg.get_value(SECTION, "content", {})
+	if prepared is Dictionary: content = prepared.duplicate(true)
 	cfg.set_value(SECTION, "pending", false)
+	cfg.set_value(SECTION, "content", {})
 	cfg.set_value(SECTION, "start", 0.0)
 	cfg.save(PATH)
 	return stage
+
+## 実行前フックが、保存した途中再生の制作元と生成先を受け渡す。
+static func pending_timeline() -> Dictionary:
+	var cfg := ConfigFile.new()
+	if cfg.load(PATH) != OK or not cfg.get_value(SECTION, "pending", false) or cfg.get_value(SECTION, "source", "") != "timeline": return {}
+	return {"stage":cfg.get_value(SECTION,"stage",0),"time":cfg.get_value(SECTION,"start",0.0),"source":cfg.get_value(SECTION,"source_path","")}
+
+static func set_timeline_content(prepared: Dictionary) -> Error:
+	var cfg := ConfigFile.new()
+	var error := cfg.load(PATH)
+	if error != OK: return error
+	if not cfg.get_value(SECTION,"pending",false) or cfg.get_value(SECTION,"source","") != "timeline": return ERR_INVALID_DATA
+	cfg.set_value(SECTION,"content",prepared)
+	return cfg.save(PATH)
 
 ## 直前に直接起動したステージ。記録がなければ 0。
 static func last_stage() -> int:

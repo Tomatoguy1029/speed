@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" path="res://tools/preview_pixel_assets.gd" id="1"]
 
-[node name="PixelPreview" type="Node"]
+[node name="PixelPreview" type="Control"]
 script = ExtResource("1")

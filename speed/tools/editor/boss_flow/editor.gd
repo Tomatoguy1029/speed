@@ -1211,7 +1211,7 @@ func _analyze_coverage() -> void:
 	var total := 0
 	for kind in preview_heads: total += preview_heads[kind]
 	var count := 3 if total <= 3 else 5 if total <= 5 else 8
-	var kinds: Array = load("res://scripts/bosses/hydra_boss.gd").NECKS[count]
+	var kinds: Array = load("res://scripts/data_types/hydra_technique.gd").NECKS[count]
 	var used := {}
 	var heads: Array = []
 	for i in kinds.size():
@@ -1492,7 +1492,7 @@ func _append_arcs() -> void:
 	button.pressed.connect(func():
 		var old: Array=current.field("arcs")
 		var next := old.duplicate()
-		next.append(preload("res://scripts/bosses/draco_exhale_arc.gd").new())
+		next.append(preload("res://scripts/data_types/boss_techniques/draco/exhale_arc.gd").new())
 		history.create_action("吐き出しの弧を追加")
 		history.add_do_method(_assign.bind(current,"arcs",next))
 		history.add_undo_method(_assign.bind(current,"arcs",old))

@@ -31,6 +31,19 @@ class CombatSummaryTest(unittest.TestCase):
         self.assertEqual(len(data["observed_outcomes"]), 2)
         self.assertEqual(data["coverage"], "recorded_interval")
 
+    def test_cpp_envelopes_and_player_hp_loss(self):
+        data = self.run_rows([
+            {"type": "header", "format": "cpp_events_v1", "during_run": False},
+            {"type": "xp_drop", "sequence": 8, "payload": {"base_xp": 2}},
+            {"type": "hurt", "sequence": 9, "payload": {"amount": 100}},
+            {"type": "combat_player_damage", "sequence": 10, "payload": {"hp_before": 30, "hp_after": 28, "amount": 100, "reason": "applied", "cause": "rain"}},
+            {"type": "combat_player_damage", "sequence": 11, "payload": {"hp_before": 28, "hp_after": 28, "reason": "shield"}},
+            {"type": "end"},
+        ])
+        self.assertEqual(data["applied_damage"], {"player": 2})
+        self.assertEqual(data["sequence_gaps"], 0)
+        self.assertEqual(data["damage_reasons"], {"player:applied": 1, "player:shield": 1})
+
     def test_truncated_or_dropped_records_are_partial(self):
         data = self.run_rows([{"type": "start", "combat_version": 1}, {"type": "boss_phase", "sequence": 3}], suffix='{"type":')
         self.assertEqual(data["coverage"], "partial")
@@ -43,6 +56,29 @@ class CombatSummaryTest(unittest.TestCase):
         self.assertEqual(data["events"], {"boss_phase": 1})
         self.assertEqual(data["sequence_gaps"], 0)
         self.assertEqual(data["coverage"], "partial")
+
+    def test_cpp_missing_transport_is_partial_without_visible_sequence_gap(self):
+        for loss in [{"transport_complete": False}, {"effect_tracking_dropped": 2}]:
+            with self.subTest(loss=loss):
+                data = self.run_rows([
+                    {"type": "start", "format": "cpp_events_v2", "combat_version": 1,
+                     "combat_config": {"level": 2}, "event_sequence_at_start": 20},
+                    {"type": "boss_action", "sequence": 21},
+                    {"type": "end", "combat_summary": loss},
+                ])
+                self.assertEqual(data["sequence_gaps"], 0)
+                self.assertEqual(data["coverage"], "partial")
+
+    def test_cpp_disabled_diagnostics_keep_normal_damage_outside_limits(self):
+        data = self.run_rows([
+            {"type": "start", "format": "cpp_events_v2", "combat_version": 1,
+             "combat_config": {"level": 0}, "event_sequence_at_start": 8},
+            {"type": "hurt", "sequence": 9, "amount": 2},
+            {"type": "combat_player_damage", "sequence": 10, "hp_before": 8, "hp_after": 6},
+            {"type": "end", "combat_summary": {"transport_complete": True}},
+        ])
+        self.assertEqual(data["coverage"], "disabled")
+        self.assertEqual(data["applied_damage"], {"player": 2})
 
 
 if __name__ == "__main__":

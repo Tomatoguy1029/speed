@@ -3,7 +3,8 @@
 class_name StageEnemyTuning
 extends RefCounted
 
-const FIELDS := ["hp", "armor", "speed", "accel", "turn", "weak_arc", "hitstop_multiplier"]
+const FIELDS := ["hp", "armor", "speed", "accel", "turn", "weak_arc", "hitstop_multiplier", "rank", "xp_reward_counts.low", "xp_reward_counts.mid", "xp_reward_counts.high"]
+const REWARD_KINDS := ["low","mid","high"]
 const REWARDS := ["big_crystal", "gem_count", "shield_time"]
 const LABELS := {"hp": "標準HP（星の計算後）", "armor": "装甲", "speed": "速さ", "accel": "加速", "turn": "旋回速度", "weak_arc": "背面の弱点の半角", "hitstop_multiplier": "ヒットストップ時間倍率"}
 
@@ -19,10 +20,13 @@ static func keys_for(definition: EnemyDef) -> Array[String]:
 
 static func base_value(definition: EnemyDef, key: String, cfg: GameConfig) -> float:
 	if key == "hp": return definition.base_hp(cfg)
+	if key.begins_with("xp_reward_counts."): return float(definition.resolve_xp_reward().counts[REWARD_KINDS.find(key.get_slice(".",1))])
 	if key.begins_with("params."): return float(definition.params[key.trim_prefix("params.")])
 	return float(definition.get(key))
 
 static func label(key: String) -> String:
+	if key=="rank": return "星の数"
+	if key.begins_with("xp_reward_counts."): return ["青い結晶の数","緑の結晶の数","黄色い結晶の数"][REWARD_KINDS.find(key.get_slice(".",1))]
 	if LABELS.has(key): return LABELS[key]
 	var name := key.trim_prefix("params.")
 	return "%s (%s)" % [EnemyDef.PARAMS_DOCS[name][0], name] if EnemyDef.PARAMS_DOCS.has(name) else name
@@ -42,16 +46,26 @@ static func error_for(definition: EnemyDef, values: Dictionary) -> String:
 		var value: Variant = values[key]
 		if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)) or float(value) < minimum(key) or float(value) > 100000.0:
 			return "範囲外の数値: %s" % key
+		if (key=="rank" or key.begins_with("xp_reward_counts.")) and (float(value)!=floorf(float(value)) or (key=="rank" and float(value)>10.0)):
+			return "星の数と結晶の数は範囲内の整数で指定してください。"
 		if key.begins_with("params.") and definition.params[key.trim_prefix("params.")] is int and float(value) != floorf(float(value)):
 			return "整数で指定する項目: %s" % key
 	return ""
 
 static func resolve(definition: EnemyDef, values: Dictionary) -> EnemyDef:
 	var result := definition.duplicate(true) as EnemyDef
+	if values.has("rank"): result.rank = int(values.rank)
+	var rewards: PackedInt32Array = result.resolve_xp_reward().counts.duplicate()
+	var reward_changed := false
 	for key: String in values:
 		if key == "hp": result.stage_hp = float(values[key])
+		elif key=="rank": pass
+		elif key.begins_with("xp_reward_counts."):
+			rewards[REWARD_KINDS.find(key.get_slice(".",1))] = int(values[key])
+			reward_changed = true
 		elif key.begins_with("params."):
 			var name := key.trim_prefix("params.")
 			result.params[name] = int(values[key]) if definition.params[name] is int else float(values[key])
 		else: result.set(key, float(values[key]))
+	if reward_changed: result.xp_reward_counts = rewards
 	return result

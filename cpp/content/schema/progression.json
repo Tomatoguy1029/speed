@@ -1,0 +1,216 @@
+{
+  "records": [
+    {
+      "name": "ProgressionDefinition",
+      "section": 17,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "xp_base",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "xp_growth",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "xp_curve",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "level_heal",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "owned_card_bias",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "levelup_bonus_chance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "levelup_bonus_more",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "levelup_bonus_last",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "weapon_slots",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "trait_slots",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "reroll_count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "start_weapon_choices",
+          "type": "u32",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "LoadoutAsset",
+      "section": 18,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "asset",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        }
+      ]
+    },
+    {
+      "name": "PostMaxDefinition",
+      "section": 400,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxTarget",
+      "section": 401,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "effect",
+          "type": "u32",
+          "min": 1,
+          "ref": "PostMaxDefinition"
+        }
+      ]
+    },
+    {
+      "name": "PostMaxInterval",
+      "section": 402,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "parameter",
+          "type": "string"
+        },
+        {
+          "name": "base",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "CardKind": [
+      {
+        "name": "Weapon",
+        "value": "weapon"
+      },
+      {
+        "name": "Trait",
+        "value": "trait"
+      },
+      {
+        "name": "PostMax",
+        "value": "post_max"
+      },
+      {
+        "name": "Heal",
+        "value": "heal"
+      },
+      {
+        "name": "Swap",
+        "value": "swap"
+      },
+      {
+        "name": "Keep",
+        "value": "keep"
+      }
+    ]
+  }
+}

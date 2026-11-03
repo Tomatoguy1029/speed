@@ -103,11 +103,11 @@ func _rubble(at: Vector2, spread: float, alpha: float, color: Color) -> void:
 
 ## 星座は戦闘とは別の遠景。画面上方の小さな領域で、背景の星に重ねる。
 func omen_rect() -> Rect2:
-	var state: RunState = intro.run.state
+	var state = intro.run.state
 	var p: IntroPresentation = intro.presentation
-	var half := state.view_half
-	var center := state.view_center + half * (p.sky_anchor * 2.0 - Vector2.ONE)
-	var extent := minf(half.x, half.y) * 2.0 * p.sky_size
+	var half: Vector2 = state.view_half
+	var center: Vector2 = state.view_center + half * (p.sky_anchor * 2.0 - Vector2.ONE)
+	var extent: float = minf(half.x, half.y) * 2.0 * p.sky_size
 	return Rect2(center - Vector2.ONE * extent * 0.5, Vector2.ONE * extent)
 
 ## 既存の星座の絵から明るい部分を採り、瓦礫の行き先をその形に合わせる。
@@ -161,14 +161,14 @@ func _sky_rubble(center: Vector2, image_size: Vector2, extent: float, time: floa
 	for i in _sky_targets.size():
 		var target := _sky_targets[i] * image_size
 		var angle := float(i) * 2.399963 + time * 0.35 * (1.0 - gather)
-		var outer := Vector2.from_angle(angle) * extent * (0.75 + float(i % 5) * 0.07)
+		var outer = Vector2.from_angle(angle) * extent * (0.75 + float(i % 5) * 0.07)
 		var pixel_step := px * 2.0
-		var at := ((center + outer.lerp(target, gather)) / pixel_step).round() * pixel_step
-		var direction := (center + target - at).normalized()
+		var at = ((center + outer.lerp(target, gather)) / pixel_step).round() * pixel_step
+		var direction = (center + target - at).normalized()
 		var glow := p.sky_glow_color
 		draw_line(at - direction * extent * 0.065 * (1.0 - gather), at,
 			Color(glow, reveal * 0.28), px * 2.0)
-		var scale := extent * (0.012 + float(i % 3) * 0.003)
+		var scale = extent * (0.012 + float(i % 3) * 0.003)
 		var piece := PackedVector2Array([Vector2(-1, -0.6), Vector2(0.6, -0.8), Vector2(1, 0.6), Vector2(-0.4, 1)])
 		for j in piece.size():
 			piece[j] = ((at + piece[j].rotated(angle) * scale) / pixel_step).round() * pixel_step
@@ -188,9 +188,9 @@ func _sky_mist(center: Vector2, extent: float, time: float, reveal: float, _puls
 
 ## 冒頭の影は仮素材。画面に対する比で構成し、正式な竜の絵へ差し替える。
 func _opening(beat: int, time: float) -> void:
-	var state: RunState=intro.run.state
-	var focus := state.view_center+Vector2(-state.view_half.x*0.1,-state.view_half.y*0.48)
-	var extent := minf(state.view_half.x,state.view_half.y)
+	var state = intro.run.state
+	var focus: Vector2 = state.view_center+Vector2(-state.view_half.x*0.1,-state.view_half.y*0.48)
+	var extent: float = minf(state.view_half.x,state.view_half.y)
 	var progress := clampf(time/intro.presentation.devour_time,0.0,1.0) if beat==intro.Beat.DEVOUR else (1.0 if beat==intro.Beat.DEPART else 0.0)
 	if beat==intro.Beat.FOCUS or (beat==intro.Beat.DEVOUR and progress<0.7): _star(focus,1.0,Color("#f3f7ff"))
 	if beat==intro.Beat.FOCUS: return

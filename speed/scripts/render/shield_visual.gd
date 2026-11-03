@@ -28,24 +28,22 @@ static func plate(c: CanvasItem, p: Vector2, facing: float, r: float, arc: float
 	var u := Vector2.from_angle(facing)
 	c.draw_circle(p + u * r * 0.95, r * 0.12, Color.WHITE if flash > 0.0 else GUARD)
 
-static func enemy(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	plate(c, t.pos[i], t.facing[i], t.r[i], float(t.def[i].params.front_arc), minf(1.0, t.flash[i] * 10.0))
-
-static func equipped(c: CanvasItem, render: RunPresentation, ship_radius: float, scale: float, visual_pos := Vector2.INF) -> void:
-	var state := render.state
+static func equipped_frame(c: CanvasItem, values: Dictionary) -> void:
+	var scale: float = values.scale
+	var ship_radius: float = values.ship_radius
 	# 実行中にスクリプトを更新した場合も、旧一枚描画を重ねて残さない。
 	var old := c.get_node_or_null("ScutumGuard") as MeshInstance2D
 	if old != null:
 		old.hide()
 		if not old.is_queued_for_deletion(): old.queue_free()
 	var canvas := c.get_node_or_null("ScutumGuardLighting") as CanvasLayer
-	if state.ship_shield_t <= 0.0:
+	if values.remaining <= 0.0:
 		if canvas != null: canvas.hide()
 		return
 	if canvas == null:
 		canvas = CanvasLayer.new()
 		canvas.name = "ScutumGuardLighting"
-		canvas.layer = (render._lit_enemy_marks.get_parent() as CanvasLayer).layer + 1
+		canvas.layer = values.layer
 		canvas.follow_viewport_enabled = true
 		c.add_child(canvas)
 		var root := Node2D.new()
@@ -94,32 +92,27 @@ static func equipped(c: CanvasItem, render: RunPresentation, ship_radius: float,
 			light.range_layer_max = canvas.layer
 			canvas.add_child(light)
 	var node := canvas.get_node("ScutumGuard") as Node2D
-	var heading := state.ship_heading.angle()
+	var heading: float = values.angle
 	# airship.pngの可視範囲(0,10)-(30,50)と、実際の描画原点(-15.5,-30)。
-	var center: Vector2 = state.ship_pos if visual_pos == Vector2.INF else visual_pos
+	var center: Vector2 = values.position
 	node.position = center + Vector2(-0.5 * scale, 0).rotated(heading + PI * 0.5)
 	node.rotation = heading
 	node.scale = Vector2.ONE * maxf(ship_radius * 2.5, 36.0 * scale) / 65.0
 	canvas.show()
 	var membrane_material := (node.get_node("Membrane") as MeshInstance2D).material as ShaderMaterial
-	membrane_material.set_shader_parameter("clock", state.world_time)
+	membrane_material.set_shader_parameter("clock", values.clock)
 	(node.get_node("Base") as Sprite2D).self_modulate = c.self_modulate
-	var source := render.shield_source_type
-	render._ensure_enemy_batch(source)
-	var def := render.run.enemies.def_of(source)
-	var painted := render._armor_batches[source].texture as CanvasTexture
-	var source_material := render._armor_batches[source].material as ShaderMaterial
 	var guard_material := (node.get_node("Armor") as Sprite2D).material as ShaderMaterial
 	# 元画像と同じ座標のcropなので、元の領域キーで準備した塗装をそのまま参照する。
-	guard_material.set_shader_parameter("painted_armor", painted.diffuse_texture)
+	guard_material.set_shader_parameter("painted_armor", values.paint)
 	for key in ["brightness", "ambient", "normal_strength"]:
-		guard_material.set_shader_parameter(key, source_material.get_shader_parameter(key))
+		guard_material.set_shader_parameter(key, values.settings[key])
 	for i in 2:
 		var prefix := "key_" if i == 0 else "fill_"
 		var light := canvas.get_node("UpperLeftLight" if i == 0 else "LowerRightLight") as DirectionalLight2D
-		light.energy = def.visual_value(prefix + "energy", render.lighting_settings.get(prefix + "energy"))
-		light.rotation_degrees = def.visual_value(prefix + "angle", render.lighting_settings.get(prefix + "angle"))
-		light.height = def.visual_value("height", render.lighting_settings.height)
+		light.energy = values.settings[prefix+"energy"]
+		light.rotation_degrees = values.settings[prefix+"angle"]
+		light.height = values.settings.height
 
 static func hide_equipped(c: CanvasItem) -> void:
 	var canvas := c.get_node_or_null("ScutumGuardLighting") as CanvasLayer

@@ -26,10 +26,6 @@ func _apply_effect_settings() -> void:
 	flight_scale = float(fixed.flight_scale)
 	effect_tint = fixed.effect_tint
 
-func setup(render: RunPresentation) -> void:
-	super.setup(render)
-	_prepare_mesh()
-
 func _prepare_mesh() -> void:
 	if _mesh != null: return
 	_mesh = QuadMesh.new()
@@ -37,7 +33,7 @@ func _prepare_mesh() -> void:
 	_mesh.size = Vector2(800, 256)
 
 func _ready() -> void:
-	if rm == null:
+	if true:
 		_prepare_mesh()
 		preview_restart()
 
@@ -45,24 +41,11 @@ func begin_batch() -> void:
 	_count = 0
 func end_batch() -> void:
 	for n in range(_count, _nodes.size()): _nodes[n].hide()
-func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> bool:
-	var payload: Dictionary = pr.pump_shells.get(i, {})
-	var angle := pr.hostile_vel[i].angle()
-	var direction := Vector2.from_angle(angle)
-	var mouth: Vector2 = payload.get("mouth", pos - direction * 1000.0)
-	var reach := maxf(0.0, (pos - mouth).dot(direction))
-	_present(c, pos, angle, pr.hostile_r[i], state.world_time, payload.get("types", PackedStringArray()), float(payload.get("full", 0.0)), reach)
-	return true
-
-## 通常ランはScopeで準備済みの塗装画像を共有する。編集用の単独プレビューも生成済み画像を読む。
 func _contents_texture(type: StringName) -> Texture2D:
 	if not _textures.has(type):
-		if rm != null:
-			_textures[type] = rm._enemy_texture(type)
-		else:
-			var look := RunPresentation.load_look(type)
-			var def := load("res://data/enemies/%s.tres" % type) as EnemyDef
-			_textures[type] = RunPresentation.look_texture(look, _preview_images, def.armor_colors) if look != null and def != null else null
+		var look := RunPresentation.load_look(type)
+		var def := load("res://data/enemies/%s.tres" % type) as EnemyDef
+		_textures[type] = RunPresentation.look_texture(look, _preview_images, def.armor_colors) if look != null and def != null else null
 	return _textures[type]
 
 func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: float, contents: PackedStringArray, full: float, reach := 1000000.0) -> void:
@@ -70,7 +53,7 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 		var created := MeshInstance2D.new()
 		created.mesh = _mesh
 		var created_material := ShaderMaterial.new()
-		var editable := rm == null or ShaderTuning.previewing()
+		var editable := true
 		created_material.shader = SHADER if editable else RUNTIME_SHADER
 		if not editable:
 			created_material.set_shader_parameter("linear_colors", RenderingServer.get_current_rendering_method() != "gl_compatibility")
@@ -89,7 +72,7 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 	node.position = pos - dir * 55.0 * scale_px
 	node.rotation = angle
 	node.scale = Vector2.ONE * scale_px
-	node.modulate = RenderPipeline.plain_color(rm._layers.projectiles, effect_tint) if rm != null else Color.WHITE
+	node.modulate = Color.WHITE
 	node.show()
 	var material := node.material as ShaderMaterial
 	if _content_types[slot] != contents or _content_full[slot] != full:
@@ -123,7 +106,7 @@ func _present(c: CanvasItem, pos: Vector2, angle: float, radius: float, clock: f
 
 ## 単独プレビューも同じ光弾・描画パラメータを使う。飛行を画面内へ縮尺表示する。
 func _process(dt: float) -> void:
-	if rm == null: preview_step(0.0 if preview_paused else dt)
+	if true: preview_step(0.0 if preview_paused else dt)
 
 func preview_restart(age := 0.0) -> void:
 	_preview_age = age

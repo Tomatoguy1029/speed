@@ -3,7 +3,7 @@ extends RefCounted
 const ARMOR_PAINT := preload("res://tools/content/visual_transforms.gd")
 const VERSION := 1
 const ROOT := "user://enemy_lab"
-const COMMANDS := ["boss_appearance", "armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field"]
+const COMMANDS := ["boss_appearance", "armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field", "post_max"]
 
 static func plain(value):
 	if value is Vector2:
@@ -44,6 +44,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 		var key: String = property.name
 		if int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE and typeof(session.run.cfg.get(key)) in [TYPE_INT, TYPE_FLOAT, TYPE_BOOL] and session.run.cfg.get(key) != ContentManager.base.get(key):
 			spec.config[key] = session.run.cfg.get(key)
+	spec["post_max"] = session.bridge._ui.get("post_max_stacks",{}).duplicate(true)
 	spec["weapons"] = {}
 	for id in session.run.state.weapons: spec.weapons[String(id)] = session.run.state.weapons[id]
 	spec["traits"] = {}
@@ -61,7 +62,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 	for phase in session.run.state.stage.phases:
 		if ContentManager.phases.has(phase.id): phase_ids.append(String(phase.id))
 	var commands := [{"tick": 0, "kind": "phase_set", "args": {"ids": phase_ids}}]
-	var t := session.run.enemies.table as EnemyTable
+	var t = session.run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.dead[i] or t.parent[i] >= 0:
 			continue
@@ -121,7 +122,7 @@ static func validate(data: Dictionary) -> String:
 		return TranslationServer.translate("lab.message_5aa5077c96")
 	if not data.get("spec") is Dictionary or not data.get("history") is Array or not data.get("branches", []) is Array:
 		return TranslationServer.translate("lab.message_03af38d54f")
-	var format_error := TranslationServer.translate("lab.message_03af38d54f")
+	var format_error = TranslationServer.translate("lab.message_03af38d54f")
 	for key in ["tick", "end", "branch_serial"]:
 		if data.has(key) and (not _number_ok(data[key]) or float(data[key]) < 0): return format_error
 	if int(data.get("tick", 0)) > int(data.get("end", 0)): return format_error
@@ -167,11 +168,11 @@ static func validate(data: Dictionary) -> String:
 	for key in ["empty", "auto_spawn", "auto_boss", "invincible"]:
 		if spec.has(key) and not spec[key] is bool: return TranslationServer.translate("lab.message_03af38d54f")
 	for key in spec:
-		if key not in ["seed", "empty", "stage", "auto_spawn", "auto_boss", "invincible", "config", "overrides", "boss_overrides", "meta", "ship_pos", "time", "gauge", "weapons", "traits", "level", "hero", "schedule", "director", "field"]:
+		if key not in ["seed", "empty", "stage", "auto_spawn", "auto_boss", "invincible", "config", "overrides", "boss_overrides", "meta", "ship_pos", "time", "gauge", "weapons", "traits", "level", "hero", "schedule", "director", "field", "post_max"]:
 			return TranslationServer.translate("lab.message_516be31176") + String(key)
 	if int(spec.get("stage", 1)) < 1 or int(spec.get("stage", 1)) > ContentManager.stage_count():
 		return TranslationServer.translate("lab.message_da5e2e784c")
-	for key in ["config", "overrides", "boss_overrides", "meta", "weapons", "traits", "director", "field"]:
+	for key in ["config", "overrides", "boss_overrides", "meta", "weapons", "traits", "director", "field", "post_max"]:
 		if spec.has(key) and not spec[key] is Dictionary: return TranslationServer.translate("lab.message_5023536a4b") + key
 	for pair in [["overrides", false], ["boss_overrides", true]]:
 		var error := _definition_problem(spec.get(pair[0], {}), pair[1])

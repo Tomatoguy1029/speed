@@ -11,24 +11,8 @@ const PERF_INTERVAL_US := 3000000
 ## 保存したファイル名を出しておく時間（実秒）
 const SAVED_NOTICE := 5.0
 const IDENTITY := preload("res://scripts/dev/recording_identity.gd")
-const WEAPON_CAUSES := {"contactWave": "W04", "barrier": "W05", "mine": "W07", "sonic": "W08",
-	"contactArc": "W17", "towShot": "W21", "bipolar": "W22", "interceptor": "W25",
-	"dashRangeDrone": "W26", "afterimage": "W27", "flashSlash": "W28", "endBlast": "W29"}
-
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 var _real_start_us := 0
-var _perf_last_us := 0
-var _perf_window_us := 0
-var _record_names: Dictionary = {}
-var _perf_phase := -1
-var _perf_bonus := false
-var _perf_frames := 0
-var _perf_sum_us := 0
-var _perf_max_us := 0
-var _perf_over_33 := 0
-var _perf_over_50 := 0
-var _perf_hitstop := 0
-var _perf_drawing := 0
-var _perf_tracing := 0
 
 ## 0=off, 1=action/damage, 2=decision candidates (default). Applied at recording start.
 @export_range(0, 2) var combat_level := 2
@@ -36,55 +20,49 @@ var _perf_tracing := 0
 @export var combat_max_events := 30000
 @export var combat_max_bytes := 33554432
 const COMBAT_LINE_BYTES := 16384
+const COMBAT_TYPES := ["boss_decision", "boss_action", "boss_effect", "boss_phase", "combat_damage"]
+var _combat_config: Dictionary = {}
+var _combat_emitted := 0
 var _combat_bytes := 0
-var _combat_dropped := 0
+var _combat_rate_dropped := 0
+var _combat_size_dropped := 0
+var _combat_window := -1
+var _combat_window_count := 0
+var _combat_sequence_gaps := 0
+var _combat_transport_missing := false
+var _combat_effect_dropped_start := 0
+var _ending := false
 var _recording_id := ""
 var _io_failed := false
 var armed := false
-var _run: RunSimulation = null
+## C++ランの通知と、録画区間の読み取り専用集計。
+var _cpp_session_id := 0
+var _cpp_time := 0.0
+var _cpp_next_sample := 0.0
+var _cpp_record_previous := {}
+var _cpp_measurement_previous: Dictionary = {}
+var _cpp_strong_finished: Dictionary = {}
+var _cpp_event_sequence := 0
+var _cpp_perf_previous := {}
+var _cpp_perf_last_us := 0
+var _cpp_perf_frames := 0
+var _cpp_perf_elapsed_us := 0
+var _cpp_perf_ui := {}
+var _cpp_perf_playing := false
+var _cpp_perf_bonus := false
 ## 記録中のランのセッション（木から出たら記録を閉じる）
 var _session: RunSession = null
-## 記録中だけ開く、録画用の処理時間の記録（ゲーム側・表示側・敵の描画の行の数）。性能の区間ごとに書いて空にする
-var _view: RunPresentation = null
-var _perf_sim := {}
-var _perf_view := {}
-var _perf_rows := {}
 ## 性能の区間のあいだに録画が書いた行数と、その時間（マイクロ秒）
 var _self_lines := 0
 var _self_write_us := 0
 var _file: FileAccess = null
-var _next_sample := 0.0
-var _last_xp_gained := 0.0
-var _last_xp_dropped := 0.0
 ## 録画開始以前の供給を観測区間へ混ぜず、基準XPと実取得XPを別々に集計する。
 var _xp_start_summary: Dictionary = {}
 var _last_xp_summary: Dictionary = {}
-## 間隔のあいだにたまった数
-var _kills: Dictionary = {}
-## 倒した原因ごとの数と、与えたダメージの原因ごとの合計（倒しきった分の余りも含む）
-var _kills_by: Dictionary = {}
-var _dealt: Dictionary = {}
-## 命中はJSONLへ1件ずつ書かず、武器・敵種・敵級・原因ごとにsampleへ集約する。
-var _effective: Dictionary = {}
-## 個体ID → 出現時刻と初被弾。開始時点で既存の個体は出現時刻を不明とする。
-var _enemy_seen: Dictionary = {}
-var _enemy_life: Dictionary = {}
-var _enemy_contacts: Dictionary = {}
-## 受けたダメージ（攻撃の種類/撃った敵ごと）
-var _damage: Dictionary = {}
-var _budget_max := 0.0
-## 強敵（星3以上）：id → [種類, 出た時刻, 体当たりの回数, 武器のダメージ, 武器のダメージの原因ごとの合計]
-var _strong: Dictionary = {}
-## 直前に出たカードと、最後に受けた攻撃
-var _offered: Array = []
-var _offer_id := 0
-var _last_hurt: Dictionary = {}
 var _label: Label
 ## 保存したファイル名の表示の残り時間と、その文字
 var _saved_t := 0.0
 var _saved_text := ""
-## Ctrl+F9 の直前から表示待ちだった出来事は、観測区間へ混ぜない。
-var _skip_events := 0
 
 ## 記録を置くフォルダ（書類フォルダの SPEED/recordings。書類フォルダが分からなければユーザーデータの中）。
 static func folder() -> String:
@@ -103,9 +81,11 @@ func _ready() -> void:
 		set_process(false)
 		set_process_input(false)
 		return
+	add_to_group("cpp_recorders")
 	var layer := CanvasLayer.new()
 	layer.layer = 120
 	add_child(layer)
+	preload("res://scripts/ui/canvas_order.gd").register(layer,2)
 	_label = Label.new()
 	_label.anchor_left = 1.0
 	_label.anchor_right = 1.0
@@ -142,13 +122,10 @@ func _set_armed(on: bool) -> void:
 	if on:
 		get_tree().node_added.connect(_on_node_added)
 		for run in get_tree().get_nodes_in_group("recordable_runs"):
-			if run.sim.state == null:
-				_on_node_added(run)
-				continue
-			if run.is_node_ready() and not run.is_queued_for_deletion() and run.sim.state != null:
-				_begin(run, true)
-				if _run != null:
-					break
+			if run.bridge!=null:
+				_begin(run,true)
+				if _cpp_session_id>0: break
+			else: _on_node_added(run)
 	else:
 		if get_tree().node_added.is_connected(_on_node_added):
 			get_tree().node_added.disconnect(_on_node_added)
@@ -162,115 +139,9 @@ func _on_node_added(node: Node) -> void:
 		if not node.started.is_connected(callback): node.started.connect(callback, CONNECT_ONE_SHOT)
 
 func _begin(session: RunSession, during_run := false) -> void:
-	if not is_instance_valid(session):
-		return
-	var run := session.sim
-	if not armed or run == _run or session.is_queued_for_deletion() or run.state == null or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
-		return
-	_end("quit")
-	_run = run
-	_session = session
-	_io_failed = false
-	_combat_bytes = 0
-	_combat_dropped = 0
-	_offer_id = 0
-	_recording_id = "%s-%d" % [run.bosses.diagnostics.run_id, Time.get_ticks_usec()]
-	var directory := _recording_directory()
-	if DirAccess.make_dir_recursive_absolute(directory) != OK:
-		_open_failed()
-		return
-	var stamp := Time.get_datetime_string_from_system().replace(":", "").replace("-", "").replace("T", "_")
-	var base := directory.path_join("stage%d_%s" % [run.state.stage_index, stamp])
-	var path := base + ".jsonl"
-	var suffix := 1
-	while FileAccess.file_exists(path):
-		path = "%s_%d.jsonl" % [base, suffix]
-		suffix += 1
-	_file = FileAccess.open(path, FileAccess.WRITE)
-	if _file == null:
-		_open_failed()
-		return
-	run.frame_events.connect(_on_events)
-	run.phase_changed.connect(_on_phase_changed)
-	run.loadout.cards_opened.connect(_on_cards)
-	run.loadout.loadout_recorded.connect(_on_loadout)
-	run.loadout.choice_recorded.connect(_on_choice)
-	run.pickups.xp_recorded.connect(_write)
-	run.ship.hurt_recorded.connect(_on_hurt)
-	run.ship.recording_hurt_attempt.connect(_on_enemy_contact)
-	run.enemies.recording_spawned.connect(_on_enemy_spawned)
-	run.enemies.recording_released.connect(_on_enemy_released)
-	run.combat.recording_damage.connect(_on_damage_recorded)
-	_skip_events = run.state.events.size() if during_run else 0
-	session.tree_exiting.connect(_end.bind("quit"))
-	_reset_counts()
-	_enemy_seen.clear()
-	_seed_existing_enemies()
-	_on_cards(run.state.cards, false)
-	_last_xp_gained = run.state.xp_gained
-	_last_xp_dropped = run.state.xp_dropped
-	_xp_start_summary = run.pickups.xp_summary().duplicate(true)
-	_last_xp_summary = _xp_start_summary.duplicate(true)
-	_next_sample = run.state.time + INTERVAL
-	var git_state := IDENTITY.git_state()
-	_open_profiles()
-	_perf_start(Time.get_ticks_usec())
-	var names_path := "res://.content/dev/stage_%d.json" % run.state.stage_index
-	_record_names = {}
-	if FileAccess.file_exists(names_path):
-		var names := JSON.new()
-		if names.parse(FileAccess.get_file_as_string(names_path)) == OK and names.data is Dictionary:
-			_record_names = names.data
-	var bands := []
-	var phases: Array = run.state.stage.phases
-	for k in phases.size():
-		var p: PhaseDef = phases[k]
-		bands.append({"id": String(p.id), "name": _record_names.get("phases", {}).get(String(p.id), p.display_name), "start": p.start})
-	var recording_start: Dictionary = run.recording_snapshot()
-	var xp_config := _xp_config()
-	recording_start["trigger"] = "during_run" if during_run else "armed_before_run"
-	var run_start := run.recording_origin.duplicate(true)
-	if not session.recording_initial.is_empty():
-		run_start["conditions"] = session.recording_initial
-	recording_start["conditions"] = {"config": IDENTITY.plain(run.cfg), "profile": IDENTITY.plain(run.ctx.profile),
-		"stats": IDENTITY.stats(run.state.stats), "hitstop_enabled": run.state.hitstop_enabled, "invincible": run.ship.invincible,
-		"rng_seed": str(run.state.rng.seed), "rng_state": str(run.state.rng.state),
-		"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "xp_config": xp_config}
-	if "stage_tuning" in run.enemies:
-		recording_start.conditions["enemy_tuning"] = IDENTITY.plain(run.enemies.get("stage_tuning"))
-	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
-		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
-		"schema_version": 4, "measurement_version": 3, "combat_version": 1, "xp_reward_version": PickupSystem.XP_REWARD_VERSION,
-		"combat_config": {"level": combat_level, "events_per_second": clampi(combat_events_per_second, 1, 1000), "max_events": clampi(combat_max_events, 1, 1000000), "max_bytes": maxi(0, combat_max_bytes), "line_bytes": COMBAT_LINE_BYTES}, "run_start": run_start, "recording_start": recording_start, "missing_prefix": during_run,
-		"xp_config": xp_config, "xp_cumulative_at_start": _xp_start_summary,
-		"equipment_progress": _equipment_progress(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
-		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
-		"git_state": git_state,
-		"perf_excludes_ui_pause": true,
-		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
-	if not run.state.cards.is_empty(): _on_cards(run.state.cards, true, true)
-	# 途中録画の個体はID・種類・保持基準XPと吸収先だけを引き継ぎ、生成時刻・出所を推定しない。
-	if during_run:
-		var existing := run.pickups.xp_snapshot()
-		existing.merge({"type": "xp_existing", "t": run.state.time, "world_t": run.state.world_time,
-			"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "origin": "unobserved"}, true)
-		_write(existing)
-	run.bosses.diagnostics.recorded.connect(_on_combat)
-	run.bosses.diagnostics.configure(0 if _io_failed else combat_level, combat_events_per_second, combat_max_events)
-	_flush()
-	_update_label()
+	if is_instance_valid(session) and session.bridge!=null:
+		_begin_cpp(session,during_run)
 
-## ランで使う機体の強化の段（ID → 段）。開発版の上書きを含む。
-func _meta_levels() -> Dictionary:
-	var out := {}
-	for def: MetaUpgradeDef in ContentManager.meta_upgrades.values():
-		out[String(def.id)] = SaveManager.run_meta_level(def.id)
-	return out
-
-func _xp_config() -> Dictionary:
-	return IDENTITY.xp_config(_run)
-
-## カウンタは区間差、地面・運搬中・指定黄色は書いた時点の値。色跨ぎの保存則は基準XP合計で照合する。
 func _xp_window(current: Dictionary, previous: Dictionary, scope: String) -> Dictionary:
 	var out := {"scope": scope, "counter_color_basis": "supplied_before_absorption_collected_after_conversion"}
 	for key in ["supplied", "collected", "lost", "gold_rolls"]:
@@ -296,362 +167,124 @@ func _base_xp_total(colors: Dictionary) -> float:
 	return total
 
 ## 空き枠は0段として、装備段数を設定上の全枠・全段で割る。選択回数・おまけとは分ける。
-func _equipment_progress() -> Dictionary:
-	var cfg := _run.cfg
-	var weapon_levels := 0
-	for level in _run.state.weapons.values():
-		weapon_levels += clampi(int(level), 0, cfg.weapon_max_level)
-	var trait_levels := 0
-	for level in _run.state.traits.values():
-		trait_levels += clampi(int(level), 0, cfg.trait_max_stacks)
-	var maximum := cfg.weapon_slots * cfg.weapon_max_level + cfg.trait_slots * cfg.trait_max_stacks
-	return {"weapon_levels": weapon_levels, "trait_levels": trait_levels, "max_levels": maximum,
-		"completion": float(weapon_levels + trait_levels) / maximum if maximum > 0 else 0.0}
-
 func _process(delta: float) -> void:
 	if _saved_t > 0.0:
 		_saved_t -= delta
 		_update_label()
-	if _run == null:
+	if _cpp_session_id>0:
+		_cpp_perf_tick(Time.get_ticks_usec())
+		if _cpp_time>=_cpp_next_sample:
+			_cpp_sample()
+			_cpp_next_sample = _cpp_time+INTERVAL
 		return
-	_perf_tick(Time.get_ticks_usec())
-	var d = _run.projectiles.director
-	if d != null:
-		_budget_max = maxf(_budget_max, d.used_cost())
-	if _run.state.time >= _next_sample:
-		_sample()
-		_next_sample = _run.state.time + INTERVAL
-	_update_label()
-
-## 間隔ごとのまとめ。
-func _sample() -> void:
-	var s = _run.state
-	var t = _run.enemies.table
-	var by_star := {}
-	var in_view := 0
-	var total := 0
-	var view: Rect2 = s.view_rect()
-	for i in t.alive.size():
-		if not t.alive[i] or t.dead[i] != 0 or t.def[i] == null:
-			continue
-		total += 1
-		var star := str(t.def[i].rank)
-		by_star[star] = int(by_star.get(star, 0)) + 1
-		if view.has_point(t.pos[i]):
-			in_view += 1
-	var xp_summary := _run.pickups.xp_summary()
-	var xp_window := _xp_window(xp_summary, _last_xp_summary, "recording_interval")
-	var field_xp := _base_xp_total(xp_summary.get("ground", {}))
-	var phase: PhaseDef = _run.spawn.current_phase()
-	_finish_removed_enemies()
-	_write({"type": "sample", "t": _r(s.time), "world_t": s.world_time, "band": String(phase.id),
-		"xp_picked": _r(s.xp_gained - _last_xp_gained), "xp_dropped": _r(s.xp_dropped - _last_xp_dropped), "xp_field": _r(field_xp),
-		"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "xp": xp_window,
-		"xp_picked_actual": xp_window.collected_actual_xp, "xp_dropped_base": _base_xp_total(xp_window.supplied), "xp_field_base": field_xp,
-		"equipment_progress": _equipment_progress(),
-		"level": s.level, "hp": _r(s.ship_hp), "hp_max": _r(s.stats.max_hp),
-		"enemies": total, "in_view": in_view, "by_star": by_star, "kills": _kills, "kills_by": _kills_by, "dealt": _dealt,
-		"effective_damage": _effective.values(), "enemy_life": _enemy_life.values(), "enemy_contacts": _enemy_contacts.values(),
-		"damage": _damage, "attack_budget_max": _r(_budget_max)})
-	_last_xp_gained = s.xp_gained
-	_last_xp_dropped = s.xp_dropped
-	_last_xp_summary = xp_summary.duplicate(true)
-	_reset_counts()
-	_flush()
-
-func _reset_counts() -> void:
-	_kills = {}
-	_kills_by = {}
-	_dealt = {}
-	_effective = {}
-	_enemy_life = {}
-	_enemy_contacts = {}
-	_damage = {}
-	_budget_max = 0.0
-
-func _on_enemy_contact(contact: Dictionary) -> void:
-	var cause := String(contact.cause)
-	var source := String(contact.source)
-	var reason := String(contact.reason)
-	var key := "%s/%s/%s" % [cause, source, reason]
-	if not _enemy_contacts.has(key):
-		_enemy_contacts[key] = {"cause": cause, "source": source, "reason": reason, "count": 0}
-	_enemy_contacts[key].count += 1
-
-func _enemy_class(boss: bool, meteor: bool, rank: int) -> String:
-	if boss: return "boss"
-	if meteor: return "meteor"
-	return "strong" if rank >= 3 else "regular"
-
-func _life_row(enemy_type: String, enemy_class: String, elite: bool) -> Dictionary:
-	var key := "%s/%s/%s" % [enemy_class, enemy_type, elite]
-	if not _enemy_life.has(key):
-		_enemy_life[key] = {"enemy": enemy_type, "class": enemy_class, "elite": elite, "spawned": 0, "killed": 0,
-			"removed": 0, "alive_at_end": 0, "unknown_spawn": 0, "life_world_sum": 0.0,
-			"life_world_count": 0, "first_hit_to_kill_world_sum": 0.0, "first_hit_to_kill_count": 0,
-			"max_hp_at_spawn_sum": 0.0, "max_hp_at_spawn_count": 0}
-	return _enemy_life[key]
-
-func _on_enemy_spawned(row: int) -> void:
-	var t := _run.enemies.table
-	var enemy_type := String(t.type[row])
-	var enemy_class := _enemy_class(t.is_boss[row] != 0, t.meteor_index[row] >= 0,
-		t.def[row].rank if t.def[row] != null else 0)
-	var elite := t.elite[row] != 0
-	_enemy_seen[t.id[row]] = {"enemy": enemy_type, "class": enemy_class, "elite": elite, "t": _run.state.time,
-		"world_t": _run.state.world_time, "observed_spawn": true, "first_hit_world_t": -1.0, "released": false}
-	var life := _life_row(enemy_type, enemy_class, elite)
-	life.spawned += 1
-	life.max_hp_at_spawn_sum += t.max_hp[row]
-	life.max_hp_at_spawn_count += 1
-
-func _seed_existing_enemies() -> void:
-	var t := _run.enemies.table
-	for row in t.alive.size():
-		if t.alive[row] == 0 or t.dead[row] != 0: continue
-		var enemy_type := String(t.type[row])
-		_enemy_seen[t.id[row]] = {"enemy": enemy_type,
-			"class": _enemy_class(t.is_boss[row] != 0, t.meteor_index[row] >= 0,
-				t.def[row].rank if t.def[row] != null else 0),
-			"elite": t.elite[row] != 0, "t": _run.state.time, "world_t": _run.state.world_time,
-			"observed_spawn": false, "first_hit_world_t": -1.0, "released": false}
-
-func _on_enemy_released(row: int) -> void:
-	var id: int = _run.enemies.table.id[row]
-	if _enemy_seen.has(id): _enemy_seen[id].released = true
-
-func _finish_enemy(id: int, result: String, event_world_t := -1.0) -> void:
-	if not _enemy_seen.has(id): return
-	var seen: Dictionary = _enemy_seen[id]
-	var row := _life_row(seen.enemy, seen["class"], bool(seen.elite))
-	var world_t := event_world_t if event_world_t >= 0.0 else _run.state.world_time
-	match result:
-		"killed": row.killed += 1
-		"removed": row.removed += 1
-		"alive": row.alive_at_end += 1
-	if not seen.observed_spawn:
-		row.unknown_spawn += 1
-	elif result == "killed":
-		row.life_world_sum += maxf(0.0, world_t - float(seen.world_t))
-		row.life_world_count += 1
-		if float(seen.first_hit_world_t) >= 0.0:
-			row.first_hit_to_kill_world_sum += maxf(0.0, world_t - float(seen.first_hit_world_t))
-			row.first_hit_to_kill_count += 1
-	_enemy_seen.erase(id)
-
-func _finish_removed_enemies() -> void:
-	for id in _enemy_seen.keys():
-		if _enemy_seen[id].released: _finish_enemy(id, "removed")
-
-func _on_damage_recorded(hit: Dictionary) -> void:
-	var cause := String(hit.cause)
-	var weapon_id := String(hit.weapon_id)
-	if weapon_id == "": weapon_id = WEAPON_CAUSES.get(cause, "")
-	var enemy_type := String(hit.enemy_type)
-	var enemy_class := _enemy_class(bool(hit.boss), bool(hit.meteor), int(hit.rank))
-	var elite := bool(hit.elite)
-	var key := "%s/%s/%s/%s/%s" % [weapon_id, enemy_class, enemy_type, elite, cause]
-	if not _effective.has(key):
-		_effective[key] = {"weapon_id": weapon_id, "enemy": enemy_type, "class": enemy_class, "elite": elite,
-			"cause": cause, "hits": 0, "resolved": 0.0, "applied": 0.0, "overkill": 0.0, "discarded": 0.0}
-	var item: Dictionary = _effective[key]
-	item.hits += 1
-	item.resolved += float(hit.resolved)
-	item.applied += float(hit.applied)
-	item.overkill += float(hit.overkill)
-	item.discarded += maxf(0.0, float(hit.resolved) - float(hit.applied) - float(hit.overkill))
-	var id: int = hit.id
-	if float(hit.applied) > 0.0 and _enemy_seen.has(id) and float(_enemy_seen[id].first_hit_world_t) < 0.0:
-		_enemy_seen[id].first_hit_world_t = _run.state.world_time
-
-func _on_cards(cards: Array, observed := true, snapshot := false) -> void:
-	_offered = []
-	for c in cards:
-		_offered.append("%s:%s:%d" % [c.kind, c.id, int(c.get("level", 0))])
-	if observed and not _offered.is_empty() and _run != null:
-		_offer_id += 1
-		_write({"type": "offer", "t": _r(_run.state.time), "world_t": _run.state.world_time,
-			"offer_id": _offer_id, "source": "initial_choice" if _run.state.start_pick else "comet_swap" if _run.state.swap_pick != &"" else "card",
-			"offered": _offered.duplicate(), "rerolls_left": _run.state.rerolls_left, "snapshot": snapshot})
-
-func _on_choice(card: Dictionary, source: StringName) -> void:
-	_write({"type": "choice", "t": _r(_run.state.time), "world_t": _run.state.world_time,
-		"level": _run.state.level, "source": String(source), "offer_id": _offer_id if _offer_id > 0 else null,
-		"offered": _offered.duplicate(), "chosen": "%s:%s:%d" % [card.kind, card.id, int(card.get("level", 0))]})
-
-func _on_loadout(change: Dictionary) -> void:
-	if int(change.current) > 0:
-		var category := &"weapons" if change.kind == "weapon" else &"traits"
-		var def := ContentManager.definition(category, StringName(change.id))
-		change["definition_sha256"] = IDENTITY.digest(IDENTITY.plain(def))
-	_write(change)
-
-func _on_hurt(hit: Dictionary) -> void:
-	_write({"type": "hurt", "t": hit.t, "world_t": hit.world_t, "amount": hit.amount,
-		"cause": String(hit.cause), "source": String(hit.source), "hp_after": hit.hp_after})
-	var key := String(hit.cause)
-	if String(hit.source) != "": key += "/" + String(hit.source)
-	_damage[key] = _r(float(_damage.get(key, 0.0)) + float(hit.amount))
-	_last_hurt = {"cause": String(hit.cause), "source": String(hit.source)}
-
-func _on_events(events: Array[Dictionary]) -> void:
-	if _run == null:
-		return
-	var time: float = _r(_run.state.time)
-	var pick: Dictionary = {}
-	for e in events:
-		if _skip_events > 0:
-			_skip_events -= 1
-			continue
-		match e.type:
-			&"enemy_tuning_changed", &"enemy_tuning_saved":
-				# t は通知を処理した時計。適用・保存そのものの時計は別に保ち、通知待ちを区別する。
-				var record := {"type": String(e.type), "t": time, "world_t": _run.state.world_time,
-					"event_t": e.get("t", null), "event_world_t": e.get("world_t", null), "values": e.get("values", null)}
-				if e.type == &"enemy_tuning_saved": record["path"] = e.get("path", null)
-				_write(record)
-			&"bonus":
-				_write({"type": "bonus", "t": time, "enter": bool(e.enter), "remaining": _run.state.bonus_t})
-			&"kill":
-				var id: int = e.get("id", -1)
-				_finish_enemy(id, "killed", float(e.get("world_t", -1.0)))
-				if e.get("cause", &"") == &"finale":
-					continue
-				var ty := String(e.get("enemy_type", &""))
-				_kills[ty] = int(_kills.get(ty, 0)) + 1
-				var by := String(e.get("cause", &""))
-				_kills_by[by] = int(_kills_by.get(by, 0)) + 1
-				if _strong.has(id):
-					var rec: Array = _strong[id]
-					_write({"type": "strong", "t": time, "enemy": rec[0], "spawned": rec[1], "life": _r(time - rec[1]),
-						"rams": rec[2], "weapon_damage": _r(rec[3]), "by_cause": rec[4], "killed_by": by, "result": "killed"})
-					_strong.erase(id)
-			&"boss_defeated":
-				_finish_enemy(int(e.get("id", -1)), "killed", float(e.get("world_t", -1.0)))
-			&"hit":
-				var cause: StringName = e.get("cause", &"")
-				var dmg := float(e.get("dmg", 0.0))
-				_dealt[String(cause)] = _r(float(_dealt.get(String(cause), 0.0)) + dmg)
-				var id: int = e.get("id", -1)
-				if _strong.has(id):
-					var rec: Array = _strong[id]
-					if cause == &"ram":
-						rec[2] += 1
-					elif cause != &"bump" and cause != &"touch":
-						rec[3] += dmg
-						rec[4][String(cause)] = _r(float(rec[4].get(String(cause), 0.0)) + dmg)
-			&"strong_spawn":
-				_strong[e.id] = [String(e.enemy_type), time, 0, 0.0, {}]
-			&"clip_group":
-				_write({"type": "clip_group", "t": time, "clip": _record_names.get("clips", {}).get(str(e.clip), str(e.clip)), "key": e.key, "n": e.n})
-			&"clip_group_end":
-				_write({"type": "clip_group_end", "t": time, "clip": _record_names.get("clips", {}).get(str(e.clip), str(e.clip)), "key": e.key})
-			&"phase":
-				var p: PhaseDef = _run.spawn.current_phase()
-				_write({"type": "band", "t": time, "id": String(p.id), "name": _record_names.get("phases", {}).get(String(p.id), p.display_name)})
-			&"levelup":
-				_write({"type": "levelup", "t": time, "level": e.level})
-			&"upgrade":
-				var c: Dictionary = e.card
-				pick = {"type": "pick", "t": time, "level": _run.state.level, "offered": _offered.duplicate(),
-					"chosen": "%s:%s:%d" % [c.kind, c.id, int(c.get("level", 0))], "bonus": 0}
-			&"level_bonus":
-				if not pick.is_empty():
-					pick.bonus += 1
-	if not pick.is_empty():
-		_write(pick)
-
-func _on_phase_changed(phase: int) -> void:
-	if _run == null:
-		return
-	_write({"type": "run_phase", "t": _r(_run.state.time), "phase": RunState.Phase.keys()[phase]})
-	if phase != RunState.Phase.ENDED:
-		return
-	var s = _run.state
-	_end("clear" if s.cleared else ("death" if s.ship_hp <= 0.0 else "quit"))
-
-## ランの記録を閉じる。
 func _end(result: String) -> void:
-	if _run == null:
+	if _cpp_session_id>0 and not _ending:
+		_ending = true
+		if is_instance_valid(_session) and _session.bridge!=null:
+			# 未通知の出来事、観測終了の出来事、終端の順に保存する。
+			if not _session.bridge.collect_frame().ok: _combat_transport_missing = true
+			if not _session.bridge.command("set_recording",{"active":false}).ok: _combat_transport_missing = true
+			if not _session.bridge.collect_frame().ok: _combat_transport_missing = true
+		_flush_cpp_performance()
+		_cpp_sample()
+		var ending := _cpp_record_previous.duplicate(true)
+		ending.merge({"type":"end","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"result":result,
+			"xp_reward_version":2,"xp_cumulative":_last_xp_summary,"xp_observed":_xp_window(_last_xp_summary,_xp_start_summary,"recording_total"),
+			"combat_summary":_combat_summary()},true)
+		ending.erase("xp")
+		ending.erase("measurement_cumulative")
+		ending.erase("strong_observations")
+		_write(ending)
+		_flush()
+		_saved_text = "記録に失敗しました" if _io_failed else "保存："+_file.get_path().get_file()
+		_saved_t = SAVED_NOTICE
+		if _file!=null: _file.close()
+		_file = null
+		_cpp_session_id = 0
+		if is_instance_valid(_session) and _session.bridge!=null:
+			_session.bridge.unsubscribe("recorder:%d" % get_instance_id())
+			_session.bridge.set_metrics_detail(false,StringName("recorder:%d" % get_instance_id()))
+			if is_instance_valid(_session.view): _session.view.get_node("RunPresentation").close_metrics_reader(StringName("recorder:%d" % get_instance_id()))
+			if _session.bridge.before_restore.is_connected(_before_cpp_restore): _session.bridge.before_restore.disconnect(_before_cpp_restore)
+		for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
+			if c.callable.get_object()==self: _session.tree_exiting.disconnect(c.callable)
+		if is_instance_valid(_session) and _session.closing.is_connected(_end): _session.closing.disconnect(_end)
+		_session = null
+		_ending = false
+		_update_label()
 		return
-	# 表示用の待ち行列は消費せず、終了直前の未通知分だけ記録する。
-	_on_events(_run.state.events)
-	var s = _run.state
-	for actor in _run.bosses.actors: actor.finish_combat_observations("observation_end", "recording_end")
-	_run.projectiles.clear_combat_observations()
-	_flush_performance(_perf_last_us)
-	for id in _enemy_seen.keys():
-		_finish_enemy(id, "removed" if _enemy_seen[id].released else "alive")
-	_sample()
-	for id in _strong:
-		var rec: Array = _strong[id]
-		_write({"type": "strong", "t": _r(s.time), "enemy": rec[0], "spawned": rec[1], "life": _r(s.time - rec[1]),
-			"rams": rec[2], "weapon_damage": _r(rec[3]), "by_cause": rec[4], "result": "alive"})
-	_write({"type": "end", "t": _r(s.time), "result": result, "level": s.level, "kills": s.kills,
-		"weapons": _plain(s.weapons), "traits": _plain(s.traits), "last_hurt": _last_hurt if result == "death" else {},
-		"xp_reward_version": PickupSystem.XP_REWARD_VERSION, "xp_cumulative": _last_xp_summary,
-		"xp_observed": _xp_window(_last_xp_summary, _xp_start_summary, "recording_total"), "equipment_progress": _equipment_progress(),
-		"combat_summary": {"emitted": _run.bosses.diagnostics.emitted, "rate_or_count_dropped": _run.bosses.diagnostics.dropped,
-			"size_dropped": _combat_dropped, "bytes": _combat_bytes, "transport_complete": _run.bosses.diagnostics.dropped == 0 and _combat_dropped == 0}})
-	_flush()
-	_saved_text = "記録に失敗しました" if _io_failed else "保存：" + _file.get_path().get_file()
-	_saved_t = SAVED_NOTICE
-	if _file != null: _file.close()
-	_file = null
-	_run.bosses.diagnostics.level = 0
-	_run.projectiles.clear_combat_observations()
-	if _run.bosses.diagnostics.recorded.is_connected(_on_combat): _run.bosses.diagnostics.recorded.disconnect(_on_combat)
-	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.loadout.cards_opened, _on_cards],
-		[_run.pickups.xp_recorded, _write], [_run.loadout.loadout_recorded, _on_loadout],
-		[_run.loadout.choice_recorded, _on_choice],
-		[_run.ship.hurt_recorded, _on_hurt], [_run.ship.recording_hurt_attempt, _on_enemy_contact],
-		[_run.enemies.recording_spawned, _on_enemy_spawned],
-		[_run.enemies.recording_released, _on_enemy_released], [_run.combat.recording_damage, _on_damage_recorded]]:
-		if sig[0].is_connected(sig[1]):
-			sig[0].disconnect(sig[1])
-	for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
-		if c.callable.get_object() == self:
-			_session.tree_exiting.disconnect(c.callable)
-	_close_profiles()
-	_run = null
-	_session = null
-	_xp_start_summary = {}
-	_last_xp_summary = {}
-	_strong = {}
-	_enemy_seen = {}
-	_offered = []
-	_last_hurt = {}
-	_skip_events = 0
-	_update_label()
-
 func _write(record: Dictionary) -> void:
 	if _file != null and not _io_failed:
 		var t0 := Time.get_ticks_usec()
-		_write_line(record)
+		var written := _write_line(record)
 		# 録画そのものの重さ（書いた行数と、行を作って書く時間）
-		_self_lines += 1
+		if written: _self_lines += 1
 		_self_write_us += Time.get_ticks_usec() - t0
 
-func _write_line(record: Dictionary) -> void:
+func _write_line(record: Dictionary) -> bool:
 	# 既存の区間行と出来事を同じ時計精度で並べる。
 	if record.has("t"): record.t = _r(float(record.t))
 	if _real_start_us > 0:
 		if not record.has("real_t"):
 			record.real_t = (Time.get_ticks_usec() - _real_start_us) / 1000000.0
-	if _run != null:
-		record["run_id"] = _run.bosses.diagnostics.run_id
-		record["recording_id"] = _recording_id
-	if not _store_line(JSON.stringify(record)): _fail_io()
+	var line := JSON.stringify(record)
+	var diagnostic: bool = record.get("type","") in COMBAT_TYPES
+	var bytes := line.to_utf8_buffer().size()+1
+	if diagnostic and not _reserve_combat(record,bytes): return false
+	if not _store_line(line):
+		_fail_io()
+		return false
+	if diagnostic:
+		_combat_emitted += 1
+		_combat_bytes += bytes
+	return true
+
+func _reset_combat_recording(state: Dictionary) -> void:
+	_combat_config = {"level":clampi(combat_level,0,2),"events_per_second":clampi(combat_events_per_second,1,1000),
+		"max_events":clampi(combat_max_events,1,1000000),"max_bytes":maxi(0,combat_max_bytes),"line_bytes":COMBAT_LINE_BYTES}
+	_combat_emitted = 0
+	_combat_bytes = 0
+	_combat_rate_dropped = 0
+	_combat_size_dropped = 0
+	_combat_window = -1
+	_combat_window_count = 0
+	_combat_sequence_gaps = 0
+	_combat_transport_missing = false
+	_combat_effect_dropped_start = int(state.get("combat_diagnostics",{}).get("effect_tracking_dropped",0))
+	_cpp_measurement_previous = {}
+	_cpp_strong_finished = {}
+
+func _reserve_combat(record: Dictionary, bytes: int) -> bool:
+	if _combat_config.level==0 or (record.type=="boss_decision" and _combat_config.level<2): return false
+	if bytes>_combat_config.line_bytes or _combat_bytes+bytes>_combat_config.max_bytes:
+		_combat_size_dropped += 1
+		return false
+	var window := int((Time.get_ticks_usec()-_real_start_us)/1000000)
+	if window!=_combat_window:
+		_combat_window = window
+		_combat_window_count = 0
+	if _combat_window_count>=_combat_config.events_per_second or _combat_emitted>=_combat_config.max_events:
+		_combat_rate_dropped += 1
+		return false
+	_combat_window_count += 1
+	return true
+
+func _combat_summary() -> Dictionary:
+	var effect_dropped := maxi(0,int(_cpp_record_previous.get("combat_diagnostics",{}).get("effect_tracking_dropped",0))-_combat_effect_dropped_start)
+	return {"emitted":_combat_emitted,"rate_or_count_dropped":_combat_rate_dropped,"size_dropped":_combat_size_dropped,
+		"bytes":_combat_bytes,"sequence_gaps":_combat_sequence_gaps,"effect_tracking_dropped":effect_dropped,
+		"transport_missing":_combat_transport_missing,"transport_complete":not _combat_transport_missing and not _io_failed and
+			_combat_rate_dropped==0 and _combat_size_dropped==0 and _combat_sequence_gaps==0 and effect_dropped==0}
 
 func _update_label() -> void:
 	if _label == null:
 		return
 	_label.visible = armed or _saved_t > 0.0
 	var text := "● REC 待機"
-	if _saved_t > 0.0 and _run == null:
+	if _saved_t > 0.0 and _cpp_session_id==0:
 		text = _saved_text
-	elif _run != null:
-		var t := int(_run.state.time)
+	elif _cpp_session_id>0:
+		var t := int(_cpp_time)
 		text = "● REC %d:%02d" % [t / 60, t % 60]
 	# 文字が変わったときだけ書き換える（毎フレーム書き換えると、文字の組み直しが毎回走る）
 	if _label.text != text:
@@ -660,157 +293,7 @@ func _update_label() -> void:
 static func _r(v: float) -> float:
 	return snappedf(v, 0.01)
 
-static func _plain(d: Dictionary) -> Dictionary:
-	var out := {}
-	for k in d:
-		out[String(k)] = d[k]
-	return out
-
-## 記録中の描画フレーム間隔を定数個のカウンタへ集約する。停止・カード選択とボーナスの境界で窓を分ける。
-func _perf_start(now_us: int) -> void:
-	_real_start_us = now_us
-	_perf_last_us = now_us
-	_perf_window_us = now_us
-	_perf_phase = _performance_phase()
-	_perf_bonus = _run.state.bonus_t > 0.0
-	_clear_performance()
-
-func _clear_performance() -> void:
-	_self_lines = 0
-	_self_write_us = 0
-	_perf_sim.clear()
-	_perf_view.clear()
-	_perf_rows.clear()
-	_perf_frames = 0
-	_perf_sum_us = 0
-	_perf_max_us = 0
-	_perf_over_33 = 0
-	_perf_over_50 = 0
-	_perf_hitstop = 0
-	_perf_drawing = 0
-	_perf_tracing = 0
-
-## 報酬・メニューの表示は PLAY のまま世界を止めるため、性能集計では停止として扱う。
-func _performance_phase() -> int:
-	var phase: int = _run.state.phase
-	if phase == RunState.Phase.PLAY and (_run.ui_reward_active or _run.ui_overlay_active):
-		return RunState.Phase.PAUSED
-	return phase
-
-func _perf_tick(now_us: int) -> void:
-	if _perf_last_us == 0:
-		_perf_start(now_us)
-		return
-	var s = _run.state
-	var phase := _performance_phase()
-	var bonus: bool = s.bonus_t > 0.0
-	if phase != _perf_phase or bonus != _perf_bonus:
-		if phase == RunState.Phase.PLAY and phase == _perf_phase:
-			# ボーナスへの出入りも遊んでいる同じ1フレーム。切替時の重さを落とさない。
-			_add_performance_frame(now_us - _perf_last_us)
-			_flush_performance(now_us)
-		else:
-			_flush_performance(_perf_last_us)
-		# 停止・カード選択の間に描いた分を、次の区間へ混ぜない
-		_clear_performance()
-		_perf_phase = phase
-		_perf_bonus = bonus
-		_perf_window_us = now_us
-		_perf_last_us = now_us
-		return
-	var dt := now_us - _perf_last_us
-	_perf_last_us = now_us
-	if phase != RunState.Phase.PLAY or dt <= 0:
-		return
-	_add_performance_frame(dt)
-	if now_us - _perf_window_us >= PERF_INTERVAL_US:
-		_flush_performance(now_us)
-
-func _add_performance_frame(dt: int) -> void:
-	if dt <= 0: return
-	var s = _run.state
-	_perf_frames += 1
-	_perf_sum_us += dt
-	_perf_max_us = maxi(_perf_max_us, dt)
-	if dt > 33333: _perf_over_33 += 1
-	if dt > 50000: _perf_over_50 += 1
-	if s.hitstop > 0.0: _perf_hitstop += 1
-	if s.drawing: _perf_drawing += 1
-	if s.tracing: _perf_tracing += 1
-
-func _flush_performance(now_us: int) -> void:
-	if _perf_frames == 0 or _perf_sum_us <= 0:
-		return
-	var s = _run.state
-	var pk = _run.pickups
-	var pr = _run.projectiles
-	_write({"type": "performance", "t": _r(s.time), "window_end_real": (now_us - _real_start_us) / 1000000.0,
-		"window_start_real": (_perf_window_us - _real_start_us) / 1000000.0,
-		"duration_real": _perf_sum_us / 1000000.0, "world_t": s.world_time, "bonus": _perf_bonus,
-		"frames": _perf_frames, "fps": _perf_frames * 1000000.0 / _perf_sum_us,
-		"frame_ms_mean": _perf_sum_us / 1000.0 / _perf_frames, "frame_ms_max": _perf_max_us / 1000.0,
-		"frames_over_33ms": _perf_over_33, "frames_over_50ms": _perf_over_50,
-		"frames_with_hitstop": _perf_hitstop, "hitstop_frame_ratio": float(_perf_hitstop) / _perf_frames, "frames_drawing": _perf_drawing, "frames_tracing": _perf_tracing,
-		"bonus_at_write": s.bonus_t > 0.0, "objects_at_write": {"enemies": _run.enemies.count(), "enemy_capacity": _run.enemies.slots.capacity(),
-			"friendly": pr.friend_count(), "friendly_capacity": pr.friend_slots.capacity(),
-			"hostile": pr.hostile_count(), "hostile_capacity": pr.hostile_slots.capacity(),
-			"hazards": pr.hazard_count(), "hazard_capacity": pr.hazard_slots.capacity(),
-			"gems": pk.gem_slots.live, "gem_capacity": pk.gem_slots.capacity(),
-			"coins": pk.coin_slots.live, "coin_capacity": pk.coin_slots.capacity(), "capsules": pk.capsules.size(),
-			"corona_members": (_run.enemies.behavior(&"corona").vortex.members.size() if _run.enemies.behavior(&"corona") != null else 0)},
-		"profile": _profile_record()})
-	if _file != null:
-		_flush()
-	_clear_performance()
-	_perf_window_us = now_us
-
-func _open_profiles() -> void:
-	_perf_sim = _run.perf.open(&"recorder")
-	_view = _session.view.get_node_or_null("RunPresentation") as RunPresentation if _session.view != null else null
-	if _view != null:
-		_perf_view = _view.perf.open(&"recorder")
-		_perf_rows = _view.perf_rows.open(&"recorder")
-
-func _close_profiles() -> void:
-	if _run != null:
-		_run.perf.close(&"recorder")
-	if is_instance_valid(_view):
-		_view.perf.close(&"recorder")
-		_view.perf_rows.close(&"recorder")
-	_view = null
-	_perf_sim = {}
-	_perf_view = {}
-	_perf_rows = {}
-
-## 区間の処理時間。sim・view は 項目 → [合計ms, 回数, 1回の最大ms]、enemy_rows は敵の描画1回あたりの行の数の平均、
-## recorder は録画が書いた行数と、行を作って書いた時間の合計。
-func _profile_record() -> Dictionary:
-	var rows := {}
-	for key in _perf_rows:
-		var rec: Array = _perf_rows[key]
-		rows[String(key)] = snappedf(float(rec[0]) / maxi(1, rec[1]), 0.1)
-	return {"sim": _pack_times(_perf_sim), "view": _pack_times(_perf_view), "enemy_rows": rows,
-		"recorder": {"lines": _self_lines, "write_ms": snappedf(_self_write_us / 1000.0, 0.001)}}
-
-static func _pack_times(records: Dictionary) -> Dictionary:
-	var out := {}
-	for key in records:
-		var rec: Array = records[key]
-		out[String(key)] = [snappedf(rec[0] / 1000.0, 0.001), rec[1], snappedf(rec[2] / 1000.0, 0.001)]
-	return out
-
-func _on_combat(record: Dictionary) -> void:
-	if _io_failed or _run == null: return
-	# The source never includes resources, credentials, user input, or scene paths.
-	var bytes := JSON.stringify(record).to_utf8_buffer().size() + 256
-	if bytes > COMBAT_LINE_BYTES or _combat_bytes + bytes > maxi(0, combat_max_bytes):
-		_combat_dropped += 1
-		return
-	_combat_bytes += bytes
-	_write(record)
-
 func _open_failed() -> void:
-	_run = null
 	_session = null
 	_saved_text = "記録ファイルを開けませんでした"
 	_saved_t = SAVED_NOTICE
@@ -831,9 +314,227 @@ func _flush() -> void:
 func _fail_io() -> void:
 	if _io_failed: return
 	_io_failed = true
-	if _run != null: _run.bosses.diagnostics.level = 0
 	push_warning("プレイ記録の書き込みに失敗しました。記録を終了します。")
 	call_deferred("_end", "io_error")
 
 func _exit_tree() -> void:
 	_end("quit")
+
+## 記録中だけ購読し、ほかの購読者の通知の所有権を奪わない。
+func attach_cpp(session: RunSession) -> void:
+	if session.bridge!=null and _cpp_session_id==session.id:
+		if not session.bridge.subscribe("recorder:%d" % get_instance_id(),consume_cpp_frame,["run_time","phase","presentation_frozen","bonus_remaining"]):
+			_combat_transport_missing = true
+
+func _before_cpp_restore() -> void:
+	var session := _session
+	if not is_instance_valid(session) or session.bridge==null: return
+	session.bridge.restored.connect(_resume_cpp_recording.bind(session),CONNECT_ONE_SHOT)
+	_end("restore")
+
+func _resume_cpp_recording(session: RunSession) -> void:
+	if armed and is_instance_valid(session) and session.bridge!=null:
+		_begin_cpp(session,true)
+
+func _begin_cpp(session: RunSession, during_run: bool) -> void:
+	if not armed or _cpp_session_id==session.id or session.is_queued_for_deletion() or not session.is_in_group("recordable_runs"): return
+	var snapshot: Dictionary = session.bridge.read_frame()
+	if not snapshot.ok: return
+	var state: Dictionary = session.bridge.read_recording(true)
+	if not state.ok: return
+	_end("quit")
+	var directory := _recording_directory()
+	if DirAccess.make_dir_recursive_absolute(directory)!=OK:
+		_open_failed()
+		return
+	var stamp := Time.get_datetime_string_from_system().replace(":","").replace("-","").replace("T","_")
+	var base := directory.path_join("cpp_run%d_%s" % [session.id,stamp])
+	var path := base+".jsonl"
+	var suffix := 1
+	while FileAccess.file_exists(path):
+		path = "%s_%d.jsonl" % [base,suffix]
+		suffix += 1
+	_file = FileAccess.open(path,FileAccess.WRITE)
+	if _file==null:
+		_open_failed()
+		return
+	_session = session
+	_cpp_session_id = session.id
+	session.bridge.set_metrics_detail(true,StringName("recorder:%d" % get_instance_id()))
+	_reset_combat_recording(state.value)
+	if not session.bridge.before_restore.is_connected(_before_cpp_restore): session.bridge.before_restore.connect(_before_cpp_restore)
+	if not session.closing.is_connected(_end): session.closing.connect(_end)
+	_cpp_time = snapshot.value.ui.run_time
+	_cpp_perf_ui = snapshot.value.ui
+	_cpp_perf_playing = _cpp_performance_playing()
+	_cpp_perf_bonus = float(_cpp_perf_ui.get("bonus_remaining",0.0))>0.0
+	_cpp_perf_previous = _cpp_metrics()
+	_cpp_perf_last_us = Time.get_ticks_usec()
+	_cpp_perf_frames = 0
+	_cpp_perf_elapsed_us = 0
+	_io_failed = false
+	_real_start_us = Time.get_ticks_usec()
+	_recording_id = "%d-%d" % [session.id,_real_start_us]
+	_cpp_record_previous = state.value
+	_xp_start_summary = state.value.xp.duplicate(true)
+	_last_xp_summary = _xp_start_summary.duplicate(true)
+	_cpp_next_sample = _cpp_time+INTERVAL
+	_cpp_event_sequence = 0
+	if during_run:
+		_cpp_event_sequence = int(_cpp_perf_previous.get("events_emitted",0))
+		for event: Dictionary in snapshot.value.events: _cpp_event_sequence = maxi(_cpp_event_sequence,int(event.sequence))
+	attach_cpp(session)
+	var identity: Dictionary = state.value.identity.duplicate(true)
+	var conditions: Dictionary = IDENTITY.capture(session,state.value)
+	state.value.xp_config = conditions.xp_config
+	identity.merge(conditions.identity,true)
+	var names: Dictionary = conditions.stage_metadata
+	for band: Dictionary in state.value.bands: band["name"] = names.get("phases",{}).get(str(band.id),str(band.id))
+	identity["implementation_revision"] = OS.get_environment("SPEED_BUILD_REVISION")
+	identity["implementation_version"] = "cpp_api%d_state%d" % [identity.abi_version,identity.state_schema_version]
+	identity["xp_reward_config_sha256"] = IDENTITY.digest(state.value.xp_config)
+	var recording_start: Dictionary = state.value.duplicate(true)
+	recording_start["conditions"] = conditions
+	recording_start["trigger"] = "during_run" if during_run else "armed_before_run"
+	recording_start.erase("measurement_cumulative")
+	recording_start.erase("strong_observations")
+	_write({"type":"start","format":"cpp_events_v2","version":2,"schema_version":4,"measurement_version":3,"combat_version":1,"xp_reward_version":2,
+		"stage":identity.stage_id,"start_time":_cpp_time,"date":Time.get_datetime_string_from_system(),"bands":state.value.bands,"run_id":session.id,"recording_id":_recording_id,"epoch":snapshot.value.epoch,"tick":snapshot.value.tick,
+		"missing_prefix":during_run,"during_run":during_run,"event_sequence_at_start":_cpp_event_sequence,"engine_version":Engine.get_version_info().string,"interval":INTERVAL,
+		"identity":identity,"run_start":session.bridge.recording_origin.duplicate(true),"recording_start":recording_start,
+		"meta_levels":conditions.meta_levels,"meta_dev_override":conditions.meta_dev_override,"git_state":identity.git_state,
+		"stage_file":String(names.get("stage_file","")).get_file(),"stage_file_sha256_at_start":FileAccess.get_sha256(names.stage_file) if names.has("stage_file") and FileAccess.file_exists(names.stage_file) else "",
+		"xp_config":state.value.xp_config,"xp_cumulative_at_start":_xp_start_summary,"equipment_progress":state.value.equipment_progress,
+		"combat_config":_combat_config.duplicate(),"perf_excludes_ui_pause":true,"perf_interval_real":PERF_INTERVAL_US/1000000.0})
+	if during_run:
+		var existing: Dictionary = state.value.existing.duplicate(true)
+		existing.merge({"type":"xp_existing","t":_cpp_time,"world_t":state.value.world_t,"xp_reward_version":2,"origin":"unobserved"},true)
+		_write(existing)
+	if not session.bridge.command("set_recording",{"active":not _io_failed,"level":_combat_config.level}).ok:
+		_combat_transport_missing = true
+	_flush()
+	session.tree_exiting.connect(_end.bind("quit"))
+	_update_label()
+
+## 共通の封筒をそのまま保存し、他の購読者の通知列を消費しない。
+func consume_cpp_frame(frame: Dictionary) -> bool:
+	if _cpp_session_id==0 or frame.run_id!=_cpp_session_id: return true
+	_cpp_time = frame.ui.run_time
+	_cpp_perf_ui = frame.ui
+	for event: Dictionary in frame.events:
+		if int(event.sequence)<=_cpp_event_sequence: continue
+		_combat_sequence_gaps += maxi(0,int(event.sequence)-_cpp_event_sequence-1)
+		_cpp_event_sequence = int(event.sequence)
+		var record: Dictionary = event.payload.duplicate(true)
+		for key in ["epoch","sequence","tick","t","world_t","type"]: record[key] = event[key]
+		record["run_id"] = frame.run_id
+		record["recording_id"] = _recording_id
+		_write(_cpp_record_value(record))
+	_update_label()
+	# 書込失敗は記録側で終了させる。同じ行の再試行で重複記録しない。
+	return true
+
+func _cpp_metrics() -> Dictionary:
+	if _session==null or _session.bridge==null: return {}
+	var reader := StringName("recorder:%d" % get_instance_id())
+	if _session.view!=null: return _session.view.get_node("RunPresentation").metrics_snapshot(reader)
+	var result: Dictionary = _session.bridge.read_metrics(reader)
+	return result.value if result.ok else {}
+
+func _cpp_performance_playing() -> bool:
+	return int(_cpp_perf_ui.get("phase",-1))==Phase.Play and not _cpp_perf_ui.get("presentation_frozen",true)
+
+func _cpp_perf_tick(now: int) -> void:
+	var playing := _cpp_performance_playing()
+	var bonus := float(_cpp_perf_ui.get("bonus_remaining",0.0))>0.0
+	if playing!=_cpp_perf_playing or bonus!=_cpp_perf_bonus:
+		if playing and _cpp_perf_playing and _cpp_perf_last_us>0:
+			_cpp_perf_elapsed_us += maxi(0,now-_cpp_perf_last_us)
+			_cpp_perf_frames += 1
+		_flush_cpp_performance()
+		# 停止中の表示処理と実時間を、次の戦闘区間へ持ち込まない。
+		_cpp_perf_previous = _cpp_metrics()
+		_cpp_perf_frames = 0
+		_cpp_perf_elapsed_us = 0
+		_cpp_perf_playing = playing
+		_cpp_perf_bonus = bonus
+		_cpp_perf_last_us = now
+		return
+	if playing and _cpp_perf_last_us>0:
+		_cpp_perf_elapsed_us += maxi(0,now-_cpp_perf_last_us)
+		_cpp_perf_frames += 1
+	_cpp_perf_last_us = now
+	if _cpp_perf_elapsed_us>=PERF_INTERVAL_US: _flush_cpp_performance()
+
+func _flush_cpp_performance() -> void:
+	if _cpp_perf_frames==0 or _session==null: return
+	var current := _cpp_metrics()
+	if current.is_empty(): return
+	var profile := preload("res://scripts/runtime/run_metrics.gd").window(current,_cpp_perf_previous,_cpp_perf_frames,_cpp_perf_elapsed_us)
+	_write({"type":"performance","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"bonus":_cpp_perf_bonus,"frames":_cpp_perf_frames,"profile":profile})
+	_cpp_perf_previous = current
+	_cpp_perf_frames = 0
+	_cpp_perf_elapsed_us = 0
+
+## 定期記録では集計だけを読み、個々の結晶は途中開始時に一度だけ写す。
+func _cpp_sample() -> void:
+	if _session==null or _session.bridge==null: return
+	var response: Dictionary = _session.bridge.read_recording()
+	if not response.ok:
+		_combat_transport_missing = true
+		return
+	var current: Dictionary = response.value
+	var window := _xp_window(current.xp,_last_xp_summary,"recording_interval")
+	var record: Dictionary = current.duplicate(true)
+	var measured: Dictionary = current.get("measurement_cumulative",{})
+	for key in ["effective_damage","enemy_life","enemy_contacts"]:
+		record[key] = _measurement_rows(measured.get(key,{}),_cpp_measurement_previous.get(key,{}))
+	for key in ["kills","kills_by","dealt","damage"]:
+		record[key] = _counter_difference(measured.get(key,{}),_cpp_measurement_previous.get(key,{}))
+	var budget_max := float(current.get("attack_budget_used",0.0))
+	var budget_changes := _counter_difference(measured.get("budget_observations",{}),_cpp_measurement_previous.get("budget_observations",{}))
+	for cost in budget_changes:
+		if budget_changes[cost]>0: budget_max = maxf(budget_max,float(cost))
+	record["attack_budget_max"] = budget_max
+	record.erase("measurement_cumulative")
+	record.erase("strong_observations")
+	record.merge({"type":"sample","run_id":_cpp_session_id,"recording_id":_recording_id,"xp_reward_version":2,"xp":window,
+		"xp_picked_actual":window.collected_actual_xp,"xp_dropped_base":_base_xp_total(window.supplied),"xp_field_base":_base_xp_total(window.ground)},true)
+	_write(record)
+	_write_cpp_strong(current,_ending)
+	_cpp_measurement_previous = measured.duplicate(true)
+	_last_xp_summary = current.xp.duplicate(true)
+	_cpp_record_previous = current
+
+func _measurement_rows(current: Dictionary, previous: Dictionary) -> Array:
+	var rows := []
+	for key in current:
+		var row := _counter_difference(current[key],previous.get(key,{}))
+		if not row.values().any(func(value): return value!=0): continue
+		for field in ["weapon_id","enemy","class","elite","cause","source","reason"]:
+			if current[key].has(field): row[field] = current[key][field]
+		rows.append(row)
+	return rows
+
+func _write_cpp_strong(current: Dictionary, include_alive: bool) -> void:
+	var observations: Dictionary = current.get("strong_observations",{})
+	for id in observations:
+		if _cpp_strong_finished.has(id): continue
+		var row: Dictionary = observations[id].duplicate(true)
+		if row.result=="alive" and not include_alive: continue
+		row.merge({"type":"strong","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"world_t":current.world_t,"id":id},true)
+		_write(row)
+		_cpp_strong_finished[id] = true
+
+static func _cpp_record_value(value: Variant) -> Variant:
+	if value is Vector2: return [value.x,value.y]
+	if value is Color: return [value.r,value.g,value.b,value.a]
+	if value is Dictionary:
+		var out := {}
+		for key in value: out[String(key)] = _cpp_record_value(value[key])
+		return out
+	if value is Array or value is PackedVector2Array:
+		var out := []
+		for item in value: out.append(_cpp_record_value(item))
+		return out
+	return value

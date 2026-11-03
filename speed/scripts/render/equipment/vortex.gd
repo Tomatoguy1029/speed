@@ -20,6 +20,41 @@ var captures: Array[Dictionary] = []
 var heals: Array[Dictionary] = []
 var pops: Array[Dictionary] = []
 var _add: PixelPainter
+var _frame_parent: Node2D
+var _frame_lens_parent: Node2D
+var _frame_top_parent: Node2D
+var _frame_seen := {}
+var frame_shake := 0.0
+
+func setup_frame(parent: Node2D, lens_parent: Node2D, top_parent: Node2D, pixel: float) -> void:
+	_frame_parent = parent
+	_frame_lens_parent = lens_parent
+	_frame_top_parent = top_parent
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+
+func sync_frame(values: Array, dt: float) -> void:
+	var alive := {}
+	for value: Dictionary in values:
+		alive[value.id] = true
+		if _frame_seen.has(value.id): continue
+		var age: float = value.age-dt
+		match int(value.kind):
+			0:
+				if value.age<CHARGE+HOLD+COLLAPSE:
+					on_event({"type":&"end_hole"})
+					holes[-1].age = age
+				else: pops.append({"age":age-CHARGE-HOLD-COLLAPSE})
+			1:
+				var event: Dictionary = value.duplicate()
+				event.type = &"hole_capture"
+				on_event(event)
+				captures[-1].age = age
+			2:
+				on_event({"type":&"hole_recover","amount":value.amount})
+				heals[-1].age = age-CRUSH
+	_frame_seen = alive
 
 const LENS := preload("res://shaders/hole_lens.gdshader")
 const GLOW := preload("res://shaders/soft_glow.gdshader")
@@ -38,9 +73,6 @@ func _free_lens(h: Dictionary) -> void:
 	if is_instance_valid(h.lens): h.lens.queue_free()
 
 ## 引き込まれて倒れた敵は、砕けながら中心へ消える姿をここで描く。
-func claims(ev: Dictionary) -> bool:
-	return ev.type == &"kill" and ev.get("cause", &"") == &"vortex"
-
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"end_hole":
@@ -53,7 +85,7 @@ func on_event(ev: Dictionary) -> void:
 			lens.material = ShaderMaterial.new()
 			lens.material.shader = LENS
 			lens.z_index = -1
-			rm._layers.ship.add_child(lens)
+			(_frame_lens_parent).add_child(lens)
 			holes.append({"age": 0.0, "particles": particles, "lens": lens})
 		&"hole_capture":
 			var shards: Array[Dictionary] = []
@@ -65,19 +97,17 @@ func on_event(ev: Dictionary) -> void:
 			for i in 14: dots.append({"a": randf() * TAU, "v": 14.0 + randf() * 26.0, "up": 10.0 + randf() * 22.0, "s": 1.2 + randf() * 1.6, "dl": randf() * 0.12})
 			heals.append({"age": -CRUSH, "dots": dots, "outer": _glow_rect(), "inner": _glow_rect()})
 
-func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
+func frame_tick(dt: float, center: Vector2) -> void:
+	var p: PixelPainter = _painter
 	if _add == null:
 		_add = PixelPainter.new()
 		_add.setup_painter(p.px)
 		var add := CanvasItemMaterial.new()
 		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 		_add.material = add
-		rm._layers.top.add_child(_add)
+		(_frame_top_parent).add_child(_add)
 	p.begin()
 	_add.begin()
-	var center := state.ship_pos
 	for h in holes:
 		h.age += dt
 		_hole(p, h, center)
@@ -143,7 +173,10 @@ func _hole(p: PixelPainter, h: Dictionary, center: Vector2) -> void:
 		var color := Color(PALE if k > 0.5 else MID, 0.4 + 0.6 * k)
 		p.ring(center, ring, color)
 		if k > 0.6: p.ring(center, ring - 1.0, color)
-	if a >= CHARGE and a < CHARGE + PULL + 0.12: rm.shake = maxf(rm.shake, 6.0 * (1.0 - (a - CHARGE) / (PULL + 0.12)))
+	if a>=CHARGE and a<CHARGE+PULL+0.12:
+		var amount := 6.0*(1.0-(a-CHARGE)/(PULL+0.12))
+		frame_shake = maxf(frame_shake,amount)
+
 	# 溜め：粒が中心へ集まる。中心に近いほど薄れて暗黒に消える
 	for q in h.particles:
 		var pr: float = (a - q.st) / q.du
@@ -242,5 +275,5 @@ func _glow_rect() -> ColorRect:
 	rect.material = ShaderMaterial.new()
 	rect.material.shader = GLOW
 	rect.z_index = -1
-	rm._layers.ship.add_child(rect)
+	(_frame_lens_parent).add_child(rect)
 	return rect
