@@ -20,10 +20,16 @@ button:hover { background:#2e3d5e; }
 canvas#stage { display:block; width:1280px; height:720px; image-rendering:pixelated; }
 body.fit canvas#stage { width:100%; height:auto; }
 #scrub { width:min(640px, 100%); }
-.grid { display:grid; grid-template-columns: minmax(260px, 340px) 1fr; gap:14px; margin-top:12px; }
-@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } #demo { min-width:0; width:100%; } }
+.workspace { display:grid; grid-template-columns:minmax(0, 1fr) clamp(300px, 25vw, 380px); gap:14px; align-items:start; }
+.preview { min-width:0; }
+.controls { position:sticky; top:12px; max-height:calc(100dvh - 24px); overflow:auto; }
+#info { margin-top:12px; }
+@media (max-width: 860px) { .wrap { padding:8px; } .workspace { grid-template-columns:minmax(160px, 1fr) 300px; gap:8px; min-width:468px; } #demo { min-width:0; width:100%; } }
 .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
-#params label { display:grid; grid-template-columns: 10em 1fr 3.5em; gap:6px; align-items:center; margin:4px 0; }
+#params label { display:grid; grid-template-columns:minmax(0, 1fr) 3.5em; gap:4px 6px; align-items:center; margin:10px 0; }
+#params .pl { grid-column:1 / -1; }
+#params input { min-width:0; width:100%; }
+#params input[type=color] { width:100%; height:28px; }
 #params .val { color:var(--muted); font-variant-numeric: tabular-nums; }
 #info h3 { margin:0 0 6px; } #info p { margin:4px 0; } #info .note { color:var(--muted); } #info ul { margin:4px 0; padding-left:18px; color:var(--muted); }
 table { border-collapse:collapse; width:100%; font-size:13px; }
@@ -38,7 +44,7 @@ details { margin-top:12px; } summary { cursor:pointer; font-weight:600; }
 pre { white-space:pre-wrap; color:var(--muted); font-size:12px; }
 </style>
 </head>
-<body>
+<body class="fit">
 <header>
   <h1>SPEED エフェクト試作（独立HTML）</h1>
   <p>現行の素材と攻撃を使い、試作と現行の見た目を切り替えて比較できます。G10・鳳凰・敵・ケンタウルスは設定値も含めて承認済みです。追加した残り4体は見た目の確認待ちです。本番への組み込みはC++移行後に行います。</p>
@@ -52,8 +58,10 @@ pre { white-space:pre-wrap; color:var(--muted); font-size:12px; }
   <div class="bar">
     <span>表示：<label><input type="radio" name="mode" value="proto" checked> 試作</label> <label><input type="radio" name="mode" value="current"> 現行</label></span>
     <span>背景：<label><input type="radio" name="bg" value="game" checked> ゲームの背景（近似）</label> <label><input type="radio" name="bg" value="dark"> 暗背景</label></span>
-    <label><input id="scale1" type="checkbox" checked> 通常倍率 1倍（1280×720）</label>
+    <label><input id="scale1" type="checkbox"> 通常倍率 1倍（1280×720）</label>
   </div>
+  <div class="workspace">
+  <section class="preview" aria-label="試作の再生画面">
   <div class="stagebox"><canvas id="stage"></canvas></div>
   <div class="bar">
     <button id="play">停止</button><button id="reset">リセット</button><button id="prev">◀ 1フレーム</button><button id="next">1フレーム ▶</button>
@@ -61,11 +69,11 @@ pre { white-space:pre-wrap; color:var(--muted); font-size:12px; }
     <span>速度：<label><input type="radio" name="speed" value="0.25"> 0.25倍</label> <label><input type="radio" name="speed" value="0.5"> 0.5倍</label> <label><input type="radio" name="speed" value="1" checked> 1倍</label></span>
     <input id="scrub" type="range" min="0" max="1" step="0.001" value="0"><span id="time" class="muted"></span>
   </div>
-  <div class="grid">
-    <div class="panel"><h3 style="margin-top:0">FXの調整・比較条件</h3><div id="params"></div>
-      <div class="bar"><button id="save">調整値を JSON で保存</button><label>JSON を読み込む <input id="load" type="file" accept="application/json,.json"></label></div><div id="status" class="muted"></div>
-      <p class="muted">色・サイズ・強度・FXの時間は試作の見た目を変えます。形態・猟犬数・分離・吸い込んだ星の数は、両表示に共通の比較条件です。本番の数値は変わりません。</p></div>
     <div class="panel" id="info"></div>
+  </section>
+    <aside class="panel controls" aria-label="調整パネル"><h3 style="margin-top:0">FXの調整・比較条件</h3><div id="params"></div>
+      <div class="bar"><button id="save">調整値を JSON で保存</button><label>JSON を読み込む <input id="load" type="file" accept="application/json,.json"></label></div><div id="status" class="muted"></div>
+      <p class="muted">色・サイズ・強度・FXの時間は試作の見た目を変えます。形態・猟犬数・分離・吸い込んだ星の数は、両表示に共通の比較条件です。本番の数値は変わりません。</p></aside>
   </div>
   <div class="panel" style="margin-top:14px">
     <h3 style="margin-top:0">改善台帳 80 件と試作の対応</h3>
@@ -96,9 +104,16 @@ pre { white-space:pre-wrap; color:var(--muted); font-size:12px; }
 <script>/*PIXELFX*/</script>
 <script>/*APP*/</script>
 <script>
+if (typeof G12_ENEMIES === 'undefined') {
+  const notice = document.createElement('div'); notice.className = 'panel';
+  const message = document.createElement('p'); message.textContent = 'ここは組み立て用のファイルです。試作は完成版HTMLから開いてください。';
+  const link = document.createElement('a'); link.href = '../../speed_fx_prototypes.html'; link.textContent = '完成版の試作を開く';
+  notice.append(message, link); document.querySelector('.wrap').replaceChildren(notice);
+} else {
 document.querySelector('#g12 tbody').append(...G12_ENEMIES.map(([id, n, st, atk, demoId]) => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${id}</td><td>${n}</td><td>${st}</td><td>${atk}</td><td>${demoId}</td>`; return tr; }));
 document.getElementById('license').textContent = LICENSE_TEXT;
 loadImages().then(() => { WATER.data = (() => { const im = IMG.water_noise; const c = document.createElement('canvas'); c.width = 512; c.height = 512; const x = c.getContext('2d'); x.drawImage(im, 0, 0); return x.getImageData(0, 0, 512, 512).data; })(); prepArrow(); boot(); });
+}
 </script>
 </body>
 </html>
