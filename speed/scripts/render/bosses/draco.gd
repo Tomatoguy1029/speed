@@ -1,6 +1,10 @@
 ## 戦闘の点列と寸法を読むだけの表示。部位やHPへ書き戻さない。
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+@export var core_glow_radius := 43.0
+@export var core_glow_opacity := 0.16
+@export var core_glow_color := Color(0.38,0.59,1.0)
+@export var rift_color := Color("#5a4d91")
 var state := {}
 var attack := {}
 var _move_style := {}
@@ -66,6 +70,7 @@ func _draw() -> void:
 	_draw_technique()
 	_draw_impacts()
 	_draw_rift_walls()
+	_draw_picaro_arrivals()
 	_draw_arrow_impacts()
 	_draw_spiral_charge()
 	_draw_inhale()
@@ -83,7 +88,7 @@ func _draw() -> void:
 	var depth := float(state.perspective_scale)
 	var core := Vector2(-110.0*float(state.head_scale)*depth,0)
 	var pulse := 0.85+sin(float(state.clock)*3.0)*0.15
-	draw_circle(core,43.0*depth,Color(0.38,0.59,1.0,0.16*pulse*float(state.alpha)*glow))
+	draw_circle(core,core_glow_radius*depth,Color(core_glow_color,core_glow_opacity*pulse*float(state.alpha)*glow))
 	preload("res://scripts/bosses/draco_form.gd").star(self,core,27.0*depth,Color(0.85,0.96,1.0,float(state.alpha)*glow))
 
 func _draw_rift() -> void:
@@ -98,7 +103,7 @@ func _draw_rift() -> void:
 		var side := (sin(j*2.3)*24.0+sin(j*4.9)*12.0)*opening
 		line.append(to_local(center+axis*along+axis.orthogonal()*side))
 	draw_polyline(line,Color(0.41,0.25,0.88,0.22),160.0*opening,false)
-	draw_polyline(line,Color("#5a4d91"),105.0*opening,false)
+	draw_polyline(line,rift_color,105.0*opening,false)
 	draw_polyline(line,Color("#050612"),88.0*opening,false)
 	if intro.eyes>0.0 and intro.emerged<0.4:
 		for side in [-1,1]:
@@ -125,6 +130,9 @@ func _draw_technique() -> void:
 		var outline: Color=_move_style.outline_color
 		outline.a+=progress*0.4
 		draw_polyline(shape+PackedVector2Array([shape[0]]),outline,float(_move_style.outline_width),false)
+	# 尾の薙ぎは、旧専用Polygon2Dと同じ予告面だけを描く。
+	if attack.get("technique","")=="tail_sweep": return
+	var visual_kind := String(_move_style.get("visual_kind",attack.get("technique","")))
 	var paths: Array = attack.get("telegraph_paths",[])
 	if paths.is_empty() and not attack.get("warning",PackedVector2Array()).is_empty(): paths=[attack.warning]
 	for warning: PackedVector2Array in paths:
@@ -139,7 +147,7 @@ func _draw_technique() -> void:
 		preload("res://scripts/bosses/draco_form.gd").star(self,path[-1],10.0,Color(1.0,0.86,0.6,0.7))
 	for target: Vector2 in attack.get("telegraph_points",PackedVector2Array()):
 		var at: Vector2 = to_local(target)
-		if attack.get("technique","")=="star_fan":
+		if visual_kind=="star_fan":
 			preload("res://scripts/bosses/draco_form.gd").star(self,at,8.0+progress*4.0,Color(1.0,0.78,0.48,0.85))
 			continue
 		var radius: float = attack.get("telegraph_radius",attack.warning_width)
@@ -149,16 +157,21 @@ func _draw_technique() -> void:
 			draw_line(at+Vector2(side*(radius+10.0),0),at+Vector2(side*(radius+25.0),0),Color("#f8c879"),float(_move_style.telegraph_line_width),false)
 			draw_line(at+Vector2(0,side*(radius+10.0)),at+Vector2(0,side*(radius+25.0)),Color("#f8c879"),float(_move_style.telegraph_line_width),false)
 	var points: PackedVector2Array = attack.get("attack_points",PackedVector2Array())
-	if points.size()>=2 and points[0].distance_to(points[1])>=8.0:
+	if points.size()>=2:
 		var line := PackedVector2Array()
 		for point in points: line.append(to_local(point))
-		if attack.get("technique","")=="breath":
+		if visual_kind=="breath" and line.size()>3:
 			for j in range(1,line.size()-1):
 				if absf((line[j]-line[0]).cross(line[j+1]-line[0]))>0.1: draw_colored_polygon(PackedVector2Array([line[0],line[j],line[j+1]]),Color(0.34,0.46,1.0,0.5))
 			draw_polyline(line,Color(0.68,0.86,1.0,0.8),float(_move_style.active_line_width),false)
-			return
-		draw_polyline(line,Color(0.52,0.72,1.0,float(_move_style.motion_trail_opacity)),14.0,false)
-		draw_polyline(line,Color(0.86,0.95,1.0,0.7),float(_move_style.telegraph_line_width),false)
+		elif preload("res://scripts/bosses/draco_form.gd").length(line)>=8.0:
+			if visual_kind in ["bite","charge","leap","tail_slam","tail_sweep"]:
+				draw_polyline(line,Color(0.52,0.72,1.0,float(_move_style.motion_trail_opacity)),14.0,false)
+				draw_polyline(line,Color(0.86,0.95,1.0,0.7),float(_move_style.telegraph_line_width),false)
+			else:
+				var active: bool = int(attack.get("stage",5))==1
+				draw_polyline(line,Color(0.6,0.78,1.0,0.32) if active else Color(1.0,0.71,0.3,0.14),float(attack.attack_width)*2.0,false)
+				draw_polyline(line,Color("#e5f7ff") if active else Color("#efb56c"),float(_move_style.active_line_width),false)
 
 func _draw_impacts() -> void:
 	var form = preload("res://scripts/bosses/draco_form.gd")
@@ -201,6 +214,36 @@ func _draw_rift_walls() -> void:
 		draw_polyline(left,Color("#8770cb"),3.0,false)
 		draw_polyline(right,Color("#40315f"),3.0,false)
 		for j in range(0,count,3):draw_line(left[j].lerp(right[j],0.25),left[j+1],Color(0.68,0.74,1.0,0.45),2.0,false)
+
+func _draw_picaro_arrivals() -> void:
+	if state.get("cinematic_hide_enemies",false): return
+	var retained := false
+	for impact: Dictionary in state.get("impacts",[]):
+		if impact.technique=="picaro_wall" and float(impact.age)<float(_styles.get("picaro_wall",{}).get("impact_lifetime",0.65)): retained = true
+	if attack.get("technique","")!="picaro_wall" and not retained: return
+	for member: Dictionary in state.get("picaro",[]):
+		var age := float(member.born_age)
+		if age>1.4: continue
+		var center := to_local(member.position)
+		var radius := maxf(125.0,float(member.radius)*2.35)
+		var alpha := clampf((1.4-age)*2.0,0.0,1.0)
+		var gather := clampf(age/0.8,0.0,1.0)
+		var swell := 1.0+0.06*sin(age*18.0)
+		draw_circle(center,radius*0.92*swell,Color(0.35,0.26,0.9,alpha*0.075))
+		draw_arc(center,radius*1.16,0.0,TAU,48,Color(0.58,0.74,1.0,alpha*0.2),8.0,false)
+		var membrane := PackedVector2Array()
+		for j in 49:
+			var angle := j*TAU/48.0
+			membrane.append(center+Vector2.from_angle(angle)*radius*swell*(1.0+sin(angle*5.0+age*12.0)*0.055))
+		draw_polyline(membrane,Color(0.68,0.54,1.0,alpha*0.85),7.0,false)
+		for j in 16:
+			var angle := j*TAU/16.0+age*4.0
+			var direction := Vector2.from_angle(angle)
+			var at := center+direction*radius*(1.55-0.72*gather)
+			var to := center+direction.rotated(0.36)*radius*(1.18-0.35*gather)
+			draw_line(at,to,Color(0.69,0.87,1.0,alpha*(0.55+0.35*gather)),3.0)
+			if j%2==0: draw_circle(at,3.5,Color(0.87,0.96,1.0,alpha))
+		preload("res://scripts/bosses/draco_form.gd").star(self,center,radius*0.3,Color(0.82,0.91,1.0,alpha*0.75))
 
 func _draw_arrow_impacts() -> void:
 	for impact: Dictionary in attack.get("arrow_impacts",[]):

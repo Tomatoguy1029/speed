@@ -191,6 +191,8 @@ public:
     Dictionary frame_snapshot_run();
     Dictionary ack_frame_run(int64_t epoch,int64_t sequence);
     Dictionary metrics_run() const;
+    void set_metrics_detail_run(bool active,StringName reader);
+    Dictionary metrics_window_run(StringName reader) const;
     Dictionary recording_run(bool initial) const;
     Dictionary render_run(const Rect2 &view,const Variant &alpha) const;
     Dictionary dispose_run();

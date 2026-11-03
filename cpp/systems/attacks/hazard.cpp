@@ -23,6 +23,8 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         if (row>=state.hazards.size()) continue;
         auto &hazard=state.hazards[row];
         if (!hazard.alive || (std::holds_alternative<MonocerosWaveHazard>(hazard.shape) || std::holds_alternative<CanisFlameHazard>(hazard.shape) || std::holds_alternative<CanisHoundLungeHazard>(hazard.shape))) continue;const auto handle=hazard.attack;const auto *record=get(state,handle);if (!record || record->id>=cutoff) continue;
+        static const char *shape_names[]={"circle","beam","wave","wall","monoceros_wave","canis_flame","hound_lunge","hydra_shape"};
+        MetricsDetailTimer measured(run.frame_workspace.metrics,"hazards.",shape_names[hazard.shape.index()]);
         auto *hydra=std::get_if<HydraShapeHazard>(&hazard.shape);
         if (hydra && state.bosses.body_handles.contains(record->spec.boss)) {const auto &b=state.bosses.bodies[record->spec.boss.slot];if (run.content->bosses[run.content->boss_bodies[b.definition-1].boss-1].kind==3 && !b.hydra.attack_field_advance) continue;}
         const double time=hydra?(hydra->age+=dt):double(hazard.time)+dt,delay=hydra?hydra->delay:hazard.delay,life=hydra?hydra->life:hazard.duration;hazard.time=time;

@@ -198,6 +198,7 @@ func _poll_cpp_loading() -> void:
 		_loading = null
 	next_bridge.end_resource_wait()
 	bridge = next_bridge
+	bridge.recording_origin["source"] = str(options.get("cpp_source","unknown"))
 	bridge.subscribe("result",_consume_cpp_result,[],[])
 	if RunManager.current_id==id or options.get("manage_result",false): cpp_finished.connect(GameManager.finish_cpp_run)
 	cpp_core = bridge._core
@@ -232,6 +233,9 @@ func _poll_cpp_loading() -> void:
 	loading_timings["presentation_setup_ms"] = (Time.get_ticks_usec()-scene_started)/1000.0
 	for recorder: Node in get_tree().get_nodes_in_group("cpp_recorders"):
 		recorder.attach_cpp(self)
+	if OS.is_debug_build():
+		bridge.recording_origin["conditions"] = preload("res://scripts/dev/recording_identity.gd").capture(self)
+		bridge.recording_origin.merge(bridge.recording_origin.conditions.run_state,true)
 	started.emit()
 	_apply_cpp_settings()
 	var publish_started := Time.get_ticks_usec()

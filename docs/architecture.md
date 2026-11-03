@@ -564,7 +564,7 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 
 AudioManagerは要求中の曲と実際に再生中の曲を分け、停止時に `menu`・`stage_select` の音源参照・再生位置・離脱要求時刻をメモリへ保持する。[再開の時間窓](spec.md#18-音)は `Time.get_ticks_msec()` で判定する。同じ音源なら停止位置をループ範囲へ整えて再開し、音源が変わった場合は既定の開始位置を使う。切り替え要求番号とTweenの取り消しで古い再生予約を無効化し、再生開始に至らなかった曲の記憶は維持する。保持した音源参照は再開時に解放する。
 
-C++の音に関わる出来事はRunBridgeからAudioManagerと敵レーザーの音処理へ配信する。再生口・音源参照・音量・バス・端末の時刻はGodotが所有する。
+C++の音に関わる出来事はRunBridgeからAudioManagerと敵レーザーの音処理へ配信する。再生口・音源参照・音量・バス・端末の時刻はGodotが所有する。 アプリ終了時は再生口とフェードを停止して音源参照を外し、停止要求後の音声ミックス完了を上限付きで待ってから音声サーバーを終了する。
 
 - 音の再生口を使い回し、同時に鳴る数に上限を設ける。
 - バスを「全体」「効果音」「エンジン音」に分ける。
@@ -574,7 +574,7 @@ C++の音に関わる出来事はRunBridgeからAudioManagerと敵レーザー�
 
 - 乱数の種を指定できるようにし、同じランを再現できるようにする。
 - 開発版では、fps・敵の数・各システムの処理時間を画面に表示できるようにする。
-- 処理時間はC++の計測出力とGodotの `PerfLog`（`scripts/runtime/perf_log.gd`）から読む。`RunBridge.perf` は入力・更新・出力構築、`RunPresentation` と `RunFrameView` は描画準備と表示の区間を記録する。`run_metrics.gd` がフレーム数・実時間と累計値から区間値を求め、F3・性能計測・プレイ記録へ渡す。計測項目と利用可能な内訳は `read_metrics()` の実出力を使う。描画フレーム時間とC++更新時間を分け、性能目標の合格を個別処理の短さだけで判断しない。
+- 処理時間はC++の計測出力とGodotの `PerfLog`（`scripts/runtime/perf_log.gd`）から読む。`RunBridge.perf` は入力・更新・出力構築、`RunPresentation` と `RunFrameView` は描画準備と表示の区間を記録する。`run_metrics.gd` がフレーム数・実時間と累計値から区間値を求め、F3・性能計測・プレイ記録へ渡す。計測項目と利用可能な内訳は `read_metrics()` の実出力を使う。 詳細表示と録画は別の読取先を登録し、読み手がいる間だけ処理・敵種・武器別の詳細を測る。区間最大は読み手ごとに取り出し、共有の累積時間・回数・最大を維持する。描画フレーム時間とC++更新時間を分け、性能目標の合格を個別処理の短さだけで判断しない。
 - Packed配列の論理量はC++の集計関数で求める。RunBridgeは同じ出力の集計値を読取・配信で再利用し、窓口内のUIと出力を保持する。公開読取は全UIを返す。購読者は読むUI項目と通知種別を登録し、コピー前にその項目と通知を選ぶ。各指定の省略は全件、空配列は受信なしを表す。公開読取とF9は全通知を保持し、結果・資源要求・識別情報は全購読者へ渡す。選んだ通知の順序を保ち、元の通知列の終端を全購読者の受領とackの基準にする。公開読取と各購読者へ独立したコピーを渡し、同じ配信の論理量は受取先ごとに保持する。入力の可否と描線中の状態は直近の確定出力から読み、初回・復帰直後・配信失敗では本体から読み直す。
 - 約1300体を維持する開発用計測では、単体生成と同じ種類・位置・群れ・乱数消費・生成順で補充し、補充の最後に出力を1回配信する。補充全体の時間と、出力構築・複製などと重ならない補充の時間を分けて記録する。
 - 自動テストと長時間の自動プレイは、依頼があるときだけ行う（AGENTS.md）。
@@ -667,7 +667,9 @@ C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` 
 
 現在の録画は `format=cpp_events_v2`・`version=2` を持つ。`schema_version=4`・`measurement_version=3` はXP・成長の集計形式も識別する。形式名と実在項目を一緒に確認する。
 
-`start.identity` はC++の `read_recording(true)` が返す戦闘定義・API・状態スキーマ等の識別子に、recorderが `implementation_revision`（`SPEED_BUILD_REVISION`）、`implementation_version`、XP設定ハッシュを足す。`start.run_start` はRunBridgeが保持するconfigureのoptions・payloadハッシュ・seed・start options、`start.recording_start` は録画開始時のC++状態を持つ。seedは文字列で保持する。`run_id`・`epoch`・`tick`・`event_sequence_at_start` でランと通知の開始境界を識別する。
+`start.identity` はC++の `read_recording(true)` が返す戦闘定義・API・状態スキーマ等の識別子に、recorderが `implementation_revision`（`SPEED_BUILD_REVISION`）、`implementation_version`、XP設定ハッシュを足す。`start.run_start` はRunBridgeが保持するconfigureのoptions・payloadハッシュ・seed・start options・開始元と初期状態、`start.recording_start` は録画開始時のC++状態を持つ。seedは文字列で保持する。`run_id`・`epoch`・`tick`・`event_sequence_at_start` でランと通知の開始境界を識別する。
+
+`run_start.conditions` と `recording_start.conditions` は、それぞれの時点の戦闘設定・機体能力・有効な機体強化係数・強化段数と上書き・物理更新周期・乱数状態・ヒットストップ・無敵を持つ。C++実装はビルド時のSHA、戦闘定義は実際に読み込んだbundleの入力・payloadのSHA、Godot資源は生成済み依存署名と読み込み済みスクリプトの実ソースSHAで識別する。
 
 出来事はC++の共通封筒の `epoch`・`sequence`・`tick`・`t`・`world_t`・`type` とpayloadを保存する。録画は他の購読者と同じ通知を読み、既に記録したsequenceを除いて書く。途中開始は `missing_prefix=true` とし、既に存在する結晶等を `xp_existing` の `origin=unobserved` で記録する。
 
@@ -675,7 +677,7 @@ C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` 
 
 #### 開始条件と分析の読み方
 
-ランの開始と録画の開始を `start.run_start`・`recording_start` で分ける。現在のC++形式はstart optionsのscenario（通常開始・timeline等）と録画開始時の状態を使う。以下の `source`・`trigger` を持つ旧形式はその値で分類し、形式間で欠けた項目を補わない。
+ランの開始と録画の開始を `start.run_start`・`recording_start` で分ける。現在のC++形式は開始元の `source`、start optionsのscenario（通常開始・timeline等）、録画開始の `trigger` とその時点の状態を使う。旧形式も実在する項目で分類し、形式間で欠けた項目を補わない。
 
 | 項目 | 意味 |
 |---|---|
@@ -685,7 +687,7 @@ C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` 
 | `recording_start.trigger` | `armed_before_run` はラン開始前から待機、`during_run` は既に存在するランで開始 |
 | `missing_prefix` | `true` はラン初期化から録画開始までの観測が欠ける。時計0でカード選択中に開始した場合もこの区分を使う |
 
-`run_start` と `recording_start` は、それぞれの時点のラン秒・世界秒（`t`・`world_t`）、状態（`phase`）、レベル、現在のレベル内の XP、取得・ドロップ XP 累計、HP・最大HP、撃破累計、武器・特性、英雄の力、ボーナス残り秒、エンドレスの有無を保持する。初期武器の選択前はレベル0・装備なしを記録し、選択後の値と区別する。
+`run_start` と `recording_start.run_state` は、それぞれの時点のラン秒・世界秒（`t`・`world_t`）、状態（`phase`）、レベル、現在のレベル内の XP、取得・ドロップ XP 累計、HP・最大HP、撃破累計、武器・特性、英雄の力、ボーナス残り秒、エンドレスの有無を保持する。初期武器の選択前はレベル0・装備なしを記録し、選択後の値と区別する。
 
 分析は記録を読む側（AI など）が次の順で区分し、除外したファイル名と理由を表示する。
 

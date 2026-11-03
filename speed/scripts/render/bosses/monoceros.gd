@@ -27,6 +27,7 @@ var appearance := {}
 var _world_clock := -1.0
 var _leg_rest := {}
 var hit := 0.0
+var hit_feedback: RefCounted
 var _body_facing := 0.0
 var _neck_facing := 0.0
 var _head_facing := 0.0
@@ -41,6 +42,13 @@ var _horn_lengths: PackedFloat32Array
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 	z_index = 8
+	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
+
+func frame_event(event: Dictionary) -> void:
+	if event.get("type",&"")==&"combat_damage":
+		hit = 0.18
+		_sync_parts(0.0)
+		queue_redraw()
 
 ## 表示用の値だけを読む。敵表・技Runnerへ書き戻す参照は持たない。
 func apply_frame(body: Dictionary, attack: Dictionary = {}, colors: Dictionary = {}) -> void:
@@ -68,7 +76,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, colors: Dictionary =
 		_horn_lengths = horn.texture.get_meta("core_lengths")
 		for i in range(1,_horn_durations.size()): _horn_source_seconds += _horn_durations[i]
 		horn.material = parts.get_node("Head/Lower/Sprite/head_gold_armor").material.duplicate()
-	hit = body.flash
+	hit = maxf(float(body.flash),hit-dt)
 	_sync_parts(dt)
 	queue_redraw()
 
@@ -92,7 +100,9 @@ func _sync_parts(dt: float) -> void:
 	_update_turn(dt)
 	# 胴体中心を固定して見た目だけ遅らせる。移動・判定・予告線は役者の方向を使う。
 	parts.rotation = -PI * 0.5 + angle_difference(float(state.facing), _body_facing)
-	var reaction := {"white":float(state.flash>0.0),"angle":0.0,"offset":Vector2.ZERO}
+	var reaction := {"white":0.0,"angle":0.0,"offset":Vector2.ZERO}
+	if hit_feedback!=null: reaction = hit_feedback.sample(int(state.actor))
+	material.set_shader_parameter("boss_hit_white",reaction.white)
 	parts.rotation += reaction.angle
 	parts.position = -Vector2(0, -37).rotated(parts.rotation) * k + reaction.offset
 	parts.get_node("Head").rotation = angle_difference(_body_facing, _neck_facing)
@@ -165,7 +175,7 @@ func _horn_glow() -> float:
 func _update_turn(dt: float) -> void:
 	var target := float(state.facing)
 	var attacking := _mode() == &"active" or _mode() == &"stuck" or (_mode() == &"windup" and bool(technique.get("locked",false)))
-	var sweeping: bool = StringName(technique.get("technique","")) in [&"sweep",&"horn_wave",&"sword_flash"] and _mode() in [&"windup", &"active"]
+	var sweeping: bool = StringName(technique.get("technique","")) in [&"sweep",&"lance",&"return_charge",&"horn_wave",&"horn_dance",&"sword_flash"] and _mode() in [&"windup", &"active"]
 	_body_facing = _follow_angle(_body_facing, target, dt, body_follow_seconds * (0.3 if attacking else 1.0))
 	_body_facing = _limit_angle(target, _body_facing, body_lag_degrees)
 	if attacking or sweeping:

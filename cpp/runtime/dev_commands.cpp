@@ -1,6 +1,10 @@
 #include "dev_commands.h"
 #include "checkpoint.h"
 #include "../systems/equipment.h"
+#include "../systems/enemy_system.h"
+#include "../systems/field.h"
+#include "../bosses/flow/phase_controller.h"
+#include "../bosses/draco/body.h"
 #include "../output/frame_builder.h"
 #include <algorithm>
 #include <cmath>
@@ -35,10 +39,33 @@ bool migrate_enemy(godot::RunState::Enemy &e,const EnemyDefinition &old,const En
     if (old.radius!=next.radius) e.radius*=next.radius/std::max(0.001,old.radius);
     if (old.fire_interval>0 && next.fire_interval!=old.fire_interval) e.fire_t*=next.fire_interval/old.fire_interval;
     if (old.xp!=next.xp) e.xp=old.xp>0?e.xp*next.xp/old.xp:next.xp;
+    if (old.attack_weight!=next.attack_weight) e.attack_managed=next.attack_weight>0;
     if (!std::isfinite(e.fire_t)) return false;
     for (double value:{e.hp,e.max_hp,e.armor,e.speed,e.radius,e.xp}) if (!std::isfinite(value) || value<0) return false;
     return true;
 }
+}
+int64_t DevCommands::place_lab_actor(RunRuntime &run,size_t definition,const EnemySpawn &options) {
+    if (definition>=run.content->definitions.size()) return -1;
+    for (const auto &body:run.content->boss_bodies) if (body.enemy==definition+1) {
+        const auto actor=run.content->bosses[body.boss-1].kind==4?DracoBody::spawn(run,body.id,options.position,false):PhaseController::spawn(run,body.id,options.position,false);
+        return run.state.enemy_handles.entity_id(actor);
+    }
+    const auto &d=run.content->definitions[definition];auto placed=options;
+    if (d.id==godot::StringName("meteor") || d.id==godot::StringName("iron") || d.id==godot::StringName("saw")) {
+        if (!d.scaling.ready) return -1;
+        FieldRock rock;rock.manual=true;rock.position=options.position;rock.facing=options.facing;
+        rock.kind=d.id==godot::StringName("meteor")?RockKind::Belt:d.id==godot::StringName("iron")?RockKind::Iron:RockKind::Saw;
+        rock.size=d.scaling.radius*d.scaling.character;placed.size=rock.size;
+        placed.rock=FieldSystem::add_rock(run,rock);
+        if (!run.state.field.rock_handles.contains(placed.rock)) return -1;
+    }
+    const auto id=EnemySystem::spawn(run,definition,placed);
+    if (run.state.field.rock_handles.contains(placed.rock)) {
+        if (id>0) run.state.field.rocks[placed.rock.slot].proxy=run.state.enemy_handles.at(run.state.rows_by_id.at(id));
+        else {run.state.field.rock_handles.release(placed.rock);run.state.field.rocks.pop_back();}
+    }
+    return id;
 }
 godot::Dictionary DevCommands::replace_definition(RunRuntime &run,const godot::Dictionary &payload,bool append) {
     using godot::Variant;

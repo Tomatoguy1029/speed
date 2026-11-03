@@ -24,16 +24,17 @@ func _draw() -> void:
 	var row := _row
 	var p: Vector2 = row.points[0]
 	var tint: Color = row.colors[0]
-	if row.trail.size()>1: draw_polyline(row.trail,Color(1.0,0.6,0.25,0.7)*tint,3.0*_pixel/_zoom*row.trail_width)
+	if row.trail.size()>1: draw_polyline(row.trail,Color(1.0,0.6,0.25,0.7)*tint,3.0/_zoom*row.trail_width)
 	var u := Vector2.from_angle(row.angle)*float(row.widths[0])
 	var v := Vector2(-u.y,u.x)*0.6
 	draw_colored_polygon(PackedVector2Array([p+u,p+v,p-u*0.7,p-v]),Color("aeb6c4")*tint)
-	draw_polyline(PackedVector2Array([p+u,p+v,p-u*0.7,p-v,p+u]),Color("ff9a3c")*tint,1.5*_pixel/_zoom)
+	draw_polyline(PackedVector2Array([p+u,p+v,p-u*0.7,p-v,p+u]),Color("ff9a3c")*tint,1.5/_zoom)
 func _stardust() -> void:
 	if _painter==null:
 		_painter = PixelPainter.new()
 		_painter.setup_painter(_pixel)
 		_painter.visibility_layer = 1|RenderPipeline.GLOW_LAYER
+		_painter.modulate = RenderPipeline.plain_color(get_parent())
 		add_child(_painter)
 	_painter.show()
 	_painter.begin()

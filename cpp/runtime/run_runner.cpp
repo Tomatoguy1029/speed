@@ -4,6 +4,8 @@
 #include "../behaviors/weapons/dashRangeDrone.h"
 #include "../behaviors/weapons/massTow.h"
 #include "run_runner.h"
+#include "dev_commands.h"
+#include "../output/frame_builder.h"
 #include "../bosses/draco/finale.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
@@ -52,6 +54,7 @@ void RunRunner::camera(godot::SpeedRunCore &core,double dt,godot::Vector2 size) 
 }
 bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &raw_input,godot::Vector2 size) {
     auto &state=core.runtime.state;auto &control=state.control;
+    auto timed=[&](const char *name,auto &&action) {MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,name);return action();};
     using Phase=godot::RunState::Phase;
     // UIの入口判定を通過するまで、入力も時計も消費しない。
     if (control.ui_overlay || (control.ui_reward && state.phase!=Phase::Finishing)) return true;
@@ -69,20 +72,22 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (!entry.enabled || control.tick<entry.start || control.tick>entry.end || (control.tick-entry.start)%entry.interval) continue;
         if (control.rng.randf()>entry.probability) continue;
         const auto at=entry.position+godot::Vector2::from_angle(control.rng.randf()*6.283185307179586)*std::sqrt(control.rng.randf())*entry.radius;
-        for (int64_t n=0;n<entry.count;++n) {
-            godot::Dictionary options;options["spawn_origin"]=int64_t(SpawnOrigin::DevPlacement);options["facing"]=entry.facing;options["elite"]=entry.elite;
-            core.spawn_enemy(core.runtime.content->definitions[entry.definition].id,at+godot::Vector2::from_angle(n*2.399963)*std::sqrt(double(n))*entry.spacing,options);
+        for (int64_t n=0;n<std::min<int64_t>(entry.count,entry.boss?32:10000);++n) {
+            EnemySpawn options;options.origin=SpawnOrigin::DevPlacement;options.facing=entry.facing;options.has_facing=true;options.elite=entry.elite;
+            options.position=at+(entry.boss?godot::Vector2(n*400,0):godot::Vector2::from_angle(n*2.399963)*std::sqrt(double(n))*entry.spacing);
+            DevCommands::place_lab_actor(core.runtime,entry.definition,options);
         }
+        if (!entry.boss) {godot::Dictionary event;event["pos"]=at;event["enemy_type"]=core.runtime.content->definitions[entry.definition].id;FrameBuilder::append(core.runtime,"lab_spawn",event);}
     }
     control.last_input=raw_input;
     InputFrame input=state.steering_locked || state.controls_locked?InputFrame():raw_input;
     if (state.controls_locked) state.ship.vel=godot::Vector2();
     camera(core,0,size);
     state.sim_time+=dt;
-    if (!core.handle_draw_input(input,int64_t(std::round(state.sim_time*1000)),control.camera_zoom)) return false;
+    if (!timed("draw_input",[&]{return core.handle_draw_input(input,int64_t(std::round(state.sim_time*1000)),control.camera_zoom);})) return false;
     if (state.hitstop>0) {state.hitstop=std::max(0.0,state.hitstop-dt);return true;}
     if (!state.draw.tracing && state.dash_stop>0) state.dash_stop=std::max(0.0,state.dash_stop-dt*state.combat_config.kill_hitstop_regen);
-    if (!core.step_draw(dt)) return false;
+    if (!timed("draw",[&]{return core.step_draw(dt);})) return false;
     if (core.check_run_end()) return true;
     control.world_scale=core.world_scale();
     const double world_dt=dt*control.world_scale;
@@ -100,28 +105,29 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (world_step) {
         control.world_real_accum=control.world_dt_accum=0;control.world_steps=0;
         control.last_world_real_dt=wr;control.last_world_dt=wd;++control.world_updates;
-        if (state.world.attack_budget.frame_enabled || core.runtime.content->encounter.active) {core.sync_attack_budget();if (!core.advance_attack_budget(state.world_time)) return false;}
+        if (state.world.attack_budget.frame_enabled || core.runtime.content->encounter.active) {core.sync_attack_budget();if (!timed("attack_budget",[&]{return core.advance_attack_budget(state.world_time);})) return false;}
         if (control.lab_enemy_ai || !control.lab_mode) {
-            FieldSystem::update(core.runtime);
-            FieldSystem::step_comets(core.runtime,wd);
-            FieldSystem::stream_rocks(core.runtime,wd);
-            FieldSystem::step_gravity(core.runtime,wd);
-            if (!core.advance_enemies(wd)) return false;
-            if (!core.avoid_strong(wd)) return false;
+            timed("field.update",[&]{FieldSystem::update(core.runtime);});
+            timed("field.comets",[&]{FieldSystem::step_comets(core.runtime,wd);});
+            timed("field.rocks",[&]{FieldSystem::stream_rocks(core.runtime,wd);});
+            timed("field.gravity",[&]{FieldSystem::step_gravity(core.runtime,wd);});
+            if (!timed("enemies",[&]{return core.advance_enemies(wd);})) return false;
+            if (!timed("avoidance",[&]{return core.avoid_strong(wd);})) return false;
         }
         if (core.check_run_end()) return true;
-        if (!core.rebuild_enemy_grid(state.frame_grid_cell)) return false;
+        if (!timed("enemy_grid",[&]{return core.rebuild_enemy_grid(state.frame_grid_cell);})) return false;
     }
-    if (!core.step_ship_input(dt,world_dt,input)) return false;
+    if (!timed("ship",[&]{return core.step_ship_input(dt,world_dt,input);})) return false;
     BossFinish::record_approach(core.runtime);
     if (control.lab_enemy_ai || !control.lab_mode) {
         if (input.hero_press) HeroesSystem::activate(core.runtime);
-        HeroesSystem::step(core.runtime,dt,world_dt);
+        timed("heroes",[&]{HeroesSystem::step(core.runtime,dt,world_dt);});
     }
     if (state.phase==Phase::Play && !state.controls_locked) {
-        LightLancesSystem::step(core.runtime,world_dt);
+        MetricsDetailTimer equipment_time(core.runtime.frame_workspace.metrics,"equipment");
+        timed("light_lances",[&]{LightLancesSystem::step(core.runtime,world_dt);});
         for (const auto &owned:state.loadout.weapons) {
-            if (core.runtime.content->equipment[owned.definition-1].external_id=="W27") AfterimageBehavior::step(core.runtime,dt);
+            if (core.runtime.content->equipment[owned.definition-1].external_id=="W27") {MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,"equipment.W27");AfterimageBehavior::step(core.runtime,dt);}
             if (state.phase!=Phase::Play) break;
         }
         if (state.phase!=Phase::Play) return true;
@@ -129,6 +135,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (state.loadout.ready) {
             for (const auto &owned:state.loadout.weapons) {
                 const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
+                if (id=="W27") continue;
+                MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,"equipment.",id);
                 if (id=="W01") core.step_forward(world_dt);
                 else if (id=="W28") FlashSlashBehavior::step(core.runtime,world_dt);
                 else if (id=="W26") DashRangeDroneBehavior::step(core.runtime,world_dt);
@@ -148,6 +156,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         } else if (state.forward.ready) core.step_forward(world_dt);
         if (state.phase==Phase::Play) for (const auto &owned:state.loadout.traits) {
             const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
+            MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,"equipment.",id);
             if (id=="T05") KillSonicBehavior::step(core.runtime,world_dt);
             else if (id=="T03") VortexBehavior::step(core.runtime,world_dt);
             else if (id=="T32") RunUpBehavior::step(core.runtime,world_dt);
@@ -156,27 +165,27 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         }
     }
     if (world_step && state.phase==Phase::Play) {
-        if (state.projectile_config.ready && !core.step_projectiles(wd)) return false;
+        if (state.projectile_config.ready && !timed("projectiles.friendly",[&]{return core.step_projectiles(wd);})) return false;
         if (core.check_run_end()) return true;
         if (!CoronaVortex::hit_thrown(core.runtime)) return true;
-        if (!state.hostiles.empty() && !core.step_hostiles(wd)) return false;
+        if (!state.hostiles.empty() && !timed("projectiles.hostile",[&]{return core.step_hostiles(wd);})) return false;
         if (core.check_run_end()) return true;
-        if (!state.hazards.empty() && !core.step_hazards(wd)) return false;
+        if (!state.hazards.empty() && !timed("projectiles.hazards",[&]{return core.step_hazards(wd);})) return false;
     }
     if (core.check_run_end()) return true;
     auto dead_rows=std::move(state.dead_rows);state.dead_rows.clear();
     for (size_t row:dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);
-    if (state.pickups_ready) PickupSystem::prune(core.runtime);
+    if (state.pickups_ready) timed("pickup_prune",[&]{PickupSystem::prune(core.runtime);});
     if (world_step && (control.lab_enemy_ai || !control.lab_mode)) {
-        if (!EncounterSystem::advance(core.runtime)) return false;
-        if (state.population.frame_enabled && !state.population.blocked && !core.attack_guard_active() && !core.step_population(wd,control.bonus_remaining>0)) return false;
-        if (state.pickups_ready && !core.step_pickups(wd)) return false;
+        if (!timed("encounters",[&]{return EncounterSystem::advance(core.runtime);})) return false;
+        if (state.population.frame_enabled && !state.population.blocked && !core.attack_guard_active() && !timed("population",[&]{return core.step_population(wd,control.bonus_remaining>0);})) return false;
+        if (state.pickups_ready && !timed("pickups",[&]{return core.step_pickups(wd);})) return false;
     }
     state.ship_pos=state.ship.pos;
     if ((control.lab_enemy_ai || !control.lab_mode) && state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
     camera(core,dt,size);
     if (!core.check_run_end()) {
-        if (state.loadout.ready) ProgressionSystem::open(core);
+        if (state.loadout.ready) timed("progression",[&]{ProgressionSystem::open(core);});
         else if (state.legacy_progression.ready) core.open_cards(false);
     }
     return true;

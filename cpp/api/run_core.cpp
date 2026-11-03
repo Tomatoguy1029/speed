@@ -104,6 +104,8 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("frame_snapshot_run"), &SpeedRunCore::frame_snapshot_run);
     ClassDB::bind_method(D_METHOD("ack_frame_run","epoch","sequence"), &SpeedRunCore::ack_frame_run);
     ClassDB::bind_method(D_METHOD("metrics_run"), &SpeedRunCore::metrics_run);
+    ClassDB::bind_method(D_METHOD("set_metrics_detail_run", "active", "reader"), &SpeedRunCore::set_metrics_detail_run, DEFVAL(StringName("overlay")));
+    ClassDB::bind_method(D_METHOD("metrics_window_run", "reader"), &SpeedRunCore::metrics_window_run);
     ClassDB::bind_method(D_METHOD("recording_run","initial"), &SpeedRunCore::recording_run);
     ClassDB::bind_method(D_METHOD("encounter_state_run"), &SpeedRunCore::encounter_state_run);
     ClassDB::bind_method(D_METHOD("query_route_run","points","parameters"), &SpeedRunCore::query_route_run);
@@ -265,6 +267,7 @@ bool SpeedRunCore::advance_enemies(double delta) {
     std::vector<speed::EnemyHandle> update_handles,marlins,coronas,triangles;update_handles.reserve(runtime.state.enemies.size());
     for (uint32_t row=0;row<runtime.state.enemies.size();++row) {const auto handle=runtime.state.enemy_handles.at(row);update_handles.push_back(handle);if (runtime.state.enemies[row].alive && runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Marlin) marlins.push_back(handle);if (runtime.state.enemies[row].alive && runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Corona) coronas.push_back(handle);if (runtime.state.enemies[row].alive && runtime.content->definitions[runtime.state.enemies[row].definition].kind==speed::EnemyDefinition::Kind::Triangle) triangles.push_back(handle);}
     for (size_t group = 0; group < update_rows.size(); ++group) {
+      speed::MetricsDetailTimer measured(runtime.frame_workspace.metrics,"enemies.kind_"+std::to_string(int(update_kinds[group])));
       std::vector<size_t> rows;for (auto row:update_rows[group]) if (runtime.state.enemy_handles.contains(update_handles[row])) rows.push_back(row);
       if (update_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
       for (size_t row : rows) {

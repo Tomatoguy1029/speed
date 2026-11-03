@@ -71,6 +71,7 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
     for (size_t row = 0; row < runtime.state.hostiles.size(); ++row) {
         auto &shot = runtime.state.hostiles[row];
         if (!shot.alive) continue;
+        speed::MetricsDetailTimer measured(runtime.frame_workspace.metrics,"hostile.",speed::symbol_name(static_cast<speed::HostileKind>(shot.kind)));
         const auto processing_handle=shot.attack;
         auto end_reason=speed::AttackEndReason::Lifetime;
         const auto release = [&]() { speed::AttackSystem::end(runtime.state,processing_handle,end_reason); };

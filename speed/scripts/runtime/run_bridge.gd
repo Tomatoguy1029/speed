@@ -60,6 +60,11 @@ func start(seed_value: int, options := {}) -> Dictionary:
 	if result.ok: recording_origin["start"] = {"seed":str(seed_value),"options":options.duplicate(true)}
 	return result
 
+## 詳細表示と録画は別の読取先として保持する。
+func set_metrics_detail(on: bool, reader: StringName = &"overlay") -> void:
+	if _closing or _disposed or _busy: return
+	if _core!=null: _core.set_metrics_detail_run(on,reader)
+
 func read_recording(initial := false) -> Dictionary:
 	if _busy: return _error(7,"recording","更新中は読めません")
 	if _core==null: return _error(4,"recording","破棄済みです")
@@ -292,10 +297,10 @@ func latest_frame() -> Dictionary:
 	if _latest.is_empty(): return read_frame()
 	return _copy_latest()
 
-func read_metrics() -> Dictionary:
+func read_metrics(reader: StringName = &"") -> Dictionary:
 	if _busy: return _error(7,"read_metrics","更新中は読めません")
 	if _core==null: return _error(4,"read_metrics","破棄済みです")
-	var result: Dictionary = _core.metrics_run()
+	var result: Dictionary = _core.metrics_window_run(reader) if not String(reader).is_empty() else _core.metrics_run()
 	if result.ok:
 		var timing: Dictionary = result.value.timings
 		result.value["clocks"] = _core.inspect()

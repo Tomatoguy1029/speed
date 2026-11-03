@@ -25,6 +25,16 @@ func check(ok: bool, label: String) -> void:
 		push_error("[play_recorder] " + label)
 
 func _ready() -> void:
+	if "--cpp-detail-reader-audit" in OS.get_cmdline_user_args():
+		check(await verify_cpp_detail_reader(),"F3を閉じても録画中は詳細計測を続ける")
+		print("[cpp_detail_reader] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--cpp-metadata-detail-audit" in OS.get_cmdline_user_args():
+		check(await verify_cpp_metadata_detail(),"開始条件と詳細計測の追加照合を完了する")
+		print("[cpp_metadata_detail] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-recording-initial" in OS.get_cmdline_user_args():
 		check(await verify_cpp_initial_recording(),"通常開始の最初の通知まで録画する")
 		print("[cpp_recording_initial] passed=%d failed=%d" % [passed,failed])
@@ -202,7 +212,7 @@ func verify_cpp_perf() -> bool:
 	var label: String = overlay._label.text
 	for name in ["ゲーム更新","C++の出力構築","窓口の受け渡し","表示の更新","描画命令の構築","資源待ち","未分離","bytes/frame","GPU単独時間：未取得"]:
 		check(label.contains(name),"F3で%sを区別する" % name)
-	check(not label.contains("処理ごと（世界側") and not label.contains("結晶 0"),"存在しない旧Systemを0表示しない")
+	check(not label.contains("処理ごと（世界側") and label.contains("結晶 %d" % cumulative.rows.crystals[0]),"C++の実数で結晶を表示する")
 	check(overlay._cpp_window.packed_bytes_per_frame>0.0,"Packed配列の論理量をbytes/frameで表示する")
 	check(cumulative.timings.resource_wait[0]>0,"開始時の資源待ちを独立して記録する")
 	rec._flush_cpp_performance()
@@ -225,6 +235,105 @@ func verify_cpp_perf() -> bool:
 	rec.free()
 	session.free()
 	await get_tree().process_frame
+	await get_tree().process_frame
+	return true
+
+func verify_cpp_detail_reader() -> bool:
+	var path := "res://.content/run/stage_2.json"
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var session := RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":9688},false)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if session.bridge==null: session.free();return false
+	if not await begin_cpp_play(session): session.free();return false
+	var bridge = session.bridge
+	var overlay := PerfOverlay.new()
+	overlay.bridge = bridge
+	add_child(overlay)
+	overlay._set_mode(PerfOverlay.Mode.DETAIL)
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	rec._set_armed(true)
+	if rec._file==null: rec.free();overlay.free();session.free();return false
+	for tick in 4: bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var before: Dictionary = bridge.read_metrics().value
+	var interval := maxi(1,int(bridge.recording_origin.conditions.config.world_tick_div))
+	overlay._set_mode(PerfOverlay.Mode.HIDDEN)
+	for tick in interval: bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	var after: Dictionary = bridge.read_metrics().value
+	print("[cpp_detail_reader] world_tick_div=%d enemy_updates=%d->%d" % [interval,before.detail_timings.enemies[1],after.detail_timings.enemies[1]])
+	var continued: bool = after.detail_timings.enemies[1]>before.detail_timings.enemies[1]
+	rec._set_armed(false)
+	rec.free()
+	overlay.free()
+	session.free()
+	await get_tree().process_frame
+	return continued
+
+func verify_cpp_metadata_detail() -> bool:
+	var path := "res://.content/run/stage_2.json"
+	if not FileAccess.file_exists(path): return false
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var profile := {"mult":{"max_speed":1.25,"xp":1.5},"add":{"max_hp":7.0},"reduce":{"charge_time":0.75}}
+	var session := RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"cpp_profile":profile,"cpp_source":"stage_launcher","seed":9688},true)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if session.bridge==null: session.free();return false
+	var bridge = session.bridge
+	var initial: Dictionary = bridge.recording_origin.conditions
+	check(initial.config.size()>80 and initial.stats.size()==18,"開始時のC++設定全列と旧機体能力18列を保存する")
+	check(initial.profile.mult.max_speed==1.25 and initial.profile.mult.xp==1.5 and initial.profile.add.max_hp==7.0 and initial.profile.reduce.charge_time==0.75,"開始時に適用した永続強化の係数を保存する")
+	check(initial.rng_seed=="9688" and not String(initial.rng_state).is_empty() and initial.rng_algorithm=="pcg32","乱数のseed・状態・方式を別々に保存する")
+	check(initial.physics_ticks_per_second==Engine.physics_ticks_per_second and initial.simulation_ticks_per_second==120 and initial.meta_levels.size()>0,"物理更新数と機体強化の段を開始条件に残す")
+	check(initial.identity.implementation_sha256.length()==64 and initial.identity.input_sha256==index.input_sha256 and initial.identity.payload_sha256==index.payload_sha256,"ロード済みC++実装と入力・戦闘データの署名を保存する")
+	if not await begin_cpp_play(session): session.free();return false
+	bridge._core.set_run_guards({"invincible":true,"hitstop_enabled":false})
+	var position: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
+	bridge.command("dev_spawn",{"definition_id":"drifter","position":position+Vector2(100,0)})
+	bridge.command("dev_drop_crystal",{"position":position+Vector2(500,0),"kind":1})
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	var before: Dictionary = bridge._core.inspect()
+	rec._set_armed(true)
+	if rec._file==null: rec.free();session.free();return false
+	var recording := rec._file.get_path()
+	var start := read_rows(recording)[0]
+	check(start.run_start.source=="stage_launcher" and start.recording_start.trigger=="during_run","起動元と録画開始のきっかけを別々に保存する")
+	check(start.run_start.conditions.hitstop_enabled==initial.hitstop_enabled and not start.recording_start.conditions.hitstop_enabled and start.recording_start.conditions.invincible,"ラン開始条件と途中録画時の現在条件を分ける")
+	check(bridge._core.inspect()==before and start.recording_start.conditions.run_state.xp_gained>=initial.run_state.xp_gained,"開始情報を読む処理はゲーム状態と乱数を変えない")
+	var overlay: PerfOverlay = session.view.get_node("Hud/PerfOverlay")
+	var presentation: RunPresentation = session.view.get_node("RunPresentation")
+	overlay._set_mode(PerfOverlay.Mode.DETAIL)
+	for tick in 4:
+		bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+		presentation._present_cpp(0.0)
+	overlay._acc = PerfOverlay.REFRESH
+	overlay._process(0.01)
+	var label: String = overlay._label.text
+	for name in ["物理更新","結晶","部品","描画命令","シェーダーのコンパイル","RAM","VRAM","つながっていないノード","表の行"]:
+		check(label.contains(name),"F3詳細へ%sの実数を戻す" % name)
+	check(overlay._view_label.visible and overlay._view_label.text.contains("C++処理") and overlay._view_label.text.contains("表示側") and overlay._view_label.text.contains("通常バッチ"),"F3右列へ処理・表示・描画個体数の内訳を戻す")
+	var first: Dictionary = bridge.read_metrics(StringName("recorder:%d" % rec.get_instance_id())).value
+	var second: Dictionary = bridge.read_metrics(StringName("recorder:%d" % rec.get_instance_id())).value
+	check(first.timings.sim[3]>0 and second.timings.sim[3]==0 and first.timings.sim.slice(0,3)==second.timings.sim.slice(0,3),"読取先の区間最大だけを更新し累積計測値を保つ")
+	var view_first: Array = presentation.metrics_snapshot(StringName("recorder:%d" % rec.get_instance_id())).detail_timings["view.view_submit"]
+	var view_second: Array = presentation.metrics_snapshot(StringName("recorder:%d" % rec.get_instance_id())).detail_timings["view.view_submit"]
+	check(view_first[3]>0 and view_second[3]==0 and view_first.slice(0,3)==view_second.slice(0,3),"表示側も区間最大だけを更新し累積計測値を保つ")
+	check(first.render_rows.live[0]>0 and first.rows.crystals[0]>0 and not first.detail_timings.is_empty(),"C++の個体数と内訳を実際の状態から取得する")
+	var detail_count: int = first.detail_timings.enemies[1]
+	overlay._set_mode(PerfOverlay.Mode.HIDDEN)
+	for tick in maxi(1,int(initial.config.world_tick_div)):
+		bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	check(bridge.read_metrics().value.detail_timings.enemies[1]>detail_count,"F3を閉じても録画中は詳細計測を続ける")
+	rec._set_armed(false)
+	detail_count = bridge.read_metrics().value.detail_timings.enemies[1]
+	for tick in maxi(1,int(initial.config.world_tick_div)):
+		bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
+	check(bridge.read_metrics().value.detail_timings.enemies[1]==detail_count,"最後の読取先を閉じたら詳細計測を止める")
+	rec.free()
+	session.free()
 	await get_tree().process_frame
 	return true
 

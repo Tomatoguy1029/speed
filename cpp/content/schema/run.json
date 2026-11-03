@@ -896,9 +896,16 @@
           "type": "f64",
           "min": 0,
           "native": "gate_arc"
+        },
+        {
+          "name": "weak_arc",
+          "type": "f64",
+          "native": "weak_arc",
+          "min": 0,
+          "value": 0.0
         }
       ],
-      "version": 9
+      "version": 2
     },
     {
       "name": "LoadoutDefinition",
@@ -2151,6 +2158,10 @@
       {
         "name": "BossEffect",
         "value": "boss_effect"
+      },
+      {
+        "name": "LabSpawn",
+        "value": "lab_spawn"
       }
     ],
     "ResultKind": [
@@ -2411,6 +2422,10 @@
     ]
   },
   "event_fields": {
+    "lab_spawn": [
+      "pos",
+      "enemy_type"
+    ],
     "attack_start": [
       "owner",
       "row",

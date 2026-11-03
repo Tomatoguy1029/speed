@@ -45,9 +45,22 @@ else:
 name = 'speed_runtime' + env['suffix'] + ('.dylib' if env['platform'] == 'macos' else '.dll')
 sources = Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/heroes/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp') + Glob('bosses/flow/*.cpp') + Glob('bosses/monoceros/*.cpp') + Glob('bosses/centaurus/*.cpp') + Glob('bosses/canis_major/*.cpp') + Glob('bosses/hydra/*.cpp') + Glob('bosses/draco/*.cpp')
 objects = []
+# ロード済みC++の実装を、録画時にソース全体を走査せず識別する。
+implementation = hashlib.sha256()
+for path in sorted([here / 'SConstruct', here / 'dependencies.json'] + list(here.rglob('*.h')) + list(here.rglob('*.cpp'))):
+    if sdk == path or sdk in path.parents:
+        continue
+    implementation.update(str(path.relative_to(here)).encode())
+    implementation.update(b'\0')
+    implementation.update(path.read_bytes())
+    implementation.update(b'\0')
 for source in sources:
     relative = Path(source.abspath).relative_to(here.parent)
     target = build / env['platform'] / env['arch'] / relative.with_suffix('')
-    objects.extend(env.SharedObject(str(target), source))
+    object_env = env
+    if relative == Path('cpp/output/metrics_builder.cpp'):
+        object_env = env.Clone()
+        object_env.Append(CPPDEFINES=[('SPEED_IMPLEMENTATION_SHA256', '\\"' + implementation.hexdigest() + '\\"')])
+    objects.extend(object_env.SharedObject(str(target), source))
 library = env.SharedLibrary(str(out / name), objects)
 Default(library)

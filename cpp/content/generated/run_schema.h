@@ -338,6 +338,7 @@ struct EnemyRecord {
     bool reward_burst{};
     uint32_t gate{};
     double gate_arc{};
+    double weak_arc{};
 };
 inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (!input.read_u32(out.id)) return false;
@@ -408,6 +409,8 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.gate > 7) return false;
     if (!input.read_f64(out.gate_arc)) return false;
     if (out.gate_arc < 0) return false;
+    if (!input.read_f64(out.weak_arc)) return false;
+    if (out.weak_arc < 0) return false;
     return true;
 }
 struct LoadoutDefinition {
@@ -7543,8 +7546,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 9) return false;
-        if (count > input.remaining()/250) return false;
+        if (version != 2) return false;
+        if (count > input.remaining()/258) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -9699,6 +9702,101 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.pickup_config.pickup_life=config.pickup_life;
     state.trace_radius=config.trace_radius;
 }
+inline godot::Dictionary config_snapshot(const RunConfig &config) {
+    godot::Dictionary out;
+    out["id"]=config.id;
+    out["aim_lag"]=config.aim_lag;
+    out["aim_speed"]=config.aim_speed;
+    out["crystal_low"]=config.crystal_low;
+    out["crystal_mid"]=config.crystal_mid;
+    out["crystal_high"]=config.crystal_high;
+    out["ship_config_start_radius"]=config.ship_config_start_radius;
+    out["ship_config_base_max_speed"]=config.ship_config_base_max_speed;
+    out["ship_config_stick_dead_zone"]=config.ship_config_stick_dead_zone;
+    out["ship_config_mouse_dead_zone"]=config.ship_config_mouse_dead_zone;
+    out["ship_config_steer_cruise"]=config.ship_config_steer_cruise;
+    out["ship_config_glide_hold"]=config.ship_config_glide_hold;
+    out["ship_config_glide_fade"]=config.ship_config_glide_fade;
+    out["ship_config_cruise_floor"]=config.ship_config_cruise_floor;
+    out["ship_config_energy_cut"]=config.ship_config_energy_cut;
+    out["ship_config_cruise_drag"]=config.ship_config_cruise_drag;
+    out["ship_config_overcap_decay"]=config.ship_config_overcap_decay;
+    out["ship_config_field_radius"]=config.ship_config_field_radius;
+    out["ship_config_boundary_push"]=config.ship_config_boundary_push;
+    out["ship_config_ship_radius"]=config.ship_config_ship_radius;
+    out["ship_config_crash_restitution"]=config.ship_config_crash_restitution;
+    out["ship_config_ship_hurt_time"]=config.ship_config_ship_hurt_time;
+    out["ship_config_max_hp"]=config.ship_config_max_hp;
+    out["ship_config_max_speed"]=config.ship_config_max_speed;
+    out["ship_config_turn_rate"]=config.ship_config_turn_rate;
+    out["ship_config_acceleration"]=config.ship_config_acceleration;
+    out["ship_config_glide_duration_mult"]=config.ship_config_glide_duration_mult;
+    out["ship_config_invulnerability"]=config.ship_config_invulnerability;
+    out["draw_config_min_charge"]=config.draw_config_min_charge;
+    out["draw_config_length"]=config.draw_config_length;
+    out["draw_config_point_step"]=config.draw_config_point_step;
+    out["draw_config_confirm_delay"]=config.draw_config_confirm_delay;
+    out["draw_config_run_time"]=config.draw_config_run_time;
+    out["draw_config_time_scale"]=config.draw_config_time_scale;
+    out["draw_config_slow_ref"]=config.draw_config_slow_ref;
+    out["draw_config_scale_min"]=config.draw_config_scale_min;
+    out["draw_config_boost_duration"]=config.draw_config_boost_duration;
+    out["draw_config_carry"]=config.draw_config_carry;
+    out["draw_config_launch_ratio"]=config.draw_config_launch_ratio;
+    out["draw_config_glide_ratio"]=config.draw_config_glide_ratio;
+    out["draw_config_capacity"]=config.draw_config_capacity;
+    out["draw_config_charge_time"]=config.draw_config_charge_time;
+    out["draw_config_length_mult"]=config.draw_config_length_mult;
+    out["camera_base_view"]=config.camera_base_view;
+    out["camera_zoom_ref_speed"]=config.camera_zoom_ref_speed;
+    out["camera_zoom_exp"]=config.camera_zoom_exp;
+    out["camera_zoom_min"]=config.camera_zoom_min;
+    out["camera_look_ahead"]=config.camera_look_ahead;
+    out["world_tick_div"]=config.world_tick_div;
+    out["grid_cell"]=config.grid_cell;
+    out["time_limit"]=config.time_limit;
+    out["combat_base_attack"]=config.combat_base_attack;
+    out["combat_atk_scale"]=config.combat_atk_scale;
+    out["combat_ram_speed_ratio"]=config.combat_ram_speed_ratio;
+    out["combat_crit_armor"]=config.combat_crit_armor;
+    out["combat_touch_damage"]=config.combat_touch_damage;
+    out["combat_contact_cooldown"]=config.combat_contact_cooldown;
+    out["combat_bounce_keep"]=config.combat_bounce_keep;
+    out["combat_bounce_min_speed"]=config.combat_bounce_min_speed;
+    out["combat_kill_hitstop"]=config.combat_kill_hitstop;
+    out["combat_kill_hitstop_cap"]=config.combat_kill_hitstop_cap;
+    out["combat_kill_hitstop_regen"]=config.combat_kill_hitstop_regen;
+    out["combat_hitstop_big_mult"]=config.combat_hitstop_big_mult;
+    out["combat_hitstop_crit_mult"]=config.combat_hitstop_crit_mult;
+    out["combat_max_enemy_radius"]=config.combat_max_enemy_radius;
+    out["combat_attack_mult"]=config.combat_attack_mult;
+    out["combat_crit_chance"]=config.combat_crit_chance;
+    out["combat_crit_mult"]=config.combat_crit_mult;
+    out["combat_ready"]=config.combat_ready;
+    out["pickups_ready"]=config.pickups_ready;
+    out["gem_max"]=config.gem_max;
+    out["strong_gold_chance"]=config.strong_gold_chance;
+    out["coin_radius"]=config.coin_radius;
+    out["pickup_xp_mult"]=config.pickup_xp_mult;
+    out["pickup_speed_mult"]=config.pickup_speed_mult;
+    out["pickup_xp_radius"]=config.pickup_xp_radius;
+    out["fixed_rewards"]=config.fixed_rewards;
+    out["character_scale"]=config.character_scale;
+    out["projectiles_ready"]=config.projectiles_ready;
+    out["debris_life"]=config.debris_life;
+    out["debris_knock"]=config.debris_knock;
+    out["trail_points"]=config.trail_points;
+    out["ship_visual"]=config.ship_visual;
+    out["shot_visual"]=config.shot_visual;
+    out["crystal_visual"]=config.crystal_visual;
+    out["coin_visual"]=config.coin_visual;
+    out["cannon_visual"]=config.cannon_visual;
+    out["enemy_face_move"]=config.enemy_face_move;
+    out["pickup_repair_fraction"]=config.pickup_repair_fraction;
+    out["pickup_life"]=config.pickup_life;
+    out["trace_radius"]=config.trace_radius;
+    return out;
+}
 inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {
     EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;
     out.hp=row.hp;
@@ -9740,6 +9838,7 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.reward_scattered=row.reward_scattered;
     out.reward_burst=row.reward_burst;
     out.gate_arc=row.gate_arc;
+    out.weak_arc=row.weak_arc;
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }

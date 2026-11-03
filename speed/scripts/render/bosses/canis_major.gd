@@ -1,6 +1,10 @@
 ## 戦闘の参照を持たず、生成済みパーツへ本体の値だけを反映する。
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+@export var pixel_size := 3.0
+@export var sirius_color := Color("#e8f6ff")
+@export var sirius_halo_color := Color("#9fe8ff")
+@export var sirius_glow_scale := 1.0
 var state := {}
 var technique := {}
 var hit := 0.0
@@ -20,6 +24,9 @@ func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 func clear_flames() -> void:
 	if flames!=null: flames.clear()
 func frame_event(event: Dictionary) -> void:
+	if event.get("type",&"")==&"combat_damage":
+		hit = 0.18
+		queue_redraw()
 	if event.get("type",&"")==&"canis_cue" and event.cue in ["aim_locked","pounce","command","sirius","phase_changed","howl","call","called","stream_windup","bay_windup","entrance_bark","nova_windup","nova_flash","relay_windup","relay_mark","relay_fire","flame_windup","flame_start"]:
 		_pulse_until = float(event.world_time)+0.35
 		if not state.is_empty(): apply_frame(state,technique)
@@ -30,6 +37,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		gait = 0.0
 		_pulse_until = -1.0
 	if not state.is_empty() and int(body.phase)>int(state.phase): _pulse_until = float(body.clock)+0.35
+	if not state.is_empty() and (body.get("calling",false)!=state.get("calling",false) or body.get("barking",false) and not state.get("barking",false)): _pulse_until = float(body.clock)+0.35
 	pulse = maxf(0.0,_pulse_until-float(body.clock))
 	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock),body.get("burning",[]),{"position":body.position+Vector2.from_angle(float(body.facing))*float(body.radius)*0.84,"profile":attack.get("flame_profile",5),"active":attack.get("technique","")=="blaze" and int(attack.get("stage",5))==0})
 	_track_command(body,attack,dt)
@@ -40,7 +48,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	position = body.position
 	rotation = body.facing
 	visible = body.mode<4
-	hit = float(body.flash)
+	hit = maxf(float(body.flash),hit-dt)
 	gait += dt*(18.0 if int(attack.get("stage",5))==1 else 9.0)
 	var k := float(body.radius)/100.0
 	var crouch := float(attack.get("crouch",0.0)) if int(attack.get("stage",5)) in [0,1] else 0.0
@@ -93,11 +101,19 @@ func _draw() -> void:
 		var color := Color("#ff667d") if technique.locked else Color("#f2b567")
 		draw_line(Vector2(float(state.radius),0.0),Vector2(maxf(float(state.radius),reach),0.0),Color(color,0.35+float(state.charge)*0.4),6.0 if technique.locked else 3.0)
 		draw_arc(Vector2(reach,0.0),float(state.radius)*0.5,0.0,TAU,24,Color(color,0.6),3.0)
-	if technique.get("technique","") not in ["command","bay"] or int(technique.get("stage",5))!=0: return
 	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE*float(state.radius)/100.0)
+	if int(technique.get("stage",5))==2:
+		var alpha := 0.45+sin(float(state.clock)*14.0)*0.25
+		draw_arc(Vector2(-6,0),106.0,0.0,TAU,32,Color(sirius_halo_color,alpha),pixel_size*2.0)
+	var calling: bool = state.get("calling",false) or state.get("barking",false)
+	var shouting: bool = technique.get("technique","") in ["command","stream","bay","hunt_pounce"] and int(technique.get("stage",5))==0 and not technique.get("jumping",false)
+	if not calling and not shouting:
+		draw_set_transform(Vector2.ZERO)
+		return
 	for ring in 2:
 		var grow := fmod(float(state.clock)*2.5+ring*0.5,1.0)
-		draw_arc(Vector2(84.0,0.0),20.0+grow*90.0,0.0,TAU,32,Color(Color("#f2b567"),1.0-grow),3.0)
+		draw_arc(Vector2(84.0,0.0),20.0+grow*90.0,0.0,TAU,32,Color(Color("#f2b567"),1.0-grow),pixel_size)
+	draw_set_transform(Vector2.ZERO)
 func _draw_command_lunges() -> void:
 	for id in _trails:
 		var trail: Dictionary = _trails[id]

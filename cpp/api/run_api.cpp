@@ -510,6 +510,20 @@ Dictionary SpeedRunCore::metrics_run() const {
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"read_metrics","開始していないランです");
     return success(speed::MetricsBuilder::read(runtime));
 }
+void SpeedRunCore::set_metrics_detail_run(bool active,StringName reader) {
+    if (runtime.busy || !runtime.api_development || reader==StringName()) return;
+    auto &m=runtime.frame_workspace.metrics;const std::string name=String(reader).utf8().get_data();
+    if (active) m.readers.insert(name);else m.readers.erase(name);
+    const auto apply=[&](speed::MetricSample &sample) {if (active) sample.window_max.try_emplace(name,0);else sample.window_max.erase(name);};
+    apply(m.sim);apply(m.output_build);for (auto &entry:m.detail) apply(entry.second);
+    m.detail_active=!m.readers.empty();
+}
+Dictionary SpeedRunCore::metrics_window_run(StringName reader) const {
+    if (runtime.busy) return failure(7,"read_metrics","更新中は読めません");
+    const std::string name=String(reader).utf8().get_data();
+    if (!runtime.state.started || runtime.state.closed || !runtime.frame_workspace.metrics.readers.count(name)) return failure(4,"read_metrics","登録した計測の読取先を指定してください");
+    return success(speed::MetricsBuilder::read(runtime,name));
+}
 Dictionary SpeedRunCore::recording_run(bool initial) const {
     if (runtime.busy) return failure(7,"recording","更新中は読めません");
     if (!runtime.api_configured || !runtime.state.started || runtime.state.closed) return failure(4,"recording","開始していないランです");

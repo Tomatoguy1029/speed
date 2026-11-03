@@ -23,6 +23,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
     for (size_t i = 0; i < runtime.state.friends.size(); ++i) {
         auto &shot = runtime.state.friends[i];
         if (!shot.alive) continue;
+        MetricsDetailTimer measured(runtime.frame_workspace.metrics,"friendly.",symbol_name(static_cast<FriendKind>(shot.kind)));
         const auto processing_handle=shot.attack;
         const Vector2 from = shot.pos, vel = shot.vel, destination = from + vel * world_dt;
         auto body_hit=speed::FieldSystem::first_body_hit(runtime,from,destination,shot.radius);

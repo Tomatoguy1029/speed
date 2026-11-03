@@ -142,7 +142,8 @@ func _rebuild() -> void:
 		var definition: EnemyDef = _baseline_definitions[id].duplicate(true)
 		for key in spec.get("overrides",{}).get(String(id),{}):
 			var value = spec.overrides[String(id)][key]
-			if key=="params": definition.params.merge(value,true)
+			if key=="params":
+				for param in value: definition.params[param] = safe_parameter(param,value[param])
 			else: definition.set(key,value)
 		if not BUILDER.chase_package(definition,_config,_source).is_empty():
 			_definitions[id] = definition
@@ -187,7 +188,7 @@ func _rebuild() -> void:
 	run.state.data.stage = stage
 	run.input = scene.cpp_input_source.get_object()
 	bridge.subscribe("実験の履歴",_consume_frame)
-	var scenario := {"lab_mode":true,"auto_spawn":spec.get("auto_spawn",false),"auto_boss":spec.get("auto_boss",false),"invincible":spec.get("invincible",true),"time":float(spec.get("time",0.0)),"gauge":float(spec.get("gauge",1.0)),"level":int(spec.get("level",1)),"empty":not terrain}
+	var scenario := {"lab_mode":true,"auto_spawn":spec.get("auto_spawn",false),"auto_boss":spec.get("auto_boss",false),"invincible":spec.get("invincible",true),"time":float(spec.get("time",0.0)),"gauge":float(spec.get("gauge",1.0)),"level":int(spec.get("level",1)),"terrain":terrain,"rocks":flags.get("rocks",not spec.get("empty",true))}
 	if not terrain or spec.has("ship_pos"): scenario.position = vector(spec.get("ship_pos",[0,0]))
 	last_error = bridge.command("dev_set_scenario",{"kind":"lab","params":scenario})
 	if not last_error.ok: return
@@ -213,6 +214,7 @@ func _rebuild() -> void:
 	schedule = spec.get("schedule",[]).duplicate(true)
 	if not String(spec.get("hero","")).is_empty(): _apply("hero",{"id":String(spec.hero)})
 	if not spec.get("meta",{}).is_empty(): _apply_meta(spec.meta)
+	if not spec.get("director",{}).is_empty(): _apply("director",spec.director)
 	_apply("schedule",{"entries":schedule})
 	_apply_recorded()
 	_refresh_projection()
@@ -369,12 +371,9 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 		"spawn":
 			var id := String(args.get("type","drifter"))
 			if not _definitions.has(StringName(id)): return {"ok":false,"message":"この敵はまだ移行していません: "+id}
-			var origin := vector(args.get("pos",[0,0]))
-			for k in clampi(int(args.get("count",1)),1,10000):
-				var offset := Vector2.from_angle(k*2.399963)*sqrt(float(k))*float(args.get("spacing",60))
-				var result: Dictionary = bridge.command("dev_spawn",{"definition_id":id,"position":origin+offset,"facing":float(args.get("angle",0)),"elite":bool(args.get("elite",false))})
-				if not result.ok: return result
-				_selected_id = result.value
+			var result: Dictionary = bridge.command("dev_edit",{"kind":"spawn","payload":{"definition_id":id,"position":vector(args.get("pos",[0,0])),"facing":float(args.get("angle",0)),"elite":bool(args.get("elite",false)),"count":clampi(int(args.get("count",1)),1,10000),"spacing":float(args.get("spacing",60))}})
+			if not result.ok: return result
+			_selected_id = result.value
 			_refresh_projection()
 			_selected_row = row_for_id(_selected_id)
 			return {"ok":true}
@@ -388,12 +387,8 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 				if not result.ok: return result
 				_selected_id = result.value
 			return {"ok":true}
-		"delete": return bridge.command("dev_remove",{"entity_id":int(args.get("id",-1))})
-		"clear":
-			for id in run.enemies.table.id:
-				var result: Dictionary = bridge.command("dev_remove",{"entity_id":int(id)})
-				if not result.ok: return result
-			return bridge.command("dev_clear_hostile",{})
+		"delete": return bridge.command("dev_edit",{"kind":"delete","payload":{"entity_id":int(args.get("id",-1))}})
+		"clear": return bridge.command("dev_edit",{"kind":"clear","payload":{}})
 		"formation":
 			var path := String(args.get("path",""))
 			if not ResourceLoader.exists(path): return {"ok":false,"message":"配置の定義がありません"}
@@ -421,7 +416,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 		"edit_range":
 			var row := row_for_id(int(args.get("id",-1)))
 			if row<0: return {"ok":false}
-			var edited := _edit_definition({"type":String(run.enemies.table.type[row]),"key":"params."+String(args.get("key","")),"value":maxf(0.01,float(args.get("length",1)))})
+			var edited := _edit_definition({"type":String(run.enemies.table.type[row]),"key":"params."+String(args.get("key","")),"value":maxf(0.01,float(args.get("length",1)))},"boss_parameter" if run.enemies.table.is_boss[row] else "parameter")
 			if not edited.ok: return edited
 			return _apply_command("move",{"id":int(args.id),"pos":run.enemies.table.pos[row],"angle":float(args.get("angle",run.enemies.table.facing[row]))})
 		"director":
@@ -430,7 +425,10 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 				if args.has(key): payload[key] = args[key]
 			return bridge.command("dev_edit",{"kind":"director","payload":payload})
 		"guard": return bridge.command("dev_edit",{"kind":"guard","payload":{"until":float(args.get("until",run.state.world_time))}})
-		"move": return bridge.command("dev_edit",{"kind":"move","payload":{"entity_id":int(args.get("id",-1)),"position":vector(args.get("pos",[0,0])),"angle":float(args.get("angle",0))}})
+		"move":
+			var payload := {"entity_id":int(args.get("id",-1)),"position":vector(args.get("pos",[0,0]))}
+			if args.has("angle"): payload.angle = float(args.angle)
+			return bridge.command("dev_edit",{"kind":"move","payload":payload})
 		"input":
 			var previous := _intent
 			_intent = Intent.new()
@@ -455,7 +453,9 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			if result.ok: pinned = position if args.get("value",false) else null
 			return result
 		"ship": return bridge.command("dev_edit",{"kind":"ship","payload":{"position":vector(args.get("pos",[0,0])),"gauge":float(args.get("gauge",run.state.gauge))}})
-		"invincible","time","level": return bridge.command("dev_edit",{"kind":kind,"payload":{"value":args.get("value")}})
+		"invincible": return bridge.command("dev_edit",{"kind":kind,"payload":{"value":bool(args.get("value",true))}})
+		"time": return bridge.command("dev_edit",{"kind":kind,"payload":{"value":maxf(0.0,float(args.get("value",0)))}})
+		"level": return bridge.command("dev_edit",{"kind":kind,"payload":{"value":clampi(int(args.get("value",1)),1,1000)}})
 		"schedule":
 			var entries: Array = args.get("entries",[]).duplicate(true)
 			for entry: Dictionary in entries:
@@ -468,11 +468,19 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 		"post_max": return bridge.command("dev_edit",{"kind":"post_max","payload":{"stacks":args.get("stacks",{})}})
 		"loadout":
 			if args.get("reset",false):
-				for item in [["weapon",run.state.weapons],["trait",run.state.traits]]:
-					for id in item[1]: bridge.command("dev_remove_"+item[0],{"id":String(id)})
-				return {"ok":true}
+				return bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"reset_loadout","args":{}}})
 			return bridge.command("dev_grant_equipment",{"id":String(args.get("id","")),"kind":String(args.get("kind","weapon")),"levels":clampi(int(args.get("level",1)),1,100)})
-		"command": return bridge.command(String(args.get("name","")),args.get("args",{}))
+		"command":
+			var name := String(args.get("name",""))
+			var payload: Dictionary = args.get("args",{})
+			if name=="draw_button":
+				_intent.alt_press = true
+				return {"ok":true}
+			if name=="debug_grant": return _apply_command("loadout",{"id":String(payload.get("id","W01")),"kind":String(payload.get("kind","weapon")),"level":int(payload.get("levels",1))})
+			if name=="debug_reset_loadout": return _apply_command("loadout",{"reset":true})
+			if name=="debug_time": return bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"time","args":{"seconds":float(payload.get("seconds",30.0))}}})
+			if name in ["debug_gauge_full","debug_heal","debug_invincible"]: return bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":name.trim_prefix("debug_"),"args":{}}})
+			return bridge.command(name,payload)
 		"field": return _add_field(String(args.get("kind","")),vector(args.get("pos",[0,0])),float(args.get("radius",0)))
 		"phase_set":
 			if args.get("ids",[]).is_empty(): return {"ok":true}
@@ -521,7 +529,8 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	var key := String(args.get("key",""))
 	if kind=="config":
 		if key not in ["base_attack","base_max_speed","draw_length","draw_confirm_delay","draw_time_scale","trace_radius","boss_hp","boss_armor"]: return {"ok":false}
-		config.set(key,maxf(0.001,float(args.get("value",0.0))))
+		if not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT] or not is_finite(float(args.value)): return {"ok":false}
+		config.set(key,clampf(float(args.value),0.001,1.0) if key=="draw_time_scale" else maxf(0.01,float(args.value)))
 	elif kind in ["boss_parameter","boss_appearance","boss_program"]:
 		if kind=="boss_parameter" and (not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT,TYPE_BOOL]): return {"ok":false}
 		if not bosses.has(type): return {"ok":false,"message":"このボスの編集はまだ移行していません"}
@@ -537,6 +546,7 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		else: return {"ok":false}
 
 	else:
+		if kind=="parameter" and (not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT,TYPE_BOOL] or (args.value is float and not is_finite(args.value))): return {"ok":false}
 		if not next.has(type): return {"ok":false}
 		var definition: EnemyDef = next[type]
 		if kind=="armor_paint":
@@ -720,9 +730,10 @@ func _free_checkpoint(item: Dictionary) -> void:
 	item.scene.free()
 
 func digest() -> String:
-	var record: Dictionary = bridge.read_recording(false)
+	var record: Dictionary = bridge.read_recording(true)
 	var snapshot: Dictionary = bridge.read_lab()
-	return str(hash(var_to_bytes([tick,record.value if record.ok else {},snapshot.value if snapshot.ok else {}])))
+	var pending := {"has_cursor":_intent.has_cursor,"cursor":_intent.cursor,"pen":_intent.pen,"press":_intent.press,"alt_press":_intent.alt_press,"hero":_intent.hero_press,"release":_intent.pen_release,"touch":_intent.touch}
+	return str(hash(var_to_bytes([tick,baseline,spec,history.filter(func(entry): return int(entry.tick)<=tick),schedule,pending,_route_play,record.value if record.ok else {},snapshot.value if snapshot.ok else {}])))
 
 func _checkpoint_key(at: int) -> String:
 	return str(hash(var_to_bytes([spec, history.filter(func(e): return int(e.tick) <= at)])))

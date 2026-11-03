@@ -12,6 +12,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-actions" in OS.get_cmdline_user_args():
+		await cpp_lab_actions()
+		print("[cpp_lab_actions] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab-boss" in OS.get_cmdline_user_args():
 		await cpp_lab_boss()
 		print("[cpp_lab_boss] passed=%d failed=%d" % [passed,failed])
@@ -98,6 +103,64 @@ func _ready() -> void:
 	await get_tree().process_frame
 	print("[lab_core] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
+
+func cpp_lab_actions() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"empty":true,"field":{"terrain":false,"rocks":true},"config":{"meteor_count":1,"iron_count":0,"saw_count":0},"director":{"enabled":true,"budget":2.0,"jitter":0.0}})
+	check(lab.run!=null and lab.last_error.get("ok",false),"個別操作の確認用ランを開始する")
+	if lab.run==null: lab.queue_free(); return
+	var core = lab.bridge._core
+	check(lab.run.projectiles.director.enabled and lab.run.projectiles.director.settings.budget==2.0,"保存した攻撃予算を開始時に適用する")
+	check(lab.bridge.command("dev_field_query",{"action":"snapshot"}).value.bodies.is_empty() and not lab.bridge.command("dev_field_query",{"action":"rocks"}).value.is_empty(),"地形なし・岩ありを独立して指定できる")
+	check(lab.perform("spawn",{"type":"iron","pos":[1700,800],"angle":0.6}),"手動の岩を配置する")
+	var rock_id: int = lab.run.enemies.table.id[lab.selected]
+	check(lab.bridge.command("dev_field_query",{"action":"rocks"}).value.any(func(rock): return rock.enemy_id==rock_id and rock.manual),"手動の岩と敵の参照を同じ操作で作る")
+	check(lab.events.any(func(event): return event.type==&"lab_spawn" and event.enemy_type==&"iron"),"手動配置をタイムラインの出現通知へ渡す")
+	check(lab.perform("move",{"id":rock_id,"pos":[1800,900]}) and is_equal_approx(lab.run.enemies.table.facing[lab.selected],0.6),"ドラッグで向きを省略したら元の向きを保つ")
+	check(lab.bridge.command("dev_field_query",{"action":"rocks"}).value.any(func(rock): return rock.enemy_id==rock_id and rock.position==Vector2(1800,900)),"岩を移動した位置をフィールド側にも反映する")
+	check(lab.perform("spawn",{"type":"gunner","pos":[500,500],"angle":0.25}),"移動確認用の敵を配置する")
+	var parent: int = lab.run.enemies.table.id[lab.selected]
+	var part: Dictionary = lab.bridge.command("dev_spawn_part",{"parent_id":parent,"definition_id":"hydra_bite","position":Vector2(550,500)})
+	check(part.ok,"移動確認用の部位を親に付ける")
+	var child: int = int(part.value) if part.ok else -1
+	var attack: Dictionary = lab.bridge.command("dev_emit_attack",{"pool":2,"position":Vector2(560,500),"owner_id":child,"attached":true,"life":10.0,"radius":2.0}) if part.ok else {"ok":false}
+	check(attack.ok,"部位に付いた攻撃を作る")
+	var before: Dictionary = core.enemy_motion_snapshot().filter(func(row): return row.id==parent)[0]
+	check(lab.perform("move",{"id":parent,"pos":[700,500],"angle":0.25+PI/2}),"攻撃を止めずに親を回転して動かす")
+	var after: Dictionary = core.enemy_motion_snapshot().filter(func(row): return row.id==parent)[0]
+	check(before.fire_t==after.fire_t and before.age==after.age,"移動編集で攻撃と個体の時計を変えない")
+	if part.ok:
+		check(lab.run.enemies.table.pos[lab.row_for_id(child)].is_equal_approx(Vector2(700,550)),"子の相対位置を親と一緒に回す")
+	if attack.ok:
+		check(core.hazards_snapshot().any(func(hazard): return hazard.pos.is_equal_approx(Vector2(700,560))),"付属した攻撃を消さず同じ相対位置へ動かす")
+	check(lab.perform("parameter",{"type":"gunner","key":"attack_weight","value":0}) and core.enemy_attack_snapshot().any(func(row): return row.id==parent and not row.managed),"攻撃の重さ0を配置済みの個体にも適用する")
+	check(lab.perform("config",{"key":"draw_time_scale","value":2.0}) and lab.run.cfg.draw_time_scale==1.0,"描いている間の速度の上限を維持する")
+	check(lab.perform("config",{"key":"base_attack","value":0.0}) and lab.run.cfg.base_attack==0.01,"通常設定の正の下限を維持する")
+	check(lab.perform("post_max",{"stacks":{"max_speed":2}}) and lab.perform("loadout",{"reset":true}) and lab.run.state.post_max_stacks.is_empty(),"装備リセットで最大強化も消す")
+	check(lab.perform("command",{"name":"debug_time","args":{}}) and lab.run.state.time==30.0,"保存済みの旧時刻命令と既定の30秒を読み替える")
+	check(lab.perform("command",{"name":"debug_grant","args":{"id":"W01"}}) and lab.run.state.weapons.has(&"W01"),"保存済みの旧装備命令を読み替える")
+	check(lab.perform("command",{"name":"debug_reset_loadout"}) and lab.run.state.weapons.is_empty(),"旧装備リセット命令を同じ正式操作へ渡す")
+	check(lab.perform("boss",{"type":"monoceros","pos":[1500,500]}),"削除確認用のボスを配置する")
+	var boss: int = lab.run.enemies.table.id[lab.selected]
+	check(lab.perform("edit_range",{"id":boss,"key":"approach_range","length":880.0,"angle":0.4}) and lab.definition_for_row(lab.row_for_id(boss)).params.approach_range==880.0,"ボスの射程編集もボス定義へ渡す")
+	check(lab.perform("delete",{"id":boss}),"停止したままボスを削除する")
+	var held: Dictionary = lab.bridge.checkpoint()
+	check(held.ok,"ボス削除直後も保持点の参照が整合する")
+	if held.ok: lab.bridge.release_checkpoint(held.value)
+	var digest: String = lab.digest()
+	check(lab.perform("schedule",{"entries":[{"type":"monoceros","pos":[1800,500],"start":0,"end":0,"count":2}]}),"ボスの予定配置を受け付ける")
+	check(lab.digest()!=digest,"同じtickの予定変更でも古い候補の比較値を更新する")
+	lab.step()
+	var bodies: Array = lab.bridge.command("dev_boss_body_state",{}).value
+	check(bodies.filter(func(body): return body.actor>0).size()==2 and lab.run.enemies.table.is_boss.count(1)==2,"予定配置のボスも本体とAIを持つ")
+	check(lab.perform("clear") and lab.run.enemies.count()==0,"一括削除で通常敵・部位・ボスを消す")
+	held = lab.bridge.checkpoint()
+	check(held.ok,"一括削除直後も保持点の参照が整合する")
+	if held.ok: lab.bridge.release_checkpoint(held.value)
+	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"追加した出現通知も正式な配信形式で届ける")
+	lab.queue_free()
+	await get_tree().process_frame
 
 func cpp_definition_edits() -> bool:
 	var builder = load("res://tools/content/build_run_content.gd")

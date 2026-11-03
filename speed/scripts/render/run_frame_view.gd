@@ -54,6 +54,8 @@ var _debris_trails: Array[Dictionary] = []
 var _scope: ContentResourceScope
 var _pixel := 1.82
 var _shot_transforms: Dictionary = {}
+var _enemy_health := PackedFloat32Array()
+var _enemy_weak := PackedFloat32Array()
 var _gunner := PackedFloat32Array()
 var _beamer := PackedFloat32Array()
 var _missile := PackedFloat32Array()
@@ -305,6 +307,13 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		preload("res://scripts/render/enemies/lynx.gd").draw_frame(canvas,_lynx,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/dolphin.gd").draw_frame(canvas,_dolphin,1.0/maxf(_zoom,0.01))
 		preload("res://scripts/render/enemies/sniper.gd").draw_frame(canvas,_sniper,_sniper_world_time,1.0/maxf(_zoom,0.01))
+		for n in range(0,_enemy_weak.size(),5):
+			canvas.draw_arc(Vector2(_enemy_weak[n],_enemy_weak[n+1]),_enemy_weak[n+2]+2.0/maxf(_zoom,0.01),_enemy_weak[n+3]+PI-_enemy_weak[n+4],_enemy_weak[n+3]+PI+_enemy_weak[n+4],12,Color("#ffe46b"),3.0/maxf(_zoom,0.01))
+		for n in range(0,_enemy_health.size(),4):
+			var width := _enemy_health[n+2]*1.6
+			var top := Vector2(_enemy_health[n]-width*0.5,_enemy_health[n+1]-_enemy_health[n+2]-10.0/maxf(_zoom,0.01))
+			canvas.draw_rect(Rect2(top,Vector2(width,4.0/maxf(_zoom,0.01))),Color(0,0,0,0.6))
+			canvas.draw_rect(Rect2(top,Vector2(width*_enemy_health[n+3],4.0/maxf(_zoom,0.01))),Color("#ff6b5a"))
 		perf.since(&"view_draw.attacks",began)
 	_layer(9).add_child(_gunner_marks)
 	_effects = PixelPainter.new()
@@ -330,7 +339,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 			if effect.mesh!=null: _particle_canvas.draw_mesh(effect.mesh,null,Transform2D(0.0,effect.pos),tint)
 			for piece: Dictionary in effect.sprites: _particle_canvas.draw_mesh(piece.mesh,piece.texture,Transform2D(0.0,effect.pos),tint)
 		for trail: Dictionary in _debris_trails:
-			if trail.points.size()>1: _particle_canvas.draw_polyline(trail.points,Color(1.0,0.6,0.25,0.6*trail.life/trail.max),3.0*_pixel/maxf(_zoom,0.01))
+			if trail.points.size()>1: _particle_canvas.draw_polyline(trail.points,Color(1.0,0.6,0.25,0.6*trail.life/trail.max),3.0/maxf(_zoom,0.01))
 		for ring: Dictionary in _rings:
 			var k: float = ring.life/ring.max
 			var color: Color = EFFECT_SETTINGS.tinted("",ring.color)
@@ -392,6 +401,8 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 	var batch: InstanceBatch
 	if entry.role==2:
 		batch = preload("res://scripts/render/attacks/friend_shot.gd").create_batch(_pixel)
+		batch.visibility_layer = 1|RenderPipeline.GLOW_LAYER
+		batch.modulate = RenderPipeline.plain_color(_layer(layer))
 	else:
 		batch = InstanceBatch.new()
 		if entry.role==4: batch.setup_polygon(InstanceBatch.circle_points(24))
@@ -410,6 +421,14 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 	return batch
 
 func _valid(frame: Dictionary) -> bool:
+	if frame.has("enemy_weak"):
+		if not frame.enemy_weak is PackedFloat32Array or frame.enemy_weak.size()%5: return false
+		for value: float in frame.enemy_weak:
+			if not is_finite(value): return false
+	if frame.has("enemy_health"):
+		if not frame.enemy_health is PackedFloat32Array or frame.enemy_health.size()%4: return false
+		for value: float in frame.enemy_health:
+			if not is_finite(value): return false
 	if frame.has("petrified_enemies"):
 		if not frame.petrified_enemies is PackedFloat32Array or frame.petrified_enemies.size()%3: return false
 		for value: float in frame.petrified_enemies:
@@ -570,7 +589,8 @@ func _valid(frame: Dictionary) -> bool:
 			for value: float in row.glows:
 				if not is_finite(value): return false
 		for flag: int in row.flags:
-			if flag & ~1: return false
+			var maximum := 3 if visuals[row.visual_id].role==2 else 2 if visuals[row.visual_id].get("iron",false) else 1
+			if flag<0 or flag>maximum: return false
 	for row in frame.shapes:
 		if not row is Dictionary or row.get("kind") not in [SHAPE_KIND.Polyline,SHAPE_KIND.Circle,SHAPE_KIND.Wave,SHAPE_KIND.Blast,SHAPE_KIND.LightArrow,SHAPE_KIND.FriendDebris,SHAPE_KIND.FriendHull,SHAPE_KIND.Zone,SHAPE_KIND.Flood,SHAPE_KIND.Shell] or not row.get("points") is PackedVector2Array or not row.get("offsets") is PackedInt32Array or not row.get("widths") is PackedFloat32Array or not row.get("colors") is PackedColorArray: return false
 		if not row.get("owner_id") is int or not row.get("layer") is int or not row.get("order") is int or row.owner_id<0: return false
@@ -672,12 +692,20 @@ func apply_frame(frame: Dictionary) -> bool:
 	_hero_power_visual.petrified = frame.get("petrified_enemies",PackedFloat32Array())
 	_hero_power_visual.queue_redraw()
 	_update_marks(frame)
+	var weak: PackedFloat32Array = frame.get("enemy_weak",PackedFloat32Array())
+	if weak!=_enemy_weak:
+		_enemy_weak = weak
+		_gunner_marks.queue_redraw()
+	var health: PackedFloat32Array = frame.get("enemy_health",PackedFloat32Array())
+	if health!=_enemy_health:
+		_enemy_health = health
+		_gunner_marks.queue_redraw()
 	var next_shots := {}
 	for row: Dictionary in frame.batches:
-		if visuals[row.visual_id].role==2: next_shots[row.visual_id] = row.transforms
+		if visuals[row.visual_id].role==2: next_shots[row.visual_id] = {"transforms":row.transforms,"flags":row.flags}
 	var unchanged_shots := {}
 	for id in visuals:
-		if visuals[id].role==2 and next_shots.get(id,PackedFloat32Array())==_shot_transforms.get(id,PackedFloat32Array()): unchanged_shots[id] = true
+		if visuals[id].role==2 and next_shots.get(id,{})==_shot_transforms.get(id,{}): unchanged_shots[id] = true
 	_shot_transforms = next_shots
 	for id in batches:
 		if not unchanged_shots.has(id): batches[id].begin()
@@ -735,14 +763,17 @@ func apply_frame(frame: Dictionary) -> bool:
 			for key in ["gunner","beamer","missile","battleship","sniper","glows","ruler_sides"]: packed_bytes+=row.get(key,PackedFloat32Array()).size()*4
 			if row.has("biter"):
 				for key in row.biter: packed_bytes+=row.biter[key].size()*4
-		if visuals[row.visual_id].role==6:
+		if visuals[row.visual_id].role==6 or visuals[row.visual_id].get("iron",false):
 			if not enemy_frames.has(row.visual_id):
-				var display = preload("res://scripts/render/run_enemy_frame.gd").new()
-				add_child(display)
-				display.perf = perf
+				var display = preload("res://scripts/render/enemies/iron.gd").new() if visuals[row.visual_id].get("iron",false) else preload("res://scripts/render/run_enemy_frame.gd").new()
+				if visuals[row.visual_id].get("iron",false): _layer(row.layer).add_child(display)
+				else:
+					add_child(display)
+					display.perf = perf
 				display.setup(_scope,visuals[row.visual_id])
 				display.begin()
 				enemy_frames[row.visual_id] = display
+			if visuals[row.visual_id].get("iron",false) and enemy_frames[row.visual_id].get_parent()!=_layer(row.layer): enemy_frames[row.visual_id].reparent(_layer(row.layer))
 			enemy_frames[row.visual_id].apply_frame(row)
 			continue
 		var batch := _batch(row.visual_id,row.layer)
@@ -948,12 +979,18 @@ func apply_frame(frame: Dictionary) -> bool:
 			_pulser_parent.add_child(display)
 			if body.kind==2: display.setup_flames(_scope,visuals)
 			if body.kind in [3,4]: display.setup_effects(_scope,visuals)
-			if body.kind==4: display.hit_feedback = boss_hit_feedback
+			if body.kind in [0,4]: display.hit_feedback = boss_hit_feedback
 			_boss_body_displays[body.id] = display
 		var attack := {}
 		for value: Dictionary in frame.get("boss_techniques",[]):
 			if value.actor==body.actor and value.stage<5: attack = value; break
-		_boss_body_displays[body.id].apply_frame(body,attack,entry.get("appearance",{}))
+		var display: Node2D = _boss_body_displays[body.id]
+		var move := String(attack.get("technique",""))
+		if display.get_meta("visual_move",null)!=move or display.get_meta("visual_revision",-1)!=EFFECT_SETTINGS.preview_revision:
+			EFFECT_SETTINGS.apply_body(display,["monoceros","centaurus","canis_major","hydra","draco"][body.kind],move)
+			display.set_meta("visual_move",move)
+			display.set_meta("visual_revision",EFFECT_SETTINGS.preview_revision)
+		display.apply_frame(body,attack,entry.get("appearance",{}))
 	for id in _boss_body_displays.keys():
 		if not body_seen.has(id):
 			_boss_body_displays[id].queue_free()
@@ -1101,14 +1138,14 @@ func receive_frame(frame: Dictionary) -> bool:
 		_zone_bursts.clear()
 		_meteor_shards.clear()
 		_shield_transfers.clear()
-	var draco_targets := {}
+	var feedback_targets := {}
 	for body: Dictionary in frame.ui.get("boss_bodies",[]):
-		if int(body.kind)!=4:continue
-		draco_targets[int(body.actor)]=true
-		for clone: Dictionary in body.get("clones",[]):draco_targets[int(clone.id)]=true
+		if int(body.kind) not in [0,4]:continue
+		feedback_targets[int(body.actor)]=true
+		for clone: Dictionary in body.get("clones",[]):feedback_targets[int(clone.id)]=true
 	for event: Dictionary in frame.events:
 		var payload: Dictionary = event.payload.duplicate(true)
-		if event.type=="combat_damage" and payload.get("target","")=="enemy" and float(payload.get("applied",0.0))>0.0 and draco_targets.has(int(payload.get("target_id",0))):
+		if event.type=="combat_damage" and payload.get("target","")=="enemy" and float(payload.get("applied",0.0))>0.0 and feedback_targets.has(int(payload.get("target_id",0))):
 			boss_hit_feedback.pulse(int(payload.target_id))
 		payload["type"] = event.type
 		_queued_events.append(payload)
@@ -1330,6 +1367,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_sniper_world_time = float(frame.ui.world_time)
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	for event: Dictionary in _queued_events:
+		if event.type==&"combat_damage" and event.get("target","")=="enemy" and float(event.get("applied",0.0))>0.0:
+			for display in _boss_body_displays.values():
+				if display.state.get("kind",-1) in [0,1,2] and display.state.get("actor",0)==event.get("target_id",0): display.frame_event(event)
 		if event.type==&"hydra_cue":
 			for display in _boss_body_displays.values():
 				if display.state.get("actor",0)==event.id: display.frame_event(event)
@@ -1348,6 +1388,10 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
 		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
 		_boss_sword_visual.frame_event(event)
+		if event.type==&"draco_roar":
+			ruler_shake = maxf(ruler_shake,12.0)
+			if pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.8)
+			_rings.append({"pos":event.pos,"radius":event.radius,"color":Color("#c2b8ff"),"life":0.8,"max":0.8})
 		if event.type==&"shield_stolen":
 			_shield_transfers.append({"pos":event.pos,"facing":event.facing,"r":event.r,"arc":event.arc,"life":0.3,"max":0.3})
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})

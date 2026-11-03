@@ -60,7 +60,9 @@ static func compile(source: StageDef, output := "res://.content", config: GameCo
 	return result if result.resources != null else null
 
 static func names(source: StageDef) -> Dictionary:
-	var result := {"phases": {}, "clips": {}}
+	var ranks := {}
+	for stars in range(11): ranks[str(stars)] = Array(EnemyDef.default_xp_reward_counts(stars))
+	var result := {"phases": {}, "clips": {},"xp_rank_counts":ranks,"stage_file":source.resource_path,"stage_file_sha256":FileAccess.get_sha256(source.resource_path)}
 	for phase: PhaseDef in source.phases: result.phases[String(phase.id)] = phase.display_name
 	for index in source.clips.size(): result.clips[index] = source.clips[index].label
 	return result

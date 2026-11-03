@@ -18,6 +18,11 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-visual-contracts" in OS.get_cmdline_user_args() or "--cpp-visual-health" in OS.get_cmdline_user_args():
+		await check_cpp_visual_contracts()
+		print("[cpp_visual_contracts] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-corona-throw" in OS.get_cmdline_user_args() or "--cpp-corona-throw-order" in OS.get_cmdline_user_args() or "--cpp-corona-throw-order-fix" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_corona_throw()
 		check(finished,"かんむり座の投射の指定確認を最後まで実施する")
@@ -253,6 +258,7 @@ func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStri
 	cpp_config.iron_count = 0
 	cpp_config.saw_count = 0
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = index_number
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = enemy_ids
@@ -1820,3 +1826,50 @@ func check_cpp_corona_throw_order(ammo: int) -> bool:
 	if not retry: check(delivered.ok and cpp_bridge.delivery_error.get("ok",false) and cpp_bridge.read_frame().ok,"同時撃破を含む固定更新の通知配信まで成功する")
 	cpp_session.free()
 	return true
+
+## 今回の移行漏れに関係する表示境界だけを短く確認する。
+func check_cpp_visual_contracts() -> void:
+	if not await prepare_cpp_attack(122,"visual_contracts",PackedStringArray(["crab"]),{"crab":{"hp":100.0,"armor":0.0,"speed":0.0}}): return
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	var crab: int = cpp_bridge.command("dev_spawn",{"definition_id":"crab","position":cpp_origin}).value
+	cpp_bridge.command("dev_enemy_combat",{"entity_id":crab,"mode":RunIds.EnemyModeId.Recover})
+	var damage: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":crab,"amount":20.0,"cause":"shot"})
+	if "--cpp-visual-health" in OS.get_cmdline_user_args():
+		var health_frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1800,1400)).value
+		var health_presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+		health_presentation._present_cpp(0.0)
+		var accepted: bool = health_presentation.frame_view.apply_frame(health_frame)
+		print("[cpp_visual_health] damage=%s health=%s weak=%s accepted=%s enemies=%s" % [damage,health_frame.enemy_health,health_frame.enemy_weak,accepted,cpp_core.enemies_snapshot()])
+		check(health_frame.enemy_health.size()==4 and is_equal_approx(health_frame.enemy_health[3],0.8) and health_frame.enemy_weak.size()==5 and accepted,"減ったHPと背面弱点をnative出力から表示へ渡す")
+		cpp_session.free()
+		return
+	for i in 3: cpp_bridge.command("dev_spawn",{"definition_id":"iron","position":cpp_origin+Vector2(100+i*70,0)})
+	for visual: String in ["weapon/scatter","weapon/interceptor"]:
+		check(cpp_core.fire_shot(cpp_origin+Vector2(0,-150),0.0,0.0,{"speed":0.0,"life":0.08,"visual_key":visual}),"短命散弾と専用曳光弾を生成する")
+	var frame: Dictionary = cpp_bridge.read_render(Rect2(-1700,-700,1800,1400)).value
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	presentation._present_cpp(0.0)
+	var view = presentation.frame_view
+	check(frame.enemy_health.size()==4 and is_equal_approx(frame.enemy_health[3],0.8) and frame.enemy_weak.size()==5 and view.apply_frame(frame),"減ったHPと背面弱点をnative出力から表示へ渡す")
+	var shot: Dictionary = frame.batches.filter(func(row): return view.visuals[row.visual_id].role==2)[0]
+	check(shot.flags==PackedInt32Array([2,3]),"短命散弾とストライクウィングを別の表示形式で受信する")
+	var painter: PixelPainter = view.batches[shot.visual_id]
+	var before: int = painter._count
+	shot.flags[0] = 0
+	check(view.apply_frame(frame) and painter._count>before,"同じ座標でも弾の表示形式だけの変更で描き直す")
+	var iron: Dictionary = frame.batches.filter(func(row): return view.visuals[row.visual_id].get("iron",false))[0]
+	var display = view.enemy_frames[iron.visual_id]
+	check(iron.flags.has(0) and iron.flags.has(1) and iron.flags.has(2) and display._batches.all(func(batch): return batch._count==1),"鉄がれきの固定3種類を同じ位置と寸法のバッチへ分ける")
+	check(display._batches[1].texture.resource_path.ends_with("iron_debris_2.png") and display._batches[2].texture.resource_path.ends_with("iron_debris_3.png"),"鉄がれきの別素材を資源範囲から受け取る")
+	view._queued_events.append({"type":&"draco_roar","pos":cpp_origin,"radius":700.0})
+	view.update_effects(cpp_bridge.read_frame().value,0.0)
+	check(view.ruler_shake==12.0 and view._rings.any(func(ring): return ring.radius==700.0),"竜の咆哮通知を揺れと輪へ接続する")
+	var mono = preload("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
+	add_child(mono)
+	mono.hit_feedback = view.boss_hit_feedback
+	view.boss_hit_feedback.pulse(777)
+	mono.apply_frame({"actor":777,"kind":0,"clock":1.0,"position":Vector2.ZERO,"facing":0.0,"mode":1,"radius":96.0,"velocity":Vector2.ZERO,"flash":0.0,"phase":2,"phase_progress":0.5,"horn_length":240.0,"charge":0.7},{"technique":"lance","stage":0,"glow":0.7,"horn":PackedVector2Array([Vector2.ZERO,Vector2(100,100)])})
+	mono.frame_event({"type":&"combat_damage"})
+	check(is_equal_approx(mono.hit,0.18) and mono.material.get_shader_parameter("boss_hit_white")>0.0 and mono.horn.frame>0 and is_equal_approx(mono._neck_facing,PI/4.0),"一角獣の命中反応・形態の角・連続技の頭向きを読み取る")
+	mono.free()
+	cpp_session.free()

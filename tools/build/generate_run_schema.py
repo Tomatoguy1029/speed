@@ -73,6 +73,10 @@ def generate():
     for f in records[0]['fields']:
         if 'runtime' in f:cpp += [f'    state.{f["runtime"]}=config.{f["name"]};']
     cpp+=['}']
+    cpp+=['inline godot::Dictionary config_snapshot(const RunConfig &config) {','    godot::Dictionary out;']
+    for f in records[0]['fields']:
+        cpp += [f'    out["{f["name"]}"]=config.{f["name"]};']
+    cpp+=['    return out;','}']
     cpp+=['inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {','    EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;']
     for f in next(r for r in records if r['name']=='EnemyRecord')['fields']:
         if 'native' in f:cpp += [f'    out.{f["native"]}=row.{f["name"]};']

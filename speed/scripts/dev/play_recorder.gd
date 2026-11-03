@@ -203,6 +203,8 @@ func _end(result: String) -> void:
 		_cpp_session_id = 0
 		if is_instance_valid(_session) and _session.bridge!=null:
 			_session.bridge.unsubscribe("recorder:%d" % get_instance_id())
+			_session.bridge.set_metrics_detail(false,StringName("recorder:%d" % get_instance_id()))
+			if is_instance_valid(_session.view): _session.view.get_node("RunPresentation").close_metrics_reader(StringName("recorder:%d" % get_instance_id()))
 			if _session.bridge.before_restore.is_connected(_before_cpp_restore): _session.bridge.before_restore.disconnect(_before_cpp_restore)
 		for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
 			if c.callable.get_object()==self: _session.tree_exiting.disconnect(c.callable)
@@ -358,6 +360,7 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 		return
 	_session = session
 	_cpp_session_id = session.id
+	session.bridge.set_metrics_detail(true,StringName("recorder:%d" % get_instance_id()))
 	_reset_combat_recording(state.value)
 	if not session.bridge.before_restore.is_connected(_before_cpp_restore): session.bridge.before_restore.connect(_before_cpp_restore)
 	if not session.closing.is_connected(_end): session.closing.connect(_end)
@@ -382,16 +385,25 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 		for event: Dictionary in snapshot.value.events: _cpp_event_sequence = maxi(_cpp_event_sequence,int(event.sequence))
 	attach_cpp(session)
 	var identity: Dictionary = state.value.identity.duplicate(true)
+	var conditions: Dictionary = IDENTITY.capture(session,state.value)
+	state.value.xp_config = conditions.xp_config
+	identity.merge(conditions.identity,true)
+	var names: Dictionary = conditions.stage_metadata
+	for band: Dictionary in state.value.bands: band["name"] = names.get("phases",{}).get(str(band.id),str(band.id))
 	identity["implementation_revision"] = OS.get_environment("SPEED_BUILD_REVISION")
 	identity["implementation_version"] = "cpp_api%d_state%d" % [identity.abi_version,identity.state_schema_version]
 	identity["xp_reward_config_sha256"] = IDENTITY.digest(state.value.xp_config)
 	var recording_start: Dictionary = state.value.duplicate(true)
+	recording_start["conditions"] = conditions
+	recording_start["trigger"] = "during_run" if during_run else "armed_before_run"
 	recording_start.erase("measurement_cumulative")
 	recording_start.erase("strong_observations")
 	_write({"type":"start","format":"cpp_events_v2","version":2,"schema_version":4,"measurement_version":3,"combat_version":1,"xp_reward_version":2,
-		"stage":identity.stage_id,"start_time":_cpp_time,"run_id":session.id,"recording_id":_recording_id,"epoch":snapshot.value.epoch,"tick":snapshot.value.tick,
+		"stage":identity.stage_id,"start_time":_cpp_time,"date":Time.get_datetime_string_from_system(),"bands":state.value.bands,"run_id":session.id,"recording_id":_recording_id,"epoch":snapshot.value.epoch,"tick":snapshot.value.tick,
 		"missing_prefix":during_run,"during_run":during_run,"event_sequence_at_start":_cpp_event_sequence,"engine_version":Engine.get_version_info().string,"interval":INTERVAL,
 		"identity":identity,"run_start":session.bridge.recording_origin.duplicate(true),"recording_start":recording_start,
+		"meta_levels":conditions.meta_levels,"meta_dev_override":conditions.meta_dev_override,"git_state":identity.git_state,
+		"stage_file":String(names.get("stage_file","")).get_file(),"stage_file_sha256_at_start":FileAccess.get_sha256(names.stage_file) if names.has("stage_file") and FileAccess.file_exists(names.stage_file) else "",
 		"xp_config":state.value.xp_config,"xp_cumulative_at_start":_xp_start_summary,"equipment_progress":state.value.equipment_progress,
 		"combat_config":_combat_config.duplicate(),"perf_excludes_ui_pause":true,"perf_interval_real":PERF_INTERVAL_US/1000000.0})
 	if during_run:
@@ -424,8 +436,9 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 
 func _cpp_metrics() -> Dictionary:
 	if _session==null or _session.bridge==null: return {}
-	if _session.view!=null: return _session.view.get_node("RunPresentation").metrics_snapshot()
-	var result: Dictionary = _session.bridge.read_metrics()
+	var reader := StringName("recorder:%d" % get_instance_id())
+	if _session.view!=null: return _session.view.get_node("RunPresentation").metrics_snapshot(reader)
+	var result: Dictionary = _session.bridge.read_metrics(reader)
 	return result.value if result.ok else {}
 
 func _cpp_performance_playing() -> bool:

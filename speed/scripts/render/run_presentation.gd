@@ -221,21 +221,35 @@ func _present_cpp(delta: float) -> void:
 
 ## 表示側も読む人ごとの窓で差分を取り、共有の累積値を消さない。
 
-func metrics_snapshot() -> Dictionary:
+func metrics_snapshot(reader: StringName = &"") -> Dictionary:
 	if bridge==null: return {}
-	var result: Dictionary = bridge.read_metrics()
+	var result: Dictionary = bridge.read_metrics(reader)
 	if not result.ok: return {}
 	var metrics: Dictionary = result.value
 	if frame_view!=null:
+		var records: Dictionary = frame_view.metrics_record if String(reader).is_empty() else frame_view.perf.open(reader)
 		var update := [0,0,0]
 		var draw := [0,0,0]
-		for key in frame_view.metrics_record:
-			var values: Array = frame_view.metrics_record[key]
+		if not String(reader).is_empty():
+			update.append(0)
+			draw.append(0)
+		for key in records:
+			var values: Array = records[key]
+			var sample := values.duplicate()
+			if not String(reader).is_empty():
+				sample.append(values[2])
+				sample[2] = frame_view.metrics_record.get(key,[0,0,0])[2]
+				values[2] = 0
+			metrics.detail_timings["view."+String(key)] = sample
 			var target: Array = draw if String(key).begins_with("view_draw.") else update
 			if not String(key).begins_with("view_draw.") and key not in [&"view_submit",&"view_effects",&"view_tail"]: continue
 			target[0] += values[0]
 			target[1] += values[1]
-			target[2] = maxi(target[2],values[2])
+			target[2] = maxi(target[2],int(sample[2]))
+			if sample.size()>3: target[3] = maxi(target[3],int(sample[3]))
 		metrics.timings["view_update"] = update
 		metrics.timings["view_draw"] = draw
 	return metrics
+
+func close_metrics_reader(reader: StringName) -> void:
+	if is_instance_valid(frame_view): frame_view.perf.close(reader)

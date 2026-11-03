@@ -84,11 +84,12 @@ void RenderBuilder::capture_previous(RunRuntime &run) {
 Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     const auto &state=run.state;const auto &config=run.content->config;const auto &previous=state.previous_poses;
     auto &groups=run.render_workspace.batches;
+    int64_t live_rows=0,batched_rows=0,marked_rows=0;
     for (auto &group:groups) {
         auto &out=group.second;out.instances.clear();out.biter=false;
         out.marks.clear();out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
-    PackedFloat32Array comet_values,crow_values,petrified_enemies;
+    PackedFloat32Array comet_values,crow_values,petrified_enemies,enemy_health,enemy_weak;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -97,10 +98,18 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (view.grow(body.radius).has_point(body.position)) batch(FieldSystem::visual(run,body),2,0).add(i+1,body.position,0,body.radius,Color(0,0,0,1));
     }
     for (size_t i=0;i<state.enemies.size();++i) {
-        const auto &enemy=state.enemies[i];if (!enemy.alive || enemy.dead || enemy.clone_visual || enemy.picaro_owner.generation || (state.control.cinematic_hide_enemies && !enemy.is_boss)) continue;
-        const auto &definition=run.content->definitions[enemy.definition];if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus || definition.kind==EnemyDefinition::Kind::CanisMajor || definition.kind==EnemyDefinition::Kind::Draco || definition.kind==EnemyDefinition::Kind::Hydra || HydraBody::owns_part(run,state.enemy_handles.at(i))) continue;
+        const auto &enemy=state.enemies[i];if (enemy.alive && !enemy.dead) ++live_rows;
+        if (!enemy.alive || enemy.dead || enemy.clone_visual || enemy.picaro_owner.generation || (state.control.cinematic_hide_enemies && !enemy.is_boss)) continue;
+        const auto &definition=run.content->definitions[enemy.definition];
+        const bool hydra_part=HydraBody::owns_part(run,state.enemy_handles.at(i));
+        if (hydra_part && definition.kind!=EnemyDefinition::Kind::Meteor && view.grow(enemy.radius).has_point(enemy.pos)) {
+            if ((enemy.is_boss || enemy.radius>=25.0) && enemy.max_hp>0 && enemy.hp<enemy.max_hp) for (float value:{enemy.pos.x,enemy.pos.y,float(enemy.radius),float(std::max(0.0,enemy.hp/enemy.max_hp))}) enemy_health.push_back(value);
+            if (enemy.stone>0) for (float value:{enemy.pos.x,enemy.pos.y,float(enemy.radius)}) petrified_enemies.push_back(value);
+        }
+        if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus || definition.kind==EnemyDefinition::Kind::CanisMajor || definition.kind==EnemyDefinition::Kind::Draco || definition.kind==EnemyDefinition::Kind::Hydra || hydra_part) continue;
         const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
+        const bool iron=definition.kind==EnemyDefinition::Kind::Obstacle && definition.id==StringName("iron");
         if (meteor && state.field.rock_handles.contains(enemy.rock) && state.field.rocks[enemy.rock.slot].kind==RockKind::Comet) {
             if (view.grow(enemy.radius*1.4142135623730951).has_point(pose.position)) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),enemy.vel.x,enemy.vel.y,float(state.field.rocks[enemy.rock.slot].rare_weapon!=0)}) comet_values.push_back(value);
             continue;
@@ -108,6 +117,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const double radius=meteor?FieldSystem::rock_sprite_radius(run,uint32_t(i)):enemy.radius*definition.sprite_scale;
         if (!view.grow(radius*1.4142135623730951).has_point(pose.position)) continue;
         if (enemy.stone>0) for (float v:{pose.position.x,pose.position.y,float(enemy.radius)}) petrified_enemies.push_back(v);
+        if (!meteor && !iron && definition.kind!=EnemyDefinition::Kind::Shield && definition.weak_arc>0) {
+            const bool native_sprite=definition.id==StringName("drifter") || definition.id==StringName("swarm") || definition.id==StringName("darter") || definition.id==StringName("armored") || definition.id==StringName("splitter") || definition.id==StringName("splitling");
+            if (!native_sprite) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(definition.weak_arc)}) enemy_weak.push_back(value);
+        }
+        if (!meteor && !iron && enemy.radius>=25.0 && enemy.max_hp>0 && enemy.hp<enemy.max_hp) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(std::max(0.0,enemy.hp/enemy.max_hp))}) enemy_health.push_back(value);
         auto &enemy_batch=batch(FieldSystem::rock_visual(run,uint32_t(i)),meteor?7:8,int32_t(enemy.definition));
         if (definition.kind==EnemyDefinition::Kind::Crow) {
             const auto cargo=CrowBehavior::cargo(run,state.enemy_handles.at(uint32_t(i)));
@@ -161,7 +175,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             }
         }
         if (definition.kind==EnemyDefinition::Kind::Battleship && (enemy.charge>0 || definition.weak_arc>0)) {
-            for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge),float(definition.weak_arc)}) enemy_batch.battleship.push_back(value);
+            for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge),0.0f}) enemy_batch.battleship.push_back(value);
         }
         if (definition.kind==EnemyDefinition::Kind::Missile && enemy.charge>0) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.missile.push_back(value);
@@ -177,9 +191,10 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         godot::Vector2 deform;double amount=0;bool flash=false;
         for (const auto &w:state.loadout.contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
         if (flash) color.r=1;
-        enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,color,enemy.flash>0 || warning || flash?1:0);
+        enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,iron?Color(0,0,0,1):color,iron?int32_t((state.field.rock_handles.contains(enemy.rock)?int64_t(enemy.rock.slot):enemy.id)%3):(enemy.flash>0 || warning || flash?1:0));
         const auto *parent=state.enemy_handles.contains(enemy.parent)?&state.enemies[enemy.parent.slot]:nullptr;
         enemy_batch.marks.push_back((enemy.landmark || (parent && parent->landmark)?1:0) | (enemy.elite || (parent && parent->elite)?2:0));
+        ++batched_rows;if (enemy_batch.marks[enemy_batch.marks.size()-1]) ++marked_rows;
         enemy_batch.instances.back().deformation=deform;enemy_batch.instances.back().amount=amount;
     }
     for (size_t i=0;i<state.friends.size();++i) {
@@ -189,7 +204,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const double radius=saw?double(shot.radius):18.0*1.82*config.character_scale;
         if (!view.grow(radius).has_point(pose.position)) continue;
         if (saw && !run.content->rock_fields.empty()) batch(run.content->definitions[run.content->rock_fields.front().saw-1].visual_id,10,0).add(shot.id,pose.position,pose.angle,radius,Color(0,0,0,1));
-        else batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1),shot.visual==StringName("weapon/scatter")?(shot.life<0.09?2:1):0);
+        else batch(config.shot_visual,10,0).add(shot.id,pose.position,pose.angle,1.82*config.character_scale,Color(1,1,1,1),shot.visual==StringName("weapon/interceptor")?3:shot.visual==StringName("weapon/scatter")?(shot.life<0.09?2:1):0);
     }
     for (uint32_t row=0;row<state.hostiles.size();++row) {
         const auto &shot=state.hostiles[row];
@@ -310,6 +325,13 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;return out;
+    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
+    if (run.frame_workspace.metrics.detail_active) {
+        const Array bodies=out["boss_bodies"];
+        for (const auto &entry:std::initializer_list<std::pair<const char *,int64_t>>{{"rows",int64_t(state.enemies.size())},{"live",live_rows},{"batched",batched_rows},{"bosses",bodies.size()},{"marked",marked_rows}}) {
+            auto &sample=run.frame_workspace.metrics.render_rows[entry.first];sample.total_us+=entry.second;++sample.count;sample.max_us=std::max(sample.max_us,entry.second);
+        }
+    }
+    return out;
 }
 }

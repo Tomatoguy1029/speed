@@ -3,6 +3,7 @@
 #include "recording_builder.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../systems/attack_system.h"
+#include "../systems/heroes.h"
 #include "../runtime/checkpoint.h"
 #include "../runtime/run_runtime.h"
 #include <godot_cpp/variant/array.hpp>
@@ -11,11 +12,20 @@
 #include <map>
 #include <tuple>
 namespace speed {
+MetricsDetailTimer::~MetricsDetailTimer() {
+    if (!sample) return;
+    const int64_t us=std::max<int64_t>(0,std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-began).count());
+    sample->total_us+=std::min(us,INT64_MAX-sample->total_us);
+    if (sample->count<INT64_MAX) ++sample->count;
+    sample->max_us=std::max(sample->max_us,us);
+    for (auto &entry:sample->window_max) entry.second=std::max(entry.second,us);
+}
 MetricsTimer::~MetricsTimer() {
     const int64_t us=std::max<int64_t>(0,std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-began).count());
     sample.total_us+=std::min(us,INT64_MAX-sample.total_us);
     if (sample.count<INT64_MAX) ++sample.count;
     sample.max_us=std::max(sample.max_us,us);
+    for (auto &entry:sample.window_max) entry.second=std::max(entry.second,us);
 }
 void MetricsBuilder::diagnostic(RunRuntime &r,godot::StringName type,const godot::Dictionary &data,uint32_t detail) {
     if (r.state.observations.recording && r.state.observations.detail_level>=detail) FrameBuilder::append(r,type,data);
@@ -109,10 +119,23 @@ void MetricsBuilder::set_recording(RunRuntime &r,bool active,uint32_t level) {
     }
     flush_observations(r);
 }
-godot::Dictionary MetricsBuilder::read(const RunRuntime &run) {
+godot::Dictionary MetricsBuilder::read(const RunRuntime &run,const std::string &reader) {
     auto out=FrameBuilder::metrics(run);godot::Dictionary timings;
-    const auto packed=[](const MetricSample &sample) {godot::Array values;values.push_back(sample.total_us);values.push_back(sample.count);values.push_back(sample.max_us);return values;};
+    const auto packed=[&](MetricSample &sample) {
+        godot::Array values;values.push_back(sample.total_us);values.push_back(sample.count);values.push_back(sample.max_us);
+        if (!reader.empty()) {auto found=sample.window_max.find(reader);values.push_back(found==sample.window_max.end()?int64_t(0):found->second);if (found!=sample.window_max.end()) found->second=0;}
+        return values;
+    };
     timings["sim"]=packed(run.frame_workspace.metrics.sim);timings["output_build"]=packed(run.frame_workspace.metrics.output_build);
+    godot::Dictionary detail;for (auto &entry:run.frame_workspace.metrics.detail) detail[godot::String(entry.first.c_str())]=packed(entry.second);
+    out["detail_timings"]=detail;
+    godot::Dictionary render_rows;for (auto &entry:run.frame_workspace.metrics.render_rows) render_rows[godot::String(entry.first.c_str())]=packed(entry.second);out["render_rows"]=render_rows;
+    const auto &s=run.state;godot::Dictionary rows;
+    const auto pool=[](int64_t used,size_t capacity) {godot::Array values;values.push_back(used);values.push_back(int64_t(capacity));return values;};
+    int64_t coins=0,hostiles=0,hazards=0;for (const auto &v:s.pickups.coins) if (v.alive) ++coins;
+    for (const auto &v:s.hostiles) if (v.alive) ++hostiles;for (const auto &v:s.hazards) if (v.alive) ++hazards;
+    rows["enemies"]=pool(s.rows_by_id.size(),s.enemies.size());rows["friendly"]=pool(s.live_friends,s.friends.size());rows["hostile"]=pool(hostiles,s.hostiles.size());rows["hazards"]=pool(hazards,s.hazards.size());
+    rows["crystals"]=pool(s.pickups.live_gems,s.pickups.gems.size());rows["coins"]=pool(coins,s.pickups.coins.size());out["rows"]=rows;
     out["timings"]=timings;return out;
 }
 godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) {
@@ -151,6 +174,22 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
     Dictionary diagnostics;diagnostics["level"]=s.observations.detail_level;diagnostics["tracked_effects"]=int64_t(s.observations.effects.size());diagnostics["effect_tracking_dropped"]=int64_t(s.observations.effect_tracking_dropped);out["combat_diagnostics"]=diagnostics;
     out.merge(RecordingBuilder::read(run),true);
     if (initial) {
+        Dictionary start;start["t"]=s.time;start["world_t"]=s.world_time;start["phase"]=int(s.phase);start["level"]=s.loadout.level;
+        start["xp"]=s.loadout.xp;start["xp_gained"]=s.loadout.xp_gained;start["xp_dropped"]=p.xp_dropped;start["hp"]=s.ship.hp;start["hp_max"]=s.ship_config.max_hp;start["kills"]=s.kills;
+        start["weapons"]=weapon_levels;start["traits"]=trait_levels;start["hero_power"]=HeroesSystem::snapshot(run)["power"];start["bonus_t"]=s.control.bonus_remaining;start["endless"]=s.lifecycle.endless;out["run_state"]=start;
+        Array bands;for (const auto &phase:s.spawn_timeline.phases) {Dictionary row;row["id"]=phase.id;row["start"]=phase.start;bands.push_back(row);}out["bands"]=bands;
+        Dictionary conditions,stats,profile,mult,add,reduce;
+        stats["max_speed"]=s.ship_config.max_speed;stats["max_hp"]=s.ship_config.max_hp;
+        stats["attack_mult"]=s.combat_config.attack_mult;stats["crit_chance"]=s.combat_config.crit_chance;stats["crit_mult"]=s.combat_config.crit_mult;
+        stats["pickup_radius"]=s.pickup_config.coin_radius;stats["xp_pickup_radius"]=s.pickup_config.xp_radius;stats["charge_time"]=s.draw_config.charge_time;
+        stats["capacity"]=s.draw_config.capacity;stats["length_mult"]=s.draw_config.length_mult;stats["glide_duration_mult"]=s.ship_config.glide_duration_mult;
+        stats["xp_mult"]=s.pickup_config.xp_mult;stats["xp_gain_mult"]=s.loadout.xp_gain_mult;stats["acceleration"]=s.ship_config.acceleration;
+        stats["turn_rate"]=s.ship_config.turn_rate;stats["invulnerability"]=s.ship_config.invulnerability;stats["repair_fraction"]=s.pickup_config.repair_fraction;stats["pickup_speed_mult"]=s.pickup_config.speed_mult;
+        const auto &l=s.loadout;mult["max_speed"]=l.speed_profile_factor;mult["attack"]=l.attack_profile_factor;mult["pickup"]=l.pickup_profile_factor;mult["length"]=l.length_profile_factor;mult["xp"]=l.xp_profile_factor;
+        add["max_hp"]=l.hp_profile_add;add["reroll"]=l.reroll_profile_add;reduce["charge_time"]=l.charge_profile_factor;profile["mult"]=mult;profile["add"]=add;profile["reduce"]=reduce;
+        conditions["config"]=config_snapshot(c.config);conditions["stats"]=stats;conditions["profile"]=profile;
+        conditions["rng_state"]=String::num_uint64(s.control.rng.get_state());conditions["rng_algorithm"]="pcg32";
+        conditions["hitstop_enabled"]=s.hitstop_enabled;conditions["invincible"]=s.invincible;out["conditions"]=conditions;
         Dictionary tuning;
         for (const auto &v:c.enemy_tuning) {const auto id=c.definitions[v.enemy-1].id;Dictionary values=tuning.get(id,Dictionary());values[String::utf8(v.key.c_str())]=v.value;tuning[id]=values;}
         out["enemy_tuning"]=tuning;
@@ -160,7 +199,10 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         Dictionary config;config["xp_reward_version"]=2;config["xp_crystal_values"]=values;config["enemy_rewards"]=rewards;config["strong_gold_chance"]=s.pickup_config.strong_gold_chance;Dictionary limit=cap.duplicate();limit.erase("absorber_id");config["cap"]=limit;
         config["ship_multiplier"]=s.pickup_config.xp_mult;config["run_multiplier"]=s.loadout.xp_gain_mult;config["collection_multiplier"]=s.pickup_config.xp_mult*s.loadout.xp_gain_mult;config["multiplier_application"]="collection_once";
         config["xp_base"]=c.progression.xp_base;config["xp_growth"]=c.progression.xp_growth;config["xp_curve"]=c.progression.xp_curve;out["xp_config"]=config;
-        PackedByteArray digest;digest.resize(32);std::copy(c.payload_sha256.begin(),c.payload_sha256.end(),digest.ptrw());Dictionary identity;identity["payload_sha256"]=digest.hex_encode();identity["abi_version"]=ABI_VERSION;identity["state_schema_version"]=STATE_SCHEMA_VERSION;identity["stage_id"]=s.control.stage_id;out["identity"]=identity;
+        PackedByteArray digest;digest.resize(32);std::copy(c.payload_sha256.begin(),c.payload_sha256.end(),digest.ptrw());Dictionary identity;identity["payload_sha256"]=digest.hex_encode();
+        std::copy(c.input_sha256.begin(),c.input_sha256.end(),digest.ptrw());identity["input_sha256"]=digest.hex_encode();
+        identity["implementation_sha256"]=SPEED_IMPLEMENTATION_SHA256;
+        identity["abi_version"]=ABI_VERSION;identity["state_schema_version"]=STATE_SCHEMA_VERSION;identity["stage_id"]=s.control.stage_id;out["identity"]=identity;
     }
     return out;
 }

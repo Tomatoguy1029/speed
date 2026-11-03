@@ -209,6 +209,7 @@ static func append_draco_style(package: Dictionary, move: BossTechnique) -> void
 	if move.technique==&"tail_sweep":
 		for key in ["base_color","progress_color","outline_color","outline_width"]: style[key]=visual.get(key)
 	else:
+		style.visual_kind = String(visual.get("technique_id"))
 		for key in ["telegraph_line_width","active_line_width","telegraph_fill_opacity","telegraph_progress_opacity","telegraph_edge_opacity","motion_trail_opacity","impact_lifetime","collapse_lifetime"]: style[key] = float(visual.get(key))
 	visual.free()
 	if move.technique==&"inhale":style.pull_range=float(move.pull_range)
@@ -1350,6 +1351,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
 		row[pair[0]] = source.attack[pair[1]]
+	row.weak_arc = definition.weak_arc
 	row.rank = source.spawn.rank
 	row.size_var = source.spawn.size_var
 	for pair in [["r",0],["g",1],["b",2],["a",3]]:
@@ -2567,6 +2569,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 				data.ShieldDefinition.append(shield)
 			var visual: Dictionary = package.visuals[5].duplicate()
 			visual.id = i+6
+			if id=="iron": visual.iron = true
 			visual.mark_key = "shape:"+String(definition.shape) if visual.path.is_empty() else "sprite:"+id
 			data.ResourceKey.append({"id":visual.id,"role":visual.role})
 			visuals.append(visual)
@@ -2755,7 +2758,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if not entry.path in paths: paths.append(entry.path)
 	paths.append("res://.content/meteor_pieces.res")
 	if not paths.has("res://.content/hero_aura.res"): paths.append("res://.content/hero_aura.res")
-	for asset in ["res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png","res://.content/attack_visuals.res","res://scripts/render/attacks/zone.gd","res://scripts/render/fx/blast_bursts.gd","res://scripts/render/attacks/flood.gd","res://shaders/water_flood.gdshader","res://assets/fx/water_noise.png","res://scripts/render/light_lance.gd","res://scripts/render/equipment/critBeam.gd","res://scripts/render/attacks/shell_frame.gd","res://shaders/pump_shell_runtime.gdshader"]:
+	for asset in ["res://assets/pixel/iron_debris_2.png","res://assets/pixel/iron_debris_3.png","res://scripts/render/attacks/friend_debris.gd","res://assets/pixel/pump.png","res://.content/attack_visuals.res","res://scripts/render/attacks/zone.gd","res://scripts/render/fx/blast_bursts.gd","res://scripts/render/attacks/flood.gd","res://shaders/water_flood.gdshader","res://assets/fx/water_noise.png","res://scripts/render/light_lance.gd","res://scripts/render/equipment/critBeam.gd","res://scripts/render/attacks/shell_frame.gd","res://shaders/pump_shell_runtime.gdshader"]:
 		if not paths.has(asset): paths.append(asset)
 	if not paths.has("res://assets/fx/light_arrow.svg"): paths.append("res://assets/fx/light_arrow.svg")
 	for visual: Dictionary in visuals:

@@ -13,6 +13,7 @@ var state := {}
 var technique := {}
 var _world_clock := -1.0
 var _technique_id := 0
+var _technique_key := ""
 var _released := 0
 var _alerting := false
 var _leaping := false
@@ -35,6 +36,11 @@ const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
 const RAIN_ANGLE := PI * 0.5 - 0.35
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self, "boss/body/centaurus")
+func frame_event(event: Dictionary) -> void:
+	if event.get("type",&"")==&"combat_damage":
+		hit = 0.18
+		queue_redraw()
+
 ## 表示用の値だけを読み、敵表や役者を参照しない。
 func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	var dt := maxf(0.0,float(body.clock)-_world_clock) if _world_clock>=0.0 else 0.0
@@ -46,8 +52,9 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	if raining and not _raining: pulse = 0.3
 	_raining = raining
 	state = body
-	if _technique_id!=int(attack.get("id",0)):
+	if _technique_id!=int(attack.get("id",0)) or _technique_key!=String(attack.get("technique","")):
 		_technique_id = int(attack.get("id",0))
+		_technique_key = String(attack.get("technique",""))
 		_released = 0
 	if _rain_visual==null:
 		_rain_visual = preload("res://scripts/render/bosses/centaurus_rain.gd").new()
@@ -69,7 +76,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		_parts = PARTS.instantiate()
 		_parts.rotation = -PI*0.5
 		add_child(_parts)
-	hit = float(body.flash)
+	hit = maxf(float(body.flash),hit-dt)
 	leap_ring = maxf(0.0,leap_ring-dt)
 	pulse = maxf(0.0,pulse-dt)
 	if int(attack.get("released",0))>_released:

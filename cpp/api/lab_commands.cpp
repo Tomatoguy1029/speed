@@ -17,6 +17,10 @@
 #include "../systems/field.h"
 #include "../systems/attack_budget.h"
 #include "../systems/combat_resolver.h"
+#include "../systems/attack_system.h"
+#include "../output/frame_builder.h"
+#include "../bosses/flow/phase_controller.h"
+#include "../bosses/hydra/body.h"
 #include <cmath>
 #include <algorithm>
 using namespace godot;
@@ -37,13 +41,15 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         speed::apply_timeline_scenario(runtime,timeline);return reply(true);
     }
     if (command=="dev_set_scenario" && (kind=="lab" || kind=="intro")) {
-        if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty","enemy_ai"})) return reply(false);
-        for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty","enemy_ai"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);
+        if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty","enemy_ai","terrain","rocks"})) return reply(false);
+        for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty","enemy_ai","terrain","rocks"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);
         Vector2 at=s.ship.pos;if (p.has("position") && !point(p,"position",at)) return reply(false);
         double gauge,time,level;if (!scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0 || !scalar(p,"time",s.time,time) || time<0 || !scalar(p,"level",s.loadout.level,level) || level<1 || level>1000) return reply(false);
         c.lab_mode=p.get("lab_mode",true);c.lab_enemy_ai=p.get("enemy_ai",true);s.population.frame_enabled=p.get("auto_spawn",false);s.world.boss_spawned=!bool(p.get("auto_boss",false));s.invincible=p.get("invincible",true);
         s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();s.view_center=s.enemy_aim=at;c.camera_center=at;c.camera_ready=false;s.draw.gauge=gauge;s.time=time;s.loadout.level=int64_t(level);speed::EquipmentSystem::refresh_effects(runtime);
-        if (bool(p.get("empty",false))) {s.field.bodies.clear();s.field.rocks.clear();s.field.wells.clear();s.field.warp_gone=-1;}
+        if (bool(p.get("empty",false))) {s.field.bodies.clear();s.field.rocks.clear();s.field.rock_handles={};s.field.wells.clear();s.field.warp_gone=-1;}
+        if (!bool(p.get("terrain",true))) s.field.bodies.clear();
+        if (!bool(p.get("rocks",true))) {s.field.rocks.clear();s.field.rock_handles={};}
         return reply(true);
     }
     if (command=="dev_set_scenario" && (kind=="formation" || kind=="phase_set")) {
@@ -59,6 +65,7 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
             target.formations=candidate->runtime.content->formations;target.formation_base_view=candidate->runtime.content->formation_base_view;target.motion_ready=true;
             const auto ids=candidate->spawn_formation(target.formations.size()-1,layout,entry,PackedStringArray(),-1.0,Variant(),Variant());
             if (ids.size()!=int64_t(f.layouts[layout].types.size())) return reply(false);value=ids;
+            Dictionary event;event["pos"]=target.ship_pos;event["enemy_type"]="formation";speed::FrameBuilder::append(candidate->runtime,"lab_spawn",event);
         } else {
             const bool enabled=target.population.frame_enabled;
             if (!target.population.ready) speed::PopulationSystem::prepare(candidate->runtime);
@@ -67,6 +74,37 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         runtime=std::move(candidate->runtime);return reply(true,value);
     }
     if (command!="dev_edit") return reply(false);
+    if (kind=="delete" || kind=="clear") {
+        if ((kind=="clear" && !p.is_empty()) || (kind=="delete" && (p.size()!=1 || p.get("entity_id",Variant()).get_type()!=Variant::INT))) return reply(false);
+        const auto erase=[&](int64_t id) {
+            const auto found=s.rows_by_id.find(id);if (found==s.rows_by_id.end()) return false;
+            const auto actor=s.enemy_handles.at(found->second);const auto enemy=s.enemies[found->second];
+            speed::PhaseController::cancel(runtime,actor);
+            speed::EnemySystem::mark_dead(runtime,actor);
+            if (kind=="delete" && s.enemy_handles.contains(enemy.parent)) {
+                speed::DeathContext death;death.target=actor;death.corpse={enemy.id,uint32_t(enemy.definition+1),enemy.pos,enemy.vel,enemy.radius,enemy.facing,enemy.max_hp,enemy.xp,enemy.elite,enemy.is_boss};
+                speed::HydraBody::part_defeated(runtime,death);
+            }
+            return remove_enemy(id);
+        };
+        if (kind=="delete") {const bool removed=erase(p["entity_id"]);if (removed) rebuild_enemy_grid(s.frame_grid_cell);return reply(removed);}
+        std::vector<int64_t> ids;for (const auto &enemy:s.enemies) if (enemy.alive) ids.push_back(enemy.id);
+        for (const auto id:ids) if (s.rows_by_id.count(id)) erase(id);
+        s.pending_enemies.clear();
+        speed::AttackSystem::clear_hostile(s,speed::AttackEndReason::BossClear);rebuild_enemy_grid(s.frame_grid_cell);return reply(true);
+    }
+    if (kind=="spawn") {
+        Vector2 at;double facing,spacing;const Variant count=p.get("count",Variant());
+        if (!keys(p,{"definition_id","position","facing","elite","count","spacing"}) || p.get("definition_id",Variant()).get_type()!=Variant::STRING || !point(p,"position",at) || p.get("elite",Variant()).get_type()!=Variant::BOOL || count.get_type()!=Variant::INT || int64_t(count)<1 || int64_t(count)>10000 || !scalar(p,"facing",0,facing) || !scalar(p,"spacing",60,spacing) || spacing<0) return reply(false);
+        size_t definition=0;while (definition<runtime.content->definitions.size() && runtime.content->definitions[definition].id!=StringName(p["definition_id"])) ++definition;
+        if (definition==runtime.content->definitions.size()) return reply(false);
+        int64_t id=-1;
+        for (int64_t k=0;k<int64_t(count);++k) {
+            speed::EnemySpawn options;options.position=at+Vector2::from_angle(k*2.399963)*std::sqrt(double(k))*spacing;options.facing=facing;options.has_facing=true;options.elite=p["elite"];options.origin=speed::SpawnOrigin::DevPlacement;
+            id=speed::DevCommands::place_lab_actor(runtime,definition,options);if (id<=0) return reply(false);
+        }
+        rebuild_enemy_grid(s.frame_grid_cell);Dictionary event;event["pos"]=at;event["enemy_type"]=runtime.content->definitions[definition].id;speed::FrameBuilder::append(runtime,"lab_spawn",event);return reply(true,id);
+    }
     if (kind=="debug_action") return development_debug_command(p);
     if (kind=="debug_content" && s.control.resume_phase!=int32_t(Phase::Finishing) && s.control.resume_phase!=int32_t(Phase::Ended)) return speed::DevCommands::replace_definition(runtime,p,true);
     if (kind=="equipment_preview" || kind=="equipment_seed") {
@@ -169,7 +207,21 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         Vector2 at;double angle;
         if (!keys(p,{"entity_id","position","angle"}) || p.get("entity_id",Variant()).get_type()!=Variant::INT || !point(p,"position",at)) return reply(false);
         const auto row=s.rows_by_id.find(int64_t(p["entity_id"]));if (row==s.rows_by_id.end() || !scalar(p,"angle",s.enemies[row->second].facing,angle)) return reply(false);
-        const auto handle=s.enemy_handles.at(row->second);if (!speed::EnemySystem::relocate(runtime,handle,at)) return reply(false);s.enemies[row->second].facing=angle;return reply(true);
+        const auto origin=s.enemies[row->second].pos;const auto delta=at-origin;const double rotation=angle-s.enemies[row->second].facing;
+        auto family=s.enemies[row->second].parts;family.insert(family.begin(),s.enemy_handles.at(row->second));
+        for (const auto child:family) if (s.enemy_handles.contains(child)) {
+            auto &enemy=s.enemies[child.slot];const auto previous=enemy.pos;enemy.pos=origin+(enemy.pos-origin).rotated(rotation)+delta;enemy.facing+=rotation;enemy.body_gap=-1;
+            if (s.field.rock_handles.contains(enemy.rock)) {auto &rock=s.field.rocks[enemy.rock.slot];rock.position+=enemy.pos-previous;}
+            for (auto &hazard:s.hazards) if (hazard.alive) {
+                const auto *record=speed::AttackSystem::get(s,hazard.attack);
+                if (!record || !record->spec.owner.attached || !speed::same_handle(record->spec.owner.live_source,child)) continue;
+                hazard.pos=origin+(hazard.pos-origin).rotated(rotation)+delta;
+                if (auto *beam=std::get_if<speed::BeamHazard>(&hazard.shape)) beam->angle+=rotation;
+                if (auto *wall=std::get_if<speed::WallHazard>(&hazard.shape)) wall->angle+=rotation;
+                if (auto *wave=std::get_if<speed::WaveHazard>(&hazard.shape)) wave->angle+=rotation;
+            }
+        }
+        rebuild_enemy_grid(s.frame_grid_cell);speed::AttackSystem::sync_observation_positions(s);return reply(true);
     }
     if (kind=="schedule") {
         if (p.size()!=1 || p.get("entries",Variant()).get_type()!=Variant::ARRAY) return reply(false);
@@ -181,6 +233,7 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
             speed::RunControlState::LabSchedule e;bool found=false;
             for (uint32_t n=0;n<runtime.content->definitions.size();++n) if (runtime.content->definitions[n].id==StringName(row["type"])) {e.definition=n;found=true;break;}
             if (!found || !point(row,"position",e.position)) return reply(false);
+            for (const auto &body:runtime.content->boss_bodies) if (body.enemy==e.definition+1) e.boss=true;
             double start,end,interval,count;if (!scalar(row,"start",0,start) || !scalar(row,"end",600,end) || !scalar(row,"interval",1,interval) || !scalar(row,"count",1,count) || start<0 || end<start || interval<=0 || count<1 || count>10000 || end>1e9) return reply(false);
             if (!scalar(row,"probability",1,e.probability) || !scalar(row,"radius",0,e.radius) || !scalar(row,"spacing",60,e.spacing) || !scalar(row,"angle",0,e.facing) || e.probability<0 || e.probability>1 || e.radius<0 || e.spacing<0) return reply(false);
             for (const char *key:{"enabled","elite"}) if (row.has(key) && row[key].get_type()!=Variant::BOOL) return reply(false);

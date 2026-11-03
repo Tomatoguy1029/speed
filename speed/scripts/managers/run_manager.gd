@@ -17,7 +17,8 @@ func create_run(overrides := {}) -> RunSession:
 	var before := Time.get_ticks_usec()
 	var prepared := GameManager.run_start_content.duplicate(true)
 	var start_time := GameManager.run_start_time
-	var timeline := OS.is_debug_build() and GameManager.run_start_source == "timeline"
+	var source := GameManager.run_start_source
+	var timeline := OS.is_debug_build() and source == "timeline"
 	if not timeline:
 		var path := "res://.content/run/stage_%d.json" % GameManager.run_stage
 		var index = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
@@ -26,7 +27,7 @@ func create_run(overrides := {}) -> RunSession:
 	GameManager.run_start_source = "stage_start"
 	GameManager.run_start_content = {}
 	var options := {"runtime":"cpp","cpp_index":prepared.get("index",""),"cpp_signature":prepared.get("signature",""),
-		"cpp_profile":ProfileManager.for_cpp(false),"seed":randi(),"endless":GameManager.run_endless,
+		"cpp_profile":ProfileManager.for_cpp(false),"seed":randi(),"endless":GameManager.run_endless,"cpp_source":source,
 		"cpp_start":{"equipment":[],"lab_mode":false}}
 	if OS.is_debug_build() and overrides.get("seed") is int: options.seed = overrides.seed
 	if timeline: options.cpp_start.scenario = {"kind":"timeline","params":{"time":start_time}}
