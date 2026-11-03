@@ -112,7 +112,7 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
         command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "final-runtime.log"), "--", "--package-final-runtime"]
         result = subprocess.run(command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
         print(result.stdout)
-        assert result.returncode == 0 and "[package_final_runtime] OK" in result.stdout, "撤去後の通常出撃から自然な結果保存・戻るまでを確認する"
+        assert result.returncode == 0 and "[package_final_runtime] OK" in result.stdout, f"撤去後の通常出撃から自然な結果保存・戻るまでを確認する（終了コード {result.returncode}）"
     if loading:
         loading_command = [executable, "--log-file", str(path.parent / "loading.log"), "--", "--package-loading"]
         result = subprocess.run(loading_command, env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)
