@@ -180,7 +180,7 @@ func _ready() -> void:
 		_key(KEY_D, true, true, false)
 		_key(KEY_D, false, false, false)
 		_check(not app._fade._discard.has("key:0:%d" % KEY_D) and not app._fade._discard.has("key:0:%d" % KEY_RIGHT), "held WASD clears without a synthetic arrow remaining after transition")
-		_check(scene.bridge.read_frame().value.ui.cards.start_pick and scene.bridge.read_frame().value.ui.weapon_levels.is_empty(), "held launch keys cannot choose starting weapon")
+		_check(scene.bridge.read_frame().value.ui.cards.initial and scene.bridge.read_frame().value.ui.weapon_levels.is_empty(), "held launch keys cannot choose starting weapon")
 		await _shot("keyboard_launch")
 	app.queue_free()
 	await _frames()

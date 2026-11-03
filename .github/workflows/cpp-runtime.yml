@@ -79,7 +79,7 @@ jobs:
         run: |
           python tools/build/build_run.py --sdk "$RUNNER_TEMP/godot-cpp" \
             --platform '${{ matrix.platform }}' --godot "$SPEED_GODOT" --templates "$SPEED_TEMPLATES" \
-            --build-dir "$RUNNER_TEMP/run-objects" --package-dir "$RUNNER_TEMP/speed-package" --verify
+            --build-dir "$RUNNER_TEMP/run-objects" --package-dir "$RUNNER_TEMP/speed-package" --verify --verify-final
       - name: 配布物と確認ログを保存
         if: always()
         uses: actions/upload-artifact@v4
