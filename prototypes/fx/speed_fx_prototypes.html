@@ -3552,8 +3552,8 @@ DEMOS.push({
         const k = B.charge, A = toL(mouth), E = toL(end), pal = FX.ramp(B.alerting ? P.color : '#ffb35a');
         FX.warnRail(R.back, A, E, { color: B.alerting ? P.color : '#ffb35a', k: B.alerting ? 1 : 0.35 + 0.45 * k, time: S.t, seed: 77, rail: B.alerting ? 1.6 : 0.9, intensity: P.intensity });
         const jit = B.alerting ? 0 : (1 - k) * 3, dx = Math.sin(S.t * 23) * jit, dy = Math.cos(S.t * 17) * jit;
-        if (hit >= 0) { const Q = V(E.x + dx, E.y + dy); R.front.circle(Q.x, Q.y, 1.4 * P.size, pal[4]); R.front.ring(Q.x, Q.y, (B.alerting ? 3 : 5 - 2 * k) * P.size, 1, pal[3], 0.9); R.front.glow(Q.x, Q.y, 9, pal[2], 0.6 * P.intensity); }
-        R.front.circle(A.x, A.y, 1.2 + (B.alerting ? 1 : 0), pal[4]); R.front.glow(A.x, A.y, 8 + 6 * k, pal[2], 0.5 * P.intensity);
+        if (hit >= 0) { const Q = V(E.x + dx, E.y + dy); R.front.px(Q.x, Q.y, pal[4]); R.front.glow(Q.x, Q.y, (B.alerting ? 3 : 5 - 2 * k) * P.size, pal[4], 0.7 * P.intensity); R.front.glow(Q.x, Q.y, 9, pal[2], 0.6 * P.intensity); } // 狙いの点は光だけ（輪は描かない）
+        R.front.px(A.x, A.y, pal[4]); R.front.glow(A.x, A.y, 2.5 + (B.alerting ? 2 : 0), pal[4], 0.7); R.front.glow(A.x, A.y, 8 + 6 * k, pal[2], 0.5 * P.intensity);
         if (B.alerting && S.t - (B.relT || 0) > 0 && B.pulse > 0.2) FX.flare(R.front, A, 3 * P.size, P.color, S.t, (B.pulse - 0.2) / 0.1, 4);
       }
     }
@@ -3591,7 +3591,7 @@ DEMOS.push({
     for (const e of S.rel) { const t = (S.t - e.t) / P.timing; if (t < 0 || t > 0.32) continue; const A = toL(e.at), pal = FX.ramp(P.color), u = fromA(e.a), n = orth(u);
       const f = 1 - t / 0.32, len0 = (10 + 26 * Math.min(1, t / 0.05)) * P.size;
       for (let i = -2; i <= 2; i++) { const spread = i * 0.16, L1 = len0 * (1 - Math.abs(i) * 0.22), d = fromA(e.a + spread); R.front.line(A.x, A.y, A.x + d.x * L1, A.y + d.y * L1, (uu) => uu < 0.35 ? pal[4] : uu < 0.7 ? pal[3] : pal[2], (uu) => f * (1 - uu * 0.7) * Math.min(1, P.intensity)); }
-      if (t < 0.06) { R.front.circle(A.x, A.y, 2.4 * P.size, pal[4], 1); R.front.glow(A.x, A.y, 14 * P.size, pal[3], 0.9 * P.intensity); }
+      if (t < 0.06) { R.front.glow(A.x, A.y, 4 * P.size, pal[4], 1); R.front.glow(A.x, A.y, 14 * P.size, pal[3], 0.9 * P.intensity); }
       const tipL = 7 * P.size; for (const s of [-1, 1]) { const T = V(A.x - u.x * 4 + n.x * s * tipL, A.y - u.y * 4 + n.y * s * tipL); R.front.line(T.x, T.y, A.x - u.x * (2 - 4 * f), A.y - u.y * (2 - 4 * f), pal[3], 0.7 * f); }
       FX.sparks(R.front, A, t, e.t * 31, 9, P.color, 55, 0.3, e.a, 0.55);
     }
@@ -3648,8 +3648,7 @@ DEMOS.push({
     if (R.proto) { const L = toL(c), rad = r.range_radius * WL, pal = FX.ramp(P.color);
       const inFan = (a, d) => Math.abs(angDiff(a, ang)) <= half && d <= rad;
       if (B.mode === 'windup') { const k = B.charge; // 扇の中だけ地面が震え、小石と塵が跳ねる。前足の接地点に力が溜まる
-        for (let i = 0; i < 70; i++) { const a = ang + (hash(i) - 0.5) * 2 * half, d = rad * Math.sqrt(hash(i * 3 + 1)), hop = Math.abs(Math.sin(S.t * (18 + hash(i) * 10) + i)) * 2 * k; R.back.dot(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d - hop, pal[hop > 1 ? 3 : 2], (0.25 + 0.6 * k) * P.intensity); }
-        for (const s of [-1, 1]) { const a = ang + s * half; FX.warnRail(R.back, L, V(L.x + Math.cos(a) * rad, L.y + Math.sin(a) * rad), { color: P.color, k: 0.15 + 0.3 * k, time: S.t, seed: 60 + s, rail: 0.6, intensity: 0.6 * P.intensity }); }
+        for (let i = 0; i < 110; i++) { const a = ang + (hash(i) - 0.5) * 2 * half, d = rad * Math.sqrt(hash(i * 3 + 1)), hop = Math.abs(Math.sin(S.t * (18 + hash(i) * 10) + i)) * 2 * k; R.back.dot(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d - hop, pal[hop > 1 ? 3 : 2], (0.25 + 0.6 * k) * P.intensity); }
         R.front.glow(L.x, L.y, 8 + 10 * k, pal[3], 0.5 * k * P.intensity); }
       if (S.strikeT) { const t = (S.t - S.strikeT) / P.timing;
         if (t < 0.9) { // 地割れ：中心から扇の中へ枝分かれ、熱が冷えていく。土煙の波が扇の端まで走る
@@ -3658,7 +3657,7 @@ DEMOS.push({
           for (let q = 0; q < 5; q++) { let a = ang + (q / 4 - 0.5) * 2 * half * 0.85 + (hash(q * 5) - 0.5) * 0.2, x = L.x, y = L.y; const segs = 14, lenq = rad * (0.55 + 0.4 * hash(q + 9)); for (let s = 0; s < segs * reach; s++) { a += (hash(q * 17 + s) - 0.5) * 0.9; const st = lenq / segs, nx = x + Math.cos(a) * st, ny = y + Math.sin(a) * st; if (!inFan(Math.atan2(ny - L.y, nx - L.x), Math.hypot(nx - L.x, ny - L.y))) break; const w = Math.max(1, 2.6 * (1 - s / segs)); R.back.beam(x, y, nx, ny, w, t < 0.18 ? crack[4] : t < 0.45 ? crack[3] : dirt[1]); if (t < 0.5) R.back.light(nx, ny, crack[2], 0.35 * (1 - t / 0.5)); if (s === 5 && hash(q + 33) > 0.4) { let b = a + (hash(q) > 0.5 ? 0.7 : -0.7), bx = nx, by = ny; for (let k2 = 0; k2 < 4; k2++) { const ex = bx + Math.cos(b) * st, ey = by + Math.sin(b) * st; if (!inFan(Math.atan2(ey - L.y, ex - L.x), Math.hypot(ex - L.x, ey - L.y))) break; R.back.line(bx, by, ex, ey, t < 0.3 ? crack[3] : dirt[1]); bx = ex; by = ey; b += (hash(k2 + q * 3) - 0.5) * 0.8; } } x = nx; y = ny; } }
           for (let i = 0; i < 12; i++) { const lf = 0.55, q2 = t / lf; if (q2 > 1) continue; const a = ang + (hash(i * 3.1) - 0.5) * 2 * half, d = rad * 0.5 * q2 * (0.5 + hash(i)), hgt = 10 * Math.sin(Math.PI * q2); R.front.rect(L.x + Math.cos(a) * d - 1, L.y + Math.sin(a) * d - hgt - 1, 2, 2, dirt[2 + (i % 2)]); }
           const wave = rad * clamp(t / 0.22); for (let i = 0; i < 90; i++) { const a = ang + (hash(i * 5) - 0.5) * 2 * half, d = wave * (0.85 + 0.15 * hash(i)); if (d > rad) continue; R.back.disc(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d, 1.2 + 2.5 * t, pal[2], (dd) => 0.4 * (1 - t) * (1 - dd * dd)); }
-          if (t < 0.1) { R.front.circle(L.x, L.y, 4 * P.size, pal[4], 1 - t / 0.1); R.front.glow(L.x, L.y, rad * 0.5, pal[3], 0.6 * (1 - t / 0.1)); }
+          if (t < 0.1) { R.front.glow(L.x, L.y, 6 * P.size, pal[4], 1 - t / 0.1); R.front.glow(L.x, L.y, rad * 0.5, pal[3], 0.6 * (1 - t / 0.1)); }
           FX.sparks(R.front, L, t, 88, 16, '#d8c7a8', 70, 0.5, ang, half);
         } }
       if (P.showHit && (B.mode === 'windup' || B.mode === 'strike')) { D2.arc(c, r.range_radius, ang - half, ang + half, 'rgba(120,255,160,.8)', px(1)); D2.line(c, add(c, mul(fromA(ang - half), r.range_radius)), 'rgba(120,255,160,.8)', px(1)); D2.line(c, add(c, mul(fromA(ang + half), r.range_radius)), 'rgba(120,255,160,.8)', px(1)); }
@@ -4117,7 +4116,7 @@ DEMOS.push({
     if (R.proto) R.blitBack();
     drawEnemy(e); drawShip(S.ship);
     if (!R.proto && aiming && e.mode !== 'WINDUP') { D2.circle(lens, px(2) + e.r * (0.2 + 0.2 * k), rgba(col, 0.5 + 0.4 * k)); if (k > 0) D2.arc(e.pos, e.r * 1.35, -Math.PI / 2, -Math.PI / 2 + TAU * k, rgba(col, 0.9), Math.max(px(2), e.r * 0.12)); }
-    if (R.proto && aiming && e.mode !== 'WINDUP') { const L = toL(lens), pal = FX.ramp(toHex(col)); R.front.circle(L.x, L.y, 1 + 2.5 * k * P.size, pal[3]); R.front.circle(L.x, L.y, 0.8 + 1.2 * k, pal[4]); R.front.glow(L.x, L.y, 8 + 10 * k, pal[2], 0.5); }
+    if (R.proto && aiming && e.mode !== 'WINDUP') { const L = toL(lens), pal = FX.ramp(toHex(col)); R.front.px(L.x, L.y, pal[4]); R.front.glow(L.x, L.y, 3 + 4 * k * P.size, pal[4], 0.6); R.front.glow(L.x, L.y, 8 + 10 * k, pal[2], 0.5); } // レンズは光だけ（丸は描かない）
   },
 });
 
@@ -4162,8 +4161,8 @@ DEMOS.push({
 DEMOS.push({
   id: 'G12-ruler', ids: ['G12'], cat: G12, group: 'じょうぎ座（ruler）', title: '分離→挟み込み→光の壁', duration: 7.4, color: '#ffd27a', cam: { x: 0, y: -160 },
   refs: ['scripts/enemies/ruler.gd（split_delay 0.4・deploy 0.5・telegraph 0.6・壁 beam_time 5.0・beam_start_gap 80・half_gap 190・emit_back 520）', 'render/enemies/ruler.gd（点線の予告）・render/attacks/wall.gd RAY（光の柱）', 'assets/pixel/ruler/ruler_top_*・ruler_bottom_*（上下の現行画像）', 'marlin_warning.gdshader、pixelFX arcane-beam.js'],
-  params: [{ k: 'muzzle', label: '試作：発射口の位置(体の縁からの距離)', type: 'range', min: 0, max: 120, step: 2, def: 6 }],
-  status: { '状態': '試作のみ', '判定': '変更なし（幅26・長さ2600、壁は機体の移動を止める）', '発射口': '溜めの光とビームの根元を体の縁に寄せた（距離はつまみ）。本番の当たりは beam_start_gap（80）だけ先から始まるので、見た目に合わせるには移行後に数値の変更が要る', '色': '南十字と同じ黄色' },
+  params: [{ k: 'muzzle', label: '試作：ビームの根元(発射口からの距離)', type: 'range', min: 0, max: 120, step: 2, def: 0 }],
+  status: { '状態': '試作のみ', '判定': '変更なし（幅26・長さ2600、壁は機体の移動を止める）', '発射口': '溜めの光とビームの根元を、上下それぞれの絵の発射口の中心に合わせた（そこからの距離はつまみ）。本番の当たりは beam_start_gap（80）だけ先から始まるので、見た目に合わせるには移行後に数値の変更が要る', '色': '南十字と同じ黄色' },
   setup(S) { S.ship = shipState(V(0, 60)); S.a = mkE('ruler', V(-80, -420), Math.PI / 2); S.b = null; },
   step(S, dt) {
     const p = prm('ruler');
@@ -4179,7 +4178,9 @@ DEMOS.push({
   phase(S) { if (!S.b) return '出現（分離前）'; const m = S.a.mode; return m === 'DASH' ? '展開（挟む位置へ）' : m === 'WINDUP' ? PH.WINDUP : m === 'RECOVER' ? PH.DASH + '（光の壁）' : PH.RECOVER; },
   draw(S, R) {
     const P = R.P, p = prm('ruler'), d0 = enemyDef('ruler').look;
-    const origin = (h) => add(h.pos, mul(fromA(h.facing), R.proto ? h.r * 0.85 + (P.muzzle ?? 6) : h.r + p.beam_width * 0.5 + p.beam_start_gap)); // 試作は体の縁から出す
+    // 試作は絵の発射口の中心から出す：上下の絵は 58×46 の共通の画面の上半分・下半分で、発射口（右端の括弧形）は x≈27.5、中心線から上 −10.5・下 +10.5（画素）
+    const origin = (h) => { const u = fromA(h.facing); if (!R.proto) return add(h.pos, mul(u, h.r + p.beam_width * 0.5 + p.beam_start_gap));
+      const sc = 2 * spriteR('ruler', h.r) / 58, lx = 27.5 * sc, ly = (h.buds === -1 ? -10.5 : 10.5) * sc; return add(add(h.pos, mul(u, lx + (P.muzzle ?? 0))), mul(orth(u), ly)); };
     const hs = S.b ? [S.a, S.b] : [];
     for (const h of hs) {
       const o = origin(h), u = fromA(h.facing), b = add(o, mul(u, p.beam_len)), col = ecol('ruler', 0.2), c0 = ecol('ruler');
@@ -4249,8 +4250,8 @@ const hexMulR = (h) => 0.6 + 0.4 * parseCol(h).r / 0.5, hexMulG = (h) => 0.6 + 0
 // 試作の照射中の水流：pixelFX water/water-jet.js の作り（白い芯→外ほど深い色の帯、流れに沿って走る筋、通り抜ける膨らみ、
 // 先ほど荒れる縁、ちぎれる先端、側面から飛ぶ尾つきの水滴、先端の霧、吹き出し口の光）を、上から見た広がる水流へ当てはめる
 function aquaRamp(hex) { const b = hexc(hex), W = PX.WHITE, K = hexc('#04101e'); return [PX.mix(K, b, 0.12), PX.mix(K, b, 0.25), PX.mix(K, b, 0.45), PX.mix(K, b, 0.7), b, PX.mix(b, W, 0.35), PX.mix(b, W, 0.7), W]; }
-function aquaJet(p, origin, a, len, half0, slope, t, g, seed, C, alpha) {
-  const O = toL(origin), ux = Math.cos(a), uy = Math.sin(a), Lend = len * WL * Math.min(1, 0.25 + 0.75 * g), view = Math.hypot(LW, LH), Dmax = Math.min(Lend, view * 1.2);
+function aquaJet(p, origin, a, len, half0, slope, t, g, seed, C, alpha, tail = 0) { // tail：止まったあと、水の後ろ端が吹き出し口から離れた割合（内側から外へ消える）
+  const O = toL(origin), ux = Math.cos(a), uy = Math.sin(a), Lend = len * WL, view = Math.hypot(LW, LH), Dmax = Math.min(Lend, view * 1.2);
   const N = Math.ceil(Dmax) + 1, UP = new Float32Array(N), DN = new Float32Array(N); // 列（流れの向きの距離）ごとの上下の縁
   for (let d = 0; d < N; d++) { const u = d / Lend, rough = smooth(0.1, 1, u), sd = ((((d - t * 520) % 150) + 150) % 150) - 75; // 通り抜ける膨らみ
     const h0 = Math.max(1.2, (half0 + d / WL * slope) * WL) * (0.55 + 0.45 * g) * (1 + Math.exp(-(sd * sd) / 160) * 0.12 * (1 - u * 0.5));
@@ -4258,8 +4259,9 @@ function aquaJet(p, origin, a, len, half0, slope, t, g, seed, C, alpha) {
   const ends = [O, V(O.x + ux * Dmax - uy * UP[N - 1], O.y + uy * Dmax + ux * UP[N - 1]), V(O.x + ux * Dmax + uy * DN[N - 1], O.y + uy * Dmax - ux * DN[N - 1])];
   const bx0 = Math.max(0, Math.min(...ends.map(e => e.x)) - 2), bx1 = Math.min(LW, Math.max(...ends.map(e => e.x)) + 2), by0 = Math.max(0, Math.min(...ends.map(e => e.y)) - 2), by1 = Math.min(LH, Math.max(...ends.map(e => e.y)) + 2);
   for (let y = Math.floor(by0); y < by1; y++) for (let x = Math.floor(bx0); x < bx1; x++) { // 画面のマスごとに流れの座標へ戻して塗る（穴を空けない）
-    const rx = x + 0.5 - O.x, ry = y + 0.5 - O.y, d = rx * ux + ry * uy; if (d < 1 || d >= Dmax) continue;
-    const q = -rx * uy + ry * ux, di = Math.floor(d), edge = q < 0 ? DN[di] : UP[di], aq = Math.abs(q) / Math.max(0.8, edge); if (aq > 1) continue;
+    const rx = x + 0.5 - O.x, ry = y + 0.5 - O.y, d = rx * ux + ry * uy, tD = tail * Lend; if (d < Math.max(1, tD) || d >= Dmax) continue;
+    const q = -rx * uy + ry * ux, di = Math.floor(d), thin = tail > 0 ? smooth(tD, tD + 26, d) : 1, edge = (q < 0 ? DN[di] : UP[di]) * (0.25 + 0.75 * thin), aq = Math.abs(q) / Math.max(0.8, edge); if (aq > 1) continue; // 後ろ端は細る
+    if (tail > 0 && PX.tileNoise(d * 0.12 - t * 25, q * 0.2, 0, 0, seed + 6) < 0.9 - 1.9 * thin) continue; // 後ろ端はちぎれる
     const u = d / Lend; if (u > 0.5 && PX.tileNoise(d * 0.1 - t * 25, q * 0.18, 0, 0, seed + 2) < -0.95 + 1.7 * smooth(0.5, 1, u) + (1 - g) * 0.8) continue; // 先がちぎれる
     const streak = PX.tileNoise(d * 0.045 - t * 46, q * 0.55, 0, 0, seed), body = PX.tileNoise(d * 0.02 - t * 12, q * 0.06, 0, 0, seed + 5);
     let lv = aq > 0.9 ? 2 : aq > 0.72 ? 3 : body > 0.2 ? 5 : 4; // 本体は主色、縁ほど深い色
@@ -4267,7 +4269,7 @@ function aquaJet(p, origin, a, len, half0, slope, t, g, seed, C, alpha) {
     p.dot(x, y, C[lv], alpha * (aq > 0.9 ? 0.75 : 1)); if (lv === 7 && (x & 3) === 0 && (y & 3) === 0) p.light(x, y, C[5], 0.12 * alpha);
   }
   PX.cycle(t, 0.6, 46, seed + 3, (r) => r.range(0.25, 0.5), (age, life, r) => { // 側面と先端から飛ぶ水滴
-    const f = Math.sqrt(r.next()), d0 = Lend * (0.15 + 0.85 * f), side = r.next() < 0.5 ? -1 : 1, h = (half0 + d0 / WL * slope) * WL * (0.55 + 0.45 * g);
+    const f = Math.sqrt(r.next()), d0 = Lend * (0.15 + 0.85 * f); if (d0 < tail * Lend) return; const side = r.next() < 0.5 ? -1 : 1, h = (half0 + d0 / WL * slope) * WL * (0.55 + 0.45 * g);
     const vA = r.range(160, 300), vS = side * r.range(20, 110) * (0.4 + f), x0 = O.x + ux * d0 - uy * side * h, y0 = O.y + uy * d0 + ux * side * h;
     const k = age / life, vx = ux * vA - uy * vS, vy = uy * vA + ux * vS, x = x0 + vx * age * 0.25, y = y0 + vy * age * 0.25; if (k > 0.8 && r.next() < (k - 0.8) * 5) return;
     const sp = Math.hypot(vx, vy), tl = Math.min(4, sp * 0.012); p.line(x - vx / sp * tl, y - vy / sp * tl, x, y, (w) => w < 0.5 ? C[4] : C[6], alpha); p.dot(x, y, k < 0.4 ? C[7] : C[6], alpha);
@@ -4281,7 +4283,7 @@ function aquaJet(p, origin, a, len, half0, slope, t, g, seed, C, alpha) {
 DEMOS.push({
   id: 'G12-aquarius', ids: ['G12'], cat: G12, group: 'みずがめ座（aquarius）', title: '全方位の極太水流', duration: 9.0, color: '#7fd8ff', cam: { x: -120, y: 0 },
   refs: ['scripts/enemies/aquarius.gd（approach 380・telegraph 4.0・beam_time 3.0・6本・広がり0.32・rest 1.2）', 'scripts/render/attacks/flood.gd・shaders/water_flood.gdshader（ripples・rushing・mist を論理ピクセルでCPU移植）', 'assets/fx/water_noise.png（焼き込み済みノイズ）'],
-  status: { '照射中の水': 'pixelFX water-jet の作り（白い芯→深い色の帯・走る筋・通り抜ける膨らみ・荒れる縁・ちぎれる先端・尾つきの水滴・霧）。予告の波紋と終わりの霧は現行shaderのまま', '状態': '試作のみ（現行shaderを基に段階化）', '判定': '変更なし（幅は half0+along×tan(0.32)）', '近似': '照射時の画面揺れ・衝撃の粒（rm._burst）・波紋（pipeline.add_wave）は未再現。現行の色はHDRの白を0.85倍で表示' },
+  status: { '消え方': '照射が止まると供給がなくなり、水の後ろ端が吹き出し口から離れて内側から外へ順に消える（後ろ端は細ってちぎれる）', '照射中の水': 'pixelFX water-jet の作り（白い芯→深い色の帯・走る筋・通り抜ける膨らみ・荒れる縁・ちぎれる先端・尾つきの水滴・霧）。予告の波紋と終わりの霧は現行shaderのまま', '状態': '試作のみ（現行shaderを基に段階化）', '判定': '変更なし（幅は half0+along×tan(0.32)）', '近似': '照射時の画面揺れ・衝撃の粒（rm._burst）・波紋（pipeline.add_wave）は未再現。現行の色はHDRの白を0.85倍で表示' },
   setup(S) { S.e = mkE('aquarius', V(-320, -40), 0, { fire_t: 0.2 }); S.ship = shipState(V(130, 90)); S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); },
   step(S, dt) {
     const e = S.e, p = prm('aquarius');
@@ -4298,22 +4300,65 @@ DEMOS.push({
         const a = S.fl.a + k * TAU / n, base = { p: e.pos, ux: Math.cos(a), uy: Math.sin(a), len: p.beam_len, half0: p.beam_width * 0.5 * (R.proto ? P.size : 1), slope: Math.tan(p.beam_spread), seed: ((k * 7) % 17) / 17 * 97, a: R.proto ? Math.min(1, P.intensity) : 1 };
         if (t < S.fl.delay) strips.push({ ...base, mode: 0, g: clamp(t / S.fl.delay) });
         else if (t < S.fl.delay + S.fl.active) (R.proto ? jets : strips).push({ ...base, mode: 1, g: 1, k });
-        else { const age = t - S.fl.delay - S.fl.active, coll = clamp(1 - age / (0.35 * (R.proto ? P.timing : 1))), life = clamp(1 - age / (1.4 * (R.proto ? P.timing : 1))); if (coll > 0) (R.proto ? jets : strips).push({ ...base, mode: 1, g: coll, k }); if (life > 0) strips.push({ ...base, mode: 2, g: life * (1 - coll * 0.6) }); }
+        else { const age = t - S.fl.delay - S.fl.active, coll = clamp(1 - age / (0.35 * (R.proto ? P.timing : 1))), life = clamp(1 - age / (1.4 * (R.proto ? P.timing : 1)));
+          if (R.proto) { const tail = 1 - Math.pow(1 - clamp(age / (0.7 * P.timing)), 1.6); if (tail < 1) jets.push({ ...base, mode: 1, g: 1, k, tail }); } // 試作：供給が止まり、内側から外へ順に消える
+          else if (coll > 0) strips.push({ ...base, mode: 1, g: coll, k });
+          if (life > 0) strips.push({ ...base, mode: 2, g: life * (1 - coll * 0.6) }); }
       }
       drawWater(strips, S.t, R.proto, R.proto ? P : null);
-      if (jets.length) { const C = aquaRamp(P.color); for (const j of jets) aquaJet(R.front, j.p, Math.atan2(j.uy, j.ux), j.len, j.half0, j.slope, S.t, j.g, 7 + j.k * 13, C, j.a); }
+      if (jets.length) { const C = aquaRamp(P.color); for (const j of jets) aquaJet(R.front, j.p, Math.atan2(j.uy, j.ux), j.len, j.half0, j.slope, S.t, j.g, 7 + j.k * 13, C, j.a, j.tail || 0); }
       if (R.proto && t < S.fl.delay) FXW.gather(R.front, e.pos, e.r * 1.6 * P.size, clamp(t / S.fl.delay) * P.intensity, P.color, S.t, 14, 4);
-      if (R.proto && t >= S.fl.delay && t < S.fl.delay + 0.25) FXW.shock(R.front, e.pos, (t - S.fl.delay) * 900, 10, P.color, 1 - (t - S.fl.delay) / 0.25);
+      if (R.proto && t >= S.fl.delay && t < S.fl.delay + 0.2) { const L = toL(e.pos), f = 1 - (t - S.fl.delay) / 0.2, C2 = aquaRamp(P.color); R.front.glow(L.x, L.y, e.r * WL * 3, C2[6], 0.8 * f * P.intensity); } // 吹き出しの瞬間は光だけ（衝撃の輪は描かない）
     }
     drawEnemy(e); drawShip(S.ship);
   },
 });
 
 // ---------- わし座（aquila）
+// 試作の稲妻：pixelFX lightning/_lib.js の作り（中点をずらして刻むジグザグ、細りながら枝分かれ、外側の暗い光→明るい本体→白い芯の3段で塗る）を移植。
+// 稲妻の作りと塗り方は Sprite Fusion のオープンソースの稲妻（MIT License, Copyright (c) 2026 Hugo Duprez）由来
+const VOLT = ['#120a33', '#2a1b78', '#4630c0', '#5a62f0', '#58a6ff', '#9ed8ff', '#e4f6ff', '#ffffff'];
+const AQ_FLICK = [1, 0.72, 0.3, 0.95, 0.5, 0.8, 0.22]; // lightning-strike.js のちらつき（30fps のコマごと）
+function voltRamp(color) { const a = hsl('#58a6ff'), b = hsl(color), dh = b.s > 0.05 ? b.h - a.h : 0; return VOLT.map((h) => { const c = hsl(h); return hexc(fromHsl({ h: (c.h + dh + 360) % 360, s: c.s, l: c.l })); }); }
+function zigzag(Rg, x0, y0, x1, y1, jag = 0.32, forks = 0.35, w = 1, depth = 0) {
+  const out = [], L = Math.hypot(x1 - x0, y1 - y0); let pts = [[x0, y0], [x1, y1]], off = L * jag;
+  while (pts.length < 2 + L / 3) { const nxt = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) { const [ax, ay] = pts[i], [bx, by] = pts[i + 1], l = Math.hypot(bx - ax, by - ay) || 1, o = Rg.range(-off, off); nxt.push([(ax + bx) / 2 + (-(by - ay) / l) * o, (ay + by) / 2 + ((bx - ax) / l) * o], [bx, by]); }
+    pts = nxt; off *= 0.52; }
+  out.push({ pts, w });
+  if (depth < 2) for (let i = 2; i < pts.length - 3; i++) if (Rg.chance(forks / (1 + depth) / Math.max(4, pts.length / 6))) {
+    const [ax, ay] = pts[i], [bx, by] = pts[Math.min(pts.length - 1, i + 3)], an = Math.atan2(by - ay, bx - ax) + Rg.sign() * Rg.range(0.35, 0.9), l = (L - (i / pts.length) * L) * Rg.range(0.25, 0.55);
+    out.push(...zigzag(Rg, ax, ay, ax + Math.cos(an) * l, ay + Math.sin(an) * l, jag * 1.1, forks, w * 0.55, depth + 1)); }
+  return out;
+}
+// 塗り：画素ごとに一番高い段だけを残して1回ずつ塗る（枝の外光が幹の本体を覆わない）
+function voltInk(p, paths, k, C, s = 1, thin = false, glowK = 0.5) {
+  if (k <= 0.02) return; const grid = new Map(), mark = (x, y, lv) => { const key = Math.floor(x) + ',' + Math.floor(y); if ((grid.get(key) || 0) < lv) grid.set(key, lv); };
+  const stamp = (x, y, r, lv) => { if (r <= 0.5) return mark(x, y, lv); for (let py = Math.floor(y - r); py <= Math.ceil(y + r); py++) for (let px2 = Math.floor(x - r); px2 <= Math.ceil(x + r); px2++) if ((px2 + 0.5 - x) ** 2 + (py + 0.5 - y) ** 2 <= r * r) mark(px2, py, lv); };
+  for (const q of paths) { const trunk = q.w >= 1; if (!trunk && k < 0.5) continue;
+    const rh = thin ? (trunk && k > 0.45 ? 1.2 : 0) : (trunk ? (k > 0.6 ? 2.1 : 1.6) : 1.1) * s, rb = thin ? 0.5 : (trunk ? (k > 0.6 ? 1.3 : 0.8) : 0.5) * s;
+    for (let i = 0; i < q.pts.length - 1; i++) { const [ax, ay] = q.pts[i], [bx, by] = q.pts[i + 1], l = Math.max(1, Math.hypot(bx - ax, by - ay));
+      for (let d = 0; d <= l; d += 0.5) { const x = ax + (bx - ax) * d / l, y = ay + (by - ay) * d / l; if (rh > 0) stamp(x, y, rh, 1); stamp(x, y, rb, trunk ? 3 : 2); if (trunk && k > 0.3) mark(x, y, 4); } }
+    for (let i = 0; i < q.pts.length - 1; i += 3) p.glow(q.pts[i][0], q.pts[i][1], (trunk ? (thin ? 8 : 14) : 6) * s, C[4], glowK * k * q.w); }
+  const cols = [C[2], C[4], C[5], C[7]]; for (const [key, lv] of grid) { const [x, y] = key.split(',').map(Number); p.px(x, y, cols[lv - 1]); }
+}
+// 範囲の中でちらつく短い放電（円は描かない）：count 本、0.06 秒ごとに形と場所が変わる
+function aqStatic(p, L, r, count, len, time, seed, C, k) {
+  const fr = Math.floor(time / 0.06); for (let i = 0; i < count; i++) { const Rg = new PX.Rng((seed * 97 + i * 13 + fr * 7) >>> 0 || 1); if (!Rg.chance(0.7)) continue;
+    const a = Rg.range(0, TAU), d = r * Math.sqrt(Rg.next()) * 0.92, x = L.x + Math.cos(a) * d, y = L.y + Math.sin(a) * d, b = Rg.range(0, TAU), l = len * Rg.range(0.5, 1);
+    voltInk(p, zigzag(Rg, x, y, x + Math.cos(b) * l, y + Math.sin(b) * l, 0.35, 0.2), k * Rg.range(0.5, 1), C, 1, true, 0.3); }
+}
+// 地面に残る放電の跡：中心から枝分かれして伸びる割れ目（着弾ごとに決まった形）
+function aqCracks(seed, r) {
+  const Rg = new PX.Rng(seed), out = [];
+  const grow = (x, y, a, len, w, depth) => { const pts = [[x, y]]; for (let s2 = 0; s2 < len; s2 += 1.5) { a += Rg.range(-0.35, 0.35); x += Math.cos(a) * 1.5; y += Math.sin(a) * 1.5; pts.push([x, y]); if (depth < 2 && s2 > 3 && Rg.chance(0.08)) grow(x, y, a + Rg.sign() * Rg.range(0.5, 1.1), (len - s2) * Rg.range(0.3, 0.6), w * 0.6, depth + 1); } out.push({ pts, w }); };
+  for (let i = 0; i < 7; i++) grow(0, 0, i * TAU / 7 + Rg.range(-0.3, 0.3), r * Rg.range(0.55, 0.95), 1, 0);
+  return out;
+}
 DEMOS.push({
-  id: 'G12-aquila', ids: ['G12'], cat: G12, group: 'わし座（aquila）', title: '進路固定→突進と落雷', duration: 3.6, color: '#d6f4ff', cam: { x: -160, y: -60 },
-  refs: ['scripts/enemies/aquila.gd（aim 0.4・lock 0.45・突進900×0.55・drop_step 0.13・blast 半径220/遅延0.4・recover 0.9）', 'render/enemies/aquila.gd（進路線＋着弾円）・render/attacks/zone_aquila.gd/zone_reticle.gd（閉じる輪・放電）', 'pixelFX lightning 系の考え方（painter.glowLine）'],
-  status: { '状態': '試作のみ', '判定': '変更なし（着弾円の半径220・発生時刻）。予兆・放電は判定円の内側に収める' },
+  id: 'G12-aquila', ids: ['G12'], cat: G12, group: 'わし座（aquila）', title: '進路固定→突進と落雷', duration: 3.6, color: '#9ed8ff', cam: { x: -160, y: -60 },
+  refs: ['scripts/enemies/aquila.gd（aim 0.4・lock 0.45・突進900×0.55・drop_step 0.13・blast 半径220/遅延0.4・recover 0.9）', 'render/enemies/aquila.gd（進路線＋着弾円）・render/attacks/zone_aquila.gd/zone_reticle.gd（閉じる輪・放電）', 'pixelFX lightning/_lib.js（zigzag・stroke の稲妻の作りと塗り）・lightning-strike.js（ちらつき・割れ目・焦げ）'],
+  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし（着弾の半径220・発生時刻）', '予兆': '線や円は使わない。進路は着弾点から着弾点へ跳び移る細い放電で示し、着弾点の範囲の中で短い放電がちらつく（溜まるほど増える）', '落雷': 'pixelFX の稲妻（枝分かれ・3段の塗り・ちらつき）が中心から範囲いっぱいへ走り、地面に割れ目の跡が残って冷える' },
   setup(S) { S.e = mkE('aquila', V(-640, -260), 0, { fire_t: 0.15 }); S.ship = shipState(V(180, 120)); S.zones = []; S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); },
   step(S, dt) {
     const e = S.e, p = prm('aquila');
@@ -4322,39 +4367,63 @@ DEMOS.push({
       if (e.timer <= p.lock_time && e.charge === 0) { const to = sub(S.ship.pos, e.pos); e.facing = angOf(to); const gap = e.r + DATA.config.ship_radius + 12, adv = Math.min(p.dash_speed * p.dash_time, Math.max(0, len(to) - gap)); e.anchor = add(e.pos, mul(fromA(e.facing), adv)); e.charge = 0.01; }
       if (e.timer <= 0) { e.mode = 'DASH'; e.timer = p.dash_time; e.bud_t = 0; e.charge = 0; } else e.charge = Math.max(e.charge, 1 - e.timer / p.lock_time); }
     else if (e.mode === 'DASH') { const dir = fromA(e.facing), rem = Math.max(0, (e.anchor.x - e.pos.x) * dir.x + (e.anchor.y - e.pos.y) * dir.y), trav = Math.min(rem, p.dash_speed * Math.min(dt, e.timer)), el2 = trav / p.dash_speed; let nd = e.bud_t;
-      while (nd <= el2 + 1e-5) { S.zones.push({ pos: add(e.pos, mul(dir, p.dash_speed * nd)), t0: S.t + nd, r: p.blast_radius, delay: p.blast_delay, active: 0.25 }); nd += p.drop_step; } e.bud_t = nd - el2; e.pos = add(e.pos, mul(dir, trav)); e.timer -= dt;
-      if (e.timer <= 0 || rem <= trav + 0.001) { if (p.drop_step - e.bud_t > p.drop_step * 0.25) S.zones.push({ pos: { ...e.pos }, t0: S.t, r: p.blast_radius, delay: p.blast_delay, active: 0.25 }); e.mode = 'RECOVER'; e.timer = p.recover; } }
+      while (nd <= el2 + 1e-5) { S.zones.push({ pos: add(e.pos, mul(dir, p.dash_speed * nd)), t0: S.t + nd, r: p.blast_radius, delay: p.blast_delay, active: 0.25, seed: S.zones.length * 31 + 7 }); nd += p.drop_step; } e.bud_t = nd - el2; e.pos = add(e.pos, mul(dir, trav)); e.timer -= dt;
+      if (e.timer <= 0 || rem <= trav + 0.001) { if (p.drop_step - e.bud_t > p.drop_step * 0.25) S.zones.push({ pos: { ...e.pos }, t0: S.t, r: p.blast_radius, delay: p.blast_delay, active: 0.25, seed: S.zones.length * 31 + 7 }); e.mode = 'RECOVER'; e.timer = p.recover; } }
     else if (e.mode === 'RECOVER') { e.timer -= dt; if (e.timer <= 0) e.mode = 'MOVE'; }
   },
   phase(S) { const e = S.e; return e.mode === 'WINDUP' ? (e.charge > 0 ? '進路固定（予告）' : PH.WINDUP + '（狙い）') : e.mode === 'DASH' ? PH.DASH : S.used ? PH.RECOVER : PH.MOVE; },
   draw(S, R) {
-    const e = S.e, P = R.P, p = prm('aquila'), C = { r: 0.88, g: 0.97, b: 1, a: 1 };
+    const e = S.e, P = R.P, p = prm('aquila'), C0 = { r: 0.88, g: 0.97, b: 1, a: 1 }, C = voltRamp(P.color), rr = p.blast_radius * WL;
     if (e.mode === 'WINDUP' && e.charge > 0) {
       const dir = norm(sub(e.anchor, e.pos)), sp = p.dash_speed * p.drop_step, total = dist(e.pos, e.anchor), cs = [];
       for (let d = 0; d <= total + 1e-3; d += sp) cs.push(add(e.pos, mul(dir, d))); if (total - Math.floor(total / sp) * sp > sp * 0.25) cs.push(e.anchor);
-      if (!R.proto) { D2.line(e.pos, e.anchor, rgba(C, 0.65 + 0.3 * e.charge), px(4)); D2.circle(e.pos, px(4), '#fff1cc'); for (const c of cs) D2.arc(c, p.blast_radius, 0, TAU, rgba(C, 0.35 + 0.4 * e.charge), px(2)); }
-      else { FXW.warnRail(R.back, e.pos, e.anchor, { color: P.color, k: e.charge, time: S.t, seed: 12, intensity: P.intensity }); cs.forEach((c, i) => { const L = toL(c), pal = FX.ramp(P.color), r = p.blast_radius * WL; R.back.ring(L.x, L.y, r, 1, pal[2], 0.35 + 0.4 * e.charge); for (let j = 0; j < 22; j++) { const an = hash(i * 31 + j) * TAU, rr = r * Math.sqrt(hash(j * 3.7 + i)); if (hash(j + Math.floor(S.t * 12) + i) < 0.35 * e.charge) R.back.dot(L.x + Math.cos(an) * rr, L.y + Math.sin(an) * rr, pal[3], 0.8); } }); }
+      if (!R.proto) { D2.line(e.pos, e.anchor, rgba(C0, 0.65 + 0.3 * e.charge), px(4)); D2.circle(e.pos, px(4), '#fff1cc'); for (const c of cs) D2.arc(c, p.blast_radius, 0, TAU, rgba(C0, 0.35 + 0.4 * e.charge), px(2)); }
+      else { // 進路：着弾点から着弾点へ跳び移る細い放電（溜まるほど先まで届く）。着弾点の範囲の中で短い放電がちらつく
+        const k = e.charge, reach = Math.ceil(cs.length * Math.min(1, k * 1.4)), fr = Math.floor(S.t / 0.06);
+        for (let i = 0; i < reach - 1; i++) { const A = toL(cs[i]), B = toL(cs[i + 1]), Rg = new PX.Rng((i * 53 + fr * 11) >>> 0 || 1); voltInk(R.back, zigzag(Rg, A.x, A.y, B.x, B.y, 0.25, 0.3), 0.35 + 0.35 * k, C, 1, true, 0.35); }
+        cs.forEach((c, i) => { if (i < reach) aqStatic(R.back, toL(c), rr, Math.round(1 + 4 * k), rr * 0.3, S.t, i + 3, C, 0.4 + 0.4 * k); }); }
       if (!R.proto) D2.arc(e.pos, e.r * 1.18, 0, TAU * Math.max(0.12, e.charge), `rgba(225,247,255,${0.55 + 0.4 * e.charge})`, px(3));
     }
-    for (const z of S.zones) { const t = S.t - z.t0; if (t < 0) continue; const L = toL(z.pos), pal = FX.ramp(P.color);
-      if (t < z.delay) { const k = clamp(t / z.delay);
-        if (!R.proto) { const a = 0.25 + 0.55 * k; D2.arc(z.pos, z.r, 0, TAU, rgba(C, a), px(2)); D2.arc(z.pos, z.r * (1 - 0.7 * k), 0, TAU, rgba(C, a), px(1.5)); for (let q = 0; q < 4; q++) { const u = fromA(q * Math.PI / 2 + Math.PI / 4); D2.line(add(z.pos, mul(u, z.r * 0.55)), add(z.pos, mul(u, z.r * 1.15)), rgba(C, a), px(2)); } }
-        else { R.back.ring(L.x, L.y, z.r * WL, 1, pal[2], 0.3 + 0.5 * k); for (let j = 0; j < 4; j++) { const an = hash(j + Math.floor(S.t * 16)) * TAU; FX.bolt(R.back, V(L.x, L.y), V(L.x + Math.cos(an) * z.r * WL * 0.8 * k, L.y + Math.sin(an) * z.r * WL * 0.8 * k), j * 9 + Math.floor(S.t * 16), P.color, 0.45 * k); } R.back.glow(L.x, L.y, z.r * WL * 0.7, pal[2], 0.15 * k * P.intensity); }
-      } else if (t < z.delay + z.active) { const f = 1 - (t - z.delay) / z.active;
-        if (!R.proto) { D2.circle(z.pos, z.r, rgba(C, 0.16 * f)); D2.arc(z.pos, z.r, 0, TAU, rgba(C, 0.75 * f), px(3)); for (let a = 0; a < 5; a++) { const sh = Math.floor((t - z.delay) / 0.06); let prev = z.pos; const end = add(z.pos, mul(fromA(a * TAU / 5), z.r * 0.65)); for (let s = 1; s <= 5; s++) { const q = add(lerpV(z.pos, end, s / 5), mul(orth(fromA(a * TAU / 5)), s < 5 ? (hash(a * 13 + s + sh * 7) - 0.5) * 30 : 0)); D2.line(prev, q, rgba(C, f), px(2)); prev = q; } } }
-        else { const seed = Math.floor(S.t * 16); FX.bolt(R.front, V(L.x + (hash(seed) - 0.5) * 6, -4), V(L.x, L.y), seed, P.color, f, 2); for (let a = 0; a < 6; a++) { const an = a * TAU / 6 + hash(a + seed); FX.bolt(R.front, V(L.x, L.y), V(L.x + Math.cos(an) * z.r * WL * 0.85, L.y + Math.sin(an) * z.r * WL * 0.85), a * 7 + seed, P.color, f); } FX.shock(R.front, V(L.x, L.y), z.r * WL * (0.6 + 0.4 * (1 - f)), 2, P.color, f); R.front.glow(L.x, L.y, z.r * WL, pal[3], 0.5 * f * P.intensity); }
-      } else if (R.proto && t < z.delay + z.active + 0.25 * P.timing) { const f = 1 - (t - z.delay - z.active) / (0.25 * P.timing); for (let j = 0; j < 3; j++) { const an = hash(j * 5 + Math.floor(S.t * 20)) * TAU; FX.bolt(R.back, V(L.x, L.y), V(L.x + Math.cos(an) * z.r * WL * 0.4, L.y + Math.sin(an) * z.r * WL * 0.4), j + Math.floor(S.t * 20), P.color, 0.4 * f); } }
+    for (const z of S.zones) { const t = S.t - z.t0; if (t < 0) continue; const L = toL(z.pos);
+      if (!R.proto) { if (t < z.delay) { const k = clamp(t / z.delay), a = 0.25 + 0.55 * k; D2.arc(z.pos, z.r, 0, TAU, rgba(C0, a), px(2)); D2.arc(z.pos, z.r * (1 - 0.7 * k), 0, TAU, rgba(C0, a), px(1.5)); for (let q = 0; q < 4; q++) { const u = fromA(q * Math.PI / 2 + Math.PI / 4); D2.line(add(z.pos, mul(u, z.r * 0.55)), add(z.pos, mul(u, z.r * 1.15)), rgba(C0, a), px(2)); } }
+        else if (t < z.delay + z.active) { const f = 1 - (t - z.delay) / z.active; D2.circle(z.pos, z.r, rgba(C0, 0.16 * f)); D2.arc(z.pos, z.r, 0, TAU, rgba(C0, 0.75 * f), px(3)); for (let a = 0; a < 5; a++) { const sh = Math.floor((t - z.delay) / 0.06); let prev = z.pos; const end = add(z.pos, mul(fromA(a * TAU / 5), z.r * 0.65)); for (let s2 = 1; s2 <= 5; s2++) { const q = add(lerpV(z.pos, end, s2 / 5), mul(orth(fromA(a * TAU / 5)), s2 < 5 ? (hash(a * 13 + s2 + sh * 7) - 0.5) * 30 : 0)); D2.line(prev, q, rgba(C0, f), px(2)); prev = q; } } }
+        continue; }
+      if (t < z.delay) { const k = clamp(t / z.delay); aqStatic(R.back, L, rr, Math.round(3 + 7 * k), rr * (0.2 + 0.25 * k), S.t, z.seed, C, 0.45 + 0.5 * k); R.back.glow(L.x, L.y, 6 + 10 * k, C[5], (0.2 + 0.6 * k) * P.intensity); } // 溜め：範囲の中の放電が増え、中心が光り始める
+      else { const a = t - z.delay, fl = AQ_FLICK[Math.floor(a * 30 + 1e-4)] ?? 0, cr = aqCracks(z.seed, rr).map(q => ({ w: q.w, pts: q.pts.map(([x, y]) => [L.x + x, L.y + y]) }));
+        const heat = Math.pow(clamp(1 - a / 1.2), 1.4); // 割れ目の跡：熱い色からすすへ冷える
+        if (heat > 0) for (const q of cr) for (let i = 0; i < q.pts.length; i++) { const [x, y] = q.pts[i], h = heat * (1 - 0.5 * i / q.pts.length) - hash(x * 7.1 + y * 3.3) * 0.25; R.back.px(x, y, h > 0.6 ? C[6] : h > 0.35 ? C[4] : h > 0.12 ? C[2] : hexc('#141020')); }
+        if (fl > 0) { const fr = Math.floor(a * 30), Rg = new PX.Rng((z.seed * 13 + fr) >>> 0 || 1), paths = [];
+          for (let j = 0; j < 6; j++) { const an = j * TAU / 6 + Rg.range(-0.35, 0.35), l = rr * Rg.range(0.7, 0.95); paths.push(...zigzag(Rg, L.x, L.y, L.x + Math.cos(an) * l, L.y + Math.sin(an) * l, 0.22, 0.6)); }
+          voltInk(R.front, paths, fl, C, 1, false, 0.6); }
+        if (a < 0.08) { R.front.glow(L.x, L.y, rr * 1.1, C[6], (1 - a / 0.08) * 0.9 * P.intensity); R.front.glow(L.x, L.y, rr * 0.4, C[7], (1 - a / 0.08) * P.intensity); } // 落ちた瞬間の閃光
+        if (a > z.active && a < z.active + 0.35) aqStatic(R.back, L, rr * 0.7, 3, rr * 0.18, S.t, z.seed + 5, C, 0.5 * (1 - (a - z.active) / 0.35)); } // 残りの放電
     }
     if (R.proto) R.blitBack();
     drawEnemy(e); drawShip(S.ship);
   },
 });
 
+// 試作の轍：左右それぞれ、区間をつないだ1本の線として途切れずに塗る。揺らぎは轍に沿った距離のなめらかなノイズで、区間をまたいでもつながる。
+// 両端は細くとがらせ、明るさは区間ごとの寿命（燃え始め・燃え尽き）を距離に沿って補間する
+function aurigaTrail(p, walls, time, P) {
+  const pal = FX.ramp(P.color), pts = [];
+  for (const w of walls) { const t = time - w.t0, left = w.life - t; if (left <= 0) continue; const k = Math.min(1, clamp(t / 0.12) * (0.3 + 0.7 * clamp(left / (0.6 * P.timing)))) * Math.min(1, P.intensity);
+    if (!pts.length) pts.push({ p: toL(w.from), k }); pts.push({ p: toL(add(w.from, mul(fromA(w.a), w.len))), k }); }
+  if (pts.length < 2) return; let total = 0; for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].p.x - pts[i - 1].p.x, pts[i].p.y - pts[i - 1].p.y);
+  const W = walls[0].w * 0.5 * WL * P.size; let cum = 0;
+  for (let i = 1; i < pts.length; i++) { const A = pts[i - 1], B = pts[i], dx = B.p.x - A.p.x, dy = B.p.y - A.p.y, L = Math.hypot(dx, dy); if (L < 0.01) continue; const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+    for (let d = 0; d < L; d += 0.5) { const c = cum + d, k = lerp(A.k, B.k, d / L); if (k <= 0.01) continue;
+      const taper = Math.pow(Math.min(1, c / 10, (total - c) / 6), 0.7), n1 = PX.tileNoise(c * 0.22, time * 9, 0, 0, 3) * 0.5 + 0.5, h = W * (0.7 + 0.9 * n1) * k * taper; if (h < 0.3) continue;
+      const x0 = A.p.x + ux * d, y0 = A.p.y + uy * d;
+      for (let q = -h; q <= h; q += 0.5) { const e = Math.abs(q) / h, lv = e < 0.25 ? 4 : e < 0.5 ? 3 : e < 0.8 ? 2 : 1; p.dot(x0 + nx * q, y0 + ny * q, pal[lv], k * (e > 0.8 ? 0.6 : 1)); }
+      if ((Math.round(c * 2) & 3) === 0) p.light(x0, y0, pal[2], 0.22 * k); }
+    cum += L; }
+}
 // ---------- ぎょしゃ座（auriga）
 DEMOS.push({
   id: 'G12-auriga', ids: ['G12'], cat: G12, group: 'ぎょしゃ座（auriga）', title: '戦車の燃える轍', duration: 6.6, color: '#ffc46b', cam: { x: 0, y: 0 },
   refs: ['scripts/enemies/auriga.gd・enemy_motion.gd _drive（速さ420で自機へ旋回しながら走行、trail_step 0.12 ごとに左右の轍 fire_wall 幅16・3.5秒）', 'render/attacks/wall.gd（現行の線）', 'pixelFX fire 系の段階色・painter.glow'],
-  status: { '状態': '試作のみ', '判定': '変更なし（轍の位置・幅16・寿命3.5秒）', '比較': 'プレイヤーの爆発（橙の点の爆発）とは形が帯で、白金の色にして区別' },
+  status: { '状態': '試作のみ', '判定': '変更なし（轍の位置・幅16・寿命3.5秒）', '轍の形': '左右それぞれを区間をつないだ1本の線で途切れずに描き、揺らぎは轍に沿った距離で続く。両端は細くとがる', '比較': 'プレイヤーの爆発（橙の点の爆発）とは形が帯で、白金の色にして区別' },
   setup(S) { S.e = mkE('auriga', V(-520, 200), -0.3); S.ship = shipState(V(60, -20)); S.walls = []; S.e.fire_t = 0; },
   step(S, dt) {
     const e = S.e, p = prm('auriga'), d = enemyDef('auriga');
@@ -4366,8 +4435,9 @@ DEMOS.push({
     const P = R.P;
     for (const w of S.walls) { const t = S.t - w.t0, left = w.life - t; if (left <= 0) continue; const b = add(w.from, mul(fromA(w.a), w.len));
       if (!R.proto) { const f = clamp(left / 0.4); D2.line(w.from, b, `rgba(255,138,60,${0.35 * f})`, w.w * 1.5); D2.line(w.from, b, `rgba(255,138,60,${0.9 * f})`, w.w); }
-      else { const ign = clamp(t / 0.12), f = clamp(left / (0.6 * P.timing)); FXW.flameStrip(R.back, w.from, b, w.w * 0.5 * P.size * (0.6 + 0.4 * f), S.t, P.color, Math.min(1, ign * (0.3 + 0.7 * f) * P.intensity), w.t0 * 13 + w.s); if (f < 1) FXW.sparks(R.front, add(w.from, mul(fromA(w.a), w.len * 0.5)), (0.6 * P.timing - left) % 0.4, w.t0 * 7, 2, '#ffe6b0', 20, 0.4, -Math.PI / 2, 0.8); }
+      else { const f = clamp(left / (0.6 * P.timing)); if (f < 1) FXW.sparks(R.front, add(w.from, mul(fromA(w.a), w.len * 0.5)), (0.6 * P.timing - left) % 0.4, w.t0 * 7, 2, '#ffe6b0', 20, 0.4, -Math.PI / 2, 0.8); }
     }
+    if (R.proto) for (const sd of [-1, 1]) aurigaTrail(R.back, S.walls.filter(w => w.s === sd), S.t, P); // 区切りの見えない1本の轍
     if (R.proto) R.blitBack();
     drawEnemy(S.e); drawShip(S.ship);
   },
@@ -4378,8 +4448,9 @@ DEMOS.push({
 DEMOS.push({
   id: 'G12-corona', ids: ['G12'], cat: G12, group: 'みなみのかんむり座（corona）', title: '渦で捕まえた雑魚を投げる', duration: 4.2, color: '#ff3b3b', cam: { x: -60, y: 0 },
   refs: ['scripts/enemies/corona.gd・corona_vortex.gd（ring 100・spin 4.8・telegraph 0.3・throw_speed 620・throw_life 1.6・throw_effect_scale 1.6・機体の方を向く個体を投げる）', 'corona_vortex.gd draw（渦の弧・選択の脈動・投擲の三角の尾）', 'pixelFX painter.arc・sparks'],
-  status: { '状態': '試作のみ', '判定': '変更なし（投擲の頭の半径＝敵半径×1.6、1投1回）', '簡略': '捕捉の吸い込み・抽選の重みは省略し、渦に保持済みの8体（swarm）から順に投げる' },
-  setup(S) { S.e = mkE('corona', V(-260, -30), 0); S.ship = shipState(V(260, 60)); S.m = []; for (let i = 0; i < 8; i++) S.m.push({ a: i * TAU / 8, rad: 100 * (0.85 + 0.3 * hash(i)), type: 'swarm', r: enemyR('swarm'), thrown: false }); S.sel = null; S.next = 0.3; },
+  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし（投擲の頭の半径＝敵半径×1.6、1投1回）', '図形': '円・輪・三角は使わない。渦は流れる粒、選ばれた個体は流れ込む光の粒と絵の明滅、投げた弾は回る絵・残像・火花の尾', '捕まえる敵': '本番で投げる対象のうち今の絵がある、かみつき・分裂の子・猟犬', '簡略': '捕捉の吸い込み・抽選の重みは省略し、渦に保持済みの8体から順に投げる' },
+  // 渦の個体は、本番で投げる対象のうち今の絵がある種類（かみつき・分裂の子・猟犬）
+  setup(S) { S.e = mkE('corona', V(-260, -30), 0); S.ship = shipState(V(260, 60)); S.m = []; const kinds = ['biter', 'splitling', 'hound']; for (let i = 0; i < 8; i++) { const type = kinds[i % 3]; S.m.push({ a: i * TAU / 8, rad: 100 * (0.85 + 0.3 * hash(i)), type, r: enemyR(type), thrown: false, spin0: hash(i * 5) * TAU }); } S.sel = null; S.next = 0.3; },
   step(S, dt) {
     const e = S.e, p = prm('corona'); e.pos = add(e.pos, mul(norm(sub(S.ship.pos, e.pos)), enemyDef('corona').speed * dt));
     for (const m of S.m) if (!m.thrown) { m.a += p.spin * dt; m.pos = add(e.pos, mul(fromA(m.a), m.rad)); m.facing = m.a + Math.PI / 2; m.vel = mul(fromA(m.a + Math.PI / 2), p.spin * m.rad); }
@@ -4391,17 +4462,27 @@ DEMOS.push({
   draw(S, R) {
     const e = S.e, P = R.P, p = prm('corona'), ATT = '#ff3b3b', CORE = '#ffb36b';
     if (!R.proto) { for (let k = 0; k < 3; k++) { const a = S.t * p.spin + k * TAU / 3; D2.arc(e.pos, p.ring * (0.72 + k * 0.14), a, a + 1.8, 'rgba(182,162,219,.3)', 3); } if (S.sel) D2.arc(e.pos, e.r * 1.2, -Math.PI / 2, -Math.PI / 2 + Math.max(0.02, e.charge) * TAU, ATT, 4); }
-    else { const L = toL(e.pos), pal = FX.ramp('#b6a2db'); for (let i = 0; i < 70; i++) { const rr = p.ring * WL * (0.55 + 0.6 * hash(i)), a0 = S.t * p.spin * (0.8 + 0.4 * hash(i + 9)) + hash(i * 3) * TAU; for (let s = 0; s < 4; s++) R.back.dot(L.x + Math.cos(a0 - s * 0.08) * rr, L.y + Math.sin(a0 - s * 0.08) * rr, pal[s < 1 ? 3 : 2], 0.55 - 0.12 * s); } if (S.sel) R.back.arc(L.x, L.y, e.r * WL * 1.25, 1, -Math.PI / 2, -Math.PI / 2 + e.charge * TAU, hexc(P.color), 0.9); R.blitBack(); }
+    else { const L = toL(e.pos), pal = FX.ramp('#b6a2db'); for (let i = 0; i < 70; i++) { const rr = p.ring * WL * (0.55 + 0.6 * hash(i)), a0 = S.t * p.spin * (0.8 + 0.4 * hash(i + 9)) + hash(i * 3) * TAU; for (let s = 0; s < 4; s++) R.back.dot(L.x + Math.cos(a0 - s * 0.08) * rr, L.y + Math.sin(a0 - s * 0.08) * rr, pal[s < 1 ? 3 : 2], 0.55 - 0.12 * s); } R.blitBack(); } // 渦は流れる粒だけ（輪は描かない）
     drawEnemy(e);
-    for (const m of S.m) { if (m.thrown && S.t - m.t0 >= p.throw_life) continue; drawEnemy({ type: 'swarm', pos: m.pos, facing: m.facing, r: m.r });
-      const r = m.r * p.throw_effect_scale;
-      if (m.thrown) { const u = norm(m.v), sd = mul(orth(u), r);
-        if (!R.proto) { D2.poly([add(m.pos, sd), sub(m.pos, mul(u, r * 4.5)), sub(m.pos, sd)], 'rgba(255,59,59,.35)'); D2.circle(m.pos, r, 'rgba(255,59,59,.15)'); D2.arc(m.pos, r, 0, TAU, ATT, 3); D2.arc(m.pos, r * 1.08, angOf(u) - 1.2, angOf(u) + 1.2, CORE, 3); }
-        else { const L = toL(m.pos), pal = FX.ramp(P.color); for (let s = 0; s < 18; s++) { const q = sub(m.pos, mul(u, s * r * 0.3)), Q = toL(q), w = r * WL * (1 - s / 18); for (let j = -w; j <= w; j += 0.7) R.front.dot(Q.x - u.y * j, Q.y + u.x * j, pal[s < 3 ? 4 : s < 8 ? 3 : 2], (1 - s / 18) * Math.min(1, P.intensity)); } R.front.arc(L.x, L.y, r * WL * 1.05, 1.5, angOf(u) - 1.3, angOf(u) + 1.3, pal[4], 1); R.front.glow(L.x, L.y, r * WL * 2, pal[2], 0.5 * P.intensity); FXW.sparks(R.front, m.pos, (S.t - m.t0) % 0.25, Math.floor((S.t - m.t0) / 0.25) + m.a, 4, P.color, 30, 0.25, angOf(u) + Math.PI, 0.6); }
-      } else if (S.sel === m) { const pulse = 0.65 + 0.35 * Math.sin(S.t * 18);
-        if (!R.proto) { D2.arc(m.pos, r, 0, TAU, `rgba(255,59,59,${pulse})`, 3); D2.line(e.pos, m.pos, 'rgba(255,59,59,.35)', 2); }
-        else { const L = toL(m.pos), pal = FX.ramp(P.color), k = e.charge; R.front.ring(L.x, L.y, r * WL * (1.6 - 0.6 * k), 1, pal[3], 0.5 + 0.5 * k); for (let q = 0; q < 4; q++) { const a = q * Math.PI / 2 + S.t * 3; R.front.dot(L.x + Math.cos(a) * r * WL * (1.6 - 0.6 * k), L.y + Math.sin(a) * r * WL * (1.6 - 0.6 * k), pal[4]); } R.front.glow(L.x, L.y, r * WL * 1.5, pal[2], 0.35 * k * P.intensity); }
-      }
+    for (const m of S.m) { if (m.thrown && S.t - m.t0 >= p.throw_life) continue; const r = m.r * p.throw_effect_scale;
+      if (!R.proto) { drawEnemy({ type: m.type, pos: m.pos, facing: m.facing, r: m.r });
+        if (m.thrown) { const u = norm(m.v), sd = mul(orth(u), r); D2.poly([add(m.pos, sd), sub(m.pos, mul(u, r * 4.5)), sub(m.pos, sd)], 'rgba(255,59,59,.35)'); D2.circle(m.pos, r, 'rgba(255,59,59,.15)'); D2.arc(m.pos, r, 0, TAU, ATT, 3); D2.arc(m.pos, r * 1.08, angOf(u) - 1.2, angOf(u) + 1.2, CORE, 3); }
+        else if (S.sel === m) { const pulse = 0.65 + 0.35 * Math.sin(S.t * 18); D2.arc(m.pos, r, 0, TAU, `rgba(255,59,59,${pulse})`, 3); D2.line(e.pos, m.pos, 'rgba(255,59,59,.35)', 2); }
+        continue; }
+      const pal = FX.ramp(P.color);
+      if (m.thrown) { // 投げた弾：本物の絵が回りながら飛び、絵の残像と流れる火花の尾を引く（円や三角は描かない）
+        const age = S.t - m.t0, u = norm(m.v), spin = m.spin0 + age * 14, fade = 1 - smooth(p.throw_life - 0.25, p.throw_life, age);
+        for (let g2 = 5; g2 >= 1; g2--) { const back = g2 * 0.022; if (age < back) continue; drawEnemy({ type: m.type, pos: sub(m.pos, mul(m.v, back)), facing: spin - g2 * 0.3, r: m.r }, { alpha: 0.42 * (1 - g2 / 6) * fade, white: 0.55 }); }
+        PX.cycle(age, 0.3, 24, 41 + m.a * 10, (rg) => rg.range(0.15, 0.3), (ag, life, rg) => { const k = ag / life, back = rg.range(0, 0.04), q = sub(m.pos, mul(m.v, back + ag * 0.6)), off = mul(orth(u), rg.range(-1, 1) * r * 0.7 * (0.4 + k)), Q = toL(add(q, off)), tl = 2 + 3 * (1 - k);
+          R.front.line(Q.x + u.x * tl, Q.y + u.y * tl, Q.x, Q.y, (w) => w < 0.5 ? pal[2] : k < 0.4 ? pal[4] : pal[3], (1 - k) * fade); });
+        const L = toL(m.pos); R.front.glow(L.x, L.y, r * WL * 1.6, pal[2], 0.45 * fade * P.intensity); R.front.glow(L.x, L.y, r * WL * 0.7, pal[4], 0.35 * fade * P.intensity);
+        drawEnemy({ type: m.type, pos: m.pos, facing: spin, r: m.r }, { alpha: fade, white: 0.25 + 0.2 * Math.sin(age * 40) });
+      } else if (S.sel === m) { // 選ばれた個体：本体から光の粒が流れ込み、絵そのものが明滅する
+        const k = e.charge, A = toL(e.pos), B = toL(m.pos);
+        for (let i = 0; i < 14; i++) { const f = ((hash(i * 3.1) + S.t * 2.6) % 1), w = (hash(i * 7.7) - 0.5) * 10 * Math.sin(Math.PI * f), x = lerp(A.x, B.x, f) - (B.y - A.y) / (dist(A, B) || 1) * w, y = lerp(A.y, B.y, f) + (B.x - A.x) / (dist(A, B) || 1) * w; R.front.dot(x, y, f > 0.7 ? pal[4] : pal[3], k * (0.4 + 0.6 * f)); }
+        R.front.glow(B.x, B.y, r * WL * 1.4, pal[2], 0.4 * k * P.intensity);
+        drawEnemy({ type: m.type, pos: m.pos, facing: m.facing, r: m.r }, { white: k * (0.35 + 0.35 * Math.sin(S.t * 30)) });
+      } else drawEnemy({ type: m.type, pos: m.pos, facing: m.facing, r: m.r });
     }
     drawShip(S.ship);
   },
@@ -4457,7 +4538,7 @@ DEMOS.push({
   id: 'G12-cepheus', ids: ['G12'], cat: G12, group: 'ケフェウス座（cepheus・兵）', title: '召喚の予告→号令の一斉射撃', duration: 4.4, color: '#c9a6ff', cam: { x: -140, y: 0 },
   params: [{ k: 'gold', label: '召喚の金色', type: 'color', def: '#ffd98a' }],
   refs: ['scripts/enemies/cepheus.gd（summon_time 0.9・隊列3体 row_near 120/spacing 120・fire_interval 0.8・VOLLEY_WARNING 0.4）', 'scripts/enemies/soldier.gd（号令で bolt）', 'render/enemies/cepheus.gd（召喚の紋章輪）・render/enemies/soldier.gd（予告線90＋弧）・render/attacks/bolt.gd（紫の光弾）'],
-  status: { '状態': '試作のみ', '判定': '変更なし（光弾の速さ640・向きは隊列の向き）' },
+  status: { '状態': '試作のみ', '判定': '変更なし（光弾の速さ640・向きは隊列の向き）', '召喚': '紋章の輪は描かない。本体から金色の粒が流れ、出る場所で散った粒が集まって兵の絵が白く光りながら形になる' },
   setup(S) { S.e = mkE('cepheus', V(-520, -20), 0); S.ship = shipState(V(220, 40)); S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); S.e.anchor = { ...S.e.pos }; S.e.mode = 'WINDUP'; S.e.timer = prm('cepheus').summon_time; S.sol = []; S.bolts = []; S.vol = 0; },
   step(S, dt) {
     const e = S.e, p = prm('cepheus'), u = fromA(e.facing), n = orth(u);
@@ -4474,7 +4555,12 @@ DEMOS.push({
     if (e.mode === 'WINDUP') { const k = e.charge;
       for (let s = 0; s < 3; s++) { const at = add(add(e.anchor, mul(u, p.row_near)), mul(n, (s - 1) * p.spacing));
         if (!R.proto) { D2.line(e.pos, at, `rgba(255,217,115,${0.25 + 0.35 * k})`, px(2)); D2.arc(at, 30 * (1.6 - 0.6 * k), 0, TAU, rgba(lighten(enemyColor('cepheus'), 0.35), 0.4 + 0.5 * k), px(2.5)); for (let q = 0; q < 5; q++) { const a = S.t * 2 + q * TAU / 5; D2.line(add(at, mul(fromA(a), 18)), add(at, mul(fromA(a), 26 + 10 * (1 - k))), `rgba(255,217,115,${0.6 * k})`, px(2)); } D2.circle(at, 6 + 8 * k, `rgba(255,242,191,${0.3 + 0.5 * k})`); }
-        else { const L = toL(at), pal = FX.ramp(P.gold), r = 30 * WL * (1.4 - 0.4 * k) * P.size; R.back.ring(L.x, L.y, r, 1, pal[3], 0.5 + 0.5 * k); R.back.ring(L.x, L.y, r * 0.62, 1, pal[2], 0.6 * k); for (let q = 0; q < 6; q++) { const a = S.t * 1.6 + q * TAU / 6; R.back.dot(L.x + Math.cos(a) * r * 0.81, L.y + Math.sin(a) * r * 0.81, pal[4], k); R.back.dot(L.x + Math.cos(a) * r * 0.81 + 0.7, L.y + Math.sin(a) * r * 0.81, pal[3], k * 0.7); } R.back.glow(L.x, L.y, r * 1.4, pal[2], 0.3 * k * P.intensity); for (let yy = 0; yy < 18 * k; yy += 0.7) R.front.dot(L.x + (hash(yy * 3 + s) - 0.5) * 2, L.y - yy, pal[yy < 4 ? 4 : 3], (1 - yy / 18) * k); FXW.warnRail(R.back, e.pos, at, { color: P.gold, k: 0.3 + 0.4 * k, time: S.t, seed: s + 40, rail: 0.8, intensity: 0.7 * P.intensity }); }
+        else { // 召喚：輪は描かない。本体から金色の粒が流れていき、出る場所で兵の絵が粒から形になる（白く光る絵が濃くなる）
+          const L = toL(at), A = toL(e.pos), pal = FX.ramp(P.gold), sz = enemyR('cepheus_soldier') * WL;
+          for (let i = 0; i < 18; i++) { const f = (hash(i * 2.3 + s) + S.t * 1.8) % 1, w = (hash(i * 5.1 + s) - 0.5) * 14 * Math.sin(Math.PI * f), dx = L.x - A.x, dy = L.y - A.y, dl = Math.hypot(dx, dy) || 1; R.back.dot(A.x + dx * f - dy / dl * w, A.y + dy * f + dx / dl * w, f > 0.75 ? pal[4] : pal[3], k * (0.3 + 0.7 * f)); }
+          for (let i = 0; i < 26; i++) { const a = hash(i * 3.7 + s) * TAU, d = sz * 1.8 * (1 - ((hash(i) + S.t * 1.2) % 1)) * (1.2 - k), x = L.x + Math.cos(a) * d, y = L.y + Math.sin(a) * d; R.front.dot(x, y, pal[d < sz ? 4 : 3], k * (1 - d / (sz * 2.2))); } // 散った粒が集まってくる
+          R.back.glow(L.x, L.y, sz * 1.6, pal[2], 0.35 * k * P.intensity);
+          if (k > 0.25) drawEnemy(mkE('cepheus_soldier', at, e.facing), { alpha: smooth(0.25, 1, k) * 0.8, white: 1 - 0.6 * smooth(0.6, 1, k) }); }
       }
       if (!R.proto) { D2.arc(e.pos, e.r * (1.15 + 0.3 * k), 0, TAU, `rgba(255,217,102,${0.35 + 0.5 * k})`, px(3)); D2.circle(sub(e.pos, mul(u, e.r * 0.55)), e.r * (0.15 + 0.2 * k), `rgba(255,235,153,${0.5 + 0.4 * k})`); }
       else FXW.gather(R.front, sub(e.pos, mul(u, e.r * 0.55)), e.r * 1.4, k * P.intensity, P.gold, S.t, 12, 3);
@@ -4486,7 +4572,7 @@ DEMOS.push({
       else { FXW.warnRail(R.front, st, add(st, mul(dir, 260)), { color: P.color, k: s.charge, time: S.t, seed: s.buds + 50, rail: 1, intensity: P.intensity, reveal: s.charge }); FXW.gather(R.front, st, s.r * 1.3, s.charge * P.intensity, P.color, S.t, 6, s.buds + 3); } }
     for (const b of S.bolts) { const u2 = fromA(b.a);
       if (!R.proto) { D2.line(sub(b.pos, mul(u2, 34)), add(b.pos, mul(u2, 6)), 'rgba(191,153,255,.35)', 14); D2.line(sub(b.pos, mul(u2, 30)), add(b.pos, mul(u2, 4)), 'rgb(217,191,255)', 6); D2.line(sub(b.pos, mul(u2, 24)), add(b.pos, mul(u2, 2)), 'rgba(255,255,255,.95)', 2.5); }
-      else { const L = toL(b.pos), pal = FX.ramp(P.color), T = toL(sub(b.pos, mul(u2, 46))); R.front.beam(T.x, T.y, L.x, L.y, 2.6 * P.size, (uu, v) => uu > 0.8 ? pal[4] : v < 0.4 ? pal[3] : pal[2], (uu) => Math.min(1, 0.25 + uu)); R.front.circle(L.x, L.y, 1.6 * P.size, pal[4]); R.front.glowLine(T.x, T.y, L.x, L.y, 4, pal[2], 0.4 * P.intensity); if (S.t - b.t0 < 0.08) FXW.flare(R.front, sub(b.pos, mul(u2, 640 * (S.t - b.t0))), 8, P.color, S.t, 1 - (S.t - b.t0) / 0.08, 4); }
+      else { const L = toL(b.pos), pal = FX.ramp(P.color), T = toL(sub(b.pos, mul(u2, 46))); R.front.beam(T.x, T.y, L.x, L.y, 2.6 * P.size, (uu, v) => uu > 0.8 ? pal[4] : v < 0.4 ? pal[3] : pal[2], (uu) => Math.min(1, 0.25 + uu)); R.front.px(L.x, L.y, pal[4]); R.front.px(L.x - Math.cos(b.a), L.y - Math.sin(b.a), pal[4]); R.front.glow(L.x, L.y, 4 * P.size, pal[4], 0.6 * P.intensity); R.front.glowLine(T.x, T.y, L.x, L.y, 4, pal[2], 0.4 * P.intensity); if (S.t - b.t0 < 0.08) FXW.flare(R.front, sub(b.pos, mul(u2, 640 * (S.t - b.t0))), 8, P.color, S.t, 1 - (S.t - b.t0) / 0.08, 4); }
     }
   },
 });

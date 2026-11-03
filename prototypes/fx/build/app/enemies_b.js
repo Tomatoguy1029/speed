@@ -54,7 +54,7 @@ DEMOS.push({
     if (R.proto) R.blitBack();
     drawEnemy(e); drawShip(S.ship);
     if (!R.proto && aiming && e.mode !== 'WINDUP') { D2.circle(lens, px(2) + e.r * (0.2 + 0.2 * k), rgba(col, 0.5 + 0.4 * k)); if (k > 0) D2.arc(e.pos, e.r * 1.35, -Math.PI / 2, -Math.PI / 2 + TAU * k, rgba(col, 0.9), Math.max(px(2), e.r * 0.12)); }
-    if (R.proto && aiming && e.mode !== 'WINDUP') { const L = toL(lens), pal = FX.ramp(toHex(col)); R.front.circle(L.x, L.y, 1 + 2.5 * k * P.size, pal[3]); R.front.circle(L.x, L.y, 0.8 + 1.2 * k, pal[4]); R.front.glow(L.x, L.y, 8 + 10 * k, pal[2], 0.5); }
+    if (R.proto && aiming && e.mode !== 'WINDUP') { const L = toL(lens), pal = FX.ramp(toHex(col)); R.front.px(L.x, L.y, pal[4]); R.front.glow(L.x, L.y, 3 + 4 * k * P.size, pal[4], 0.6); R.front.glow(L.x, L.y, 8 + 10 * k, pal[2], 0.5); } // レンズは光だけ（丸は描かない）
   },
 });
 
@@ -246,7 +246,7 @@ DEMOS.push({
       drawWater(strips, S.t, R.proto, R.proto ? P : null);
       if (jets.length) { const C = aquaRamp(P.color); for (const j of jets) aquaJet(R.front, j.p, Math.atan2(j.uy, j.ux), j.len, j.half0, j.slope, S.t, j.g, 7 + j.k * 13, C, j.a, j.tail || 0); }
       if (R.proto && t < S.fl.delay) FXW.gather(R.front, e.pos, e.r * 1.6 * P.size, clamp(t / S.fl.delay) * P.intensity, P.color, S.t, 14, 4);
-      if (R.proto && t >= S.fl.delay && t < S.fl.delay + 0.25) FXW.shock(R.front, e.pos, (t - S.fl.delay) * 900, 10, P.color, 1 - (t - S.fl.delay) / 0.25);
+      if (R.proto && t >= S.fl.delay && t < S.fl.delay + 0.2) { const L = toL(e.pos), f = 1 - (t - S.fl.delay) / 0.2, C2 = aquaRamp(P.color); R.front.glow(L.x, L.y, e.r * WL * 3, C2[6], 0.8 * f * P.intensity); } // 吹き出しの瞬間は光だけ（衝撃の輪は描かない）
     }
     drawEnemy(e); drawShip(S.ship);
   },

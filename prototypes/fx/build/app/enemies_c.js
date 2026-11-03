@@ -93,7 +93,7 @@ DEMOS.push({
   id: 'G12-cepheus', ids: ['G12'], cat: G12, group: 'ケフェウス座（cepheus・兵）', title: '召喚の予告→号令の一斉射撃', duration: 4.4, color: '#c9a6ff', cam: { x: -140, y: 0 },
   params: [{ k: 'gold', label: '召喚の金色', type: 'color', def: '#ffd98a' }],
   refs: ['scripts/enemies/cepheus.gd（summon_time 0.9・隊列3体 row_near 120/spacing 120・fire_interval 0.8・VOLLEY_WARNING 0.4）', 'scripts/enemies/soldier.gd（号令で bolt）', 'render/enemies/cepheus.gd（召喚の紋章輪）・render/enemies/soldier.gd（予告線90＋弧）・render/attacks/bolt.gd（紫の光弾）'],
-  status: { '状態': '試作のみ', '判定': '変更なし（光弾の速さ640・向きは隊列の向き）' },
+  status: { '状態': '試作のみ', '判定': '変更なし（光弾の速さ640・向きは隊列の向き）', '召喚': '紋章の輪は描かない。本体から金色の粒が流れ、出る場所で散った粒が集まって兵の絵が白く光りながら形になる' },
   setup(S) { S.e = mkE('cepheus', V(-520, -20), 0); S.ship = shipState(V(220, 40)); S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); S.e.anchor = { ...S.e.pos }; S.e.mode = 'WINDUP'; S.e.timer = prm('cepheus').summon_time; S.sol = []; S.bolts = []; S.vol = 0; },
   step(S, dt) {
     const e = S.e, p = prm('cepheus'), u = fromA(e.facing), n = orth(u);
@@ -110,7 +110,12 @@ DEMOS.push({
     if (e.mode === 'WINDUP') { const k = e.charge;
       for (let s = 0; s < 3; s++) { const at = add(add(e.anchor, mul(u, p.row_near)), mul(n, (s - 1) * p.spacing));
         if (!R.proto) { D2.line(e.pos, at, `rgba(255,217,115,${0.25 + 0.35 * k})`, px(2)); D2.arc(at, 30 * (1.6 - 0.6 * k), 0, TAU, rgba(lighten(enemyColor('cepheus'), 0.35), 0.4 + 0.5 * k), px(2.5)); for (let q = 0; q < 5; q++) { const a = S.t * 2 + q * TAU / 5; D2.line(add(at, mul(fromA(a), 18)), add(at, mul(fromA(a), 26 + 10 * (1 - k))), `rgba(255,217,115,${0.6 * k})`, px(2)); } D2.circle(at, 6 + 8 * k, `rgba(255,242,191,${0.3 + 0.5 * k})`); }
-        else { const L = toL(at), pal = FX.ramp(P.gold), r = 30 * WL * (1.4 - 0.4 * k) * P.size; R.back.ring(L.x, L.y, r, 1, pal[3], 0.5 + 0.5 * k); R.back.ring(L.x, L.y, r * 0.62, 1, pal[2], 0.6 * k); for (let q = 0; q < 6; q++) { const a = S.t * 1.6 + q * TAU / 6; R.back.dot(L.x + Math.cos(a) * r * 0.81, L.y + Math.sin(a) * r * 0.81, pal[4], k); R.back.dot(L.x + Math.cos(a) * r * 0.81 + 0.7, L.y + Math.sin(a) * r * 0.81, pal[3], k * 0.7); } R.back.glow(L.x, L.y, r * 1.4, pal[2], 0.3 * k * P.intensity); for (let yy = 0; yy < 18 * k; yy += 0.7) R.front.dot(L.x + (hash(yy * 3 + s) - 0.5) * 2, L.y - yy, pal[yy < 4 ? 4 : 3], (1 - yy / 18) * k); FXW.warnRail(R.back, e.pos, at, { color: P.gold, k: 0.3 + 0.4 * k, time: S.t, seed: s + 40, rail: 0.8, intensity: 0.7 * P.intensity }); }
+        else { // 召喚：輪は描かない。本体から金色の粒が流れていき、出る場所で兵の絵が粒から形になる（白く光る絵が濃くなる）
+          const L = toL(at), A = toL(e.pos), pal = FX.ramp(P.gold), sz = enemyR('cepheus_soldier') * WL;
+          for (let i = 0; i < 18; i++) { const f = (hash(i * 2.3 + s) + S.t * 1.8) % 1, w = (hash(i * 5.1 + s) - 0.5) * 14 * Math.sin(Math.PI * f), dx = L.x - A.x, dy = L.y - A.y, dl = Math.hypot(dx, dy) || 1; R.back.dot(A.x + dx * f - dy / dl * w, A.y + dy * f + dx / dl * w, f > 0.75 ? pal[4] : pal[3], k * (0.3 + 0.7 * f)); }
+          for (let i = 0; i < 26; i++) { const a = hash(i * 3.7 + s) * TAU, d = sz * 1.8 * (1 - ((hash(i) + S.t * 1.2) % 1)) * (1.2 - k), x = L.x + Math.cos(a) * d, y = L.y + Math.sin(a) * d; R.front.dot(x, y, pal[d < sz ? 4 : 3], k * (1 - d / (sz * 2.2))); } // 散った粒が集まってくる
+          R.back.glow(L.x, L.y, sz * 1.6, pal[2], 0.35 * k * P.intensity);
+          if (k > 0.25) drawEnemy(mkE('cepheus_soldier', at, e.facing), { alpha: smooth(0.25, 1, k) * 0.8, white: 1 - 0.6 * smooth(0.6, 1, k) }); }
       }
       if (!R.proto) { D2.arc(e.pos, e.r * (1.15 + 0.3 * k), 0, TAU, `rgba(255,217,102,${0.35 + 0.5 * k})`, px(3)); D2.circle(sub(e.pos, mul(u, e.r * 0.55)), e.r * (0.15 + 0.2 * k), `rgba(255,235,153,${0.5 + 0.4 * k})`); }
       else FXW.gather(R.front, sub(e.pos, mul(u, e.r * 0.55)), e.r * 1.4, k * P.intensity, P.gold, S.t, 12, 3);
@@ -122,7 +127,7 @@ DEMOS.push({
       else { FXW.warnRail(R.front, st, add(st, mul(dir, 260)), { color: P.color, k: s.charge, time: S.t, seed: s.buds + 50, rail: 1, intensity: P.intensity, reveal: s.charge }); FXW.gather(R.front, st, s.r * 1.3, s.charge * P.intensity, P.color, S.t, 6, s.buds + 3); } }
     for (const b of S.bolts) { const u2 = fromA(b.a);
       if (!R.proto) { D2.line(sub(b.pos, mul(u2, 34)), add(b.pos, mul(u2, 6)), 'rgba(191,153,255,.35)', 14); D2.line(sub(b.pos, mul(u2, 30)), add(b.pos, mul(u2, 4)), 'rgb(217,191,255)', 6); D2.line(sub(b.pos, mul(u2, 24)), add(b.pos, mul(u2, 2)), 'rgba(255,255,255,.95)', 2.5); }
-      else { const L = toL(b.pos), pal = FX.ramp(P.color), T = toL(sub(b.pos, mul(u2, 46))); R.front.beam(T.x, T.y, L.x, L.y, 2.6 * P.size, (uu, v) => uu > 0.8 ? pal[4] : v < 0.4 ? pal[3] : pal[2], (uu) => Math.min(1, 0.25 + uu)); R.front.circle(L.x, L.y, 1.6 * P.size, pal[4]); R.front.glowLine(T.x, T.y, L.x, L.y, 4, pal[2], 0.4 * P.intensity); if (S.t - b.t0 < 0.08) FXW.flare(R.front, sub(b.pos, mul(u2, 640 * (S.t - b.t0))), 8, P.color, S.t, 1 - (S.t - b.t0) / 0.08, 4); }
+      else { const L = toL(b.pos), pal = FX.ramp(P.color), T = toL(sub(b.pos, mul(u2, 46))); R.front.beam(T.x, T.y, L.x, L.y, 2.6 * P.size, (uu, v) => uu > 0.8 ? pal[4] : v < 0.4 ? pal[3] : pal[2], (uu) => Math.min(1, 0.25 + uu)); R.front.px(L.x, L.y, pal[4]); R.front.px(L.x - Math.cos(b.a), L.y - Math.sin(b.a), pal[4]); R.front.glow(L.x, L.y, 4 * P.size, pal[4], 0.6 * P.intensity); R.front.glowLine(T.x, T.y, L.x, L.y, 4, pal[2], 0.4 * P.intensity); if (S.t - b.t0 < 0.08) FXW.flare(R.front, sub(b.pos, mul(u2, 640 * (S.t - b.t0))), 8, P.color, S.t, 1 - (S.t - b.t0) / 0.08, 4); }
     }
   },
 });

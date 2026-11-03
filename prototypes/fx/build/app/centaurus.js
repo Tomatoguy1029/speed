@@ -114,8 +114,8 @@ DEMOS.push({
         const k = B.charge, A = toL(mouth), E = toL(end), pal = FX.ramp(B.alerting ? P.color : '#ffb35a');
         FX.warnRail(R.back, A, E, { color: B.alerting ? P.color : '#ffb35a', k: B.alerting ? 1 : 0.35 + 0.45 * k, time: S.t, seed: 77, rail: B.alerting ? 1.6 : 0.9, intensity: P.intensity });
         const jit = B.alerting ? 0 : (1 - k) * 3, dx = Math.sin(S.t * 23) * jit, dy = Math.cos(S.t * 17) * jit;
-        if (hit >= 0) { const Q = V(E.x + dx, E.y + dy); R.front.circle(Q.x, Q.y, 1.4 * P.size, pal[4]); R.front.ring(Q.x, Q.y, (B.alerting ? 3 : 5 - 2 * k) * P.size, 1, pal[3], 0.9); R.front.glow(Q.x, Q.y, 9, pal[2], 0.6 * P.intensity); }
-        R.front.circle(A.x, A.y, 1.2 + (B.alerting ? 1 : 0), pal[4]); R.front.glow(A.x, A.y, 8 + 6 * k, pal[2], 0.5 * P.intensity);
+        if (hit >= 0) { const Q = V(E.x + dx, E.y + dy); R.front.px(Q.x, Q.y, pal[4]); R.front.glow(Q.x, Q.y, (B.alerting ? 3 : 5 - 2 * k) * P.size, pal[4], 0.7 * P.intensity); R.front.glow(Q.x, Q.y, 9, pal[2], 0.6 * P.intensity); } // 狙いの点は光だけ（輪は描かない）
+        R.front.px(A.x, A.y, pal[4]); R.front.glow(A.x, A.y, 2.5 + (B.alerting ? 2 : 0), pal[4], 0.7); R.front.glow(A.x, A.y, 8 + 6 * k, pal[2], 0.5 * P.intensity);
         if (B.alerting && S.t - (B.relT || 0) > 0 && B.pulse > 0.2) FX.flare(R.front, A, 3 * P.size, P.color, S.t, (B.pulse - 0.2) / 0.1, 4);
       }
     }
@@ -153,7 +153,7 @@ DEMOS.push({
     for (const e of S.rel) { const t = (S.t - e.t) / P.timing; if (t < 0 || t > 0.32) continue; const A = toL(e.at), pal = FX.ramp(P.color), u = fromA(e.a), n = orth(u);
       const f = 1 - t / 0.32, len0 = (10 + 26 * Math.min(1, t / 0.05)) * P.size;
       for (let i = -2; i <= 2; i++) { const spread = i * 0.16, L1 = len0 * (1 - Math.abs(i) * 0.22), d = fromA(e.a + spread); R.front.line(A.x, A.y, A.x + d.x * L1, A.y + d.y * L1, (uu) => uu < 0.35 ? pal[4] : uu < 0.7 ? pal[3] : pal[2], (uu) => f * (1 - uu * 0.7) * Math.min(1, P.intensity)); }
-      if (t < 0.06) { R.front.circle(A.x, A.y, 2.4 * P.size, pal[4], 1); R.front.glow(A.x, A.y, 14 * P.size, pal[3], 0.9 * P.intensity); }
+      if (t < 0.06) { R.front.glow(A.x, A.y, 4 * P.size, pal[4], 1); R.front.glow(A.x, A.y, 14 * P.size, pal[3], 0.9 * P.intensity); }
       const tipL = 7 * P.size; for (const s of [-1, 1]) { const T = V(A.x - u.x * 4 + n.x * s * tipL, A.y - u.y * 4 + n.y * s * tipL); R.front.line(T.x, T.y, A.x - u.x * (2 - 4 * f), A.y - u.y * (2 - 4 * f), pal[3], 0.7 * f); }
       FX.sparks(R.front, A, t, e.t * 31, 9, P.color, 55, 0.3, e.a, 0.55);
     }
@@ -210,8 +210,7 @@ DEMOS.push({
     if (R.proto) { const L = toL(c), rad = r.range_radius * WL, pal = FX.ramp(P.color);
       const inFan = (a, d) => Math.abs(angDiff(a, ang)) <= half && d <= rad;
       if (B.mode === 'windup') { const k = B.charge; // 扇の中だけ地面が震え、小石と塵が跳ねる。前足の接地点に力が溜まる
-        for (let i = 0; i < 70; i++) { const a = ang + (hash(i) - 0.5) * 2 * half, d = rad * Math.sqrt(hash(i * 3 + 1)), hop = Math.abs(Math.sin(S.t * (18 + hash(i) * 10) + i)) * 2 * k; R.back.dot(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d - hop, pal[hop > 1 ? 3 : 2], (0.25 + 0.6 * k) * P.intensity); }
-        for (const s of [-1, 1]) { const a = ang + s * half; FX.warnRail(R.back, L, V(L.x + Math.cos(a) * rad, L.y + Math.sin(a) * rad), { color: P.color, k: 0.15 + 0.3 * k, time: S.t, seed: 60 + s, rail: 0.6, intensity: 0.6 * P.intensity }); }
+        for (let i = 0; i < 110; i++) { const a = ang + (hash(i) - 0.5) * 2 * half, d = rad * Math.sqrt(hash(i * 3 + 1)), hop = Math.abs(Math.sin(S.t * (18 + hash(i) * 10) + i)) * 2 * k; R.back.dot(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d - hop, pal[hop > 1 ? 3 : 2], (0.25 + 0.6 * k) * P.intensity); }
         R.front.glow(L.x, L.y, 8 + 10 * k, pal[3], 0.5 * k * P.intensity); }
       if (S.strikeT) { const t = (S.t - S.strikeT) / P.timing;
         if (t < 0.9) { // 地割れ：中心から扇の中へ枝分かれ、熱が冷えていく。土煙の波が扇の端まで走る
@@ -220,7 +219,7 @@ DEMOS.push({
           for (let q = 0; q < 5; q++) { let a = ang + (q / 4 - 0.5) * 2 * half * 0.85 + (hash(q * 5) - 0.5) * 0.2, x = L.x, y = L.y; const segs = 14, lenq = rad * (0.55 + 0.4 * hash(q + 9)); for (let s = 0; s < segs * reach; s++) { a += (hash(q * 17 + s) - 0.5) * 0.9; const st = lenq / segs, nx = x + Math.cos(a) * st, ny = y + Math.sin(a) * st; if (!inFan(Math.atan2(ny - L.y, nx - L.x), Math.hypot(nx - L.x, ny - L.y))) break; const w = Math.max(1, 2.6 * (1 - s / segs)); R.back.beam(x, y, nx, ny, w, t < 0.18 ? crack[4] : t < 0.45 ? crack[3] : dirt[1]); if (t < 0.5) R.back.light(nx, ny, crack[2], 0.35 * (1 - t / 0.5)); if (s === 5 && hash(q + 33) > 0.4) { let b = a + (hash(q) > 0.5 ? 0.7 : -0.7), bx = nx, by = ny; for (let k2 = 0; k2 < 4; k2++) { const ex = bx + Math.cos(b) * st, ey = by + Math.sin(b) * st; if (!inFan(Math.atan2(ey - L.y, ex - L.x), Math.hypot(ex - L.x, ey - L.y))) break; R.back.line(bx, by, ex, ey, t < 0.3 ? crack[3] : dirt[1]); bx = ex; by = ey; b += (hash(k2 + q * 3) - 0.5) * 0.8; } } x = nx; y = ny; } }
           for (let i = 0; i < 12; i++) { const lf = 0.55, q2 = t / lf; if (q2 > 1) continue; const a = ang + (hash(i * 3.1) - 0.5) * 2 * half, d = rad * 0.5 * q2 * (0.5 + hash(i)), hgt = 10 * Math.sin(Math.PI * q2); R.front.rect(L.x + Math.cos(a) * d - 1, L.y + Math.sin(a) * d - hgt - 1, 2, 2, dirt[2 + (i % 2)]); }
           const wave = rad * clamp(t / 0.22); for (let i = 0; i < 90; i++) { const a = ang + (hash(i * 5) - 0.5) * 2 * half, d = wave * (0.85 + 0.15 * hash(i)); if (d > rad) continue; R.back.disc(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d, 1.2 + 2.5 * t, pal[2], (dd) => 0.4 * (1 - t) * (1 - dd * dd)); }
-          if (t < 0.1) { R.front.circle(L.x, L.y, 4 * P.size, pal[4], 1 - t / 0.1); R.front.glow(L.x, L.y, rad * 0.5, pal[3], 0.6 * (1 - t / 0.1)); }
+          if (t < 0.1) { R.front.glow(L.x, L.y, 6 * P.size, pal[4], 1 - t / 0.1); R.front.glow(L.x, L.y, rad * 0.5, pal[3], 0.6 * (1 - t / 0.1)); }
           FX.sparks(R.front, L, t, 88, 16, '#d8c7a8', 70, 0.5, ang, half);
         } }
       if (P.showHit && (B.mode === 'windup' || B.mode === 'strike')) { D2.arc(c, r.range_radius, ang - half, ang + half, 'rgba(120,255,160,.8)', px(1)); D2.line(c, add(c, mul(fromA(ang - half), r.range_radius)), 'rgba(120,255,160,.8)', px(1)); D2.line(c, add(c, mul(fromA(ang + half), r.range_radius)), 'rgba(120,255,160,.8)', px(1)); }
