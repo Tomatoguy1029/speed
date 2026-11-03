@@ -3,7 +3,7 @@ name: C++配布確認
 on:
   push:
     branches: [codex/native-runtime-optimization]
-    paths: [.github/workflows/cpp-runtime.yml, cpp/**, tools/build/**]
+    paths: [.github/workflows/cpp-runtime.yml, cpp/**, speed/**, tools/build/**]
   workflow_dispatch:
     inputs:
       ref:
