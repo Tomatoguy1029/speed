@@ -155,7 +155,7 @@ DEMOS.push({
       if (t < 0.06) { const f0 = 1 - t / 0.06; R.front.glow(A.x, A.y, 4 * P.size, pal[4], f0); R.front.glow(A.x, A.y, 12 * P.size, pal[3], 0.7 * f0 * P.intensity); }
       PX.cycle(t, 10, 12, Math.floor(e.t * 97), (r) => r.range(0.14, 0.3), (age, life, r) => { if (age > t) return; const k = age / life, side = r.chance(0.5) ? -1 : 1, d0 = r.range(4, 34) * P.size + age * r.range(20, 50), len = r.range(6, 14) * (0.5 + k) * P.size, off = side * (r.range(2.5, 4.5) + k * r.range(1, 2.5)) * P.size;
         const x0 = A.x + u.x * d0 + n.x * off, y0 = A.y + u.y * d0 + n.y * off; R.front.line(x0, y0, x0 - u.x * len, y0 - u.y * len, (w) => w < 0.25 && k < 0.4 ? PX.mix(wind, PX.WHITE, 0.5) : k < 0.4 ? wind : PX.mix(wind, dark, (k - 0.4) * 1.2), (w) => (w < 0.65 ? 1 : (1 - w) / 0.35) * (1 - k * 0.6)); }); // 空気の筋
-      PX.cycle(t, 10, 6, Math.floor(e.t * 53), (r) => r.range(0.15, 0.28), (age, life, r) => { if (age > t) return; const k = age / life, d0 = r.range(-2, 8) * P.size - age * 30, off = r.sign() * r.range(2, 4) * P.size, a = age * 30 + r.range(0, TAU), rr = (1.2 + k * 1.5) * P.size, cx = A.x + u.x * d0 + n.x * off, cy = A.y + u.y * d0 + n.y * off;
+      PX.cycle(t, 10, 6, Math.floor(e.t * 53), (r) => r.range(0.15, 0.28), (age, life, r) => { if (age > t) return; const k = age / life, d0 = r.range(0, 8) * P.size + age * 15, off = r.sign() * (r.range(2, 4) + age * 25) * P.size, a = age * 30 + r.range(0, TAU), rr = (1.2 + k * 1.5) * P.size, cx = A.x + u.x * d0 + n.x * off, cy = A.y + u.y * d0 + n.y * off;
         for (let i = 0; i < 4; i++) R.front.dot(cx + Math.cos(a + i * 0.5) * rr, cy + Math.sin(a + i * 0.5) * rr, wind, (1 - k) * (1 - i * 0.2)); }); // 小さな渦
       FX.sparks(R.front, A, t, e.t * 31, 7, P.color, 45, 0.25, e.a, 0.4);
     }
@@ -212,7 +212,7 @@ DEMOS.push({
   id: 'C13-stomp', ids: ['C13'], cat: CEN_CAT, group: 'ケンタウルス座', title: '前脚の踏みつけ', duration: 2.4, color: '#e8c48a', cam: { x: 60, y: 0 }, bg: 'asteroid_a',
   params: [{ k: 'showHit', label: '判定の扇を重ねる(0/1)', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
   refs: [...CEN_REFS, 'data/bosses/centaurus_moves/stomp.tres（warn 0.6・active 0.15・半径260・半角50°・recover 1.0）', 'scripts/bosses/centaurus/techniques/stomp.gd contact_center（前脚の接地点の平均＝踏みつけの中心）', 'additional_technique_visual.gd（現行の赤い扇と弧）', 'pixelFX melee/heavy-cleave.js の地割れ・土煙'],
-  status: { '状態': '試作のみ（エフェクトだけ）', '判定・挙動': '変更なし（中心・半径・角度・時刻）', '予兆': '体が伸び上がって止まり（絵の位置と大きさだけ）、扇の中にこれから割れる地割れの筋が細くちらつきながら伸びる。踏む瞬間に沈み込む', '地割れ': '細く明るい割れ目が光ってから土色へ冷え、薄れて消える。先の塵の波はなし', 'モーション': '踏みつけのクリップ stomp/stomp_windup は現行で空（中立姿勢のまま）。実際に前足を踏みつける動作は移行後（C13のモーション）', '注意': 'centaurus_animation.tres は中心位置に効くため変更していない' },
+  status: { '状態': '試作のみ（エフェクトだけ）', '判定・挙動': '変更なし（中心・半径・角度・時刻）', '予兆': '体が伸び上がって止まり（絵の位置と大きさだけ）、扇の中にこれから割れる地割れの筋が細くちらつきながら伸びる。踏む瞬間に沈み込む。粒の予兆はなし', '地割れ': '細く明るい割れ目が光ってから土色へ冷え、薄れて消える。先の塵の波はなし', 'モーション': '踏みつけのクリップ stomp/stomp_windup は現行で空（中立姿勢のまま）。実際に前足を踏みつける動作は移行後（C13のモーション）', '注意': 'centaurus_animation.tres は中心位置に効くため変更していない' },
   setup(S) { S.B = mkBoss(V(-140, 0), 0); S.ship = shipState(V(120, 30)); S.B.technique = 'stomp'; },
   step(S, dt) {
     const B = S.B, r = CEN.moves.stomp, t = S.t - 0.3;
@@ -227,8 +227,7 @@ DEMOS.push({
     if (R.proto) { const L = toL(c), rad = r.range_radius * WL, pal = FX.ramp(P.color);
       const inFan = (a, d) => Math.abs(angDiff(a, ang)) <= half && d <= rad;
       const cracks = stompCracks(L, ang, half, rad, inFan), crack = FX.ramp('#ffc890'), dirt = FX.ramp('#b89878');
-      if (B.mode === 'windup') { const k = B.charge; // 予兆：扇の中で塵が跳ね、これから割れる地割れの筋が細く薄くちらつきながら伸びる。前足の接地点に力が溜まる
-        for (let i = 0; i < 110; i++) { const a = ang + (hash(i) - 0.5) * 2 * half, d = rad * Math.sqrt(hash(i * 3 + 1)), hop = Math.abs(Math.sin(S.t * (18 + hash(i) * 10) + i)) * 2 * k; R.back.dot(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d - hop, pal[hop > 1 ? 3 : 2], (0.25 + 0.6 * k) * P.intensity); }
+      if (B.mode === 'windup') { const k = B.charge; // 予兆：これから割れる地割れの筋が細く薄くちらつきながら伸びる。前足の接地点に力が溜まる
         const grow = smooth(0, 1, k), fl = 0.55 + 0.45 * Math.sin(S.t * 40) * Math.sin(S.t * 23);
         for (const c of cracks) { if (c.u > grow) continue; R.back.line(c.x, c.y, c.nx, c.ny, crack[2], (0.25 + 0.4 * k) * fl * P.intensity); }
         R.front.glow(L.x, L.y, 8 + 10 * k, pal[3], 0.5 * k * P.intensity); }
@@ -253,14 +252,14 @@ function stompCenter(B) { const pose = samplePose('stomp', B.poseTime || 0); let
 DEMOS.push({
   id: 'C09-rain-current', ids: ['C09'], cat: CEN_CAT, group: 'ケンタウルス座', title: '矢の雨（現行の予兆・矢をそのまま再現）', duration: 7.8, color: '#f2b567', cam: { x: 80, y: 0 },
   refs: [...CEN_REFS, 'data/bosses/centaurus_moves/rain.tres（warn 0.8・トレース4本・長さ900・速さ1200・間隔0.35・矢の間隔44・半径100・drop_delay 0.4・fall 0.3・linger 0.6）', 'technique_visual.gd _draw_rain・additional_technique_visual.gd draw_powder/draw_rain_arrow/fall_origin'],
-  status: { '状態': '現行の再現のみ（最新指示により予兆は現行採用・新制作なし）', '試作': '予兆・降る矢は現行のまま。撃ち上げの動きだけ足した：トレースごとに矢を5本、弓口から画面の上（空）へ撃ち上げ、撃つたびに体が小さく反動する（絵の位置だけ）', 'モーション': '本番の撃ち上げの体の動き（クリップ）は移行後' },
+  status: { '状態': '現行の再現のみ（最新指示により予兆は現行採用・新制作なし）', '試作': '予兆・降る矢は現行のまま。撃ち上げの動きだけ足した：溜めの間に、降らせる回数（トレースの数）だけまとめて撃ち上げ（1回に4本）、そのあと雨が順に降る。撃つたびに体が小さく反動する（絵の位置だけ）。硬直中の水色の輪は出さない', 'モーション': '本番の撃ち上げの体の動き（クリップ）は移行後' },
   setup(S) { S.B = mkBoss(V(-300, 0), 0); S.ship = shipState(V(220, 40), 0, 300); S.B.technique = 'rain'; S.traces = []; S.rain = []; S.rng2 = mkRng(11); },
   step(S, dt) {
     const B = S.B, r = CEN.moves.rain, t = S.t - 0.2; S.ship.pos = add(S.ship.pos, mul(V(1, 0.15), 300 * dt)); if (S.ship.pos.x > 520) S.ship.pos.x = -200; S.ship.heading = Math.atan2(0.15, 1);
-    if (B.mode === 'idle' && t >= 0 && !S.started) { B.mode = 'windup'; S.started = S.t; }
+    if (B.mode === 'idle' && t >= 0 && !S.started) { B.mode = 'windup'; S.started = S.t; S.ups = []; for (let v = 0; v < r.traces; v++) for (let i = 0; i < 4; i++) S.ups.push({ t: S.t + 0.08 + v * (r.warn - 0.16) / r.traces + i * 0.035, v, i, a: -Math.PI / 2 + (hash(v * 7 + i) - 0.5) * 0.3 }); } // 試作：降らせる回数だけ、溜めの間にまとめて撃ち上げる（1回に4本）
     if (B.mode === 'windup') { B.charge = clamp((S.t - S.started) / r.warn); B.facing = rotToward(B.facing, angOf(sub(S.ship.pos, B.pos)), CEN.def.turn * dt); if (S.t - S.started >= r.warn) { B.mode = 'rain'; B.left = r.traces; B.nextAt = S.t; } }
     if (B.mode === 'rain') {
-      if (B.left > 0 && S.t >= B.nextAt) { const head = V(1, 0.15), start = add(S.ship.pos, mul(norm(head), r.forward)); const tr = { start, dir: norm(sub(S.ship.pos, start)), turn: S.traces.length % 2 ? -1 : 1, t0: S.t, next: 0, landed: 0 }; const R0 = r.trace_length / Math.abs(r.trace_bend), reach = 2 * R0 * Math.asin(Math.min(1, r.forward / (2 * R0))), pr = tracePoint(tr, reach, r); tr.dir = rot(tr.dir, angDiff(angOf(sub(S.ship.pos, start)), angOf(sub(pr, start)))); S.traces.push(tr); B.left--; B.nextAt = S.t + r.trace_length / r.trace_speed + r.trace_gap; const mz = bowMouth(B); for (let i = 0; i < 5; i++) (S.ups ||= []).push({ t: S.t + i * 0.05, from: { ...mz }, a: -Math.PI / 2 + (hash(S.t * 7 + i) - 0.5) * 0.3 }); } // 試作：トレースごとに矢を5本撃ち上げる
+      if (B.left > 0 && S.t >= B.nextAt) { const head = V(1, 0.15), start = add(S.ship.pos, mul(norm(head), r.forward)); const tr = { start, dir: norm(sub(S.ship.pos, start)), turn: S.traces.length % 2 ? -1 : 1, t0: S.t, next: 0, landed: 0 }; const R0 = r.trace_length / Math.abs(r.trace_bend), reach = 2 * R0 * Math.asin(Math.min(1, r.forward / (2 * R0))), pr = tracePoint(tr, reach, r); tr.dir = rot(tr.dir, angDiff(angOf(sub(S.ship.pos, start)), angOf(sub(pr, start)))); S.traces.push(tr); B.left--; B.nextAt = S.t + r.trace_length / r.trace_speed + r.trace_gap; }
       let all = true; for (const tr of S.traces) { const run = S.t - tr.t0, head = clamp(run * r.trace_speed, 0, r.trace_length); while (tr.next <= head) { const c = tracePoint(tr, tr.next, r); for (let k = 0; k < r.arrows_per_step; k++) { const a = S.rng2() * TAU, d = Math.sqrt(S.rng2()) * r.circle_radius; S.rain.push({ x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, z: tr.t0 + tr.next / r.trace_speed + r.drop_delay }); } tr.next += r.arrow_gap; } tr.landed = clamp((run - r.drop_delay - r.fall) * r.trace_speed, 0, r.trace_length); if (tr.landed < r.trace_length) all = false; }
       S.rain = S.rain.filter(a => a.z + r.fall + r.linger + 0.15 >= S.t);
       if (B.left === 0 && all && !S.rain.length) { B.mode = 'recovery'; B.recovery = r.recover; }
@@ -273,7 +272,7 @@ DEMOS.push({
     const lastUp = R.proto ? (S.ups || []).filter(u => u.t <= S.t).slice(-1)[0] : null, rec = lastUp ? 1 - smooth(0, 0.12, S.t - lastUp.t) : 0; // 撃つたびに小さく反動
     drawCentaurus(rec > 0 ? { ...B, lift: mul(fromA(B.facing), -B.r * 0.05 * rec) } : B, B.pose); drawShip(S.ship);
     if (R.proto) { const fan = CEN.moves.fan_volley, pal = FX.ramp(R.P.color); // 試作：撃ち上げた矢は弓口から画面の上（空）へ飛び去る。弓口が光り、矢は細い空気の筋を引く
-      for (const u of S.ups || []) { const age = S.t - u.t; if (age < 0 || age > 0.5) continue; const d = fromA(u.a), at = add(u.from, mul(d, 1700 * age)), op = 1 - smooth(0.3, 0.5, age), A = toL(u.from), T = toL(at);
+      for (const u of S.ups || []) { const age = S.t - u.t; if (age < 0 || age > 0.5) continue; u.from ||= bowMouth(B); const d = fromA(u.a), at = add(u.from, mul(d, 1700 * age)), op = 1 - smooth(0.3, 0.5, age), A = toL(u.from), T = toL(at);
         if (age < 0.06) { R.front.glow(A.x, A.y, 4, pal[4], 1 - age / 0.06); R.front.glow(A.x, A.y, 11, pal[3], 0.6 * (1 - age / 0.06)); }
         R.front.line(T.x - d.x * 2, T.y - d.y * 2, T.x - d.x * 18, T.y - d.y * 18, (w) => w < 0.3 ? pal[4] : pal[3], (w) => (1 - w) * 0.6 * op);
         drawArrow(at, u.a, fan.radius, op, fan.length); } }
@@ -282,7 +281,7 @@ DEMOS.push({
       const fan = CEN.moves.fan_volley;
       for (const a of S.rain) { const t = S.t - a.z; if (t < 0) continue; const f = clamp(t / r.fall), target = V(a.x, a.y), origin = fallOrigin(target, r.drop_height), ang = angOf(sub(target, origin)), at = lerpV(origin, target, f * f); let op = clamp(t / Math.max(Math.min(r.fade, 0.05), 0.001)); if (t > r.fall + r.linger) op *= clamp(1 - (t - r.fall - r.linger) / 0.15); drawArrow(at, ang, fan.radius, op, fan.length); if (t >= r.fall) drawPowder(target, 12, t, op * 0.4, a.z); }
     }
-    drawCenPresentationCurrent(B);
+    if (!R.proto) drawCenPresentationCurrent(B); // 試作では硬直中の水色の輪などを出さない
   },
 });
 const rot = (v, a) => V(v.x * Math.cos(a) - v.y * Math.sin(a), v.x * Math.sin(a) + v.y * Math.cos(a));

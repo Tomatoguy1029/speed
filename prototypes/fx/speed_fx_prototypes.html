@@ -3593,7 +3593,7 @@ DEMOS.push({
       if (t < 0.06) { const f0 = 1 - t / 0.06; R.front.glow(A.x, A.y, 4 * P.size, pal[4], f0); R.front.glow(A.x, A.y, 12 * P.size, pal[3], 0.7 * f0 * P.intensity); }
       PX.cycle(t, 10, 12, Math.floor(e.t * 97), (r) => r.range(0.14, 0.3), (age, life, r) => { if (age > t) return; const k = age / life, side = r.chance(0.5) ? -1 : 1, d0 = r.range(4, 34) * P.size + age * r.range(20, 50), len = r.range(6, 14) * (0.5 + k) * P.size, off = side * (r.range(2.5, 4.5) + k * r.range(1, 2.5)) * P.size;
         const x0 = A.x + u.x * d0 + n.x * off, y0 = A.y + u.y * d0 + n.y * off; R.front.line(x0, y0, x0 - u.x * len, y0 - u.y * len, (w) => w < 0.25 && k < 0.4 ? PX.mix(wind, PX.WHITE, 0.5) : k < 0.4 ? wind : PX.mix(wind, dark, (k - 0.4) * 1.2), (w) => (w < 0.65 ? 1 : (1 - w) / 0.35) * (1 - k * 0.6)); }); // 空気の筋
-      PX.cycle(t, 10, 6, Math.floor(e.t * 53), (r) => r.range(0.15, 0.28), (age, life, r) => { if (age > t) return; const k = age / life, d0 = r.range(-2, 8) * P.size - age * 30, off = r.sign() * r.range(2, 4) * P.size, a = age * 30 + r.range(0, TAU), rr = (1.2 + k * 1.5) * P.size, cx = A.x + u.x * d0 + n.x * off, cy = A.y + u.y * d0 + n.y * off;
+      PX.cycle(t, 10, 6, Math.floor(e.t * 53), (r) => r.range(0.15, 0.28), (age, life, r) => { if (age > t) return; const k = age / life, d0 = r.range(0, 8) * P.size + age * 15, off = r.sign() * (r.range(2, 4) + age * 25) * P.size, a = age * 30 + r.range(0, TAU), rr = (1.2 + k * 1.5) * P.size, cx = A.x + u.x * d0 + n.x * off, cy = A.y + u.y * d0 + n.y * off;
         for (let i = 0; i < 4; i++) R.front.dot(cx + Math.cos(a + i * 0.5) * rr, cy + Math.sin(a + i * 0.5) * rr, wind, (1 - k) * (1 - i * 0.2)); }); // 小さな渦
       FX.sparks(R.front, A, t, e.t * 31, 7, P.color, 45, 0.25, e.a, 0.4);
     }
@@ -3650,7 +3650,7 @@ DEMOS.push({
   id: 'C13-stomp', ids: ['C13'], cat: CEN_CAT, group: 'ケンタウルス座', title: '前脚の踏みつけ', duration: 2.4, color: '#e8c48a', cam: { x: 60, y: 0 }, bg: 'asteroid_a',
   params: [{ k: 'showHit', label: '判定の扇を重ねる(0/1)', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
   refs: [...CEN_REFS, 'data/bosses/centaurus_moves/stomp.tres（warn 0.6・active 0.15・半径260・半角50°・recover 1.0）', 'scripts/bosses/centaurus/techniques/stomp.gd contact_center（前脚の接地点の平均＝踏みつけの中心）', 'additional_technique_visual.gd（現行の赤い扇と弧）', 'pixelFX melee/heavy-cleave.js の地割れ・土煙'],
-  status: { '状態': '試作のみ（エフェクトだけ）', '判定・挙動': '変更なし（中心・半径・角度・時刻）', '予兆': '体が伸び上がって止まり（絵の位置と大きさだけ）、扇の中にこれから割れる地割れの筋が細くちらつきながら伸びる。踏む瞬間に沈み込む', '地割れ': '細く明るい割れ目が光ってから土色へ冷え、薄れて消える。先の塵の波はなし', 'モーション': '踏みつけのクリップ stomp/stomp_windup は現行で空（中立姿勢のまま）。実際に前足を踏みつける動作は移行後（C13のモーション）', '注意': 'centaurus_animation.tres は中心位置に効くため変更していない' },
+  status: { '状態': '試作のみ（エフェクトだけ）', '判定・挙動': '変更なし（中心・半径・角度・時刻）', '予兆': '体が伸び上がって止まり（絵の位置と大きさだけ）、扇の中にこれから割れる地割れの筋が細くちらつきながら伸びる。踏む瞬間に沈み込む。粒の予兆はなし', '地割れ': '細く明るい割れ目が光ってから土色へ冷え、薄れて消える。先の塵の波はなし', 'モーション': '踏みつけのクリップ stomp/stomp_windup は現行で空（中立姿勢のまま）。実際に前足を踏みつける動作は移行後（C13のモーション）', '注意': 'centaurus_animation.tres は中心位置に効くため変更していない' },
   setup(S) { S.B = mkBoss(V(-140, 0), 0); S.ship = shipState(V(120, 30)); S.B.technique = 'stomp'; },
   step(S, dt) {
     const B = S.B, r = CEN.moves.stomp, t = S.t - 0.3;
@@ -3665,8 +3665,7 @@ DEMOS.push({
     if (R.proto) { const L = toL(c), rad = r.range_radius * WL, pal = FX.ramp(P.color);
       const inFan = (a, d) => Math.abs(angDiff(a, ang)) <= half && d <= rad;
       const cracks = stompCracks(L, ang, half, rad, inFan), crack = FX.ramp('#ffc890'), dirt = FX.ramp('#b89878');
-      if (B.mode === 'windup') { const k = B.charge; // 予兆：扇の中で塵が跳ね、これから割れる地割れの筋が細く薄くちらつきながら伸びる。前足の接地点に力が溜まる
-        for (let i = 0; i < 110; i++) { const a = ang + (hash(i) - 0.5) * 2 * half, d = rad * Math.sqrt(hash(i * 3 + 1)), hop = Math.abs(Math.sin(S.t * (18 + hash(i) * 10) + i)) * 2 * k; R.back.dot(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d - hop, pal[hop > 1 ? 3 : 2], (0.25 + 0.6 * k) * P.intensity); }
+      if (B.mode === 'windup') { const k = B.charge; // 予兆：これから割れる地割れの筋が細く薄くちらつきながら伸びる。前足の接地点に力が溜まる
         const grow = smooth(0, 1, k), fl = 0.55 + 0.45 * Math.sin(S.t * 40) * Math.sin(S.t * 23);
         for (const c of cracks) { if (c.u > grow) continue; R.back.line(c.x, c.y, c.nx, c.ny, crack[2], (0.25 + 0.4 * k) * fl * P.intensity); }
         R.front.glow(L.x, L.y, 8 + 10 * k, pal[3], 0.5 * k * P.intensity); }
@@ -3691,14 +3690,14 @@ function stompCenter(B) { const pose = samplePose('stomp', B.poseTime || 0); let
 DEMOS.push({
   id: 'C09-rain-current', ids: ['C09'], cat: CEN_CAT, group: 'ケンタウルス座', title: '矢の雨（現行の予兆・矢をそのまま再現）', duration: 7.8, color: '#f2b567', cam: { x: 80, y: 0 },
   refs: [...CEN_REFS, 'data/bosses/centaurus_moves/rain.tres（warn 0.8・トレース4本・長さ900・速さ1200・間隔0.35・矢の間隔44・半径100・drop_delay 0.4・fall 0.3・linger 0.6）', 'technique_visual.gd _draw_rain・additional_technique_visual.gd draw_powder/draw_rain_arrow/fall_origin'],
-  status: { '状態': '現行の再現のみ（最新指示により予兆は現行採用・新制作なし）', '試作': '予兆・降る矢は現行のまま。撃ち上げの動きだけ足した：トレースごとに矢を5本、弓口から画面の上（空）へ撃ち上げ、撃つたびに体が小さく反動する（絵の位置だけ）', 'モーション': '本番の撃ち上げの体の動き（クリップ）は移行後' },
+  status: { '状態': '現行の再現のみ（最新指示により予兆は現行採用・新制作なし）', '試作': '予兆・降る矢は現行のまま。撃ち上げの動きだけ足した：溜めの間に、降らせる回数（トレースの数）だけまとめて撃ち上げ（1回に4本）、そのあと雨が順に降る。撃つたびに体が小さく反動する（絵の位置だけ）。硬直中の水色の輪は出さない', 'モーション': '本番の撃ち上げの体の動き（クリップ）は移行後' },
   setup(S) { S.B = mkBoss(V(-300, 0), 0); S.ship = shipState(V(220, 40), 0, 300); S.B.technique = 'rain'; S.traces = []; S.rain = []; S.rng2 = mkRng(11); },
   step(S, dt) {
     const B = S.B, r = CEN.moves.rain, t = S.t - 0.2; S.ship.pos = add(S.ship.pos, mul(V(1, 0.15), 300 * dt)); if (S.ship.pos.x > 520) S.ship.pos.x = -200; S.ship.heading = Math.atan2(0.15, 1);
-    if (B.mode === 'idle' && t >= 0 && !S.started) { B.mode = 'windup'; S.started = S.t; }
+    if (B.mode === 'idle' && t >= 0 && !S.started) { B.mode = 'windup'; S.started = S.t; S.ups = []; for (let v = 0; v < r.traces; v++) for (let i = 0; i < 4; i++) S.ups.push({ t: S.t + 0.08 + v * (r.warn - 0.16) / r.traces + i * 0.035, v, i, a: -Math.PI / 2 + (hash(v * 7 + i) - 0.5) * 0.3 }); } // 試作：降らせる回数だけ、溜めの間にまとめて撃ち上げる（1回に4本）
     if (B.mode === 'windup') { B.charge = clamp((S.t - S.started) / r.warn); B.facing = rotToward(B.facing, angOf(sub(S.ship.pos, B.pos)), CEN.def.turn * dt); if (S.t - S.started >= r.warn) { B.mode = 'rain'; B.left = r.traces; B.nextAt = S.t; } }
     if (B.mode === 'rain') {
-      if (B.left > 0 && S.t >= B.nextAt) { const head = V(1, 0.15), start = add(S.ship.pos, mul(norm(head), r.forward)); const tr = { start, dir: norm(sub(S.ship.pos, start)), turn: S.traces.length % 2 ? -1 : 1, t0: S.t, next: 0, landed: 0 }; const R0 = r.trace_length / Math.abs(r.trace_bend), reach = 2 * R0 * Math.asin(Math.min(1, r.forward / (2 * R0))), pr = tracePoint(tr, reach, r); tr.dir = rot(tr.dir, angDiff(angOf(sub(S.ship.pos, start)), angOf(sub(pr, start)))); S.traces.push(tr); B.left--; B.nextAt = S.t + r.trace_length / r.trace_speed + r.trace_gap; const mz = bowMouth(B); for (let i = 0; i < 5; i++) (S.ups ||= []).push({ t: S.t + i * 0.05, from: { ...mz }, a: -Math.PI / 2 + (hash(S.t * 7 + i) - 0.5) * 0.3 }); } // 試作：トレースごとに矢を5本撃ち上げる
+      if (B.left > 0 && S.t >= B.nextAt) { const head = V(1, 0.15), start = add(S.ship.pos, mul(norm(head), r.forward)); const tr = { start, dir: norm(sub(S.ship.pos, start)), turn: S.traces.length % 2 ? -1 : 1, t0: S.t, next: 0, landed: 0 }; const R0 = r.trace_length / Math.abs(r.trace_bend), reach = 2 * R0 * Math.asin(Math.min(1, r.forward / (2 * R0))), pr = tracePoint(tr, reach, r); tr.dir = rot(tr.dir, angDiff(angOf(sub(S.ship.pos, start)), angOf(sub(pr, start)))); S.traces.push(tr); B.left--; B.nextAt = S.t + r.trace_length / r.trace_speed + r.trace_gap; }
       let all = true; for (const tr of S.traces) { const run = S.t - tr.t0, head = clamp(run * r.trace_speed, 0, r.trace_length); while (tr.next <= head) { const c = tracePoint(tr, tr.next, r); for (let k = 0; k < r.arrows_per_step; k++) { const a = S.rng2() * TAU, d = Math.sqrt(S.rng2()) * r.circle_radius; S.rain.push({ x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d, z: tr.t0 + tr.next / r.trace_speed + r.drop_delay }); } tr.next += r.arrow_gap; } tr.landed = clamp((run - r.drop_delay - r.fall) * r.trace_speed, 0, r.trace_length); if (tr.landed < r.trace_length) all = false; }
       S.rain = S.rain.filter(a => a.z + r.fall + r.linger + 0.15 >= S.t);
       if (B.left === 0 && all && !S.rain.length) { B.mode = 'recovery'; B.recovery = r.recover; }
@@ -3711,7 +3710,7 @@ DEMOS.push({
     const lastUp = R.proto ? (S.ups || []).filter(u => u.t <= S.t).slice(-1)[0] : null, rec = lastUp ? 1 - smooth(0, 0.12, S.t - lastUp.t) : 0; // 撃つたびに小さく反動
     drawCentaurus(rec > 0 ? { ...B, lift: mul(fromA(B.facing), -B.r * 0.05 * rec) } : B, B.pose); drawShip(S.ship);
     if (R.proto) { const fan = CEN.moves.fan_volley, pal = FX.ramp(R.P.color); // 試作：撃ち上げた矢は弓口から画面の上（空）へ飛び去る。弓口が光り、矢は細い空気の筋を引く
-      for (const u of S.ups || []) { const age = S.t - u.t; if (age < 0 || age > 0.5) continue; const d = fromA(u.a), at = add(u.from, mul(d, 1700 * age)), op = 1 - smooth(0.3, 0.5, age), A = toL(u.from), T = toL(at);
+      for (const u of S.ups || []) { const age = S.t - u.t; if (age < 0 || age > 0.5) continue; u.from ||= bowMouth(B); const d = fromA(u.a), at = add(u.from, mul(d, 1700 * age)), op = 1 - smooth(0.3, 0.5, age), A = toL(u.from), T = toL(at);
         if (age < 0.06) { R.front.glow(A.x, A.y, 4, pal[4], 1 - age / 0.06); R.front.glow(A.x, A.y, 11, pal[3], 0.6 * (1 - age / 0.06)); }
         R.front.line(T.x - d.x * 2, T.y - d.y * 2, T.x - d.x * 18, T.y - d.y * 18, (w) => w < 0.3 ? pal[4] : pal[3], (w) => (1 - w) * 0.6 * op);
         drawArrow(at, u.a, fan.radius, op, fan.length); } }
@@ -3720,7 +3719,7 @@ DEMOS.push({
       const fan = CEN.moves.fan_volley;
       for (const a of S.rain) { const t = S.t - a.z; if (t < 0) continue; const f = clamp(t / r.fall), target = V(a.x, a.y), origin = fallOrigin(target, r.drop_height), ang = angOf(sub(target, origin)), at = lerpV(origin, target, f * f); let op = clamp(t / Math.max(Math.min(r.fade, 0.05), 0.001)); if (t > r.fall + r.linger) op *= clamp(1 - (t - r.fall - r.linger) / 0.15); drawArrow(at, ang, fan.radius, op, fan.length); if (t >= r.fall) drawPowder(target, 12, t, op * 0.4, a.z); }
     }
-    drawCenPresentationCurrent(B);
+    if (!R.proto) drawCenPresentationCurrent(B); // 試作では硬直中の水色の輪などを出さない
   },
 });
 const rot = (v, a) => V(v.x * Math.cos(a) - v.y * Math.sin(a), v.x * Math.sin(a) + v.y * Math.cos(a));
@@ -4590,24 +4589,37 @@ function drawBites(S, R, type) {
     else { const tt = t / P.timing; if (tt < 0.35) { const close = clamp(tt / 0.08), f = tt < 0.08 ? 1 : 1 - (tt - 0.08) / 0.27; for (const s of [-1, 1]) { const a0 = b.a + s * lerp(1.5, 0.35, close); FXW.crescent(R.front, add(b.pos, mul(fromA(b.a), -b.r * 0.2)), b.r * 0.85 * P.size, a0, b.a + s * 0.05 + (s > 0 ? 0 : 0), 1, 0, 3.2, P.color, f * Math.min(1, P.intensity)); } if (tt > 0.06) FXW.sparks(R.front, b.pos, tt - 0.06, b.t0 * 9, 6, '#ffffff', 25, 0.2); } }
   }
 }
-function biteMarks(R, e) { // 予備動作：現行は共通の口元の円（enemy_visual.gd draw_marks）。猟犬・守る雑魚は試作でも噛みつく敵と同じ現行の絵
+// 噛みつく敵（ステージ1の biter）の攻撃エフェクト：口先から長短と向きの違う6本の火花が伸びて消える（shaders/biter_sparks.gdshader と render/enemies/biter.gd の時間）。
+// 猟犬・守る雑魚はこれだけを使い、口（顎）は動かさない
+const BITE_SPARK = { angles: [-0.05, -0.42, -0.92, 0.37, 0.78, 1.12], lengths: [25, 17, 12, 14, 10, 8], powers: [1, 0.76, 0.68, 0.55, 0.6, 0.53], widths: [1.9, 1.5, 1.2, 1.4, 1.1, 0.9], snap: 0.034, time: 0.11 };
+function biteSparks(p, type, b, t) {
+  const a = t - BITE_SPARK.snap; if (a < 0 || a >= BITE_SPARK.time) return; const ph = a / BITE_SPARK.time, prm2 = prm(type), r = enemyR(type), sr = spriteR(type, r), sc = sr / 17, u = fromA(b.a);
+  const mouth = add(sub(b.pos, mul(u, r + prm2.bite_reach * 0.5)), mul(u, sr * 16 / 17 + 6 * sc)), O = toL(mouth), unit = 0.5 * sc * WL, st = smooth(0, 0.22, ph);
+  const orange = PX.mix(hexc('#ff9e29'), hexc('#ff4a09'), ph), yellow = hexc('#ffe070'), white = hexc('#fffbe8');
+  BITE_SPARK.angles.forEach((ag, j) => { const an = b.a + ag, ax = Math.cos(an), ay = Math.sin(an), tip = BITE_SPARK.lengths[j] * (0.18 + 0.82 * st), tail = BITE_SPARK.lengths[j] * Math.pow(ph, 1.4) * 0.86, pw = BITE_SPARK.powers[j] * Math.pow(1 - ph, 0.55);
+    for (let d = tail; d < tip; d += 0.5) { const w = BITE_SPARK.widths[j] * Math.max(0.08, 1 - d / Math.max(tip, 0.01)), x = O.x + ax * d * unit, y = O.y + ay * d * unit;
+      for (let q = -w * 1.2; q <= w * 1.2; q += 0.5) { const aq = Math.abs(q), c = aq < w * 0.4 && ph < 0.6 ? white : aq < w * 1.0 ? yellow : orange; p.dot(x - ay * q * unit, y + ax * q * unit, c, Math.min(1, pw * (aq < w ? 1 : 0.5))); }
+      if ((Math.round(d) & 3) === 0) p.light(x, y, orange, 0.3 * pw); } });
+}
+function biteGlow(R, e) { if (e.charge <= 0) return; const L = toL(add(e.pos, mul(fromA(e.facing), e.r))); R.front.glow(L.x, L.y, 3 + 4 * e.charge, hexc('#ffb347'), 0.5 * e.charge); } // 試作の予兆：口元がほのかに光るだけ（輪は描かない）
+function biteMarks(R, e) { // 予備動作：現行は共通の口元の円（enemy_visual.gd draw_marks）
   if (e.charge <= 0) return; const mz = add(e.pos, mul(fromA(e.facing), e.r));
-  if (!R.proto || R.sameAsBiter) D2.circle(mz, px(3) + e.r * 0.45 * e.charge, `rgba(255,230,153,${0.35 + 0.55 * e.charge})`);
+  if (!R.proto) D2.circle(mz, px(3) + e.r * 0.45 * e.charge, `rgba(255,230,153,${0.35 + 0.55 * e.charge})`);
   else { const P = R.P, L = toL(mz), pal = FX.ramp(P.color), k = e.charge; for (const s of [-1, 1]) { const a = e.facing + s * lerp(1.2, 0.5, k); R.front.line(L.x + Math.cos(a) * 3, L.y + Math.sin(a) * 3, L.x + Math.cos(a) * (3 + 3 * k * P.size), L.y + Math.sin(a) * (3 + 3 * k * P.size), pal[4], k); } R.front.glow(L.x, L.y, 4 + 4 * k, pal[2], 0.4 * k * P.intensity); }
 }
 DEMOS.push({
   id: 'G12-hound', ids: ['G12'], cat: G12, group: '猟犬（hound）', title: '群れの噛みつき', duration: 4.0, color: '#ffe8c0', cam: { x: 0, y: 0 },
   refs: ['scripts/enemies/hound.gd（群れの追跡）→ biter.gd の共通の噛みつき（bite_telegraph 0.3・bite_reach 22・半径26・bite_rest 0.8）', 'render/enemies/enemy_visual.gd draw_marks・render/attacks/zone_bite.gd（現行）', 'pixelFX melee/sword-slash.js の三日月'],
-  status: { '状態': '試作なし（噛みつく敵と同じ現行の絵）', '判定': '変更なし（判定の円＝口の前 r+11、半径26、0.25秒）', '簡略': '群れの整列（alignment/cohesion）は省略し、各個体が直接追跡' },
+  status: { '状態': '試作：攻撃はステージ1の噛みつく敵（biter）の火花だけ（biter_sparks.gdshader）。口は動かさない。予兆は口元がほのかに光る', '判定': '変更なし（判定の円＝口の前 r+11、半径26、0.25秒）', '簡略': '群れの整列（alignment/cohesion）は省略し、各個体が直接追跡' },
   setup(S) { S.ship = shipState(V(160, 30)); S.bites = []; S.hs = []; for (let k = 0; k < 5; k++) S.hs.push(mkE('hound', V(-200 - 38 * ((k + 1) >> 1), 30 + (k % 2 ? 19 : -19) * (k ? 1 : 0)), 0)); },
   step(S, dt) { for (const e of S.hs) biteStep(S, e, dt, prm('hound'), enemyDef('hound')); },
   phase(S) { return S.hs.some(e => e.mode === 'WINDUP') ? PH.WINDUP : S.bites.length ? PH.DASH + '／' + PH.RECOVER : PH.MOVE; },
-  draw(S, R) { const R2 = { ...R, proto: false, sameAsBiter: true }; for (const e of S.hs) drawEnemy(e); drawShip(S.ship); drawBites(S, R2, 'hound'); for (const e of S.hs) biteMarks(R2, e); }, // 噛みつく敵と同じ現行の絵
+  draw(S, R) { for (const e of S.hs) drawEnemy(e); drawShip(S.ship); if (!R.proto) { drawBites(S, R, 'hound'); for (const e of S.hs) biteMarks(R, e); } else { for (const b of S.bites) biteSparks(R.front, 'hound', b, S.t - b.t0); for (const e of S.hs) biteGlow(R, e); } }, // 試作：噛みつく敵の火花だけ（口は動かさない）
 });
 DEMOS.push({
   id: 'G12-defender', ids: ['G12'], cat: G12, group: '守る雑魚（defender）', title: '列で守る→守る相手がいないと噛みつく', duration: 5.2, color: '#ffe8c0', cam: { x: -300, y: 0 },
   refs: ['scripts/enemies/defender.gd（guard_radius 600 内の強敵と機体を結ぶ線上へ guard_spacing 42 で整列、守る相手がいないと biter.gd の噛みつき）'],
-  status: { '状態': '試作なし（噛みつきは噛みつく敵と同じ現行の絵）', '判定': '変更なし', '演出': 'デモでは t=1.6s で守る相手（ぼうえんきょう座）を外し、噛みつきへ移る現行の挙動を見せる' },
+  status: { '状態': '試作：噛みつきはステージ1の噛みつく敵（biter）の火花だけ（biter_sparks.gdshader）。口は動かさない', '判定': '変更なし', '演出': 'デモでは t=1.6s で守る相手（ぼうえんきょう座）を外し、噛みつきへ移る現行の挙動を見せる' },
   setup(S) { S.ship = shipState(V(-120, 40)); S.bites = []; S.tel = mkE('telescope', V(-620, -20), 0); S.ds = []; for (let k = 0; k < 3; k++) S.ds.push(mkE('defender', V(-500, -100 + k * 60), 0)); },
   step(S, dt) {
     const p = prm('defender'), def = enemyDef('defender');
@@ -4615,7 +4627,7 @@ DEMOS.push({
     else for (const e of S.ds) biteStep(S, e, dt, p, def);
   },
   phase(S) { return S.t < 1.6 ? '整列（守る）' : S.ds.some(e => e.mode === 'WINDUP') ? PH.WINDUP : S.bites.length ? PH.DASH + '／' + PH.RECOVER : PH.MOVE; },
-  draw(S, R) { if (S.t < 1.6) drawEnemy(S.tel, { alpha: S.t > 1.3 ? (1.6 - S.t) / 0.3 : 1 }); const R2 = { ...R, proto: false, sameAsBiter: true }; for (const e of S.ds) drawEnemy(e); drawShip(S.ship); drawBites(S, R2, 'defender'); for (const e of S.ds) biteMarks(R2, e); }, // 噛みつく敵と同じ現行の絵
+  draw(S, R) { if (S.t < 1.6) drawEnemy(S.tel, { alpha: S.t > 1.3 ? (1.6 - S.t) / 0.3 : 1 }); for (const e of S.ds) drawEnemy(e); drawShip(S.ship); if (!R.proto) { drawBites(S, R, 'defender'); for (const e of S.ds) biteMarks(R, e); } else { for (const b of S.bites) biteSparks(R.front, 'defender', b, S.t - b.t0); for (const e of S.ds) biteGlow(R, e); } }, // 試作：噛みつく敵の火花だけ（口は動かさない）
 });
 
 // ---------- ケフェウス座（cepheus・兵 cepheus_soldier）
@@ -4640,15 +4652,16 @@ DEMOS.push({
     if (e.mode === 'WINDUP') { const k = e.charge;
       for (let s = 0; s < 3; s++) { const at = add(add(e.anchor, mul(u, p.row_near)), mul(n, (s - 1) * p.spacing));
         if (!R.proto) { D2.line(e.pos, at, `rgba(255,217,115,${0.25 + 0.35 * k})`, px(2)); D2.arc(at, 30 * (1.6 - 0.6 * k), 0, TAU, rgba(lighten(enemyColor('cepheus'), 0.35), 0.4 + 0.5 * k), px(2.5)); for (let q = 0; q < 5; q++) { const a = S.t * 2 + q * TAU / 5; D2.line(add(at, mul(fromA(a), 18)), add(at, mul(fromA(a), 26 + 10 * (1 - k))), `rgba(255,217,115,${0.6 * k})`, px(2)); } D2.circle(at, 6 + 8 * k, `rgba(255,242,191,${0.3 + 0.5 * k})`); }
-        else { // 召喚：輪は描かない。本体から金色の粒が流れていき、出る場所で兵の絵が粒から形になる（白く光る絵が濃くなる）
-          const L = toL(at), A = toL(e.pos), pal = FX.ramp(P.gold), sz = enemyR('cepheus_soldier') * WL;
-          for (let i = 0; i < 18; i++) { const f = (hash(i * 2.3 + s) + S.t * 1.8) % 1, w = (hash(i * 5.1 + s) - 0.5) * 14 * Math.sin(Math.PI * f), dx = L.x - A.x, dy = L.y - A.y, dl = Math.hypot(dx, dy) || 1; R.back.dot(A.x + dx * f - dy / dl * w, A.y + dy * f + dx / dl * w, f > 0.75 ? pal[4] : pal[3], k * (0.3 + 0.7 * f)); }
-          for (let i = 0; i < 26; i++) { const a = hash(i * 3.7 + s) * TAU, d = sz * 1.8 * (1 - ((hash(i) + S.t * 1.2) % 1)) * (1.2 - k), x = L.x + Math.cos(a) * d, y = L.y + Math.sin(a) * d; R.front.dot(x, y, pal[d < sz ? 4 : 3], k * (1 - d / (sz * 2.2))); } // 散った粒が集まってくる
-          R.back.glow(L.x, L.y, sz * 1.6, pal[2], 0.35 * k * P.intensity);
-          if (k > 0.25) drawEnemy(mkE('cepheus_soldier', at, e.facing), { alpha: smooth(0.25, 1, k) * 0.8, white: 1 - 0.6 * smooth(0.6, 1, k) }); }
+        else if (k > 0.25) drawEnemy(mkE('cepheus_soldier', at, e.facing), { alpha: smooth(0.25, 1, k) * 0.8, white: 1 - 0.6 * smooth(0.6, 1, k) }); // 兵の絵が白く光りながら形になる（光の流れは下でまとめて描く）
       }
       if (!R.proto) { D2.arc(e.pos, e.r * (1.15 + 0.3 * k), 0, TAU, `rgba(255,217,102,${0.35 + 0.5 * k})`, px(3)); D2.circle(sub(e.pos, mul(u, e.r * 0.55)), e.r * (0.15 + 0.2 * k), `rgba(255,235,153,${0.5 + 0.4 * k})`); }
       else FXW.gather(R.front, sub(e.pos, mul(u, e.r * 0.55)), e.r * 1.4, k * P.intensity, P.gold, S.t, 12, 3);
+    }
+    if (R.proto) { // 召喚の光：本体から兵の場所へ流れる粒は召喚の間だけ出し、出し終えた粒は流れきって兵の場所に集まって消える（急に止めない）
+      const sum = p.summon_time, T = 0.45, pal = FX.ramp(P.gold), A = toL(e.pos), sz = enemyR('cepheus_soldier') * WL;
+      for (let sl = 0; sl < 3; sl++) { const at = add(add(e.anchor, mul(u, p.row_near)), mul(n, (sl - 1) * p.spacing)), L = toL(at), dx = L.x - A.x, dy = L.y - A.y, dl = Math.hypot(dx, dy) || 1;
+        for (let i = 0; i < 40; i++) { const born = (i / 40) * sum * 0.92, f = (S.t - born) / T; if (f < 0 || f > 1) continue; const ee = f * f * (3 - 2 * f), w = (hash(i * 5.1 + sl) - 0.5) * 14 * Math.sin(Math.PI * ee), x = A.x + dx * ee - dy / dl * w, y = A.y + dy * ee + dx / dl * w; R.back.dot(x, y, f > 0.75 ? pal[4] : pal[3], 0.4 + 0.6 * f); }
+        const gl = S.t < sum ? clamp(S.t / sum) : 1 - smooth(sum, sum + 0.35, S.t); if (gl > 0) R.back.glow(L.x, L.y, sz * 1.6, pal[2], 0.35 * gl * P.intensity); }
     }
     if (R.proto) R.blitBack();
     drawEnemy(e); for (const s of S.sol) drawEnemy(s); drawShip(S.ship);

@@ -67,24 +67,37 @@ function drawBites(S, R, type) {
     else { const tt = t / P.timing; if (tt < 0.35) { const close = clamp(tt / 0.08), f = tt < 0.08 ? 1 : 1 - (tt - 0.08) / 0.27; for (const s of [-1, 1]) { const a0 = b.a + s * lerp(1.5, 0.35, close); FXW.crescent(R.front, add(b.pos, mul(fromA(b.a), -b.r * 0.2)), b.r * 0.85 * P.size, a0, b.a + s * 0.05 + (s > 0 ? 0 : 0), 1, 0, 3.2, P.color, f * Math.min(1, P.intensity)); } if (tt > 0.06) FXW.sparks(R.front, b.pos, tt - 0.06, b.t0 * 9, 6, '#ffffff', 25, 0.2); } }
   }
 }
-function biteMarks(R, e) { // 予備動作：現行は共通の口元の円（enemy_visual.gd draw_marks）。猟犬・守る雑魚は試作でも噛みつく敵と同じ現行の絵
+// 噛みつく敵（ステージ1の biter）の攻撃エフェクト：口先から長短と向きの違う6本の火花が伸びて消える（shaders/biter_sparks.gdshader と render/enemies/biter.gd の時間）。
+// 猟犬・守る雑魚はこれだけを使い、口（顎）は動かさない
+const BITE_SPARK = { angles: [-0.05, -0.42, -0.92, 0.37, 0.78, 1.12], lengths: [25, 17, 12, 14, 10, 8], powers: [1, 0.76, 0.68, 0.55, 0.6, 0.53], widths: [1.9, 1.5, 1.2, 1.4, 1.1, 0.9], snap: 0.034, time: 0.11 };
+function biteSparks(p, type, b, t) {
+  const a = t - BITE_SPARK.snap; if (a < 0 || a >= BITE_SPARK.time) return; const ph = a / BITE_SPARK.time, prm2 = prm(type), r = enemyR(type), sr = spriteR(type, r), sc = sr / 17, u = fromA(b.a);
+  const mouth = add(sub(b.pos, mul(u, r + prm2.bite_reach * 0.5)), mul(u, sr * 16 / 17 + 6 * sc)), O = toL(mouth), unit = 0.5 * sc * WL, st = smooth(0, 0.22, ph);
+  const orange = PX.mix(hexc('#ff9e29'), hexc('#ff4a09'), ph), yellow = hexc('#ffe070'), white = hexc('#fffbe8');
+  BITE_SPARK.angles.forEach((ag, j) => { const an = b.a + ag, ax = Math.cos(an), ay = Math.sin(an), tip = BITE_SPARK.lengths[j] * (0.18 + 0.82 * st), tail = BITE_SPARK.lengths[j] * Math.pow(ph, 1.4) * 0.86, pw = BITE_SPARK.powers[j] * Math.pow(1 - ph, 0.55);
+    for (let d = tail; d < tip; d += 0.5) { const w = BITE_SPARK.widths[j] * Math.max(0.08, 1 - d / Math.max(tip, 0.01)), x = O.x + ax * d * unit, y = O.y + ay * d * unit;
+      for (let q = -w * 1.2; q <= w * 1.2; q += 0.5) { const aq = Math.abs(q), c = aq < w * 0.4 && ph < 0.6 ? white : aq < w * 1.0 ? yellow : orange; p.dot(x - ay * q * unit, y + ax * q * unit, c, Math.min(1, pw * (aq < w ? 1 : 0.5))); }
+      if ((Math.round(d) & 3) === 0) p.light(x, y, orange, 0.3 * pw); } });
+}
+function biteGlow(R, e) { if (e.charge <= 0) return; const L = toL(add(e.pos, mul(fromA(e.facing), e.r))); R.front.glow(L.x, L.y, 3 + 4 * e.charge, hexc('#ffb347'), 0.5 * e.charge); } // 試作の予兆：口元がほのかに光るだけ（輪は描かない）
+function biteMarks(R, e) { // 予備動作：現行は共通の口元の円（enemy_visual.gd draw_marks）
   if (e.charge <= 0) return; const mz = add(e.pos, mul(fromA(e.facing), e.r));
-  if (!R.proto || R.sameAsBiter) D2.circle(mz, px(3) + e.r * 0.45 * e.charge, `rgba(255,230,153,${0.35 + 0.55 * e.charge})`);
+  if (!R.proto) D2.circle(mz, px(3) + e.r * 0.45 * e.charge, `rgba(255,230,153,${0.35 + 0.55 * e.charge})`);
   else { const P = R.P, L = toL(mz), pal = FX.ramp(P.color), k = e.charge; for (const s of [-1, 1]) { const a = e.facing + s * lerp(1.2, 0.5, k); R.front.line(L.x + Math.cos(a) * 3, L.y + Math.sin(a) * 3, L.x + Math.cos(a) * (3 + 3 * k * P.size), L.y + Math.sin(a) * (3 + 3 * k * P.size), pal[4], k); } R.front.glow(L.x, L.y, 4 + 4 * k, pal[2], 0.4 * k * P.intensity); }
 }
 DEMOS.push({
   id: 'G12-hound', ids: ['G12'], cat: G12, group: '猟犬（hound）', title: '群れの噛みつき', duration: 4.0, color: '#ffe8c0', cam: { x: 0, y: 0 },
   refs: ['scripts/enemies/hound.gd（群れの追跡）→ biter.gd の共通の噛みつき（bite_telegraph 0.3・bite_reach 22・半径26・bite_rest 0.8）', 'render/enemies/enemy_visual.gd draw_marks・render/attacks/zone_bite.gd（現行）', 'pixelFX melee/sword-slash.js の三日月'],
-  status: { '状態': '試作なし（噛みつく敵と同じ現行の絵）', '判定': '変更なし（判定の円＝口の前 r+11、半径26、0.25秒）', '簡略': '群れの整列（alignment/cohesion）は省略し、各個体が直接追跡' },
+  status: { '状態': '試作：攻撃はステージ1の噛みつく敵（biter）の火花だけ（biter_sparks.gdshader）。口は動かさない。予兆は口元がほのかに光る', '判定': '変更なし（判定の円＝口の前 r+11、半径26、0.25秒）', '簡略': '群れの整列（alignment/cohesion）は省略し、各個体が直接追跡' },
   setup(S) { S.ship = shipState(V(160, 30)); S.bites = []; S.hs = []; for (let k = 0; k < 5; k++) S.hs.push(mkE('hound', V(-200 - 38 * ((k + 1) >> 1), 30 + (k % 2 ? 19 : -19) * (k ? 1 : 0)), 0)); },
   step(S, dt) { for (const e of S.hs) biteStep(S, e, dt, prm('hound'), enemyDef('hound')); },
   phase(S) { return S.hs.some(e => e.mode === 'WINDUP') ? PH.WINDUP : S.bites.length ? PH.DASH + '／' + PH.RECOVER : PH.MOVE; },
-  draw(S, R) { const R2 = { ...R, proto: false, sameAsBiter: true }; for (const e of S.hs) drawEnemy(e); drawShip(S.ship); drawBites(S, R2, 'hound'); for (const e of S.hs) biteMarks(R2, e); }, // 噛みつく敵と同じ現行の絵
+  draw(S, R) { for (const e of S.hs) drawEnemy(e); drawShip(S.ship); if (!R.proto) { drawBites(S, R, 'hound'); for (const e of S.hs) biteMarks(R, e); } else { for (const b of S.bites) biteSparks(R.front, 'hound', b, S.t - b.t0); for (const e of S.hs) biteGlow(R, e); } }, // 試作：噛みつく敵の火花だけ（口は動かさない）
 });
 DEMOS.push({
   id: 'G12-defender', ids: ['G12'], cat: G12, group: '守る雑魚（defender）', title: '列で守る→守る相手がいないと噛みつく', duration: 5.2, color: '#ffe8c0', cam: { x: -300, y: 0 },
   refs: ['scripts/enemies/defender.gd（guard_radius 600 内の強敵と機体を結ぶ線上へ guard_spacing 42 で整列、守る相手がいないと biter.gd の噛みつき）'],
-  status: { '状態': '試作なし（噛みつきは噛みつく敵と同じ現行の絵）', '判定': '変更なし', '演出': 'デモでは t=1.6s で守る相手（ぼうえんきょう座）を外し、噛みつきへ移る現行の挙動を見せる' },
+  status: { '状態': '試作：噛みつきはステージ1の噛みつく敵（biter）の火花だけ（biter_sparks.gdshader）。口は動かさない', '判定': '変更なし', '演出': 'デモでは t=1.6s で守る相手（ぼうえんきょう座）を外し、噛みつきへ移る現行の挙動を見せる' },
   setup(S) { S.ship = shipState(V(-120, 40)); S.bites = []; S.tel = mkE('telescope', V(-620, -20), 0); S.ds = []; for (let k = 0; k < 3; k++) S.ds.push(mkE('defender', V(-500, -100 + k * 60), 0)); },
   step(S, dt) {
     const p = prm('defender'), def = enemyDef('defender');
@@ -92,7 +105,7 @@ DEMOS.push({
     else for (const e of S.ds) biteStep(S, e, dt, p, def);
   },
   phase(S) { return S.t < 1.6 ? '整列（守る）' : S.ds.some(e => e.mode === 'WINDUP') ? PH.WINDUP : S.bites.length ? PH.DASH + '／' + PH.RECOVER : PH.MOVE; },
-  draw(S, R) { if (S.t < 1.6) drawEnemy(S.tel, { alpha: S.t > 1.3 ? (1.6 - S.t) / 0.3 : 1 }); const R2 = { ...R, proto: false, sameAsBiter: true }; for (const e of S.ds) drawEnemy(e); drawShip(S.ship); drawBites(S, R2, 'defender'); for (const e of S.ds) biteMarks(R2, e); }, // 噛みつく敵と同じ現行の絵
+  draw(S, R) { if (S.t < 1.6) drawEnemy(S.tel, { alpha: S.t > 1.3 ? (1.6 - S.t) / 0.3 : 1 }); for (const e of S.ds) drawEnemy(e); drawShip(S.ship); if (!R.proto) { drawBites(S, R, 'defender'); for (const e of S.ds) biteMarks(R, e); } else { for (const b of S.bites) biteSparks(R.front, 'defender', b, S.t - b.t0); for (const e of S.ds) biteGlow(R, e); } }, // 試作：噛みつく敵の火花だけ（口は動かさない）
 });
 
 // ---------- ケフェウス座（cepheus・兵 cepheus_soldier）
@@ -117,15 +130,16 @@ DEMOS.push({
     if (e.mode === 'WINDUP') { const k = e.charge;
       for (let s = 0; s < 3; s++) { const at = add(add(e.anchor, mul(u, p.row_near)), mul(n, (s - 1) * p.spacing));
         if (!R.proto) { D2.line(e.pos, at, `rgba(255,217,115,${0.25 + 0.35 * k})`, px(2)); D2.arc(at, 30 * (1.6 - 0.6 * k), 0, TAU, rgba(lighten(enemyColor('cepheus'), 0.35), 0.4 + 0.5 * k), px(2.5)); for (let q = 0; q < 5; q++) { const a = S.t * 2 + q * TAU / 5; D2.line(add(at, mul(fromA(a), 18)), add(at, mul(fromA(a), 26 + 10 * (1 - k))), `rgba(255,217,115,${0.6 * k})`, px(2)); } D2.circle(at, 6 + 8 * k, `rgba(255,242,191,${0.3 + 0.5 * k})`); }
-        else { // 召喚：輪は描かない。本体から金色の粒が流れていき、出る場所で兵の絵が粒から形になる（白く光る絵が濃くなる）
-          const L = toL(at), A = toL(e.pos), pal = FX.ramp(P.gold), sz = enemyR('cepheus_soldier') * WL;
-          for (let i = 0; i < 18; i++) { const f = (hash(i * 2.3 + s) + S.t * 1.8) % 1, w = (hash(i * 5.1 + s) - 0.5) * 14 * Math.sin(Math.PI * f), dx = L.x - A.x, dy = L.y - A.y, dl = Math.hypot(dx, dy) || 1; R.back.dot(A.x + dx * f - dy / dl * w, A.y + dy * f + dx / dl * w, f > 0.75 ? pal[4] : pal[3], k * (0.3 + 0.7 * f)); }
-          for (let i = 0; i < 26; i++) { const a = hash(i * 3.7 + s) * TAU, d = sz * 1.8 * (1 - ((hash(i) + S.t * 1.2) % 1)) * (1.2 - k), x = L.x + Math.cos(a) * d, y = L.y + Math.sin(a) * d; R.front.dot(x, y, pal[d < sz ? 4 : 3], k * (1 - d / (sz * 2.2))); } // 散った粒が集まってくる
-          R.back.glow(L.x, L.y, sz * 1.6, pal[2], 0.35 * k * P.intensity);
-          if (k > 0.25) drawEnemy(mkE('cepheus_soldier', at, e.facing), { alpha: smooth(0.25, 1, k) * 0.8, white: 1 - 0.6 * smooth(0.6, 1, k) }); }
+        else if (k > 0.25) drawEnemy(mkE('cepheus_soldier', at, e.facing), { alpha: smooth(0.25, 1, k) * 0.8, white: 1 - 0.6 * smooth(0.6, 1, k) }); // 兵の絵が白く光りながら形になる（光の流れは下でまとめて描く）
       }
       if (!R.proto) { D2.arc(e.pos, e.r * (1.15 + 0.3 * k), 0, TAU, `rgba(255,217,102,${0.35 + 0.5 * k})`, px(3)); D2.circle(sub(e.pos, mul(u, e.r * 0.55)), e.r * (0.15 + 0.2 * k), `rgba(255,235,153,${0.5 + 0.4 * k})`); }
       else FXW.gather(R.front, sub(e.pos, mul(u, e.r * 0.55)), e.r * 1.4, k * P.intensity, P.gold, S.t, 12, 3);
+    }
+    if (R.proto) { // 召喚の光：本体から兵の場所へ流れる粒は召喚の間だけ出し、出し終えた粒は流れきって兵の場所に集まって消える（急に止めない）
+      const sum = p.summon_time, T = 0.45, pal = FX.ramp(P.gold), A = toL(e.pos), sz = enemyR('cepheus_soldier') * WL;
+      for (let sl = 0; sl < 3; sl++) { const at = add(add(e.anchor, mul(u, p.row_near)), mul(n, (sl - 1) * p.spacing)), L = toL(at), dx = L.x - A.x, dy = L.y - A.y, dl = Math.hypot(dx, dy) || 1;
+        for (let i = 0; i < 40; i++) { const born = (i / 40) * sum * 0.92, f = (S.t - born) / T; if (f < 0 || f > 1) continue; const ee = f * f * (3 - 2 * f), w = (hash(i * 5.1 + sl) - 0.5) * 14 * Math.sin(Math.PI * ee), x = A.x + dx * ee - dy / dl * w, y = A.y + dy * ee + dx / dl * w; R.back.dot(x, y, f > 0.75 ? pal[4] : pal[3], 0.4 + 0.6 * f); }
+        const gl = S.t < sum ? clamp(S.t / sum) : 1 - smooth(sum, sum + 0.35, S.t); if (gl > 0) R.back.glow(L.x, L.y, sz * 1.6, pal[2], 0.35 * gl * P.intensity); }
     }
     if (R.proto) R.blitBack();
     drawEnemy(e); for (const s of S.sol) drawEnemy(s); drawShip(S.ship);
