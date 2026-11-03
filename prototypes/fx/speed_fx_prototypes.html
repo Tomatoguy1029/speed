@@ -5973,15 +5973,111 @@ function canisJetStream(R, at, angle, length, width, age, duration, alpha, seed)
   if (back <= 0) { const [px, py] = P2(1, 0); p.glow(px, py, 6 * W0, H[2], 0.7 * alpha); p.px(px, py, H[0]); } // 口元の点火の光
   p.fade = 1;
 }
+// おおいぬ専用の火炎放射。GIFの形状計算と本番pixel_fire_density／shapeの式をHTMLでも使う。
+// pixelFX fire/_lib.js由来のノイズ・炎の舌：MIT License, Copyright (c) 2026 Hugo Duprez。
+// 一角獣の尾は別の形・動きなので、従来のcanisJetStreamから切り離しておく。
+function canisPixelFireStream(R, at, angle, length, width, age, duration, alpha, seed) {
+  if (alpha <= 0 || length < 4) return;
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], NL = fire.noiseFor(0), N = (rate, n = 0, off = 0) => NL(age, rate, n + seed, off);
+  const L = length * WL, speed = L / 0.22, front = Math.min(L, age * speed), back = age > duration ? Math.min(L, (age - duration) * speed) : 0;
+  if (front <= back + 1) return;
+  const W0 = Math.max(0.8, L * 0.014 * width), samples = [];
+  const flow = te => 1 - 0.35 * Math.exp(-Math.pow(((((te % 1.6) + 1.6) % 1.6) - 0.55) / 0.05, 2));
+  const cy = x => N(1.2, 9, x * 0.02) * 2.2 * Math.pow(x / L, 1.5) * W0;
+  const wid = x => (2.1 + 5 * Math.pow(x / L, 0.7)) * W0 * flow(age - x / speed);
+  for (let x = back + 0.2; x < front; x += 0.8) {
+    const taper = Math.pow(clamp((front - x) / Math.max(12, L * 0.11)), 1.1);
+    const w = wid(x) * (1 + 0.15 * fire.pnoise(x * 0.4 - age * 15, 24, seed + 4)) * smooth(back, back + 6, x) * taper;
+    if (w < 0.25) continue;
+    const y = cy(x), surge = ((x * 0.035 - age * 3) % 1 + 1) % 1 < 0.12 ? 1.15 : 1;
+    const inner = 0.66 + 0.08 * fire.pnoise(x * 0.35 - age * 20, 24, seed + 12), core = 0.16 + 0.05 * fire.pnoise(x * 0.4 - age * 26, 24, seed + 13);
+    samples.push([x, y, w * 1.28, 0, 1.5], [x, y, w * inner * surge * 1.28, 1, 1.5], [x, y, w * core * surge * 1.28, 2, 1.5]);
+    for (const ph of [0, Math.PI]) {
+      const a = x * 0.22 - age * 56 + ph;
+      if (Math.cos(a) > -0.1 && w > 1.2) {
+        const sy = y + Math.sin(a) * w * 0.55;
+        samples.push([x, sy, 1.3, 1, 1.5]);
+        if (Math.cos(a) > 0.55) samples.push([x, sy, 0.9, 2, 1.5]);
+      }
+    }
+  }
+  const spikes = R.P.jetSpikes ?? 1;
+  if (spikes > 0) for (let i = 0; i < 14; i++) {
+    const ph = (i * 0.618 + age / 1.6) % 1, x = back + 8 + ph * (front - back - 12);
+    if (x > front - 4) continue;
+    const sd = i % 2 ? 1 : -1, w = wid(x), h = (3 + 12 * x / L) * (0.55 + 0.6 * (0.5 + 0.5 * N(5, i * 19 + 1))) * Math.min(1, (1 - ph) * 6) * W0 / 1.5 * spikes;
+    const bx = -0.55, by = sd * 0.8, norm = Math.hypot(bx, by);
+    for (const [lw, lh, layer] of [[1, 1, 0], [0.7, 0.86, 1], [0.3, 0.42, 2]]) for (let r = 0; r < h * lh; r += 0.65) {
+      const u = r / (h * lh), bend = N(3, i) * 0.6, off = bend * u * u * lh + N(4, seed + i * 19 + 7, r * 0.2) * u * 1.1;
+      const xx = x + bx / norm * r - by / norm * off, yy = cy(x) + sd * w * 0.7 + by / norm * r + bx / norm * off;
+      if (xx < back || xx > front) continue;
+      const half = (1.1 + 1.6 * x / L) * lw * Math.pow(1 - u, 0.85) * Math.min(1, (r + 1.5) / 3.5) + N(9, seed + i * 19, r * 0.45) * 0.5;
+      if (half >= 0.3) samples.push([xx, yy, half * 1.4, layer, 1.2, Math.atan2(by, bx)]);
+    }
+  }
+  canisPixelFireField(R, at, angle, age, alpha, samples);
+}
+function canisPixelFireField(R, at, angle, clock, alpha, samples) {
+  if (!samples.length) return;
+  let minX = Infinity, maxX = -Infinity, side = 0;
+  for (const [x, y, width, , axial] of samples) {
+    const pad = Math.max(width, axial);
+    minX = Math.min(minX, x - pad); maxX = Math.max(maxX, x + pad); side = Math.max(side, Math.abs(y) + pad);
+  }
+  const fw = Math.max(192, Math.ceil(side * 2 + 16)), fh = Math.max(512, Math.ceil(maxX + 80)), ox = fw * 0.5, oy = fh - 40;
+  const count = fw * fh * 3;
+  let field = canisPixelFireField.buffer;
+  if (!field || field.length < count) field = canisPixelFireField.buffer = new Float32Array(count);
+  field.fill(0, 0, count);
+  // pixel_fire_density.gdshaderの加算密度。細長い粒で帯と舌をつなぎ、画像の伸縮はしない。
+  for (const [x, y, width, channel, axial, a = 0] of samples) {
+    const cx = ox + y, cy = oy - x, c = Math.cos(a), s = Math.sin(a), rx = Math.abs(c * width) + Math.abs(s * axial), ry = Math.abs(s * width) + Math.abs(c * axial);
+    const x0 = Math.max(0, Math.floor(cx - rx)), x1 = Math.min(fw - 1, Math.ceil(cx + rx)), y0 = Math.max(0, Math.floor(cy - ry)), y1 = Math.min(fh - 1, Math.ceil(cy + ry));
+    for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
+      const dx = i + 0.5 - cx, dy = j + 0.5 - cy, u = (dx * c + dy * s) / width, v = (-dx * s + dy * c) / axial, d2 = u * u + v * v;
+      if (d2 < 1) field[(j * fw + i) * 3 + channel] += Math.exp(-d2 * 3.2) * (1 - smooth(0.72, 1, Math.sqrt(d2)));
+    }
+  }
+  const origin = toL(at), c = Math.cos(angle), s = Math.sin(angle), corners = [[minX, -side], [minX, side], [maxX, -side], [maxX, side]].map(([x, y]) => [origin.x + c * x - s * y, origin.y + s * x + c * y]);
+  const x0 = Math.max(0, Math.floor(Math.min(...corners.map(q => q[0])) - 3)), x1 = Math.min(LW - 1, Math.ceil(Math.max(...corners.map(q => q[0])) + 3));
+  const y0 = Math.max(0, Math.floor(Math.min(...corners.map(q => q[1])) - 3)), y1 = Math.min(LH - 1, Math.ceil(Math.max(...corners.map(q => q[1])) + 3));
+  const color = R.P.color || '#80c8ff';
+  if (canisPixelFireField.color !== color) {
+    const base = hsl('#80c8ff'), tint = hsl(color);
+    canisPixelFireField.color = color;
+    canisPixelFireField.colors = ['#2a66c4', '#a9dcff', '#ffffff'].map(hex => {
+      const v = hsl(hex);
+      return hexc(fromHsl({ h: (v.h + tint.h - base.h + 360) % 360, s: clamp(v.s * tint.s / base.s), l: v.l }));
+    });
+  }
+  const cols = canisPixelFireField.colors, p = R.front, fade = p.fade;
+  p.fade *= alpha;
+  try {
+    for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
+      const dx = i + 0.5 - origin.x, dy = j + 0.5 - origin.y;
+      const wx = Math.floor(ox - s * dx + c * dy) + 0.5, wy = Math.floor(oy - c * dx - s * dy) + 0.5;
+      const u = (Math.sin(wy * 0.075 - clock * 4.4) + Math.sin(wx * 0.11 + wy * 0.033 + clock * 2.1)) * 1.2, v = Math.cos(wx * 0.08 + clock * 3) * 0.55 * 1.2;
+      const xx = Math.floor(wx + u), yy = Math.floor(wy + v);
+      if (xx < 0 || xx >= fw || yy < 0 || yy >= fh) continue;
+      const k = (yy * fw + xx) * 3;
+      // pixel_fire_shape.gdshaderのthreshold 0.32＋edge_softness 0.04の中点。
+      if (field[k] < 0.34) continue;
+      const inner = field[k + 1] >= 0.34, core = inner && field[k + 2] >= 0.34, col = cols[core ? 2 : inner ? 1 : 0];
+      p.px(i, j, col);
+      if ((i & 3) === 0 && (j & 3) === 0) p.glow(i, j, 2, col, core ? 0.10 : inner ? 0.05 : 0.02);
+    }
+  } finally { p.fade = fade; }
+}
+
 function canisJetPictures(S, R) {
   const B = S.B, P = R.P, Wm = P.jetWidth ?? 1, Wh = P.houndJetWidth ?? 1; // 長さは判定と同じ値（canisStartJet で掛け済み）
   if (S.tech === 'sirius_flame' && S.flames.length) { // シリウスの光：歩きながら口から噴き続ける
     const mouth = B.visualMouth || canisMouth(B), u = fromA(B.facing), n = orth(u); let reach = 0, width = 0;
     for (const f of S.flames) { const rel = sub(f.pos, mouth), radius = lerp(f.r0, f.r1, f.age / f.life); reach = Math.max(reach, rel.x * u.x + rel.y * u.y + radius); width = Math.max(width, Math.abs(rel.x * n.x + rel.y * n.y) * 2 + radius); }
-    S.jetStart ??= S.t; canisJetStream(R, mouth, B.facing, reach * P.size, P.size * Wm, S.t - S.jetStart, Infinity, Math.min(1, P.intensity), 11);
+    S.jetStart ??= S.t; canisPixelFireStream(R, mouth, B.facing, reach * P.size, P.size * Wm, S.t - S.jetStart, Infinity, Math.min(1, P.intensity), 11);
   } else S.jetStart = null;
   for (const jet of S.jetVisuals) { const age = S.t - jet.t, source = jet.owner === 'boss' && age <= jet.duration ? (B.visualMouth || jet.at) : jet.at;
-    canisJetStream(R, source, jet.a, jet.length * P.size, P.size * (jet.owner === 'hound' ? Wh : Wm), age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13); }
+    canisPixelFireStream(R, source, jet.a, jet.length * P.size, P.size * (jet.owner === 'hound' ? Wh : Wm), age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13); }
 }
 
 // 残り火：噴射が通ったマス（deposit）ごとに、別々の寿命の小さな火を置く（燃えない所も残る＝まだら）。粒を密度の場へ足し込み、
