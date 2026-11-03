@@ -248,7 +248,7 @@ func dispose() -> Dictionary:
 		_disposed = true
 	return result
 
-## UIの差分は窓口内で合成する。外側へ戦闘の可変参照を渡さない。
+## 現在UIは窓口だけが所有する。外側へ戦闘の可変参照を渡さない。
 func _read_locked() -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var result: Dictionary = _core.frame_snapshot_run()
