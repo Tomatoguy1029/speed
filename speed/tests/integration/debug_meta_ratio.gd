@@ -19,7 +19,7 @@ func check(ok: bool, label: String) -> void:
 		push_error(label)
 
 func _ready() -> void:
-	if "--cpp-debug" in OS.get_cmdline_user_args():
+	if "--cpp-debug" in OS.get_cmdline_user_args() or "--cpp-debug-boss" in OS.get_cmdline_user_args():
 		await _test_cpp_debug()
 		print("[cpp_debug_panel] %d failures" % failed)
 		get_tree().quit(1 if failed else 0)
@@ -149,13 +149,14 @@ func _test_cpp_debug() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	var baseline := config.draw_time_scale
 	var saved := SaveManager.data.duplicate(true)
-	var stage: StageDef = load("res://data/stages/stage_1.tres")
+	var stage_number := 3 if "--cpp-debug-boss" in OS.get_cmdline_user_args() else 1
+	var stage: StageDef = load("res://data/stages/stage_%d.tres" % stage_number)
 	var source: RuntimeStage = load("res://tools/content/build_runtime_stage.gd").compile(stage,"res://.content",config)
 	var output := "res://.content/dev/debug_check"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(source,config,output,"開発パネル確認".sha256_text())
 	check(built==OK,"開始用の定義を正規生成する")
 	if built!=OK: return
-	var path := output.path_join("stage_1.json")
+	var path := output.path_join("stage_%d.json" % stage_number)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var options := {"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":734,"cpp_start":{"lab_mode":true},"cpp_edit_source":{"stage":source,"config":config,"definitions":{}}}
 	var session: RunSession = RunManager.create_session(self,options,true)
@@ -179,6 +180,7 @@ func _test_cpp_debug() -> void:
 	var old_weapons: Array = bridge.read_frame().value.ui.weapon_levels.duplicate(true)
 	var old_scope: ContentResourceScope = session.resources
 	var old_definitions: PackedStringArray = bridge.read_lab().value.definition_ids
+	if stage_number == 3: check("canis_major" in old_definitions, "おおいぬ座を含む通常ステージの定義で開始する")
 	var added: Dictionary = await panel._commands.handle_cpp(&"debug_spawn_enemies",{"count":100})
 	check(added.ok,"ステージ外を含む抽選で敵を生成する")
 	if added.ok:
@@ -192,7 +194,7 @@ func _test_cpp_debug() -> void:
 		for visual: Dictionary in session.cpp_resources.visuals:
 			check(presentation.frame_view.visuals.has(visual.id),"追加外観を表示へ登録する")
 			if visual.role==6: check(old_scope.resources.has(visual.path),"追加の生成済み外観をScopeで保持する")
-		await RenderingServer.frame_post_draw
+		if DisplayServer.get_name() != "headless": await RenderingServer.frame_post_draw
 	panel._on_slider(0.25,"draw_time_scale")
 	check(is_equal_approx(panel._editor().config.draw_time_scale,0.25),"現在ランの設定を変更する")
 	check(is_equal_approx(bridge.read_lab().value.draw_time_scale,0.25),"設定をC++へ反映する")

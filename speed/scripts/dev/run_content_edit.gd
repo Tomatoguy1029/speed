@@ -13,6 +13,7 @@ var error := ""
 var saved_index_path := ""
 var _saved_bytes := PackedByteArray()
 var _busy := false
+var _definition_order := PackedStringArray()
 
 static func for_session(owner: RunSession) -> RefCounted:
 	if owner.has_meta("dev_content_edit"): return owner.get_meta("dev_content_edit")
@@ -55,11 +56,17 @@ func attach(owner: RunSession) -> bool:
 		error = "このランの定義を読み込めません。"
 		return false
 	source.resources = source.resources.duplicate(true)
-	source.resources.enemy_ids = current.value.definition_ids
+	_definition_order = current.value.definition_ids.duplicate()
+	# ランの定義にはボス本体と技内部の種類も含まれる。通常敵だけを制作元へ戻す。
+	source.resources.enemy_ids = PackedStringArray()
+	for id: String in _definition_order:
+		if definitions.has(StringName(id)) or ContentManager.catalog.find(&"enemies", id) != null:
+			source.resources.enemy_ids.append(id)
 	# このランで参照する基準を最初に複製し、以後の再読込から隔離する。
 	for id: String in source.resources.enemy_ids:
 		if not definitions.has(StringName(id)):
-			var definition: EnemyDef = ResourceLoader.load("res://data/enemies/%s.tres" % id,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+			var entry: ContentEntry = ContentManager.catalog.find(&"enemies", id)
+			var definition: EnemyDef = ResourceLoader.load(entry.path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) if entry != null else null
 			if definition!=null: definitions[StringName(id)] = definition.duplicate(true)
 	values = source.enemy_tuning.duplicate(true)
 	signature = index.source_sha256
@@ -86,7 +93,7 @@ func apply(tuning: Dictionary) -> Dictionary:
 	var next := source.duplicate(true) as RuntimeStage
 	next.enemy_tuning = tuning.duplicate(true)
 	var output := "res://.content/dev/live_%d" % owner.id
-	var built: Error = BUILD.build(next,config,output,signature,definitions,[],{},owner.cpp_resources)
+	var built: Error = BUILD.build(next,config,output,signature,definitions,[],{},owner.cpp_resources,{},_definition_order)
 	if built!=OK: return _failure("定義の生成に失敗しました: %s" % error_string(built))
 	var index_path := output.path_join("stage_%d.json" % next.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
@@ -139,7 +146,7 @@ func _build(stage: RuntimeStage, next_config: GameConfig) -> Dictionary:
 	var owner: RunSession = session.get_ref() if session!=null else null
 	if owner==null or owner.bridge==null: return _failure("対象のランは終了しています。")
 	var output := "res://.content/dev/debug_%d" % owner.id
-	var built: Error = BUILD.build(stage,next_config,output,signature,definitions,[],{},owner.cpp_resources)
+	var built: Error = BUILD.build(stage,next_config,output,signature,definitions,[],{},owner.cpp_resources,{},_definition_order)
 	if built!=OK: return _failure("定義の生成に失敗しました: %s" % error_string(built))
 	var path := output.path_join("stage_%d.json" % stage.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -193,4 +200,5 @@ func prepare_debug_enemies() -> Dictionary:
 		presentation.cpp_resources = prepared.resources
 		if presentation.frame_view!=null: presentation.frame_view.replace_lab_visuals(owner.resources,prepared.resources.visuals)
 	source = next
+	_definition_order = owner.bridge.read_lab().value.definition_ids.duplicate()
 	return {"ok":true,"value":choices}

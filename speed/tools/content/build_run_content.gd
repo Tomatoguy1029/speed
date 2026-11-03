@@ -2226,7 +2226,48 @@ static func append_bosses(data: Dictionary, visuals: Array[Dictionary], definiti
 				data[record.name].append(row)
 	return OK
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}) -> Error:
+## 開発用の追加生成でも、ボス・技内部の種類を含む既存の定義番号を保つ。
+static func preserve_definition_order(data: Dictionary, previous: PackedStringArray) -> Error:
+	if previous.is_empty(): return OK
+	var names := {}
+	for row: Dictionary in data.StringEntry:
+		if names.has(row.value): return ERR_INVALID_DATA
+		names[row.value] = int(row.id)
+	var order := previous.duplicate()
+	for row: Dictionary in data.StringEntry:
+		if not row.value in order: order.append(row.value)
+	if order.size() != names.size(): return ERR_INVALID_DATA
+	var remap := {}
+	for i in order.size():
+		if not names.has(order[i]) or remap.has(names[order[i]]): return ERR_INVALID_DATA
+		remap[names[order[i]]] = i + 1
+	# id自体が敵定義への参照になっている種類別の表と、その参照先も同時に移す。
+	var aliases := {"EnemyRecord":true, "StringEntry":true, "DefinitionIndex":true}
+	var changed := true
+	while changed:
+		changed = false
+		for record: Dictionary in Schema.SCHEMA.records:
+			if not aliases.has(record.name) and aliases.has(record.fields[0].get("ref", "")):
+				aliases[record.name] = true
+				changed = true
+	for record: Dictionary in Schema.SCHEMA.records:
+		for row: Dictionary in data[record.name]:
+			for field: Dictionary in record.fields:
+				if (field.name == "id" and aliases.has(record.name)) or aliases.has(field.get("ref", "")):
+					var original: int = row.get(field.name, field.get("value", 0))
+					if original == 0: continue
+					if not remap.has(original): return ERR_INVALID_DATA
+					row[field.name] = remap[original]
+		if aliases.has(record.name): data[record.name].sort_custom(func(left, right): return left.id < right.id)
+	return OK
+
+static func authoring_enemy(id: String, definitions: Dictionary) -> EnemyDef:
+	var definition: EnemyDef = definitions.get(StringName(id))
+	if definition != null: return definition
+	var entry: ContentEntry = _catalog().find(&"enemies", id)
+	return ResourceLoader.load(entry.path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as EnemyDef if entry != null else null
+
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}, previous_definition_ids := PackedStringArray()) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
@@ -2260,16 +2301,14 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	for terrain in ["meteor","iron","saw"]:
 		if not terrain in enemy_ids: enemy_ids.append(terrain)
 	for candidate_id: String in enemy_ids.duplicate():
-		var candidate: EnemyDef = definitions.get(StringName(candidate_id))
-		if candidate==null: candidate = load("res://data/enemies/%s.tres" % candidate_id)
+		var candidate := authoring_enemy(candidate_id, definitions)
+		if candidate == null: return ERR_INVALID_DATA
 		if candidate!=null and candidate.behavior==&"triangle" and not "triangle_star" in enemy_ids: enemy_ids.append("triangle_star")
 		if candidate!=null and candidate.behavior==&"cepheus" and not "cepheus_soldier" in enemy_ids: enemy_ids.append("cepheus_soldier")
 		if candidate!=null and candidate.behavior==&"split" and not "splitling" in enemy_ids: enemy_ids.append("splitling")
 	for i in enemy_ids.size():
 		var id: String = enemy_ids[i]
-		var definition: EnemyDef = definitions.get(StringName(id))
-		if definition == null:
-			definition = ResourceLoader.load("res://data/enemies/%s.tres" % id,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as EnemyDef
+		var definition := authoring_enemy(id, definitions)
 		if definition == null or String(definition.id)!=id: return ERR_INVALID_DATA
 		var tuning: Dictionary = stage.enemy_tuning.get(id,{})
 		if not StageEnemyTuning.error_for(definition,tuning).is_empty(): return ERR_INVALID_DATA
@@ -2626,6 +2665,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if boss.external_id!="draco": continue
 		var source: BossDef = resolved_bosses.get(&"draco",resolved_bosses.get("draco"))
 		if source==null or append_draco_cycle(data,source,boss.id)!=OK: return ERR_INVALID_DATA
+	var order_error := preserve_definition_order(data, previous_definition_ids)
+	if order_error != OK: return order_error
 	# 開発中の追加定義は既存の装備・保留要求の資源番号を維持する。
 	if previous_resources!=null:
 		var remap := {}
