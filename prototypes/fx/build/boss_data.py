@@ -28,6 +28,8 @@ def extract_bosses(out, image_url, lit, Image):
                 except (ValueError, AssertionError, IndexError):
                     pass
         values.update(data['res'])
+        if data['sub']:
+            values['subresources'] = {key: clean(section['props']) for key, section in data['sub'].items()}
         return clean(values)
 
     out['bosses'] = {}
@@ -114,3 +116,18 @@ def extract_bosses(out, image_url, lit, Image):
         out['bosses'][name] = boss
     for name in ['star', 'large_star']:
         out['images']['canis_major/' + name] = image_url(Image.open(root + '/assets/pixel/canis_major/' + name + '.png').convert('RGBA'))
+    hydra_files = {
+        'body': ('body/hydra_body.png', 'body/hydra_body_lit_normal.png'),
+        'neck': ('neck/hydra_neck.png', 'neck/hydra_neck_normal.png'),
+        'undead': ('neck/hydra_undead_neck.png', 'neck/hydra_undead_neck_normal.png'),
+        'head0': ('heads/hydra_head.png', 'heads/hydra_head_normal.png'),
+        'head1': ('heads/hydra_head_2.png', 'heads/hydra_head_2_normal.png'),
+        'head2': ('heads/hydra_head_3.png', 'heads/hydra_head_3_normal.png'),
+    }
+    for key, (diffuse, normal) in hydra_files.items():
+        path = root + '/assets/pixel/hydra/'
+        out['images']['hydra/' + key] = image_url(lit(Image.open(path + diffuse).convert('RGBA'), Image.open(path + normal), {}))
+    out['bosses']['hydra']['body_source_width'] = Image.open(root + '/assets/pixel/hydra/hydra.png').width
+    for part in ['head', 'arm', 'claw', 'body_a', 'body_b', 'body_c', 'body_d', 'body_e', 'tail_joint', 'tail_tip']:
+        path = root + '/assets/pixel/draco/' + part
+        out['images']['draco/' + part] = image_url(lit(Image.open(path + '.png').convert('RGBA'), Image.open(path + '_normal.png'), {}))

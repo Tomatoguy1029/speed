@@ -41,7 +41,7 @@ pre { white-space:pre-wrap; color:var(--muted); font-size:12px; }
 <body>
 <header>
   <h1>SPEED エフェクト試作（独立HTML）</h1>
-  <p>本番のゲーム・データは変更していません。現行 main の素材・パーツ構成・攻撃の挙動と時刻を読み取って再現し、見た目だけを差し替えた試作を切り替えて比較します。ユーザー確認前の試作で、承認・本番実装済みではありません。</p>
+  <p>現行の素材と攻撃を使い、試作と現行の見た目を切り替えて比較できます。G10・鳳凰・敵・ケンタウルスは設定値も含めて承認済みです。追加した残り4体は見た目の確認待ちです。本番への組み込みはC++移行後に行います。</p>
 </header>
 <div class="wrap">
   <div class="bar">
@@ -62,20 +62,21 @@ pre { white-space:pre-wrap; color:var(--muted); font-size:12px; }
     <input id="scrub" type="range" min="0" max="1" step="0.001" value="0"><span id="time" class="muted"></span>
   </div>
   <div class="grid">
-    <div class="panel"><h3 style="margin-top:0">FXの調整（試作のみに効く）</h3><div id="params"></div>
+    <div class="panel"><h3 style="margin-top:0">FXの調整・比較条件</h3><div id="params"></div>
       <div class="bar"><button id="save">調整値を JSON で保存</button><label>JSON を読み込む <input id="load" type="file" accept="application/json,.json"></label></div><div id="status" class="muted"></div>
-      <p class="muted">調整値は比較用です。攻撃の判定・範囲・時刻・本番の数値は変わりません。</p></div>
+      <p class="muted">色・サイズ・強度・FXの時間は試作の見た目を変えます。形態・猟犬数・分離・吸い込んだ星の数は、両表示に共通の比較条件です。本番の数値は変わりません。</p></div>
     <div class="panel" id="info"></div>
   </div>
   <div class="panel" style="margin-top:14px">
     <h3 style="margin-top:0">改善台帳 80 件と試作の対応</h3>
     <p class="muted" id="ledgerCount"></p>
-    <p class="legend muted"><span>■黄：今回の試作あり（未承認）</span><span>■水色：現行採用の再現のみ</span><span>■赤：今回の対象だが未着手</span><span>■灰：C++移行後</span><span>■紫：確認待ち</span></p>
+    <p class="legend muted"><span>■黄：試作あり（承認状態は各行）</span><span>■水色：現行採用の再現のみ</span><span>■赤：今回の対象だが未着手</span><span>■灰：C++移行後</span><span>■紫：確認待ち</span></p>
     <div class="tablebox"><table id="ledger"><thead><tr><th>ID</th><th>内容</th><th>分類（作業時期）</th><th>今回の状態</th><th>試作ID</th><th>未確認事項・メモ</th></tr></thead><tbody></tbody></table></div>
     <h3>G12 の内訳（現行の出現構成から列挙した、ステージ1に出ない敵）</h3>
     <div class="tablebox"><table id="g12"><thead><tr><th>type ID</th><th>名称</th><th>登場ステージ</th><th>固有攻撃</th><th>試作ID</th></tr></thead><tbody></tbody></table></div>
-    <details><summary>今回未着手のボス4体について（理由と次に必要なこと）</summary>
-      <p>おおいぬ座・いっかくじゅう座・うみへび座・りゅう座は、全身とパーツの動きが GDScript の手続き（canis_major_boss.gd・monoceros_boss.gd・hydra_boss.gd ほか、合計約5,000行）で作られています。現行の動きと時刻を保ったまま「予備動作→発動→攻撃中→終了」を見せるには、これらの移植が必要です。不完全な再現（静止した本体＋FX）を完成プレビューとして出さないため、今回は台帳に「未着手」と明記しています。</p>
+    <details><summary>追加した4体と、確認が残っているところ</summary>
+      <p>おおいぬ12技、いっかくじゅう8技、うみへび18技、りゅう13技の全身と攻撃FXを追加しました。うみへびには首の撃破・分離後の見え方の比較もあります。今回の追加分は未承認です。</p>
+      <p>現行表示の照明と一部の効果はHTMLでの近似です。障害物のない単独の比較場面で再生し、群れの通常AIや地形への干渉は省いています。うみへびのH22のULT、遮蔽・移動・攻撃数値の未決事項、本番の実験場の不具合は確認待ちのままです。</p>
     </details>
     <details><summary>現行の再現で近似している点</summary>
       <ul class="muted">

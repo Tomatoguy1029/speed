@@ -2,16 +2,22 @@
 const CANIS_IDS = { pounce: ['O02'], command: ['O03', 'O04'], stream: ['O03', 'O04', 'O08'], sirius: ['O05'], sirius_flame: ['O05', 'O06'], howl: ['O07'], bay: ['O09'], blaze: ['O10'], relay: ['O11'], hunt: ['O12'], hunt_pounce: ['O02', 'O04'], nova: ['O13', 'O14'] };
 const moveToward = (a, b, step) => a + clamp(b - a, -step, step);
 const canisMouth = B => add(B.pos, mul(fromA(B.facing), B.r * 0.84));
-function canisPose(B, t) {
+function canisPose(B, t, opts = {}) {
   const edits = {}, moving = len(B.vel) > 5;
   ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => edits[path] = { rotation: Math.sin(B.gait + (i === 0 || i === 3 ? 0 : Math.PI)) * (moving ? 0.16 : 0.015) });
   edits.Tail = { rotation: Math.sin(B.gait * 0.4) * 0.07 };
   edits.Head = { rotation: B.pose.howl ? -0.45 * smooth(0, 0.65, B.charge) : 0 };
+  if (opts.proto) {
+    // 見た目の部位だけで、静かな構えから咆哮の反動へ移す。役者の位置・方向は保つ。
+    const charge = B.mode === 'windup' ? B.charge : 0, release = opts.releaseAge >= 0 ? Math.max(0, 1 - opts.releaseAge / 0.22) : 0;
+    if (B.pose.shout || B.pose.gather || B.pose.bay || release > 0) { edits.Head.rotation += -0.12 * charge + Math.sin(release * Math.PI) * 0.11; edits.Head.position = V(0, 42 - charge * 3 + release * 4); edits.Body = { position: V(0, -charge * 2 + release * 2) }; }
+    if (B.pose.flame && B.mode === 'active') { edits.Head.rotation += Math.sin(t * 23) * 0.018; edits.Head.position = V(0, 42 + Math.sin(t * 16) * 1.2); }
+  }
   return edits;
 }
 function drawCanis(B, t, opts = {}) {
   const c = B.pose.crouch || 0, k = B.r / 100;
-  const rig = drawBossParts(B, canisPose(B, t), { ...opts, root: M.mk(-Math.PI / 2, k * (1 + c * 0.15), k * (B.pose.stretch || 1), 0, 0) });
+  const rig = drawBossParts(B, canisPose(B, t, opts), { ...opts, root: M.mk(-Math.PI / 2, k * (1 + c * 0.15), k * (B.pose.stretch || 1), 0, 0) });
   if (opts.shadow || !rig['Head/Sirius']) return;
   const at = M.pt(rig['Head/Sirius'], V(0, 0)), q = IMG['canis_major/star'];
   const charge = Math.max(B.charge, B.pose.glow || 0), large = IMG['canis_major/large_star'];
@@ -199,6 +205,7 @@ function canisStep(S, dt) {
   S.flames = S.flames.filter(f => f.age < f.life);
 }
 function canisDraw(S, R) {
+  R = bossView(R, '#80c8ff');
   const B = S.B, r = S.r, t = S.t, id = S.tech, P = R.P, mouth = canisMouth(B), pal = FX.ramp(P.color);
   if (R.proto) {
     for (const q of S.pack) bossTrail(R, q.trail, q.until > t ? 0 : Math.max(0, t - (q.until || 0)));
@@ -225,7 +232,7 @@ function canisDraw(S, R) {
     if (!R.proto && id === 'command' && q.until > t) { for (let i = 1; i < q.trail.length; i++) D2.line(q.trail[i - 1], q.trail[i], rgba('#ff667d', i / q.trail.length * 0.7), q.r); D2.circle(q.pos, q.r * 1.9, rgba('#ff667d', 0.22)); }
   }
   R.blitBack();
-  drawCanis(B, t, { white: R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  drawCanis(B, t, { proto: R.proto, releaseAge: S.shouts.length ? t - S.shouts[S.shouts.length - 1].t : -1, white: R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
   for (const q of S.pack) if (!q.dead) drawEnemy(q, { white: R.proto && q.warning > t ? clamp(1 - (q.warning - t) / 0.6) * 0.25 : 0 });
   if (R.proto) {
     for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); bossFire(R.front, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, P.color, P.intensity, P.size); }

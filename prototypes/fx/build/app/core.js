@@ -58,12 +58,12 @@ function blitFrame(f) {
   g.restore();
 }
 // ---------- カメラ
-const cam = { x: 0, y: 0, shake: 0 };
-function worldTransform() { g.setTransform(Z, 0, 0, Z, W / 2 - cam.x * Z, H / 2 - cam.y * Z); }
-const px = (n) => n / Z;        // Godot の _px（画面px → ワールド）
+const cam = { x: 0, y: 0, shake: 0, zoom: 1 };
+function worldTransform() { const z = Z * cam.zoom; g.setTransform(z, 0, 0, z, W / 2 - cam.x * z, H / 2 - cam.y * z); }
+const px = (n) => n / (Z * cam.zoom);        // Godot の _px（画面px → ワールド）
 // ワールド座標 → pixelFX の論理ピクセル座標
-const toL = (p) => V((p.x - cam.x) * Z / LP + LW / 2, (p.y - cam.y) * Z / LP + LH / 2);
-const WL = Z / LP;              // ワールド長 → 論理ピクセル長
+const toL = (p) => V((p.x - cam.x) * WL + LW / 2, (p.y - cam.y) * WL + LH / 2);
+let WL = Z / LP;              // ワールド長 → 論理ピクセル長（りゅうの現行カメラの引きにも合わせる）
 function painter(layer = 'front') { const p = PX.painterFor(FR[layer]); p.place(0, 0); return p; }
 
 // ---------- Godot の描画命令の移植（現行表示の再現に使う）

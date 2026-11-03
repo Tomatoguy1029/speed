@@ -20,7 +20,7 @@ function changedParamsText() {
   return Object.keys(out).length ? 'FX試作の調整値\n' + JSON.stringify(out, null, 1) : '';
 }
 function P() { const out = {}; for (const p of paramDefs(demo)) out[p.k] = PARAMS[demo.id]?.[p.k] ?? p.def; return out; }
-function resetSim() { S = { t: 0, ev: [], ents: [], hz: [], fx: [], rng: mkRng(7) }; cam.x = demo.cam?.x ?? 0; cam.y = demo.cam?.y ?? 0; demo.setup(S); demo.step(S, 0); } // 最初のコマを描く前に状態を整える（t=0 で描画が落ちないように）
+function resetSim() { S = { t: 0, ev: [], ents: [], hz: [], fx: [], rng: mkRng(7) }; cam.x = demo.cam?.x ?? 0; cam.y = demo.cam?.y ?? 0; cam.zoom = 1; WL = Z / LP; demo.setup(S); demo.step(S, 0); } // 最初のコマを描く前に状態を整える（t=0 で描画が落ちないように）
 function simTo(t) {
   if (!S || t < S.t - 1e-9) resetSim();
   let guard = 0;
@@ -44,6 +44,7 @@ function drawBackground() {
 }
 // ---------- 1フレームの描画
 function render() {
+  WL = Z / LP * cam.zoom;
   drawBackground();
   PX.clearFrame(FR.back); PX.clearFrame(FR.front);
   const R = {

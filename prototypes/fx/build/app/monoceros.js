@@ -104,6 +104,7 @@ function monoStep(S, dt) {
   cam.x = (B.pos.x + S.ship.pos.x) * 0.5; cam.y = (B.pos.y + S.ship.pos.y) * 0.5;
 }
 function monoDraw(S, R) {
+  R = bossView(R, '#ffd27a');
   const B = S.B, r = S.r, id = S.tech, P = R.P, u = fromA(S.angle), tip = monoTip(S), pal = FX.ramp(P.color), rig = monoEdits(S, R);
   if (R.proto) {
     bossTrail(R, S.track, ['run', 'circle'].includes(S.stage) ? 0 : S.st);

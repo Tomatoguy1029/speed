@@ -1,11 +1,14 @@
 // ===== ボス試作共通：現行パーツを組み立て、見た目だけを重ねる =====
 const BOSSES = DATA.bosses;
+const BOSS_WHITE = new Map();
+function bossWhiteImage(key) { if (BOSS_WHITE.has(key)) return BOSS_WHITE.get(key); const im = IMG[key], canvas = document.createElement('canvas'); canvas.width = im.width; canvas.height = im.height; const ctx = canvas.getContext('2d'); ctx.filter = 'brightness(0) invert(1)'; ctx.drawImage(im, 0, 0); BOSS_WHITE.set(key, canvas); return canvas; }
 const rotateV = (v, a) => V(v.x * Math.cos(a) - v.y * Math.sin(a), v.x * Math.sin(a) + v.y * Math.cos(a));
 function bossRule(name, id, phase = 1) {
   const src = BOSSES[name].moves[id], out = { ...src };
   if (phase >= 2) for (const k in src) if (k.endsWith('_p2')) out[k.slice(0, -3)] = src[k];
   return out;
 }
+function bossView(R, color) { return R.proto ? R : { ...R, P: { ...R.P, color, size: 1, intensity: 1, timing: 1 } }; }
 function bossActor(name, pos, facing = 0) {
   return { name, pos: { ...pos }, facing, r: BOSSES[name].def.radius * CS, charge: 0, mode: 'windup', vel: V(0, 0), gait: 0, pose: {}, phase: 1 };
 }
@@ -28,7 +31,7 @@ function drawBossParts(B, edits = {}, opts = {}) {
     if (n.flip_h) ctx.scale(-1, 1); if (n.flip_v) ctx.scale(1, -1);
     const x = off.x - (centered ? r.w / 2 : 0), y = off.y - (centered ? r.h / 2 : 0);
     ctx.imageSmoothingEnabled = false; ctx.drawImage(im, r.x, r.y, r.w, r.h, x, y, r.w, r.h);
-    if ((e.white || opts.white || 0) > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= e.white || opts.white; ctx.filter = 'brightness(0) invert(1)'; ctx.drawImage(im, r.x, r.y, r.w, r.h, x, y, r.w, r.h); }
+    if ((e.white || opts.white || 0) > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= e.white || opts.white; ctx.drawImage(bossWhiteImage(tex.key), r.x, r.y, r.w, r.h, x, y, r.w, r.h); }
     ctx.restore();
   }
   return transforms;
