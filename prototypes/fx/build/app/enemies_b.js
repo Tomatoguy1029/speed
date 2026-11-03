@@ -217,10 +217,20 @@ function aquaJet(p, origin, a, len, half0, slope, t, g, seed, C, alpha) {
   });
   for (let d = 0; d < Math.min(Lend, view); d += 12) p.glow(O.x + ux * d, O.y + uy * d, 10 + d * 0.06, C[4], 0.18 * alpha * (1 - d / Lend * 0.6)); // 芯の光
 }
+// 試作：水瓶の体の動き（絵の位置と向きだけ）。予告の間は注ぐ構えに少し傾き、照射中は水の勢いで小刻みに震えながらゆっくり揺れて注ぎ、止まると戻る
+function aquaPose(e, S) {
+  if (!S.fl) return e; const p = prm('aquarius'), t = S.t - S.fl.t0, tel = S.fl.delay, act = S.fl.active; let rot = 0, sh = V(0, 0);
+  if (t < tel) rot = -0.18 * smooth(0, tel * 0.6, t);
+  else if (t < tel + act) { const a = t - tel; rot = -0.18 + Math.sin(a * 2.4) * 0.09 * smooth(0, 0.3, a) + Math.sin(a * 41) * 0.012; sh = V(Math.sin(a * 53) * 1.6, Math.cos(a * 47) * 1.6); }
+  else rot = lerp(-0.18 + Math.sin(act * 2.4) * 0.09, 0, smooth(0, 0.5, t - tel - act));
+  return { ...e, pos: add(e.pos, sh), facing: e.facing + rot };
+}
+// 黄色い爪の先（試作の絵 90×90 の x≈33, y≈78。画像の中心から見て (-12, 33)）の世界座標
+function aquaClawTip(e) { const d = enemyDef('aquarius'), ang = d.look.angle + e.facing, sc = 2 * spriteR('aquarius', e.r) / 90, lx = -12 * sc, ly = 33 * sc; return add(e.pos, V(lx * Math.cos(ang) - ly * Math.sin(ang), lx * Math.sin(ang) + ly * Math.cos(ang))); }
 DEMOS.push({
   id: 'G12-aquarius', ids: ['G12'], cat: G12, group: 'みずがめ座（aquarius）', title: '全方位の極太水流', duration: 9.0, color: '#7fd8ff', cam: { x: -120, y: 0 },
   refs: ['scripts/enemies/aquarius.gd（approach 380・telegraph 4.0・beam_time 3.0・6本・広がり0.32・rest 1.2）', 'scripts/render/attacks/flood.gd・shaders/water_flood.gdshader（ripples・rushing・mist を論理ピクセルでCPU移植）', 'assets/fx/water_noise.png（焼き込み済みノイズ）'],
-  status: { '消え方': '現行のまま（現行shaderの移植：水流が崩れて霧になる）', '照射中の水': 'pixelFX water-jet の作り（白い芯→深い色の帯・走る筋・通り抜ける膨らみ・荒れる縁・ちぎれる先端・尾つきの水滴・霧）。予告の波紋と終わりの霧は現行shaderのまま', '状態': '試作のみ（現行shaderを基に段階化）', '判定': '変更なし（幅は half0+along×tan(0.32)）', '近似': '照射時の画面揺れ・衝撃の粒（rm._burst）・波紋（pipeline.add_wave）は未再現。現行の色はHDRの白を0.85倍で表示' },
+  status: { '消え方': '現行のまま（現行shaderの移植：水流が崩れて霧になる）', '出どころと体': '6本の水流（向き・本数は本番どおり）を黄色い爪の先から流す。予告で注ぐ構えに傾き、照射中は小刻みに震えながら揺れて注ぐ（絵の位置と向きだけ）。本番の出どころは体の中心なので、合わせるには移行後の変更が要る', '照射中の水': 'pixelFX water-jet の作り（白い芯→深い色の帯・走る筋・通り抜ける膨らみ・荒れる縁・ちぎれる先端・尾つきの水滴・霧）。予告の波紋と終わりの霧は現行shaderのまま', '状態': '試作のみ（現行shaderを基に段階化）', '判定': '変更なし（幅は half0+along×tan(0.32)）', '近似': '照射時の画面揺れ・衝撃の粒（rm._burst）・波紋（pipeline.add_wave）は未再現。現行の色はHDRの白を0.85倍で表示' },
   setup(S) { S.e = mkE('aquarius', V(-320, -40), 0, { fire_t: 0.2 }); S.ship = shipState(V(130, 90)); S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); },
   step(S, dt) {
     const e = S.e, p = prm('aquarius');
@@ -230,11 +240,12 @@ DEMOS.push({
   },
   phase(S) { if (!S.fl) return PH.MOVE; const t = S.t - S.fl.t0; return t < S.fl.delay ? PH.WINDUP + '（水の流れで予告）' : t < S.fl.delay + S.fl.active ? PH.DASH : PH.RECOVER + '（崩れて霧）'; },
   draw(S, R) {
+    const B = R.proto ? aquaPose(S.e, S) : S.e, src = R.proto ? aquaClawTip(B) : S.e.pos; // 試作は黄色い爪の先から水を流す
     const e = S.e, p = prm('aquarius'), P = R.P;
     if (S.fl) {
       const t = S.t - S.fl.t0, strips = [], jets = [], n = p.beams;
       for (let k = 0; k < n; k++) {
-        const a = S.fl.a + k * TAU / n, base = { p: e.pos, ux: Math.cos(a), uy: Math.sin(a), len: p.beam_len, half0: p.beam_width * 0.5 * (R.proto ? P.size : 1), slope: Math.tan(p.beam_spread), seed: ((k * 7) % 17) / 17 * 97, a: R.proto ? Math.min(1, P.intensity) : 1 };
+        const a = S.fl.a + k * TAU / n, base = { p: src, ux: Math.cos(a), uy: Math.sin(a), len: p.beam_len, half0: p.beam_width * 0.5 * (R.proto ? P.size : 1), slope: Math.tan(p.beam_spread), seed: ((k * 7) % 17) / 17 * 97, a: R.proto ? Math.min(1, P.intensity) : 1 };
         if (t < S.fl.delay) strips.push({ ...base, mode: 0, g: clamp(t / S.fl.delay) });
         else if (t < S.fl.delay + S.fl.active) (R.proto ? jets : strips).push({ ...base, mode: 1, g: 1, k });
         else { const age = t - S.fl.delay - S.fl.active, coll = clamp(1 - age / (0.35 * (R.proto ? P.timing : 1))), life = clamp(1 - age / (1.4 * (R.proto ? P.timing : 1)));
@@ -243,10 +254,10 @@ DEMOS.push({
       }
       drawWater(strips, S.t, R.proto, R.proto ? P : null);
       if (jets.length) { const C = aquaRamp(P.color); for (const j of jets) aquaJet(R.front, j.p, Math.atan2(j.uy, j.ux), j.len, j.half0, j.slope, S.t, j.g, 7 + j.k * 13, C, j.a); }
-      if (R.proto && t < S.fl.delay) FXW.gather(R.front, e.pos, e.r * 1.6 * P.size, clamp(t / S.fl.delay) * P.intensity, P.color, S.t, 14, 4);
-      if (R.proto && t >= S.fl.delay && t < S.fl.delay + 0.2) { const L = toL(e.pos), f = 1 - (t - S.fl.delay) / 0.2, C2 = aquaRamp(P.color); R.front.glow(L.x, L.y, e.r * WL * 3, C2[6], 0.8 * f * P.intensity); } // 吹き出しの瞬間は光だけ（衝撃の輪は描かない）
+      if (R.proto && t < S.fl.delay) FXW.gather(R.front, src, e.r * 1.2 * P.size, clamp(t / S.fl.delay) * P.intensity, P.color, S.t, 14, 4);
+      if (R.proto && t >= S.fl.delay && t < S.fl.delay + 0.2) { const L = toL(src), f = 1 - (t - S.fl.delay) / 0.2, C2 = aquaRamp(P.color); R.front.glow(L.x, L.y, e.r * WL * 3, C2[6], 0.8 * f * P.intensity); } // 吹き出しの瞬間は光だけ（衝撃の輪は描かない）
     }
-    drawEnemy(e); drawShip(S.ship);
+    drawEnemy(B); drawShip(S.ship);
   },
 });
 
