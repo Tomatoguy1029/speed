@@ -155,6 +155,8 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 
 func _poll_cpp_loading() -> void:
 	if _pending_cpp.is_empty() or not _cpp_accepting: return
+	# create_runは木へ入れる前に資源を準備する。同期読込でも開始と表示は追加後に行う。
+	if not is_inside_tree(): return
 	if is_instance_valid(_progress): _progress.value = resources.progress()*100.0
 	if resources.failed or resources.cancelled:
 		_fail_cpp_loading(ERR_CANT_OPEN)
