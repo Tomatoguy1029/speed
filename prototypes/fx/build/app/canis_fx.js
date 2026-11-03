@@ -226,18 +226,18 @@ function canisJetPictures(S, R) {
     canisPixelFireStream(R, source, jet.a, jet.length * P.size, P.size * (jet.owner === 'hound' ? Wh : Wm), age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13); }
 }
 
-// 残り火：噴射1回ぶんの炎が通り終わってから共通の待ち時間を置き、通った全マスへ同時に出す。寿命・形のむらは残す。粒を密度の場へ足し込み、
+// 残り火：噴射開始から共通の待ち時間で出す。噴射中は保持し、火が消えた時点から冷えて消える。粒を密度の場へ足し込み、
 // 鳳凰と同じく、ゆがめてしきい値で切った外炎・内炎・芯の面で塗る（シリウスの青）。燃えた跡にはまだらなすすが残って薄れる
 function canisEmbers(S, R) {
   const P = R.P, frame = canisEmbers.frame ||= PX.createFrame(LW, LH); PX.clearFrame(frame); const p = new PX.Painter(frame), H = SIRIUS_H.map(hexc), sp = [];
   const soot = [hexc('#0c1420'), hexc('#142238')], cell = 45 * WL, wMul = (P.jetWidth ?? 1) * P.size; // 残り火の太さは噴射の太さと同じつまみ
   for (const tr of S.trails) for (const d of tr.deposits || []) {
-    const wait = P.emberDelay ?? 0.2, a = S.t - (tr.emberAt ?? tr.t) - wait, life = 1.0 + hash(d.seed + 5) * 1.8; if (a < 0 || a > life + 0.8) continue; const L = toL(d.pos);
+    const wait = clamp(P.emberDelay ?? 0.2, 0, tr.jetDuration ?? 1.1), bornAge = S.t - tr.t - wait, a = Math.max(0, S.t - (tr.fireEndAt ?? tr.t)), life = 1.0 + hash(d.seed + 5) * 1.8; if (bornAge < 0 || a > life + 0.8) continue; const L = toL(d.pos);
     for (let j = 0; j < 7; j++) { const sx = L.x + (hash(d.seed + j * 7) - 0.5) * cell * 1.2, sy = L.y + (hash(d.seed + j * 11) - 0.5) * cell * 1.2, hs = hash(d.seed + j * 13 + 1); if (hs < 0.35) continue; // すすは燃えた所にまだらに残る
       p.blend(sx, sy, soot[j % 2], 0.6 * (1 - smooth(life * 0.5, life + 0.8, a))); }
     for (let j = 0; j < 4; j++) { const hj = hash(d.seed + j * 17 + 3); if (hj < 0.3) continue; // 燃えない所もある
       const lf = life * (0.45 + 0.55 * hash(d.seed + j * 29)); if (a > lf) continue; const k = 1 - a / lf, flick = 0.75 + 0.25 * Math.sin(S.t * (9 + hj * 7) + j * 2);
-      sp.push({ x: L.x + (hash(d.seed + j * 7 + 50) - 0.5) * cell * 1.1, y: L.y + (hash(d.seed + j * 11 + 50) - 0.5) * cell * 1.1, r: (2.4 + 3.4 * hj) * Math.pow(k, 0.6) * flick * wMul * smooth(0, 0.1, a), age: 1 - k }); }
+      sp.push({ x: L.x + (hash(d.seed + j * 7 + 50) - 0.5) * cell * 1.1, y: L.y + (hash(d.seed + j * 11 + 50) - 0.5) * cell * 1.1, r: (2.4 + 3.4 * hj) * Math.pow(k, 0.6) * flick * wMul * smooth(0, 0.1, bornAge), age: 1 - k }); }
   }
   if (sp.length) { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const q of sp) { x0 = Math.min(x0, q.x - q.r * 2); y0 = Math.min(y0, q.y - q.r * 2); x1 = Math.max(x1, q.x + q.r * 2); y1 = Math.max(y1, q.y + q.r * 2); }
     const ox = Math.max(0, Math.floor(x0)), oy = Math.max(0, Math.floor(y0)), Wd = Math.min(LW, Math.ceil(x1)) - ox + 1, Hd = Math.min(LH, Math.ceil(y1)) - oy + 1;
