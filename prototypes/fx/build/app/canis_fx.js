@@ -232,7 +232,7 @@ function canisEmbers(S, R) {
   const P = R.P, frame = canisEmbers.frame ||= PX.createFrame(LW, LH); PX.clearFrame(frame); const p = new PX.Painter(frame), H = SIRIUS_H.map(hexc), sp = [];
   const soot = [hexc('#0c1420'), hexc('#142238')], cell = 45 * WL, wMul = (P.jetWidth ?? 1) * P.size; // 残り火の太さは噴射の太さと同じつまみ
   for (const tr of S.trails) for (const d of tr.deposits || []) {
-    const wait = 0.12 + hash(d.seed + 21) * 0.18, a = S.t - d.t - wait, life = 1.0 + hash(d.seed + 5) * 1.8; if (a < 0 || a > life + 0.8) continue; const L = toL(d.pos);
+    const wait = P.emberDelay ?? 0.2, a = S.t - d.t - wait, life = 1.0 + hash(d.seed + 5) * 1.8; if (a < 0 || a > life + 0.8) continue; const L = toL(d.pos);
     for (let j = 0; j < 7; j++) { const sx = L.x + (hash(d.seed + j * 7) - 0.5) * cell * 1.2, sy = L.y + (hash(d.seed + j * 11) - 0.5) * cell * 1.2, hs = hash(d.seed + j * 13 + 1); if (hs < 0.35) continue; // すすは燃えた所にまだらに残る
       p.blend(sx, sy, soot[j % 2], 0.6 * (1 - smooth(life * 0.5, life + 0.8, a))); }
     for (let j = 0; j < 4; j++) { const hj = hash(d.seed + j * 17 + 3); if (hj < 0.3) continue; // 燃えない所もある
