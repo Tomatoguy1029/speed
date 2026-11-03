@@ -318,8 +318,8 @@ phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource(
 enemies = Array[StringName]([&"biter", &"bomber", &"splitter", &"splitling", &"pulser", &"shield", &"pump", &"marlin", &"triangle", &"triangle_star"])
 enemy_tuning = {
 "biter": {
-"params.bullet_dmg": 4.0,
-"params.bite_telegraph": 0.4
+"params.bite_telegraph": 0.4,
+"params.bullet_dmg": 4.0
 },
 "bomber": {
 "params.blast_dmg": 14.0
