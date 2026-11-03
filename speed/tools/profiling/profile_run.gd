@@ -9,6 +9,7 @@ const TEXT := ["size", "drive", "weapons", "meta", "mix", "revision", "out", "vs
 const EVENT_ACTIVATIONS := {"space_quake":"W04","barrier_hit":"W05","barrier_restore":"W05","escort_deploy":"W26","escort_slash":"W26","sonic_push":"W08","sonic_impact":"W08","bolt":"W17","contact_bolt":"W17","critical_lance":"T06","chain_shock":"T05","end_hole":"T03","flash_slash":"W28","anchor_fire":"W21","bipolar_charge":"W22"}
 const CAUSE_ACTIVATIONS := {"mine":"W07","endBlast":"W29","afterimage":"W27","barrier":"W05","contactWave":"W04","sonic":"W08","contactArc":"W17","dashRangeDrone":"W26","killSonic":"T05","critBeam":"T06","vortex":"T03","interceptor":"W25"}
 var options := {}
+var _input_packet: Dictionary = {}
 var session: RunSession
 var bridge: RefCounted
 var view: Node2D
@@ -166,6 +167,7 @@ func _ready() -> void:
 	if options.has("boss_hp") and not _command("dev_benchmark",{"boss_hp":float(options.boss_hp)}): return
 	position_rng.seed = int(options.seed)
 	drive_center = bridge.latest_frame().value.ui.ship.ship_pos
+	_input_packet = bridge.latest_frame().value
 	session.cpp_input_source = _drive_intent
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(),true)
 	ready_us = Time.get_ticks_usec()
@@ -189,7 +191,7 @@ func _ready() -> void:
 	last_packed_bytes = int(start_metrics.packed_bytes)
 	last_run_clock = float(start_recording.t)
 	var bundle: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(session.cpp_index_path))
-	metadata = {"runtime":"cpp","entry":"RunManager.create_run → RunSession → RunBridge","options":options,"actual_equipment":_equipment(start_recording),"process_id":OS.get_process_id(),"profile":ProfileManager.for_cpp(false),"bundle":bundle,"recording_identity":bridge.recording_origin,"engine":Engine.get_version_info(),"revision":options.revision,"library_sha256":FileAccess.get_sha256("res://extensions/run/bin/libspeed_runtime.macos.template_release.arm64.dylib"),"renderer":RenderingServer.get_current_rendering_method(),"adapter":RenderingServer.get_video_adapter_name(),"processor":OS.get_processor_name(),"window":str(DisplayServer.window_get_size()),"logical_size":str(get_viewport().get_visible_rect().size),"texture_size":str(get_viewport().get_texture().get_size()),"measurement_seconds":measurement_seconds,"physics_hz":Engine.physics_ticks_per_second,"max_fps":Engine.max_fps,"vsync":DisplayServer.window_get_vsync_mode(),"gpu_measurement":true,"loading_timings":session.loading_timings,"ready_ms":(ready_us-startup_us)/1000.0,"copy_bytes_scope":"Packed配列の論理転送量。物理メモリコピー量ではない","timing_scope":"sim/output_buildはC++内部区間、bridge_copyはGodotの明示複製、engine_gpu_waitは未分離残差。観測費用を重ねて合算しない","source_generation_during_measurement":false,"ship_survival":"条件計測だけ致死を防ぐ。接触・バリア・ダメージは通常経路" if options.mode=="condition" else "通常進行では致死を防がない","boss_hp_hold":options.get("boss_hp","無効"),"normal_drops":true,"input_clock":"120Hz固定tick。描線時刻はsim_timeに対応する入力tick"}
+	metadata = {"runtime":"cpp","entry":"RunManager.create_run → RunSession → RunBridge","options":options,"actual_equipment":_equipment(start_recording),"process_id":OS.get_process_id(),"profile":ProfileManager.for_cpp(false),"bundle":bundle,"recording_identity":bridge.recording_origin,"engine":Engine.get_version_info(),"revision":options.revision,"library_sha256":FileAccess.get_sha256("res://extensions/run/bin/libspeed_runtime.macos.template_release.arm64.dylib"),"renderer":RenderingServer.get_current_rendering_method(),"adapter":RenderingServer.get_video_adapter_name(),"processor":OS.get_processor_name(),"window":str(DisplayServer.window_get_size()),"logical_size":str(get_viewport().get_visible_rect().size),"texture_size":str(get_viewport().get_texture().get_size()),"window_scaling":{"size":str(get_window().size),"factor":get_window().content_scale_factor,"size_setting":str(get_window().content_scale_size),"mode":get_window().content_scale_mode},"measurement_seconds":measurement_seconds,"physics_hz":Engine.physics_ticks_per_second,"max_fps":Engine.max_fps,"vsync":DisplayServer.window_get_vsync_mode(),"gpu_measurement":true,"loading_timings":session.loading_timings,"ready_ms":(ready_us-startup_us)/1000.0,"copy_bytes_scope":"Packed配列の論理転送量。物理メモリコピー量ではない","timing_scope":"sim/output_buildはC++内部区間、bridge_copyはGodotの明示複製、engine_gpu_waitは未分離残差。観測費用を重ねて合算しない","source_generation_during_measurement":false,"ship_survival":"条件計測だけ致死を防ぐ。接触・バリア・ダメージは通常経路" if options.mode=="condition" else "通常進行では致死を防がない","boss_hp_hold":options.get("boss_hp","無効"),"normal_drops":true,"input_clock":"120Hz固定tick。描線時刻はsim_timeに対応する入力tick"}
 	metadata["actual_start"]={"run_clock":start_recording.t,"world_clock":start_recording.world_t,"tick":start_metrics.tick,"enemy_types":start_metrics.enemy_types,"enemies":start_metrics.enemies,"bonus_remaining":bridge.latest_frame().value.ui.bonus_remaining,"boss_bodies":bridge.latest_frame().value.ui.boss_bodies}
 	var effective: Dictionary = bridge.read_lab().value
 	metadata["effective"]={"attack_power":effective.attack_power,"max_speed":effective.max_speed,"capacity":effective.capacity,"length_mult":effective.length_mult,"xp_profile_factor":effective.xp_profile_factor}
@@ -225,7 +227,7 @@ func _command(kind: String, payload: Dictionary) -> bool:
 	return reply.ok
 
 func _drive_intent() -> Intent:
-	var packet: Dictionary = bridge.latest_frame().value
+	var packet: Dictionary = _input_packet
 	var ship: Dictionary = packet.ui.ship
 	var draw: Dictionary = packet.ui.draw
 	var input := Intent.new()
@@ -264,6 +266,7 @@ func _drive_intent() -> Intent:
 	return input
 
 func _receive(frame: Dictionary) -> bool:
+	_input_packet = frame
 	if not measuring: return true
 	for event: Dictionary in frame.events:
 		var type: String = event.type
