@@ -16,6 +16,9 @@ function canisHoundShape(q) {
   return CANIS_HOUND_HULL.map(p => add(q.pos, rotateV(mul(p, scale), angle)));
 }
 const canisNovaOrigin = S => S.B.visualMouth || add(S.B.pos, mul(fromA(S.B.facing), S.B.r * 1.01));
+function canisNovaCharge(S) {
+  return S.age < S.r.warn ? smooth(S.novaTiming?.gatherStart ?? 0, S.r.warn, S.age) : 0;
+}
 function canisFlash(S) {
   const t = S.age - S.r.warn;
   return smooth(0, 0.09, t) * (1 - smooth(0.22, 0.98, t));
@@ -88,7 +91,7 @@ const NOVA_EMISSION = (() => {
   return data;
 })();
 function canisNovaLight(S, R) {
-  const field = canisNovaField(S), origin = canisNovaOrigin(S), source = toL(origin), p = R.P, charge = S.age < S.r.warn ? smooth(0, S.r.warn, S.age) : 0, flash = canisFlash(S);
+  const field = canisNovaField(S), origin = canisNovaOrigin(S), source = toL(origin), p = R.P, charge = canisNovaCharge(S), flash = canisFlash(S);
   const t = S.age - S.r.warn;
   const tell = t < 0 ? charge : 1 - smooth(0.22, 0.98, t);
   const tint = hexc('#9caec0');
@@ -122,15 +125,16 @@ function canisNovaLight(S, R) {
     R.front.glow(target.x, target.y, 8, hexc('#ffe7bd'), flash * gain * 0.48);
   }
 }
-// 内破から弾ける光（pixelFX explosions/implosion.js の流れ）：発動の NOVA_IMPLODE 秒前から、光の筋が光源へ吸い込まれ、まわりが暗く縮んで
+// 内破から弾ける光（pixelFX explosions/implosion.js の流れ）：設定した光集めの開始から、光の筋が光源へ吸い込まれ、まわりが暗く縮んで
 // 白い一点に潰れる → 一瞬止まる（NOVA_STILL 秒）→ 発動の瞬間に光が弾ける（白い芯の爆発と、外へ飛ぶ光の筋）。輪は描かない
-const NOVA_IMPLODE = 0.75, NOVA_STILL = 0.08;
+const NOVA_STILL = 0.08;
 function canisNovaImplode(S, R) {
   const t = S.age - S.r.warn, src = toL(canisNovaOrigin(S)), gain = Math.min(1, R.P.intensity), w = '#e8f4ff';
-  if (t >= -NOVA_IMPLODE && t < 0) { const k = smooth(-NOVA_IMPLODE, -NOVA_STILL, t), still = t > -NOVA_STILL;
+  const duration = R.P.novaGatherTime ?? 0.75, stillTime = Math.min(NOVA_STILL, duration * 0.2);
+  if (t >= -duration && t < 0) { const k = smooth(-duration, -stillTime, t), still = t > -stillTime;
     g.save(); g.setTransform(1, 0, 0, 1, 0, 0); const cx = src.x * LP, cy = src.y * LP, rd = lerp(420, 30, k), gr = g.createRadialGradient(cx, cy, rd * 0.15, cx, cy, rd); // まわりが暗く縮む
     gr.addColorStop(0, `rgba(2,4,12,${0.6 * k * gain})`); gr.addColorStop(1, 'rgba(2,4,12,0)'); g.fillStyle = gr; g.fillRect(cx - rd, cy - rd, rd * 2, rd * 2); g.restore(); worldTransform();
-    if (!still) for (let i = 0; i < 70; i++) { const a = hash(i * 7.31) * TAU, sp = 0.6 + 0.8 * hash(i * 3.3), ph = ((hash(i * 1.7) + (t + NOVA_IMPLODE) * sp * 1.6) % 1), r0 = (1 - ph) * (110 - 70 * k), len = 4 + 10 * (1 - ph); // 光の筋が吸い込まれる
+    if (!still) for (let i = 0; i < 70; i++) { const a = hash(i * 7.31) * TAU, sp = 0.6 + 0.8 * hash(i * 3.3), ph = ((hash(i * 1.7) + (t + duration) / duration * 0.75 * sp * 1.6) % 1), r0 = (1 - ph) * (110 - 70 * k), len = 4 + 10 * (1 - ph); // 光の筋が吸い込まれる
       const x0 = src.x + Math.cos(a) * r0, y0 = src.y + Math.sin(a) * r0; R.front.line(x0, y0, x0 + Math.cos(a) * len, y0 + Math.sin(a) * len, (u) => u < 0.4 ? hexc('#ffffff') : hexc('#9ed8ff'), (u) => (1 - u) * (0.3 + 0.7 * ph) * gain); }
     R.front.glow(src.x, src.y, 2 + 2 * k, hexc('#ffffff'), (0.5 + 0.5 * k) * gain); R.front.px(src.x, src.y, hexc('#ffffff')); } // 白い一点
   if (t >= 0 && t < 0.45) { const u = t / 0.45; // 弾ける：白い芯の爆発と、外へ飛ぶ光の筋

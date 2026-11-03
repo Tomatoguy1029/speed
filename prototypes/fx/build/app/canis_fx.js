@@ -212,15 +212,21 @@ function canisPixelFireField(R, at, angle, clock, alpha, samples) {
 }
 // シリウスの光の描画と通過跡は、同じ口・射程・太さ・密度場を使う。
 function canisSiriusStream(S, R) {
-  if (!S.flames.length) return;
-  const mouth = canisSiriusMouth(S), u = fromA(S.B.facing), P = R.P;
-  let reach = 0;
-  for (const f of S.flames) {
-    const rel = sub(f.pos, mouth), radius = lerp(f.r0, f.r1, f.age / f.life);
-    reach = Math.max(reach, rel.x * u.x + rel.y * u.y + radius);
+  const tr = S.siriusFlameTrail;
+  if (!tr || S.t > tr.fireEndAt) return;
+  const age = S.t - tr.t, P = R.P;
+  if (age <= tr.jetDuration) {
+    const mouth = canisSiriusMouth(S), u = fromA(S.B.facing);
+    let reach = 0;
+    for (const f of S.flames) {
+      const rel = sub(f.pos, mouth), radius = lerp(f.r0, f.r1, f.age / f.life);
+      reach = Math.max(reach, rel.x * u.x + rel.y * u.y + radius);
+    }
+    tr.releaseMouth = mouth; tr.releaseAngle = S.B.facing; tr.releaseReach = reach;
   }
-  const started = S.siriusFlameTrail?.t ?? S.t;
-  canisPixelFireStream(R, mouth, S.B.facing, reach * P.size, P.size * (P.jetWidth ?? 1), S.t - started, Infinity, Math.min(1, P.intensity), 11);
+  if (!tr.releaseMouth) return;
+  // 噴射が止まった口から炎の後端を送り出す。最後の射程と向きを保って先端まで抜ける。
+  canisPixelFireStream(R, tr.releaseMouth, tr.releaseAngle, tr.releaseReach * P.size, P.size * (P.jetWidth ?? 1), age, tr.jetDuration, Math.min(1, P.intensity), 11);
 }
 function canisRecordSiriusFootprint(S) {
   if (S.siriusFlameTrail) canisSiriusStream(S, { P: P(), stampState: S, stampTrail: S.siriusFlameTrail });
@@ -234,7 +240,7 @@ function canisStampFirePixel(S, tr, x, y) {
   const deposit = canisDepositFlame(S, { trail: tr, pos, age: 0, life: 1, visualPixel: true });
   if (deposit) (deposit.pixels ||= []).push(pos);
 }
-function canisRecordRelayFootprints(S) {
+function canisRecordJetFootprints(S) {
   const P0 = P();
   for (const jet of S.jetVisuals) {
     if (!jet.trail?.visualFootprint) continue;
@@ -263,7 +269,7 @@ function canisJetPictures(S, R) {
 function canisEmbers(S, R) {
   const P = R.P, frame = canisEmbers.frame ||= PX.createFrame(LW, LH); PX.clearFrame(frame); const p = new PX.Painter(frame), H = SIRIUS_H.map(hexc), sp = [];
   const soot = [hexc('#0c1420'), hexc('#142238')], cell = 45 * WL, wMul = (P.jetWidth ?? 1) * P.size; // 残り火の太さは噴射の太さと同じつまみ
-  const footprints = ['sirius_flame', 'relay'].includes(S.tech) ? S.trails.filter(tr => tr.visualFootprint) : [];
+  const footprints = ['sirius_flame', 'relay', 'hunt'].includes(S.tech) ? S.trails.filter(tr => tr.visualFootprint) : [];
   for (const tr of S.trails) for (const d of tr.deposits || []) {
     const wait = clamp(P.emberDelay ?? 0.2, 0, tr.jetDuration ?? 1.1), bornAge = S.t - tr.t - wait, a = Math.max(0, S.t - (tr.fireEndAt ?? tr.t)), life = 1.0 + hash(d.seed + 5) * 1.8; if (bornAge < 0 || a > life + 0.8) continue; const L = toL(d.pos);
     for (let j = 0; j < 7; j++) { const point = d.pixels?.length ? toL(d.pixels[Math.floor(hash(d.seed + j * 7) * d.pixels.length)]) : null, sx = point ? point.x : L.x + (hash(d.seed + j * 7) - 0.5) * cell * 1.2, sy = point ? point.y : L.y + (hash(d.seed + j * 11) - 0.5) * cell * 1.2, hs = hash(d.seed + j * 13 + 1); if (hs < 0.35) continue; // すすは燃えた所にまだらに残る
@@ -289,7 +295,7 @@ function canisSpriteFX(name, point, time, scaleX, scaleY, angle = 0, alpha = 1) 
 }
 function canisTrailPictures(S, R) {
   for (const q of S.pack) if (q.burn && !q.dead) canisSpriteFX('canis_fireball', q.pos, S.t + q.idx * 0.13, q.r * 7 / 100, q.r * 3.2 / 18, q.facing, 0.88);
-  if (!['sirius', 'sirius_flame', 'relay'].includes(S.tech)) return;
+  if (!['sirius', 'sirius_flame', 'relay', 'hunt'].includes(S.tech)) return;
   canisEmbers(S, R); return; // 残り火は canisEmbers（密度の場）で描く
   const fire = PIXELFX.fx['src/fx/fire/_lib.js'], P = R.P;
   const frame = canisTrailPictures.floorFrame ||= PX.createFrame(LW, LH);
