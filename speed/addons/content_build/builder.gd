@@ -37,6 +37,8 @@ static func is_current(output := ROOT) -> bool:
 	for path in saved.get("outputs", []):
 		if not FileAccess.file_exists(path): return false
 	return true
+const INPUTS := preload("res://addons/content_build/inputs.gd")
+const STAGES := preload("res://tools/content/build_stage_bundle.gd")
 static var last_build_report: Array[Dictionary] = []
 const EDITOR_RESULT_PREFIX := "SPEED_CONTENT_BUILD_RESULT:"
 
@@ -60,8 +62,9 @@ static func build_for_editor() -> Error:
 	return FAILED if exit_code!=0 and result_error==OK else result_error
 
 static func _select(files: PackedStringArray, prefixes: Array) -> PackedStringArray:
-	var chosen := PackedStringArray(["res://project.godot", "res://addons/content_build/builder.gd", "res://addons/content_build/incremental.gd"])
+	var chosen := PackedStringArray(["res://project.godot"])
 	for path in files:
+		if not INPUTS.affects_output(path): continue
 		for prefix: String in prefixes:
 			if path.begins_with(prefix):
 				if not path in chosen: chosen.append(path)
@@ -79,43 +82,10 @@ static func _visual_outputs(output: String) -> PackedStringArray:
 			paths.append(output.path_join("dev/armor_"+name.get_basename()+".res"))
 	return paths
 
-static func _bundle_outputs(path: String) -> PackedStringArray:
-	var index = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
-	return PackedStringArray([path,index.binary,index.resources]) if index is Dictionary else PackedStringArray()
-
-## 一つのステージの配置・記録名・診断入力・戦闘データを同じ入力から作る。
-static func _build_stage(source: StageDef, output: String, input_signature: String, reuse_prepared: bool) -> Dictionary:
-	var config := load("res://data/config.tres") as GameConfig
-	var stage := preload("res://tools/content/build_runtime_stage.gd").compile(source,output,config)
-	if stage == null: return _result(ERR_INVALID_DATA, PackedStringArray())
-	var paths := PackedStringArray([output.path_join("stage_%d.tres" % source.index),output.path_join("dev/stage_%d.json" % source.index),output.path_join("dev/native_spawn_%d.bin" % source.index)])
-	var error := ResourceSaver.save(stage,paths[0])
-	if error != OK: return _result(error,paths)
-	# 保存済み配置の数値精度を通常の生成経路とそろえる。
-	stage = ResourceLoader.load(paths[0],"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
-	if stage == null: return _result(ERR_FILE_CORRUPT,paths)
-	var names := FileAccess.open(paths[1],FileAccess.WRITE)
-	if names == null: return _result(FileAccess.get_open_error(),paths)
-	names.store_string(JSON.stringify(preload("res://tools/content/build_runtime_stage.gd").names(source)))
-	names.close()
-	var timeline := preload("res://tools/content/build_native_data.gd").compile_spawn_timeline(stage,config)
-	if timeline.is_empty(): return _result(ERR_INVALID_DATA,paths)
-	var file := FileAccess.open(paths[2],FileAccess.WRITE)
-	if file == null: return _result(FileAccess.get_open_error(),paths)
-	file.store_var(timeline)
-	file.close()
-	error = preload("res://tools/content/build_run_content.gd").build(stage,config,output.path_join("run"),input_signature,{},[],{},null,{},PackedStringArray(),reuse_prepared)
-	paths.append_array(_bundle_outputs(output.path_join("run/stage_%d.json" % source.index)))
-	return _result(error,paths)
-
-static func _build_intro(output: String, reuse_prepared: bool) -> Dictionary:
-	var intro: Dictionary = load("res://scripts/runtime/intro_sequence.gd").practice_package(load("res://data/config.tres"),load("res://data/visuals/intro_presentation.tres"))
-	var error := preload("res://tools/content/build_run_content.gd").build(intro.stage,intro.config,output.path_join("run/intro"),"導入練習".sha256_text(),intro.definitions,[],{},null,{},PackedStringArray(),reuse_prepared)
-	return _result(error,_bundle_outputs(output.path_join("run/intro/stage_1.json")))
-
 static func stage_inputs(files: PackedStringArray, source: StageDef, output: String) -> PackedStringArray:
 	var paths := PackedStringArray()
 	for path in files:
+		if not INPUTS.affects_stage(path): continue
 		if path.begins_with("res://data/stages/") and path != source.resource_path: continue
 		if path.begins_with("res://data/codex/"): continue
 		if path.begins_with("res://data/bosses/"):
@@ -131,7 +101,7 @@ static func stage_inputs(files: PackedStringArray, source: StageDef, output: Str
 		var resources := ResourceLoader.load(index.resources,"",ResourceLoader.CACHE_MODE_IGNORE) as Resource
 		if resources != null:
 			for path: String in resources.dependencies:
-				if not path in paths: paths.append(path)
+				if INPUTS.affects_stage(path) and not path in paths: paths.append(path)
 	return paths
 
 ## 全体の編集版だけを更新し、変わっていない戦闘バイナリと資源表はそのまま使う。
@@ -207,15 +177,15 @@ static func _build_units(force: bool, output: String) -> Error:
 		if not name.ends_with(".tres"): continue
 		var source := ResourceLoader.load("res://data/stages/"+name,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
 		if source == null: return ERR_INVALID_DATA
-		var error: Error = cache.run("stage_%d" % source.index,stage_inputs(files,source,output),func(): return _build_stage(source,output,input_signature,not force),force)
+		var error: Error = cache.run("stage_%d" % source.index,stage_inputs(files,source,output),func(): return STAGES.build_stage(source,output,input_signature,not force),force)
 		if error != OK: return error
 		cache.entries["stage_%d" % source.index].fingerprint = cache.digest(stage_inputs(files,source,output))
 		error = _refresh_source_signature(output.path_join("run/stage_%d.json" % source.index),input_signature)
 		if error != OK: return error
 	var intro_inputs := _select(files,["res://data/","res://assets/","res://shaders/","res://scripts/","res://scenes/","res://tools/content/"])
 	for i in range(intro_inputs.size()-1,-1,-1):
-		if intro_inputs[i].begins_with("res://data/stages/") or intro_inputs[i].begins_with("res://data/bosses/") or intro_inputs[i].begins_with("res://data/codex/"): intro_inputs.remove_at(i)
-	var error: Error = cache.run("intro",intro_inputs,func(): return _build_intro(output,not force),force)
+		if not INPUTS.affects_stage(intro_inputs[i]) or intro_inputs[i].begins_with("res://data/stages/") or intro_inputs[i].begins_with("res://data/bosses/") or intro_inputs[i].begins_with("res://data/codex/"): intro_inputs.remove_at(i)
+	var error: Error = cache.run("intro",intro_inputs,func(): return STAGES.build_intro(output,not force),force)
 	if error != OK: return error
 	var active := {}
 	for row: Dictionary in cache.report: active[row.unit] = true

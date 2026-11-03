@@ -63,6 +63,7 @@ static func _visit(path: String, hashes: Dictionary, pending: Dictionary) -> boo
 static func _folder(directory: String, hashes: Dictionary) -> bool:
 	for name in DirAccess.get_files_at(directory):
 		var path := directory.path_join(name)
+		if not preload("res://addons/content_build/inputs.gd").affects_stage(path): continue
 		if name.ends_with(".regions.json") or name.ends_with(".gd") or name.ends_with(".gdshader") or name.ends_with(".gdshaderinc"):
 			if not _visit(path,hashes,{}): return false
 	for name in DirAccess.get_directories_at(directory):

@@ -2279,7 +2279,7 @@ static func preparation_signature(stage: RuntimeStage, config: GameConfig, defin
 		cache.files(directory,paths)
 	for i in range(paths.size()-1,-1,-1):
 		var path: String = paths[i]
-		if path == "res://data/content_catalog.tres" or path.begins_with("res://data/stages/") or path.begins_with("res://data/codex/") or path.begins_with("res://data/text/") or path.begins_with("res://assets/ui/") or path.begins_with("res://assets/audio/"):
+		if not preload("res://addons/content_build/inputs.gd").affects_stage(path) or path == "res://data/content_catalog.tres" or path.begins_with("res://data/stages/") or path.begins_with("res://data/codex/") or path.begins_with("res://data/text/") or path.begins_with("res://assets/ui/") or path.begins_with("res://assets/audio/"):
 			paths.remove_at(i)
 		elif path.begins_with("res://data/bosses/") and path != "res://data/bosses/%s.tres" % stage.boss_id and not (stage.boss_id == &"draco" and path == "res://data/bosses/hydra.tres"):
 			paths.remove_at(i)
@@ -2287,7 +2287,6 @@ static func preparation_signature(stage: RuntimeStage, config: GameConfig, defin
 		if String(path).begins_with("res://.content/") and not path in paths: paths.append(path)
 	if not stage.boss_id.is_empty(): paths.append("res://.content/boss_%s.tres" % stage.boss_id)
 	if stage.boss_id == &"draco": paths.append("res://.content/boss_hydra.tres")
-	paths.append("res://addons/content_build/incremental.gd")
 	var values: Variant = BossProgram.canonical([stage,config,definitions,extra,bosses,programs])
 	var bytes := cache.digest(paths).to_utf8_buffer()
 	bytes.append_array(var_to_bytes(values))
