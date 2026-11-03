@@ -5776,7 +5776,7 @@ const ROAR_LEVELS = {
   2: { life: 0.36, blur: 0.075, reach: 5, mix: 0.8 },
   3: { life: 0.52, blur: 0.17, reach: 8, mix: 1 },
 };
-const roarLevel = P => ROAR_LEVELS[P.roarLevel] || ROAR_LEVELS[1];
+const roarLevel = P => { const l = ROAR_LEVELS[P.roarLevel] || ROAR_LEVELS[1]; return { ...l, life: l.life * (P.roarTime ?? 1) }; }; // 長さはつまみの倍率（待ち時間の起点も一緒にずれる）
 function activeRoar(S, P) {
   const e = S.shouts.findLast(e => !e.small), age = e ? (S.t - e.t) / P.timing : -1;
   return age >= 0 && age < roarLevel(P).life ? { ...e, age } : null;
@@ -5790,6 +5790,7 @@ function canisOrderCue(S) {
 }
 
 const CANIS_ROAR_VISUAL_PARAMS = [
+  { k: 'roarTime', label: '咆哮：長さ（倍率）', type: 'range', min: 0.3, max: 4, step: 0.05, def: 1 },
   { k: 'roarSize', label: '咆哮：全体の大きさ', type: 'range', min: 0.5, max: 1.8, step: 0.01, def: 1 },
   { k: 'roarColor', label: '咆哮：色', type: 'color', def: '#b6e5ff' },
   { k: 'roarClear', label: '咆哮：中心を残す広さ', type: 'range', min: 0.2, max: 1.2, step: 0.01, def: 0.5 },
