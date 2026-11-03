@@ -12,7 +12,9 @@ const STD_PARAMS = [
   { k: 'intensity', label: '強度', type: 'range', min: 0, max: 2, step: 0.01, def: 1 },
   { k: 'timing', label: 'FXの時間倍率', type: 'range', min: 0.5, max: 2, step: 0.01, def: 1 },
 ];
-function paramDefs(d) { return [...STD_PARAMS.map(p => p.k === 'color' ? { ...p, def: d.color || '#ffffff' } : d.defaults?.[p.k] != null ? { ...p, def: d.defaults[p.k] } : p), ...(d.params || [])]; }
+function paramDefsBase(d) { return [...STD_PARAMS.map(p => p.k === 'color' ? { ...p, def: d.color || '#ffffff' } : d.defaults?.[p.k] != null ? { ...p, def: d.defaults[p.k] } : p), ...(d.params || [])]; }
+// 試作ごとの段階別の初期値（例：おおいぬの咆哮の段階）。levelDefaults() が返す値で、その段階の初期値を差し替える
+function paramDefs(d) { const list = paramDefsBase(d), ld = d.levelDefaults ? d.levelDefaults() : null; return ld ? list.map(p => ld[p.k] != null ? { ...p, def: ld[p.k] } : p) : list; }
 // 初期値と違う値だけを、試作ごとにまとめた文字列にする（貼り付けて渡せば初期値に入れられる）
 function changedParamsText() {
   const out = {};
@@ -100,7 +102,7 @@ function buildParams() {
     inp.value = v;
     const number = !choice && p.type !== 'color';
     const out = el('span', { class: 'val' }, number ? (+v).toFixed(2) : '');
-    inp.addEventListener(choice ? 'change' : 'input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = number ? (+inp.value).toFixed(2) : ''; saveParams(); resetSim(); $('#scrub').max = demo.duration; });
+    inp.addEventListener(choice ? 'change' : 'input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = number ? (+inp.value).toFixed(2) : ''; saveParams(); resetSim(); $('#scrub').max = demo.duration; if (p.k === 'roarLevel') buildParams(); });
     box.append(el('label', {}, el('span', { class: 'pl' }, p.label), inp, out));
   }
   if (demo.id.startsWith('O-') && CANIS_ROARS.has(demo.id.slice(2))) {
