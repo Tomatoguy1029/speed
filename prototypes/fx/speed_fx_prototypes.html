@@ -3954,7 +3954,8 @@ DEMOS.push({
     // 引っかき始めの外側の端（真ん中の傷）が、体の前の爪（render/enemies/lynx.gd の paw：前へ r×0.55・横へ r×0.6）に来るよう、絵の置き場所をずらす
     const outerOff = (a, sd, sz) => { const uu = fromA(a), ac = mul(orth(uu), sd), phi = -Math.PI / 2 + span * 1.08, ax = 1 + SLASH.STEP, ay = SLASH.TALL + SLASH.STEP + SLASH.STRETCH; return mul(add(mul(ac, SLASH.INNER + (P.gap ?? 0.3) + ax * Math.cos(phi)), mul(uu, -(SLASH.TALL + SLASH.STRETCH) - ay * Math.sin(phi))), sz); };
     const shift = (a, sd, paw) => sub(paw ?? (() => { const uu = fromA(a); return add(mul(uu, -e.r * 0.45), mul(orth(uu), sd * e.r * 0.6)); })(), outerOff(a, sd, full * g0)); // 口（pos＋u×r）から見たずれ
-    for (const s of S.shots) { const age = S.t - s.t0; if (R.proto) drawClawsProto(R, add(s.pos, shift(s.a, s.side, s.paw)), s.a, full * lerp(g0, 1, ease(age / grow)), s.side, Math.min(1, P.intensity), P, span, Math.min(1, age / cutT)); else drawClawsCur(s.pos, s.a, p.slash_size, s.side, 1); }
+    // 爪への固定は引っかいた直後だけ。大きくなるほど外し、最大では進む向きの線から「中心の空き×大きさ」離れる
+    for (const s of S.shots) { const age = S.t - s.t0, sz = full * lerp(g0, 1, ease(age / grow)); if (R.proto) drawClawsProto(R, add(s.pos, mul(shift(s.a, s.side, s.paw), full * g0 / sz)), s.a, sz, s.side, Math.min(1, P.intensity), P, span, Math.min(1, age / cutT)); else drawClawsCur(s.pos, s.a, p.slash_size, s.side, 1); }
     const k = e.charge; if (k <= 0) return;
     const u = fromA(B.facing), paw = add(add(B.pos, mul(u, e.r * 0.55)), mul(orth(u), side * e.r * 0.6));
     if (!R.proto) { D2.circle(paw, e.r * (0.25 + 0.35 * k), `rgba(255,140,51,${0.25 * k})`); drawClawsCur(paw, e.facing, e.r * (0.5 + 0.5 * k), side, 0.3 + 0.7 * k); }
