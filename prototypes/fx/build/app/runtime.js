@@ -100,8 +100,17 @@ function buildParams() {
     inp.value = v;
     const number = !choice && p.type !== 'color';
     const out = el('span', { class: 'val' }, number ? (+v).toFixed(2) : '');
-    inp.addEventListener(choice ? 'change' : 'input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = number ? (+inp.value).toFixed(2) : ''; saveParams(); resetSim(); });
+    inp.addEventListener(choice ? 'change' : 'input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = number ? (+inp.value).toFixed(2) : ''; saveParams(); resetSim(); $('#scrub').max = demo.duration; });
     box.append(el('label', {}, el('span', { class: 'pl' }, p.label), inp, out));
+  }
+  if (demo.id.startsWith('O-') && CANIS_ROARS.has(demo.id.slice(2))) {
+    box.prepend(el('button', { onclick: () => {
+      playing = false; syncPlay(); mode = 'proto';
+      $('input[name=mode][value=proto]').checked = true; resetSim();
+      while (!S.shouts.length && S.t < demo.duration) simTo(S.t + DT);
+      playT = Math.min(demo.duration, S.t + roarLevel(P()).life * P().timing * 0.35);
+      simTo(playT); render();
+    } }, '咆哮の瞬間で止めて調整'));
   }
   const copied = el('span', { class: 'val' }, '');
   box.append(el('button', { onclick: () => { const t = changedParamsText(); if (!t) { copied.textContent = '初期値から変えた値はありません'; return; } const done = () => { copied.textContent = 'コピーしました（全部の試作の分）'; }; (navigator.clipboard?.writeText(t) || Promise.reject()).then(done, () => { window.prompt('この文字列をコピーしてください', t.replace(/\n/g, ' ')); }); } }, '調整した値をコピー'), copied);
@@ -159,7 +168,7 @@ function boot() {
   $('#prev').onclick = () => { playT = Math.max(0, Math.round(playT / DT) * DT - DT); playing = false; syncPlay(); };
   $('#next').onclick = () => { playT = Math.min(demo.duration, Math.round(playT / DT) * DT + DT); playing = false; syncPlay(); };
   document.querySelectorAll('input[name=speed]').forEach(r => r.onchange = () => speed = +r.value);
-  document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { mode = r.value; resetSim(); }); // 試作と現行で動きが違うデモがあるため作り直す
+  document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { mode = r.value; resetSim(); $('#scrub').max = demo.duration; }); // 試作と現行で動きが違うデモがあるため作り直す
   document.querySelectorAll('input[name=bg]').forEach(r => r.onchange = () => bgMode = r.value);
   $('#scale1').onchange = (e) => document.body.classList.toggle('fit', !e.target.checked);
   $('#save').onclick = saveJSON;

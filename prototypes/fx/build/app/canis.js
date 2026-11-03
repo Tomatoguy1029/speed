@@ -21,6 +21,11 @@ function canisPose(B, t, opts = {}) {
       edits.Head = { rotation: -0.045 * inhale, position: V(0, 42 - inhale * 9 + push * 13), scale: V(1 + push * 0.035, 1 + push * 0.09) };
       edits.Body = { position: V(0, -inhale * 4 - push * 3), scale: V(1 + inhale * 0.025 - push * 0.02, 1 - inhale * 0.055 + push * 0.04) };
     } else if (B.pose.shout || B.pose.gather || B.pose.bay || release > 0) { edits.Head.rotation += -0.12 * charge + Math.sin(release * Math.PI) * 0.11; edits.Head.position = V(0, 42 - charge * 3 + release * 4); edits.Body = { position: V(0, -charge * 2 + release * 2) }; }
+    if (opts.nova) {
+      const { brace, release } = opts.nova;
+      edits.Body = { position: V(0, -5 * brace - 14 * release), scale: V(1 + 0.04 * brace, 1 - 0.08 * brace) };
+      edits.Tail.rotation += 0.17 * brace - 0.26 * release;
+    }
     if (B.pose.flame && B.mode === 'active') { edits.Head.rotation += Math.sin(t * 23) * 0.018; edits.Head.position = V(0, 42 + Math.sin(t * 16) * 1.2); }
   }
   return edits;
@@ -38,6 +43,13 @@ function drawCanis(B, t, opts = {}) {
 function canisSetup(S, id) {
   S.tech = id; S.B = bossActor('canis_major', V(-500, 0)); S.B.phase = Math.round(P().phase); S.r = bossRule('canis_major', id, S.B.phase);
   if (id === 'nova' && mode === 'proto') S.r = { ...S.r, warn: 3.2, after: 1.15 };
+  S.orderTiming = null;
+  if (mode === 'proto' && CANIS_ROARS.has(id)) {
+    const warn = ['hunt', 'hunt_pounce'].includes(id) ? bossRule('canis_major', 'stream', S.B.phase).warn : S.r.warn;
+    const cue = warn - Math.min(warn * 0.65, id === 'howl' ? 0.55 : 0.32), roarEnd = cue + roarLevel(P()).life * P().timing;
+    const warnStart = roarEnd + P().orderWait;
+    S.orderTiming = { cue, roarEnd, warnStart, shift: warnStart - warn, houndWarn: P().houndWarn };
+  }
   S.age = -0.4; S.stageAge = 0; S.stage = 'start'; S.ship = shipState(V(130, 0), Math.PI / 2, 35); S.shipVel = V(0, 35);
   S.pack = []; S.jetVisuals = []; S.jets = []; S.flames = []; S.trails = []; S.shouts = []; S.transfers = []; S.bursts = []; S.shadows = [];
   if (mode === 'proto' && CANIS_ROARS.has(id)) roarScreen ||= makeRoarScreen();
@@ -92,18 +104,18 @@ function canisFlameAim(S, dt, cfg) {
   }
   a.age += dt; B.charge = 0; return a.age >= cfg.time;
 }
-function canisSequence(S, dt, r, startAt, order = S.order, prefix = '') {
+function canisSequence(S, dt, r, startAt, order = S.order, prefix = '', age = S.age) {
   let last = startAt;
-  order.forEach((q, i) => { const mark = startAt + i * (r.interval ?? r.seq_interval), launch = mark + (r.each_warn ?? r.seq_warn); last = launch;
-    if (S.age >= mark && q.seq !== prefix) { q.seq = prefix; q.warning = S.t + Math.max(0, launch - S.age); }
-    if (S.age >= launch && q.sent !== prefix) { q.sent = prefix; canisLaunchHound(S, q, r.lunge_speed, r.lunge_time); }
+  order.forEach((q, i) => { const mark = startAt + i * (r.interval ?? r.seq_interval), warning = S.orderTiming?.houndWarn ?? (r.each_warn ?? r.seq_warn), launch = mark + warning; last = launch;
+    if (age >= mark && q.seq !== prefix) { q.seq = prefix; q.warnDuration = warning; q.warning = S.t + Math.max(0, launch - age); }
+    if (age >= launch && q.sent !== prefix) { q.sent = prefix; canisLaunchHound(S, q, r.lunge_speed, r.lunge_time); }
   });
   return last;
 }
 function canisStep(S, dt) {
-  S.age += dt; const B = S.B, r = S.r, id = S.tech, age = S.age, was = { ...B.pos };
+  S.age += dt; const B = S.B, r = S.r, id = S.tech, age = S.age - (S.orderTiming?.shift || 0), was = { ...B.pos };
   S.ship.pos = id === 'nova' && mode === 'proto' ? V(P().playerX, P().playerY) : V(130, Math.sin(S.t * 0.5) * 70); S.shipVel = V(0, Math.cos(S.t * 0.5) * 35);
-  if (age < 0) return;
+  if (S.age < 0) return;
   canisOrderCue(S);
   B.gait += dt * (B.mode === 'active' ? 18 : 9);
   if (B.mode === 'recovery') { S.recover -= dt; if (S.recover <= 0) B.mode = 'idle'; }
@@ -113,12 +125,19 @@ function canisStep(S, dt) {
     if (id === 'pounce') { if (canisJump(S, dt, r)) canisFinish(S); }
     else if (['command', 'stream', 'hunt', 'hunt_pounce'].includes(id)) {
       const sr = ['hunt', 'hunt_pounce'].includes(id) ? bossRule('canis_major', 'stream', B.phase) : r;
-      if (age < sr.warn) { canisFace(S, dt); B.pose = { shout: true }; if (id === 'command') for (const q of S.pack) q.warning = 0.4 + sr.warn; }
+      const commandAt = sr.warn + (id === 'command' ? S.orderTiming?.houndWarn || 0 : 0);
+      if (age < commandAt) {
+        canisFace(S, dt); B.pose = { shout: true };
+        if (id === 'command') for (const q of S.pack) {
+          if (!S.orderTiming) q.warning = 0.4 + sr.warn;
+          else if (age >= sr.warn) { q.warnDuration = S.orderTiming.houndWarn; q.warning = S.t + Math.max(0, commandAt - age); }
+        }
+      }
       else {
         if (!S.orderStarted) { S.orderStarted = true; B.mode = 'active'; }
         let last;
-        if (id === 'command') { for (const q of S.pack) if (q.sent !== 'command') { q.sent = 'command'; canisLaunchHound(S, q, r.lunge_speed, r.lunge_time); } last = sr.warn; }
-        else last = canisSequence(S, dt, sr, sr.warn, S.order, 'stream');
+        if (id === 'command') { for (const q of S.pack) if (q.sent !== 'command') { q.sent = 'command'; canisLaunchHound(S, q, r.lunge_speed, r.lunge_time); } last = commandAt; }
+        else last = canisSequence(S, dt, sr, sr.warn, S.order, 'stream', age);
         if (['command', 'stream'].includes(id) && age >= last + sr.lunge_time + (id === 'command' ? 0.05 : 0)) canisFinish(S);
         if (id === 'hunt' && age >= last + r.gap) { if (canisFlameAim(S, dt, { warn: r.aim_warn, lock: r.aim_lock, lead: r.aim_lead, turn: r.aim_turn, length: r.beam_length, width: r.beam_width, time: r.beam_time })) canisFinish(S); B.pose = { glow: B.charge }; }
         if (id === 'hunt_pounce' && age >= last + r.gap) { const jr = { ...bossRule('canis_major', 'pounce', B.phase), alone_hounds: 0 }; if (!S.jump) canisJump(S, 0, jr, true); if (canisJump(S, dt, jr)) canisFinish(S, jr.recover); }
@@ -147,11 +166,11 @@ function canisStep(S, dt) {
       if (age >= Math.max(r.warn, r.ignite_at + Math.max(0, S.chosen.length - 1) * r.ignite_step)) canisFinish(S);
     } else if (id === 'relay') {
       if (age < r.warn) { canisFace(S, dt); B.pose = { shout: true }; }
-      S.order.forEach((q, i) => { const mark = r.warn + i * r.interval, at = mark + r.each_warn;
-        if (age >= mark && !q.relay) { q.relay = { from: { ...q.pos }, a: angOf(sub(S.ship.pos, q.pos)) }; q.warning = 0.4 + at; q.facing = q.relay.a; }
+      S.order.forEach((q, i) => { const mark = r.warn + i * r.interval, warning = S.orderTiming?.houndWarn ?? r.each_warn, at = mark + warning;
+        if (age >= mark && !q.relay) { q.relay = { from: { ...q.pos }, a: angOf(sub(S.ship.pos, q.pos)) }; q.warnDuration = warning; q.warning = S.orderTiming ? S.t + Math.max(0, at - age) : 0.4 + at; q.facing = q.relay.a; }
         if (age >= at && !q.relayFired) { q.relayFired = true; canisStartJet(S, add(q.pos, mul(fromA(q.relay.a), q.r)), q.relay.a, r.hound_beam_length, r.hound_beam_width, r.hound_beam_time, false, 'hound'); }
       });
-      const finalAt = r.warn + Math.max(0, S.order.length - 1) * r.interval + r.each_warn + r.interval + 0.3;
+      const finalAt = r.warn + Math.max(0, S.order.length - 1) * r.interval + (S.orderTiming?.houndWarn ?? r.each_warn) + r.interval + 0.3;
       if (age >= finalAt) { if (canisFlameAim(S, dt, { warn: r.final_warn, lock: r.final_lock, turn: r.final_turn, remaining: true, length: r.final_length, width: r.final_width, time: r.final_time })) canisFinish(S); B.pose = { glow: B.charge }; }
     } else if (id === 'howl') {
       if (age < r.warn) { canisFace(S, dt); B.pose = { howl: true }; }
@@ -164,7 +183,7 @@ function canisStep(S, dt) {
         if (age < r.warn + r.follow_time) S.ringCenter = lerpV(S.ringCenter, S.ship.pos, 1 - Math.exp(-r.follow_rate * dt));
         const rr = lerp(r.ring_radius, r.ring_close, clamp((age - r.warn - r.gather_time) / r.close_time));
         for (const q of S.pack) if (!q.sent) { q.goal = add(S.ringCenter, mul(fromA(q.ringA), rr)); q.followScale = r.catch_up; }
-        const last = canisSequence(S, dt, r, r.warn + r.follow_time, S.order, 'howl'); if (age >= last + r.tail) canisFinish(S);
+        const last = canisSequence(S, dt, r, r.warn + r.follow_time, S.order, 'howl', age); if (age >= last + r.tail) canisFinish(S);
       }
     } else if (id === 'bay') {
       if (age < r.warn) { canisFace(S, dt); B.pose = { bay: true, shout: true }; }
@@ -176,7 +195,7 @@ function canisStep(S, dt) {
           const rel = Math.abs(angDiff(m.angle, Math.PI / 2)), front = rel < r.front_angle * Math.PI / 180, back = rel > r.back_angle * Math.PI / 180;
           if (q.until > S.t) return;
           if (q.warning > 0 && S.t >= q.warning) { canisLaunchHound(S, q, r.nip_speed, r.nip_time); m.cool = r.nip_cd; return; }
-          if (back && m.cool <= 0 && S.pack.filter(q => q.warning > S.t || q.until > S.t).length < r.nip_max) { q.warning = S.t + r.nip_warn; m.cool = r.nip_cd; }
+          if (back && m.cool <= 0 && S.pack.filter(q => q.warning > S.t || q.until > S.t).length < r.nip_max) { q.warnDuration = S.orderTiming?.houndWarn ?? r.nip_warn; q.warning = S.t + q.warnDuration; m.cool = r.nip_cd; }
           if (front && m.bark <= 0) { m.bark = lerp(r.bark_min, r.bark_max, S.rng()); canisShout(S, q.pos, angOf(sub(S.ship.pos, q.pos)), true); }
           const rad = front ? r.r_front : back ? r.r_back : r.r_side, wobble = mul(V(Math.sin(S.t * 2 + m.phase), Math.cos(S.t * 1.7 + m.phase)), r.wobble);
           q.steer = { goal: add(add(S.ship.pos, mul(fromA(m.angle), rad)), wobble), face: S.ship.pos, cfg: r };
@@ -249,8 +268,8 @@ function canisDraw(S, R) {
   R.blitBack();
   if (R.proto) canisTrailPictures(S, R);
   const mainShout = S.shouts.findLast(e => !e.small);
-  drawCanis(B, t, { proto: R.proto, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.10 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
-  for (const q of S.pack) if (!q.dead) { drawEnemy(q); if (R.proto && q.warning > t) canisHoundWarning(q, clamp(1 - (q.warning - t) / 0.6)); }
+  drawCanis(B, t, { proto: R.proto, nova: R.proto && id === 'nova' ? { brace: S.age < r.warn ? smooth(0, r.warn, S.age) : 0, release: canisFlash(S) } : null, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.10 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  for (const q of S.pack) if (!q.dead) { if (R.proto && q.warning > t) canisHoundWarning(q, clamp(1 - (q.warning - t) / (q.warnDuration || 0.6)), angOf(sub(S.ship.pos, q.pos))); else drawEnemy(q); }
   if (R.proto) {
     for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); canisFire(R, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, 'ignite'); }
     if (id !== 'nova' && !CANIS_ROARS.has(id) && B.charge > 0 && B.mode === 'windup' && !S.jump) bossGather(R, mouth, B.r * 1.2, B.charge, t);
@@ -260,6 +279,7 @@ function canisDraw(S, R) {
   for (const b of S.bursts) { const age = (t - b.t) / P.timing; if (age < 0 || age > 0.65) continue; const samples = []; for (let i = 0; i < 18; i++) samples.push({ pos: add(b.at, mul(fromA(hash(i * 9) * TAU), Math.sqrt(age) * b.radius * hash(i + 3))), radius: b.radius * (0.3 + hash(i) * 0.2) * (1 - age / 0.65), seed: i }); bossFire(R.front, samples, t, P.color, P.intensity, P.size); }
   }
   drawShip(S.ship);
+  if (R.proto && id === 'nova') canisNovaFlare(S, R);
   if (R.proto) canisJetPictures(S, R);
 }
 function canisNovaDraw(S, R) {
@@ -275,10 +295,14 @@ function canisNovaDraw(S, R) {
 const tFix = t => Math.floor(t * 30) / 30;
 for (const id of Object.keys(CANIS_IDS)) {
   const r = bossRule('canis_major', id);
-  DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, duration: id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5, color: '#80c8ff',
-    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: id === 'nova' ? 18 : 8, step: 1, def: id === 'nova' ? 12 : 8 }, ...(id === 'nova' ? [{ k: 'playerX', label: '機体の位置（横）', type: 'range', min: -850, max: 850, step: 5, def: 130 }, { k: 'playerY', label: '機体の位置（縦）', type: 'range', min: -450, max: 450, step: 5, def: 0 }] : []), ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
-    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。本体と口元をぼかさず、周囲だけにラディアルブラーをかける。通常の号令は短い小、遠吠えは中。白い空気・集まる粒子・画面全体の揺れは出さない' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '構える→予告中に咆哮→猟犬が動き始める。攻撃の開始時刻は現行どおり' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。3.2秒かけて影を見せ、一度だけ閃光を放つ。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
-    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX原本 fire/fire-breath・fire/fireball・fire/spirit-flame の青い出力、鳳凰と共通のpixel_fire密度場・爆発粒子', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
-    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { if (S.tech === 'nova' && mode === 'proto') return (S.age < S.r.warn ? '予兆・猟犬の影へ／' : S.age < S.r.warn + 0.42 ? '閃光発動／' : '照射終了／') + (S.novaSafe ? '機体全体が影の中（安全）' : '光が届く（危険）'); const e = S.shouts.findLast(e => !e.small); return mode === 'proto' && e && S.t - e.t < 0.25 ? '咆哮（号令）' : bossPhase(S.B); }
+  DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, get duration() { const base = id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5; return base + (mode === 'proto' && CANIS_ROARS.has(id) ? 5 : 0); }, color: '#80c8ff',
+    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: id === 'nova' ? 18 : 8, step: 1, def: id === 'nova' ? 12 : 8 }, ...(['sirius', 'sirius_flame'].includes(id) ? [{ k: 'jetLength', label: '噴射の長さ', type: 'range', min: 0.4, max: 1.8, step: 0.05, def: 1 }, { k: 'jetWidth', label: '噴射の太さ', type: 'range', min: 0.4, max: 2.5, step: 0.05, def: 1 }] : []), ...(id === 'sirius' ? [{ k: 'trailLength', label: '残り火の長さ', type: 'range', min: 0.4, max: 1.8, step: 0.05, def: 1 }, { k: 'trailWidth', label: '残り火の太さ', type: 'range', min: 0.5, max: 3, step: 0.05, def: 1 }] : []), ...(id === 'nova' ? [{ k: 'playerX', label: '機体の位置（横）', type: 'range', min: -850, max: 850, step: 5, def: 130 }, { k: 'playerY', label: '機体の位置（縦）', type: 'range', min: -450, max: 450, step: 5, def: 170 }] : []), ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（短く、弱く）' }, { value: 2, label: '中：強い号令（周囲にブラー）' }, { value: 3, label: '大：大技（広く、強いブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarPost', label: '咆哮のブラーの強さ', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }, ...CANIS_ROAR_VISUAL_PARAMS, { k: 'orderWait', label: '咆哮後の待ち（秒）', type: 'range', min: 0, max: 1.5, step: 0.05, def: 0.2 }, { k: 'houndWarn', label: '猟犬の攻撃予兆（秒）', type: 'range', min: 0.1, max: 1.5, step: 0.05, def: 0.6 }] : [])],
+    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。顔の中心を残し、すぐ外側に空気の濃淡とブラーが広がる。右パネルで色・サイズ・内側と外側の範囲を調整できる。通常の号令は小、遠吠えは中' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', ...(CANIS_ROARS.has(id) ? { '号令の順序': '試作は構える→咆哮→少し待つ→猟犬の予兆→攻撃。待ちと猟犬の予兆を右のパネルで別々に調整する。遠吠えと追い吠えは位置取りのあと各攻撃を予告。現行表示の時刻は維持' } : {}), '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? '試作では個体の実画像に沿う影と、前後をずらした3つの壁へ変更。表示と安全確認は同じ影の場を使用。光が当たる場所全体が攻撃範囲。3.2秒の予兆の後、シリウスの光が一度だけ弾ける。機体の縦位置を0にすると正面の猟犬の影を比較できる。本番の波動判定と、2体の間までまとめる遮蔽は移行後に変更が要る' : id === 'stream' ? 'O08の待ちと猟犬の予兆は試作内で調整可能。本番への反映はC++移行後' : CANIS_ROARS.has(id) ? '号令後の待ちと猟犬の予兆は試作だけで変更。本番への反映はC++移行後' : '本番の攻撃数値・軌道・範囲は変更していない' },
+    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX原本 fire/fire-breath・fire/fireball の青い出力、鳳凰と共通のpixel_fire密度場・爆発粒子', ...(CANIS_ROARS.has(id) ? ['G2 Studios「軽くて綺麗なラディアルブラーを作ろう！」https://note.com/g2studios/n/n7b7a0c068a1c（サンプリング位置のディザ）'] : [])],
+    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { if (S.tech === 'nova' && mode === 'proto') {
+      if (S.age >= S.r.warn + 0.42) return '照射終了';
+      if (S.novaHit) return '閃光発動／被弾';
+      return (S.age < S.r.warn ? '予兆・猟犬の影へ／' : '閃光発動／') + (S.novaSafe ? '機体全体が影の中（安全）' : '光が届く（危険）');
+    } const e = S.shouts.findLast(e => !e.small); if (mode === 'proto' && S.orderTiming) { if (e && S.t - e.t < roarLevel(P()).life * P().timing) return '咆哮（号令）'; if (S.age >= S.orderTiming.roarEnd && S.age < S.orderTiming.warnStart) return '号令後の待ち'; if (S.pack.some(q => q.warning > S.t)) return '猟犬の攻撃予兆'; } return bossPhase(S.B); }
   });
 }

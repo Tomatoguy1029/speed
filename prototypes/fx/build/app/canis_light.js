@@ -73,28 +73,57 @@ function canisNovaSafe(S, point, radius = DATA.config.ship_radius) {
   }
   return true;
 }
+// 光源のまわりの露光を低解像度の固定テクスチャに焼く。ひと続きの発光面を一度だけ開く。
+const NOVA_EMISSION = (() => {
+  const side = 192, data = new Float32Array(side * side);
+  for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) {
+    const u = (x + 0.5) / 96 - 1, v = (y + 0.5) / 96 - 1, radius = Math.hypot(u, v);
+    const warp = Math.sin(6 * v + 2.1 * Math.sin(4 * u));
+    const grain = Math.sin(13 * u + 9 * v + 3 * warp) * Math.sin(8 * v - 2 * u);
+    const heat = Math.max(0, 1 - radius * (1.2 + 0.24 * warp));
+    data[y * side + x] = heat ** 3 * (0.70 + 0.30 * grain);
+
+  }
+  return data;
+})();
 function canisNovaLight(S, R) {
   const field = canisNovaField(S), origin = canisNovaOrigin(S), source = toL(origin), p = R.P, charge = S.age < S.r.warn ? smooth(0, S.r.warn, S.age) : 0, flash = canisFlash(S);
   const t = S.age - S.r.warn;
   const tell = t < 0 ? charge : 1 - smooth(0.22, 0.98, t);
-  const tint = hexc('#759ab2'), rays = hexc('#adc4d2');
+  const tint = hexc('#9caec0');
   const gain = Math.min(p.intensity, 1);
+  const hot = hexc('#fff0cc'), corona = hexc('#6a9bca');
+  const aperture = S.B.r * WL * (t < 0 ? 0.18 + 0.28 * tell * (1 - 0.65 * smooth(0.83, 1, tell)) : 0.24 + 2.65 * smooth(0, 0.115, t));
   if (tell || flash) for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) {
     const dx = x - source.x, dy = y - source.y, distance = Math.hypot(dx, dy) / WL;
     const visible = 1 - field.pixels[(y * LW + x) * 4 + 3] / 255;
     if (visible < 0.01 || distance > S.r.ring_end) continue;
     const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 760) ** 2);
     const strength = visible * gain * falloff;
-    R.back.light(x, y, tint, strength * (tell * 0.13 + flash * 0.10));
-    if (flash > 0) {
-      // 星から同時に伸びる光条。角度を固定し、発動中に明滅させない。
-      const angle = Math.atan2(dy, dx);
-      const spread = angle * 7 + 0.68 * Math.sin(angle * 3) + 0.28 * Math.cos(angle * 5);
-      const shaft = Math.pow(Math.max(0, Math.cos(spread)), 18);
-      R.back.light(x, y, rays, strength * flash * shaft * 0.54);
+    R.back.light(x, y, tint, strength * (tell * 0.10 + flash * 0.25));
+    const stretch = t < 0 ? 1 : 1 + 0.45 * flash;
+    const tx = Math.floor(96 + dx * 96 / (aperture * stretch)), ty = Math.floor(96 + dy * 96 / aperture);
+    if (tx >= 0 && tx < 192 && ty >= 0 && ty < 192) {
+      const flux = NOVA_EMISSION[ty * 192 + tx] * visible * gain;
+      const exposure = t < 0 ? tell * 0.65 : flash * (1.35 - 0.65 * smooth(0.12, 0.56, t));
+      R.front.light(x, y, corona, flux * exposure * 0.8);
+      R.front.light(x, y, hot, flux * flux * exposure);
     }
   }
   R.front.glow(source.x, source.y, 4 + tell * 6 + flash * 9, hexc('#bedbe8'), gain * (tell * 0.12 + flash * 0.25));
   S.novaSafe = canisNovaSafe(S, S.ship.pos);
   S.novaHit = t >= 0.09 && t < 0.42 && !S.novaSafe;
+  if (S.novaHit) {
+    const target = toL(S.ship.pos), direction = angOf(sub(S.ship.pos, origin));
+    FX.sparks(R.front, target, t - 0.09, 81, 19, '#ffe7bd', 78, 0.34, direction, 1.4);
+    R.front.glow(target.x, target.y, 8, hexc('#ffe7bd'), flash * gain * 0.48);
+  }
+}
+function canisNovaFlare(S, R) {
+  const power = canisFlash(S), t = S.age - S.r.warn;
+  if (power <= 0) return;
+  const origin = canisNovaOrigin(S), gain = Math.min(1, R.P.intensity);
+  // シリウス自身の星の絵を開き、光源の近くへ発光を集中させる。
+  drawImg('canis_major/large_star', origin, S.B.facing, S.B.r * (0.18 + power * 0.55), power * gain, false, 0.28 * power * gain);
+
 }
