@@ -16,9 +16,9 @@ void CentaurusRear::step(RunRuntime &r,TechniqueState &t,double dt) {
     if (t.stage!=TechniqueStage::Active || t.hit) return;
     const auto &v=*std::find_if(r.content->centaurus_rears.begin(),r.content->centaurus_rears.end(),[&](const auto &v){return v.technique==t.definition;});
     const auto center=e.pos-godot::Vector2::from_angle(e.facing)*v.back_offset;
-    if (!CollisionQuery::touches(PointCircle{center,v.radius},{t.previous_ship,r.state.ship_pos,r.state.ship_config.ship_radius},{true,true})) return;
+    if (!r.state.observations.check(t.observation_id,CollisionQuery::touches(PointCircle{center,v.radius},{t.previous_ship,r.state.ship_pos,r.state.ship_config.ship_radius},{true,true}))) return;
     t.hit=true;
-    ShipDamageRequest request;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::RearAttack;request.source=e.definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);
+    ShipDamageRequest request;request.observation_id=t.observation_id;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::RearAttack;request.source=e.definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);
 }
 void CentaurusRear::command(RunRuntime &r,TechniqueState &t,TechniqueCommand command) {
     if (command==TechniqueCommand::StrikeRear && t.stage==TechniqueStage::Windup) {t.stage=TechniqueStage::Active;t.hit=false;cue(r,t,"strike");}

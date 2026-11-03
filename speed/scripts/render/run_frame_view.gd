@@ -1330,6 +1330,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_sniper_world_time = float(frame.ui.world_time)
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	for event: Dictionary in _queued_events:
+		if event.type==&"hydra_cue":
+			for display in _boss_body_displays.values():
+				if display.state.get("actor",0)==event.id: display.frame_event(event)
 		if event.type==&"canis_cue":
 			for display in _boss_body_displays.values():
 				if display.state.get("actor",0)==event.id: display.frame_event(event)

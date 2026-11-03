@@ -55,6 +55,9 @@ bool SpeedRunCore::restore_checkpoint(int64_t id) {
     // セル境界も候補順に影響するため、保存した範囲を保って索引だけを再構築する。
     if (!speed::rebuild_state_indexes(candidate->runtime.state,*candidate->runtime.content) ||
         !candidate->rebuild_enemy_grid(grid_cell)) return false;
+    // 記録区間は保持点の外にあるファイルへ属する。復帰後は新しい途中録画として始める。
+    candidate->runtime.state.observations={};
+    candidate->runtime.state.recording={};
     candidate->runtime.epoch=runtime.epoch+1;
     candidate->runtime.api_configured=runtime.api_configured;
     candidate->runtime.api_run_id=runtime.api_run_id;

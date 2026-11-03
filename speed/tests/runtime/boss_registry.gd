@@ -6042,7 +6042,7 @@ func native_boss_trace() -> void:
 	check(executions.size()==2,"判定形状を繰り返し生成してもexecuteは各行動に一度だけ記録する")
 	recording.recorder._end("stopped")
 	var closed: Array = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="observation_end")
-	check(closed.size()==2 and closed.all(func(e): return e.payload.reason=="recording_end" and e.payload.checks>0),"録画停止で並行首の評価をそれぞれ閉じる")
+	check(closed.size()==2 and closed.all(func(e): return e.payload.reason=="recording_end" and e.payload.checks==0),"録画停止では生成攻撃の判定を直接判定へ混ぜず並行首をそれぞれ閉じる")
 	check(bridge.read_recording().value.active_observations==0,"録画停止後に観測を残さない")
 	recording.recorder.free();recording.session.free()
 	if "--cpp-boss-trace-stop" in OS.get_cmdline_user_args():

@@ -11,6 +11,7 @@ const PERF_INTERVAL_US := 3000000
 ## 保存したファイル名を出しておく時間（実秒）
 const SAVED_NOTICE := 5.0
 const IDENTITY := preload("res://scripts/dev/recording_identity.gd")
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 var _real_start_us := 0
 
 ## 0=off, 1=action/damage, 2=decision candidates (default). Applied at recording start.
@@ -18,6 +19,19 @@ var _real_start_us := 0
 @export var combat_events_per_second := 120
 @export var combat_max_events := 30000
 @export var combat_max_bytes := 33554432
+const COMBAT_LINE_BYTES := 16384
+const COMBAT_TYPES := ["boss_decision", "boss_action", "boss_effect", "boss_phase", "combat_damage"]
+var _combat_config: Dictionary = {}
+var _combat_emitted := 0
+var _combat_bytes := 0
+var _combat_rate_dropped := 0
+var _combat_size_dropped := 0
+var _combat_window := -1
+var _combat_window_count := 0
+var _combat_sequence_gaps := 0
+var _combat_transport_missing := false
+var _combat_effect_dropped_start := 0
+var _ending := false
 var _recording_id := ""
 var _io_failed := false
 var armed := false
@@ -26,11 +40,16 @@ var _cpp_session_id := 0
 var _cpp_time := 0.0
 var _cpp_next_sample := 0.0
 var _cpp_record_previous := {}
+var _cpp_measurement_previous: Dictionary = {}
+var _cpp_strong_finished: Dictionary = {}
 var _cpp_event_sequence := 0
 var _cpp_perf_previous := {}
 var _cpp_perf_last_us := 0
 var _cpp_perf_frames := 0
 var _cpp_perf_elapsed_us := 0
+var _cpp_perf_ui := {}
+var _cpp_perf_playing := false
+var _cpp_perf_bonus := false
 ## 記録中のランのセッション（木から出たら記録を閉じる）
 var _session: RunSession = null
 ## 性能の区間のあいだに録画が書いた行数と、その時間（マイクロ秒）
@@ -159,15 +178,22 @@ func _process(delta: float) -> void:
 			_cpp_next_sample = _cpp_time+INTERVAL
 		return
 func _end(result: String) -> void:
-	if _cpp_session_id>0:
+	if _cpp_session_id>0 and not _ending:
+		_ending = true
 		if is_instance_valid(_session) and _session.bridge!=null:
-			_session.bridge.command("set_recording",{"active":false})
+			# 未通知の出来事、観測終了の出来事、終端の順に保存する。
+			if not _session.bridge.collect_frame().ok: _combat_transport_missing = true
+			if not _session.bridge.command("set_recording",{"active":false}).ok: _combat_transport_missing = true
+			if not _session.bridge.collect_frame().ok: _combat_transport_missing = true
 		_flush_cpp_performance()
 		_cpp_sample()
 		var ending := _cpp_record_previous.duplicate(true)
 		ending.merge({"type":"end","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"result":result,
-			"xp_reward_version":2,"xp_cumulative":_last_xp_summary,"xp_observed":_xp_window(_last_xp_summary,_xp_start_summary,"recording_total")},true)
+			"xp_reward_version":2,"xp_cumulative":_last_xp_summary,"xp_observed":_xp_window(_last_xp_summary,_xp_start_summary,"recording_total"),
+			"combat_summary":_combat_summary()},true)
 		ending.erase("xp")
+		ending.erase("measurement_cumulative")
+		ending.erase("strong_observations")
 		_write(ending)
 		_flush()
 		_saved_text = "記録に失敗しました" if _io_failed else "保存："+_file.get_path().get_file()
@@ -175,27 +201,78 @@ func _end(result: String) -> void:
 		if _file!=null: _file.close()
 		_file = null
 		_cpp_session_id = 0
+		if is_instance_valid(_session) and _session.bridge!=null:
+			_session.bridge.unsubscribe("recorder:%d" % get_instance_id())
+			if _session.bridge.before_restore.is_connected(_before_cpp_restore): _session.bridge.before_restore.disconnect(_before_cpp_restore)
 		for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
 			if c.callable.get_object()==self: _session.tree_exiting.disconnect(c.callable)
 		if is_instance_valid(_session) and _session.closing.is_connected(_end): _session.closing.disconnect(_end)
 		_session = null
+		_ending = false
 		_update_label()
 		return
 func _write(record: Dictionary) -> void:
 	if _file != null and not _io_failed:
 		var t0 := Time.get_ticks_usec()
-		_write_line(record)
+		var written := _write_line(record)
 		# 録画そのものの重さ（書いた行数と、行を作って書く時間）
-		_self_lines += 1
+		if written: _self_lines += 1
 		_self_write_us += Time.get_ticks_usec() - t0
 
-func _write_line(record: Dictionary) -> void:
+func _write_line(record: Dictionary) -> bool:
 	# 既存の区間行と出来事を同じ時計精度で並べる。
 	if record.has("t"): record.t = _r(float(record.t))
 	if _real_start_us > 0:
 		if not record.has("real_t"):
 			record.real_t = (Time.get_ticks_usec() - _real_start_us) / 1000000.0
-	if not _store_line(JSON.stringify(record)): _fail_io()
+	var line := JSON.stringify(record)
+	var diagnostic: bool = record.get("type","") in COMBAT_TYPES
+	var bytes := line.to_utf8_buffer().size()+1
+	if diagnostic and not _reserve_combat(record,bytes): return false
+	if not _store_line(line):
+		_fail_io()
+		return false
+	if diagnostic:
+		_combat_emitted += 1
+		_combat_bytes += bytes
+	return true
+
+func _reset_combat_recording(state: Dictionary) -> void:
+	_combat_config = {"level":clampi(combat_level,0,2),"events_per_second":clampi(combat_events_per_second,1,1000),
+		"max_events":clampi(combat_max_events,1,1000000),"max_bytes":maxi(0,combat_max_bytes),"line_bytes":COMBAT_LINE_BYTES}
+	_combat_emitted = 0
+	_combat_bytes = 0
+	_combat_rate_dropped = 0
+	_combat_size_dropped = 0
+	_combat_window = -1
+	_combat_window_count = 0
+	_combat_sequence_gaps = 0
+	_combat_transport_missing = false
+	_combat_effect_dropped_start = int(state.get("combat_diagnostics",{}).get("effect_tracking_dropped",0))
+	_cpp_measurement_previous = {}
+	_cpp_strong_finished = {}
+
+func _reserve_combat(record: Dictionary, bytes: int) -> bool:
+	if _combat_config.level==0 or (record.type=="boss_decision" and _combat_config.level<2): return false
+	if bytes>_combat_config.line_bytes or _combat_bytes+bytes>_combat_config.max_bytes:
+		_combat_size_dropped += 1
+		return false
+	var window := int((Time.get_ticks_usec()-_real_start_us)/1000000)
+	if window!=_combat_window:
+		_combat_window = window
+		_combat_window_count = 0
+	if _combat_window_count>=_combat_config.events_per_second or _combat_emitted>=_combat_config.max_events:
+		_combat_rate_dropped += 1
+		return false
+	_combat_window_count += 1
+	return true
+
+func _combat_summary() -> Dictionary:
+	var effect_dropped := maxi(0,int(_cpp_record_previous.get("combat_diagnostics",{}).get("effect_tracking_dropped",0))-_combat_effect_dropped_start)
+	return {"emitted":_combat_emitted,"rate_or_count_dropped":_combat_rate_dropped,"size_dropped":_combat_size_dropped,
+		"bytes":_combat_bytes,"sequence_gaps":_combat_sequence_gaps,"effect_tracking_dropped":effect_dropped,
+		"transport_missing":_combat_transport_missing,"transport_complete":not _combat_transport_missing and not _io_failed and
+			_combat_rate_dropped==0 and _combat_size_dropped==0 and _combat_sequence_gaps==0 and effect_dropped==0}
 
 func _update_label() -> void:
 	if _label == null:
@@ -241,10 +318,21 @@ func _fail_io() -> void:
 func _exit_tree() -> void:
 	_end("quit")
 
-## 未録画でも購読し、記録開始時に通知の所有権を奪わない。
+## 記録中だけ購読し、ほかの購読者の通知の所有権を奪わない。
 func attach_cpp(session: RunSession) -> void:
-	if session.bridge!=null:
-		session.bridge.subscribe("recorder:%d" % get_instance_id(),consume_cpp_frame,["run_time"])
+	if session.bridge!=null and _cpp_session_id==session.id:
+		if not session.bridge.subscribe("recorder:%d" % get_instance_id(),consume_cpp_frame,["run_time","phase","presentation_frozen","bonus_remaining"]):
+			_combat_transport_missing = true
+
+func _before_cpp_restore() -> void:
+	var session := _session
+	if not is_instance_valid(session) or session.bridge==null: return
+	session.bridge.restored.connect(_resume_cpp_recording.bind(session),CONNECT_ONE_SHOT)
+	_end("restore")
+
+func _resume_cpp_recording(session: RunSession) -> void:
+	if armed and is_instance_valid(session) and session.bridge!=null:
+		_begin_cpp(session,true)
 
 func _begin_cpp(session: RunSession, during_run: bool) -> void:
 	if not armed or _cpp_session_id==session.id or session.is_queued_for_deletion() or not session.is_in_group("recordable_runs"): return
@@ -253,7 +341,6 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 	var state: Dictionary = session.bridge.read_recording(true)
 	if not state.ok: return
 	_end("quit")
-	attach_cpp(session)
 	var directory := _recording_directory()
 	if DirAccess.make_dir_recursive_absolute(directory)!=OK:
 		_open_failed()
@@ -271,8 +358,13 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 		return
 	_session = session
 	_cpp_session_id = session.id
+	_reset_combat_recording(state.value)
+	if not session.bridge.before_restore.is_connected(_before_cpp_restore): session.bridge.before_restore.connect(_before_cpp_restore)
 	if not session.closing.is_connected(_end): session.closing.connect(_end)
 	_cpp_time = snapshot.value.ui.run_time
+	_cpp_perf_ui = snapshot.value.ui
+	_cpp_perf_playing = _cpp_performance_playing()
+	_cpp_perf_bonus = float(_cpp_perf_ui.get("bonus_remaining",0.0))>0.0
 	_cpp_perf_previous = _cpp_metrics()
 	_cpp_perf_last_us = Time.get_ticks_usec()
 	_cpp_perf_frames = 0
@@ -284,23 +376,30 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 	_xp_start_summary = state.value.xp.duplicate(true)
 	_last_xp_summary = _xp_start_summary.duplicate(true)
 	_cpp_next_sample = _cpp_time+INTERVAL
-	_cpp_event_sequence = int(_cpp_perf_previous.get("events_emitted",0))
-	for event: Dictionary in snapshot.value.events: _cpp_event_sequence = maxi(_cpp_event_sequence,int(event.sequence))
+	_cpp_event_sequence = 0
+	if during_run:
+		_cpp_event_sequence = int(_cpp_perf_previous.get("events_emitted",0))
+		for event: Dictionary in snapshot.value.events: _cpp_event_sequence = maxi(_cpp_event_sequence,int(event.sequence))
+	attach_cpp(session)
 	var identity: Dictionary = state.value.identity.duplicate(true)
 	identity["implementation_revision"] = OS.get_environment("SPEED_BUILD_REVISION")
 	identity["implementation_version"] = "cpp_api%d_state%d" % [identity.abi_version,identity.state_schema_version]
 	identity["xp_reward_config_sha256"] = IDENTITY.digest(state.value.xp_config)
+	var recording_start: Dictionary = state.value.duplicate(true)
+	recording_start.erase("measurement_cumulative")
+	recording_start.erase("strong_observations")
 	_write({"type":"start","format":"cpp_events_v2","version":2,"schema_version":4,"measurement_version":3,"combat_version":1,"xp_reward_version":2,
 		"stage":identity.stage_id,"start_time":_cpp_time,"run_id":session.id,"recording_id":_recording_id,"epoch":snapshot.value.epoch,"tick":snapshot.value.tick,
 		"missing_prefix":during_run,"during_run":during_run,"event_sequence_at_start":_cpp_event_sequence,"engine_version":Engine.get_version_info().string,"interval":INTERVAL,
-		"identity":identity,"run_start":session.bridge.recording_origin.duplicate(true),"recording_start":state.value,
+		"identity":identity,"run_start":session.bridge.recording_origin.duplicate(true),"recording_start":recording_start,
 		"xp_config":state.value.xp_config,"xp_cumulative_at_start":_xp_start_summary,"equipment_progress":state.value.equipment_progress,
-		"combat_config":{"level":combat_level}})
+		"combat_config":_combat_config.duplicate(),"perf_excludes_ui_pause":true,"perf_interval_real":PERF_INTERVAL_US/1000000.0})
 	if during_run:
 		var existing: Dictionary = state.value.existing.duplicate(true)
 		existing.merge({"type":"xp_existing","t":_cpp_time,"world_t":state.value.world_t,"xp_reward_version":2,"origin":"unobserved"},true)
 		_write(existing)
-	session.bridge.command("set_recording",{"active":combat_level>0})
+	if not session.bridge.command("set_recording",{"active":not _io_failed,"level":_combat_config.level}).ok:
+		_combat_transport_missing = true
 	_flush()
 	session.tree_exiting.connect(_end.bind("quit"))
 	_update_label()
@@ -309,8 +408,10 @@ func _begin_cpp(session: RunSession, during_run: bool) -> void:
 func consume_cpp_frame(frame: Dictionary) -> bool:
 	if _cpp_session_id==0 or frame.run_id!=_cpp_session_id: return true
 	_cpp_time = frame.ui.run_time
+	_cpp_perf_ui = frame.ui
 	for event: Dictionary in frame.events:
 		if int(event.sequence)<=_cpp_event_sequence: continue
+		_combat_sequence_gaps += maxi(0,int(event.sequence)-_cpp_event_sequence-1)
 		_cpp_event_sequence = int(event.sequence)
 		var record: Dictionary = event.payload.duplicate(true)
 		for key in ["epoch","sequence","tick","t","world_t","type"]: record[key] = event[key]
@@ -327,8 +428,26 @@ func _cpp_metrics() -> Dictionary:
 	var result: Dictionary = _session.bridge.read_metrics()
 	return result.value if result.ok else {}
 
+func _cpp_performance_playing() -> bool:
+	return int(_cpp_perf_ui.get("phase",-1))==Phase.Play and not _cpp_perf_ui.get("presentation_frozen",true)
+
 func _cpp_perf_tick(now: int) -> void:
-	if _cpp_perf_last_us>0:
+	var playing := _cpp_performance_playing()
+	var bonus := float(_cpp_perf_ui.get("bonus_remaining",0.0))>0.0
+	if playing!=_cpp_perf_playing or bonus!=_cpp_perf_bonus:
+		if playing and _cpp_perf_playing and _cpp_perf_last_us>0:
+			_cpp_perf_elapsed_us += maxi(0,now-_cpp_perf_last_us)
+			_cpp_perf_frames += 1
+		_flush_cpp_performance()
+		# 停止中の表示処理と実時間を、次の戦闘区間へ持ち込まない。
+		_cpp_perf_previous = _cpp_metrics()
+		_cpp_perf_frames = 0
+		_cpp_perf_elapsed_us = 0
+		_cpp_perf_playing = playing
+		_cpp_perf_bonus = bonus
+		_cpp_perf_last_us = now
+		return
+	if playing and _cpp_perf_last_us>0:
 		_cpp_perf_elapsed_us += maxi(0,now-_cpp_perf_last_us)
 		_cpp_perf_frames += 1
 	_cpp_perf_last_us = now
@@ -339,7 +458,7 @@ func _flush_cpp_performance() -> void:
 	var current := _cpp_metrics()
 	if current.is_empty(): return
 	var profile := preload("res://scripts/runtime/run_metrics.gd").window(current,_cpp_perf_previous,_cpp_perf_frames,_cpp_perf_elapsed_us)
-	_write({"type":"performance","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"frames":_cpp_perf_frames,"profile":profile})
+	_write({"type":"performance","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"bonus":_cpp_perf_bonus,"frames":_cpp_perf_frames,"profile":profile})
 	_cpp_perf_previous = current
 	_cpp_perf_frames = 0
 	_cpp_perf_elapsed_us = 0
@@ -348,15 +467,51 @@ func _flush_cpp_performance() -> void:
 func _cpp_sample() -> void:
 	if _session==null or _session.bridge==null: return
 	var response: Dictionary = _session.bridge.read_recording()
-	if not response.ok: return
+	if not response.ok:
+		_combat_transport_missing = true
+		return
 	var current: Dictionary = response.value
 	var window := _xp_window(current.xp,_last_xp_summary,"recording_interval")
 	var record: Dictionary = current.duplicate(true)
+	var measured: Dictionary = current.get("measurement_cumulative",{})
+	for key in ["effective_damage","enemy_life","enemy_contacts"]:
+		record[key] = _measurement_rows(measured.get(key,{}),_cpp_measurement_previous.get(key,{}))
+	for key in ["kills","kills_by","dealt","damage"]:
+		record[key] = _counter_difference(measured.get(key,{}),_cpp_measurement_previous.get(key,{}))
+	var budget_max := float(current.get("attack_budget_used",0.0))
+	var budget_changes := _counter_difference(measured.get("budget_observations",{}),_cpp_measurement_previous.get("budget_observations",{}))
+	for cost in budget_changes:
+		if budget_changes[cost]>0: budget_max = maxf(budget_max,float(cost))
+	record["attack_budget_max"] = budget_max
+	record.erase("measurement_cumulative")
+	record.erase("strong_observations")
 	record.merge({"type":"sample","run_id":_cpp_session_id,"recording_id":_recording_id,"xp_reward_version":2,"xp":window,
 		"xp_picked_actual":window.collected_actual_xp,"xp_dropped_base":_base_xp_total(window.supplied),"xp_field_base":_base_xp_total(window.ground)},true)
 	_write(record)
+	_write_cpp_strong(current,_ending)
+	_cpp_measurement_previous = measured.duplicate(true)
 	_last_xp_summary = current.xp.duplicate(true)
 	_cpp_record_previous = current
+
+func _measurement_rows(current: Dictionary, previous: Dictionary) -> Array:
+	var rows := []
+	for key in current:
+		var row := _counter_difference(current[key],previous.get(key,{}))
+		if not row.values().any(func(value): return value!=0): continue
+		for field in ["weapon_id","enemy","class","elite","cause","source","reason"]:
+			if current[key].has(field): row[field] = current[key][field]
+		rows.append(row)
+	return rows
+
+func _write_cpp_strong(current: Dictionary, include_alive: bool) -> void:
+	var observations: Dictionary = current.get("strong_observations",{})
+	for id in observations:
+		if _cpp_strong_finished.has(id): continue
+		var row: Dictionary = observations[id].duplicate(true)
+		if row.result=="alive" and not include_alive: continue
+		row.merge({"type":"strong","run_id":_cpp_session_id,"recording_id":_recording_id,"t":_cpp_time,"world_t":current.world_t,"id":id},true)
+		_write(row)
+		_cpp_strong_finished[id] = true
 
 static func _cpp_record_value(value: Variant) -> Variant:
 	if value is Vector2: return [value.x,value.y]

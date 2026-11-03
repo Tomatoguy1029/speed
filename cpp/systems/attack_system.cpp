@@ -41,7 +41,10 @@ AttackHandle register_attack(State &state,AttackPool pool,uint32_t row,AttackSpe
             spec.owner.live_source={};
         }
     }
-    if (!spec.observation_id && state.bosses.handles.contains(spec.technique)) spec.observation_id=state.bosses.techniques[spec.technique.slot].observation_id;
+    if (!state.observations.recording || !state.observations.detail_level) spec.observation_id=0;
+    else if (!spec.observation_id && state.bosses.handles.contains(spec.technique)) spec.observation_id=state.bosses.techniques[spec.technique.slot].observation_id;
+    if (state.observations.recording && state.observations.detail_level && !spec.observation_id && spec.source_technique) for (const auto &t:state.bosses.techniques)
+        if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && state.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {spec.observation_id=t.observation_id;break;}
     while (!all.free_records.empty() && !all.handles.reusable(all.free_records.back())) all.free_records.pop_back();
     if (all.free_records.empty() && all.records.size()>=UINT32_MAX) return {};
     if (!AttackBudgetSystem::retain(state,spec.owner.budget)) return {};
@@ -108,6 +111,7 @@ AttackHandle AttackSystem::emit_hostile(State &state,State::Hostile value,Attack
     const auto handle=register_attack(state,AttackPool::Hostile,uint32_t(row),spec);if (!get(state,handle)) return {};
     value.attack=handle;value.alive=true;
     if (state.free_hostiles.empty()) state.hostiles.push_back(std::move(value));else {state.free_hostiles.pop_back();state.hostiles[row]=std::move(value);}
+    state.observations.effect_begin(get(state,handle)->id,get(state,handle)->spec.observation_id,state.hostiles[row].pos);
     return handle;
 }
 AttackHandle AttackSystem::emit_hazard(State &state,State::Hazard value,AttackSpec spec) {
@@ -120,6 +124,7 @@ AttackHandle AttackSystem::emit_hazard(State &state,State::Hazard value,AttackSp
     const auto handle=register_attack(state,AttackPool::Hazard,uint32_t(row),spec);if (!get(state,handle)) return {};
     value.attack=handle;value.alive=true;
     if (state.free_hazards.empty()) state.hazards.push_back(std::move(value));else {state.free_hazards.pop_back();state.hazards[row]=std::move(value);}
+    state.observations.effect_begin(get(state,handle)->id,get(state,handle)->spec.observation_id,state.hazards[row].pos);
     return handle;
 }
 bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) {
@@ -148,6 +153,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
     }
     }
     const auto &s=record.spec;
+    state.observations.effect_end(record.id,pos,reason);
     state.observations.release(s.observation_id);
     erase_index(all.by_source,s.owner.source_id,handle);erase_index(all.by_technique,handle_key(s.technique),handle);
     erase_index(all.by_participant,handle_key(s.participant),handle);erase_index(all.by_boss,handle_key(s.boss),handle);
@@ -214,6 +220,18 @@ void AttackSystem::finish_hostile_update(State &state) {
 }
 bool AttackSystem::hazard_act(const State &state,AttackHandle handle,double) {return get(state,handle) && state.phase==State::Phase::Play;}
 bool AttackSystem::hazard_before_touch(const State &state,AttackHandle handle) {return get(state,handle) && state.phase==State::Phase::Play;}
+void AttackSystem::sync_observation_positions(State &state) {
+    auto &o=state.observations;if (!o.recording || !o.detail_level) return;
+    for (const auto &a:state.attacks.records) if (a.alive && a.spec.observation_id) {
+        switch (a.pool) {
+        case AttackPool::Hostile: if (a.row<state.hostiles.size()) o.effect_position(a.id,state.hostiles[a.row].pos);break;
+        case AttackPool::Hazard: if (a.row<state.hazards.size()) o.effect_position(a.id,state.hazards[a.row].pos);break;
+        case AttackPool::Friendly: break;
+        }
+    }
+    for (const auto &b:state.bosses.bodies) for (const auto &v:b.canis.burning)
+        if (state.enemy_handles.contains(v.actor)) o.effect_position(v.effect_id,state.enemies[v.actor.slot].pos);
+}
 bool AttackSystem::rebuild(State &state) {
     auto &all=state.attacks;if (all.next_id<=0 || all.records.size()>=UINT32_MAX || all.hostile_updating || all.hostile_clear_pending) return false;
     all.by_source.clear();all.by_technique.clear();all.by_participant.clear();all.by_boss.clear();all.by_encounter.clear();

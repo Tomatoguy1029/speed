@@ -39,7 +39,7 @@ void CentaurusShower::step(RunRuntime &r,TechniqueState &t,double dt) {
         if (age<v.mark_time+v.rain_time) finished=false;
         if (age<v.mark_time || mark.landed) continue;
         mark.landed=true;cue(r,t,"shower_landed",&mark.center);const double reach=v.radius+r.state.ship_config.ship_radius;
-        if (r.state.ship_pos.distance_squared_to(mark.center)<=reach*reach) {ShipDamageRequest request;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::ArrowShower;request.source=e.definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);}
+        if (r.state.observations.check(t.observation_id,r.state.ship_pos.distance_squared_to(mark.center)<=reach*reach)) {ShipDamageRequest request;request.observation_id=t.observation_id;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::ArrowShower;request.source=e.definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);}
     }
     if (finished) {s.marks.clear();t.stage=TechniqueStage::Recovery;t.remaining=p.recover;cue(r,t,"recovery_started");}
 }

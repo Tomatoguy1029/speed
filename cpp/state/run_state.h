@@ -7,6 +7,7 @@
 #include "combat_types.h"
 #include "attack_state.h"
 #include "observation_state.h"
+#include "recording_state.h"
 #include "world_state.h"
 #include "loadout_state.h"
 #include "pickup_state.h"
@@ -41,6 +42,7 @@ struct RunState {
     speed::PreviousPoseState previous_poses;
     speed::AttackState attacks;
     speed::ObservationState observations;
+    speed::RecordingState recording;
     using EnemyMode=speed::EnemyMode;
     using Enemy=speed::Enemy;
     std::deque<Enemy> enemies;

@@ -39,7 +39,9 @@ void MonocerosHornWave::advance_waves(RunRuntime &r,double dt) {
     for (size_t row=r.state.hazards.size();row-->0;) {auto &h=r.state.hazards[row];auto *w=std::get_if<MonocerosWaveHazard>(&h.shape);if (!h.alive || !w) continue;const auto *record=AttackSystem::get(r.state,h.attack);if (!record) continue;const auto owner=record->spec.owner.live_source;
         if (!r.state.enemy_handles.contains(owner) || r.state.enemies[owner.slot].dead) {AttackSystem::end(r.state,h.attack,AttackEndReason::BossClear);continue;}
         w->radius+=w->speed*dt;const auto offset=r.state.ship_pos-h.pos;
-        if (!h.hit && std::abs(offset.length()-w->radius)<=w->width*0.5+r.state.ship_config.ship_radius && std::abs(angle_difference(offset.angle()-w->angle))<=w->half_angle) {ShipDamageRequest request;request.amount=h.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::HornWave;request.source=record->spec.owner.source_definition;request.technique=record->spec.source_technique;h.hit=true;AttackSystem::mark_ship_hit(r.state,h.attack);CombatResolver::ship_damage(r,request);}
+        const bool touching=!h.hit && std::abs(offset.length()-w->radius)<=w->width*0.5+r.state.ship_config.ship_radius && std::abs(angle_difference(offset.angle()-w->angle))<=w->half_angle;
+        if (!h.hit) r.state.observations.effect_check(record->id,touching);
+        if (touching) {ShipDamageRequest request;request.observation_id=record->spec.observation_id;request.effect_id=record->id;request.amount=h.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::HornWave;request.source=record->spec.owner.source_definition;request.technique=record->spec.source_technique;h.hit=true;AttackSystem::mark_ship_hit(r.state,h.attack);CombatResolver::ship_damage(r,request);}
         if (w->radius>=w->maximum) AttackSystem::end(r.state,h.attack,AttackEndReason::Lifetime);
     }
 }

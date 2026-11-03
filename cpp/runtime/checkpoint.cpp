@@ -39,6 +39,10 @@ godot::RunState clone_state(const godot::RunState &source) {
     state.legacy_progression.cards=source.legacy_progression.cards.duplicate(true);
     state.legacy_progression.resource_requests=source.legacy_progression.resource_requests.duplicate(true);
     state.forward_parameters=source.forward_parameters.duplicate(true);
+    for (auto &a:state.observations.actions) a.boundary=a.boundary.duplicate(true);
+    for (auto &e:state.observations.pending) e.action.boundary=e.action.boundary.duplicate(true);
+    for (auto &e:state.observations.effects) e.action.boundary=e.action.boundary.duplicate(true);
+    for (auto &e:state.observations.pending_effects) e.effect.action.boundary=e.effect.action.boundary.duplicate(true);
     return state;
 }
 bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) {

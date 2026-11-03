@@ -46,15 +46,16 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         if (pending.zone_definition && !ZoneSystem::activate(run,handle)) {EventBuilder::flush_combat(run);return true;}
         if (!get(state,handle)) continue;
         auto &current=state.hazards[row];
+        if (const auto *effect=get(state,handle)) state.observations.effect_position(effect->id,current.pos);
         const auto *circle=std::get_if<CircleHazard>(&current.shape);
         const ContactShape shape=std::holds_alternative<HydraShapeHazard>(current.shape)?ContactShape(Polyline{std::get<HydraShapeHazard>(current.shape).points,std::get<HydraShapeHazard>(current.shape).before,std::get<HydraShapeHazard>(current.shape).width*0.5}):circle?ContactShape(PointCircle{current.pos,circle->radius}):std::holds_alternative<WaveHazard>(current.shape)?WaveSystem::geometry(current):std::holds_alternative<WallHazard>(current.shape)?WallSystem::geometry(current):BeamSystem::geometry(current);
         if (circle) current.hit=true;
         const auto *contact=get(state,handle);if (!contact) continue;const auto &policy=contact->spec.contact;
         const auto previous=contact->ship_previous_ready?contact->ship_previous:state.ship.pos;
-        if (!CollisionQuery::touches(shape,{previous,state.ship.pos,state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) {if (auto *o=state.observations.find(contact->spec.observation_id)) ++o->checks;if (std::holds_alternative<HydraShapeHazard>(current.shape)) record_ship_position(state,handle);continue;}
+        if (!CollisionQuery::touches(shape,{previous,state.ship.pos,state.ship_config.ship_radius},{policy.add_ship_radius,policy.ship_sweep})) {state.observations.effect_check(contact->id,false);if (std::holds_alternative<HydraShapeHazard>(current.shape)) record_ship_position(state,handle);continue;}
         if (const auto *hydra=std::get_if<HydraShapeHazard>(&current.shape)) {
-            if (contact->spec.cause==Cause::Wind) {if (!state.draw.tracing && !state.ship.glide && state.ship.vel.length()<state.ship_config.max_speed && hydra->points.size()>=2) state.ship.vel+=(hydra->points.back()-hydra->points.front()).normalized()*(hydra->wind_force*dt);record_ship_position(state,handle);continue;}
-            if (current.damage<=0) {record_ship_position(state,handle);continue;}
+            if (contact->spec.cause==Cause::Wind) {state.observations.effect_check(contact->id,true);if (!state.draw.tracing && !state.ship.glide && state.ship.vel.length()<state.ship_config.max_speed && hydra->points.size()>=2) state.ship.vel+=(hydra->points.back()-hydra->points.front()).normalized()*(hydra->wind_force*dt);record_ship_position(state,handle);continue;}
+            if (current.damage<=0) {state.observations.effect_check(contact->id,true);record_ship_position(state,handle);continue;}
         }
         if (!std::holds_alternative<WallHazard>(current.shape)) current.hit=true;
         if (circle && circle->kind!=CircleHazardKind::Blast && state.bite_zone_config.hit) {

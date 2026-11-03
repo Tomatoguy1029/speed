@@ -34,7 +34,7 @@ void CentaurusStomp::step(RunRuntime &r,TechniqueState &t,double dt) {
     if (t.stage==TechniqueStage::Windup) {t.stage=TechniqueStage::Active;cue(r,t,"stomp");}
     if (elapsed>=p.warn+p.active) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;cue(r,t,"recovery_started");return;}
     const auto &v=rule(r,t);const auto offset=r.state.ship_pos-center(r,t);
-    if (!t.hit && offset.length()<=v.radius+r.state.ship_config.ship_radius && std::abs(angle_difference(offset.angle()-e.facing))<=v.half_angle) {ShipDamageRequest request;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::Stomp;request.source=e.definition+1;request.technique=t.definition;t.hit=CombatResolver::ship_damage(r,request).accepted;}
+    if (!t.hit && r.state.observations.check(t.observation_id,offset.length()<=v.radius+r.state.ship_config.ship_radius && std::abs(angle_difference(offset.angle()-e.facing))<=v.half_angle)) {ShipDamageRequest request;request.observation_id=t.observation_id;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::Stomp;request.source=e.definition+1;request.technique=t.definition;t.hit=CombatResolver::ship_damage(r,request).accepted;}
 }
 godot::Dictionary CentaurusStomp::snapshot(const RunRuntime &r,const TechniqueState &t) {const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=rule(r,t);godot::Dictionary out;out["center"]=center(r,t);out["range_radius"]=v.radius;out["half_angle"]=v.half_angle;out["active_duration"]=p.active;out["pose_time"]=t.stage==TechniqueStage::Active?std::max(0.0,PhaseController::find(r,t.actor)->clock-t.started_at-p.warn):0.0;return out;}
 }

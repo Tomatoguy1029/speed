@@ -30,6 +30,17 @@ func _ready() -> void:
 	_check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T36","levels":1}).ok,"HUD確認用の特性を取得する")
 	_step()
 	hud._update_cpp_cinematic()
+	var draw_intent := Intent.new()
+	draw_intent.press = true
+	_check(bridge.step(1.0/120.0,bridge.pack_intent(draw_intent),{"logical_size":get_viewport().get_visible_rect().size}).ok,"実際の描画入力でスローを始める")
+	hud._update_cpp_finish()
+	_check(float(hud._cpp_ui.get("world_scale",1.0))<0.999 and AudioManager._slow_motion,"描画スローをHUDへ届けて音量も減衰する")
+	draw_intent.press = false
+	draw_intent.touch = true
+	draw_intent.pen_release = true
+	bridge.step(1.0/120.0,bridge.pack_intent(draw_intent),{"logical_size":get_viewport().get_visible_rect().size})
+	hud._update_cpp_finish()
+	_check(not AudioManager._slow_motion,"描画の取消で音量を戻す")
 	_check(hud._loadout_icons.visible and hud._loadout_icons.get_child_count()>=2,"通常の武器・特性のアイコンを表示する")
 	_check(hud._owned_loadout("weapon_levels").get(&"W01")==3 and hud._owned_loadout("trait_levels").get(&"T36")==1,"取得した段階を装備欄へ渡す")
 	for key in ["attack_power","kills","level","coins"]:

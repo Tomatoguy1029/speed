@@ -212,8 +212,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         runtime.state.hitstop_enabled=payload["hitstop"];if (!runtime.state.hitstop_enabled) runtime.state.hitstop=0;response=success();
     } else if (kind=="choose_card" && payload.size()==2 && is(payload,"offer_id",Variant::INT) && is(payload,"candidate_id",Variant::INT)) {
         response=speed::ProgressionSystem::choose(runtime,payload["offer_id"],payload["candidate_id"])?success():failure(5,"offer_id/candidate_id","現在の候補と一致しません");
-    } else if (kind=="set_recording" && payload.size()==1 && is(payload,"active",Variant::BOOL)) {
-        speed::MetricsBuilder::set_recording(runtime,payload["active"]);response=success();
+    } else if (kind=="set_recording" && (payload.size()==1 || (payload.size()==2 && payload.has("level"))) && is(payload,"active",Variant::BOOL) && (!payload.has("level") || (is(payload,"level",Variant::INT) && int64_t(payload["level"])>=0 && int64_t(payload["level"])<=2))) {
+        speed::MetricsBuilder::set_recording(runtime,payload["active"],uint32_t(int64_t(payload.get("level",2))));response=success();
     } else if (kind=="choose_swap" && payload.size()==3 && is(payload,"offer_id",Variant::INT) && is(payload,"candidate_id",Variant::INT) && is(payload,"replace_weapon_id",Variant::STRING)) {
         response=speed::ProgressionSystem::choose_swap(runtime,payload["offer_id"],payload["candidate_id"],payload["replace_weapon_id"])?success():failure(5,"replace_weapon_id","交換先と候補が一致しません");
     } else if (kind=="reroll" && payload.size()==1 && is(payload,"offer_id",Variant::INT)) {

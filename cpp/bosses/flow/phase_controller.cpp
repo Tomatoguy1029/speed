@@ -76,15 +76,15 @@ void PhaseController::damaged(RunRuntime &r,EnemyHandle actor) {
 }
 bool PhaseController::can_defeat(RunRuntime &r,EnemyHandle actor) {auto *b=find(r,actor);if (b && r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==4) return false;if (b && r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3) {if (b->hydra.separated) return !HydraRegrow::alive(r,b->hydra.bearer);b->hydra.separation_pending=true;return false;}return !b || b->phase!=1 || !r.content->boss_bodies[b->definition-1].hp_floor_enabled;}
 void PhaseController::defeated(RunRuntime &r,const DeathContext &death) {
-    auto *b=find(r,death.target);if (!b || b->mode==BossMode::Defeated || b->mode==BossMode::Cancelled) return;end_actions(r,*b);HydraBody::release(r,*b);b->mode=BossMode::Defeated;for (auto &p:b->participants) p.active=false;r.state.enemies[death.target.slot].hp=0;r.state.boss_dead=true;
+    auto *b=find(r,death.target);if (!b || b->mode==BossMode::Defeated || b->mode==BossMode::Cancelled) return;TechniqueRunner::finish_scripted(r,*b);end_actions(r,*b);HydraBody::release(r,*b);b->mode=BossMode::Defeated;for (auto &p:b->participants) p.active=false;r.state.enemies[death.target.slot].hp=0;r.state.boss_dead=true;
     godot::Dictionary p;p["pos"]=death.corpse.pos;p["id"]=death.corpse.id;p["dir"]=death.request.direction;p["cause"]=symbol_name(r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3?Cause::Ram:death.request.cause);FrameBuilder::append(r,"boss_defeated",p);
 }
 void PhaseController::cancel(RunRuntime &r,EnemyHandle actor) {
-    auto *b=find(r,actor);if (!b || b->mode==BossMode::Cancelled || b->mode==BossMode::Defeated) return;end_actions(r,*b);HydraBody::release(r,*b);b->mode=BossMode::Cancelled;for (auto &p:b->participants) p.active=false;event(r,"boss_cancelled",*b);
+    auto *b=find(r,actor);if (!b || b->mode==BossMode::Cancelled || b->mode==BossMode::Defeated) return;TechniqueRunner::finish_scripted(r,*b,"actor_end");end_actions(r,*b);HydraBody::release(r,*b);b->mode=BossMode::Cancelled;for (auto &p:b->participants) p.active=false;event(r,"boss_cancelled",*b);
 }
 bool PhaseController::begin_final(RunRuntime &r,EnemyHandle actor,double charge) {
     auto *b=find(r,actor);if (!b || !std::isfinite(charge) || b->mode==BossMode::Final || b->mode==BossMode::Defeated || b->mode==BossMode::Cancelled) return false;
-    end_actions(r,*b);b->mode=BossMode::Final;b->final_started=r.state.time;b->final_charge=std::max(0.1,charge);b->final_elapsed=0;if (r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3) HydraFinish::begin(r,*b);godot::Dictionary p;FrameBuilder::append(r,"final_strike",p);return true;
+    end_actions(r,*b);b->mode=BossMode::Final;b->final_started=r.state.time;b->final_charge=std::max(0.1,charge);b->final_elapsed=0;TechniqueRunner::observe_scripted(r,*b,"final_strike","final_strike_replay",ObservationEvent::Warning,true);if (r.content->bosses[r.content->boss_bodies[b->definition-1].boss-1].kind==3) HydraFinish::begin(r,*b);godot::Dictionary p;FrameBuilder::append(r,"final_strike",p);return true;
 }
 void PhaseController::step(RunRuntime &r,double dt) {
     if (dt<=0) return;auto &s=r.state;
@@ -107,12 +107,13 @@ void PhaseController::step(RunRuntime &r,double dt) {
             if (definition.kind==1 || definition.kind==2) {e.vel={};const TrackingPolicy tracking{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)};if (!tracking.locked()) e.facing+=std::clamp(angle_difference((s.enemy_aim-e.pos).angle()-e.facing),-definition.turn*dt,definition.turn*dt);}
             if (b.phase_remaining<=0) {b.mode=BossMode::Idle;if (definition.kind==4) {e.guard=0;s.encounter_protected=false;}}
         } else if (b.mode==BossMode::Final) {
+            if (definition.kind!=4 && !b.final_landed) TechniqueRunner::observe_scripted(r,b,"final_strike","final_strike_replay",b.final_landed?ObservationEvent::Execute:ObservationEvent::Warning);
             if (definition.kind==4) {DracoBody::update(r,b);continue;}
             if (definition.kind==3) {HydraFinish::tick(r,b,dt);continue;}
             b.final_elapsed=std::max(0.0,s.time-b.final_started);const auto aim=TrackingPolicy{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)}.target(e.pos,e.facing,s.ship_pos);const auto direction=aim-e.pos;
             e.vel={};e.facing+=std::clamp(angle_difference(direction.angle()-e.facing),-definition.turn*dt,definition.turn*dt);e.guard=1;e.charge=std::clamp(b.final_elapsed/b.final_charge,0.0,1.0);
             b.final_to=e.pos+direction.normalized()*p.final_reach;const double widen=std::clamp((b.final_elapsed-(b.final_charge-p.final_widen_time))/p.final_widen_time,0.0,1.0);b.final_width=p.final_warn_width+(p.final_beam_width-p.final_warn_width)*widen*widen;
-            if (!b.final_landed && b.final_elapsed>=b.final_charge) {b.final_landed=true;s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;request.source=e.definition+1;CombatResolver::ship_damage(r,request);}
+            if (!b.final_landed && b.final_elapsed>=b.final_charge) {b.final_landed=true;TechniqueRunner::observe_scripted(r,b,"final_strike","final_strike_replay",ObservationEvent::Execute);s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.observation_id=b.final_observation_id;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;request.source=e.definition+1;CombatResolver::ship_damage(r,request);TechniqueRunner::finish_scripted(r,b);}
         } else if (definition.kind==1 && b.centaurus.leaping) {
             CentaurusFinish::leap_tick(r,b,dt);
         } else if (!busy(r,b.actor)) {

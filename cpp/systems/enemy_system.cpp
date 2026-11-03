@@ -16,6 +16,7 @@
 #include "../runtime/run_runtime.h"
 #include "../output/frame_builder.h"
 #include "../output/event_builder.h"
+#include "../output/recording_builder.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -83,6 +84,7 @@ int64_t EnemySystem::spawn_base(RunRuntime &run,size_t definition,const EnemySpa
     if (def.kind==EnemyDefinition::Kind::Crow) CrowBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)),p.flock_member);
     if (def.kind==EnemyDefinition::Kind::Triangle) TriangleBehavior::spawned(run,state.enemy_handles.at(uint32_t(row)));
     if (p.picaro_owner.generation) DracoPicaro::spawned(run,state.enemy_handles.at(uint32_t(row)));
+    RecordingBuilder::enemy_spawned(run,state.enemy_handles.at(uint32_t(row)));
     return enemy.id;
 }
 void EnemySystem::flush_spawns(RunRuntime &run) {
@@ -197,6 +199,7 @@ bool EnemySystem::retire(RunRuntime &run,EnemyHandle handle,RetireReason reason)
     event.origin=enemy.origin;event.role=enemy.role;event.target_id=enemy.id;event.definition=uint32_t(enemy.definition+1);event.pos=enemy.pos;
     event.time=state.time;event.world_time=state.world_time;state.combat_events.push_back(event);
     state.dead_rows.erase(std::remove(state.dead_rows.begin(),state.dead_rows.end(),row),state.dead_rows.end());
+    RecordingBuilder::enemy_released(run,handle);
     enemy.alive=false;release(state,uint32_t(row));
     if (state.enemy_handles.reusable(uint32_t(row))) state.free_rows.push_back(row);
     state.rows_by_id.erase(enemy.id);return true;

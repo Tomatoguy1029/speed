@@ -43,8 +43,8 @@ void CentaurusRain::step(RunRuntime &r,TechniqueState &t,double dt) {
         const double run=now-trace.started,head=std::clamp(run*speed,0.0,length);
         while (trace.next_drop<=head) {v.expire_at=std::max(v.expire_at,trace.started+trace.next_drop/speed+p.drop_delay+p.fall+p.linger+0.15);trace.next_drop+=gap;}
         const double land=std::clamp((run-p.drop_delay-p.fall)*speed,0.0,length);
-        if (!trace.hit && land>trace.landed && CollisionQuery::touches(SegmentCircle{point(p,trace,trace.landed),point(p,trace,land),p.circle_radius},{r.state.ship_pos,r.state.ship_pos,r.state.ship_config.ship_radius},{true,false})) {
-            trace.hit=true;ShipDamageRequest request;request.amount=base.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::Rain;request.source=r.state.enemies[t.actor.slot].definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);
+        if (!trace.hit && land>trace.landed && r.state.observations.check(t.observation_id,CollisionQuery::touches(SegmentCircle{point(p,trace,trace.landed),point(p,trace,land),p.circle_radius},{r.state.ship_pos,r.state.ship_pos,r.state.ship_config.ship_radius},{true,false}))) {
+            trace.hit=true;ShipDamageRequest request;request.observation_id=t.observation_id;request.amount=base.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::Rain;request.source=r.state.enemies[t.actor.slot].definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);
         }
         trace.landed=land;if (land<length) all_landed=false;
     }

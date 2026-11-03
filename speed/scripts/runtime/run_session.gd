@@ -93,6 +93,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		# 受付停止後、記録・資源・表示・C++・登録の順に片付ける。
 		_cpp_accepting = false
+		if SaveManager.settings_changed.is_connected(_on_cpp_settings_changed): SaveManager.settings_changed.disconnect(_on_cpp_settings_changed)
 		auto_step = false
 		if bridge!=null: bridge.begin_close()
 		closing.emit(str(_cpp_pending_result.get("kind","quit")))
@@ -142,6 +143,7 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	cpp_resources = prepared.resources
 	_pending_cpp_bridge = next_bridge
 	_pending_cpp = {"seed":seed_value,"options":options.duplicate(true),"with_view":with_view}
+	if not SaveManager.settings_changed.is_connected(_on_cpp_settings_changed): SaveManager.settings_changed.connect(_on_cpp_settings_changed)
 	_load_started_us = Time.get_ticks_usec()
 	next_bridge.begin_resource_wait()
 	if with_view:
@@ -153,6 +155,13 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	loading_timings["resource_request_ms"] = (Time.get_ticks_usec()-_load_started_us)/1000.0
 	_poll_cpp_loading()
 	return cpp_error
+
+func _on_cpp_settings_changed() -> void:
+	_apply_cpp_settings.call_deferred()
+
+func _apply_cpp_settings() -> void:
+	if not _cpp_accepting or bridge==null: return
+	bridge.command("set_settings",{"hitstop":bool(SaveManager.settings.get("hitstop",true))})
 
 func _poll_cpp_loading() -> void:
 	if _pending_cpp.is_empty() or not _cpp_accepting: return
@@ -224,6 +233,7 @@ func _poll_cpp_loading() -> void:
 	for recorder: Node in get_tree().get_nodes_in_group("cpp_recorders"):
 		recorder.attach_cpp(self)
 	started.emit()
+	_apply_cpp_settings()
 	var publish_started := Time.get_ticks_usec()
 	var delivered: Dictionary = bridge.collect_frame()
 	loading_timings["initial_publish_ms"] = (Time.get_ticks_usec()-publish_started)/1000.0

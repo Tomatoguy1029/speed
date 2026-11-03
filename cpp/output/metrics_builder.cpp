@@ -1,5 +1,8 @@
 #include "metrics_builder.h"
 #include "frame_builder.h"
+#include "recording_builder.h"
+#include "../bosses/flow/technique_runner.h"
+#include "../systems/attack_system.h"
 #include "../runtime/checkpoint.h"
 #include "../runtime/run_runtime.h"
 #include <godot_cpp/variant/array.hpp>
@@ -14,36 +17,94 @@ MetricsTimer::~MetricsTimer() {
     if (sample.count<INT64_MAX) ++sample.count;
     sample.max_us=std::max(sample.max_us,us);
 }
+void MetricsBuilder::diagnostic(RunRuntime &r,godot::StringName type,const godot::Dictionary &data,uint32_t detail) {
+    if (r.state.observations.recording && r.state.observations.detail_level>=detail) FrameBuilder::append(r,type,data);
+}
+namespace {
+godot::Dictionary action_fields(const RunRuntime &r,const ActionObservation &a) {
+    godot::Dictionary d=a.boundary.duplicate(true);
+    if (a.definition) {
+        const auto &t=r.content->boss_techniques[a.definition-1];
+        d["action"]=godot::String(t.external_id.c_str());d["boss"]=godot::String(r.content->bosses[t.boss-1].external_id.c_str());
+    }
+    d["action_id"]=a.observed_start?godot::Variant(a.id):godot::Variant();d["body_id"]=a.actor_id;
+    d["observed_start"]=a.observed_start;d["origin"]=a.origin;
+    d["decision_id"]=a.observed_start && a.decision_id?godot::Variant(a.decision_id):godot::Variant();return d;
+}
+const char *observed_outcome(uint64_t checks,uint64_t contacts,double applied) {
+    return applied>0?"hit":contacts>0?"contact_blocked":checks>0?"evaluated_miss":"no_hit_observed";
+}
+const char *effect_end_reason(AttackEndReason reason) {
+    switch (reason) {
+        case AttackEndReason::Lifetime:return "lifetime";case AttackEndReason::TechniqueCancel:return "technique_cancel";
+        case AttackEndReason::TechniqueEnd:return "technique_end";case AttackEndReason::ParticipantEnd:return "participant_end";
+        case AttackEndReason::BossClear:return "boss_clear";case AttackEndReason::BonusClear:return "bonus_clear";
+        case AttackEndReason::Hit:return "hit";case AttackEndReason::Relocate:return "relocate";case AttackEndReason::Barrier:return "barrier";
+    }
+    return "lifetime";
+}
+}
 void MetricsBuilder::flush_observations(RunRuntime &r) {
-    for (const auto &e:r.state.observations.pending) {
-        const auto &a=e.action;const auto &t=r.content->boss_techniques[a.definition-1];
-        godot::Dictionary d;d["action_id"]=a.id;d["body_id"]=a.actor_id;d["action"]=godot::String(t.external_id.c_str());
-        d["boss"]=godot::String(r.content->bosses[t.boss-1].external_id.c_str());d["observed_start"]=a.observed_start;
-        d["step"]=e.step==ObservationEvent::Selected?"selected":e.step==ObservationEvent::Execute?"execute":"observation_end";
-        d["checks"]=int64_t(a.checks);d["contacts"]=int64_t(a.contacts);d["applied"]=a.applied;
-        if (e.step>=ObservationEvent::Finished) d["outcome"]=a.applied>0?"hit":a.contacts>0?"contact_blocked":a.checks>0?"evaluated_miss":"no_hit_observed";
-        d["reason"]=e.step==ObservationEvent::RecordingEnd?"recording_end":e.step==ObservationEvent::ActorEnd?"actor_end":"finished";
+    auto &o=r.state.observations;
+    for (const auto &e:o.pending) {
+        const auto &a=e.action;if (a.definition>r.content->boss_techniques.size()) continue;
+        auto d=action_fields(r,a);
+        const char *steps[]={"selected","execute","warning","aim_lock","recovery","interrupted","observation_end","observation_end","observation_end"};
+        d["step"]=steps[e.step];d["checks"]=int64_t(a.checks);d["contacts"]=int64_t(a.contacts);d["applied"]=a.applied;
+        d["observation_scope"]="actor_direct_geometry";
+        if (e.step>=ObservationEvent::Finished) d["outcome"]=observed_outcome(a.checks,a.contacts,a.applied);
+        d["reason"]=e.step==ObservationEvent::RecordingEnd?godot::StringName("recording_end"):e.step==ObservationEvent::ActorEnd?godot::StringName("actor_end"):a.reason;
         FrameBuilder::append(r,"boss_action",d);
     }
-    r.state.observations.pending.clear();
+    o.pending.clear();
+    for (const auto &event:o.pending_effects) {
+        const auto &e=event.effect;if (e.definition>r.content->boss_techniques.size()) continue;
+        auto d=action_fields(r,e.action);d.erase("t");d.erase("world_t");
+        d["observed_start"]=e.observed_start;d["effect_id"]=e.id;
+        d["step"]=event.step==EffectObservationEvent::Spawned?"spawned":"ended";
+        d["spawn_position"]=e.born_pos;d["position"]=e.pos;d["checks"]=int64_t(e.checks);d["contacts"]=int64_t(e.contacts);d["applied"]=e.applied;
+        d["observation_scope"]="effect_observed_lifetime";
+        if (event.step!=EffectObservationEvent::Spawned) {
+            d["outcome"]=observed_outcome(e.checks,e.contacts,e.applied);
+            d["reason"]=event.step==EffectObservationEvent::RecordingEnd?"recording_end":effect_end_reason(event.reason);
+        }
+        FrameBuilder::append(r,"boss_effect",d);
+    }
+    o.pending_effects.clear();
 }
-void MetricsBuilder::set_recording(RunRuntime &r,bool active) {
-    auto &s=r.state;auto &o=s.observations;if (o.recording==active) return;
-    if (!active) o.stop();else {
-        o.recording=true;
+void MetricsBuilder::set_recording(RunRuntime &r,bool active,uint32_t level) {
+    auto &s=r.state;auto &o=s.observations;
+    if (o.recording==active && (!active || o.detail_level==level)) return;
+    if (o.recording) {AttackSystem::sync_observation_positions(s);o.stop();flush_observations(r);}
+    RecordingBuilder::set_active(r,active);
+    for (auto &f:s.bosses.flows) {f.decision_id=0;for (auto &n:f.nodes) n.decision_id=0;}
+    for (auto &t:s.bosses.techniques) t.decision_id=0;
+    if (active) {
+        o.detail_level=level;o.recording=true;
         for (auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished) t.observation_id=o.begin(s.enemy_handles.entity_id(t.actor),t.definition,false);
+        for (auto &b:s.bosses.bodies) {
+            b.final_observation_id=0;
+            if (b.mode==BossMode::Final && (!b.final_landed || b.draco.finale.active)) TechniqueRunner::observe_scripted(r,b,b.draco.finale.active?"draco_finale":"final_strike",b.draco.finale.active?"scripted_finale":"final_strike_replay",ObservationEvent::Selected,false);
+        }
         // 終了して行が再利用された技も、発生時のHandleと出所で分ける。
         std::map<std::tuple<int64_t,uint64_t,uint32_t>,int64_t> remaining;
-        for (auto &a:s.attacks.records) if (a.alive && a.spec.source_technique) {
+        for (auto &a:s.attacks.records) if (a.alive && (a.spec.source_technique || s.bosses.body_handles.contains(a.spec.boss))) {
             auto &spec=a.spec;int64_t id=0;
-            if (s.bosses.handles.contains(spec.technique)) id=s.bosses.techniques[spec.technique.slot].observation_id;
+            if (!spec.source_technique && s.bosses.body_handles.contains(spec.boss)) id=s.bosses.bodies[spec.boss.slot].final_observation_id;
+            else if (s.bosses.handles.contains(spec.technique)) id=s.bosses.techniques[spec.technique.slot].observation_id;
             else for (const auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && s.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {id=t.observation_id;break;}
+            if (!spec.source_technique && !id) continue;
             if (!o.find(id)) {
                 const auto key=std::make_tuple(spec.owner.source_id,handle_key(spec.technique),spec.source_technique);
                 auto &retained=remaining[key];if (!retained) {retained=o.begin(spec.owner.source_id,spec.source_technique,false);if (auto *v=o.find(retained)) v->running=false;}
                 id=retained;
             }
             spec.observation_id=id;o.retain(id);
+            godot::Vector2 pos;
+            if (a.pool==AttackPool::Friendly) pos=s.friends[a.row].pos;
+            else if (a.pool==AttackPool::Hostile) pos=s.hostiles[a.row].pos;
+            else pos=s.hazards[a.row].pos;
+            o.effect_begin(a.id,id,pos,false);
         }
     }
     flush_observations(r);
@@ -87,6 +148,8 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
     }
     Dictionary population;population["origins"]=origins;population["roles"]=roles;population["raw"]=s.population.raw;population["accumulator"]=s.population.accumulator;out["population"]=population;
     out["active_observations"]=int64_t(s.observations.actions.size());
+    Dictionary diagnostics;diagnostics["level"]=s.observations.detail_level;diagnostics["tracked_effects"]=int64_t(s.observations.effects.size());diagnostics["effect_tracking_dropped"]=int64_t(s.observations.effect_tracking_dropped);out["combat_diagnostics"]=diagnostics;
+    out.merge(RecordingBuilder::read(run),true);
     if (initial) {
         Dictionary tuning;
         for (const auto &v:c.enemy_tuning) {const auto id=c.definitions[v.enemy-1].id;Dictionary values=tuning.get(id,Dictionary());values[String::utf8(v.key.c_str())]=v.value;tuning[id]=values;}

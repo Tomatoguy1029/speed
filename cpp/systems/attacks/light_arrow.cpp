@@ -28,7 +28,7 @@ std::optional<double> LightArrowSystem::contact(RunRuntime &run,AttackHandle han
     if (run.state.ship.pos.distance_squared_to(to)>reach*reach) return {};
     const auto tail=from-shot.vel.normalized()*length;
     const double t=CollisionQuery::segment_circle_t(tail,to,run.state.ship.pos,shot.radius+run.state.ship_config.ship_radius);
-    if (t<0) return {};const double arrival=step>0?std::max(0.0,(t*(step+length)-length)/step):0;
+    if (t<0) {run.state.observations.effect_check(record->id,false);return {};}const double arrival=step>0?std::max(0.0,(t*(step+length)-length)/step):0;
     if (body_t && arrival>=*body_t) return {};
     const auto result=CombatResolver::attack_ship_damage(run,handle,SegmentCircle{tail,to,double(shot.radius)},shot.damage,0);
     return result.touching?std::optional<double>(arrival):std::nullopt;

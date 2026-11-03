@@ -25,6 +25,26 @@ func check(ok: bool, label: String) -> void:
 		push_error("[play_recorder] " + label)
 
 func _ready() -> void:
+	if "--cpp-recording-initial" in OS.get_cmdline_user_args():
+		check(await verify_cpp_initial_recording(),"通常開始の最初の通知まで録画する")
+		print("[cpp_recording_initial] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--cpp-recording-restore" in OS.get_cmdline_user_args():
+		check(not (await cpp_recording_scenario(true,2,true)).is_empty(),"保持から復帰した後の録画を最後まで保存する")
+		print("[cpp_recording_restore] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--cpp-recording-measurements" in OS.get_cmdline_user_args():
+		check(not (await cpp_recording_scenario(true,0)).is_empty(),"詳細度0でも通常計測を最後まで保存する")
+		print("[cpp_recording_measurements] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
+	if "--cpp-combat-limits" in OS.get_cmdline_user_args():
+		verify_cpp_combat_limits()
+		print("[cpp_combat_limits] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-recording" in OS.get_cmdline_user_args():
 		var finished: bool = await verify_cpp_recording()
 		check(finished,"C++録画の指定確認を最後まで実施する")
@@ -83,6 +103,46 @@ func read_rows(path: String) -> Array[Dictionary]:
 		rows.append(JSON.parse_string(file.get_line()))
 	return rows
 
+func verify_cpp_combat_limits() -> void:
+	# 共通封筒を実際の保存先へ渡し、診断の上限で通常イベントを落とさない。
+	for scenario in ["rate", "count", "bytes", "line", "off", "level_one", "gap", "effect_loss"]:
+		var rec := TempRecorder.new()
+		add_child(rec)
+		rec.set_process(false)
+		rec.combat_events_per_second = 1 if scenario=="rate" else 120
+		rec.combat_max_events = 1 if scenario=="count" else 30000
+		rec.combat_max_bytes = 1 if scenario=="bytes" else 33554432
+		rec.combat_level = 0 if scenario=="off" else 1 if scenario=="level_one" else 2
+		rec._reset_combat_recording({"combat_diagnostics":{"effect_tracking_dropped":4}})
+		if scenario=="effect_loss": rec._cpp_record_previous = {"combat_diagnostics":{"effect_tracking_dropped":6}}
+		DirAccess.make_dir_recursive_absolute(rec.directory)
+		var path: String = rec.directory.path_join(scenario+".jsonl")
+		rec._file = FileAccess.open(path,FileAccess.WRITE)
+		rec._cpp_session_id = 123
+		rec._real_start_us = Time.get_ticks_usec()
+		var first := {"type":"boss_decision" if scenario=="level_one" else "boss_action","sequence":1,"payload":{"action":"charge"}}
+		if scenario=="line": first.payload["detail"] = "あ".repeat(6000)
+		var events := [first,{"type":"boss_action","sequence":2,"payload":{"step":"end"}},
+			{"type":"hurt","sequence":4 if scenario=="gap" else 3,"payload":{"amount":2}},
+			{"type":"combat_player_damage","sequence":5 if scenario=="gap" else 4,"payload":{"hp_before":8,"hp_after":6}}]
+		for event in events:
+			event.merge({"epoch":1,"tick":1,"t":0.0,"world_t":0.0})
+		rec.consume_cpp_frame({"run_id":123,"ui":{"run_time":0.0},"events":events})
+		rec._end("stopped")
+		var rows := read_rows(path)
+		var diagnostics: Array = rows.filter(func(row):return row.type in ["boss_action","boss_decision"])
+		check(rows.any(func(row):return row.type=="hurt"),"%s: 診断の制限で通常の被弾を落とさない" % scenario)
+		check(rows.any(func(row):return row.type=="combat_player_damage"),"%s: 機体の被弾判定を詳細度0でも保存する" % scenario)
+		var expected := 0 if scenario in ["bytes","off"] else 2 if scenario in ["gap","effect_loss"] else 1
+		check(diagnostics.size()==expected,"%s: 詳細度と診断の上限を保存時に適用する" % scenario)
+		var summary: Dictionary = rows.back().get("combat_summary",{})
+		check(summary.get("emitted",-1)==expected,"%s: 実際に保存した診断件数を終端へ記録する" % scenario)
+		if scenario in ["rate","count"]: check(summary.get("rate_or_count_dropped",0)==1,"%s: 件数上限の欠測を集計する" % scenario)
+		if scenario in ["bytes","line"]: check(summary.get("size_dropped",0)==(2 if scenario=="bytes" else 1),"%s: 容量上限の欠測を集計する" % scenario)
+		if scenario=="gap": check(summary.get("sequence_gaps",0)==1 and not summary.get("transport_complete",true),"通知末尾の欠測を終端で明示する")
+		if scenario=="effect_loss": check(summary.get("effect_tracking_dropped",0)==2 and not summary.get("transport_complete",true),"攻撃追跡の欠測は録画開始後の差分だけを終端へ記録する")
+		rec.free()
+
 func verify_cpp_perf() -> bool:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.moon_count = 0
@@ -91,6 +151,7 @@ func verify_cpp_perf() -> bool:
 	config.saw_count = 0
 	var stage := RuntimeStage.new()
 	stage.index = 89
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["drifter"])
 	var output := "res://.content/dev/run_perf"
@@ -101,6 +162,8 @@ func verify_cpp_perf() -> bool:
 	session.auto_step = false
 	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
 	if session.bridge==null: session.free(); return false
+	check(await begin_cpp_play(session),"性能確認の前に初期カードを選びPLAYへ進める")
+	if session.bridge.read_frame().value.ui.phase!=RunIds.Phase.Play: session.free(); return false
 	var overlay := session.view.get_node_or_null("Hud/PerfOverlay")
 	check(overlay!=null,"C++の通常表示へF3の性能表示を接続する")
 	if overlay==null: session.free(); return false
@@ -165,6 +228,15 @@ func verify_cpp_perf() -> bool:
 	await get_tree().process_frame
 	return true
 
+func begin_cpp_play(session: RunSession) -> bool:
+	if session.bridge.read_frame().value.ui.phase==RunIds.Phase.Play: return true
+	if not session.bridge.command("choose_card",{"index":0}).ok: return false
+	for attempt in 60:
+		session.cpp_choices.poll()
+		if session.bridge.read_frame().value.ui.phase==RunIds.Phase.Play: return true
+		await get_tree().process_frame
+	return false
+
 func verify_cpp_perf_bytes(session: RunSession, overlay: PerfOverlay) -> bool:
 	overlay._set_mode(PerfOverlay.Mode.DETAIL)
 	var rec := TempRecorder.new()
@@ -206,7 +278,41 @@ func verify_cpp_recording() -> bool:
 	check(not on.is_empty() and on==off,"録画の開始/停止/再開と読取でランの状態・乱数・XPを変えない")
 	return not on.is_empty() and not off.is_empty()
 
-func cpp_recording_scenario(recording: bool) -> Dictionary:
+func verify_cpp_initial_recording() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.moon_count = 0
+	config.meteor_count = 0
+	config.iron_count = 0
+	config.saw_count = 0
+	var stage := RuntimeStage.new()
+	stage.index = 90
+	stage.boss_enabled = false
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	var output := "res://.content/dev/run_recording_initial"
+	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"開始前待機の通知".sha256_text())!=OK: return false
+	var path := output.path_join("stage_90.json")
+	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	rec._set_armed(true)
+	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":690,"cpp_start":{"equipment":[]}},false)
+	session.auto_step = false
+	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
+	if session.bridge==null or rec._file==null: rec.free();session.free();return false
+	var recording: String = rec._file.get_path()
+	rec._set_armed(false)
+	var rows := read_rows(recording)
+	check(rows.front().event_sequence_at_start==0 and not rows.front().missing_prefix,"開始前待機では初期化通知を観測対象に含める")
+	check(rows.any(func(row):return row.type=="offer" and row.get("initial",false)),"初期武器の候補通知を開始済みとして捨てない")
+	check(rows.back().combat_summary.transport_complete,"通常開始の通知列に欠測を作らない")
+	rec.free()
+	session.free()
+	await get_tree().process_frame
+	return true
+
+func cpp_recording_scenario(recording: bool, combat_detail := 2, restore_recording := false) -> Dictionary:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.moon_count = 0
 	config.meteor_count = 0
@@ -216,6 +322,7 @@ func cpp_recording_scenario(recording: bool) -> Dictionary:
 	config.xp_base = 100000.0
 	var stage := RuntimeStage.new()
 	stage.index = 88
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["drifter"])
 	var output := "res://.content/dev/run_recording"
@@ -226,6 +333,7 @@ func cpp_recording_scenario(recording: bool) -> Dictionary:
 	session.auto_step = false
 	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
 	if session.bridge==null: session.free();return {}
+	if not await begin_cpp_play(session): session.free();return {}
 	var bridge = session.bridge
 	var core = bridge._core
 	if not core.has_method("recording_run"):
@@ -246,6 +354,7 @@ func cpp_recording_scenario(recording: bool) -> Dictionary:
 	var rec := TempRecorder.new()
 	add_child(rec)
 	rec.set_process(false)
+	rec.combat_level = combat_detail
 	var paths: Array[String] = []
 	if recording:
 		var key := InputEventKey.new()
@@ -257,6 +366,7 @@ func cpp_recording_scenario(recording: bool) -> Dictionary:
 		if rec._file==null: rec.free();session.free();return {}
 		paths.append(rec._file.get_path())
 		check(core.inspect()==before,"開始時のXP集計と識別情報の読取は時計・乱数を変えない")
+	bridge.command("dev_damage",{"entity_id":owner,"cause":"shot","amount":0.01,"weapon_id":1})
 	bridge.command("dev_kill",{"entity_id":owner,"cause":"shot"})
 	bridge.command("dev_pickup_rates",{"ship":1.5,"run":2.0})
 	bridge.command("dev_collect_gems",{})
@@ -271,6 +381,14 @@ func cpp_recording_scenario(recording: bool) -> Dictionary:
 		rec._set_armed(true)
 		check(rec._file!=null,"録画を停止して同じランで再開する")
 		if rec._file!=null: paths.append(rec._file.get_path())
+	if restore_recording:
+		var held: Dictionary = bridge.checkpoint()
+		check(held.ok,"録画中のランを保持する")
+		if not held.ok: rec.free();session.free();return {}
+		check(bridge.restore(held.value).ok,"保持したランへ復帰する")
+		check(rec._file!=null and rec._file.get_path()!=paths.back(),"復帰前の記録を閉じて別ファイルへ途中録画を始める")
+		if rec._file!=null: paths.append(rec._file.get_path())
+		bridge.release_checkpoint(held.value)
 	bridge.command("dev_drop_crystal",{"position":origin+Vector2(700,0),"kind":0})
 	bridge.collect_frame()
 	for tick in 4: bridge.step(1.0/120.0,idle,{"logical_size":Vector2(1280,720)})
@@ -282,21 +400,32 @@ func cpp_recording_scenario(recording: bool) -> Dictionary:
 			if rows.is_empty(): continue
 			var start: Dictionary = rows.front()
 			check(start.type=="start" and start.schema_version==4 and start.measurement_version==3 and start.combat_version==1 and start.xp_reward_version==2,"既存識別子とC++形式版を残す")
+			check(start.combat_config.level==combat_detail and start.combat_config.events_per_second==120 and start.combat_config.max_events==30000 and start.combat_config.max_bytes==33554432 and start.combat_config.line_bytes==16384,"開始行に適用した診断の詳細度と上限を保存する")
 			check(start.format=="cpp_events_v2" and start.identity.payload_sha256.length()==64 and start.identity.xp_reward_config_sha256.length()==64 and start.identity.implementation_version.begins_with("cpp_api"),"定義署名・報酬署名・実装版と開始条件を残す")
 			check(start.run_start.start.seed=="688" and start.missing_prefix,"開始seedと途中開始を明示する")
 			var existing: Array = rows.filter(func(row):return row.type=="xp_existing")
 			check(existing.size()==1 and existing[0].origin=="unobserved","途中開始の結晶の未観測の出所を推定しない")
 			var ending: Dictionary = rows.back()
 			check(ending.type=="end" and ending.has("xp_cumulative") and ending.has("xp_observed") and ending.has("equipment_progress"),"終了時はラン累計と録画区間を分ける")
+			check(ending.get("combat_summary",{}).get("transport_complete",false) and ending.combat_summary.rate_or_count_dropped==0 and ending.combat_summary.size_dropped==0,"終了までの診断の送出数と欠測の有無を残す")
 			if i==0:
+				var samples: Array = rows.filter(func(row):return row.type=="sample")
+				check(not samples.is_empty() and samples[0].has("effective_damage") and samples[0].has("enemy_life") and samples[0].has("enemy_contacts") and samples[0].has("attack_budget_max"),"通常の命中・生存・接触計測を診断ログとは別の区間集計へ残す")
+				if not samples.is_empty() and samples[0].has("effective_damage"):
+					check(samples[0].effective_damage.any(func(hit):return hit.enemy=="drifter" and hit.weapon_id=="W01" and hit.applied>0.0),"武器IDと敵種付きの実ダメージを保存する")
+					check(samples[0].enemy_life.any(func(life):return life.enemy=="drifter" and life.killed==1 and life.unknown_spawn==1 and life.life_world_count==0),"途中録画の既存敵を出現から撃破の時間へ混ぜない")
 				check(start.event_sequence_at_start==before_sequence,"開始前の通知番号を区間の欠落として数えない")
 				check(rows.any(func(row):return row.type=="hurt" and row.pos is Array and row.pos.size()==2),"C++通知の座標を既存と同じ数値配列で記録する")
 				check(existing[0].ground.size()==2 and existing[0].carried.size()==1 and existing[0].cap.absorber_id>0,"途中開始の地面・運搬・集約先の基準XPを保存する")
 				check(rows.any(func(row):return row.type in ["xp_drop","xp_absorb"] and row.get("source","")=="crow_carry" and row.id==carried and not row.new_supply),"運搬から戻した結晶を新しい供給と混ぜない")
 				check(rows.any(func(row):return row.type=="combat_player_damage" and row.cause=="slash" and row.accepted) and rows.any(func(row):return row.type=="combat_player_damage" and not row.accepted),"機体の実HP減少と拒否理由を同じ通知経路から記録する")
 				check(ending.xp_observed.collected_actual_xp>0.0 and ending.xp_observed.supplied.high.base_xp>=0.0,"倍率適用後XPと基準XPの区間差を保存する")
-			else:
+			elif i==paths.size()-1:
 				check(ending.xp_observed.collected_actual_xp==0.0 and ending.xp_observed.supplied.low.count==1,"再開前の取得を録画区間へ混ぜない")
+			if restore_recording and i==1:
+				check(ending.result=="restore","復帰前の録画の終了理由を区別する")
+			if restore_recording and i==2:
+				check(start.epoch>read_rows(paths[1]).front().epoch and start.missing_prefix,"復帰後の通知世代と途中開始を保存する")
 		print("[cpp_recording] output="+paths[0])
 	var result := {"inspect":core.inspect(),"xp":bridge.read_recording().value.xp,"ship":core.ship_snapshot()}
 	rec.free()

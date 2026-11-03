@@ -64,17 +64,23 @@ def summarize(path, boss=None, action=None, timeline=False):
                 applied[target] += row.get("applied", 0)
                 damage_reasons[f"{target}:{row.get('reason', 'unknown')}"] += 1
             if timeline:
-                fields = ("t", "world_t", "sequence", "type", "boss", "body_id", "phase", "decision_id", "action_id", "action", "origin", "step", "reason", "selected", "candidates", "aim", "player_pos", "outcome", "effect_id", "applied")
+                fields = ("t", "world_t", "sequence", "type", "boss", "body_id", "phase", "decision_id", "action_id", "action", "origin", "step", "reason", "selected", "candidates", "selection", "aim", "direction", "player_pos", "ship_position", "ship_velocity", "body_position", "facing", "pass", "observation_scope", "outcome", "effect_id", "applied")
                 trace.append({key: row[key] for key in fields if key in row})
     loss = end.get("combat_summary", {})
     available = start.get("combat_version") == 1 or combat_rows > 0
+    incomplete = (
+        not end or start.get("missing_prefix") or errors or sequence_gaps
+        or any(loss.get(key, 0) for key in (
+            "rate_or_count_dropped", "size_dropped", "effect_tracking_dropped", "sequence_gaps"))
+        or loss.get("transport_complete") is False or loss.get("transport_missing")
+    )
     return {
         "file": str(path), "schema_version": start.get("schema_version"),
         "combat_available": available, "configured_level": start.get("combat_config", {}).get("level"),
         "run_id": start.get("run_id"), "stage": start.get("stage"),
         "missing_prefix": start.get("missing_prefix", None), "has_end": bool(end),
         "sequence_gaps": sequence_gaps, "loss": loss, "parse_errors": errors,
-        "coverage": "unavailable" if not available else "disabled" if start.get("combat_config", {}).get("level") == 0 and not combat_rows else "partial" if not end or start.get("missing_prefix") or errors or sequence_gaps or loss.get("rate_or_count_dropped", 0) or loss.get("size_dropped", 0) else "recorded_interval",
+        "coverage": "unavailable" if not available else "disabled" if start.get("combat_config", {}).get("level") == 0 else "partial" if incomplete else "recorded_interval",
         "events": dict(counts), "candidate_rejections": dict(reasons),
         "observed_outcomes": dict(outcomes), "applied_damage": dict(applied), "damage_reasons": dict(damage_reasons),
         **({"timeline": trace} if timeline else {}),

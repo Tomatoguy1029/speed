@@ -10,7 +10,7 @@ func _initialize() -> void: call_deferred("exercise")
 # 待機ノードで技の長さを固定し、区間・抽選・休息だけを観測する。
 func fixture(actions: Dictionary, sections: Array, options: Dictionary={}) -> Dictionary:
 	var builder=load("res://tools/content/build_run_content.gd")
-	var cfg: GameConfig=ContentManager.base.duplicate(true)
+	var cfg: GameConfig=(root.get_node("ContentManager").get("base") as GameConfig).duplicate(true)
 	cfg.planet_radius=0;cfg.moon_count=0;cfg.meteor_count=0;cfg.iron_count=0;cfg.saw_count=0
 	var definition: BossDef=load("res://data/bosses/monoceros.tres").duplicate(true)
 	definition.speed=0;definition.params.initial_wait=0.0

@@ -36,9 +36,11 @@ bool SlashSystem::touches(const ContentBundle &content,godot::Vector2 pos,double
 bool SlashSystem::contact(RunRuntime &run,AttackHandle handle,godot::Vector2 to) {
     const auto *record=AttackSystem::get(run.state,handle);if (!record || record->pool!=AttackPool::Hostile) return false;
     const auto &shot=run.state.hostiles[record->row];
-    if (!shot.slash.definition || !touches(*run.content,to,shot.vel.angle(),shot.radius,shot.slash.side,run.state.ship.pos,run.state.ship_config.ship_radius)) return false;
+    if (!shot.slash.definition) return false;
+    const bool touching=touches(*run.content,to,shot.vel.angle(),shot.radius,shot.slash.side,run.state.ship.pos,run.state.ship_config.ship_radius);
+    run.state.observations.effect_check(record->id,touching);if (!touching) return false;
     const auto spec=record->spec;
-    ShipDamageRequest request;request.amount=shot.damage;request.scale=spec.contact.scale;request.hit_policy=spec.contact.hit_policy;
+    ShipDamageRequest request;request.observation_id=spec.observation_id;request.effect_id=record->id;request.amount=shot.damage;request.scale=spec.contact.scale;request.hit_policy=spec.contact.hit_policy;
     request.cause=spec.cause;request.technique=spec.source_technique;
     // 現行の斬撃は、移動後の爪痕だけで判定し、発生元の種類名を被弾記録へ付けない。
     CombatResolver::ship_damage(run,request);AttackSystem::mark_ship_hit(run.state,handle);AttackSystem::record_ship_position(run.state,handle);

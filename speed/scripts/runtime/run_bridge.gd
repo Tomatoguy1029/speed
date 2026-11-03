@@ -1,5 +1,7 @@
 ## Sessionが所有するC++ランの窓口。個別Systemの更新は公開しない。
 extends RefCounted
+signal before_restore
+signal restored
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 var perf := PerfLog.new()
 var _core: RefCounted
@@ -106,8 +108,11 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 	_busy = false
 	return result
 
+func _recording_stop(kind: String, payload: Dictionary) -> bool:
+	return kind == "set_recording" and payload.size() == 1 and payload.get("active") is bool and payload.active == false
+
 func command(kind: String, payload := {}) -> Dictionary:
-	if _closing: return _error(4,"session","終了処理中です")
+	if _closing and not _recording_stop(kind,payload): return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"command","更新中は再入できません")
 	if _next_command == 9223372036854775807: return _error(9,"command_id","命令番号が上限です")
 	var envelope := {"run_id":_run_id,"epoch":_epoch,"command_id":_next_command,"kind":kind,"payload":payload}
@@ -123,7 +128,7 @@ func boss_trial(entity_id: int, action: String, fields: Dictionary = {}) -> Dict
 	return command("dev_boss_trial",payload)
 
 func send_envelope(envelope: Dictionary) -> Dictionary:
-	if _closing: return _error(4,"session","終了処理中です")
+	if _closing and (not envelope.get("payload",{}) is Dictionary or not _recording_stop(str(envelope.get("kind","")),envelope.get("payload",{}))): return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"command","更新中は再入できません")
 	if _core == null: return _error(4,"command","破棄済みです")
 	_busy = true
@@ -207,7 +212,10 @@ func restore(id: int) -> Dictionary:
 	if _closing: return _error(4,"session","終了処理中です")
 	if _busy: return _error(7,"restore","更新中は復帰できません")
 	if _core == null or not _development: return _error(4,"restore","開発中のランだけ復帰できます")
-	if not _core.restore_checkpoint(id): return _error(5,"checkpoint","保持点がありません")
+	before_restore.emit()
+	if not _core.restore_checkpoint(id):
+		restored.emit()
+		return _error(5,"checkpoint","保持点がありません")
 	_epoch = _core.current_epoch()
 	_next_command = 1
 	_ui = {}
@@ -217,6 +225,7 @@ func restore(id: int) -> Dictionary:
 	_delivery_sizes = {}
 	_delivery = {}
 	delivery_error = {}
+	restored.emit()
 	return _ok({"epoch":_epoch})
 
 func release_checkpoint(id: int) -> Dictionary:

@@ -4,7 +4,7 @@
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
 extends Control
 
-const CPP_UI_FIELDS := ["attack_power", "bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "coins", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "kills", "lab_mode", "level", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "trait_levels", "view_center", "view_half", "weapon_levels", "xp"]
+const CPP_UI_FIELDS := ["attack_power", "bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "coins", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "kills", "lab_mode", "level", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "trait_levels", "view_center", "view_half", "weapon_levels", "world_scale", "xp"]
 
 ## 描けるようになったときに広がる輪の時間（実秒）
 const PickupKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.PickupKind
@@ -703,7 +703,9 @@ func _prepare_cpp_finish() -> void:
 func _update_cpp_finish() -> void:
 	var value: Dictionary = _cpp_ui.get("boss_finish",{})
 	var active: bool = value.get("active",false)
-	if not value.is_empty(): AudioManager.set_slow_motion(active and value.elapsed<value.slow_time and not _cpp_ui.get("presentation_frozen",false))
+	var slow := int(_cpp_ui.get("phase",-1))==Phase.Play and float(_cpp_ui.get("world_scale",1.0))<0.999
+	if active: slow = value.elapsed<value.slow_time
+	AudioManager.set_slow_motion(slow and not _cpp_ui.get("presentation_frozen",false) and _menu_overlay==null and not _rewards.is_active())
 	_finish_skip.visible = active and value.elapsed>=0.35 and value.elapsed<value.reveal_start+value.reveal_duration
 	if _speed_indicator!=null: _speed_indicator.visible = not active
 	if _legendary_reveal==null: return

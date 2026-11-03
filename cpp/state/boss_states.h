@@ -114,7 +114,8 @@ struct HydraGridState {HydraGridPlan plan;std::vector<bool> arrived;double posit
 struct HydraTechniqueState {double time=0;bool playing=false;std::vector<EnemyHandle> participants;std::variant<HydraCurveState,HydraGridState,HydraPincerState,HydraTornadoState,HydraShatterState,HydraNorthState,HydraSequenceState,HydraSwarmState> move;};
 struct TechniqueState {
     std::variant<std::monostate,MonocerosSweepState,MonocerosLanceState,MonocerosReturnState,MonocerosHornWaveState,MonocerosDanceState,MonocerosSwordState,CentaurusVolleyState,CentaurusRainState,CentaurusPowerState,CentaurusShowerState,CentaurusSailState,CanisCommandState,CanisHowlState,CanisPounceState,CanisSiriusState,CanisBayState,CanisBlazeState,CanisStreamState,CanisHuntState,CanisHuntPounceState,CanisNovaState,CanisRelayState,DracoTechniqueState,CanisSiriusFlameState,HydraTechniqueState> detail;
-    int64_t id=0,observation_id=0;
+    int64_t id=0,observation_id=0,decision_id=0;
+    std::string observation_origin="external_forced";
     uint32_t definition=0,command_cursor=0,ticket_refs=0,combo_definition=0,combo_step=0;
     bool combo_waiting=false;
     EnemyHandle actor;
@@ -126,6 +127,7 @@ struct TechniqueState {
 };
 enum class FlowStatus : uint8_t { Running,Finished,Failed,Cancelled };
 struct FlowNodeState {
+    int64_t decision_id=0;
     uint32_t definition=0,cursor=0,child=UINT32_MAX;
     double elapsed=0;
     FlowStatus status=FlowStatus::Running;
@@ -133,6 +135,7 @@ struct FlowNodeState {
     std::vector<uint32_t> branches;
 };
 struct BossFlowState {
+    int64_t decision_id=0;
     uint32_t definition=0,index=0,rest_next=0,completed_actions=0,phase=1;
     int32_t last_category_override=-1;
     EnemyHandle actor;
@@ -162,7 +165,7 @@ struct CentaurusBodyState {
 };
 struct CanisHoundRef {EnemyHandle actor;double base_hp=0;godot::Color color;};
 struct CanisRingMember {EnemyHandle actor;double angle=0;};
-struct CanisBurningHound {EnemyHandle actor;uint32_t definition=0,technique=0;double base_hp=0,age=0,blink_age=-1;godot::Color color;};
+struct CanisBurningHound {EnemyHandle actor;int64_t observation_id=0,effect_id=0;godot::Vector2 observation_pos;uint32_t definition=0,technique=0;double base_hp=0,age=0,blink_age=-1;godot::Color color;};
 struct CanisBodyState {
     TechniqueHandle nova;
     std::vector<CanisBurningHound> burning;
@@ -271,6 +274,7 @@ struct HydraNeckState {
 struct DracoCloneUnit {TechniqueState inner;HydraNeckState neck;std::vector<EnemyHandle> parts;std::vector<godot::Vector2> points;godot::Vector2 origin;uint32_t index=0;bool entry_hit=false;};
 struct HydraBodyState {std::unordered_map<int64_t,AttackHandle> final_beams;double major_cd=0,combo_left=0,major_padding_left=0;std::unordered_map<uint32_t,double> major_until;HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false,attack_field_advance=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
+    int64_t final_observation_id=0;
     HydraBodyState hydra;
     DracoBodyState draco;
     CanisBodyState canis;

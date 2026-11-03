@@ -30,6 +30,7 @@ public:
     static void finish_hostile_update(godot::RunState &);
     static bool hazard_act(const godot::RunState &,AttackHandle,double dt);
     static bool hazard_before_touch(const godot::RunState &,AttackHandle);
+    static void sync_observation_positions(godot::RunState &);
     static bool rebuild(godot::RunState &);
 };
 }

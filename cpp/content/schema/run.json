@@ -2143,6 +2143,14 @@
       {
         "name": "DracoCue",
         "value": "draco_cue"
+      },
+      {
+        "name": "BossDecision",
+        "value": "boss_decision"
+      },
+      {
+        "name": "BossEffect",
+        "value": "boss_effect"
       }
     ],
     "ResultKind": [
@@ -2480,7 +2488,8 @@
       "reason",
       "hp_before",
       "hp_after",
-      "observation_id"
+      "observation_id",
+      "effect_id"
     ],
     "critical_hit": [
       "pos",
@@ -3085,7 +3094,8 @@
       "duration",
       "damage",
       "next_count",
-      "target"
+      "target",
+      "kind"
     ],
     "draco_roar": [
       "pos",
@@ -3102,13 +3112,97 @@
       "contacts",
       "applied",
       "outcome",
-      "reason"
+      "reason",
+      "origin",
+      "decision_id",
+      "ship_position",
+      "ship_velocity",
+      "aim",
+      "direction",
+      "phase",
+      "pass",
+      "stage",
+      "body_position",
+      "facing",
+      "distance",
+      "observation_scope",
+      "row",
+      "section",
+      "flow_clock",
+      "node",
+      "technique",
+      "requested_action"
     ],
     "draco_cue": [
       "cue",
       "pos",
       "radius",
       "boss"
+    ],
+    "boss_decision": [
+      "action_id",
+      "body_id",
+      "action",
+      "boss",
+      "observed_start",
+      "origin",
+      "decision_id",
+      "ship_position",
+      "ship_velocity",
+      "aim",
+      "direction",
+      "phase",
+      "pass",
+      "stage",
+      "body_position",
+      "facing",
+      "distance",
+      "row",
+      "section",
+      "flow_clock",
+      "request",
+      "stamina",
+      "maximum_stamina",
+      "stamina_reserved",
+      "cap",
+      "section_spent",
+      "section_budget",
+      "remaining_budget",
+      "history",
+      "candidates",
+      "selection",
+      "selected",
+      "reason"
+    ],
+    "boss_effect": [
+      "action_id",
+      "body_id",
+      "action",
+      "boss",
+      "observed_start",
+      "origin",
+      "decision_id",
+      "ship_position",
+      "ship_velocity",
+      "aim",
+      "direction",
+      "phase",
+      "pass",
+      "stage",
+      "body_position",
+      "facing",
+      "distance",
+      "effect_id",
+      "step",
+      "spawn_position",
+      "position",
+      "checks",
+      "contacts",
+      "applied",
+      "observation_scope",
+      "outcome",
+      "reason",
+      "row"
     ]
   },
   "includes": [

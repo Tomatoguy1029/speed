@@ -10,7 +10,7 @@
 namespace speed {
 namespace {
 void cue(RunRuntime &r,const BossBodyState &b,const char *name,int32_t neck=-1,double duration=0,double damage=0,uint32_t count=0) {
-    godot::Dictionary e;e["id"]=r.state.enemy_handles.entity_id(b.actor);e["cue"]=name;e["technique"]="";e["neck"]=neck;e["position"]=r.state.enemies[b.actor.slot].pos;e["duration"]=duration;e["damage"]=damage;e["next_count"]=count;e["target"]="hydra";FrameBuilder::append(r,"hydra_cue",e);
+    godot::Dictionary e;e["id"]=r.state.enemy_handles.entity_id(b.actor);e["cue"]=name;e["technique"]="";e["neck"]=neck;const auto *part=neck>=0 && size_t(neck)<b.hydra.necks.size()?&b.hydra.necks[neck]:neck==-2?&b.hydra.bearer:nullptr;e["position"]=part?HydraBody::head_position(r,b,*part):r.state.enemies[b.actor.slot].pos;e["kind"]=part?symbol_name(part->kind):"body";e["duration"]=duration;e["damage"]=damage;e["next_count"]=count;e["target"]="hydra";FrameBuilder::append(r,"hydra_cue",e);
 }
 void interrupt(RunRuntime &r,BossBodyState &b) {
     for (auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) FlowRunner::cancel(r,f);

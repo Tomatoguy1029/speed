@@ -15,6 +15,13 @@ func enemy(core, id: int) -> Dictionary:
 	return {}
 func _ready() -> void:
 	helper = load("res://tests/runtime/boss_registry.gd").new()
+	if "--cpp-hydra-trace" in OS.get_cmdline_user_args():
+		check_trace()
+		failed += helper.failed
+		helper.free()
+		print("[hydra_trace] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	check_environment()
 	check_budget()
 	check_grid()
@@ -23,6 +30,44 @@ func _ready() -> void:
 	helper.free()
 	print("[hydra_live] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
+func check_trace() -> void:
+	var c: Dictionary = helper.hydra_normal_case(false,{}, {"normal_charge":0.1,"normal_hold":0.1,"attack_cd":0.01,"bolt_length":150.0,"bolt_width":60.0,"bolt_speed":200.0,"bolt_life":2.0},"beam_bolt")
+	if c.is_empty(): check(false,"技と残留弾の観測を準備する");return
+	var bridge = c.bridge
+	var events: Array = []
+	bridge.subscribe("技と弾の境界",func(packet): events.append_array(packet.events);return true)
+	bridge.command("set_recording",{"active":true,"level":1})
+	var head: Dictionary = body(bridge).necks[3]
+	bridge.command("dev_ship_motion",{"position":head.position+Vector2.from_angle(head.angle)*200,"velocity":Vector2.ZERO})
+	check(bridge.command("dev_boss_technique",{"entity_id":head.id,"definition":1}).ok,"観測中に弾を出す技を始める")
+	for tick in 40:
+		bridge._core.step(1.0/120.0)
+		bridge.command("dev_boss_body_state")
+	var starts: Array = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="selected")
+	var warnings: Array = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="warning")
+	var spawned: Array = events.filter(func(e): return e.type=="boss_effect" and e.payload.step=="spawned")
+	check(starts.size()==1 and warnings.size()==1,"予告を開始と別の境界で一度だけ記録する")
+	check(spawned.size()==1 and starts.size()==1 and spawned[0].payload.action_id==starts[0].payload.action_id,"残留弾は生成時の技の観測IDを持つ")
+	if not spawned.is_empty():
+		var effect: Dictionary = body(bridge).effects[0]
+		bridge._core.set_run_guards({"invincible":false})
+		bridge.command("dev_ship_motion",{"position":(effect.points[0]+effect.points[1])*0.5,"velocity":Vector2.ZERO})
+		bridge._core.step_hazards(1.0/120.0)
+		bridge.command("dev_boss_body_state")
+	bridge.command("set_recording",{"active":false})
+	var ended: Array = events.filter(func(e): return e.type=="boss_effect" and e.payload.step=="ended")
+	check(ended.size()==1 and spawned.size()==1 and ended[0].payload.effect_id==spawned[0].payload.effect_id and ended[0].payload.checks>0 and ended[0].payload.contacts>0 and ended[0].payload.applied>0.0 and ended[0].payload.reason=="recording_end","録画停止で残留弾の判定・接触・実HP減少を閉じる")
+	events.clear()
+	bridge.command("set_recording",{"active":true,"level":1})
+	check(bridge.command("dev_boss_final",{"entity_id":c.id,"charge":0.1}).ok,"専用の決着経路を開始する")
+	bridge._core.step(0.02)
+	bridge.command("dev_boss_body_state")
+	starts = events.filter(func(e): return e.type=="boss_action" and e.payload.step=="selected" and e.payload.action=="final_strike")
+	spawned = events.filter(func(e): return e.type=="boss_effect" and e.payload.step=="spawned" and e.payload.action=="final_strike")
+	check(starts.size()==1 and starts[0].payload.origin=="final_strike_replay" and not spawned.is_empty() and spawned.all(func(e):return e.payload.action_id==starts[0].payload.action_id),"決着の専用ビームも元の技と開始経路へ結び付ける")
+	bridge.command("dev_cancel_boss",{"entity_id":c.id})
+	bridge.command("set_recording",{"active":false})
+	bridge.dispose()
 func check_environment() -> void:
 	var cfg: GameConfig = ContentManager.base.duplicate(true)
 	cfg.planet_radius = 1.0

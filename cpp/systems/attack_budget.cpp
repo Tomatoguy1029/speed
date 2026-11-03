@@ -1,6 +1,7 @@
 #include "attack_budget.h"
 #include "../runtime/run_runtime.h"
 #include "../output/event_builder.h"
+#include "../output/recording_builder.h"
 #include "timing.h"
 #include "enemy_system.h"
 #include <algorithm>
@@ -126,7 +127,7 @@ int64_t AttackBudgetSystem::passive(const std::string &owner,EnemyHandle source)
     group.owner=owner+":passive:"+std::to_string(token);group.id=state.enemy_handles.entity_id(source);group.actor=source;
     group.until=group.start=budget.now;group.passive=true;
     group.pos=state.enemies[source.slot].pos;group.definition=uint32_t(state.enemies[source.slot].definition+1);group.categories.push_back(AttackCategory::Zone);
-    budget.groups.insert(token,group);return token;
+    budget.groups.insert(token,group);RecordingBuilder::budget(run);return token;
 }
 bool AttackBudgetSystem::advance(double at) {
     auto &state=run.state;auto &budget=state.world.attack_budget;
