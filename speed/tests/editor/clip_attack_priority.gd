@@ -39,76 +39,86 @@ func _runtime_checks() -> void:
 	check(ResourceSaver.save(clip, SAVE) == OK, "Priority saves")
 	loaded = ResourceLoader.load(SAVE, "", ResourceLoader.CACHE_MODE_IGNORE)
 	check(loaded.attack_priority == 1.0, "Priority survives reload")
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	root.add_child(lab)
-	await lab.reset({"seed": 932, "empty": true, "stage": 4})
-	var em = lab.run.enemies
-	var stage := StageDef.new()
-	stage.enemy_attack_priorities = {"aquarius": 9.0, "telescope": 5.0}
-	lab.run.state.stage = stage
-	var aquarius: int = em.spawn(em.def_of(&"aquarius"), Vector2.ZERO)
-	check(em.table.attack_priority[aquarius] == 9.0, "Non-clip spawn uses StageDef priority")
-	var data := {"layouts": [{"weight": 1.0, "markers": [
-		{"type": &"aquarius", "pos": Vector2.ZERO, "rot": 0.0},
-		{"type": &"telescope", "pos": Vector2(100, 0), "rot": 0.0}]}],
-		"entries": [{"weight": 1.0, "pos": Vector2.ZERO, "rot": 0.0}]}
-	var rows: PackedInt32Array = em.ctx.spawn.spawn_formation(data, 0, 0, [], -1.0, 0.0)
-	check(em.table.attack_priority[rows[0]] == 0.0 and em.table.attack_priority[rows[2]] == 0.0,
-		"Explicit clip zero overrides both StageDef types")
-	rows = em.ctx.spawn.spawn_formation(data, 0, 0, [], 2.0, 1.0)
-	check(em.table.attack_priority[rows[0]] == 1.0 and em.table.attack_priority[rows[2]] == 1.0,
-		"Clip priority reaches every type with shared override")
-	check(em.table.attack_value[rows[0]] == 2.0, "Priority preserves shared attack cost")
-	var part: int = em.spawn_part(rows[0], em.def_of(&"telescope"), Vector2.ZERO)
-	check(em.table.attack_priority[part] == 1.0, "Derived part keeps source priority over its type default")
-	var ruler: int = em.spawn(em.def_of(&"ruler"), Vector2.ZERO, {"attack_priority": 1.0})
-	em.behavior(&"ruler")._split_ruler(ruler)
-	var halves: PackedInt32Array = em.behavior(&"ruler").rows()
-	check(halves.size() == 2 and em.table.attack_priority[halves[1]] == 1.0, "Ruler split keeps priority")
-	# 実際のクリップ出現経路。時刻・配置・数はfixtureのまま使う。
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
+	cfg.planet_radius = 0.0
+	var stage := RuntimeStage.new()
+	stage.index = 245
+	stage.enemy_attack_priorities = {"aquarius":9.0,"telescope":5.0}
+	stage.resources = StageResources.new()
+	stage.resources.enemy_ids = PackedStringArray(["aquarius","telescope","ruler"])
 	clip.formations = [load("res://data/formations/aquarius_solo.tscn")]
 	clip.types = [&"aquarius"]
 	clip.length = 10.0
 	stage.clips = [load("res://tools/content/build_runtime_stage.gd").clip(clip)]
-	lab.run.state.time = 0.0
-	em.ctx.spawn._tick_clips()
-	var groups: Array = em.ctx.spawn._clip_groups[0]
-	var spawned: PackedInt32Array = groups[0]
-	check(em.table.attack_priority[spawned[0]] == 1.0, "Ticked clip propagates Inspector value")
-	var d = load("res://scripts/encounters/attack_director.gd").new()
-	d.projectiles = lab.run.projectiles
-	d.configure({"enabled": true, "budget": 4.0, "jitter": 0.0})
-	d.formation_mode = true
-	lab.run.projectiles.director = d
-	# 同じ0・同時刻は登録順。owner名や群れの有無で順位を変えない。
-	d.queue("formation:99", ["beam"], rows[0], em.table.id[rows[0]], 0.0)
-	d.queue("1", ["beam"], rows[2], em.table.id[rows[2]], 0.0)
-	check(d._next_owner() == "formation:99", "Equal zero uses registration order across owner kinds")
-	d.waiting.clear()
-	d.queue("1", ["beam"], rows[2], em.table.id[rows[2]], 0.0)
-	d.queue("formation:99", ["beam"], rows[0], em.table.id[rows[0]], 0.0)
-	check(d._next_owner() == "1", "Reversed registration reverses tied order")
-	d.waiting.clear()
-	# 画面外のみずがめ座1と画面内のぼうえんきょう座0を本番の許可経路へ通す。
-	var high: int = spawned[0]
-	var low: int = em.spawn(em.def_of(&"telescope"), Vector2.ZERO, {"attack_priority": 0.0})
-	em.table.pos[high] = Vector2(10000, 0)
-	em.table.fire_t[high] = 0.0
-	d.configure({"enabled": true, "budget": 0.0, "jitter": 0.0})
-	em._lab_admit(low, 0.01)
-	em._lab_admit(high, 0.01)
-	check(d.waiting[em._lab_owner(low)].priority == 0.0 and d.waiting[em._lab_owner(high)].priority == 1.0,
-		"Runtime request has exact configured priorities without view bonus")
-	d.settings.budget = 4.0
-	check(d._next_owner() == em._lab_owner(high), "Aquarius one precedes newly waiting zero")
-	d.waiting.clear()
-	d.now = 0.0
-	d.queue("older", ["beam"], low, em.table.id[low], 0.0)
-	d.now = 6.0
-	d.queue("newer", ["beam"], high, em.table.id[high], 1.0)
-	check(d._next_owner() == "older", "Existing wait-time fairness remains")
-	lab.queue_free()
-	await process_frame
+	var data := {"layouts":[{"weight":1.0,"markers":[{"type":&"aquarius","pos":Vector2.ZERO,"rot":0.0},{"type":&"telescope","pos":Vector2(100,0),"rot":0.0}]}],"entries":[{"weight":1.0,"pos":Vector2.ZERO,"rot":0.0}]}
+	var phase := PhaseDef.new()
+	phase.pop_from=0.0;phase.pop_to=0.0;phase.rate=0.0
+	stage.phases=[phase]
+	var builder = load("res://tools/content/build_run_content.gd")
+	var output := "res://.content/dev/clip_priority"
+	var built: Error = builder.build(stage,cfg,output,"クリップの優先度".sha256_text(),{},[data])
+	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+	var ready := false
+	if built==OK:
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(output.path_join("stage_245.json")))
+		ready = bridge.configure(FileAccess.get_file_as_bytes(index.binary),{"api_version":1,"run_id":245,"mode":1,"stage_id":"priority","profile":{},"settings":{}}).ok and bridge.start(932).ok
+	if not ready:
+		check(false,"優先度の編集値をC++ランへ生成する")
+		bridge.dispose()
+		return
+	var core = bridge._core
+	var aquarius: int = core.spawn_enemy(&"aquarius",Vector2.ZERO,{})
+	check(_priority(core,aquarius).priority==9.0,"通常出現はステージの優先度を使う")
+	var ids: PackedInt64Array = core.spawn_formation(1,0,0,PackedStringArray(),-1.0,0.0,null)
+	check(not ids.is_empty() and _all_priority(core,ids,0.0),"クリップの明示的な0で全種類の優先度を上書きする")
+	ids = core.spawn_formation(1,0,0,PackedStringArray(),2.0,1.0,null)
+	check(not ids.is_empty() and _all_priority(core,ids,1.0),"共有の優先度を編成の全種類へ渡す")
+	check(not ids.is_empty() and _priority(core,ids[0]).value==2.0,"優先度と独立した共有コストを保つ")
+	if ids.is_empty(): bridge.dispose();return
+	var part: Dictionary = bridge.command("dev_spawn_part",{"parent_id":int(ids[0]),"definition_id":"telescope","position":Vector2.ZERO})
+	check(part.ok and _priority(core,int(part.value)).priority==1.0,"派生部位は親の優先度を受け取る")
+	core.configure_attack_budget({"enabled":false})
+	core.spawn_enemy(&"ruler",Vector2.ZERO,{"attack_priority":1.0})
+	core.step(float(ContentManager.enemies[&"ruler"].params.split_delay)+0.01)
+	var halves: Array = core.enemies_snapshot().filter(func(row):return row.type=="ruler")
+	check(halves.size()==2 and _priority(core,halves[1].id).priority==1.0,"分裂した定規も優先度を保つ")
+	# 通常更新が持つクリップへ、生成済みの索引を戻してInspector値を確認する。
+	core.step_clips()
+	var groups: Array = core.clips_snapshot()[0].groups
+	check(not groups.is_empty() and not groups[0].is_empty() and _all_priority(core,groups[0],1.0),"通常更新のクリップ出現にInspector値を渡す")
+	var cats := PackedStringArray(["beam"])
+	for names in [["formation:99","1"],["1","formation:99"]]:
+		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+		core.request_attack(names[0],cats,ids[0],1.0,0.0,1.0)
+		core.request_attack(names[1],cats,ids[-1],1.0,0.0,1.0)
+		core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+		check(not core.request_attack(names[1],cats,ids[-1],1.0,0.0,1.0) and core.request_attack(names[0],cats,ids[0],1.0,0.0,1.0),"同順位は所有者名に関係なく登録順を使う: "+names[0])
+		core.cancel_attack(names[0],ids[0]);core.cancel_attack_wait(names[1],ids[-1])
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.request_attack("low",cats,ids[0],1.0,0.0,1.0)
+	core.request_attack("high",cats,ids[-1],1.0,1.0,1.0)
+	var waiting: Array = core.attack_budget_snapshot().waiting
+	check(waiting.size()==2 and waiting[0].priority==0.0 and waiting[1].priority==1.0,"要求の優先度へ画面内の加点を足さない")
+	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	check(core.request_attack("high",cats,ids[-1],1.0,1.0,1.0),"高い優先度を先に許可する")
+	core.cancel_attack("high",ids[-1]);core.cancel_attack_wait("low",ids[0])
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	core.request_attack("older",cats,ids[0],1.0,0.0,1.0)
+	core.advance_attack_budget(core.attack_budget_snapshot().now+6.0)
+	core.request_attack("newer",cats,ids[-1],1.0,1.0,1.0)
+	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	check(core.request_attack("older",cats,ids[0],1.0,0.0,1.0),"待ち時間による公平性を保つ")
+	bridge.dispose()
+
+func _priority(core, id: int) -> Dictionary:
+	for row: Dictionary in core.enemy_attack_snapshot():
+		if row.id==id:return row
+	return {}
+
+func _all_priority(core, ids, value: float) -> bool:
+	for id in ids:
+		if _priority(core,int(id)).get("priority",-1.0)!=value:return false
+	return true
 
 func _editor_checks() -> void:
 	while EditorInterface.get_resource_filesystem().is_scanning():
