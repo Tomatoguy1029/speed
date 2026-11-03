@@ -171,5 +171,7 @@ out['images']['water_noise'] = durl(Image.open(P('assets/fx/water_noise.png')).c
 # ---------- 効果設定（矢の見た目の上書きなど）
 eff = gdres.resource('data/visuals/effect_settings.tres')['res']
 out['effect_settings'] = jsonable({k: v for k, v in (eff or {}).items() if k != 'script'})
+from boss_data import extract_bosses
+extract_bosses(out, durl, lit, Image)
 if __name__ == '__main__': json.dump(out, open(sys.argv[1], 'w'), ensure_ascii=False)
 print('ok', os.path.getsize(sys.argv[1]), file=sys.stderr)
