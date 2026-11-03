@@ -21,6 +21,13 @@ func _ready() -> void:
 	if not await _open_session():
 		get_tree().quit(1)
 		return
+	if "--cpp-operation-menus" in OS.get_cmdline_user_args() or "--cpp-operation-choice" in OS.get_cmdline_user_args():
+		if "--cpp-operation-menus" in OS.get_cmdline_user_args(): await _operation_menus()
+		else: await _operation_choice()
+		await _close()
+		print("[操作経路] 成功=%d 失敗=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	var cards: Array = _state().cards.duplicate(true)
 	await _shot("selection")
 	for i in 3:
@@ -151,6 +158,72 @@ func _ready_cards() -> void:
 	while Time.get_ticks_usec() < deadline:
 		await get_tree().process_frame
 
+## 表示の確認やsignalの直接発火ではなく、Viewportから操作を最後まで通す。
+func _operation_menus() -> void:
+	_tap(KEY_ESCAPE)
+	await get_tree().process_frame
+	_click(hud._pause_box.get_child(2).get_global_rect().get_center())
+	_check(hud._settings!=null,"設定ボタンのクリックで設定を開く")
+	_tap(KEY_ESCAPE)
+	_check(hud._settings==null and _state().phase==MenuIds.Phase.Paused,"設定のEscは設定だけ閉じてポーズを維持する")
+	# 失敗時も次の独立した確認へ進めるための後片付け。
+	if hud._settings!=null: hud._settings._on_back()
+	bridge.command("pause",{"paused":false})
+	await _ready_cards()
+	_tap(KEY_P)
+	var before: Dictionary = bridge.read_frame().value.ui
+	_tap(KEY_1)
+	_tap(KEY_R)
+	var after: Dictionary = bridge.read_frame().value.ui
+	_check(panel.visible and int(after.cards.selected_id)==0 and after.rerolls_left==before.rerolls_left,"デバッグ表示中の数字とRは背後の選択予約・引き直しをしない")
+	_tap(KEY_P)
+	_check(int(bridge.read_frame().value.ui.cards.selected_id)==0,"デバッグを閉じても背後の選択予約を残さない")
+
+func _operation_choice() -> void:
+	_clear_choice()
+	for id in ["W01","W02","W03","W04"]: bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":2})
+	scene.cpp_choices.prepare = func(paths: PackedStringArray) -> ContentResourceScope:
+		var scope := ContentManager.prepare_resources(paths,false)
+		scope.pending.append("held://operation")
+		_held_scopes.append(scope)
+		return scope
+	bridge.command("dev_edit",{"kind":"comet_weapon","payload":{"id":"W22"}})
+	_step(1.0/120.0)
+	await _ready_cards()
+	var before: Array = bridge.read_frame().value.ui.weapon_levels.duplicate(true)
+	var slot: Control = hud._swap_grid.get_child(1)
+	_click(slot.get_global_rect().get_center())
+	_step(1.0/120.0)
+	var cards: Dictionary = bridge.read_frame().value.ui.cards
+	_check(int(cards.selected_id)==int(cards.candidates[1].candidate_id) and cards.preparing,"交換先の実クリックで指定武器の準備を始める")
+	await get_tree().process_frame
+	_click(hud._cpp_cancel.get_global_rect().get_center())
+	_step(1.0/120.0)
+	_check(int(bridge.read_frame().value.ui.cards.selected_id)==0 and bridge.read_frame().value.ui.weapon_levels==before,"選び直すの実クリックで装備を変えず候補へ戻る")
+	await get_tree().process_frame
+	_click(hud._swap_grid.get_child(1).get_global_rect().get_center())
+	_step(1.0/120.0)
+	for scope in _held_scopes:
+		scope.failed = true
+		scope.pending.clear()
+	scene.cpp_choices.poll()
+	_step(1.0/120.0)
+	cards = bridge.read_frame().value.ui.cards
+	_check(int(cards.error_code)==-1 and hud._cpp_retry.visible,"準備失敗を正式画面に表示する")
+	var failed_request: int = cards.get("request_id",0)
+	scene.cpp_choices.prepare = Callable()
+	await get_tree().process_frame
+	_click(hud._cpp_retry.get_global_rect().get_center())
+	cards = bridge.read_frame().value.ui.cards
+	_check(int(cards.get("request_id",0))!=failed_request and int(cards.error_code)==0,"もう一度準備するの実クリックで新しい準備を始める")
+	for i in 240:
+		scene.cpp_choices.poll()
+		_step(1.0/120.0)
+		if int(bridge.read_frame().value.ui.phase)==MenuIds.Phase.Play: break
+		await get_tree().process_frame
+	var ui: Dictionary = bridge.read_frame().value.ui
+	_check(int(ui.phase)==MenuIds.Phase.Play and ui.weapon_levels.any(func(v):return v.id=="W22") and not ui.weapon_levels.any(func(v):return v.id=="W02"),"再準備完了でクリックした武器だけ交換して戦闘へ戻る")
+
 func _settle_choice() -> void:
 	for i in 4000:
 		scene.cpp_choices.poll()
@@ -184,7 +257,27 @@ func _click(point: Vector2) -> void:
 		get_viewport().push_input(ev, true)
 
 func _open_session() -> bool:
-	scene = await _cpp_open(1, false)
+	if "--cpp-operation-menus" in OS.get_cmdline_user_args() or "--cpp-operation-choice" in OS.get_cmdline_user_args():
+		var config: GameConfig = ContentManager.base.duplicate(true)
+		config.planet_radius = 0.0
+		config.moon_count = 0
+		config.levelup_bonus_chance = 0.0
+		var stage := RuntimeStage.new()
+		stage.index = 88
+		stage.boss_enabled = false
+		stage.resources = StageResources.new()
+		stage.resources.enemy_ids = PackedStringArray(["drifter"])
+		var output := "res://.content/dev/operation_paths"
+		var generated: Error = load("res://tools/content/build_run_content.gd").build(stage,config,output,"操作経路の確認".sha256_text())
+		_check(generated==OK,"操作確認用の最小データを生成する: %s" % error_string(generated))
+		if generated!=OK: return false
+		var path := output.path_join("stage_88.json")
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+		scene = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":932,"cpp_start":{"equipment":[],"lab_mode":false}},true)
+		scene.auto_step = false
+		while scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
+	else:
+		scene = await _cpp_open(1, false)
 	if scene.bridge == null: return false
 	bridge = scene.bridge
 	hud = scene.view.get_node("Hud/HudRoot")

@@ -5,6 +5,9 @@ func check(value: bool, message: String) -> void:
 		failures += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-entrance-click" in OS.get_cmdline_user_args():
+		call_deferred("entrance_click")
+		return
 	if "--cpp-draco-finale" in OS.get_cmdline_user_args():
 		call_deferred("native_finale")
 		return
@@ -302,6 +305,40 @@ func finale_entrance_hud() -> void:
 	f.bridge.command("skip_boss_entrance")
 	check(not finale_body(f).intro.active,"登場skipで戦闘へ返す")
 	hud.free();f.bridge.dispose()
+
+func entrance_click() -> void:
+	var f := finale_fixture()
+	if f.is_empty(): get_tree().quit(1);return
+	var hud = load("res://scripts/ui/hud.gd").new()
+	hud.bridge = f.bridge
+	hud.size = get_viewport().get_visible_rect().size
+	add_child(hud)
+	f.bridge.command("dev_draco_intro",{"entity_id":f.boss,"operation":"begin"})
+	f.bridge._core.step(0.5)
+	f.bridge.command("dev_boss_body_state")
+	hud.apply_snapshot(f.bridge.read_frame().value.ui)
+	hud._update_cpp_cinematic()
+	await get_tree().process_frame
+	var button: Button = hud._entrance_skip
+	check(button.is_visible_in_tree(),"登場スキップを正式HUDに表示する")
+	var point := button.get_global_rect().get_center()
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	get_viewport().push_input(motion,true)
+	for down in [true,false]:
+		var event := InputEventMouseButton.new()
+		event.position = point
+		event.global_position = point
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		event.pressed = down
+		get_viewport().push_input(event,true)
+	check(not finale_body(f).intro.active,"スキップの実クリックで登場を終える")
+	check(f.bridge.read_frame().value.ui.input_enabled,"登場スキップ後に戦闘入力を戻す")
+	hud.free()
+	f.bridge.dispose()
+	print("[登場スキップの実操作] 失敗=%d" % failures)
+	get_tree().quit(1 if failures else 0)
 
 func finale_hud_case(size: Vector2,angle: float) -> void:
 	var f:=finale_fixture(size,angle)

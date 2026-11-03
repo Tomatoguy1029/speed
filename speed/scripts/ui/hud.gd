@@ -186,7 +186,7 @@ func _card_input_id(event: InputEvent) -> String:
 	return ""
 
 func _card_command(command: StringName, args := {}) -> void:
-	if _cpp_ui.is_empty() or int(_cpp_ui.phase)!=Phase.Levelup or Time.get_ticks_usec()<_cards_accept_at: return
+	if _menu_overlay!=null or _settings!=null or _rewards.is_active() or _cpp_ui.is_empty() or int(_cpp_ui.phase)!=Phase.Levelup or Time.get_ticks_usec()<_cards_accept_at: return
 	var cards: Dictionary = _cpp_ui.get("cards",{})
 	var payload := {"offer_id":cards.get("offer_id",0)}
 	if command==&"choose_card":
@@ -200,6 +200,7 @@ func _card_command(command: StringName, args := {}) -> void:
 	bridge.command(String(command),payload)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _settings!=null or _menu_overlay!=null: return
 	if event.is_action_pressed(&"pause") and not event.is_echo() and not _cpp_ui.is_empty():
 		bridge.command("pause",{"paused":int(_cpp_ui.phase)!=Phase.Paused})
 		get_viewport().set_input_as_handled()
@@ -847,26 +848,29 @@ func _show_cpp_cards() -> void:
 
 func _input_cpp(event: InputEvent) -> void:
 	if _cpp_ui.is_empty(): return
+	var focus := get_viewport().gui_get_focus_owner()
+	if _settings!=null or (focus!=null and focus.is_in_group("stage_enemy_tuning_input")): return
 	if int(_cpp_ui.phase)==Phase.Finishing:
 		if float(_cpp_ui.get("boss_finish",{}).get("elapsed",0.0))>=0.35 and not event.is_echo() and (event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_accept")):
 			bridge.command("skip_finish")
 			get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed(&"pause") and not event.is_echo():
+	if _menu_overlay==null and event.is_action_pressed(&"pause") and not event.is_echo():
 		bridge.command("pause",{"paused":int(_cpp_ui.phase)!=Phase.Paused})
 		_card_discard.merge(_card_held)
 		get_viewport().set_input_as_handled()
 		return
 	var id := _card_input_id(event)
 	if id=="": return
+	var in_menu := _menu_overlay!=null or int(_cpp_ui.phase)==Phase.Paused
 	# 継続を出した押下やタッチ由来の擬似マウスを、次送りに使わない。
-	var reward_active := _rewards.is_active()
-	var reward_press: bool = _menu_overlay==null and int(_cpp_ui.phase)!=Phase.Paused and _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
+	var reward_active: bool = _rewards.is_active()
+	var reward_press: bool = not in_menu and _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
 		(event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.device!=-1 and event.pressed)
 		or (event is InputEventScreenTouch and event.pressed)
 		or event.is_action_pressed(&"ui_accept"))
-	var choosing := int(_cpp_ui.phase)==Phase.Levelup
-	var blocked := _card_discard.has(id) or reward_active or (choosing and Time.get_ticks_usec()<_cards_accept_at)
+	var choosing := not in_menu and int(_cpp_ui.phase)==Phase.Levelup
+	var blocked: bool = _card_discard.has(id) or (not in_menu and (reward_active or (choosing and Time.get_ticks_usec()<_cards_accept_at)))
 	# 擬似イベントと元の入力の間で期限を越えても同じ押下を破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
