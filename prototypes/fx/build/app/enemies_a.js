@@ -56,17 +56,20 @@ DEMOS.push({
 // ---------- かに座（crab）：ユーザー指示「範囲を実攻撃に合わせて狭める・後ろからすぐ消さず少し残す・予兆をハサミ固有に」
 DEMOS.push({
   id: 'G12-crab', ids: ['G12'], cat: G12, group: 'かに座（crab）', title: 'ハサミの薙ぎ', duration: 3.4, color: '#ff8a4a', cam: { x: 40, y: 0 }, bg: 'asteroid_a',
-  params: [{ k: 'linger', label: '斬撃の残る時間(秒)', type: 'range', min: 0.15, max: 1.0, step: 0.01, def: 0.45 }, { k: 'showHit', label: '判定円を重ねる(0/1)', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
+  params: [{ k: 'linger', label: '斬撃の残る時間(秒)', type: 'range', min: 0.15, max: 1.0, step: 0.01, def: 0.45 }, { k: 'showHit', label: '判定円を重ねる(0/1)', type: 'range', min: 0, max: 1, step: 1, def: 0 },
+    { k: 'reachR', label: '試作：斬撃の半径(×体の半径・本体中心から)', type: 'range', min: 1.0, max: 3.0, step: 0.05, def: 1.5 }, { k: 'hitR', label: '試作：判定円の半径(×体の半径)', type: 'range', min: 0.5, max: 3.0, step: 0.05, def: 1.0 }],
   refs: ['scripts/enemies/crab.gd（横歩き・approach・telegraph 0.6・fire_zone(sweep_center, reach×0.6)・open_time 1.4）', 'scripts/render/enemies/crab.gd（現行の予告円・ハサミの丸・振りの弧）', 'render/attacks/zone.gd（判定の閃き ZONE_FLASH 0.25s）', 'pixelFX melee/sword-slash.js（白→色へ冷える三日月）、painter.js'],
-  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし。斬撃・予兆はすべて実際の判定円（中心 sweep_center、半径 reach×0.6=180）の内側に描く', '前回指摘への対応': '範囲を判定円内へ縮小（弧は本体中心・半径204・±0.75rad、太さ26）／斬撃は後端から消さず全体を残光でフェード（残る時間は調整値）／予兆はビームを流用せずハサミの開きと爪先の光で示す' },
-  setup(S) { const p = prm('crab'); S.ship = shipState(V(180, 40)); S.e = mkE('crab', V(-520, 40), -Math.PI / 2, { buds: 1 }); },
+  status: { '状態': '試作のみ（作り直し2回目）', '位置と判定': '斬撃はハサミのある前側・体の近くに出す。試作の判定円（前側、半径はつまみ）もそこに置く。本番の判定は歩く向きの横（sweep_center、半径180）なので、合わせるには移行後に行動の処理の変更が要る', '予兆': '開く→途中で止める→もう一度振りかぶる→一気に閉じる。予告0.6秒と攻撃全体の時間は変えない', '前回指摘への対応': '斬撃は後端から消さず全体を残光でフェード（残る時間は調整値）／予兆はハサミの開きと爪先の光で示す' },
+  setup(S) { const p = prm('crab'); S.e = mkE('crab', V(-520, 40), -Math.PI / 2, { buds: 1 }); S.ship = shipState(V(180, 40 - S.e.r * (P().reachR ?? 1.5))); },
   step(S, dt) {
-    const e = S.e, p = prm('crab'), walk = mul(fromA(e.facing + Math.PI / 2), e.buds < 0 ? -1 : 1);
+    const e = S.e, p = prm('crab'), walk = mul(fromA(e.facing + Math.PI / 2), e.buds < 0 ? -1 : 1), PP = P();
     const center = add(e.pos, mul(walk, e.r + p.reach * 0.5)), rad = p.reach * 0.6; S.sweep = { center, rad, walk };
+    S.front = { center: add(e.pos, mul(fromA(e.facing), e.r * PP.reachR)), rad: e.r * PP.hitR }; // 試作：ハサミの前・体の近く
+    const zone = mode === 'proto' ? S.front : S.sweep;
     if (e.mode === 'MOVE') {
-      if (dist(center, S.ship.pos) <= rad && dist(e.pos, S.ship.pos) <= p.approach) { e.mode = 'WINDUP'; e.timer = p.telegraph; e.charge = 0; }
+      if (dist(zone.center, S.ship.pos) <= zone.rad && dist(e.pos, S.ship.pos) <= p.approach) { e.mode = 'WINDUP'; e.timer = p.telegraph; e.charge = 0; }
       else e.pos = add(e.pos, mul(walk, enemyDef('crab').speed * dt));
-    } else if (e.mode === 'WINDUP') { e.timer = Math.max(0, e.timer - dt); e.charge = clamp(1 - e.timer / p.telegraph); if (e.timer <= 0) { S.zone = { ...S.sweep, t0: S.t }; e.mode = 'RECOVER'; e.timer = p.open_time; e.charge = 0; } }
+    } else if (e.mode === 'WINDUP') { e.timer = Math.max(0, e.timer - dt); e.charge = clamp(1 - e.timer / p.telegraph); if (e.timer <= 0) { S.zone = { ...zone, t0: S.t }; e.mode = 'RECOVER'; e.timer = p.open_time; e.charge = 0; } }
     else if (e.mode === 'RECOVER') { e.timer -= dt; if (e.timer <= 0) { e.mode = 'MOVE'; e.pos = add(e.pos, V(0, 0)); S.done = 1; } }
   },
   phase(S) { return S.done ? PH.RECOVER : PH[S.e.mode]; },
@@ -74,28 +77,28 @@ DEMOS.push({
     const e = S.e, P = R.P, p = prm('crab'), col = ecol('crab', 0.3), sw = S.sweep;
     const toward = angOf(sw.walk);
     if (R.proto) {
-      const k = e.charge;
+      // ハサミの軌跡：体の前（向き e.facing）で、外側 ±OPEN から中央 ±0.03 へ閉じる。爪先の角度 claw(k) は
+      // 開く（0〜0.45）→止める（〜0.7）→もう一度振りかぶる（〜1.0）→ 予告の終わりで一気に閉じる
+      const k = e.charge, R0 = e.r * P.reachR * P.size, OPEN = 1.25, HOLD = 0.6, BACK = 0.9, fwd = e.facing;
+      const claw = (k) => k < 0.45 ? lerp(OPEN, HOLD, smooth(0, 0.45, k)) : k < 0.7 ? HOLD : lerp(HOLD, BACK, smooth(0.7, 1, k));
+      const headOf = (ang) => (OPEN - ang) / (OPEN - 0.03);
       if (e.mode === 'WINDUP') {
-        // ハサミの開き：左右の爪先が外へ開きながら光を溜め、これから閉じる軌跡（判定円の内側）を薄い擦過光で示す
+        const ang = claw(k);
         for (const s of [-1, 1]) {
-          const tip = add(e.pos, mul(fromA(toward + s * (0.7 + 0.5 * k)), e.r * (1.0 + 0.15 * k)));
-          FXW.gather(R.front, tip, e.r * 0.9, k * P.intensity, P.color, S.t + s, 7, 11 + s);
-          // 薙ぎの弧は本体中心・半径＝sweep_center までの距離。±0.75rad なら太さを含めて判定円（半径180）の内側に収まる
-          const R0 = dist(e.pos, sw.center), a0 = toward + s * 0.75 * P.size, a1 = toward + s * lerp(0.75, 0.05, k) * P.size;
-          FXW.crescent(R.back, e.pos, R0, a0, a1, 1, 0, 4, P.color, 0.25 + 0.4 * k * P.intensity);
+          const tip = add(e.pos, mul(fromA(fwd + s * ang), R0));
+          FXW.gather(R.front, tip, e.r * 0.7, k * P.intensity, P.color, S.t + s, 7, 11 + s);
+          FXW.crescent(R.back, e.pos, R0, fwd + s * OPEN, fwd + s * 0.03, headOf(ang), 0, 4, P.color, 0.3 + 0.4 * k * P.intensity);
         }
       }
       if (S.zone) {
         const t = S.t - S.zone.t0, sweepT = 0.12, linger = P.linger * P.timing;
         if (t < sweepT + linger) {
-          const head = clamp(t / sweepT), fade = t < sweepT ? 1 : 1 - smooth(0, 1, (t - sweepT) / linger), tail = t < sweepT ? 0 : 0.25 * (t - sweepT) / linger;
-          const R0 = dist(e.pos, S.zone.center);
-          for (const s of [-1, 1]) FXW.crescent(R.front, e.pos, R0, toward + s * 0.75 * P.size, toward + s * 0.03, head, tail, 26, P.color, fade * Math.min(1, P.intensity));
-          if (t < 0.4) FXW.sparks(R.front, S.zone.center, t - 0.08, 21, 14, '#ffe2b0', 60, 0.35, toward, 1.2);
-          if (t < 0.25) { const fz = 1 - t / 0.25; R.back.glow(toL(S.zone.center).x, toL(S.zone.center).y, S.zone.rad * WL, hexc(P.color), 0.18 * fz * P.intensity); }
+          const h0 = headOf(BACK), head = lerp(h0, 1, smooth(0, sweepT, t)), fade = t < sweepT ? 1 : 1 - smooth(0, 1, (t - sweepT) / linger), tail = t < sweepT ? 0 : 0.25 * (t - sweepT) / linger; // 振りかぶった所から続けて閉じる
+          for (const s of [-1, 1]) FXW.crescent(R.front, e.pos, R0, fwd + s * OPEN, fwd + s * 0.03, head, tail, 22 * P.size, P.color, fade * Math.min(1, P.intensity));
+          if (t < 0.4) FXW.sparks(R.front, add(e.pos, mul(fromA(fwd), R0)), t - 0.08, 21, 14, '#ffe2b0', 60, 0.35, fwd, 1.2);
         }
       }
-      if (P.showHit && (e.mode === 'WINDUP' || S.zone && S.t - S.zone.t0 < 0.25)) { D2.arc(sw.center, sw.rad, 0, TAU, 'rgba(120,255,160,.8)', px(1)); }
+      if (P.showHit && (e.mode === 'WINDUP' || S.zone && S.t - S.zone.t0 < 0.25)) { D2.arc(S.front.center, S.front.rad, 0, TAU, 'rgba(120,255,160,.8)', px(1)); }
       R.blitBack();
     }
     drawEnemy(e); drawShip(S.ship);
