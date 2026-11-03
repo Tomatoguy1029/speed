@@ -140,6 +140,17 @@ func _package_loading() -> void:
 		push_error("P04は描画付きの配布版で確認してください")
 		quit(1)
 		return
+	if "--loading-boss-only" in OS.get_cmdline_user_args():
+		var path := "res://.content/run/stage_1.json"
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+		var owner: RunSession = RunManager.create_session(root,{"cpp_index":path,"cpp_signature":index.input_sha256,"seed":42,"cpp_start":{"lab_mode":true}},true)
+		var ready := await _package_ready(owner)
+		var boss_ok: bool = await _package_boss_preparation(owner) if ready else false
+		owner.free()
+		await process_frame
+		if boss_ok: print("[package_loading_boss] OK")
+		quit(0 if boss_ok else 1)
+		return
 	var stamp := FileAccess.get_sha256("res://.content/stamp.json")
 	_package_measure("起動",{"engine_elapsed_ms":Time.get_ticks_msec(),"content":ContentManager.startup_timings})
 	var ok := true
@@ -221,21 +232,25 @@ func _package_initial_equipment(session: RunSession, label: String) -> bool:
 	_package_measure(label+"の初期装備",{"resource_and_present_ms":(Time.get_ticks_usec()-began)/1000.0,"weapon":candidate.id,"equipped":ok})
 	return ok
 
-func _package_lab_preparation(session: RunSession) -> bool:
+func _package_boss_preparation(session: RunSession) -> bool:
 	var bridge: RefCounted = session.bridge
 	var ok := true
 	for i in ContentManager.cfg.weapon_slots:
 		ok = bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W%02d" % (i+1),"levels":1}).ok and ok
 	var at: float = ContentManager.stage(1).boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1
 	var began := Time.get_ticks_usec()
-	ok = bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":true,"invincible":true,"time":at}}).ok and ok
+	ok = bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":true,"invincible":true,"time":at,"level":1}}).ok and ok
 	for i in 3: ok = _package_step(session) and ok
 	await process_frame
 	await process_frame
 	var boss: bool = not bridge.read_frame().value.ui.boss_bodies.is_empty()
 	_package_measure("実験場条件のボス初登場",{"spawn_and_present_ms":(Time.get_ticks_usec()-began)/1000.0,"boss_bodies_present":boss,"natural_progression":false})
-	ok = boss and ok
-	began = Time.get_ticks_usec()
+	return boss and ok
+
+func _package_lab_preparation(session: RunSession) -> bool:
+	var bridge: RefCounted = session.bridge
+	var ok := await _package_boss_preparation(session)
+	var began := Time.get_ticks_usec()
 	ok = bridge.command("dev_edit",{"kind":"comet_weapon","payload":{"id":"W22"}}).ok and ok
 	ok = _package_step(session) and ok
 	var cards: Dictionary = bridge.read_frame().value.ui.cards

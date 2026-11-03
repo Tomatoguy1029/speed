@@ -42,7 +42,7 @@ func _ready() -> void:
 	await get_tree().create_timer(1.1).timeout
 	print("[stage_shader_warmup] 敵の表示後=%d" % (Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS)-before_canvas))
 	var at: float = stage.boss_start(ContentManager.cfg)+ContentManager.cfg.boss_time_spread+0.1
-	failed = not bridge.command("dev_set_scenario", {"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":true,"invincible":true,"time":at}}).ok or failed
+	failed = not bridge.command("dev_set_scenario", {"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":true,"invincible":true,"time":at,"level":1}}).ok or failed
 	_step(bridge)
 	await get_tree().create_timer(1.1).timeout
 	print("[stage_shader_warmup] ボスの表示後=%d" % (Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS)-before_canvas))
