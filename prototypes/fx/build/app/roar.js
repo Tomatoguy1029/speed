@@ -56,7 +56,7 @@ function roarLumpTex() { // 大きなむら（角度ごとに帯を途切れさ�
 function radialMask(ctx, c, stops) { const gr = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, stops[stops.length - 1][0]); for (const [r, a] of stops) gr.addColorStop(Math.min(1, r / stops[stops.length - 1][0]), `rgba(0,0,0,${a})`); ctx.globalCompositeOperation = 'destination-in'; ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over'; }
 function postCanisRoar(S, R) {
   const P = R.P;
-  if (!CANIS_ROARS.has(S.tech) || P.roarPost <= 0 || P.intensity <= 0) return;
+  if ((!CANIS_ROARS.has(S.tech) && S.tech !== 'nova') || P.roarPost <= 0 || P.intensity <= 0) return;
   const e = activeRoar(S, P); if (!e) return;
   const lv = P.roarLevel || 1, level = roarLevel(P), u = e.age / level.life, env = smooth(0, 0.08, u) * (1 - smooth(0.35, 1, u));
   if (env <= 0.001) return;

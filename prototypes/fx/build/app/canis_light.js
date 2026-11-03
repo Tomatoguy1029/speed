@@ -101,13 +101,13 @@ function canisNovaLight(S, R) {
     const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 420) ** 2); // 遠くほど光が弱まり、影の線が遠くまで同じ濃さで続かない
     const strength = visible * gain * falloff;
     const ray = 0.45 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(Math.atan2(dy, dx) * 23 + Math.sin(Math.atan2(dy, dx) * 7) * 2.3), 3); // 閃光：光源から放射状に走る光の筋（影の中には入らない）
-    R.back.light(x, y, tint, strength * (tell * 0.10 + flash * 0.25));
+    R.back.light(x, y, tint, strength * (tell * 0.22 + flash * 0.25)); // 予兆の光を強く
     if (flash > 0) R.front.light(x, y, hexc('#e8f4ff'), strength * flash * ray * 0.55 * (1 - smooth(0, S.r.ring_end, distance) * 0.5));
     const stretch = t < 0 ? 1 : 1 + 0.45 * flash;
     const tx = Math.floor(96 + dx * 96 / (aperture * stretch)), ty = Math.floor(96 + dy * 96 / aperture);
     if (tx >= 0 && tx < 192 && ty >= 0 && ty < 192) {
       const flux = NOVA_EMISSION[ty * 192 + tx] * visible * gain;
-      const exposure = t < 0 ? tell * 0.65 : flash * (1.35 - 0.65 * smooth(0.12, 0.56, t));
+      const exposure = t < 0 ? tell * 1.1 : flash * (1.35 - 0.65 * smooth(0.12, 0.56, t));
       R.front.light(x, y, corona, flux * exposure * 0.8);
       R.front.light(x, y, hot, flux * flux * exposure);
     }
@@ -121,7 +121,24 @@ function canisNovaLight(S, R) {
     R.front.glow(target.x, target.y, 8, hexc('#ffe7bd'), flash * gain * 0.48);
   }
 }
+// 内破から弾ける光（pixelFX explosions/implosion.js の流れ）：発動の NOVA_IMPLODE 秒前から、光の筋が光源へ吸い込まれ、まわりが暗く縮んで
+// 白い一点に潰れる → 一瞬止まる（NOVA_STILL 秒）→ 発動の瞬間に光が弾ける（白い芯の爆発と、外へ飛ぶ光の筋）。輪は描かない
+const NOVA_IMPLODE = 0.75, NOVA_STILL = 0.08;
+function canisNovaImplode(S, R) {
+  const t = S.age - S.r.warn, src = toL(canisNovaOrigin(S)), gain = Math.min(1, R.P.intensity), w = '#e8f4ff';
+  if (t >= -NOVA_IMPLODE && t < 0) { const k = smooth(-NOVA_IMPLODE, -NOVA_STILL, t), still = t > -NOVA_STILL;
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); const cx = src.x * LP, cy = src.y * LP, rd = lerp(420, 30, k), gr = g.createRadialGradient(cx, cy, rd * 0.15, cx, cy, rd); // まわりが暗く縮む
+    gr.addColorStop(0, `rgba(2,4,12,${0.6 * k * gain})`); gr.addColorStop(1, 'rgba(2,4,12,0)'); g.fillStyle = gr; g.fillRect(cx - rd, cy - rd, rd * 2, rd * 2); g.restore(); worldTransform();
+    if (!still) for (let i = 0; i < 70; i++) { const a = hash(i * 7.31) * TAU, sp = 0.6 + 0.8 * hash(i * 3.3), ph = ((hash(i * 1.7) + (t + NOVA_IMPLODE) * sp * 1.6) % 1), r0 = (1 - ph) * (110 - 70 * k), len = 4 + 10 * (1 - ph); // 光の筋が吸い込まれる
+      const x0 = src.x + Math.cos(a) * r0, y0 = src.y + Math.sin(a) * r0; R.front.line(x0, y0, x0 + Math.cos(a) * len, y0 + Math.sin(a) * len, (u) => u < 0.4 ? hexc('#ffffff') : hexc('#9ed8ff'), (u) => (1 - u) * (0.3 + 0.7 * ph) * gain); }
+    R.front.glow(src.x, src.y, 2 + 2 * k, hexc('#ffffff'), (0.5 + 0.5 * k) * gain); R.front.px(src.x, src.y, hexc('#ffffff')); } // 白い一点
+  if (t >= 0 && t < 0.45) { const u = t / 0.45; // 弾ける：白い芯の爆発と、外へ飛ぶ光の筋
+    R.front.glow(src.x, src.y, 18 + 90 * Math.sqrt(u), hexc(w), (1 - u) * 1.2 * gain); R.front.glow(src.x, src.y, 6 + 20 * u, hexc('#ffffff'), (1 - u) * gain);
+    for (let i = 0; i < 90; i++) { const a = hash(i * 5.17) * TAU, sp = 0.5 + hash(i * 9.1), r1 = (20 + 260 * sp) * Math.pow(u, 0.6), len = (8 + 30 * sp) * (1 - u); const x1 = src.x + Math.cos(a) * r1, y1 = src.y + Math.sin(a) * r1;
+      R.front.line(x1 - Math.cos(a) * len, y1 - Math.sin(a) * len, x1, y1, (q) => q > 0.6 ? hexc('#ffffff') : hexc('#9ed8ff'), (q) => q * (1 - u) * gain); } }
+}
 function canisNovaFlare(S, R) {
+  canisNovaImplode(S, R);
   const power = canisFlash(S), t = S.age - S.r.warn;
   if (power <= 0) return;
   const origin = canisNovaOrigin(S), gain = Math.min(1, R.P.intensity);

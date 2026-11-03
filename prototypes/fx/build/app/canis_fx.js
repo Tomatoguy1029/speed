@@ -106,15 +106,10 @@ function canisJetStream(R, at, angle, length, width, age, duration, alpha, seed)
     for (const ph of [0, Math.PI]) { const a = x * 0.22 - age * 56 + ph, sy = c + Math.sin(a) * w * 0.55; if (Math.cos(a) > -0.1 && w > 1.2) { const [px, py] = P2(x, sy); p.px(px, py, Math.cos(a) > 0.55 ? H[0] : H[1]); } } // ねじれる熱い筋
     if (Math.round(x * 2) % 6 === 0) { const [px, py] = P2(x, c); p.light(px, py, H[4], 0.35 * alpha); }
   }
-  for (let i = 0; i < 14; i++) { // 両脇から後ろへなびく炎の舌
-    const ph = ((i * 0.618 + age / 1.6) % 1), x = back + 8 + ph * (front - back - 12); if (x > front - 4) continue; const sd = i % 2 ? 1 : -1, w = wid(x), h = (3 + 12 * (x / L)) * (0.55 + 0.6 * (0.5 + 0.5 * N(5, i * 19 + 1))) * Math.min(1, (1 - ph) * 6) * W0 / 1.5;
+  const spikes = R.P.jetSpikes ?? 1; if (spikes > 0) for (let i = 0; i < 14; i++) { // 両脇から後ろへなびく炎の舌（大きさはつまみ。0で無し）
+    const ph = ((i * 0.618 + age / 1.6) % 1), x = back + 8 + ph * (front - back - 12); if (x > front - 4) continue; const sd = i % 2 ? 1 : -1, w = wid(x), h = (3 + 12 * (x / L)) * (0.55 + 0.6 * (0.5 + 0.5 * N(5, i * 19 + 1))) * Math.min(1, (1 - ph) * 6) * W0 / 1.5 * spikes;
     const [px, py] = P2(x, cy(x) + sd * w * 0.7), bx = -ux * 0.55 - uy * sd * 0.8, by = -uy * 0.55 + ux * sd * 0.8, bl = Math.hypot(bx, by);
     fire.flameBlade(p, px, py, bx / bl, by / bl, h, 1.1 + 1.6 * (x / L), N(3, i) * 0.6, N, seed + i * 19, H, fire.LAYERS);
-  }
-  if (front >= L - 2 || age > duration) for (let i = 0; i < 18; i++) { // 先端：炎の塊が巻いて煙になる
-    const q = new PX.Rng(seed * 31 + i + Math.floor(age * 6) * 97), life = q.range(0.3, 0.55), a0 = ((age * 6) % 1) / 6 + i * 0.03, ag = (age - a0) % life; if (ag < 0) continue;
-    const k = ag / life, side = q.range(-1, 1), R0 = q.range(5, 11) * W0, xx = front - 2 + Math.sin(k * 2.2) * R0, yy = cy(front) + side * wid(front) * 0.9 + side * (1 - Math.cos(k * 2.2)) * R0, [px, py] = P2(xx, yy);
-    if (k < 0.6) fire.firePuff(p, px, py, 1 - k / 0.6, q.range(2.5, 4.5) * W0, q.next(), H, 0.12); else fire.smokePuff(p, px, py, 1 - (k - 0.6) / 0.4, q.range(3, 5) * W0, hexc('#2a3448'), true, 0.6);
   }
   for (let i = 0; i < 10; i++) { // 両脇へこぼれる火の粒
     const q = new PX.Rng(seed * 7 + i + 1), life = q.range(0.3, 0.55), born = (i / 10) * 1.6, ag = ((age - born) % 1.6 + 1.6) % 1.6; if (ag > life || age < born) continue;
@@ -125,21 +120,21 @@ function canisJetStream(R, at, angle, length, width, age, duration, alpha, seed)
   p.fade = 1;
 }
 function canisJetPictures(S, R) {
-  const B = S.B, P = R.P, L = P.jetLength ?? 1, Wm = P.jetWidth ?? 1;
+  const B = S.B, P = R.P, Wm = P.jetWidth ?? 1, Wh = P.houndJetWidth ?? 1; // 長さは判定と同じ値（canisStartJet で掛け済み）
   if (S.tech === 'sirius_flame' && S.flames.length) { // シリウスの光：歩きながら口から噴き続ける
     const mouth = B.visualMouth || canisMouth(B), u = fromA(B.facing), n = orth(u); let reach = 0, width = 0;
     for (const f of S.flames) { const rel = sub(f.pos, mouth), radius = lerp(f.r0, f.r1, f.age / f.life); reach = Math.max(reach, rel.x * u.x + rel.y * u.y + radius); width = Math.max(width, Math.abs(rel.x * n.x + rel.y * n.y) * 2 + radius); }
-    S.jetStart ??= S.t; canisJetStream(R, mouth, B.facing, reach * P.size * L, P.size * Wm, S.t - S.jetStart, Infinity, Math.min(1, P.intensity), 11);
+    S.jetStart ??= S.t; canisJetStream(R, mouth, B.facing, reach * P.size, P.size * Wm, S.t - S.jetStart, Infinity, Math.min(1, P.intensity), 11);
   } else S.jetStart = null;
   for (const jet of S.jetVisuals) { const age = S.t - jet.t, source = jet.owner === 'boss' && age <= jet.duration ? (B.visualMouth || jet.at) : jet.at;
-    canisJetStream(R, source, jet.a, jet.length * P.size * L, P.size * Wm, age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13); }
+    canisJetStream(R, source, jet.a, jet.length * P.size, P.size * (jet.owner === 'hound' ? Wh : Wm), age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13); }
 }
 
 // 残り火：噴射が通ったマス（deposit）ごとに、別々の寿命の小さな火を置く（燃えない所も残る＝まだら）。粒を密度の場へ足し込み、
 // 鳳凰と同じく、ゆがめてしきい値で切った外炎・内炎・芯の面で塗る（シリウスの青）。燃えた跡にはまだらなすすが残って薄れる
 function canisEmbers(S, R) {
   const P = R.P, frame = canisEmbers.frame ||= PX.createFrame(LW, LH); PX.clearFrame(frame); const p = new PX.Painter(frame), H = SIRIUS_H.map(hexc), sp = [];
-  const soot = [hexc('#0c1420'), hexc('#142238')], cell = 45 * WL, wMul = (P.trailWidth ?? 1) * P.size;
+  const soot = [hexc('#0c1420'), hexc('#142238')], cell = 45 * WL, wMul = (P.jetWidth ?? 1) * P.size; // 残り火の太さは噴射の太さと同じつまみ
   for (const tr of S.trails) for (const d of tr.deposits || []) {
     const wait = 0.12 + hash(d.seed + 21) * 0.18, a = S.t - d.t - wait, life = 1.0 + hash(d.seed + 5) * 1.8; if (a < 0 || a > life + 0.8) continue; const L = toL(d.pos);
     for (let j = 0; j < 7; j++) { const sx = L.x + (hash(d.seed + j * 7) - 0.5) * cell * 1.2, sy = L.y + (hash(d.seed + j * 11) - 0.5) * cell * 1.2, hs = hash(d.seed + j * 13 + 1); if (hs < 0.35) continue; // すすは燃えた所にまだらに残る
@@ -207,4 +202,23 @@ function canisTrailPictures(S, R) {
   }
   // 専用の床レイヤーを今ここで合成する。噴射や本体より奥で、R.frontには残さない。
   blitFrame(frame); worldTransform();
+}
+
+// 猟犬の攻撃（飛びかかり）：燃える青い弾。pixelFX projectiles/plasma-shot.js の作り（熱い芯・肌の上の揺らぎ・尾が細ってちぎれる雫が冷えて消える）から
+// プラズマを抜き、シリウスの青い炎にした。体の輪郭から後ろへ炎がなびき、通った跡に燃える雫が残って冷えて消える
+function canisHoundBurn(R, q, t) {
+  const live = q.until > t, k = live ? 1 : 1 - clamp((t - (q.until || 0)) / 0.4); if (k <= 0 || !q.trail?.length) return;
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], H = SIRIUS_H.map(hexc), u = fromA(q.facing), n = q.trail.length;
+  for (let i = 0; i < n; i++) { const f = (i + 1) / n, P0 = toL(q.trail[i]), drop = (i % 3) === 0 ? 1 : 0.55, jx = (hash(i * 3.1 + (q.idx || 0)) - 0.5) * 2, jy = (hash(i * 5.7 + (q.idx || 0)) - 0.5) * 2; // 雫：古いほど小さく冷える
+    fire.firePuff(R.back, P0.x + jx, P0.y + jy, Math.max(0.05, f * k), (0.8 + 2.6 * f) * drop * q.r * WL * 0.22, hash(i + (q.idx || 0) * 7), H, 0.14); }
+  if (!live) return; const E = spriteEdges('enemy/hound'); if (!E) return;
+  const d = enemyDef('hound'), ang = d.look.angle + q.facing, sc = 2 * spriteR('hound', q.r) / Math.max(E.w, E.h), ca = Math.cos(ang), sa = Math.sin(ang), fr = Math.floor(t * 30);
+  for (let i = 0; i < 18; i++) { const rg = new PX.Rng(i * 17 + fr * 3 + (q.idx || 0) * 101 + 1), e0 = rg.pick(E.pts), W0 = toL(V(q.pos.x + (e0[0] * ca - e0[1] * sa) * sc, q.pos.y + (e0[0] * sa + e0[1] * ca) * sc)), lf = rg.range(2, 6); // 体の輪郭から後ろへなびく炎
+    R.front.line(W0.x, W0.y, W0.x - u.x * lf + rg.range(-1, 1), W0.y - u.y * lf + rg.range(-1, 1), (w) => w < 0.3 ? H[1] : w < 0.6 ? H[3] : H[5]); }
+  const head = toL(add(q.pos, mul(u, q.r * 0.6))); R.front.glow(head.x, head.y, q.r * WL * 1.6, H[4], 0.45); R.front.glow(head.x, head.y, q.r * WL * 0.6, H[1], 0.4); // 熱い芯
+}
+// 光を継ぐ群れの猟犬の予兆：ボスの噴射の予兆と同じく、口元に光が集まって光る
+function canisRelayTell(R, q, k, t) {
+  const m = add(q.pos, mul(fromA(q.facing), q.r)), L = toL(m); bossGather(R, m, q.r * 1.2, k, t, (q.idx || 0) + 3);
+  R.front.glow(L.x, L.y, 2 + 5 * k, hexc('#a9dcff'), 0.3 + 0.5 * k); R.front.glow(L.x, L.y, 1 + 2 * k, hexc('#ffffff'), 0.5 * k);
 }
