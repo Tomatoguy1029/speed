@@ -647,6 +647,8 @@ C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` 
 
 #### ボス戦闘の診断
 
+C++ランは共通の被弾通知と、並行する技の観測開始・実行・結果を記録する。以下の契約のうち、詳細度1と2の分離、記録件数・容量の上限、`boss_decision`・`boss_effect`、`boss_action`の詳細な動作境界、終端の`combat_summary`は未接続。現在の`set_recording`は観測のON/OFFだけを受け取る。
+
 既存のschema 4へ `combat_version=1` の出来事を追加する。Ctrl+F9の記録中にMonocerosとDracoの判断と、全5ボスの動作・判定・機体へのダメージを観測する。Hydraの通常攻撃は首ごとの行動IDで区別し、録画停止・ボスの解放では並行する観測も閉じる。`start.combat_config` は適用した詳細度と上限を持つ。起動時の `SPEED_COMBAT_LOG_LEVEL` は `0`（戦闘診断停止）、`1`（動作・判定・ダメージ）、`2`（候補理由も含む。既定値）を指定する。既存の成長・被弾・性能記録は同じファイルへ保存する。
 
 戦闘行はラン内で共通の `run_id`、録画区間の `recording_id`、ステージ、発生ラン秒 `t`・世界秒 `world_t`、書き込み実秒 `real_t`、通し番号 `sequence` を持つ。ボス由来が分かる行には種類・`body_id`・表の行番号・形態を付ける。座標と速度はワールド座標の `[x,y]` とする。
