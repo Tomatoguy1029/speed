@@ -23,7 +23,7 @@ function drawBossParts(B, edits = {}, opts = {}) {
   const ctx = opts.ctx || g;
   for (const { n, e, tex, m } of sprites) {
     const im = IMG[tex.key]; if (!im) continue;
-    const r = tex.region || { x: 0, y: 0, w: im.width, h: im.height }, off = n.offset || V(0, 0), centered = n.centered !== false;
+    const r = tex.region || { x: (e.frame ?? n.frame ?? 0) % (n.hframes || 1) * im.width / (n.hframes || 1), y: 0, w: im.width / (n.hframes || 1), h: im.height }, off = n.offset || V(0, 0), centered = n.centered !== false;
     ctx.save(); ctx.transform(...m); ctx.globalAlpha *= opts.alpha ?? 1;
     if (n.flip_h) ctx.scale(-1, 1); if (n.flip_v) ctx.scale(1, -1);
     const x = off.x - (centered ? r.w / 2 : 0), y = off.y - (centered ? r.h / 2 : 0);
@@ -74,3 +74,12 @@ function bossTrail(R, points, age = 0, color = R.P.color) {
   for (let i = 0; i < points.length; i++) { const q = toL(points[i]), f = (i + 1) / points.length * clamp(1 - age / 0.3); R.back.glow(q.x, q.y, 3 * R.P.size, pal[2], f * 0.22 * R.P.intensity); if (i % 2 === 0 && f > 0.25) R.back.px(q.x, q.y, pal[f > 0.7 ? 3 : 1]); }
 }
 function bossPhase(B) { return ({ windup: '予備動作（予告）', active: '攻撃中', bay: '吠え立て・包囲', recovery: '終了・硬直', idle: '終了' })[B.mode] || B.mode; }
+// pixelFX sword-slash の先端の速さ・冷える残光を、判定線に沿う傷として塗る。
+function bossSlash(R, A0, B0, width, age, life = 0.5, seed = 1) {
+  const t = age / R.P.timing; if (t < 0 || t > life) return;
+  const A = toL(A0), B = toL(B0), u = norm(sub(B, A)), n = orth(u), length = dist(A, B), pal = FX.ramp(R.P.color), fade = 1 - t / life;
+  for (let d = 0; d <= length; d++) { const k = d / Math.max(1, length), taper = Math.sin(k * Math.PI) ** 0.7, w = width * WL * 0.5 * taper * R.P.size * fade, center = add(add(A, mul(u, d)), mul(n, Math.sin(d * 0.3 + seed) * 0.6));
+    for (let off = -w; off <= w; off += 0.7) { const edge = Math.abs(off) / Math.max(0.1, w), q = add(center, mul(n, off)); if (fade < 0.35 && hash(d * 13 + Math.floor(off) * 7 + seed) > fade * 2.7) continue; R.front.px(q.x, q.y, pal[t < 0.06 && edge < 0.5 ? 4 : edge < 0.5 ? 3 : 1]); }
+    if (d % 4 === 0) R.front.glow(center.x, center.y, 2 + w, pal[2], fade * 0.16 * R.P.intensity);
+  }
+}
