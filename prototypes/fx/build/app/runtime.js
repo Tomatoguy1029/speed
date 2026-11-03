@@ -55,6 +55,7 @@ function render() {
   worldTransform();
   demo.draw(S, R);
   g.save(); blitFrame(FR.front); g.restore();
+  if (R.proto && demo.post) demo.post(S, R);
   // 情報表示
   g.setTransform(1, 0, 0, 1, 0, 0);
   const ph = demo.phase ? demo.phase(S) : '';
@@ -94,9 +95,12 @@ function buildParams() {
   const box = $('#params'); box.innerHTML = '';
   for (const p of paramDefs(demo)) {
     const v = PARAMS[demo.id]?.[p.k] ?? p.def;
-    const inp = p.type === 'color' ? el('input', { type: 'color', value: v }) : el('input', { type: 'range', min: p.min, max: p.max, step: p.step, value: v });
-    const out = el('span', { class: 'val' }, p.type === 'color' ? '' : (+v).toFixed(2));
-    inp.addEventListener('input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = p.type === 'color' ? '' : (+inp.value).toFixed(2); saveParams(); resetSim(); });
+    const choice = p.type === 'select';
+    const inp = choice ? el('select', {}, ...p.options.map(o => el('option', { value: o.value }, o.label))) : p.type === 'color' ? el('input', { type: 'color', value: v }) : el('input', { type: 'range', min: p.min, max: p.max, step: p.step, value: v });
+    inp.value = v;
+    const number = !choice && p.type !== 'color';
+    const out = el('span', { class: 'val' }, number ? (+v).toFixed(2) : '');
+    inp.addEventListener(choice ? 'change' : 'input', () => { (PARAMS[demo.id] ||= {})[p.k] = p.type === 'color' ? inp.value : +inp.value; out.textContent = number ? (+inp.value).toFixed(2) : ''; saveParams(); resetSim(); });
     box.append(el('label', {}, el('span', { class: 'pl' }, p.label), inp, out));
   }
   const copied = el('span', { class: 'val' }, '');
@@ -160,7 +164,7 @@ function boot() {
   $('#scale1').onchange = (e) => document.body.classList.toggle('fit', !e.target.checked);
   $('#save').onclick = saveJSON;
   $('#load').onchange = (e) => e.target.files[0] && loadJSON(e.target.files[0]);
-  selectDemo(DEMOS[0].id); syncPlay();
+  selectDemo(new URLSearchParams(location.search).get('demo') || DEMOS[0].id); syncPlay();
   requestAnimationFrame(frame);
 }
 function loadImages() {

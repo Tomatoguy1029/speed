@@ -37,7 +37,7 @@ function canisSetup(S, id) {
   S.order = S.pack.slice(); for (let i = S.order.length - 1; i > 0; i--) { const j = Math.floor(S.rng() * (i + 1)); [S.order[i], S.order[j]] = [S.order[j], S.order[i]]; }
 }
 function canisFace(S, dt, rate = BOSSES.canis_major.def.turn, lead = 0) { S.B.facing = rotToward(S.B.facing, angOf(sub(add(S.ship.pos, mul(S.shipVel, lead)), S.B.pos)), rate * dt); }
-function canisShout(S, at = canisMouth(S.B), facing = S.B.facing) { S.shouts.push({ at: { ...at }, a: facing, t: S.t, seed: S.shouts.length * 9 + 1 }); }
+function canisShout(S, at = canisMouth(S.B), facing = S.B.facing, small = false) { S.shouts.push({ small, at: { ...at }, a: facing, t: S.t, seed: S.shouts.length * 9 + 1 }); }
 function canisFinish(S, recover = S.r.recover || 0.6) { if (S.B.mode === 'recovery' || S.B.mode === 'idle') return; S.B.mode = 'recovery'; S.recover = recover; S.B.vel = V(0, 0); S.B.charge = 0; S.B.pose = {}; S.stage = 'done'; }
 function canisLaunchHound(S, q, speed, duration) { q.launch = S.t; q.until = S.t + duration; q.warning = -1; q.vel = mul(norm(sub(S.ship.pos, q.pos)), speed); q.facing = angOf(q.vel); }
 function canisSteer(q, goal, face, cfg, dt) {
@@ -134,6 +134,7 @@ function canisStep(S, dt) {
       if (age >= Math.max(r.warn, r.ignite_at + Math.max(0, S.chosen.length - 1) * r.ignite_step)) canisFinish(S);
     } else if (id === 'relay') {
       if (age < r.warn) { canisFace(S, dt); B.pose = { shout: true }; }
+      else if (!S.shouted) { canisShout(S); S.shouted = true; }
       S.order.forEach((q, i) => { const mark = r.warn + i * r.interval, at = mark + r.each_warn;
         if (age >= mark && !q.relay) { q.relay = { from: { ...q.pos }, a: angOf(sub(S.ship.pos, q.pos)) }; q.warning = 0.4 + at; q.facing = q.relay.a; }
         if (age >= at && !q.relayFired) { q.relayFired = true; canisStartJet(S, add(q.pos, mul(fromA(q.relay.a), q.r)), q.relay.a, r.hound_beam_length, r.hound_beam_width, r.hound_beam_time); }
@@ -156,6 +157,7 @@ function canisStep(S, dt) {
     } else if (id === 'bay') {
       if (age < r.warn) { canisFace(S, dt); B.pose = { bay: true, shout: true }; }
       else {
+        if (!S.shouted) { canisShout(S); S.shouted = true; }
         B.mode = S.jump ? B.mode : 'bay'; B.pose = { bay: true };
         if (!S.jump && age < r.warn + r.pounce_at && dist(B.pos, S.ship.pos) > r.approach_stop) { canisFace(S, dt); B.pos = add(B.pos, mul(fromA(B.facing), BOSSES.canis_major.def.speed * dt)); }
         if (age >= r.warn + r.pounce_at) { const jr = { ...bossRule('canis_major', 'pounce', B.phase), alone_hounds: 0 }; if (!S.jump) canisJump(S, 0, jr, true); if (canisJump(S, dt, jr)) canisFinish(S, jr.recover); }
@@ -164,7 +166,7 @@ function canisStep(S, dt) {
           if (q.until > S.t) return;
           if (q.warning > 0 && S.t >= q.warning) { canisLaunchHound(S, q, r.nip_speed, r.nip_time); m.cool = r.nip_cd; return; }
           if (back && m.cool <= 0 && S.pack.filter(q => q.warning > S.t || q.until > S.t).length < r.nip_max) { q.warning = S.t + r.nip_warn; m.cool = r.nip_cd; }
-          if (front && m.bark <= 0) { m.bark = lerp(r.bark_min, r.bark_max, S.rng()); canisShout(S, q.pos, angOf(sub(S.ship.pos, q.pos))); }
+          if (front && m.bark <= 0) { m.bark = lerp(r.bark_min, r.bark_max, S.rng()); canisShout(S, q.pos, angOf(sub(S.ship.pos, q.pos)), true); }
           const rad = front ? r.r_front : back ? r.r_back : r.r_side, wobble = mul(V(Math.sin(S.t * 2 + m.phase), Math.cos(S.t * 1.7 + m.phase)), r.wobble);
           q.steer = { goal: add(add(S.ship.pos, mul(fromA(m.angle), rad)), wobble), face: S.ship.pos, cfg: r };
         });
@@ -211,7 +213,7 @@ function canisDraw(S, R) {
     for (const q of S.pack) bossTrail(R, q.trail, q.until > t ? 0 : Math.max(0, t - (q.until || 0)));
     if (S.jump && !S.jump.active && S.aim) { const shadow = { ...B, pos: S.aim, pose: {}, vel: V(0, 0) }; g.save(); g.filter = 'brightness(0) blur(5px)'; g.globalAlpha = 0.28 * B.charge; drawCanis(shadow, t, { shadow: true }); g.restore(); bossGather(R, B.pos, B.r * 1.4, B.charge, t, 51); }
     if (S.land) bossBreath(R, S.land.at, B.facing, t - S.land.t, 91, Math.PI, 120);
-    for (const e of S.shouts) bossBreath(R, e.at, e.a, t - e.t, e.seed, id === 'howl' ? Math.PI : 1.1);
+    for (const e of roarEvents(S, P)) drawRoar(R, e);
     if (S.warning) { const w = S.warning; bossGather(R, w.at, B.r, w.k, t); const A = toL(w.at), u = fromA(w.a), n = orth(u);
       for (let i = 0; i < 65; i++) { const phase = (hash(i * 7) + t * 0.4) % 1, d = phase * w.length * WL, width = w.width * WL * (0.5 + hash(i + 1)), q = add(add(A, mul(u, d)), mul(n, (hash(i + 8) - 0.5) * width)); R.back.glow(q.x, q.y, 1.5 + hash(i) * 2, pal[2], (0.06 + w.k * 0.12) * P.intensity); }
     }
@@ -232,7 +234,8 @@ function canisDraw(S, R) {
     if (!R.proto && id === 'command' && q.until > t) { for (let i = 1; i < q.trail.length; i++) D2.line(q.trail[i - 1], q.trail[i], rgba('#ff667d', i / q.trail.length * 0.7), q.r); D2.circle(q.pos, q.r * 1.9, rgba('#ff667d', 0.22)); }
   }
   R.blitBack();
-  drawCanis(B, t, { proto: R.proto, releaseAge: S.shouts.length ? t - S.shouts[S.shouts.length - 1].t : -1, white: R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  const mainShout = S.shouts.findLast(e => !e.small);
+  drawCanis(B, t, { proto: R.proto, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
   for (const q of S.pack) if (!q.dead) drawEnemy(q, { white: R.proto && q.warning > t ? clamp(1 - (q.warning - t) / 0.6) * 0.25 : 0 });
   if (R.proto) {
     for (const tr of S.transfers) { const age = t - tr.t; if (age < 0 || age > tr.life + 0.25) continue; const u = clamp(age / tr.life), at = lerpV(tr.from, tr.q.pos, u); bossFire(R.front, [{ pos: at, radius: 16 * (1 - smooth(tr.life, tr.life + 0.25, age)) }], t, P.color, P.intensity, P.size); }
@@ -261,9 +264,9 @@ const tFix = t => Math.floor(t * 30) / 30;
 for (const id of Object.keys(CANIS_IDS)) {
   const r = bossRule('canis_major', id);
   DEMOS.push({ id: 'O-' + id, ids: CANIS_IDS[id], cat: 'おおいぬ座（O）', group: 'おおいぬ座', title: r.display_name, duration: id === 'howl' ? 9 : id === 'blaze' ? 7.5 : ['bay', 'relay', 'sirius', 'hunt', 'hunt_pounce', 'nova'].includes(id) ? 8.5 : 5.5, color: '#80c8ff',
-    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: 8, step: 1, def: 8 }],
-    status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? 'O15の遮蔽仕様は未決。現行の2体をまとめた遮蔽域を維持し、判定の変更案を採用していない' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
-    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX fire/flamethrower.js の密度・流れ、SPEED pixel_fire の密度場'],
-    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, phase(S) { return bossPhase(S.B); }
+    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'pack', label: '開始時の猟犬数', type: 'range', min: 0, max: 8, step: 1, def: 8 }, ...(CANIS_ROARS.has(id) ? [{ k: 'roarLevel', label: '咆哮の段階', type: 'select', options: [{ value: 1, label: '小：通常の号令（画面は揺らさない）' }, { value: 2, label: '中：強い号令（弱いゆがみ）' }, { value: 3, label: '大：大技（強いゆがみ・ブラー）' }], def: id === 'howl' ? 2 : 1 }, { k: 'roarFX', label: '咆哮の白い空気', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }, { k: 'roarPost', label: '咆哮のゆがみ・ブラー', type: 'range', min: 0, max: 2, step: 0.01, def: 1 }] : [])],
+    status: { ...(CANIS_ROARS.has(id) ? { '咆哮': '小・中・大の3段階。通常の号令は小で、画面の揺れ・ブラーなし。遠吠えは中。画像のような大は大技用の比較として右側で選べる。猟犬の吠えは口元だけ' } : {}), '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '技の再生': '現行の技データとRunnerを移植。障害物のない比較場面で再生。猟犬の初期配置と機体の移動は比較用', '現行表示': '本体のパーツ・歩き・頭の構えを移植。炎の密度場・照明はHTMLでの近似再現', '未決': id === 'nova' ? 'O15の遮蔽仕様は未決。現行の2体をまとめた遮蔽域を維持し、判定の変更案を採用していない' : id === 'stream' ? 'O08の予告時間の延長は本番の挙動変更なので保留。現行の時刻を維持' : '本番の攻撃数値・軌道・範囲は変更していない' },
+    refs: ['scenes/bosses/canis_major_parts.tscn・scripts/bosses/canis_major_presentation.gd（全身）', 'data/bosses/canis_major_moves/' + id + '.tres', 'scripts/bosses/canis_major/techniques/' + id + '.gd・technique_runner.gd', 'scripts/bosses/canis_major/sirius_effects.gd・scripts/enemies/hound.gd', 'pixelFX fire/flamethrower.js・impacts/ground-slam.js の流れと雲、SPEED pixel_fire の密度場', ...(CANIS_ROARS.has(id) ? ['SPEED shockwave.gdshader の画面屈折を下敷きに、提示画像の放射ブラーと白い空気を追加'] : [])],
+    setup(S) { canisSetup(S, id); }, step: canisStep, draw: canisDraw, post: postCanisRoar, phase(S) { return bossPhase(S.B); }
   });
 }
