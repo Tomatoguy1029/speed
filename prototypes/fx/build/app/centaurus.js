@@ -274,35 +274,54 @@ function drawPowder(center, radius, age, strength, salt = 0) { // additional_tec
 }
 
 // ---------- G10 プレイヤー → ボスの命中フィードバック
+// 試作（体当たり）：接触した瞬間に世界ごと短く止め（ヒットストップ）、止まり終わりで機体をボスの反対側へ瞬間移動させる。
+// 入った点と抜けた点で火花。間をつなぐ線は描かない。本番のヒットストップ値・機体の移動処理は変えない（試作の中だけの提案）。
+function segCircleExit(a, dir, c, r) { const f = sub(a, c), b = f.x * dir.x + f.y * dir.y, cc = f.x * f.x + f.y * f.y - r * r, disc = b * b - cc; if (disc < 0) return null; return -b + Math.sqrt(disc); }
 DEMOS.push({
-  id: 'G10-boss-hit', ids: ['G10'], cat: 'ボスへの命中 G10', group: 'プレイヤー→ボス', title: '体当たりの命中が分かる表現', duration: 2.6, color: '#fff2c8', cam: { x: 0, y: 0 },
-  params: [{ k: 'variant', label: '比較用：0=体当たり 1=弾', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
-  refs: [...CEN_REFS, 'scripts/bosses/boss_hit_feedback.gd（現行：白0.28を0.12秒・2.5pxの揺れ・0.0035radの傾き）', 'centaurus_presentation.gd hit（明るさ1.6倍を0.18秒）', 'scripts/render/ship_visual.gd（機体：airship.png、原画y=30が位置、×1.3）', 'pixelFX impacts 系の閃光・火花、melee/sword-slash.js の切り口の光'],
-  status: { '状態': '試作のみ（ヒットストップ値は変更しない：G14/G15 は別タスク）', '対象': 'プレイヤーからボスへの命中。ボスからの攻撃や予兆ではない', '比較用操作': '体当たり／弾の切り替えは比較のための操作で、承認済みの仕様ではない' },
+  id: 'G10-boss-hit', ids: ['G10'], cat: 'ボスへの命中 G10', group: 'プレイヤー→ボス', title: '体当たり：ヒットストップ→反対側へ抜ける', duration: 2.6, color: '#fff2c8', cam: { x: 0, y: 0 },
+  params: [{ k: 'hitstop', label: 'ヒットストップ(秒・試作内のみ)', type: 'range', min: 0, max: 0.15, step: 0.005, def: 0.07 }, { k: 'variant', label: '比較用：0=体当たり 1=弾', type: 'range', min: 0, max: 1, step: 1, def: 0 }],
+  refs: [...CEN_REFS, 'scripts/bosses/boss_hit_feedback.gd（現行：白0.28を0.12秒・2.5pxの揺れ・0.0035radの傾き）', 'centaurus_presentation.gd hit（明るさ1.6倍を0.18秒）', 'scripts/render/ship_visual.gd（機体：airship.png、原画y=30が位置、×1.3）', 'pixelFX core（painter の火花・光）、explosions 系の火花と破片の飛び方'],
+  status: { '状態': '試作のみ（2回目）', '対象': 'プレイヤーからボスへの命中。ボスからの攻撃や予兆ではない', 'ヒットストップ・瞬間移動': '試作の中だけの見せ方の提案。本番のヒットストップ値（G14/G15）と機体の移動・すり抜けの処理は変えていない。採用する場合は移行後に本番の処理として検討', '比較用操作': '体当たり／弾の切り替えは比較のための操作で、承認済みの仕様ではない' },
   setup(S) { S.B = mkBoss(V(0, 0), Math.PI * 0.9); S.ship = shipState(V(-900, 300), 0, 1500); S.hits = []; S.shots = []; S.B.mode = 'idle'; },
   step(S, dt) {
-    const B = S.B, v = (PARAMS[demo.id]?.variant ?? 0) | 0;
-    if (!v) { const dir = norm(V(1, -0.32)), before = { ...S.ship.pos }; if (S.t > 0.3) S.ship.pos = add(S.ship.pos, mul(dir, 1500 * dt)); S.ship.heading = angOf(dir); S.ship.speed = 1500;
-      const inNow = dist(S.ship.pos, B.pos) <= B.r + 26, wasIn = dist(before, B.pos) <= B.r + 26; if (inNow && !wasIn) S.hits.push({ t: S.t, at: { ...S.ship.pos }, a: S.ship.heading, kind: 'in' }); if (!inNow && wasIn) S.hits.push({ t: S.t, at: { ...S.ship.pos }, a: S.ship.heading, kind: 'out' }); if (inNow && (S.lastTick == null || S.t - S.lastTick > 0.06)) { S.lastTick = S.t; B.hitPulse = 0.12; B.hit = 0.18; S.hits.push({ t: S.t, at: { ...S.ship.pos }, a: S.ship.heading, kind: 'tick' }); } }
+    const B = S.B, v = (PARAMS[demo.id]?.variant ?? 0) | 0, proto = mode === 'proto', hs = PARAMS[demo.id]?.hitstop ?? 0.07, reach = B.r + DATA.config.ship_radius;
+    if (!v && proto) { // 試作：接触→ヒットストップ→反対側へ
+      const dir = norm(V(1, -0.32)); S.ship.heading = angOf(dir); S.ship.speed = 1500;
+      if (S.stopUntil != null && S.t < S.stopUntil) { B.hitPulse = 0.12; return; } // 世界ごと止める（ボスのアニメーションも進めない）
+      if (S.stopUntil != null && !S.warped) { S.warped = true; S.ship.pos = { ...S.exitAt }; S.hits.push({ t: S.t, at: { ...S.exitAt }, a: S.ship.heading, kind: 'out' }); }
+      if (S.t > 0.3) { const before = { ...S.ship.pos }, next = add(before, mul(dir, 1500 * dt));
+        if (S.stopUntil == null && dist(next, B.pos) <= reach) { const enter = segCircleExit(before, mul(dir, -1), B.pos, reach), hit = enter != null ? sub(before, mul(dir, -enter)) : next; // 接触点
+          S.ship.pos = hit; const ex = segCircleExit(hit, dir, B.pos, reach); S.exitAt = add(hit, mul(dir, (ex ?? 0) + 4)); S.stopUntil = S.t + hs; B.hit = 0.18; S.hits.push({ t: S.t, at: { ...hit }, a: S.ship.heading, kind: 'in' }); return; }
+        S.ship.pos = next; }
+    } else if (!v) { const dir = norm(V(1, -0.32)), before = { ...S.ship.pos }; if (S.t > 0.3) S.ship.pos = add(S.ship.pos, mul(dir, 1500 * dt)); S.ship.heading = angOf(dir); S.ship.speed = 1500;
+      const inNow = dist(S.ship.pos, B.pos) <= reach, wasIn = dist(before, B.pos) <= reach; if (inNow && (S.lastTick == null || S.t - S.lastTick > 0.06)) { S.lastTick = S.t; B.hitPulse = 0.12; B.hit = 0.18; S.hits.push({ t: S.t, at: { ...S.ship.pos }, a: S.ship.heading, kind: 'tick' }); } if (!inNow && wasIn) S.hits.push({ t: S.t, at: { ...S.ship.pos }, a: S.ship.heading, kind: 'out' }); }
     else { S.ship.pos = V(-420, 160); S.ship.heading = angOf(sub(B.pos, S.ship.pos)); S.ship.speed = 0; if (S.t > 0.3 && (S.nextShot == null || S.t >= S.nextShot) && S.t < 2.0) { S.nextShot = S.t + 0.12; S.shots.push({ pos: { ...S.ship.pos }, a: S.ship.heading + (hash(S.t * 9) - 0.5) * 0.1 }); } for (const s of S.shots) { if (s.dead) continue; s.pos = add(s.pos, mul(fromA(s.a), 1400 * dt)); if (dist(s.pos, B.pos) < B.r * 0.85) { s.dead = 1; B.hitPulse = 0.12; B.hit = 0.18; S.hits.push({ t: S.t, at: { ...s.pos }, a: s.a, kind: 'shot' }); } } }
     B.hitPulse = Math.max(0, (B.hitPulse || 0) - dt); bossTick(B, dt);
   },
-  phase(S) { const last = S.hits[S.hits.length - 1]; return last && S.t - last.t < 0.3 ? '命中' : S.hits.length ? '通過後' : '接近'; },
+  phase(S) { if (S.stopUntil != null && S.t < S.stopUntil) return 'ヒットストップ'; const last = S.hits[S.hits.length - 1]; return last && S.t - last.t < 0.3 ? (last.kind === 'out' ? '反対側へ抜けた' : '命中') : S.hits.length ? '通過後' : '接近'; },
   draw(S, R) {
     const B = S.B, P = R.P, strength = (B.hitPulse || 0) / 0.12, ph = B.clock * 86;
     const jitter = R.proto ? V(0, 0) : mul(V(Math.sin(ph), Math.cos(ph * 1.17)), 2.5 * strength * 0.7071 / Z);
     const body = { ...B, pos: add(B.pos, jitter) };
     let white = R.proto ? 0 : 0.28 * strength + (B.hit > 0 ? 0.25 : 0);
-    if (R.proto) { const last = S.hits.filter(h => h.kind !== 'out').slice(-1)[0]; if (last) { const t = (S.t - last.t) / P.timing; white = (t < 0.05 ? 0.75 : t < 0.16 ? 0.45 * (1 - (t - 0.05) / 0.11) : 0) * P.intensity; } }
+    const stopEnd = S.stopUntil ?? Infinity, stopping = S.stopUntil != null && S.t < S.stopUntil;
+    if (R.proto) { const hitIn = S.hits.find(h => h.kind === 'in' || h.kind === 'shot'), last = S.hits.filter(h => h.kind === 'shot').slice(-1)[0] || hitIn;
+      if (last) { const t = stopping ? 0 : (S.t - Math.max(last.t, last.kind === 'in' ? stopEnd : last.t)) / P.timing; white = (stopping ? 0.7 : t < 0.12 ? 0.45 * (1 - t / 0.12) : 0) * P.intensity; } }
     drawCentaurus(body, B.pose, { white });
     for (const s of S.shots) if (!s.dead) { D2.line(s.pos, sub(s.pos, mul(fromA(s.a), 26)), 'rgba(160,220,255,.9)', 5); }
     drawShip(S.ship);
     if (!R.proto) return;
-    // 試作：入射点の閃光と白い十字の光条、機体が通った切り口に沿って白→金→消える光の筋、出口で装甲片と火花、命中ごとに小さな光の欠片
     const pal = FX.ramp(P.color), hitIn = S.hits.find(h => h.kind === 'in'), hitOut = S.hits.find(h => h.kind === 'out');
-    if (hitIn) { const t = (S.t - hitIn.t) / P.timing, A = toL(hitIn.at); if (t < 0.25) { const f = 1 - t / 0.25, Lr = (6 + 18 * Math.min(1, t / 0.04)) * P.size; for (const a of [hitIn.a + Math.PI / 2, hitIn.a - Math.PI / 2, hitIn.a + Math.PI]) R.front.line(A.x, A.y, A.x + Math.cos(a) * Lr, A.y + Math.sin(a) * Lr, (u) => u < 0.4 ? pal[4] : pal[3], (u) => f * (1 - u)); R.front.circle(A.x, A.y, 3 * f * P.size, pal[4]); R.front.glow(A.x, A.y, 20 * P.size, pal[3], f * P.intensity); }
-      const endP = hitOut ? hitOut.at : S.ship.pos, E = toL(endP), tl = (S.t - hitIn.t) / P.timing; if (tl < 0.7) { const f = 1 - smooth(0.25, 0.7, tl); R.front.beam(A.x, A.y, E.x, E.y, 2.6 * P.size * f + 0.5, (u, vv) => vv < 0.4 ? pal[4] : pal[3], f); R.front.glowLine(A.x, A.y, E.x, E.y, 7, pal[2], 0.45 * f * P.intensity); } }
-    if (hitOut) { const t = (S.t - hitOut.t) / P.timing, E = toL(hitOut.at); FX.sparks(R.front, E, t, 7, 22, P.color, 90, 0.45, hitOut.a, 0.7); for (let i = 0; i < 8; i++) { const lf = 0.6, q = t / lf; if (q > 1) continue; const a = hitOut.a + (hash(i) - 0.5) * 1.6, d = 40 * q * (0.6 + hash(i + 2)), x = E.x + Math.cos(a) * d, y = E.y + Math.sin(a) * d + 18 * q * q; R.front.rect(x - 1, y - 1, 2, 2, hexc('#5a6f93'), 1 - q); R.front.dot(x - 1, y - 1, hexc('#c7a24a'), 1 - q); } if (t < 0.12) R.front.glow(E.x, E.y, 26, pal[3], (1 - t / 0.12) * P.intensity); }
-    for (const h of S.hits) if (h.kind === 'tick' || h.kind === 'shot') { const t = (S.t - h.t) / P.timing; if (t > 0.3) continue; const A = toL(h.at); FX.sparks(R.front, A, t, h.t * 13, h.kind === 'shot' ? 8 : 3, P.color, 50, 0.25, h.a + Math.PI, 1.2); if (h.kind === 'shot' && t < 0.08) { R.front.circle(A.x, A.y, 2.2 * P.size, pal[4]); R.front.glow(A.x, A.y, 10, pal[3], 0.8 * P.intensity); } }
+    if (hitIn) { const A = toL(hitIn.at);
+      if (stopping) { // 止まっている間：接触点の閃光（形は光と短い光条だけ）
+        const Lr = 10 * P.size; for (const a of [hitIn.a + Math.PI / 2, hitIn.a - Math.PI / 2, hitIn.a + Math.PI * 0.8, hitIn.a - Math.PI * 0.8]) R.front.line(A.x, A.y, A.x + Math.cos(a) * Lr, A.y + Math.sin(a) * Lr, (u) => u < 0.4 ? pal[4] : pal[3], (u) => 1 - u);
+        R.front.glow(A.x, A.y, 22 * P.size, pal[3], P.intensity); R.front.glow(A.x, A.y, 8, pal[4], P.intensity); }
+      else { const t = (S.t - stopEnd) / P.timing; // 止まり終わり：入った点から手前側と横へ火花がはじける
+        FX.sparks(R.front, A, t, 3, 26, P.color, 85, 0.4, hitIn.a + Math.PI, 1.3); if (t < 0.1) R.front.glow(A.x, A.y, 16 * P.size, pal[3], (1 - t / 0.1) * P.intensity); } }
+    if (hitOut) { const t = (S.t - hitOut.t) / P.timing, E = toL(hitOut.at); // 抜けた点：進む向きへ火花と装甲片
+      FX.sparks(R.front, E, t, 7, 30, P.color, 110, 0.5, hitOut.a, 0.75);
+      for (let i = 0; i < 10; i++) { const q = t / 0.6; if (q > 1) continue; const a = hitOut.a + (hash(i) - 0.5) * 1.4, d = 46 * q * (0.6 + hash(i + 2)), x = E.x + Math.cos(a) * d, y = E.y + Math.sin(a) * d + 16 * q * q; R.front.rect(x - 1, y - 1, 2, 2, hexc('#5a6f93'), 1); R.front.px(x - 1, y - 1, hexc('#c7a24a')); }
+      if (t < 0.1) { R.front.glow(E.x, E.y, 24 * P.size, pal[3], (1 - t / 0.1) * P.intensity); R.front.glow(E.x, E.y, 8, pal[4], (1 - t / 0.1) * P.intensity); } }
+    for (const h of S.hits) if (h.kind === 'shot') { const t = (S.t - h.t) / P.timing; if (t > 0.3) continue; const A = toL(h.at); FX.sparks(R.front, A, t, h.t * 13, 8, P.color, 50, 0.25, h.a + Math.PI, 1.2); if (t < 0.08) R.front.glow(A.x, A.y, 10, pal[4], 0.8 * P.intensity); }
   },
 });

@@ -143,7 +143,7 @@ function boot() {
   $('#prev').onclick = () => { playT = Math.max(0, Math.round(playT / DT) * DT - DT); playing = false; syncPlay(); };
   $('#next').onclick = () => { playT = Math.min(demo.duration, Math.round(playT / DT) * DT + DT); playing = false; syncPlay(); };
   document.querySelectorAll('input[name=speed]').forEach(r => r.onchange = () => speed = +r.value);
-  document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => mode = r.value);
+  document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { mode = r.value; resetSim(); }); // 試作と現行で動きが違うデモがあるため作り直す
   document.querySelectorAll('input[name=bg]').forEach(r => r.onchange = () => bgMode = r.value);
   $('#scale1').onchange = (e) => document.body.classList.toggle('fit', !e.target.checked);
   $('#save').onclick = saveJSON;
