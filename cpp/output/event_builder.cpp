@@ -70,7 +70,24 @@ void EventBuilder::enemy_kill(RunRuntime &run,const DeathContext &death) {
     RecordingBuilder::enemy_killed(run,death);
     auto event=event_for(run,death.request,death.target);event.kind=CombatEventKind::Kill;
     event.target_id=death.corpse.id;event.definition=death.corpse.definition;event.pos=death.corpse.pos;
-    event.radius=death.corpse.radius;event.facing=death.corpse.facing;event.elite=death.corpse.elite;run.state.combat_events.push_back(event);
+    event.radius=death.corpse.radius;event.facing=death.corpse.facing;event.elite=death.corpse.elite;
+    if (!death.corpse.is_boss && run.state.enemy_handles.contains(death.target)) {
+        const auto &enemy=run.state.enemies[death.target.slot];const auto &d=run.content->definitions[enemy.definition];
+        // 星3〜5の強敵のみ。雑魚のエリート・大物・従属部位は対象外。
+        if (d.rank>=3 && d.rank<=5 && !enemy.parent.generation && !enemy.clone_visual && !enemy.picaro_owner.generation && death.request.cause!=Cause::Afterimage && death.request.cause!=Cause::Vortex) {
+            auto &v=event.death_visual;v.visual=d.visual_id;v.velocity=death.corpse.vel;
+            v.radius=enemy.radius*d.sprite_scale;v.angle=enemy.facing+d.sprite_angle;
+            v.mode=int32_t(enemy.mode);v.charge=enemy.charge;v.timer=enemy.timer;v.rest=d.bite.rest;
+            if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) v.ruler_side=ruler->side;
+            if (const auto *pump=std::get_if<PumpState>(&enemy.behavior_state)) {
+                const auto &p=run.content->pumps[d.pump_definition-1];const double base=d.radius*(enemy.elite?1.25:1.0);
+                v.pump_scale=base*d.sprite_scale/18.5;
+                v.pump_full=enemy.mode==EnemyMode::Windup?1.0:std::clamp((enemy.radius/std::max(base,0.001)-1.0)/std::max(p.grow,0.001),0.0,1.0);
+                v.pump_stored=double(pump->contents.size())/p.store_max;
+            }
+        }
+    }
+    run.state.combat_events.push_back(event);
 }
 void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &request,const ShipDamageResult &result) {
     RecordingBuilder::player_damage(run,request,result);
@@ -114,6 +131,13 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             d["enemy_type"]=definition_name(run,e.definition);d["meteor_index"]=e.meteor_index;d["facing"]=e.facing;
             d["elite"]=e.elite;d["cause"]=cause;d["dir"]=e.direction;
             if (e.definition && e.definition<=run.content->definitions.size()) d["color"]=run.content->definitions[e.definition-1].color;
+            if (e.death_visual.visual) {
+                const auto &v=e.death_visual;godot::Dictionary pose;
+                pose["visual_id"]=v.visual;pose["velocity"]=v.velocity;pose["radius"]=v.radius;pose["angle"]=v.angle;
+                pose["mode"]=v.mode;pose["charge"]=v.charge;pose["timer"]=v.timer;pose["rest"]=v.rest;pose["ruler_side"]=v.ruler_side;
+                pose["pump_scale"]=v.pump_scale;pose["pump_full"]=v.pump_full;pose["pump_stored"]=v.pump_stored;
+                d["death_visual"]=pose;
+            }
             append(run,"kill",d);break;
         case CombatEventKind::ShieldBlock:append(run,"shield_block",d);break;
         case CombatEventKind::Hurt:

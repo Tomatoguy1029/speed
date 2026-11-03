@@ -2563,7 +2563,8 @@
       "cause",
       "dir",
       "color",
-      "silent"
+      "silent",
+      "death_visual"
     ],
     "launch": [
       "pos",
@@ -2981,6 +2982,7 @@
       "pos"
     ],
     "anchor_capture": [
+      "id",
       "pos",
       "to"
     ],

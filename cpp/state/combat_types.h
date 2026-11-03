@@ -66,7 +66,14 @@ struct FloodTailState {
     bool ready=false;uint32_t row=0;godot::Vector2 pos;
     double angle=0,length=0,width=0,spread=0,age=0;
 };
+struct DeathVisual {
+    uint32_t visual=0;
+    godot::Vector2 velocity;
+    double radius=0,angle=0,charge=0,timer=0,rest=0,pump_scale=0,pump_full=0,pump_stored=0;
+    int32_t mode=0,ruler_side=0;
+};
 struct CombatEvent {
+    DeathVisual death_visual;
     FloodTailState flood;
     uint32_t zone_definition=0;
     AttackEndReason attack_end_reason{};AttackPool attack_pool{};int64_t source_entity_id=0;

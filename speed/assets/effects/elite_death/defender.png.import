@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/defender.png-097025a4c6d1d3e8a0decc17e2e4adcf.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/defender.png"
+dest_files=["res://.godot/imported/defender.png-097025a4c6d1d3e8a0decc17e2e4adcf.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

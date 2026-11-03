@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/pump.png-9c45a814759b5aa8710641390a4aec48.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/pump.png"
+dest_files=["res://.godot/imported/pump.png-9c45a814759b5aa8710641390a4aec48.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

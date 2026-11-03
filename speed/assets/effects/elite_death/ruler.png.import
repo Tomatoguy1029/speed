@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/ruler.png-6eb8ddbc168e214f2d48df668ba2d7bb.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/ruler.png"
+dest_files=["res://.godot/imported/ruler.png-6eb8ddbc168e214f2d48df668ba2d7bb.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

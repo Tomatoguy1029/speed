@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/bomber.png-77d3e6338a1d5c31a0b364ee3ad3b778.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/bomber.png"
+dest_files=["res://.godot/imported/bomber.png-77d3e6338a1d5c31a0b364ee3ad3b778.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

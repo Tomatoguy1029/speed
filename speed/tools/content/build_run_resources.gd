@@ -4,7 +4,7 @@ extends RefCounted
 const VIEW := "res://scenes/run/run.tscn"
 const PROFILE_PATHS := ["res://data/visuals/burst_runtime.tres","res://data/visuals/pump_shell_runtime.tres",
 	"res://data/visuals/elite_runtime.tres","res://assets/effects/build/burst_noise.tres",
-	"res://assets/effects/landmark/masks.tres","res://assets/effects/landmark/elite_contacts.tres","res://data/visuals/landmark_aura_material.tres","res://data/visuals/biter_parts.tres"]
+	"res://assets/effects/elite_death/masks.tres","res://assets/effects/landmark/masks.tres","res://assets/effects/landmark/elite_contacts.tres","res://data/visuals/landmark_aura_material.tres","res://data/visuals/biter_parts.tres"]
 
 ## 一度の共通生成の間だけ共有する。次のF5やライブ編集へ古い署名を持ち越さない。
 static var _batch_active := false
@@ -87,7 +87,7 @@ static func collect(startup: PackedStringArray, visuals: Array, catalog: Content
 		startup_paths[path] = true
 	# 画面の静的preloadも、この生成済みの依存一覧へ展開する。
 	for path in [VIEW,"res://scripts/render/run_frame_view.gd","res://assets/pixel/xp_crystal_facets.tres",
-		"res://assets/effects/landmark/masks.tres","res://data/visuals/landmark_aura_material.tres",
+		"res://assets/effects/elite_death/masks.tres","res://assets/effects/landmark/masks.tres","res://data/visuals/landmark_aura_material.tres",
 		"res://assets/effects/landmark/elite_contacts.tres","res://data/visuals/elite_runtime.tres",
 		"res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]:
 		var dependencies := {}

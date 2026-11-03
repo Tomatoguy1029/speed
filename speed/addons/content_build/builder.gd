@@ -17,6 +17,7 @@ static func signature() -> String:
 	files.append("res://tools/art/bake_burst_profiles.py")
 	files.append("res://tools/art/bake_pump_shell.py")
 	files.append("res://tools/art/bake_landmark_masks.py")
+	files.append("res://tools/art/bake_elite_death.py")
 	files.append("res://tools/art/elite_contacts.py")
 	files.append("res://tools/art/bake_elite_crackle.py")
 	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
@@ -140,7 +141,7 @@ static func _build_units(force: bool, output: String) -> Error:
 	cache.open(output.path_join("dev/build_cache.json"))
 	var files := PackedStringArray()
 	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
-	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","elite_contacts","bake_elite_crackle"]: files.append("res://tools/art/"+name+".py")
+	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle"]: files.append("res://tools/art/"+name+".py")
 	# 全編集元を内容で照合し、変更も出力欠落もなければResourceの読込前に返す。
 	var all_inputs := files.duplicate()
 	var boss_inputs := PackedStringArray()

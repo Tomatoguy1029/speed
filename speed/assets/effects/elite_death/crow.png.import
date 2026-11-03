@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/crow.png-aa8b3c9add54bce3adeea85df0a2b180.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/crow.png"
+dest_files=["res://.godot/imported/crow.png-aa8b3c9add54bce3adeea85df0a2b180.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false
