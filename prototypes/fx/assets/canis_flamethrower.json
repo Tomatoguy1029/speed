@@ -1,0 +1,1128 @@
+{
+ "frames": [
+  {
+   "filename": "canis_flamethrower 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 1",
+   "frame": {
+    "x": 332,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 2",
+   "frame": {
+    "x": 664,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 3",
+   "frame": {
+    "x": 996,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 4",
+   "frame": {
+    "x": 1328,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 5",
+   "frame": {
+    "x": 0,
+    "y": 144,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 6",
+   "frame": {
+    "x": 332,
+    "y": 144,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 7",
+   "frame": {
+    "x": 664,
+    "y": 144,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 8",
+   "frame": {
+    "x": 996,
+    "y": 144,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 9",
+   "frame": {
+    "x": 1328,
+    "y": 144,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 10",
+   "frame": {
+    "x": 0,
+    "y": 288,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 11",
+   "frame": {
+    "x": 332,
+    "y": 288,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 12",
+   "frame": {
+    "x": 664,
+    "y": 288,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 13",
+   "frame": {
+    "x": 996,
+    "y": 288,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 14",
+   "frame": {
+    "x": 1328,
+    "y": 288,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 15",
+   "frame": {
+    "x": 0,
+    "y": 432,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 16",
+   "frame": {
+    "x": 332,
+    "y": 432,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 17",
+   "frame": {
+    "x": 664,
+    "y": 432,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 18",
+   "frame": {
+    "x": 996,
+    "y": 432,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 19",
+   "frame": {
+    "x": 1328,
+    "y": 432,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 20",
+   "frame": {
+    "x": 0,
+    "y": 576,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 21",
+   "frame": {
+    "x": 332,
+    "y": 576,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 22",
+   "frame": {
+    "x": 664,
+    "y": 576,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 23",
+   "frame": {
+    "x": 996,
+    "y": 576,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 24",
+   "frame": {
+    "x": 1328,
+    "y": 576,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 25",
+   "frame": {
+    "x": 0,
+    "y": 720,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 26",
+   "frame": {
+    "x": 332,
+    "y": 720,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 27",
+   "frame": {
+    "x": 664,
+    "y": 720,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 28",
+   "frame": {
+    "x": 996,
+    "y": 720,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 29",
+   "frame": {
+    "x": 1328,
+    "y": 720,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 30",
+   "frame": {
+    "x": 0,
+    "y": 864,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 31",
+   "frame": {
+    "x": 332,
+    "y": 864,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 32",
+   "frame": {
+    "x": 664,
+    "y": 864,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 33",
+   "frame": {
+    "x": 996,
+    "y": 864,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 34",
+   "frame": {
+    "x": 1328,
+    "y": 864,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 35",
+   "frame": {
+    "x": 0,
+    "y": 1008,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 36",
+   "frame": {
+    "x": 332,
+    "y": 1008,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 37",
+   "frame": {
+    "x": 664,
+    "y": 1008,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 38",
+   "frame": {
+    "x": 996,
+    "y": 1008,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 39",
+   "frame": {
+    "x": 1328,
+    "y": 1008,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 40",
+   "frame": {
+    "x": 0,
+    "y": 1152,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 41",
+   "frame": {
+    "x": 332,
+    "y": 1152,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 42",
+   "frame": {
+    "x": 664,
+    "y": 1152,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 43",
+   "frame": {
+    "x": 996,
+    "y": 1152,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 44",
+   "frame": {
+    "x": 1328,
+    "y": 1152,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 45",
+   "frame": {
+    "x": 0,
+    "y": 1296,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 46",
+   "frame": {
+    "x": 332,
+    "y": 1296,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  },
+  {
+   "filename": "canis_flamethrower 47",
+   "frame": {
+    "x": 664,
+    "y": 1296,
+    "w": 332,
+    "h": 144
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 332,
+    "h": 144
+   },
+   "sourceSize": {
+    "w": 332,
+    "h": 144
+   },
+   "duration": 33
+  }
+ ],
+ "meta": {
+  "app": "https://github.com/patch-gg/pixelfx",
+  "version": "1",
+  "image": "canis_flamethrower.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 1660,
+   "h": 1440
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "canis_flamethrower",
+    "from": 0,
+    "to": 47,
+    "direction": "forward"
+   }
+  ],
+  "pixelfx": {
+   "id": "fire/flamethrower",
+   "name": "Flamethrower",
+   "fps": 30,
+   "loop": true,
+   "frames": 48,
+   "frameSize": [
+    332,
+    144
+   ],
+   "pivot": [
+    36,
+    88
+   ],
+   "columns": 5,
+   "options": {
+    "palette": [
+     "#071527",
+     "#123452",
+     "#18557c",
+     "#207fa7",
+     "#2b9ec3",
+     "#52bad4",
+     "#89d4e5",
+     "#b9e6ef",
+     "#d9f2f5"
+    ],
+    "pilot": [
+     "#1163bd",
+     "#36cfff",
+     "#e6fbff"
+    ],
+    "reach": 224,
+    "speed": 560
+   },
+   "refinement": {
+    "core": "部分的に冷える青",
+    "centerline": "原本のまま",
+    "body_width": [
+     0.56,
+     1.6
+    ],
+    "body_span": [
+     10,
+     216
+    ],
+    "flow_speed": 68
+   }
+  }
+ }
+}

@@ -77,6 +77,35 @@ function canisJetImage(at, angle, reach, width, time, alpha = 1) {
   g.save(); g.translate(at.x, at.y); g.rotate(angle); g.globalAlpha = alpha; g.imageSmoothingEnabled = false;
   g.scale(reach / 133, Math.max(0.45, width / 62)); g.drawImage(im, frame.x, frame.y, frame.w, frame.h, -12, -72, frame.w, frame.h); g.restore();
 }
+// 焼き焦がす光：原本flamethrowerを固定の大きさで流し、実粒の到達で前後を開く。
+// 光の切り口を作らないよう、原本1枚を柔らかな透明マスクで表示する。
+function canisSiriusJet(S, R, jet) {
+  const flames = S.flames.filter(f => f.jetId === jet.id); if (!flames.length) return;
+  const u = fromA(jet.a), P = R.P, sheet = DATA.canis_flamethrower_sheet, meta = sheet.meta.pixelfx, image = IMG.canis_flamethrower;
+  const age = Math.max(0, S.t - jet.t), cycle = Math.floor(age * meta.fps) % 32, frame = sheet.frames[cycle < 17 ? cycle : cycle + 16].frame;
+  let front = 0, back = Infinity;
+  for (const flame of flames) { const rel = sub(flame.pos, jet.at), d = rel.x * u.x + rel.y * u.y, radius = lerp(flame.r0, flame.r1, flame.age / flame.life); front = Math.max(front, d + radius); back = Math.min(back, d - radius); }
+  const emitting = age <= jet.duration + 1 / 60;
+  front = Math.min(jet.length, front); back = emitting ? 0 : Math.max(0, back); if (front <= back) return;
+  // 横は実射程で固定。共通サイズは太さと火の大きさへだけ使う。
+  const sx = jet.length / 240, sy = Math.max(jet.width * 1.2, jet.length * 0.025) / 4.2 * (P.jetWidth ?? 1) * P.size;
+  const fade = 1 - smooth(jet.duration + jet.life * 0.65, jet.duration + jet.life, age), alpha = Math.min(1, P.intensity) * fade;
+  if (alpha <= 0) return;
+  let surface = canisSiriusJet.surface;
+  if (!surface) { const canvas = document.createElement('canvas'); canvas.width = frame.w; canvas.height = frame.h; const mask = document.createElement('canvas'); mask.width = frame.w; mask.height = frame.h; const maskG = mask.getContext('2d'); surface = canisSiriusJet.surface = { canvas, ctx: canvas.getContext('2d'), mask, maskG, pixels: maskG.createImageData(frame.w, frame.h) }; }
+  const ctx = surface.ctx, left = meta.pivot[0] + (emitting ? -7 : back / sx), right = meta.pivot[0] + front / sx, edge = Math.min(9, Math.max(1, (right - left) * 0.24));
+  ctx.clearRect(0, 0, frame.w, frame.h); ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
+  // 芯の先より外側の光を先に消す、丸みのある切り口。縦一直線に光を切らない。
+  const pixels = surface.pixels.data;
+  for (let y = 0; y < frame.h; y++) for (let x = 0; x < frame.w; x++) { const dy = y - meta.pivot[1] - 5 * ((x - meta.pivot[0]) / 224) ** 2, index = (y * frame.w + x) * 4;
+    const a = smooth(0, edge, x - left - dy * dy / 55) * smooth(0, edge * 1.5, right - x - dy * dy / 70);
+    pixels[index] = pixels[index + 1] = pixels[index + 2] = 255; pixels[index + 3] = Math.round(a * 255); }
+  surface.maskG.putImageData(surface.pixels, 0, 0); ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(surface.mask, 0, 0);
+  const mouth = emitting && S.B.visualMouth ? S.B.visualMouth : jet.at;
+  g.save(); g.translate(mouth.x, mouth.y); g.rotate(jet.a); g.imageSmoothingEnabled = false; g.globalAlpha = alpha;
+  g.drawImage(surface.canvas, -meta.pivot[0] * sx, -meta.pivot[1] * sy, frame.w * sx, frame.h * sy);
+  g.restore();
+}
 function canisJetPictures(S, R) {
   const B = S.B, P = R.P;
   if (S.tech === 'sirius_flame' && S.flames.length) {
@@ -85,6 +114,7 @@ function canisJetPictures(S, R) {
     canisJetImage(mouth, B.facing, reach * P.size * (P.jetLength ?? 1), width * P.size * (P.jetWidth ?? 1), S.t, Math.min(1, P.intensity));
   }
   for (const jet of S.jetVisuals) {
+    if (S.tech === 'sirius') { canisSiriusJet(S, R, jet); continue; }
     const age = S.t - jet.t, tail = Math.max(0, age - jet.duration) / jet.life; if (tail >= 1) continue;
     const source = jet.owner === 'boss' ? (B.visualMouth || jet.at) : jet.at;
     const shift = jet.length * tail, at = add(source, mul(fromA(jet.a), shift)), reach = Math.min(jet.length - shift, age / jet.life * jet.length);
@@ -98,30 +128,47 @@ function canisSpriteFX(name, point, time, scaleX, scaleY, angle = 0, alpha = 1) 
   g.drawImage(image, frame.x, frame.y, frame.w, frame.h, -meta.pivot[0], -meta.pivot[1], frame.w, frame.h); g.restore();
 }
 function canisTrailPictures(S, R) {
-  const P = R.P, lengthScale = P.trailLength ?? 1, widthScale = P.trailWidth ?? 1;
-  for (let ti = 0; ti < S.trails.length; ti++) {
-    const trail = S.trails[ti], age = S.t - trail.t;
-    if (age >= trail.life || age < 0) continue;
-    const samples = [], embers = [], length = trail.length * lengthScale, width = trail.width * 2.2 * widthScale;
-    const noise = (distance, span, seed) => { const cell = Math.floor(distance / span), f = smooth(0, 1, distance / span - cell); return lerp(hash(cell * 17 + seed), hash((cell + 1) * 17 + seed), f); };
-    // 粒を密に重ねて1枚の燃え面へ合成する。等間隔の炎画像は並べない。
-    const step = Math.max(5, width * 0.42), flight = S.r.beam_particle_life || 0.65;
-    for (let d = 0; d <= length; d += step) {
-      const laid = clamp(d / Math.max(1, length)) * flight, localAge = age - laid - (S.r.trail_delay || 0);
-      if (localAge <= 0) continue;
-      const rough = noise(d, 110, ti * 41 + 7), small = noise(d, 37, ti * 13 + 97);
-      const coolAt = trail.life * (0.25 + rough * 0.60), cooling = 1 - smooth(coolAt, Math.min(trail.life, coolAt + 0.65), localAge);
-      const fuel = smooth(0, 0.18, localAge) * cooling * (1 - smooth(trail.life * 0.74, trail.life, age));
-      const taper = Math.min(1, (d + width) / (width * 2), (length - d + width * 0.3) / width);
-      const side = (noise(d, 83, ti * 31 + 127) - 0.5) * width * 0.6, pos = add(trail.at, rotateV(V(d, side), trail.a));
-      if (cooling < 0.8 && localAge > 0.4) embers.push({ pos, radius: width * (0.35 + rough * 0.28) * taper, age: localAge, life: trail.life, heat: 0, seed: ti * 71 + d * 0.23 });
-      if (fuel < 0.05) continue;
-      const heat = (0.24 + small * 0.53 + rough * 0.13) * Math.pow(fuel, 0.25);
-      samples.push({ pos, radius: width * (0.35 + rough * 0.85 + small * 0.30) * Math.sqrt(fuel) * taper, age: localAge, life: trail.life, heat, layerScale: [1, 0.80, 0.25], seed: ti * 53 + d * 0.17 });
-    }
-    // 冷えた場所は暗い青の小さな熾火へ縮め、熱い面との間に切れ目を残す。
-    canisFire(R, embers, S.t, 'trail', 0.28 * (1 - smooth(trail.life * 0.8, trail.life, age)));
-    canisFire(R, samples, S.t, 'trail');
-  }
   for (const q of S.pack) if (q.burn && !q.dead) canisSpriteFX('canis_fireball', q.pos, S.t + q.idx * 0.13, q.r * 7 / 100, q.r * 3.2 / 18, q.facing, 0.88);
+  if (S.tech !== 'sirius') return;
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], P = R.P;
+  const frame = canisTrailPictures.floorFrame ||= PX.createFrame(LW, LH);
+  PX.clearFrame(frame);
+  const p = new PX.Painter(frame), NL = fire.noiseFor(0);
+  const H = ['#cceafa', '#a8d9ef', '#72bbdf', '#4293c2', '#2874aa', '#20568c', '#193d69', '#132a49', '#0b1c31'].map(hexc);
+  const dark = [hexc('#0b1421'), hexc('#132237'), hexc('#1d3047')], emberColors = ['#edbc82', '#c57c48', '#84432b', '#412b28'].map(hexc);
+  for (const trail of S.trails) {
+    const maximum = trail.maximum * (P.trailLength ?? 1), spread = P.trailWidth ?? 1;
+    for (const d of trail.deposits || []) {
+      if (dist(d.pos, trail.at) > maximum) continue;
+      const seed = d.seed, elapsed = S.t - d.t, wait = 0.14 + hash(seed + 21) * 0.16, age = elapsed - wait;
+      if (age < 0) continue; // その場所を炎が吹き抜けたあとだけ火床を見せる。
+      const life = Math.min(trail.life, 1.25 + hash(seed + 5) * 1.8), grow = smooth(0, 0.12 + hash(seed + 9) * 0.16, age), collapse = 1 - smooth(life * (0.42 + hash(seed + 17) * 0.18), life, age);
+      const remain = 1 - smooth(life, life + 0.45, age); if (remain <= 0) continue;
+      const at = toL(d.pos), radius = (1.8 + hash(seed + 31) * 2.4) * spread * P.size;
+      p.place(at.x, at.y); p.fade = remain; p.lightK = P.intensity * 0.32;
+      // 原本fire-ringの焦げと同じく、欠けた煤と冷える粒を小さい範囲へ置く。
+      for (let y = -Math.ceil(radius * 0.56); y <= radius * 0.56; y++) for (let x = -Math.ceil(radius); x <= radius; x++) {
+        const dist2 = (x / radius) ** 2 + (y / (radius * 0.56)) ** 2, grain = hash(seed + x * 41 + y * 137);
+        if (dist2 > 0.7 + grain * 0.3 || grain < 0.24 || (Math.abs(x) < radius * 0.18 && grain > 0.66)) continue;
+        p.blend(x, y, dark[Math.floor(grain * 3) % 3], grow * (0.40 + grain * 0.35));
+      }
+      const kind = hash(seed + 47), flame = grow * collapse;
+      if (kind > 0.48 && flame > 0.02) {
+        const h = (1.8 + hash(seed + 53) * 8.0) * Math.pow(flame, 0.8) * P.size, w = (0.65 + hash(seed + 59) * 1.0) * spread * Math.sqrt(flame);
+        const N = (rate, n = 0, off = 0) => NL(age, rate, n + seed, off);
+        const layers = age < life * 0.30 && kind > 0.76 ? fire.BACK_LAYERS : [[1, 1, 7], [0.70, 0.76, 5], [0.33, 0.44, 3]];
+        // 原本の舌・火の塊を場所ごとに別の寿命で育て、線として結ばない。
+        if (kind < 0.72) fire.firePuff(p, hash(seed + 62) - 0.5, -h * 0.3, 0.65 * collapse, Math.max(0.7, h * 0.35), kind, H, 0.08);
+        else fire.flameTongue(p, 0, 0, h, w, N(2.2, 40) * (0.6 + h * 0.1), N, seed, H, layers, 0.35, 0.65);
+      }
+      for (let j = 0; j < 3; j++) {
+        const mark = hash(seed + j * 67 + 101); if (mark < 0.42) continue;
+        const x = (hash(seed + j * 13 + 111) - 0.5) * radius * 1.7, y = (hash(seed + j * 23 + 127) - 0.5) * radius * 0.8;
+        const heat = Math.max(0, 0.85 - age / (life + 0.4)) * grow;
+        if (heat > 0.04) fire.ember(p, x, y, heat, 1, emberColors, age * 29 + seed + j);
+      }
+    }
+  }
+  // 専用の床レイヤーを今ここで合成する。噴射や本体より奥で、R.frontには残さない。
+  blitFrame(frame); worldTransform();
 }

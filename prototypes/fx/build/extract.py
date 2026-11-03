@@ -173,7 +173,7 @@ eff = gdres.resource('data/visuals/effect_settings.tres')['res']
 out['effect_settings'] = jsonable({k: v for k, v in (eff or {}).items() if k != 'script'})
 # pixelFX原本を変更せず、青い配色で tools/render.mjs --sheet 出力した炎。
 fx_assets = os.path.normpath(os.path.join(os.path.dirname(__file__), '../assets'))
-for stem in ['canis_breath', 'canis_fireball', 'hydra_wind']:
+for stem in ['canis_breath', 'canis_flamethrower', 'canis_fireball', 'hydra_wind']:
     out['images'][stem] = durl(Image.open(fx_assets + '/' + stem + '.png').convert('RGBA'))
     out[stem + '_sheet'] = json.load(open(fx_assets + '/' + stem + '.json'))
 from boss_data import extract_bosses
