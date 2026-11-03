@@ -33,18 +33,13 @@ function canisFire(R, samples, time, kind = 'flame', fade = 1) {
     try { phxDrawParticles({ list, draw() {} }, painter, 'front', time, 0, settings); } finally { painter.fade = oldFade; }
   });
 }
-function canisBurstStart(S, burst) {
-  const rng = new PX.Rng(451 + S.bursts.length), ps = new PX.Particles({ rng, sparks: ['#d4f8ff', '#37a6ff', '#1471e8', '#163976'] });
-  burst.fx = { R: rng, ps }; burst.fx.blazes = new PX.Blazes(ps);
-  withCanisFire(P(), 'burst', () => phxBurst(burst.fx, burst.radius * WL));
-}
+// 承認GIFと同じbomber_burstシェーダーから書き出した0.8秒の透過コマ。
 function canisBurstDraw(S, R, burst, layer) {
-  if (!burst.fx || S.t - burst.t > 2.8) return;
-  const point = toL(burst.at), painter = layer === 'back' ? R.back : R.front;
-  withCanisFire(R.P, 'burst', () => {
-    painter.place(point.x, point.y);
-    try { withPhxRamp(() => phxDrawParticles(burst.fx.ps, painter, layer, S.t, S.t - burst.t)); } finally { painter.place(0, 0); }
-  });
+  if (layer !== 'front') return;
+  const meta = DATA.canis_bomber_burst_sheet.meta.pixelfx, age = (S.t - burst.t) / R.P.timing;
+  if (age < 0 || age >= meta.duration || R.P.intensity <= 0) return;
+  const scale = burst.radius / meta.base_radius / meta.reference_zoom * R.P.size;
+  canisSpriteFX('canis_bomber_burst', burst.at, age, scale, scale, 0, Math.min(1, R.P.intensity));
 }
 const CANIS_TINTS = new Map();
 function canisHoundWarning(q, strength, direction = q.facing) {

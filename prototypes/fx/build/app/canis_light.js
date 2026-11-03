@@ -37,11 +37,12 @@ function canisWallLayout(S) {
   }
 }
 function canisWallStep(S) {
+  if (S.novaTiming && S.age < S.novaTiming.houndStart) return;
   if (!S.wall) canisWallLayout(S);
   const source = canisNovaOrigin(S), cfg = { ...bossRule('canis_major', 'bay'), max_speed: S.r.gather_speed, arrive: 2, face_turn: 8 };
   for (const m of S.wall) {
     const u = fromA(m.angle), goal = add(source, mul(u, m.depth));
-    if (S.age < S.r.warn + S.r.after) m.q.steer = { goal, face: add(goal, mul(orth(u), 1000)), cfg };
+    if (S.age < Math.max(S.r.warn, S.novaTiming?.houndStart ?? 0) + S.r.after) m.q.steer = { goal, face: add(goal, mul(orth(u), 1000)), cfg };
   }
 }
 function canisNovaField(S) {
