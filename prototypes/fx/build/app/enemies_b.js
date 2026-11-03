@@ -291,10 +291,53 @@ function aqCracks(seed, r) {
   for (let i = 0; i < 7; i++) grow(0, 0, i * TAU / 7 + Rg.range(-0.3, 0.3), r * Rg.range(0.55, 0.95), 1, 0);
   return out;
 }
+// 絵の輪郭の画素（画像の中心から見た画素座標）。帯電の放電を輪郭の上に這わせるのに使う
+const EDGE_CACHE = {};
+function spriteEdges(key) {
+  if (EDGE_CACHE[key]) return EDGE_CACHE[key]; const im = IMG[key]; if (!im) return null; const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, im.width, im.height).data, on = (i, j) => i >= 0 && j >= 0 && i < im.width && j < im.height && d[(j * im.width + i) * 4 + 3] > 80, out = [];
+  for (let j = 0; j < im.height; j++) for (let i = 0; i < im.width; i++) if (on(i, j) && (!on(i - 1, j) || !on(i + 1, j) || !on(i, j - 1) || !on(i, j + 1))) out.push([i + 0.5 - im.width / 2, j + 0.5 - im.height / 2]);
+  return (EDGE_CACHE[key] = { pts: out, w: im.width, h: im.height });
+}
+// 帯電（pixelFX lightning/electrified.js の作り）：輪郭の近い2点の間を放電が跳び（1コマおきに打ち直す）、ときどき体全体が電気色に光って火花が散る
+function aqElectrify(R, e, time, C, k) {
+  const E = spriteEdges('enemy/' + e.type); if (!E || !E.pts.length) return;
+  const d = enemyDef(e.type), ang = d.look.fixed_angle ? d.look.angle : d.look.angle + e.facing, sc = 2 * spriteR(e.type, e.r) / Math.max(E.w, E.h), ca = Math.cos(ang), sa = Math.sin(ang);
+  const W = (q) => toL(V(e.pos.x + (q[0] * ca - q[1] * sa) * sc, e.pos.y + (q[0] * sa + q[1] * ca) * sc)), f = Math.floor(time * 30), Rg = new PX.Rng((f >> 1) * 7 + 3), jolt = (f % 20) < 3, L0 = toL(e.pos);
+  if (jolt) drawEnemy(e, { white: (0.7 - (f % 20) * 0.2) * k }); // 体が電気色に光る
+  const n = Math.round((2 + (jolt ? 3 : Rg.int(0, 1))) * k);
+  for (let i = 0; i < n; i++) {
+    const A = W(Rg.pick(E.pts)); let B = null;
+    for (let t2 = 0; t2 < 12; t2++) { const c = W(Rg.pick(E.pts)), dd = Math.hypot(c.x - A.x, c.y - A.y); if (dd > 2 && dd < 9) { B = c; break; } }
+    if (!B) continue;
+    voltInk(R.front, zigzag(new PX.Rng(f * 13 + i + 1), A.x, A.y, B.x, B.y, 0.42, 0.35), (f & 1 ? 0.75 : 0.95) * k, C, 1, true, 0.4); R.front.px(A.x, A.y, C[5]); R.front.px(B.x, B.y, C[5]);
+  }
+  if (jolt) for (let i = 0; i < 8; i++) { // 光ったときに輪郭から火花が散る
+    const q = new PX.Rng(Math.floor(f / 20) * 31 + i + 1), A = W(q.pick(E.pts)), an = Math.atan2(A.y - L0.y, A.x - L0.x) + q.range(-0.6, 0.6), age = (f % 20) / 30, dd = q.range(20, 50) * age, x = A.x + Math.cos(an) * dd, y = A.y + Math.sin(an) * dd;
+    R.front.line(x - Math.cos(an) * 2, y - Math.sin(an) * 2, x, y, (w) => w > 0.5 ? C[7] : C[5], k);
+  }
+  R.front.glow(L0.x, L0.y, e.r * WL * 2.2, C[4], (jolt ? 0.45 : 0.15) * k);
+}
+// 後ろの航跡（pixelFX lightning/ball-lightning.js の航跡を下敷き）：通った跡が細りながら冷え、光の粒がこぼれて漂い、筋の上を放電が跳ねる
+function aqWake(R, hist, time, C, k) {
+  if (hist.length < 2 || k <= 0) return; const f = Math.floor(time * 30);
+  for (let i = 1; i < hist.length; i++) {
+    const A = toL(hist[i - 1].p), B = toL(hist[i].p), u = clamp((time - hist[i].t) / 0.45); if (u >= 1) continue;
+    const w = (1 - u) * 2.2 * k, dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
+    for (let d = 0; d <= l; d += 0.5) { const x = A.x + dx * d / l, y = A.y + dy * d / l; for (let q = -w; q <= w; q += 0.5) { const e2 = Math.abs(q) / Math.max(w, 0.01); R.back.px(x - dy / l * q, y + dx / l * q, C[e2 < 0.35 && u < 0.4 ? 6 : u < 0.5 ? 5 : u < 0.75 ? 4 : 3]); } }
+    if (i % 3 === 0) R.back.glow(B.x, B.y, 6 * (1 - u) + 2, C[4], 0.3 * (1 - u) * k);
+  }
+  PX.cycle(time, 0.8, 30, 77, (g) => g.range(0.35, 0.7), (age, life, q) => {
+    const h = hist[Math.floor(q.next() * hist.length)]; if (!h || time - h.t > 0.45 || age > time - h.t) return;
+    const P0 = toL(h.p), a = q.range(0, TAU), sp = q.range(6, 20), kk = 1 - age / life, x = P0.x + Math.cos(a) * sp * age, y = P0.y + Math.sin(a) * sp * age;
+    R.back.px(x, y, kk > 0.6 ? C[6] : kk > 0.3 ? C[4] : C[3]); R.back.glow(x, y, 3, C[4], 0.3 * kk * k);
+  });
+  if (hist.length > 4 && (f & 1)) { const Rg = new PX.Rng(f + 5), i0 = Rg.int(0, hist.length - 4), A = toL(hist[i0].p), B = toL(hist[Math.min(hist.length - 1, i0 + 3)].p); if (time - hist[i0].t < 0.4) voltInk(R.back, zigzag(Rg, A.x, A.y, B.x, B.y, 0.45, 0.3), 0.6 * k, C, 1, true, 0.3); }
+}
 DEMOS.push({
   id: 'G12-aquila', ids: ['G12'], cat: G12, group: 'わし座（aquila）', title: '進路固定→突進と落雷', duration: 3.6, color: '#9ed8ff', cam: { x: -160, y: -60 },
   refs: ['scripts/enemies/aquila.gd（aim 0.4・lock 0.45・突進900×0.55・drop_step 0.13・blast 半径220/遅延0.4・recover 0.9）', 'render/enemies/aquila.gd（進路線＋着弾円）・render/attacks/zone_aquila.gd/zone_reticle.gd（閉じる輪・放電）', 'pixelFX lightning/_lib.js（zigzag・stroke の稲妻の作りと塗り）・lightning-strike.js（ちらつき・割れ目・焦げ）'],
-  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし（着弾の半径220・発生時刻）', '予兆': '線や円は使わない。進路は着弾点から着弾点へ跳び移る細い放電で示し、着弾点の範囲の中で短い放電がちらつく（溜まるほど増える）', '落雷': 'pixelFX の稲妻（枝分かれ・3段の塗り・ちらつき）が中心から範囲いっぱいへ走り、地面に割れ目の跡が残って冷える' },
+  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし（着弾の半径220・発生時刻）', '予兆': '線や円は使わない。進路は着弾点から着弾点へ跳び移る細い放電で示し、着弾点の範囲の中で短い放電がちらつく（溜まるほど増える）', '落雷': 'pixelFX の稲妻（枝分かれ・3段の塗り・ちらつき）が中心から範囲いっぱいへ走る。最初の1コマは全体が白く光り、火花がはじけ、地面が照らされる。割れ目の跡が残って冷える', '本体': 'pixelFX electrified の作りで帯電：輪郭の上を放電が這い、ときどき体全体が電気色に光って火花が散る', '航跡': 'pixelFX ball-lightning の航跡を下敷きに、通った跡が細りながら冷え、光の粒がこぼれ、筋の上を放電が跳ねる' },
   setup(S) { S.e = mkE('aquila', V(-640, -260), 0, { fire_t: 0.15 }); S.ship = shipState(V(180, 120)); S.zones = []; S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); },
   step(S, dt) {
     const e = S.e, p = prm('aquila');
@@ -306,6 +349,7 @@ DEMOS.push({
       while (nd <= el2 + 1e-5) { S.zones.push({ pos: add(e.pos, mul(dir, p.dash_speed * nd)), t0: S.t + nd, r: p.blast_radius, delay: p.blast_delay, active: 0.25, seed: S.zones.length * 31 + 7 }); nd += p.drop_step; } e.bud_t = nd - el2; e.pos = add(e.pos, mul(dir, trav)); e.timer -= dt;
       if (e.timer <= 0 || rem <= trav + 0.001) { if (p.drop_step - e.bud_t > p.drop_step * 0.25) S.zones.push({ pos: { ...e.pos }, t0: S.t, r: p.blast_radius, delay: p.blast_delay, active: 0.25, seed: S.zones.length * 31 + 7 }); e.mode = 'RECOVER'; e.timer = p.recover; } }
     else if (e.mode === 'RECOVER') { e.timer -= dt; if (e.timer <= 0) e.mode = 'MOVE'; }
+    (S.hist ||= []).push({ p: { ...e.pos }, t: S.t }); while (S.hist.length && S.t - S.hist[0].t > 0.5) S.hist.shift(); // 航跡のための位置の履歴
   },
   phase(S) { const e = S.e; return e.mode === 'WINDUP' ? (e.charge > 0 ? '進路固定（予告）' : PH.WINDUP + '（狙い）') : e.mode === 'DASH' ? PH.DASH : S.used ? PH.RECOVER : PH.MOVE; },
   draw(S, R) {
@@ -330,12 +374,14 @@ DEMOS.push({
         if (heat > 0) for (const q of cr) for (let i = 0; i < q.pts.length; i++) { const [x, y] = q.pts[i], h = heat * (1 - 0.5 * i / q.pts.length) - hash(x * 7.1 + y * 3.3) * 0.25; R.back.px(x, y, h > 0.6 ? C[6] : h > 0.35 ? C[4] : h > 0.12 ? C[2] : hexc('#141020')); }
         if (fl > 0) { const fr = Math.floor(a * 30), Rg = new PX.Rng((z.seed * 13 + fr) >>> 0 || 1), paths = [];
           for (let j = 0; j < 6; j++) { const an = j * TAU / 6 + Rg.range(-0.35, 0.35), l = rr * Rg.range(0.7, 0.95); paths.push(...zigzag(Rg, L.x, L.y, L.x + Math.cos(an) * l, L.y + Math.sin(an) * l, 0.22, 0.6)); }
-          voltInk(R.front, paths, fl, C, 1, false, 0.6); }
+          voltInk(R.front, paths, fl, a < 1 / 30 ? C.map((c, i) => C[Math.min(7, i + 2)]) : C, 1.25, false, 0.8); } // 最初の1コマは稲妻全体が白く光る
+        if (a < 0.5) for (let j = 0; j < 16; j++) { const q = new PX.Rng(z.seed * 7 + j + 1), life = q.range(0.2, 0.45); if (a > life) continue; const an = q.range(0, TAU), d2 = q.range(25, 60) * a * (1 - a / life * 0.4), x = L.x + Math.cos(an) * d2, y = L.y + Math.sin(an) * d2, tl = 3 * (1 - a / life); R.front.line(x - Math.cos(an) * tl, y - Math.sin(an) * tl, x, y, (w) => w > 0.5 ? C[7] : C[5], 1 - a / life); } // 着地点からはじける火花
+        if (a < 0.3) R.back.glow(L.x, L.y, rr * 1.2, C[4], 0.5 * (1 - a / 0.3) * P.intensity); // 地面が照らされる
         if (a < 0.08) { R.front.glow(L.x, L.y, rr * 1.1, C[6], (1 - a / 0.08) * 0.9 * P.intensity); R.front.glow(L.x, L.y, rr * 0.4, C[7], (1 - a / 0.08) * P.intensity); } // 落ちた瞬間の閃光
         if (a > z.active && a < z.active + 0.35) aqStatic(R.back, L, rr * 0.7, 3, rr * 0.18, S.t, z.seed + 5, C, 0.5 * (1 - (a - z.active) / 0.35)); } // 残りの放電
     }
-    if (R.proto) R.blitBack();
-    drawEnemy(e); drawShip(S.ship);
+    if (R.proto) { aqWake(R, S.hist || [], S.t, C, e.mode === 'DASH' || e.mode === 'RECOVER' ? 1 : 0.5); R.blitBack(); }
+    drawEnemy(e); if (R.proto) aqElectrify(R, e, S.t, C, e.mode === 'WINDUP' ? 0.6 + 0.4 * e.charge : 1); drawShip(S.ship);
   },
 });
 
