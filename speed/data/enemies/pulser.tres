@@ -51,7 +51,7 @@ shape = &"hex"
 behavior = &"pulser"
 ranged = true
 params = {
-"bullet_dmg": 10.0,
+"bullet_dmg": 6.0,
 "fire_interval": 3.2,
 "keep": 260.0,
 "telegraph": 1.4,
