@@ -645,7 +645,7 @@ func _ready_cpp() -> void:
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
 	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
-	_font = ThemeDB.fallback_font
+	_font = get_theme_default_font()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_speed_indicator = SPEED_INDICATOR.new()

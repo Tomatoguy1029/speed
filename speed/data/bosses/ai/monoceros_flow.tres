@@ -28,7 +28,7 @@ sections = [{
 }, {
 "name": "大技候補",
 "request": "major",
-"cap": 3.0,
+"cap": 4.0,
 "action_count": 1,
 "no_candidate_timeout": 0.6,
 "next": 3,

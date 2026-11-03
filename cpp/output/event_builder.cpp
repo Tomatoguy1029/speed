@@ -94,7 +94,7 @@ void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &reques
     const double applied=std::max(0.0,result.hp_before-result.hp_after);
     if (request.effect_id) run.state.observations.effect_damage(request.effect_id,applied);
     else if (auto *o=run.state.observations.find(request.observation_id)) o->applied+=applied;
-    CombatEvent event;event.observation_id=request.observation_id;event.effect_id=request.effect_id;event.kind=CombatEventKind::ShipDamage;event.cause=request.cause;event.source=request.source;event.source_is_explicit=request.source_is_explicit;event.technique=request.technique;
+    CombatEvent event;event.observation_id=request.observation_id;event.effect_id=request.effect_id;event.kind=CombatEventKind::ShipDamage;event.cause=request.cause;event.source=request.source;event.source_is_explicit=request.source_is_explicit;event.technique=request.technique;event.borrowed_technique=request.borrowed_technique;
     event.pos=run.state.ship.pos;event.time=run.state.time;event.world_time=run.state.world_time;event.reason=result.reason;
     event.requested=request.amount;event.resolved=result.amount;event.hp_before=result.hp_before;event.hp_after=result.hp_after;event.accepted=result.accepted;
     if (result.accepted) {event.kind=CombatEventKind::Hurt;run.state.combat_events.push_back(event);event.kind=CombatEventKind::ShipDamage;}
@@ -144,6 +144,11 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             d["amount"]=e.resolved;d["cause"]=cause;d["source"]=e.cause==Cause::FinalStrike?godot::StringName("boss"):definition_name(run,e.source);d["t"]=e.time;
             d["world_t"]=e.world_time;d["hp_after"]=e.hp_after;append(run,"hurt",d);break;
         case CombatEventKind::ShipDamage:
+            if (e.borrowed_technique && e.borrowed_technique<=run.content->boss_techniques.size()) {
+                const auto &borrowed=run.content->boss_techniques[e.borrowed_technique-1];
+                d["borrowed_technique"]=godot::StringName(borrowed.external_id.c_str());
+                d["borrowed_source"]=godot::StringName(run.content->bosses[borrowed.boss-1].external_id.c_str());
+            }
             d["cause"]=cause;d["source"]=e.cause==Cause::FinalStrike?godot::StringName("boss"):definition_name(run,e.source);d["technique"]=e.technique;
             if (e.technique && e.technique<=run.content->boss_techniques.size()) {
                 const auto &technique=run.content->boss_techniques[e.technique-1];
