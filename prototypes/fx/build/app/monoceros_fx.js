@@ -13,7 +13,7 @@ function monoOriginalBooster(S, rig) {
   } g.restore();
 }
 function monoOriginalLance(S, rig) {
-  const form = S.form, r = S.r, a = add(S.B.pos, mul(rig.hornAxis, S.B.r * 0.65)), horn = rig.hornTip, axis = rig.hornAxis, tip = add(horn, mul(axis, r.head_length * form)), side = mul(orth(axis), 18 * form);
+  const form = S.form, r = S.r, a = rig.horn, horn = rig.hornTip, /* 槍は角の根元から出す（見た目は変えない） */ axis = rig.hornAxis, tip = add(horn, mul(axis, r.head_length * form)), side = mul(orth(axis), 18 * form);
   D2.line(a, horn, '#f2b567', 12 + 28 * form); D2.line(a, horn, '#fff', 7 + 5 * form);
   D2.poly([tip, add(horn, side), sub(horn, mul(axis, r.head_length * form * 0.35)), sub(horn, side)], '#fff7df');
 }
@@ -96,5 +96,5 @@ function monoBurntTrail(S, R) {
 function monoTailJet(S, R) {
   if (S.stage !== 'run' || !['charge', 'return_charge', 'horn_dance', 'lance'].includes(S.tech)) { S.jetT = null; return; }
   S.jetT ??= S.t; const B = S.B, u = fromA(S.angle), age = S.t - S.jetT, burst = 1 + 0.5 * (1 - smooth(0, 0.18, age));
-  canisJetStream(R, add(B.pos, mul(u, -B.r * 0.95)), S.angle + Math.PI, B.r * 2.6 * burst * R.P.size, 1.1 * burst, age + 0.3, Infinity, Math.min(1, R.P.intensity), 77);
+  canisJetStream(R, add(B.pos, mul(u, -B.r * 0.95)), S.angle + Math.PI, B.r * 2.6 * burst * R.P.size * (R.P.tailJet ?? 1), 1.1 * burst * (R.P.tailJetWidth ?? 1), age + 0.3, Infinity, Math.min(1, R.P.intensity), 77); // 長さ・太さはつまみ
 }
