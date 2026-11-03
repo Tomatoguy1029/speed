@@ -139,45 +139,39 @@ function drawPhxShadow(at, angle, scale, blurPx, alpha) {
   g.save(); g.translate(at.x, at.y); g.rotate(angle); g.filter = `blur(${blurPx.toFixed(1)}px)`; g.globalAlpha = alpha; g.globalCompositeOperation = 'source-over';
   g.drawImage(c, -c.width * s / 2, -c.height * s / 2, c.width * s, c.height * s); g.restore();
 }
-// 炎と煙の粒を丸く描かない：pixelFX の FIRE／SMOKE の描き方（色・明るさ・寿命の段階）はそのままに、
-// 円を重ねる代わりに、粒ごとの乱数で縁をぎざぎざに削り、動く向きと上へ伸ばして先をとがらせた形で塗る。燃え尽きる前は虫食い状に崩れる
-function phxBlob(p, cx, cy, r, c, a, q, opaque, erode) {
-  if (r < 0.6) return opaque ? p.px(cx, cy, c) : p.blend(cx, cy, c, a);
-  let ux = q.vx * 0.012, uy = q.vy * 0.012 - 1; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul; // 上へ、勢いがあればその向きへ
-  const st = 0.45 + Math.min(0.5, Math.hypot(q.vx, q.vy) * 0.004), R2 = r * (1 + st);
-  p.each(cx - R2, cy - R2, cx + R2, cy + R2, (x, y, sx, sy) => {
-    const dx = x - cx, dy = y - cy, al = dx * ux + dy * uy, ac = -dx * uy + dy * ux, fw = al > 0 ? al / (1 + st) : al;
-    const acw = ac * (1 + Math.max(0, fw / r) * 0.9); // 先ほど細く
-    const d = Math.hypot(acw, fw) / r; if (d > 1.15) return;
-    const an = Math.atan2(ac, al), sec = an * 1.6 + q.seed, i0 = Math.floor(sec), f = sec - i0, edge = 0.72 + 0.4 * lerp(hash(i0 + q.seed * 3.1), hash(i0 + 1 + q.seed * 3.1), f * f * (3 - 2 * f));
-    const cell = hash(Math.round(dx) * 7.13 + Math.round(dy) * 3.71 + q.seed * 11.3);
-    if (d > edge - 0.08 * cell) return;
-    if (erode > 0 && cell < erode * (0.6 + d)) return;
-    opaque ? p.put(sx, sy, c, 1) : p.blendPx(sx, sy, c, a);
-  });
+// 炎と煙は粒を1つずつ描かない：現行のピクセル炎（scripts/render/fx/pixel_fire.gd＋pixel_fire_density/shape.gdshader）と同じ作りで、
+// 粒を外炎・内炎・芯の3つの密度場へ足し込み（芯ほど小さく短命）、場を時間でゆがめて読み、しきい値で切って3色の面で塗る。粒どうしがつながって1つの炎になる。
+// 粒の動きは pixelFX の爆発のまま。色はプレイヤーのギアアップの炎（橙〜金）と分けて、鳳凰の紅〜深紅にする。
+const PHX_FIELD = { pad: 6, threshold: 0.32, deformation: 1.4, fps: 30 };
+const PHX_FLAME_COLS = { outer: ['#e8333f', '#7a1430'], inner: ['#ff7a3a', '#c42340'], core: ['#fff1c4', '#ff9a3a'] };
+function phxSplat(field, W, H, ox, oy, x, y, r, ch) { // pixel_fire_density.gdshader：exp(-d²×3.2)、縁で0へ
+  if (r < 0.3) return; const x0 = Math.max(0, Math.floor(x - r - ox)), x1 = Math.min(W - 1, Math.ceil(x + r - ox)), y0 = Math.max(0, Math.floor(y - r - oy)), y1 = Math.min(H - 1, Math.ceil(y + r - oy));
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const dx = (i + ox + 0.5 - x) / r, dy = (j + oy + 0.5 - y) / r, d2 = dx * dx + dy * dy; if (d2 >= 1) continue; const d = Math.sqrt(d2); field[(j * W + i) * 3 + ch] += Math.exp(-d2 * 3.2) * (1 - smooth(0.72, 1, d)); }
 }
-function phxDrawParticles(ps, p, layer) {
+function phxDrawParticles(ps, p, layer, time, burstAge) {
   const own = [], rest = [];
   for (const q of ps.list) (q.k === PX.P.FIRE || q.k === PX.P.SMOKE ? own : rest).push(q);
   const keep = ps.list; ps.list = rest; try { ps.draw(p, layer); } finally { ps.list = keep; }
-  for (const q of own) {
-    if (q.delay > 0) continue; const isSmoke = q.k === PX.P.SMOKE; if ((isSmoke || q.flag & PX.PF.BACK ? 'back' : 'front') !== layer) continue;
-    const k = q.life / q.max, age = 1 - k, x = q.x, y = q.y;
-    if (!isSmoke) { // pixelFX の FIRE と同じ冷え方：暗い縁、明るい芯、上の舌
-      const F = PX.FIRE_RAMP, n = F.length, heat = Math.min(0.999, Math.pow(age, 0.62) + (q.seed % 1) * 0.1), idx = Math.min(n - 2, Math.floor(heat * (n - 1)));
-      const r = q.size * (0.55 + 0.45 * Math.min(1, age * 7)) * (1 - age * 0.55), c = F[idx], er = Math.max(0, (age - 0.55) / 0.45);
-      if (idx >= n - 2) { phxBlob(p, x, y, r, c, Math.min(1, k * 3) * 0.85, q, false, er); continue; }
-      phxBlob(p, x, y, r, F[Math.min(n - 1, idx + 2)], 1, q, true, er);
-      phxBlob(p, x - r * 0.12, y - r * 0.2, r * 0.74, c, 1, { ...q, seed: q.seed + 17 }, true, er * 0.8);
-      if (idx <= 3 && r > 1.8) phxBlob(p, x - r * 0.2, y - r * 0.32, r * 0.38, F[Math.max(0, idx - 1)], 1, { ...q, seed: q.seed + 41 }, true, 0);
-      if (idx < 6) p.glow(x, y, r * 2.4 + 2, c, 0.18 * k);
-    } else { // pixelFX の SMOKE と同じ色と濃さ（体・低い芯・若いうちの明るい頂）
-      const big = q.flag & PX.PF.BIG, r = q.size * (0.65 + Math.min(1, age * 2.5) * 0.45 + age * (big ? 0.5 : 0.4)), a = Math.min(1, age * 12) * Math.min(1, k * 2.4) * (big ? 0.7 : 0.58);
-      const SR = PX.SMOKE_RAMP, at = (t) => SR[Math.min(SR.length - 1, Math.max(0, Math.floor(t * SR.length)))], c = q.col ? PX.mix(q.col, at(age), age) : at(age * 1.05), er = Math.max(0, (age - 0.6) / 0.4) * 0.7;
-      phxBlob(p, x, y, r, c, a * 0.45, q, false, er);
-      phxBlob(p, x + r * 0.05, y + r * 0.06, r * 0.74, c, a * 0.62, { ...q, seed: q.seed + 23 }, false, er);
-      if (age < 0.5) phxBlob(p, x - r * 0.22, y - r * 0.3, r * 0.5, PX.mix(c, PX.WHITE, 0.12), a * 0.4 * (1 - age * 2), { ...q, seed: q.seed + 5 }, false, 0);
-    }
+  const want = layer === 'back' ? PX.P.SMOKE : PX.P.FIRE, list = own.filter(q => q.delay <= 0 && q.k === want); if (!list.length) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const q of list) { const r = q.size * 2; x0 = Math.min(x0, q.x - r); y0 = Math.min(y0, q.y - r); x1 = Math.max(x1, q.x + r); y1 = Math.max(y1, q.y + r); }
+  const pad = PHX_FIELD.pad, ox = Math.floor(x0) - pad, oy = Math.floor(y0) - pad, W = Math.ceil(x1) - ox + pad, H = Math.ceil(y1) - oy + pad, field = new Float32Array(W * H * 3);
+  for (const q of list) { const age = 1 - q.life / q.max;
+    if (want === PX.P.FIRE) { const base = q.size * 1.25 * Math.pow(1 - age, 0.6) * (0.7 + 0.3 * smooth(0, 0.08, age)); // pixel_fire.gd の大きさの変化
+      phxSplat(field, W, H, ox, oy, q.x, q.y, base, 0); if (age < 0.62) phxSplat(field, W, H, ox, oy, q.x, q.y - base * 0.1, base * 0.7, 1); if (age < 0.3) phxSplat(field, W, H, ox, oy, q.x, q.y - base * 0.15, base * 0.44, 2); }
+    else { const big = q.flag & PX.PF.BIG, r = q.size * (0.65 + Math.min(1, age * 2.5) * 0.45 + age * (big ? 0.5 : 0.4)) * 1.2; phxSplat(field, W, H, ox, oy, q.x, q.y, r, 0); if (age < 0.5) phxSplat(field, W, H, ox, oy, q.x, q.y, r * 0.6, 1); } }
+  const clock = Math.floor(time * PHX_FIELD.fps) / PHX_FIELD.fps, def = PHX_FIELD.deformation, th = PHX_FIELD.threshold;
+  const read = (i, j, ch) => { i = Math.max(0, Math.min(W - 1, Math.round(i))); j = Math.max(0, Math.min(H - 1, Math.round(j))); return field[(j * W + i) * 3 + ch]; };
+  const cool = clamp(burstAge / 1.3);
+  const cOuter = PX.mix(hexc(PHX_FLAME_COLS.outer[0]), hexc(PHX_FLAME_COLS.outer[1]), cool), cInner = PX.mix(hexc(PHX_FLAME_COLS.inner[0]), hexc(PHX_FLAME_COLS.inner[1]), cool), cCore = PX.mix(hexc(PHX_FLAME_COLS.core[0]), hexc(PHX_FLAME_COLS.core[1]), cool);
+  const SR = PX.SMOKE_RAMP;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const wx = (i + ox) * LP, wy = (j + oy) * LP; // 画面px でゆがみを計る（pixel_fire_shape.gdshader と同じ式）
+    const u = (Math.sin(wy * 0.075 - clock * 4.4) + Math.sin(wx * 0.11 + wy * 0.033 + clock * 2.1)) * def, v = Math.cos(wx * 0.08 + clock * 3.0) * 0.55 * def;
+    const r0 = read(i + u, j + v, 0); if (r0 < th) continue;
+    const x = i + ox, y = j + oy;
+    if (want === PX.P.FIRE) { const g1 = read(i + u, j + v, 1) >= th, b1 = g1 && read(i + u, j + v, 2) >= th; const c = b1 ? cCore : g1 ? cInner : cOuter; p.px(x, y, c); if ((x & 3) === 0 && (y & 3) === 0) p.glow(x, y, 5, c, b1 ? 0.3 : g1 ? 0.18 : 0.08); } // 光はやわらかく間引いて置く（縞にしない）
+    else { const young = read(i + u, j + v, 1) >= th; p.blend(x, y, young ? SR[1] : SR[Math.min(SR.length - 1, 3)], young ? 0.55 : 0.4); }
   }
 }
 function withPhxRamp(fn) { const F = PX.FIRE_RAMP, saved = F.slice(); F.splice(0, F.length, ...PHX_FIRE.map(hexc)); try { fn(); } finally { F.splice(0, F.length, ...saved); } }
@@ -253,10 +247,10 @@ DEMOS.push({
     }
     // 着地のあと：焦げ跡と燃え残り（背面）、煙
     if (S.flame) { const t = S.t - S.flame.t0, Lf = toL(S.flame.pos); R.back.place(Lf.x, Lf.y); phxScorch(R.back, S.flame.r * WL * 0.85 * P.size, t / P.timing, 1 - smooth(2.4, 3.2, t / P.timing)); R.back.place(0, 0); }
-    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.back.place(Lf.x, Lf.y); withPhxRamp(() => { phxDrawParticles(S.fx.ps, R.back, 'back'); S.fx.blazes.drawBack(R.back); }); R.back.place(0, 0); }
+    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.back.place(Lf.x, Lf.y); withPhxRamp(() => { phxDrawParticles(S.fx.ps, R.back, 'back', S.t, S.flame ? S.t - S.flame.t0 : 0); S.fx.blazes.drawBack(R.back); }); R.back.place(0, 0); }
     R.blitBack();
     drawEnemy(e); drawShip(S.ship);
-    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.front.place(Lf.x, Lf.y); withPhxRamp(() => phxDrawParticles(S.fx.ps, R.front, 'front'));
+    if (S.flame || e.mode === 'DASH') { const Lf = toL(anchor); R.front.place(Lf.x, Lf.y); withPhxRamp(() => phxDrawParticles(S.fx.ps, R.front, 'front', S.t, S.flame ? S.t - S.flame.t0 : 0));
       if (S.flame) { const t = S.t - S.flame.t0; if (t < 0.12) { R.front.glow(0, 0, r * 1.3, hexc('#fff1c4'), (1 - t / 0.12) * P.intensity); R.front.glow(0, 0, r * 0.6, hexc('#ffffff'), (1 - t / 0.12) * 0.8 * P.intensity); } if (t < 0.8) R.front.glow(0, 0, r * 1.1, hexc('#ff6a3a'), 0.35 * (1 - t / 0.8) * P.intensity); }
       R.front.place(0, 0); }
     if (P.playerRef && S.flame) drawPlayerBlastRef(S, R, add(S.flame.pos, V(-460, 40)), S.flame.t0);
