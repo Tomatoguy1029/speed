@@ -45,21 +45,16 @@ function monoChargePose(S, edits) {
     edits[path + '/Foot'].position = add(foot.position, V(0, -prepare * 7 + release * 3));
   }
 }
+// 角の衝撃波：角は光なので、衝撃も光で見せる。先頭は細く明るい白金の帯（両端はとがり、太さはノイズで揺らぐ）、その後ろに外へ押し出される
+// 短い光の筋が長さ・明るさばらばらに並ぶ。消えるときは虫食い状に崩れる。判定の弧の範囲と広がる速さは現行のまま
 function monoPressureWave(S, R, wave, radius) {
-  const center = toL(wave.center), half = S.r.wave_half_angle, r = radius * WL;
-  const fade = 1 - smooth(S.r.wave_max * 0.45, S.r.wave_max, radius), width = Math.max(2.2, S.r.wave_width * WL * 1.05) * R.P.size;
-  const p = R.front, dust = PIXELFX.fx['src/fx/impacts/_lib.js'].dustRing;
-  p.place(center.x, center.y, false, wave.a);
-  // pixelFX の柔らかい圧力環を前方だけに使う。面の内側を透かし、両端は空気へほどく。
-  const pressure = { blend(x, y, color, alpha) {
-    const edge = 1 - smooth(half * 0.55, half, Math.abs(Math.atan2(y, x)));
-    if (edge > 0) p.blend(x, y, color, alpha * edge);
-  } };
-  const phase = wave.t * 7.3 + (S.t - wave.t) * 2.1;
-  dust(pressure, 0, 0, Math.max(1, r - width * 1.8), width * 2.1, fade * 0.17, hexc('#b7b9a6'), { ph: phase + 1.3, brk: 0.38, lit: 0.1 });
-  dust(pressure, 0, 0, r, width, fade * 0.78, hexc('#e9dfbc'), { ph: phase, brk: (1 - fade) * 0.3, lit: 0.22 });
-  p.place(0, 0);
-  if (wave.air) { p.place(LW / 2 - cam.x * WL, LH / 2 - cam.y * WL); wave.air.draw(p); p.place(0, 0); }
+  const L = toL(wave.center), half = S.r.wave_half_angle, r = radius * WL, fade = 1 - smooth(S.r.wave_max * 0.45, S.r.wave_max, radius), H = MONO_GOLD.map(hexc), p = R.front;
+  const a0 = wave.a - half, a1 = wave.a + half, w = Math.max(1.2, S.r.wave_width * WL * 0.45) * R.P.size, n = Math.max(16, Math.round((a1 - a0) * r * 1.5)), gone = 1 - fade;
+  for (let i = 0; i <= n; i++) { const u = i / n, an = a0 + (a1 - a0) * u, tp = Math.pow(Math.min(1, Math.min(u, 1 - u) / 0.2), 0.8), nz = 0.6 + 0.4 * Math.sin(an * 17 + wave.t * 5) * Math.sin(an * 7 - S.t * 3), ww = w * tp * nz, c = Math.cos(an), sn = Math.sin(an);
+    for (let q = -ww; q <= ww; q += 0.5) { const x = L.x + c * (r + q), y = L.y + sn * (r + q); if (gone > 0 && hash(Math.round(x) * 12.9898 + Math.round(y) * 78.233) < gone * 0.9) continue; const e = q / Math.max(ww, 0.01); p.dot(x, y, e > 0.3 ? H[0] : e > -0.3 ? H[2] : H[4], Math.max(0.15, fade)); }
+    if (i % 4 === 0) p.light(L.x + c * r, L.y + sn * r, H[3], 0.35 * fade); }
+  for (let i = 0; i < 38; i++) { const an = a0 + (a1 - a0) * (0.08 + 0.84 * hash(i * 3.7 + wave.t)), len = (3 + 9 * hash(i * 5.1)) * R.P.size, back = (2 + 10 * hash(i * 7.3)) * R.P.size, br = hash(i * 9.9); if (hash(i + Math.floor(S.t * 20)) < gone) continue; // 外へ押し出される光の筋
+    const c = Math.cos(an), sn = Math.sin(an), r0 = r - back - len, r1 = r - back; p.line(L.x + c * r0, L.y + sn * r0, L.x + c * r1, L.y + sn * r1, (t) => t > 0.7 ? H[br > 0.5 ? 0 : 1] : H[3], (t) => Math.max(0.15, fade * (0.3 + 0.7 * t))); }
 }
 function monoWaveAir(S, dt) {
   if (mode !== 'proto' || S.tech !== 'horn_wave' || dt <= 0) return;
