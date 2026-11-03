@@ -97,9 +97,10 @@ DEMOS.push({
 
 // ---------- じょうぎ座（ruler）
 DEMOS.push({
-  id: 'G12-ruler', ids: ['G12'], cat: G12, group: 'じょうぎ座（ruler）', title: '分離→挟み込み→光の壁', duration: 7.4, color: '#9fd0ff', cam: { x: 0, y: -160 },
+  id: 'G12-ruler', ids: ['G12'], cat: G12, group: 'じょうぎ座（ruler）', title: '分離→挟み込み→光の壁', duration: 7.4, color: '#ffd27a', cam: { x: 0, y: -160 },
   refs: ['scripts/enemies/ruler.gd（split_delay 0.4・deploy 0.5・telegraph 0.6・壁 beam_time 5.0・beam_start_gap 80・half_gap 190・emit_back 520）', 'render/enemies/ruler.gd（点線の予告）・render/attacks/wall.gd RAY（光の柱）', 'assets/pixel/ruler/ruler_top_*・ruler_bottom_*（上下の現行画像）', 'marlin_warning.gdshader、pixelFX arcane-beam.js'],
-  status: { '状態': '試作のみ', '判定': '変更なし（幅26・長さ2600、壁は機体の移動を止める）' },
+  params: [{ k: 'muzzle', label: '試作：発射口の位置(体の縁からの距離)', type: 'range', min: 0, max: 120, step: 2, def: 6 }],
+  status: { '状態': '試作のみ', '判定': '変更なし（幅26・長さ2600、壁は機体の移動を止める）', '発射口': '溜めの光とビームの根元を体の縁に寄せた（距離はつまみ）。本番の当たりは beam_start_gap（80）だけ先から始まるので、見た目に合わせるには移行後に数値の変更が要る', '色': '南十字と同じ黄色' },
   setup(S) { S.ship = shipState(V(0, 60)); S.a = mkE('ruler', V(-80, -420), Math.PI / 2); S.b = null; },
   step(S, dt) {
     const p = prm('ruler');
@@ -115,7 +116,7 @@ DEMOS.push({
   phase(S) { if (!S.b) return '出現（分離前）'; const m = S.a.mode; return m === 'DASH' ? '展開（挟む位置へ）' : m === 'WINDUP' ? PH.WINDUP : m === 'RECOVER' ? PH.DASH + '（光の壁）' : PH.RECOVER; },
   draw(S, R) {
     const P = R.P, p = prm('ruler'), d0 = enemyDef('ruler').look;
-    const origin = (h) => add(h.pos, mul(fromA(h.facing), h.r + p.beam_width * 0.5 + p.beam_start_gap));
+    const origin = (h) => add(h.pos, mul(fromA(h.facing), R.proto ? h.r * 0.85 + (P.muzzle ?? 6) : h.r + p.beam_width * 0.5 + p.beam_start_gap)); // 試作は体の縁から出す
     const hs = S.b ? [S.a, S.b] : [];
     for (const h of hs) {
       const o = origin(h), u = fromA(h.facing), b = add(o, mul(u, p.beam_len)), col = ecol('ruler', 0.2), c0 = ecol('ruler');
