@@ -3,8 +3,9 @@
 DEMOS.push({
   id: 'G12-corona', ids: ['G12'], cat: G12, group: 'みなみのかんむり座（corona）', title: '渦で捕まえた雑魚を投げる', duration: 4.2, color: '#ff3b3b', cam: { x: -60, y: 0 },
   refs: ['scripts/enemies/corona.gd・corona_vortex.gd（ring 100・spin 4.8・telegraph 0.3・throw_speed 620・throw_life 1.6・throw_effect_scale 1.6・機体の方を向く個体を投げる）', 'corona_vortex.gd draw（渦の弧・選択の脈動・投擲の三角の尾）', 'pixelFX painter.arc・sparks'],
-  status: { '状態': '試作のみ', '判定': '変更なし（投擲の頭の半径＝敵半径×1.6、1投1回）', '簡略': '捕捉の吸い込み・抽選の重みは省略し、渦に保持済みの8体（swarm）から順に投げる' },
-  setup(S) { S.e = mkE('corona', V(-260, -30), 0); S.ship = shipState(V(260, 60)); S.m = []; for (let i = 0; i < 8; i++) S.m.push({ a: i * TAU / 8, rad: 100 * (0.85 + 0.3 * hash(i)), type: 'swarm', r: enemyR('swarm'), thrown: false }); S.sel = null; S.next = 0.3; },
+  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし（投擲の頭の半径＝敵半径×1.6、1投1回）', '図形': '円・輪・三角は使わない。渦は流れる粒、選ばれた個体は流れ込む光の粒と絵の明滅、投げた弾は回る絵・残像・火花の尾', '捕まえる敵': '本番で投げる対象のうち今の絵がある、かみつき・分裂の子・猟犬', '簡略': '捕捉の吸い込み・抽選の重みは省略し、渦に保持済みの8体から順に投げる' },
+  // 渦の個体は、本番で投げる対象のうち今の絵がある種類（かみつき・分裂の子・猟犬）
+  setup(S) { S.e = mkE('corona', V(-260, -30), 0); S.ship = shipState(V(260, 60)); S.m = []; const kinds = ['biter', 'splitling', 'hound']; for (let i = 0; i < 8; i++) { const type = kinds[i % 3]; S.m.push({ a: i * TAU / 8, rad: 100 * (0.85 + 0.3 * hash(i)), type, r: enemyR(type), thrown: false, spin0: hash(i * 5) * TAU }); } S.sel = null; S.next = 0.3; },
   step(S, dt) {
     const e = S.e, p = prm('corona'); e.pos = add(e.pos, mul(norm(sub(S.ship.pos, e.pos)), enemyDef('corona').speed * dt));
     for (const m of S.m) if (!m.thrown) { m.a += p.spin * dt; m.pos = add(e.pos, mul(fromA(m.a), m.rad)); m.facing = m.a + Math.PI / 2; m.vel = mul(fromA(m.a + Math.PI / 2), p.spin * m.rad); }
@@ -16,17 +17,27 @@ DEMOS.push({
   draw(S, R) {
     const e = S.e, P = R.P, p = prm('corona'), ATT = '#ff3b3b', CORE = '#ffb36b';
     if (!R.proto) { for (let k = 0; k < 3; k++) { const a = S.t * p.spin + k * TAU / 3; D2.arc(e.pos, p.ring * (0.72 + k * 0.14), a, a + 1.8, 'rgba(182,162,219,.3)', 3); } if (S.sel) D2.arc(e.pos, e.r * 1.2, -Math.PI / 2, -Math.PI / 2 + Math.max(0.02, e.charge) * TAU, ATT, 4); }
-    else { const L = toL(e.pos), pal = FX.ramp('#b6a2db'); for (let i = 0; i < 70; i++) { const rr = p.ring * WL * (0.55 + 0.6 * hash(i)), a0 = S.t * p.spin * (0.8 + 0.4 * hash(i + 9)) + hash(i * 3) * TAU; for (let s = 0; s < 4; s++) R.back.dot(L.x + Math.cos(a0 - s * 0.08) * rr, L.y + Math.sin(a0 - s * 0.08) * rr, pal[s < 1 ? 3 : 2], 0.55 - 0.12 * s); } if (S.sel) R.back.arc(L.x, L.y, e.r * WL * 1.25, 1, -Math.PI / 2, -Math.PI / 2 + e.charge * TAU, hexc(P.color), 0.9); R.blitBack(); }
+    else { const L = toL(e.pos), pal = FX.ramp('#b6a2db'); for (let i = 0; i < 70; i++) { const rr = p.ring * WL * (0.55 + 0.6 * hash(i)), a0 = S.t * p.spin * (0.8 + 0.4 * hash(i + 9)) + hash(i * 3) * TAU; for (let s = 0; s < 4; s++) R.back.dot(L.x + Math.cos(a0 - s * 0.08) * rr, L.y + Math.sin(a0 - s * 0.08) * rr, pal[s < 1 ? 3 : 2], 0.55 - 0.12 * s); } R.blitBack(); } // 渦は流れる粒だけ（輪は描かない）
     drawEnemy(e);
-    for (const m of S.m) { if (m.thrown && S.t - m.t0 >= p.throw_life) continue; drawEnemy({ type: 'swarm', pos: m.pos, facing: m.facing, r: m.r });
-      const r = m.r * p.throw_effect_scale;
-      if (m.thrown) { const u = norm(m.v), sd = mul(orth(u), r);
-        if (!R.proto) { D2.poly([add(m.pos, sd), sub(m.pos, mul(u, r * 4.5)), sub(m.pos, sd)], 'rgba(255,59,59,.35)'); D2.circle(m.pos, r, 'rgba(255,59,59,.15)'); D2.arc(m.pos, r, 0, TAU, ATT, 3); D2.arc(m.pos, r * 1.08, angOf(u) - 1.2, angOf(u) + 1.2, CORE, 3); }
-        else { const L = toL(m.pos), pal = FX.ramp(P.color); for (let s = 0; s < 18; s++) { const q = sub(m.pos, mul(u, s * r * 0.3)), Q = toL(q), w = r * WL * (1 - s / 18); for (let j = -w; j <= w; j += 0.7) R.front.dot(Q.x - u.y * j, Q.y + u.x * j, pal[s < 3 ? 4 : s < 8 ? 3 : 2], (1 - s / 18) * Math.min(1, P.intensity)); } R.front.arc(L.x, L.y, r * WL * 1.05, 1.5, angOf(u) - 1.3, angOf(u) + 1.3, pal[4], 1); R.front.glow(L.x, L.y, r * WL * 2, pal[2], 0.5 * P.intensity); FXW.sparks(R.front, m.pos, (S.t - m.t0) % 0.25, Math.floor((S.t - m.t0) / 0.25) + m.a, 4, P.color, 30, 0.25, angOf(u) + Math.PI, 0.6); }
-      } else if (S.sel === m) { const pulse = 0.65 + 0.35 * Math.sin(S.t * 18);
-        if (!R.proto) { D2.arc(m.pos, r, 0, TAU, `rgba(255,59,59,${pulse})`, 3); D2.line(e.pos, m.pos, 'rgba(255,59,59,.35)', 2); }
-        else { const L = toL(m.pos), pal = FX.ramp(P.color), k = e.charge; R.front.ring(L.x, L.y, r * WL * (1.6 - 0.6 * k), 1, pal[3], 0.5 + 0.5 * k); for (let q = 0; q < 4; q++) { const a = q * Math.PI / 2 + S.t * 3; R.front.dot(L.x + Math.cos(a) * r * WL * (1.6 - 0.6 * k), L.y + Math.sin(a) * r * WL * (1.6 - 0.6 * k), pal[4]); } R.front.glow(L.x, L.y, r * WL * 1.5, pal[2], 0.35 * k * P.intensity); }
-      }
+    for (const m of S.m) { if (m.thrown && S.t - m.t0 >= p.throw_life) continue; const r = m.r * p.throw_effect_scale;
+      if (!R.proto) { drawEnemy({ type: m.type, pos: m.pos, facing: m.facing, r: m.r });
+        if (m.thrown) { const u = norm(m.v), sd = mul(orth(u), r); D2.poly([add(m.pos, sd), sub(m.pos, mul(u, r * 4.5)), sub(m.pos, sd)], 'rgba(255,59,59,.35)'); D2.circle(m.pos, r, 'rgba(255,59,59,.15)'); D2.arc(m.pos, r, 0, TAU, ATT, 3); D2.arc(m.pos, r * 1.08, angOf(u) - 1.2, angOf(u) + 1.2, CORE, 3); }
+        else if (S.sel === m) { const pulse = 0.65 + 0.35 * Math.sin(S.t * 18); D2.arc(m.pos, r, 0, TAU, `rgba(255,59,59,${pulse})`, 3); D2.line(e.pos, m.pos, 'rgba(255,59,59,.35)', 2); }
+        continue; }
+      const pal = FX.ramp(P.color);
+      if (m.thrown) { // 投げた弾：本物の絵が回りながら飛び、絵の残像と流れる火花の尾を引く（円や三角は描かない）
+        const age = S.t - m.t0, u = norm(m.v), spin = m.spin0 + age * 14, fade = 1 - smooth(p.throw_life - 0.25, p.throw_life, age);
+        for (let g2 = 5; g2 >= 1; g2--) { const back = g2 * 0.022; if (age < back) continue; drawEnemy({ type: m.type, pos: sub(m.pos, mul(m.v, back)), facing: spin - g2 * 0.3, r: m.r }, { alpha: 0.42 * (1 - g2 / 6) * fade, white: 0.55 }); }
+        PX.cycle(age, 0.3, 24, 41 + m.a * 10, (rg) => rg.range(0.15, 0.3), (ag, life, rg) => { const k = ag / life, back = rg.range(0, 0.04), q = sub(m.pos, mul(m.v, back + ag * 0.6)), off = mul(orth(u), rg.range(-1, 1) * r * 0.7 * (0.4 + k)), Q = toL(add(q, off)), tl = 2 + 3 * (1 - k);
+          R.front.line(Q.x + u.x * tl, Q.y + u.y * tl, Q.x, Q.y, (w) => w < 0.5 ? pal[2] : k < 0.4 ? pal[4] : pal[3], (1 - k) * fade); });
+        const L = toL(m.pos); R.front.glow(L.x, L.y, r * WL * 1.6, pal[2], 0.45 * fade * P.intensity); R.front.glow(L.x, L.y, r * WL * 0.7, pal[4], 0.35 * fade * P.intensity);
+        drawEnemy({ type: m.type, pos: m.pos, facing: spin, r: m.r }, { alpha: fade, white: 0.25 + 0.2 * Math.sin(age * 40) });
+      } else if (S.sel === m) { // 選ばれた個体：本体から光の粒が流れ込み、絵そのものが明滅する
+        const k = e.charge, A = toL(e.pos), B = toL(m.pos);
+        for (let i = 0; i < 14; i++) { const f = ((hash(i * 3.1) + S.t * 2.6) % 1), w = (hash(i * 7.7) - 0.5) * 10 * Math.sin(Math.PI * f), x = lerp(A.x, B.x, f) - (B.y - A.y) / (dist(A, B) || 1) * w, y = lerp(A.y, B.y, f) + (B.x - A.x) / (dist(A, B) || 1) * w; R.front.dot(x, y, f > 0.7 ? pal[4] : pal[3], k * (0.4 + 0.6 * f)); }
+        R.front.glow(B.x, B.y, r * WL * 1.4, pal[2], 0.4 * k * P.intensity);
+        drawEnemy({ type: m.type, pos: m.pos, facing: m.facing, r: m.r }, { white: k * (0.35 + 0.35 * Math.sin(S.t * 30)) });
+      } else drawEnemy({ type: m.type, pos: m.pos, facing: m.facing, r: m.r });
     }
     drawShip(S.ship);
   },
