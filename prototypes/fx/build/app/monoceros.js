@@ -1,4 +1,5 @@
 // ===== いっかくじゅう：現行8技の手続き型の動き、パーツ、歩きコマ =====
+const MONO_BOOST_DEFAULTS = { tailJet: 1, tailJetResponse: 0.30, tailJetWidth: 2.50, tailOuterColor: '#6f0bb1', tailJetColor: '#c20098', tailCoreColor: '#ffb8e6' };
 const MONO = BOSSES.monoceros, MONO_LEGS = ['FrontLeftLeg', 'FrontRightLeg', 'RearLeftLeg', 'RearRightLeg'];
 function monoHornLength(B) { return B.r * (B.phase > 1 ? MONO.def.params.horn_length_ratio_p2 : MONO.def.params.horn_length_ratio); }
 const monoTip = S => add(S.B.pos, mul(fromA(S.angle), monoHornLength(S.B)));
@@ -138,9 +139,17 @@ function monoDraw(S, R) {
 for (const id of Object.keys(MONO.moves)) {
   const ids = id === 'horn_wave' ? ['I02', 'I04'] : id === 'horn_dance' ? ['I01', 'I04', 'I05'] : ['I01', 'I03', 'I04'];
   DEMOS.push({ id: 'I-' + id, ids, cat: 'いっかくじゅう座（I）', group: 'いっかくじゅう座', title: MONO.moves[id].display_name, duration: id === 'horn_dance' ? 16 : id === 'return_charge' ? 10 : 6, color: '#ffd27a',
-    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'tailJet', label: 'ブースト：長さ', type: 'range', min: 0, max: 4, step: 0.05, def: 1 }, { k: 'tailJetResponse', label: 'ブースト：伸びる速さ', type: 'range', min: 0.1, max: 4, step: 0.05, def: 1 }, { k: 'tailJetWidth', label: 'ブースト：太さ', type: 'range', min: 0.05, max: 4, step: 0.01, def: 1 }, { k: 'tailOuterColor', label: 'ブースト：外側の色', type: 'color', def: '#245c96' }, { k: 'tailJetColor', label: 'ブースト：内側の色', type: 'color', def: '#61c9ff' }, { k: 'tailCoreColor', label: 'ブースト：芯の色', type: 'color', def: '#e0fbff' }, { k: 'hornBright', label: '第2形態の角の明るさ', type: 'range', min: 0, max: 1.5, step: 0.01, def: 0.8 }],
+    params: [{ k: 'phase', label: '形態（1／2）', type: 'range', min: 1, max: 2, step: 1, def: 1 }, { k: 'tailJet', label: 'ブースト：長さ', type: 'range', min: 0, max: 4, step: 0.05, def: MONO_BOOST_DEFAULTS.tailJet }, { k: 'tailJetResponse', label: 'ブースト：伸びる速さ', type: 'range', min: 0.1, max: 4, step: 0.05, def: MONO_BOOST_DEFAULTS.tailJetResponse }, { k: 'tailJetWidth', label: 'ブースト：太さ', type: 'range', min: 0.05, max: 4, step: 0.01, def: MONO_BOOST_DEFAULTS.tailJetWidth }, { k: 'tailOuterColor', label: 'ブースト：外側の色', type: 'color', def: MONO_BOOST_DEFAULTS.tailOuterColor }, { k: 'tailJetColor', label: 'ブースト：内側の色', type: 'color', def: MONO_BOOST_DEFAULTS.tailJetColor }, { k: 'tailCoreColor', label: 'ブースト：芯の色', type: 'color', def: MONO_BOOST_DEFAULTS.tailCoreColor }, { k: 'hornBright', label: '第2形態の角の明るさ', type: 'range', min: 0, max: 1.5, step: 0.01, def: 0.8 }],
     status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '現行表示': '現行の8技の段階・時刻・距離、歩きコマ、角の15コマと伸び、首・胴・尾の旋回を移植。照明は焼込みで近似', '試作': '角と槍は現行の見た目を保つ。尾のブーストは承認した直進版。長さ・伸びる速さ・太さ・外側/内側/芯の色を右パネルで調整できる。突進は足を踏ん張り、頭を引いて止める動きで予告。衝撃波はpixelFXの圧力の面を使用。後ろ蹴りは脚の一周回転と過度な伸びを廃止。乱舞には燃え跡を残す', '本番との違い': id === 'horn_dance' ? '試作だけ、体全体が見える範囲へ移動を制限し、カメラを固定。移行後に本番の移動範囲の変更が要る。乱舞の自然選択条件は変更せず単独再生する' : '障害物のない比較場面。地形への角刺さり・共通AIの技選択は再現対象外。攻撃の数値・軌道は不変更' },
     refs: ['scenes/bosses/monoceros_parts.tscn・monoceros_presentation.tscn', 'data/visuals/monoceros_gait.tres・assets/pixel/monoceros/horn/horn.tres', 'scripts/bosses/monoceros_presentation.gd・monoceros_parts.gd', 'data/bosses/monoceros_moves/' + id + '.tres・scripts/bosses/monoceros/techniques/' + id + '.gd', 'pixelFX impacts/_lib.js の dustRing・core/sim.js の VAPOUR（角の衝撃波）'],
     setup(S) { monoSetup(S, id); }, step: monoStep, draw: monoDraw, phase(S) { return bossPhase(S.B); }
   });
 }
+// 本人が指定した共通設定を、保存済みの全技にも一度だけ反映する。
+try {
+  const key = 'speed-fx-mono-boost-preset', preset = 'purple-pink-v1';
+  if (localStorage.getItem(key) !== preset) {
+    for (const id of Object.keys(MONO.moves)) Object.assign(PARAMS['I-' + id] ||= {}, MONO_BOOST_DEFAULTS);
+    saveParams(); localStorage.setItem(key, preset);
+  }
+} catch (e) { }
