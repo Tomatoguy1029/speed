@@ -140,6 +140,9 @@ func _package_loading() -> void:
 		push_error("P04は描画付きの配布版で確認してください")
 		quit(1)
 		return
+	if not await _package_startup():
+		quit(1)
+		return
 	if "--loading-boss-only" in OS.get_cmdline_user_args():
 		var path := "res://.content/run/stage_1.json"
 		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -202,6 +205,14 @@ func _package_loading() -> void:
 
 func _package_measure(label: String, values: Dictionary) -> void:
 	print("[package_loading_measure] "+JSON.stringify({"case":label,"values":values}))
+
+func _package_startup() -> bool:
+	var app := root.get_node_or_null("Main")
+	if app == null: return false
+	while not app.get("startup_complete") and not app.get("startup_failed"):
+		await process_frame
+	_package_measure("起動時の資源と描画準備",{"complete":app.get("startup_complete"),"failed":app.get("startup_failed"),"timings":ContentManager.startup_timings,"sessions":RunManager.get("_sessions").size()})
+	return app.get("startup_complete") and not app.get("startup_failed") and RunManager.get("_sessions").is_empty()
 
 func _package_ready(session: RunSession) -> bool:
 	session.auto_step = false
@@ -293,6 +304,9 @@ func _package_release(session: RunSession, label: String, normal_return: bool) -
 func _package_final_runtime() -> void:
 	if OS.has_feature("editor") or SaveManager.SAVE_PATH.begins_with("user://") or SaveManager.SETTINGS_PATH.begins_with("user://"):
 		push_error("最終配布確認には隔離した保存先と配布エンジンが必要です")
+		quit(1)
+		return
+	if not await _package_startup():
 		quit(1)
 		return
 	var save_path: String = SaveManager.SAVE_PATH

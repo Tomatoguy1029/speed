@@ -9,6 +9,7 @@ var cancelled := false
 var failed := false
 var warming := false
 var warmup_complete := DisplayServer.get_name() == "headless"
+var warmup_progress := 0.0
 var warm_materials: Array[Material] = []
 func is_ready() -> bool:
 	return pending.is_empty()

@@ -132,6 +132,15 @@ func _ready() -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if options.vsync=="on" else DisplayServer.VSYNC_DISABLED)
 	var size := String(options.size).split("x")
 	DisplayServer.window_set_size(Vector2i(int(size[0]),int(size[1])))
+	# 通常起動と同じ資源を保持し、起動準備の後から戦闘の区間を測る。
+	var loading := preload("res://scripts/ui/startup_loading.gd").new()
+	add_child(loading)
+	var startup_ready: bool = await loading.prepare()
+	loading.queue_free()
+	if not startup_ready:
+		_fail("通常起動と同じ資源準備が完了しません")
+		return
+	startup_us = Time.get_ticks_usec()
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.dev_meta_override.clear()
 	for item in String(options.get("meta","")).split(",",false):
@@ -196,6 +205,7 @@ func _ready() -> void:
 	last_run_clock = float(start_recording.t)
 	var bundle: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(session.cpp_index_path))
 	metadata = {"runtime":"cpp","entry":"RunManager.create_run → RunSession → RunBridge","options":options,"actual_equipment":_equipment(start_recording),"process_id":OS.get_process_id(),"profile":ProfileManager.for_cpp(false),"bundle":bundle,"recording_identity":bridge.recording_origin,"engine":Engine.get_version_info(),"revision":options.revision,"library_sha256":FileAccess.get_sha256("res://extensions/run/bin/libspeed_runtime.macos.template_release.arm64.dylib"),"renderer":RenderingServer.get_current_rendering_method(),"adapter":RenderingServer.get_video_adapter_name(),"processor":OS.get_processor_name(),"window":str(DisplayServer.window_get_size()),"logical_size":str(get_viewport().get_visible_rect().size),"texture_size":str(get_viewport().get_texture().get_size()),"window_scaling":{"size":str(get_window().size),"factor":get_window().content_scale_factor,"size_setting":str(get_window().content_scale_size),"mode":get_window().content_scale_mode},"measurement_seconds":measurement_seconds,"physics_hz":Engine.physics_ticks_per_second,"max_fps":Engine.max_fps,"vsync":DisplayServer.window_get_vsync_mode(),"gpu_measurement":true,"loading_timings":session.loading_timings,"ready_ms":(ready_us-startup_us)/1000.0,"copy_bytes_scope":"Packed配列の論理転送量。物理メモリコピー量ではない","timing_scope":"sim/output_buildはC++内部区間、bridge_copyはGodotの明示複製、engine_gpu_waitは未分離残差。観測費用を重ねて合算しない","source_generation_during_measurement":false,"ship_survival":"条件計測だけ致死を防ぐ。接触・バリア・ダメージは通常経路" if options.mode=="condition" else "デバッグ無敵あり。時間飛ばし・強制撃破は使わない。生存難易度の評価には使わない","boss_hp_hold":options.get("boss_hp","無効"),"normal_drops":true,"input_clock":"120Hz固定tick。描線時刻はsim_timeに対応する入力tick"}
+	metadata["startup_preparation"] = ContentManager.startup_timings.duplicate(true)
 	metadata["invincible"]=bridge.latest_frame().value.ui.invincible
 	metadata["actual_start"]={"run_clock":start_recording.t,"world_clock":start_recording.world_t,"tick":start_metrics.tick,"enemy_types":start_metrics.enemy_types,"enemies":start_metrics.enemies,"bonus_remaining":bridge.latest_frame().value.ui.bonus_remaining,"boss_bodies":bridge.latest_frame().value.ui.boss_bodies}
 	var effective: Dictionary = bridge.read_lab().value

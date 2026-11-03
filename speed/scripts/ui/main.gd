@@ -19,6 +19,8 @@ var _prepared_run: RunSession
 var _screen_request := 0
 var _displayed_screen := -1
 var _fade := preload("res://scripts/ui/screen_fade.gd").new()
+var startup_complete := false
+var startup_failed := false
 
 ## 仮の画面フェード。暗転と表示の時間を個別に調整する。
 @export_range(0.0, 1.0, 0.01) var fade_out_time := 0.14
@@ -27,10 +29,21 @@ var _fade := preload("res://scripts/ui/screen_fade.gd").new()
 func _ready() -> void:
 	add_child(_fade)
 	GameManager.screen_changed.connect(_show)
+	startup_complete = true
 	if GameManager.boot_request.is_valid() and GameManager.boot_request.call(): return
+	startup_complete = false
+	if DisplayServer.get_name() != "headless":
+		var loading := preload("res://scripts/ui/startup_loading.gd").new()
+		add_child(loading)
+		if not await loading.prepare():
+			startup_failed = true
+			return
+		loading.queue_free()
+	startup_complete = true
 	_show(GameManager.screen)
 
 func _show(screen: GameManager.Screen) -> void:
+	if not startup_complete: return
 	if _prepared_run != null:
 		_prepared_run.free()
 		_prepared_run = null

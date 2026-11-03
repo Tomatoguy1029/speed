@@ -216,10 +216,49 @@ var _resource_jobs: Dictionary = {}
 ## 画像・音・shaderを先に揃えてから、preloadを持つScript/Sceneを主スレッドで読む。
 var _composite_scopes: Array[WeakRef] = []
 var _prepared_resources: Dictionary = {}
+var _startup_resources: ContentResourceScope
+
+## 全ステージと装備の生成済み一覧を起動時に準備し、終了まで保持する。
+func prepare_startup_resources() -> ContentResourceScope:
+	if _startup_resources != null: return _startup_resources
+	var paths := PackedStringArray()
+	var signatures := {}
+	for index in range(1, stage_count()+1):
+		var path := "res://.content/run/stage_%d.json" % index
+		var header = JSON.parse_string(FileAccess.get_file_as_string(path))
+		var bundle := {}
+		if header is Dictionary:
+			bundle = preload("res://scripts/runtime/run_content_loader.gd").read_bundle(path,str(header.get("input_sha256","")))
+		if bundle.is_empty():
+			_startup_resources = ContentResourceScope.new()
+			_startup_resources.failed = true
+			return _startup_resources
+		for resource_path: String in bundle.resources.order:
+			var signature: String = bundle.resources.signatures[resource_path]
+			if signatures.has(resource_path) and signatures[resource_path] != signature:
+				_startup_resources = ContentResourceScope.new()
+				_startup_resources.failed = true
+				return _startup_resources
+			if not signatures.has(resource_path): paths.append(resource_path)
+			signatures[resource_path] = signature
+		await get_tree().process_frame
+	_startup_resources = prepare_resources(paths,true,signatures)
+	return _startup_resources
+
+func _startup_covers(paths: PackedStringArray, signatures: Dictionary) -> bool:
+	if _startup_resources == null or _startup_resources.cancelled or _startup_resources.failed or not _startup_resources.warmup_complete: return false
+	for path in paths:
+		if not _startup_resources.resources.has(path) or _startup_resources.signatures.get(path) != signatures.get(path): return false
+	return true
+
 func prepare_resources(paths: PackedStringArray, threaded := true, signatures := {}) -> ContentResourceScope:
 	var scope := ContentResourceScope.new()
 	scope.signatures = signatures
 	if paths.is_empty(): scope.warmup_complete = true
+	if _startup_covers(paths,signatures):
+		scope.warmup_complete = true
+		scope.warmup_progress = 1.0
+		scope.warm_materials = _startup_resources.warm_materials.duplicate()
 	for path in paths:
 		if scope.resources.has(path) or path in scope.pending: continue
 		if path.get_extension() not in ["png","svg","jpg","jpeg","webp","wav","ogg","mp3","gdshader","glsl"]:
@@ -240,21 +279,24 @@ func prepare_resources(paths: PackedStringArray, threaded := true, signatures :=
 				_resource_jobs[key] = job
 				job.start(path,version)
 			_resource_jobs[key].waiters.append(weakref(scope))
-	if not _finish_composites(scope): _composite_scopes.append(weakref(scope))
+	if not _finish_composites(scope,4000 if threaded else 0): _composite_scopes.append(weakref(scope))
 	return scope
 
-func _finish_composites(scope: ContentResourceScope) -> bool:
+func _finish_composites(scope: ContentResourceScope, budget_us := 4000) -> bool:
 	if scope.cancelled: return true
 	for path in scope.pending:
 		if not path in scope.composites: return false
 	# 同時に別の版を準備しても、このScopeの依存を親のpreloadへ渡す。
 	for path in scope.resources:
 		if not str(scope.signatures.get(path,"")).is_empty(): scope.resources[path].take_over_path(path)
-	var composite_paths := scope.composites.duplicate()
-	scope.composites.clear()
-	for path in composite_paths:
+	var began := Time.get_ticks_usec()
+	var completed := 0
+	for path in scope.composites:
 		scope.provide(path,null if scope.failed else _load_prepared(path,str(scope.signatures.get(path,""))))
-	return true
+		completed += 1
+		if budget_us > 0 and Time.get_ticks_usec()-began >= budget_us: break
+	for index in completed: scope.composites.remove_at(0)
+	return scope.composites.is_empty()
 
 func _cached_prepared(path: String, signature: String) -> Resource:
 	var entry: WeakRef = _prepared_resources.get(path+":"+signature)
@@ -289,6 +331,7 @@ func _process(_delta: float) -> void:
 		if scope==null or _finish_composites(scope): _composite_scopes.erase(reference)
 
 func _exit_tree() -> void:
+	if _startup_resources != null: _startup_resources.cancel()
 	for job: ResourceJob in _resource_jobs.values(): job.finish()
 	_resource_jobs.clear()
 
