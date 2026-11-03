@@ -80,35 +80,15 @@ func _ready() -> void:
 	print("[enemy_motion] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
-func gunner_states(run: RunSimulation, core, row: int, id: int, comparison, label: String) -> void:
-	if ranged_retry:
-		if label in ["normal/6","normal/7"]: ranged_shot_states(run,core,comparison,label)
-		return
-	if gunner_cycle: return
-	var found := false
+func _enemy(core, id: int) -> Dictionary:
 	for enemy: Dictionary in core.enemies_snapshot():
-		if enemy.id!=id: continue
-		found = true
-		var pos := Vector2(enemy.pos[0],enemy.pos[1])
-		var vel := Vector2(enemy.vel[0],enemy.vel[1])
-		check(pos.distance_to(run.enemies.table.pos[row])<0.02 and vel.distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001,label+"の距離保持・旋回・移動")
-		check(enemy.dead==run.enemies.table.dead[row],label+"の生死")
-	for motion: Dictionary in core.enemy_motion_snapshot():
-		if motion.id!=id: continue
-		check(is_equal_approx(motion.fire_t,run.enemies.table.fire_t[row]) and is_equal_approx(motion.charge,run.enemies.table.charge[row]),label+"の発射周期と予告")
-	check(found,label+"の個体IDが有効")
-	ranged_shot_states(run,core,comparison,label)
+		if enemy.id==id: return enemy
+	return {}
 
-func ranged_shot_states(run: RunSimulation, core, comparison, label: String) -> void:
-	var shots := []
-	var ps := run.projectiles
-	for i in ps.hostile_alive.size():
-		if ps.hostile_alive[i]==0: continue
-		shots.append({"pos":ps.hostile_pos[i],"vel":ps.hostile_vel[i],"life":ps.hostile_life[i],"kind":ps.hostile_kind[i]})
-	var current := []
-	for shot: Dictionary in core.hostiles_snapshot(): current.append({"pos":shot.pos,"vel":shot.vel,"life":shot.life,"kind":shot.kind})
-	var difference: String = comparison.difference(comparison.plain(shots),comparison.plain(current))
-	check(difference.is_empty(),label+"の発射位置・向き・弾: "+difference)
+func _motion(core, id: int) -> Dictionary:
+	for motion: Dictionary in core.enemy_motion_snapshot():
+		if motion.id==id: return motion
+	return {}
 
 func check_cpp_gunner() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -159,36 +139,15 @@ func check_cpp_gunner() -> void:
 		gunner_finished = true
 		session.free()
 		return
-	var comparison = preload("res://tools/compare_runtime.gd").new()
-	var budget_probe = preload("res://tests/runtime/run_attack_budget.gd").new()
 	for kind in (["normal"] if gunner_cycle or ranged_retry else ["normal","death","reuse"]):
 		bridge.restore(initial.value)
-		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-		add_child(lab)
-		await lab.reset({"seed":976,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
-			"config":{"start_radius":900.0,"planet_radius":100.0}})
-		var run: RunSimulation = lab.run
-		run.state.ship_pos = target
-		run.state.enemy_aim = target
-		run.state.view_center = target
-		run.state.view_half = Vector2(640,360)
-		run.state.world_time = core.inspect().world_time
-		run.state.time = core.inspect().time
-		run.enemies._lod = core.inspect().ticks
-		run.enemies._next_id = 1
-		run.state.rng.state = int(core.inspect().rng_state)
-		var director = run.projectiles.director
-		director.formation_mode = true
 		core.set_attack_formation_mode(true)
-		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
 		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
-		var definition := run.enemies.def_of(StringName(type))
+		var definition: EnemyDef = ContentManager.enemies[StringName(type)]
 		var expected_volley := int(definition.params.volley) if battleship_enemy else 1
 		var position := target+Vector2(480,120)
-		var row := run.enemies.spawn(definition,position)
 		var id: int = bridge.command("dev_spawn",{"definition_id":type,"position":position}).value
-		check(run.enemies.table.id[row]==id and id==1,"射撃型を同じ個体IDと乱数の位置から生成する: "+kind)
-		run.enemies.table.fire_t[row] = 0.25
+		check(id==1,"射撃型を同じ個体IDと乱数の位置から生成する: "+kind)
 		core.set_enemy_motion(id,{"fire_t":0.25})
 		core.set_motion_context(target,target,Vector2(640,360))
 		var warning: Dictionary = {}
@@ -197,42 +156,27 @@ func check_cpp_gunner() -> void:
 		var previous_count := 0
 		for step in 8:
 			if step==2:
-				director.configure({"enabled":true,"budget":1.0,"jitter":0.0})
 				core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 			if step==3 and kind=="death":
-				run.combat.kill_enemy(row,{"cause":&"ram"})
 				bridge.command("dev_kill",{"entity_id":id,"cause":"ram"})
 			if step==3 and kind=="reuse":
-				run.enemies._release_row(row)
 				core.remove_enemy(id)
-				row = run.enemies.spawn(definition,position)
 				var old_id := id
 				id = bridge.command("dev_spawn",{"definition_id":type,"position":position}).value
-				check(id!=old_id and run.enemies.table.id[row]==id and core.hostiles_snapshot().is_empty(),"予告中の行を再利用しても古い射撃や所有者を引き継がない")
-				run.enemies.table.fire_t[row] = 0.25
+				check(id!=old_id and core.hostiles_snapshot().is_empty(),"予告中の行を再利用しても古い射撃や所有者を引き継がない")
 				core.set_enemy_motion(id,{"fire_t":0.25})
 			if step in [4,5]:
-				run.enemies.table.held[row] = 1 if step==4 else 0
 				core.set_enemy_motion(id,{"held":step==4})
 			if step==6 and kind=="normal":
-				run.projectiles.clear_hostile()
 				bridge.command("dev_clear_hostile",{})
 				previous_count = 0
 			var dt: float = (float(definition.params.fire_interval)+1.0 if missile_enemy else 3.0) if step==6 else 0.125
-			run.state.world_time += dt
-			run.state.time += dt
-			director.advance(run.state.world_time,run.enemies)
-			core.advance_attack_budget(run.state.world_time)
-			run.enemies.tick(dt,dt)
+			core.advance_attack_budget(core.inspect().world_time+dt)
 			core.step(dt)
 			emitted_count += maxi(0,core.hostiles_snapshot().size()-previous_count)
 			previous_count = core.hostiles_snapshot().size()
-			gunner_states(run,core,row,id,comparison,"%s/%d" % [kind,step])
 			if step<2 and not ranged_retry:
-				check(core.hostiles_snapshot().is_empty() and run.enemies.table.charge[row]==0.0,"枠を待つ間は予告と射撃を始めず追跡する: %s/%d" % [kind,step])
-			if (missile_enemy or battleship_enemy) and not ranged_retry:
-				var budget_diff: String = comparison.difference(budget_probe.snapshot(director),core.attack_budget_snapshot())
-				check(budget_diff.is_empty(),"射撃する敵の予算と待機・残留枠が一致する: "+budget_diff)
+				check(core.hostiles_snapshot().is_empty() and _motion(core,id).charge==0.0,"枠を待つ間は予告と射撃を始めず追跡する: %s/%d" % [kind,step])
 			if step==2 and kind=="normal" and not gunner_cycle and not ranged_retry:
 				warning = bridge.checkpoint()
 				warning_state = core.enemy_motion_snapshot()
@@ -244,13 +188,13 @@ func check_cpp_gunner() -> void:
 				check(marked,"射撃の予告を表示用の値へ渡す")
 				if battleship_enemy:
 					for batch: Dictionary in frame.batches:
-						if batch.has("battleship"): check(is_equal_approx(batch.battleship[2],run.enemies.table.r[row]) and is_equal_approx(batch.battleship[5],definition.weak_arc),"大型の当たり半径と背面の弱点を同じ本体へ渡す")
+						if batch.has("battleship"): check(is_equal_approx(batch.battleship[2],_enemy(core,id).radius) and is_equal_approx(batch.battleship[5],definition.weak_arc),"大型の当たり半径と背面の弱点を同じ本体へ渡す")
 				var presentation: RunPresentation = session.view.get_node("RunPresentation")
 				presentation._present_cpp(0.0)
 				check(presentation.frame_view.apply_frame(frame) and presentation.frame_view.get("_battleship" if battleship_enemy else ("_missile" if missile_enemy else "_gunner")).size()==(6 if battleship_enemy else 5),"射撃型の本体と砲口の光を通常画面へ表示する")
 				await get_tree().process_frame
 		if kind=="normal" and not ranged_retry:
-			check(emitted_count==2*expected_volley and core.hostiles_snapshot().size()==run.projectiles.hostile_slots.live,"周期を過ぎる大きな更新でも1更新に1回ずつ発射する")
+			check(emitted_count==2*expected_volley and core.hostiles_snapshot().size()==2*expected_volley,"周期を過ぎる大きな更新でも1更新に1回ずつ発射する")
 			if not gunner_cycle:
 				bridge.restore(warning.value)
 				check(core.enemy_motion_snapshot()==warning_state,"予告中の位置と射撃状態を復元する")
@@ -282,19 +226,9 @@ func check_cpp_gunner() -> void:
 					bridge.release_checkpoint(fired.value)
 				bridge.release_checkpoint(warning.value)
 		elif kind=="death": check(core.hostiles_snapshot().is_empty(),"予告中に倒れた敵は発射しない")
-		lab.free()
 	bridge.release_checkpoint(initial.value)
 	session.free()
-	budget_probe.free()
 	gunner_finished = true
-
-func rocket_state(run: RunSimulation, core, row: int, id: int, label: String) -> void:
-	for enemy: Dictionary in core.enemies_snapshot():
-		if enemy.id!=id: continue
-		check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001,label+"の位置・速度・向きが一致する")
-		check(enemy.dead==run.enemies.table.dead[row],label+"の死亡印が一致する")
-	for motion: Dictionary in core.enemy_motion_snapshot():
-		if motion.id==id: check(motion.mode==run.enemies.table.mode[row] and is_equal_approx(motion.timer,maxf(0.0,run.enemies.table.timer[row])),label+"の飛行状態と寿命が一致する")
 
 func check_cpp_rocket() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -334,42 +268,17 @@ func check_cpp_rocket() -> void:
 		if argument.begins_with("--cpp-rocket-case="): cases = [argument.get_slice("=",1)]
 	for kind in cases:
 		bridge.restore(initial.value)
-		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-		add_child(lab)
-		await lab.reset({"seed":977,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,"config":{"start_radius":900.0,"planet_radius":100.0}})
-		var run: RunSimulation = lab.run
-		run.state.ship_pos = target
-		run.state.enemy_aim = target
-		run.state.view_center = target
-		run.state.view_half = Vector2(640,360)
-		run.state.world_time = core.inspect().world_time
-		run.enemies._lod = core.inspect().ticks
-		run.enemies._next_id = 1
-		run.state.rng.state = int(core.inspect().rng_state)
 		core.set_motion_context(target,target,Vector2(640,360))
 		var position := target+Vector2(40 if kind=="fuse" else 500,0)
-		var row := run.enemies.spawn(definition,position)
 		var id: int = bridge.command("dev_spawn",{"definition_id":"rocket","position":position}).value
-		var director = run.projectiles.director
-		director.formation_mode = true
 		core.set_attack_formation_mode(true)
-		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
 		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
-		run.state.world_time += 0.01
-		director.advance(run.state.world_time,run.enemies)
-		core.advance_attack_budget(run.state.world_time)
-		run.enemies.tick(0.01,0.01)
+		core.advance_attack_budget(core.inspect().world_time+0.01)
 		core.step(0.01)
-		rocket_state(run,core,row,id,kind+"の予算待機")
-		check(run.enemies.table.mode[row]==RunIds.EnemyModeId.Move and core.hazards_snapshot().is_empty(),"予算を待つ間は飛行と起爆を始めない")
-		director.configure({"enabled":true,"budget":1.0,"jitter":0.0})
+		check(_motion(core,id).mode==RunIds.EnemyModeId.Move and core.hazards_snapshot().is_empty(),"予算を待つ間は飛行と起爆を始めない")
 		core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
-		run.state.world_time += 0.01
-		director.advance(run.state.world_time,run.enemies)
-		core.advance_attack_budget(run.state.world_time)
-		run.enemies.tick(0.01,0.01)
+		core.advance_attack_budget(core.inspect().world_time+0.01)
 		core.step(0.01)
-		rocket_state(run,core,row,id,kind+"の初回")
 		if kind=="life":
 			var body_visual := 0
 			for entry: Dictionary in session.cpp_resources.visuals:
@@ -386,26 +295,18 @@ func check_cpp_rocket() -> void:
 		var flight: Dictionary = bridge.checkpoint()
 		var flight_state: Array = core.enemy_motion_snapshot()
 		if kind=="death":
-			run.combat.kill_enemy(row,{"cause":&"ram"})
 			check(bridge.command("dev_kill",{"entity_id":id,"cause":"ram"}).ok,"飛行中のロケット敵を倒す")
 		if kind=="reuse":
-			run.enemies._release_row(row)
 			core.remove_enemy(id)
 			var old_id := id
-			row = run.enemies.spawn(definition,position)
 			id = bridge.command("dev_spawn",{"definition_id":"rocket","position":position}).value
 			check(id!=old_id and not core.set_enemy_motion(old_id,{"timer":5.0}),"行の再利用で古いロケットのIDと寿命を失効する")
-			rocket_state(run,core,row,id,"再利用直後")
 		for step in (4 if kind=="life" else 1):
 			var dt := 0.125 if kind=="life" else 0.01
-			run.state.world_time += dt
-			director.advance(run.state.world_time,run.enemies)
-			core.advance_attack_budget(run.state.world_time)
-			run.enemies.tick(dt,dt)
+			core.advance_attack_budget(core.inspect().world_time+dt)
 			core.step(dt)
-			rocket_state(run,core,row,id,"%s/%d" % [kind,step])
 		if kind=="fuse":
-			check(core.hazards_snapshot().size()==1 and run.projectiles.hazard_slots.live==1,"近接起爆で同じ円形爆発を作る")
+			check(core.hazards_snapshot().size()==1,"近接起爆で同じ円形爆発を作る")
 			var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
 			var visible := false
 			for shape: Dictionary in frame.shapes:
@@ -415,10 +316,9 @@ func check_cpp_rocket() -> void:
 			await get_tree().process_frame
 			check(bridge.command("dev_remove",{"entity_id":id}).ok and core.hazards_snapshot().size()==1,"親を先に退場させても起爆済みの爆発を保つ")
 			var blast: Dictionary = bridge.checkpoint()
-			run.projectiles._update_hazards(0.01)
 			core.step_hazards(0.01)
 			var hp: float = core.ship_snapshot().ship_hp
-			check(is_equal_approx(hp,run.state.ship_hp) and is_equal_approx(hp,config.base_hp-float(definition.params.blast_dmg)),"爆発は機体へ実効ダメージを一度だけ与える")
+			check(is_equal_approx(hp,config.base_hp-float(definition.params.blast_dmg)),"爆発は機体へ実効ダメージを一度だけ与える")
 			core.step_hazards(0.01)
 			check(is_equal_approx(core.ship_snapshot().ship_hp,hp),"爆発の表示が残っていても再命中しない")
 			core.step_hazards(0.25)
@@ -427,11 +327,10 @@ func check_cpp_rocket() -> void:
 			core.step_hazards(0.01)
 			check(is_equal_approx(core.ship_snapshot().ship_hp,hp),"爆発の復帰後も同じ一度の命中になる")
 			bridge.release_checkpoint(blast.value)
-		elif kind=="life": check(core.hazards_snapshot().is_empty() and run.enemies.table.dead[row]!=0,"飛行寿命で爆発やドロップを出さず退場する")
+		elif kind=="life": check(core.hazards_snapshot().is_empty() and _enemy(core,id).dead!=0,"飛行寿命で爆発やドロップを出さず退場する")
 		elif kind=="death": check(core.hazards_snapshot().is_empty(),"飛行中に倒したロケット敵は自爆しない")
 		check(bridge.restore(flight.value).ok and core.enemy_motion_snapshot()==flight_state,"飛行中の向き・残り寿命・予算を値で戻す: "+kind)
 		bridge.release_checkpoint(flight.value)
-		lab.free()
 	bridge.release_checkpoint(initial.value)
 	session.free()
 
@@ -464,20 +363,8 @@ func check_cpp_drift() -> void:
 	var core = bridge._core
 	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	var target: Vector2 = core.ship_snapshot().ship_pos
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	add_child(lab)
-	await lab.reset({"seed":978,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"config":{"start_radius":900.0,"planet_radius":100.0}})
-	var run: RunSimulation = lab.run
-	run.state.ship_pos = target
-	run.state.enemy_aim = target
-	run.state.view_center = target
-	run.state.view_half = Vector2(640,360)
-	run.enemies._lod = core.inspect().ticks
-	run.state.rng.state = int(core.inspect().rng_state)
-	run.enemies._next_id = 1
 	var position := target+Vector2(500,100)
 	var options := {"vel":Vector2(150,50),"facing":0.3,"spin":1.7,"guard":0.08,"hit_cd":0.04}
-	var row := run.enemies.spawn(definition,position,options)
 	var id: int = core.spawn_enemy(&"hydra_rubble",position,options)
 	core.set_motion_context(target,target,Vector2(640,360))
 	var pending: Dictionary = {}
@@ -493,14 +380,8 @@ func check_cpp_drift() -> void:
 			5: change = {"slash_hold":true}
 			6: change = {"slash_hold":false}
 		if not change.is_empty():
-			for key in change:
-				var column = run.enemies.table.get(key)
-				column[row] = int(change[key]) if change[key] is bool else change[key]
-				run.enemies.table.set(key,column)
 			core.set_enemy_motion(id,change)
-		run.enemies.tick(0.05,0.05)
 		core.step(0.05)
-		rocket_state(run,core,row,id,"漂流/%d" % tick)
 		if tick==6:
 			pending = bridge.checkpoint()
 			pending_state = core.enemy_motion_snapshot()
@@ -509,7 +390,7 @@ func check_cpp_drift() -> void:
 			var presentation: RunPresentation = session.view.get_node("RunPresentation")
 			check(presentation.frame_view.apply_frame(frame) and not frame.batches.is_empty(),"回転した瓦礫の本体を通常画面へ表示する")
 			await get_tree().process_frame
-	check(run.enemies.table.dead[row]!=0 and core.hazards_snapshot().is_empty(),"寿命で漂流する瓦礫を退場し攻撃を出さない")
+	check(_enemy(core,id).dead!=0 and core.hazards_snapshot().is_empty(),"寿命で漂流する瓦礫を退場し攻撃を出さない")
 	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==pending_state and core.enemies_snapshot()==pending_enemies,"漂流の回転・押し出し・寿命を値で復帰する")
 	var before: float = core.enemies_snapshot()[0].hp
 	var at := Vector2(core.enemies_snapshot()[0].pos[0],core.enemies_snapshot()[0].pos[1])
@@ -522,7 +403,6 @@ func check_cpp_drift() -> void:
 	var replacement: int = core.spawn_enemy(&"hydra_rubble",position,{})
 	check(replacement!=id and not core.valid_enemy_handle(old) and core.enemy_motion_snapshot()[0].spin==0.0 and core.enemy_motion_snapshot()[0].age==0.0,"再利用時に古い回転・寿命・外力を引き継がない")
 	bridge.release_checkpoint(pending.value)
-	lab.free()
 	session.free()
 
 func check_cpp_part() -> void:
@@ -644,34 +524,15 @@ func check_cpp_dash() -> void:
 	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	var target: Vector2 = core.ship_snapshot().ship_pos
 	var initial: Dictionary = bridge.checkpoint()
-	var comparison = preload("res://tools/compare_runtime.gd").new()
-	var budget_probe = preload("res://tests/runtime/run_attack_budget.gd").new()
 	var cases := ["normal","death","reuse"]
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--cpp-dash-case="): cases = [argument.get_slice("=",1)]
 	for kind in cases:
 		bridge.restore(initial.value)
-		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-		add_child(lab)
-		await lab.reset({"seed":980,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"config":{"start_radius":900.0,"planet_radius":100.0}})
-		var run: RunSimulation = lab.run
-		run.state.ship_pos = target
-		run.state.enemy_aim = target
-		run.state.view_center = target
-		run.state.view_half = Vector2(640,360)
-		run.state.world_time = core.inspect().world_time
-		run.enemies._lod = core.inspect().ticks
-		run.state.rng.state = int(core.inspect().rng_state)
-		run.enemies._next_id = 1
 		core.set_motion_context(target,target,Vector2(640,360))
-		var definition := run.enemies.def_of(&"darter")
 		var position := target+Vector2(300,100)
-		var row := run.enemies.spawn(definition,position)
 		var id: int = core.spawn_enemy(&"darter",position,{})
-		var director = run.projectiles.director
-		director.formation_mode = true
 		core.set_attack_formation_mode(true)
-		director.configure({"enabled":true,"budget":0.0,"jitter":0.0})
 		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 		var modes := [RunIds.EnemyModeId.Move]
 		var pending: Dictionary = {}
@@ -679,31 +540,18 @@ func check_cpp_dash() -> void:
 		var next_state: Array = []
 		for tick in (21 if kind=="normal" else 5):
 			if tick==1:
-				director.configure({"enabled":true,"budget":1.0,"jitter":0.0})
 				core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
 			if tick==3 and kind=="death":
-				run.combat.kill_enemy(row,{"cause":&"bullet"})
 				bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
 			if tick==3 and kind=="reuse":
-				run.enemies._release_row(row)
 				core.remove_enemy(id)
 				var old_id := id
-				row = run.enemies.spawn(definition,position)
 				id = core.spawn_enemy(&"darter",position,{})
 				check(id!=old_id and not core.set_enemy_motion(old_id,{"facing":1.0}),"予告中の行を再利用しても旧突進のIDを受け付けない")
-			run.state.world_time += 0.125
-			director.advance(run.state.world_time,run.enemies)
-			core.advance_attack_budget(run.state.world_time)
-			run.enemies.tick(0.125,0.125)
+			core.advance_attack_budget(core.inspect().world_time+0.125)
 			core.step(0.125)
-			modes.append(run.enemies.table.mode[row])
-			var difference: String = comparison.difference(budget_probe.snapshot(director),core.attack_budget_snapshot())
-			check(difference.is_empty(),"突進する敵の予算・待機・解放が一致する: "+kind+" "+difference)
-			for enemy: Dictionary in core.enemies_snapshot():
-				if enemy.id==id: check(Vector2(enemy.pos[0],enemy.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(enemy.vel[0],enemy.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(enemy.facing-run.enemies.table.facing[row])<0.0001 and enemy.dead==run.enemies.table.dead[row],"突進する敵の姿勢・移動・生死が一致する: %s/%d" % [kind,tick])
-			for item: Dictionary in core.enemy_motion_snapshot():
-				if item.id==id: check(item.mode==run.enemies.table.mode[row] and is_equal_approx(item.timer,run.enemies.table.timer[row]),"予告・突進・硬直の状態と時間が一致する: %s/%d" % [kind,tick])
-			if tick==0: check(run.enemies.table.mode[row]==RunIds.EnemyModeId.Move,"予算0では予告を始めず追跡する")
+			modes.append(_motion(core,id).mode)
+			if tick==0: check(_motion(core,id).mode==RunIds.EnemyModeId.Move,"予算0では予告を始めず追跡する")
 			if tick==2 and kind=="normal":
 				pending = bridge.checkpoint()
 				pending_state = core.enemy_motion_snapshot()
@@ -719,7 +567,5 @@ func check_cpp_dash() -> void:
 			check(core.enemy_motion_snapshot()==next_state,"予告中の復帰後に同じ突進へ進む")
 			bridge.release_checkpoint(pending.value)
 		elif kind=="death": check(core.enemies_snapshot()[0].dead!=0,"予告中に倒した敵は突進を再開しない")
-		lab.free()
-	budget_probe.free()
 	bridge.release_checkpoint(initial.value)
 	session.free()

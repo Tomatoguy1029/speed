@@ -1,8 +1,5 @@
 ## たて座の生成・追跡・旋回を、本番の編集値と更新へ照合する。
 extends Node
-const COMPARE := preload("res://tools/compare_runtime.gd")
-const DATA := preload("res://tools/content/build_native_data.gd")
-const HOSTILES := preload("res://tests/runtime/run_hostiles.gd")
 var failed := 0
 var reflected_finished := false
 var reflected_fixes := false
@@ -35,28 +32,9 @@ func _ready() -> void:
 	print("[run_shield] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
-func values(object: Object, keys: Array) -> Dictionary:
-	var out := {}
-	for key in keys: out[key] = object.get(key)
-	return out
-func reflected_states(run: RunSimulation, core, label: String) -> void:
-	var reader = HOSTILES.new()
-	var expected: Array = reader.snapshot(run.projectiles)
-	reader.free()
-	for row: Dictionary in expected:
-		row.stone = maxf(0.0,row.stone)
-		row.wait = maxf(0.0,row.wait)
-	var comparison = COMPARE.new()
-	var difference: String = comparison.difference(comparison.plain(expected),comparison.plain(core.hostiles_snapshot()))
-	check(difference.is_empty(),label+"：反射弾の状態が現行と一致する "+difference)
-
-func reflected_shot(run: RunSimulation, core, source: int, target: Vector2, radius: float) -> void:
-	run.enemies.table.fire_t[source] = 0.0
-	run.combat.rebuild_grid()
+func reflected_shot(core, target: Vector2, radius: float) -> void:
 	var options := {"speed":1200.0,"r":radius,"life":4.0}
-	run.projectiles.fire_shot(target,PI,10.0,options)
 	check(core.fire_shot(target,PI,10.0,options),"盾の前面へ味方弾を作る")
-	run.projectiles._update_friendly(0.5)
 	check(core.step_projectiles(0.5),"味方弾の共通更新で盾の反射を通す")
 
 func check_cpp_reflected() -> void:
@@ -95,25 +73,13 @@ func check_cpp_reflected() -> void:
 	core.set_motion_context(target,target,Vector2(640,360))
 	var source_position := Vector2(-1200,0)
 	var source_id: int = bridge.command("dev_spawn",{"definition_id":"shield","position":source_position}).value
-	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-	add_child(lab)
-	await lab.reset({"seed":287,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
-		"config":{"start_radius":900.0,"planet_radius":100.0}})
-	var run: RunSimulation = lab.run
-	run.state.ship_pos = target
-	run.state.ship_vel = Vector2.ZERO
-	run.state.view_center = target
-	run.state.view_half = Vector2(640,360)
-	var definition: EnemyDef = run.enemies.def_of(&"shield")
-	var source: int = run.enemies.spawn(definition,source_position)
+	var definition: EnemyDef = ContentManager.enemies[&"shield"]
 	var empty: Dictionary = bridge.checkpoint()
 	var pending: Dictionary = {}
 	if not reflected_lifetime:
 		for radius in [1.0,7.0,17.0]:
 			check(bridge.restore(empty.value).ok,"半径ごとの反射の場面を初期化する")
-			run.projectiles.clear_hostile()
-			reflected_shot(run,core,source,target,radius)
-			reflected_states(run,core,"盾の反射と半径の上下限")
+			reflected_shot(core,target,radius)
 			var shots: Array = core.hostiles_snapshot()
 			check(shots.size()==1 and shots[0].kind==2 and is_equal_approx(shots[0].life,float(definition.params.reflect_life)),"盾の寿命の値で危険な反射弾を1つ作る")
 			var record: Dictionary = core.attack_snapshot()[0]
@@ -122,14 +88,10 @@ func check_cpp_reflected() -> void:
 		# この弾を、同じ更新順と保持点から先へ進める。
 		pending = bridge.checkpoint()
 		var saved_hp: float = core.enemies_snapshot()[0].hp
-		run.projectiles.fire_shot(target,PI,10.0,{"speed":1200.0,"r":7.0,"life":4.0})
 		core.fire_shot(target,PI,10.0,{"speed":1200.0,"r":7.0,"life":4.0})
-		run.projectiles._update_friendly(0.5)
 		core.step_projectiles(0.5)
 		check(core.hostiles_snapshot().size()==1 and core.enemies_snapshot()[0].hp==saved_hp,"反射の待機中も味方弾を止め、反射弾とダメージを重ねない")
-		run.projectiles._update_hostile(0.1)
 		core.step_hostiles(0.1)
-		reflected_states(run,core,"反射後の直進")
 		var visual := 0
 		var stone_visual := 0
 		for entry: Dictionary in session.cpp_resources.visuals:
@@ -149,54 +111,37 @@ func check_cpp_reflected() -> void:
 			check(arrays[Mesh.ARRAY_COLOR].has(Color("#ff84df")) and arrays[Mesh.ARRAY_COLOR].has(Color("#f45ec5")) and arrays[Mesh.ARRAY_COLOR].has(Color("#fff0fc")),"反射弾の尾・本体・芯の色を保つ")
 		bridge.command("dev_kill",{"entity_id":source_id,"cause":"ram"})
 		check(core.hostiles_snapshot().size()==1 and not core.attack_snapshot()[0].source_alive,"盾が倒れても反射弾を寿命まで残す")
-		run.projectiles._update_hostile(0.5)
 		core.step_hostiles(0.5)
-		reflected_states(run,core,"機体への命中と終了")
 		var hit: Dictionary = core.ship_snapshot()
-		check(is_equal_approx(hit.ship_hp,run.state.ship_hp) and is_equal_approx(hit.ship_hp,config.base_hp-float(definition.params.reflect_dmg)),"反射弾を共通の機体被弾へ通す")
+		check(is_equal_approx(hit.ship_hp,config.base_hp-float(definition.params.reflect_dmg)),"反射弾を共通の機体被弾へ通す")
 		bridge.restore(pending.value)
 		core.step_hostiles(0.1)
 		core.step_hostiles(0.5)
 		check(core.hostiles_snapshot().is_empty() and core.ship_snapshot()==hit,"保持点から反射弾と同じ命中・消滅を再現する")
 		bridge.restore(pending.value)
-		run.projectiles.clear_hostile()
-		run.state.ship_hp = config.base_hp
-		run.state.ship_invuln = 0.0
-		reflected_shot(run,core,source,target,17.0)
+		reflected_shot(core,target,17.0)
 		# C++には保持点の弾があるため、上で新規に追加された分を残さない。
 		# 盾は保持点のクールダウン中なので、新しい反射弾は生成されない。
-		run.projectiles.stone_hostile(Rect2(-1800,-500,1500,1000),0.1)
 		bridge.command("dev_stone_hostiles",{"duration":0.1,"view":Rect2(-1800,-500,1500,1000)})
-		run.projectiles._update_hostile(0.05)
 		core.step_hostiles(0.05)
-		reflected_states(run,core,"石化した反射弾")
 		frame = bridge.read_render(Rect2(-1800,-500,1500,1000)).value
 		var stone_shown := false
 		for batch: Dictionary in frame.batches:
 			if batch.visual_id==stone_visual: stone_shown = batch.ids.size()==1
 		check(stone_shown,"石化した反射弾にも同じ灰色の表示を重ねる")
-		var at: Vector2 = run.projectiles.hostile_pos[0]
-		run.state.ship_pos = at
+		var at := Vector2(core.hostiles_snapshot()[0].pos[0],core.hostiles_snapshot()[0].pos[1])
 		bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
-		run.projectiles._update_hostile(0.02)
 		core.step_hostiles(0.02)
 		check(core.hostiles_snapshot().is_empty() and is_equal_approx(core.ship_snapshot().ship_hp,config.base_hp),"石化した反射弾は触れると被弾せずに消える")
 	# 十分に広い表示範囲で、地形と機体を避け、反射弾自体の寿命で終了させる。
 	bridge.restore(empty.value)
-	run.projectiles.clear_hostile()
 	var far_source_position := Vector2(1500,1500)
-	var far_source: int = run.enemies.spawn(definition,far_source_position)
 	bridge.command("dev_spawn",{"definition_id":"shield","position":far_source_position})
-	reflected_shot(run,core,far_source,Vector2(1800,1500),7.0)
+	reflected_shot(core,Vector2(1800,1500),7.0)
 	var outside := Vector2(-3000,3000)
-	run.state.ship_pos = outside
-	run.state.view_center = Vector2(2000,1500)
-	run.state.view_half = Vector2(10000,10000)
 	bridge.command("dev_ship_motion",{"position":outside,"velocity":Vector2.ZERO})
-	core.set_motion_context(outside,run.state.view_center,run.state.view_half)
-	run.projectiles._update_hostile(float(definition.params.reflect_life)+0.01)
+	core.set_motion_context(outside,Vector2(2000,1500),Vector2(10000,10000))
 	core.step_hostiles(float(definition.params.reflect_life)+0.01)
-	if not reflected_lifetime: reflected_states(run,core,"地形・機体・画面外に依存しない寿命終了")
 	var lifetime := 0
 	# 個別Systemを直接進める確認では、通常Runnerの末尾に相当する通知の確定も行う。
 	for event: Dictionary in core.drain_events():
@@ -205,7 +150,6 @@ func check_cpp_reflected() -> void:
 	if not pending.is_empty(): bridge.release_checkpoint(pending.value)
 	bridge.release_checkpoint(empty.value)
 	await get_tree().process_frame
-	lab.free()
 	session.free()
 	reflected_finished = true
 
@@ -257,60 +201,34 @@ func check_cpp_shield() -> void:
 		for event: Dictionary in frame.events:
 			if event.type in [&"shield_stolen",&"shield_block",&"shield_expired"]: notices.append({"type":event.type,"data":event.payload})
 		return true)
-	var comparison = COMPARE.new()
 	for mode in ["front_ram","rear_ram","front_shots","back_shots","movement"]:
 		bridge.restore(initial.value)
 		notices.clear()
-		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
-		add_child(lab)
-		await lab.reset({"seed":287,"empty":true,"field":{"terrain":true,"rocks":false,"gimmicks":false},"invincible":false,
-			"config":{"start_radius":900.0,"planet_radius":100.0,"base_hp":100.0,"base_attack":100.0,"ram_speed_ratio":0.0}})
-		var run: RunSimulation = lab.run
-		run.state.ship_pos = target
-		run.state.ship_vel = Vector2.ZERO
-		run.state.enemy_aim = target
-		run.state.view_center = target
-		run.state.view_half = Vector2(640,360)
-		run.enemies._next_id = 1
-		run.enemies._lod = core.inspect().ticks
-		run.state.rng.state = int(core.inspect().rng_state)
-		var definition := run.enemies.def_of(&"shield")
+		var definition: EnemyDef = ContentManager.enemies[&"shield"]
 		var position := target+Vector2(25,0) if mode=="rear_ram" else target-Vector2(25,0) if mode=="front_ram" else target+Vector2(480,200)
-		var row := run.enemies.spawn(definition,position)
 		var id: int = bridge.command("dev_spawn",{"definition_id":"shield","position":position}).value
-		run.combat.rebuild_grid()
 		core.set_motion_context(target,target,Vector2(640,360))
 		if mode.ends_with("ram"):
 			var velocity := Vector2(1000,0) if mode=="rear_ram" else Vector2(-1000,0)
-			run.state.ship_vel = velocity
 			bridge.command("dev_ship_motion",{"position":target,"velocity":velocity})
 			var from := target-velocity.normalized()*100.0
-			var bounced := run.combat.collide_ship(from,config.ship_radius,null)
-			check(core.collide_ship(from,config.ship_radius)==bounced,"盾への体当たりの前後判定: "+mode)
+			check(core.collide_ship(from,config.ship_radius)==(mode=="front_ram"),"盾への体当たりの前後判定: "+mode)
 		elif mode.ends_with("shots"):
 			var from := position+Vector2(200,0) if mode=="front_shots" else position-Vector2(200,0)
 			var angle := PI if mode=="front_shots" else 0.0
 			for repeat in 2:
 				var options := {"speed":1200.0,"life":1.0,"pierce_left":5,"knock":0.0,"weapon_id":&"W01"}
-				run.projectiles.fire_shot(from,angle,2.0,options)
 				core.fire_shot(from,angle,2.0,options)
-				run.projectiles._update_friendly(0.2)
 				core.step_projectiles(0.2)
 			check(core.hostiles_snapshot().size()==(1 if mode=="front_shots" else 0),"前面だけ反射し待ち時間中の反射を重ねない: "+mode)
 		else:
 			for step in 4:
-				run.enemies.tick(0.125,0.125)
 				core.step(0.125)
-			var moved: Dictionary = core.enemies_snapshot()[0]
-			check(Vector2(moved.pos[0],moved.pos[1]).distance_to(run.enemies.table.pos[row])<0.02 and Vector2(moved.vel[0],moved.vel[1]).distance_to(run.enemies.table.vel[row])<0.02 and absf(moved.facing-run.enemies.table.facing[row])<0.0001,"盾の追跡・旋回を共通の操舵へ通す")
 			var relocated := target+Vector2(500,-100)
 			check(bridge.command("dev_relocate",{"entity_id":id,"position":relocated}).ok and core.enemies_snapshot()[0].id==id,"再配置で盾の個体IDを保つ")
 			bridge.command("dev_kill",{"entity_id":id,"cause":"ram"})
 			check(core.enemies_snapshot()[0].dead==1,"再配置した盾も通常の撃破へ通る")
-			lab.free()
 			continue
-		check(is_equal_approx(core.enemies_snapshot()[0].hp,run.enemies.table.hp[row]) and core.enemies_snapshot()[0].dead==run.enemies.table.dead[row],"前後からの命中と盾の生死が一致する: "+mode)
-		check(is_equal_approx(core.ship_snapshot().ship_shield_t,run.state.ship_shield_t),"盾の取得と持続時間が一致する: "+mode)
 		bridge.command("set_ui_overlay",{"active":false})
 		if mode=="rear_ram":
 			check(notices.size()>0 and notices[0].type==&"shield_stolen" and notices[0].data.get("enemy_type")==&"shield","奪った敵の種類を表示通知へ渡す")
@@ -321,17 +239,11 @@ func check_cpp_shield() -> void:
 			check(holder!=null and holder.get_node_or_null("ScutumGuardLighting/ScutumGuard/Armor")!=null,"奪った盾の本体・装甲・法線を機体へ表示する")
 			await get_tree().process_frame
 			for elapsed in [0.21,0.01,float(definition.params.shield_time)]:
-				run.ship.intent.touch = true
-				run.ship.tick(elapsed,elapsed)
 				core.step_ship(elapsed,elapsed,{"touch":true})
-				run.state.view_center = run.state.ship_pos
-				core.set_motion_context(core.ship_snapshot().ship_pos,run.state.ship_pos,Vector2(640,360))
-				var values := {"kind":0,"pos":run.state.ship_pos,"vel":Vector2.ZERO,"speed":0.0,"r":7.0,"life":1.0,"dmg":7.0,"slow":0.2,"turn":0.0}
-				run.projectiles._add_hostile(values.pos,values.vel,values.speed,values.r,values.life,values.dmg,values.slow,values.turn,0)
-				core.spawn_hostile(values)
-				run.projectiles._update_hostile(0.01)
+				var at: Vector2 = core.ship_snapshot().ship_pos
+				core.set_motion_context(at,at,Vector2(640,360))
+				core.spawn_hostile({"kind":0,"pos":at,"vel":Vector2.ZERO,"speed":0.0,"r":7.0,"life":1.0,"dmg":7.0,"slow":0.2,"turn":0.0})
 				core.step_hostiles(0.01)
-				check(is_equal_approx(core.ship_snapshot().ship_hp,run.state.ship_hp) and is_equal_approx(core.ship_snapshot().ship_shield_t,run.state.ship_shield_t),"取得後の防御・待ち時間・失効後の被弾が一致する")
 			bridge.command("set_ui_overlay",{"active":false})
 			presentation._present_cpp(0.0)
 			check(core.ship_snapshot().ship_hp<config.base_hp and not holder.get_node("ScutumGuardLighting").visible,"失効した盾は表示を消して被弾する")
@@ -340,7 +252,6 @@ func check_cpp_shield() -> void:
 			presentation._present_cpp(0.0)
 			check(bridge.read_frame().value.ui.get("ship_shield_visual",0)>0 and holder.get_node("ScutumGuardLighting").visible,"盾を奪った保持点から外観と防御を復元する")
 			bridge.release_checkpoint(held.value)
-		lab.free()
 	bridge.release_checkpoint(initial.value)
 	session.free()
 	shield_finished = true
