@@ -30,6 +30,8 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     auto &enemy = runtime.state.enemies[row]; const auto &def = runtime.content->definitions[enemy.definition];
     const Vector2 from = enemy.pos;
     const int64_t token = enemy.attack_managed && enemy.mode == EnemyMode::Windup ? speed::AttackBudgetSystem::token(runtime.state,speed::AttackBudgetSystem::owner(runtime.state,enemy.id,enemy.attack_group)) : 0;
+    const bool stop_for_bite = def.id == StringName("biter");
+    if (stop_for_bite && enemy.mode == EnemyMode::Windup) enemy.vel = Vector2();
     if (far && (enemy.id + runtime.state.ticks) % 3 != 0) { enemy.pos += enemy.vel * dt; return; }
     const double bdt = far ? dt * 3.0 : dt;
     const speed::TrackingPolicy policy{runtime.state.draw.tracing,enemy.held,runtime.state.enemy_handles.contains(enemy.pump_owner)};
@@ -65,6 +67,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
             const double reach = enemy.radius + (def.bite.reach + runtime.state.ship_config.ship_radius);
             if (distance * distance <= reach * reach && admit_bite(row, bdt)) {
                 enemy.mode = EnemyMode::Windup; enemy.timer = def.bite.telegraph;
+                if (stop_for_bite) enemy.vel = Vector2();
                 if (def.id!=StringName("biter")) enemy.flash = 0.1;
             }
         }
