@@ -204,7 +204,12 @@ func _draw() -> void:
 	if _selected < _stars.size():
 		var brackets := _selection_bracket_rect()
 		source = Vector2(brackets.end.x, brackets.position.y)
-	var points := PackedVector2Array([source.round(), Vector2(396, source.y).round(), Vector2(423, 210), Vector2(430, 210)])
+	var elbow := Vector2(396, source.y).round()
+	var profile_entry := Vector2(423, 210)
+	if _selected < _stars.size():
+		# ブラケット上辺に沿う水平線から、縦横同じ距離の45度線で接続する。
+		elbow = Vector2(profile_entry.x - absf(profile_entry.y - source.round().y), source.round().y)
+	var points := PackedVector2Array([source.round(), elbow, profile_entry, Vector2(430, 210)])
 	var total := 0.0
 	for i in range(1, points.size()):
 		total += points[i - 1].distance_to(points[i])
