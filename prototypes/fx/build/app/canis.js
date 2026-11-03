@@ -2,17 +2,46 @@
 const CANIS_IDS = { pounce: ['O02'], command: ['O03', 'O04'], stream: ['O03', 'O04', 'O08'], sirius: ['O05'], sirius_flame: ['O05', 'O06'], howl: ['O07'], bay: ['O09'], blaze: ['O10'], relay: ['O11'], hunt: ['O12'], hunt_pounce: ['O02', 'O04'], nova: ['O13', 'O14'] };
 const moveToward = (a, b, step) => a + clamp(b - a, -step, step);
 const canisMouth = B => add(B.pos, mul(fromA(B.facing), B.r * 0.84));
+// 承認した飛びかかり。元の胴体・脚の倍率を固定し、接続を保って姿勢を変える。
+function predatoryMotion(S){
+ const j=S.jump;if(!j)return null;
+ if(!j.active&&S.B.mode==='windup')return{phase:'load',t:j.t-j.warn};
+ if(j.active&&j.t<j.rule.active&&S.B.mode==='active')return{phase:'strike',t:j.t,span:j.rule.active};
+ const age=S.land?S.t-S.land.t:-1;return age>=0&&age<.5?{phase:'catch',t:age}:null;
+}
+function predatoryCurve(t,keys){
+ if(t<=keys[0][0])return keys[0][1];
+ for(let i=1;i<keys.length;i++)if(t<=keys[i][0]){const a=keys[i-1],b=keys[i],u=smooth(a[0],b[0],t);return lerp(a[1],b[1],u);}
+ return keys.at(-1)[1];
+}
+function predatoryParts(edits,m){
+ const t=m.phase==='load'?m.t:m.phase==='strike'?m.t/m.span*.45:.45+m.t;
+ for(const path of ['RearLeftLeg','RearRightLeg','FrontLeftLeg','FrontRightLeg']){
+  const front=path.startsWith('Front'),side=path.includes('Left')?-1:1,lag=side>0?.018:0,s=t-lag,node=BOSSES.canis_major.nodes.find(n=>n.name===path);
+  const travel=front?predatoryCurve(s,[[-.7,0],[-.18,-1],[-.06,-3],[.035,7],[.17,3],[.32,8],[.4,4],[.46,-5],[.54,-3],[.7,0]])
+   :predatoryCurve(s,[[-.7,0],[-.18,2],[-.06,4],[.035,-7],[.15,-5],[.32,-2],[.42,2],[.49,5],[.57,2],[.7,0]]);
+  const angle=front?predatoryCurve(s,[[-.7,0],[-.16,.05],[-.06,.07],[.04,.01],[.17,.1],[.32,0],[.43,.025],[.53,.06],[.7,0]])
+   :predatoryCurve(s,[[-.7,0],[-.18,.06],[-.06,.12],[.04,.02],[.19,.055],[.4,.06],[.5,.11],[.7,0]]);
+  edits[path]={position:V(node.position.x,node.position.y+travel),rotation:side*angle,scale:V(1,1)};
+ }
+ const chest=predatoryCurve(t,[[-.7,0],[-.18,-1],[-.06,-3],[.035,3],[.2,3],[.4,1],[.48,-3],[.67,0]]);
+ const neck=predatoryCurve(t,[[-.7,0],[-.17,-1],[-.055,-4],[.035,5],[.3,6],[.43,7],[.5,0],[.66,0]]);
+ edits.Body={position:V(0,chest),rotation:0,scale:V(1,1)};
+ edits.Head={position:V(0,42+neck),rotation:0,scale:V(1,1)};
+ edits.Tail={rotation:predatoryCurve(t,[[-.7,0],[-.12,.025],[.09,-.03],[.38,-.015],[.53,.03],[.7,0]]),scale:V(1,1)};
+}
+
 function canisPose(B, t, opts = {}) {
-  const edits = {}, moving = len(B.vel) > 5;
+  const edits = {}, moving = !opts.predatory && len(B.vel) > 5;
   ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => edits[path] = { rotation: Math.sin(B.gait + (i === 0 || i === 3 ? 0 : Math.PI)) * (moving ? 0.16 : 0.015) });
   if (opts.proto) {
     const phases = [0, 0.5, 0.25, 0.75];
     ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => { const node = BOSSES.canis_major.nodes.find(n => n.name === path), phase = ((B.walkPhase || 0) / TAU + phases[i]) % 1, stance = phase < 0.72, stroke = stance ? 1 - 2 * phase / 0.72 : -1 + 2 * smooth(0.72, 1, phase); edits[path] = { rotation: moving ? stroke * 0.26 : 0, position: V(node.position.x + (moving && !stance ? Math.sin((phase - 0.72) / 0.28 * Math.PI) * 3 * (i % 2 ? 1 : -1) : 0), node.position.y + (moving ? stroke * 11 : 0)), scale: V(1, moving && !stance ? 1 - Math.sin((phase - 0.72) / 0.28 * Math.PI) * 0.18 : 1) }; }); // 歩幅を大きく：踏み出す脚は外へ持ち上がり、着いた脚は後ろへ送られる
   }
-  edits.Tail = { rotation: Math.sin(B.gait * 0.4) * 0.07 + (opts.proto && len(B.vel) > 5 ? Math.sin(B.walkPhase || 0) * 0.12 : 0) };
-  if (opts.proto && len(B.vel) > 5) { const w = B.walkPhase || 0; edits.Body = { rotation: Math.sin(w) * 0.05, position: V(Math.sin(w) * 1.5, Math.abs(Math.sin(w)) * 2) }; } // 歩きに合わせて体が左右に揺れ、上下する
+  edits.Tail = { rotation: Math.sin(B.gait * 0.4) * 0.07 + (opts.proto && moving ? Math.sin(B.walkPhase || 0) * 0.12 : 0) };
+  if (opts.proto && moving) { const w = B.walkPhase || 0; edits.Body = { rotation: Math.sin(w) * 0.05, position: V(Math.sin(w) * 1.5, Math.abs(Math.sin(w)) * 2) }; } // 歩きに合わせて体が左右に揺れ、上下する
   edits.Head = { rotation: B.pose.howl ? -0.45 * smooth(0, 0.65, B.charge) : 0 };
-  if (opts.proto && len(B.vel) > 5) edits.Head.rotation -= Math.sin(B.walkPhase || 0) * 0.07; // 歩きに合わせて頭が揺れる
+  if (opts.proto && moving) edits.Head.rotation -= Math.sin(B.walkPhase || 0) * 0.07; // 歩きに合わせて頭が揺れる
   if (opts.proto) {
     // 見た目の部位だけで、静かな構えから咆哮の反動へ移す。役者の位置・方向は保つ。
     const charge = B.mode === 'windup' ? B.charge : 0, release = opts.releaseAge >= 0 ? Math.max(0, 1 - opts.releaseAge / 0.22) : 0;
@@ -30,11 +59,12 @@ function canisPose(B, t, opts = {}) {
     }
     if (B.pose.flame && B.mode === 'active') { edits.Head.rotation += Math.sin(t * 23) * 0.018; edits.Head.position = V(0, 42 + Math.sin(t * 16) * 1.2); }
   }
+  if(opts.proto&&opts.predatory)predatoryParts(edits,opts.predatory);
   return edits;
 }
 function drawCanis(B, t, opts = {}) {
-  const c = B.pose.crouch || 0, k = B.r / 100;
-  const rig = drawBossParts(B, canisPose(B, t, opts), { ...opts, root: M.mk(-Math.PI / 2, k * (1 + c * 0.15), k * (B.pose.stretch || 1), 0, 0) });
+  const c = opts.predatory ? 0 : B.pose.crouch || 0, k = B.r / 100;
+  const rig = drawBossParts(B, canisPose(B, t, opts), { ...opts, root: M.mk(-Math.PI / 2, k * (1 + c * 0.15), k * (opts.predatory ? 1 : B.pose.stretch || 1), 0, 0) });
   if (opts.shadow || !rig['Head/Sirius']) return;
   const at = M.pt(rig['Head/Sirius'], V(0, 0)); B.visualMouth = { ...at }; const q = IMG['canis_major/star'];
   const charge = opts.proto && opts.orderRoar && !B.pose.glow ? 0 : Math.max(B.charge, B.pose.glow || 0), large = IMG['canis_major/large_star'];
@@ -84,6 +114,7 @@ function canisSteer(q, goal, face, cfg, dt, speedRate = 1) {
   q.vel = mul(fromA(q.facing), speed * speedRate); q.pos = add(q.pos, mul(q.vel, dt));
 }
 function canisJump(S, dt, rule, start = false) {
+  if (mode === 'proto') rule = { ...rule, active: rule.active / 1.7 };
   const B = S.B;
   if (start) { S.jump = { t: 0, warn: rule.warn, left: S.pack.length < rule.alone_hounds ? rule.chain : 1, rule, locked: false, active: false }; B.mode = 'windup'; }
   const j = S.jump; if (!j) return false;
@@ -297,7 +328,6 @@ function canisDraw(S, R) {
   if (R.proto) {
     for (const q of S.pack) canisHoundBurn(R, q, t); // 猟犬の攻撃：燃える青い弾（plasma shot からプラズマを抜いた作り）
     if (S.jump && !S.jump.active && S.aim) { const shadow = { ...B, pos: S.aim, pose: {}, vel: V(0, 0) }; g.save(); g.filter = 'brightness(0) blur(5px)'; g.globalAlpha = 0.28 * B.charge; drawCanis(shadow, t, { shadow: true }); g.restore(); }
-    if (S.land) bossBreath(R, S.land.at, B.facing, t - S.land.t, 91, Math.PI, 120);
     if (S.warning) { const w = S.warning; bossGather(R, w.at, B.r, w.k, t); const A = toL(w.at), u = fromA(w.a), n = orth(u);
       for (let i = 0; i < 65; i++) { const phase = (hash(i * 7) + t * 0.4) % 1, d = phase * w.length * WL, width = w.width * WL * (0.5 + hash(i + 1)), q = add(add(A, mul(u, d)), mul(n, (hash(i + 8) - 0.5) * width)); R.back.glow(q.x, q.y, 1.5 + hash(i) * 2, pal[2], (0.06 + w.k * 0.12) * P.intensity); }
     }
@@ -319,8 +349,14 @@ function canisDraw(S, R) {
   }
   R.blitBack();
   if (R.proto) canisTrailPictures(S, R);
-  const mainShout = S.shouts.findLast(e => !e.small);
-  drawCanis(B, t, { proto: R.proto, nova: R.proto && id === 'nova' ? { brace: S.age < r.warn ? smooth(0, r.warn, S.age) : 0, release: canisFlash(S) } : null, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.10 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
+  if (R.proto) drawLanding(S); // 四脚の土煙は体・脚より奥へ描く。
+  const mainShout=S.shouts.findLast(e=>!e.small),predatory=R.proto?predatoryMotion(S):null;
+  if(predatory?.phase==='strike'){
+    g.save();g.filter='brightness(0) blur(2px)';g.globalAlpha=.22;drawCanis(B,t,{proto:true,shadow:true,predatory});g.restore();
+  }
+  const low=predatory?.phase==='strike'?B.r*.04*smooth(0,.025,predatory.t/predatory.span*.45)*(1-smooth(.36,.43,predatory.t/predatory.span*.45)):0;
+  const shown=low?{...B,pos:add(B.pos,V(0,-low))}:B;
+  drawCanis(shown, t, { proto: R.proto, predatory, nova: R.proto && id === 'nova' ? { brace: S.age < r.warn ? smooth(0, r.warn, S.age) : 0, release: canisFlash(S) } : null, orderRoar: CANIS_ROARS.has(id) && !S.jump && !S.flameAim, releaseAge: mainShout ? t - mainShout.t : -1, white: R.proto && id === 'nova' ? canisFlash(S) * 0.10 : R.proto && B.pose.glow ? B.pose.glow * 0.15 : 0 });
   for (const q of S.pack) if (!q.dead && R.proto && id === 'relay' && q.warning > t) { drawEnemy(q); canisRelayTell(R, q, clamp(1 - (q.warning - t) / (q.warnDuration || 0.6)), t); } // 光を継ぐ群れの猟犬の予兆はボスと同じ（口元に光が集まる）
   for (const q of S.pack) if (!q.dead) { if (R.proto && id === 'relay' && q.warning > t) continue; if (R.proto && q.warning > t) canisHoundWarning(q, clamp(1 - (q.warning - t) / (q.warnDuration || 0.6)), angOf(sub(S.ship.pos, q.pos))); else drawEnemy(q); }
   if (R.proto) {

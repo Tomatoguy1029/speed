@@ -357,3 +357,55 @@ function canisRelayTell(R, q, k, t) {
   const m = add(q.pos, mul(fromA(q.facing), q.r)), L = toL(m); bossGather(R, m, q.r * 1.2, k, t, (q.idx || 0) + 3);
   R.front.glow(L.x, L.y, 2 + 5 * k, hexc('#a9dcff'), 0.3 + 0.5 * k); R.front.glow(L.x, L.y, 1 + 2 * k, hexc('#ffffff'), 0.5 * k);
 }
+
+// pixelFX (MIT): impacts/blunt-hit.js の粒の動きを SPEED の俯瞰表示に合わせる。
+// pixelfx blunt-hit の減速・膨張・薄まり方を使用。粒を3軸で動かしてから投影する。
+// 白い芯・発光・輪・三角片は描かない。
+function pounceFeet(S){
+ const B={...S.B,pos:S.land.at,facing:S.land.facing??S.B.facing},k=B.r/100;
+ const edits=canisPose(B,S.land.t,{proto:true,predatory:{phase:'catch',t:0}}),rearEdits=canisPose(B,S.land.t+.045,{proto:true,predatory:{phase:'catch',t:.045}}),mats={};
+ const root=M.mul(M.mk(B.facing,1,1,B.pos.x,B.pos.y),M.mk(-Math.PI/2,k,k,0,0));
+ for(const n of BOSSES.canis_major.nodes.slice(1)){
+  const path=n.parent==='.'?n.name:n.parent+'/'+n.name,e=(path.startsWith('Rear')?rearEdits:edits)[path]||{},pos=e.position||n.position||V(0,0),sc=e.scale||n.scale||V(1,1),parent=n.parent==='.'?root:mats[n.parent];
+  if(parent)mats[path]=M.mul(parent,M.mk(e.rotation??n.rotation??0,sc.x,sc.y,pos.x,pos.y));
+ }
+ return ['FrontLeftLeg','FrontRightLeg','RearLeftLeg','RearRightLeg'].map((name,i)=>{const rear=i>=2,flip=i%2;return {at:M.pt(mats[name+'/Sprite'],V((flip?-1:1)*(rear?2.871:2.558),rear?31.952:28.45)),side:flip?-1:1,seed:[9,37,71,101][i],variant:i,delay:rear?.045:0};});
+}
+function landingProject(point,forward,right,x,y,z){
+ // XYはゲームの地面、Zは高さ。上から見たゲーム画面へ同じ座標で投影。
+ return toL(V(point.x+forward.x*x+right.x*y,point.y+forward.y*x+right.y*y-z*.45));
+}
+function drawLanding(S){
+ if(!S.land)return;const age=S.t-S.land.t;if(age<0||age>.62)return;
+ if(!S.land.feet){S.land.facing=S.B.facing;S.land.feet=pounceFeet(S);}
+ const frame=drawLanding.frame||=PX.createFrame(LW,LH);PX.clearFrame(frame);const p=new PX.Painter(frame);
+ const f=fromA(S.land.facing),r=orth(f);
+ const dust=hexc('#887f74'),lit=hexc('#aca397'),shade=hexc('#625c55');
+ for(const foot of S.land.feet){
+  const clock=(age-foot.delay)*1.65;if(clock<0)continue;
+  const shape=[{n:18,x:1,y:1,z:.8,s:1.05},{n:23,x:1,y:1,z:.6,s:.85},{n:16,x:1,y:1,z:1.2,s:.95},{n:21,x:1,y:1,z:.7,s:1}][foot.variant];
+  for(let i=0;i<shape.n;i++){
+   const seed=foot.seed+i*23,h=n=>hash(seed+n),delay=h(11)*.035,t=clock-delay,life=.28+h(12)*.5;
+   if(t<0||t>life)continue;
+   const lifeK=1-t/life,drag=(1-Math.exp(-4.5*t))/4.5;
+   // 接地点から地面の全周へ。速度と発生半径をばらし、土煙の輪郭を不揃いにする。
+   const angle=i/shape.n*TAU+hash(foot.seed*7)*TAU+(h(13)-.5)*.35,speed=20+h(14)*75;
+   const radius=h(16)*3+speed*drag,vz=5+h(15)*22;
+   const x=Math.cos(angle)*radius,y=Math.sin(angle)*radius,z=vz*t*.7;
+   const q=landingProject(foot.at,f,r,x*1.25*shape.x,y*1.25*shape.y,z*1.25*shape.z),size=1.25*shape.s*(3+h(18)*5)*(.7+(1-lifeK)*.85)*WL;
+   const alpha=Math.pow(lifeK,1.25)*Math.min(1,t/.018)*(1-smooth(.42,.62,age)),phase=h(19)*TAU;
+   // 元のlumpと同じ角度依存の縁。均一な円にはしない。
+   const edge=a=>.81+.1*Math.sin(a*5+phase)+.055*Math.sin(a*9+phase*2.3);
+   p.disc(q.x,q.y,size*1.22,shade,(d,a)=>d>edge(a)?0:alpha*.42*(1-d*d*.65));
+   p.disc(q.x-size*.12,q.y-size*.15,size, dust,(d,a)=>d>edge(a)?0:alpha*.54*(1-d*d*.7));
+   p.disc(q.x-size*.22,q.y-size*.27,size*.56,lit,(d,a)=>d>edge(a)?0:alpha*.20*(1-d*d));
+  }
+  for(let i=0;i<13;i++){
+   const seed=foot.seed+i*43+810,h=n=>hash(seed+n),t=clock,life=.25+h(1)*.4;if(t>life)continue;
+   const drag=(1-Math.exp(-3.5*t))/3.5,angle=i/13*TAU+hash(foot.seed*11)*TAU+(h(2)-.5)*.4,radius=h(3)*3+(35+h(4)*110)*drag;
+   const x=Math.cos(angle)*radius,y=Math.sin(angle)*radius,z=Math.max(0,(25+h(6)*50)*t-140*t*t);
+   const q=landingProject(foot.at,f,r,x*1.25*shape.x,y*1.25*shape.y,z*1.25*shape.z);p.dot(q.x,q.y,i%3?shade:dust,(1-t/life)*.8);
+  }
+ }
+ blitFrame(frame);worldTransform();
+}
