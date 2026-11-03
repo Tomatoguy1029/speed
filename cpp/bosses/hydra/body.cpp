@@ -42,7 +42,7 @@ void HydraBody::spawned(RunRuntime &r,BossBodyState &b) {
     for (auto &e:s.enemies) {e.body_gap=-1;if (e.alive && !e.dead && e.id!=s.enemy_handles.entity_id(b.actor)) {const auto next=clear(e.pos,e.radius);if (next!=e.pos) {e.pos=next;e.vel={};}}}
     for (auto &shot:s.hostiles) shot.gap=0;
     for (auto &rock:s.field.rocks) if (!rock.destroyed) {const auto pos=FieldSystem::rock_at(r,rock),next=clear(pos,rock.size);if (next!=pos) {rock.position=next;rock.velocity={};}}
-    for (auto &v:s.pickups.gems) if (v.alive) {const auto next=clear(v.pos,12);if (next!=v.pos) {v.pos=next;v.velocity={};}}
+    for (size_t row=0;row<s.pickups.gems.size();++row) {auto &v=s.pickups.gems[row];if (v.alive) {const auto next=clear(v.pos,12);if (next!=v.pos) {s.pickups.move_gem(row,next);v.velocity={};}}}
     for (auto &v:s.pickups.coins) if (v.alive) v.pos=clear(v.pos,12);for (auto &v:s.pickups.capsules) v.pos=clear(v.pos,24);
     b.hydra.major_cd=0;for (const auto &v:r.content->hydra_majors) if (r.content->boss_techniques[v.technique-1].boss==r.content->boss_bodies[b.definition-1].boss) b.hydra.major_cd=v.global_cd*0.6;
     HydraRegrow::set_count(r,b,3);

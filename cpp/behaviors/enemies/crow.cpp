@@ -27,13 +27,13 @@ void CrowBehavior::gather(RunRuntime &r,double dt) {
     for (auto row:s.behavior_rows[size_t(kind-s.behavior_kinds.begin())]) {
         const auto &e=s.enemies[row];if (e.dead) continue;const auto &p=r.content->crows[r.content->definitions[e.definition].crow_definition-1];
         const double reach=std::max(p.gather_width,p.gather_behind)+e.radius,step=p.gather_speed*dt;const auto u=godot::Vector2::from_angle(e.facing),feet=e.pos-u*e.radius*0.62;
-        for (size_t crystal=0;crystal<s.pickups.gems.size();++crystal) {
+        for (size_t crystal:s.pickups.query_gems(godot::Rect2(e.pos-godot::Vector2(reach,reach),godot::Vector2(reach*2,reach*2)))) {
             auto &gem=s.pickups.gems[crystal];if (!gem.alive || gem.pulled || gem.wait>0) continue;
             const auto rel=gem.pos-e.pos;if (rel.length_squared()>=reach*reach) continue;const double along=rel.dot(u);
             if (along>e.radius*0.3 || along<-p.gather_behind || std::abs(rel.cross(u))>p.gather_width) continue;
             const auto delta=feet-gem.pos;const double distance=delta.length();
             if (distance<=step+4) PickupSystem::carry(r,s.enemy_handles.at(uint32_t(row)),crystal);
-            else gem.pos+=delta/distance*step;
+            else s.pickups.move_gem(crystal,gem.pos+delta/distance*step);
         }
     }
 }

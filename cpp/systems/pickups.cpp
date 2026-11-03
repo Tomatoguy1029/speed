@@ -102,24 +102,36 @@ bool SpeedRunCore::step_pickups(double world_dt) {
     const double gem_radius = runtime.state.pickup_config.xp_radius;
     const double step = (700.0 + runtime.state.ship.vel.length() * 1.2) * runtime.state.pickup_config.speed_mult * world_dt;
     const double far = std::max(gem_radius, reach), far_sq = far * far;
-    for (auto &gem:runtime.state.pickups.gems) if (gem.alive && gem.wait>0) {gem.pos+=gem.velocity*world_dt;gem.velocity*=std::exp(-world_dt*5.0);gem.wait=speed::remaining_time(gem.wait,world_dt);}
+    auto &pickups=runtime.state.pickups;
+    const std::vector<size_t> moving(pickups.moving_gems.begin(),pickups.moving_gems.end());
+    for (auto row:moving) {
+        auto &gem=pickups.gems[row];
+        if (gem.wait<=0) continue;
+        const auto next=gem.pos+gem.velocity*world_dt;
+        gem.velocity*=std::exp(-world_dt*5.0);gem.wait=speed::remaining_time(gem.wait,world_dt);
+        pickups.move_gem(row,next);
+    }
     speed::CrowBehavior::gather(runtime,world_dt);
-    for (size_t row = 0; row < runtime.state.pickups.gems.size(); ++row) {
-        auto &gem = runtime.state.pickups.gems[row];
-        if (!gem.alive) continue;
-        if (gem.wait>0) continue;
-        if (!gem.pulled && runtime.state.ship.pos.distance_squared_to(gem.pos) >= far_sq) continue;
-        const Vector2 p = gem.pos, d = runtime.state.ship.pos - p;
-        const double distance = d.length();
-        if (distance < gem_radius || gem.pulled) {
-            gem.pulled = true;
-            gem.pos = p + d / std::max(distance, 1.0) * std::min(step, distance);
+    auto candidates=pickups.query_gems(Rect2(runtime.state.ship.pos-Vector2(far,far),Vector2(far*2,far*2)));
+    candidates.insert(candidates.end(),pickups.moving_gems.begin(),pickups.moving_gems.end());
+    std::sort(candidates.begin(),candidates.end());candidates.erase(std::unique(candidates.begin(),candidates.end()),candidates.end());
+    std::vector<size_t> collected;
+    for (size_t row:candidates) {
+        auto &gem=pickups.gems[row];
+        if (!gem.alive || gem.wait>0) continue;
+        if (!gem.pulled && runtime.state.ship.pos.distance_squared_to(gem.pos)>=far_sq) continue;
+        const Vector2 p=gem.pos,d=runtime.state.ship.pos-p;
+        const double distance=d.length();
+        if (distance<gem_radius || gem.pulled) {
+            gem.pulled=true;
+            pickups.move_gem(row,p+d/std::max(distance,1.0)*std::min(step,distance));
         }
-        if (distance < reach) {
-            if (runtime.state.pickup_config.fixed_rewards) speed::PickupSystem::collect_rows(*this,{row},speed::CrystalCollectMethod::Ship);
+        if (distance<reach) {
+            if (runtime.state.pickup_config.fixed_rewards) collected.push_back(row);
             else {collect_pickup("gem",gem.value);speed::PickupSystem::release_crystal(runtime,row,speed::CrystalRemoval::Collected);}
         }
     }
+    if (!collected.empty()) speed::PickupSystem::collect_rows(*this,collected,speed::CrystalCollectMethod::Ship);
     const double coin_radius = runtime.state.pickup_config.coin_radius * 1.3;
     const double coin_step = (700.0 + runtime.state.ship.vel.length() * 1.2) * world_dt;
     const double coin_far = std::max(coin_radius, reach), coin_far_sq = coin_far * coin_far;
@@ -149,7 +161,8 @@ PackedFloat32Array SpeedRunCore::pickup_buffer(StringName kind, double size, Col
     const bool is_gem = kind == StringName("gem");
     if (!is_gem && kind != StringName("coin")) return buffer;
     int64_t count = 0;
-    if (is_gem) { for (const auto &gem : runtime.state.pickups.gems) if (gem.alive && view.has_point(gem.pos)) ++count; }
+    const auto gem_rows=is_gem?runtime.state.pickups.query_gems(view):std::vector<size_t>{};
+    if (is_gem) count=int64_t(gem_rows.size());
     else { for (const auto &coin : runtime.state.pickups.coins) if (coin.alive && view.has_point(coin.pos)) ++count; }
     buffer.resize(count * 12);
     float *out = buffer.ptrw();
@@ -160,8 +173,7 @@ PackedFloat32Array SpeedRunCore::pickup_buffer(StringName kind, double size, Col
         out[index++] = color.r; out[index++] = color.g; out[index++] = color.b; out[index++] = color.a;
     };
     if (is_gem) {
-        for (const auto &gem : runtime.state.pickups.gems) if (gem.alive && view.has_point(gem.pos))
-            append(gem.pos, size * (gem.value <= 1.0 ? 1.0 : std::min(std::pow(gem.value, 0.2), 3.0)));
+        for (auto row:gem_rows) append(runtime.state.pickups.gems[row].pos,size);
     } else { for (const auto &coin : runtime.state.pickups.coins) if (coin.alive && view.has_point(coin.pos)) append(coin.pos, size); }
     return buffer;
 }

@@ -155,7 +155,7 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         Array rows;for (const auto &g:entry.crystals) {++carried[g.kind].count;carried[g.kind].base_xp+=g.value;if (initial) rows.push_back(crystal(g));}
         if (initial) {Dictionary row;row["enemy_id"]=entry.enemy_id;row["crystals"]=rows;existing_cargo.push_back(row);}
     }
-    Dictionary cap;cap["mode"]="oldest_high_absorber";cap["limit"]=s.pickup_config.gem_max;cap["absorber_id"]=p.gem_absorber_id?int64_t(p.gem_absorber_id):-1;
+    Dictionary cap;cap["mode"]="offscreen_low_far_old";cap["limit"]=s.pickup_config.gem_max;cap["absorber_id"]=p.gem_absorber_id?int64_t(p.gem_absorber_id):-1;
     Dictionary xp;xp["supplied"]=totals(p.supplied);xp["collected"]=totals(p.collected);xp["lost"]=totals(p.lost);xp["ground"]=totals(ground);xp["carried"]=totals(carried);xp["cap"]=cap;
     Dictionary rolls;rolls["eligible"]=int64_t(p.gold_rolls);rolls["won"]=int64_t(p.gold_won);xp["gold_rolls"]=rolls;xp["collected_actual_xp"]=p.collected_actual_xp;
     int64_t weapons=0,traits=0,wm=0,tm=0;Dictionary weapon_levels,trait_levels;
