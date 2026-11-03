@@ -1457,7 +1457,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 				var layers: Dictionary = library.get_meta("looks",{}).get(event.get("scene",""),{})
 				var phase: String = event.phase
 				_attack_ends.append({"mesh":layers.get(phase),"sprites":layers.get(phase+"_sprites",[]),"pos":event.pos,"duration":event.get("duration",0.25 if phase=="Hit" else 0.2),"age":0.0,"tint":event.get("tint",Color.WHITE)})
-		if event.type==&"explode" and event.get("cause",&"") not in [&"endBlast",&"runUp",&"mine",&"pumpBurst"]:
+		if event.type==&"explode" and event.get("cause",&"") not in [&"endBlast",&"runUp",&"mine"]:
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":event.life,"max":event.life})
 			if event.radius>=150.0 and pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.4)
 		if event.type==&"debris_trail" and event.get("life",0.0)>0.0:

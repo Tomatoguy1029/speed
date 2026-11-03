@@ -16,15 +16,19 @@ void vertex() {
 	instance_y = normalize(MODEL_MATRIX[1].xy);
 }
 void fragment() {
-	if (death_enabled && texture(death_map, UV).r <= death_age) discard;
+	vec3 mapped = death_sample(UV, death_age);
+	if (mapped.z < 0.5) discard;
+	vec2 sprite_uv = mapped.xy;
 	// RGBは共通の確定塗装、アルファと法線は制作時に分割した部位。
-	vec4 armor = texture(paint_tex, UV);
-	float alpha = texture(TEXTURE, UV).a;
+	vec4 armor = texture(paint_tex, sprite_uv);
+	float alpha = texture(TEXTURE, sprite_uv).a;
 	COLOR = vec4(mix(armor.rgb, vec3(1.0), hit_flash * 0.8) * ambient * brightness, alpha);
+	if (death_enabled) NORMAL = texture(NORMAL_TEXTURE, sprite_uv).rgb * vec3(2.0, -2.0, 2.0) + vec3(-1.0, 1.0, -1.0);
 	vec3 surface_normal = normalize(vec3(NORMAL.xy * normal_strength, max(NORMAL.z, 0.001)));
 	NORMAL = vec3(mat2(instance_x, instance_y) * surface_normal.xy, surface_normal.z);
 }
 void light() {
-	vec3 albedo = mix(texture(paint_tex, UV).rgb, vec3(1.0), hit_flash * 0.8);
+	vec2 sprite_uv = death_sample(UV, death_age).xy;
+	vec3 albedo = mix(texture(paint_tex, sprite_uv).rgb, vec3(1.0), hit_flash * 0.8);
 	LIGHT = vec4(albedo * brightness * LIGHT_COLOR.rgb * LIGHT_ENERGY * max(dot(NORMAL, LIGHT_DIRECTION), 0.0), LIGHT_COLOR.a);
 }

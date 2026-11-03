@@ -11,7 +11,9 @@ void vertex() {
 	hit_flash = COLOR.r;
 }
 void fragment() {
-	if (death_enabled && texture(death_map, UV).r <= death_age) discard;
-	vec4 sprite = texture(TEXTURE, UV);
+	vec3 mapped = death_sample(UV, death_age);
+	if (mapped.z < 0.5) discard;
+	vec2 sprite_uv = mapped.xy;
+	vec4 sprite = texture(TEXTURE, sprite_uv);
 	COLOR = vec4(mix(sprite.rgb, vec3(1.0), hit_flash * 0.8) * brightness, sprite.a);
 }

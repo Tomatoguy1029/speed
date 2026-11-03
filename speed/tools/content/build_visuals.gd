@@ -184,7 +184,7 @@ static func _build_meteor_pieces(output: String) -> Error:
 
 static func _validate_elite_death() -> Error:
 	var baked := ResourceLoader.load("res://assets/effects/elite_death/masks.tres","",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	if baked == null or baked.get_meta("bake_version",0)!=1: return ERR_INVALID_DATA
+	if baked == null or baked.get_meta("bake_version",0)!=2: return ERR_INVALID_DATA
 	for group in ["inputs","outputs"]:
 		for path: String in baked.get_meta(group,{}):
 			if not FileAccess.file_exists(path) or FileAccess.get_sha256(path)!=baked.get_meta(group)[path]:

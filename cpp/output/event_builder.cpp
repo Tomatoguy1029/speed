@@ -73,9 +73,8 @@ void EventBuilder::enemy_kill(RunRuntime &run,const DeathContext &death) {
     event.radius=death.corpse.radius;event.facing=death.corpse.facing;event.elite=death.corpse.elite;
     if (!death.corpse.is_boss && run.state.enemy_handles.contains(death.target)) {
         const auto &enemy=run.state.enemies[death.target.slot];const auto &d=run.content->definitions[enemy.definition];
-        // 星3〜5の強敵と三角の星。雑魚のエリート・大物・ボス部位は対象外。
-        const bool triangle_star=d.kind==EnemyDefinition::Kind::TriangleStar;
-        if (((d.rank>=3 && d.rank<=5) || triangle_star) && (!enemy.parent.generation || triangle_star) && !enemy.clone_visual && !enemy.picaro_owner.generation && death.request.cause!=Cause::Afterimage && death.request.cause!=Cause::Vortex) {
+        // 星3〜5の強敵のみ。雑魚のエリート・大物・従属部位は対象外。
+        if (d.rank>=3 && d.rank<=5 && !enemy.parent.generation && !enemy.clone_visual && !enemy.picaro_owner.generation && death.request.cause!=Cause::Afterimage && death.request.cause!=Cause::Vortex) {
             auto &v=event.death_visual;v.visual=d.visual_id;v.velocity=death.corpse.vel;
             v.radius=enemy.radius*d.sprite_scale;v.angle=enemy.facing+d.sprite_angle;
             v.mode=int32_t(enemy.mode);v.charge=enemy.charge;v.timer=enemy.timer;v.rest=d.bite.rest;

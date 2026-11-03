@@ -2,7 +2,6 @@
 extends Node
 const MASKS := "res://assets/effects/elite_death/masks.tres"
 const DISPLAY := preload("res://scripts/render/run_enemy_frame.gd")
-const LIMIT := 128
 var _scope: ContentResourceScope
 var _entries: Dictionary
 var _masks: Dictionary
@@ -26,7 +25,7 @@ func clear() -> void:
 	_displays.clear()
 
 func add_event(event: Dictionary, now: float, view: Rect2) -> void:
-	if not event.has("death_visual") or _active.size()>=LIMIT: return
+	if not event.has("death_visual"): return
 	var pose: Dictionary = event.death_visual
 	var entry: Dictionary = _entries.get(pose.visual_id,{})
 	if entry.get("role",-1)!=6: return

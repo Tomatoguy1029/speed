@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Bake inward fragment erosion from the existing landmark silhouettes (Pillow only).
+"""Bake fragment contraction from the existing landmark silhouettes (Pillow only).
 
 No runtime partitioning, random numbers, particle trajectories or image reads.
-Each source pixel stores its disappearance time during the half-second death.
+Sixteen frames store source coordinates of independently shrinking fragments.
+Their centers inherit the original world velocity; no outward scattering is added.
 """
 from pathlib import Path
 import hashlib
@@ -26,6 +27,8 @@ def bake():
     outputs, entries = {}, {}
     source = MANIFEST.read_text().split('metadata/masks = ', 1)[1]
     for key, body in re.findall(r'"(res://data/visuals/looks/[^\"]+)": \{(.*?)\}', source, re.S):
+        # Joined silhouettes are only for outlines; each rendered half uses its own source UV.
+        if not key.endswith(".tres"): continue
         path = re.search(r'"file": "([^\"]+)"', body)[1]
         mask_path = ROOT / path[6:]
         inputs[path] = sha(mask_path)
@@ -42,19 +45,28 @@ def bake():
                     seeds.append((sx,sy,rng.uniform(0.56,0.98)))
         if not seeds:
             raise ValueError('Empty death silhouette: '+key)
-        cells = [[] for _ in seeds]
+        assert max(width,height)<=256, 'Source coordinates use one byte per axis'
+        labels = []
         for y in range(height):
             for x in range(width):
-                index = min(range(len(seeds)),key=lambda i:(x-seeds[i][0])**2+(y-seeds[i][1])**2)
-                distance = math.hypot(x-seeds[index][0],y-seeds[index][1])
-                cells[index].append((x,y,distance))
-        image = Image.new('L',(width,height))
-        for seed, cell in zip(seeds,cells):
-            extent = max(1.0,max(p[2] for p in cell))
-            for x,y,distance in cell:
-                # Edges disappear first, leaving small islands that contract in place.
-                threshold = 0.10+(seed[2]-0.10)*(1.0-distance/(extent+0.5))
-                image.putpixel((x,y),max(1,min(250,round(threshold*255))))
+                labels.append(min(range(len(seeds)),key=lambda i:(x-seeds[i][0])**2+(y-seeds[i][1])**2))
+        # RG stores original source pixel coordinates, B stores coverage. Inverse
+        # mapping moves the painted pixels with the entire fragment, unlike an
+        # alpha threshold which only erodes a stationary image. Each Voronoi cell
+        # is convex, so contracting around its seed cannot overlap another cell.
+        image = Image.new('RGB',(width*4,height*4))
+        for frame in range(16):
+            age = frame/15.0
+            for y in range(height):
+                for x in range(width):
+                    label = labels[y*width+x]
+                    cx,cy,end = seeds[label]
+                    scale = max(0.0,1.0-age/end)
+                    if scale<=0.001: continue
+                    sx = math.floor(cx+0.5+(x-cx)/scale)
+                    sy = math.floor(cy+0.5+(y-cy)/scale)
+                    if 0<=sx<width and 0<=sy<height and labels[sy*width+sx]==label:
+                        image.putpixel(((frame%4)*width+x,(frame//4)*height+y),(sx,sy,255))
         name = Path(key).stem
         target = OUTPUT / (name+'.png')
         image.save(target)
@@ -83,7 +95,7 @@ process/fix_alpha_border=false
     lines = [f'[gd_resource type="Resource" load_steps={len(entries)+1} format=3]', '']
     for i,path in enumerate(entries.values()):
         lines.append(f'[ext_resource type="Texture2D" path="{path}" id="{i+1}"]')
-    lines += ['', '[resource]', 'metadata/bake_version = 1', 'metadata/lifetime = 0.5',
+    lines += ['', '[resource]', 'metadata/bake_version = 2', 'metadata/lifetime = 0.5',
               'metadata/inputs = '+json.dumps(inputs,sort_keys=True),
               'metadata/outputs = '+json.dumps(outputs,sort_keys=True),
               'metadata/masks = {'+',\n'.join(json.dumps(key)+f': ExtResource("{i+1}")' for i,key in enumerate(entries))+'}']

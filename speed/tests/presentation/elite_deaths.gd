@@ -28,8 +28,30 @@ func add_look(id: int, name: String, pump := false) -> void:
 func event(id: int, visual := 1) -> Dictionary:
 	return {"id":id,"pos":Vector2(20,30),"world_t":10.0,"death_visual":{"visual_id":visual,"velocity":Vector2(80,-40),"radius":30.0,"angle":0.7,"mode":1,"charge":0.6,"timer":0.2,"rest":0.5,"ruler_side":0,"pump_scale":2.0 if visual==2 else 0.0,"pump_full":0.8,"pump_stored":0.6}}
 
+func check_fragment_motion() -> void:
+	var baked: Resource = scope.resources[DEATHS.MASKS]
+	var texture: Texture2D = baked.get_meta("masks")["res://data/visuals/looks/shield.tres"]
+	var atlas := texture.get_image()
+	var width := atlas.get_width()/4
+	var height := atlas.get_height()/4
+	var moved := 0
+	var first_matches := true
+	var last_empty := true
+	for y in height:
+		for x in width:
+			var first := atlas.get_pixel(x,y)
+			first_matches = first_matches and roundi(first.r*255)==x and roundi(first.g*255)==y and first.b>0.99
+			last_empty = last_empty and atlas.get_pixel(width*3+x,height*3+y).b<0.01
+			for frame in range(1,15):
+				var sample := atlas.get_pixel(width*(frame%4)+x,height*(frame/4)+y)
+				if sample.b>0.99 and (roundi(sample.r*255)!=x or roundi(sample.g*255)!=y): moved+=1
+	check(first_matches,"最初のコマは元画像をそのまま参照")
+	check(last_empty,"最後のコマは全破片が消える")
+	check(moved>0,"アルファを削るだけでなく破片内の絵も動く")
+
 func run() -> void:
 	scope.resources[DEATHS.MASKS] = load(DEATHS.MASKS)
+	check_fragment_motion()
 	add_look(1,"shield")
 	add_look(2,"pump",true)
 	effect = DEATHS.new()
@@ -57,12 +79,12 @@ func run() -> void:
 	check(effect._active.is_empty(),"到達しない画面外の敵を生成しない")
 	effect.clear()
 	for i in 256: effect.add_event(event(i+100),10.0,VIEW)
-	check(effect._active.size()==DEATHS.LIMIT,"同時撃破の上限")
+	check(effect._active.size()==256,"128体を超えても撃破表示を落とさない")
 	var start := Time.get_ticks_usec()
 	for i in 60: effect.step(10.0+float(i)/120.0,VIEW)
 	var cpu_ms := float(Time.get_ticks_usec()-start)/60000.0
 	check(effect._displays.size()==1,"同じ外観は1表示にまとめる")
-	check(effect._displays[1]._parts[0].base.multimesh.visible_instance_count==DEATHS.LIMIT,"本体の描画をバッチ化")
+	check(effect._displays[1]._parts[0].base.multimesh.visible_instance_count==256,"本体の描画をバッチ化")
 	effect.clear()
 	for i in 128: effect.add_event(event(i+500,2),10.0,VIEW)
 	effect.step(10.0,VIEW)
@@ -73,7 +95,7 @@ func run() -> void:
 	print("128 pump bodies CPU update mean=%.3f ms (headless; GPU excluded)" % pump_cpu_ms)
 	effect.step(9.0,VIEW)
 	check(effect._active.is_empty(),"巻き戻しで古い死体を消す")
-	print("elite_deaths failures=%d, 128 bodies CPU update mean=%.3f ms (headless; GPU excluded)" % [failures,cpu_ms])
+	print("elite_deaths failures=%d, 256 bodies CPU update mean=%.3f ms (headless; GPU excluded)" % [failures,cpu_ms])
 	effect.queue_free()
 	await process_frame
 	quit(0 if failures==0 else 1)

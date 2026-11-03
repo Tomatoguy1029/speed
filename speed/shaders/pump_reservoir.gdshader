@@ -32,7 +32,10 @@ void fragment() {
 	if (!front && full > 0.001) source = pump_source(p, radii);
 	bool valid = source.x >= 0.0 && source.x < 24.0 && source.y >= (front ? 0.0 : 18.0) && source.y < 37.0;
 	vec2 sample_uv = (source + 0.5) / vec2(24.0, 37.0);
-	if (death_enabled && texture(death_map, sample_uv).r <= death_age) discard;
+	vec3 mapped = death_sample(sample_uv, death_age);
+	if (mapped.z < 0.5) discard;
+	sample_uv = mapped.xy;
+	if (death_enabled) source = sample_uv * vec2(24.0, 37.0) - 0.5;
 	vec4 base = valid && (front || rear) ? texture(base_tex, sample_uv) : vec4(0.0);
 	vec4 armor = valid && (front || rear) ? texture(armor_tex, sample_uv) : vec4(0.0);
 	vec4 contents = vec4(0.0);
