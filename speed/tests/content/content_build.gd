@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--incremental-only" in OS.get_cmdline_user_args():
+		check_incremental()
+		print("[incremental_build] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--run-content-only" in OS.get_cmdline_user_args():
 		check(check_run_content(), "ステージ生成の確認が最後まで完了する")
 		print("[run_content] failed=%d" % failed)
@@ -101,3 +106,48 @@ func check_run_content() -> bool:
 	session.free()
 	DirAccess.remove_absolute(saved_path)
 	return true
+
+## 独立コピーでF5前の生成だけを確認し、変更を元に戻す。
+func check_incremental() -> void:
+	var builder = load("res://addons/content_build/builder.gd")
+	var generator = load("res://tools/content/build_run_content.gd")
+	var before := {}
+	for number in range(1,6):
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://.content/run/stage_%d.json" % number))
+		before[number] = index.payload_sha256
+	var started := Time.get_ticks_usec()
+	check(builder.build_all()==OK,"差分生成の初回キャッシュを作る")
+	print("[incremental initial_ms] ",(Time.get_ticks_usec()-started)/1000.0)
+	for number in range(1,6):
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://.content/run/stage_%d.json" % number))
+		check(index.payload_sha256==before[number],"生成方法を変えても戦闘データは変わらない: %d" % number)
+	started = Time.get_ticks_usec()
+	check(builder.build_all()==OK,"変更なしで実行前の生成を呼べる")
+	check(builder.last_build_report.all(func(row): return not row.rebuilt),"変更なしでは全ての生成を再利用する")
+	print("[incremental unchanged_ms] ",(Time.get_ticks_usec()-started)/1000.0," units=",builder.last_build_report)
+	var source_path := "res://data/stages/stage_1.tres"
+	var original_stage := FileAccess.get_file_as_string(source_path)
+	var stage: StageDef = ResourceLoader.load(source_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	stage.time_limit += 1.0
+	check(ResourceSaver.save(stage,source_path)==OK,"独立コピーのステージ1だけを調整する")
+	started = Time.get_ticks_usec()
+	check(builder.build_all()==OK,"変更したステージを生成する")
+	for row: Dictionary in builder.last_build_report:
+		if row.unit.begins_with("stage_"): check(row.rebuilt==(row.unit=="stage_1"),"ステージ1の変更で他のステージを作り直さない: "+row.unit)
+	print("[incremental stage1_ms] ",(Time.get_ticks_usec()-started)/1000.0," units=",builder.last_build_report)
+	DirAccess.remove_absolute("res://.content/dev/stage_1.json")
+	check(not builder.is_current(),"生成物の欠落を検出する")
+	var prepared_before: int = generator.preparation_build_count
+	check(builder.build_all()==OK and builder.is_current(),"欠落した記録名を再生成する")
+	check(generator.preparation_build_count==prepared_before,"欠落の修復でも計算済みの戦闘を再利用する")
+	var ui_path := "res://scripts/ui/hud.gd"
+	var original_ui := FileAccess.get_file_as_string(ui_path)
+	FileAccess.open(ui_path,FileAccess.WRITE).store_string(original_ui+"\n# 差分生成の確認用。\n")
+	prepared_before = generator.preparation_build_count
+	started = Time.get_ticks_usec()
+	check(builder.build_all()==OK,"UI変更後の資源情報を更新する")
+	check(generator.preparation_build_count==prepared_before,"UI変更で戦闘データを計算し直さない")
+	print("[incremental ui_ms] ",(Time.get_ticks_usec()-started)/1000.0," units=",builder.last_build_report)
+	FileAccess.open(ui_path,FileAccess.WRITE).store_string(original_ui)
+	FileAccess.open(source_path,FileAccess.WRITE).store_string(original_stage)
+	check(builder.build_all()==OK and builder.is_current(),"確認用の入力を元に戻して生成物をそろえる")

@@ -33,60 +33,161 @@ static func is_current(output := ROOT) -> bool:
 	for path in saved.get("outputs", []):
 		if not FileAccess.file_exists(path): return false
 	return true
+static var last_build_report: Array[Dictionary] = []
+
+static func _select(files: PackedStringArray, prefixes: Array) -> PackedStringArray:
+	var chosen := PackedStringArray(["res://project.godot", "res://addons/content_build/builder.gd", "res://addons/content_build/incremental.gd"])
+	for path in files:
+		for prefix: String in prefixes:
+			if path.begins_with(prefix):
+				if not path in chosen: chosen.append(path)
+				break
+	return chosen
+
+static func _result(error: Error, paths: PackedStringArray) -> Dictionary:
+	return {"error":error,"outputs":paths}
+
+static func _visual_outputs(output: String) -> PackedStringArray:
+	var paths := PackedStringArray([output.path_join("visual_index.tres"),output.path_join("meteor_pieces.res")])
+	for name in DirAccess.get_files_at("res://data/visuals/looks"):
+		if name.ends_with(".tres"):
+			paths.append(output.path_join("look_"+name.get_basename()+".res"))
+			paths.append(output.path_join("dev/armor_"+name.get_basename()+".res"))
+	return paths
+
+static func _bundle_outputs(path: String) -> PackedStringArray:
+	var index = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+	return PackedStringArray([path,index.binary,index.resources]) if index is Dictionary else PackedStringArray()
+
+## 一つのステージの配置・記録名・診断入力・戦闘データを同じ入力から作る。
+static func _build_stage(source: StageDef, output: String, input_signature: String, reuse_prepared: bool) -> Dictionary:
+	var config := load("res://data/config.tres") as GameConfig
+	var stage := preload("res://tools/content/build_runtime_stage.gd").compile(source,output,config)
+	if stage == null: return _result(ERR_INVALID_DATA, PackedStringArray())
+	var paths := PackedStringArray([output.path_join("stage_%d.tres" % source.index),output.path_join("dev/stage_%d.json" % source.index),output.path_join("dev/native_spawn_%d.bin" % source.index)])
+	var error := ResourceSaver.save(stage,paths[0])
+	if error != OK: return _result(error,paths)
+	# 保存済み配置の数値精度を通常の生成経路とそろえる。
+	stage = ResourceLoader.load(paths[0],"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
+	if stage == null: return _result(ERR_FILE_CORRUPT,paths)
+	var names := FileAccess.open(paths[1],FileAccess.WRITE)
+	if names == null: return _result(FileAccess.get_open_error(),paths)
+	names.store_string(JSON.stringify(preload("res://tools/content/build_runtime_stage.gd").names(source)))
+	names.close()
+	var timeline := preload("res://tools/content/build_native_data.gd").compile_spawn_timeline(stage,config)
+	if timeline.is_empty(): return _result(ERR_INVALID_DATA,paths)
+	var file := FileAccess.open(paths[2],FileAccess.WRITE)
+	if file == null: return _result(FileAccess.get_open_error(),paths)
+	file.store_var(timeline)
+	file.close()
+	error = preload("res://tools/content/build_run_content.gd").build(stage,config,output.path_join("run"),input_signature,{},[],{},null,{},PackedStringArray(),reuse_prepared)
+	paths.append_array(_bundle_outputs(output.path_join("run/stage_%d.json" % source.index)))
+	return _result(error,paths)
+
+static func _build_intro(output: String, reuse_prepared: bool) -> Dictionary:
+	var intro: Dictionary = load("res://scripts/runtime/intro_sequence.gd").practice_package(load("res://data/config.tres"),load("res://data/visuals/intro_presentation.tres"))
+	var error := preload("res://tools/content/build_run_content.gd").build(intro.stage,intro.config,output.path_join("run/intro"),"導入練習".sha256_text(),intro.definitions,[],{},null,{},PackedStringArray(),reuse_prepared)
+	return _result(error,_bundle_outputs(output.path_join("run/intro/stage_1.json")))
+
+static func stage_inputs(files: PackedStringArray, source: StageDef, output: String) -> PackedStringArray:
+	var paths := PackedStringArray()
+	for path in files:
+		if path.begins_with("res://data/stages/") and path != source.resource_path: continue
+		if path.begins_with("res://data/codex/"): continue
+		if path.begins_with("res://data/bosses/"):
+			if path != "res://data/bosses/%s.tres" % source.boss_id and not (source.boss_id == &"draco" and path == "res://data/bosses/hydra.tres"): continue
+		paths.append(path)
+	if not source.resource_path.is_empty() and not source.resource_path in paths: paths.append(source.resource_path)
+	if not source.boss_id.is_empty(): paths.append(output.path_join("boss_%s.tres" % source.boss_id))
+	if source.boss_id == &"draco": paths.append(output.path_join("boss_hydra.tres"))
+	# 前回の実行資源が参照した外部ファイルも追跡する。生成物の欠落も入力変更になる。
+	var index_path := output.path_join("run/stage_%d.json" % source.index)
+	var index = JSON.parse_string(FileAccess.get_file_as_string(index_path)) if FileAccess.file_exists(index_path) else null
+	if index is Dictionary and FileAccess.file_exists(index.resources):
+		var resources := ResourceLoader.load(index.resources,"",ResourceLoader.CACHE_MODE_IGNORE) as Resource
+		if resources != null:
+			for path: String in resources.dependencies:
+				if not path in paths: paths.append(path)
+	return paths
+
+## 全体の編集版だけを更新し、変わっていない戦闘バイナリと資源表はそのまま使う。
+static func _refresh_source_signature(path: String, input_signature: String) -> Error:
+	var index = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not index is Dictionary: return ERR_FILE_CORRUPT
+	if index.get("source_sha256") == input_signature: return OK
+	index.source_sha256 = input_signature
+	var file := FileAccess.open(path+".pending",FileAccess.WRITE)
+	if file == null: return FileAccess.get_open_error()
+	file.store_string(JSON.stringify(index))
+	file.close()
+	return DirAccess.rename_absolute(path+".pending",path)
+
 static func build_all(force := false, output := ROOT) -> Error:
-	for id in ["hydra", "monoceros", "draco", "centaurus", "canis_major"]:
-		var boss: Dictionary = preload("res://tools/content/build_boss_program.gd").build_boss(id, output.path_join("boss_" + id + ".tres"))
-		if boss.error != OK: return boss.error
-	if not force and is_current(output): return OK
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output))
+	var resources = preload("res://tools/content/build_run_resources.gd")
+	resources.begin_batch()
+	var error := _build_units(force,output)
+	resources.end_batch()
+	return error
+
+static func _build_units(force: bool, output: String) -> Error:
+	last_build_report = []
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output.path_join("dev")))
-	var visual_error: Error = load("res://tools/content/build_visuals.gd").build(output)
-	if visual_error != OK: return visual_error
-	var attack_error: Error = load("res://tools/content/build_attack_visuals.gd").build(output)
-	if attack_error != OK: return attack_error
-	var aura_error: Error = preload("res://tools/content/build_hero_aura.gd").build(output)
-	if aura_error != OK: return aura_error
-	var codex_error: Error = preload("res://tools/content/build_codex_thumbnails.gd").build(output)
-	if codex_error != OK: return codex_error
-	var catalog_path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
-	var error: Error = load("res://tools/content/build_catalog.gd").build(catalog_path)
-	if error != OK: return error
-	error = load("res://tools/content/build_audio.gd").build(output.path_join("audio.res"))
-	if error != OK: return error
-	error = load("res://tools/content/build_runtime_stage.gd").build_all(output)
-	if error != OK: return error
-	error = load("res://tools/content/build_native_data.gd").build_probe(output.path_join("dev/native_probe.json"))
-	if error != OK: return error
-	error = load("res://tools/content/build_native_data.gd").build_spawn_timelines(output)
-	if error != OK: return error
-	var run_outputs := []
+	# 技の見た目の編集位置は既存の意味比較で除き、実効値が変わったボスだけ更新する。
+	for id in ["hydra","monoceros","draco","centaurus","canis_major"]:
+		var boss: Dictionary = preload("res://tools/content/build_boss_program.gd").build_boss(id,output.path_join("boss_"+id+".tres"))
+		if boss.error != OK: return boss.error
+	var cache := preload("res://addons/content_build/incremental.gd").new()
+	cache.open(output.path_join("dev/build_cache.json"))
+	var files := PackedStringArray()
+	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
+	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","elite_contacts","bake_elite_crackle"]: files.append("res://tools/art/"+name+".py")
+	var units := [
+		["visuals",["res://data/visuals/","res://data/enemies/","res://assets/","res://shaders/","res://scripts/data_types/","res://tools/content/build_visuals.gd","res://tools/content/visual_transforms.gd","res://tools/content/build_effect_profiles.gd","res://tools/art/"],func(): return _result(load("res://tools/content/build_visuals.gd").build(output),_visual_outputs(output))],
+		["attacks",["res://data/bosses/","res://data/enemies/","res://data/visuals/","res://scenes/attacks/","res://scripts/render/attacks/","res://scripts/data_types/","res://assets/","res://shaders/","res://tools/content/build_attack_visuals.gd","res://tools/content/build_stage_resources.gd"],func(): return _result(load("res://tools/content/build_attack_visuals.gd").build(output),PackedStringArray([output.path_join("attack_visuals.res")]))],
+		["aura",["res://tools/content/build_hero_aura.gd","res://scripts/data_types/hero_aura_assets.gd","res://shaders/hero_aura.gdshader"],func(): return _result(load("res://tools/content/build_hero_aura.gd").build(output),PackedStringArray([output.path_join("hero_aura.res")]))],
+		["codex",["res://data/codex/","res://scripts/data_types/codex_animation.gd","res://tools/content/build_codex_thumbnails.gd"],func():
+			var paths := PackedStringArray()
+			for name in DirAccess.get_files_at("res://data/codex"):
+				if name.ends_with(".res"): paths.append(output.path_join("codex_thumbnail_"+name))
+			return _result(load("res://tools/content/build_codex_thumbnails.gd").build(output),paths)],
+		["catalog",["res://data/","res://scripts/data_types/","res://scripts/render/","res://scenes/attacks/","res://assets/","res://shaders/","res://tools/content/build_catalog.gd","res://tools/content/build_stage_resources.gd"],func():
+			var path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
+			return _result(load("res://tools/content/build_catalog.gd").build(path),PackedStringArray([path]))],
+		["audio",["res://assets/audio/","res://tools/content/build_audio.gd","res://scripts/data_types/audio_bank.gd"],func(): return _result(load("res://tools/content/build_audio.gd").build(output.path_join("audio.res")),PackedStringArray([output.path_join("audio.res")]))],
+		["probe",["res://data/config.tres","res://data/enemies/drifter.tres","res://data/weapons/W01_forward.tres","res://scripts/data_types/","res://tools/content/build_native_data.gd"],func(): return _result(load("res://tools/content/build_native_data.gd").build_probe(output.path_join("dev/native_probe.json")),PackedStringArray([output.path_join("dev/native_probe.json")]))]]
+	for unit: Array in units:
+		var inputs := _select(files,unit[1])
+		if unit[0] == "attacks": inputs.append_array(preload("res://tools/content/build_attack_visuals.gd").input_paths())
+		var error: Error = cache.run(unit[0],inputs,unit[2],force)
+		if error != OK: return error
 	var input_signature := signature()
 	for name in DirAccess.get_files_at("res://data/stages"):
 		if not name.ends_with(".tres"): continue
 		var source := ResourceLoader.load("res://data/stages/"+name,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
-		var stage := ResourceLoader.load(output.path_join("stage_%d.tres" % source.index),"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
-		error = preload("res://tools/content/build_run_content.gd").build(stage,load("res://data/config.tres"),output.path_join("run"),input_signature)
-		if error!=OK: return error
-		var index_path := output.path_join("run/stage_%d.json" % source.index)
-		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
-		run_outputs.append_array([index_path,index.binary,index.resources])
-	var intro: Dictionary = load("res://scripts/runtime/intro_sequence.gd").practice_package(load("res://data/config.tres"),load("res://data/visuals/intro_presentation.tres"))
-	var intro_output := output.path_join("run/intro")
-	error = load("res://tools/content/build_run_content.gd").build(intro.stage,intro.config,intro_output,"導入練習".sha256_text(),intro.definitions)
-	if error!=OK: return error
-	var intro_path := intro_output.path_join("stage_1.json")
-	var intro_index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(intro_path))
-	var outputs := [catalog_path,intro_path,intro_index.binary,intro_index.resources]
-	outputs.append_array(run_outputs)
-	var visual_index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
-	for file in DirAccess.get_files_at(output):
-		if file.begins_with("look_") and not output.path_join(file) in visual_index.look_paths.values(): continue
-		if file.get_extension() in ["tres", "res"]: outputs.append(output.path_join(file))
-	for file in DirAccess.get_files_at(output.path_join("dev")):
-		if file.get_extension() in ["json", "res", "bin"]: outputs.append(output.path_join("dev").path_join(file))
-	var stamp := FileAccess.open(output.path_join("stamp.json"), FileAccess.WRITE)
+		if source == null: return ERR_INVALID_DATA
+		var error: Error = cache.run("stage_%d" % source.index,stage_inputs(files,source,output),func(): return _build_stage(source,output,input_signature,not force),force)
+		if error != OK: return error
+		cache.entries["stage_%d" % source.index].fingerprint = cache.digest(stage_inputs(files,source,output))
+		error = _refresh_source_signature(output.path_join("run/stage_%d.json" % source.index),input_signature)
+		if error != OK: return error
+	var intro_inputs := _select(files,["res://data/","res://assets/","res://shaders/","res://scripts/","res://scenes/","res://tools/content/"])
+	for i in range(intro_inputs.size()-1,-1,-1):
+		if intro_inputs[i].begins_with("res://data/stages/") or intro_inputs[i].begins_with("res://data/bosses/") or intro_inputs[i].begins_with("res://data/codex/"): intro_inputs.remove_at(i)
+	var error: Error = cache.run("intro",intro_inputs,func(): return _build_intro(output,not force),force)
+	if error != OK: return error
+	var active := {}
+	for row: Dictionary in cache.report: active[row.unit] = true
+	for key in cache.entries.keys():
+		if not active.has(key): cache.entries.erase(key)
+	error = cache.save(output.path_join("dev/build_cache.json"))
+	if error != OK: return error
+	var outputs: PackedStringArray = cache.outputs()
+	for id in ["hydra","monoceros","draco","centaurus","canis_major"]: outputs.append(output.path_join("boss_"+id+".tres"))
+	var stamp := FileAccess.open(output.path_join("stamp.json"),FileAccess.WRITE)
 	if stamp == null: return FileAccess.get_open_error()
-	stamp.store_string(JSON.stringify({"signature": signature(), "outputs": outputs}))
+	stamp.store_string(JSON.stringify({"signature":input_signature,"outputs":outputs}))
+	stamp.close()
+	last_build_report.assign(cache.report)
 	return OK
 
 ## 開発用C++入口。通常入口の切替までは明示して呼ぶ。

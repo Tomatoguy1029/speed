@@ -6,6 +6,20 @@ const PROFILE_PATHS := ["res://data/visuals/burst_runtime.tres","res://data/visu
 	"res://data/visuals/elite_runtime.tres","res://assets/effects/build/burst_noise.tres",
 	"res://assets/effects/landmark/masks.tres","res://assets/effects/landmark/elite_contacts.tres","res://data/visuals/landmark_aura_material.tres","res://data/visuals/biter_parts.tres"]
 
+## 一度の共通生成の間だけ共有する。次のF5やライブ編集へ古い署名を持ち越さない。
+static var _batch_active := false
+static var _batch_hashes := {}
+static var _batch_dependencies := {}
+static var _batch_signatures := {}
+static func begin_batch() -> void:
+	end_batch()
+	_batch_active = true
+static func end_batch() -> void:
+	_batch_active = false
+	_batch_hashes.clear()
+	_batch_dependencies.clear()
+	_batch_signatures.clear()
+
 static func _constant_paths(value: Variant, paths: PackedStringArray) -> void:
 	if value is Resource:
 		var path: String = value.resource_path.split("::")[0]
@@ -16,6 +30,7 @@ static func _constant_paths(value: Variant, paths: PackedStringArray) -> void:
 		for child in value: _constant_paths(child,paths)
 
 static func _dependencies(path: String) -> PackedStringArray:
+	if _batch_active and _batch_dependencies.has(path): return _batch_dependencies[path]
 	var paths := PackedStringArray()
 	for dependency in ResourceLoader.get_dependencies(path):
 		var target: String = dependency.split("::")[-1]
@@ -26,6 +41,7 @@ static func _dependencies(path: String) -> PackedStringArray:
 	if path.ends_with(".gd"):
 		var script := load(path) as Script
 		if script!=null: _constant_paths(script.get_script_constant_map(),paths)
+	if _batch_active: _batch_dependencies[path] = paths
 	return paths
 
 static func _visit(path: String, hashes: Dictionary, pending: Dictionary) -> bool:
@@ -33,7 +49,8 @@ static func _visit(path: String, hashes: Dictionary, pending: Dictionary) -> boo
 	if not path.begins_with("res://") or path.contains("..") or not FileAccess.file_exists(path): return false
 	if pending.has(path): return true
 	pending[path] = true
-	hashes[path] = FileAccess.get_sha256(path)
+	hashes[path] = _batch_hashes[path] if _batch_active and _batch_hashes.has(path) else FileAccess.get_sha256(path)
+	if _batch_active: _batch_hashes[path] = hashes[path]
 	if hashes[path].is_empty(): return false
 	if ResourceLoader.exists(path):
 		for target in _dependencies(path):
@@ -130,6 +147,9 @@ static func collect(startup: PackedStringArray, visuals: Array, catalog: Content
 	for path: String in keys.values(): _ordered(path,seen,order)
 	var signatures := {}
 	for path in order:
+		if _batch_active and _batch_signatures.has(path):
+			signatures[path] = _batch_signatures[path]
+			continue
 		var closure := {}
 		if not _visit(path,closure,{}): return {}
 		var names := closure.keys()
@@ -137,4 +157,5 @@ static func collect(startup: PackedStringArray, visuals: Array, catalog: Content
 		var lines := PackedStringArray()
 		for name: String in names: lines.append(name+":"+str(closure[name]))
 		signatures[path] = "\n".join(lines).sha256_text()
+		if _batch_active: _batch_signatures[path] = signatures[path]
 	return {"paths":startup_order,"hashes":hashes,"keys":keys,"equipment":equipment,"order":order,"signatures":signatures}

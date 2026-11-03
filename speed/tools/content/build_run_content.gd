@@ -2267,7 +2267,31 @@ static func authoring_enemy(id: String, definitions: Dictionary) -> EnemyDef:
 	var entry: ContentEntry = _catalog().find(&"enemies", id)
 	return ResourceLoader.load(entry.path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as EnemyDef if entry != null else null
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}, previous_definition_ids := PackedStringArray()) -> Error:
+static var preparation_build_count := 0
+
+## 戦闘と固定外観に使う入力だけを照合する。UI・開発パネルの変更は資源表で拾う。
+static func preparation_signature(stage: RuntimeStage, config: GameConfig, definitions: Dictionary, extra: Array, bosses: Dictionary, programs: Dictionary) -> String:
+	var paths := PackedStringArray()
+	var cache := preload("res://addons/content_build/incremental.gd").new()
+	for directory in ["res://data","res://tools/content","res://scripts/data_types","res://scripts/render","res://assets","res://shaders"]:
+		cache.files(directory,paths)
+	for i in range(paths.size()-1,-1,-1):
+		var path: String = paths[i]
+		if path == "res://data/content_catalog.tres" or path.begins_with("res://data/stages/") or path.begins_with("res://data/codex/") or path.begins_with("res://data/text/") or path.begins_with("res://assets/ui/") or path.begins_with("res://assets/audio/"):
+			paths.remove_at(i)
+		elif path.begins_with("res://data/bosses/") and path != "res://data/bosses/%s.tres" % stage.boss_id and not (stage.boss_id == &"draco" and path == "res://data/bosses/hydra.tres"):
+			paths.remove_at(i)
+	for path in stage.resources.paths:
+		if String(path).begins_with("res://.content/") and not path in paths: paths.append(path)
+	if not stage.boss_id.is_empty(): paths.append("res://.content/boss_%s.tres" % stage.boss_id)
+	if stage.boss_id == &"draco": paths.append("res://.content/boss_hydra.tres")
+	paths.append("res://addons/content_build/incremental.gd")
+	var values: Variant = BossProgram.canonical([stage,config,definitions,extra,bosses,programs])
+	var bytes := cache.digest(paths).to_utf8_buffer()
+	bytes.append_array(var_to_bytes(values))
+	return Schema.sha256(bytes).hex_encode()
+
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}, previous_definition_ids := PackedStringArray(), reuse_prepared := true) -> Error:
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
@@ -2276,395 +2300,415 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var field_visuals: Array = []
 	var attack_visuals: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
-	var enemy_ids := stage.resources.enemy_ids.duplicate()
-	var cycle_source: BossDef = boss_definitions.get(&"draco",boss_definitions.get("draco"))
-	if cycle_source==null and stage.boss_id==&"draco": cycle_source = load("res://data/bosses/draco.tres")
+	var preparation_key := preparation_signature(stage,config,definitions,extra_formations,boss_definitions,boss_programs)
+	var preparation_path := "res://.content/dev/prepared/"+preparation_key+".res"
+	var prepared: Resource = ResourceLoader.load(preparation_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) if reuse_prepared and FileAccess.file_exists(preparation_path) else null
 	var cycle_dependencies: Array = []
-	if cycle_source!=null:
-		cycle_dependencies = draco_cycle_candidates(cycle_source)
-		for id in cycle_dependencies:
-			if not String(id) in enemy_ids: enemy_ids.append(String(id))
-	var encounter_profile: Dictionary = stage.encounter_profile.duplicate(true)
-	if encounter_profile.get("enabled",false):
-		for path in encounter_profile.get("baseline",{}):
-			if String(path).begins_with("res://data/stages/"): continue
-			if not (String(path).begins_with("res://data/") or String(path).begins_with("res://scripts/") or String(path).begins_with("res://gyms/enemy_lab/")) or FileAccess.get_sha256(path)!=encounter_profile.baseline[path]:
-				encounter_profile.enabled = false
-				push_warning("採用した配置規則の基準が変わったため、既存の扱いに合わせて無効にします。")
-				break
-	if encounter_profile.get("enabled",false):
-		for pattern in encounter_profile.get("patterns",[]):
-			for region in pattern.get("regions",[]):
-				var type := String(region.get("type",""))
-				if _definitions(&"enemies").has(StringName(type)) and not enemy_ids.has(type): enemy_ids.append(type)
+	if prepared != null and prepared.get_meta("data",null) is Dictionary:
+		data = prepared.get_meta("data").duplicate(true)
+		visuals.assign(prepared.get_meta("visuals").duplicate(true))
+		appearance_metadata = prepared.get_meta("appearance").duplicate(true)
+		cycle_dependencies.assign(prepared.get_meta("cycles"))
+	else:
+		var enemy_ids := stage.resources.enemy_ids.duplicate()
+		var cycle_source: BossDef = boss_definitions.get(&"draco",boss_definitions.get("draco"))
+		if cycle_source==null and stage.boss_id==&"draco": cycle_source = load("res://data/bosses/draco.tres")
+		cycle_dependencies = []
+		if cycle_source!=null:
+			cycle_dependencies = draco_cycle_candidates(cycle_source)
+			for id in cycle_dependencies:
+				if not String(id) in enemy_ids: enemy_ids.append(String(id))
+		var encounter_profile: Dictionary = stage.encounter_profile.duplicate(true)
+		if encounter_profile.get("enabled",false):
+			for path in encounter_profile.get("baseline",{}):
+				if String(path).begins_with("res://data/stages/"): continue
+				if not (String(path).begins_with("res://data/") or String(path).begins_with("res://scripts/") or String(path).begins_with("res://gyms/enemy_lab/")) or FileAccess.get_sha256(path)!=encounter_profile.baseline[path]:
+					encounter_profile.enabled = false
+					push_warning("採用した配置規則の基準が変わったため、既存の扱いに合わせて無効にします。")
+					break
+		if encounter_profile.get("enabled",false):
+			for pattern in encounter_profile.get("patterns",[]):
+				for region in pattern.get("regions",[]):
+					var type := String(region.get("type",""))
+					if _definitions(&"enemies").has(StringName(type)) and not enemy_ids.has(type): enemy_ids.append(type)
 
-	for terrain in ["meteor","iron","saw"]:
-		if not terrain in enemy_ids: enemy_ids.append(terrain)
-	for candidate_id: String in enemy_ids.duplicate():
-		var candidate := authoring_enemy(candidate_id, definitions)
-		if candidate == null: return ERR_INVALID_DATA
-		if candidate!=null and candidate.behavior==&"triangle" and not "triangle_star" in enemy_ids: enemy_ids.append("triangle_star")
-		if candidate!=null and candidate.behavior==&"cepheus" and not "cepheus_soldier" in enemy_ids: enemy_ids.append("cepheus_soldier")
-		if candidate!=null and candidate.behavior==&"split" and not "splitling" in enemy_ids: enemy_ids.append("splitling")
-	for i in enemy_ids.size():
-		var id: String = enemy_ids[i]
-		var definition := authoring_enemy(id, definitions)
-		if definition == null or String(definition.id)!=id: return ERR_INVALID_DATA
-		var tuning: Dictionary = stage.enemy_tuning.get(id,{})
-		if not StageEnemyTuning.error_for(definition,tuning).is_empty(): return ERR_INVALID_DATA
-		for key: String in tuning:
-			data.EnemyTuningValue.append({"id":data.EnemyTuningValue.size()+1,"enemy":i+1,"key":key,"value":float(tuning[key])})
-		definition = StageEnemyTuning.resolve(definition,tuning)
-		var package := chase_package(definition,config,stage)
-		if package.is_empty(): return ERR_UNAVAILABLE
-		var resolved: Dictionary = package.records
-		var row: Dictionary = resolved.EnemyRecord[0]
-		row.id = i+1
-		row.visual_id = i+6
-		data.EnemyRecord.append(row)
-		var hull_look: Dictionary = resolved.FriendHullLook[0].duplicate()
-		hull_look.id = row.id
-		hull_look.enemy = row.id
-		data.FriendHullLook.append(hull_look)
-		var shell_source: Dictionary = resolved.ShellSource[0].duplicate()
-		shell_source.id = row.id
-		shell_source.enemy = row.id
-		data.ShellSource.append(shell_source)
-		for chain: Dictionary in resolved.DeathChainDefinition:
-			chain.id = row.id
-			data.DeathChainDefinition.append(chain)
-		for bite: Dictionary in resolved.BiteDefinition:
-			bite.id = row.id
-			data.BiteDefinition.append(bite)
-		for item: Dictionary in resolved.LynxDefinition:
-			item.id = row.id
-			data.LynxDefinition.append(item)
-		for item: Dictionary in resolved.TriangleDefinition:
-			item.id=row.id
-			item.star=enemy_ids.find("triangle_star")+1
-			data.TriangleDefinition.append(item)
-		for item: Dictionary in resolved.RulerDefinition:
-			item.id=row.id
-			data.RulerDefinition.append(item)
-		for item: Dictionary in resolved.CepheusDefinition:
-			item.id = row.id
-			item.soldier = enemy_ids.find("cepheus_soldier")+1
-			data.CepheusDefinition.append(item)
-		for item: Dictionary in resolved.SoldierDefinition:
-			item.id = row.id
-			data.SoldierDefinition.append(item)
-		for item: Dictionary in resolved.AurigaDefinition:
-			item.id = row.id
-			data.AurigaDefinition.append(item)
-		for item: Dictionary in resolved.ClockDefinition:
-			item.id = row.id
-			data.ClockDefinition.append(item)
-		for item: Dictionary in resolved.CoronaDefinition:
-			item.id = row.id
-			data.CoronaDefinition.append(item)
-		for item: Dictionary in resolved.CoronaType:
-			item.id = data.CoronaType.size()+1
-			item.owner = row.id
-			data.CoronaType.append(item)
-		for item: Dictionary in resolved.PumpDefinition:
-			item.id = row.id
-			data.PumpDefinition.append(item)
-		for item: Dictionary in resolved.CrabDefinition:
-			item.id = row.id
-			data.CrabDefinition.append(item)
-		for item: Dictionary in resolved.AquilaDefinition:
-			item.id = row.id
-			data.AquilaDefinition.append(item)
-		for item: Dictionary in resolved.PhoenixDefinition:
-			item.id = row.id
-			data.PhoenixDefinition.append(item)
-		for item: Dictionary in resolved.BomberDefinition:
-			item.id = row.id
-			data.BomberDefinition.append(item)
-		for item: Dictionary in resolved.CrossEnemyDefinition:
-			item.id = row.id
-			data.CrossEnemyDefinition.append(item)
-		for item: Dictionary in resolved.AquariusDefinition:
-			item.id = row.id
-			data.AquariusDefinition.append(item)
-		for item: Dictionary in resolved.CrowDefinition:
-			item.id = row.id
-			data.CrowDefinition.append(item)
-		for item: Dictionary in resolved.DefenderDefinition:
-			item.id = row.id
-			data.DefenderDefinition.append(item)
-		for item: Dictionary in resolved.SplitDefinition:
-			item.id = row.id
-			data.SplitDefinition.append(item)
-		for item: Dictionary in resolved.ReticleDefinition:
-			item.id = row.id
-			data.ReticleDefinition.append(item)
-		for dolphin: Dictionary in resolved.DolphinDefinition:
-			dolphin.id = row.id
-			data.DolphinDefinition.append(dolphin)
-		for pulser: Dictionary in resolved.PulserDefinition:
-			pulser.id = row.id
-			data.PulserDefinition.append(pulser)
-		for marlin: Dictionary in resolved.MarlinDefinition:
-			marlin.id = row.id
-			data.MarlinDefinition.append(marlin)
-		for sniper: Dictionary in resolved.SniperDefinition:
-			sniper.id = row.id
-			data.SniperDefinition.append(sniper)
-		for battleship: Dictionary in resolved.BattleshipDefinition:
-			battleship.id = row.id
-			data.BattleshipDefinition.append(battleship)
-		for dash: Dictionary in resolved.DashDefinition:
-			dash.id = row.id
-			data.DashDefinition.append(dash)
-		for star: Dictionary in resolved.TriangleStarDefinition:
-			star.id = row.id
-			data.TriangleStarDefinition.append(star)
-		for part: Dictionary in resolved.PartDefinition:
-			part.id = row.id
-			data.PartDefinition.append(part)
-		for drift: Dictionary in resolved.DriftDefinition:
-			drift.id = row.id
-			data.DriftDefinition.append(drift)
-		for rocket: Dictionary in resolved.RocketDefinition:
-			rocket.id = row.id
-			data.RocketDefinition.append(rocket)
-		for missile: Dictionary in resolved.MissileEnemyDefinition:
-			missile.id = row.id
-			data.MissileEnemyDefinition.append(missile)
-		for beamer: Dictionary in resolved.BeamerDefinition:
-			beamer.id = row.id
-			data.BeamerDefinition.append(beamer)
-		for gunner: Dictionary in resolved.GunnerDefinition:
-			gunner.id = row.id
-			data.GunnerDefinition.append(gunner)
-		for hound: Dictionary in resolved.HoundDefinition:
-			hound.id = row.id
-			data.HoundDefinition.append(hound)
-		data.StringEntry.append({"id":i+1,"value":id})
-		data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
-		data.NumericTraitLevel = resolved.NumericTraitLevel
-		data.HeroConfig = resolved.HeroConfig
-		data.HerculesDefinition = resolved.HerculesDefinition
-		data.GeminiDefinition = resolved.GeminiDefinition
-		data.LeoDefinition = resolved.LeoDefinition
-		data.PerseusDefinition = resolved.PerseusDefinition
-		data.HeroDefinition = resolved.HeroDefinition
-		data.HeroStar = resolved.HeroStar
-		data.HeroLink = resolved.HeroLink
-		data.RunConfig = resolved.RunConfig
-		data.ContactDefinition = resolved.ContactDefinition
-		data.BeamDefinition = resolved.BeamDefinition
-		data.WaveDefinition = resolved.WaveDefinition
-		data.PopulationDefinition = resolved.PopulationDefinition
-		data.PopulationType.append({"id":row.id,"enemy":row.id,"rank":definition.rank,"maximum":definition.max_alive,"ranged":definition.ranged})
-		data.CometDefinition = resolved.CometDefinition
-		data.WarpDefinition = resolved.WarpDefinition
-		data.GravityDefinition = resolved.GravityDefinition
-		data.WallDefinition = resolved.WallDefinition
-		data.SlashDefinition = resolved.SlashDefinition
-		data.BoltDefinition = resolved.BoltDefinition
-		data.LightArrowDefinition = resolved.LightArrowDefinition
-		data.FriendShotDefinition = resolved.FriendShotDefinition
-		data.BudgetPhase = resolved.BudgetPhase
-		if data.ResourceKey.is_empty():
-			data.ResourceKey = resolved.ResourceKey.slice(0,5)
-			visuals.assign(package.visuals.slice(0,5))
-			data.FriendHullDefinition = resolved.FriendHullDefinition.duplicate(true)
-			data.ZoneDefinition = resolved.ZoneDefinition.duplicate(true)
-			data.FloodDefinition = resolved.FloodDefinition.duplicate(true)
-			data.LightLanceDefinition = resolved.LightLanceDefinition.duplicate(true)
-			data.ShellDefinition = resolved.ShellDefinition.duplicate(true)
-			data.FriendSawPoint = resolved.FriendSawPoint.duplicate(true)
-			data.FriendDebrisDefinition = resolved.FriendDebrisDefinition.duplicate(true)
-			data.LumpDefinition = resolved.LumpDefinition.duplicate(true)
-			data.RingHoldDefinition = resolved.RingHoldDefinition.duplicate(true)
-			data.StarBoltDefinition = resolved.StarBoltDefinition.duplicate(true)
-			data.LoadoutDefinition = resolved.LoadoutDefinition
-			data.ForwardDefinition = resolved.ForwardDefinition
-			data.ScatterDefinition = resolved.ScatterDefinition
-			data.ScatterPostDefinition = resolved.ScatterPostDefinition
-			data.RearDefinition = resolved.RearDefinition
-			data.RearPostDefinition = resolved.RearPostDefinition
-			data.KnockbackDefinition = resolved.KnockbackDefinition
-			data.MinesDefinition = resolved.MinesDefinition
-			data.EndBlastDefinition = resolved.EndBlastDefinition
-			data.InterceptorDefinition = resolved.InterceptorDefinition
-			data.FlashSlashDefinition = resolved.FlashSlashDefinition
-			data.AfterimageDefinition = resolved.AfterimageDefinition
-			data.DashRangeDroneDefinition = resolved.DashRangeDroneDefinition
-			data.BipolarDefinition = resolved.BipolarDefinition
-			data.MassTowDefinition = resolved.MassTowDefinition
-			data.ContactArcDefinition = resolved.ContactArcDefinition
-			data.SonicDefinition = resolved.SonicDefinition
-			data.ContactWaveDefinition = resolved.ContactWaveDefinition
-			data.BarrierDefinition = resolved.BarrierDefinition
-			data.BarrierPostDefinition = resolved.BarrierPostDefinition
-			data.FullChargeDefinition = resolved.FullChargeDefinition
-			data.KillSonicDefinition = resolved.KillSonicDefinition
-			data.CritBeamDefinition = resolved.CritBeamDefinition
-			data.VortexDefinition = resolved.VortexDefinition
-			data.RunUpDefinition = resolved.RunUpDefinition
-			data.RampageDefinition = resolved.RampageDefinition
-			data.DuplicatorDefinition = resolved.DuplicatorDefinition
-			data.ProgressionDefinition = resolved.ProgressionDefinition
-			data.LifecycleDefinition = resolved.LifecycleDefinition
-			for section in ["PostMaxDefinition","PostMaxTarget","PostMaxInterval","PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:
-				data[section] = resolved[section]
-			equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
-			data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
-			data.MoonDefinition = resolved.MoonDefinition.duplicate(true)
-			for projectile: Dictionary in resolved.HostileDefinition:
-				if projectile.kind==2: continue
-				var attack := projectile.duplicate()
-				attack.id = data.HostileDefinition.size()+1
-				data.HostileDefinition.append(attack)
-			field_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [9,10])
-			attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12,13,Schema.ENUMS.VisualRole.StarBolt])
-		for attack_visual: Dictionary in package.visuals:
-			if attack_visual.role==13 and not attack_visuals.any(func(value: Dictionary): return value.role==13): attack_visuals.append(attack_visual)
-		for shield_source: Dictionary in resolved.ShieldDefinition:
-			var shield := shield_source.duplicate()
-			var reflected: Dictionary = resolved.HostileDefinition[1].duplicate()
-			reflected.id = data.HostileDefinition.size()+1
-			shield.id = row.id
-			shield.reflected = reflected.id
-			data.HostileDefinition.append(reflected)
-			data.ShieldDefinition.append(shield)
-		var visual: Dictionary = package.visuals[5].duplicate()
-		visual.id = i+6
-		visual.mark_key = "shape:"+String(definition.shape) if visual.path.is_empty() else "sprite:"+id
-		data.ResourceKey.append({"id":visual.id,"role":visual.role})
-		visuals.append(visual)
-		if visual.role==6:
-			var look: EnemyLook = load(visual.path)
-			var lighting: Resource = load("res://data/visuals/enemy_lighting.tres")
-			var settings := {}
-			for key in ["key_energy","fill_energy","key_angle","fill_angle","height","ambient","normal_strength"]:
-				settings[key] = definition.visual_value(key,lighting.get(key))
-			appearance_metadata[visual.id] = {"settings":settings,"paint":look.colors_key(definition.armor_colors),"hull_preview":look.preview_key(definition.armor_colors),"biting":definition.behavior==&"biter","pump":definition.behavior==&"pump",
-				"biter_parts":"res://data/visuals/biter_parts.tres" if id=="biter" and look.source_path=="res://data/visuals/looks/biter.tres" else ""}
-			if definition.behavior==&"ruler":
-				appearance_metadata[visual.id].ruler=true
-				appearance_metadata[visual.id].lower_paint=look.split_other.colors_key(definition.armor_colors) if look.split_other!=null else ""
-	for item: Dictionary in data.SplitDefinition:
-		item.child = enemy_ids.find("splitling")+1
-	if data.RunConfig.is_empty(): return ERR_INVALID_DATA
-	if not data.BiteDefinition.is_empty():
-		var key: int = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":key,"role":8})
-		visuals.append({"id":key,"role":8,"path":"res://scenes/attacks/zone_biter.tscn"})
-		for bite: Dictionary in data.BiteDefinition: bite.visual_key = key
-	for resource: Dictionary in equipment_resources:
-		var row := resource.duplicate()
-		row.erase("equipment")
-		row.id = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":row.id,"role":row.role})
-		visuals.append(row)
-		data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":int(resource.get("equipment",1)),"asset":row.id})
-	for resource: Dictionary in field_visuals:
-		var row := resource.duplicate()
-		row.id = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":row.id,"role":row.role})
-		visuals.append(row)
-		if row.role==9: data.FieldBodyDefinition[0].visual = row.id
-		else: data.MoonDefinition[0].visual = row.id
-	for resource: Dictionary in attack_visuals:
-		var row := resource.duplicate()
-		row.id = data.ResourceKey.size()+1
-		data.ResourceKey.append({"id":row.id,"role":row.role})
-		visuals.append(row)
-		for star: Dictionary in data.StarBoltDefinition:
-			if row.role==Schema.ENUMS.VisualRole.StarBolt: star.visual = row.id
-			elif row.role==12: star.stone_visual = row.id
-		for attack: Dictionary in data.HostileDefinition:
-			if row.role==12: attack.stone_visual = row.id
-			elif (row.role==13 and attack.kind==2) or (row.role==11 and attack.kind!=2): attack.visual = row.id
-	var terrain := {"id":1}
-	for key in ["meteor_count","iron_count","saw_count","planet_radius","meteor_coin_chance","meteor_heal_chance","meteor_magnet_chance","saw_speed","saw_power","saw_life"]:
-		terrain[key] = config.get(key)
-	for id in ["meteor","iron","saw"]: terrain[id] = enemy_ids.find(id)+1
-	for variant in 2:
-		var path := "res://assets/pixel/%s_spritesheet.png" % ("meteor" if variant==0 else "meteor2")
-		var texture: Texture2D = load(path)
-		if texture==null: return ERR_CANT_OPEN
-		var size := float(texture.get_height())
-		terrain["meteor_radius_%d" % variant] = size*0.5
-		for damage in 3:
+		for terrain in ["meteor","iron","saw"]:
+			if not terrain in enemy_ids: enemy_ids.append(terrain)
+		for candidate_id: String in enemy_ids.duplicate():
+			var candidate := authoring_enemy(candidate_id, definitions)
+			if candidate == null: return ERR_INVALID_DATA
+			if candidate!=null and candidate.behavior==&"triangle" and not "triangle_star" in enemy_ids: enemy_ids.append("triangle_star")
+			if candidate!=null and candidate.behavior==&"cepheus" and not "cepheus_soldier" in enemy_ids: enemy_ids.append("cepheus_soldier")
+			if candidate!=null and candidate.behavior==&"split" and not "splitling" in enemy_ids: enemy_ids.append("splitling")
+		for i in enemy_ids.size():
+			var id: String = enemy_ids[i]
+			var definition := authoring_enemy(id, definitions)
+			if definition == null or String(definition.id)!=id: return ERR_INVALID_DATA
+			var tuning: Dictionary = stage.enemy_tuning.get(id,{})
+			if not StageEnemyTuning.error_for(definition,tuning).is_empty(): return ERR_INVALID_DATA
+			for key: String in tuning:
+				data.EnemyTuningValue.append({"id":data.EnemyTuningValue.size()+1,"enemy":i+1,"key":key,"value":float(tuning[key])})
+			definition = StageEnemyTuning.resolve(definition,tuning)
+			var package := chase_package(definition,config,stage)
+			if package.is_empty(): return ERR_UNAVAILABLE
+			var resolved: Dictionary = package.records
+			var row: Dictionary = resolved.EnemyRecord[0]
+			row.id = i+1
+			row.visual_id = i+6
+			data.EnemyRecord.append(row)
+			var hull_look: Dictionary = resolved.FriendHullLook[0].duplicate()
+			hull_look.id = row.id
+			hull_look.enemy = row.id
+			data.FriendHullLook.append(hull_look)
+			var shell_source: Dictionary = resolved.ShellSource[0].duplicate()
+			shell_source.id = row.id
+			shell_source.enemy = row.id
+			data.ShellSource.append(shell_source)
+			for chain: Dictionary in resolved.DeathChainDefinition:
+				chain.id = row.id
+				data.DeathChainDefinition.append(chain)
+			for bite: Dictionary in resolved.BiteDefinition:
+				bite.id = row.id
+				data.BiteDefinition.append(bite)
+			for item: Dictionary in resolved.LynxDefinition:
+				item.id = row.id
+				data.LynxDefinition.append(item)
+			for item: Dictionary in resolved.TriangleDefinition:
+				item.id=row.id
+				item.star=enemy_ids.find("triangle_star")+1
+				data.TriangleDefinition.append(item)
+			for item: Dictionary in resolved.RulerDefinition:
+				item.id=row.id
+				data.RulerDefinition.append(item)
+			for item: Dictionary in resolved.CepheusDefinition:
+				item.id = row.id
+				item.soldier = enemy_ids.find("cepheus_soldier")+1
+				data.CepheusDefinition.append(item)
+			for item: Dictionary in resolved.SoldierDefinition:
+				item.id = row.id
+				data.SoldierDefinition.append(item)
+			for item: Dictionary in resolved.AurigaDefinition:
+				item.id = row.id
+				data.AurigaDefinition.append(item)
+			for item: Dictionary in resolved.ClockDefinition:
+				item.id = row.id
+				data.ClockDefinition.append(item)
+			for item: Dictionary in resolved.CoronaDefinition:
+				item.id = row.id
+				data.CoronaDefinition.append(item)
+			for item: Dictionary in resolved.CoronaType:
+				item.id = data.CoronaType.size()+1
+				item.owner = row.id
+				data.CoronaType.append(item)
+			for item: Dictionary in resolved.PumpDefinition:
+				item.id = row.id
+				data.PumpDefinition.append(item)
+			for item: Dictionary in resolved.CrabDefinition:
+				item.id = row.id
+				data.CrabDefinition.append(item)
+			for item: Dictionary in resolved.AquilaDefinition:
+				item.id = row.id
+				data.AquilaDefinition.append(item)
+			for item: Dictionary in resolved.PhoenixDefinition:
+				item.id = row.id
+				data.PhoenixDefinition.append(item)
+			for item: Dictionary in resolved.BomberDefinition:
+				item.id = row.id
+				data.BomberDefinition.append(item)
+			for item: Dictionary in resolved.CrossEnemyDefinition:
+				item.id = row.id
+				data.CrossEnemyDefinition.append(item)
+			for item: Dictionary in resolved.AquariusDefinition:
+				item.id = row.id
+				data.AquariusDefinition.append(item)
+			for item: Dictionary in resolved.CrowDefinition:
+				item.id = row.id
+				data.CrowDefinition.append(item)
+			for item: Dictionary in resolved.DefenderDefinition:
+				item.id = row.id
+				data.DefenderDefinition.append(item)
+			for item: Dictionary in resolved.SplitDefinition:
+				item.id = row.id
+				data.SplitDefinition.append(item)
+			for item: Dictionary in resolved.ReticleDefinition:
+				item.id = row.id
+				data.ReticleDefinition.append(item)
+			for dolphin: Dictionary in resolved.DolphinDefinition:
+				dolphin.id = row.id
+				data.DolphinDefinition.append(dolphin)
+			for pulser: Dictionary in resolved.PulserDefinition:
+				pulser.id = row.id
+				data.PulserDefinition.append(pulser)
+			for marlin: Dictionary in resolved.MarlinDefinition:
+				marlin.id = row.id
+				data.MarlinDefinition.append(marlin)
+			for sniper: Dictionary in resolved.SniperDefinition:
+				sniper.id = row.id
+				data.SniperDefinition.append(sniper)
+			for battleship: Dictionary in resolved.BattleshipDefinition:
+				battleship.id = row.id
+				data.BattleshipDefinition.append(battleship)
+			for dash: Dictionary in resolved.DashDefinition:
+				dash.id = row.id
+				data.DashDefinition.append(dash)
+			for star: Dictionary in resolved.TriangleStarDefinition:
+				star.id = row.id
+				data.TriangleStarDefinition.append(star)
+			for part: Dictionary in resolved.PartDefinition:
+				part.id = row.id
+				data.PartDefinition.append(part)
+			for drift: Dictionary in resolved.DriftDefinition:
+				drift.id = row.id
+				data.DriftDefinition.append(drift)
+			for rocket: Dictionary in resolved.RocketDefinition:
+				rocket.id = row.id
+				data.RocketDefinition.append(rocket)
+			for missile: Dictionary in resolved.MissileEnemyDefinition:
+				missile.id = row.id
+				data.MissileEnemyDefinition.append(missile)
+			for beamer: Dictionary in resolved.BeamerDefinition:
+				beamer.id = row.id
+				data.BeamerDefinition.append(beamer)
+			for gunner: Dictionary in resolved.GunnerDefinition:
+				gunner.id = row.id
+				data.GunnerDefinition.append(gunner)
+			for hound: Dictionary in resolved.HoundDefinition:
+				hound.id = row.id
+				data.HoundDefinition.append(hound)
+			data.StringEntry.append({"id":i+1,"value":id})
+			data.DefinitionIndex.append({"id":i+1,"enemy":i+1})
+			data.NumericTraitLevel = resolved.NumericTraitLevel
+			data.HeroConfig = resolved.HeroConfig
+			data.HerculesDefinition = resolved.HerculesDefinition
+			data.GeminiDefinition = resolved.GeminiDefinition
+			data.LeoDefinition = resolved.LeoDefinition
+			data.PerseusDefinition = resolved.PerseusDefinition
+			data.HeroDefinition = resolved.HeroDefinition
+			data.HeroStar = resolved.HeroStar
+			data.HeroLink = resolved.HeroLink
+			data.RunConfig = resolved.RunConfig
+			data.ContactDefinition = resolved.ContactDefinition
+			data.BeamDefinition = resolved.BeamDefinition
+			data.WaveDefinition = resolved.WaveDefinition
+			data.PopulationDefinition = resolved.PopulationDefinition
+			data.PopulationType.append({"id":row.id,"enemy":row.id,"rank":definition.rank,"maximum":definition.max_alive,"ranged":definition.ranged})
+			data.CometDefinition = resolved.CometDefinition
+			data.WarpDefinition = resolved.WarpDefinition
+			data.GravityDefinition = resolved.GravityDefinition
+			data.WallDefinition = resolved.WallDefinition
+			data.SlashDefinition = resolved.SlashDefinition
+			data.BoltDefinition = resolved.BoltDefinition
+			data.LightArrowDefinition = resolved.LightArrowDefinition
+			data.FriendShotDefinition = resolved.FriendShotDefinition
+			data.BudgetPhase = resolved.BudgetPhase
+			if data.ResourceKey.is_empty():
+				data.ResourceKey = resolved.ResourceKey.slice(0,5)
+				visuals.assign(package.visuals.slice(0,5))
+				data.FriendHullDefinition = resolved.FriendHullDefinition.duplicate(true)
+				data.ZoneDefinition = resolved.ZoneDefinition.duplicate(true)
+				data.FloodDefinition = resolved.FloodDefinition.duplicate(true)
+				data.LightLanceDefinition = resolved.LightLanceDefinition.duplicate(true)
+				data.ShellDefinition = resolved.ShellDefinition.duplicate(true)
+				data.FriendSawPoint = resolved.FriendSawPoint.duplicate(true)
+				data.FriendDebrisDefinition = resolved.FriendDebrisDefinition.duplicate(true)
+				data.LumpDefinition = resolved.LumpDefinition.duplicate(true)
+				data.RingHoldDefinition = resolved.RingHoldDefinition.duplicate(true)
+				data.StarBoltDefinition = resolved.StarBoltDefinition.duplicate(true)
+				data.LoadoutDefinition = resolved.LoadoutDefinition
+				data.ForwardDefinition = resolved.ForwardDefinition
+				data.ScatterDefinition = resolved.ScatterDefinition
+				data.ScatterPostDefinition = resolved.ScatterPostDefinition
+				data.RearDefinition = resolved.RearDefinition
+				data.RearPostDefinition = resolved.RearPostDefinition
+				data.KnockbackDefinition = resolved.KnockbackDefinition
+				data.MinesDefinition = resolved.MinesDefinition
+				data.EndBlastDefinition = resolved.EndBlastDefinition
+				data.InterceptorDefinition = resolved.InterceptorDefinition
+				data.FlashSlashDefinition = resolved.FlashSlashDefinition
+				data.AfterimageDefinition = resolved.AfterimageDefinition
+				data.DashRangeDroneDefinition = resolved.DashRangeDroneDefinition
+				data.BipolarDefinition = resolved.BipolarDefinition
+				data.MassTowDefinition = resolved.MassTowDefinition
+				data.ContactArcDefinition = resolved.ContactArcDefinition
+				data.SonicDefinition = resolved.SonicDefinition
+				data.ContactWaveDefinition = resolved.ContactWaveDefinition
+				data.BarrierDefinition = resolved.BarrierDefinition
+				data.BarrierPostDefinition = resolved.BarrierPostDefinition
+				data.FullChargeDefinition = resolved.FullChargeDefinition
+				data.KillSonicDefinition = resolved.KillSonicDefinition
+				data.CritBeamDefinition = resolved.CritBeamDefinition
+				data.VortexDefinition = resolved.VortexDefinition
+				data.RunUpDefinition = resolved.RunUpDefinition
+				data.RampageDefinition = resolved.RampageDefinition
+				data.DuplicatorDefinition = resolved.DuplicatorDefinition
+				data.ProgressionDefinition = resolved.ProgressionDefinition
+				data.LifecycleDefinition = resolved.LifecycleDefinition
+				for section in ["PostMaxDefinition","PostMaxTarget","PostMaxInterval","PostMaxChargeDefinition","PostMaxCritDefinition","PostMaxMotionDefinition","PostMaxWeaponPowerDefinition","PostMaxPickupDefinition","PostMaxDrawDefinition"]:
+					data[section] = resolved[section]
+				equipment_resources = package.visuals.filter(func(key: Dictionary): return key.role==7)
+				data.FieldBodyDefinition = resolved.FieldBodyDefinition.duplicate(true)
+				data.MoonDefinition = resolved.MoonDefinition.duplicate(true)
+				for projectile: Dictionary in resolved.HostileDefinition:
+					if projectile.kind==2: continue
+					var attack := projectile.duplicate()
+					attack.id = data.HostileDefinition.size()+1
+					data.HostileDefinition.append(attack)
+				field_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [9,10])
+				attack_visuals = package.visuals.filter(func(key: Dictionary): return key.role in [11,12,13,Schema.ENUMS.VisualRole.StarBolt])
+			for attack_visual: Dictionary in package.visuals:
+				if attack_visual.role==13 and not attack_visuals.any(func(value: Dictionary): return value.role==13): attack_visuals.append(attack_visual)
+			for shield_source: Dictionary in resolved.ShieldDefinition:
+				var shield := shield_source.duplicate()
+				var reflected: Dictionary = resolved.HostileDefinition[1].duplicate()
+				reflected.id = data.HostileDefinition.size()+1
+				shield.id = row.id
+				shield.reflected = reflected.id
+				data.HostileDefinition.append(reflected)
+				data.ShieldDefinition.append(shield)
+			var visual: Dictionary = package.visuals[5].duplicate()
+			visual.id = i+6
+			visual.mark_key = "shape:"+String(definition.shape) if visual.path.is_empty() else "sprite:"+id
+			data.ResourceKey.append({"id":visual.id,"role":visual.role})
+			visuals.append(visual)
+			if visual.role==6:
+				var look: EnemyLook = load(visual.path)
+				var lighting: Resource = load("res://data/visuals/enemy_lighting.tres")
+				var settings := {}
+				for key in ["key_energy","fill_energy","key_angle","fill_angle","height","ambient","normal_strength"]:
+					settings[key] = definition.visual_value(key,lighting.get(key))
+				appearance_metadata[visual.id] = {"settings":settings,"paint":look.colors_key(definition.armor_colors),"hull_preview":look.preview_key(definition.armor_colors),"biting":definition.behavior==&"biter","pump":definition.behavior==&"pump",
+					"biter_parts":"res://data/visuals/biter_parts.tres" if id=="biter" and look.source_path=="res://data/visuals/looks/biter.tres" else ""}
+				if definition.behavior==&"ruler":
+					appearance_metadata[visual.id].ruler=true
+					appearance_metadata[visual.id].lower_paint=look.split_other.colors_key(definition.armor_colors) if look.split_other!=null else ""
+		for item: Dictionary in data.SplitDefinition:
+			item.child = enemy_ids.find("splitling")+1
+		if data.RunConfig.is_empty(): return ERR_INVALID_DATA
+		if not data.BiteDefinition.is_empty():
 			var key: int = data.ResourceKey.size()+1
-			data.ResourceKey.append({"id":key,"role":0})
-			visuals.append({"id":key,"role":0,"path":path,"rect":Rect2(size*damage,0.0,size,size)})
-			terrain["meteor_visual_%d" % (variant*3+damage)] = key
-	data.RockFieldDefinition = [terrain]
-	if not stage.phases.is_empty():
-		data.PopulationDefinition[0].active = true
-		data.PopulationDefinition[0].boss_start = stage.boss_start(config)
-		var enemy_indices := {}
-		for enemy in data.StringEntry: enemy_indices[StringName(enemy.value)] = enemy.id
-		for phase: PhaseDef in stage.phases:
-			var phase_row := {"id":data.PopulationPhase.size()+1,"external_id":String(phase.id),"start":phase.start,"pop_from":phase.pop_from,"pop_to":phase.pop_to,"rate":phase.rate,"xp_bonus":phase.xp_bonus,"attack_budget":phase.attack_budget,"wave_interval":phase.wave_interval,"wave_type":enemy_indices.get(phase.wave_type,0)}
-			if phase.wave_interval>0.0 and phase_row.wave_type==0: return ERR_UNAVAILABLE
-			for key in ["surge_interval","surge_pop","surge_ranged","surge_elite"]: phase_row[key] = phase.surge_value(key,config)
-			data.PopulationPhase.append(phase_row)
-			for enemy in phase.mix:
-				if not enemy_indices.has(StringName(enemy)): return ERR_UNAVAILABLE
-				data.PopulationMix.append({"id":data.PopulationMix.size()+1,"phase":phase_row.id,"enemy":enemy_indices[StringName(enemy)],"weight":float(phase.mix[enemy])})
-		for curve: SpawnCurve in stage.zako_curves:
-			if not enemy_indices.has(curve.type): return ERR_UNAVAILABLE
-			var curve_row := {"id":data.PopulationCurve.size()+1,"enemy":enemy_indices[curve.type]}
-			data.PopulationCurve.append(curve_row)
-			for n in curve.points.size(): data.PopulationPoint.append({"id":data.PopulationPoint.size()+1,"curve":curve_row.id,"time":curve.points[n].x,"value":curve.points[n].y,"slope":SpawnCurve._slope(curve.points,n) if curve.points.size()>1 else 0.0})
-		for window in stage.surge_windows(config): data.PopulationWindow.append({"id":data.PopulationWindow.size()+1,"start":window.x,"end":window.y if is_finite(window.y) else -1.0})
+			data.ResourceKey.append({"id":key,"role":8})
+			visuals.append({"id":key,"role":8,"path":"res://scenes/attacks/zone_biter.tscn"})
+			for bite: Dictionary in data.BiteDefinition: bite.visual_key = key
+		for resource: Dictionary in equipment_resources:
+			var row := resource.duplicate()
+			row.erase("equipment")
+			row.id = data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":row.id,"role":row.role})
+			visuals.append(row)
+			data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":int(resource.get("equipment",1)),"asset":row.id})
+		for resource: Dictionary in field_visuals:
+			var row := resource.duplicate()
+			row.id = data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":row.id,"role":row.role})
+			visuals.append(row)
+			if row.role==9: data.FieldBodyDefinition[0].visual = row.id
+			else: data.MoonDefinition[0].visual = row.id
+		for resource: Dictionary in attack_visuals:
+			var row := resource.duplicate()
+			row.id = data.ResourceKey.size()+1
+			data.ResourceKey.append({"id":row.id,"role":row.role})
+			visuals.append(row)
+			for star: Dictionary in data.StarBoltDefinition:
+				if row.role==Schema.ENUMS.VisualRole.StarBolt: star.visual = row.id
+				elif row.role==12: star.stone_visual = row.id
+			for attack: Dictionary in data.HostileDefinition:
+				if row.role==12: attack.stone_visual = row.id
+				elif (row.role==13 and attack.kind==2) or (row.role==11 and attack.kind!=2): attack.visual = row.id
+		var terrain := {"id":1}
+		for key in ["meteor_count","iron_count","saw_count","planet_radius","meteor_coin_chance","meteor_heal_chance","meteor_magnet_chance","saw_speed","saw_power","saw_life"]:
+			terrain[key] = config.get(key)
+		for id in ["meteor","iron","saw"]: terrain[id] = enemy_ids.find(id)+1
+		for variant in 2:
+			var path := "res://assets/pixel/%s_spritesheet.png" % ("meteor" if variant==0 else "meteor2")
+			var texture: Texture2D = load(path)
+			if texture==null: return ERR_CANT_OPEN
+			var size := float(texture.get_height())
+			terrain["meteor_radius_%d" % variant] = size*0.5
+			for damage in 3:
+				var key: int = data.ResourceKey.size()+1
+				data.ResourceKey.append({"id":key,"role":0})
+				visuals.append({"id":key,"role":0,"path":path,"rect":Rect2(size*damage,0.0,size,size)})
+				terrain["meteor_visual_%d" % (variant*3+damage)] = key
+		data.RockFieldDefinition = [terrain]
+		if not stage.phases.is_empty():
+			data.PopulationDefinition[0].active = true
+			data.PopulationDefinition[0].boss_start = stage.boss_start(config)
+			var enemy_indices := {}
+			for enemy in data.StringEntry: enemy_indices[StringName(enemy.value)] = enemy.id
+			for phase: PhaseDef in stage.phases:
+				var phase_row := {"id":data.PopulationPhase.size()+1,"external_id":String(phase.id),"start":phase.start,"pop_from":phase.pop_from,"pop_to":phase.pop_to,"rate":phase.rate,"xp_bonus":phase.xp_bonus,"attack_budget":phase.attack_budget,"wave_interval":phase.wave_interval,"wave_type":enemy_indices.get(phase.wave_type,0)}
+				if phase.wave_interval>0.0 and phase_row.wave_type==0: return ERR_UNAVAILABLE
+				for key in ["surge_interval","surge_pop","surge_ranged","surge_elite"]: phase_row[key] = phase.surge_value(key,config)
+				data.PopulationPhase.append(phase_row)
+				for enemy in phase.mix:
+					if not enemy_indices.has(StringName(enemy)): return ERR_UNAVAILABLE
+					data.PopulationMix.append({"id":data.PopulationMix.size()+1,"phase":phase_row.id,"enemy":enemy_indices[StringName(enemy)],"weight":float(phase.mix[enemy])})
+			for curve: SpawnCurve in stage.zako_curves:
+				if not enemy_indices.has(curve.type): return ERR_UNAVAILABLE
+				var curve_row := {"id":data.PopulationCurve.size()+1,"enemy":enemy_indices[curve.type]}
+				data.PopulationCurve.append(curve_row)
+				for n in curve.points.size(): data.PopulationPoint.append({"id":data.PopulationPoint.size()+1,"curve":curve_row.id,"time":curve.points[n].x,"value":curve.points[n].y,"slope":SpawnCurve._slope(curve.points,n) if curve.points.size()>1 else 0.0})
+			for window in stage.surge_windows(config): data.PopulationWindow.append({"id":data.PopulationWindow.size()+1,"start":window.x,"end":window.y if is_finite(window.y) else -1.0})
 
 
-	var formation_enemy_indices := {}
-	for enemy in data.StringEntry: formation_enemy_indices[StringName(enemy.value)] = enemy.id
-	var clips := Legacy.compile_spawn_clips(stage,config)
-	if clips.is_empty(): return ERR_INVALID_DATA
-	# 実験場の手動配置の定義は、自動クリップを追加せず同じ生成形式へ通す。
-	for source: Dictionary in extra_formations: clips.formations.append(Legacy.compile_formation(source))
-	for formation: Dictionary in clips.formations:
-		var formation_id: int = data.FormationDefinition.size()+1
-		data.FormationDefinition.append({"id":formation_id,"base_view":config.base_view})
-		var entry_ids: Array[int] = []
-		for entry: Dictionary in formation.entries:
-			var entry_id: int = data.FormationEntry.size()+1
-			entry_ids.append(entry_id)
-			data.FormationEntry.append({"id":entry_id,"formation":formation_id,"weight":entry.weight,"x":entry.pos.x,"y":entry.pos.y})
-		for layout: Dictionary in formation.layouts:
-			var layout_id: int = data.FormationLayout.size()+1
-			data.FormationLayout.append({"id":layout_id,"formation":formation_id,"weight":layout.weight,"value":layout.value,"managed":-1 if layout.managed==null else int(bool(layout.managed))})
-			for type in layout.types:
+		var formation_enemy_indices := {}
+		for enemy in data.StringEntry: formation_enemy_indices[StringName(enemy.value)] = enemy.id
+		var clips := Legacy.compile_spawn_clips(stage,config)
+		if clips.is_empty(): return ERR_INVALID_DATA
+		# 実験場の手動配置の定義は、自動クリップを追加せず同じ生成形式へ通す。
+		for source: Dictionary in extra_formations: clips.formations.append(Legacy.compile_formation(source))
+		for formation: Dictionary in clips.formations:
+			var formation_id: int = data.FormationDefinition.size()+1
+			data.FormationDefinition.append({"id":formation_id,"base_view":config.base_view})
+			var entry_ids: Array[int] = []
+			for entry: Dictionary in formation.entries:
+				var entry_id: int = data.FormationEntry.size()+1
+				entry_ids.append(entry_id)
+				data.FormationEntry.append({"id":entry_id,"formation":formation_id,"weight":entry.weight,"x":entry.pos.x,"y":entry.pos.y})
+			for layout: Dictionary in formation.layouts:
+				var layout_id: int = data.FormationLayout.size()+1
+				data.FormationLayout.append({"id":layout_id,"formation":formation_id,"weight":layout.weight,"value":layout.value,"managed":-1 if layout.managed==null else int(bool(layout.managed))})
+				for type in layout.types:
+					if not formation_enemy_indices.has(StringName(type)): return ERR_UNAVAILABLE
+					data.FormationType.append({"id":data.FormationType.size()+1,"layout":layout_id,"enemy":formation_enemy_indices[StringName(type)]})
+				for e in layout.placements.size():
+					for marker: Dictionary in layout.placements[e]:
+						data.FormationMarker.append({"id":data.FormationMarker.size()+1,"layout":layout_id,"entry":entry_ids[e],"enemy":formation_enemy_indices[StringName(marker.type)],"x":marker.offset.x,"y":marker.offset.y,"rotation":marker.rotation})
+		for clip: Dictionary in clips.clips:
+			var clip_id: int = data.PopulationClip.size()+1
+			data.PopulationClip.append({"id":clip_id,"start":clip.start,"end":clip.end if is_finite(clip.end) else -1.0,"interval":clip.interval,"groups":clip.groups,"priority":clip.priority})
+			for type in clip.types:
 				if not formation_enemy_indices.has(StringName(type)): return ERR_UNAVAILABLE
-				data.FormationType.append({"id":data.FormationType.size()+1,"layout":layout_id,"enemy":formation_enemy_indices[StringName(type)]})
-			for e in layout.placements.size():
-				for marker: Dictionary in layout.placements[e]:
-					data.FormationMarker.append({"id":data.FormationMarker.size()+1,"layout":layout_id,"entry":entry_ids[e],"enemy":formation_enemy_indices[StringName(marker.type)],"x":marker.offset.x,"y":marker.offset.y,"rotation":marker.rotation})
-	for clip: Dictionary in clips.clips:
-		var clip_id: int = data.PopulationClip.size()+1
-		data.PopulationClip.append({"id":clip_id,"start":clip.start,"end":clip.end if is_finite(clip.end) else -1.0,"interval":clip.interval,"groups":clip.groups,"priority":clip.priority})
-		for type in clip.types:
-			if not formation_enemy_indices.has(StringName(type)): return ERR_UNAVAILABLE
-			data.PopulationClipType.append({"id":data.PopulationClipType.size()+1,"clip":clip_id,"enemy":formation_enemy_indices[StringName(type)]})
-		for formation in clip.formations:
-			data.PopulationClipFormation.append({"id":data.PopulationClipFormation.size()+1,"clip":clip_id,"formation":formation+1})
+				data.PopulationClipType.append({"id":data.PopulationClipType.size()+1,"clip":clip_id,"enemy":formation_enemy_indices[StringName(type)]})
+			for formation in clip.formations:
+				data.PopulationClipFormation.append({"id":data.PopulationClipFormation.size()+1,"clip":clip_id,"formation":formation+1})
 
-	var encounter_error := encounter_records(data,encounter_profile,enemy_ids)
-	if encounter_error!=OK: return encounter_error
-	var resolved_bosses: Dictionary = boss_definitions.duplicate()
-	if not stage.boss_id.is_empty() and not resolved_bosses.has(stage.boss_id): resolved_bosses[stage.boss_id] = _definition(&"bosses",stage.boss_id)
-	var bosses_error := append_bosses(data,visuals,resolved_bosses,config,stage,boss_programs)
-	if bosses_error!=OK: return bosses_error
-	if stage.boss_enabled:
-		var body_id := 0
-		for body: Dictionary in data.BossBodyDefinition:
-			if data.BossDefinition[body.boss-1].external_id==String(stage.boss_id): body_id = body.id
-		if body_id==0: return ERR_UNAVAILABLE
-		data.StageBossDefinition = [{"id":1,"body":body_id,"start":stage.boss_start(config),"spread":config.boss_time_spread if stage.boss_time<0.0 else 0.0}]
-	for boss: Dictionary in data.BossDefinition:
-		if boss.external_id!="draco": continue
-		var source: BossDef = resolved_bosses.get(&"draco",resolved_bosses.get("draco"))
-		if source==null or append_draco_cycle(data,source,boss.id)!=OK: return ERR_INVALID_DATA
+		var encounter_error := encounter_records(data,encounter_profile,enemy_ids)
+		if encounter_error!=OK: return encounter_error
+		var resolved_bosses: Dictionary = boss_definitions.duplicate()
+		if not stage.boss_id.is_empty() and not resolved_bosses.has(stage.boss_id): resolved_bosses[stage.boss_id] = _definition(&"bosses",stage.boss_id)
+		var bosses_error := append_bosses(data,visuals,resolved_bosses,config,stage,boss_programs)
+		if bosses_error!=OK: return bosses_error
+		if stage.boss_enabled:
+			var body_id := 0
+			for body: Dictionary in data.BossBodyDefinition:
+				if data.BossDefinition[body.boss-1].external_id==String(stage.boss_id): body_id = body.id
+			if body_id==0: return ERR_UNAVAILABLE
+			data.StageBossDefinition = [{"id":1,"body":body_id,"start":stage.boss_start(config),"spread":config.boss_time_spread if stage.boss_time<0.0 else 0.0}]
+		for boss: Dictionary in data.BossDefinition:
+			if boss.external_id!="draco": continue
+			var source: BossDef = resolved_bosses.get(&"draco",resolved_bosses.get("draco"))
+			if source==null or append_draco_cycle(data,source,boss.id)!=OK: return ERR_INVALID_DATA
+		prepared = Resource.new()
+		prepared.set_meta("data",data)
+		prepared.set_meta("visuals",visuals)
+		prepared.set_meta("appearance",appearance_metadata)
+		prepared.set_meta("cycles",cycle_dependencies)
+		var directory_error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(preparation_path.get_base_dir()))
+		if directory_error != OK: return directory_error
+		var preparation_error := ResourceSaver.save(prepared,preparation_path,ResourceSaver.FLAG_COMPRESS)
+		if preparation_error != OK: return preparation_error
+		preparation_build_count += 1
 	var order_error := preserve_definition_order(data, previous_definition_ids)
 	if order_error != OK: return order_error
 	# 開発中の追加定義は既存の装備・保留要求の資源番号を維持する。

@@ -39,6 +39,6 @@ static func build(output := "res://data/content_catalog.tres") -> Error:
 			catalog.entries.append(entry)
 	catalog.source_signature = "\n".join(hashes).sha256_text()
 	if FileAccess.file_exists(output):
-		var previous := load(output) as ContentCatalog
+		var previous := ResourceLoader.load(output,"",ResourceLoader.CACHE_MODE_IGNORE) as ContentCatalog
 		if previous != null and previous.source_signature == catalog.source_signature: return OK
 	return ResourceSaver.save(catalog, output)
