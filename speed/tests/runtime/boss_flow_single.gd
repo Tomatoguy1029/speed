@@ -1,22 +1,15 @@
 extends SceneTree
 func _initialize() -> void: call_deferred("exercise")
 func exercise() -> void:
-	var script = load("res://gyms/boss_flow_single_adapter.gd")
-	if script == null:
-		quit(1)
-		return
-	var adapter = script.new()
-	var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
-	flow.maximum_stamina = 2.0
-	flow.sections = [{"request": "normal", "cap": 1.0, "weights": {"single": 100.0}, "next": 0}]
-	var runner = load("res://scripts/bosses/flow/runner.gd").new()
-	runner.configure(flow)
-	runner.tick(0.1, {"player": Vector2(120, 0)}, adapter)
-	assert(adapter.started.size() == 1 and runner.stamina == 1.0)
-	adapter.advance(2.0)
-	runner.tick(0.1, {"player": Vector2(120, 0)}, adapter)
-	runner.tick(0.2, {"player": Vector2(120, 0)}, adapter)
-	assert(adapter.started.size() == 2)
+	var helper=load("res://tests/runtime/boss_flow_runner.gd").new()
+	var f: Dictionary=helper.fixture({"a":{}},[{"request":"normal","cap":1.0,"next":0}],{"stamina":2.0})
+	if f.is_empty():helper.free();quit(1);return
+	assert(helper.next_action(f)==["a"] and helper.state(f).stamina==1.0)
+	assert(helper.next_action(f)==["a"])
+	helper.close(f);helper.free()
+	var flow=load("res://scripts/data_types/boss_flow_def.gd").new()
+	flow.maximum_stamina=2.0
+	flow.sections=[{"request":"normal","cap":1.0,"weights":{"single":100.0},"next":0}]
 	var move = load("res://data/bosses/monoceros_moves/charge.tres").duplicate(true)
 	move.technique = &"strike"
 	move.set_field("damage", 12.0)
