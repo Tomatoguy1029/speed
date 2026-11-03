@@ -253,10 +253,50 @@ DEMOS.push({
 });
 
 // ---------- わし座（aquila）
+// 試作の稲妻：pixelFX lightning/_lib.js の作り（中点をずらして刻むジグザグ、細りながら枝分かれ、外側の暗い光→明るい本体→白い芯の3段で塗る）を移植。
+// 稲妻の作りと塗り方は Sprite Fusion のオープンソースの稲妻（MIT License, Copyright (c) 2026 Hugo Duprez）由来
+const VOLT = ['#120a33', '#2a1b78', '#4630c0', '#5a62f0', '#58a6ff', '#9ed8ff', '#e4f6ff', '#ffffff'];
+const AQ_FLICK = [1, 0.72, 0.3, 0.95, 0.5, 0.8, 0.22]; // lightning-strike.js のちらつき（30fps のコマごと）
+function voltRamp(color) { const a = hsl('#58a6ff'), b = hsl(color), dh = b.s > 0.05 ? b.h - a.h : 0; return VOLT.map((h) => { const c = hsl(h); return hexc(fromHsl({ h: (c.h + dh + 360) % 360, s: c.s, l: c.l })); }); }
+function zigzag(Rg, x0, y0, x1, y1, jag = 0.32, forks = 0.35, w = 1, depth = 0) {
+  const out = [], L = Math.hypot(x1 - x0, y1 - y0); let pts = [[x0, y0], [x1, y1]], off = L * jag;
+  while (pts.length < 2 + L / 3) { const nxt = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) { const [ax, ay] = pts[i], [bx, by] = pts[i + 1], l = Math.hypot(bx - ax, by - ay) || 1, o = Rg.range(-off, off); nxt.push([(ax + bx) / 2 + (-(by - ay) / l) * o, (ay + by) / 2 + ((bx - ax) / l) * o], [bx, by]); }
+    pts = nxt; off *= 0.52; }
+  out.push({ pts, w });
+  if (depth < 2) for (let i = 2; i < pts.length - 3; i++) if (Rg.chance(forks / (1 + depth) / Math.max(4, pts.length / 6))) {
+    const [ax, ay] = pts[i], [bx, by] = pts[Math.min(pts.length - 1, i + 3)], an = Math.atan2(by - ay, bx - ax) + Rg.sign() * Rg.range(0.35, 0.9), l = (L - (i / pts.length) * L) * Rg.range(0.25, 0.55);
+    out.push(...zigzag(Rg, ax, ay, ax + Math.cos(an) * l, ay + Math.sin(an) * l, jag * 1.1, forks, w * 0.55, depth + 1)); }
+  return out;
+}
+// 塗り：画素ごとに一番高い段だけを残して1回ずつ塗る（枝の外光が幹の本体を覆わない）
+function voltInk(p, paths, k, C, s = 1, thin = false, glowK = 0.5) {
+  if (k <= 0.02) return; const grid = new Map(), mark = (x, y, lv) => { const key = Math.floor(x) + ',' + Math.floor(y); if ((grid.get(key) || 0) < lv) grid.set(key, lv); };
+  const stamp = (x, y, r, lv) => { if (r <= 0.5) return mark(x, y, lv); for (let py = Math.floor(y - r); py <= Math.ceil(y + r); py++) for (let px2 = Math.floor(x - r); px2 <= Math.ceil(x + r); px2++) if ((px2 + 0.5 - x) ** 2 + (py + 0.5 - y) ** 2 <= r * r) mark(px2, py, lv); };
+  for (const q of paths) { const trunk = q.w >= 1; if (!trunk && k < 0.5) continue;
+    const rh = thin ? (trunk && k > 0.45 ? 1.2 : 0) : (trunk ? (k > 0.6 ? 2.1 : 1.6) : 1.1) * s, rb = thin ? 0.5 : (trunk ? (k > 0.6 ? 1.3 : 0.8) : 0.5) * s;
+    for (let i = 0; i < q.pts.length - 1; i++) { const [ax, ay] = q.pts[i], [bx, by] = q.pts[i + 1], l = Math.max(1, Math.hypot(bx - ax, by - ay));
+      for (let d = 0; d <= l; d += 0.5) { const x = ax + (bx - ax) * d / l, y = ay + (by - ay) * d / l; if (rh > 0) stamp(x, y, rh, 1); stamp(x, y, rb, trunk ? 3 : 2); if (trunk && k > 0.3) mark(x, y, 4); } }
+    for (let i = 0; i < q.pts.length - 1; i += 3) p.glow(q.pts[i][0], q.pts[i][1], (trunk ? (thin ? 8 : 14) : 6) * s, C[4], glowK * k * q.w); }
+  const cols = [C[2], C[4], C[5], C[7]]; for (const [key, lv] of grid) { const [x, y] = key.split(',').map(Number); p.px(x, y, cols[lv - 1]); }
+}
+// 範囲の中でちらつく短い放電（円は描かない）：count 本、0.06 秒ごとに形と場所が変わる
+function aqStatic(p, L, r, count, len, time, seed, C, k) {
+  const fr = Math.floor(time / 0.06); for (let i = 0; i < count; i++) { const Rg = new PX.Rng((seed * 97 + i * 13 + fr * 7) >>> 0 || 1); if (!Rg.chance(0.7)) continue;
+    const a = Rg.range(0, TAU), d = r * Math.sqrt(Rg.next()) * 0.92, x = L.x + Math.cos(a) * d, y = L.y + Math.sin(a) * d, b = Rg.range(0, TAU), l = len * Rg.range(0.5, 1);
+    voltInk(p, zigzag(Rg, x, y, x + Math.cos(b) * l, y + Math.sin(b) * l, 0.35, 0.2), k * Rg.range(0.5, 1), C, 1, true, 0.3); }
+}
+// 地面に残る放電の跡：中心から枝分かれして伸びる割れ目（着弾ごとに決まった形）
+function aqCracks(seed, r) {
+  const Rg = new PX.Rng(seed), out = [];
+  const grow = (x, y, a, len, w, depth) => { const pts = [[x, y]]; for (let s2 = 0; s2 < len; s2 += 1.5) { a += Rg.range(-0.35, 0.35); x += Math.cos(a) * 1.5; y += Math.sin(a) * 1.5; pts.push([x, y]); if (depth < 2 && s2 > 3 && Rg.chance(0.08)) grow(x, y, a + Rg.sign() * Rg.range(0.5, 1.1), (len - s2) * Rg.range(0.3, 0.6), w * 0.6, depth + 1); } out.push({ pts, w }); };
+  for (let i = 0; i < 7; i++) grow(0, 0, i * TAU / 7 + Rg.range(-0.3, 0.3), r * Rg.range(0.55, 0.95), 1, 0);
+  return out;
+}
 DEMOS.push({
-  id: 'G12-aquila', ids: ['G12'], cat: G12, group: 'わし座（aquila）', title: '進路固定→突進と落雷', duration: 3.6, color: '#d6f4ff', cam: { x: -160, y: -60 },
-  refs: ['scripts/enemies/aquila.gd（aim 0.4・lock 0.45・突進900×0.55・drop_step 0.13・blast 半径220/遅延0.4・recover 0.9）', 'render/enemies/aquila.gd（進路線＋着弾円）・render/attacks/zone_aquila.gd/zone_reticle.gd（閉じる輪・放電）', 'pixelFX lightning 系の考え方（painter.glowLine）'],
-  status: { '状態': '試作のみ', '判定': '変更なし（着弾円の半径220・発生時刻）。予兆・放電は判定円の内側に収める' },
+  id: 'G12-aquila', ids: ['G12'], cat: G12, group: 'わし座（aquila）', title: '進路固定→突進と落雷', duration: 3.6, color: '#9ed8ff', cam: { x: -160, y: -60 },
+  refs: ['scripts/enemies/aquila.gd（aim 0.4・lock 0.45・突進900×0.55・drop_step 0.13・blast 半径220/遅延0.4・recover 0.9）', 'render/enemies/aquila.gd（進路線＋着弾円）・render/attacks/zone_aquila.gd/zone_reticle.gd（閉じる輪・放電）', 'pixelFX lightning/_lib.js（zigzag・stroke の稲妻の作りと塗り）・lightning-strike.js（ちらつき・割れ目・焦げ）'],
+  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし（着弾の半径220・発生時刻）', '予兆': '線や円は使わない。進路は着弾点から着弾点へ跳び移る細い放電で示し、着弾点の範囲の中で短い放電がちらつく（溜まるほど増える）', '落雷': 'pixelFX の稲妻（枝分かれ・3段の塗り・ちらつき）が中心から範囲いっぱいへ走り、地面に割れ目の跡が残って冷える' },
   setup(S) { S.e = mkE('aquila', V(-640, -260), 0, { fire_t: 0.15 }); S.ship = shipState(V(180, 120)); S.zones = []; S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); },
   step(S, dt) {
     const e = S.e, p = prm('aquila');
@@ -265,28 +305,36 @@ DEMOS.push({
       if (e.timer <= p.lock_time && e.charge === 0) { const to = sub(S.ship.pos, e.pos); e.facing = angOf(to); const gap = e.r + DATA.config.ship_radius + 12, adv = Math.min(p.dash_speed * p.dash_time, Math.max(0, len(to) - gap)); e.anchor = add(e.pos, mul(fromA(e.facing), adv)); e.charge = 0.01; }
       if (e.timer <= 0) { e.mode = 'DASH'; e.timer = p.dash_time; e.bud_t = 0; e.charge = 0; } else e.charge = Math.max(e.charge, 1 - e.timer / p.lock_time); }
     else if (e.mode === 'DASH') { const dir = fromA(e.facing), rem = Math.max(0, (e.anchor.x - e.pos.x) * dir.x + (e.anchor.y - e.pos.y) * dir.y), trav = Math.min(rem, p.dash_speed * Math.min(dt, e.timer)), el2 = trav / p.dash_speed; let nd = e.bud_t;
-      while (nd <= el2 + 1e-5) { S.zones.push({ pos: add(e.pos, mul(dir, p.dash_speed * nd)), t0: S.t + nd, r: p.blast_radius, delay: p.blast_delay, active: 0.25 }); nd += p.drop_step; } e.bud_t = nd - el2; e.pos = add(e.pos, mul(dir, trav)); e.timer -= dt;
-      if (e.timer <= 0 || rem <= trav + 0.001) { if (p.drop_step - e.bud_t > p.drop_step * 0.25) S.zones.push({ pos: { ...e.pos }, t0: S.t, r: p.blast_radius, delay: p.blast_delay, active: 0.25 }); e.mode = 'RECOVER'; e.timer = p.recover; } }
+      while (nd <= el2 + 1e-5) { S.zones.push({ pos: add(e.pos, mul(dir, p.dash_speed * nd)), t0: S.t + nd, r: p.blast_radius, delay: p.blast_delay, active: 0.25, seed: S.zones.length * 31 + 7 }); nd += p.drop_step; } e.bud_t = nd - el2; e.pos = add(e.pos, mul(dir, trav)); e.timer -= dt;
+      if (e.timer <= 0 || rem <= trav + 0.001) { if (p.drop_step - e.bud_t > p.drop_step * 0.25) S.zones.push({ pos: { ...e.pos }, t0: S.t, r: p.blast_radius, delay: p.blast_delay, active: 0.25, seed: S.zones.length * 31 + 7 }); e.mode = 'RECOVER'; e.timer = p.recover; } }
     else if (e.mode === 'RECOVER') { e.timer -= dt; if (e.timer <= 0) e.mode = 'MOVE'; }
   },
   phase(S) { const e = S.e; return e.mode === 'WINDUP' ? (e.charge > 0 ? '進路固定（予告）' : PH.WINDUP + '（狙い）') : e.mode === 'DASH' ? PH.DASH : S.used ? PH.RECOVER : PH.MOVE; },
   draw(S, R) {
-    const e = S.e, P = R.P, p = prm('aquila'), C = { r: 0.88, g: 0.97, b: 1, a: 1 };
+    const e = S.e, P = R.P, p = prm('aquila'), C0 = { r: 0.88, g: 0.97, b: 1, a: 1 }, C = voltRamp(P.color), rr = p.blast_radius * WL;
     if (e.mode === 'WINDUP' && e.charge > 0) {
       const dir = norm(sub(e.anchor, e.pos)), sp = p.dash_speed * p.drop_step, total = dist(e.pos, e.anchor), cs = [];
       for (let d = 0; d <= total + 1e-3; d += sp) cs.push(add(e.pos, mul(dir, d))); if (total - Math.floor(total / sp) * sp > sp * 0.25) cs.push(e.anchor);
-      if (!R.proto) { D2.line(e.pos, e.anchor, rgba(C, 0.65 + 0.3 * e.charge), px(4)); D2.circle(e.pos, px(4), '#fff1cc'); for (const c of cs) D2.arc(c, p.blast_radius, 0, TAU, rgba(C, 0.35 + 0.4 * e.charge), px(2)); }
-      else { FXW.warnRail(R.back, e.pos, e.anchor, { color: P.color, k: e.charge, time: S.t, seed: 12, intensity: P.intensity }); cs.forEach((c, i) => { const L = toL(c), pal = FX.ramp(P.color), r = p.blast_radius * WL; R.back.ring(L.x, L.y, r, 1, pal[2], 0.35 + 0.4 * e.charge); for (let j = 0; j < 22; j++) { const an = hash(i * 31 + j) * TAU, rr = r * Math.sqrt(hash(j * 3.7 + i)); if (hash(j + Math.floor(S.t * 12) + i) < 0.35 * e.charge) R.back.dot(L.x + Math.cos(an) * rr, L.y + Math.sin(an) * rr, pal[3], 0.8); } }); }
+      if (!R.proto) { D2.line(e.pos, e.anchor, rgba(C0, 0.65 + 0.3 * e.charge), px(4)); D2.circle(e.pos, px(4), '#fff1cc'); for (const c of cs) D2.arc(c, p.blast_radius, 0, TAU, rgba(C0, 0.35 + 0.4 * e.charge), px(2)); }
+      else { // 進路：着弾点から着弾点へ跳び移る細い放電（溜まるほど先まで届く）。着弾点の範囲の中で短い放電がちらつく
+        const k = e.charge, reach = Math.ceil(cs.length * Math.min(1, k * 1.4)), fr = Math.floor(S.t / 0.06);
+        for (let i = 0; i < reach - 1; i++) { const A = toL(cs[i]), B = toL(cs[i + 1]), Rg = new PX.Rng((i * 53 + fr * 11) >>> 0 || 1); voltInk(R.back, zigzag(Rg, A.x, A.y, B.x, B.y, 0.25, 0.3), 0.35 + 0.35 * k, C, 1, true, 0.35); }
+        cs.forEach((c, i) => { if (i < reach) aqStatic(R.back, toL(c), rr, Math.round(1 + 4 * k), rr * 0.3, S.t, i + 3, C, 0.4 + 0.4 * k); }); }
       if (!R.proto) D2.arc(e.pos, e.r * 1.18, 0, TAU * Math.max(0.12, e.charge), `rgba(225,247,255,${0.55 + 0.4 * e.charge})`, px(3));
     }
-    for (const z of S.zones) { const t = S.t - z.t0; if (t < 0) continue; const L = toL(z.pos), pal = FX.ramp(P.color);
-      if (t < z.delay) { const k = clamp(t / z.delay);
-        if (!R.proto) { const a = 0.25 + 0.55 * k; D2.arc(z.pos, z.r, 0, TAU, rgba(C, a), px(2)); D2.arc(z.pos, z.r * (1 - 0.7 * k), 0, TAU, rgba(C, a), px(1.5)); for (let q = 0; q < 4; q++) { const u = fromA(q * Math.PI / 2 + Math.PI / 4); D2.line(add(z.pos, mul(u, z.r * 0.55)), add(z.pos, mul(u, z.r * 1.15)), rgba(C, a), px(2)); } }
-        else { R.back.ring(L.x, L.y, z.r * WL, 1, pal[2], 0.3 + 0.5 * k); for (let j = 0; j < 4; j++) { const an = hash(j + Math.floor(S.t * 16)) * TAU; FX.bolt(R.back, V(L.x, L.y), V(L.x + Math.cos(an) * z.r * WL * 0.8 * k, L.y + Math.sin(an) * z.r * WL * 0.8 * k), j * 9 + Math.floor(S.t * 16), P.color, 0.45 * k); } R.back.glow(L.x, L.y, z.r * WL * 0.7, pal[2], 0.15 * k * P.intensity); }
-      } else if (t < z.delay + z.active) { const f = 1 - (t - z.delay) / z.active;
-        if (!R.proto) { D2.circle(z.pos, z.r, rgba(C, 0.16 * f)); D2.arc(z.pos, z.r, 0, TAU, rgba(C, 0.75 * f), px(3)); for (let a = 0; a < 5; a++) { const sh = Math.floor((t - z.delay) / 0.06); let prev = z.pos; const end = add(z.pos, mul(fromA(a * TAU / 5), z.r * 0.65)); for (let s = 1; s <= 5; s++) { const q = add(lerpV(z.pos, end, s / 5), mul(orth(fromA(a * TAU / 5)), s < 5 ? (hash(a * 13 + s + sh * 7) - 0.5) * 30 : 0)); D2.line(prev, q, rgba(C, f), px(2)); prev = q; } } }
-        else { const seed = Math.floor(S.t * 16); FX.bolt(R.front, V(L.x + (hash(seed) - 0.5) * 6, -4), V(L.x, L.y), seed, P.color, f, 2); for (let a = 0; a < 6; a++) { const an = a * TAU / 6 + hash(a + seed); FX.bolt(R.front, V(L.x, L.y), V(L.x + Math.cos(an) * z.r * WL * 0.85, L.y + Math.sin(an) * z.r * WL * 0.85), a * 7 + seed, P.color, f); } FX.shock(R.front, V(L.x, L.y), z.r * WL * (0.6 + 0.4 * (1 - f)), 2, P.color, f); R.front.glow(L.x, L.y, z.r * WL, pal[3], 0.5 * f * P.intensity); }
-      } else if (R.proto && t < z.delay + z.active + 0.25 * P.timing) { const f = 1 - (t - z.delay - z.active) / (0.25 * P.timing); for (let j = 0; j < 3; j++) { const an = hash(j * 5 + Math.floor(S.t * 20)) * TAU; FX.bolt(R.back, V(L.x, L.y), V(L.x + Math.cos(an) * z.r * WL * 0.4, L.y + Math.sin(an) * z.r * WL * 0.4), j + Math.floor(S.t * 20), P.color, 0.4 * f); } }
+    for (const z of S.zones) { const t = S.t - z.t0; if (t < 0) continue; const L = toL(z.pos);
+      if (!R.proto) { if (t < z.delay) { const k = clamp(t / z.delay), a = 0.25 + 0.55 * k; D2.arc(z.pos, z.r, 0, TAU, rgba(C0, a), px(2)); D2.arc(z.pos, z.r * (1 - 0.7 * k), 0, TAU, rgba(C0, a), px(1.5)); for (let q = 0; q < 4; q++) { const u = fromA(q * Math.PI / 2 + Math.PI / 4); D2.line(add(z.pos, mul(u, z.r * 0.55)), add(z.pos, mul(u, z.r * 1.15)), rgba(C0, a), px(2)); } }
+        else if (t < z.delay + z.active) { const f = 1 - (t - z.delay) / z.active; D2.circle(z.pos, z.r, rgba(C0, 0.16 * f)); D2.arc(z.pos, z.r, 0, TAU, rgba(C0, 0.75 * f), px(3)); for (let a = 0; a < 5; a++) { const sh = Math.floor((t - z.delay) / 0.06); let prev = z.pos; const end = add(z.pos, mul(fromA(a * TAU / 5), z.r * 0.65)); for (let s2 = 1; s2 <= 5; s2++) { const q = add(lerpV(z.pos, end, s2 / 5), mul(orth(fromA(a * TAU / 5)), s2 < 5 ? (hash(a * 13 + s2 + sh * 7) - 0.5) * 30 : 0)); D2.line(prev, q, rgba(C0, f), px(2)); prev = q; } } }
+        continue; }
+      if (t < z.delay) { const k = clamp(t / z.delay); aqStatic(R.back, L, rr, Math.round(3 + 7 * k), rr * (0.2 + 0.25 * k), S.t, z.seed, C, 0.45 + 0.5 * k); R.back.glow(L.x, L.y, 6 + 10 * k, C[5], (0.2 + 0.6 * k) * P.intensity); } // 溜め：範囲の中の放電が増え、中心が光り始める
+      else { const a = t - z.delay, fl = AQ_FLICK[Math.floor(a * 30 + 1e-4)] ?? 0, cr = aqCracks(z.seed, rr).map(q => ({ w: q.w, pts: q.pts.map(([x, y]) => [L.x + x, L.y + y]) }));
+        const heat = Math.pow(clamp(1 - a / 1.2), 1.4); // 割れ目の跡：熱い色からすすへ冷える
+        if (heat > 0) for (const q of cr) for (let i = 0; i < q.pts.length; i++) { const [x, y] = q.pts[i], h = heat * (1 - 0.5 * i / q.pts.length) - hash(x * 7.1 + y * 3.3) * 0.25; R.back.px(x, y, h > 0.6 ? C[6] : h > 0.35 ? C[4] : h > 0.12 ? C[2] : hexc('#141020')); }
+        if (fl > 0) { const fr = Math.floor(a * 30), Rg = new PX.Rng((z.seed * 13 + fr) >>> 0 || 1), paths = [];
+          for (let j = 0; j < 6; j++) { const an = j * TAU / 6 + Rg.range(-0.35, 0.35), l = rr * Rg.range(0.7, 0.95); paths.push(...zigzag(Rg, L.x, L.y, L.x + Math.cos(an) * l, L.y + Math.sin(an) * l, 0.22, 0.6)); }
+          voltInk(R.front, paths, fl, C, 1, false, 0.6); }
+        if (a < 0.08) { R.front.glow(L.x, L.y, rr * 1.1, C[6], (1 - a / 0.08) * 0.9 * P.intensity); R.front.glow(L.x, L.y, rr * 0.4, C[7], (1 - a / 0.08) * P.intensity); } // 落ちた瞬間の閃光
+        if (a > z.active && a < z.active + 0.35) aqStatic(R.back, L, rr * 0.7, 3, rr * 0.18, S.t, z.seed + 5, C, 0.5 * (1 - (a - z.active) / 0.35)); } // 残りの放電
     }
     if (R.proto) R.blitBack();
     drawEnemy(e); drawShip(S.ship);
