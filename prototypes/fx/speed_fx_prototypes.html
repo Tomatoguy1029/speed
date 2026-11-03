@@ -7047,7 +7047,7 @@ function monoBoostStep(S, dt) {
   if (!run) S.boostRunAt = null;
   const burst = run ? 1 + 0.5 * (1 - smooth(0, 0.18, S.t - S.boostRunAt)) : 1;
   const move = S.tech === 'sweep' ? clamp((S.v || 0) / (S.r.approach_speed_max || 1), 0, 1.2) : clamp((S.travel || 700) / 700, 0.4, 2);
-  const idle = 50 * 0.55 * k, braking = ['brake', 'stop', 'end'].includes(S.stage);
+  const idle = 50 * 0.8 * k, braking = ['brake', 'stop', 'end'].includes(S.stage);
   const ratio = braking ? clamp(len(B.vel) / Math.max(1, S.runSpeed || S.r.speed || S.r.approach_speed_max), 0, 1) : 0;
   const drive = run ? 1 : ratio, lengthScale = (P0.tailJet ?? 1) * P0.size, widthScale = (P0.tailJetWidth ?? 1) * P0.size;
   const target = lerp(idle, B.r * 2.6 * burst * move, drive) * lengthScale;
@@ -7058,7 +7058,8 @@ function monoBoostStep(S, dt) {
   state.width = lerp(state.width, targetWidth, response);
 }
 function monoBoostSamples(S) {
-  const L = S.boost.length * WL, W0 = S.boost.width * WL, clock = S.t, samples = [];
+  const overlap = 24 * S.B.r / 96;
+  const L = (S.boost.length + overlap) * WL, W0 = S.boost.width * WL, clock = S.t, samples = [];
   if (L <= 0 || W0 <= 0) return samples;
   for (let x = 0; x < L; x += 0.55) {
     const u = x / L, flow = 0.88 + 0.12 * Math.sin(x * 0.55 - clock * 39);
@@ -7186,7 +7187,9 @@ function monoPixelBooster(S, R, rig) {
   if (R.P.intensity <= 0 || R.P.tailJet <= 0 || R.P.tailJetWidth <= 0) return;
   const mat = rig.mats['TailBooster/Sprite/booster']; if (!mat) return;
   if (MONO_FIRE_SHADER === undefined) MONO_FIRE_SHADER = monoCreateFireShader();
-  if (MONO_FIRE_SHADER) MONO_FIRE_SHADER.draw(S, M.pt(mat,V(37,0)), S.tailAngle+Math.PI, monoBoostSamples(S), R.P);
+  // 根元を体の内側へ延ばす。体の描画より先に重ね、接続部分は体で隠す。
+  const root = add(M.pt(mat,V(37,0)), mul(fromA(S.tailAngle), 24 * S.B.r / 96));
+  if (MONO_FIRE_SHADER) MONO_FIRE_SHADER.draw(S, root, S.tailAngle+Math.PI, monoBoostSamples(S), R.P);
 }
 
 // ===== いっかくじゅう：現行8技の手続き型の動き、パーツ、歩きコマ =====
