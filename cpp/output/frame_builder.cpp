@@ -64,7 +64,9 @@ Dictionary FrameBuilder::ui_delta(RunRuntime &run,const Dictionary &ui) {
     if (out.ui_revision!=run.state.control.revision) {
         Dictionary delta;auto names=ui.keys();
         for (int64_t i=0;i<names.size();++i) if (!out.previous_ui.has(names[i]) || Variant(out.previous_ui[names[i]])!=Variant(ui[names[i]])) delta[names[i]]=ui[names[i]];
-        out.previous_ui=ui.duplicate(true);out.ui_delta=delta.duplicate(true);out.ui_revision=run.state.control.revision;
+        out.previous_ui=ui.duplicate(true);
+        // 新しい差分辞書は窓口内で保持し、返却時に独立した深いコピーを作る。
+        out.ui_delta=delta;out.ui_revision=run.state.control.revision;
     }
     return out.ui_delta.duplicate(true);
 }
