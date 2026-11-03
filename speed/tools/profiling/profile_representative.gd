@@ -1,6 +1,6 @@
 ## profile_runのC++用経路。代表場面を明示生成し、通常のBridgeと表示を計測する。
 extends Node
-const ENTRY := preload("res://tools/profiling/profile_legacy_run.gd")
+const ENTRY := preload("res://tools/profiling/profile_run.gd")
 const BUILDER := preload("res://tools/content/build_run_content.gd")
 var options: Dictionary
 var session: RunSession

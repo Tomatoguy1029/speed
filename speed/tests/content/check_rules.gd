@@ -30,7 +30,7 @@ func _initialize() -> void:
 	for path in _files("res://scripts/ui"):
 		_forbid_regex(path, "\\bstate\\.[a-z_]+\\s*[+\\-*/]?=[^=]", "UI がランの状態を書き換えている")
 	for path in _files("res://scripts/encounters"):
-		_forbid(path, ["projectiles.director ="], "攻撃directorの所有はRunSimulationに集約する")
+		_forbid(path, ["projectiles.director ="], "攻撃予算の所有はC++ランに集約する")
 	_forbid("res://scenes/run/run.tscn", ["res://scripts/dev/"], "本番の表示が開発用機能を参照している")
 	_forbid("res://scripts/ui/main.gd", ["res://gyms/", "res://addons/"], "画面の入口が開発用機能を参照している")
 	if errors.is_empty():

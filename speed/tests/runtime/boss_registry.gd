@@ -649,7 +649,7 @@ func native_centaurus_rear() -> void:
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
 	check(records.CentaurusRearDefinition.size()==2 and records.CentaurusRearDefinition[0].radius==move.range_radius and records.CentaurusRearDefinition[0].back_offset==move.back_offset,"制作Resourceの半径と背後距離を形態ごとに生成する")
 	check(records.BossTechniqueStage[0].at==move.warn and is_equal_approx(records.BossTechniqueStage[1].at,move.warn+move.active+0.05),"開始と終了をRunnerと同じ実効時刻で生成する")
-	check(not move.has_method("make_runner") or move.make_runner()==null,"編集Resourceへ戦闘Runnerを残さない")
+	check(not move.has_method("make_runner"),"編集Resourceへ戦闘Runnerを残さない")
 	var c := centaurus_rear_case(true)
 	check(not c.is_empty(),"本体・背後攻撃・フローを同じ生成形式で読む")
 	if c.is_empty(): get_tree().quit(1); return
@@ -780,7 +780,7 @@ func native_centaurus_rain() -> void:
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
 	check(records.CentaurusRainDefinition[0].traces==4 and records.CentaurusRainDefinition[1].traces==6 and records.CentaurusRainDefinition[1].arrows_per_step==2 and records.CentaurusRainDefinition[1].arrow_gap==22.0,"制作値と第2形態の本数・散布数・間隔を生成する")
 	check(records.BossTechniqueStage.size()==2 and records.BossTechniqueStage[0].at==move.warn and records.BossTechniqueStage[0].command==6,"予告終了時刻だけを生成し着弾終了を技が判断する")
-	check(move.make_runner()==null,"雨の編集Resourceから戦闘Runnerを分離する")
+	check(not move.has_method("make_runner"),"雨の編集Resourceから戦闘Runnerを分離する")
 	var c := centaurus_rain_case(true)
 	check(not c.is_empty(),"雨・固有外観・本体・フローを同じ生成形式で読む")
 	if c.is_empty(): get_tree().quit(1); return
@@ -999,7 +999,7 @@ func native_centaurus_power() -> void:
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
 	check(records.CentaurusPowerDefinition[0].count==1 and records.CentaurusPowerDefinition[1].count==3 and records.LightArrowDefinition[0].cosmic and records.CentaurusPowerDefinition[0].spread==move.spread,"強弓の全値・形態別本数・コズミック外観を生成する")
 	check(records.BossTechniqueStage.size()==6 and is_equal_approx(records.BossTechniqueStage[0].at,move.warn-move.alert) and records.BossTechniqueStage[1].at==move.warn and is_equal_approx(records.BossTechniqueStage[2].at,move.warn+0.05),"alert・release・end_attackを実効値から生成する")
-	check(move.make_runner()==null,"強弓の編集ResourceからRunnerを分離する")
+	check(not move.has_method("make_runner"),"強弓の編集ResourceからRunnerを分離する")
 	var c := centaurus_power_case(true)
 	check(not c.is_empty(),"強弓・固有矢・本体・フローを同じ生成形式で読む")
 	if c.is_empty(): get_tree().quit(1); return
@@ -1274,12 +1274,11 @@ func centaurus_stomp_case(flow_enabled := false) -> Dictionary:
 func native_centaurus_stomp() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var move = load("res://data/bosses/centaurus_moves/stomp.tres")
-	var source = load("res://scripts/bosses/centaurus/techniques/stomp.gd")
 	var animation = load("res://data/visuals/centaurus_animation.tres")
 	if "--cpp-centaurus-stomp-runtime" not in OS.get_cmdline_user_args():
 		var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
 		check(records.CentaurusStompDefinition.size()==2 and records.CentaurusStompDefinition[0].radius==move.range_radius and is_equal_approx(records.CentaurusStompDefinition[0].half_angle,deg_to_rad(move.half_angle)) and records.BossTechniqueStage.is_empty(),"全項目と脚のフレームを生成し、戦闘method trackを使わない")
-		check(move.make_runner()==null,"編集ResourceからRunnerを分離する")
+		check(not move.has_method("make_runner"),"編集ResourceからRunnerを分離する")
 	var c := centaurus_stomp_case(true)
 	check(not c.is_empty(),"踏みつけを制作入口から型付きデータへつなぐ")
 	if c.is_empty(): get_tree().quit(1); return
@@ -1289,7 +1288,7 @@ func native_centaurus_stomp() -> void:
 	check(not attacks.is_empty() and attacks[0].kind==12 and attacks[0].stage==0,"遅延照準ではなく機体の今の位置で技を選ぶ")
 	if attacks.is_empty(): bridge.dispose(); get_tree().quit(1); return
 	var t: Dictionary = attacks[0]
-	var expected: Vector2 = (source.contact_center(animation,0.0)*t.radius/135.0).rotated(t.facing-PI*0.5)+t.position
+	var expected: Vector2 = (stomp_contact_center(animation,0.0)*t.radius/135.0).rotated(t.facing-PI*0.5)+t.position
 	check(semantics_approx(t.center,expected,"native_centaurus_stomp:t.center"),"脚の保存配置から現在の接地点を生成する")
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
@@ -1488,7 +1487,7 @@ func native_centaurus_fan() -> void:
 	var move = load("res://data/bosses/centaurus_moves/fan_volley.tres")
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
 	check(records.CentaurusFanDefinition.size()==2 and records.CentaurusFanDefinition[0].shots==move.shots and records.CentaurusFanDefinition[0].count==move.count and is_equal_approx(records.CentaurusFanDefinition[0].spread,deg_to_rad(move.spread)) and records.CentaurusFanDefinition[0].length==move.length and records.BossTechniqueStage.is_empty(),"制作値の回数・本数・扇角度・カプセル長を生成する")
-	check(move.make_runner()==null,"編集Resourceから扇状連射のRunnerを分離する")
+	check(not move.has_method("make_runner"),"編集Resourceから扇状連射のRunnerを分離する")
 	var c := centaurus_fan_case(false,false)
 	check(not c.is_empty(),"制作入口の扇状連射と固有の矢を型付き形式へつなぐ")
 	if c.is_empty(): get_tree().quit(1); return
@@ -1637,7 +1636,7 @@ func native_centaurus_shower() -> void:
 		var move = load("res://data/bosses/centaurus_moves/shower_"+pattern+".tres")
 		var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
 		check(records.CentaurusShowerDefinition.size()==2 and records.CentaurusShowerDefinition[0].pattern==["chase","wall","path"].find(pattern) and records.CentaurusShowerDefinition[0].count==move.count and records.CentaurusShowerDefinition[1].count==move.count_p2 and records.CentaurusShowerDefinition[0].linger==move.linger and records.CentaurusShowerDefinition[0].rain_time==move.rain_time and records.BossTechniqueStage.is_empty(),"3パターンの実効値と形態別の数を生成する: "+pattern)
-		check(move.make_runner()==null,"3つの制作Resourceから戦闘Runnerを分離する: "+pattern)
+		check(not move.has_method("make_runner"),"3つの制作Resourceから戦闘Runnerを分離する: "+pattern)
 	var c := centaurus_shower_case()
 	check(not c.is_empty(),"追尾の円を制作入口から型付き状態へ接続する")
 	if c.is_empty(): get_tree().quit(1); return
@@ -1793,7 +1792,7 @@ func native_canis_command() -> void:
 	var move = load("res://data/bosses/canis_major_moves/command.tres")
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
 	if "--cpp-canis-command-runtime" not in OS.get_cmdline_user_args():
-		check(move.make_runner()==null and records.CanisCommandDefinition.size()==2 and records.CanisCommandDefinition[0].lunge_speed==move.lunge_speed and records.CanisCommandDefinition[1].lunge_speed==move.lunge_speed_p2 and records.BossTechniqueDefinition[1].cd==move.cd_p2,"号令の編集値と第2形態の実効値を生成する")
+		check(not move.has_method("make_runner") and records.CanisCommandDefinition.size()==2 and records.CanisCommandDefinition[0].lunge_speed==move.lunge_speed and records.CanisCommandDefinition[1].lunge_speed==move.lunge_speed_p2 and records.BossTechniqueDefinition[1].cd==move.cd_p2,"号令の編集値と第2形態の実効値を生成する")
 		check(records.BossTechniqueStage.size()==4 and records.BossTechniqueStage[0].at==move.warn and records.BossTechniqueStage[1].at==move.warn+move.lunge_time+0.05,"発動と終了を静的method trackから独立した時刻へ生成する")
 	var c := canis_move_case("command",{"warn":0.1,"lunge_time":0.2,"lunge_speed":100.0,"lunge_speed_p2":100.0,"recover":0.05,"cd":0.0},true)
 	check(not c.is_empty(),"号令の値・本体・フロー・正式表示を同じ入口から読む")
@@ -1883,7 +1882,7 @@ func native_canis_howl() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var move = load("res://data/bosses/canis_major_moves/howl.tres")
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
-	check(move.make_runner()==null and records.CanisHowlDefinition.size()==2 and records.BossTechniqueStage.is_empty(),"遠吠えの編集値を手動進行の型付き定義へ生成する")
+	check(not move.has_method("make_runner") and records.CanisHowlDefinition.size()==2 and records.BossTechniqueStage.is_empty(),"遠吠えの編集値を手動進行の型付き定義へ生成する")
 	for field in builder.Schema.SCHEMA.records.filter(func(v): return v.name=="CanisHowlDefinition")[0].fields:
 		if field.name not in ["id","technique"]: check(records.CanisHowlDefinition[0][field.name]==move.get(field.name),"遠吠えの実効値を保持する: "+field.name)
 	var changes := {"warn":0.1,"ring_count":10,"summon_max":1,"ring_radius":300.0,"ring_close":200.0,"spawn_out":100.0,"gather_time":0.05,"close_time":0.1,"follow_time":0.2,"follow_rate":4.0,"seq_interval":0.02,"seq_warn":0.05,"lunge_speed":100.0,"lunge_time":0.1,"tail":0.15,"recover":0.05,"cd":0.0,"track_during_warn":false}
@@ -2023,7 +2022,7 @@ func native_centaurus_sail() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var move = load("res://data/bosses/centaurus_moves/sail_run.tres")
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
-	check(records.CentaurusSailDefinition.size()==2 and records.CentaurusSailDefinition[0].approach_speed==move.approach_speed and is_equal_approx(records.CentaurusSailDefinition[0].arc,deg_to_rad(move.arc)) and records.CentaurusSailDefinition[0].duration==move.duration and records.BossTechniqueStage.is_empty() and move.make_runner()==null,"帆走の全項目と弧角度を生成し編集ResourceからRunnerを分離する")
+	check(records.CentaurusSailDefinition.size()==2 and records.CentaurusSailDefinition[0].approach_speed==move.approach_speed and is_equal_approx(records.CentaurusSailDefinition[0].arc,deg_to_rad(move.arc)) and records.CentaurusSailDefinition[0].duration==move.duration and records.BossTechniqueStage.is_empty() and not move.has_method("make_runner"),"帆走の全項目と弧角度を生成し編集ResourceからRunnerを分離する")
 	var c := centaurus_sail_case()
 	check(not c.is_empty(),"帆走を本体・矢の固有外観と同じ型付き形式で読む")
 	if c.is_empty(): get_tree().quit(1); return
@@ -2139,7 +2138,7 @@ func native_centaurus_combo_rain() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var move = load("res://data/bosses/centaurus_moves/combo_rain_volley.tres")
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
-	check(records.CentaurusComboDefinition.size()==2 and records.CentaurusComboDefinition[0].gap==move.gap and records.CentaurusComboDefinition[0].first==1 and records.CentaurusComboDefinition[0].second==3 and records.BossTechniqueDefinition[4].cd==move.cd and move.make_runner()==null,"連携Resourceの全値と形態ごとの部品参照を生成する")
+	check(records.CentaurusComboDefinition.size()==2 and records.CentaurusComboDefinition[0].gap==move.gap and records.CentaurusComboDefinition[0].first==1 and records.CentaurusComboDefinition[0].second==3 and records.BossTechniqueDefinition[4].cd==move.cd and not move.has_method("make_runner"),"連携Resourceの全値と形態ごとの部品参照を生成する")
 	var c := centaurus_combo_case()
 	check(not c.is_empty(),"矢の雨と速射の部品・外観・連携を同じ制作入口で読む")
 	if c.is_empty(): get_tree().quit(1); return
@@ -2207,7 +2206,7 @@ func native_centaurus_combo_shower() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var move = load("res://data/bosses/centaurus_moves/combo_shower_shot.tres")
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
-	check(records.CentaurusComboDefinition.size()==2 and records.CentaurusComboDefinition[0].gap==move.gap and records.CentaurusShowerDefinition[0].pattern==0 and records.CentaurusPowerDefinition[0].technique==3 and records.BossTechniqueDefinition[4].cd==move.cd and move.make_runner()==null,"降り矢と強弓の全値・形態別参照・連携の値を生成する")
+	check(records.CentaurusComboDefinition.size()==2 and records.CentaurusComboDefinition[0].gap==move.gap and records.CentaurusShowerDefinition[0].pattern==0 and records.CentaurusPowerDefinition[0].technique==3 and records.BossTechniqueDefinition[4].cd==move.cd and not move.has_method("make_runner"),"降り矢と強弓の全値・形態別参照・連携の値を生成する")
 	var c := centaurus_combo_case(true)
 	check(not c.is_empty(),"追跡する降り矢・強弓・固有外観を同じ制作入口で読む")
 	if c.is_empty(): get_tree().quit(1); return
@@ -2465,7 +2464,7 @@ func native_canis_pounce() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var move = load("res://data/bosses/canis_major_moves/pounce.tres")
 	var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
-	check(move.make_runner()==null and records.CanisPounceDefinition.size()==2 and records.BossTechniqueStage.is_empty(),"飛びかかりの値をmanualの型付き定義へ分ける")
+	check(not move.has_method("make_runner") and records.CanisPounceDefinition.size()==2 and records.BossTechniqueStage.is_empty(),"飛びかかりの値をmanualの型付き定義へ分ける")
 	check(records.BossTechniqueDefinition[1].warn==move.warn_p2 and records.BossTechniqueDefinition[1].cd==move.cd_p2 and records.CanisPounceDefinition[1].cd_alone==move.cd_alone_p2 and records.CanisPounceDefinition[0].overshoot==move.overshoot,"形態別の予告・再使用待ちと先の着地点の値を生成する")
 	var c := canis_move_case("pounce",{"warn":0.1,"active":0.2,"lock":0.04,"overshoot":40.0,"lead_extra":0.1,"recover":0.05})
 	check(not c.is_empty(),"飛びかかりの制作値を本体と正式表示へつなぐ")
@@ -2770,7 +2769,7 @@ func native_canis_sirius() -> void:
 	var observed: Array = []
 	bridge.subscribe("確認",func(packet): observed.append_array(packet.events); return true)
 	var records: Dictionary = c.package.records
-	check(c.move.make_runner()==null and records.CanisSiriusDefinition.size()==2 and records.BossTechniqueStage.is_empty() and records.CanisFlameDefinition[0].length==300.0 and records.CanisFlameDefinition[0].particle_life==0.2,"編集値だけのResourceから連射と戦闘粒を生成する")
+	check(not c.move.has_method("make_runner") and records.CanisSiriusDefinition.size()==2 and records.BossTechniqueStage.is_empty() and records.CanisFlameDefinition[0].length==300.0 and records.CanisFlameDefinition[0].particle_life==0.2,"編集値だけのResourceから連射と戦闘粒を生成する")
 	bridge.command("dev_ship_motion",{"position":Vector2(300,300),"velocity":Vector2(100,0)})
 	bridge._core.set_motion_context(Vector2(300,300),Vector2(300,300),Vector2(3000,2000))
 	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
@@ -2837,7 +2836,7 @@ func native_canis_bay() -> void:
 	check(not c.is_empty(),"吠え立てと依存する飛びかかりを同じ制作形式へ生成する")
 	if c.is_empty(): get_tree().quit(1); return
 	var bridge = c.bridge
-	check(c.move.make_runner()==null and c.package.records.CanisBayDefinition.size()==2 and c.package.records.CanisPounceDefinition.size()==2 and c.package.records.BossTechniqueDefinition.size()==4 and is_equal_approx(c.package.records.CanisBayDefinition[0].front_angle,PI),"全編集値・形態別の跳躍・角度の単位を型付き定義へ渡す")
+	check(not c.move.has_method("make_runner") and c.package.records.CanisBayDefinition.size()==2 and c.package.records.CanisPounceDefinition.size()==2 and c.package.records.BossTechniqueDefinition.size()==4 and is_equal_approx(c.package.records.CanisBayDefinition[0].front_angle,PI),"全編集値・形態別の跳躍・角度の単位を型付き定義へ渡す")
 	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	check(started.ok,"囲みを制作入口から単独発動する")
 	var first: Dictionary = bridge.command("dev_boss_state").value[0]
@@ -3154,7 +3153,7 @@ func native_canis_blaze() -> void:
 	var bridge = c.bridge
 	var observed: Array = []
 	bridge.subscribe("記録確認",func(packet): observed.append_array(packet.events); return true)
-	check(c.move.make_runner()==null and c.package.records.CanisBlazeDefinition.size()==2 and c.package.records.CanisBlazeDefinition[0].turn_fast==load("res://data/bosses/canis_major_moves/bay.tres").turn_fast and c.package.records.CanisFlameDefinition[4].duration==0.1,"編集Resourceを分け、Bayから借りる操舵と点火間隔も生成する")
+	check(not c.move.has_method("make_runner") and c.package.records.CanisBlazeDefinition.size()==2 and c.package.records.CanisBlazeDefinition[0].turn_fast==load("res://data/bosses/canis_major_moves/bay.tres").turn_fast and c.package.records.CanisFlameDefinition[4].duration==0.1,"編集Resourceを分け、Bayから借りる操舵と点火間隔も生成する")
 	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	check(started.ok,"制作入口から燃える猟犬だけを発動する")
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
@@ -3334,7 +3333,7 @@ func native_canis_stream() -> void:
 	var move = load("res://data/bosses/canis_major_moves/stream.tres")
 	var rows: Dictionary = builder.boss_technique_records(load("res://data/bosses/canis_major.tres"),move)
 	if not tail_only:
-		check(move.make_runner()==null and rows.CanisStreamDefinition.size()==2 and rows.CanisStreamDefinition[1].lunge_speed==move.lunge_speed_p2 and rows.BossTechniqueDefinition[1].cd==move.cd_p2 and rows.BossTechniqueStage.is_empty(),"順番の号令の編集値・2形態・手動段階を型付き入力へ生成する")
+		check(not move.has_method("make_runner") and rows.CanisStreamDefinition.size()==2 and rows.CanisStreamDefinition[1].lunge_speed==move.lunge_speed_p2 and rows.BossTechniqueDefinition[1].cd==move.cd_p2 and rows.BossTechniqueStage.is_empty(),"順番の号令の編集値・2形態・手動段階を型付き入力へ生成する")
 	var values := {"warn":0.1,"interval":0.05,"each_warn":0.02,"lunge_speed":200.0,"lunge_speed_p2":200.0,"lunge_time":0.08,"recover":0.04,"min_hounds":1}
 	var c := canis_move_case("stream",values,false,{"pack_size":3,"lead_max":3},false,0.5)
 	if not tail_only:
@@ -3651,8 +3650,7 @@ func native_hydra_squad() -> void:
 func native_hydra_bite() -> void:
 	var retry := "--cpp-hydra-bite-retry" in OS.get_cmdline_user_args()
 	var move = load("res://data/bosses/hydra_moves/bite_thrust.tres").duplicate(true)
-	if not retry: check(move.make_runner()==null and move.get_script().resource_path=="res://scripts/data_types/boss_techniques/hydra/bite_thrust.gd","噛みつきの制作Resourceは編集値だけを持つ")
-	if not retry: check(load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"bite_thrust","通常入口の切替前も互換Runnerから元の噛みつきを呼べる")
+	if not retry: check(not move.has_method("make_runner") and move.get_script().resource_path=="res://scripts/data_types/boss_techniques/hydra/bite_thrust.gd","噛みつきの制作Resourceは編集値だけを持つ")
 	var edits := {"normal_charge":0.15,"normal_lunge":0.4,"normal_hold":0.1,"attack_cd":0.05,"bite_radius":150.0,"bite_dmg":7.0}
 	var c := hydra_normal_case(true,{},edits)
 	if c.is_empty(): get_tree().quit(1);return
@@ -3767,7 +3765,7 @@ func native_canis_hunt() -> void:
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge = c.bridge
 	var records: Dictionary = c.package.records
-	check(c.move.make_runner()==null and records.CanisHuntDefinition.size()==2 and records.CanisStreamDefinition.size()==2 and records.CanisHuntDefinition[1].stream==4 and records.BossTechniqueStage.is_empty() and records.CanisFlameDefinition[0].external_id=="hunt" and records.CanisFlameDefinition[0].trail_life==0.0,"全編集値と二形態・依存ID・狙撃専用の炎を生成する")
+	check(not c.move.has_method("make_runner") and records.CanisHuntDefinition.size()==2 and records.CanisStreamDefinition.size()==2 and records.CanisHuntDefinition[1].stream==4 and records.BossTechniqueStage.is_empty() and records.CanisFlameDefinition[0].external_id=="hunt" and records.CanisFlameDefinition[0].trail_life==0.0,"全編集値と二形態・依存ID・狙撃専用の炎を生成する")
 	var events: Array = []
 	bridge.subscribe("記録確認",func(packet): events.append_array(packet.events);return true)
 	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
@@ -3860,7 +3858,7 @@ func native_canis_hunt_pounce() -> void:
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge = c.bridge
 	var records: Dictionary = c.package.records
-	check(c.move.make_runner()==null and records.CanisHuntPounceDefinition.size()==2 and records.CanisStreamDefinition.size()==2 and records.CanisPounceDefinition.size()==2 and records.CanisHuntPounceDefinition[1].stream==4 and records.CanisHuntPounceDefinition[1].pounce==6 and records.BossTechniqueStage.is_empty(),"二形態の依存参照を一意に生成し、戦闘method trackを残さない")
+	check(not c.move.has_method("make_runner") and records.CanisHuntPounceDefinition.size()==2 and records.CanisStreamDefinition.size()==2 and records.CanisPounceDefinition.size()==2 and records.CanisHuntPounceDefinition[1].stream==4 and records.CanisHuntPounceDefinition[1].pounce==6 and records.BossTechniqueStage.is_empty(),"二形態の依存参照を一意に生成し、戦闘method trackを残さない")
 	var events: Array = []
 	bridge.subscribe("記録確認",func(packet): events.append_array(packet.events);return true)
 	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
@@ -3911,7 +3909,7 @@ func native_canis_hunt_pounce() -> void:
 	var ended_checkpoint: Dictionary = bridge.checkpoint()
 	var old_id: int = t.id
 	var next_ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
-	check(next_ticket.ok and bridge.command("dev_boss_state").value[0].id>old_id and canis_lunges(bridge).size()==residue.size(),"自然終了したticketを再利用し、旧Runnerの残留を勝手に取り消さない")
+	check(next_ticket.ok and bridge.command("dev_boss_state").value[0].id>old_id and canis_lunges(bridge).size()==residue.size(),"自然終了したticketを再利用し、C++実行の残留を勝手に取り消さない")
 	bridge._core.step(0.01)
 	check(canis_lunges(bridge)[0].from==residue[0].from,"行を再利用した別の技を旧Handleから進めない")
 	check(bridge.restore(ended_checkpoint.value).ok,"旧Handleのまま停止した残留も復帰する")
@@ -3986,7 +3984,7 @@ func native_canis_nova() -> void:
 	var events: Array = []
 	bridge.subscribe("閃光の記録",func(packet): events.append_array(packet.events);return true)
 	var records: Dictionary = c.package.records
-	check(c.move.make_runner()==null and records.CanisNovaDefinition.size()==2 and records.BossTechniqueStage.is_empty() and records.CanisNovaDefinition[0].arrive==load("res://data/bosses/canis_major_moves/bay.tres").arrive,"全編集値とBayから借りる操舵を二形態分生成し、method trackを残さない")
+	check(not c.move.has_method("make_runner") and records.CanisNovaDefinition.size()==2 and records.BossTechniqueStage.is_empty() and records.CanisNovaDefinition[0].arrive==load("res://data/bosses/canis_major_moves/bay.tres").arrive,"全編集値とBayから借りる操舵を二形態分生成し、method trackを残さない")
 	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	check(ticket.ok,"閃光を単独発動する")
 	var t: Dictionary = bridge.command("dev_boss_state").value[0]
@@ -4081,7 +4079,7 @@ func native_canis_relay() -> void:
 	var events: Array = []
 	bridge.subscribe("継ぐ炎の記録",func(packet): events.append_array(packet.events);return true)
 	var records: Dictionary = c.package.records
-	check(c.move.make_runner()==null and records.CanisRelayDefinition.size()==2 and records.CanisRelayDefinition[1].hound_flame==8 and records.CanisRelayDefinition[1].final_flame==2 and records.CanisFlameDefinition[6].damage==7.0 and records.CanisFlameDefinition[0].damage==9.0 and records.BossTechniqueStage.is_empty(),"全編集値・二形態と猟犬用/本体用の炎を一意に生成する")
+	check(not c.move.has_method("make_runner") and records.CanisRelayDefinition.size()==2 and records.CanisRelayDefinition[1].hound_flame==8 and records.CanisRelayDefinition[1].final_flame==2 and records.CanisFlameDefinition[6].damage==7.0 and records.CanisFlameDefinition[0].damage==9.0 and records.BossTechniqueStage.is_empty(),"全編集値・二形態と猟犬用/本体用の炎を一意に生成する")
 	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	check(ticket.ok,"制作入口では通常選択の猟犬数と分けて単独発動する")
 	var initial: Dictionary = bridge.checkpoint()
@@ -4170,7 +4168,7 @@ func native_canis_relay() -> void:
 ## 既存の通常技の正常・中断ケースを薙ぎ払いの実行先へ接続する。
 func native_hydra_sweep() -> void:
 	var move = load("res://data/bosses/hydra_moves/bite_sweep.tres")
-	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"bite_sweep","薙ぎ払いは編集Resourceと互換Runnerに分かれる")
+	check(not move.has_method("make_runner"),"薙ぎ払いは編集ResourceとC++実行に分かれる")
 	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"sweep_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"sweep_arc":1.8,"sweep_reach":350.0,"bite_radius":150.0,"bite_dmg":7.0},"bite_sweep")
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge = c.bridge
@@ -4252,7 +4250,7 @@ func native_hydra_sweep() -> void:
 ## 既存の首技の正常・中断・表示のケースを移動するビーム弾へ接続する。
 func native_hydra_bolt() -> void:
 	var move = load("res://data/bosses/hydra_moves/beam_bolt.tres")
-	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"beam_bolt","ビーム弾は編集値と互換Runnerに分かれる")
+	check(not move.has_method("make_runner"),"ビーム弾は編集値とC++実行に分かれる")
 	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"bolt_length":150.0,"bolt_width":60.0,"bolt_speed":400.0,"bolt_life":2.0,"beam_dmg":7.0},"beam_bolt")
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge = c.bridge
@@ -4321,7 +4319,7 @@ func native_hydra_bolt() -> void:
 ## 既存の首技の正常・中断ケースを予告付き固定ビームへ接続する。
 func native_hydra_fixed() -> void:
 	var move = load("res://data/bosses/hydra_moves/beam_fixed.tres")
-	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"beam_fixed","固定ビームの編集ResourceとUID参照を分離する")
+	check(not move.has_method("make_runner"),"固定ビームの編集ResourceとUID参照を分離する")
 	var c := hydra_normal_case(true,{}, {"normal_charge":0.15,"beam_time":0.4,"normal_hold":0.1,"attack_cd":0.05,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0},"beam_fixed")
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge = c.bridge
@@ -4451,7 +4449,7 @@ func native_canis_sirius_flame() -> void:
 	var events: Array = []
 	bridge.subscribe("連続炎の記録",func(packet): events.append_array(packet.events);return true)
 	var records: Dictionary = c.package.records
-	check(c.move.make_runner()==null and records.CanisSiriusFlameDefinition.size()==2 and records.CanisSiriusFlameDefinition[1].flame==4 and records.CanisFlameDefinition[2].speed==0.0 and records.CanisFlameDefinition[2].damage==7.0 and records.CanisFlameDefinition[2].particle_life==0.3 and records.BossTechniqueStage.is_empty(),"全編集値と二形態の自由な粒を生成し、method trackを残さない")
+	check(not c.move.has_method("make_runner") and records.CanisSiriusFlameDefinition.size()==2 and records.CanisSiriusFlameDefinition[1].flame==4 and records.CanisFlameDefinition[2].speed==0.0 and records.CanisFlameDefinition[2].damage==7.0 and records.CanisFlameDefinition[2].particle_life==0.3 and records.BossTechniqueStage.is_empty(),"全編集値と二形態の自由な粒を生成し、method trackを残さない")
 	var ticket: Dictionary = bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
 	check(ticket.ok,"猟犬がいない場合もシリウスの光を単独発動する")
 	var initial: Dictionary = bridge.checkpoint()
@@ -4524,7 +4522,7 @@ func native_canis_sirius_flame() -> void:
 func native_canis_sirius_flame_flow() -> void:
 	for name in ["sirius_flame","nova","relay"]:
 		var c := canis_move_case(name,{"track_during_warn":false},true,{"pack_size":0 if name=="sirius_flame" else 5,"lead_max":0 if name=="sirius_flame" else 5})
-		check(not c.is_empty(),"%s の互換Runner登録を検証して通常フローを生成する" % name)
+		check(not c.is_empty(),"%s のC++実行登録を検証して通常フローを生成する" % name)
 		if c.is_empty(): get_tree().quit(1);return
 		var bridge = c.bridge
 		check(c.package.records.BossFlowProgram.size()==1 and bridge.command("dev_boss_flow_state").value.size()==1,"%s の条件確認を実際に接続したフローで行う" % name)
@@ -4541,7 +4539,7 @@ func native_canis_sirius_flame_flow() -> void:
 func native_hydra_blades() -> void:
 	var edits := {"normal_charge":0.15,"blade_interval":0.08,"normal_hold":0.2,"attack_cd":0.05,"blade_size":60.0,"blade_width":40.0,"blade_speed":300.0,"blade_life":3.0,"blade_spread":1.0,"bite_dmg":7.0}
 	var move = load("res://data/bosses/hydra_moves/wind_blades.tres")
-	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"wind_blades","風刃は編集値と互換Runnerに分かれる")
+	check(not move.has_method("make_runner"),"風刃は編集値とC++実行に分かれる")
 	var c := hydra_normal_case(true,{},edits,"wind_blades")
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge = c.bridge
@@ -4845,7 +4843,7 @@ func native_hydra_curve() -> void:
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
 	var events: Array=[];bridge.subscribe("曲線の記録",func(packet):events.append_array(packet.events);return true)
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"curve","編集Resourceと互換RunnerをUID付きで分ける")
+	check(not c.move.has_method("make_runner"),"編集ResourceとC++実行をUID付きで分ける")
 	for tick in 30:
 		bridge._core.step(0.01)
 		if not bridge.command("dev_boss_state").value.is_empty(): break
@@ -4907,7 +4905,7 @@ func native_hydra_grid() -> void:
 	var c := hydra_major_case("grid",edits,true)
 	if c.is_empty():get_tree().quit(1);return
 	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":true})
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"grid" and c.package.records.HydraGridSlot.size()==8,"格子の編集Resourceと配置の順序付き生成値を分ける")
+	check(not c.move.has_method("make_runner") and c.package.records.HydraGridSlot.size()==8,"格子の編集Resourceと配置の順序付き生成値を分ける")
 	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離前には格子を開始しない")
 	hydra_grid_separate(c)
 	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(100,80));bridge._core.step(0.01)
@@ -4974,7 +4972,7 @@ func native_hydra_rubble() -> void:
 	var name := "rubble_fan" if "--fan" in OS.get_cmdline_user_args() else "rubble_lump"
 	var fan := name=="rubble_fan"
 	var move = load("res://data/bosses/hydra_moves/%s.tres" % name)
-	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==StringName(name),"瓦礫の編集値と互換Runnerを分ける")
+	check(not move.has_method("make_runner"),"瓦礫の編集値とC++実行を分ける")
 	var edits := {"normal_charge":0.15,"normal_hold":0.25,"attack_cd":0.05,"lump_speed":400.0,"lump_dmg":7.0}
 	if fan: edits.merge({"rubble_count":6,"rubble_spread":1.3,"rubble_small_radius":16.0})
 	else: edits.lump_r=26.0
@@ -5096,7 +5094,7 @@ func native_hydra_pincer() -> void:
 	var c := hydra_major_case("beam_pincer",edits,true,{"combo_cooldown":0.1})
 	if c.is_empty():get_tree().quit(1);return
 	var bridge=c.bridge
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"beam_pincer","挟撃の編集Resourceと互換Runnerを分けてUID参照を維持する")
+	check(not c.move.has_method("make_runner"),"挟撃の編集ResourceとC++実行を分けてUID参照を維持する")
 	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"ビームの首が1本だけなら挟撃を開始しない")
 	hydra_pincer_grow(c)
 	for tick in 40:
@@ -5163,7 +5161,7 @@ func native_hydra_tornado() -> void:
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
 	var events: Array=[];bridge.subscribe("竜巻の記録",func(packet):events.append_array(packet.events);return true)
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"tornado","竜巻の編集Resourceを互換Runnerから分ける")
+	check(not c.move.has_method("make_runner"),"竜巻の編集ResourceをC++実行から分ける")
 	for tick in 30:
 		bridge._core.step(0.01)
 		if not bridge.command("dev_boss_state").value.is_empty(): break
@@ -5216,7 +5214,7 @@ func native_hydra_shatter() -> void:
 	if c.is_empty():get_tree().quit(1);return
 	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
 	var events: Array=[];bridge.subscribe("瓦礫砕きの記録",func(packet):events.append_array(packet.events);return true)
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"debris_shatter","瓦礫砕きの編集値とRunnerを分ける")
+	check(not c.move.has_method("make_runner"),"瓦礫砕きの編集値とRunnerを分ける")
 	for tick in 40:
 		bridge._core.step(0.01)
 		if not bridge.command("dev_boss_state").value.is_empty():break
@@ -5304,7 +5302,7 @@ func hydra_thunder_tick(bridge, dt: float) -> void:
 func native_hydra_thunder() -> void:
 	var move = load("res://data/bosses/hydra_moves/thunder_drop.tres")
 	if not "--cpp-hydra-thunder-rest" in OS.get_cmdline_user_args():
-		check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"thunder_drop","落雷の編集値と旧Runnerを分離する")
+		check(not move.has_method("make_runner"),"落雷の編集値とC++実行を分離する")
 	var c := hydra_thunder_case(true)
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge = c.bridge
@@ -5584,7 +5582,7 @@ func native_hydra_wind() -> void:
 
 func hydra_wind_resource_check() -> void:
 	var move=load("res://data/bosses/hydra_moves/wind_band.tres")
-	check(move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(move).kind()==&"wind_band" and is_equal_approx(move.range_info(move.values()).max,430.0),"風の帯の編集値・範囲案内・互換RunnerとUID参照を分ける")
+	check(not move.has_method("make_runner") and is_equal_approx(move.range_info(move.values()).max,430.0),"風の帯の編集値・範囲案内・C++実行とUID参照を分ける")
 
 
 func native_hydra_wind_resource() -> void:
@@ -5727,7 +5725,7 @@ func native_hydra_north() -> void:
 	var c := hydra_major_case("north",edits,true)
 	if c.is_empty():get_tree().quit(1);return
 	var bridge=c.bridge
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"north","同時噛みつきの編集Resourceと互換Runnerを分ける")
+	check(not c.move.has_method("make_runner"),"同時噛みつきの編集ResourceとC++実行を分ける")
 	for tick in 30:
 		bridge._core.step(0.01)
 		if not bridge.command("dev_boss_state").value.is_empty():break
@@ -5825,7 +5823,7 @@ func native_hydra_sequence() -> void:
 	var c := hydra_major_case("sequence",edits,true)
 	if c.is_empty():get_tree().quit(1);return
 	var bridge=c.bridge
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"sequence","順番噛みの編集Resourceと互換Runnerを分ける")
+	check(not c.move.has_method("make_runner"),"順番噛みの編集ResourceとC++実行を分ける")
 	for tick in 30:
 		bridge._core.step(0.01)
 		if not bridge.command("dev_boss_state").value.is_empty():break
@@ -5919,7 +5917,7 @@ func native_hydra_swarm() -> void:
 	var c := hydra_major_case("swarm",edits,true)
 	if c.is_empty():get_tree().quit(1);return
 	var bridge=c.bridge
-	check(c.move.make_runner()==null and load("res://scripts/bosses/legacy_technique_runners.gd").make(c.move).kind()==&"swarm","連続飛びかかりの編集Resourceと互換Runnerを分ける")
+	check(not c.move.has_method("make_runner"),"連続飛びかかりの編集ResourceとC++実行を分ける")
 	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離前には連続飛びかかりを選ばない")
 	hydra_grid_separate(c)
 	for tick in 30:
@@ -7077,3 +7075,15 @@ func semantics_centaurus_finish() -> void:
 	if attacks.is_empty():failed+=1;push_error("着地後の壁の場面を開始できない")
 	else:semantics_approx(attacks[0].elapsed,0.0,"native_centaurus_finish:wall_elapsed")
 	bridge.dispose();print("SEMANTICS_CENTAURUS_FINISH failures=",failed);get_tree().quit(1 if failed else 0)
+
+const FOOT_CONTACTS := {"FrontLeftLeg": Vector2(11.5, 52.0), "FrontRightLeg": Vector2(7.5, 52.0)}
+func stomp_contact_center(animation: Resource, time: float) -> Vector2:
+	var pose: Dictionary = animation.sample("stomp", time)
+	var center := Vector2.ZERO
+	for path: String in FOOT_CONTACTS:
+		var entry: Dictionary = pose.get(path, animation.poses.get("neutral", {}).get(path, {}))
+		var transform := Transform2D(float(entry.get("rotation", 0.0)), entry.get("scale", Vector2.ONE), float(entry.get("skew", 0.0)), entry.get("position", Vector2.ZERO))
+		if animation.part_pivots.has(path) and entry.has("pivot_origin"):
+			transform.origin = entry.pivot_origin - transform.basis_xform(animation.part_pivots[path])
+		center += transform * FOOT_CONTACTS[path]
+	return center * 0.5

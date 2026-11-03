@@ -259,8 +259,8 @@ func restore_hero_point(bridge,fixture,behavior,label: String):
 	return restored
 
 func check_restore_heroes() -> void:
-	var fixture=load("res://tests/hero_guidance.gd").new()
-	var behavior=load("res://tests/hero_behaviors.gd").new()
+	var fixture=load("res://tests/integration/hero_guidance.gd").new()
+	var behavior=load("res://tests/runtime/hero_behaviors.gd").new()
 	for id in ["perseus","leo","gemini","hercules"]:
 		var bridge=fixture._cpp_fixture(true,100000.0,100000.0)
 		behavior._cpp_rescue(bridge,id)

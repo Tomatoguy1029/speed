@@ -572,7 +572,7 @@ func check_cpp_slash() -> bool:
 	core.step_hostiles(0.1)
 	var shot: Dictionary = core.hostiles_snapshot()[0]
 	check(shot.pos==origin+Vector2(10,0) and shot.vel==Vector2(100,0) and is_equal_approx(shot.life,1.9),"斬撃が形を保って直進し寿命を減らす")
-	var shape = load("res://scripts/attacks/slash.gd")
+	var shape = load("res://scripts/data_types/attack_defaults.gd")
 	var frame: Dictionary = bridge.read_render(Rect2(-1600,-500,1400,1000)).value
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	presentation._present_cpp(0.0)

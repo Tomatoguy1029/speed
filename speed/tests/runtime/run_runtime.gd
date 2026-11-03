@@ -1,5 +1,6 @@
 ## 二つのネイティブランの寿命と、無効な更新で状態が壊れないことを確かめる。
 extends Node
+const COMBAT_CONFIG := ["base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius"]
 const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 func check(ok: bool, label: String) -> void:
@@ -371,7 +372,7 @@ func clock_fixture(config: GameConfig, definition: EnemyDef, combat := false, sp
 	if combat:
 		# 未移行の戦闘サービスは既存の設定口から試験条件だけを渡す。
 		var combat_config := {}
-		for key in load("res://tests/runtime/run_combat.gd").COMBAT_CONFIG: combat_config[key] = config.get(key)
+		for key in COMBAT_CONFIG: combat_config[key] = config.get(key)
 		combat_config.ram_speed_ratio = 0.0
 		check(bridge._core.configure_combat(combat_config,{"attack_mult":1.0,"crit_chance":0.0,"crit_mult":config.crit_mult}), "停止を起こす戦闘の固定条件を設定する")
 		check(bridge._core.configure_pickups({"xp_bonus":1.0,"gem_max":10,"drop_base":0.0,"drop_max":0.0,"drop_power_exp":0.0,"big_crystal_shift_time":1.0,
