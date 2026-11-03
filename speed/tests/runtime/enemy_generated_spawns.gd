@@ -312,6 +312,7 @@ func check_cpp_crow() -> void:
 	definition.xp_reward_counts = PackedInt32Array([1,0,0])
 	var stage := RuntimeStage.new()
 	stage.index = 96
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["crow"])
 	var output := "res://.content/dev/run_crow"
