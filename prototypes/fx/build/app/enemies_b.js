@@ -293,11 +293,27 @@ DEMOS.push({
   },
 });
 
+// 試作の轍：左右それぞれ、区間をつないだ1本の線として途切れずに塗る。揺らぎは轍に沿った距離のなめらかなノイズで、区間をまたいでもつながる。
+// 両端は細くとがらせ、明るさは区間ごとの寿命（燃え始め・燃え尽き）を距離に沿って補間する
+function aurigaTrail(p, walls, time, P) {
+  const pal = FX.ramp(P.color), pts = [];
+  for (const w of walls) { const t = time - w.t0, left = w.life - t; if (left <= 0) continue; const k = Math.min(1, clamp(t / 0.12) * (0.3 + 0.7 * clamp(left / (0.6 * P.timing)))) * Math.min(1, P.intensity);
+    if (!pts.length) pts.push({ p: toL(w.from), k }); pts.push({ p: toL(add(w.from, mul(fromA(w.a), w.len))), k }); }
+  if (pts.length < 2) return; let total = 0; for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].p.x - pts[i - 1].p.x, pts[i].p.y - pts[i - 1].p.y);
+  const W = walls[0].w * 0.5 * WL * P.size; let cum = 0;
+  for (let i = 1; i < pts.length; i++) { const A = pts[i - 1], B = pts[i], dx = B.p.x - A.p.x, dy = B.p.y - A.p.y, L = Math.hypot(dx, dy); if (L < 0.01) continue; const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+    for (let d = 0; d < L; d += 0.5) { const c = cum + d, k = lerp(A.k, B.k, d / L); if (k <= 0.01) continue;
+      const taper = Math.pow(Math.min(1, c / 10, (total - c) / 6), 0.7), n1 = PX.tileNoise(c * 0.22, time * 9, 0, 0, 3) * 0.5 + 0.5, h = W * (0.7 + 0.9 * n1) * k * taper; if (h < 0.3) continue;
+      const x0 = A.p.x + ux * d, y0 = A.p.y + uy * d;
+      for (let q = -h; q <= h; q += 0.5) { const e = Math.abs(q) / h, lv = e < 0.25 ? 4 : e < 0.5 ? 3 : e < 0.8 ? 2 : 1; p.dot(x0 + nx * q, y0 + ny * q, pal[lv], k * (e > 0.8 ? 0.6 : 1)); }
+      if ((Math.round(c * 2) & 3) === 0) p.light(x0, y0, pal[2], 0.22 * k); }
+    cum += L; }
+}
 // ---------- ぎょしゃ座（auriga）
 DEMOS.push({
   id: 'G12-auriga', ids: ['G12'], cat: G12, group: 'ぎょしゃ座（auriga）', title: '戦車の燃える轍', duration: 6.6, color: '#ffc46b', cam: { x: 0, y: 0 },
   refs: ['scripts/enemies/auriga.gd・enemy_motion.gd _drive（速さ420で自機へ旋回しながら走行、trail_step 0.12 ごとに左右の轍 fire_wall 幅16・3.5秒）', 'render/attacks/wall.gd（現行の線）', 'pixelFX fire 系の段階色・painter.glow'],
-  status: { '状態': '試作のみ', '判定': '変更なし（轍の位置・幅16・寿命3.5秒）', '比較': 'プレイヤーの爆発（橙の点の爆発）とは形が帯で、白金の色にして区別' },
+  status: { '状態': '試作のみ', '判定': '変更なし（轍の位置・幅16・寿命3.5秒）', '轍の形': '左右それぞれを区間をつないだ1本の線で途切れずに描き、揺らぎは轍に沿った距離で続く。両端は細くとがる', '比較': 'プレイヤーの爆発（橙の点の爆発）とは形が帯で、白金の色にして区別' },
   setup(S) { S.e = mkE('auriga', V(-520, 200), -0.3); S.ship = shipState(V(60, -20)); S.walls = []; S.e.fire_t = 0; },
   step(S, dt) {
     const e = S.e, p = prm('auriga'), d = enemyDef('auriga');
@@ -309,8 +325,9 @@ DEMOS.push({
     const P = R.P;
     for (const w of S.walls) { const t = S.t - w.t0, left = w.life - t; if (left <= 0) continue; const b = add(w.from, mul(fromA(w.a), w.len));
       if (!R.proto) { const f = clamp(left / 0.4); D2.line(w.from, b, `rgba(255,138,60,${0.35 * f})`, w.w * 1.5); D2.line(w.from, b, `rgba(255,138,60,${0.9 * f})`, w.w); }
-      else { const ign = clamp(t / 0.12), f = clamp(left / (0.6 * P.timing)); FXW.flameStrip(R.back, w.from, b, w.w * 0.5 * P.size * (0.6 + 0.4 * f), S.t, P.color, Math.min(1, ign * (0.3 + 0.7 * f) * P.intensity), w.t0 * 13 + w.s); if (f < 1) FXW.sparks(R.front, add(w.from, mul(fromA(w.a), w.len * 0.5)), (0.6 * P.timing - left) % 0.4, w.t0 * 7, 2, '#ffe6b0', 20, 0.4, -Math.PI / 2, 0.8); }
+      else { const f = clamp(left / (0.6 * P.timing)); if (f < 1) FXW.sparks(R.front, add(w.from, mul(fromA(w.a), w.len * 0.5)), (0.6 * P.timing - left) % 0.4, w.t0 * 7, 2, '#ffe6b0', 20, 0.4, -Math.PI / 2, 0.8); }
     }
+    if (R.proto) for (const sd of [-1, 1]) aurigaTrail(R.back, S.walls.filter(w => w.s === sd), S.t, P); // 区切りの見えない1本の轍
     if (R.proto) R.blitBack();
     drawEnemy(S.e); drawShip(S.ship);
   },
