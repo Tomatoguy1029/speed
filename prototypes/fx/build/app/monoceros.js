@@ -123,6 +123,7 @@ function monoDraw(S, R) {
   for (const slash of S.slashes) { const age = S.t - slash.t; if (R.proto) bossSlash(R, slash.a, slash.b, r.slash_width, age, 0.6, S.slashes.indexOf(slash) + 1); else if (age < 0.6) { const d = norm(sub(slash.b, slash.a)), n = mul(orth(d), r.slash_width * 0.8 * (1 - age / 0.6)); const mid = lerpV(slash.a, slash.b, 0.5); D2.poly([slash.a, add(mid, n), slash.b, sub(mid, n)], rgba('#c9a6ff', 1 - (age / 0.6) ** 2)); } }
   for (const boom of S.booms) { const age = S.t - boom.t; if (R.proto) bossBreath(R, boom.at, B.facing + Math.PI, age, 83, 0.7, 200); else if (age < 0.4) D2.arc(boom.at, lerp(40, 190, age / 0.4), B.facing + Math.PI - 0.9, B.facing + Math.PI + 0.9, rgba('#9fe8ff', (1 - age / 0.4) * 0.5), 3); }
   monoOriginalBooster(S, rig);
+  if (R.proto) monoTailJet(S, R); // 突進中は尾から強いジェットの炎
   R.blitBack(); drawBossParts(B, rig.edits, { root: rig.root });
   if (id === 'lance' && S.form > 0) monoOriginalLance(S, rig);
   if (S.shattered && R.proto) FXW.sparks(R.front, S.shattered.at, (S.t - S.shattered.t) / P.timing, 31, 22, P.color, 55, 0.7);

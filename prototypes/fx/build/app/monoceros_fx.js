@@ -17,18 +17,19 @@ function monoOriginalLance(S, rig) {
   D2.line(a, horn, '#f2b567', 12 + 28 * form); D2.line(a, horn, '#fff', 7 + 5 * form);
   D2.poly([tip, add(horn, side), sub(horn, mul(axis, r.head_length * form * 0.35)), sub(horn, side)], '#fff7df');
 }
+// 後ろ蹴り：溜めで体重を前へかけて頭を下げ、後ろ脚を体の下へ引き込んで止まる（静）→ 後ろ脚を体の外まで後ろへ一気に突き出し、
+// 反動で体が前へ押し出され頭が上がる（動）→ ゆっくり戻る。脚は回転・引き伸ばしせず、位置だけを動かす
 function monoKickPose(S, edits) {
   const active = S.B.mode === 'active', recover = S.B.mode === 'recovery', wait = S.B.mode === 'windup';
-  const fold = wait ? smooth(0.1, S.r.warn * 0.65, S.st) : active || recover ? 1 : 0;
-  const kick = active ? smooth(0, S.r.active * 0.32, S.st) : recover ? 1 - smooth(S.r.hold, S.r.hold + 0.32, S.st) : 0;
-  const settle = recover ? 1 - smooth(S.r.hold, S.r.hold + 0.32, S.st) : 1;
+  const fold = wait ? smooth(0.05, S.r.warn * 0.55, S.st) : 0, kick = active ? smooth(0, S.r.active * 0.25, S.st) : recover ? 1 - smooth(S.r.hold, S.r.hold + 0.45, S.st) : 0;
   for (const [i, path] of ['RearLeftLeg', 'RearRightLeg'].entries()) {
-    const foot = MONO.nodes.find(n => n.name === 'Foot' && n.parent === path), rest = foot.position;
-    // 足先は後方へまっすぐ押し出す。元絵を回転・引き伸ばしして振り回さない。
-    edits[path] = { rotation: (i ? 1 : -1) * fold * settle * 0.045, scale: V(1, 1) };
-    edits[path + '/Foot'] = { position: V(rest.x, rest.y - fold * settle * 12 - kick * 50), rotation: 0 };
+    const foot = MONO.nodes.find(n => n.name === 'Foot' && n.parent === path), rest = foot.position, sd = i ? 1 : -1;
+    edits[path] = { rotation: 0, scale: V(1, 1) };
+    edits[path + '/Foot'] = { position: V(rest.x + sd * (kick * 7 - fold * 3), rest.y + fold * 14 - kick * 125), rotation: 0 };
   }
-  edits.Body = { position: V(0, -37 + fold * settle * 2 - kick * 4) };
+  const head = MONO.nodes.find(n => n.name === 'Head');
+  edits.Body = { position: V(0, -37 + fold * 6 + kick * 5) };
+  if (edits.Head) edits.Head.position = add(head.position, V(0, fold * 4 - kick * 3));
 }
 function monoChargePose(S, edits) {
   if (!['charge', 'return_charge', 'horn_dance'].includes(S.tech)) return;
@@ -72,14 +73,21 @@ function monoWaveAir(S, dt) {
     wave.air.update(dt);
   }
 }
+// 突進専用の予兆：角は光が集まって光る（炎は出さない）。光の粒がまわりから角へ集まり、溜まるほど角が強く光る。前足が地面を蹴って金の火花が後ろへ散り、
+// 尾の噴射口の青い炎が脈打って膨らむ。溜めの最後は動きを止めて見せる（姿勢は monoChargePose）
+const MONO_GOLD = ['#ffffff', '#fff3c0', '#ffe08a', '#ffc457', '#f2a03a', '#d8782a', '#a8521e', '#6e3214', '#3a1a0c'];
 function monoChargeTell(S, R, rig) {
-  const duration = S.tech === 'horn_dance' ? S.r.aim_time : S.r.warn, charge = smooth(0, duration * 0.62, S.st);
-  // 本体を複製しない。踏ん張った足の接地と角先へ光を絞り、最後は止めて見せる。
-  for (const path of ['FrontLeftLeg/Foot', 'FrontRightLeg/Foot']) {
-    const mat = rig.mats[path]; if (!mat) continue; const point = toL(M.pt(mat, V(0, 0)));
-    R.back.glow(point.x, point.y, 2.5, hexc('#d8ae6c'), charge * 0.13);
-  }
-  const point = toL(rig.hornTip); R.front.glow(point.x, point.y, 3 + charge * 2, hexc('#f4c47a'), charge * 0.18);
+  const duration = S.tech === 'horn_dance' ? S.r.aim_time : S.r.warn, charge = smooth(0, duration * 0.62, S.st), H = MONO_GOLD.map(hexc);
+  const B = S.B, u = fromA(S.angle), tip = toL(rig.hornTip), root = toL(rig.horn), back = V(-u.x, -u.y);
+  for (let i = 0; i < 22; i++) { const f = (hash(i * 3.1) + S.t * (0.9 + hash(i) * 0.6)) % 1, a = hash(i * 7.7) * TAU, d = (1 - f) * (14 + 10 * hash(i * 5.3)), on = lerpV(root, tip, hash(i * 2.9)); // 光の粒が角へ集まる
+    const x = on.x + Math.cos(a) * d, y = on.y + Math.sin(a) * d; R.front.dot(x, y, f > 0.7 ? H[0] : H[2], charge * (0.3 + 0.7 * f)); }
+  for (let s = 0; s <= 1; s += 0.08) { const q = lerpV(root, tip, s); R.front.glow(q.x, q.y, 1.2 + 1.6 * charge, H[2], (0.05 + 0.12 * charge) * (0.6 + 0.4 * s)); } // 角そのものが光る（塊にしない）
+  R.front.glow(tip.x, tip.y, 4 + charge * 6, H[3], 0.25 + charge * 0.45);
+  for (const path of ['FrontLeftLeg/Foot', 'FrontRightLeg/Foot']) { const mat = rig.mats[path]; if (!mat) continue; const f = toL(M.pt(mat, V(0, 0))); // 前足が地面を蹴る火花
+    R.back.glow(f.x, f.y, 3, H[4], charge * 0.35);
+    for (let j = 0; j < 5; j++) { const q = new PX.Rng(Math.floor(S.t * 12) * 13 + j + (path.length * 7)), ag = ((S.t * 12) % 1) / 12 + j * 0.02, d = q.range(4, 14) * charge, a = Math.atan2(back.y, back.x) + q.range(-0.6, 0.6), x = f.x + Math.cos(a) * d, y = f.y + Math.sin(a) * d; if (charge > 0.15) R.back.line(x - Math.cos(a) * 2, y - Math.sin(a) * 2, x, y, (w) => w > 0.5 ? H[1] : H[4], charge * (1 - ag * 4)); } }
+  const tail = toL(add(B.pos, mul(u, -B.r * 0.95))), pulse = 0.6 + 0.4 * Math.sin(S.t * (12 + 20 * charge)); // 尾の噴射口が脈打って膨らむ
+  R.front.glow(tail.x, tail.y, 5 + 9 * charge * pulse, hexc('#6fc4ff'), (0.3 + 0.5 * charge) * pulse); R.front.glow(tail.x, tail.y, 2 + 3 * charge, hexc('#e4f6ff'), 0.6 * charge);
 }
 let MONO_SCORCH = null;
 function monoBurntTrail(S, R) {
@@ -87,4 +95,11 @@ function monoBurntTrail(S, R) {
   if (!MONO_SCORCH) { const R = 5, N = 11, m = new Float32Array(N * N); for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) { const q = (x * x / 25 + y * y / 6); if (q < 1 + hash(x * 11 + y * 31) * 0.6) m[(y + R) * N + x + R] = Math.max(0, 1.2 - q) * (0.6 + hash(x * 17 + y) * 0.4); } MONO_SCORCH = { R, N, m }; }
   const before = PHXC; phxColors('#d18a35');
   try { for (const e of S.scorch) { const age = S.t - e.t; if (age > 2.2) continue; const q = toL(e.at); R.back.place(q.x, q.y); phxScorch(R.back, MONO_SCORCH, age, 1 - smooth(1, 2.2, age)); } } finally { R.back.place(0, 0); PHXC = before; }
+}
+
+// 突進中の尾のジェット：予兆で脈打った尾の噴射口から、飛び出す瞬間に強い青い炎を噴く（おおいぬの噴射と同じ作り canisJetStream を使う）
+function monoTailJet(S, R) {
+  if (S.stage !== 'run' || !['charge', 'return_charge', 'horn_dance', 'lance'].includes(S.tech)) { S.jetT = null; return; }
+  S.jetT ??= S.t; const B = S.B, u = fromA(S.angle), age = S.t - S.jetT, burst = 1 + 0.5 * (1 - smooth(0, 0.18, age));
+  canisJetStream(R, add(B.pos, mul(u, -B.r * 0.95)), S.angle + Math.PI, B.r * 2.6 * burst * R.P.size, 1.1 * burst, age + 0.3, Infinity, Math.min(1, R.P.intensity), 77);
 }
