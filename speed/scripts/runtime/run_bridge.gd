@@ -19,6 +19,8 @@ var _metrics_record := {}
 var _metrics_bytes := 0
 var _latest_bytes := 0
 var _delivery_bytes := 0
+var _delivery_base_bytes := -1
+var _delivery_ui_bytes := {}
 var _resource_wait_started := 0
 var recording_origin := {}
 
@@ -210,6 +212,8 @@ func restore(id: int) -> Dictionary:
 	_latest = {}
 	_latest_bytes = 0
 	_delivery_bytes = 0
+	_delivery_base_bytes = -1
+	_delivery_ui_bytes = {}
 	_delivery = {}
 	delivery_error = {}
 	return _ok({"epoch":_epoch})
@@ -237,6 +241,8 @@ func dispose() -> Dictionary:
 		_latest = {}
 		_latest_bytes = 0
 		_delivery_bytes = 0
+		_delivery_base_bytes = -1
+		_delivery_ui_bytes = {}
 		_ui = {}
 		_delivery = {}
 		_disposed = true
@@ -310,9 +316,18 @@ func ack_frame(epoch: int, sequence: int) -> Dictionary:
 	if _busy: return _error(7,"ack_frame","配信中は受領できません")
 	return _core.ack_frame_run(epoch,sequence) if _core!=null else _error(4,"ack_frame","破棄済みです")
 
-func subscribe(name: String, consumer: Callable) -> bool:
+## ui_fieldsの省略は全UI、空配列はUIなし。通知と共通の封筒は全購読者へ渡す。
+func subscribe(name: String, consumer: Callable, ui_fields: Variant = null) -> bool:
 	if _busy or _disposed or name.is_empty() or not consumer.is_valid() or _subscribers.has(name): return false
-	_subscribers[name] = {"consumer":consumer,"epoch":0,"sequence":0,"revision":-1}
+	var fields: Variant=null
+	if ui_fields!=null:
+		if not ui_fields is Array and not ui_fields is PackedStringArray: return false
+		fields=PackedStringArray()
+		for key: Variant in ui_fields:
+			if not key is String and not key is StringName: return false
+			if str(key).is_empty(): return false
+			if str(key) not in fields: fields.append(str(key))
+	_subscribers[name] = {"consumer":consumer,"ui_fields":fields,"epoch":0,"sequence":0,"revision":-1}
 	return true
 
 func unsubscribe(name: String) -> bool:
@@ -328,14 +343,37 @@ func collect_frame() -> Dictionary:
 	_busy = false
 	return result
 
+## コピーする前にUIを選ぶ。共通の封筒と通知・結果・資源要求はすべて保持する。
+func _copy_delivery(fields: Variant) -> Dictionary:
+	if fields==null: return _delivery.duplicate(true)
+	var selected := {}
+	for key: String in fields:
+		if _delivery.ui.has(key): selected[key]=_delivery.ui[key]
+	var source: Dictionary=_delivery.duplicate()
+	source.ui=selected
+	return source.duplicate(true)
+
+func _delivery_size(fields: Variant) -> int:
+	if fields==null: return _delivery_bytes
+	if _delivery_base_bytes<0:
+		var common: Dictionary=_delivery.duplicate()
+		common.erase("ui")
+		_delivery_base_bytes=_packed_bytes(common)
+	var total := _delivery_base_bytes
+	for key: String in fields:
+		if not _delivery.ui.has(key): continue
+		if not _delivery_ui_bytes.has(key): _delivery_ui_bytes[key]=_packed_bytes(_delivery.ui[key])
+		total+=int(_delivery_ui_bytes[key])
+	return total
+
 func _deliver_locked() -> Dictionary:
 	var sequence: int = _delivery.events.back().sequence if not _delivery.events.is_empty() else 0
 	for name: String in _subscribers:
 		var receiver: Dictionary = _subscribers[name]
 		if receiver.epoch==_delivery.epoch and receiver.sequence>=sequence and receiver.revision>=_delivery.state_revision: continue
 		var began := Time.get_ticks_usec() if perf.active else 0
-		var packet: Dictionary = _delivery.duplicate(true)
-		_metrics_bytes += _delivery_bytes
+		var packet: Dictionary = _copy_delivery(receiver.ui_fields)
+		_metrics_bytes += _delivery_size(receiver.ui_fields)
 		perf.since(&"bridge_copy",began)
 		if not receiver.consumer.is_valid() or receiver.consumer.call(packet)!=true:
 			return _error(8,"subscriber", "通知を受け取れません: %s" % name)
@@ -359,5 +397,7 @@ func _collect_locked() -> Dictionary:
 	if _subscribers.is_empty(): return snapshot
 	_delivery = snapshot.value
 	_delivery_bytes = _latest_bytes
+	_delivery_base_bytes = -1
+	_delivery_ui_bytes = {}
 	delivery_error = _deliver_locked()
 	return snapshot if delivery_error.ok else delivery_error

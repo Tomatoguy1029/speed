@@ -243,7 +243,7 @@ func _exit_tree() -> void:
 ## 未録画でも購読し、記録開始時に通知の所有権を奪わない。
 func attach_cpp(session: RunSession) -> void:
 	if session.bridge!=null:
-		session.bridge.subscribe("recorder:%d" % get_instance_id(),consume_cpp_frame)
+		session.bridge.subscribe("recorder:%d" % get_instance_id(),consume_cpp_frame,["run_time"])
 
 func _begin_cpp(session: RunSession, during_run: bool) -> void:
 	if not armed or _cpp_session_id==session.id or session.is_queued_for_deletion() or not session.is_in_group("recordable_runs"): return

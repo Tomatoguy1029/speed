@@ -4,6 +4,8 @@
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
 extends Control
 
+const CPP_UI_FIELDS := ["bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "lab_mode", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "view_center", "view_half", "xp"]
+
 ## 描けるようになったときに広がる輪の時間（実秒）
 const PickupKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.PickupKind
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
@@ -633,7 +635,7 @@ func _ready_cpp() -> void:
 			_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
-	bridge.subscribe("hud",_receive_cpp_frame)
+	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS)
 	_font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE

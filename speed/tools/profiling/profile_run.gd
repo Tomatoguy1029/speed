@@ -2,7 +2,8 @@
 extends Node
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 const DRIVE_RADIUS := 900.0
-const REFILL_FRAMES := 15
+const REFILL_TICKS := 30
+const OBSERVED_UI_FIELDS := ["ship", "draw", "capacity", "min_charge", "full_burst", "full_burst_active", "phase", "input_enabled", "cards", "mines", "afterimage", "end_blast", "barrier", "knockback", "interceptor", "full_charge", "bonus_remaining", "run_time", "world_time", "hitstop", "boss_bodies"]
 const FLAGS := ["gpu", "hitstop", "levels", "bonus", "keep", "normal-drops", "rewards"]
 const NUMBERS := ["stage", "time", "seconds", "warmup", "seed", "hz", "fps", "draw", "stroke", "mixed_target", "boss_hp"]
 const TEXT := ["size", "drive", "weapons", "meta", "mix", "revision", "out", "vsync", "condition", "require", "mode"]
@@ -39,6 +40,7 @@ var drive_center := Vector2.ZERO
 var stroke: Array[Vector2] = []
 var stroke_time := -1.0
 var next_draw := 0.0
+var next_refill_tick := 0
 var input_ticks := 0
 var stroke_starts := 0
 var traced_ticks := 0
@@ -157,7 +159,7 @@ func _ready() -> void:
 	bridge = session.bridge
 	session.cpp_finished.connect(func(result: Dictionary): run_result=result.duplicate(true))
 	view = session.view.get_node("RunPresentation").frame_view
-	bridge.subscribe("final_profile",_receive)
+	bridge.subscribe("final_profile",_receive,OBSERVED_UI_FIELDS)
 	if not _command("dev_edit",{"kind":"debug_action","payload":{"action":"reset_loadout","args":{}}}): return
 	for id: String in expected_equipment:
 		if not _command("dev_grant_equipment",{"kind":"trait" if id.begins_with("T") else "weapon","id":id,"levels":expected_equipment[id]}): return
@@ -214,6 +216,7 @@ func _ready() -> void:
 	maintenance_us=0
 	last_metrics=bridge.read_metrics().value
 	last_packed_bytes=int(last_metrics.packed_bytes)
+	next_refill_tick=int(_input_packet.tick)+REFILL_TICKS
 	start_us=Time.get_ticks_usec()
 	previous_us=start_us
 	measuring=true
@@ -293,7 +296,7 @@ func _refill() -> void:
 	var initial: Dictionary=bridge.read_metrics().value
 	var missing := maxi(0,int(options.mixed_target)-int(initial.enemies))
 	if missing==0: return
-	var camera: Dictionary=bridge.latest_frame().value.camera
+	var camera: Dictionary=_input_packet.camera
 	var area := Rect2(camera.center-camera.half,camera.half*2.0)
 	var rng_before := position_rng.state
 	var entries: Array[Dictionary]=[]
@@ -328,7 +331,7 @@ func _process(_delta: float) -> void:
 	if not bridge.delivery_error.is_empty() and not bridge.delivery_error.ok:
 		_fail("通知の配信に失敗しました: "+str(bridge.delivery_error))
 		return
-	var packet: Dictionary = bridge.latest_frame().value
+	var packet: Dictionary = _input_packet
 	if packet.ui.phase==Phase.Paused:
 		if not _command("pause",{"paused":false}): return
 	if options.get("rewards","off")=="off" and session.view.get_node("Hud/HudRoot")._rewards.is_active():
@@ -341,7 +344,9 @@ func _process(_delta: float) -> void:
 				for candidate: Dictionary in cards.candidates:
 					if candidate.kind=="keep": chosen=candidate
 			if not _command("choose_card",{"offer_id":int(cards.offer_id),"candidate_id":int(chosen.candidate_id)}): return
-	if measuring and options.has("mixed_target") and Engine.get_process_frames()%REFILL_FRAMES==0: _refill()
+	if measuring and options.has("mixed_target") and int(packet.tick)>=next_refill_tick:
+		_refill()
+		next_refill_tick=int(packet.tick)+REFILL_TICKS
 	if not measuring or finished: return
 	var before := Time.get_ticks_usec()
 	var metrics: Dictionary = bridge.read_metrics().value

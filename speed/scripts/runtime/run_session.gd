@@ -188,7 +188,7 @@ func _poll_cpp_loading() -> void:
 		_loading = null
 	next_bridge.end_resource_wait()
 	bridge = next_bridge
-	bridge.subscribe("result",_consume_cpp_result)
+	bridge.subscribe("result",_consume_cpp_result,[])
 	if RunManager.current_id==id or options.get("manage_result",false): cpp_finished.connect(GameManager.finish_cpp_run)
 	cpp_core = bridge._core
 	cpp_choices = preload("res://scripts/runtime/run_choice_resources.gd").new()
@@ -211,10 +211,10 @@ func _poll_cpp_loading() -> void:
 		else: view.get_node("Hud").free()
 		cpp_input_source = view.get_node("World/InputRouter").poll
 		add_child(view)
-		bridge.subscribe("audio",AudioManager.consume_cpp_frame)
+		bridge.subscribe("audio",AudioManager.consume_cpp_frame,[])
 		cpp_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
 		add_child(cpp_laser_audio)
-		bridge.subscribe("laser_audio",cpp_laser_audio.consume_cpp_frame)
+		bridge.subscribe("laser_audio",cpp_laser_audio.consume_cpp_frame,["laser_voices","world_scale"])
 	else:
 		var router = preload("res://scripts/input/input_router.gd").new()
 		add_child(router)
