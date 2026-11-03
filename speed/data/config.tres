@@ -151,6 +151,7 @@ meteor_heal_frac = 0.1
 meteor_magnet_chance = 0.04
 pickup_life = 45.0
 gem_max = 100000
+gem_draw_max = 2048
 xp_base = 30.0
 xp_growth = 10.0
 xp_curve = 3.0

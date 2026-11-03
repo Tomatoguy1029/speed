@@ -36,7 +36,9 @@ enum class CapsuleKind {Heal,Magnet,CometWeapon};
 struct CapsuleState {godot::Vector2 pos;double age=0;CapsuleKind kind=CapsuleKind::Heal;uint32_t weapon=0;bool drop=true;};
 struct CrystalTotal {uint64_t count=0;double base_xp=0,actual_xp=0;};
 struct CrystalCargo {EnemyHandle owner;int64_t enemy_id=0;std::vector<CrystalState> crystals;};
+struct CrystalQueryStats {size_t cells=0,candidates=0;};
 struct PickupState {
+    std::vector<size_t> nearest_gems(godot::Rect2 area,godot::Vector2 ship,size_t limit,CrystalQueryStats *stats=nullptr) const;
     // Derived indexes: rebuilt from crystals when restoring a checkpoint.
     using Cell=std::pair<double,double>;
     std::map<Cell,std::set<size_t>> gem_cells;

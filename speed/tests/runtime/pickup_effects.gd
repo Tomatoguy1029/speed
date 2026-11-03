@@ -7,6 +7,11 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-visible" in OS.get_cmdline_user_args():
+		check(check_cpp_visible(),"描画上限の確認を最後まで実施する")
+		print("[cpp_visible] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-pickups-tail" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_pickups_tail()
 		check(finished,"取得入口の後半を最後まで実施する")
@@ -310,7 +315,7 @@ func check_cpp_cap() -> bool:
 	check(crystals.size()==1,"結晶を共通の描画バッチへ渡す")
 	if crystals.size()==1:
 		var batch: Dictionary = crystals[0]
-		check(batch.layer==6 and batch.ids.size()==4 and not batch.ids.has(outside) and ids.all(func(id): return batch.ids.has(id)),"カメラ+128pxの全結晶を敵の背面に描き、それ以外を除外する")
+		check(batch.layer==6 and batch.ids.size()==4 and not batch.ids.has(outside) and ids.all(func(id): return batch.ids.has(id)),"描画上限未満ならカメラ+128pxの全結晶を敵の背面に描き、それ以外を除外する")
 		check(batch.colors[0]==Color("08DEFF") and batch.colors[1]==Color("945CFF") and batch.colors[2]==Color("FFB609"),"3種類の色を保持する")
 		check(batch.transforms[0]==batch.transforms[6] and batch.transforms[0]==batch.transforms[12],"種類によらず同じ寸法にする")
 	bridge.dispose()
@@ -571,5 +576,53 @@ func check_cpp_crow_index() -> bool:
 	bridge._core.step_pickups(0.02)
 	check(bridge._core.pickups_snapshot()==future and bridge._core.pickup_buffer(&"gem",1.0,Color.WHITE,area)==visible,"復帰後のからす座探索・移動・描画索引が同じ結果になる")
 	bridge.release_checkpoint(saved.value)
+	bridge.dispose()
+	return true
+
+func visible_crystal_ids(bridge,area: Rect2) -> Array:
+	var ids: Array = []
+	for batch: Dictionary in bridge.read_render(area,1.0).value.batches:
+		if batch.visual_id==3: ids.append_array(batch.ids)
+	return ids
+
+func check_cpp_visible() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius=0;config.moon_count=0;config.gem_draw_max=2
+	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	bridge.subscribe("visible",func(_frame): return true,[],[])
+	check(bridge.read_recording(true).value.xp_config.gem_draw_max==2,"録画へ保持上限とは独立した描画上限を記録する")
+	var at := Vector2(-3000,0)
+	var far: int = supply_crystal(bridge,at+Vector2(200,0),2)
+	var left: int = supply_crystal(bridge,at+Vector2(-60,0),1)
+	var right: int = supply_crystal(bridge,at+Vector2(60,0),0)
+	var near: int = supply_crystal(bridge,at+Vector2(5,0),0)
+	var area := Rect2(at-Vector2(300,200),Vector2(600,400))
+	var before: Dictionary = bridge._core.pickups_snapshot()
+	var ordered: Array = before.gems.duplicate()
+	ordered.sort_custom(func(x,y):
+		var dx: float=x.pos.distance_squared_to(at)
+		var dy: float=y.pos.distance_squared_to(at)
+		return dx<dy or (dx==dy and x.id<y.id))
+	var expected: Array = [ordered[0].id,ordered[1].id]
+	expected.sort()
+	check(visible_crystal_ids(bridge,area)==expected and near in expected and far not in expected,"実際の散らばり位置から近い2個を選び、描画上限を守る")
+	check(bridge._core.pickups_snapshot()==before,"描画制限は保持状態・XPを変更しない")
+	var saved: Dictionary = bridge.checkpoint()
+	bridge.command("dev_ship_motion",{"position":at+Vector2(61,0),"velocity":Vector2.ZERO})
+	check(visible_crystal_ids(bridge,area)==[right,near],"機体の移動に応じて近い結晶を選び直す")
+	check(bridge.restore(saved.value).ok,"描画上限付きの保持点を復元する")
+	check(visible_crystal_ids(bridge,area)==expected,"復元後も同じ距離・IDの選択を維持する")
+	bridge.release_checkpoint(saved.value)
+	bridge.command("dev_pickup_rates",{"ship":1.5,"run":1.25})
+	# 隠れた結晶も通常回収対象。全て足元へ移動する代わりに各配置を機体で通る。
+	for gem: Dictionary in before.gems:
+		bridge.command("dev_ship_motion",{"position":gem.pos,"velocity":Vector2.ZERO})
+		check(bridge._core.step_pickups(0.001),"上限を超えた結晶も通常の回収判定を通る")
+	var after: Dictionary = bridge._core.pickups_snapshot()
+	check(after.gems.is_empty(),"描画されなかった結晶も全て回収する")
+	check(is_equal_approx(after.xp_statistics.collected_actual_xp,base_total(before.gems)*1.875),"描画数によらず全基準XPへ倍率を一回適用する")
+	check(base_total(after.xp_statistics.lost)==0.0,"描画制限でXPを失わない")
 	bridge.dispose()
 	return true

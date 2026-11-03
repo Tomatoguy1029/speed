@@ -130,6 +130,7 @@ struct RunState {
     bool boss_dead=false;
     struct PickupConfig {
         int64_t gem_max = 0;
+        int64_t gem_draw_max = 0;
         bool fixed_rewards=false;
         double strong_gold_chance=0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;

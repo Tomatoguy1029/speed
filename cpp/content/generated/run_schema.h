@@ -77,6 +77,7 @@ struct RunConfig {
     bool combat_ready{};
     bool pickups_ready{};
     int64_t gem_max{};
+    int64_t gem_draw_max{};
     double strong_gold_chance{};
     double coin_radius{};
     double pickup_xp_mult{};
@@ -238,6 +239,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_bool(out.pickups_ready)) return false;
     if (!input.read_i64(out.gem_max)) return false;
     if (out.gem_max < 1) return false;
+    if (!input.read_i64(out.gem_draw_max)) return false;
+    if (out.gem_draw_max < 1) return false;
     if (!input.read_f64(out.strong_gold_chance)) return false;
     if (out.strong_gold_chance < 0) return false;
     if (!input.read_f64(out.coin_radius)) return false;
@@ -7528,8 +7531,8 @@ struct ContentRecords {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 9) return false;
-        if (count > input.remaining()/672) return false;
+        if (version != 10) return false;
+        if (count > input.remaining()/680) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -9688,6 +9691,7 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.combat_ready=config.combat_ready;
     state.pickups_ready=config.pickups_ready;
     state.pickup_config.gem_max=config.gem_max;
+    state.pickup_config.gem_draw_max=config.gem_draw_max;
     state.pickup_config.strong_gold_chance=config.strong_gold_chance;
     state.pickup_config.coin_radius=config.coin_radius;
     state.pickup_config.xp_mult=config.pickup_xp_mult;
@@ -9775,6 +9779,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["combat_ready"]=config.combat_ready;
     out["pickups_ready"]=config.pickups_ready;
     out["gem_max"]=config.gem_max;
+    out["gem_draw_max"]=config.gem_draw_max;
     out["strong_gold_chance"]=config.strong_gold_chance;
     out["coin_radius"]=config.coin_radius;
     out["pickup_xp_mult"]=config.pickup_xp_mult;

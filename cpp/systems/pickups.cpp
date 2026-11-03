@@ -25,6 +25,10 @@ bool SpeedRunCore::configure_pickups(const Dictionary &config, const Dictionary 
     if ((maximum.get_type() != Variant::INT && maximum.get_type() != Variant::FLOAT) ||
             !std::isfinite(double(maximum)) || double(maximum) < 0 || double(maximum) > INT32_MAX || std::floor(double(maximum)) != double(maximum)) return false;
     c.gem_max = int64_t(maximum);
+    const Variant draw_maximum=config.get("gem_draw_max",maximum);
+    if ((draw_maximum.get_type()!=Variant::INT && draw_maximum.get_type()!=Variant::FLOAT) ||
+            !std::isfinite(double(draw_maximum)) || double(draw_maximum)<0 || double(draw_maximum)>INT32_MAX || std::floor(double(draw_maximum))!=double(draw_maximum)) return false;
+    c.gem_draw_max=int64_t(draw_maximum);
     const char *arrays[] = {"big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end"};
     std::vector<double> *dest[] = {&c.xp, &c.start_weights, &c.end_weights};
     for (int i = 0; i < 3; ++i) {
