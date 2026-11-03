@@ -17,6 +17,8 @@ var _delivery: Dictionary = {}
 var delivery_error: Dictionary = {}
 var _metrics_record := {}
 var _metrics_bytes := 0
+var _latest_bytes := 0
+var _delivery_bytes := 0
 var _resource_wait_started := 0
 var recording_origin := {}
 
@@ -84,7 +86,9 @@ func poll_and_step(dt: float, source: Callable, logical_size: Vector2) -> Dictio
 	if not source.is_valid():
 		_busy = false
 		return _error(1,"input","入力元がありません")
-	var frame: Dictionary = _read_locked()
+	# 成功した更新と命令の出力を既に保持している。入力には可否と描線中だけを読む。
+	# 初回・復帰直後・配信失敗では従来どおり本体から読み直す。
+	var frame: Dictionary = _read_locked() if _latest.is_empty() or (not delivery_error.is_empty() and not delivery_error.ok) else _ok(_latest)
 	var router := source.get_object() as InputRouter
 	if router!=null and frame.ok: router.drawing = frame.value.ui.draw.drawing
 	var intent = source.call() if frame.ok and frame.value.ui.input_enabled else Intent.new()
@@ -204,6 +208,8 @@ func restore(id: int) -> Dictionary:
 	_next_command = 1
 	_ui = {}
 	_latest = {}
+	_latest_bytes = 0
+	_delivery_bytes = 0
 	_delivery = {}
 	delivery_error = {}
 	return _ok({"epoch":_epoch})
@@ -229,6 +235,8 @@ func dispose() -> Dictionary:
 		_core = null
 		_subscribers.clear()
 		_latest = {}
+		_latest_bytes = 0
+		_delivery_bytes = 0
 		_ui = {}
 		_delivery = {}
 		_disposed = true
@@ -248,10 +256,13 @@ func _read_locked() -> Dictionary:
 			var entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(event.payload.get("text","")))
 			if entry!=null: event.payload.text = entry.get_display_name()
 	_ui.merge(result.value.ui,true)
-	_latest = result.value.duplicate(true)
-	_latest.ui = _ui.duplicate(true)
+	# 本体が返した外側DictionaryとUIは窓口だけが所有する。
+	# 公開読取と各購読者への深い複製は返却/配信の境界で行う。
+	_latest = result.value
+	_latest.ui = _ui
 	var snapshot := _ok(_latest.duplicate(true))
-	_metrics_bytes += _packed_bytes(snapshot.value)
+	_latest_bytes = _packed_bytes(snapshot.value)
+	_metrics_bytes += _latest_bytes
 	perf.since(&"bridge_copy",began)
 	return snapshot
 
@@ -261,7 +272,7 @@ func latest_frame() -> Dictionary:
 	if _latest.is_empty(): return read_frame()
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var snapshot := _ok(_latest.duplicate(true))
-	_metrics_bytes += _packed_bytes(snapshot.value)
+	_metrics_bytes += _latest_bytes
 	perf.since(&"bridge_copy",began)
 	return snapshot
 
@@ -292,18 +303,8 @@ func end_resource_wait() -> void:
 	_resource_wait_started = 0
 
 ## Packed配列の論理量。参照共有やエンジン内部の物理コピー量は含めない。
-static func _packed_bytes(value: Variant) -> int:
-	if value is PackedByteArray: return value.size()
-	if value is PackedInt32Array or value is PackedFloat32Array: return value.size()*4
-	if value is PackedInt64Array or value is PackedFloat64Array or value is PackedVector2Array: return value.size()*8
-	if value is PackedVector3Array: return value.size()*12
-	if value is PackedColorArray or value is PackedVector4Array: return value.size()*16
-	var total := 0
-	if value is Dictionary:
-		for item: Variant in value.values(): total += _packed_bytes(item)
-	elif value is Array:
-		for item: Variant in value: total += _packed_bytes(item)
-	return total
+func _packed_bytes(value: Variant) -> int:
+	return _core.packed_payload_bytes(value)
 
 func ack_frame(epoch: int, sequence: int) -> Dictionary:
 	if _busy: return _error(7,"ack_frame","配信中は受領できません")
@@ -334,7 +335,7 @@ func _deliver_locked() -> Dictionary:
 		if receiver.epoch==_delivery.epoch and receiver.sequence>=sequence and receiver.revision>=_delivery.state_revision: continue
 		var began := Time.get_ticks_usec() if perf.active else 0
 		var packet: Dictionary = _delivery.duplicate(true)
-		_metrics_bytes += _packed_bytes(packet)
+		_metrics_bytes += _delivery_bytes
 		perf.since(&"bridge_copy",began)
 		if not receiver.consumer.is_valid() or receiver.consumer.call(packet)!=true:
 			return _error(8,"subscriber", "通知を受け取れません: %s" % name)
@@ -357,5 +358,6 @@ func _collect_locked() -> Dictionary:
 		return snapshot
 	if _subscribers.is_empty(): return snapshot
 	_delivery = snapshot.value
+	_delivery_bytes = _latest_bytes
 	delivery_error = _deliver_locked()
 	return snapshot if delivery_error.ok else delivery_error

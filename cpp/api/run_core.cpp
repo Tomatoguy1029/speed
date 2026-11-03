@@ -54,10 +54,47 @@
 #include <cmath>
 #include <algorithm>
 #include <godot_cpp/core/math.hpp>
+#include <godot_cpp/variant/packed_byte_array.hpp>
+#include <godot_cpp/variant/packed_int32_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
+#include <godot_cpp/variant/packed_vector3_array.hpp>
+#include <godot_cpp/variant/packed_vector4_array.hpp>
+#include <godot_cpp/variant/packed_color_array.hpp>
 
 using namespace godot;
 
+namespace {
+// ラン出力のPacked配列の論理量。Dictionaryのキーや参照共有は数えない。
+int64_t packed_payload_bytes_inner(const Variant &value, unsigned depth) {
+    if (depth>64) return 0;
+    switch (value.get_type()) {
+    case Variant::PACKED_BYTE_ARRAY: return PackedByteArray(value).size();
+    case Variant::PACKED_INT32_ARRAY: return PackedInt32Array(value).size()*4;
+    case Variant::PACKED_FLOAT32_ARRAY: return PackedFloat32Array(value).size()*4;
+    case Variant::PACKED_INT64_ARRAY: return PackedInt64Array(value).size()*8;
+    case Variant::PACKED_FLOAT64_ARRAY: return PackedFloat64Array(value).size()*8;
+    case Variant::PACKED_VECTOR2_ARRAY: return PackedVector2Array(value).size()*8;
+    case Variant::PACKED_VECTOR3_ARRAY: return PackedVector3Array(value).size()*12;
+    case Variant::PACKED_COLOR_ARRAY: return PackedColorArray(value).size()*16;
+    case Variant::PACKED_VECTOR4_ARRAY: return PackedVector4Array(value).size()*16;
+    case Variant::DICTIONARY: {
+        const Array values=Dictionary(value).values();int64_t total=0;
+        for (int64_t i=0;i<values.size();++i) total+=packed_payload_bytes_inner(values[i],depth+1);
+        return total;
+    }
+    case Variant::ARRAY: {
+        const Array values=value;int64_t total=0;
+        for (int64_t i=0;i<values.size();++i) total+=packed_payload_bytes_inner(values[i],depth+1);
+        return total;
+    }
+    default: return 0;
+    }
+}
+int64_t packed_payload_bytes(const Variant &value) {return packed_payload_bytes_inner(value,0);}
+}
+
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_static_method(get_class_static(),D_METHOD("packed_payload_bytes","value"),&packed_payload_bytes);
     ClassDB::bind_method(D_METHOD("configure_run", "bytes", "options"), &SpeedRunCore::configure_run);
     ClassDB::bind_method(D_METHOD("start_run", "seed", "options"), &SpeedRunCore::start_run);
     ClassDB::bind_method(D_METHOD("step_run", "dt", "input", "viewport"), &SpeedRunCore::step_run);

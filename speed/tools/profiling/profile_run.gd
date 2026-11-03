@@ -44,6 +44,7 @@ var stroke_starts := 0
 var traced_ticks := 0
 var drawing_ticks := 0
 var maintenance_us := 0
+var maintenance_total_us := 0
 var metadata := {}
 var measurement_seconds := 60.0
 var last_run_clock := 0.0
@@ -289,20 +290,38 @@ func _receive(frame: Dictionary) -> bool:
 
 func _refill() -> void:
 	var before := Time.get_ticks_usec()
-	var count := int(bridge.read_metrics().value.enemies)
-	var camera: Dictionary = bridge.latest_frame().value.camera
+	var initial: Dictionary=bridge.read_metrics().value
+	var missing := maxi(0,int(options.mixed_target)-int(initial.enemies))
+	if missing==0: return
+	var camera: Dictionary=bridge.latest_frame().value.camera
 	var area := Rect2(camera.center-camera.half,camera.half*2.0)
-	while count<int(options.mixed_target):
-		var id: String = mix[mix_cursor%mix.size()]
-		mix_cursor+=1
+	var rng_before := position_rng.state
+	var entries: Array[Dictionary]=[]
+	for i in missing:
 		var pos := Vector2(position_rng.randf_range(area.position.x,area.end.x),position_rng.randf_range(area.position.y,area.end.y))
-		if not _command("dev_spawn",{"definition_id":id,"position":pos}): return
-		var after := int(bridge.read_metrics().value.enemies)
-		if after<=count:
-			_fail("混成の補充で個体数が増えません: "+id)
-			return
-		count=after
-	if measuring: maintenance_us+=Time.get_ticks_usec()-before
+		entries.append({"definition_id":mix[(mix_cursor+i)%mix.size()],"position":pos})
+	var reply: Dictionary=bridge.command("dev_refill",{"target_count":int(options.mixed_target),"spawns":entries})
+	if not reply.ok:
+		_fail("混成の一括補充に失敗: "+str(reply))
+		return
+	var used := int(reply.value.used)
+	# 群れを伴う1回の生成で目標数へ届いた場合も、未使用分の乱数を消費しない。
+	position_rng.state=rng_before
+	for i in used:
+		position_rng.randf_range(area.position.x,area.end.x)
+		position_rng.randf_range(area.position.y,area.end.y)
+	mix_cursor+=used
+	if not reply.value.complete or int(reply.value.enemies)<=int(initial.enemies):
+		_fail("混成の補充で目標数へ届きません")
+		return
+	if measuring:
+		var after: Dictionary=bridge.read_metrics().value
+		var overlap := 0
+		for key in ["output_build","bridge_copy","resource_wait"]:
+			overlap+=int(after.timings.get(key,[0,0,0])[0])-int(initial.timings.get(key,[0,0,0])[0])
+		var total := Time.get_ticks_usec()-before
+		maintenance_us+=maxi(0,total-overlap)
+		maintenance_total_us+=total
 
 func _process(_delta: float) -> void:
 	if not configured or finished: return
@@ -354,6 +373,8 @@ func _process(_delta: float) -> void:
 	var ui_paused: bool = packet.ui.phase in [Phase.Paused,Phase.Levelup] or session.view.get_node("Hud/HudRoot")._rewards.is_active()
 	var scene := "ui" if ui_paused else "bonus" if bonus else "boss" if not packet.ui.get("boss_bodies",[]).is_empty() else "normal"
 	var row := {"elapsed_ms":(now-start_us)/1000.0,"frame_ms":frame_ms,"tick":metrics.tick,"fixed_steps":metrics.fixed_steps,"enemies":metrics.enemies,"enemy_types":metrics.enemy_types,"attack_pools":metrics.attack_pools,"friendly":metrics.friendly_shots,"run_clock":packet.ui.run_time,"run_delta":float(packet.ui.run_time)-last_run_clock,"world_clock":packet.ui.world_time,"phase":packet.ui.phase,"scene":scene,"bonus_remaining":packet.ui.get("bonus_remaining",0.0),"hitstop":packet.ui.get("hitstop",0.0),"drawing":packet.ui.draw.drawing,"tracing":packet.ui.draw.tracing,"ship_position":str(packet.ui.ship.ship_pos),"boss_bodies":packet.ui.get("boss_bodies",[]),"sim":timings.sim,"output_build":timings.output_build,"bridge_copy":timings.bridge_copy,"resource_wait":timings.resource_wait,"bridge_bytes":int(metrics.packed_bytes)-last_packed_bytes,"view_update":update,"view_draw":draw,"view_detail":display,"observation_ms":(now-before)/1000.0,"keep_refill":maintenance_us/1000.0,"viewport_cpu_ms":RenderingServer.viewport_get_measured_render_time_cpu(viewport),"viewport_gpu_ms":RenderingServer.viewport_get_measured_render_time_gpu(viewport),"draw_calls":Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),"scope_resources":session.resources.resources.size(),"objects":Performance.get_monitor(Performance.OBJECT_COUNT),"nodes":Performance.get_monitor(Performance.OBJECT_NODE_COUNT),"static_mb":Performance.get_monitor(Performance.MEMORY_STATIC)/1048576.0}
+	row["keep_refill_inclusive"]=maintenance_total_us/1000.0
+	maintenance_total_us=0
 	row["sim_clock"]=metrics.clocks.sim_time
 	row["world_updates"]=metrics.clocks.world_updates
 	row["world_real_accum"]=metrics.clocks.world_real_accum

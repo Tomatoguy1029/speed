@@ -309,6 +309,28 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         response=speed::BossFinish::skip(runtime)?success():failure(4,"phase","クリア演出中だけスキップできます");
     } else if (kind=="dev_finish" && runtime.api_development && payload.size()==1 && is(payload,"cleared",Variant::BOOL)) {
         response=speed::Lifecycle::finish(runtime,bool(payload["cleared"])?speed::ResultKind::Clear:speed::ResultKind::Death)?success():failure(4,"result","結果は確定済みです");
+    } else if (kind=="dev_refill" && runtime.api_development && keys(payload,{"target_count","spawns"}) && is(payload,"target_count",Variant::INT) && is(payload,"spawns",Variant::ARRAY)) {
+        const int64_t target=payload["target_count"];const Array entries=payload["spawns"];
+        bool valid=target>=0 && target<=10000 && entries.size()<=10000;
+        for (int64_t i=0;valid && i<entries.size();++i) {
+            if (entries[i].get_type()!=Variant::DICTIONARY) {valid=false;break;}
+            const Dictionary entry=entries[i];
+            valid=keys(entry,{"definition_id","position"}) && is(entry,"definition_id",Variant::STRING) && is(entry,"position",Variant::VECTOR2) && Vector2(entry["position"]).is_finite();
+            if (valid) {const StringName id=entry["definition_id"];valid=std::any_of(runtime.content->definitions.begin(),runtime.content->definitions.end(),[&](const auto &d){return d.id==id;});}
+        }
+        if (!valid) response=failure(1,"spawns","補充の目標数・定義・位置が不正です");
+        else {
+            int64_t used=0;
+            while (runtime.state.rows_by_id.size()<size_t(target) && used<entries.size()) {
+                const Dictionary entry=entries[used];Dictionary options;options["facing"]=0.0;options["elite"]=false;options["spawn_origin"]=int64_t(speed::SpawnOrigin::DevPlacement);
+                if (spawn_enemy(String(entry["definition_id"]),entry["position"],options)<=0) break;
+                ++used;
+                // 単体の開発用生成と同じ初期化・順序・格子を保ち、出力だけ最後に配信する。
+                rebuild_enemy_grid(runtime.state.frame_grid_cell);
+            }
+            Dictionary value;value["used"]=used;value["enemies"]=int64_t(runtime.state.rows_by_id.size());value["complete"]=runtime.state.rows_by_id.size()>=size_t(target);
+            response=success(value);
+        }
     } else if (kind=="dev_spawn" && runtime.api_development && keys(payload,{"definition_id","position","facing","elite"}) && is(payload,"definition_id",Variant::STRING) && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite() && (!payload.has("elite") || is(payload,"elite",Variant::BOOL)) && (!payload.has("facing") || ((is(payload,"facing",Variant::FLOAT) || is(payload,"facing",Variant::INT)) && std::isfinite(double(payload["facing"]))))) {
         Dictionary options;options["facing"]=payload.get("facing",0.0);options["elite"]=payload.get("elite",false);options["spawn_origin"]=int64_t(speed::SpawnOrigin::DevPlacement);
         auto entity=spawn_enemy(String(payload["definition_id"]),payload["position"],options);
