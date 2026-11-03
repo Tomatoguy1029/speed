@@ -8,8 +8,11 @@ const ROAR_LEVELS = {
   2: { life: 0.36, blur: 0.075, reach: 5, mix: 0.8 },
   3: { life: 0.52, blur: 0.17, reach: 8, mix: 1 },
 };
-// 咆哮（中）＝段階2の初期値（本人指定）。小・大は各つまみの既定値のまま
-const ROAR_LEVEL_DEFAULTS = { 2: { roarPost: 1.4, roarTime: 2.5, roarSize: 0.8, roarClear: 0.7, roarRange: 2.0, roarBlur: 0.5, roarLines: 1.0, roarShake: 0.8, orderWait: 0.1 } };
+// ボスによらず共通の段階別プリセット。小は各つまみの既定値を使う。
+const ROAR_LEVEL_DEFAULTS = {
+  2: { roarPost: 1.4, roarTime: 2.5, roarSize: 0.8, roarClear: 0.7, roarRange: 2.0, roarBlur: 0.5, roarLines: 1.0, roarShake: 0.8, orderWait: 0.1 },
+  3: { roarPost: 1.41, roarTime: 3.5, roarSize: 1.2, roarColor: '#b6e5ff', roarClear: 0.7, roarRange: 2.35, roarBlur: 1.6, roarLines: 1.0, roarShake: 1.1 },
+};
 const roarLevel = P => { const l = ROAR_LEVELS[P.roarLevel] || ROAR_LEVELS[1]; return { ...l, life: l.life * (P.roarTime ?? 1) }; }; // 長さはつまみの倍率（待ち時間の起点も一緒にずれる）
 function activeRoar(S, P) {
   const e = S.shouts.findLast(e => !e.small), age = e ? (S.t - e.t) / P.timing : -1;
