@@ -119,12 +119,12 @@ function canisStartJet(S, at, angle, length, width, duration, trail = false, own
   S.jets.push(jet); S.jetVisuals.push({ ...jet, owner, t: S.t }); return jet;
 }
 function canisDepositFlame(S, f) {
-  const trail = f.trail; if (!trail?.deposits || f.age > f.life || S.t > trail.fireEndAt) return;
+  const trail = f.trail; if (!trail?.deposits || f.age > f.life || S.t > trail.fireEndAt || (trail.visualFootprint && !f.visualPixel)) return;
   const local = rotateV(sub(f.pos, trail.at), -trail.a), along = Math.floor(local.x / 45), across = Math.floor(local.y / 45), key = along + ':' + across;
   const old = trail._depositCells.get(key);
-  if (old) { old.t = S.t; return; }
+  if (old) { old.t = S.t; return old; }
   const deposit = { pos: { ...f.pos }, t: S.t, seed: ((along * 73856093) ^ (across * 19349663) ^ (Math.round(trail.t * 60) * 83492791)) >>> 0 };
-  trail.deposits.push(deposit); trail._depositCells.set(key, deposit);
+  trail.deposits.push(deposit); trail._depositCells.set(key, deposit); return deposit;
 }
 function canisFlameAim(S, dt, cfg) {
   const B = S.B;
@@ -185,7 +185,7 @@ function canisStep(S, dt) {
       if (age >= r.warn && age < r.warn + r.duration) {
         if (mode === 'proto' && !S.siriusFlameTrail) {
           const remaining = r.warn + r.duration - age;
-          S.siriusFlameTrail = { at: canisMouth(B), a: B.facing, length: 0, maximum: Infinity, t: S.t, jetDuration: remaining, fireEndAt: S.t + remaining + r.life, deposits: [], _depositCells: new Map() };
+          S.siriusFlameTrail = { at: canisMouth(B), a: B.facing, length: 0, maximum: Infinity, t: S.t, jetDuration: remaining, fireEndAt: S.t + remaining + r.life, deposits: [], _depositCells: new Map(), visualFootprint: new Set() };
           S.trails.push(S.siriusFlameTrail);
         }
         B.mode = 'active'; B.charge = 1;
@@ -285,6 +285,7 @@ function canisStep(S, dt) {
     if (f.trail) { f.trail.length = Math.min(f.trail.maximum, Math.max(f.trail.length, dist(f.pos, f.origin))); canisDepositFlame(S, f); }
   }
   S.flames = S.flames.filter(f => f.age < f.life);
+  if (mode === 'proto' && id === 'sirius_flame') canisRecordSiriusFootprint(S);
   for (const b of S.bursts) if (b.fx && S.t - b.t < 2.8 && dt > 0) { b.fx.ps.update(dt); b.fx.blazes.update(dt); }
 }
 function canisDraw(S, R) {

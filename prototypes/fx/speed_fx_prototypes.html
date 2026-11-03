@@ -6050,8 +6050,8 @@ function canisPixelFireField(R, at, angle, clock, alpha, samples) {
       return hexc(fromHsl({ h: (v.h + tint.h - base.h + 360) % 360, s: clamp(v.s * tint.s / base.s), l: v.l }));
     });
   }
-  const cols = canisPixelFireField.colors, p = R.front, fade = p.fade;
-  p.fade *= alpha;
+  const cols = canisPixelFireField.colors, p = R.front, fade = p?.fade;
+  if (p) p.fade *= alpha;
   try {
     for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
       const dx = i + 0.5 - origin.x, dy = j + 0.5 - origin.y;
@@ -6063,19 +6063,45 @@ function canisPixelFireField(R, at, angle, clock, alpha, samples) {
       // pixel_fire_shape.gdshaderのthreshold 0.32＋edge_softness 0.04の中点。
       if (field[k] < 0.34) continue;
       const inner = field[k + 1] >= 0.34, core = inner && field[k + 2] >= 0.34, col = cols[core ? 2 : inner ? 1 : 0];
+      if (R.stampState) { canisStampSiriusPixel(R.stampState, i, j); continue; }
       p.px(i, j, col);
       if ((i & 3) === 0 && (j & 3) === 0) p.glow(i, j, 2, col, core ? 0.10 : inner ? 0.05 : 0.02);
     }
-  } finally { p.fade = fade; }
+  } finally { if (p) p.fade = fade; }
+}
+// シリウスの光の描画と通過跡は、同じ口・射程・太さ・密度場を使う。
+function canisSiriusStream(S, R) {
+  if (!S.flames.length) return;
+  const mouth = canisSiriusMouth(S), u = fromA(S.B.facing), P = R.P;
+  let reach = 0;
+  for (const f of S.flames) {
+    const rel = sub(f.pos, mouth), radius = lerp(f.r0, f.r1, f.age / f.life);
+    reach = Math.max(reach, rel.x * u.x + rel.y * u.y + radius);
+  }
+  const started = S.siriusFlameTrail?.t ?? S.t;
+  canisPixelFireStream(R, mouth, S.B.facing, reach * P.size, P.size * (P.jetWidth ?? 1), S.t - started, Infinity, Math.min(1, P.intensity), 11);
+}
+function canisRecordSiriusFootprint(S) {
+  if (S.siriusFlameTrail) canisSiriusStream(S, { P: P(), stampState: S });
+}
+function canisStampSiriusPixel(S, x, y) {
+  const tr = S.siriusFlameTrail, cell = tr.pixelCell ||= 1 / WL;
+  const pos = V(cam.x + (x + 0.5 - LW / 2) / WL, cam.y + (y + 0.5 - LH / 2) / WL);
+  const key = Math.floor(pos.x / cell) + ':' + Math.floor(pos.y / cell);
+  if (tr.visualFootprint.has(key)) return;
+  tr.visualFootprint.add(key);
+  const deposit = canisDepositFlame(S, { trail: tr, pos, age: 0, life: 1, visualPixel: true });
+  if (deposit) (deposit.pixels ||= []).push(pos);
+}
+function canisSiriusFootprintContains(tr, x, y) {
+  if (!tr?.visualFootprint || !tr.pixelCell) return true;
+  const wx = cam.x + (x + 0.5 - LW / 2) / WL, wy = cam.y + (y + 0.5 - LH / 2) / WL;
+  return tr.visualFootprint.has(Math.floor(wx / tr.pixelCell) + ':' + Math.floor(wy / tr.pixelCell));
 }
 
 function canisJetPictures(S, R) {
   const B = S.B, P = R.P, Wm = P.jetWidth ?? 1, Wh = P.houndJetWidth ?? 1; // 長さは判定と同じ値（canisStartJet で掛け済み）
-  if (S.tech === 'sirius_flame' && S.flames.length) { // シリウスの光：歩きながら口から噴き続ける
-    const mouth = B.visualMouth || canisMouth(B), u = fromA(B.facing), n = orth(u); let reach = 0, width = 0;
-    for (const f of S.flames) { const rel = sub(f.pos, mouth), radius = lerp(f.r0, f.r1, f.age / f.life); reach = Math.max(reach, rel.x * u.x + rel.y * u.y + radius); width = Math.max(width, Math.abs(rel.x * n.x + rel.y * n.y) * 2 + radius); }
-    S.jetStart ??= S.t; canisPixelFireStream(R, mouth, B.facing, reach * P.size, P.size * Wm, S.t - S.jetStart, Infinity, Math.min(1, P.intensity), 11);
-  } else S.jetStart = null;
+  if (S.tech === 'sirius_flame') canisSiriusStream(S, R);
   for (const jet of S.jetVisuals) { const age = S.t - jet.t, source = jet.owner === 'boss' && age <= jet.duration ? (B.visualMouth || jet.at) : jet.at;
     canisPixelFireStream(R, source, jet.a, jet.length * P.size, P.size * (jet.owner === 'hound' ? Wh : Wm), age, jet.duration, Math.min(1, P.intensity), 5 + jet.id * 13); }
 }
@@ -6085,13 +6111,15 @@ function canisJetPictures(S, R) {
 function canisEmbers(S, R) {
   const P = R.P, frame = canisEmbers.frame ||= PX.createFrame(LW, LH); PX.clearFrame(frame); const p = new PX.Painter(frame), H = SIRIUS_H.map(hexc), sp = [];
   const soot = [hexc('#0c1420'), hexc('#142238')], cell = 45 * WL, wMul = (P.jetWidth ?? 1) * P.size; // 残り火の太さは噴射の太さと同じつまみ
+  const footprint = S.tech === 'sirius_flame' ? S.siriusFlameTrail : null;
   for (const tr of S.trails) for (const d of tr.deposits || []) {
     const wait = clamp(P.emberDelay ?? 0.2, 0, tr.jetDuration ?? 1.1), bornAge = S.t - tr.t - wait, a = Math.max(0, S.t - (tr.fireEndAt ?? tr.t)), life = 1.0 + hash(d.seed + 5) * 1.8; if (bornAge < 0 || a > life + 0.8) continue; const L = toL(d.pos);
-    for (let j = 0; j < 7; j++) { const sx = L.x + (hash(d.seed + j * 7) - 0.5) * cell * 1.2, sy = L.y + (hash(d.seed + j * 11) - 0.5) * cell * 1.2, hs = hash(d.seed + j * 13 + 1); if (hs < 0.35) continue; // すすは燃えた所にまだらに残る
+    for (let j = 0; j < 7; j++) { const point = d.pixels?.length ? toL(d.pixels[Math.floor(hash(d.seed + j * 7) * d.pixels.length)]) : null, sx = point ? point.x : L.x + (hash(d.seed + j * 7) - 0.5) * cell * 1.2, sy = point ? point.y : L.y + (hash(d.seed + j * 11) - 0.5) * cell * 1.2, hs = hash(d.seed + j * 13 + 1); if (hs < 0.35) continue; // すすは燃えた所にまだらに残る
       p.blend(sx, sy, soot[j % 2], 0.6 * (1 - smooth(life * 0.5, life + 0.8, a))); }
     for (let j = 0; j < 4; j++) { const hj = hash(d.seed + j * 17 + 3); if (hj < 0.3) continue; // 燃えない所もある
       const lf = life * (0.45 + 0.55 * hash(d.seed + j * 29)); if (a > lf) continue; const k = 1 - a / lf, flick = 0.75 + 0.25 * Math.sin(S.t * (9 + hj * 7) + j * 2);
-      sp.push({ x: L.x + (hash(d.seed + j * 7 + 50) - 0.5) * cell * 1.1, y: L.y + (hash(d.seed + j * 11 + 50) - 0.5) * cell * 1.1, r: (2.4 + 3.4 * hj) * Math.pow(k, 0.6) * flick * wMul * smooth(0, 0.1, bornAge), age: 1 - k }); }
+      const point = d.pixels?.length ? toL(d.pixels[Math.floor(hash(d.seed + j * 7 + 50) * d.pixels.length)]) : null;
+      sp.push({ x: point ? point.x : L.x + (hash(d.seed + j * 7 + 50) - 0.5) * cell * 1.1, y: point ? point.y : L.y + (hash(d.seed + j * 11 + 50) - 0.5) * cell * 1.1, r: (2.4 + 3.4 * hj) * Math.pow(k, 0.6) * flick * (point ? 1 : wMul) * smooth(0, 0.1, bornAge), age: 1 - k }); }
   }
   if (sp.length) { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const q of sp) { x0 = Math.min(x0, q.x - q.r * 2); y0 = Math.min(y0, q.y - q.r * 2); x1 = Math.max(x1, q.x + q.r * 2); y1 = Math.max(y1, q.y + q.r * 2); }
     const ox = Math.max(0, Math.floor(x0)), oy = Math.max(0, Math.floor(y0)), Wd = Math.min(LW, Math.ceil(x1)) - ox + 1, Hd = Math.min(LH, Math.ceil(y1)) - oy + 1;
@@ -6099,7 +6127,7 @@ function canisEmbers(S, R) {
       for (const q of sp) { phxSplat(field, Wd, Hd, ox, oy, q.x, q.y, q.r * 1.25, 0); if (q.age < 0.55) phxSplat(field, Wd, Hd, ox, oy, q.x, q.y - q.r * 0.15, q.r * 0.8, 1); if (q.age < 0.25) phxSplat(field, Wd, Hd, ox, oy, q.x, q.y - q.r * 0.2, q.r * 0.5, 2); }
       const clock = Math.floor(S.t * 30) / 30, th = 0.32, read = (i, j, ch) => { i = Math.max(0, Math.min(Wd - 1, Math.round(i))); j = Math.max(0, Math.min(Hd - 1, Math.round(j))); return field[(j * Wd + i) * 3 + ch]; };
       for (let j = 0; j < Hd; j++) for (let i = 0; i < Wd; i++) { const wx = (i + ox) * LP, wy = (j + oy) * LP, u2 = (Math.sin(wy * 0.075 - clock * 4.4) + Math.sin(wx * 0.11 + wy * 0.033 + clock * 2.1)) * 1.2, v2 = Math.cos(wx * 0.08 + clock * 3) * 0.66;
-        if (read(i + u2, j + v2, 0) < th) continue; const g1 = read(i + u2, j + v2, 1) >= th, b1 = g1 && read(i + u2, j + v2, 2) >= th, c = b1 ? H[1] : g1 ? H[4] : H[6]; p.px(i + ox, j + oy, c); if (((i + ox) & 3) === 0 && ((j + oy) & 3) === 0) p.glow(i + ox, j + oy, 4, c, 0.18 * P.intensity); } } }
+        if (!canisSiriusFootprintContains(footprint, i + ox, j + oy) || read(i + u2, j + v2, 0) < th) continue; const g1 = read(i + u2, j + v2, 1) >= th, b1 = g1 && read(i + u2, j + v2, 2) >= th, c = b1 ? H[1] : g1 ? H[4] : H[6]; p.px(i + ox, j + oy, c); if (((i + ox) & 3) === 0 && ((j + oy) & 3) === 0) p.glow(i + ox, j + oy, 4, c, 0.18 * P.intensity); } } }
   g.save(); blitFrame(frame); g.restore(); worldTransform();
 }
 function canisSpriteFX(name, point, time, scaleX, scaleY, angle = 0, alpha = 1) {
@@ -6443,12 +6471,12 @@ function canisStartJet(S, at, angle, length, width, duration, trail = false, own
   S.jets.push(jet); S.jetVisuals.push({ ...jet, owner, t: S.t }); return jet;
 }
 function canisDepositFlame(S, f) {
-  const trail = f.trail; if (!trail?.deposits || f.age > f.life || S.t > trail.fireEndAt) return;
+  const trail = f.trail; if (!trail?.deposits || f.age > f.life || S.t > trail.fireEndAt || (trail.visualFootprint && !f.visualPixel)) return;
   const local = rotateV(sub(f.pos, trail.at), -trail.a), along = Math.floor(local.x / 45), across = Math.floor(local.y / 45), key = along + ':' + across;
   const old = trail._depositCells.get(key);
-  if (old) { old.t = S.t; return; }
+  if (old) { old.t = S.t; return old; }
   const deposit = { pos: { ...f.pos }, t: S.t, seed: ((along * 73856093) ^ (across * 19349663) ^ (Math.round(trail.t * 60) * 83492791)) >>> 0 };
-  trail.deposits.push(deposit); trail._depositCells.set(key, deposit);
+  trail.deposits.push(deposit); trail._depositCells.set(key, deposit); return deposit;
 }
 function canisFlameAim(S, dt, cfg) {
   const B = S.B;
@@ -6509,7 +6537,7 @@ function canisStep(S, dt) {
       if (age >= r.warn && age < r.warn + r.duration) {
         if (mode === 'proto' && !S.siriusFlameTrail) {
           const remaining = r.warn + r.duration - age;
-          S.siriusFlameTrail = { at: canisMouth(B), a: B.facing, length: 0, maximum: Infinity, t: S.t, jetDuration: remaining, fireEndAt: S.t + remaining + r.life, deposits: [], _depositCells: new Map() };
+          S.siriusFlameTrail = { at: canisMouth(B), a: B.facing, length: 0, maximum: Infinity, t: S.t, jetDuration: remaining, fireEndAt: S.t + remaining + r.life, deposits: [], _depositCells: new Map(), visualFootprint: new Set() };
           S.trails.push(S.siriusFlameTrail);
         }
         B.mode = 'active'; B.charge = 1;
@@ -6609,6 +6637,7 @@ function canisStep(S, dt) {
     if (f.trail) { f.trail.length = Math.min(f.trail.maximum, Math.max(f.trail.length, dist(f.pos, f.origin))); canisDepositFlame(S, f); }
   }
   S.flames = S.flames.filter(f => f.age < f.life);
+  if (mode === 'proto' && id === 'sirius_flame') canisRecordSiriusFootprint(S);
   for (const b of S.bursts) if (b.fx && S.t - b.t < 2.8 && dt > 0) { b.fx.ps.update(dt); b.fx.blazes.update(dt); }
 }
 function canisDraw(S, R) {
