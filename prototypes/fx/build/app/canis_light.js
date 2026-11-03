@@ -24,14 +24,14 @@ function canisWallLayout(S) {
   const source = canisNovaOrigin(S), groups = Math.min(3, Math.floor(S.pack.length / 2)); S.wall = [];
   if (!groups) return;
   for (let group = 0; group < groups; group++) {
-    const members = S.order.filter((_, i) => i % groups === group), angle = group * TAU / groups;
+    const members = S.order.filter((_, i) => i % groups === group), angle = group * TAU / groups + (hash(group * 7 + 3) - 0.5) * 0.5; // 群れの向きにもばらつき
     const spans = members.map((q, i) => {
       const clone = { ...q, pos: V(0, 0), facing: angle + Math.PI / 2 }, axis = orth(fromA(angle)), points = canisHoundShape(clone), lateral = points.map(p => p.x * axis.x + p.y * axis.y);
-      const depth = Math.max(S.B.r * 1.5, S.r.pair_dist) + (i % 2 ? q.r * 1.5 : 0) + q.r * (hash(i + group * 9) - 0.5) * 0.3;
+      const depth = Math.max(S.B.r * 1.5, S.r.pair_dist) + (i % 2 ? q.r * 1.1 : 0) + q.r * (hash(i + group * 9) - 0.5) * 1.2; // 前後に不ぞろい
       return { q, depth, width: Math.max(...lateral) - Math.min(...lateral) };
     });
     const angular = spans.map(m => Math.atan2(m.width * 0.5, m.depth)), positions = [0];
-    for (let i = 1; i < spans.length; i++) positions.push(positions[i - 1] + (angular[i - 1] + angular[i]) * 0.5);
+    for (let i = 1; i < spans.length; i++) positions.push(positions[i - 1] + (angular[i - 1] + angular[i]) * 0.5 * (0.8 + 0.12 * hash(i * 5 + group * 3))); // 少し重なる不ぞろいな間隔（隙間を作らない）
     const center = (positions[0] + positions[positions.length - 1]) * 0.5;
     spans.forEach((m, i) => S.wall.push({ ...m, angle: angle + positions[i] - center }));
   }
@@ -50,7 +50,7 @@ function canisNovaField(S) {
     const make = () => { const c = document.createElement('canvas'); c.width = LW; c.height = LH; return c; }, plane = make(), sum = make();
     S.lightField = { plane, planeG: plane.getContext('2d'), sum, sumG: sum.getContext('2d', { willReadFrequently: true }) };
   }
-  const f = S.lightField, source = canisNovaOrigin(S), lights = [V(0, 0), ...Array.from({ length: 8 }, (_, i) => mul(fromA(i * 2.399963), 9 * Math.sqrt((i + 0.5) / 8)))], shapes = S.pack.filter(q => !q.dead).map(canisHoundShape);
+  const f = S.lightField, source = canisNovaOrigin(S), lights = [V(0, 0), ...Array.from({ length: 8 }, (_, i) => mul(fromA(i * 2.399963), 24 * Math.sqrt((i + 0.5) / 8)))] /* 光源を広げ、遠くほど影の縁がぼけて広がる */, shapes = S.pack.filter(q => !q.dead).map(canisHoundShape);
   f.sumG.clearRect(0, 0, LW, LH); f.sumG.globalCompositeOperation = 'lighter'; f.sumG.globalAlpha = 1 / lights.length; f.sumG.filter = 'blur(0.8px)';
   for (const offset of lights) {
     const light = add(source, offset), ctx = f.planeG; ctx.clearRect(0, 0, LW, LH); ctx.fillStyle = '#fff';
@@ -98,9 +98,11 @@ function canisNovaLight(S, R) {
     const dx = x - source.x, dy = y - source.y, distance = Math.hypot(dx, dy) / WL;
     const visible = 1 - field.pixels[(y * LW + x) * 4 + 3] / 255;
     if (visible < 0.01 || distance > S.r.ring_end) continue;
-    const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 760) ** 2);
+    const falloff = (1 - smooth(S.r.ring_end * 0.8, S.r.ring_end, distance)) / (1 + (distance / 420) ** 2); // 遠くほど光が弱まり、影の線が遠くまで同じ濃さで続かない
     const strength = visible * gain * falloff;
+    const ray = 0.45 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(Math.atan2(dy, dx) * 23 + Math.sin(Math.atan2(dy, dx) * 7) * 2.3), 3); // 閃光：光源から放射状に走る光の筋（影の中には入らない）
     R.back.light(x, y, tint, strength * (tell * 0.10 + flash * 0.25));
+    if (flash > 0) R.front.light(x, y, hexc('#e8f4ff'), strength * flash * ray * 0.55 * (1 - smooth(0, S.r.ring_end, distance) * 0.5));
     const stretch = t < 0 ? 1 : 1 + 0.45 * flash;
     const tx = Math.floor(96 + dx * 96 / (aperture * stretch)), ty = Math.floor(96 + dy * 96 / aperture);
     if (tx >= 0 && tx < 192 && ty >= 0 && ty < 192) {
