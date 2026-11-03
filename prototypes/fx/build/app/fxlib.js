@@ -44,20 +44,22 @@ const FX = (() => {
       const f = flow(pk, (d + (o.offset || 0)) / (o.path || L));
       const x = A.x + ux * d, y = A.y + uy * d;
       const b = env * (0.35 + 0.65 * k) * (0.7 + 0.6 * f) * inten;
-      p.px(x, y, b > 0.95 ? pal[4] : b > 0.62 ? pal[3] : b > 0.3 ? pal[2] : pal[1]);
+      p.px(x, y, pal[Math.min(o.maxLv ?? 4, b > 0.95 ? 4 : b > 0.62 ? 3 : b > 0.3 ? 2 : 1)]); // maxLv：明るさの上限（白くしない予兆用）
       p.light(x, y, pal[2], 0.16 * env * (0.4 + k) * (0.6 + f) * inten);
       p.light(x + nx * side, y + ny * side, pal[2], 0.22 * env * (0.3 + 0.7 * k) * (0.6 + 0.6 * f) * inten);
       p.light(x - nx * side, y - ny * side, pal[1], 0.18 * env * (0.3 + 0.7 * k) * (0.6 + 0.6 * f) * inten);
     }
     p.glowLine(A.x, A.y, B.x, B.y, 2.5 + 2 * k, pal[2], 0.10 * k * inten);
   }
+  // from/to（0〜1）：帯の描く区間（先端が伸びる・根元から消える）。taper：区間の両端をとがらせる長さ（論理px）
   // 照射中のビーム：芯（白）→明→主→暗の帯、芯を流れる包み、ゆらぐ幅、発射元のフレア
   function beam(p, A, B, o) {
     const pal = ramp(o.color), dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy); if (L < 1) return;
     const ux = dx / L, uy = dy / L, nx = -uy, ny = ux, t = o.time || 0, a = clamp(o.alpha ?? 1), w0 = o.w;
     const LV = [pal[4], pal[3], pal[2], pal[1], pal[0]];
-    for (let d = 0; d <= L; d += 0.5) {
-      const ends = o.round ? Math.min(1, Math.sqrt(Math.max(0, Math.min(d, L - d)) / (w0 * 0.9 + 0.01))) : Math.min(1, (d + 2) / 4);
+    const d0 = (o.from ?? 0) * L, d1 = (o.to ?? 1) * L, tp = o.taper;
+    for (let d = d0; d <= d1; d += 0.5) {
+      const ends = tp ? Math.min(1, (d - d0) / tp * (d0 > 0 ? 1 : 3), (d1 - d) / tp) ** 0.8 : o.round ? Math.min(1, Math.sqrt(Math.max(0, Math.min(d, L - d)) / (w0 * 0.9 + 0.01))) : Math.min(1, (d + 2) / 4);
       const w = w0 * (1 + 0.1 * Math.sin(d * 0.35 - t * 40)) * ends;
       const pulse = ((d * 0.03 - t * 3) % 1 + 1) % 1 < 0.06 ? 1 : 0;
       const x = A.x + ux * d, y = A.y + uy * d;
@@ -70,8 +72,8 @@ const FX = (() => {
       }
       if ((Math.round(d * 2) & 5) === 0) p.light(x, y, pal[2], 0.25 * a * (o.intensity ?? 1));
     }
-    p.glowLine(A.x, A.y, B.x, B.y, w0 * 2.6 + 3, pal[2], 0.35 * a * (o.intensity ?? 1));
-    if (o.source !== false) flare(p, A, w0 * 1.3, o.color, t, a);
+    p.glowLine(A.x + ux * d0, A.y + uy * d0, A.x + ux * d1, A.y + uy * d1, w0 * 2.6 + 3, pal[2], 0.35 * a * (o.intensity ?? 1));
+    if (o.source !== false && d0 <= 0) flare(p, A, w0 * 1.3, o.color, t, a);
   }
   // 発射元・着弾点のフレア（arcane-beam の source：回る光条と白い芯）
   function flare(p, P0, r, color, t, a = 1, rays = 4) {

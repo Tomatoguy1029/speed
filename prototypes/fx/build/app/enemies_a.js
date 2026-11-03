@@ -15,7 +15,8 @@ const PH = { MOVE: '移動／待機', WINDUP: '予備動作（予告）', DASH: 
 DEMOS.push({
   id: 'G12-beamer', ids: ['G12'], cat: G12, group: 'ビームの敵（beamer）', title: '砲口の溜め→ビーム', duration: 3.2, color: LASER, cam: { x: -60, y: 30 },
   refs: ['scripts/enemies/beamer.gd（溜め・発射の時刻）', 'scripts/render/enemies/beamer.gd・render/attacks/beam_guide.gd・beam.gd（現行の描画）', 'data/enemies/beamer.tres params（telegraph 0.9 / beam_time 0.35 / 幅22 / 長さ2200）', 'pixelFX arcane-beam.js の帯分け・発射元フレア、shaders/marlin_warning.gdshader の芯＋平行光＋光の包み'],
-  status: { '状態': '試作のみ（本番未変更）', '判定': '変更なし。ビーム本体の帯（白〜主色）は幅22の判定幅に合わせ、外側は光（加算）だけ' },
+  params: [{ k: 'travel', label: '発射：先端が届くまで(秒)', type: 'range', min: 0, max: 0.3, step: 0.01, def: 0.1 }],
+  status: { '状態': '試作のみ（本番未変更）', '判定': '変更なし。ビーム本体の帯（白〜主色）は幅22の判定幅に合わせ、外側は光（加算）だけ', '照準': '機体と交わったらそこで止まる。溜めの終わりでも白くならない（主色まで）', '発射': '先端が砲口から伸び（時間はつまみで調整）、終わりは砲口の側から消える。両端はとがらせる。判定の時刻と長さは変えていない' },
   setup(S) { S.e = mkE('beamer', V(-420, -40), 0, { fire_t: 0.5 }); S.ship = shipState(V(280, 110)); S.e.facing = angOf(sub(S.ship.pos, S.e.pos)); },
   step(S, dt) {
     const e = S.e, p = prm('beamer'); S.ship.pos.y = 110 + Math.sin(S.t * 1.3) * 30;
@@ -33,9 +34,13 @@ DEMOS.push({
         else if (on) { const f = 1 - clamp((t - h.delay) / h.active) * 0.6; D2.line(h.p, b, rgba(col, 0.35 * f), h.w * 1.6); D2.line(h.p, b, rgba(col, 0.9 * f), h.w); D2.line(h.p, b, rgba('#fff', 0.85 * f), Math.max(px(2), h.w * 0.3)); }
       } else {
         const tt = t * P.timing;
-        if (t < h.delay) { FXW.warnRail(R.back, h.p, b, { color: P.color, k, time: S.t, seed: 3, intensity: P.intensity }); FXW.gather(R.front, h.p, e.r * 2.2 * P.size, k * P.intensity, P.color, S.t, 16, 5); }
-        else if (on) { const u = (t - h.delay) / h.active, a = (u < 0.08 ? 1 : 1 - smooth(0.7, 1, u)) * P.intensity; FXW.beam(R.front, h.p, b, { color: P.color, w: h.w / 2 * (u > 0.85 ? lerp(1, 0.4, (u - 0.85) / 0.15) : 1), time: S.t, alpha: Math.min(1, a) }); if (u < 0.12) FXW.flare(R.front, h.p, 18 * P.size, '#ffffff', S.t, 1 - u / 0.12, 6); }
-        else if (t > h.delay + h.active && t < h.delay + h.active + 0.3 * P.timing) { const f = 1 - (t - h.delay - h.active) / (0.3 * P.timing); FXW.warnRail(R.back, h.p, b, { color: P.color, k: 0.3 * f, time: S.t, seed: 9, intensity: f * P.intensity, rail: 1.2 }); FXW.sparks(R.front, h.p, t - h.delay - h.active, 4, 8, P.color, 30, 0.3); }
+        const hitT = segCircleT(h.p, b, S.ship.pos, DATA.config.ship_radius), aimEnd = hitT >= 0 ? lerpV(h.p, b, hitT) : b; // 照準は機体で止まる
+        const travel = Math.max(0.001, (P.travel ?? 0.1) * P.timing);
+        if (t < h.delay) { FXW.warnRail(R.back, h.p, aimEnd, { color: P.color, k, time: S.t, seed: 3, intensity: P.intensity, maxLv: 2 }); FXW.gather(R.front, h.p, e.r * 2.2 * P.size, k * P.intensity, P.color, S.t, 16, 5); }
+        else if (on) { const tf = t - h.delay, u = tf / h.active, left = h.active - tf, head = Math.min(1, smooth(0, travel, tf) * 1.0001), tail = left < travel ? smooth(travel, 0, left) : 0; // 先端が伸び、終わりは根元から消える
+          if (head > tail) FXW.beam(R.front, h.p, b, { color: P.color, w: h.w / 2, time: S.t, alpha: Math.min(1, P.intensity), from: tail, to: head, taper: 10 * P.size, source: tail <= 0 });
+          if (tf < travel * 1.5) FXW.flare(R.front, h.p, 12 * P.size, P.color, S.t, 1 - tf / (travel * 1.5), 6); }
+        else if (t > h.delay + h.active && t < h.delay + h.active + 0.3 * P.timing) FXW.sparks(R.front, h.p, t - h.delay - h.active, 4, 8, P.color, 30, 0.3);
       }
     }
     if (R.proto) R.blitBack();
