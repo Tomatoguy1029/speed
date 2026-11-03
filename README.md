@@ -55,7 +55,7 @@ godot-bg --editor --path speed
 
 `.godot/`・`.content/`・拡張の共有ライブラリは生成物としてGit管理から除外します。編集元の保存と、実行用データの生成を分けて扱います。エディタの実行前・CLI・exportは同じ生成入口を使います。
 
-配布用のビルドはソースの外に新しい作業先を指定します。以下はMacの例です。`--templates` は `version.txt` を持つGodot 4.7.2のexport templateフォルダへ置き換えてください。
+配布用のビルドはソースの外に新しい作業先を指定します。以下はMacの例です。Macでは `godot-bg` をPATHへ用意します。importと共通生成はheadlessで行い、シェーダー事前変換を使うexportは `godot-bg` で行います。`--templates` は `version.txt` を持つGodot 4.7.2のexport templateフォルダへ置き換えてください。
 
 ```bash
 python3 tools/build/build_run.py --sdk /tmp/speed-godot-cpp --scons /tmp/speed-build-python/bin/scons --platform macos --package-dir /tmp/speed-package --godot godot --templates /path/to/4.7.2.stable

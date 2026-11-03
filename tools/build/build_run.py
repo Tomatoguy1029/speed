@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -12,8 +13,8 @@ import tempfile
 import zipfile
 
 
-def run(command):
-    subprocess.run([str(part) for part in command], check=True)
+def run(command, env=None):
+    subprocess.run([str(part) for part in command], check=True, env=env)
 
 
 def library_name(platform, arch):
@@ -121,7 +122,17 @@ def package(root, lock, args):
     output.mkdir(exist_ok=True)
     preset = 'macOS' if args.platform == 'macos' else 'Windows'
     artifact = output / ('Speed.zip' if args.platform == 'macos' else 'Speed.exe')
-    run([*engine, '--editor', '--export-release', preset, artifact, '--log-file', destination / 'export.log'])
+    export_engine = engine
+    export_environment = None
+    if args.platform == 'macos':
+        # Metal用のshader事前変換には描画デバイスを使う。生成/importはheadlessのまま行う。
+        launcher = shutil.which('godot-bg')
+        if not launcher:
+            raise ValueError('Macの描画付きexportにはgodot-bgが必要です')
+        export_environment = os.environ.copy()
+        export_environment['GODOT'] = str(args.godot)
+        export_engine = [launcher, '--path', project]
+    run([*export_engine, '--editor', '--export-release', preset, artifact, '--log-file', destination / 'export.log'], env=export_environment)
     if args.platform == 'macos':
         with zipfile.ZipFile(artifact) as archive:
             archive.extractall(output)
