@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--editor-process-only" in OS.get_cmdline_user_args():
+		check_editor_process()
+		print("[起動前の別プロセス生成] failed=",failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--startup-only" in OS.get_cmdline_user_args():
 		_startup_only()
 		return
@@ -119,6 +124,29 @@ func check_run_content() -> bool:
 	return true
 
 ## 独立コピーでF5前の生成だけを確認し、変更を元に戻す。
+func check_editor_process() -> void:
+	var builder = load("res://addons/content_build/builder.gd")
+	var started := Time.get_ticks_usec()
+	check(builder.build_for_editor()==OK,"新しいプロセスで起動前の生成を完了する")
+	check(not builder.last_build_report.is_empty(),"子プロセスの生成結果を受け取る")
+	print("[起動前の更新あり] ms=",(Time.get_ticks_usec()-started)/1000.0)
+	started = Time.get_ticks_usec()
+	check(builder.build_for_editor()==OK,"変更なしでも同じ入口から開始できる")
+	check(builder.last_build_report.size()==1 and builder.last_build_report[0].unit=="all" and not builder.last_build_report[0].rebuilt,"変更なしでは全体を再利用する")
+	print("[起動前の変更なし] ms=",(Time.get_ticks_usec()-started)/1000.0)
+	# 独立コピーで入力を壊し、失敗を起動成功として扱わないことを確認する。
+	var path := "res://data/stages/stage_1.tres"
+	var original := FileAccess.get_file_as_string(path)
+	var file := FileAccess.open(path,FileAccess.WRITE)
+	file.store_string("invalid resource")
+	file.close()
+	var error: Error = builder.build_for_editor()
+	file = FileAccess.open(path,FileAccess.WRITE)
+	file.store_string(original)
+	file.close()
+	check(error!=OK,"生成の失敗を親プロセスへ返して起動を止める")
+	check(not builder.last_build_report.is_empty(),"途中で失敗しても実施した単位の結果を失わない")
+
 func check_incremental() -> void:
 	var builder = load("res://addons/content_build/builder.gd")
 	var generator = load("res://tools/content/build_run_content.gd")
