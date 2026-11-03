@@ -61,7 +61,6 @@ function canisSetup(S, id) {
     cam.x = (left + right) / 2;
   }
   S.pack = []; S.jetVisuals = []; S.jets = []; S.flames = []; S.trails = []; S.shouts = []; S.transfers = []; S.bursts = []; S.shadows = [];
-  if (mode === 'proto' && CANIS_ROARS.has(id)) roarScreen ||= makeRoarScreen();
   const count = id === 'nova' && mode === 'current' ? 8 : Math.round(P().pack), B = S.B;
   for (let i = 0, row = 1, column = 0; i < count; i++) {
     const q = mkE('hound', add(B.pos, V(B.r + 20 + row * 50, (column - row * 0.5) * 55)), 0, { idx: i, vel: V(0, 0), trail: [], warning: -1, dead: false }); S.pack.push(q);
