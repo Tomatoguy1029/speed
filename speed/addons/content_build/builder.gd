@@ -21,6 +21,10 @@ static func signature() -> String:
 	files.append("res://tools/art/bake_elite_crackle.py")
 	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
 		if not path in files and FileAccess.file_exists(path): files.append(path)
+	return _file_signature(files)
+
+static func _file_signature(files: PackedStringArray) -> String:
+	files = files.duplicate()
 	files.sort()
 	var hashes := PackedStringArray(["engine:" + str(Engine.get_version_info().string), "res://project.godot:" + FileAccess.get_sha256("res://project.godot")])
 	for path in files: hashes.append(path + ":" + FileAccess.get_sha256(path))
@@ -132,15 +136,32 @@ static func build_all(force := false, output := ROOT) -> Error:
 static func _build_units(force: bool, output: String) -> Error:
 	last_build_report = []
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output.path_join("dev")))
-	# 技の見た目の編集位置は既存の意味比較で除き、実効値が変わったボスだけ更新する。
-	for id in ["hydra","monoceros","draco","centaurus","canis_major"]:
-		var boss: Dictionary = preload("res://tools/content/build_boss_program.gd").build_boss(id,output.path_join("boss_"+id+".tres"))
-		if boss.error != OK: return boss.error
 	var cache := preload("res://addons/content_build/incremental.gd").new()
 	cache.open(output.path_join("dev/build_cache.json"))
 	var files := PackedStringArray()
 	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
 	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","elite_contacts","bake_elite_crackle"]: files.append("res://tools/art/"+name+".py")
+	# 全編集元を内容で照合し、変更も出力欠落もなければResourceの読込前に返す。
+	var all_inputs := files.duplicate()
+	var boss_inputs := PackedStringArray()
+	cache.files("res://data/bosses",boss_inputs)
+	for path in boss_inputs:
+		if not path in all_inputs: all_inputs.append(path)
+	var input_fingerprint := _file_signature(all_inputs)
+	var stamp_path := output.path_join("stamp.json")
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(stamp_path)) if FileAccess.file_exists(stamp_path) else null
+	if not force and saved is Dictionary and saved.get("input_fingerprint","") == input_fingerprint and not saved.get("outputs",[]).is_empty() and saved.outputs.all(func(path): return FileAccess.file_exists(path)) and FileAccess.file_exists(output.path_join("dev/build_cache.json")):
+		last_build_report.append({"unit":"all","rebuilt":false})
+		return OK
+	# 変更がないときは技のResourceを読み込まず、依存の内容だけを照合する。
+	for id in ["hydra","monoceros","draco","centaurus","canis_major"]:
+		var inputs := _select(files,["res://scripts/data_types/","res://tools/content/build_boss_program.gd"])
+		inputs.append_array(PackedStringArray(["res://data/bosses/ai/"+id+"_action_rules.tres","res://data/bosses/ai/"+id+"_flow.tres"]))
+		var error: Error = cache.run("boss_"+id,inputs,func():
+			var path := output.path_join("boss_"+id+".tres")
+			var result: Dictionary = preload("res://tools/content/build_boss_program.gd").build_boss(id,path)
+			return _result(result.error,PackedStringArray([path])),force)
+		if error != OK: return error
 	var units := [
 		["visuals",["res://data/visuals/","res://data/enemies/","res://assets/","res://shaders/","res://scripts/data_types/","res://tools/content/build_visuals.gd","res://tools/content/visual_transforms.gd","res://tools/content/build_effect_profiles.gd","res://tools/art/"],func(): return _result(load("res://tools/content/build_visuals.gd").build(output),_visual_outputs(output))],
 		["attacks",["res://data/bosses/","res://data/enemies/","res://data/visuals/","res://scenes/attacks/","res://scripts/render/attacks/","res://scripts/data_types/","res://assets/","res://shaders/","res://tools/content/build_attack_visuals.gd","res://tools/content/build_stage_resources.gd"],func(): return _result(load("res://tools/content/build_attack_visuals.gd").build(output),PackedStringArray([output.path_join("attack_visuals.res")]))],
@@ -182,10 +203,9 @@ static func _build_units(force: bool, output: String) -> Error:
 	error = cache.save(output.path_join("dev/build_cache.json"))
 	if error != OK: return error
 	var outputs: PackedStringArray = cache.outputs()
-	for id in ["hydra","monoceros","draco","centaurus","canis_major"]: outputs.append(output.path_join("boss_"+id+".tres"))
 	var stamp := FileAccess.open(output.path_join("stamp.json"),FileAccess.WRITE)
 	if stamp == null: return FileAccess.get_open_error()
-	stamp.store_string(JSON.stringify({"signature":input_signature,"outputs":outputs}))
+	stamp.store_string(JSON.stringify({"signature":input_signature,"outputs":outputs,"input_fingerprint":_file_signature(all_inputs)}))
 	stamp.close()
 	last_build_report.assign(cache.report)
 	return OK

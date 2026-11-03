@@ -6,6 +6,17 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--startup-only" in OS.get_cmdline_user_args():
+		_startup_only()
+		return
+	if "--incremental-current-only" in OS.get_cmdline_user_args():
+		var builder = load("res://addons/content_build/builder.gd")
+		var began := Time.get_ticks_usec()
+		check(builder.build_all()==OK,"描画ありでも変更のない生成を再利用する")
+		check(builder.last_build_report.all(func(row): return not row.rebuilt),"ボスを含めて変更のない単位を読み直さない")
+		print("[rendered_incremental] ms=",(Time.get_ticks_usec()-began)/1000.0," failed=",failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--incremental-only" in OS.get_cmdline_user_args():
 		check_incremental()
 		print("[incremental_build] failed=%d" % failed)
@@ -151,3 +162,13 @@ func check_incremental() -> void:
 	FileAccess.open(ui_path,FileAccess.WRITE).store_string(original_ui)
 	FileAccess.open(source_path,FileAccess.WRITE).store_string(original_stage)
 	check(builder.build_all()==OK and builder.is_current(),"確認用の入力を元に戻して生成物をそろえる")
+
+## 通常のロード画面からタイトルまでを測り、出撃と保存は行わない。
+func _startup_only() -> void:
+	RenderingServer.frame_post_draw.connect(func(): print("[startup_first_draw] engine_ms=",Time.get_ticks_msec()),CONNECT_ONE_SHOT)
+	var app: Node = load("res://scenes/app/main.tscn").instantiate()
+	get_tree().root.add_child.call_deferred(app)
+	while not app.get("startup_complete") and not app.get("startup_failed"):
+		await get_tree().process_frame
+	print("[startup_title] engine_ms=",Time.get_ticks_msec()," complete=",app.get("startup_complete")," timings=",ContentManager.startup_timings)
+	get_tree().quit(0 if app.get("startup_complete") else 1)
