@@ -751,7 +751,10 @@ func _draw_cpp() -> void:
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
 		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
-	draw_texture_rect_region(SLOTS,LOADOUT_REGION,LOADOUT_REGION)
+	var loadout_region := LOADOUT_REGION
+	if StringName(hero.get("power", &"")) == &"":
+		loadout_region.size.x = LOADOUT_HERO.x - LOADOUT_REGION.position.x
+	draw_texture_rect_region(SLOTS,loadout_region,loadout_region)
 	if _cpp_ui.get("final_modules",[]).is_empty():
 		_draw_slot_row(LOADOUT_WEAPON,true,ContentManager.cfg.weapon_slots,ContentManager.cfg.weapon_max_level,_owned_loadout("weapon_levels"),ContentManager.catalog.table(&"weapons"))
 	_draw_slot_row(LOADOUT_TRAIT,false,ContentManager.cfg.trait_slots,ContentManager.cfg.trait_max_stacks,_owned_loadout("trait_levels"),ContentManager.catalog.table(&"traits"))
