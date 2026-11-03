@@ -207,19 +207,19 @@ DEMOS.push({
 
 // ---------- いるか座（dolphin）
 // 波動の帯：弧に沿って塗り、両端は細くとがらせる（丸を付けない）。外側（進む側）の縁だけ明るく、内側は暗く
-function waveBand(p, L, r, a0, a1, w, cols, alpha) {
-  if (r <= 0 || w <= 0) return; const n = Math.max(8, Math.round((a1 - a0) * r * 2));
+function waveBand(p, L, r, a0, a1, w, cols, alpha, dissolve = 0) {
+  if (r <= 0 || w <= 0 || alpha <= 0) return; alpha = Math.max(0.14, alpha); const n = Math.max(8, Math.round((a1 - a0) * r * 2)); // 0.12未満は点を間引いて描かれ点線になるので、それより薄くしない
   for (let i = 0; i <= n; i++) {
     const u = i / n, an = a0 + (a1 - a0) * u, tp = Math.pow(Math.min(1, Math.min(u, 1 - u) / 0.22), 0.75), ww = w * tp; if (ww < 0.3) continue;
     const c = Math.cos(an), sn = Math.sin(an);
-    for (let q = -ww; q <= ww; q += 0.5) { const e = q / ww; p.dot(L.x + c * (r + q), L.y + sn * (r + q), e > 0.55 ? cols.edge : e > -0.45 ? cols.body : cols.inner, alpha); }
+    for (let q = -ww; q <= ww; q += 0.5) { const e = q / ww, x = L.x + c * (r + q), y = L.y + sn * (r + q); if (dissolve > 0 && hash(Math.round(x) * 12.9898 + Math.round(y) * 78.233) < dissolve) continue; p.dot(x, y, e > 0.55 ? cols.edge : e > -0.45 ? cols.body : cols.inner, alpha); } // dissolve：マスごとに虫食い状に抜く
   }
 }
-function waveArc(R, pos, rad, a0, a1, w, color, alpha, t) { // 現行（wave.gd RIPPLE）と同じ並び：当たる先頭の帯＋後ろの薄い波紋3本
+function waveArc(R, pos, rad, a0, a1, w, color, alpha, t, dissolve = 0) { // 現行（wave.gd RIPPLE）と同じ並び：当たる先頭の帯＋後ろの薄い波紋3本
   const pal = FX.ramp(color), L = toL(pos), r = rad * WL, ww = w * WL, edge = PX.mix(pal[2], hexc('#fff4e0'), 0.35);
-  waveBand(R.front, L, r, a0, a1, Math.min(ww * 0.5, r * 0.3), { edge, body: pal[2], inner: pal[1] }, alpha); // 出たばかりで半径が小さいうちは細く（塊にしない）
-  for (let n = 1; n < 4; n++) { const rr = r - n * ww * 1.6; waveBand(R.front, L, rr, a0 + 0.03 * n, a1 - 0.03 * n, ww * 0.22, { edge: pal[2], body: pal[1], inner: pal[0] }, alpha * (0.7 - n * 0.15)); }
-  for (let an = a0 + 0.1; an <= a1 - 0.1 + 1e-6; an += 0.12) R.front.glow(L.x + Math.cos(an) * r, L.y + Math.sin(an) * r, ww * 0.9 + 3, pal[2], 0.16 * alpha); // 弧の範囲だけ光らせる
+  waveBand(R.front, L, r, a0, a1, Math.min(ww * 0.5, r * 0.3), { edge, body: pal[2], inner: pal[1] }, alpha, dissolve); // 出たばかりで半径が小さいうちは細く（塊にしない）
+  for (let n = 1; n < 4; n++) { const rr = r - n * ww * 1.6; waveBand(R.front, L, rr, a0 + 0.03 * n, a1 - 0.03 * n, Math.max(0.9, ww * 0.22), { edge: pal[2], body: pal[1], inner: pal[0] }, alpha * (0.7 - n * 0.15), dissolve); } // 波紋は点線にならない太さを保つ
+  for (let an = a0 + 0.1; an <= a1 - 0.1 + 1e-6; an += 0.12) R.front.glow(L.x + Math.cos(an) * r, L.y + Math.sin(an) * r, ww * 0.9 + 3, pal[2], 0.16 * alpha * (1 - dissolve)); // 弧の範囲だけ光らせる
 }
 DEMOS.push({
   id: 'G12-dolphin', ids: ['G12'], cat: G12, group: 'いるか座（dolphin）', title: '扇の波動', duration: 3.4, color: '#ff4f42', cam: { x: -80, y: 20 },
@@ -253,7 +253,7 @@ DEMOS.push({
       if (rad > 0 && rad < p.wave_radius) {
         if (!R.proto) { D2.roundArc(S.wave.pos, rad, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, rgba(col, 0.3 * fade), w * 2); D2.roundArc(S.wave.pos, rad, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, rgba(lighten(col, 0.3), 0.95 * fade), w); for (let n = 1; n < 4; n++) { const b = rad - n * w * 1.6; if (b > 0) D2.roundArc(S.wave.pos, b, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, rgba(col, 0.28 * fade / n), w * 0.45); } }
         else waveArc(R, S.wave.pos, rad, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, w, P.color, fade * Math.min(1, P.intensity), t);
-      } else if (R.proto && rad >= p.wave_radius && t < p.wave_radius / p.wave_speed + 0.25 * P.timing) { const f = 1 - (t - p.wave_radius / p.wave_speed) / (0.25 * P.timing); waveArc(R, S.wave.pos, p.wave_radius + (t - p.wave_radius / p.wave_speed) * 60, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, w * f * 0.6, P.color, 0.5 * f, t); }
+      } else if (R.proto && rad >= p.wave_radius && t < p.wave_radius / p.wave_speed + 0.25 * P.timing) { const f = 1 - (t - p.wave_radius / p.wave_speed) / (0.25 * P.timing); waveArc(R, S.wave.pos, p.wave_radius + (t - p.wave_radius / p.wave_speed) * p.wave_speed * 0.5, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, w, P.color, 0.5 * Math.min(1, P.intensity) * (0.5 + 0.5 * f), t, 1 - f); } // 消え方：形と太さを保ったまま、進みを緩めて虫食い状に抜ける
     }
   },
 });
