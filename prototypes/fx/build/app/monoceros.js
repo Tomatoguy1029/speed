@@ -78,7 +78,7 @@ function monoStep(S, dt) {
       if (S.stage === 'approach') { S.v = Math.min(r.approach_speed_max, S.v + r.approach_accel * dt); monoFace(S, r.approach_turn, dt); S.direction = fromA(B.facing); B.pos = add(B.pos, mul(S.direction, S.v * dt)); const q = clamp(S.st / r.twist_time); S.angle = B.facing - r.twist * (1 - (1 - q) ** 2); S.glow = q;
         if ((dist(B.pos, S.ship.pos) < r.stop_range && S.st > r.approach_min) || S.st > r.approach_max) { S.base = B.facing; monoEnter(S, 'stop'); }
       } else if (S.stage === 'stop') { S.v = Math.max(0, S.v - r.stop_decel * dt); B.pos = add(B.pos, mul(fromA(S.base), S.v * dt)); S.angle = S.base - lerp(r.twist, r.windup_twist, 1 - (1 - clamp(S.st / r.stop_time)) ** 2); if (S.st >= r.stop_time) { B.mode = 'active'; monoEnter(S, 'swing'); } }
-      else if (S.stage === 'swing') { if (S.st === 0 || !S.slashStart) S.slashStart = S.t - S.st; const q = clamp(S.st / r.active); S.angle = S.base - r.windup_twist + r.arc * q * q * (1.6 - 0.6 * q); if (q >= 1) monoEnter(S, 'hold'); }
+      else if (S.stage === 'swing') { const q = clamp(S.st / r.active); S.angle = S.base - r.windup_twist + r.arc * q * q * (1.6 - 0.6 * q); if (q >= 1) monoEnter(S, 'hold'); }
       else if (S.stage === 'hold') { if (S.st >= r.hold) monoEnter(S, 'return'); }
       else if (S.stage === 'return') { S.angle = lerp(S.base - r.windup_twist + r.arc, S.base, smooth(0, r.return_time, S.st)); if (S.st >= r.return_time) monoFinish(S); }
     } else if (id === 'sword_flash') {
@@ -107,6 +107,7 @@ function monoStep(S, dt) {
   if (id === 'horn_dance' && ['run', 'circle'].includes(S.stage) && (!S.burn?.length || dist(S.burn[S.burn.length - 1].pos, B.pos) > 14)) (S.burn ||= []).push({ pos: { ...B.pos }, t: S.t }); // 乱舞の燃え跡を置く
   if (len(B.vel) > 400) { S.track.push({ ...B.pos }); if (S.track.length > 22) S.track.shift(); if (id === 'horn_dance' && S.stage === 'run' && (!S.scorch.length || dist(S.scorch[S.scorch.length - 1].at, B.pos) > 18)) S.scorch.push({ at: { ...B.pos }, t: S.t }); }
   monoWaveAir(S, dt);
+  if (mode === 'proto' && dt > 0) monoRecordSlash(S, dt);
   if (mode === 'proto' && id === 'horn_dance') { cam.x = 0; cam.y = 0; cam.zoom = 0.8; } else { cam.x = (B.pos.x + S.ship.pos.x) * 0.5; cam.y = (B.pos.y + S.ship.pos.y) * 0.5; }
 }
 function monoDraw(S, R) {
