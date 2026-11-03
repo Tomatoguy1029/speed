@@ -637,7 +637,7 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 
 C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` に個数 `count` と基準量 `base_xp` を持ち、`collected` は実取得量 `actual_xp` も持つ。`gold_rolls` は適格な実撃破の抽選数 `eligible` と当選数 `won`、`collected_actual_xp` は実取得の合計を表す。`ground`・`carried` は現在の残存、`cap` は `mode=offscreen_low_far_old`・`limit` を持つ。
 
-供給・地面・運搬中・回収・消失は結晶の種類別に個数と基準XPを照合する。
+供給・地面・運搬中・回収・消失は結晶の種類別に個数と基準XPを照合する。区間集計は `counter_color_basis=crystal_kind_preserved` で色を保持する方式を識別する。
 
 録画の `start.xp_cumulative_at_start` は開始時点の累計、`sample.xp` は `scope=recording_interval` の区間差、`end.xp_cumulative` はラン全体、`end.xp_observed` は `scope=recording_total` の録画区間全体を表す。供給・回収・持ち去り・抽選は区間差を取り、地面・運搬中・上限設定は各時点の現在値を保存する。録画前からの残存と録画区間中の供給を区別する。
 
