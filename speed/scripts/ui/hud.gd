@@ -859,11 +859,14 @@ func _input_cpp(event: InputEvent) -> void:
 		return
 	var id := _card_input_id(event)
 	if id=="": return
-	if _rewards.is_active():
-		get_viewport().set_input_as_handled()
-		return
+	# 継続を出した押下やタッチ由来の擬似マウスを、次送りに使わない。
+	var reward_active := _rewards.is_active()
+	var reward_press: bool = _menu_overlay==null and int(_cpp_ui.phase)!=Phase.Paused and _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
+		(event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.device!=-1 and event.pressed)
+		or (event is InputEventScreenTouch and event.pressed)
+		or event.is_action_pressed(&"ui_accept"))
 	var choosing := int(_cpp_ui.phase)==Phase.Levelup
-	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec()<_cards_accept_at)
+	var blocked := _card_discard.has(id) or reward_active or (choosing and Time.get_ticks_usec()<_cards_accept_at)
 	# 擬似イベントと元の入力の間で期限を越えても同じ押下を破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
@@ -878,6 +881,9 @@ func _input_cpp(event: InputEvent) -> void:
 		else:
 			_card_held.erase(id)
 			_card_discard.erase(id)
+	if reward_press and _reward_advanced_frame!=Engine.get_process_frames():
+		_reward_advanced_frame = Engine.get_process_frames()
+		_rewards.advance_bonus()
 	if blocked or (choosing and (event is InputEventScreenTouch or event is InputEventScreenDrag)):
 		get_viewport().set_input_as_handled()
 		return
