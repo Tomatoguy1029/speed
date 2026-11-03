@@ -144,8 +144,15 @@ function buildLedger() {
   $('#ledgerCount').textContent = `台帳 ${n} 件（重複なし：${ids.size === n ? 'OK' : 'NG'}）／試作 ${DEMOS.length} 本`;
 }
 function saveJSON() {
-  const blob = new Blob([JSON.stringify({ format: 'speed-fx-proto/1', params: PARAMS }, null, 2)], { type: 'application/json' });
-  const a = el('a', { href: URL.createObjectURL(blob), download: 'speed_fx_params.json' }); document.body.append(a); a.click(); a.remove();
+  const params = {};
+  // 選択中の技に関係なく、全試作の初期値・段階別プリセット・保存値を解決する。
+  for (const d of DEMOS) {
+    params[d.id] = {};
+    for (const p of paramDefs(d)) params[d.id][p.k] = PARAMS[d.id]?.[p.k] ?? p.def;
+  }
+  const blob = new Blob([JSON.stringify({ format: 'speed-fx-proto/1', params, overrides: PARAMS }, null, 2)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: 'speed_fx_all_params.json' }); document.body.append(a); a.click(); a.remove();
+  $('#status').textContent = `全${DEMOS.length}試作の設定を1つのJSONに保存しました（初期値を含む）。`;
 }
 function loadJSON(file) {
   file.text().then(t => { const j = JSON.parse(t); const p = j.params || j; for (const [id, v] of Object.entries(p)) PARAMS[id] = { ...v }; buildParams(); $('#status').textContent = `読み込み：${Object.keys(p).length} 件の試作の値`; })
