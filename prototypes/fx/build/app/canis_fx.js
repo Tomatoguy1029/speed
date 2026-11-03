@@ -255,7 +255,7 @@ function canisSpriteFX(name, point, time, scaleX, scaleY, angle = 0, alpha = 1) 
 }
 function canisTrailPictures(S, R) {
   for (const q of S.pack) if (q.burn && !q.dead) canisSpriteFX('canis_fireball', q.pos, S.t + q.idx * 0.13, q.r * 7 / 100, q.r * 3.2 / 18, q.facing, 0.88);
-  if (S.tech !== 'sirius') return;
+  if (!['sirius', 'sirius_flame'].includes(S.tech)) return;
   canisEmbers(S, R); return; // 残り火は canisEmbers（密度の場）で描く
   const fire = PIXELFX.fx['src/fx/fire/_lib.js'], P = R.P;
   const frame = canisTrailPictures.floorFrame ||= PX.createFrame(LW, LH);
