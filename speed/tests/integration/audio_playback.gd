@@ -40,6 +40,14 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--audio-shutdown" in OS.get_cmdline_user_args():
+		var voice := AudioManager._next
+		AudioManager.play(&"hurt")
+		check(AudioManager._players[voice].stream is AudioStreamMP3 and AudioManager._players[voice].playing, "終了直前にMP3を再生する")
+		await get_tree().process_frame
+		await get_tree().process_frame
+		get_tree().quit(failed)
+		return
 	check(not AudioManager.has_method("_build_sounds"), "起動時の音声合成を持たない")
 	for name in EXPECTED:
 		var wav: AudioStreamWAV = AudioManager._sounds[StringName(name)]

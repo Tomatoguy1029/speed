@@ -46,6 +46,27 @@ func _ready() -> void:
 	SaveManager.settings_changed.connect(_apply_volumes)
 	_apply_volumes()
 
+## 再生口を捨てる前に、音声サーバーへ停止とストリーム解放を渡す。
+func _exit_tree() -> void:
+	_music_request += 1
+	if _music_fade!=null: _music_fade.kill()
+	if _slow_fade!=null: _slow_fade.kill()
+	for player: AudioStreamPlayer in find_children("*","AudioStreamPlayer",true,false):
+		player.stop()
+		player.stream = null
+	_menu_music_positions.clear()
+	_sounds.clear()
+	_music.clear()
+	# stop()は次の音声ミックスで再生参照を解放する。終了処理が先に
+	# 音声スレッドを止めないよう、停止要求より後のミックス完了を待つ。
+	# 出力デバイスが止まっていても、終了自体は待ち続けない。
+	var stopped_at := Time.get_ticks_usec()
+	while Time.get_ticks_usec() - stopped_at < 250000:
+		var sampled_at := Time.get_ticks_usec()
+		var since_mix := roundi(AudioServer.get_time_since_last_mix() * 1000000.0)
+		if sampled_at - since_mix > stopped_at: break
+		OS.delay_usec(1000)
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"mute"):
 		toggle_mute()
