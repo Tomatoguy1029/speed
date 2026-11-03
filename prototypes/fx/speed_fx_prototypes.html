@@ -4004,14 +4004,18 @@ function waveBand(p, L, r, a0, a1, w, cols, alpha, dissolve = 0) {
     for (let q = -ww; q <= ww; q += 0.5) { const e = q / ww, x = L.x + c * (r + q), y = L.y + sn * (r + q); if (dissolve > 0 && hash(Math.round(x) * 12.9898 + Math.round(y) * 78.233) < dissolve) continue; p.dot(x, y, e > 0.55 ? cols.edge : e > -0.45 ? cols.body : cols.inner, alpha); } // dissolve：マスごとに虫食い状に抜く
   }
 }
-function waveArc(R, pos, rad, a0, a1, w, color, alpha, t, dissolve = 0) { // 現行（wave.gd RIPPLE）と同じ並び：当たる先頭の帯＋後ろの薄い波紋3本
-  const pal = FX.ramp(color), L = toL(pos), r = rad * WL, ww = w * WL, edge = PX.mix(pal[2], hexc('#fff4e0'), 0.35);
-  waveBand(R.front, L, r, a0, a1, Math.min(ww * 0.5, r * 0.3), { edge, body: pal[2], inner: pal[1] }, alpha, dissolve); // 出たばかりで半径が小さいうちは細く（塊にしない）
-  for (let n = 1; n < 4; n++) { const rr = r - n * ww * 1.6; waveBand(R.front, L, rr, a0 + 0.03 * n, a1 - 0.03 * n, Math.max(0.9, ww * 0.22), { edge: pal[2], body: pal[1], inner: pal[0] }, alpha * (0.7 - n * 0.15), dissolve); } // 波紋は点線にならない太さを保つ
-  for (let an = a0 + 0.1; an <= a1 - 0.1 + 1e-6; an += 0.12) R.front.glow(L.x + Math.cos(an) * r, L.y + Math.sin(an) * r, ww * 0.9 + 3, pal[2], 0.16 * alpha * (1 - dissolve)); // 弧の範囲だけ光らせる
+function waveArc(R, pos, rad, a0, a1, w, color, alpha, t, maxR = Infinity, fadeLen = 1) { // 現行（wave.gd RIPPLE）と同じ並び：当たる先頭の帯＋後ろの薄い波紋3本
+  // 消え方：帯ごとに、届く距離の端（maxR）を越えた所から崩れる。先頭が最初に崩れ、後ろの波紋は端に着いたものから順に崩れる
+  const pal = FX.ramp(color), L = toL(pos), edge = PX.mix(pal[2], hexc('#fff4e0'), 0.35), gone = (rb) => clamp((rb - maxR) / fadeLen);
+  for (let n = 3; n >= 0; n--) {
+    const rb = rad - n * w * 1.6, d = gone(rb); if (rb <= 0 || d >= 1) continue; const r = rb * WL, ww = w * WL;
+    if (n === 0) { waveBand(R.front, L, r, a0, a1, Math.min(ww * 0.5, r * 0.3), { edge, body: pal[2], inner: pal[1] }, alpha * (1 - 0.4 * d), d); // 出たばかりで半径が小さいうちは細く（塊にしない）
+      for (let an = a0 + 0.1; an <= a1 - 0.1 + 1e-6; an += 0.12) R.front.glow(L.x + Math.cos(an) * r, L.y + Math.sin(an) * r, ww * 0.9 + 3, pal[2], 0.16 * alpha * (1 - d)); } // 弧の範囲だけ光らせる
+    else waveBand(R.front, L, r, a0 + 0.03 * n, a1 - 0.03 * n, Math.max(0.9, ww * 0.22), { edge: pal[2], body: pal[1], inner: pal[0] }, alpha * (0.7 - n * 0.15) * (1 - 0.4 * d), d); // 波紋は点線にならない太さを保つ
+  }
 }
 DEMOS.push({
-  id: 'G12-dolphin', ids: ['G12'], cat: G12, group: 'いるか座（dolphin）', title: '扇の波動', duration: 3.4, color: '#ff4f42', cam: { x: -80, y: 20 },
+  id: 'G12-dolphin', ids: ['G12'], cat: G12, group: 'いるか座（dolphin）', title: '扇の波動', duration: 4.0, color: '#ff4f42', cam: { x: -80, y: 20 },
   params: [],
   refs: ['scripts/enemies/dolphin.gd（telegraph 1.0 の間 aim_turn 2.0 で向き直り、fire_wave、recover 0.6）', 'render/enemies/dolphin.gd・render/attacks/wave.gd RIPPLE（現行）', 'data/enemies/dolphin.tres（wave_arc 0.7 / 半径430 / 速さ300 / 幅50）', 'pixelFX painter.arc/glowRing'],
   status: { '状態': '試作のみ', '判定': '変更なし。当たる先頭の弧（幅50）を最も明るい帯に、後ろの層は見た目だけ', '形': '現行と同じ帯＋後ろの波紋3本。両端は丸めずにとがらせ、色は主色の赤（外側の縁だけ明るく）' },
@@ -4041,8 +4045,9 @@ DEMOS.push({
       const t = S.t - S.wave.t0, rad = Math.min(p.wave_radius, t * p.wave_speed), fade = 1 - 0.5 * clamp(rad / p.wave_radius), w = p.wave_width;
       if (rad > 0 && rad < p.wave_radius) {
         if (!R.proto) { D2.roundArc(S.wave.pos, rad, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, rgba(col, 0.3 * fade), w * 2); D2.roundArc(S.wave.pos, rad, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, rgba(lighten(col, 0.3), 0.95 * fade), w); for (let n = 1; n < 4; n++) { const b = rad - n * w * 1.6; if (b > 0) D2.roundArc(S.wave.pos, b, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, rgba(col, 0.28 * fade / n), w * 0.45); } }
-        else waveArc(R, S.wave.pos, rad, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, w, P.color, fade * Math.min(1, P.intensity), t);
-      } else if (R.proto && rad >= p.wave_radius && t < p.wave_radius / p.wave_speed + 0.25 * P.timing) { const f = 1 - (t - p.wave_radius / p.wave_speed) / (0.25 * P.timing); waveArc(R, S.wave.pos, p.wave_radius + (t - p.wave_radius / p.wave_speed) * p.wave_speed * 0.5, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, w, P.color, 0.5 * Math.min(1, P.intensity) * (0.5 + 0.5 * f), t, 1 - f); } // 消え方：形と太さを保ったまま、進みを緩めて虫食い状に抜ける
+      }
+      if (R.proto) { const radAll = t * p.wave_speed, fadeLen = p.wave_speed * 0.25 * P.timing; // 波紋は進み続け、それぞれ端に着いた所から順に崩れる
+        if (radAll - 3 * w * 1.6 < p.wave_radius + fadeLen) waveArc(R, S.wave.pos, radAll, S.wave.a - p.wave_arc, S.wave.a + p.wave_arc, w, P.color, fade * Math.min(1, P.intensity), t, p.wave_radius, fadeLen); }
     }
   },
 });
