@@ -1,15 +1,27 @@
 // ===== G12：ステージ1に出ない敵の固有攻撃（後半） =====
+// サーチライトの光の円錐：幅を少しずつ狭めた扇を加算で重ね、中心ほど明るく縁をやわらかくする。明るさはレンズから先へ薄れる。
+// 光の中だけで見える塵と、照らされた機体のまわりの明るみ（seenAt）を足す
+function teleCone(R, lens, f, half, len, col, a0, time, seenAt) {
+  const layers = 6; g.save(); g.globalCompositeOperation = 'lighter';
+  for (let n = 0; n < layers; n++) { const hh = half * (1 - n / layers), gr = g.createRadialGradient(lens.x, lens.y, 0, lens.x, lens.y, len);
+    gr.addColorStop(0, rgba(col, a0 / layers * 1.6)); gr.addColorStop(0.35, rgba(col, a0 / layers)); gr.addColorStop(1, rgba(col, 0));
+    g.fillStyle = gr; g.beginPath(); g.moveTo(lens.x, lens.y); g.arc(lens.x, lens.y, len, f - hh, f + hh); g.closePath(); g.fill(); }
+  if (seenAt) { const gr = g.createRadialGradient(seenAt.x, seenAt.y, 0, seenAt.x, seenAt.y, 70); gr.addColorStop(0, rgba(col, a0 * 0.9)); gr.addColorStop(1, rgba(col, 0)); g.fillStyle = gr; g.fillRect(seenAt.x - 70, seenAt.y - 70, 140, 140); }
+  g.restore();
+  const L = toL(lens), pal = FX.ramp(toHex(col));
+  for (let i = 0; i < 46; i++) { const dd = ((hash(i) + time * 0.06 * (0.5 + hash(i + 3))) % 1) * len * WL, an = f + (hash(i * 7) - 0.5) * 2 * half * 0.9, tw = 0.5 + 0.5 * Math.sin(time * (2 + hash(i) * 3) + i); R.back.dot(L.x + Math.cos(an) * dd, L.y + Math.sin(an) * dd, pal[3], 0.6 * tw * (1 - dd / (len * WL))); }
+}
 // ---------- ぼうえんきょう座（telescope）
 DEMOS.push({
   id: 'G12-telescope', ids: ['G12'], cat: G12, group: 'ぼうえんきょう座（telescope）', title: 'サーチライト→照準→レーザー', duration: 3.8, color: LASER, cam: { x: -120, y: 0 }, bg: 'station_a',
   refs: ['scripts/enemies/sniper.gd（探索の揺れ・lock_fill 0.9・帯 0.36→0.09・laser_charge 0.5・delay 0.04・照射0.18・cooldown 1.4）', 'render/enemies/sniper.gd（帯の多角形・照準線・輪）', 'render/attacks/beam.gd TELESCOPE（丸い先端のビーム）', 'marlin_warning.gdshader、pixelFX arcane-beam.js・painter.glow'],
-  status: { '状態': '試作のみ', '判定': '変更なし（帯の角度・長さ1000・レーザー幅30）。探索・照準の挙動は現行のまま', '備考': '小隕石による遮蔽はこのデモでは置いていない（光線48本は全長）' },
+  status: { '状態': '試作のみ（作り直し）', '判定': '変更なし（帯の角度・長さ1000・レーザー幅30）。探索・照準・溜め・発射の流れは現行（sniper.gd・render/enemies/sniper.gd）のまま', 'サーチライト': 'レンズから広がるなめらかな光の円錐。中心ほど明るく縁はやわらか、光の中だけ塵が見える。機体が光の中にいる間は明るい。溜まるほど水色→赤', '溜め→発射': '帯は切り替えずに連続してすぼまり、赤い照準線が脈打つ。発射はレンズから先端が伸びる', '備考': '小隕石による遮蔽はこのデモでは置いていない（光線48本は全長）' },
   setup(S) { S.e = mkE('telescope', V(-560, -40), 0); S.ship = shipState(V(240, 70)); S.e.facing = angOf(sub(S.ship.pos, S.e.pos)) + 0.45; },
   step(S, dt) {
     const e = S.e, p = prm('telescope'); const lens = () => add(e.pos, mul(fromA(e.facing), e.r * 0.9));
     const half = lerp(p.band_width, p.band_narrow, e.charge); S.half = half; S.lens = lens();
     if (e.mode === 'RECOVER') { e.timer -= dt; const sway = Math.sin(e.age = (e.age || 0) + dt) * p.search_sway; turnToward(e, angOf(sub(S.ship.pos, e.pos)) + sway, p.search_turn, dt); if (e.timer <= 0) e.mode = 'MOVE'; return; }
-    const d = sub(S.ship.pos, S.lens), seen = Math.abs(angDiff(angOf(d), e.facing)) <= half + Math.atan(DATA.config.ship_radius / len(d)) && len(d) <= p.band_len;
+    const d = sub(S.ship.pos, S.lens), seen = S.seen = Math.abs(angDiff(angOf(d), e.facing)) <= half + Math.atan(DATA.config.ship_radius / len(d)) && len(d) <= p.band_len;
     if (!seen) { e.charge = 0; turnToward(e, angOf(sub(S.ship.pos, e.pos)) + Math.sin(S.t * TAU / p.search_period) * p.search_sway, p.search_turn, dt); return; }
     turnToward(e, angOf(sub(S.ship.pos, e.pos)), p.track_turn, dt);
     if (e.mode === 'WINDUP') { e.timer -= dt; if (e.timer <= 0) { S.beam = { p: S.lens, a: e.facing, len: p.band_len, w: p.laser_width, delay: p.laser_delay, active: p.laser_time, t0: S.t }; e.charge = 0; e.mode = 'RECOVER'; e.timer = p.cooldown; } return; }
@@ -24,22 +36,19 @@ DEMOS.push({
       const pts = []; for (let n = 0; n < 48; n++) pts.push(add(lens, mul(fromA(f - half + 2 * half * n / 47), p.band_len)));
       const a0 = 0.16 + 0.22 * k + 0.08;
       if (!R.proto) { D2.fan(lens, pts, rgba(col, a0), rgba(col, 0)); D2.line(lens, pts[0], rgba(col, a0 * 1.6), px(1.5)); D2.line(lens, pts[47], rgba(col, a0 * 1.6), px(1.5)); }
-      else { // 柔らかい光の円錐：中心ほど明るい光（加算）と、光の中だけで見える塵
-        const L = toL(lens), pal = FX.ramp(toHex(col));
-        for (let d = 2; d < p.band_len * WL; d += 1) { const w = Math.tan(half) * d, fall = (1 - d / (p.band_len * WL)) ** 1.5; for (let q = -w; q <= w; q += 1.5) { const e2 = Math.abs(q) / Math.max(w, 0.01), x = L.x + Math.cos(f) * d - Math.sin(f) * q, y = L.y + Math.sin(f) * d + Math.cos(f) * q; R.back.light(x, y, pal[2], 0.13 * fall * (1 - e2 * e2) * (0.6 + k) * P.intensity); } }
-        for (let i = 0; i < 40; i++) { const dd = ((hash(i) + S.t * 0.08 * (0.5 + hash(i + 3))) % 1) * p.band_len * WL, an = f + (hash(i * 7) - 0.5) * 2 * half; R.back.dot(L.x + Math.cos(an) * dd, L.y + Math.sin(an) * dd, pal[3], 0.7 * (1 - dd / (p.band_len * WL))); }
-        for (const s of [-1, 1]) FX.warnRail(R.back, L, toL(add(lens, mul(fromA(f + s * half), p.band_len * 0.8))), { color: toHex(col), k: 0.15 + 0.3 * k, time: S.t, seed: s + 4, rail: 0.6, intensity: 0.6 * P.intensity });
-      }
+      else teleCone(R, lens, f, half, p.band_len, col, (0.16 + 0.22 * k + (S.seen ? 0.08 : 0)) * P.intensity, S.t, S.seen ? S.ship.pos : null);
     }
     if (e.mode === 'WINDUP') {
       const w = 1 - clamp(e.timer / p.laser_charge), tip = add(lens, mul(fromA(f), p.band_len)), pulse = 0.5 + 0.5 * Math.sin(S.t * (30 + 40 * w));
       if (!R.proto) { D2.line(lens, tip, `rgba(255,64,51,${0.25 + 0.35 * pulse})`, Math.max(px(2), 4 + 10 * w)); D2.line(lens, tip, `rgba(255,217,204,${0.5 + 0.4 * pulse})`, Math.max(px(1), 1.5 + 2 * w)); for (let n = 0; n < 10; n++) { const fr = (w * 3 + n / 10) % 1; D2.circle(add(lens, mul(fromA(n * TAU / 10 + w * 4), e.r * (2.4 - 2.2 * fr))), Math.max(px(1.5), e.r * 0.07), `rgba(255,115,77,${fr})`); } D2.circle(lens, e.r * (0.35 + 0.6 * w), `rgba(255,77,56,${0.35 + 0.3 * pulse})`); D2.circle(lens, e.r * (0.18 + 0.3 * w), 'rgba(255,235,217,.9)'); }
-      else { FXW.warnRail(R.back, lens, tip, { color: P.color, k: 0.4 + 0.6 * w, time: S.t, seed: 2, intensity: P.intensity }); FXW.gather(R.front, lens, e.r * 2.4 * P.size, (0.4 + 0.6 * w) * P.intensity, P.color, S.t, 16, 8); }
+      else { // 本番どおり帯がすぼまって赤い照準線になる。切り替えずに、帯の幅を溜めの前半で連続して0へ
+        const shrink = 1 - smooth(0, 0.45, w), hc = p.band_narrow * shrink; if (hc > 0.002) teleCone(R, lens, f, hc, p.band_len, { r: 1, g: 0.22, b: 0.2, a: 1 }, 0.38 * shrink * P.intensity, S.t, null);
+        FXW.warnRail(R.back, lens, tip, { color: P.color, k: (0.3 + 0.7 * w) * (0.75 + 0.25 * pulse), time: S.t, seed: 2, intensity: P.intensity, maxLv: 3 }); FXW.gather(R.front, lens, e.r * 2.4 * P.size, (0.4 + 0.6 * w) * P.intensity, P.color, S.t, 16, 8); }
     }
     if (S.beam) { const h = S.beam, t = S.t - h.t0, b = add(h.p, mul(fromA(h.a), h.len));
       if (t >= h.delay && t <= h.delay + h.active) { const rem = h.delay + h.active - t; let fade = (1 - clamp((t - h.delay) / h.active) * 0.6) * smooth(0, Math.min(0.08, h.active), rem);
         if (!R.proto) { D2.roundBeam(h.p, b, `rgba(255,77,64,${0.35 * fade})`, h.w * 1.6); D2.roundBeam(h.p, b, `rgba(255,77,64,${0.9 * fade})`, h.w); D2.roundBeam(h.p, b, `rgba(255,255,255,${0.85 * fade})`, Math.max(px(2), h.w * 0.3)); }
-        else { FXW.beam(R.front, h.p, b, { color: P.color, w: h.w / 2, time: S.t, alpha: Math.min(1, fade * 1.3 * P.intensity), round: true }); if (t - h.delay < 0.06) FXW.flare(R.front, h.p, 22 * P.size, '#ffffff', S.t, 1, 6); }
+        else { const tf = t - h.delay, head = Math.min(1, smooth(0, 0.06 * P.timing, tf)) * 0.999 + 0.001; FXW.beam(R.front, h.p, b, { color: P.color, w: h.w / 2, time: S.t, alpha: Math.min(1, fade * 1.3 * P.intensity), to: head, taper: 10 * P.size }); if (tf < 0.08) FXW.flare(R.front, h.p, 16 * P.size, P.color, S.t, 1 - tf / 0.08, 6); } // 先端がレンズから伸びる
       } else if (R.proto && t > h.delay + h.active && t < h.delay + h.active + 0.3 * P.timing) { const u = (t - h.delay - h.active) / (0.3 * P.timing); FXW.warnRail(R.back, h.p, b, { color: P.color, k: 0.2, time: S.t, seed: 6, rail: 1, intensity: (1 - u) * P.intensity }); FXW.sparks(R.front, h.p, t - h.delay - h.active, 9, 8, P.color, 35, 0.3, h.a, 0.6); }
     }
     if (R.proto) R.blitBack();
