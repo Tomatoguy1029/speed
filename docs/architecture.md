@@ -375,17 +375,21 @@ C++のカード候補と装備は資源要求のキー・revisionを出す。`ru
 
 ```mermaid
 sequenceDiagram
+  participant O as 出撃元のシーン
   participant RM as RunManager
   participant S as RunSession
   participant L as RunContentLoader
   participant B as RunBridge / SpeedRunCore
   participant CM as ContentManager / Scope
   participant P as RunPresentation
+  O->>RM: create_run(options)
   RM->>S: start_loading(options)
   S->>L: read_bundle(index, signature)
   L-->>S: bytes / RunResources
   S->>B: configure(bytes, options)
   S->>CM: prepare_resources(paths, signatures)
+  RM-->>O: RunSession
+  O->>S: add_childで木へ追加
   loop 資源と描画の準備
     S->>CM: is_ready()
     S->>P: warm_resources(self, scope)
@@ -395,6 +399,8 @@ sequenceDiagram
   S->>S: 表示・入力・HUD・購読者を接続
   S->>S: started.emit()
 ```
+
+`create_run()`はSessionを木へ追加する前に資源の準備を始める。資源を同期的に取得できた場合も、C++の開始・表示・購読者の接続はSessionが木へ入ってから進める。
 
 バイナリ・索引・資源表の整合が取れず、拡張や必須資源が欠けている場合は開始を拒否する。資源とshaderの準備中はC++を開始前の状態で保持する。画面遷移の入力抑止もランへ通知し、戦闘の時計と入力消費を止める。セッション終了は受付を止め、録画終端の通知、Scope、表示、C++、RunManager登録を順に解放する。
 
