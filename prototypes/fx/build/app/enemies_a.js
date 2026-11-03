@@ -122,25 +122,28 @@ function drawClawsCur(pos, travel, size, side, a) { // render/attacks/slash.gd d
   const th = SLASH.THICK * size;
   for (let k = 0; k < 3; k++) { const pts = slashPts(pos, travel, size, side, k); D2.polyline(pts, `rgba(255,115,38,${0.28 * a})`, th * 2.2); D2.polyline(pts, `rgba(255,140,56,${0.95 * a})`, th); D2.polyline(pts.slice(1, -1), `rgba(255,242,217,${a})`, Math.max(px(1.5), th * 0.3)); }
 }
-function drawClawsProto(R, pos, travel, size, side, a, P, age, reveal = 1) {
-  const u = fromA(travel), pal = FX.ramp(P.color);
-  for (let k = 0; k < 3; k++) {
-    const pts = slashPts(pos, travel, size, side, k).map(toL), n = Math.max(2, Math.round(pts.length * reveal));
-    const th = SLASH.THICK * size * WL;
-    for (let i = 1; i < n; i++) {
-      const A = pts[i - 1], B = pts[i], m = Math.sin(Math.PI * i / pts.length);
-      R.front.beam(A.x, A.y, B.x, B.y, Math.max(1, th * (0.55 + 0.45 * m)), (uu, v) => v < 0.35 ? pal[4] : v < 0.7 ? pal[3] : pal[2], a);
-      // 進行方向の後ろへ流れる残光（ディザで薄れる）
-      for (let s = 1; s <= 3; s++) { const off = -s * 3.2; R.front.dot(A.x + Math.cos(travel) * off, A.y + Math.sin(travel) * off, pal[s < 2 ? 2 : 1], a * (0.55 - 0.15 * s)); }
-      if (i % 2 === 0) R.front.light(A.x, A.y, pal[2], 0.35 * a * P.intensity);
-    }
-    const tip = pts[pts.length - 1]; R.front.glow(tip.x, tip.y, 5, pal[4], 0.4 * a * P.intensity);
+// 試作の爪痕：3本の平行な刃。両端がとがり中央が太い三日月を、楕円の弧（slash.gd と同じ中心と半径の比）に沿って塗る。
+// 弧は進む向きの先端から片側（side）へ span だけ回り込む。白い芯→主色の縁。scale で大きさ、reveal で先端から描かれる割合
+function lynxBlade(p, pos, travel, size, side, k, span, reveal, pal, a, dim = 0) {
+  const u = fromA(travel), across = mul(orth(u), side), ax = 1 + SLASH.STEP * k, ay = SLASH.TALL + (SLASH.STEP + SLASH.STRETCH) * k;
+  const C = add(pos, mul(sub(mul(across, SLASH.INNER), mul(u, SLASH.TALL + SLASH.STRETCH * k)), size)), sp = span + 0.2 * k, n = Math.max(12, Math.round(sp * ax * size * WL * 0.9));
+  const th = SLASH.THICK * size * WL * 1.15, pt = (f) => { const phi = -Math.PI / 2 + sp * f; return toL(add(C, mul(add(mul(across, ax * Math.cos(phi)), mul(u, -ay * Math.sin(phi))), size))); };
+  for (let i = 0; i < n * reveal; i++) {
+    const f = i / n, A = pt(f), B = pt(Math.min(reveal, (i + 1) / n)), w = th * Math.pow(Math.sin(Math.PI * Math.min(1, f + 0.5 / n)), 0.7), nx = -(B.y - A.y), ny = B.x - A.x, nl = Math.hypot(nx, ny) || 1;
+    for (let q = -w; q <= w; q += 0.5) { const e = Math.abs(q) / Math.max(w, 0.01), lv = Math.max(0, (e < 0.35 ? 4 : e < 0.7 ? 3 : 2) - dim); p.dot(A.x + nx / nl * q, A.y + ny / nl * q, pal[lv], a); }
+    if (i % 3 === 0 && !dim) p.light(A.x, A.y, pal[2], 0.3 * a);
   }
+}
+function drawClawsProto(R, pos, travel, size, side, a, P, span, reveal = 1, trail = 0) {
+  const pal = FX.ramp(P.color);
+  for (let s = trail; s >= 1; s--) for (let k = 0; k < 3; k++) lynxBlade(R.front, sub(pos, mul(fromA(travel), size * 0.09 * s)), travel, size, side, k, span, reveal, pal, a * (0.45 - 0.12 * s), 2); // 後ろへ流れる残像
+  for (let k = 0; k < 3; k++) lynxBlade(R.front, pos, travel, size, side, k, span, reveal, pal, a);
 }
 DEMOS.push({
   id: 'G12-lynx', ids: ['G12'], cat: G12, group: 'やまねこ座（lynx）', title: '爪痕の斬撃（左右交互）', duration: 4.6, color: '#ff8a38', cam: { x: -40, y: 0 },
   refs: ['scripts/enemies/lynx.gd・enemy_motion.gd _gun_timer（fire_interval 0.9、telegraph 0.35 で charge）', 'scripts/attacks/slash.gd（爪痕の形・太さ＝判定）', 'scripts/render/attacks/slash.gd・render/enemies/lynx.gd（現行描画）', 'pixelFX painter.beam・melee/dagger-flurry.js の白い芯と火花'],
-  status: { '状態': '試作のみ', '判定': '変更なし。爪痕の点列・太さは slash.gd と同じ（太さ0.07×size）。速さ380・直進・追尾なしを維持' },
+  params: [{ k: 'span', label: '試作：1本の弧の角度(度)', type: 'range', min: 60, max: 180, step: 1, def: 110 }, { k: 'grow', label: '試作：最大の大きさまでの時間(秒)', type: 'range', min: 0.05, max: 1.2, step: 0.01, def: 0.35 }, { k: 'start', label: '試作：発射時の大きさ(倍)', type: 'range', min: 0.15, max: 1, step: 0.01, def: 0.3 }],
+  status: { '状態': '試作のみ（作り直し）', '形': '3本の平行な刃（両端がとがった三日月、白い芯→主色）。進む向きの先端から片側へ回り込む弧で、左右交互。弧の角度はつまみ', '大きさ': '手元の小さな大きさで発射し、最大まで段階的に大きくなる（時間はつまみ）。本番の判定は発射の瞬間から最大なので、合わせるには移行後に判定の処理の変更が要る', '判定': '速さ380・直進・追尾なしは変えていない' },
   setup(S) { S.e = mkE('lynx', V(-520, -60), 0, { fire_t: 0.6 }); S.ship = shipState(V(260, 90)); S.shots = []; },
   step(S, dt) {
     const e = S.e, p = prm('lynx'); S.ship.pos.y = 90 + Math.sin(S.t * 0.9) * 60;
@@ -154,11 +157,12 @@ DEMOS.push({
   draw(S, R) {
     const e = S.e, P = R.P, p = prm('lynx'), side = e.buds % 2 === 0 ? 1 : -1;
     drawEnemy(e); drawShip(S.ship);
-    for (const s of S.shots) { if (R.proto) drawClawsProto(R, s.pos, s.a, p.slash_size * 1, s.side, Math.min(1, P.intensity), P, S.t - s.t0); else drawClawsCur(s.pos, s.a, p.slash_size, s.side, 1); }
+    const span = (P.span ?? 110) * Math.PI / 180, g0 = P.start ?? 0.3, grow = Math.max(0.01, (P.grow ?? 0.35) * P.timing);
+    for (const s of S.shots) { const age = S.t - s.t0; if (R.proto) drawClawsProto(R, s.pos, s.a, p.slash_size * P.size * lerp(g0, 1, smooth(0, grow, age)), s.side, Math.min(1, P.intensity), P, span, smooth(0, 0.08 * P.timing, age) * 0.999 + 0.001, 3); else drawClawsCur(s.pos, s.a, p.slash_size, s.side, 1); }
     const k = e.charge; if (k <= 0) return;
     const u = fromA(e.facing), paw = add(add(e.pos, mul(u, e.r * 0.55)), mul(orth(u), side * e.r * 0.6));
     if (!R.proto) { D2.circle(paw, e.r * (0.25 + 0.35 * k), `rgba(255,140,51,${0.25 * k})`); drawClawsCur(paw, e.facing, e.r * (0.5 + 0.5 * k), side, 0.3 + 0.7 * k); }
-    else { drawClawsProto(R, paw, e.facing, e.r * (0.5 + 0.5 * k) * P.size, side, (0.3 + 0.7 * k), P, 0, k); FXW.sparks(R.front, paw, (S.t * 3) % 0.3, 31 + e.buds, 5, P.color, 25, 0.3); }
+    else { const mouth = add(e.pos, mul(u, e.r)); drawClawsProto(R, mouth, e.facing, p.slash_size * P.size * g0 * (0.6 + 0.4 * k), side, 0.25 + 0.6 * k, P, span, 0.15 + 0.85 * k); FXW.sparks(R.front, mouth, (S.t * 3) % 0.3, 31 + e.buds, 5, P.color, 25, 0.3); } // 発射する位置で、発射時の大きさまで爪を溜める
   },
 });
 
