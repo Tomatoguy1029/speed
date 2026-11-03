@@ -329,7 +329,7 @@ enemy_tuning = {
 "params.fire_interval": 3.6
 },
 "pulser": {
-"params.bullet_dmg": 12.0
+"params.bullet_dmg": 6.0
 },
 "pump": {
 "hp": 60.0,

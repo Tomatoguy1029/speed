@@ -13,6 +13,7 @@
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
+[ext_resource type="PackedScene" uid="uid://cagn3eqtiqrgr" path="res://data/formations/s2_telescope.tscn" id="telescope"]
 
 [sub_resource type="Resource" id="Clip_0"]
 script = ExtResource("clip")
@@ -246,7 +247,7 @@ layouts = Array[StringName]([&"aquila/1体"])
 attack_priority = 1
 time = 290.0
 length = 75.0
-interval = 30.0
+interval = 80.0
 
 [sub_resource type="Resource" id="Clip_21"]
 script = ExtResource("clip")
@@ -329,7 +330,7 @@ attack_priority = 1
 time = 438.0
 length = 34.0
 groups = 2
-interval = 30.0
+interval = 40.0
 
 [sub_resource type="Resource" id="Clip_29"]
 script = ExtResource("clip")
@@ -354,6 +355,30 @@ time = 437.0
 length = 30.0
 groups = 2
 interval = 12.0
+
+[sub_resource type="Resource" id="Clip_31"]
+script = ExtResource("clip")
+label = "ぼうえんきょう座"
+track = 8
+types = Array[StringName]([&"telescope"])
+formations = Array[PackedScene]([ExtResource("telescope")])
+layouts = Array[StringName]([&"uid://cagn3eqtiqrgr/1380940436"])
+time = 235.0
+length = 24.0
+groups = 1
+interval = 30.0
+
+[sub_resource type="Resource" id="Clip_32"]
+script = ExtResource("clip")
+label = "ぼうえんきょう座"
+track = 8
+types = Array[StringName]([&"telescope"])
+formations = Array[PackedScene]([ExtResource("telescope")])
+layouts = Array[StringName]([&"uid://cagn3eqtiqrgr/1380940436"])
+time = 415.0
+length = 20.0
+groups = 1
+interval = 30.0
 
 [sub_resource type="Resource" id="Phase0"]
 script = ExtResource("phase")
@@ -482,7 +507,7 @@ script = ExtResource("stage")
 index = 5
 scene_path = "res://scenes/stages/stage_5.tscn"
 phases = [SubResource("Phase0"), SubResource("Phase1"), SubResource("Phase2"), SubResource("Phase3"), SubResource("Phase4"), SubResource("Phase5"), SubResource("Phase6"), SubResource("Phase7"), SubResource("Phase8"), SubResource("Phase9"), SubResource("Phase10"), SubResource("Resource_tpwl5")]
-enemies = Array[StringName]([&"biter", &"splitter", &"splitling", &"bomber", &"pump", &"crab", &"cross", &"auriga", &"dolphin", &"crow", &"cepheus", &"cepheus_soldier", &"aquila"])
+enemies = Array[StringName]([&"biter", &"splitter", &"splitling", &"bomber", &"pump", &"crab", &"cross", &"auriga", &"dolphin", &"crow", &"cepheus", &"cepheus_soldier", &"aquila", &"telescope"])
 enemy_tuning = {
 "aquila": {
 "hp": 240.0
@@ -491,9 +516,16 @@ enemy_tuning = {
 "hp": 100.0
 },
 "cepheus": {
-"hp": 160.0
+"hp": 160.0,
+"params.reinforce_interval": 7.0
+},
+"crab": {
+"hp": 60.0
 },
 "cross": {
+"hp": 60.0
+},
+"telescope": {
 "hp": 60.0
 }
 }
@@ -510,11 +542,12 @@ enemy_attack_values = {
 "dolphin": 1.0,
 "pump": 1.0,
 "splitling": 0.0,
-"splitter": 0.0
+"splitter": 0.0,
+"telescope": 1.0
 }
 zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_splitter"), SubResource("Curve_bomber")])
-clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Clip_13"), SubResource("Clip_14"), SubResource("Clip_15"), SubResource("Clip_16"), SubResource("Clip_17"), SubResource("Clip_18"), SubResource("Clip_19"), SubResource("Clip_20"), SubResource("Clip_21"), SubResource("Clip_22"), SubResource("Clip_23"), SubResource("Clip_24"), SubResource("Clip_25"), SubResource("Clip_26"), SubResource("Clip_28"), SubResource("Clip_29"), SubResource("Clip_30")])
-track_names = PackedStringArray("ポンプ座", "かに座", "みなみじゅうじ座", "ぎょしゃ座", "いるか座", "からす座", "ケフェウス座", "わし座")
+clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Clip_13"), SubResource("Clip_14"), SubResource("Clip_15"), SubResource("Clip_16"), SubResource("Clip_17"), SubResource("Clip_18"), SubResource("Clip_19"), SubResource("Clip_20"), SubResource("Clip_21"), SubResource("Clip_22"), SubResource("Clip_23"), SubResource("Clip_24"), SubResource("Clip_25"), SubResource("Clip_26"), SubResource("Clip_28"), SubResource("Clip_29"), SubResource("Clip_30"), SubResource("Clip_31"), SubResource("Clip_32")])
+track_names = PackedStringArray("ポンプ座", "かに座", "みなみじゅうじ座", "ぎょしゃ座", "いるか座", "からす座", "ケフェウス座", "わし座", "ぼうえんきょう座")
 boss_time = 490.0
 time_limit = 900.0
 boss_id = &"draco"
