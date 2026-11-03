@@ -43,6 +43,13 @@ func setup(world: Node2D, camera: Camera2D, glow_layers: Array, overlay_layer :=
 	_setup_shockwave()
 	_setup_sparks()
 
+## 外観の追加で敵の照明層が増えたら、画面効果の順序をまとめて移す。
+func set_overlay_layer(value: int) -> void:
+	var offset := value-_overlay_layer
+	_overlay_layer = value
+	for child in get_children():
+		if child is CanvasLayer: child.layer += offset
+
 func _setup_hdr_glow(glow_layers: Array) -> void:
 	get_viewport().use_hdr_2d = true
 	var env := Environment.new()

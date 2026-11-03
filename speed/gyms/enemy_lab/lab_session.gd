@@ -591,6 +591,7 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 			presentation.cpp_resources = bundle.resources
 			presentation.cpp_scope = scope
 			presentation.frame_view.replace_lab_visuals(scope,bundle.resources.visuals)
+			presentation.sync_canvas_layers()
 	return result
 
 func row_for_id(id: int) -> int:

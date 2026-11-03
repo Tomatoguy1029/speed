@@ -205,7 +205,7 @@ static func _build_units(force: bool, output: String) -> Error:
 	var outputs: PackedStringArray = cache.outputs()
 	var stamp := FileAccess.open(output.path_join("stamp.json"),FileAccess.WRITE)
 	if stamp == null: return FileAccess.get_open_error()
-	stamp.store_string(JSON.stringify({"signature":input_signature,"outputs":outputs,"input_fingerprint":_file_signature(all_inputs)}))
+	stamp.store_string(JSON.stringify({"signature":input_signature,"outputs":outputs,"input_fingerprint":input_fingerprint if _file_signature(all_inputs)==input_fingerprint else ""}))
 	stamp.close()
 	last_build_report.assign(cache.report)
 	return OK

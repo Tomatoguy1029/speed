@@ -199,6 +199,7 @@ func prepare_debug_enemies() -> Dictionary:
 		var presentation: Node = owner.view.get_node("RunPresentation")
 		presentation.cpp_resources = prepared.resources
 		if presentation.frame_view!=null: presentation.frame_view.replace_lab_visuals(owner.resources,prepared.resources.visuals)
+		presentation.sync_canvas_layers()
 	source = next
 	_definition_order = owner.bridge.read_lab().value.definition_ids.duplicate()
 	return {"ok":true,"value":choices}

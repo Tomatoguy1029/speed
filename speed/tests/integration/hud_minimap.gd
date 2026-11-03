@@ -25,6 +25,27 @@ func _ready() -> void:
 	bridge = scene.bridge
 	var hud: Control = scene.view.get_node("Hud/HudRoot")
 	_check(bridge.command("dev_edit", {"kind": "debug_action", "payload": {"action": "reset_loadout", "args": {}}}).ok, "初期候補を閉じて地図だけを確認する")
+	# 実際のC++出力から、武器・特性と状態表示を購読する。
+	_check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W01","levels":3}).ok,"HUD確認用の武器を取得する")
+	_check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T36","levels":1}).ok,"HUD確認用の特性を取得する")
+	_step()
+	hud._update_cpp_cinematic()
+	_check(hud._loadout_icons.visible and hud._loadout_icons.get_child_count()>=2,"通常の武器・特性のアイコンを表示する")
+	_check(hud._owned_loadout("weapon_levels").get(&"W01")==3 and hud._owned_loadout("trait_levels").get(&"T36")==1,"取得した段階を装備欄へ渡す")
+	for key in ["attack_power","kills","level","coins"]:
+		_check(hud._cpp_ui.has(key) and hud._cpp_ui[key]==bridge.read_frame().value.ui[key],"状態表示へC++の値を渡す: "+key)
+	var presentation: Node = scene.view.get_node("RunPresentation")
+	var originals: Array[Dictionary] = presentation.cpp_resources.visuals.duplicate()
+	var extra_id := int(originals.back().id)+200
+	presentation.cpp_resources.visuals.append({"id":extra_id,"role":6})
+	presentation.sync_canvas_layers()
+	_check(scene.view.get_node("Hud").layer>extra_id-5,"外観追加後もHUDとカードを敵より手前に保つ")
+	for child in presentation.pipeline.get_children():
+		if child is CanvasLayer:
+			_check(child.layer>extra_id-5 and child.layer<scene.view.get_node("Hud").layer,"画面効果を敵とHUDの間へ移す")
+	presentation.cpp_resources.visuals.assign(originals)
+	presentation.sync_canvas_layers()
+	_check(bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"reset_loadout","args":{}}}).ok,"地図確認の前に装備を戻す")
 	for ship in [Vector2.ZERO, Vector2(4000, -3000), Vector2(-5500, 0)]:
 		_set_ship(ship)
 		_check(hud._minimap_offset(ship).is_zero_approx(), "機体の位置%sを地図の中心にする" % ship)

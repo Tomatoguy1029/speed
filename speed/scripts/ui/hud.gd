@@ -4,7 +4,7 @@
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
 extends Control
 
-const CPP_UI_FIELDS := ["bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "lab_mode", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "view_center", "view_half", "xp"]
+const CPP_UI_FIELDS := ["attack_power", "bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "coins", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "kills", "lab_mode", "level", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "trait_levels", "view_center", "view_half", "weapon_levels", "xp"]
 
 ## 描けるようになったときに広がる輪の時間（実秒）
 const PickupKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.PickupKind
@@ -98,6 +98,7 @@ var _swap_keep: Button
 var _swap_keep_index := -1
 var _loadout_icons: Control
 var _loadout_key := ""
+var _music_started := false
 var _health_fill: AtlasTexture
 var _experience_fill: AtlasTexture
 var _pause_box: VBoxContainer
@@ -209,6 +210,7 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
+	_warning_t = maxf(0.0,_warning_t-delta)
 	_update_speed_indicator(delta)
 	_update_cpp_finish()
 	_update_cpp_cinematic()
@@ -635,7 +637,7 @@ func _ready_cpp() -> void:
 			_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
-	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","game_over","clear_banner"])
+	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
 	_font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -720,24 +722,32 @@ func _draw_cpp() -> void:
 		var height:=size.y*0.1*bars
 		draw_rect(Rect2(Vector2.ZERO,Vector2(size.x,height)),Color.BLACK)
 		draw_rect(Rect2(Vector2(0,size.y-height),Vector2(size.x,height)),Color.BLACK)
-	if not show_status or bars>0.0:return
+	if bars>0.0:return
 	if _cpp_ui.get("boss_finish",{}).get("active",false):
 		_draw_banner()
 		return
 	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
 	draw_set_transform((size-ART_SIZE*factor)*0.5,0.0,Vector2.ONE*factor)
+	var hero: Dictionary = _cpp_ui.get("hero",{})
+	if show_minimap and not hero.is_empty(): _draw_cpp_hero_map(hero)
+	if not show_status:
+		draw_set_transform(Vector2.ZERO)
+		return
 	var hp := clampf(float(_cpp_ui.hp)/maxf(1.0,float(_cpp_ui.max_hp)),0.0,1.0)
 	_draw_bar(HEALTH,_health_fill,hp,Color("#ff526e") if hp<=0.1 else Color("#ffe46b") if hp<0.5 else Color("#67e8b1"))
 	draw_string(_font,Vector2(7,40),"%d/%d" % [ceili(maxf(0.0,float(_cpp_ui.hp))),roundi(float(_cpp_ui.max_hp))],HORIZONTAL_ALIGNMENT_LEFT,-1,14,CYAN)
+	draw_string(_font,Vector2(7,52),"ATK %.1f  %s  Lv %d  %s" % [float(_cpp_ui.get("attack_power",0.0)),tr("hud.kills").format({n=int(_cpp_ui.get("kills",0))}),int(_cpp_ui.get("level",1)),tr("common.parts").format({n=int(_cpp_ui.get("coins",0))})],HORIZONTAL_ALIGNMENT_LEFT,260,8,CYAN)
 	_draw_bar(EXPERIENCE,_experience_fill,float(_cpp_ui.get("xp",0.0))/maxf(1.0,float(_cpp_ui.get("next_xp",1.0))),Color("#b8a0ff"))
 	var seconds := int(_cpp_ui.run_time)
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
 		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
-	var hero: Dictionary = _cpp_ui.get("hero",{})
+	draw_texture_rect_region(SLOTS,LOADOUT_REGION,LOADOUT_REGION)
+	if _cpp_ui.get("final_modules",[]).is_empty():
+		_draw_slot_row(LOADOUT_WEAPON,true,ContentManager.cfg.weapon_slots,ContentManager.cfg.weapon_max_level,_owned_loadout("weapon_levels"),ContentManager.catalog.table(&"weapons"))
+	_draw_slot_row(LOADOUT_TRAIT,false,ContentManager.cfg.trait_slots,ContentManager.cfg.trait_max_stacks,_owned_loadout("trait_levels"),ContentManager.catalog.table(&"traits"))
 	if not hero.is_empty():
 		_draw_hero_slot_values(LOADOUT_HERO,hero.power,float(hero.active),float(hero.cooldown))
-		if show_minimap: _draw_cpp_hero_map(hero)
 	draw_set_transform(Vector2.ZERO)
 	if not hero.is_empty() and hero.guidance and hero.revealed and hero.captive:
 		_draw_edge_arrow_values(hero.center,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
@@ -753,6 +763,8 @@ func _draw_cpp() -> void:
 		break
 	for comet in _cpp_ui.get("rare_comets",PackedVector2Array()): _draw_edge_arrow_values(comet,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	_draw_cpp_gauge_ring()
+	if _warning_t>0.0 and fmod(_warning_t,0.5)<0.3:
+		draw_string(_font,Vector2(size.x*0.5-160,120),tr("hud.warning"),HORIZONTAL_ALIGNMENT_CENTER,320,48,Color("#ff526e"))
 	_draw_banner()
 
 func _cpp_card_visibility() -> void:
@@ -827,6 +839,11 @@ func _show_cpp_cards() -> void:
 
 func _input_cpp(event: InputEvent) -> void:
 	if _cpp_ui.is_empty(): return
+	if int(_cpp_ui.phase)==Phase.Finishing:
+		if float(_cpp_ui.get("boss_finish",{}).get("elapsed",0.0))>=0.35 and not event.is_echo() and (event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_accept")):
+			bridge.command("skip_finish")
+			get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(&"pause") and not event.is_echo():
 		bridge.command("pause",{"paused":int(_cpp_ui.phase)!=Phase.Paused})
 		_card_discard.merge(_card_held)
@@ -867,8 +884,24 @@ func _input_cpp(event: InputEvent) -> void:
 
 func _receive_cpp_frame(frame: Dictionary) -> bool:
 	apply_snapshot(frame.ui)
+	if not _music_started:
+		_music_started = true
+		if not _cpp_ui.get("lab_mode",false):
+			var boss_spawned: bool = _cpp_ui.get("boss_bodies",[]).any(func(body): return body.get("boss_spawned",false))
+			AudioManager.play_music(&"boss" if boss_spawned else &"battle",0.6,self)
 	for event: Dictionary in frame.events:
 		if event.type=="hero_discovered": _hero_notice_t = 1.8
+		if event.type=="level_bonus" and int(_cpp_ui.phase) not in [Phase.Finishing,Phase.Ended]:
+			var reward: Dictionary = event.payload.duplicate()
+			reward.type = &"level_bonus"
+			_rewards.enqueue_bonus(reward)
+		if event.type=="boss_spawn":
+			_warning_t = 3.0
+			if not _cpp_ui.get("lab_mode",false): AudioManager.play_music(&"boss",1.0,self)
+		if event.type=="full_burst_ready":
+			_ring_flash_t = 0.1
+			_ring_flash_max = 0.1
+			_ring_pulse_t = 0.3
 		if event.type=="hero_freed" and int(_cpp_ui.phase) not in [Phase.Finishing,Phase.Ended]:
 			var reward: Dictionary = event.payload.duplicate()
 			reward.type = &"hero_freed"
@@ -939,13 +972,19 @@ func _draw_cpp_hero_map(hero: Dictionary) -> void:
 	var side := Vector2(-head.y, head.x)
 	draw_colored_polygon(PackedVector2Array([MINIMAP_CENTER + head * 6.0, MINIMAP_CENTER - head * 4.0 + side * 4.0, MINIMAP_CENTER - head * 4.0 - side * 4.0]), Color.WHITE)
 
+func _owned_loadout(field: String) -> Dictionary:
+	var owned := {}
+	for item: Dictionary in _cpp_ui.get(field,[]): owned[StringName(item.id)] = int(item.level)
+	return owned
+
 func _update_cpp_cinematic() -> void:
 	if _cpp_ui.is_empty() or _loadout_icons==null:return
 	var bars: float=_cpp_ui.get("cinematic_bars",0.0)
 	var modules: Array=_cpp_ui.get("final_modules",[])
 	var active: bool=int(_cpp_ui.phase)==Phase.Play
 	_speed_indicator.visible=active and bars<=0.0
-	_loadout_icons.visible=active and not modules.is_empty() and (show_status or bars>0.0)
+	var combat_visible := show_status and bars<=0.0 and int(_cpp_ui.phase) not in [Phase.Dying,Phase.Finishing,Phase.Ended]
+	_loadout_icons.visible=combat_visible or (active and bars>0.0 and not modules.is_empty())
 	_entrance_skip.visible=false
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		var intro: Dictionary=body.get("intro",{})
@@ -953,10 +992,21 @@ func _update_cpp_cinematic() -> void:
 	var factor:=minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
 	_loadout_icons.position=(size-ART_SIZE*factor)*0.5
 	_loadout_icons.scale=Vector2.ONE*factor
-	var key:=str(modules)
+	var key:=str(_cpp_ui.get("weapon_levels",[]))+str(_cpp_ui.get("trait_levels",[]))+str(modules)+str(bars>0.0)
 	if key==_loadout_key:return
 	_loadout_key=key
 	for child in _loadout_icons.get_children():child.queue_free()
+	if bars<=0.0:
+		for row in 2:
+			if row==0 and not modules.is_empty(): continue
+			var owned := _owned_loadout("weapon_levels" if row==0 else "trait_levels")
+			var index := 0
+			for id: StringName in owned:
+				var at := (LOADOUT_WEAPON if row==0 else LOADOUT_TRAIT)+Vector2(index*LOADOUT_STEP,0)
+				var definition: ContentEntry = ContentManager.catalog.find(&"weapons" if row==0 else &"traits",id)
+				if row==0 and definition!=null and definition.comet_only: _add_comet_slot_frame(Rect2(at,Vector2(LOADOUT_SLOT,17)))
+				_add_icon(_loadout_icons,definition,Rect2(at+Vector2(2,2),Vector2(12,10)))
+				index += 1
 	for j in modules.size():
 		var icon=preload("res://scripts/ui/legendary_module_icon.gd").new()
 		icon.position=LOADOUT_WEAPON+Vector2(j*LOADOUT_STEP+2,2)

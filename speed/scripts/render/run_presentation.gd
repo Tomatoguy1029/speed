@@ -158,8 +158,16 @@ func _ready_cpp() -> void:
 	var layer_count: int = cpp_resources.visuals.size()-3
 	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],layer_count)
 	frame_view.pipeline = pipeline
+	sync_canvas_layers()
+
+## 外観の追加後も画面効果とHUDを全ての敵より手前に保つ。
+func sync_canvas_layers() -> void:
+	var overlay_layer := 1
+	for entry: Dictionary in cpp_resources.visuals:
+		overlay_layer = maxi(overlay_layer,int(entry.id)-3)
+	if pipeline!=null: pipeline.set_overlay_layer(overlay_layer)
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
-	if hud!=null: hud.layer = maxi(hud.layer,layer_count+3)
+	if hud!=null: hud.layer = maxi(hud.layer,overlay_layer+3)
 
 func _present_cpp(delta: float) -> void:
 	if frame_view==null: return
