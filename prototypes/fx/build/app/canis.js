@@ -7,10 +7,12 @@ function canisPose(B, t, opts = {}) {
   ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => edits[path] = { rotation: Math.sin(B.gait + (i === 0 || i === 3 ? 0 : Math.PI)) * (moving ? 0.16 : 0.015) });
   if (opts.proto) {
     const phases = [0, 0.5, 0.25, 0.75];
-    ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => { const node = BOSSES.canis_major.nodes.find(n => n.name === path), phase = ((B.walkPhase || 0) / TAU + phases[i]) % 1, stance = phase < 0.72, stroke = stance ? 1 - 2 * phase / 0.72 : -1 + 2 * smooth(0.72, 1, phase); edits[path] = { rotation: moving ? stroke * 0.11 : 0, position: V(node.position.x, node.position.y + (moving ? stroke * 4 : 0)), scale: V(1, moving && !stance ? 1 - Math.sin((phase - 0.72) / 0.28 * Math.PI) * 0.13 : 1) }; });
+    ['RearLeftLeg', 'RearRightLeg', 'FrontLeftLeg', 'FrontRightLeg'].forEach((path, i) => { const node = BOSSES.canis_major.nodes.find(n => n.name === path), phase = ((B.walkPhase || 0) / TAU + phases[i]) % 1, stance = phase < 0.72, stroke = stance ? 1 - 2 * phase / 0.72 : -1 + 2 * smooth(0.72, 1, phase); edits[path] = { rotation: moving ? stroke * 0.26 : 0, position: V(node.position.x + (moving && !stance ? Math.sin((phase - 0.72) / 0.28 * Math.PI) * 3 * (i % 2 ? 1 : -1) : 0), node.position.y + (moving ? stroke * 11 : 0)), scale: V(1, moving && !stance ? 1 - Math.sin((phase - 0.72) / 0.28 * Math.PI) * 0.18 : 1) }; }); // 歩幅を大きく：踏み出す脚は外へ持ち上がり、着いた脚は後ろへ送られる
   }
-  edits.Tail = { rotation: Math.sin(B.gait * 0.4) * 0.07 };
+  edits.Tail = { rotation: Math.sin(B.gait * 0.4) * 0.07 + (opts.proto && len(B.vel) > 5 ? Math.sin(B.walkPhase || 0) * 0.12 : 0) };
+  if (opts.proto && len(B.vel) > 5) { const w = B.walkPhase || 0; edits.Body = { rotation: Math.sin(w) * 0.05, position: V(Math.sin(w) * 1.5, Math.abs(Math.sin(w)) * 2) }; } // 歩きに合わせて体が左右に揺れ、上下する
   edits.Head = { rotation: B.pose.howl ? -0.45 * smooth(0, 0.65, B.charge) : 0 };
+  if (opts.proto && len(B.vel) > 5) edits.Head.rotation -= Math.sin(B.walkPhase || 0) * 0.07; // 歩きに合わせて頭が揺れる
   if (opts.proto) {
     // 見た目の部位だけで、静かな構えから咆哮の反動へ移す。役者の位置・方向は保つ。
     const charge = B.mode === 'windup' ? B.charge : 0, release = opts.releaseAge >= 0 ? Math.max(0, 1 - opts.releaseAge / 0.22) : 0;

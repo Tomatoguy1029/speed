@@ -69,7 +69,15 @@ function canisHoundWarning(q, strength, direction = q.facing) {
     g.fillStyle = '#f0bb7f'; g.fillRect(Math.round(x), y, 1, 1);
   }
   g.restore();
+  // 見やすい予兆：水色や体の塗りではなく、目が橙色に光って攻撃が近いほど速く強く明滅し、頭のまわりに橙の光がにじむ。後ろ足から蹴る火の粉が後ろへ散る
+  const uu = fromA(direction), side = orth(uu), head = add(q.pos, mul(uu, q.r * 0.55)), blink = 0.55 + 0.45 * Math.sin(S_now() * (10 + 30 * u)), k = smooth(0.05, 0.6, u) * (0.7 + 0.3 * blink);
+  g.save(); g.globalCompositeOperation = 'lighter';
+  const gr = g.createRadialGradient(head.x, head.y, 0, head.x, head.y, q.r * 1.3); gr.addColorStop(0, `rgba(255,150,40,${0.55 * k})`); gr.addColorStop(1, 'rgba(255,90,20,0)'); g.fillStyle = gr; g.fillRect(head.x - q.r * 1.3, head.y - q.r * 1.3, q.r * 2.6, q.r * 2.6);
+  for (const sd of [-1, 1]) { const ey = add(head, mul(side, sd * q.r * 0.22)), er = Math.max(1.6, q.r * 0.12); const g2 = g.createRadialGradient(ey.x, ey.y, 0, ey.x, ey.y, er * 2.4); g2.addColorStop(0, `rgba(255,240,200,${k})`); g2.addColorStop(0.35, `rgba(255,170,50,${k})`); g2.addColorStop(1, 'rgba(255,90,20,0)'); g.fillStyle = g2; g.fillRect(ey.x - er * 2.4, ey.y - er * 2.4, er * 4.8, er * 4.8); }
+  if (u > 0.35) for (let i = 0; i < 6; i++) { const ph = ((S_now() * 3 + i / 6) % 1), base = add(q.pos, mul(uu, -q.r * 0.6)), p0 = add(add(base, mul(uu, -ph * q.r * 1.6)), mul(side, (hash(i * 3.7) - 0.5) * q.r * 1.2)); g.fillStyle = `rgba(255,${180 - ph * 80 | 0},80,${(1 - ph) * smooth(0.35, 0.8, u)})`; g.fillRect(p0.x - 1, p0.y - 1, 2, 2); }
+  g.restore();
 }
+const S_now = () => (typeof S !== 'undefined' && S ? S.t : 0);
 // pixelFX 原本 fire/fire-breath の45コマを再生する。形は作り直さず、口元と現行の粒の範囲へ合わせる。
 function canisJetImage(at, angle, reach, width, time, alpha = 1) {
   if (reach < 8 || alpha <= 0) return;
