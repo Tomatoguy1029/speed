@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/auriga.png-a9664a4943392a2bf249f6f3aa9d0161.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/auriga.png"
+dest_files=["res://.godot/imported/auriga.png-a9664a4943392a2bf249f6f3aa9d0161.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

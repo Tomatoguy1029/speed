@@ -1,5 +1,7 @@
 shader_type canvas_item;
 uniform sampler2D paint_tex : source_color, filter_nearest;
+#include "res://shaders/elite_death.gdshaderinc"
+varying float death_age;
 uniform float brightness = 1.0;
 uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
@@ -8,11 +10,13 @@ varying vec2 instance_x;
 varying vec2 instance_y;
 
 void vertex() {
+	death_age = COLOR.a;
 	hit_flash = COLOR.r;
 	instance_x = normalize(MODEL_MATRIX[0].xy);
 	instance_y = normalize(MODEL_MATRIX[1].xy);
 }
 void fragment() {
+	if (death_enabled && texture(death_map, UV).r <= death_age) discard;
 	// RGBは共通の確定塗装、アルファと法線は制作時に分割した部位。
 	vec4 armor = texture(paint_tex, UV);
 	float alpha = texture(TEXTURE, UV).a;

@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/biter.png-404a42fee44984d745df193935d2652a.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/biter.png"
+dest_files=["res://.godot/imported/biter.png-404a42fee44984d745df193935d2652a.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

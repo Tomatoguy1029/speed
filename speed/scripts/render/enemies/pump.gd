@@ -19,8 +19,10 @@ var _frame_targets := {}
 var _frame_swallow: DrawLayer
 var _frame_clock := -1.0
 var _frame_brightness_value := 1.0
+var _death_map: Texture2D
 
-func setup_frame(parent: Node, look: EnemyLook, paint: Texture2D, settings: Dictionary) -> void:
+func setup_frame(parent: Node, look: EnemyLook, paint: Texture2D, settings: Dictionary, death_map: Texture2D = null) -> void:
+	_death_map = death_map
 	_frame_parent = parent
 	_frame_look = look
 	_frame_paint = paint
@@ -39,6 +41,9 @@ func _frame_nodes() -> void:
 	body.mesh = _body_mesh
 	var material := ShaderMaterial.new()
 	material.shader = BODY_SHADER
+	if _death_map != null:
+		material.set_shader_parameter("death_enabled",true)
+		material.set_shader_parameter("death_map",_death_map)
 	material.set_shader_parameter("brightness",_frame_brightness_value)
 	material.set_shader_parameter("base_tex",_frame_look.base)
 	material.set_shader_parameter("armor_tex",_frame_paint)
@@ -80,6 +85,7 @@ func apply_frame(row: Dictionary) -> void:
 		body.scale = Vector2.ONE*scale_px
 		body.show()
 		var material := body.material as ShaderMaterial
+		if _death_map != null: material.set_shader_parameter("death_age",row.colors[i].a)
 		material.set_shader_parameter("full",values[n+4])
 		material.set_shader_parameter("stored_full",values[n+5])
 		material.set_shader_parameter("clock",values[n+6])

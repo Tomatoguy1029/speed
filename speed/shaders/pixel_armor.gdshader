@@ -1,4 +1,6 @@
 shader_type canvas_item;
+#include "res://shaders/elite_death.gdshaderinc"
+varying float death_age;
 uniform float brightness = 1.0;
 uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
@@ -9,6 +11,7 @@ varying vec2 instance_x;
 varying vec2 instance_y;
 
 void vertex() {
+	death_age = COLOR.a;
 	hit_flash = COLOR.r;
 	fuse_flash = COLOR.g;
 	instance_x = normalize(MODEL_MATRIX[0].xy);
@@ -16,6 +19,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (death_enabled && texture(death_map, UV).r <= death_age) discard;
 	vec4 armor = texture(TEXTURE, UV);
 	vec3 base = mix(armor.rgb, vec3(1.0), hit_flash * 0.8) * ambient;
 	base = mix(base, vec3(1.0, 0.045, 0.02), fuse_flash * 0.9 * (1.0 - hit_flash));

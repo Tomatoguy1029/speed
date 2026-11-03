@@ -1,6 +1,8 @@
 ## 生成済み外観とRenderFrameの値だけで、装甲と噛みつきの顎を描く。
 extends Node2D
 var perf := PerfLog.new()
+var _death_masks: Dictionary = {}
+var _death_map: Texture2D
 var _pump: EnemyVisual
 var _canvas: CanvasLayer
 var _parts: Array[Dictionary] = []
@@ -18,8 +20,10 @@ const CLOSED_HOLD := 0.051
 const RETURN_TIME := 0.12
 const SPARK_TIME := 0.11
 
-func setup(scope: ContentResourceScope, entry: Dictionary) -> void:
+func setup(scope: ContentResourceScope, entry: Dictionary, death_masks: Dictionary = {}) -> void:
+	_death_masks = death_masks
 	var look := scope.resources[entry.path] as EnemyLook
+	_death_map = death_masks.get(look.source_path)
 	_canvas = CanvasLayer.new()
 	_canvas.layer = int(entry.id)-5
 	_canvas.follow_viewport_enabled = true
@@ -40,7 +44,7 @@ func setup(scope: ContentResourceScope, entry: Dictionary) -> void:
 	_biting = entry.get("biting",false)
 	if entry.get("pump",false):
 		_pump = preload("res://scripts/render/enemies/pump.gd").new()
-		_pump.setup_frame(_canvas,look,paint,settings)
+		_pump.setup_frame(_canvas,look,paint,settings,_death_map)
 	elif _biter:
 		var assets: Resource = scope.resources[parts_path]
 		for part: Dictionary in assets.get_meta("parts",[]):
@@ -51,6 +55,7 @@ func setup(scope: ContentResourceScope, entry: Dictionary) -> void:
 		if _ruler:
 			var lower: EnemyLook=look.split_other
 			var lower_paint: Texture2D=lower.painted_armors[entry.lower_paint]
+			_death_map = death_masks.get(lower.source_path)
 			_add_part("lower",lower.base_texture(),lower_paint,lower.normal,Vector2.ZERO,lower_paint,settings)
 			_parts.back().angle=lower.angle-look.angle
 	if _biting:
@@ -78,6 +83,10 @@ func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, 
 	material.set_shader_parameter("ambient",settings.ambient)
 	material.set_shader_parameter("normal_strength",settings.normal_strength)
 	if _biter: material.set_shader_parameter("paint_tex",paint)
+	if _death_map != null:
+		for shader_material: ShaderMaterial in [base_material,material]:
+			shader_material.set_shader_parameter("death_enabled",true)
+			shader_material.set_shader_parameter("death_map",_death_map)
 	armor.material = material
 	_canvas.add_child(armor)
 	_parts.append({"name":name,"base":base,"armor":armor,"pivot":pivot})
@@ -124,7 +133,7 @@ func apply_frame(row: Dictionary) -> void:
 		if _biting:
 			var values: Dictionary = row.biter
 			if _biter: jaw = deg_to_rad(jaw_angle(values.modes[i],values.charges[i],values.timers[i],values.rests[i]))
-			if values.modes[i]==3:
+			if values.modes[i]==3 and _death_masks.is_empty():
 				var spark_age: float = values.rests[i]-values.timers[i]-SNAP
 				if spark_age>=0.0 and spark_age<SPARK_TIME:
 					var direction := Vector2.from_angle(angle-PI/2.0)

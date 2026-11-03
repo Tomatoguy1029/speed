@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/reticle.png-955bf37d6b7ddbe178d69510a63d76b4.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/reticle.png"
+dest_files=["res://.godot/imported/reticle.png-955bf37d6b7ddbe178d69510a63d76b4.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

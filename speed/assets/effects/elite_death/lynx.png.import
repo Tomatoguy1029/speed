@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/lynx.png-e8f9a0ab627328191e28fe5c8e3f4992.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/lynx.png"
+dest_files=["res://.godot/imported/lynx.png-e8f9a0ab627328191e28fe5c8e3f4992.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/shield.png-a1b8b2cf14bbaf77d9ba8b801c2516c8.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/shield.png"
+dest_files=["res://.godot/imported/shield.png-a1b8b2cf14bbaf77d9ba8b801c2516c8.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/telescope.png-ad9188ae6eac2f0d9f34ca21eeb92675.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/telescope.png"
+dest_files=["res://.godot/imported/telescope.png-ad9188ae6eac2f0d9f34ca21eeb92675.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

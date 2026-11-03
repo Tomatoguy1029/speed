@@ -7,6 +7,7 @@ var perf := PerfLog.new()
 var boss_hit_feedback := preload("res://scripts/bosses/boss_hit_feedback.gd").new()
 var metrics_record := {}
 var visuals: Dictionary = {}
+var _elite_deaths := preload("res://scripts/render/elite_deaths.gd").new()
 var batches: Dictionary = {}
 var parts: Dictionary = {}
 var enemy_frames: Dictionary = {}
@@ -186,6 +187,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	add_child(landmark_aura)
 	landmark_aura.setup(scope)
 	for entry in entries: visuals[int(entry.id)] = entry
+	add_child(_elite_deaths)
+	_elite_deaths.setup(scope,visuals)
 	for entry: Dictionary in entries:
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
 	var mark_layer := CanvasLayer.new()
@@ -1048,6 +1051,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		boss_hit_feedback.clear()
 		ruler_shake=0.0
 		_queued_events.clear()
+		_elite_deaths.clear()
 		for display in _boss_body_displays.values():
 			if display.has_method("clear_flames"): display.clear_flames()
 		if _boss_lance_visual!=null: _boss_lance_visual.reset_frame()
@@ -1366,7 +1370,12 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_zoom = frame.camera.zoom
 	_sniper_world_time = float(frame.ui.world_time)
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
+	var death_view := Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0)
+	var captured := {}
 	for event: Dictionary in _queued_events:
+		if event.type==&"anchor_capture": captured[event.get("id",0)] = true
+	for event: Dictionary in _queued_events:
+		if event.type==&"kill" and not captured.has(event.id): _elite_deaths.add_event(event,frame.ui.world_time,death_view)
 		if event.type==&"combat_damage" and event.get("target","")=="enemy" and float(event.get("applied",0.0))>0.0:
 			for display in _boss_body_displays.values():
 				if display.state.get("kind",-1) in [0,1,2] and display.state.get("actor",0)==event.get("target_id",0): display.frame_event(event)
@@ -1448,7 +1457,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 				var layers: Dictionary = library.get_meta("looks",{}).get(event.get("scene",""),{})
 				var phase: String = event.phase
 				_attack_ends.append({"mesh":layers.get(phase),"sprites":layers.get(phase+"_sprites",[]),"pos":event.pos,"duration":event.get("duration",0.25 if phase=="Hit" else 0.2),"age":0.0,"tint":event.get("tint",Color.WHITE)})
-		if event.type==&"explode" and event.get("cause",&"") not in [&"endBlast",&"runUp",&"mine"]:
+		if event.type==&"explode" and event.get("cause",&"") not in [&"endBlast",&"runUp",&"mine",&"pumpBurst"]:
 			_rings.append({"pos":event.pos,"radius":event.radius,"color":event.color,"life":event.life,"max":event.life})
 			if event.radius>=150.0 and pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.4)
 		if event.type==&"debris_trail" and event.get("life",0.0)>0.0:
@@ -1491,6 +1500,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if equipped_rear: preload("res://scripts/render/equipment/rear.gd").frame_event(_rear_flashes,_rear_shells,event,frame.ui.ship.ship_heading,frame.ui.rear.mount)
 		if equipped_scatter: preload("res://scripts/render/equipment/scatter.gd").frame_event(_scatter_flashes,event)
 		if equipped_forward: preload("res://scripts/render/equipment/forward.gd").frame_event(_flashes,event)
+	_elite_deaths.step(frame.ui.world_time,death_view,1.0-float(frame.ui.get("death_dim",0.0)))
 	_queued_events.clear()
 	var ui: Dictionary = frame.ui
 	_dim_strength = float(ui.get("death_dim",0.0))

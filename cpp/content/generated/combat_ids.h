@@ -996,7 +996,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::Hit: return field=="pos" || field=="crit" || field=="dmg" || field=="cause" || field=="id";
     case EventType::HullScatter: return field=="pos" || field=="count" || field=="visual_key";
     case EventType::Hurt: return field=="pos" || field=="amount" || field=="cause" || field=="source" || field=="hp_after";
-    case EventType::Kill: return field=="pos" || field=="id" || field=="r" || field=="crit" || field=="enemy_type" || field=="meteor_index" || field=="facing" || field=="elite" || field=="cause" || field=="dir" || field=="color" || field=="silent";
+    case EventType::Kill: return field=="pos" || field=="id" || field=="r" || field=="crit" || field=="enemy_type" || field=="meteor_index" || field=="facing" || field=="elite" || field=="cause" || field=="dir" || field=="color" || field=="silent" || field=="death_visual";
     case EventType::Launch: return field=="pos" || field=="dir" || field=="gauge";
     case EventType::LevelBonus: return field=="kind" || field=="id" || field=="level" || field=="count";
     case EventType::Levelup: return field=="level";
@@ -1070,7 +1070,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::LanceShatter: return field=="pos" || field=="direction" || field=="horn" || field=="head_length";
     case EventType::ChainShock: return field=="pos" || field=="radius" || field=="life" || field=="generation";
     case EventType::WaveRelease: return field=="pos";
-    case EventType::AnchorCapture: return field=="pos" || field=="to";
+    case EventType::AnchorCapture: return field=="id" || field=="pos" || field=="to";
     case EventType::AnchorFire: return field=="pos" || field=="dir" || field=="radius";
     case EventType::BipolarCharge: return field=="from" || field=="to";
     case EventType::RouteOpportunity: return field=="route" || field=="status" || field=="start" || field=="window" || field=="margin";

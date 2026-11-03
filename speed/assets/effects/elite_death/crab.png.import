@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/crab.png-83aecf63c1c201f7a3cfaa9406fd8930.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/crab.png"
+dest_files=["res://.godot/imported/crab.png-83aecf63c1c201f7a3cfaa9406fd8930.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

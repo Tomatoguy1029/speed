@@ -11,7 +11,7 @@ bool MassTowBehavior::capture(RunRuntime &r,const DeathContext &death) {
     auto &s=r.state;auto &w=s.loadout.mass_tow;const auto &e=death.corpse;
     if (!w.ready || !s.draw.tracing || e.is_boss || r.content->definitions[e.definition-1].kind==EnemyDefinition::Kind::Meteor || s.ship.pos.distance_squared_to(e.pos)>std::pow(w.capture_radius*(1+w.area_increment*double(s.loadout.post_area_stacks))+e.radius,2)) return false;
     w.cargo.push_back({e.pos,e.pos-s.ship.pos,e.radius,e.facing,e.definition,e.id,false});
-    godot::Dictionary event;event["pos"]=e.pos;event["to"]=s.ship.pos-s.ship.heading*70;FrameBuilder::append(r,"anchor_capture",event);return true;
+    godot::Dictionary event;event["id"]=e.id;event["pos"]=e.pos;event["to"]=s.ship.pos-s.ship.heading*70;FrameBuilder::append(r,"anchor_capture",event);return true;
 }
 void MassTowBehavior::end(RunRuntime &r) {auto &w=r.state.loadout.mass_tow;if (!w.ready) return;for (auto &c:w.cargo) c.ready=true;w.fire.remaining=w.hold;}
 void MassTowBehavior::step(RunRuntime &r,double dt) {

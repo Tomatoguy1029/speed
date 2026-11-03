@@ -5,6 +5,8 @@ uniform sampler2D normal_tex : hint_normal, filter_nearest;
 uniform sampler2D enemy0 : source_color, filter_nearest;
 uniform sampler2D enemy1 : source_color, filter_nearest;
 uniform sampler2D enemy2 : source_color, filter_nearest;
+#include "res://shaders/elite_death.gdshaderinc"
+uniform float death_age = 0.0;
 uniform float full = 0.0;
 uniform float stored_full = 0.0;
 uniform float clock = 0.0;
@@ -30,6 +32,7 @@ void fragment() {
 	if (!front && full > 0.001) source = pump_source(p, radii);
 	bool valid = source.x >= 0.0 && source.x < 24.0 && source.y >= (front ? 0.0 : 18.0) && source.y < 37.0;
 	vec2 sample_uv = (source + 0.5) / vec2(24.0, 37.0);
+	if (death_enabled && texture(death_map, sample_uv).r <= death_age) discard;
 	vec4 base = valid && (front || rear) ? texture(base_tex, sample_uv) : vec4(0.0);
 	vec4 armor = valid && (front || rear) ? texture(armor_tex, sample_uv) : vec4(0.0);
 	vec4 contents = vec4(0.0);

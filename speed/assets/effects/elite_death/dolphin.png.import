@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/dolphin.png-9729a9927afc4855cfa8a07a74ff706f.ctex"
+
+[deps]
+source_file="res://assets/effects/elite_death/dolphin.png"
+dest_files=["res://.godot/imported/dolphin.png-9729a9927afc4855cfa8a07a74ff706f.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false
