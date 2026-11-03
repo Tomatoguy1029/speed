@@ -196,19 +196,26 @@ DEMOS.push({
 });
 
 // ---------- いるか座（dolphin）
-function waveArc(R, pos, rad, a0, a1, w, color, alpha, t) { // 先頭の当たる弧＋後ろの波紋（試作）
-  const pal = FX.ramp(color), L = toL(pos), r = rad * WL, ww = w * WL;
-  R.front.arc(L.x, L.y, r, Math.max(1.5, ww * 0.5), a0, a1, pal[3], alpha);
-  R.front.arc(L.x, L.y, r + ww * 0.15, Math.max(1, ww * 0.18), a0, a1, pal[4], alpha);
-  for (let n = 1; n <= 4; n++) { const rr = r - n * ww * 0.55; if (rr > 0) R.front.arc(L.x, L.y, rr, Math.max(1, ww * (0.32 - n * 0.05)), a0 + 0.04 * n, a1 - 0.04 * n, pal[Math.max(0, 3 - n)], alpha * (0.75 - n * 0.15)); }
-  for (const s of [a0, a1]) R.front.circle(L.x + Math.cos(s) * r, L.y + Math.sin(s) * r, Math.max(1, ww * 0.28), pal[3], alpha);
-  for (let an = a0; an <= a1 + 1e-6; an += 0.12) R.front.glow(L.x + Math.cos(an) * r, L.y + Math.sin(an) * r, ww * 0.9 + 3, pal[2], 0.18 * alpha); // 弧の範囲だけ光らせる（全周の輪にしない）
+// 波動の帯：弧に沿って塗り、両端は細くとがらせる（丸を付けない）。外側（進む側）の縁だけ明るく、内側は暗く
+function waveBand(p, L, r, a0, a1, w, cols, alpha) {
+  if (r <= 0 || w <= 0) return; const n = Math.max(8, Math.round((a1 - a0) * r * 2));
+  for (let i = 0; i <= n; i++) {
+    const u = i / n, an = a0 + (a1 - a0) * u, tp = Math.pow(Math.min(1, Math.min(u, 1 - u) / 0.22), 0.75), ww = w * tp; if (ww < 0.3) continue;
+    const c = Math.cos(an), sn = Math.sin(an);
+    for (let q = -ww; q <= ww; q += 0.5) { const e = q / ww; p.dot(L.x + c * (r + q), L.y + sn * (r + q), e > 0.55 ? cols.edge : e > -0.45 ? cols.body : cols.inner, alpha); }
+  }
+}
+function waveArc(R, pos, rad, a0, a1, w, color, alpha, t) { // 現行（wave.gd RIPPLE）と同じ並び：当たる先頭の帯＋後ろの薄い波紋3本
+  const pal = FX.ramp(color), L = toL(pos), r = rad * WL, ww = w * WL, edge = PX.mix(pal[2], hexc('#fff4e0'), 0.35);
+  waveBand(R.front, L, r, a0, a1, Math.min(ww * 0.5, r * 0.3), { edge, body: pal[2], inner: pal[1] }, alpha); // 出たばかりで半径が小さいうちは細く（塊にしない）
+  for (let n = 1; n < 4; n++) { const rr = r - n * ww * 1.6; waveBand(R.front, L, rr, a0 + 0.03 * n, a1 - 0.03 * n, ww * 0.22, { edge: pal[2], body: pal[1], inner: pal[0] }, alpha * (0.7 - n * 0.15)); }
+  for (let an = a0 + 0.1; an <= a1 - 0.1 + 1e-6; an += 0.12) R.front.glow(L.x + Math.cos(an) * r, L.y + Math.sin(an) * r, ww * 0.9 + 3, pal[2], 0.16 * alpha); // 弧の範囲だけ光らせる
 }
 DEMOS.push({
   id: 'G12-dolphin', ids: ['G12'], cat: G12, group: 'いるか座（dolphin）', title: '扇の波動', duration: 3.4, color: '#ff4f42', cam: { x: -80, y: 20 },
   params: [],
   refs: ['scripts/enemies/dolphin.gd（telegraph 1.0 の間 aim_turn 2.0 で向き直り、fire_wave、recover 0.6）', 'render/enemies/dolphin.gd・render/attacks/wave.gd RIPPLE（現行）', 'data/enemies/dolphin.tres（wave_arc 0.7 / 半径430 / 速さ300 / 幅50）', 'pixelFX painter.arc/glowRing'],
-  status: { '状態': '試作のみ', '判定': '変更なし。当たる先頭の弧（幅50）を最も明るい帯に、後ろの層は見た目だけ' },
+  status: { '状態': '試作のみ', '判定': '変更なし。当たる先頭の弧（幅50）を最も明るい帯に、後ろの層は見た目だけ', '形': '現行と同じ帯＋後ろの波紋3本。両端は丸めずにとがらせ、色は主色の赤（外側の縁だけ明るく）' },
   setup(S) { S.e = mkE('dolphin', V(-420, -20), 0, { fire_t: 0.3 }); S.ship = shipState(V(200, 80)); },
   step(S, dt) {
     const e = S.e, p = prm('dolphin'); S.ship.pos.y = 80 + Math.sin(S.t) * 40;
