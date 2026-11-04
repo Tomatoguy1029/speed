@@ -1045,7 +1045,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::TelescopeFire: return field=="pos" || field=="angle" || field=="length" || field=="width";
     case EventType::Explode: return field=="pos" || field=="radius" || field=="cause" || field=="color" || field=="life";
     case EventType::FullBurstReady: return field=="pos";
-    case EventType::FloodEnd: return field=="id" || field=="row" || field=="pos" || field=="angle" || field=="length" || field=="width" || field=="spread" || field=="age" || field=="tail" || field=="collapse" || field=="margin";
+    case EventType::FloodEnd: return field=="reference_aquarius" || field=="index" || field=="id" || field=="row" || field=="pos" || field=="angle" || field=="length" || field=="width" || field=="spread" || field=="age" || field=="tail" || field=="collapse" || field=="margin";
     case EventType::Beam: return field=="from" || field=="to" || field=="width" || field=="life" || field=="color" || field=="visual_key" || field=="width_scale";
     case EventType::CriticalLance: return field=="from" || field=="to" || field=="width";
     case EventType::CriticalLanceHit: return field=="pos" || field=="radius" || field=="direction";
