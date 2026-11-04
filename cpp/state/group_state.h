@@ -5,6 +5,7 @@
 namespace speed {
 struct HoundSteering {
     double arrive=0,decel=0,face_turn=0,turn_slow=0,turn_fast=0,turn_switch=0,max_speed=0,accel=0;
+    double speed_rate=1;
 };
 struct HoundOrder {
     bool follow=false,steer=false,quiet=false,warning=false,quiet_velocity_set=false;

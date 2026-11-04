@@ -34,8 +34,8 @@ bool GroupSystem::follow(godot::RunState &state,EnemyHandle actor,godot::Vector2
     auto *o=order(state,actor);if (!o) return false;o->canis_howl_rest=false;o->follow=true;o->follow_goal=goal;o->follow_until=until;o->follow_scale=scale;return true;
 }
 bool GroupSystem::steer(godot::RunState &state,EnemyHandle actor,godot::Vector2 goal,godot::Vector2 face,double until,const HoundSteering &config) {
-    auto *o=order(state,actor);if (!o) return false;
-    o->canis_howl_rest=false;if (!o->steer) {o->heading=state.enemies[actor.slot].facing;o->speed=state.enemies[actor.slot].vel.length();}
+    auto *o=order(state,actor);if (!o || !std::isfinite(config.speed_rate) || config.speed_rate<=0) return false;
+    o->canis_howl_rest=false;if (!o->steer || o->steering.speed_rate!=config.speed_rate) {o->heading=state.enemies[actor.slot].facing;o->speed=state.enemies[actor.slot].vel.length()/config.speed_rate;}
     o->steer=true;o->steer_goal=goal;o->face_point=face;o->steer_until=until;o->steering=config;return true;
 }
 bool GroupSystem::quiet(godot::RunState &state,EnemyHandle actor,double until,bool has_velocity,godot::Vector2 velocity) {
@@ -57,7 +57,7 @@ bool GroupSystem::validate(const godot::RunState &state) {
     for (const auto &g:state.groups.groups) {
         if (g.value.members.is_empty() || !g.value.target.is_finite()) return false;
         if (g.value.kind==Group::Kind::Cepheus && (!g.value.formation.anchor.is_finite() || g.value.formation.tier<1 || g.value.formation.tier>3)) return false;
-        for (const auto &m:g.value.members) if ((m.value.order.canis_howl_rest && (g.value.kind!=Group::Kind::Hounds || m.value.order.follow || m.value.order.steer || m.value.order.warning)) || !state.enemy_handles.contains(m.value.actor) ||
+        for (const auto &m:g.value.members) if (!std::isfinite(m.value.order.steering.speed_rate) || m.value.order.steering.speed_rate<=0 || (m.value.order.canis_howl_rest && (g.value.kind!=Group::Kind::Hounds || m.value.order.follow || m.value.order.steer || m.value.order.warning)) || !state.enemy_handles.contains(m.value.actor) ||
             state.enemy_handles.entity_id(m.value.actor)!=m.key || !seen.insert(m.key).second ||
             state.enemies[m.value.actor.slot].group_id!=g.key || !std::isfinite(m.value.order.warning_started)) return false;
     }
