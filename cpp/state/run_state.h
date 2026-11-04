@@ -17,6 +17,7 @@
 #include "hazard_state.h"
 #include "previous_pose_state.h"
 #include "../systems/timing.h"
+#include "../systems/boss_contact.h"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include "run_control_state.h"
 #include "hero_state.h"
@@ -38,6 +39,8 @@ namespace godot {
 struct RunState {
     speed::HeroState heroes;
     speed::BossStates bosses;
+    std::vector<speed::BossLandingContact> boss_landings;
+    bool boss_contact_interrupt_trace=false;
     speed::RunControlState control;
     speed::PreviousPoseState previous_poses;
     speed::AttackState attacks;

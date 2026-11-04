@@ -1,3 +1,4 @@
+#include "boss_contact.h"
 #include "heroes.h"
 #include "../api/run_core.h"
 #include "attacks/wall.h"
@@ -85,6 +86,7 @@ void SpeedRunCore::kill_enemy(size_t row,bool crit,StringName cause,Vector2 dire
 bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.combat_ready || !from.is_finite() || !std::isfinite(radius) || radius < 0) return false;
     if (speed::WallSystem::bounce_ship(runtime,from)) return true;
+    if (speed::BossContactSystem::resolve(runtime,from,runtime.state.ship.pos,runtime.state.ship_config.ship_radius)) return true;
     const auto &c = runtime.state.combat_config;
     const Vector2 to = runtime.state.ship.pos;
     const double padding = radius + std::max(c.max_enemy_radius, runtime.state.grid.max_radius);
