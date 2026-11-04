@@ -8,6 +8,7 @@
 #include "hound.h"
 #include "defender.h"
 #include "../../systems/attacks/zone.h"
+#include "../../output/frame_builder.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -44,14 +45,19 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         enemy.charge = 1.0 - std::max(0.0, enemy.timer) / def.bite.telegraph;
         if (enemy.timer <= 0) {
             const Vector2 at = from + Vector2::from_angle(enemy.facing) * (enemy.radius + def.bite.reach * 0.5);
+            bool emitted=false;
             if (def.kind==speed::EnemyDefinition::Kind::Defender) {
-                speed::ZoneParams zone;zone.position=at;zone.radius=def.bite.radius;zone.damage=def.bite.damage;zone.style=speed::ZoneStyle::Bite;zone.color=def.color.lightened(0.4);zone.owner=runtime.state.enemy_handles.at(uint32_t(row));zone.budget.value=token;speed::ZoneSystem::emit(runtime,zone);
+                speed::ZoneParams zone;zone.position=at;zone.radius=def.bite.radius;zone.damage=def.bite.damage;zone.style=speed::ZoneStyle::Bite;zone.color=def.color.lightened(0.4);zone.owner=runtime.state.enemy_handles.at(uint32_t(row));zone.budget.value=token;const auto attack=speed::ZoneSystem::emit(runtime,zone);emitted=speed::AttackSystem::get(runtime.state,attack)!=nullptr;
             } else if (runtime.state.bite_zone_config.ready) {
                 BiteZone zone;zone.pos=at;zone.shape=speed::CircleHazard{float(def.bite.radius)};zone.damage=def.bite.damage;zone.color=def.color.lightened(0.4);
                 speed::AttackSpec spec;spec.owner.budget.value=token;spec.owner.live_source=runtime.state.enemy_handles.at(uint32_t(row));
                 spec.policies=speed::EndPolicy::NaturalLifetime|speed::EndPolicy::ClearWithBonus;spec.cause=speed::Cause::Blast;
                 if (!runtime.content->contacts.empty()) speed::AttackSystem::configure_contact(*runtime.content,2,spec);
-                speed::AttackSystem::emit_hazard(runtime.state,zone,spec);
+                const auto attack=speed::AttackSystem::emit_hazard(runtime.state,zone,spec);emitted=speed::AttackSystem::get(runtime.state,attack)!=nullptr;
+            }
+            if (emitted && (def.kind==speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender)) {
+                Dictionary cue;cue["id"]=enemy.id;cue["pos"]=from;cue["angle"]=enemy.facing;cue["radius"]=enemy.radius;cue["sprite_radius"]=enemy.radius*def.sprite_scale;cue["cue"]=def.kind==speed::EnemyDefinition::Kind::Hound?"hound":"defender";
+                speed::FrameBuilder::append(runtime,"biter_cue",cue);
             }
             enemy.charge = 0; enemy.mode = EnemyMode::Recover; enemy.timer = def.bite.rest;
         }
