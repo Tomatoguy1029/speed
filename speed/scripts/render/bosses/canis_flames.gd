@@ -40,13 +40,16 @@ func _transfer(effect: Dictionary, progress: float) -> Array:
 		var p := clampf(progress-k*0.045,0.0,1.0)
 		samples.append({"pos":effect.from+to*p+side*sin(p*PI)*minf(60.0,to.length()*0.15),"radius":lerpf(22.0,8.0,k/4.0),"seed":k})
 	return samples
-func apply_frame(rows: Array, clock: float, burning: Array = [], mouth: Dictionary = {}) -> void:
+func apply_frame(rows: Array, clock: float, burning: Array = [], mouth: Dictionary = {}, fire_visual: Array = []) -> void:
 	if _clock>clock: clear()
 	_clock = clock
 	var seen := {}
 	var clouds := {}
+	var replacement := {}
+	for jet: Dictionary in fire_visual: replacement[int(jet.id)] = true
 	for row: Dictionary in rows:
 		if row.kind==1:
+			if replacement.has(int(row.get("jet_id",0))): continue
 			if not clouds.has(row.profile): clouds[row.profile] = []
 			clouds[row.profile].append(row)
 		elif row.kind==2 and row.length>0.0:

@@ -2,6 +2,7 @@
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const POUNCE_MOTION := preload("res://scripts/render/bosses/canis_motion.gd")
+const FIRE_PIXELS := preload("res://scripts/render/bosses/canis_fire_pixels.gd")
 const HOUND_BURN := preload("res://scripts/render/bosses/canis_hound_burn.gd")
 const LANDING_DUST := preload("res://scripts/render/bosses/canis_landing.gd")
 const NOVA_DISPLAY := preload("res://scripts/render/bosses/canis_nova.gd")
@@ -67,7 +68,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	if not state.is_empty() and int(body.phase)>int(state.phase): _pulse_until = float(body.clock)+0.35
 	if not state.is_empty() and (body.get("calling",false)!=state.get("calling",false) or body.get("barking",false) and not state.get("barking",false)): _pulse_until = float(body.clock)+0.35
 	pulse = maxf(0.0,_pulse_until-float(body.clock))
-	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock),body.get("burning",[]),{"position":body.position+Vector2.from_angle(float(body.facing))*float(body.radius)*0.84,"profile":attack.get("flame_profile",5),"active":attack.get("technique","")=="blaze" and int(attack.get("stage",5))==0})
+	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock),body.get("burning",[]),{"position":body.position+Vector2.from_angle(float(body.facing))*float(body.radius)*0.84,"profile":attack.get("flame_profile",5),"active":attack.get("technique","")=="blaze" and int(attack.get("stage",5))==0},body.get("fire_visual",[]))
 	_track_command(body,attack,dt)
 	_track_nova(body)
 	if not state.is_empty() and dt>0.0:
@@ -157,6 +158,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if is_instance_valid(_burst_overlay): _burst_overlay.apply_frame(state.get("blaze_bursts",[]),float(state.clock))
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 	HOUND_BURN.draw(canvas,_trails,float(state.clock))
+	FIRE_PIXELS.draw(canvas,state.get("fire_visual",[]))
 	if not _nova.is_empty():
 		NOVA_DISPLAY.draw_field(canvas,_nova,_nova_params)
 		NOVA_DISPLAY.draw_flare(canvas,_nova,_nova_params)
