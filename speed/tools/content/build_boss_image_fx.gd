@@ -74,6 +74,8 @@ static func apply(data: Dictionary) -> Error:
 				"offset_x":sprite.offset.x,"offset_y":sprite.offset.y,"centered":sprite.centered,"flip_h":sprite.flip_h,"flip_v":sprite.flip_v,
 				"visible":sprite.visible,"bow":path=="Bow" and sprite.name==&"Bow"})
 	root.free()
+	# alpha=1が重なっても元canvasの閾値を超えない上限。
+	if data.CentaurusImageSprite.size() > 60: return ERR_INVALID_DATA
 	data.CentaurusImageBow = []
 	for index in PARTS.BOW_REGIONS.size():
 		var region: Rect2 = PARTS.BOW_REGIONS[index]

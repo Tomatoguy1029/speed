@@ -24,6 +24,10 @@ def bake():
         inputs[resource] = sha(path)
         image = Image.open(path).convert('RGBA')
         alpha = image.getchannel('A').tobytes()
+        # 不透明な部位以外のalphaはarmorの1のみ。最大60枚でも合成値は閾値以下。
+        allowed = (0, 1, 255) if name == 'armor.png' else (0, 255)
+        if any(value not in allowed for value in alpha):
+            raise ValueError('半透明の合成を再評価してください: ' + resource)
         bits = bytearray((len(alpha) + 7) // 8)
         for index, value in enumerate(alpha):
             if value > THRESHOLD:
