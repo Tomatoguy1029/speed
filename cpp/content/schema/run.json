@@ -628,6 +628,11 @@
           "runtime": "control.boss_ram_hitstop"
         },
         {
+          "name": "fx_monoceros_sweep_timing",
+          "type": "f64",
+          "min": 0
+        },
+        {
           "name": "fx_monoceros_slash_life",
           "type": "f64",
           "min": 0
@@ -639,7 +644,7 @@
           "runtime": "control.boss_touch_damage"
         }
       ],
-      "version": 12
+      "version": 13
     },
     {
       "name": "StringEntry",
