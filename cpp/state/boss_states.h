@@ -2,6 +2,7 @@
 #include "entity_store.h"
 #include "combat_types.h"
 #include "../bosses/centaurus/image_pose_state.h"
+#include "../bosses/centaurus/reference_fx_state.h"
 #include "../bosses/canis_major/image_pose_state.h"
 #include "../bosses/monoceros/image_pose_state.h"
 #include "../bosses/monoceros/sweep_visual_state.h"
@@ -175,6 +176,7 @@ struct ParticipantState {
 };
 struct CentaurusGuardState {EnemyHandle actor;double scale=1,phase=0;};
 struct CentaurusBodyState {
+    CentaurusReferenceFxState reference_fx;
     CentaurusImagePoseClock image_pose;
     std::vector<CentaurusGuardState> guards;
     std::unordered_map<uint32_t,double> cooldowns;
