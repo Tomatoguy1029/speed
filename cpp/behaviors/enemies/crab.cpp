@@ -30,7 +30,13 @@ void CrabBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     if (e.mode!=EnemyMode::Move) admit();
     switch (e.mode) {
     case EnemyMode::Move: {
-        steer(r,row);const auto center=e.pos+godot::Vector2::from_angle(e.facing)*(e.radius*p.fx_reach_r);const double radius=e.radius*p.fx_hit_r;
+        const auto to=s.ship_pos-e.pos;const double distance=to.length(),min_distance=e.radius*std::abs(p.fx_reach_r-p.fx_hit_r),max_distance=e.radius*(p.fx_reach_r+p.fx_hit_r);
+        const TrackingPolicy tracking{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)};
+        if (!tracking.locked() && distance>0 && distance>=min_distance && distance<=max_distance && distance<=p.approach) {
+            const auto center=e.pos+godot::Vector2::from_angle(e.facing)*(e.radius*p.fx_reach_r);
+            if (center.distance_squared_to(s.ship_pos)>e.radius*e.radius*p.fx_hit_r*p.fx_hit_r) e.facing=to.angle();
+        } else steer(r,row);
+        const auto center=e.pos+godot::Vector2::from_angle(e.facing)*(e.radius*p.fx_reach_r);const double radius=e.radius*p.fx_hit_r;
         if (center.distance_squared_to(s.ship_pos)<=radius*radius && e.pos.distance_squared_to(s.ship_pos)<=p.approach*p.approach) {e.vel={};if (admit()) {e.mode=EnemyMode::Windup;e.timer=std::max(0.01,p.telegraph);e.charge=0;}}
         else {e.vel=walk(e)*e.speed;budget.cancel_wait(owner,e.id);}break;
     }
