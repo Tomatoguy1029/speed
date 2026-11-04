@@ -72,6 +72,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->monoceros_image_pose.tuning=records.MonocerosImageTuning_rows;
     if (records.BossImageFeedback_rows.size()!=1) return {};
     bundle->boss_image_feedback=records.BossImageFeedback_rows.front();
+    if (records.CentaurusReferenceFxDefinition_rows.size()!=1) return {};
+    bundle->centaurus_fx=records.CentaurusReferenceFxDefinition_rows.front();
     if (bundle->boss_image_feedback.duration<=0 || bundle->boss_image_feedback.seed_modulo==0) return {};
     bundle->canis_image_parts=records.CanisImagePartDefinition_rows;
     bundle->canis_roars=records.CanisRoarDefinition_rows;

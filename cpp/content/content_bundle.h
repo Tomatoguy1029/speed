@@ -17,6 +17,7 @@ struct ContentBundle {
     CentaurusImagePoseData centaurus_image_pose;
     MonocerosImagePoseData monoceros_image_pose;
     BossImageFeedback boss_image_feedback;
+    CentaurusReferenceFxDefinition centaurus_fx;
     std::vector<CanisImagePartDefinition> canis_image_parts;
     std::vector<CanisRoarDefinition> canis_roars;
     std::vector<DracoFinaleDefinition> draco_finales;
