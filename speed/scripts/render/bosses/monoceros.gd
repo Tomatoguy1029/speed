@@ -175,7 +175,7 @@ func _charge_pose() -> void:
 	var body := parts.get_node("Body") as Node2D
 	head.position = parts.rest_position("Head") + Vector2(0, -prepare*5.0 + release*3.0)
 	body.position = parts.rest_position("Body") + Vector2(0, -prepare*2.0 + release*2.0)
-	for path in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
+	for path: String in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
 		var foot := parts.get_node(path) as Node2D
 		foot.position += Vector2(0, -prepare*7.0 + release*3.0)
 
@@ -298,7 +298,7 @@ func _draw_charge_tell(canvas, move: String) -> void:
 	var charge := smoothstep(0.0, 0.62, float(technique.get("windup_progress", 0.0)))
 	var clock := float(state.clock)
 	var back := -Vector2.from_angle(float(state.facing))
-	for path in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
+	for path: String in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
 		var foot := parts.get_node(path) as Node2D
 		var at: Vector2 = canvas.to_logical(foot.global_position)
 		canvas.back.glow(at.x, at.y, 3.0, Color("#f2a03a"), charge*0.35)
