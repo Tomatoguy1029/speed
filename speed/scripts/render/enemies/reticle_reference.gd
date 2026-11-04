@@ -19,7 +19,7 @@ func render(rows: Array, events: Array, canvas, clock: float) -> void:
 	var palette := FX.ramp(color)
 	for row: Dictionary in rows:
 		var k := float(row.charge)
-		var size := float(row.target_radius) * (1.6 - 0.5 * k) * canvas.world_scale * float(_settings.size)
+		var size: float = float(row.target_radius) * (1.6 - 0.5 * k) * canvas.world_scale * float(_settings.size)
 		var spin := PI / 4.0 * (1.0 - k)
 		var center: Vector2 = canvas.to_logical(row.target)
 		for q in range(4):

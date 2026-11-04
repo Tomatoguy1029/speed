@@ -42,7 +42,7 @@ func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 		var shift := paw - raw_mouth - _at(Vector2.ZERO, angle, side, initial_size, span, 0.0, 0.0)
 		var origin := raw_mouth + shift
 		for k in 3:
-			var tip := canvas.to_logical(_mark(origin, angle, side, initial_size, span, float(_settings.gap), k, FROM[k]))
+			var tip: Vector2 = canvas.to_logical(_mark(origin, angle, side, initial_size, span, float(_settings.gap), k, FROM[k]))
 			var flicker := 0.6 + 0.4 * sin(world_time * 40 + k * 2)
 			canvas.front.glow(tip.x, tip.y, 3 + 3 * charge, palette[4], charge * flicker * float(_settings.intensity))
 			canvas.front.px(tip.x, tip.y, palette[4] if charge > 0.6 else palette[3])
@@ -64,16 +64,16 @@ func _mark(origin: Vector2, angle: float, side: float, size: float, span: float,
 
 func _scratch(canvas, origin: Vector2, angle: float, side: float, size: float, span: float, k: int, cut: float, palette: Array[Color], alpha: float) -> void:
 	var count := maxi(10, floori(size * canvas.world_scale * 1.6 + 0.5))
-	var thickness := 0.07 * size * canvas.world_scale * 0.9
+	var thickness: float = 0.07 * size * canvas.world_scale * 0.9
 	for i in count:
 		var m := float(i) / count
 		var a := lerpf(FROM[k], TO[k], m)
 		var b := lerpf(FROM[k], TO[k], float(i + 1) / count)
 		if a > cut:
 			break
-		var start := canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, a))
-		var end := canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, minf(cut, b)))
-		var width := thickness * smoothstep(0.0, 0.1, m) * pow(1 - m, 0.7) * (0.85 + 0.3 * FX.hash_value(k * 17 + floorf(m * 9)))
+		var start: Vector2 = canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, a))
+		var end: Vector2 = canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, minf(cut, b)))
+		var width: float = thickness * smoothstep(0.0, 0.1, m) * pow(1 - m, 0.7) * (0.85 + 0.3 * FX.hash_value(k * 17 + floorf(m * 9)))
 		if width < 0.25:
 			canvas.front.dot(start.x, start.y, palette[3], alpha * 0.8)
 			continue
@@ -88,5 +88,5 @@ func _scratch(canvas, origin: Vector2, angle: float, side: float, size: float, s
 		if i % 3 == 0:
 			canvas.front.light(start.x, start.y, palette[2], 0.25 * alpha)
 	if cut < TO[k] and cut > FROM[k]:
-		var tip := canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, cut))
+		var tip: Vector2 = canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, cut))
 		canvas.front.glow(tip.x, tip.y, 4, palette[4], 0.6 * alpha)
