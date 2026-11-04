@@ -88,6 +88,7 @@ var _boss_final_beams := {}
 var _boss_body_displays := {}
 var _reference_layer: RefCounted
 var _enemy_reference = preload("res://scripts/render/enemies/enemy_reference.gd").new()
+var _hound_warning_displays := {}
 var _reference_render_frame: Dictionary = {}
 var _reference_events: Array = []
 var _ram_reference := preload("res://scripts/render/fx/boss_ram_reference.gd").new()
@@ -1178,6 +1179,7 @@ func receive_frame(frame: Dictionary) -> bool:
 
 func update_reference_effects(frame: Dictionary, real_dt: float) -> void:
 	if _reference_layer == null: return
+	_update_hound_warnings(_reference_render_frame.get("hound_warning",[]),float(frame.ui.get("world_time",0.0)))
 	_enemy_reference.render(_reference_render_frame, frame.events, _reference_layer.canvas, real_dt, float(frame.ui.get("world_time",0.0)))
 	for display: Node2D in _boss_body_displays.values():
 		if display.visible and display.has_method("draw_reference"):
@@ -1187,6 +1189,24 @@ func update_reference_effects(frame: Dictionary, real_dt: float) -> void:
 	_ram_reference.render(ram,ram_body,_reference_layer.canvas,int(_reference_render_frame.get("epoch",0)))
 	_reference_layer.end_frame()
 	_reference_events.clear()
+
+func _update_hound_warnings(rows: Array, world_time: float) -> void:
+	var groups := {}
+	for row: Dictionary in rows:
+		var id := int(row.visual_id)
+		if not groups.has(id): groups[id] = []
+		groups[id].append(row)
+		if not _hound_warning_displays.has(id):
+			var layer := CanvasLayer.new()
+			layer.layer = id-5
+			layer.follow_viewport_enabled = true
+			add_child(layer)
+			var display := preload("res://scripts/render/bosses/canis_hound_warning.gd").new()
+			layer.add_child(display)
+			display.setup(preload("res://assets/pixel/hound/base.png"),preload("res://assets/pixel/hound/armor.png"))
+			_hound_warning_displays[id] = display
+	for id in _hound_warning_displays:
+		_hound_warning_displays[id].apply_frame(groups.get(id,[]),world_time)
 
 func update_effects(frame: Dictionary, dt: float) -> void:
 	if authoring_clock >= 0.0:
@@ -1456,7 +1476,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			ruler_shake=maxf(ruler_shake,4.0)
 			_rings.append({"pos":event.pos,"radius":46.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
 			_burst(event.pos,event.color,10,260.0)
-		if event.type==&"cepheus_summon":
+		if event.type==&"cepheus_summon" and not (_reference_render_frame.has("cepheus_fx") and _reference_render_frame.has("cepheus_actors")):
 			_rings.append({"pos":event.pos,"radius":70.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
 		if event.type==&"beam" and event.get("visual_key","")!="weapon/bipolar" and not (event.get("visual_key","")=="enemy/reticle" and _reference_render_frame.has("reticle_fx")):
 			var life: float = event.get("life",0.4)*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
