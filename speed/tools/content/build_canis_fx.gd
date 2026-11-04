@@ -3,10 +3,11 @@
 extends RefCounted
 
 const HULL_PATH := "res://data/visuals/canis_nova_hull.tres"
+const EMISSION_PATH := "res://data/visuals/canis_nova_emission.tres"
 const SETTINGS_PATH := "res://data/visuals/fx_reference.tres"
 
 static func input_paths() -> PackedStringArray:
-	return PackedStringArray([HULL_PATH,SETTINGS_PATH,"res://data/visuals/looks/hound.tres",
+	return PackedStringArray([HULL_PATH,EMISSION_PATH,SETTINGS_PATH,"res://data/visuals/looks/hound.tres",
 		"res://assets/pixel/hound/base.png","res://assets/pixel/hound/base.png.import",
 		"res://assets/pixel/hound/armor.png","res://assets/pixel/hound/armor.png.import","res://tools/art/bake_canis_fx.py"])
 
@@ -31,6 +32,16 @@ static func apply(data: Dictionary) -> Error:
 		canonical += "%d,%d;" % [int(point.x),int(point.y)]
 		rows.append({"id":rows.size()+1,"x":point.x,"y":point.y})
 	if canonical.sha256_text()!=baked.get_meta("hull_sha256",""): return ERR_INVALID_DATA
+	var emission := ResourceLoader.load(EMISSION_PATH,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if emission==null or emission.get_meta("bake_version",0)!=1: return ERR_INVALID_DATA
+	for path: String in emission.get_meta("inputs",{}):
+		if FileAccess.get_sha256(path)!=emission.get_meta("inputs",{})[path]: return ERR_INVALID_DATA
+	var samples = emission.get_meta("values",PackedFloat32Array())
+	if not samples is PackedFloat32Array or samples.size()!=192*192: return ERR_INVALID_DATA
+	var digest := HashingContext.new()
+	digest.start(HashingContext.HASH_SHA256)
+	digest.update(samples.to_byte_array())
+	if digest.finish().hex_encode()!=emission.get_meta("values_sha256",""): return ERR_INVALID_DATA
 	var settings := ResourceLoader.load(SETTINGS_PATH,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as FxReferenceSettings
 	if settings==null or not settings.valid(): return ERR_INVALID_DATA
 	var values := settings.for_id("O-nova")

@@ -2,6 +2,7 @@
 """猟犬の実画像から、シリウスの閃光が使う固定輪郭を生成する。"""
 import hashlib
 import json
+import math
 import re
 import struct
 import zlib
@@ -10,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 LOOK = ROOT / "data/visuals/looks/hound.tres"
 OUTPUT = ROOT / "data/visuals/canis_nova_hull.tres"
+EMISSION = ROOT / "data/visuals/canis_nova_emission.tres"
 
 
 def image(path):
@@ -115,6 +117,22 @@ def main():
               f'metadata/hull = PackedVector2Array({coordinates})\n'
               f'metadata/hull_sha256 = "{hashlib.sha256(canonical.encode()).hexdigest()}"\n')
     OUTPUT.write_text(output)
+    # 試作 NOVA_EMISSION はFloat32Array。光の歪みを実行中に焼き直さない。
+    samples = []
+    for y in range(192):
+        for x in range(192):
+            u, v = (x + 0.5) / 96 - 1, (y + 0.5) / 96 - 1
+            radius = math.hypot(u, v)
+            warp = math.sin(6 * v + 2.1 * math.sin(4 * u))
+            grain = math.sin(13 * u + 9 * v + 3 * warp) * math.sin(8 * v - 2 * u)
+            heat = max(0, 1 - radius * (1.2 + 0.24 * warp))
+            samples.append(struct.unpack('<f', struct.pack('<f', heat ** 3 * (0.70 + 0.30 * grain)))[0])
+    binary = struct.pack('<' + 'f' * len(samples), *samples)
+    values = ', '.join(format(value, '.9g') for value in samples)
+    EMISSION.write_text('[gd_resource type="Resource" format=3]\n\n[resource]\n'
+                        f'metadata/bake_version = 1\nmetadata/inputs = {json.dumps({"res://tools/art/bake_canis_fx.py": hashes["res://tools/art/bake_canis_fx.py"]})}\n'
+                        f'metadata/values_sha256 = "{hashlib.sha256(binary).hexdigest()}"\n'
+                        f'metadata/values = PackedFloat32Array({values})\n')
     print(f"猟犬の閃光用輪郭: {len(polygon)}点")
 
 
