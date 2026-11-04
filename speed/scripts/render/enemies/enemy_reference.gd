@@ -35,6 +35,7 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> 
 	_scope = scope
 	_visuals = visuals
 	_phoenix.setup_shadow(parent)
+	_telescope.setup(parent)
 
 func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_time: float) -> void:
 	var world_dt := 0.0 if _last_world_time < 0.0 or world_time < _last_world_time else world_time - _last_world_time
@@ -65,8 +66,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_dolphin.render(frame.dolphin_actors, frame.dolphin_waves, normalized, canvas, world_time)
 	if frame.has("auriga_trails"):
 		_auriga.render(frame.auriga_trails, canvas, world_time)
-	if frame.has("telescope_beams"):
-		_telescope.render(frame.telescope_beams, normalized, canvas, world_time)
+	if frame.has("telescope_beams") and frame.has("telescope_actors"):
+		_telescope.render(frame.telescope_actors, frame.telescope_beams, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -81,12 +82,12 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var ruler := frame.has("ruler_fx")
 	var dolphin := frame.has("dolphin_actors") and frame.has("dolphin_waves")
 	var auriga := frame.has("auriga_trails")
-	var telescope := frame.has("telescope_beams")
+	var telescope := frame.has("telescope_beams") and frame.has("telescope_actors")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
 	if ruler:
 		result.ruler = PackedFloat64Array()
-	if beamer or lynx or bite or cross or crab or dolphin:
+	if beamer or lynx or bite or cross or crab or dolphin or telescope:
 		var batches: Array = []
 		for source: Dictionary in frame.get("batches", []):
 			var row := source.duplicate()
@@ -94,6 +95,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 			if lynx: row.erase("lynx")
 			if cross: row.erase("cross")
 			if dolphin: row.erase("dolphin")
+			if telescope: row.erase("sniper")
 			if crab and row.has("crab"):
 				var old_crab: PackedFloat32Array = row.crab.duplicate()
 				for index in range(0, old_crab.size(), 14): old_crab[index + 4] = 0.0
