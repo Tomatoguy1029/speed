@@ -34,7 +34,7 @@ bool BossRamSystem::begin(RunRuntime &r,EnemyHandle target,const BossImageCut &c
     ram.pending=true;ram.target=target;ram.target_id=enemy.id;ram.serial=control.next_boss_ram_serial++;
     ram.direction=direction;ram.entry=cut.enter;
     ram.exit=cut.exit+direction*(ship_radius+4.0);
-    ram.remaining=s.hitstop_enabled?control.boss_ram_hitstop:0;ram.started_at=s.sim_time;ram.released_at=-1;
+    ram.remaining=s.hitstop_enabled?std::max(s.hitstop,control.boss_ram_hitstop):0;ram.started_at=s.sim_time;ram.released_at=-1;
     s.ship.pos=cut.enter-direction*ship_radius;s.ship_pos=s.ship.pos;s.hitstop=std::max(s.hitstop,ram.remaining);
     notify(r,"in",ram.entry);
     return true;
