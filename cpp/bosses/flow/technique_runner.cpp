@@ -209,6 +209,7 @@ godot::Array TechniqueRunner::snapshot(const RunRuntime &run) {
             if (t.stage!=TechniqueStage::Active && p.kind!=2) stage="other";
             if (p.kind==2 && t.stage!=TechniqueStage::Windup && t.stage!=TechniqueStage::Active) stage="other";
             item["fx_boost_stage"]=godot::String(stage);item["fx_boost_travel"]=travel;item["fx_boost_run_speed"]=run_speed;item["fx_boost_approach_speed_max"]=approach_speed_max;
+            item["fx_boost_elapsed"]=p.kind==0?std::max(0.0,t.elapsed-p.warn):p.kind==4?std::get<MonocerosReturnState>(t.detail).elapsed:p.kind==6?std::get<MonocerosDanceState>(t.detail).elapsed:0.0;
         }
         if (HydraTechnique::supports(p.kind)) {const auto value=HydraTechnique::snapshot(t,*run.content);for (const auto &key:value.keys()) item[key]=value[key];}
         if (p.kind==2) {const auto &v=std::get<MonocerosSweepState>(t.detail);item["stop_progress"]=std::clamp(v.elapsed/std::max(p.stop_time,0.001),0.0,1.0);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["side"]=v.side;item["speed"]=v.speed;item["glow"]=v.glow;item["booster"]=v.stage==MonocerosSweepState::Stage::Approach?0.55+1.95*v.speed/std::max(p.approach_speed_max,0.001):v.stage==MonocerosSweepState::Stage::Stop?0.3:0.55;}

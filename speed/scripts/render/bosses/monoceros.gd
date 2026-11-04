@@ -38,8 +38,8 @@ var _flame_facing := 0.0
 var _horn_source_seconds := 0.0
 var _horn_durations: PackedFloat32Array
 var _horn_lengths: PackedFloat32Array
-var _reference_canvas: RefCounted
-var _reference_boost: Node2D
+var _reference_canvas
+var _reference_boost
 var _reference_id := "I-charge"
 @onready var parts: PartsVisual = $Parts
 @onready var horn: Sprite2D = $Parts/Head/Lower/Horn
@@ -131,7 +131,23 @@ func _sync_parts(dt: float) -> void:
 		if not _leg_rest.has(path): _leg_rest[path] = foot.position.y
 		foot.position.y = float(_leg_rest[path])
 	_kick_pose()
+	_charge_pose()
 	_sync_horn(dt, k, horn_tint)
+
+## 突進の構えと発進は本体と足の見た目だけを動かす。
+func _charge_pose() -> void:
+	var move := String(technique.get("technique", ""))
+	var aimed := move in ["charge", "return_charge", "horn_dance"]
+	var prepare := smoothstep(0.0, 0.62, float(technique.get("windup_progress", 0.0))) if aimed and _mode() == &"windup" and int(technique.get("sequence_stage", 0)) == 0 else 0.0
+	var elapsed := float(technique.get("fx_boost_elapsed", 0.0))
+	var release := 1.0 - smoothstep(0.035, 0.14, elapsed) if aimed and String(technique.get("fx_boost_stage", "")) == "run" else 0.0
+	var head := parts.get_node("Head") as Node2D
+	var body := parts.get_node("Body") as Node2D
+	head.position = parts.rest_position("Head") + Vector2(0, -prepare*5.0 + release*3.0)
+	body.position = parts.rest_position("Body") + Vector2(0, -prepare*2.0 + release*2.0)
+	for path in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
+		var foot := parts.get_node(path) as Node2D
+		foot.position += Vector2(0, -prepare*7.0 + release*3.0)
 
 ## 後脚は表示専用。C++の進行値から同じ姿勢を組み直せる。
 func _kick_pose() -> void:
@@ -219,14 +235,15 @@ func booster_strength() -> float:
 	return 2.5 if _mode() == &"active" and StringName(technique.get("technique","")) in [&"charge", &"return_charge"] else 0.55
 
 ## 共通ホストから画素変換を受け取り、技の値と本体の姿勢を同じフレームで描く。
-func set_reference_canvas(canvas: RefCounted) -> void:
+func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
 
-func draw_reference(canvas: RefCounted, _real_dt: float) -> void:
+func draw_reference(canvas, _real_dt: float) -> void:
 	if state.is_empty() or not is_instance_valid(_reference_boost): return
 	var move := String(technique.get("technique", ""))
 	if not move.is_empty() and not REFERENCE_SETTINGS.for_id("I-" + move).is_empty(): _reference_id = "I-" + move
 	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
+	_draw_charge_tell(canvas, move)
 	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
 	var overlap := Vector2.from_angle(_tail_facing) * (24.0 * float(state.radius) / 96.0)
 	var anchor := to_local(nozzle.to_global(Vector2(37, 0)) + overlap)
@@ -235,3 +252,35 @@ func draw_reference(canvas: RefCounted, _real_dt: float) -> void:
 		float(technique.get("fx_boost_travel", 0.0)), float(technique.get("fx_boost_run_speed", 0.0)),
 		float(technique.get("fx_boost_approach_speed_max", 0.0)), values, float(canvas.world_scale),
 		anchor, _tail_facing - float(state.facing))
+
+## 試作のmulberry32を、足ごと・時刻ごとの同じ種で使う。
+func _charge_random(state0: int) -> Array:
+	var a := (state0 + 0x6d2b79f5) & 0xffffffff
+	var t := ((a ^ (a >> 15)) * (a | 1)) & 0xffffffff
+	t = (t ^ (t + (((t ^ (t >> 7)) * (t | 61)) & 0xffffffff))) & 0xffffffff
+	return [a, float((t ^ (t >> 14)) & 0xffffffff) / 4294967296.0]
+
+func _draw_charge_tell(canvas, move: String) -> void:
+	if move not in ["charge", "return_charge", "horn_dance"] or _mode() != &"windup" or int(technique.get("sequence_stage", 0)) != 0: return
+	var charge := smoothstep(0.0, 0.62, float(technique.get("windup_progress", 0.0)))
+	var clock := float(state.clock)
+	var back := -Vector2.from_angle(float(state.facing))
+	for path in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
+		var foot := parts.get_node(path) as Node2D
+		var at: Vector2 = canvas.to_logical(foot.global_position)
+		canvas.back.glow(at.x, at.y, 3.0, Color("#f2a03a"), charge*0.35)
+		for j in 5:
+			var seed := floori(clock*12.0)*13+j+path.length()*7
+			var first := _charge_random(seed if seed != 0 else 1)
+			var second := _charge_random(first[0])
+			var age := fposmod(clock*12.0,1.0)/12.0+j*0.02
+			var distance := lerpf(4.0,14.0,first[1])*charge
+			var angle := back.angle()+lerpf(-0.6,0.6,second[1])
+			var direction := Vector2.from_angle(angle)
+			var point := at+direction*distance
+			if charge > 0.15:
+				canvas.back.line(point.x-direction.x*2.0,point.y-direction.y*2.0,point.x,point.y,func(u: float): return Color("#fff3c0") if u > 0.5 else Color("#f2a03a"),charge*(1.0-age*4.0))
+	var tail: Vector2 = canvas.to_logical(state.position - Vector2.from_angle(float(state.facing))*float(state.radius)*0.95)
+	var pulse := 0.6 + 0.4*sin(clock*(12.0+20.0*charge))
+	canvas.front.glow(tail.x,tail.y,5.0+9.0*charge*pulse,Color("#6fc4ff"),(0.3+0.5*charge)*pulse)
+	canvas.front.glow(tail.x,tail.y,2.0+3.0*charge,Color("#e4f6ff"),0.6*charge)
