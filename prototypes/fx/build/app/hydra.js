@@ -347,23 +347,24 @@ function hCycle(e, active, count, life0, life1, seed, fn) { // pixelFX cycle の
 // 手前を回る所は明るく太く、奥は暗く細い。輪のような風の弧が回りながら先へ流れ、軸に光の芯、葉がらせんに乗って運ばれる。
 function hWindBand(S, R, n, pose) {
   if (S.tech !== 'wind_band' || pose.rel < 0) return; const r = S.r, T = pose.T, e = pose.rel, p = R.front, C = H_WIND;
-  const M = hMouthAt(n, pose), dir = fromA(n.sweep), sd = orth(dir), L = r.wind_length, R0 = (R.P.windR0 ?? 32) * R.P.size, R1 = (R.P.windR1 ?? 115) * R.P.size;
+  const M = hMouthAt(n, pose), dir = fromA(n.sweep), sd = orth(dir), L = R.P.windLen ?? r.wind_length, R0 = (R.P.windR0 ?? 32) * R.P.size, R1 = (R.P.windR1 ?? 115) * R.P.size;
   const end = e > T.active ? clamp(1 - (e - T.active) / (0.45 * R.P.timing)) : 1; if (end <= 0) return;
-  const front = Math.min(L * 1.05, e * 2200), tail = e > T.active ? (e - T.active) * 700 : 0, step = 0.5 / WL;
+  const front = Math.min(L * 1.12, e * 2200), tail = e > T.active ? (e - T.active) * 700 : 0, step = 0.5 / WL;
   const rad = (s) => lerp(R0, R1, Math.pow(clamp(s / L), 0.85)), W = (s, y) => toL(add(add(M, mul(dir, s)), mul(sd, y)));
-  const fadeS = (s) => clamp((s - tail) / 30) * clamp((front - s) / 30) * (s > L ? clamp(1 - (s - L) / (0.05 * L)) : 1) * end;
+  const far = (s) => 1 - smooth(L * 0.68, L * 1.1, s), fadeS = (s) => clamp((s - tail) / 30) * clamp((front - s) / 30) * far(s) * end; // 先の3割で細く薄くなって消える
   // 軸の光の芯と口元
   const A = W(Math.max(6, tail), 0), B = W(Math.max(tail + 1, L * 0.95), 0); p.glowLine(A.x, A.y, B.x, B.y, 7 * R.P.size, C[4], 0.22 * end * R.P.intensity); p.glow(A.x, A.y, 6 * R.P.size, C[6], 0.45 * end * R.P.intensity);
   // ねじれた風の筋（らせん）
   for (let k = 0; k < 4; k++) { const ph = k * TAU / 4 + hash(k * 3.3) * 0.6;
     for (let s = tail; s <= front; s += step) { const th = s * (0.05 - 0.00004 * s) - e * (13 + 4 * hash(k)) + ph + Math.sin(s * 0.02 + k * 2.1 - e * 3) * 0.5, depth = 0.5 + 0.5 * Math.sin(th);
       const f = fadeS(s) * (0.25 + 0.75 * clamp(s / 40)) * clamp(0.55 + 0.9 * PX.tileFbm(s * 0.03 - e * 6, k * 3.1, 0, 0, 31, 2)); if (f <= 0.04) continue; // 筋ごとに濃さのむら
-      const q = W(s, rad(s) * (1 + 0.14 * Math.sin(s * 0.03 + k * 2 - e * 5)) * Math.cos(th)), w = (0.3 + 1.4 * depth) * (0.6 + 0.4 * s / L) * R.P.size, b = f * (0.3 + 0.7 * depth), nr = orth(dir);
+      const fr = far(s); if (fr < 0.95 && hash(k * 31 + Math.floor(s * WL * 2) * 7 + Math.floor(e * 24)) > fr * 1.25) continue; // 先は虫食いで散る
+      const q = W(s, rad(s) * (1 + 0.14 * Math.sin(s * 0.03 + k * 2 - e * 5) + (1 - fr) * 0.25 * Math.sin(s * 0.11 + k)) * Math.cos(th)), w = (0.3 + 1.4 * depth) * (0.6 + 0.4 * Math.min(1, s / L)) * (0.35 + 0.65 * fr) * R.P.size, b = f * (0.3 + 0.7 * depth), nr = orth(dir);
       for (let o = -w; o <= w; o += 0.5) { const x = q.x + nr.x * o, y = q.y + nr.y * o, ee = Math.abs(o) / Math.max(0.5, w);
         if (depth > 0.55 && b > 0.5) p.px(x, y, C[ee < 0.4 && depth > 0.8 ? 7 : 6]); else p.blend(x, y, depth > 0.5 ? C[5] : C[3], Math.min(0.85, b * (1 - ee * 0.5))); }
       if (depth > 0.5) p.light(q.x, q.y, C[5], 0.18 * b * R.P.intensity); } }
   // 輪のような風の弧：回りながら先へ流れる（全周は描かず、先が細る弧）
-  hCycle(e, T.active, 10, 0.32, 0.42, 21, (age, life, rnd) => { const k = age / life, s0 = lerp(10, 40, rnd(1)) + age * lerp(650, 850, rnd(2)); if (s0 > L * 1.05) return;
+  hCycle(e, T.active, 10, 0.32, 0.42, 21, (age, life, rnd) => { const k = age / life, s0 = lerp(10, 40, rnd(1)) + age * lerp(650, 850, rnd(2)) * L / 340; if (s0 > L * 1.1) return;
     const rr = rad(s0) * lerp(0.85, 1.05, rnd(3)), rx = rr * 0.26, phi0 = rnd(4) * TAU - e * 14, span = lerp(3.4, 4.4, rnd(5)), fa = Math.sin(Math.PI * k) * fadeS(s0);
     for (let m = 0; m <= 40; m++) { const u = m / 40, phi = phi0 + span * u, depth = 0.5 + 0.5 * Math.sin(phi), q = W(s0 + rx * Math.sin(phi), rr * Math.cos(phi)), b = fa * Math.sin(Math.PI * u) * (0.35 + 0.65 * depth), w = (0.3 + 1.1 * Math.sin(Math.PI * u) * depth) * R.P.size;
       if (b < 0.12) continue; for (let o = -w; o <= w; o += 0.5) { const x = q.x + dir.x * o, y = q.y + dir.y * o; if (b > 0.5 && depth > 0.5) p.px(x, y, C[Math.abs(o) < w * 0.5 ? 7 : 6]); else p.blend(x, y, C[depth > 0.5 ? 5 : 4], Math.min(0.8, b)); }
@@ -526,6 +527,7 @@ const H_DESC = {
 };
 const H_REFS = ['cpp/bosses/hydra/body.cpp（chain・待機の狙い）', 'cpp/bosses/hydra/ の各技（bite_thrust・bite_sweep・wind_band・wind_blades・rubble_lump・beam_fixed・beam_bolt・thunder_drop）', 'data/bosses/hydra.tres・hydra_moves/*.tres', 'scripts/render/attacks/hydra_shape.gd（現行表示の近似）', 'pixelFX の作り方を下敷き（impacts/hit-spark・melee/sword-slash・わしの稲妻 zigzag・voltInk）'];
 const H_PARAMS = [
+  { k: 'windLen', label: '風の帯（竜巻）の長さ（見た目、判定は340）', type: 'range', min: 200, max: 600, step: 10, def: 340 },
   { k: 'windR0', label: '風の帯（竜巻）の口元の太さ（半径）', type: 'range', min: 10, max: 90, step: 1, def: 32 },
   { k: 'windR1', label: '風の帯（竜巻）の先の太さ（半径）', type: 'range', min: 60, max: 200, step: 1, def: 115 },
   { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
