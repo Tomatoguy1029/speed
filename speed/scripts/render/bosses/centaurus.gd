@@ -39,6 +39,7 @@ const REAR_GLOW := Color(1.9, 0.35, 0.35)
 const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
 ## 矢の雨の矢の向き（画面の下向きから少し傾ける）
 const RAIN_ANGLE := PI * 0.5 - 0.35
+const PARTS_SCRIPT := preload("res://scripts/bosses/centaurus_parts.gd")
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self, "boss/body/centaurus")
 func frame_event(event: Dictionary) -> void:
@@ -97,8 +98,37 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		_parts.scale *= 1.0+0.12*height
 		_parts.position = Vector2(0.0,-65.0*height).rotated(-global_rotation)
 	_parts.set_bow_pose(StringName(technique.get("technique","")),_mode(),float(body.charge),dt,float(technique.get("pose_time",-1.0)))
+	_apply_image_parts(body.get("image_parts",[]))
 	_sync_reference_white()
 	queue_redraw()
+
+## 戦闘が使った画素→world変換を、そのまま実Spriteへ戻す。
+func _apply_image_parts(parts: Array) -> void:
+	if parts.is_empty(): return
+	for entry: Dictionary in _white_sprites:
+		var parent := (entry.source as Sprite2D).get_parent()
+		while parent != null and parent != _parts:
+			if parent is CanvasItem: parent.visible = true
+			parent = parent.get_parent()
+	for value: Dictionary in parts:
+		var index := int(value.get("part",0))-1
+		if index < 0 or index >= _white_sprites.size(): continue
+		var sprite: Sprite2D = _white_sprites[index].source
+		if sprite.get_parent() == _parts.get_node_or_null("Bow") and sprite.name == &"Bow":
+			var region := Rect2(value.get("region",Rect2i()))
+			for variant in PARTS_SCRIPT.BOW_REGIONS.size():
+				if PARTS_SCRIPT.BOW_REGIONS[variant] == region:
+					_parts._set_bow_variant(sprite.get_parent(),variant)
+					break
+		var rect := sprite.get_rect()
+		var origin := rect.position
+		var sign_x := -1.0 if sprite.flip_h else 1.0
+		var sign_y := -1.0 if sprite.flip_v else 1.0
+		if sprite.flip_h: origin.x += rect.size.x
+		if sprite.flip_v: origin.y += rect.size.y
+		var pixels := Transform2D(Vector2(sign_x,0),Vector2(0,sign_y),origin)
+		sprite.global_transform = (value.pixel_to_world as Transform2D) * pixels.affine_inverse()
+		sprite.visible = bool(value.get("visible",false))
 
 ## 同じ進路を本体全体に通し、現在の見た目の入口・出口を返す。
 func reference_cut(from: Vector2, direction: Vector2) -> Dictionary:

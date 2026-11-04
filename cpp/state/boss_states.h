@@ -1,6 +1,7 @@
 #pragma once
 #include "entity_store.h"
 #include "combat_types.h"
+#include "../bosses/centaurus/image_pose_state.h"
 #include "../content/generated/combat_ids.h"
 #include "../content/boss_image_data.h"
 #include <godot_cpp/variant/vector2.hpp>
@@ -170,6 +171,7 @@ struct ParticipantState {
 };
 struct CentaurusGuardState {EnemyHandle actor;double scale=1,phase=0;};
 struct CentaurusBodyState {
+    CentaurusImagePoseClock image_pose;
     std::vector<CentaurusGuardState> guards;
     std::unordered_map<uint32_t,double> cooldowns;
     godot::Vector2 guard_point,leap_from,leap_to;
