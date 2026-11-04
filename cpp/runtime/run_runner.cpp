@@ -28,6 +28,8 @@
 #include "../behaviors/traits/vortex.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
+#include "../systems/boss_ram.h"
+#include "../systems/boss_contact.h"
 #include "../systems/enemy_system.h"
 #include "../systems/encounters.h"
 #include "../systems/pickup_system.h"
@@ -56,6 +58,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     auto &state=core.runtime.state;auto &control=state.control;
     auto timed=[&](const char *name,auto &&action) {MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,name);return action();};
     using Phase=godot::RunState::Phase;
+    BossRamSystem::cancel_invalid(core.runtime);
     // UIの入口判定を通過するまで、入力も時計も消費しない。
     if (control.ui_overlay || (control.ui_reward && state.phase!=Phase::Finishing)) return true;
     if (state.phase==Phase::LevelUp) {ProgressionSystem::poll(core);return true;}
@@ -85,7 +88,9 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     camera(core,0,size);
     state.sim_time+=dt;
     if (!timed("draw_input",[&]{return core.handle_draw_input(input,int64_t(std::round(state.sim_time*1000)),control.camera_zoom);})) return false;
-    if (state.hitstop>0) {state.hitstop=std::max(0.0,state.hitstop-dt);return true;}
+    if (state.control.boss_ram.pending && state.draw.tracing) core.end_trace(false);
+    if (state.hitstop>0) {state.hitstop=std::max(0.0,state.hitstop-dt);BossRamSystem::advance(core.runtime,dt);return true;}
+    if (state.control.boss_ram.pending) BossRamSystem::advance(core.runtime,dt);
     if (!state.draw.tracing && state.dash_stop>0) state.dash_stop=std::max(0.0,state.dash_stop-dt*state.combat_config.kill_hitstop_regen);
     if (!timed("draw",[&]{return core.step_draw(dt);})) return false;
     if (core.check_run_end()) return true;
@@ -117,7 +122,9 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (core.check_run_end()) return true;
         if (!timed("enemy_grid",[&]{return core.rebuild_enemy_grid(state.frame_grid_cell);})) return false;
     }
+    if (state.boss_contact_interrupt_trace) {state.boss_contact_interrupt_trace=false;if (state.draw.tracing) core.end_trace(false);}
     if (!timed("ship",[&]{return core.step_ship_input(dt,world_dt,input);})) return false;
+    BossContactSystem::clear_landings(core.runtime);
     BossFinish::record_approach(core.runtime);
     if (control.lab_enemy_ai || !control.lab_mode) {
         if (input.hero_press) HeroesSystem::activate(core.runtime);
