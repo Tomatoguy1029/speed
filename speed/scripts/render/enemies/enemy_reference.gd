@@ -14,6 +14,7 @@ const TELESCOPE := preload("res://scripts/render/enemies/telescope_reference.gd"
 const RETICLE := preload("res://scripts/render/enemies/reticle_reference.gd")
 const AQUARIUS := preload("res://scripts/render/enemies/aquarius_reference.gd")
 const SOLDIER := preload("res://scripts/render/enemies/soldier_reference.gd")
+const CEPHEUS := preload("res://scripts/render/enemies/cepheus_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -31,6 +32,7 @@ var _telescope = TELESCOPE.new()
 var _reticle = RETICLE.new()
 var _aquarius = AQUARIUS.new()
 var _soldier = SOLDIER.new()
+var _cepheus = CEPHEUS.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -43,6 +45,7 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> 
 	_phoenix.setup_shadow(parent)
 	_telescope.setup(parent)
 	_aquarius.setup(parent, scope)
+	_cepheus.setup(parent, scope, visuals)
 
 func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_time: float) -> void:
 	var world_dt := 0.0 if _last_world_time < 0.0 or world_time < _last_world_time else world_time - _last_world_time
@@ -81,6 +84,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_aquarius.render(frame.aquarius_jets, normalized, canvas, world_time)
 	if frame.has("soldier_fx") and frame.has("soldier_bolts"):
 		_soldier.render(frame.soldier_fx, frame.soldier_bolts, canvas, world_time)
+	if frame.has("cepheus_fx") and frame.has("cepheus_actors"):
+		_cepheus.render(frame.cepheus_actors, frame.cepheus_fx, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -99,10 +104,13 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var reticle := frame.has("reticle_fx")
 	var aquarius := frame.has("aquarius_jets")
 	var soldier := frame.has("soldier_fx") and frame.has("soldier_bolts")
+	var cepheus := frame.has("cepheus_fx") and frame.has("cepheus_actors")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
 	if ruler:
 		result.ruler = PackedFloat64Array()
+	if cepheus:
+		result.cepheus = {"values":PackedFloat64Array(), "marks":PackedFloat64Array()}
 	if beamer or lynx or bite or cross or crab or dolphin or telescope or reticle or aquarius or soldier:
 		var batches: Array = []
 		for source: Dictionary in frame.get("batches", []):

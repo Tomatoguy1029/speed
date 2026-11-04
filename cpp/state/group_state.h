@@ -19,7 +19,7 @@ struct Group {
     EnemyHandle leader;Vector2 target;SoldierFormation formation;
     OrderedValues<int64_t,GroupMember> members;
 };
-struct CepheusMark {Vector2 pos,king;godot::Color color;double age=0,life=0;};
+struct CepheusMark {Vector2 pos,king;godot::Color color;double age=0,life=0;int64_t visual_owner=0,visual_tick=0;uint32_t visual_slot=0,visual_id=0;double visual_angle=0,visual_radius=0,visual_sprite_radius=0;};
 struct DefenderPost {EnemyHandle actor,target;godot::Vector2 position;};
 struct GroupState {
     OrderedValues<int64_t,Group> groups;

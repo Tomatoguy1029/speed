@@ -62,7 +62,7 @@ bool GroupSystem::validate(const godot::RunState &state) {
             state.enemies[m.value.actor.slot].group_id!=g.key) return false;
     }
     for (const auto &e:state.enemies) if (e.alive && e.group_id && !seen.count(e.id)) return false;
-    for (const auto &m:state.groups.summon_marks) if (!m.pos.is_finite() || !m.king.is_finite() || !std::isfinite(m.age) || m.age<0 || !std::isfinite(m.life) || m.life<=0) return false;
+    for (const auto &m:state.groups.summon_marks) if (!m.pos.is_finite() || !m.king.is_finite() || !std::isfinite(m.age) || m.age<0 || !std::isfinite(m.life) || m.life<=0 || m.visual_owner<0 || !std::isfinite(m.visual_angle) || !std::isfinite(m.visual_radius) || m.visual_radius<0 || !std::isfinite(m.visual_sprite_radius) || m.visual_sprite_radius<0) return false;
     return true;
 }
 }
