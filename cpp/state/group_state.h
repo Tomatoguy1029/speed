@@ -8,6 +8,7 @@ struct HoundSteering {
 };
 struct HoundOrder {
     bool follow=false,steer=false,quiet=false,warning=false,quiet_velocity_set=false;
+    bool canis_howl_rest=false;
     godot::Vector2 follow_goal,steer_goal,face_point,quiet_velocity;
     double follow_until=0,follow_scale=1,steer_until=0,quiet_until=0,warning_until=0,warning_started=0,heading=0,speed=0;
     HoundSteering steering;
