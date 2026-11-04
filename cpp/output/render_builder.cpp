@@ -268,11 +268,26 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     aquila["values"]=aquila_values;aquila["view"]=view;
     PackedFloat64Array phoenix;
-    for (const auto &e:state.enemies) {
+    Array phoenix_fx,phoenix_impacts;
+    for (size_t i=0;i<state.enemies.size();++i) {
+        const auto &e=state.enemies[i];
         if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss) || (e.mode!=EnemyMode::Windup && e.mode!=EnemyMode::Dash)) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Phoenix) continue;
         const auto &p=run.content->phoenixes[d.phoenix_definition-1];const auto center=std::get<PhoenixState>(e.behavior_state).anchor;const double radius=std::max(e.radius*1.1,p.impact_radius);
+        const auto pose=interpolate(previous,{e.id,e.pos,e.facing},i,false,alpha);
+        const bool diving=e.mode==EnemyMode::Dash;
+        Dictionary fx;fx["id"]=e.id;fx["mode"]=diving?"dash":"windup";fx["pos"]=pose.position;fx["anchor"]=center;
+        fx["radius"]=e.radius;fx["facing"]=pose.angle;fx["sprite_radius"]=e.radius*d.sprite_scale;fx["sprite_angle"]=pose.angle+d.sprite_angle;fx["retreat_time"]=p.retreat_time;fx["impact_radius"]=radius;
+        fx["telegraph_progress"]=diving?1.0:e.charge;fx["dive_progress"]=diving?std::clamp(1.0-e.timer/p.dive_time,0.0,1.0):0.0;
+        fx["telegraph_elapsed"]=diving?p.telegraph+std::clamp(p.dive_time-e.timer,0.0,p.dive_time):std::clamp(p.telegraph-e.timer,0.0,p.telegraph);
+        phoenix_fx.push_back(fx);
         if (!view.grow(radius*3).has_point(center)) continue;
         for (double v:{double(center.x),double(center.y),e.radius,e.facing,radius,e.mode==EnemyMode::Windup?e.charge:1.0,double(e.id%31)/31.0}) phoenix.push_back(v);
+    }
+    for (const auto &h:state.hazards) {
+        if (!h.alive || !h.zone_definition || h.time<h.delay) continue;
+        const auto &zone=run.content->zones[h.zone_definition-1];if (zone.style!=uint32_t(ZoneStyle::Phoenix)) continue;
+        const auto *circle=std::get_if<CircleHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);if (!circle || !record) continue;
+        Dictionary impact;impact["order"]=record->id;impact["owner_id"]=record->spec.owner.source_id;impact["pos"]=h.pos;impact["radius"]=double(circle->radius);impact["age"]=std::max(0.0,double(h.time-h.delay));phoenix_impacts.push_back(impact);
     }
     Dictionary marlin;PackedInt64Array marlin_ids;PackedFloat64Array marlin_values;
     for (size_t i=0;i<state.enemies.size();++i) {
@@ -325,7 +340,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
+    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];
         for (const auto &entry:std::initializer_list<std::pair<const char *,int64_t>>{{"rows",int64_t(state.enemies.size())},{"live",live_rows},{"batched",batched_rows},{"bosses",bodies.size()},{"marked",marked_rows}}) {
