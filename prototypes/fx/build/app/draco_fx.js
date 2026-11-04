@@ -164,7 +164,7 @@ function dOrganic(S, R, pose) {
 }
 for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []), { k: 'alive', label: '生き物らしさ（うねり・頭の振り・ため）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 }];
 
-// 螺旋の待ちの予兆：光が尾から頭へ胴を満たしていき、頭に届いたら飛び出す。照準の光も残り時間に合わせて下へ伸びる
+// 螺旋の待ちの予兆：光が尾から頭へ胴を満たしていき、頭に届いたら飛び出す（照準の線は出さない）
 function dSpiralCountdown(S, R, pose) {
   const sp = S.spiral; if (!sp || S.B.mode !== 'active' || !pose) return; const e = S.elapsed, shrinkAt = sp.coil + sp.pause; if (e < sp.coil || e >= shrinkAt + 0.1) return;
   const q = clamp((e - sp.coil) / sp.pause), pal = dRamp(R), pts = pose.points, N = pts.length - 1, cut = N * (1 - q), last = smooth(0.85, 1, q);
@@ -172,7 +172,6 @@ function dSpiralCountdown(S, R, pose) {
     R.front.glow(c.x, c.y, (7 + 4 * edge) * R.P.size, pal[edge > 0.5 ? 3 : 2], (0.38 + 0.5 * edge) * pulse * R.P.intensity); R.front.px(c.x, c.y, pal[edge > 0.3 ? 4 : 3]);
     for (let m = 0; m < 3; m++) { const a = hash(i * 7 + m * 13 + Math.floor(S.t * 12)) * TAU, d = 2 + 9 * hash(i * 3 + m); if (hash(i + m * 5 + Math.floor(S.t * 8)) < 0.5) R.front.px(c.x + Math.cos(a) * d, c.y + Math.sin(a) * d, pal[3]); } }
   const head = pts[0], M = toL(add(head, mul(fromA(pose.facing), 120 * DP.head_scale))), end = toL(add(head, V(0, 950)));
-  FX.warnRail(R.back, M, end, { color: R.P.color, k: 0.35 + 0.65 * q, time: S.t, seed: 77, maxLv: 2, reveal: 0.15 + 0.85 * q, intensity: R.P.intensity });
   bossGather(R, add(head, mul(fromA(pose.facing), 120 * DP.head_scale)), 120, q, S.t, 88);
   if (last > 0) { for (const sx of [-1, 1]) { const ey = toL(add(head, add(mul(fromA(pose.facing), 40), mul(orth(fromA(pose.facing)), sx * 34)))); R.front.glow(ey.x, ey.y, 3 + 4 * last, pal[3], last * R.P.intensity); R.front.px(ey.x, ey.y, pal[4]); } }
 }
