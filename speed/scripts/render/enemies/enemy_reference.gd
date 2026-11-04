@@ -1,6 +1,7 @@
 ## 承認済みの敵FXを同じ前後の論理画素層へ渡す。
 extends RefCounted
 
+const COMPOSITE := preload("res://shaders/fx_reference_composite.gdshader")
 const PHOENIX := preload("res://scripts/render/enemies/phoenix_reference.gd")
 const BEAMER := preload("res://scripts/render/enemies/beamer_reference.gd")
 const LYNX := preload("res://scripts/render/enemies/lynx_reference.gd")
@@ -40,6 +41,7 @@ var _aquila = AQUILA.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
+var _ghost_copies: Array[BackBufferCopy] = []
 
 ## parent はカメラ変換が適用されるワールド層。影は論理画素の背面より奥に置く。
 func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> void:
@@ -193,6 +195,8 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 func _draw_afterimages(rows: Array) -> void:
 	for sprite in _ghosts:
 		sprite.hide()
+	for copy in _ghost_copies:
+		copy.hide()
 	var used := 0
 	for row: Dictionary in rows:
 		var visual_id := int(row.visual_id)
@@ -213,19 +217,35 @@ func _draw_afterimages(rows: Array) -> void:
 			_parent.add_child(layer)
 			_ghost_layers[visual_id] = layer
 		var sprite: Sprite2D
+		var copy: BackBufferCopy
 		if used >= _ghosts.size():
+			copy = BackBufferCopy.new()
+			copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+			_ghost_layers[visual_id].add_child(copy)
+			_ghost_copies.append(copy)
 			sprite = Sprite2D.new()
 			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			var material := ShaderMaterial.new()
+			material.shader = COMPOSITE
+			material.set_shader_parameter("has_light",false)
+			sprite.material = material
 			_ghost_layers[visual_id].add_child(sprite)
 			_ghosts.append(sprite)
 		else:
 			sprite = _ghosts[used]
+			copy = _ghost_copies[used]
 			if sprite.get_parent() != _ghost_layers[visual_id]:
+				copy.reparent(_ghost_layers[visual_id])
 				sprite.reparent(_ghost_layers[visual_id])
 		used += 1
+		copy.show()
 		sprite.texture = texture
+		sprite.material.set_shader_parameter("color_pixels",texture)
+		sprite.material.set_shader_parameter("light_pixels",texture)
+		sprite.material.set_shader_parameter("opacity",float(row.alpha))
+		sprite.material.set_shader_parameter("linear_target",_parent.get_viewport().use_hdr_2d)
 		sprite.position = row.pos
 		sprite.rotation = float(row.angle)
 		sprite.scale = Vector2.ONE * (2.0 * float(row.radius) / maxf(texture.get_width(), texture.get_height()))
-		sprite.modulate = Color(1, 1, 1, float(row.alpha))
+		sprite.modulate = Color.WHITE
 		sprite.show()

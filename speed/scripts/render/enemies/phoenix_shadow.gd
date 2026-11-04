@@ -3,6 +3,7 @@ extends Node2D
 
 const SOURCE := preload("res://assets/effects/reference/phoenix_shadow.png")
 const BLUR := preload("res://shaders/phoenix_shadow_blur.gdshader")
+const COMPOSITE := preload("res://shaders/fx_reference_composite.gdshader")
 const POOL := preload("res://shaders/phoenix_pool.gdshader")
 const SOURCE_SIZE := Vector2(177, 134)
 
@@ -14,6 +15,7 @@ class Shadow:
 	var h_material: ShaderMaterial
 	var v_material: ShaderMaterial
 	var sprite: Sprite2D
+	var material: ShaderMaterial
 
 var _pool: Sprite2D
 var _pool_material: ShaderMaterial
@@ -58,9 +60,20 @@ func _make_shadow() -> Shadow:
 	result.v_material.set_shader_parameter("padding", Vector2.ZERO)
 	result.v_rect.material = result.v_material
 	result.vertical.add_child(result.v_rect)
+	var copy := BackBufferCopy.new()
+	copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+	add_child(copy)
 	result.sprite = Sprite2D.new()
 	result.sprite.texture = result.vertical.get_texture()
 	result.sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	result.material = ShaderMaterial.new()
+	result.material.shader = COMPOSITE
+	result.material.set_shader_parameter("color_pixels",result.sprite.texture)
+	result.material.set_shader_parameter("light_pixels",result.sprite.texture)
+	result.material.set_shader_parameter("linear_color_pixels",result.sprite.texture)
+	result.material.set_shader_parameter("filter_color_linear",true)
+	result.material.set_shader_parameter("has_light",false)
+	result.sprite.material = result.material
 	add_child(result.sprite)
 	return result
 
@@ -96,6 +109,7 @@ func _update_shadow(shadow: Shadow, sprite_radius: float, angle: float, size: fl
 	shadow.v_material.set_shader_parameter("sigma", sigma)
 	shadow.sprite.rotation = angle
 	shadow.sprite.scale = Vector2.ONE * world_pixel
-	shadow.sprite.modulate.a = clampf(alpha, 0.0, 1.0)
+	shadow.material.set_shader_parameter("opacity",clampf(alpha, 0.0, 1.0))
+	shadow.material.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	shadow.horizontal.render_target_update_mode = SubViewport.UPDATE_ONCE
 	shadow.vertical.render_target_update_mode = SubViewport.UPDATE_ONCE
