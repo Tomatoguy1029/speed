@@ -124,6 +124,21 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     const double release=aimed && run_stage?1.0-godot::Math::smoothstep(0.035,0.14,elapsed):0;
     nodes[head].position+=Vector2(0,-prepare*5+release*3);nodes[torso].position+=Vector2(0,-prepare*2+release*2);
     for (size_t i=0;i<2;++i) {const auto foot=find(nodes,std::string("Parts/")+feet[i]+"/Foot");nodes[foot].position+=Vector2(0,-prepare*7+release*3);}
+    // monoWavePose の頭・胴の溜め、震え、突き出しを画像境界と表示で共有する。
+    if (move=="horn_wave" && t && attack) if (const auto *v=std::get_if<MonocerosHornWaveState>(&t->detail)) {
+        using Stage=MonocerosHornWaveState::Stage;double pull=0,thrust=0,shake=0;
+        if (v->stage==Stage::Windup || v->stage==Stage::Recharge) {
+            const double duration=v->stage==Stage::Windup?attack->warn:attack->recharge;
+            pull=godot::Math::smoothstep(0.0,duration*0.7,v->elapsed);
+            shake=godot::Math::smoothstep(duration*0.7,duration,v->elapsed)*std::sin((t->elapsed+0.4)*70.0)*1.6;
+        } else if (v->stage==Stage::Swing) {
+            const double q=std::clamp(v->elapsed/std::max(attack->swing_time,0.001),0.0,1.0);
+            thrust=std::sin(godot::Math::PI*std::min(1.0,q*1.3));pull=1.0-godot::Math::smoothstep(0.0,0.25,q);
+        }
+        nodes[head].position+=Vector2(shake,-pull*16+thrust*15);
+        nodes[torso].position+=Vector2(shake*0.5,-pull*8+thrust*8);
+        nodes[torso].scale=Vector2(1+pull*0.05,1-pull*0.07+thrust*0.05);
+    }
     // 承認済みmonoKickPose：後脚を回転・伸縮せず、付け根から足を移動する。
     if (move=="kick" && t && attack && int(t->stage)<=2) {
         const double recovery_total=attack->hold+(attack->return_speed>0?godot::Math::PI/attack->return_speed:0)+attack->recover;
