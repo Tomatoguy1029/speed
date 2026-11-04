@@ -125,6 +125,8 @@ func _present(camera: Dictionary, frame: int, images: Array) -> bool:
 	if observe_contacts:
 		var ship: Dictionary = state.value.ui.ship
 		images[-1]["ship"] = var_to_str(ship)
+		images[-1]["hp"] = state.value.ui.hp
+		images[-1]["invincible"] = state.value.ui.invincible
 		images[-1]["max_speed"] = state.value.ui.max_speed
 		images[-1]["boss_ram"] = var_to_str(render.frame_view._reference_render_frame.get("boss_ram",{}))
 	return true
