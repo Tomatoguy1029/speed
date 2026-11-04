@@ -49,9 +49,9 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary, sha
 	_scope = scope
 	_visuals = visuals
 	_phoenix.setup_shadow(shadow_parent)
-	_telescope.setup(parent)
-	_aquarius.setup(parent, scope)
-	_cepheus.setup(parent, scope, visuals)
+	_telescope.setup(shadow_parent)
+	_aquarius.setup(parent, shadow_parent, scope)
+	_cepheus.setup(shadow_parent, scope, visuals)
 	_corona.setup(parent, scope, visuals)
 	_aquila.setup(parent, scope, visuals)
 
@@ -212,7 +212,7 @@ func _draw_afterimages(rows: Array) -> void:
 			continue
 		if not _ghost_layers.has(visual_id):
 			var layer := CanvasLayer.new()
-			layer.layer = visual_id - 5
+			layer.layer = visual_id - 6
 			layer.follow_viewport_enabled = true
 			_parent.add_child(layer)
 			_ghost_layers[visual_id] = layer

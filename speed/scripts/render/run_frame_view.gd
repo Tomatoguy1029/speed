@@ -12,6 +12,7 @@ var batches: Dictionary = {}
 var parts: Dictionary = {}
 var enemy_frames: Dictionary = {}
 var _layers: Dictionary = {}
+var _ship_layer_parent: Node2D
 var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
@@ -253,6 +254,10 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	add_child(marlin_layer)
 	var marlin_parent := Node2D.new()
 	marlin_layer.add_child(marlin_parent)
+	# 本体を描いた後、自機を描き、最後に前面FXを重ねる。
+	_ship_layer_parent = marlin_parent
+	for id: int in [17,18]:
+		if _layers.has(id): _layers[id].reparent(_ship_layer_parent)
 	_boss_technique_visual = preload("res://scripts/bosses/monoceros/technique_visual.gd").new()
 	marlin_parent.add_child(_boss_technique_visual)
 	_boss_lance_visual = preload("res://scripts/bosses/monoceros/lance_visual.gd").new()
@@ -385,7 +390,10 @@ func _layer(layer: int) -> Node2D:
 	if not _layers.has(layer):
 		var node := Node2D.new()
 		node.z_index = layer
-		add_child(node)
+		if layer in [17,18] and _ship_layer_parent != null:
+			_ship_layer_parent.add_child(node)
+		else:
+			add_child(node)
 		_layers[layer] = node
 	return _layers[layer]
 
@@ -999,7 +1007,11 @@ func apply_frame(frame: Dictionary) -> bool:
 			if scene==null: continue
 			var display = scene.instantiate()
 			display.set_script([preload("res://scripts/render/bosses/monoceros.gd"),preload("res://scripts/render/bosses/centaurus.gd"),preload("res://scripts/render/bosses/canis_major.gd"),preload("res://scripts/render/bosses/hydra.gd"),preload("res://scripts/render/bosses/draco.gd")][body.kind])
-			_pulser_parent.add_child(display)
+			if body.kind in [0,1,2]:
+				# 試作はボス本体→猟犬などの通常敵→自機の順で描く。
+				add_child(display)
+			else:
+				_pulser_parent.add_child(display)
 			if body.kind==2: display.setup_flames(_scope,visuals)
 			if body.kind in [3,4]: display.setup_effects(_scope,visuals)
 			if body.kind in [0,4]: display.hit_feedback = boss_hit_feedback
@@ -1020,6 +1032,10 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.set_reference_canvas(_reference_layer.canvas)
 		if display.has_method("setup_reference_overlay"):
 			display.setup_reference_overlay(_reference_layer.overlay)
+		if display.has_method("setup_reference_shadows"):
+			display.setup_reference_shadows(_reference_layer.shadows)
+		if display.has_method("setup_reference_front"):
+			display.setup_reference_front(_reference_layer.foreground)
 		display.apply_frame(body,attack,entry.get("appearance",{}))
 	for id in _boss_body_displays.keys():
 		if not body_seen.has(id):

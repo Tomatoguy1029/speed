@@ -20,10 +20,6 @@ func render(actors: Array, waves: Array, events: Array, canvas, clock: float) ->
 		for n in range(3):
 			var fr := 1.0 - fposmod(k * 1.6 + float(n) / 3.0, 1.0)
 			_arc(canvas.front, mouth, float(actor.radius) * (0.6 + 2.6 * fr) * canvas.world_scale * float(_settings.size), angle - arc * 0.8, angle + arc * 0.8, pal[3], (1.0 - fr) * k * float(_settings.intensity))
-		for i in range(26):
-			var an := angle + (FX.hash_value(i * 3.3) - 0.5) * 2.0 * arc
-			var d := fposmod(FX.hash_value(i) + clock * 0.9, 1.0) * 160.0 * k
-			canvas.back.dot(mouth.x + cos(an) * d * canvas.world_scale, mouth.y + sin(an) * d * canvas.world_scale, pal[2], 0.5 * k * (1.0 - d / 160.0))
 		FX.gather(canvas.front, mouth, float(actor.radius) * 1.4 * canvas.world_scale, k * float(_settings.intensity), color, clock, 10, 13)
 	var present := {}
 	for row: Dictionary in waves:

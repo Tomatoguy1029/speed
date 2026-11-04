@@ -79,7 +79,7 @@ static func _draw_group(canvas, rows: Array, clock: float, logical_pixel: float,
 				if not pixels.is_empty(): point = canvas.to_logical(pixels[floori(_hash(seed+j*7.0)*pixels.size())])
 				else: point = center+Vector2((_hash(seed+j*7.0)-0.5)*cell*1.2,(_hash(seed+j*11.0)-0.5)*cell*1.2)
 				if _hash(seed+j*13.0+1.0)<0.35: continue
-				canvas.back.blend(point.x,point.y,SOOT[j%2],0.6*(1.0-smoothstep(life*0.5,life+0.8,after)))
+				canvas.mid.blend(point.x,point.y,SOOT[j%2],0.6*(1.0-smoothstep(life*0.5,life+0.8,after)))
 			for j in 4:
 				var h := _hash(seed+j*17.0+3.0)
 				if h<0.3: continue
@@ -128,5 +128,5 @@ static func _draw_group(canvas, rows: Array, clock: float, logical_pixel: float,
 			var inner := _read(field,width,height,x+u,y+v,1)>=0.32
 			var core := inner and _read(field,width,height,x+u,y+v,2)>=0.32
 			var color: Color = H[1 if core else 4 if inner else 6]
-			canvas.back.px(px,py,color)
-			if (px&3)==0 and (py&3)==0: canvas.back.glow(px,py,4.0,color,0.18*float(params.intensity))
+			canvas.mid.px(px,py,color)
+			if (px&3)==0 and (py&3)==0: canvas.mid.glow(px,py,4.0,color,0.18*float(params.intensity))

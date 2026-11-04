@@ -108,7 +108,7 @@ func apply(body: Dictionary, attack: Dictionary, gait: float, world_to_screen: f
 		visible = false
 		return
 	position = (get_parent() as Node2D).to_local(attack.aim)
-	rotation = -float(body.facing)
+	global_rotation = 0.0
 	scale = Vector2.ONE/world_to_screen
 	var progress := clampf(float(motion.stage_time)/maxf(float(motion.warn_time),0.001),0.0,1.0)
 	_rig.modulate.a = 0.28*progress

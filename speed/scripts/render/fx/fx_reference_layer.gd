@@ -5,6 +5,7 @@ const COMPOSITE := preload("res://shaders/fx_reference_composite.gdshader")
 var canvas := CANVAS.new()
 var shadows: Node2D
 var overlay: Node2D
+var foreground: Node2D
 var _sprites: Array[Sprite2D] = []
 var _lights: Array[ImageTexture] = []
 var _copies: Array[BackBufferCopy] = []
@@ -21,10 +22,13 @@ func setup(parent: Node2D, back_parent: Node2D) -> void:
 	overlay = Node2D.new()
 	overlay.z_index = 9
 	parent.add_child(overlay)
-	for i in 2:
+	foreground = Node2D.new()
+	foreground.z_index = 19
+	parent.add_child(foreground)
+	for i in 4:
 		# CanvasLayerをまたいでz_indexは比較されない。背面は本体と同じワールドへ置く。
-		var target: Node2D = back_parent if i == 0 else parent
-		var depth := -1 if i==0 else 10
+		var target: Node2D = parent if i == 3 else back_parent
+		var depth: int = [-1, 0, 1, 20][i]
 		var copy := BackBufferCopy.new()
 		copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
 		copy.z_index = depth
@@ -49,8 +53,8 @@ func begin_frame(size: Vector2, center: Vector2, zoom: float) -> void:
 
 func end_frame() -> void:
 	canvas.end_frame()
-	var painters: Array = [canvas.back,canvas.front]
-	for i in 2:
+	var painters: Array = [canvas.back,canvas.mid,canvas.mid_landing,canvas.front]
+	for i in 4:
 		var painter = painters[i]
 		var visible: bool = painter.has_color or painter.has_light
 		_copies[i].visible = visible

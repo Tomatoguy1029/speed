@@ -9,6 +9,7 @@ const STREAM := preload("res://scripts/render/enemies/aquarius_stream.gd")
 var _settings: Dictionary = SETTINGS.for_id("G12-aquarius")
 var _jet = JET.new()
 var _parent: Node2D
+var _back_parent: Node2D
 var _noise: Texture2D
 var _waters := {}
 var _streams := {}
@@ -17,8 +18,9 @@ var _last_time := -1.0
 var _epoch := -1
 var _sequence := 0
 
-func setup(parent: Node2D, scope: ContentResourceScope) -> void:
+func setup(parent: Node2D, back_parent: Node2D, scope: ContentResourceScope) -> void:
 	_parent = parent
+	_back_parent = back_parent
 	_noise = scope.resources.get("res://assets/fx/water_noise.png") as Texture2D
 
 func render(rows: Array, events: Array, canvas, clock: float) -> void:
@@ -94,6 +96,6 @@ func _water(id: int):
 	if not _waters.has(id):
 		var node = WATER.new()
 		node.setup(_noise)
-		_parent.add_child(node)
+		_back_parent.add_child(node)
 		_waters[id] = node
 	return _waters[id]

@@ -380,20 +380,25 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var burn_values: Dictionary = REFERENCE_SETTINGS.for_id("I-horn_dance")
 	for burn: Dictionary in state.get("monoceros_burns",[]):
 		REFERENCE_BURN.draw(canvas,burn.position,float(state.clock)-float(burn.started),burn_values)
-	for breath: Dictionary in state.get("monoceros_breaths",[]):
-		var breath_values: Dictionary = REFERENCE_SETTINGS.for_id("I-kick" if int(breath.preset)==0 else "I-lance")
-		REFERENCE_BREATH.draw(canvas,breath.position,float(breath.direction),float(state.clock)-float(breath.started),float(breath.seed),float(breath.spread),float(breath.reach),breath_values)
+	# 前面の重なり順も元の monoDraw に合わせる。
 	var wave_values: Dictionary = REFERENCE_SETTINGS.for_id("I-horn_wave")
 	for wave: Dictionary in state.get("horn_waves",[]): REFERENCE_WAVE.draw(canvas,wave,wave_values)
-	var lance_values: Dictionary = REFERENCE_SETTINGS.for_id("I-lance")
-	for shatter: Dictionary in state.get("monoceros_shatters",[]):
-		REFERENCE_SPARKS.draw(canvas,shatter.position,float(state.clock)-float(shatter.started),lance_values)
-	var sweep_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sweep")
-	for sweep: Dictionary in state.get("sweep_visuals",[]):
-		REFERENCE_SWEEP.draw(canvas,sweep.points,float(state.clock)-float(sweep.started),float(sweep.duration),sweep_values,sweep.motes)
 	var slash_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sword_flash")
 	for slash: Dictionary in state.get("sword_slashes",[]):
 		REFERENCE_SLASH.draw(canvas,slash.from,slash.to,float(slash.width),float(state.clock)-float(slash.started),0.6,float(slash.seed),slash_values)
+	var lance_values: Dictionary = REFERENCE_SETTINGS.for_id("I-lance")
+	for breath: Dictionary in state.get("monoceros_breaths",[]):
+		if int(breath.preset)==1:
+			REFERENCE_BREATH.draw(canvas,breath.position,float(breath.direction),float(state.clock)-float(breath.started),float(breath.seed),float(breath.spread),float(breath.reach),lance_values)
+	var sweep_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sweep")
+	for sweep: Dictionary in state.get("sweep_visuals",[]):
+		REFERENCE_SWEEP.draw(canvas,sweep.points,float(state.clock)-float(sweep.started),float(sweep.duration),sweep_values,sweep.motes)
+	for shatter: Dictionary in state.get("monoceros_shatters",[]):
+		REFERENCE_SPARKS.draw(canvas,shatter.position,float(state.clock)-float(shatter.started),lance_values)
+	var kick_values: Dictionary = REFERENCE_SETTINGS.for_id("I-kick")
+	for breath: Dictionary in state.get("monoceros_breaths",[]):
+		if int(breath.preset)==0:
+			REFERENCE_BREATH.draw(canvas,breath.position,float(breath.direction),float(state.clock)-float(breath.started),float(breath.seed),float(breath.spread),float(breath.reach),kick_values)
 	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
 	var overlap := Vector2.from_angle(_tail_facing) * (24.0 * float(state.radius) / 96.0)
 	var anchor := to_local(nozzle.to_global(Vector2(37, 0)) + overlap)

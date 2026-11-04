@@ -18,7 +18,7 @@ static func project(canvas, point: Vector2, forward: Vector2, right: Vector2, x:
 
 static func draw(canvas, feet: Array, facing: float, age: float) -> void:
 	if age<0.0 or age>0.62 or feet.size()!=4: return
-	var painter = canvas.back
+	var painter = canvas.mid_landing
 	var forward := Vector2.from_angle(facing)
 	var right := Vector2(-forward.y,forward.x)
 	for foot in 4:

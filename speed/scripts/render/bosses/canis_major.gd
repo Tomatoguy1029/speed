@@ -47,6 +47,7 @@ func _ready() -> void:
 	_pounce_shadow = POUNCE_SHADOW.new()
 	add_child(_pounce_shadow)
 	_pounce_shadow.setup(parts)
+	visibility_changed.connect(_sync_reference_shadow_visibility)
 	z_index = 1
 func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 	flames = preload("res://scripts/render/bosses/canis_flames.gd").new()
@@ -190,6 +191,16 @@ func _sync_reference_white() -> void:
 		overlay.region_rect = source.region_rect
 		overlay.self_modulate.a = source.self_modulate.a
 
+func setup_reference_shadows(parent: Node2D) -> void:
+	if _pounce_shadow.get_parent()!=parent: _pounce_shadow.reparent(parent)
+
+func setup_reference_front(parent: Node2D) -> void:
+	if is_instance_valid(_nova_overlay) and _nova_overlay.get_parent()!=parent: _nova_overlay.reparent(parent)
+	if flames!=null and flames.get_parent()!=parent: flames.reparent(parent)
+
+func _sync_reference_shadow_visibility() -> void:
+	if is_instance_valid(_pounce_shadow) and not is_visible_in_tree(): _pounce_shadow.hide()
+
 func setup_reference_overlay(parent: Node2D) -> void:
 	if is_instance_valid(_nova_overlay): return
 	_nova_overlay = NOVA_OVERLAY.new()
@@ -198,6 +209,8 @@ func setup_reference_overlay(parent: Node2D) -> void:
 	parent.add_child(_burst_overlay)
 
 func _exit_tree() -> void:
+	if is_instance_valid(_pounce_shadow) and _pounce_shadow.get_parent()!=self: _pounce_shadow.queue_free()
+	if is_instance_valid(flames) and flames.get_parent()!=self: flames.queue_free()
 	if is_instance_valid(_nova_overlay): _nova_overlay.queue_free()
 	if is_instance_valid(_burst_overlay): _burst_overlay.queue_free()
 
@@ -205,13 +218,13 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if canvas!=_reference_canvas or state.is_empty(): return
 	_pounce_shadow.apply(state,technique,gait,canvas.world_scale*get_viewport_rect().size.y/225.0)
 	if is_instance_valid(_burst_overlay): _burst_overlay.apply_frame(state.get("blaze_bursts",[]),float(state.clock))
-	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 	HOUND_BURN.draw(canvas,_trails,float(state.clock))
-	EMBERS.draw(canvas,state.get("fire_visual",[]),float(state.clock),get_viewport_rect().size.y/225.0)
-	FIRE_PIXELS.draw(canvas,state.get("fire_visual",[]))
 	if not _nova.is_empty():
 		NOVA_DISPLAY.draw_field(canvas,_nova,_nova_params)
 		NOVA_DISPLAY.draw_flare(canvas,_nova,_nova_params)
+	EMBERS.draw(canvas,state.get("fire_visual",[]),float(state.clock),get_viewport_rect().size.y/225.0)
+	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
+	FIRE_PIXELS.draw(canvas,state.get("fire_visual",[]))
 	if is_instance_valid(_nova_overlay):
 		_nova_overlay.update_overlay(_nova,_nova_params,float(state.facing),canvas.world_scale*get_viewport_rect().size.y/225.0)
 

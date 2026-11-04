@@ -278,6 +278,8 @@ class Painter:
 				if d < 1.0: _add(sx,sy,c,(1.0-d)*(1.0-d)*strength)
 
 var back := Painter.new()
+var mid := Painter.new()
+var mid_landing := Painter.new()
 var front := Painter.new()
 var world_scale := 1.0
 var _camera_position := Vector2.ZERO
@@ -292,6 +294,8 @@ func begin_frame(view_size: Vector2, camera_position: Vector2, world_to_screen_s
 	_camera_position = camera_position
 	world_scale = world_to_screen_scale / logical_pixel
 	back.clear(_logical_size.x, _logical_size.y)
+	mid.clear(_logical_size.x, _logical_size.y)
+	mid_landing.clear(_logical_size.x, _logical_size.y)
 	front.clear(_logical_size.x, _logical_size.y)
 
 func to_logical(world: Vector2) -> Vector2:
@@ -299,4 +303,6 @@ func to_logical(world: Vector2) -> Vector2:
 
 func end_frame() -> void:
 	back.finish()
+	mid.finish()
+	mid_landing.finish()
 	front.finish()

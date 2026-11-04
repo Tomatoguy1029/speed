@@ -111,11 +111,6 @@ func _draw_thrown(row: Dictionary, canvas, clock: float) -> void:
 			var start := point+direction*2.0
 			canvas.front.line(start.x,start.y,point.x,point.y,func(u: float): return colors[7] if u>0.5 else colors[4],(1.0-k)*fade)
 			elapsed += 0.4
-	d = trail*0.4
-	while d < trail:
-		var point := center-direction*d+normal*sin(d*0.2+clock*3.0)*1.2
-		canvas.back.dot(point.x,point.y,Color("3a2a2e"),0.35*fade*(1.0-d/trail))
-		d += 1.0
 	_draw_body(row,fade,canvas,clock,direction,center,colors)
 	canvas.front.glow(center.x,center.y,float(row.radius)*canvas.world_scale*2.0,colors[4],0.5*fade*float(_settings.intensity))
 
