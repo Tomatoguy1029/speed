@@ -241,7 +241,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !std::isfinite(wall->angle) || !std::isfinite(wall->length) || wall->length<0 || !std::isfinite(wall->half_width) || wall->half_width<0) return false;
         }
         if (const auto *wave=std::get_if<MonocerosWaveHazard>(&hazard.shape)) {
-            for (double value:{wave->radius,wave->maximum,wave->speed,wave->half_angle,wave->width}) if (!std::isfinite(value) || value<0) return false;
+            for (double value:{wave->radius,wave->maximum,wave->speed,wave->half_angle,wave->width,wave->reference_time,wave->visual_age}) if (!std::isfinite(value) || value<0) return false;
             if (!std::isfinite(wave->angle)) return false;
         }
         if (const auto *wave=std::get_if<WaveHazard>(&hazard.shape)) {

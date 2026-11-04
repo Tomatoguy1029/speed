@@ -13,7 +13,7 @@ namespace {
 const BossTechniqueDefinition &rule(const RunRuntime &r,const TechniqueState &t) {return r.content->boss_techniques[t.definition-1];}
 void enter(MonocerosHornWaveState &v,MonocerosHornWaveState::Stage stage) {v.stage=stage;v.elapsed=0;v.released=false;}
 void release(RunRuntime &r,TechniqueState &t) {
-    const auto &p=rule(r,t);const auto &e=r.state.enemies[t.actor.slot];const auto &v=std::get<MonocerosHornWaveState>(t.detail);HazardState h;h.pos=e.pos;h.damage=p.damage;h.shape=MonocerosWaveHazard{p.wave_start,p.wave_max,p.wave_speed,v.angle,p.wave_half_angle,p.wave_width};
+    const auto &p=rule(r,t);const auto &e=r.state.enemies[t.actor.slot];const auto &v=std::get<MonocerosHornWaveState>(t.detail);HazardState h;h.pos=e.pos;h.damage=p.damage;h.shape=MonocerosWaveHazard{p.wave_start,p.wave_max,p.wave_speed,v.angle,p.wave_half_angle,p.wave_width,t.elapsed+0.4,0};
     AttackSpec spec;spec.owner.live_source=t.actor;spec.cause=Cause::HornWave;spec.source_technique=t.definition;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::MarkBefore,true,false};
     for (uint32_t row=0;row<r.state.bosses.techniques.size();++row) if (&r.state.bosses.techniques[row]==&t) spec.technique=r.state.bosses.handles.at(row);
     for (uint32_t row=0;row<r.state.bosses.bodies.size();++row) if (same_handle(r.state.bosses.bodies[row].actor,t.actor)) spec.boss=r.state.bosses.body_handles.at(row);
@@ -38,13 +38,13 @@ void MonocerosHornWave::advance_waves(RunRuntime &r,double dt) {
     if (dt<=0) return;
     for (size_t row=r.state.hazards.size();row-->0;) {auto &h=r.state.hazards[row];auto *w=std::get_if<MonocerosWaveHazard>(&h.shape);if (!h.alive || !w) continue;const auto *record=AttackSystem::get(r.state,h.attack);if (!record) continue;const auto owner=record->spec.owner.live_source;
         if (!r.state.enemy_handles.contains(owner) || r.state.enemies[owner.slot].dead) {AttackSystem::end(r.state,h.attack,AttackEndReason::BossClear);continue;}
-        w->radius+=w->speed*dt;const auto offset=r.state.ship_pos-h.pos;
+        w->radius+=w->speed*dt;w->visual_age+=dt;const auto offset=r.state.ship_pos-h.pos;
         const bool touching=!h.hit && std::abs(offset.length()-w->radius)<=w->width*0.5+r.state.ship_config.ship_radius && std::abs(angle_difference(offset.angle()-w->angle))<=w->half_angle;
         if (!h.hit) r.state.observations.effect_check(record->id,touching);
         if (touching) {ShipDamageRequest request;request.observation_id=record->spec.observation_id;request.effect_id=record->id;request.amount=h.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::HornWave;request.source=record->spec.owner.source_definition;request.technique=record->spec.source_technique;h.hit=true;AttackSystem::mark_ship_hit(r.state,h.attack);CombatResolver::ship_damage(r,request);}
         if (w->radius>=w->maximum) AttackSystem::end(r.state,h.attack,AttackEndReason::Lifetime);
     }
 }
-godot::Array MonocerosHornWave::waves(const RunRuntime &r,EnemyHandle actor) {godot::Array out;for (const auto &h:r.state.hazards) {const auto *w=std::get_if<MonocerosWaveHazard>(&h.shape);if (!h.alive || !w) continue;const auto *record=AttackSystem::get(r.state,h.attack);if (!record || !same_handle(record->spec.owner.live_source,actor)) continue;godot::Dictionary item;item["id"]=record->id;item["center"]=h.pos;item["radius"]=w->radius;item["angle"]=w->angle;item["max"]=w->maximum;item["half"]=w->half_angle;item["width"]=w->width;item["hit"]=h.hit;out.push_back(item);}return out;}
+godot::Array MonocerosHornWave::waves(const RunRuntime &r,EnemyHandle actor) {godot::Array out;for (const auto &h:r.state.hazards) {const auto *w=std::get_if<MonocerosWaveHazard>(&h.shape);if (!h.alive || !w) continue;const auto *record=AttackSystem::get(r.state,h.attack);if (!record || !same_handle(record->spec.owner.live_source,actor)) continue;godot::Dictionary item;item["id"]=record->id;item["center"]=h.pos;item["radius"]=w->radius;item["angle"]=w->angle;item["max"]=w->maximum;item["half"]=w->half_angle;item["width"]=w->width;item["reference_time"]=w->reference_time;item["visual_time"]=w->reference_time+w->visual_age;item["hit"]=h.hit;out.push_back(item);}return out;}
 bool MonocerosHornWave::validate(const TechniqueState &t) {if (!std::holds_alternative<MonocerosHornWaveState>(t.detail)) return false;const auto &v=std::get<MonocerosHornWaveState>(t.detail);return v.stage<=MonocerosHornWaveState::Stage::Return && std::isfinite(v.elapsed) && v.elapsed>=0 && std::isfinite(v.angle) && std::isfinite(v.glow) && v.glow>=0 && v.glow<=1 && (v.direction==1 || v.direction==-1);}
 }

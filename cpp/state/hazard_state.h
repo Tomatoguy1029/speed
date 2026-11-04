@@ -18,6 +18,7 @@ struct WaveHazard {
 };
 struct MonocerosWaveHazard {
     double radius=0,maximum=0,speed=0,angle=0,half_angle=0,width=0;
+    double reference_time=0,visual_age=0;
 };
 struct CanisFlameHazard {
     enum class Kind : uint8_t { Jet,Particle,Trail,Transfer };

@@ -6,6 +6,7 @@ const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd
 const REFERENCE_SLASH := preload("res://scripts/render/bosses/monoceros_slash.gd")
 const REFERENCE_SWEEP := preload("res://scripts/render/bosses/monoceros_sweep_slash.gd")
 const REFERENCE_LANCE := preload("res://scripts/render/bosses/monoceros_lance.gd")
+const REFERENCE_WAVE := preload("res://scripts/render/bosses/monoceros_wave.gd")
 const REFERENCE_BURN := preload("res://scripts/render/bosses/monoceros_burn.gd")
 const REFERENCE_SPARKS := preload("res://scripts/render/bosses/monoceros_sparks.gd")
 const REFERENCE_BREATH := preload("res://scripts/render/bosses/monoceros_breath.gd")
@@ -382,6 +383,8 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	for breath: Dictionary in state.get("monoceros_breaths",[]):
 		var breath_values: Dictionary = REFERENCE_SETTINGS.for_id("I-kick" if int(breath.preset)==0 else "I-lance")
 		REFERENCE_BREATH.draw(canvas,breath.position,float(breath.direction),float(state.clock)-float(breath.started),float(breath.seed),float(breath.spread),float(breath.reach),breath_values)
+	var wave_values: Dictionary = REFERENCE_SETTINGS.for_id("I-horn_wave")
+	for wave: Dictionary in state.get("horn_waves",[]): REFERENCE_WAVE.draw(canvas,wave,wave_values)
 	var lance_values: Dictionary = REFERENCE_SETTINGS.for_id("I-lance")
 	for shatter: Dictionary in state.get("monoceros_shatters",[]):
 		REFERENCE_SPARKS.draw(canvas,shatter.position,float(state.clock)-float(shatter.started),lance_values)
