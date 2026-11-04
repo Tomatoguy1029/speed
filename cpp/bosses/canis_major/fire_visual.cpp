@@ -61,6 +61,11 @@ void CanisFireVisualSystem::tick(RunRuntime &r,BossBodyState &body) {
             const bool active=std::any_of(r.state.bosses.techniques.begin(),r.state.bosses.techniques.end(),[&](const auto &t){return t.id==jet.action && same_handle(t.actor,body.actor) && t.stage==TechniqueStage::Active;});
             if (!active) jet.duration=std::max(0.0,age);
         }
+        if (sampled && !jet.continuous && age<jet.duration) {
+            const auto it=std::find_if(r.state.hazards.begin(),r.state.hazards.end(),[&](const auto &h){const auto *record=h.alive?AttackSystem::get(r.state,h.attack):nullptr;return record && record->id==jet.id;});
+            const auto *source=it==r.state.hazards.end()?nullptr:std::get_if<CanisFlameHazard>(&it->shape);
+            if (!source || source->source_ended) jet.duration=std::max(0.0,age);
+        }
         auto source=jet.origin;double angle=jet.angle,length=jet.length;
         if (jet.continuous) {
             if (age<=jet.duration && r.state.enemy_handles.contains(body.actor)) {
