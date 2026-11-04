@@ -11,6 +11,7 @@ const RULER := preload("res://scripts/render/enemies/ruler_reference.gd")
 const DOLPHIN := preload("res://scripts/render/enemies/dolphin_reference.gd")
 const AURIGA := preload("res://scripts/render/enemies/auriga_reference.gd")
 const TELESCOPE := preload("res://scripts/render/enemies/telescope_reference.gd")
+const RETICLE := preload("res://scripts/render/enemies/reticle_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -25,6 +26,7 @@ var _ruler = RULER.new()
 var _dolphin = DOLPHIN.new()
 var _auriga = AURIGA.new()
 var _telescope = TELESCOPE.new()
+var _reticle = RETICLE.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -68,6 +70,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_auriga.render(frame.auriga_trails, canvas, world_time)
 	if frame.has("telescope_beams") and frame.has("telescope_actors"):
 		_telescope.render(frame.telescope_actors, frame.telescope_beams, normalized, canvas, world_time)
+	if frame.has("reticle_fx"):
+		_reticle.render(frame.reticle_fx, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -83,11 +87,12 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var dolphin := frame.has("dolphin_actors") and frame.has("dolphin_waves")
 	var auriga := frame.has("auriga_trails")
 	var telescope := frame.has("telescope_beams") and frame.has("telescope_actors")
+	var reticle := frame.has("reticle_fx")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
 	if ruler:
 		result.ruler = PackedFloat64Array()
-	if beamer or lynx or bite or cross or crab or dolphin or telescope:
+	if beamer or lynx or bite or cross or crab or dolphin or telescope or reticle:
 		var batches: Array = []
 		for source: Dictionary in frame.get("batches", []):
 			var row := source.duplicate()
@@ -96,6 +101,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 			if cross: row.erase("cross")
 			if dolphin: row.erase("dolphin")
 			if telescope: row.erase("sniper")
+			if reticle: row.erase("reticle")
 			if crab and row.has("crab"):
 				var old_crab: PackedFloat32Array = row.crab.duplicate()
 				for index in range(0, old_crab.size(), 14): old_crab[index + 4] = 0.0

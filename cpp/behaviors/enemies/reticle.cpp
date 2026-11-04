@@ -40,7 +40,7 @@ void ReticleBehavior::step(RunRuntime &r,uint32_t row,double dt) {
         if (!near || !s.enemy_handles.contains(state.rock) || s.enemies[state.rock.slot].dead) {e.mode=EnemyMode::Move;state.rock={};e.charge=0;return;}
         const auto rock=s.enemies[state.rock.slot];EnemyMotion::turn(e,(rock.pos-e.pos).angle(),d.turn*3.0,dt,tracking);e.timer-=dt;e.charge=1.0-std::max(0.0,e.timer)/p.aim_time;
         if (e.timer<=0) {
-            const auto from=e.pos+godot::Vector2::from_angle(e.facing)*e.radius;godot::Dictionary beam;beam["from"]=from;beam["to"]=rock.pos;beam["width"]=10.0;beam["life"]=0.25;beam["color"]=d.color.lightened(0.3);FrameBuilder::append(r,"beam",beam);
+            const auto from=e.pos+godot::Vector2::from_angle(e.facing)*e.radius;godot::Dictionary beam;beam["from"]=from;beam["to"]=rock.pos;beam["width"]=10.0;beam["life"]=0.25;beam["color"]=d.color.lightened(0.3);beam["visual_key"]="enemy/reticle";FrameBuilder::append(r,"beam",beam);
             godot::Dictionary effect;effect["pos"]=rock.pos;effect["r"]=rock.radius;effect["meteor_index"]=int64_t(rock.rock.slot);effect["facing"]=rock.facing;effect["dir"]=(rock.pos-from).normalized();effect["color"]=godot::Color::html("a08a78");FrameBuilder::append(r,"rock_break",effect);
             EnemySystem::mark_dead(r,state.rock);e.mode=EnemyMode::Move;state.rock={};e.charge=0;e.fire_t=p.break_interval;
         }return;

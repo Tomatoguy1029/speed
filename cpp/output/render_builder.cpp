@@ -93,7 +93,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         out.marks.clear();out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
     PackedFloat32Array comet_values,crow_values,petrified_enemies,enemy_health,enemy_weak;
-    Array lynx_actors,lynx_afterimages,lynx_fx,bite_fx,cross_actors,cross_beams,crab_fx,dolphin_actors,dolphin_waves,telescope_actors;
+    Array lynx_actors,lynx_afterimages,lynx_fx,bite_fx,cross_actors,cross_beams,crab_fx,dolphin_actors,dolphin_waves,telescope_actors,reticle_fx;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -177,6 +177,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             const auto &target=std::get<ReticleState>(enemy.behavior_state);const bool valid=enemy.mode==EnemyMode::Windup && state.enemy_handles.contains(target.rock);
             const auto at=valid?state.enemies[target.rock.slot].pos:Vector2();const double radius=valid?state.enemies[target.rock.slot].radius:0;const auto color=definition.color.lightened(0.2);
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge),color.r,color.g,color.b,float(valid),at.x,at.y,float(radius)}) enemy_batch.reticle.push_back(value);
+            if (valid) {Dictionary fx;fx["pos"]=pose.position;fx["radius"]=enemy.radius;fx["angle"]=pose.angle;fx["charge"]=enemy.charge;fx["target"]=at;fx["target_radius"]=radius;reticle_fx.push_back(fx);}
         }
         if (definition.kind==EnemyDefinition::Kind::Soldier) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.mode),float(enemy.charge),float(0.5+0.5*std::sin(state.world_time*30.0+double(enemy.id)))}) enemy_batch.soldier.push_back(value);
@@ -408,7 +409,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
     if (ram.serial>0) {boss_ram["cut_exit"]=ram.exit-ram.direction*(state.ship_config.ship_radius+4.0);int64_t body_id=0;for (const auto &body:state.bosses.bodies) if (same_handle(body.actor,ram.target)) {body_id=body.id;break;}boss_ram["body_id"]=body_id;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
-    out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;out["dolphin_actors"]=dolphin_actors;out["dolphin_waves"]=dolphin_waves;out["auriga_trails"]=auriga_trails;out["telescope_beams"]=telescope_beams;out["telescope_actors"]=telescope_actors;
+    out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;out["dolphin_actors"]=dolphin_actors;out["dolphin_waves"]=dolphin_waves;out["auriga_trails"]=auriga_trails;out["telescope_beams"]=telescope_beams;out["telescope_actors"]=telescope_actors;out["reticle_fx"]=reticle_fx;
     out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["cross_actors"]=cross_actors;out["cross_beams"]=cross_beams;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];
