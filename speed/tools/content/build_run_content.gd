@@ -12,7 +12,9 @@ static func _prepare_reference_fx(data: Dictionary) -> Error:
 	if error != OK: return error
 	error = preload("res://tools/content/build_canis_fx.gd").apply(data)
 	if error != OK: return error
-	return preload("res://tools/content/build_boss_image_fx.gd").apply(data)
+	error = preload("res://tools/content/build_boss_image_fx.gd").apply(data)
+	if error != OK: return error
+	return preload("res://tools/content/build_canis_image_fx.gd").apply(data)
 
 static func _write_reference_content(data: Dictionary, signature: PackedByteArray) -> PackedByteArray:
 	if _prepare_reference_fx(data) != OK: return PackedByteArray()

@@ -5369,6 +5369,37 @@ inline bool read(BinaryReader &input, CentaurusImagePose &out) {
     if (!input.read_f64(out.pivot_y)) return false;
     return true;
 }
+struct CanisImagePartDefinition {
+    uint32_t id{};
+    std::string name{};
+    uint32_t mask{};
+    double x{};
+    double y{};
+    double sprite_x{};
+    double sprite_y{};
+    uint32_t width{};
+    uint32_t height{};
+    bool flip_h{};
+    bool visible{};
+};
+inline bool read(BinaryReader &input, CanisImagePartDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.name)) return false;
+    if (!input.read_u32(out.mask)) return false;
+    if (out.mask < 1) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.sprite_x)) return false;
+    if (!input.read_f64(out.sprite_y)) return false;
+    if (!input.read_u32(out.width)) return false;
+    if (out.width < 1) return false;
+    if (!input.read_u32(out.height)) return false;
+    if (out.height < 1) return false;
+    if (!input.read_bool(out.flip_h)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    return true;
+}
 struct CanisBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -7729,6 +7760,7 @@ struct ContentRecords {
     std::vector<CentaurusImageClip> CentaurusImageClip_rows;
     std::vector<CentaurusImageKey> CentaurusImageKey_rows;
     std::vector<CentaurusImagePose> CentaurusImagePose_rows;
+    std::vector<CanisImagePartDefinition> CanisImagePartDefinition_rows;
     std::vector<CanisBodyDefinition> CanisBodyDefinition_rows;
     std::vector<CanisFlameDefinition> CanisFlameDefinition_rows;
     std::vector<CanisCommandDefinition> CanisCommandDefinition_rows;
@@ -8846,6 +8878,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CentaurusImagePose row; if (!read(input,row)) return false; out.CentaurusImagePose_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 363: {
+        if (version != 1) return false;
+        if (count > input.remaining()/54) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisImagePartDefinition row; if (!read(input,row)) return false; out.CanisImagePartDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 340: {
         if (version != 1) return false;
         if (count > input.remaining()/164) return false;
@@ -9566,6 +9604,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusImageKey_rows) if (!CentaurusImageKey_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusImagePose_ids;
     for (const auto &row:data.CentaurusImagePose_rows) if (!CentaurusImagePose_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisImagePartDefinition_ids;
+    for (const auto &row:data.CanisImagePartDefinition_rows) if (!CanisImagePartDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisBodyDefinition_ids;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!CanisBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisFlameDefinition_ids;
@@ -10184,5 +10224,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=236;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=237;
 }
