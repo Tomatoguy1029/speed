@@ -275,6 +275,8 @@ var front := Painter.new()
 var world_scale := 1.0
 var _camera_position := Vector2.ZERO
 var _logical_size := Vector2i.ZERO
+var logical_size: Vector2i:
+	get: return _logical_size
 
 ## world_to_screen_scale はカメラの基準倍率と現在のズームを掛けた実効値。
 func begin_frame(view_size: Vector2, camera_position: Vector2, world_to_screen_scale: float) -> void:
