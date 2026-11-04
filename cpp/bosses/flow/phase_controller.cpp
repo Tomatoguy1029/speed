@@ -135,6 +135,7 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
         for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width,b.hit_feedback_until}) if (!std::isfinite(value) || value<0) return false;
         for (const auto &slash:b.monoceros_slashes) if (!slash.from.is_finite() || !slash.to.is_finite() || !std::isfinite(slash.width) || slash.width<0 || !std::isfinite(slash.started) || slash.started<0 || slash.started>b.clock) return false;
         for (const auto &v:b.monoceros_breaths) if (!v.position.is_finite() || !std::isfinite(v.direction) || !std::isfinite(v.started) || v.started<0 || v.started>b.clock || !std::isfinite(v.lifetime) || v.lifetime<=0 || !std::isfinite(v.spread) || v.spread<0 || !std::isfinite(v.reach) || v.reach<0 || !v.seed || v.preset>1) return false;
+        for (const auto &v:b.monoceros_shatters) if (!v.position.is_finite() || !std::isfinite(v.started) || v.started<0 || v.started>b.clock || !std::isfinite(v.lifetime) || v.lifetime<=0) return false;
         const auto &mp=b.monoceros_pose;
         for (double value:{mp.last_body_clock,mp.body,mp.neck,mp.head,mp.tail,mp.flame,mp.gait,mp.feedback_white,mp.feedback_angle}) if (!std::isfinite(value)) return false;
         if (mp.last_body_clock<0 || mp.last_body_clock>b.clock || mp.gait<0 || mp.feedback_white<0 || !mp.feedback_offset.is_finite()) return false;
@@ -164,8 +165,9 @@ godot::Array PhaseController::snapshot(const RunRuntime &r) {
         }p["sweep_visuals"]=sweep_visuals;
         godot::Array breaths;for (const auto &breath:b.monoceros_breaths) {
             godot::Dictionary v;v["position"]=breath.attached && r.state.enemy_handles.contains(b.actor)?r.state.enemies[b.actor.slot].pos+breath.position:breath.position;
-            v["direction"]=breath.direction;v["started"]=breath.started;v["seed"]=breath.seed;v["spread"]=breath.spread;v["reach"]=breath.reach;v["preset"]=breath.preset;breaths.push_back(v);
+            v["direction"]=breath.preset==1 && r.state.enemy_handles.contains(b.actor)?r.state.enemies[b.actor.slot].facing+std::acos(-1.0):breath.direction;v["started"]=breath.started;v["seed"]=breath.seed;v["spread"]=breath.spread;v["reach"]=breath.reach;v["preset"]=breath.preset;breaths.push_back(v);
         }p["monoceros_breaths"]=breaths;
+        godot::Array shatters;for (const auto &shatter:b.monoceros_shatters) {godot::Dictionary v;v["position"]=shatter.position;v["started"]=shatter.started;shatters.push_back(v);}p["monoceros_shatters"]=shatters;
         if (definition.kind==0) {
             godot::Array nodes;for (const auto &node:b.monoceros_pose.nodes) {godot::Dictionary v;v["node"]=node.node;v["transform"]=node.transform;v["visible"]=node.visible;nodes.push_back(v);}p["image_node_poses"]=nodes;
             godot::Dictionary feedback;feedback["white"]=b.monoceros_pose.feedback_white;feedback["angle"]=b.monoceros_pose.feedback_angle;feedback["offset"]=b.monoceros_pose.feedback_offset;p["image_feedback"]=feedback;

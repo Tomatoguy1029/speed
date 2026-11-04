@@ -36,6 +36,7 @@ size_t gait_frame(const MonocerosImagePoseData &data,double time) {
 }
 bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     const auto &c=*run.content;const auto &data=c.monoceros_image_pose;
+    body.monoceros_shatters.erase(std::remove_if(body.monoceros_shatters.begin(),body.monoceros_shatters.end(),[&](const auto &v){return body.clock-v.started>v.lifetime;}),body.monoceros_shatters.end());
     body.monoceros_breaths.erase(std::remove_if(body.monoceros_breaths.begin(),body.monoceros_breaths.end(),[&](const auto &v){return body.clock-v.started>v.lifetime;}),body.monoceros_breaths.end());
     if (!run.state.enemy_handles.contains(body.actor) || !body.definition || body.definition>c.boss_bodies.size()) return false;
     const auto &body_def=c.boss_bodies[body.definition-1];

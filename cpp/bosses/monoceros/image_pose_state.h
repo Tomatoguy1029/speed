@@ -7,6 +7,7 @@ struct MonocerosBreathVisual {
     godot::Vector2 position;double direction=0,started=0,lifetime=0,spread=0,reach=0;
     uint32_t seed=0,preset=0;bool attached=false;
 };
+struct MonocerosShatterVisual {godot::Vector2 position;double started=0,lifetime=0;};
 struct MonocerosImageNodePose {uint32_t node=0;godot::Transform2D transform;bool visible=true;};
 struct MonocerosImagePoseClock {
     bool initialized=false;

@@ -5,6 +5,8 @@ const REFERENCE_SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd")
 const REFERENCE_SLASH := preload("res://scripts/render/bosses/monoceros_slash.gd")
 const REFERENCE_SWEEP := preload("res://scripts/render/bosses/monoceros_sweep_slash.gd")
+const REFERENCE_LANCE := preload("res://scripts/render/bosses/monoceros_lance.gd")
+const REFERENCE_SPARKS := preload("res://scripts/render/bosses/monoceros_sparks.gd")
 const REFERENCE_BREATH := preload("res://scripts/render/bosses/monoceros_breath.gd")
 const HORN_LIGHT_SHADER := preload("res://shaders/monoceros_horn_light.gdshader")
 const REFERENCE_WHITE_SHADER := preload("res://shaders/fx_reference_white.gdshader")
@@ -45,6 +47,7 @@ var _horn_durations: PackedFloat32Array
 var _horn_lengths: PackedFloat32Array
 var _reference_canvas
 var _reference_boost
+var _reference_lance
 var _reference_id := "I-charge"
 var _horn_visual := 0.0
 var _horn_overlay: Sprite2D
@@ -62,6 +65,9 @@ func _ready() -> void:
 	_create_ram_white()
 	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 	z_index = 8
+	_reference_lance = REFERENCE_LANCE.new()
+	_reference_lance.z_index = 1
+	add_child(_reference_lance)
 	_reference_boost = REFERENCE_BOOST.new()
 	_reference_boost.z_index = -1
 	add_child(_reference_boost)
@@ -221,6 +227,7 @@ func _sync_parts(dt: float) -> void:
 	_sync_horn(dt, k)
 	_apply_image_pose(state.get("image_node_poses",[]),state.get("image_parts",[]),reaction)
 	_sync_ram_white()
+	_sync_lance()
 
 ## 本番が画像境界に使った全関節を、そのまま表示とFXの基点にも使う。
 func _apply_image_pose(node_poses: Array, sprites: Array, reaction: Dictionary) -> void:
@@ -307,6 +314,13 @@ func _sync_horn(_dt: float, body_scale: float) -> void:
 	var source := parts.get_node("Head/Lower/Sprite/head_gold_armor").material as ShaderMaterial
 	for key in ["painted","paint"]: (horn.material as ShaderMaterial).set_shader_parameter(key,source.get_shader_parameter(key))
 
+func _sync_lance() -> void:
+	var form := float(technique.get("form",0.0)) if technique.get("technique","")=="lance" else 0.0
+	var root := to_local(horn.global_position)
+	var axis := (to_local(horn.to_global(Vector2.DOWN))-root).normalized()
+	var tip := root+axis*maxf(1.0,float(state.horn_length)-root.dot(axis))
+	_reference_lance.apply_reference(root,tip,axis,form,float(technique.get("head_length",0.0)))
+
 func _horn_glow() -> float:
 	if technique.get("technique","") in ["lance","return_charge","horn_wave","horn_dance","sword_flash"]: return float(technique.get("glow",0.0)) if _mode() in [&"windup",&"active"] else 0.0
 	if technique.get("technique","")=="kick": return 0.0
@@ -364,6 +378,9 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	for breath: Dictionary in state.get("monoceros_breaths",[]):
 		var breath_values: Dictionary = REFERENCE_SETTINGS.for_id("I-kick" if int(breath.preset)==0 else "I-lance")
 		REFERENCE_BREATH.draw(canvas,breath.position,float(breath.direction),float(state.clock)-float(breath.started),float(breath.seed),float(breath.spread),float(breath.reach),breath_values)
+	var lance_values: Dictionary = REFERENCE_SETTINGS.for_id("I-lance")
+	for shatter: Dictionary in state.get("monoceros_shatters",[]):
+		REFERENCE_SPARKS.draw(canvas,shatter.position,float(state.clock)-float(shatter.started),lance_values)
 	var sweep_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sweep")
 	for sweep: Dictionary in state.get("sweep_visuals",[]):
 		REFERENCE_SWEEP.draw(canvas,sweep.points,float(state.clock)-float(sweep.started),float(sweep.duration),sweep_values,sweep.motes)
