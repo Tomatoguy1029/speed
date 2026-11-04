@@ -6,6 +6,7 @@
 #include "../bosses/canis_major/image_pose_state.h"
 #include "../bosses/monoceros/image_pose_state.h"
 #include "../bosses/monoceros/sweep_visual_state.h"
+#include "../bosses/canis_major/fire_visual_state.h"
 #include "../content/generated/combat_ids.h"
 #include "../content/boss_image_data.h"
 #include <godot_cpp/variant/vector2.hpp>
@@ -191,6 +192,7 @@ struct CanisBurningHound {EnemyHandle actor;int64_t observation_id=0,effect_id=0
 struct CanisBlazeBurst {godot::Vector2 position;double radius=0,started=0;int64_t id=0;uint32_t technique=0;};
 struct CanisBodyState {
     CanisImagePoseClock image_pose;
+    CanisFireVisualState fire_visual;
     int64_t roar_last_technique=0,roar_serial=0;
     uint32_t roar_definition=0;
     double roar_started=-1;
