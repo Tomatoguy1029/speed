@@ -79,7 +79,7 @@ func _draw_cpp_gauge_ring() -> void:
 		drawing = preview_mode==2
 	var usable := amount >= float(_cpp_ui.min_charge)
 	if preview_mode==5:
-		var charging := not state.drawing and not state.tracing
+		var charging: bool = not bool(state.drawing) and not bool(state.tracing)
 		if usable and not _ring_usable and charging: _ring_pulse_t = RING_PULSE_TIME
 		if charging and _lap_filled(_ring_amount,amount,capacity):
 			_ring_flash_t = RING_FLASH_TIME

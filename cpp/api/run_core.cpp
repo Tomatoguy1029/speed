@@ -383,6 +383,7 @@ bool SpeedRunCore::advance_enemies(double delta) {
         speed::FlowRunner::step(runtime,delta);
         for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);speed::CanisHowl::ring_tick(runtime,body);if (body.mode!=speed::BossMode::Final) {speed::CanisNova::effect_tick(runtime,body,delta);speed::CanisBlaze::burning_tick(runtime,body,delta);speed::CanisFlames::step(runtime,body,delta);}}
     }
+    speed::RulerBehavior::after_tick(runtime);
     return true;
 }
 

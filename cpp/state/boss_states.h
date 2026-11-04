@@ -89,6 +89,7 @@ struct DracoRiftsState {DracoStagingState staging;std::vector<std::vector<godot:
 struct DracoArrowImpact {godot::Vector2 position;double wait=0,warn=0,age=0;bool locked=false;};
 struct DracoPicaroWallState {uint32_t shots=0;std::vector<DracoArrowImpact> impacts;};
 struct DracoSpiralState {
+    DracoStagingState return_staging;
     godot::Vector2 center,correction,held_ship,outside,control,inside,recovery;
     double extent=1000,horizontal=1000,length=9000,inner=0.2,coil=1.2,pause=1.6,first=0.42,second=0.54,bend=0.24,shrink=2,offset=320,bend_radius=220,zoom=1,departure_time=0,departure_angle=0,hp_before=0;
     bool camera_before=false,controls_before=false,protection_before=false,departing=true,holding=false,charging=false,trapped=false,trapped_hit=false,hp_sampled=false;
