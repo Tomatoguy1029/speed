@@ -147,7 +147,7 @@ for (const d of DEMOS) if (d.id.startsWith('D-')) d.status = { ...d.status, '状
 for (const d of DEMOS) if (d.id === 'D-spiral') d.status = { ...d.status, '螺旋（本人指示で変更）': '中心は巻き始めの自機の位置で固定し、外周から内周まで2周で一定に半径を縮める（中心へずらす補正をやめ、2周目が1周目に寄って通り道を塞がない）。上から入って上で巻き終わり、頭は自機の少し上で画面の下へ向ける。直進では頭が真下へ抜け、残りの胴は紐を結ぶように渦ごと中心へ締まる', '本番との違い': '本番（spiral.cpp）は2周目に中心を自機へ寄せる補正があり、直進後の胴は通った道をたどってほどける。採用するなら本番の動きと判定を変える必要がある' };
 for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []), { k: 'spiralScale', label: '渦の外周の大きさ（周回の間）', type: 'range', min: 1, max: 1.7, step: 0.05, def: 1.3 }];
 
-// 生き物らしさ（螺旋）：絵の動きだけに、頭から尾へ流れるうねり・頭の振り・呼吸・直進前のための引きを足す（当たりの点列は変えない）
+// 生き物らしさ（螺旋）：絵の動きだけに、頭から尾へ流れるうねり・頭の振り・直進前のための引きを足す（当たりの点列は変えない）
 function dOrganic(S, R, pose) {
   if (S.tech !== 'spiral' || !S.spiral || !pose) return pose; const sp = S.spiral, k = R.P.alive ?? 1; if (k <= 0) return pose;
   const t = S.t, active = S.B.mode === 'active', e = S.elapsed, shrinkAt = sp.coil + sp.pause;
@@ -159,6 +159,6 @@ function dOrganic(S, R, pose) {
   // 直進の前：頭を少し引いて力み、震えて止まる → 飛び出す
   if (active && e >= sp.coil && e < shrinkAt + 0.15) { const pull = smooth(shrinkAt - 0.45, shrinkAt - 0.05, e) * (1 - smooth(shrinkAt, shrinkAt + 0.12, e)), back = mul(fromA(pose.facing), -48 * pull * k), shake = mul(orth(fromA(pose.facing)), Math.sin(t * 90) * 3 * pull * k);
     for (let i = 0; i <= 6; i++) out[i] = add(out[i], mul(add(back, shake), 1 - i / 7)); }
-  return { ...pose, points: out, facing, width: DP.body_width * (1 + 0.04 * k * Math.sin(t * 2.3)) };
+  return { ...pose, points: out, facing };
 }
 for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []), { k: 'alive', label: '生き物らしさ（うねり・頭の振り・ため）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 }];
