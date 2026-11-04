@@ -53,7 +53,8 @@ static func apply(data: Dictionary) -> Error:
 		var sprite := root.get_node_or_null(name+"/Sprite") as Sprite2D
 		if node==null or sprite==null or not sprite.texture is CanvasTexture:
 			root.free(); return ERR_INVALID_DATA
-		var texture: Texture2D = sprite.texture.diffuse_texture
+		var canvas_texture := sprite.texture as CanvasTexture
+		var texture: Texture2D = canvas_texture.diffuse_texture
 		if texture==null or not sheet_ids.has(texture.resource_path) or not sprite.centered or sprite.offset!=Vector2.ZERO or sprite.rotation!=0.0 or sprite.scale!=Vector2.ONE or sprite.flip_v or node.rotation!=0.0 or node.scale!=Vector2.ONE:
 			root.free(); return ERR_INVALID_DATA
 		var sheet: Dictionary = sheets[texture.resource_path]
