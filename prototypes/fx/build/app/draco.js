@@ -218,7 +218,7 @@ function dSpiralActive(S, dt) {
   if (!sp.held) sp.held = { ...S.ship.pos };
   if (t < sp.coil) S.ship.pos = { ...sp.held };
   if (t < shrinkAt) {
-    let turns = t < sp.first ? t / sp.first : 1 + (t - sp.first) / sp.second; turns = clamp(turns, 0, 2);
+    let turns = t < sp.first ? t / sp.first : 1 + (t - sp.first) / sp.second; turns = clamp(turns, 0, 2); turns = clamp(turns + 0.035 * Math.sin(turns * TAU * 2.5) * Math.sin(turns * Math.PI / 2), 0, 2); // 押し出すような速さの緩急（進みは戻らない）
     let head = dSpiralHead(S, turns);
     // 巻き終わり：自機の真上で曲げて頭を画面の下へ向ける。曲げた分だけ最後の4分の1周で寄せて、真下への直進が中心を通るようにする
     const bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2; head = add(head, V(-sp.bendRadius * Math.sin(bend) + sp.bendRadius * smooth(1.75, 2, turns), sp.bendRadius * (1 - Math.cos(bend))));

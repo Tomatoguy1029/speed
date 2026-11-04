@@ -117,7 +117,7 @@ function dShotsFx(S, R) {
 }
 function dDraw(S, R) {
   R = bossView(R, '#ab9cff');
-  const r = S.r, B = S.B, P = R.P, id = S.tech, t = S.t, pose = R.proto ? dPresentation(S) : null; dTellDraw(S, R, pose);
+  const r = S.r, B = S.B, P = R.P, id = S.tech, t = S.t, pose = R.proto ? dOrganic(S, R, dPresentation(S)) : null; dTellDraw(S, R, pose);
   if (!R.proto) {
     if (S.fan && B.mode === 'active') { D2.poly(S.fan, rgba('#5775ff', 0.5)); D2.polyline(S.fan, '#addbff', 4); }
     if (S.exhale && B.mode === 'active') { const e = S.exhale, age = t - e.t, end = add(e.at, mul(fromA(e.a), r.reach)); if (age < r.beam_warn) D2.line(e.at, end, rgba('#d4bbff', 0.35), 4); else D2.line(e.at, add(e.at, mul(fromA(e.a), r.reach * clamp((age - r.beam_warn) / r.beam_extend))), '#d4bbff', r.width); }
@@ -131,7 +131,7 @@ function dDraw(S, R) {
   R.blitBack();
   for (const rock of S.rocks) drawImg('meteor_0', rock.pos, rock.seed * 1.7, rock.radius);
   if (id === 'clones' && B.mode === 'active') { for (const unit of S.units) drawDraco(unit.points, unit.angle, unit.index > 0 ? 0.85 : 1); }
-  else if (R.proto) drawDraco(pose.points, pose.facing, 1, DP.body_width, pose.arms);
+  else if (R.proto) drawDraco(pose.points, pose.facing, 1, pose.width || DP.body_width, pose.arms);
   else drawDraco(S.points, B.facing);
   if (id === 'rifts' && B.mode === 'active' && R.proto) for (let hand = 0; hand < 2; hand++) { const local = S.elapsed - hand * r.interval, path = S.paths?.[hand * r.claw_count]; if (path && local >= 0 && local < 0.18) dSupply(R, pose.claws[hand], path[0], 1 - local / 0.18, t * 3, 311 + hand, hand ? 22 : -22); }
   if (S.picaro) for (const q of S.picaro) drawEnemy(q, { white: clamp(1 - S.age) * 0.6 });
@@ -146,3 +146,19 @@ function dDraw(S, R) {
 for (const d of DEMOS) if (d.id.startsWith('D-')) d.status = { ...d.status, '状態': '見た目を作り直した試作（未承認）', '試作の見た目': '予兆は照準の光（白くしない）と部位へ光を運ぶ粒。ブレスは口から流れる光の筋の束と星、岩で止まると火花。爪はぎざぎざの空間の裂け目。星弾は回る星とまたたきの尾。着弾は白い光・冷える割れ目・土ぼこり・欠片。吸い込みは口へ流れる筋と星屑。突進は体の両脇の空気の筋。全身複製は分身の口からうみへびの技', '動き': '体の動き・技の時刻・軌道は以前の再生（現行の値）のまま。main の cpp/bosses/draco との行ごとの照合はしていない' };
 for (const d of DEMOS) if (d.id === 'D-spiral') d.status = { ...d.status, '螺旋（本人指示で変更）': '中心は巻き始めの自機の位置で固定し、外周から内周まで2周で一定に半径を縮める（中心へずらす補正をやめ、2周目が1周目に寄って通り道を塞がない）。上から入って上で巻き終わり、頭は自機の少し上で画面の下へ向ける。直進では頭が真下へ抜け、残りの胴は紐を結ぶように渦ごと中心へ締まる', '本番との違い': '本番（spiral.cpp）は2周目に中心を自機へ寄せる補正があり、直進後の胴は通った道をたどってほどける。採用するなら本番の動きと判定を変える必要がある' };
 for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []), { k: 'spiralScale', label: '渦の外周の大きさ（周回の間）', type: 'range', min: 1, max: 1.7, step: 0.05, def: 1.3 }];
+
+// 生き物らしさ（螺旋）：絵の動きだけに、頭から尾へ流れるうねり・頭の振り・呼吸・直進前のための引きを足す（当たりの点列は変えない）
+function dOrganic(S, R, pose) {
+  if (S.tech !== 'spiral' || !S.spiral || !pose) return pose; const sp = S.spiral, k = R.P.alive ?? 1; if (k <= 0) return pose;
+  const t = S.t, active = S.B.mode === 'active', e = S.elapsed, shrinkAt = sp.coil + sp.pause;
+  const swim = !active ? 1 : e < sp.coil ? 1 : e < shrinkAt ? 0.35 : 0.7, pts = pose.points, N = pts.length - 1;
+  let s = 0; const out = pts.map((p, i) => { if (i > 0) s += dist(pts[i - 1], p); const a = i === 0 ? sub(pts[1], pts[0]) : sub(p, pts[i - 1]), n = orth(norm(a)), u = i / N;
+    const amp = 26 * k * swim * (0.15 + 0.85 * smooth(0, 0.35, u)) * (0.75 + 0.25 * Math.sin(t * 3.1 + u * 4)), wave = Math.sin(s / 560 * TAU - t * 7.5) * amp;
+    return add(p, mul(n, wave)); });
+  let facing = pose.facing + Math.sin(t * 5.3) * 0.07 * k * swim;
+  // 直進の前：頭を少し引いて力み、震えて止まる → 飛び出す
+  if (active && e >= sp.coil && e < shrinkAt + 0.15) { const pull = smooth(shrinkAt - 0.45, shrinkAt - 0.05, e) * (1 - smooth(shrinkAt, shrinkAt + 0.12, e)), back = mul(fromA(pose.facing), -48 * pull * k), shake = mul(orth(fromA(pose.facing)), Math.sin(t * 90) * 3 * pull * k);
+    for (let i = 0; i <= 6; i++) out[i] = add(out[i], mul(add(back, shake), 1 - i / 7)); }
+  return { ...pose, points: out, facing, width: DP.body_width * (1 + 0.04 * k * Math.sin(t * 2.3)) };
+}
+for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []), { k: 'alive', label: '生き物らしさ（うねり・頭の振り・ため）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 }];
