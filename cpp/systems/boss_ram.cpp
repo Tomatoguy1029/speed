@@ -24,22 +24,18 @@ void BossRamSystem::cancel_invalid(RunRuntime &r) {
         !s.enemy_handles.contains(ram.target) || s.enemies[ram.target.slot].dead ||
         s.enemy_handles.entity_id(ram.target)!=ram.target_id) ram={};
 }
-bool BossRamSystem::begin(RunRuntime &r,EnemyHandle target,godot::Vector2 contact,godot::Vector2 direction,double ship_radius) {
+bool BossRamSystem::begin(RunRuntime &r,EnemyHandle target,const BossImageCut &cut,godot::Vector2 direction,double ship_radius) {
     auto &s=r.state;auto &control=s.control;
     if (control.boss_ram.pending || control.next_boss_ram_serial==INT64_MAX || !s.enemy_handles.contains(target)) return false;
     const auto &enemy=s.enemies[target.slot];
-    if (!enemy.is_boss || enemy.dead || !contact.is_finite() || !direction.is_finite() || direction.length_squared()<0.000001) return false;
+    if (!enemy.is_boss || enemy.dead || !cut.enter.is_finite() || !cut.exit.is_finite() || !direction.is_finite() || direction.length_squared()<0.000001) return false;
     direction=direction.normalized();
-    const auto relative=contact-enemy.pos;
-    const double radius=enemy.radius+ship_radius, projection=relative.dot(direction);
-    const double discriminant=projection*projection-double(relative.length_squared())+radius*radius;
-    if (discriminant<0) return false;
     auto &ram=control.boss_ram;
     ram.pending=true;ram.target=target;ram.target_id=enemy.id;ram.serial=control.next_boss_ram_serial++;
-    ram.direction=direction;ram.entry=contact+direction*ship_radius;
-    ram.exit=contact+direction*(-projection+std::sqrt(discriminant)+4.0);
+    ram.direction=direction;ram.entry=cut.enter;
+    ram.exit=cut.exit+direction*(ship_radius+4.0);
     ram.remaining=s.hitstop_enabled?control.boss_ram_hitstop:0;ram.started_at=s.sim_time;ram.released_at=-1;
-    s.ship.pos=contact;s.ship_pos=contact;s.hitstop=std::max(s.hitstop,ram.remaining);
+    s.ship.pos=cut.enter-direction*ship_radius;s.ship_pos=s.ship.pos;s.hitstop=std::max(s.hitstop,ram.remaining);
     notify(r,"in",ram.entry);
     return true;
 }

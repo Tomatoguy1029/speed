@@ -10,6 +10,7 @@
 #include "geometry.h"
 #include "combat_resolver.h"
 #include "boss_ram.h"
+#include "boss_image.h"
 #include "../output/event_builder.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
@@ -92,16 +93,32 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     const Vector2 to = runtime.state.ship.pos;
     const double padding = radius + std::max(c.max_enemy_radius, runtime.state.grid.max_radius);
     const Vector2 pad(padding, padding);
-    struct Hit { double time; size_t row; };
+    struct Hit { double time; size_t row; bool image=false; speed::BossImageCut cut; };
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
-    for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
+    auto candidates=query_enemy_rows(from.min(to) - pad, from.max(to) + pad);
+    for (const auto &body:runtime.state.bosses.bodies) {
+        if (runtime.state.enemy_handles.contains(body.actor) && speed::BossImageSystem::available(runtime,body.actor) && std::find(candidates.begin(),candidates.end(),body.actor.slot)==candidates.end()) candidates.push_back(body.actor.slot);
+    }
+    for (size_t row : candidates) {
         const auto &enemy = runtime.state.enemies[row];
         const auto target=speed::CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(row)));if (!runtime.state.enemy_handles.contains(target)) continue;const auto &health=runtime.state.enemies[target.slot];
         const bool normal_boss=enemy.is_boss && !runtime.state.draw.tracing && !runtime.state.ship.glide && runtime.state.ship.vel.length()<runtime.state.ship_config.max_speed*c.ram_speed_ratio;
         if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(health.id) > 0 : (health.hit_cd > 0 && !normal_boss && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
-        const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
-        if (t >= 0) hits.push_back({t, row});
+        const auto handle=runtime.state.enemy_handles.at(uint32_t(row));
+        if (enemy.is_boss && !normal_boss && speed::BossImageSystem::available(runtime,handle)) {
+            const auto delta=to-from;
+            const double length=delta.length();
+            if (length<=0) continue;
+            const auto direction=delta/length;
+            speed::BossImageCut cut;
+            if (!speed::BossImageSystem::cut(runtime,handle,from,direction,cut)) continue;
+            const double distance=(cut.enter-direction*radius-from).dot(direction);
+            if (distance<=length) hits.push_back({std::max(0.0,distance/length),row,true,cut});
+        } else {
+            const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
+            if (t >= 0) hits.push_back({t, row});
+        }
     }
     SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
     for (const auto &hit : hits) {
@@ -188,7 +205,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             }
             speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position,result.applied);
             speed::RunUpBehavior::contact(runtime,position,direction,result.applied);
-            if (enemy.is_boss && result.applied>0 && speed::BossRamSystem::begin(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position,direction,radius)) return true;
+            if (hit.image && result.applied>0 && speed::BossRamSystem::begin(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),hit.cut,direction,radius)) return true;
             continue;
         }
         runtime.state.ship.glide = false;
