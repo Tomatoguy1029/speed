@@ -33,7 +33,9 @@ AquariusPose AquariusBehavior::visual_pose(const RunRuntime &r,uint32_t row,godo
         rotation=-0.18+std::sin(age*2.4)*0.09*smooth(0,0.3,age)+std::sin(age*41)*0.012;
         shake={float(std::sin(age*53)*1.6),float(std::cos(age*47)*1.6)};
     } else rotation=(-0.18+std::sin(p.beam_time*2.4)*0.09)*(1-smooth(0,0.5,time-p.telegraph-p.beam_time));
-    return {pos+shake,facing+rotation};
+    const double tilt=time<p.telegraph?smooth(0,p.telegraph*0.6,time):
+        (time<p.telegraph+p.beam_time?1.0:1.0-smooth(0,0.5,time-p.telegraph-p.beam_time));
+    return {pos+shake,facing+rotation-godot::Math::PI*0.5*tilt};
 }
 godot::Vector2 AquariusBehavior::claw_tip(const RunRuntime &r,uint32_t row,const AquariusPose &pose) {
     const auto &e=r.state.enemies[row];const auto &d=r.content->definitions[e.definition];
