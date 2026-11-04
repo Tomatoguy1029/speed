@@ -1,6 +1,7 @@
 ## 攻撃の向きと進行を読み、パーツの弓差分を表示する。
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const REFERENCE_WHITE := preload("res://shaders/fx_reference_white.gdshader")
 @export var pixel_size := 3.0
 @export var sail_star_scale := 1.0
 @export var sail_star_color := Color("#fff6c8")
@@ -9,6 +10,9 @@ const PARTS = preload("res://scenes/bosses/centaurus_parts.tscn")
 var _shower_visual: Node2D
 var _rain_visual: Node2D
 var _parts: Node2D
+var _reference_white := 0.0
+var _white_material: ShaderMaterial
+var _white_sprites: Array[Dictionary] = []
 var state := {}
 var technique := {}
 var _world_clock := -1.0
@@ -76,6 +80,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		_parts = PARTS.instantiate()
 		_parts.rotation = -PI*0.5
 		add_child(_parts)
+		_create_reference_white()
 	hit = maxf(float(body.flash),hit-dt)
 	leap_ring = maxf(0.0,leap_ring-dt)
 	pulse = maxf(0.0,pulse-dt)
@@ -91,7 +96,52 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		_parts.scale *= 1.0+0.12*height
 		_parts.position = Vector2(0.0,-65.0*height).rotated(-global_rotation)
 	_parts.set_bow_pose(StringName(technique.get("technique","")),_mode(),float(body.charge),dt,float(technique.get("pose_time",-1.0)))
+	_sync_reference_white()
 	queue_redraw()
+
+## 停止中と停止後の白を、本体の描画とは別の加算層で受ける。
+func set_reference_hit(white: float) -> void:
+	_reference_white = clampf(white, 0.0, 1.0)
+	_sync_reference_white()
+
+func _collect_reference_sprites(node: Node, result: Array[Sprite2D]) -> void:
+	for child in node.get_children():
+		if child is Sprite2D: result.append(child)
+		_collect_reference_sprites(child, result)
+
+func _create_reference_white() -> void:
+	_white_material = ShaderMaterial.new()
+	_white_material.shader = REFERENCE_WHITE
+	var sources: Array[Sprite2D] = []
+	_collect_reference_sprites(_parts, sources)
+	for source: Sprite2D in sources:
+		var overlay := Sprite2D.new()
+		overlay.material = _white_material
+		overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		source.add_child(overlay)
+		_white_sprites.append({"source":source,"overlay":overlay})
+	_sync_reference_white()
+
+func _sync_reference_white() -> void:
+	if _white_material == null: return
+	_white_material.set_shader_parameter("strength", _reference_white)
+	for entry: Dictionary in _white_sprites:
+		var source: Sprite2D = entry.source
+		var overlay: Sprite2D = entry.overlay
+		overlay.visible = _reference_white > 0.0 and source.texture != null
+		if not overlay.visible: continue
+		overlay.texture = source.texture
+		overlay.centered = source.centered
+		overlay.offset = source.offset
+		overlay.flip_h = source.flip_h
+		overlay.flip_v = source.flip_v
+		overlay.frame = 0
+		overlay.hframes = source.hframes
+		overlay.vframes = source.vframes
+		overlay.frame = source.frame
+		overlay.region_enabled = source.region_enabled
+		overlay.region_rect = source.region_rect
+		overlay.self_modulate.a = source.self_modulate.a
 
 func _mode() -> StringName:
 	if technique.get("combo_waiting",false) and int(technique.get("stage",5))<5: return &"combo_gap"
