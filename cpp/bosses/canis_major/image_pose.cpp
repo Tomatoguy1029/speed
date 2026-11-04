@@ -82,6 +82,10 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
         const double time=p->jumping?p->stage_time/std::max(span,.001)*.45:p->stage_time-span;
         pounce(c.nodes,time);
     } else if (land_age>=0 && land_age<.5) pounce(c.nodes,.45+land_age);
+    if (t && t->stage==TechniqueStage::Active && r.content->boss_techniques[t->definition-1].external_id=="sirius_flame") {
+        c.nodes[6].rotation+=std::sin(b.clock*23)*.018;
+        c.nodes[6].position=Vector2(0,42+std::sin(b.clock*16)*1.2);
+    }
     if (r.state.bosses.handles.contains(b.canis.nova)) {
         const auto head=CanisNova::image_head_pose(r,b);c.nodes[6].position={0,head.x};c.nodes[6].rotation=head.y;
     }
