@@ -21,7 +21,7 @@ struct DamageRequest {
     Cause cause=Cause::None;
     WeaponId weapon_id=0;
     godot::Vector2 direction, impact;
-    bool has_impact=false, crit=false, no_crit=false;
+    bool has_impact=false, crit=false, no_crit=false, boss_ram_visual=false;
     int32_t shatter_depth=0;
 };
 struct DamageResult {

@@ -187,6 +187,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
                 damage = std::max(damage, enemy.hp);
             }
             speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));request.amount=damage;request.cause=speed::Cause::Ram;request.crit=crit;request.direction=direction;request.impact=position;request.has_impact=true;
+            request.boss_ram_visual=hit.image;
             const auto result=speed::CombatResolver::damage_enemy(runtime,request);speed::EventBuilder::flush_combat(runtime);
             health.hit_cd = c.contact_cooldown;
             if (runtime.state.draw.tracing) {

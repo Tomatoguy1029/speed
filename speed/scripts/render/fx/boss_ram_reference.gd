@@ -26,9 +26,8 @@ func render(values: Dictionary, body: Node2D, canvas, epoch: int) -> void:
 	if serial != _serial:
 		_serial = serial
 		_cut.clear()
-		# 可視形状の縁を取得できる本体だけで描く。円の縁による代用は行わない。
-		if body.has_method("reference_cut"):
-			_cut = body.reference_cut(values.entry,values.direction)
+		if values.has("cut_exit"):
+			_cut = {"enter":values.entry,"exit":values.cut_exit}
 	if _cut.is_empty(): return
 	var params: Dictionary = SETTINGS.for_id("G10-boss-hit")
 	var color := Color(params.color)

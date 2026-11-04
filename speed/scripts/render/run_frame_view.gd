@@ -1008,7 +1008,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.set_meta("visual_revision",EFFECT_SETTINGS.preview_revision)
 		if display.has_method("set_reference_hit"):
 			var ram: Dictionary = frame.get("boss_ram",{})
-			display.set_reference_hit(_ram_reference.white(ram) if int(ram.get("id",0))==int(body.id) else 0.0)
+			display.set_reference_hit(_ram_reference.white(ram) if int(ram.get("body_id",0))==int(body.id) else 0.0)
 		if display.has_method("set_reference_canvas"):
 			display.set_reference_canvas(_reference_layer.canvas)
 		if display.has_method("setup_reference_overlay"):
@@ -1183,7 +1183,7 @@ func update_reference_effects(frame: Dictionary, real_dt: float) -> void:
 		if display.visible and display.has_method("draw_reference"):
 			display.draw_reference(_reference_layer.canvas, 0.0 if authoring_paused else real_dt)
 	var ram: Dictionary = _reference_render_frame.get("boss_ram",{})
-	var ram_body: Node2D = _boss_body_displays.get(int(ram.get("id",0)))
+	var ram_body: Node2D = _boss_body_displays.get(int(ram.get("body_id",0)))
 	_ram_reference.render(ram,ram_body,_reference_layer.canvas,int(_reference_render_frame.get("epoch",0)))
 	_reference_layer.end_frame()
 	_reference_events.clear()
