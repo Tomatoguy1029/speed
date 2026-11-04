@@ -2,6 +2,7 @@
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const POUNCE_MOTION := preload("res://scripts/render/bosses/canis_motion.gd")
+const POUNCE_SHADOW := preload("res://scripts/render/bosses/canis_pounce_shadow.gd")
 const EMBERS := preload("res://scripts/render/bosses/canis_embers.gd")
 const FIRE_PIXELS := preload("res://scripts/render/bosses/canis_fire_pixels.gd")
 const HOUND_BURN := preload("res://scripts/render/bosses/canis_hound_burn.gd")
@@ -32,6 +33,7 @@ var _reference_canvas
 var _nova_params := {}
 var _nova_overlay
 var _burst_overlay
+var _pounce_shadow
 var _reference_white := 0.0
 var _white_material: ShaderMaterial
 var _white_sprites: Array[Dictionary] = []
@@ -42,6 +44,9 @@ func _ready() -> void:
 	for name: String in ["RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg","Body","Head","Tail"]:
 		_part_origins[name] = (parts.get_node(name) as Node2D).position
 	_create_reference_white()
+	_pounce_shadow = POUNCE_SHADOW.new()
+	add_child(_pounce_shadow)
+	_pounce_shadow.setup(parts)
 	z_index = 1
 func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 	flames = preload("res://scripts/render/bosses/canis_flames.gd").new()
@@ -198,6 +203,7 @@ func _exit_tree() -> void:
 
 func draw_reference(canvas, _real_dt: float) -> void:
 	if canvas!=_reference_canvas or state.is_empty(): return
+	_pounce_shadow.apply(state,technique,gait,canvas.world_scale*get_viewport_rect().size.y/225.0)
 	if is_instance_valid(_burst_overlay): _burst_overlay.apply_frame(state.get("blaze_bursts",[]),float(state.clock))
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 	HOUND_BURN.draw(canvas,_trails,float(state.clock))
@@ -244,11 +250,6 @@ func _draw() -> void:
 		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))
 		var mouth := Vector2(float(state.radius)*0.84,0.0)
 		draw_line(mouth,mouth+Vector2(float(technique.beam_length),0.0),Color(color,alpha),width)
-	if (technique.get("technique","")=="pounce" or (technique.get("technique","") in ["bay","hunt_pounce"] and technique.get("jumping",false))) and int(technique.get("stage",5))==0:
-		var reach := position.distance_to(technique.aim)
-		var color := Color("#ff667d") if technique.locked else Color("#f2b567")
-		draw_line(Vector2(float(state.radius),0.0),Vector2(maxf(float(state.radius),reach),0.0),Color(color,0.35+float(state.charge)*0.4),6.0 if technique.locked else 3.0)
-		draw_arc(Vector2(reach,0.0),float(state.radius)*0.5,0.0,TAU,24,Color(color,0.6),3.0)
 	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE*float(state.radius)/100.0)
 	if int(technique.get("stage",5))==2 and technique.get("technique","")!="nova":
 		var alpha := 0.45+sin(float(state.clock)*14.0)*0.25
