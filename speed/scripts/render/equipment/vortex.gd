@@ -21,6 +21,7 @@ var heals: Array[Dictionary] = []
 var pops: Array[Dictionary] = []
 var _add: PixelPainter
 var _frame_parent: Node2D
+var _lens_copy: BackBufferCopy
 var _frame_lens_parent: Node2D
 var _frame_top_parent: Node2D
 var _frame_seen := {}
@@ -29,6 +30,11 @@ var frame_shake := 0.0
 func setup_frame(parent: Node2D, lens_parent: Node2D, top_parent: Node2D, pixel: float) -> void:
 	_frame_parent = parent
 	_frame_lens_parent = lens_parent
+	_lens_copy = BackBufferCopy.new()
+	_lens_copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+	_lens_copy.z_index = -1
+	_lens_copy.hide()
+	lens_parent.add_child(_lens_copy)
 	_frame_top_parent = top_parent
 	_painter = PixelPainter.new()
 	_painter.setup_painter(pixel)
@@ -62,6 +68,7 @@ const GLOW := preload("res://shaders/soft_glow.gdshader")
 const TUNED_SHADERS := [LENS]
 
 func dispose() -> void:
+	if is_instance_valid(_lens_copy): _lens_copy.queue_free()
 	if is_instance_valid(_add): _add.queue_free()
 	for h in holes: _free_lens(h)
 	for g in heals:
@@ -116,6 +123,7 @@ func frame_tick(dt: float, center: Vector2) -> void:
 			_free_lens(h)
 			pops.append({"age": 0.0})
 	holes = holes.filter(func(h): return h.age < CHARGE + HOLD + COLLAPSE)
+	_lens_copy.visible = not holes.is_empty()
 	for c in captures:
 		c.age += dt
 		_capture(p, c, center)
