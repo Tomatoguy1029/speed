@@ -9,6 +9,7 @@
 #include "field.h"
 #include "geometry.h"
 #include "combat_resolver.h"
+#include "boss_ram.h"
 #include "../output/event_builder.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
@@ -187,6 +188,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             }
             speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position,result.applied);
             speed::RunUpBehavior::contact(runtime,position,direction,result.applied);
+            if (enemy.is_boss && result.applied>0 && speed::BossRamSystem::begin(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position,direction,radius)) return true;
             continue;
         }
         runtime.state.ship.glide = false;
