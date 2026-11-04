@@ -42,7 +42,7 @@ function pathAt(points, d) { for (let i = 1; i < points.length; i++) { const spa
 const H_TECH = {
   bite_thrust: { kind: 'bite', type: 'lunge', title: '突き噛み', color: '#ff5470', ship: V(250, 70), active: r => r.normal_lunge, aimBase: true, retract: true },
   bite_sweep: { kind: 'bite', type: 'sweep', title: '横薙ぎ', color: '#ff5470', ship: V(110, 130), active: r => r.sweep_time, aimBase: true, aimOff: r => -r.sweep_arc * 0.5 },
-  wind_band: { kind: 'vortex', type: 'breath', title: '風の帯', color: '#5fe3c4', ship: V(300, 50), active: r => r.wind_time },
+  wind_band: { kind: 'vortex', type: 'breath', title: '風の帯', color: '#a8f0ec', ship: V(300, 50), active: r => r.wind_time },
   wind_blades: { kind: 'vortex', type: 'sweep', title: '三日月の風刃', color: '#5fe3c4', ship: V(640, 80), active: r => 2 * r.blade_interval, aimOff: r => -r.blade_spread * 0.5 },
   rubble_lump: { kind: 'debris', type: 'spit', title: '塊投げ', color: '#a9bccd', ship: V(620, 40), active: () => 0 },
   rubble_fan: { kind: 'debris', type: 'spit', title: '散らし吐き', color: '#a9bccd', ship: V(460, 40), active: () => 0 },
@@ -336,28 +336,39 @@ function hInhale(S, R, n, pose) {
     for (let j = 0; j < 5; j++) { const q = toL(add(M, mul(fromA(an - j * 0.09), rad + j * 1.5))), k = u * (1 - j / 5) * Math.sin(Math.PI * ph); if (k > 0.05) R.front.dot(q.x, q.y, pal[j === 0 && k > 0.5 ? 3 : 2], k); }
   }
 }
-// 風の帯：口から帯の幅いっぱいへ流れる空気の筋の束。圧の山が前へ走り、先で外へ巻いて散る。止むと根元から離れて流れ去る
+// 風の帯（pixelFX ice/frost-breath の作り方を下敷き）：むらのある半透明の風のかたまりが流れ、空気の玉がふくらみながら運ばれ、
+// 先の巻いた筋と短く速い筋が走り、砂粒が転がって運ばれる。止むと根元から離れて流れ去る
+function hFbm(x, y) { return pcNoise(x, y) * 0.62 + pcNoise(x * 2.1 + 17, y * 2.1 + 5) * 0.38; }
 function hWindBand(S, R, n, pose) {
   if (S.tech !== 'wind_band' || pose.rel < 0) return; const r = S.r, T = pose.T, e = pose.rel, pal = FX.ramp(R.P.color);
   const M = hMouthAt(n, pose), dir = fromA(n.sweep), sd = orth(dir), L = r.wind_length, Wd = r.wind_width * 0.5 * R.P.size;
-  const front = Math.min(L * 1.3, e * 3500), tail = e > T.active ? (e - T.active) * 1300 : 0, fadeAll = e > T.active ? clamp(1 - (e - T.active) / (0.4 * R.P.timing)) : 1; if (fadeAll <= 0) return;
-  for (let i = 0; i < 70; i++) {
-    const lane = (hash(i * 1.37) - 0.5) * 2, v = 900 + 500 * hash(i * 2.1), sl = 35 + 60 * hash(i * 3.9), ph = hash(i * 5.3), head = ((e * v + ph * L * 1.3) % (L * 1.3)) - 0.1 * L;
-    for (let s = head - sl; s <= head; s += 0.5 / WL) {
-      if (s < tail || s > front || s < 0) continue;
-      const end = clamp((L * 1.3 - s) / (0.3 * L)), curl = s > 0.75 * L ? (s - 0.75 * L) * 0.55 * Math.sign(lane || 1) : 0, lat = lane * Wd * (0.55 + 0.45 * clamp(s / L)) + Math.sin(s * 0.02 + i) * 5 + curl;
-      let b = ((s - head + sl) / sl) * (1 - lane * lane * 0.45) * fadeAll * end;
-      for (let p = 0; p < 9; p++) { const ps = (e - p * 0.12) * 800; if (ps > 0 && Math.abs(s - ps) < 26) b *= 1.55; }
-      const q = toL(add(add(M, mul(dir, s)), mul(sd, lat))); if (b < 0.06) continue;
-      if (b > 0.55) R.front.px(q.x, q.y, pal[b > 0.95 ? 4 : 3]); else R.front.dot(q.x, q.y, pal[2], b * 1.3);
-    }
-    const hq = toL(add(add(M, mul(dir, head)), mul(sd, lane * Wd * 0.8))); if (head > tail && head < front) R.front.light(hq.x, hq.y, pal[2], 0.12 * fadeAll * R.P.intensity);
-  }
-  for (let i = 0; i < 14; i++) { // 風に運ばれる砂粒
-    const s = ((e * (620 + 200 * hash(i)) + hash(i * 3) * L) % (L * 1.2)), lat = (hash(i * 7.7) - 0.5) * 2 * Wd * 0.8; if (s < tail || s > front) continue;
-    const q = toL(add(add(M, mul(dir, s)), mul(sd, lat))); R.front.px(q.x, q.y, H_STONE[3]);
-  }
-  if (e < T.active) { const m = toL(M); R.front.glow(m.x, m.y, 5 * R.P.size, pal[3], 0.35 * R.P.intensity); }
+  const front = Math.min(L * 1.15, e * 2600), tail = e > T.active ? (e - T.active) * 900 : 0, fadeAll = e > T.active ? clamp(1 - (e - T.active) / (0.55 * R.P.timing)) : 1; if (fadeAll <= 0) return;
+  const W = (s, o) => toL(add(add(M, mul(dir, s)), mul(sd, o)));
+  // 風のかたまり：ノイズのむらで濃さが変わる半透明の帯。口ではすぼまり、先で広がって薄れる
+  const step = 0.5 / WL;
+  for (let s = Math.max(0, tail); s <= front; s += step) { const u = s / L, hw = Wd * (0.4 + 0.6 * smooth(0, 0.45, u)), lead = clamp((front - s) / 40);
+    for (let o = -hw; o <= hw; o += step) { const v = o / hw, nz = hFbm(s * 0.028 - e * 9, o * 0.05 + 3 + Math.sin(s * 0.02 - e * 6) * 0.6), edge = (1 - v * v) * (u < 0.06 ? u / 0.06 : 1) * Math.pow(Math.max(0, 1.15 - u), 0.7) * lead;
+      const d = clamp(0.3 + (nz - 0.5) * 1.7 + (1 - Math.abs(v)) * 0.22 * (1 - u)) * edge * fadeAll; if (d < 0.12) continue; const q = W(s, o);
+      R.front.dot(q.x, q.y, pal[d > 0.55 ? 4 : 3], Math.min(0.42, d * 0.6)); if (d > 0.45) R.front.light(q.x, q.y, pal[2], 0.12 * d * R.P.intensity); } }
+  // 空気の玉：流れながらふくらみ、上の明るい所から薄れる
+  for (let i = 0; i < 16; i++) { const life = 0.55 + 0.25 * hash(i * 2.3), spawn = (hash(i * 5.1) * life), cyc = Math.floor((e + spawn) / life), age = (e + spawn) - cyc * life, born = e - age; if (born < 0 || born > T.active) continue;
+    const v0 = (520 + 160 * hash(i * 7.3 + cyc)) , s = v0 * age * (1 - age * 0.35), lat = (hash(i * 3.9 + cyc) - 0.5) * 1.5 * Wd * (0.4 + 0.6 * clamp(s / L)), k = age / life, rad = (5 + 30 * Math.pow(k, 0.75)) * WL * R.P.size, a = 0.6 * Math.pow(1 - k, 1.2) * Math.min(1, age / 0.06) * fadeAll; if (s > L * 1.15 || a < 0.04) continue;
+    const c = W(s, lat); for (let y = -rad; y <= rad; y += 0.5) for (let x = -rad; x <= rad; x += 0.5) { const dd = (x * x + y * y) / (rad * rad); if (dd > 1) continue; const top = y < -rad * 0.25 && x < 0; R.front.dot(c.x + x, c.y + y, pal[top && k < 0.5 ? 4 : 3], a * 0.7 * (1 - dd) * (top ? 1 : 0.6)); } }
+  // 先の巻いた筋：まっすぐ走って、先がくるっと巻く
+  for (let i = 0; i < 11; i++) { const life = 0.38 + 0.12 * hash(i * 4.7), spawn = hash(i * 8.1) * life, cyc = Math.floor((e + spawn) / life), age = (e + spawn) - cyc * life, born = e - age; if (born < 0 || born > T.active) continue;
+    const k = age / life, s0 = (700 + 200 * hash(i + cyc)) * age, lat = (hash(i * 6.6 + cyc) - 0.5) * 1.4 * Wd, curlR = 9 + 6 * hash(i * 2.2), sign = hash(i * 9.3 + cyc) > 0.5 ? 1 : -1, len0 = 44, pts = [];
+    for (let m = 0; m <= 24; m++) { const u = m / 24, along = len0 * u; pts.push(W(s0 - len0 + along, lat)); }
+    for (let m = 1; m <= 18; m++) { const a = (m / 18) * 4.4, cx = s0 + Math.sin(a) * curlR, cy = lat + sign * (1 - Math.cos(a)) * curlR; pts.push(W(cx, cy)); }
+    const fade = (1 - k) * fadeAll; pts.forEach((q, m) => { const u = m / (pts.length - 1), b = fade * (0.25 + 0.75 * Math.sin(Math.PI * Math.min(1, u * 1.15))); if (b < 0.2) return; if (b > 0.35) { R.front.px(q.x, q.y, pal[4]); R.front.light(q.x, q.y, pal[3], 0.2 * b * R.P.intensity); } else R.front.dot(q.x, q.y, pal[4], b * 1.8); }); }
+  // 短く速い筋
+  for (let i = 0; i < 12; i++) { const life = 0.22 + 0.12 * hash(i * 3.1), spawn = hash(i * 1.7) * life, cyc = Math.floor((e + spawn) / life), age = (e + spawn) - cyc * life, born = e - age; if (born < 0 || born > T.active) continue;
+    const s = (900 + 300 * hash(i + cyc * 3)) * age, lat = (hash(i * 2.9 + cyc) - 0.5) * 1.6 * Wd, k = age / life, l = 26 + 20 * hash(i); if (s > L * 1.1) continue;
+    for (let d = 0; d < l; d += step) { const q = W(s - d, lat), u = 1 - d / l, b = u * (k < 0.75 ? 1 : (1 - k) / 0.25) * fadeAll; if (b > 0.55) R.front.px(q.x, q.y, pal[u > 0.8 ? 4 : 3]); else if (b > 0.2) R.front.dot(q.x, q.y, pal[3], b); } }
+  // 運ばれて転がる砂粒
+  for (let i = 0; i < 12; i++) { const life = 0.7, spawn = hash(i * 2.6) * life, cyc = Math.floor((e + spawn) / life), age = (e + spawn) - cyc * life, born = e - age; if (born < 0 || born > T.active) continue;
+    const s = (480 + 180 * hash(i + cyc)) * age, lat = (hash(i * 7.7 + cyc) - 0.5) * 1.5 * Wd + Math.sin(age * 14 + i) * 8; if (s > L * 1.15) continue; const q = W(s, lat), spin = age * 20 + i;
+    R.front.px(q.x, q.y, H_STONE[3]); R.front.px(q.x + Math.round(Math.cos(spin)), q.y + Math.round(Math.sin(spin)), H_STONE[2]); }
+  if (e < T.active) { const m = toL(M); R.front.glow(m.x, m.y, 5 * R.P.size, pal[3], 0.3 * R.P.intensity); }
 }
 // 三日月の風刃：押し固めた空気の刃。外の縁が白く、内側へ冷え、後ろへ短い筋を引く。寿命の終わりに両端から欠けて消える
 function hBlades(S, R) {
@@ -496,7 +507,7 @@ const H_STATUS = {
 const H_DESC = {
   bite_thrust: '予兆：首をS字にためて頭を引き、目が赤く強まり、最後は震えて止まる → 一気に伸びて頭の形の光と両脇の空気の筋、目の光が通り道に残る → 上下の牙の鉤が口先へ寄り、前へ長い閃光と欠片・土ぼこり → 衝撃の波が首を根元へ抜ける',
   bite_sweep: '予兆：振りかぶる側へ首を弓なりにため、目が赤く強まって止まる → ゆっくり振り出し、真ん中で一気に速くなって頭が外へ突き出し、振る先を向いて噛みにいく。三日月の帯（先が白く後ろへ冷えて細る）と外へ削られる小石 → 振り切って少し行き過ぎて戻り、帯は後ろから崩れて消える。緩急と踏み込みは見た目だけで、判定は現行の円のまま',
-  wind_band: '予兆：前から空気の筋が口へ吸い込まれ、頭がふくらんで止まる → 口から帯の幅いっぱいへ空気の筋の束が流れ、圧の山が前へ走り、先で外へ巻いて散る。砂粒が運ばれる → 止むと根元から離れて流れ去る',
+  wind_band: '予兆：前から空気の筋が口へ吸い込まれ、頭がふくらんで止まる → 口からむらのある半透明の風のかたまりが流れ出て先で広がり、空気の玉がふくらみながら運ばれ、先の巻いた筋と短い筋が走り、砂粒が転がって運ばれる（pixelFX ice/frost-breath の作り方を下敷き）→ 止むと根元から離れて流れ去る',
   wind_blades: '予兆：口のまわりで空気が渦を巻いて縮む → 0.18秒ごとに首を振り抜いて、押し固めた空気の三日月を3枚。外の縁が白く内側へ冷え、後ろへ短い筋 → 寿命の終わりに両端から欠けて消える',
   rubble_lump: '予兆：首の瓦礫が口へ送られ、口先で塊になる。頭を大きく引いて止まる → 頭を突き出して吐き、土煙と砂利。岩は回りながら飛んで砂ぼこりの尾を引く',
   rubble_fan: '予兆：首の瓦礫が口へ送られ、口で小石が暴れる → 頭を突き出して扇に吐き、広い土煙と砂利。小岩はそれぞれ砂ぼこりの尾',
