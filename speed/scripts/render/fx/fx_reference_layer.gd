@@ -6,6 +6,7 @@ var canvas := CANVAS.new()
 var shadows: Node2D
 var overlay: Node2D
 var foreground: Node2D
+var under_actors: Node2D
 var _sprites: Array[Sprite2D] = []
 var _lights: Array[ImageTexture] = []
 var _copies: Array[BackBufferCopy] = []
@@ -26,6 +27,11 @@ func setup(parent: Node2D, back_parent: Node2D) -> void:
 	foreground.z_index = 19
 	parent.add_child(foreground)
 	for i in 4:
+		if i == 1:
+			# 火球の画像は背面の炎より後、残火と着地煙より前に描く。
+			under_actors = Node2D.new()
+			under_actors.z_index = 0
+			back_parent.add_child(under_actors)
 		# CanvasLayerをまたいでz_indexは比較されない。背面は本体と同じワールドへ置く。
 		var target: Node2D = parent if i == 3 else back_parent
 		var depth: int = [-1, 0, 1, 20][i]

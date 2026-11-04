@@ -1036,6 +1036,8 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.setup_reference_shadows(_reference_layer.shadows)
 		if display.has_method("setup_reference_front"):
 			display.setup_reference_front(_reference_layer.foreground)
+		if display.has_method("setup_reference_underlay"):
+			display.setup_reference_underlay(_reference_layer.under_actors)
 		display.apply_frame(body,attack,entry.get("appearance",{}))
 	for id in _boss_body_displays.keys():
 		if not body_seen.has(id):

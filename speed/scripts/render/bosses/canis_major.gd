@@ -6,6 +6,9 @@ const POUNCE_SHADOW := preload("res://scripts/render/bosses/canis_pounce_shadow.
 const EMBERS := preload("res://scripts/render/bosses/canis_embers.gd")
 const FIRE_PIXELS := preload("res://scripts/render/bosses/canis_fire_pixels.gd")
 const HOUND_BURN := preload("res://scripts/render/bosses/canis_hound_burn.gd")
+const BLAZE_REFERENCE := preload("res://scripts/render/bosses/canis_blaze_reference.gd")
+const BLAZE_FIREBALL := preload("res://scripts/render/bosses/canis_blaze_fireball.gd")
+const FLAME_WARNING := preload("res://scripts/render/bosses/canis_flame_warning.gd")
 const LANDING_DUST := preload("res://scripts/render/bosses/canis_landing.gd")
 const NOVA_DISPLAY := preload("res://scripts/render/bosses/canis_nova.gd")
 const BURST_DISPLAY := preload("res://scripts/render/bosses/canis_burst.gd")
@@ -34,6 +37,7 @@ var _nova_params := {}
 var _nova_overlay
 var _burst_overlay
 var _pounce_shadow
+var _blaze_fireball
 var _reference_white := 0.0
 var _white_material: ShaderMaterial
 var _white_sprites: Array[Dictionary] = []
@@ -148,7 +152,13 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 			node.rotation = pose.rotation
 			node.scale = pose.scale
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
-	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(attack.get("glow",body.charge)) if int(attack.get("stage",5)) in [0,1] else float(body.charge),pulse)
+	var glow := float(attack.get("glow",0.0))
+	var order_roar: bool = attack.get("technique","") in ["command","stream","howl","bay","relay","hunt","hunt_pounce"] and motion.is_empty() and not bool(attack.get("aiming",false))
+	var charge := float(attack.get("glow",body.charge)) if int(attack.get("stage",5)) in [0,1] else float(body.charge)
+	if order_roar:
+		phase = 1.0 if int(body.phase)>1 else 0.0
+		charge = 0.0 if glow<=0.0 else maxf(float(body.charge),glow)
+	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,charge,pulse,order_roar)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE
 
 func set_reference_canvas(canvas) -> void:
@@ -191,6 +201,11 @@ func _sync_reference_white() -> void:
 		overlay.region_rect = source.region_rect
 		overlay.self_modulate.a = source.self_modulate.a
 
+func setup_reference_underlay(parent: Node2D) -> void:
+	if is_instance_valid(_blaze_fireball): return
+	_blaze_fireball = BLAZE_FIREBALL.new()
+	parent.add_child(_blaze_fireball)
+
 func setup_reference_shadows(parent: Node2D) -> void:
 	if _pounce_shadow.get_parent()!=parent: _pounce_shadow.reparent(parent)
 
@@ -199,7 +214,9 @@ func setup_reference_front(parent: Node2D) -> void:
 	if flames!=null and flames.get_parent()!=parent: flames.reparent(parent)
 
 func _sync_reference_shadow_visibility() -> void:
-	if is_instance_valid(_pounce_shadow) and not is_visible_in_tree(): _pounce_shadow.hide()
+	if not is_visible_in_tree():
+		if is_instance_valid(_pounce_shadow): _pounce_shadow.hide()
+		if is_instance_valid(_blaze_fireball): _blaze_fireball.hide()
 
 func setup_reference_overlay(parent: Node2D) -> void:
 	if is_instance_valid(_nova_overlay): return
@@ -210,6 +227,7 @@ func setup_reference_overlay(parent: Node2D) -> void:
 
 func _exit_tree() -> void:
 	if is_instance_valid(_pounce_shadow) and _pounce_shadow.get_parent()!=self: _pounce_shadow.queue_free()
+	if is_instance_valid(_blaze_fireball): _blaze_fireball.queue_free()
 	if is_instance_valid(flames) and flames.get_parent()!=self: flames.queue_free()
 	if is_instance_valid(_nova_overlay): _nova_overlay.queue_free()
 	if is_instance_valid(_burst_overlay): _burst_overlay.queue_free()
@@ -218,12 +236,17 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if canvas!=_reference_canvas or state.is_empty(): return
 	_pounce_shadow.apply(state,technique,gait,canvas.world_scale*get_viewport_rect().size.y/225.0)
 	if is_instance_valid(_burst_overlay): _burst_overlay.apply_frame(state.get("blaze_bursts",[]),float(state.clock))
+	if is_instance_valid(_blaze_fireball):
+		_blaze_fireball.show()
+		_blaze_fireball.apply_frame(state.get("burning",[]),float(state.clock))
 	HOUND_BURN.draw(canvas,_trails,float(state.clock))
+	FLAME_WARNING.draw(canvas,state,technique)
 	if not _nova.is_empty():
 		NOVA_DISPLAY.draw_field(canvas,_nova,_nova_params)
 		NOVA_DISPLAY.draw_flare(canvas,_nova,_nova_params)
 	EMBERS.draw(canvas,state.get("fire_visual",[]),float(state.clock),get_viewport_rect().size.y/225.0)
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
+	BLAZE_REFERENCE.draw(canvas,state.get("flames",[]),state.get("burning",[]),float(state.clock),get_viewport_rect().size.y/225.0)
 	FIRE_PIXELS.draw(canvas,state.get("fire_visual",[]))
 	if is_instance_valid(_nova_overlay):
 		_nova_overlay.update_overlay(_nova,_nova_params,float(state.facing),canvas.world_scale*get_viewport_rect().size.y/225.0)
@@ -252,21 +275,7 @@ func _track_command(body: Dictionary, _attack: Dictionary, dt: float) -> void:
 	for id in _trails.keys():
 		if not live.has(id) and float(body.clock)>=float(_trails[id].until)+0.4: _trails.erase(id)
 	queue_redraw()
-func _draw() -> void:
-	for warning: Dictionary in technique.get("warnings",[]):
-		var from: Vector2 = warning.from
-		var to := from+Vector2.from_angle(float(warning.angle))*float(warning.length)
-		draw_line(to_local(from),to_local(to),Color(SIRIUS_COLOR,lerpf(0.12,0.45,float(warning.progress))),lerpf(1.0,3.0,float(warning.progress)))
-	if (technique.get("technique","")=="sirius" or (technique.get("technique","") in ["hunt","relay"] and technique.get("aiming",false))) and int(technique.get("stage",5))==0:
-		var color := Color("#ff667d") if technique.locked else Color("#e8f6ff")
-		var alpha := 0.35 if technique.locked else lerpf(0.12,0.45,float(state.charge))
-		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))
-		var mouth := Vector2(float(state.radius)*0.84,0.0)
-		draw_line(mouth,mouth+Vector2(float(technique.beam_length),0.0),Color(color,alpha),width)
-	# 咆哮はroar_post、着地は足元の土煙が描く。旧い輪は重ねない。
-	draw_set_transform(Vector2.ZERO)
 ## 閃光の遮蔽場は戦闘側から受け取り、描画側で再計算しない。
-const SIRIUS_COLOR := Color("#cfefff")
 var _nova := {}
 func _track_nova(body: Dictionary) -> void:
 	_nova = body.get("nova",{})

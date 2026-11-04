@@ -213,7 +213,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.mode),float(enemy.charge),definition.color.r,definition.color.g,definition.color.b,definition.color.a}) enemy_batch.beamer.push_back(value);
         }
         if (body_visible) if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) enemy_batch.ruler_sides.push_back(ruler->side);
-        const bool warning=definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
+        bool relay_warning=false;
+        if (definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i))))
+            for (const auto &technique:state.bosses.techniques) if (const auto *relay=std::get_if<CanisRelayState>(&technique.detail); relay && technique.stage<TechniqueStage::Finished && !relay->cancelled && !relay->aiming)
+                for (const auto &item:relay->items) if (item.marked && !item.fired && same_handle(item.actor,state.enemy_handles.at(uint32_t(i)))) relay_warning=true;
+        const bool warning=definition.kind==EnemyDefinition::Kind::Hound && !relay_warning && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {
             const auto *order=GroupSystem::order(state,state.enemy_handles.at(uint32_t(i)));const auto delta=state.ship_pos-pose.position;Dictionary fx;
             fx["id"]=enemy.id;fx["position"]=pose.position;fx["radius"]=enemy.radius;fx["sprite_radius"]=radius;fx["facing"]=delta.length_squared()>0.000001?double(delta.angle()):pose.angle;
