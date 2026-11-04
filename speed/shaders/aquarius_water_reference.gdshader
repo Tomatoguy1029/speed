@@ -86,17 +86,20 @@ void fragment() {
 	float q = dot(relative,vec2(-direction.y,direction.x));
 	float half = max(half0+along*slope,1.0);
 	float side = abs(q/half);
-	if (along < 0.0 || along > beam_length || side > 1.12) { COLOR = vec4(0.0); return; }
-	float fade = opacity*(1.0-smoothstep(0.7,1.0,along/beam_length));
-	vec4 a = tail ? (collapse > 0.0 ? rushing(along,q,side) : vec4(0.0)) : ripples(along,q,side);
-	float alpha_a = a.a*fade;
-	vec3 premul = ramp(a.rgb)*alpha_a;
-	float alpha = alpha_a;
-	if (tail) {
-		vec4 b = mist(along,q,side);
-		float alpha_b = b.a*fade;
-		premul = premul*(1.0-alpha_b)+ramp(b.rgb)*alpha_b;
-		alpha += alpha_b*(1.0-alpha);
+	if (along < 0.0 || along > beam_length || side > 1.12) {
+		COLOR = vec4(0.0);
+	} else {
+		float fade = opacity*(1.0-smoothstep(0.7,1.0,along/beam_length));
+		vec4 a = tail ? (collapse > 0.0 ? rushing(along,q,side) : vec4(0.0)) : ripples(along,q,side);
+		float alpha_a = a.a*fade;
+		vec3 premul = ramp(a.rgb)*alpha_a;
+		float alpha = alpha_a;
+		if (tail) {
+			vec4 b = mist(along,q,side);
+			float alpha_b = b.a*fade;
+			premul = premul*(1.0-alpha_b)+ramp(b.rgb)*alpha_b;
+			alpha += alpha_b*(1.0-alpha);
+		}
+		COLOR = alpha > 0.003 ? vec4(premul/max(alpha,0.001)*0.85,alpha) : vec4(0.0);
 	}
-	COLOR = alpha > 0.003 ? vec4(premul/max(alpha,0.001)*0.85,alpha) : vec4(0.0);
 }
