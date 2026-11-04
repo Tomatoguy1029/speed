@@ -74,6 +74,7 @@ func _ready() -> void:
 	_reference_boost.z_index = -1
 	add_child(_reference_boost)
 	_horn_overlay = _make_light_overlay(horn)
+	(_horn_overlay.material as ShaderMaterial).shader = preload("res://shaders/monoceros_horn_only_light.gdshader")
 	_armor_overlay = _make_light_overlay(parts.get_node("Head/Lower/Sprite/head_gold_armor") as Sprite2D)
 	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
 

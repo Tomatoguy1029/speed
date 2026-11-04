@@ -62,11 +62,22 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     const bool stuck=live && t && t->stage==TechniqueStage::Stuck;
     const bool attacking=active || stuck || (windup && t->locked);
     const bool sweeping=(move=="sweep" || move=="lance" || move=="return_charge" || move=="horn_wave" || move=="horn_dance" || move=="sword_flash") && (windup || active);
+    const auto *wave_pose=t?std::get_if<MonocerosHornWaveState>(&t->detail):nullptr;
+    double wave_pull_scale=1.0;
+    if (wave_pose && attack) {
+        using Stage=MonocerosHornWaveState::Stage;
+        if (wave_pose->stage==Stage::Windup || wave_pose->stage==Stage::Recharge) wave_pull_scale=0.5;
+        else if (wave_pose->stage==Stage::Swing) {
+            const double q=std::clamp(wave_pose->elapsed/std::max(attack->swing_time,0.001),0.0,1.0);
+            wave_pull_scale=0.5+0.5*godot::Math::smoothstep(0.0,0.25,q);
+        }
+    }
     pose.body=limit(enemy.facing,follow(pose.body,enemy.facing,dt,tuning->body_follow*(attacking?0.3:1.0)),tuning->body_lag);
     godot::PackedVector2Array horn_line;
     if (t) horn_line=TechniqueRunner::shape(run,*t);
     if (attacking || sweeping) {
         pose.neck=move!="kick" && horn_line.size()>=2?(Vector2(horn_line[1])-Vector2(horn_line[0])).angle():enemy.facing;
+        if (wave_pose) pose.neck=enemy.facing+godot::Math::angle_difference(enemy.facing,pose.neck)*wave_pull_scale;
         pose.head=pose.neck;
     } else {
         pose.neck=limit(pose.body,follow(pose.neck,enemy.facing,dt,tuning->neck_follow),tuning->head_turn*0.55);
@@ -129,11 +140,11 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
         using Stage=MonocerosHornWaveState::Stage;double pull=0,thrust=0,shake=0;
         if (v->stage==Stage::Windup || v->stage==Stage::Recharge) {
             const double duration=v->stage==Stage::Windup?attack->warn:attack->recharge;
-            pull=godot::Math::smoothstep(0.0,duration*0.7,v->elapsed);
+            pull=godot::Math::smoothstep(0.0,duration*0.7,v->elapsed)*wave_pull_scale;
             shake=godot::Math::smoothstep(duration*0.7,duration,v->elapsed)*std::sin((t->elapsed+0.4)*70.0)*1.6;
         } else if (v->stage==Stage::Swing) {
             const double q=std::clamp(v->elapsed/std::max(attack->swing_time,0.001),0.0,1.0);
-            thrust=std::sin(godot::Math::PI*std::min(1.0,q*1.3));pull=1.0-godot::Math::smoothstep(0.0,0.25,q);
+            thrust=std::sin(godot::Math::PI*std::min(1.0,q*1.3));pull=(1.0-godot::Math::smoothstep(0.0,0.25,q))*wave_pull_scale;
         }
         nodes[head].position+=Vector2(shake,-pull*16+thrust*15);
         nodes[torso].position+=Vector2(shake*0.5,-pull*8+thrust*8);
