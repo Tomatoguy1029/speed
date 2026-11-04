@@ -19,7 +19,7 @@ var _last_sigma := -1.0
 
 func setup(source_parts: Node2D) -> void:
 	show_behind_parent = true
-	z_index = -2
+	z_index = -3
 	for name: String in NAMES:
 		var source_node := source_parts.get_node(name) as Node2D
 		var source := source_node.get_node("Sprite") as Sprite2D
