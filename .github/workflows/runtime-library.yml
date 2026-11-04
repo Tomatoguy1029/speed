@@ -2,7 +2,7 @@ name: 開発用ライブラリ
 
 on:
   push:
-    branches: [main, feature/wakida/build-pipeline]
+    branches: [main]
     paths: [.github/workflows/runtime-library.yml, cpp/**, tools/build/**]
 
 concurrency:
