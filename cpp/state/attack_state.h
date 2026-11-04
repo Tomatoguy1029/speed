@@ -13,7 +13,7 @@ struct ShellState {uint32_t definition=0;double burst=0,full=0;godot::Vector2 mo
 struct LightArrowState {uint32_t definition=0;float length=0;};
 struct StarBoltState {uint32_t definition=0;};
 struct BoltState {uint32_t definition=0;};
-struct SlashState {uint32_t definition=0;float side=1;};
+struct SlashState {uint32_t definition=0;float side=1;uint32_t lynx_definition=0;double initial_life=0,age=0;godot::Vector2 paw_offset;};
 struct BudgetToken {int64_t value=0;};
 enum class EndPolicy : uint32_t { NaturalLifetime=1,CancelWithTechnique=2,EndWithTechnique=4,CancelWithParticipant=8,ClearWithBoss=16,ClearWithBonus=32 };
 using EndPolicies=uint32_t;

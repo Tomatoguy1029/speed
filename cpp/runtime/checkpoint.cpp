@@ -200,7 +200,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (shot.kind==int64_t(HostileKind::Slash)) {
             if (shot.slash.definition!=1 || content.slashes.empty() || (shot.slash.side!=1 && shot.slash.side!=-1) ||
                 !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.radius) || shot.radius<=0 ||
-                !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0) return false;
+                !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0 ||
+                shot.slash.lynx_definition>content.lynxes.size() || !std::isfinite(shot.slash.initial_life) || shot.slash.initial_life<0 || !std::isfinite(shot.slash.age) || shot.slash.age<0 || !shot.slash.paw_offset.is_finite()) return false;
         } else if (shot.slash.definition) return false;
         if (shot.kind==int64_t(HostileKind::Bolt)) {
             if (!shot.bolt.definition || shot.bolt.definition>content.bolts.size() || !shot.pos.is_finite() || !shot.vel.is_finite() ||

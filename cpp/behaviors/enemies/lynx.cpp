@@ -18,6 +18,10 @@ void LynxBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     if (!GunnerTiming::advance(e.fire_t,e.charge,dt,p.warn,d.fire_interval)) return;
     auto &state=std::get<LynxState>(e.behavior_state);const double side=state.buds%2==0?1:-1;state.buds=state.buds==INT32_MAX?INT32_MIN:state.buds+1;
     const double angle=tracking.angle(e.facing,(s.ship_pos-e.pos).angle());SlashParams shot;shot.position=e.pos+godot::Vector2::from_angle(angle)*e.radius;shot.angle=angle;shot.speed=p.slash_speed;shot.size=p.slash_size;shot.range=p.slash_range;shot.damage=p.damage;shot.side=side;
+    const auto body_forward=godot::Vector2::from_angle(e.facing),paw_forward=godot::Vector2::from_angle(e.facing+side*0.45);
+    const auto paw_side=godot::Vector2(-paw_forward.y,paw_forward.x);
+    const auto paw=e.pos-body_forward*(e.radius*0.28)+paw_forward*(e.radius*0.55)+paw_side*(side*e.radius*0.6);
+    shot.lynx_definition=d.lynx_definition;shot.paw_offset=paw-shot.position;
     if (e.attack_managed) shot.budget.value=budget.token(owner);SlashSystem::emit(r,shot);
 }
 }
