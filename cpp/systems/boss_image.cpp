@@ -2,10 +2,10 @@
 #include "../runtime/run_runtime.h"
 #include "../bosses/centaurus/image_pose_system.h"
 #include "../bosses/canis_major/image_pose.h"
+#include "../bosses/canis_major/roar.h"
 #include "../bosses/monoceros/image_pose_system.h"
 #include <cmath>
 #include <algorithm>
-#include <limits>
 namespace speed {
 namespace {
 const BossBodyState *body_for(const RunRuntime &r,EnemyHandle actor) {
@@ -36,7 +36,7 @@ void BossImageSystem::refresh(RunRuntime &r) {
         switch (r.content->bosses[boss-1].kind) {
         case 0:MonocerosImagePoseSystem::refresh(r,body);break;
         case 1:CentaurusImagePoseSystem::refresh(r,body);break;
-        case 2:CanisImagePose::update(r,body);break;
+        case 2:CanisImagePose::update(r,body);CanisRoar::update(r,body);break;
         default:break;
         }
     }
