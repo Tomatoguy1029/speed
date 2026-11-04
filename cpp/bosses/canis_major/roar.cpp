@@ -1,5 +1,6 @@
 #include "roar.h"
 #include "image_pose.h"
+#include "../../state/boss_states.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -25,7 +26,7 @@ double warning(const ContentBundle &content,const TechniqueState &t) {
 }
 const CanisRoarDefinition *CanisRoar::settings(const ContentBundle &content,uint32_t technique) { return find_settings(content,technique); }
 void CanisRoar::update(RunRuntime &r,BossBodyState &body) {
-    for (const auto &t:r.state.bosses.techniques) {
+    for (const auto &t:r.state.bosses->techniques) {
         if (!same_handle(t.actor,body.actor) || t.stage>=TechniqueStage::Finished || body.canis.roar_last_technique==t.id) continue;
         const auto *p=find_settings(*r.content,t.definition);if (!p || !p->has_roar) continue;
         const auto &id=r.content->boss_techniques[t.definition-1].external_id;

@@ -1,5 +1,6 @@
 #include "image_pose_system.h"
 #include "image_pose.h"
+#include "../../state/boss_states.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -32,7 +33,7 @@ bool CentaurusImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     if (!definition.boss || definition.boss>content.bosses.size() || content.bosses[definition.boss-1].kind!=1) return false;
     const auto &enemy=run.state.enemies[body.actor.slot];
     const TechniqueState *t=nullptr;
-    for (const auto &candidate:run.state.bosses.techniques) if (same_handle(candidate.actor,body.actor) && candidate.stage<TechniqueStage::Finished) {t=&candidate;break;}
+    for (const auto &candidate:run.state.bosses->techniques) if (same_handle(candidate.actor,body.actor) && candidate.stage<TechniqueStage::Finished) {t=&candidate;break;}
     std::string technique;
     uint32_t released=0;
     int64_t id=0;

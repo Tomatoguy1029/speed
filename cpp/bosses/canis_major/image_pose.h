@@ -1,6 +1,7 @@
 #pragma once
 #include "image_pose_state.h"
 #include "../../content/boss_image_data.h"
+#include "../../state/boss_states.h"
 #include <godot_cpp/variant/array.hpp>
 #include <vector>
 

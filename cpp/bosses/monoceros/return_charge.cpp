@@ -3,6 +3,7 @@
 #include "../../systems/field.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

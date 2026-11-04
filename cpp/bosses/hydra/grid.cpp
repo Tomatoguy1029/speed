@@ -7,6 +7,7 @@
 #include "../../systems/attack_system.h"
 #include "../../systems/field.h"
 #include "../../systems/collision_query.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -34,7 +35,7 @@ std::optional<HydraGridPlan> HydraTechnique::grid_plan(const RunRuntime &r,const
     }return {};
 }
 void HydraTechnique::grid_prepare(RunRuntime &r,TechniqueState &t) {auto &b=*PhaseController::find(r,t.actor);auto &v=std::get<HydraTechniqueState>(t.detail);HydraGridState g;const auto plan=grid_plan(r,b,t.definition);if (!plan) {finish(r,t,true);return;}g.plan=*plan;g.arrived.resize(v.participants.size(),false);v.move=g;}
-std::optional<V> HydraTechnique::bearer_target(const RunRuntime &r,const BossBodyState &b) {for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && supports(r.content->boss_techniques[t.definition-1].kind)) if (const auto *v=std::get_if<HydraTechniqueState>(&t.detail)) if (const auto *g=std::get_if<HydraGridState>(&v->move)) return g->plan.bearer;return {};}
+std::optional<V> HydraTechnique::bearer_target(const RunRuntime &r,const BossBodyState &b) {for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && supports(r.content->boss_techniques[t.definition-1].kind)) if (const auto *v=std::get_if<HydraTechniqueState>(&t.detail)) if (const auto *g=std::get_if<HydraGridState>(&v->move)) return g->plan.bearer;return {};}
 bool HydraTechnique::grid_position(RunRuntime &r,TechniqueState &t,double dt) {
     auto &b=*PhaseController::find(r,t.actor);auto &v=std::get<HydraTechniqueState>(t.detail);auto &g=std::get<HydraGridState>(v.move);const auto &p=grid_rule(r,t.definition);g.position_elapsed+=dt;if (g.position_elapsed>p.formation_timeout) {finish(r,t,true);return false;}bool ready=true;
     for (size_t i=0;i<v.participants.size();++i) {auto *n=HydraNormalAttack::neck(b,v.participants[i]);if (!n || !HydraRegrow::alive(r,*n)) continue;const auto slot=g.plan.starts[i];if (!g.arrived[i]) {if (n->free_pos.distance_to(slot)<45) {n->velocity=(slot-n->free_pos).limit_length(100);n->free_pos+=n->velocity*dt*4;}else HydraSwim::steer(r,b,*n,slot,dt,1.8,true);}n->strike_pos=n->free_pos;r.state.enemies[n->actor.slot].pos=n->free_pos;if (n->free_pos.distance_to(slot)<=p.tolerance) g.arrived[i]=true;if (!g.arrived[i]) ready=false;}

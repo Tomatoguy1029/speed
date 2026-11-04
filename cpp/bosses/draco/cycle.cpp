@@ -6,6 +6,7 @@
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -23,7 +24,7 @@ bool DracoCycle::begin_deep(RunRuntime &r,BossBodyState &b) {
 }
 bool DracoCycle::tick(RunRuntime &r,BossBodyState &b,double dt) {
     const auto *p=rule(r,b);if (!p) return false;auto &v=b.draco.cycle;auto &e=r.state.enemies[b.actor.slot];
-    if (v.stage==DracoCycleStage::None) {bool enabled=!r.state.control.lab_mode;for (const auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) enabled=f.selection_enabled;if (enabled && b.phase>=2 && b.mode==BossMode::Idle) {v.next_cycle-=dt;if (v.next_cycle<=0) begin_deep(r,b);}return v.stage!=DracoCycleStage::None;}
+    if (v.stage==DracoCycleStage::None) {bool enabled=!r.state.control.lab_mode;for (const auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) enabled=f.selection_enabled;if (enabled && b.phase>=2 && b.mode==BossMode::Idle) {v.next_cycle-=dt;if (v.next_cycle<=0) begin_deep(r,b);}return v.stage!=DracoCycleStage::None;}
     v.time+=dt;e.vel={};if (v.first) DracoCinematic::frame(r,r.state.ship_pos.lerp(e.pos,0.55),v.zoom*0.8);
     switch (v.stage) {
     case DracoCycleStage::Roar:if (v.time>=1) {v.stage=DracoCycleStage::Collect;v.time=0;}break;

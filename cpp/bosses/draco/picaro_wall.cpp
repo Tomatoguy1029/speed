@@ -5,6 +5,7 @@
 #include "../../systems/attacks/light_arrow.h"
 #include "../../systems/attacks/zone.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -19,7 +20,7 @@ void DracoPicaroWall::begin(RunRuntime &r,TechniqueState &t) {
     for (uint32_t j=0;j<p.count;++j) DracoPicaro::spawn(r,*b,choices[j%choices.size()],origin.lerp(aim,0.45)+forward.orthogonal()*(double(j)-double(p.count-1)*0.5)*180);
 }
 void DracoPicaroWall::active(RunRuntime &r,TechniqueState &t,double dt) {
-    auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoPicaroWallState>(v.move);const auto &p=rule(r,t);const auto &e=r.state.enemies[t.actor.slot];auto *b=PhaseController::find(r,t.actor);const auto ticket=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));
+    auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoPicaroWallState>(v.move);const auto &p=rule(r,t);const auto &e=r.state.enemies[t.actor.slot];auto *b=PhaseController::find(r,t.actor);const auto ticket=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));
     if (s.shots<p.arrows && v.stage_time>=s.shots*p.interval) {
         const auto from=e.pos+godot::Vector2::from_angle(e.facing)*100*b->draco.head_scale;LightArrowParams arrow;arrow.position=from;arrow.angle=-1.5707963267948966;arrow.speed=900;arrow.radius=12;arrow.travel=std::max(1000.0,double(r.state.view_half.y)*2.5);arrow.cosmic=true;arrow.owner=t.actor;arrow.technique=ticket;LightArrowSystem::emit(r,arrow);
         const double top=r.state.view_center.y-r.state.view_half.y,leave=std::max(0.0,double(from.y)-top+80)/900;s.impacts.push_back({{},std::max(p.flight,leave+0.15),p.impact_warn,0,false});++s.shots;

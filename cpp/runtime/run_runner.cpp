@@ -37,6 +37,7 @@
 #include "../systems/encounters.h"
 #include "../systems/pickup_system.h"
 #include "../api/run_core.h"
+#include "../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -198,7 +199,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     camera(core,dt,size);
     BossImageSystem::refresh(core.runtime);
     if (world_step && state.phase==Phase::Play)
-        for (auto &body:state.bosses.bodies) {CanisNova::field_tick(core.runtime,body);CanisFireVisualSystem::tick(core.runtime,body);}
+        for (auto &body:state.bosses->bodies) {CanisNova::field_tick(core.runtime,body);CanisFireVisualSystem::tick(core.runtime,body);}
     if (!core.check_run_end()) {
         if (state.loadout.ready) timed("progression",[&]{ProgressionSystem::open(core);});
         else if (state.legacy_progression.ready) core.open_cards(false);

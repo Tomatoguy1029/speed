@@ -4,6 +4,7 @@
 #include "../flow/phase_controller.h"
 #include "../../systems/collision_query.h"
 #include "../../systems/combat_resolver.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

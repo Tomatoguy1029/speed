@@ -1,6 +1,7 @@
 #include "meteor.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/enemy_system.h"
+#include "../../state/boss_states.h"
 namespace speed {
 void DracoMeteor::begin(RunRuntime &r,TechniqueState &t) {DracoBreath::begin(r,t);if (!std::get<DracoBreathState>(std::get<DracoTechniqueState>(t.detail).move).rocks.empty()) r.state.observations.execute(t.observation_id);}
 void DracoMeteor::end(RunRuntime &r,TechniqueState &t,bool cancelled) {if (cancelled) {DracoBreath::end(r,t,true);return;}auto *b=PhaseController::find(r,t.actor);if (!b) return;auto &v=std::get<DracoTechniqueState>(t.detail);b->draco.placed_meteors=std::get<DracoBreathState>(v.move).rocks;v.warning_paths.clear();}

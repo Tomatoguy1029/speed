@@ -11,6 +11,7 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -39,7 +40,7 @@ void DracoInhale::active(RunRuntime &r,TechniqueState &t,double dt) {
         if (s.caught && b.clock>=s.release_at) r.state.steering_locked=false;return;
     }
     if (r.state.steering_locked) {if (b.clock<s.release_at) {v.stage_time=t.elapsed=p.inhale_time;return;}r.state.steering_locked=false;}
-    if (s.spent) {extend(r,t);return;}s.spent=true;s.direction=(DracoTechnique::predict(r,t.actor,0,DracoBody::rule(r,b).aim_lead_cap)-e.pos).normalized();if (s.direction.is_zero_approx()) s.direction=t.direction;t.direction=s.direction;e.facing=s.direction.angle();mouth=DracoTechnique::mouth(r,b);const auto ticket=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));
+    if (s.spent) {extend(r,t);return;}s.spent=true;s.direction=(DracoTechnique::predict(r,t.actor,0,DracoBody::rule(r,b).aim_lead_cap)-e.pos).normalized();if (s.direction.is_zero_approx()) s.direction=t.direction;t.direction=s.direction;e.facing=s.direction.angle();mouth=DracoTechnique::mouth(r,b);const auto ticket=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));
     BeamParams beam;beam.position=mouth;beam.angle=t.direction.angle();beam.length=common.reach;beam.half_width=common.width*0.5;beam.delay=p.beam_warn;beam.active=p.beam_time;beam.damage=common.damage*r.state.combat_config.atk_scale;beam.color=godot::Color::html("d4bbff");beam.style=BeamStyle::Draco;beam.owner=t.actor;beam.technique=ticket;beam.definition=p.beam_definition;s.beam=BeamSystem::emit(r,beam);extend(r,t);
     if (!s.stars && r.state.control.lab_mode) s.stars=b.draco.lab_inhale_stars;
     uint32_t remaining=uint32_t(std::min(uint64_t(p.comet_cap),uint64_t(s.stars)*p.comets_per_star));std::vector<const DracoInhaleArc *> arcs;for (const auto &a:r.content->draco_inhale_arcs) if (a.technique==t.definition) arcs.push_back(&a);

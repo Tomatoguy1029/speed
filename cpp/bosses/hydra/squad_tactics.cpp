@@ -6,13 +6,14 @@
 #include "../flow/flow_runner.h"
 #include "../flow/technique_runner.h"
 #include "../../systems/motion_math.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
 namespace {
 using V=godot::Vector2;constexpr double PI=3.141592653589793,TAU=PI*2;
 std::vector<HydraNeckState *> live(RunRuntime &r,BossBodyState &b) {std::vector<HydraNeckState *> out;for (auto &n:b.hydra.necks) if (HydraRegrow::alive(r,n)) out.push_back(&n);return out;}
-BossFlowState *flow(RunRuntime &r,const BossBodyState &b) {for (auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) return &f;return nullptr;}
+BossFlowState *flow(RunRuntime &r,const BossBodyState &b) {for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) return &f;return nullptr;}
 const BossFlowSection *section(const RunRuntime &r,const BossFlowState &f) {for (const auto &s:r.content->flow_sections) if (s.flow==f.definition && s.order==f.index) return &s;return nullptr;}
 double reserved(RunRuntime &r,BossBodyState &b) {double out=0;for (auto *n:live(r,b)) out+=n->motion.reserved;return out;}
 double available(RunRuntime &r,BossBodyState &b) {const auto *f=flow(r,b);if (!f) return 0;const auto *s=section(r,*f);return std::max(0.,std::min({f->stamina,s?s->cap:f->stamina,s && s->has_budget?s->budget-f->section_spent:double(INFINITY)})-reserved(r,b));}
@@ -51,7 +52,7 @@ void HydraSquad::block(RunRuntime &r,BossBodyState &b) {const auto &p=rule(r,b);
 void HydraSquad::started(BossBodyState &b,HydraNeckState &n) {n.motion.reserved=0;n.motion.last_attack=b.clock;for (auto actor:b.hydra.squad.pair) if (same_handle(actor,n.actor)) b.hydra.squad.pair_launched=true;}
 bool HydraSquad::custom_owns(const RunRuntime &r,const BossBodyState &b,const HydraNeckState &) {
     if (HydraTechnique::busy(r,b)) return true;
-    for (const auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor) && f.active) for (auto row:f.roots) if (row<f.nodes.size() && f.nodes[row].status==FlowStatus::Running && r.content->flow_nodes[f.nodes[row].definition-1].kind>=2) return true;
+    for (const auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor) && f.active) for (auto row:f.roots) if (row<f.nodes.size() && f.nodes[row].status==FlowStatus::Running && r.content->flow_nodes[f.nodes[row].definition-1].kind>=2) return true;
     return false;
 }
 bool HydraSquad::validate(const HydraBodyState &h) {const auto &s=h.squad;if (s.tactic< -1 || s.tactic>2 || s.roster.size()>8 || s.pair.size()>2 || !s.predicted.is_finite() || !s.bearer_goal.is_finite()) return false;for (double v:{s.replan_time,s.formation_angle,s.reorient_time,s.bearer_replan,s.panic,s.panic_cooldown,s.tactic_time,s.attack_gap,s.pair_elapsed,s.wave_angle,s.wave_gap,s.counter_time}) if (!std::isfinite(v)) return false;for (const auto &n:h.necks) {const auto &m=n.motion;if (!m.goal.is_finite() || !m.block_target.is_finite() || !m.separation.is_finite() || m.block< -1 || m.slot<0 || m.slot_count<1 || m.slot_count>8) return false;for (double v:{m.reserved,m.attack_angle,m.wait,m.last_attack,m.close_angle,m.close_radius,m.detour_side,m.look_time,m.look_offset}) if (!std::isfinite(v)) return false;}return true;}

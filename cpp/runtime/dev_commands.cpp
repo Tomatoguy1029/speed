@@ -6,6 +6,7 @@
 #include "../bosses/flow/phase_controller.h"
 #include "../bosses/draco/body.h"
 #include "../output/frame_builder.h"
+#include "../content/generated/run_schema_read.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>

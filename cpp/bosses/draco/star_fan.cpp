@@ -1,5 +1,6 @@
 #include "star_fan.h"
 #include "../../systems/attacks/star_bolt.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -9,7 +10,7 @@ void arrange(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueSt
 }
 void DracoStarFan::begin(RunRuntime &r,TechniqueState &t) {std::get<DracoTechniqueState>(t.detail).move=DracoStarFanState{};arrange(r,t);}
 void DracoStarFan::windup(RunRuntime &r,TechniqueState &t) {if (t.locked) return;arrange(r,t);t.locked=std::get<DracoTechniqueState>(t.detail).stage_time>=std::min(0.25,r.content->boss_techniques[t.definition-1].warn*0.35);}
-void DracoStarFan::active(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoStarFanState>(v.move);if (s.fired) return;s.fired=true;const auto &d=rule(r,t);const auto ticket=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));for (size_t j=0;j<s.positions.size();++j) {StarBoltParams shot;shot.position=s.positions[j];shot.angle=s.angles[j];shot.speed=d.speed;shot.damage=r.content->boss_techniques[t.definition-1].damage*r.state.combat_config.atk_scale;shot.owner=t.actor;shot.technique=ticket;shot.definition=d.projectile;StarBoltSystem::emit(r,shot);}v.warning_paths.clear();}
+void DracoStarFan::active(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoStarFanState>(v.move);if (s.fired) return;s.fired=true;const auto &d=rule(r,t);const auto ticket=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));for (size_t j=0;j<s.positions.size();++j) {StarBoltParams shot;shot.position=s.positions[j];shot.angle=s.angles[j];shot.speed=d.speed;shot.damage=r.content->boss_techniques[t.definition-1].damage*r.state.combat_config.atk_scale;shot.owner=t.actor;shot.technique=ticket;shot.definition=d.projectile;StarBoltSystem::emit(r,shot);}v.warning_paths.clear();}
 void DracoStarFan::end(RunRuntime &,TechniqueState &t) {std::get<DracoTechniqueState>(t.detail).warning_paths.clear();}
 bool DracoStarFan::validate(const DracoStarFanState &s) {if (s.positions.size()!=s.angles.size() || s.positions.size()>2048) return false;for (auto p:s.positions) if (!p.is_finite()) return false;for (double angle:s.angles) if (!std::isfinite(angle)) return false;return true;}
 godot::Dictionary DracoStarFan::snapshot(const TechniqueState &t) {const auto &v=std::get<DracoTechniqueState>(t.detail);const auto &s=std::get<DracoStarFanState>(v.move);godot::Dictionary out;godot::PackedVector2Array points;if (!v.warning_paths.empty()) for (auto p:s.positions) points.push_back(p);out["telegraph_points"]=points;out["fired"]=s.fired;return out;}

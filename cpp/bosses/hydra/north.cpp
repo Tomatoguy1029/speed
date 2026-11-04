@@ -6,6 +6,7 @@
 #include "../../systems/attack_system.h"
 #include "../../systems/motion_math.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -27,7 +28,7 @@ std::vector<EnemyHandle> HydraTechnique::front_heads(const RunRuntime &r,const B
 }
 void HydraTechnique::north_prepare(RunRuntime &r,TechniqueState &t) {auto &b=*PhaseController::find(r,t.actor);targets(r,b,t);}
 void HydraTechnique::front_body(RunRuntime &r,BossBodyState &b,double dt) {
-    for (auto &t:r.state.bosses.techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && (r.content->boss_techniques[t.definition-1].kind==88 || r.content->boss_techniques[t.definition-1].kind==89)) {
+    for (auto &t:r.state.bosses->techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && (r.content->boss_techniques[t.definition-1].kind==88 || r.content->boss_techniques[t.definition-1].kind==89)) {
         auto &v=std::get<HydraTechniqueState>(t.detail);auto *s=std::get_if<HydraNorthState>(&v.move);if (!s || s->aiming) {auto &body=r.state.enemies[b.actor.slot];godot::Vector2 middle;for (auto h:v.participants) if (const auto *n=HydraNormalAttack::neck(b,h)) middle+=godot::Vector2::from_angle(n->base_angle);const double desired=(r.state.ship_pos-body.pos).angle()-middle.angle(),turn=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1].turn*dt;if (!locked(r,b)) body.facing+=std::clamp(angle_difference(desired-body.facing),-turn,turn);if (s) targets(r,b,t);}
         if (!s) continue;
         for (auto h:v.participants) {auto *found=HydraNormalAttack::neck(b,h);if (!found) continue;auto &n=*found;if (!HydraRegrow::alive(r,n)) continue;n.elapsed+=dt;if (!s->burst) {const double direction=(n.target-HydraBody::neck_base(r,b,n)).angle();if (!locked(r,b)) n.angle+=angle_difference(direction-n.angle)*std::min(1.0,dt*6);const double rest=HydraBody::rule(r,b).neck_rest;n.length+=std::clamp(rest*0.35-n.length,-rest*dt*2,rest*dt*2);n.glow=std::min(1.0,n.glow+dt*1.5);}else if (n.step<2) lunge(r,b,t,n,std::min(1.0,n.elapsed/std::max(0.001,north_rule(r,t.definition).flight)),dt);}
@@ -42,6 +43,6 @@ void HydraTechnique::north_timeline(RunRuntime &r,TechniqueState &t,double dt) {
     if (b.hydra.separated || !all_participants_alive(r,v)) finish(r,t,true);
 }
 godot::Array HydraTechnique::north_targets(const RunRuntime &r,const BossBodyState &b) {
-    godot::Array out;for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && r.content->boss_techniques[t.definition-1].kind==88) {const auto &v=std::get<HydraTechniqueState>(t.detail);const auto &s=std::get<HydraNorthState>(v.move);if (s.burst) continue;for (auto h:v.participants) {const auto it=std::find_if(b.hydra.necks.begin(),b.hydra.necks.end(),[&](const auto &n){return same_handle(n.actor,h);});if (it==b.hydra.necks.end() || !HydraRegrow::alive(r,*it)) continue;godot::Dictionary x;x["from"]=HydraBody::head_position(r,b,*it);x["target"]=it->target;x["radius"]=north_rule(r,t.definition).radius;x["locked"]=!s.aiming;out.push_back(x);}}return out;
+    godot::Array out;for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && r.content->boss_techniques[t.definition-1].kind==88) {const auto &v=std::get<HydraTechniqueState>(t.detail);const auto &s=std::get<HydraNorthState>(v.move);if (s.burst) continue;for (auto h:v.participants) {const auto it=std::find_if(b.hydra.necks.begin(),b.hydra.necks.end(),[&](const auto &n){return same_handle(n.actor,h);});if (it==b.hydra.necks.end() || !HydraRegrow::alive(r,*it)) continue;godot::Dictionary x;x["from"]=HydraBody::head_position(r,b,*it);x["target"]=it->target;x["radius"]=north_rule(r,t.definition).radius;x["locked"]=!s.aiming;out.push_back(x);}}return out;
 }
 }

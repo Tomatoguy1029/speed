@@ -10,6 +10,7 @@
 #include "../flow/technique_runner.h"
 #include "../flow/flow_runner.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -32,13 +33,13 @@ void frame(RunRuntime &r,BossBodyState &b,const DracoFinaleDefinition &p) {
 }
 bool DracoFinale::begin(RunRuntime &r,BossBodyState &b) {
     if (!rule(r,b)) return false;if (b.draco.finale.active) dispose(r,b);const auto original_ship=r.state.ship_pos,original_velocity=r.state.ship.vel;
-    DracoIntro::end(r,b,true);for (uint32_t row=0;row<r.state.bosses.techniques.size();++row) if (same_handle(r.state.bosses.techniques[row].actor,b.actor)) TechniqueRunner::cancel(r,r.state.bosses.handles.at(row));DracoCycle::cancel(r,b);DracoPicaro::pause(r,b,true);for (auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) {FlowRunner::cancel(r,f);f.suspended=true;}
+    DracoIntro::end(r,b,true);for (uint32_t row=0;row<r.state.bosses->techniques.size();++row) if (same_handle(r.state.bosses->techniques[row].actor,b.actor)) TechniqueRunner::cancel(r,r.state.bosses->handles.at(row));DracoCycle::cancel(r,b);DracoPicaro::pause(r,b,true);for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) {FlowRunner::cancel(r,f);f.suspended=true;}
     auto &v=b.draco.finale;v={};DracoCinematic::capture(r,v.saved);const auto &p=DracoBody::rule(r,b);auto &e=r.state.enemies[b.actor.slot];v.modules_before=r.state.control.final_modules;v.finish_before=r.state.control.draco_finish_done;r.state.control.final_modules.clear();r.state.control.draco_finish_done=false;v.original_ship=original_ship;v.original_velocity=original_velocity;v.original_pos=e.pos;v.original_angle=e.facing;v.original_guard=e.guard;v.pose_from=DracoPose::points(r,b);v.camera_from=r.state.view_center;v.zoom=std::max(0.1,r.state.control.camera_zoom);v.assembly_camera=v.camera_from;v.assembly_zoom=v.zoom;v.center=e.pos-godot::Vector2::from_angle(e.facing)*p.body_length*0.32;v.radius=std::max(b.draco.width*2,p.body_length/(TAU*0.76));v.core=v.core_from=e.pos-godot::Vector2::from_angle(e.facing)*110*b.draco.head_scale*b.draco.depth;
     for (uint32_t j=0;j<=p.body_segments;++j) {const double t=double(j)/p.body_segments,angle=-PI*0.25+t*TAU*0.76,radius=v.radius*(0.94+std::sin(t*PI)*0.06);v.pose.push_back(v.center+godot::Vector2::from_angle(angle)*radius);}
     v.stage=Stage::Release;v.active=true;b.mode=BossMode::Final;e.hp=1;e.guard=1;e.vel={};auto &s=r.state;s.controls_locked=s.encounter_protected=true;s.control.cinematic_bars=1;s.control.cinematic_camera=s.control.cinematic_hide_enemies=true;s.draw.drawing=s.draw.tracing=false;s.ship.vel={};s.control.world_scale=0;cue(r,"core_released",v.core,100);TechniqueRunner::observe_scripted(r,b,"draco_finale","scripted_finale",ObservationEvent::Warning,true);return true;
 }
 bool DracoFinale::tick(RunRuntime &r,double dt,const InputFrame &input,godot::Vector2 size) {
-    auto found=std::find_if(r.state.bosses.bodies.begin(),r.state.bosses.bodies.end(),[](const auto &b){return b.draco.finale.active;});if (found==r.state.bosses.bodies.end()) return false;auto &b=*found;auto &v=b.draco.finale;const auto *p=rule(r,b);if (!p || !r.state.enemy_handles.contains(b.actor)) {dispose(r,b);return true;}auto &s=r.state;s.control.logical_size=size;v.time+=dt;b.clock+=dt;DracoRifts::tick_closing(r,b,dt);s.control.world_scale=0;v.trails.erase(std::remove_if(v.trails.begin(),v.trails.end(),[&](const auto &t){return b.clock-t.time>=0.5;}),v.trails.end());
+    auto found=std::find_if(r.state.bosses->bodies.begin(),r.state.bosses->bodies.end(),[](const auto &b){return b.draco.finale.active;});if (found==r.state.bosses->bodies.end()) return false;auto &b=*found;auto &v=b.draco.finale;const auto *p=rule(r,b);if (!p || !r.state.enemy_handles.contains(b.actor)) {dispose(r,b);return true;}auto &s=r.state;s.control.logical_size=size;v.time+=dt;b.clock+=dt;DracoRifts::tick_closing(r,b,dt);s.control.world_scale=0;v.trails.erase(std::remove_if(v.trails.begin(),v.trails.end(),[&](const auto &t){return b.clock-t.time>=0.5;}),v.trails.end());
     TechniqueRunner::observe_scripted(r,b,"draco_finale","scripted_finale",v.stage>=Stage::Strikes?ObservationEvent::Execute:ObservationEvent::Warning);
     switch(v.stage) {
     case Stage::Release:v.core=v.core_from.lerp(v.center+godot::Vector2(-60,-250),smooth(0,1.8,v.time));if (v.time>=2) {cue(r,"bear_roar",v.core,180);next(v,Stage::Combine);}break;

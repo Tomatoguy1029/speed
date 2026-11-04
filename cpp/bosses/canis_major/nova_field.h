@@ -1,5 +1,6 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 namespace speed {
 // 同じ8bit遮光場を戦闘判定と表示へ渡す。
 class CanisNovaField {public:

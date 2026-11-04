@@ -5,6 +5,7 @@
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 void HydraNormalAttack::step_rubble(RunRuntime &r,TechniqueState &t,double dt,const HydraNormalContext *ctx) {
@@ -22,7 +23,7 @@ void HydraNormalAttack::step_rubble(RunRuntime &r,TechniqueState &t,double dt,co
         if (id>0) {
             const auto actor=r.state.enemy_handles.at(r.state.rows_by_id.at(id));r.state.enemies[actor.slot].radius=rubble.radius;
             HazardState h;h.pos=from;h.duration=rubble.life;h.damage=p.damage;HydraShapeHazard shape;shape.points={from,from+godot::Vector2(0.1,0)};shape.life=rubble.life;shape.width=rubble.radius*2;shape.follow=actor;h.shape=shape;
-            AttackSpec spec;spec.owner.live_source=t.actor;spec.technique=ticket(r,t,ctx);spec.boss=r.state.bosses.body_handles.at(uint32_t(b-r.state.bosses.bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Rubble;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=(context_spec(r,spec,ctx),AttackSystem::emit_hazard(r.state,h,spec));if (AttackSystem::get(r.state,handle)) r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;
+            AttackSpec spec;spec.owner.live_source=t.actor;spec.technique=ticket(r,t,ctx);spec.boss=r.state.bosses->body_handles.at(uint32_t(b-r.state.bosses->bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Rubble;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=(context_spec(r,spec,ctx),AttackSystem::emit_hazard(r.state,h,spec));if (AttackSystem::get(r.state,handle)) r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;
         }
         }
         cue(r,*b,n,"attack_started",t.definition,0,0,ctx);

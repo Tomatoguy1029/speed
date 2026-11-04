@@ -3,6 +3,7 @@
 #include "pose.h"
 #include "cinematic.h"
 #include "../../systems/field.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

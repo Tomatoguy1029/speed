@@ -4,6 +4,7 @@
 #include "sequence.h"
 #include "technique_common.h"
 #include "../flow/phase_controller.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {const CanisHuntPounceDefinition &rule(const ContentBundle &c,uint32_t definition) {return *std::find_if(c.canis_hunt_pounces.begin(),c.canis_hunt_pounces.end(),[&](const auto &v){return v.technique==definition;});}}

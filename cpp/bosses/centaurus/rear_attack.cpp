@@ -2,6 +2,7 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/boss_contact.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {

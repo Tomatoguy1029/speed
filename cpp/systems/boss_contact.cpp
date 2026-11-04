@@ -12,6 +12,7 @@
 #include "../bosses/monoceros/horn_dance.h"
 #include "../bosses/centaurus/stomp.h"
 #include "../output/event_builder.h"
+#include "../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -100,7 +101,7 @@ bool BossContactSystem::resolve(RunRuntime &r,godot::Vector2 from,godot::Vector2
         if (!entry.attempted) {entry.attempted=true;hit(r,entry.actor,entry.technique,entry.observation,Cause::Pounce);}
         push(r,entry.actor,from,to);return true;
     }
-    for (auto &t:r.state.bosses.techniques) {
+    for (auto &t:r.state.bosses->techniques) {
         if (!alive(r,t.actor,t.definition)) continue;
         ContactShape shape;Cause cause=Cause::Horn;
         const bool active=mono_shape(r,t,shape) || centaurus_shape(r,t,shape,cause);

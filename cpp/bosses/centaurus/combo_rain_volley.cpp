@@ -1,6 +1,7 @@
 #include "combo_rain_volley.h"
 #include "../flow/phase_controller.h"
 #include "../flow/technique_runner.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {

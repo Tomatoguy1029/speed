@@ -4,11 +4,12 @@
 #include "squad.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {
 void bite(RunRuntime &r,const BossBodyState &b,TechniqueState &t,godot::Vector2 from,godot::Vector2 to,const HydraNormalDefinition &v,const HydraNormalContext *ctx) {
-    HazardState h;h.pos=from;h.duration=0.1;h.damage=r.content->boss_techniques[t.definition-1].damage;h.shape=HydraShapeHazard{{from,to},v.bite_radius};std::get<HydraShapeHazard>(h.shape).life=0.1;AttackSpec s;s.owner.live_source=t.actor;s.owner.attached=true;s.technique=HydraNormalAttack::ticket(r,t,ctx);s.boss=r.state.bosses.body_handles.at(uint32_t(&b-r.state.bosses.bodies.data()));s.source_technique=t.definition;s.cause=Cause::Bite;s.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;s.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);s.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=(HydraNormalAttack::context_spec(r,s,ctx),AttackSystem::emit_hazard(r.state,h,s));if (AttackSystem::get(r.state,handle)) {auto &record=r.state.attacks.records[handle.slot];record.ship_previous=t.previous_ship;record.ship_previous_ready=true;}
+    HazardState h;h.pos=from;h.duration=0.1;h.damage=r.content->boss_techniques[t.definition-1].damage;h.shape=HydraShapeHazard{{from,to},v.bite_radius};std::get<HydraShapeHazard>(h.shape).life=0.1;AttackSpec s;s.owner.live_source=t.actor;s.owner.attached=true;s.technique=HydraNormalAttack::ticket(r,t,ctx);s.boss=r.state.bosses->body_handles.at(uint32_t(&b-r.state.bosses->bodies.data()));s.source_technique=t.definition;s.cause=Cause::Bite;s.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;s.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);s.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=(HydraNormalAttack::context_spec(r,s,ctx),AttackSystem::emit_hazard(r.state,h,s));if (AttackSystem::get(r.state,handle)) {auto &record=r.state.attacks.records[handle.slot];record.ship_previous=t.previous_ship;record.ship_previous_ready=true;}
 }
 }
 void HydraNormalAttack::step_thrust(RunRuntime &r,TechniqueState &t,double dt,const HydraThunderDefinition *thunder,const HydraNormalContext *ctx) {

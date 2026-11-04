@@ -4,6 +4,7 @@
 #include "../../systems/field.h"
 #include "../../systems/boss_contact.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

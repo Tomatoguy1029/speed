@@ -23,24 +23,25 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
 namespace {
 void event(RunRuntime &r,const char *type,const BossBodyState &b) {godot::Dictionary p;p["id"]=r.state.enemy_handles.entity_id(b.actor);p["boss"]=godot::String(r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1].external_id.c_str());if (std::string(type)=="boss_phase") {p["phase"]=b.phase;p["reason"]="hp_threshold";}FrameBuilder::append(r,type,p);}
-bool busy(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,actor) && t.stage<TechniqueStage::Finished) return true;return false;}
+bool busy(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,actor) && t.stage<TechniqueStage::Finished) return true;return false;}
 void end_actions(RunRuntime &r,BossBodyState &b) {
     if (r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1].kind==4) DracoBody::cancel(r,b);
     CanisMajorBody::release(r,b);b.centaurus.leaping=false;
-    for (auto &f:r.state.bosses.flows) if (same_handle(f.actor,b.actor)) {FlowRunner::cancel(r,f);f.selection_enabled=false;f.blocked=true;}
-    for (uint32_t row=0;row<r.state.bosses.techniques.size();++row) if (same_handle(r.state.bosses.techniques[row].actor,b.actor)) TechniqueRunner::cancel(r,r.state.bosses.handles.at(row));
+    for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) {FlowRunner::cancel(r,f);f.selection_enabled=false;f.blocked=true;}
+    for (uint32_t row=0;row<r.state.bosses->techniques.size();++row) if (same_handle(r.state.bosses->techniques[row].actor,b.actor)) TechniqueRunner::cancel(r,r.state.bosses->handles.at(row));
     if (r.state.enemy_handles.contains(b.actor)) {auto &e=r.state.enemies[b.actor.slot];e.vel={};e.charge=e.guard=0;}
-    const auto handle=r.state.bosses.body_handles.at(uint32_t(&b-r.state.bosses.bodies.data()));AttackSystem::end_boss(r.state,handle);
+    const auto handle=r.state.bosses->body_handles.at(uint32_t(&b-r.state.bosses->bodies.data()));AttackSystem::end_boss(r.state,handle);
 }
 }
-BossBodyState *PhaseController::find(RunRuntime &r,EnemyHandle actor) {for (auto &b:r.state.bosses.bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
-const BossBodyState *PhaseController::find(const RunRuntime &r,EnemyHandle actor) {for (const auto &b:r.state.bosses.bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
-bool PhaseController::can_start(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,actor) && t.reposition>0) return false;const auto *body=find(r,actor);return !body || (body->mode==BossMode::Idle && body->draco.cycle.stage==DracoCycleStage::None && body->draco.closing_walls.empty() && body->initial_wait<=0 && (!body->phase_pending || r.content->bosses[r.content->boss_bodies[body->definition-1].boss-1].kind==1) && !body->centaurus.leaping);}
+BossBodyState *PhaseController::find(RunRuntime &r,EnemyHandle actor) {for (auto &b:r.state.bosses->bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
+const BossBodyState *PhaseController::find(const RunRuntime &r,EnemyHandle actor) {for (const auto &b:r.state.bosses->bodies) if (same_handle(b.actor,actor)) return &b;return nullptr;}
+bool PhaseController::can_start(const RunRuntime &r,EnemyHandle actor) {for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,actor) && t.reposition>0) return false;const auto *body=find(r,actor);return !body || (body->mode==BossMode::Idle && body->draco.cycle.stage==DracoCycleStage::None && body->draco.closing_walls.empty() && body->initial_wait<=0 && (!body->phase_pending || r.content->bosses[r.content->boss_bodies[body->definition-1].boss-1].kind==1) && !body->centaurus.leaping);}
 bool PhaseController::automatic(RunRuntime &r) {
     auto &s=r.state;auto &c=s.control;
     if (r.content->stage_boss.empty() || (c.lab_mode && s.world.boss_spawned)) return true;
@@ -59,15 +60,15 @@ bool PhaseController::automatic(RunRuntime &r) {
     return s.enemy_handles.contains(actor);
 }
 EnemyHandle PhaseController::spawn(RunRuntime &r,uint32_t definition,godot::Vector2 at,bool entrance) {
-    auto &s=r.state;if (!definition || definition>r.content->boss_bodies.size() || !at.is_finite() || s.bosses.next_body_id==INT64_MAX) return {};
+    auto &s=r.state;if (!definition || definition>r.content->boss_bodies.size() || !at.is_finite() || s.bosses->next_body_id==INT64_MAX) return {};
     const auto &p=r.content->boss_bodies[definition-1];EnemySpawn options;options.position=at;options.facing=(s.ship_pos-at).angle();options.has_facing=true;options.is_boss=true;
     const auto id=EnemySystem::spawn_base(r,p.enemy-1,options);if (id<0) return {};const auto actor=s.enemy_handles.at(s.rows_by_id.at(id));
-    BossBodyState body;body.id=s.bosses.next_body_id++;body.definition=definition;body.actor=actor;body.initial_wait=p.initial_wait;body.entrance_target=at;body.participants.push_back({actor,actor,id,true,true});
-    s.bosses.body_handles.attach(s.bosses.bodies.size(),body.id);s.bosses.bodies.push_back(body);
-    if (r.content->bosses[p.boss-1].kind==3) HydraBody::spawned(r,s.bosses.bodies.back());
-    if (r.content->bosses[p.boss-1].kind==1) CentaurusBody::spawned(r,s.bosses.bodies.back());
-    if (entrance && r.content->bosses[p.boss-1].kind!=3) {auto &created=s.bosses.bodies.back();created.mode=BossMode::Entrance;created.entrance_from=at-godot::Vector2(std::max(1000.0,double(s.view_half.x)*2.0),0);s.enemies[actor.slot].pos=created.entrance_from;s.enemies[actor.slot].facing=0;}
-    for (const auto &flow:r.content->boss_flows) if (flow.boss==p.boss) {FlowRunner::attach(r,actor,flow.id);s.bosses.flows.back().suspended=entrance || p.initial_wait>0;break;}
+    BossBodyState body;body.id=s.bosses->next_body_id++;body.definition=definition;body.actor=actor;body.initial_wait=p.initial_wait;body.entrance_target=at;body.participants.push_back({actor,actor,id,true,true});
+    s.bosses->body_handles.attach(s.bosses->bodies.size(),body.id);s.bosses->bodies.push_back(body);
+    if (r.content->bosses[p.boss-1].kind==3) HydraBody::spawned(r,s.bosses->bodies.back());
+    if (r.content->bosses[p.boss-1].kind==1) CentaurusBody::spawned(r,s.bosses->bodies.back());
+    if (entrance && r.content->bosses[p.boss-1].kind!=3) {auto &created=s.bosses->bodies.back();created.mode=BossMode::Entrance;created.entrance_from=at-godot::Vector2(std::max(1000.0,double(s.view_half.x)*2.0),0);s.enemies[actor.slot].pos=created.entrance_from;s.enemies[actor.slot].facing=0;}
+    for (const auto &flow:r.content->boss_flows) if (flow.boss==p.boss) {FlowRunner::attach(r,actor,flow.id);s.bosses->flows.back().suspended=entrance || p.initial_wait>0;break;}
     // 登場を確定した入口だけで立てる。撃破や取消では戻さない。
     s.world.boss_spawned=true;godot::Dictionary e;e["pos"]=at;FrameBuilder::append(r,"boss_spawn",e);return actor;
 }
@@ -89,7 +90,7 @@ bool PhaseController::begin_final(RunRuntime &r,EnemyHandle actor,double charge)
 }
 void PhaseController::step(RunRuntime &r,double dt) {
     if (dt<=0) return;auto &s=r.state;
-    for (auto &b:s.bosses.bodies) {
+    for (auto &b:s.bosses->bodies) {
         if (b.mode==BossMode::Defeated || b.mode==BossMode::Cancelled) continue;
         if (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead) {cancel(r,b.actor);continue;}
         const auto &p=r.content->boss_bodies[b.definition-1];const auto &definition=r.content->bosses[p.boss-1];b.clock+=dt;if (definition.kind==4) {DracoPicaro::tick(r,b);if (!b.draco.intro.active) DracoRifts::tick_closing(r,b,dt);}auto &e=s.enemies[b.actor.slot];if (definition.kind==2) b.canis.turn_motion=0;
@@ -123,11 +124,11 @@ void PhaseController::step(RunRuntime &r,double dt) {
             else {b.initial_wait=std::max(0.0,b.initial_wait-dt);suspend=b.initial_wait>0;if (definition.kind==0) MonocerosBody::step(r,b,dt);else if (definition.kind==1) {CentaurusBody::step(r,b,dt);suspend=suspend || b.centaurus.leaping;}else if (definition.kind==2) {CanisMajorBody::step(r,b,dt);suspend=suspend || b.canis.calling;}else if (definition.kind==4) DracoBody::step(r,b,dt);}
         } else suspend=false;
         if (definition.kind==4 && b.mode!=BossMode::Idle) DracoBody::update(r,b);
-        for (auto &f:s.bosses.flows) if (same_handle(f.actor,b.actor)) {f.phase=b.phase;f.suspended=suspend;}
+        for (auto &f:s.bosses->flows) if (same_handle(f.actor,b.actor)) {f.phase=b.phase;f.suspended=suspend;}
     }
 }
 bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) {
-    for (uint32_t row=0;row<s.bosses.bodies.size();++row) {const auto &b=s.bosses.bodies[row];if (b.id<=0 || b.id>=s.bosses.next_body_id || s.bosses.body_handles.entity_id(s.bosses.body_handles.at(row))!=b.id || !b.definition || b.definition>c.boss_bodies.size() || b.mode>BossMode::Cancelled || b.phase<1 || b.phase>(c.bosses[c.boss_bodies[b.definition-1].boss-1].kind==4?3u:2u) || !b.entrance_from.is_finite() || !b.entrance_target.is_finite() || !b.final_to.is_finite() || !b.slash_from.is_finite() || !b.slash_to.is_finite()) return false;
+    for (uint32_t row=0;row<s.bosses->bodies.size();++row) {const auto &b=s.bosses->bodies[row];if (b.id<=0 || b.id>=s.bosses->next_body_id || s.bosses->body_handles.entity_id(s.bosses->body_handles.at(row))!=b.id || !b.definition || b.definition>c.boss_bodies.size() || b.mode>BossMode::Cancelled || b.phase<1 || b.phase>(c.bosses[c.boss_bodies[b.definition-1].boss-1].kind==4?3u:2u) || !b.entrance_from.is_finite() || !b.entrance_target.is_finite() || !b.final_to.is_finite() || !b.slash_from.is_finite() || !b.slash_to.is_finite()) return false;
         if ((b.sweep_side!=1 && b.sweep_side!=-1) || b.participants.empty() || (c.bosses[c.boss_bodies[b.definition-1].boss-1].kind!=3 && c.bosses[c.boss_bodies[b.definition-1].boss-1].kind!=4 && b.participants.size()!=1) || b.participants[0].id<=0 || !same_handle(b.participants[0].actor,b.actor) || !same_handle(b.participants[0].health_target,b.actor) || !b.participants[0].is_body || b.participants[0].active!=(b.mode<BossMode::Defeated)) return false;
         if (!HydraBody::validate(s,c,b)) return false;
         if (!DracoBody::validate(s,c,b)) return false;
@@ -153,7 +154,7 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
     }return true;
 }
 godot::Array PhaseController::snapshot(const RunRuntime &r) {
-    godot::Array out;for (const auto &b:r.state.bosses.bodies) {godot::Dictionary p;p["id"]=b.id;p["definition"]=b.definition;p["actor"]=r.state.enemy_handles.entity_id(b.actor);p["mode"]=int(b.mode);p["phase"]=b.phase;p["pending"]=b.phase_pending;p["clock"]=b.clock;p["initial_wait"]=b.initial_wait;p["phase_remaining"]=b.phase_remaining;p["final_elapsed"]=b.final_elapsed;p["final_landed"]=b.final_landed;p["final_to"]=b.final_to;p["final_width"]=b.final_width;p["final_warning"]=b.final_elapsed<b.final_charge-r.content->boss_bodies[b.definition-1].final_widen_time;p["final_clock"]=r.state.time;p["final_alpha"]=r.state.phase==godot::RunState::Phase::Play?1.0:r.state.phase==godot::RunState::Phase::Dying?std::max(0.0,1.0-r.state.sequence_t/std::max(0.01,r.state.death_freeze)):0.0;p["boss_spawned"]=r.state.world.boss_spawned;p["boss_dead"]=r.state.boss_dead;
+    godot::Array out;for (const auto &b:r.state.bosses->bodies) {godot::Dictionary p;p["id"]=b.id;p["definition"]=b.definition;p["actor"]=r.state.enemy_handles.entity_id(b.actor);p["mode"]=int(b.mode);p["phase"]=b.phase;p["pending"]=b.phase_pending;p["clock"]=b.clock;p["initial_wait"]=b.initial_wait;p["phase_remaining"]=b.phase_remaining;p["final_elapsed"]=b.final_elapsed;p["final_landed"]=b.final_landed;p["final_to"]=b.final_to;p["final_width"]=b.final_width;p["final_warning"]=b.final_elapsed<b.final_charge-r.content->boss_bodies[b.definition-1].final_widen_time;p["final_clock"]=r.state.time;p["final_alpha"]=r.state.phase==godot::RunState::Phase::Play?1.0:r.state.phase==godot::RunState::Phase::Dying?std::max(0.0,1.0-r.state.sequence_t/std::max(0.01,r.state.death_freeze)):0.0;p["boss_spawned"]=r.state.world.boss_spawned;p["boss_dead"]=r.state.boss_dead;
         const auto &definition=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1];p["kind"]=int(definition.kind);if (definition.kind==4) DracoBody::snapshot(r,b,p);if (definition.kind==3) HydraBody::snapshot(r,b,p);if (definition.kind==2) {CanisMajorBody::snapshot(r,b,p);p["flames"]=CanisFlames::snapshot(r,b);p["lunges"]=CanisHoundLunge::snapshot(r,b);}p["phase_progress"]=b.phase>=2?(b.mode==BossMode::Phase?1.0-b.phase_remaining/std::max(0.001,r.content->boss_bodies[b.definition-1].phase_time):1.0):0.0;
         godot::Array image_parts;for (const auto &part:b.image_parts) {godot::Dictionary v;v["part"]=part.part;v["region"]=part.region;v["pixel_to_world"]=part.pixel_to_world;v["visible"]=part.visible;image_parts.push_back(v);}p["image_parts"]=image_parts;
         if (definition.kind==1) p["reference_fx"]=CentaurusReferenceFx::snapshot(b);

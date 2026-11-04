@@ -11,6 +11,7 @@
 #include "attacks/zone.h"
 #include "../output/event_builder.h"
 #include "../runtime/run_runtime.h"
+#include "../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -137,7 +138,7 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     if (!state.enemy_handles.contains(result.target)) return result;
     if (!request.boss_ram_visual) {
         state.enemies[result.target.slot].flash=0.12;
-        if (result.applied>0) for (auto &body:state.bosses.bodies)
+        if (result.applied>0) for (auto &body:state.bosses->bodies)
             if (same_handle(body.actor,result.target)) body.hit_feedback_until=state.sim_time+run.content->boss_image_feedback.duration;
     }
     auto resolved_request=request;resolved_request.amount=result.resolved;

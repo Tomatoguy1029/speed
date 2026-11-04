@@ -19,6 +19,8 @@
 #include "../systems/equipment.h"
 #include "../systems/combat_resolver.h"
 #include "../systems/field.h"
+#include "../content/generated/run_schema_read.h"
+#include "../state/boss_states.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <climits>
@@ -46,7 +48,7 @@ Dictionary minimap_snapshot(const speed::RunRuntime &run) {
         ++counts[y*16+x];
     }
     for (int g=0;g<16*16;++g) if (counts[g]>=12) dense.push_back(Vector2((g%16+0.5)*cell-radius,(g/16+0.5)*cell-radius));
-    for (const auto &body:s.bosses.bodies) if (s.enemy_handles.contains(body.actor)) {
+    for (const auto &body:s.bosses->bodies) if (s.enemy_handles.contains(body.actor)) {
         const auto &enemy=s.enemies[body.actor.slot];
         if (enemy.alive && !enemy.dead) bosses.push_back(enemy.pos);
     }
@@ -304,7 +306,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     } else if (kind=="abort" && payload.size()==1 && is(payload,"reason",Variant::INT)) {
         response=speed::BossFinish::abort(runtime)?success():failure(4,"result","結果は確定済みです");
     } else if (kind=="skip_boss_entrance" && payload.is_empty()) {
-        for (auto &body:runtime.state.bosses.bodies) if (body.draco.intro.active) speed::DracoIntro::end(runtime,body);response=success();
+        for (auto &body:runtime.state.bosses->bodies) if (body.draco.intro.active) speed::DracoIntro::end(runtime,body);response=success();
     } else if (kind=="skip_finish" && payload.is_empty()) {
         response=speed::BossFinish::skip(runtime)?success():failure(4,"phase","クリア演出中だけスキップできます");
     } else if (kind=="dev_finish" && runtime.api_development && payload.size()==1 && is(payload,"cleared",Variant::BOOL)) {

@@ -5,12 +5,13 @@
 #include "../bosses/canis_major/image_pose.h"
 #include "../bosses/canis_major/roar.h"
 #include "../bosses/monoceros/image_pose_system.h"
+#include "../state/boss_states.h"
 #include <cmath>
 #include <algorithm>
 namespace speed {
 namespace {
 const BossBodyState *body_for(const RunRuntime &r,EnemyHandle actor) {
-    for (const auto &body:r.state.bosses.bodies)
+    for (const auto &body:r.state.bosses->bodies)
         if (body.actor.slot==actor.slot && body.actor.generation==actor.generation) return &body;
     return nullptr;
 }
@@ -30,7 +31,7 @@ bool solid(const ContentBundle &content,const BossBodyState &body,godot::Vector2
 }
 }
 void BossImageSystem::refresh(RunRuntime &r) {
-    for (auto &body:r.state.bosses.bodies) {
+    for (auto &body:r.state.bosses->bodies) {
         if (!r.state.enemy_handles.contains(body.actor) || r.state.enemies[body.actor.slot].dead) {body.image_parts.clear();continue;}
         if (!body.definition || body.definition>r.content->boss_bodies.size()) continue;
         const auto boss=r.content->boss_bodies[body.definition-1].boss;

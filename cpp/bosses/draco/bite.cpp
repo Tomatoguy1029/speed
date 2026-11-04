@@ -2,6 +2,7 @@
 #include "body.h"
 #include "pose.h"
 #include "../flow/phase_controller.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 void DracoBite::begin(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueState>(t.detail);v.move=DracoBiteState{};auto &s=std::get<DracoBiteState>(v.move);auto &b=*PhaseController::find(r,t.actor);auto &e=r.state.enemies[t.actor.slot];const auto &p=r.content->boss_techniques[t.definition-1];const auto &d=*std::find_if(r.content->draco_bites.begin(),r.content->draco_bites.end(),[&](const auto &d){return d.technique==t.definition;});s.origin=e.pos;t.aim=DracoTechnique::predict(r,t.actor,p.warn+p.active*0.55,d.lead_cap);t.direction=(t.aim-s.origin).normalized();if (t.direction.is_zero_approx()) t.direction=godot::Vector2(1,0);e.facing=t.direction.angle();s.base=DracoTechnique::neutral(r,b,s.origin,e.facing);s.retracted=s.origin-t.direction*d.retract;s.strike=s.origin+t.direction*p.reach;v.warning={s.origin,s.strike+t.direction*105*b.draco.head_scale};v.warning_width=p.width;}

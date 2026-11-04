@@ -2,6 +2,7 @@
 #include "screen_staging.h"
 #include "pose.h"
 #include "../flow/phase_controller.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {

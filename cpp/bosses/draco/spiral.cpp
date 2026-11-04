@@ -12,6 +12,7 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -51,7 +52,7 @@ void DracoSpiral::active(RunRuntime &r,TechniqueState &t,double dt) {
     bool touching=false;for (size_t j=0;j+1<s.points.size();++j) {const auto delta=s.points[j+1]-s.points[j];const double f=delta.length_squared()>0?std::clamp(double((r.state.ship_pos-s.points[j]).dot(delta))/delta.length_squared(),0.0,1.0):0;if (r.state.ship_pos.distance_to(s.points[j]+delta*f)<=b.draco.width*0.5*taper((fractions[j]+fractions[j+1])*0.5)+r.state.ship_config.ship_radius) {touching=true;break;}}
     if (at<shrink_at && touching && s.hp_sampled && r.state.ship.hp<s.hp_before) r.state.ship.invuln=std::max(r.state.ship.invuln,d.touch_invuln);s.hp_before=r.state.ship.hp;s.hp_sampled=true;
     if (at>=shrink_at && !s.trapped_hit && DracoTechnique::observe_contact(r,t,touching)) {s.trapped=s.trapped_hit=true;ShipDamageRequest hit;hit.observation_id=t.observation_id;hit.amount=p.damage;hit.scale=DamageScale::AtkScale;hit.cause=Cause::Spiral;hit.source=r.state.enemies[t.actor.slot].definition+1;hit.technique=t.definition;CombatResolver::ship_damage(r,hit);r.state.ship.invuln=std::max(r.state.ship.invuln,s.shrink*(1-shrink)+1);}
-    const auto ticket=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));while (s.walls.size()+1<s.points.size()) {WallParams w;w.position=s.center;w.length=1;w.half_width=b.draco.width*0.5;w.active=p.active+2;w.damage=at>=shrink_at?0:p.damage*r.state.combat_config.atk_scale;w.color=godot::Color::html("7560d9");w.style=WallStyle::Trail;w.blocking=w.attached=true;w.owner=t.actor;w.technique=ticket;s.walls.push_back(WallSystem::emit(r,w));}
+    const auto ticket=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));while (s.walls.size()+1<s.points.size()) {WallParams w;w.position=s.center;w.length=1;w.half_width=b.draco.width*0.5;w.active=p.active+2;w.damage=at>=shrink_at?0:p.damage*r.state.combat_config.atk_scale;w.color=godot::Color::html("7560d9");w.style=WallStyle::Trail;w.blocking=w.attached=true;w.owner=t.actor;w.technique=ticket;s.walls.push_back(WallSystem::emit(r,w));}
     for (size_t j=0;j<s.walls.size();++j) {const auto delta=s.points[j+1]-s.points[j];WallSystem::move(r,s.walls[j],s.points[j],delta.angle(),delta.length());const auto *a=AttackSystem::get(r.state,s.walls[j]);if (!a || a->pool!=AttackPool::Hazard) continue;auto &h=r.state.hazards[a->row];std::get<WallHazard>(h.shape).half_width=b.draco.width*0.5*taper((fractions[j]+fractions[j+1])*0.5);if (at>=shrink_at) h.damage=0;}
 }
 void DracoSpiral::end(RunRuntime &r,TechniqueState &t,bool cancelled) {auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoSpiralState>(v.move);release(r,s);r.state.control.cinematic_camera=s.camera_before;if (auto *b=PhaseController::find(r,t.actor)) DracoPicaro::pause(r,*b,false);for (auto h:s.walls) AttackSystem::end(r.state,h,cancelled?AttackEndReason::TechniqueCancel:AttackEndReason::TechniqueEnd);s.recovery=r.state.enemies[t.actor.slot].pos;v.warning_paths.clear();}

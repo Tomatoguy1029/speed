@@ -4,6 +4,7 @@
 #include "hound_lunge.h"
 #include "roar.h"
 #include "../flow/phase_controller.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

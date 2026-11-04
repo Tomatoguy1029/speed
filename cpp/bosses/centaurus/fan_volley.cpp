@@ -4,6 +4,7 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -24,7 +25,7 @@ void CentaurusFan::step(RunRuntime &r,TechniqueState &t,double dt) {
     const auto &b=*std::find_if(r.content->centaurus_bodies.begin(),r.content->centaurus_bodies.end(),[&](const auto &b){return b.body==body->id;});
     while (fired<v.shots && elapsed>=p.warn+fired*v.interval) {
         const auto mouth=e.pos+godot::Vector2::from_angle(e.facing)*e.radius*b.bow_reach;const double angle=tracking.locked()?e.facing:(r.state.enemy_aim-mouth).angle();
-        for (uint32_t k=0;k<v.count;++k) {LightArrowParams shot;shot.position=mouth;shot.angle=angle+(v.count>1?(double(k)/double(v.count-1)-0.5)*v.spread:0);shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.length=v.length;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));LightArrowSystem::emit(r,shot);}
+        for (uint32_t k=0;k<v.count;++k) {LightArrowParams shot;shot.position=mouth;shot.angle=angle+(v.count>1?(double(k)/double(v.count-1)-0.5)*v.spread:0);shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.length=v.length;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));LightArrowSystem::emit(r,shot);}
         ++fired;cue(r,t,"fan_released");
     }
     if (fired>=v.shots) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;cue(r,t,"recovery_started");}

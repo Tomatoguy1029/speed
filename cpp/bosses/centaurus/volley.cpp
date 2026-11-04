@@ -4,6 +4,7 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -29,7 +30,7 @@ void CentaurusVolley::command(RunRuntime &r,TechniqueState &t,TechniqueCommand c
         const auto &b=*std::find_if(r.content->centaurus_bodies.begin(),r.content->centaurus_bodies.end(),[&](const auto &b){return b.body==body->id;});
         const auto mouth=e.pos+godot::Vector2::from_angle(e.facing)*e.radius*b.bow_reach;
         const auto target=p.track_during_warn?r.state.enemy_aim:t.aim;const bool locked=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked();
-        LightArrowParams shot;shot.position=mouth;shot.angle=locked?e.facing:(target-mouth).angle();shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));
+        LightArrowParams shot;shot.position=mouth;shot.angle=locked?e.facing:(target-mouth).angle();shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));
         LightArrowSystem::emit(r,shot);CentaurusReferenceFx::released(r,t,mouth,shot.angle);++std::get<CentaurusVolleyState>(t.detail).released;t.stage=TechniqueStage::Active;cue(r,t,"released");
     } else if (command==TechniqueCommand::FinishVolley) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;cue(r,t,"recovery_started");}
 }

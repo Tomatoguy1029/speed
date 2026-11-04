@@ -4,6 +4,7 @@
 #include "../flow/phase_controller.h"
 #include "../../systems/attacks/zone.h"
 #include "../../systems/attacks/wave.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -17,7 +18,7 @@ void target(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueSta
 }
 void DracoTailSlam::begin(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueState>(t.detail);v.move=DracoTailSlamState{};auto &s=std::get<DracoTailSlamState>(v.move);auto &b=*PhaseController::find(r,t.actor);const auto &e=r.state.enemies[t.actor.slot];s.origin=e.pos;s.base=DracoTechnique::neutral(r,b,e.pos,e.facing);target(r,t);}
 void DracoTailSlam::windup(RunRuntime &r,TechniqueState &t) {const auto &v=std::get<DracoTechniqueState>(t.detail);const auto &s=std::get<DracoTailSlamState>(v.move);const double warn=r.content->boss_techniques[t.definition-1].warn;if (!t.locked) {target(r,t);t.locked=v.stage_time>=std::min(0.25,warn*0.35);}DracoTechnique::blend(r,*PhaseController::find(r,t.actor),s.base,s.lifted,v.stage_time/std::max(0.001,warn));}
-void DracoTailSlam::active(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoTailSlamState>(v.move);auto &b=*PhaseController::find(r,t.actor);const auto &p=r.content->boss_techniques[t.definition-1];const auto &d=rule(r,t);v.warning_paths.clear();const double drop=DracoTechnique::smooth(v.stage_time/(p.active*0.65));b.draco.override_points=pose(r,t,(s.target+godot::Vector2(0,-180)).lerp(s.target,drop));if (s.fired || drop<1) return;s.fired=true;const auto ticket=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));
+void DracoTailSlam::active(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoTailSlamState>(v.move);auto &b=*PhaseController::find(r,t.actor);const auto &p=r.content->boss_techniques[t.definition-1];const auto &d=rule(r,t);v.warning_paths.clear();const double drop=DracoTechnique::smooth(v.stage_time/(p.active*0.65));b.draco.override_points=pose(r,t,(s.target+godot::Vector2(0,-180)).lerp(s.target,drop));if (s.fired || drop<1) return;s.fired=true;const auto ticket=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));
     ZoneParams zone;zone.position=s.target;zone.radius=d.radius;zone.damage=p.damage*r.state.combat_config.atk_scale;zone.owner=t.actor;zone.technique=ticket;ZoneSystem::emit(r,zone);
     WaveParams wave;wave.position=s.target;wave.arc=3.141592653589793;wave.radius=d.radius*1.6;wave.speed=330;wave.width=18;wave.damage=p.damage*0.5*r.state.combat_config.atk_scale;wave.owner=t.actor;wave.technique=ticket;WaveSystem::emit(r,wave);
     b.draco.impacts.push_back({s.target,b.clock,d.radius,t.definition});if (b.draco.impacts.size()>32) b.draco.impacts.erase(b.draco.impacts.begin());

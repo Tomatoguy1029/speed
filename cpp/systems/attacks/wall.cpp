@@ -2,6 +2,7 @@
 #include "../attack_system.h"
 #include "../field.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -13,7 +14,7 @@ AttackHandle WallSystem::emit(RunRuntime &run,const WallParams &p) {
     for (float v:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(v)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.delay=p.delay;hazard.duration=p.active;hazard.damage=p.damage;hazard.color=p.color;
     hazard.shape=WallHazard{float(p.angle),float(p.length),float(p.half_width),1,uint32_t(p.style),p.blocking};
-    AttackSpec spec;spec.cause=Cause::Wall;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.attached=p.attached;spec.owner.budget=p.budget;
+    AttackSpec spec;spec.cause=Cause::Wall;spec.technique=p.technique;if (run.state.bosses->handles.contains(p.technique)) spec.source_technique=run.state.bosses->techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.attached=p.attached;spec.owner.budget=p.budget;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (p.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);
     if (!AttackSystem::configure_contact(*run.content,run.content->walls.front().contact,spec)) return {};

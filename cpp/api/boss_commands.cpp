@@ -17,6 +17,7 @@
 #include "../bosses/canis_major/flames.h"
 #include "../bosses/canis_major/hound_lunge.h"
 #include "../systems/attack_system.h"
+#include "../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -118,7 +119,7 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
     if (kind=="dev_boss_flow_state") return result(p.is_empty(),speed::FlowRunner::snapshot(runtime));
     if (kind=="dev_cancel_flow") {
         if (p.size()!=1 || p.get("entity_id",Variant()).get_type()!=Variant::INT) return result(false);
-        for (auto &flow:runtime.state.bosses.flows) if (runtime.state.enemy_handles.entity_id(flow.actor)==int64_t(p["entity_id"])) {speed::FlowRunner::cancel(runtime,flow);flow.selection_enabled=false;return result(true);}
+        for (auto &flow:runtime.state.bosses->flows) if (runtime.state.enemy_handles.entity_id(flow.actor)==int64_t(p["entity_id"])) {speed::FlowRunner::cancel(runtime,flow);flow.selection_enabled=false;return result(true);}
         return result(false);
     }
     if (kind=="dev_boss_flow") {
@@ -133,7 +134,7 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));const int64_t definition=p["definition"];
         if (found==runtime.state.rows_by_id.end() || definition<=0 || uint64_t(definition)>runtime.content->boss_techniques.size()) return result(false);
         const auto handle=speed::TechniqueRunner::begin(runtime,runtime.state.enemy_handles.at(found->second),uint32_t(definition));
-        if (!runtime.state.bosses.handles.contains(handle)) return result(false);
+        if (!runtime.state.bosses->handles.contains(handle)) return result(false);
         PackedInt64Array ticket;ticket.push_back(handle.slot);ticket.push_back(handle.generation);return result(true,ticket);
     }
     if (p.size()!=1 || p.get("ticket",Variant()).get_type()!=Variant::PACKED_INT64_ARRAY) return result(false);

@@ -5,6 +5,7 @@
 #include "../../systems/field.h"
 #include "../../systems/motion_math.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -37,7 +38,7 @@ void CentaurusBody::spawned(RunRuntime &r,BossBodyState &body) {
 }
 void CentaurusBody::pre_step(RunRuntime &r,BossBodyState &body,double dt) {
     auto &v=body.centaurus;v.turn_motion=0;const auto &p=parameters(r,body);const auto &e=r.state.enemies[body.actor.slot];const auto offset=r.state.ship_pos-e.pos;const auto speed=r.state.ship.vel.length();
-    bool busy=false;for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,body.actor) && t.stage<TechniqueStage::Finished) busy=true;
+    bool busy=false;for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,body.actor) && t.stage<TechniqueStage::Finished) busy=true;
     if (body.phase<2 || body.mode!=BossMode::Idle || v.leaping || busy || speed<r.content->config.ship_config_base_max_speed*r.content->config.ship_config_steer_cruise*0.5 || speed<0.001 || offset.length()<p.path_min || offset.length()>p.path_max || std::abs(r.state.ship.vel.normalized().dot(offset.normalized()))>=p.path_cos) v.path_hold=0;
     else v.path_hold+=dt;
 }

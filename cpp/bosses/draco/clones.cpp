@@ -7,6 +7,7 @@
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/combat_resolver.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -35,7 +36,7 @@ void DracoClones::begin(RunRuntime &r,TechniqueState &t) {
     }
 }
 void DracoClones::active(RunRuntime &r,TechniqueState &t,double dt) {
-    auto *b=PhaseController::find(r,t.actor);if (!b) return;auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoClonesState>(v.move);const auto &p=rule(r,t);const auto &move=r.content->boss_techniques[t.definition-1];v.warning_paths.clear();const auto parent=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));
+    auto *b=PhaseController::find(r,t.actor);if (!b) return;auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoClonesState>(v.move);const auto &p=rule(r,t);const auto &move=r.content->boss_techniques[t.definition-1];v.warning_paths.clear();const auto parent=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));
     for (auto &u:s.units) {
         if (!alive(r,u.inner.actor)) {for (auto part:u.parts) EnemySystem::mark_dead(r,part);continue;}
         const double entry=u.index*0.7;if (v.stage_time<entry) {v.warning_paths.push_back({r.state.enemies[u.inner.actor.slot].pos+godot::Vector2::from_angle(u.neck.angle)*120*b->draco.head_scale,s.center});continue;}
@@ -50,10 +51,10 @@ void DracoClones::active(RunRuntime &r,TechniqueState &t,double dt) {
 }
 void DracoClones::clear(RunRuntime &r,BossBodyState &b) {
     // 所有者の終了では、後から取消フックが呼ばれてもPicaroを新しく残さない。
-    for (auto &t:r.state.bosses.techniques) if (same_handle(t.actor,b.actor) && r.content->boss_techniques[t.definition-1].kind==105) end(r,t,false);
+    for (auto &t:r.state.bosses->techniques) if (same_handle(t.actor,b.actor) && r.content->boss_techniques[t.definition-1].kind==105) end(r,t,false);
 }
 void DracoClones::end(RunRuntime &r,TechniqueState &t,bool cancelled) {
-    auto &v=std::get<DracoTechniqueState>(t.detail);auto *s=std::get_if<DracoClonesState>(&v.move);if (!s || s->ended) return;s->ended=true;auto *b=PhaseController::find(r,t.actor);const auto &p=rule(r,t);const auto ticket=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));
+    auto &v=std::get<DracoTechniqueState>(t.detail);auto *s=std::get_if<DracoClonesState>(&v.move);if (!s || s->ended) return;s->ended=true;auto *b=PhaseController::find(r,t.actor);const auto &p=rule(r,t);const auto ticket=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));
     // SourceのHost終了は非persistentだけを消し、投石などの持続攻撃を残す。
     std::vector<AttackHandle> stop;for (uint32_t i=0;i<r.state.attacks.records.size();++i) {const auto &a=r.state.attacks.records[i];if (a.alive && same_handle(a.spec.technique,ticket) && has_policy(a.spec.policies,EndPolicy::CancelWithTechnique)) stop.push_back(r.state.attacks.handles.at(i));}for (auto h:stop) AttackSystem::end(r.state,h,AttackEndReason::TechniqueCancel);
     for (auto &u:s->units) {if (!u.index) continue;if (cancelled && b && alive(r,t.actor) && DracoPicaro::adopt_clone(r,*b,u.inner.actor,u.parts,u.neck.angle,p.clone_stars)) continue;EnemySystem::mark_dead(r,u.inner.actor);for (auto h:u.parts) EnemySystem::mark_dead(r,h);}
@@ -66,7 +67,7 @@ godot::Dictionary DracoClones::snapshot(const RunRuntime &r,const TechniqueState
 namespace speed {
 void DracoClones::snapshot_body(const RunRuntime &r,const BossBodyState &b,godot::Dictionary &out) {
     godot::Array units;
-    for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,b.actor) && r.content->boss_techniques[t.definition-1].kind==105 && t.stage<TechniqueStage::Finished) {const auto &state=std::get<DracoClonesState>(std::get<DracoTechniqueState>(t.detail).move);if (!state.ended) for (const auto &u:state.units) if (u.index && alive(r,u.inner.actor)) {godot::Dictionary x;x["id"]=r.state.enemy_handles.entity_id(u.inner.actor);x["position"]=r.state.enemies[u.inner.actor.slot].pos;x["angle"]=u.neck.angle;godot::PackedVector2Array points;for (auto p:u.points) points.push_back(p);x["points"]=points;units.push_back(x);}}
+    for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,b.actor) && r.content->boss_techniques[t.definition-1].kind==105 && t.stage<TechniqueStage::Finished) {const auto &state=std::get<DracoClonesState>(std::get<DracoTechniqueState>(t.detail).move);if (!state.ended) for (const auto &u:state.units) if (u.index && alive(r,u.inner.actor)) {godot::Dictionary x;x["id"]=r.state.enemy_handles.entity_id(u.inner.actor);x["position"]=r.state.enemies[u.inner.actor.slot].pos;x["angle"]=u.neck.angle;godot::PackedVector2Array points;for (auto p:u.points) points.push_back(p);x["points"]=points;units.push_back(x);}}
     for (const auto &m:b.draco.picaro) if (!m.clone_parts.empty() && alive(r,m.actor)) {godot::Dictionary x;x["id"]=r.state.enemy_handles.entity_id(m.actor);x["position"]=r.state.enemies[m.actor.slot].pos;x["angle"]=m.angle;godot::PackedVector2Array points;for (auto p:DracoTechnique::neutral(r,b,r.state.enemies[m.actor.slot].pos,m.angle)) points.push_back(p);x["points"]=points;units.push_back(x);}
     out["clones"]=units;out["effects"]=HydraNormalAttack::shapes(r,b);
 }

@@ -6,6 +6,7 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -15,8 +16,8 @@ void enter(MonocerosHornWaveState &v,MonocerosHornWaveState::Stage stage) {v.sta
 void release(RunRuntime &r,TechniqueState &t) {
     const auto &p=rule(r,t);const auto &e=r.state.enemies[t.actor.slot];const auto &v=std::get<MonocerosHornWaveState>(t.detail);HazardState h;h.pos=e.pos;h.damage=p.damage;h.shape=MonocerosWaveHazard{p.wave_start,p.wave_max,p.wave_speed,v.angle,p.wave_half_angle,p.wave_width,t.elapsed+0.4,0};
     AttackSpec spec;spec.owner.live_source=t.actor;spec.cause=Cause::HornWave;spec.source_technique=t.definition;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::MarkBefore,true,false};
-    for (uint32_t row=0;row<r.state.bosses.techniques.size();++row) if (&r.state.bosses.techniques[row]==&t) spec.technique=r.state.bosses.handles.at(row);
-    for (uint32_t row=0;row<r.state.bosses.bodies.size();++row) if (same_handle(r.state.bosses.bodies[row].actor,t.actor)) spec.boss=r.state.bosses.body_handles.at(row);
+    for (uint32_t row=0;row<r.state.bosses->techniques.size();++row) if (&r.state.bosses->techniques[row]==&t) spec.technique=r.state.bosses->handles.at(row);
+    for (uint32_t row=0;row<r.state.bosses->bodies.size();++row) if (same_handle(r.state.bosses->bodies[row].actor,t.actor)) spec.boss=r.state.bosses->body_handles.at(row);
     AttackSystem::emit_hazard(r.state,std::move(h),spec);godot::Dictionary event;event["pos"]=MonocerosHornWave::horn(r,t)[1];FrameBuilder::append(r,"wave_release",event);
 }
 }

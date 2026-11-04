@@ -1,5 +1,6 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 namespace speed {class CentaurusCombo {public:
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static bool cooldown_ready(const RunRuntime &,EnemyHandle,uint32_t);

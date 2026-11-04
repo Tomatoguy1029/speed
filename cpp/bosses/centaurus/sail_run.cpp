@@ -6,6 +6,7 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -33,7 +34,7 @@ void CentaurusSail::step(RunRuntime &r,TechniqueState &t,double dt) {
     const double running=elapsed-p.warn,duration=std::max(v.duration,0.001),theta=s.angle+s.side*v.arc*std::clamp(running/duration,0.0,1.0);
     move(r,t,s.center+godot::Vector2::from_angle(theta)*s.radius-e.pos,dt);e.facing=theta+s.side*godot::Math::PI*0.5;
     const double interval=std::max(v.interval,0.001);
-    while (s.fired*interval<=running && s.fired*interval<duration) {LightArrowParams shot;shot.position=e.pos+godot::Vector2::from_angle(e.facing)*e.radius*body_rule(r,b).bow_reach;shot.angle=tracking.angle(e.facing,(r.state.enemy_aim-shot.position).angle());shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.length=v.length;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));LightArrowSystem::emit(r,shot);++s.fired;cue(r,t,"sail_shot");}
+    while (s.fired*interval<=running && s.fired*interval<duration) {LightArrowParams shot;shot.position=e.pos+godot::Vector2::from_angle(e.facing)*e.radius*body_rule(r,b).bow_reach;shot.angle=tracking.angle(e.facing,(r.state.enemy_aim-shot.position).angle());shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.length=v.length;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));LightArrowSystem::emit(r,shot);++s.fired;cue(r,t,"sail_shot");}
     if (running>=duration) {release(r,t);e.vel={};t.stage=TechniqueStage::Recovery;t.remaining=p.recover;cue(r,t,"sail_folded");}
 }
 bool CentaurusSail::validate(const TechniqueState &t,const ContentBundle &c) {const auto *s=std::get_if<CentaurusSailState>(&t.detail);if (!s || !s->center.is_finite() || !std::isfinite(s->radius) || !std::isfinite(s->angle) || s->radius<0 || (s->side!=1 && s->side!=-1)) return false;return s->fired<=std::ceil(std::max(rule(c,t).duration,0.001)/std::max(rule(c,t).interval,0.001));}

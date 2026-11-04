@@ -12,6 +12,8 @@
 #include <map>
 #include <tuple>
 #include "build_identity.h"
+#include "../content/generated/run_schema_read.h"
+#include "../state/boss_states.h"
 namespace speed {
 MetricsDetailTimer::~MetricsDetailTimer() {
     if (!sample) return;
@@ -88,22 +90,22 @@ void MetricsBuilder::set_recording(RunRuntime &r,bool active,uint32_t level) {
     if (o.recording==active && (!active || o.detail_level==level)) return;
     if (o.recording) {AttackSystem::sync_observation_positions(s);o.stop();flush_observations(r);}
     RecordingBuilder::set_active(r,active);
-    for (auto &f:s.bosses.flows) {f.decision_id=0;for (auto &n:f.nodes) n.decision_id=0;}
-    for (auto &t:s.bosses.techniques) t.decision_id=0;
+    for (auto &f:s.bosses->flows) {f.decision_id=0;for (auto &n:f.nodes) n.decision_id=0;}
+    for (auto &t:s.bosses->techniques) t.decision_id=0;
     if (active) {
         o.detail_level=level;o.recording=true;
-        for (auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished) t.observation_id=o.begin(s.enemy_handles.entity_id(t.actor),t.definition,false);
-        for (auto &b:s.bosses.bodies) {
+        for (auto &t:s.bosses->techniques) if (t.stage<TechniqueStage::Finished) t.observation_id=o.begin(s.enemy_handles.entity_id(t.actor),t.definition,false);
+        for (auto &b:s.bosses->bodies) {
             b.final_observation_id=0;
             if (b.mode==BossMode::Final && (!b.final_landed || b.draco.finale.active)) TechniqueRunner::observe_scripted(r,b,b.draco.finale.active?"draco_finale":"final_strike",b.draco.finale.active?"scripted_finale":"final_strike_replay",ObservationEvent::Selected,false);
         }
         // 終了して行が再利用された技も、発生時のHandleと出所で分ける。
         std::map<std::tuple<int64_t,uint64_t,uint32_t>,int64_t> remaining;
-        for (auto &a:s.attacks.records) if (a.alive && (a.spec.source_technique || s.bosses.body_handles.contains(a.spec.boss))) {
+        for (auto &a:s.attacks.records) if (a.alive && (a.spec.source_technique || s.bosses->body_handles.contains(a.spec.boss))) {
             auto &spec=a.spec;int64_t id=0;
-            if (!spec.source_technique && s.bosses.body_handles.contains(spec.boss)) id=s.bosses.bodies[spec.boss.slot].final_observation_id;
-            else if (s.bosses.handles.contains(spec.technique)) id=s.bosses.techniques[spec.technique.slot].observation_id;
-            else for (const auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && s.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {id=t.observation_id;break;}
+            if (!spec.source_technique && s.bosses->body_handles.contains(spec.boss)) id=s.bosses->bodies[spec.boss.slot].final_observation_id;
+            else if (s.bosses->handles.contains(spec.technique)) id=s.bosses->techniques[spec.technique.slot].observation_id;
+            else for (const auto &t:s.bosses->techniques) if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && s.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {id=t.observation_id;break;}
             if (!spec.source_technique && !id) continue;
             if (!o.find(id)) {
                 const auto key=std::make_tuple(spec.owner.source_id,handle_key(spec.technique),spec.source_technique);

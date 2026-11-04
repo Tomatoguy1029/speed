@@ -12,6 +12,7 @@
 #include "boss_ram.h"
 #include "boss_image.h"
 #include "../output/event_builder.h"
+#include "../state/boss_states.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -98,7 +99,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
     auto candidates=query_enemy_rows(from.min(to) - pad, from.max(to) + pad);
-    for (const auto &body:runtime.state.bosses.bodies) {
+    for (const auto &body:runtime.state.bosses->bodies) {
         if (runtime.state.enemy_handles.contains(body.actor) && speed::BossImageSystem::available(runtime,body.actor) && std::find(candidates.begin(),candidates.end(),body.actor.slot)==candidates.end()) candidates.push_back(body.actor.slot);
     }
     for (size_t row : candidates) {

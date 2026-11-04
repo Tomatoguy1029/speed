@@ -4,11 +4,12 @@
 #include "squad.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 void HydraNormalAttack::lightning(RunRuntime &r,BossBodyState &b,TechniqueState &t,godot::Vector2 at,double delay,const HydraThunderDefinition &v,const HydraNormalContext *ctx) {
     HazardState h;h.pos=at;h.delay=std::max(0.0,delay);h.duration=v.flash;h.damage=v.damage;HydraShapeHazard shape;shape.points={at,at+godot::Vector2(0.1,0)};shape.width=v.radius*2;shape.delay=delay;shape.life=v.flash;h.shape=shape;
-    AttackSpec spec;spec.owner.live_source=t.actor;spec.owner.attached=true;spec.technique=ticket(r,t,ctx);spec.boss=r.state.bosses.body_handles.at(uint32_t(&b-r.state.bosses.bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Lightning;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;spec.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=(context_spec(r,spec,ctx),AttackSystem::emit_hazard(r.state,h,spec));if (AttackSystem::get(r.state,handle)) {r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;r.state.attacks.records[handle.slot].ship_previous_ready=true;}
+    AttackSpec spec;spec.owner.live_source=t.actor;spec.owner.attached=true;spec.technique=ticket(r,t,ctx);spec.boss=r.state.bosses->body_handles.at(uint32_t(&b-r.state.bosses->bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Lightning;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;spec.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=(context_spec(r,spec,ctx),AttackSystem::emit_hazard(r.state,h,spec));if (AttackSystem::get(r.state,handle)) {r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;r.state.attacks.records[handle.slot].ship_previous_ready=true;}
     if (auto *n=neck(b,t.actor,ctx)) n->emission=handle;
 }
 void HydraNormalAttack::step_thunder(RunRuntime &r,TechniqueState &t,double dt,const HydraNormalContext *ctx) {

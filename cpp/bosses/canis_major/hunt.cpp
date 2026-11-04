@@ -4,6 +4,7 @@
 #include "flame_aim.h"
 #include "technique_common.h"
 #include "../flow/phase_controller.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {

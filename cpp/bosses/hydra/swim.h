@@ -1,5 +1,6 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 namespace speed {class HydraSwim {public:
     static const HydraSwimDefinition &rule(const RunRuntime &,const BossBodyState &);
     static bool begin(RunRuntime &,BossBodyState &);

@@ -7,6 +7,7 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/motion_math.h"
 #include "../../systems/collision_query.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

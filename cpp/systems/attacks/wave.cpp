@@ -2,11 +2,12 @@
 #include "../attack_system.h"
 #include "../combat_resolver.h"
 #include "../motion_math.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
 AttackHandle WaveSystem::emit(RunRuntime &run,const WaveParams &p) {
-    if ((p.technique.generation && !run.state.bosses.handles.contains(p.technique)) || !run.state.started || run.state.closed || run.content->waves.empty() || p.style>=WaveStyle::Count || !p.position.is_finite() ||
+    if ((p.technique.generation && !run.state.bosses->handles.contains(p.technique)) || !run.state.started || run.state.closed || run.content->waves.empty() || p.style>=WaveStyle::Count || !p.position.is_finite() ||
         (p.owner.generation && !run.state.enemy_handles.contains(p.owner))) return {};
     for (double value:{p.arc,p.radius,p.start_radius,p.speed,p.width,p.delay,p.damage,p.gap_arc,p.enemy_damage}) if (!std::isfinite(value) || value<0) return {};
     for (double value:{p.angle,p.arc,p.radius,p.start_radius,p.speed,p.width,p.delay,p.gap,p.gap_arc}) if (!std::isfinite(float(value))) return {};
@@ -16,7 +17,7 @@ AttackHandle WaveSystem::emit(RunRuntime &run,const WaveParams &p) {
     if (!std::isfinite(h.duration)) return {};
     WaveHazard wave;wave.angle=p.angle;wave.arc=p.arc;wave.radius=p.radius;wave.start_radius=start;wave.speed=p.speed;
     wave.half_width=p.width*0.5;wave.gap=p.gap;wave.gap_arc=p.gap_arc;wave.enemy_damage=p.enemy_damage;wave.definition=1;wave.style=uint32_t(p.style);h.shape=wave;
-    AttackSpec spec;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.cause=Cause::Wave;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;
+    AttackSpec spec;spec.technique=p.technique;if (run.state.bosses->handles.contains(p.technique)) spec.source_technique=run.state.bosses->techniques[p.technique.slot].definition;spec.cause=Cause::Wave;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;
     spec.owner.attached=p.owner.generation && p.style==WaveStyle::Pulser;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (spec.owner.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);

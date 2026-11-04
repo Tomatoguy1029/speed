@@ -7,6 +7,7 @@
 #include "../../systems/attack_system.h"
 #include "../../systems/field.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

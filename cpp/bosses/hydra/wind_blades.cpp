@@ -4,6 +4,7 @@
 #include "squad.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -21,14 +22,14 @@ void HydraNormalAttack::step_blades(RunRuntime &r,TechniqueState &t,double dt) {
             const double angle=n.sweep+(double(n.step)*0.5-0.5)*blade.spread;const auto origin=free?n.free_pos:n.strike_pos,direction=godot::Vector2::from_angle(angle);if (!free) n.angle=angle;
             HazardState h;h.pos=origin;h.duration=blade.life;h.damage=p.damage;HydraShapeHazard shape;shape.life=blade.life;shape.width=blade.width;shape.velocity=direction*blade.speed;
             for (int i=0;i<13;++i) {const double arc=-3.141592653589793*0.5+3.141592653589793*i/12;shape.points.push_back(origin+godot::Vector2(std::cos(arc)*blade.size*0.6,std::sin(arc)*blade.size).rotated(angle));}h.shape=shape;
-            AttackSpec spec;spec.owner.live_source=t.actor;spec.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));spec.boss=r.state.bosses.body_handles.at(uint32_t(b-r.state.bosses.bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::WindBlade;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=AttackSystem::emit_hazard(r.state,h,spec);if (AttackSystem::get(r.state,handle)) r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;
+            AttackSpec spec;spec.owner.live_source=t.actor;spec.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));spec.boss=r.state.bosses->body_handles.at(uint32_t(b-r.state.bosses->bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::WindBlade;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=AttackSystem::emit_hazard(r.state,h,spec);if (AttackSystem::get(r.state,handle)) r.state.attacks.records[handle.slot].ship_previous=t.previous_ship;
             ++n.step;if (!free) cue(r,*b,n,"attack_started",t.definition);
         }
         if (free) n.glow=0;
     }
     t.aim=n.target;t.locked=n.locked;t.direction=godot::Vector2::from_angle(free?n.look_angle:n.angle);t.stage=time<p.warn?TechniqueStage::Windup:time<p.warn+p.active?TechniqueStage::Active:TechniqueStage::Recovery;
     auto &part=r.state.enemies[t.actor.slot];part.pos=HydraBody::head_position(r,*b,n);part.facing=b->hydra.separated?n.look_angle:n.angle;
-    if (time>=p.warn+p.active+p.hold) {const auto at=part.pos;if (!b->hydra.separated) n.angle=(at-base).angle();n.length=at.distance_to(base);n.free_pos=at;n.locked=n.extension=false;n.normal=0;n.cd=v.attack_cd;t.stage=TechniqueStage::Finished;AttackSystem::end_technique(r.state,r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data())),false);AttackSystem::source_ended(r.state,t.actor,AttackEndReason::TechniqueEnd);if (b->hydra.separated) HydraSquad::watch_player(r,*b,n,&n==&b->hydra.bearer?HydraSquadRole::Bearer:HydraSquad::profile(n));cue(r,*b,n,"finished");}
+    if (time>=p.warn+p.active+p.hold) {const auto at=part.pos;if (!b->hydra.separated) n.angle=(at-base).angle();n.length=at.distance_to(base);n.free_pos=at;n.locked=n.extension=false;n.normal=0;n.cd=v.attack_cd;t.stage=TechniqueStage::Finished;AttackSystem::end_technique(r.state,r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data())),false);AttackSystem::source_ended(r.state,t.actor,AttackEndReason::TechniqueEnd);if (b->hydra.separated) HydraSquad::watch_player(r,*b,n,&n==&b->hydra.bearer?HydraSquadRole::Bearer:HydraSquad::profile(n));cue(r,*b,n,"finished");}
     t.previous_ship=r.state.ship_pos;
 }
 }

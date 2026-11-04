@@ -2,6 +2,7 @@
 #include "../flow/phase_controller.h"
 #include "stomp.h"
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -38,7 +39,7 @@ void CentaurusReferenceFx::update(RunRuntime &r,BossBodyState &b) {
     auto &fx=b.centaurus.reference_fx;const auto &e=r.state.enemies[b.actor.slot];const auto &p=r.content->centaurus_fx;
     if (fx.leaping && !b.centaurus.leaping) {auto points=feet(r,b);if (points.size()==4) fx.landings.push_back({e.pos,std::move(points),b.clock,e.radius});}
     fx.leaping=b.centaurus.leaping;
-    for (const auto &t:r.state.bosses.techniques) {
+    for (const auto &t:r.state.bosses->techniques) {
         if (!same_handle(t.actor,b.actor) || t.stage>=TechniqueStage::Finished) continue;
         const auto &technique=r.content->boss_techniques[t.definition-1];
         if (technique.kind==12 && t.stage!=TechniqueStage::Windup && fx.stomp_id!=t.id) {

@@ -1,6 +1,7 @@
 #include "image_pose_system.h"
 #include "sweep_visual.h"
 #include "../flow/technique_runner.h"
+#include "../../state/boss_states.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -44,7 +45,7 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     if (!body_def.boss || body_def.boss>c.bosses.size() || c.bosses[body_def.boss-1].kind!=0 || data.nodes.empty() || data.sprites.empty() || data.gait.empty() || data.horns.empty()) return false;
     const auto &enemy=run.state.enemies[body.actor.slot];
     const TechniqueState *t=nullptr;
-    for (const auto &candidate:run.state.bosses.techniques) if (same_handle(candidate.actor,body.actor) && candidate.stage<TechniqueStage::Finished) {t=&candidate;break;}
+    for (const auto &candidate:run.state.bosses->techniques) if (same_handle(candidate.actor,body.actor) && candidate.stage<TechniqueStage::Finished) {t=&candidate;break;}
     const BossTechniqueDefinition *attack=t && t->definition && t->definition<=c.boss_techniques.size()?&c.boss_techniques[t->definition-1]:nullptr;
     const std::string move=attack?attack->external_id:"";
     const MonocerosImageTuning *tuning=nullptr;

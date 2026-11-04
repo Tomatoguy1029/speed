@@ -4,11 +4,12 @@
 #include "squad.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 namespace {
 void bite(RunRuntime &r,const BossBodyState &b,TechniqueState &t,godot::Vector2 from,godot::Vector2 to,const HydraNormalDefinition &v) {
-    HazardState h;h.pos=from;h.duration=b.hydra.separated && !same_handle(t.actor,b.hydra.bearer.actor)?0.1:0.12;h.damage=r.content->boss_techniques[t.definition-1].damage;h.shape=HydraShapeHazard{{from,to},v.bite_radius};std::get<HydraShapeHazard>(h.shape).life=b.hydra.separated && !same_handle(t.actor,b.hydra.bearer.actor)?0.1:0.12;AttackSpec s;s.owner.live_source=t.actor;s.owner.attached=true;s.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));s.boss=r.state.bosses.body_handles.at(uint32_t(&b-r.state.bosses.bodies.data()));s.source_technique=t.definition;s.cause=Cause::Bite;s.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;s.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);s.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=AttackSystem::emit_hazard(r.state,h,s);if (AttackSystem::get(r.state,handle)) {auto &record=r.state.attacks.records[handle.slot];record.ship_previous=t.previous_ship;record.ship_previous_ready=true;}
+    HazardState h;h.pos=from;h.duration=b.hydra.separated && !same_handle(t.actor,b.hydra.bearer.actor)?0.1:0.12;h.damage=r.content->boss_techniques[t.definition-1].damage;h.shape=HydraShapeHazard{{from,to},v.bite_radius};std::get<HydraShapeHazard>(h.shape).life=b.hydra.separated && !same_handle(t.actor,b.hydra.bearer.actor)?0.1:0.12;AttackSpec s;s.owner.live_source=t.actor;s.owner.attached=true;s.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));s.boss=r.state.bosses->body_handles.at(uint32_t(&b-r.state.bosses->bodies.data()));s.source_technique=t.definition;s.cause=Cause::Bite;s.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;s.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);s.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};const auto handle=AttackSystem::emit_hazard(r.state,h,s);if (AttackSystem::get(r.state,handle)) {auto &record=r.state.attacks.records[handle.slot];record.ship_previous=t.previous_ship;record.ship_previous_ready=true;}
 }
 }
 void HydraNormalAttack::step_sweep(RunRuntime &r,TechniqueState &t,double dt) {
@@ -29,7 +30,7 @@ void HydraNormalAttack::step_sweep(RunRuntime &r,TechniqueState &t,double dt) {
     }
     t.aim=n.target;t.locked=n.locked;t.direction=godot::Vector2::from_angle(free?n.look_angle:n.angle);t.stage=time<p.warn?TechniqueStage::Windup:time<p.warn+p.active?TechniqueStage::Active:TechniqueStage::Recovery;
     auto &part=r.state.enemies[t.actor.slot];part.pos=HydraBody::head_position(r,*b,n);part.facing=b->hydra.separated?n.look_angle:n.angle;
-    if (time>=p.warn+p.active+p.hold) {const auto at=part.pos;if (!b->hydra.separated) n.angle=(at-base).angle();n.length=at.distance_to(base);n.free_pos=at;n.locked=n.extension=false;n.normal=0;n.cd=v.attack_cd;t.stage=TechniqueStage::Finished;AttackSystem::end_technique(r.state,r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data())),false);AttackSystem::source_ended(r.state,t.actor,AttackEndReason::TechniqueEnd);if (b->hydra.separated) HydraSquad::watch_player(r,*b,n,&n==&b->hydra.bearer?HydraSquadRole::Bearer:HydraSquad::profile(n));cue(r,*b,n,"finished");}
+    if (time>=p.warn+p.active+p.hold) {const auto at=part.pos;if (!b->hydra.separated) n.angle=(at-base).angle();n.length=at.distance_to(base);n.free_pos=at;n.locked=n.extension=false;n.normal=0;n.cd=v.attack_cd;t.stage=TechniqueStage::Finished;AttackSystem::end_technique(r.state,r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data())),false);AttackSystem::source_ended(r.state,t.actor,AttackEndReason::TechniqueEnd);if (b->hydra.separated) HydraSquad::watch_player(r,*b,n,&n==&b->hydra.bearer?HydraSquadRole::Bearer:HydraSquad::profile(n));cue(r,*b,n,"finished");}
     t.previous_ship=r.state.ship_pos;
 }
 }

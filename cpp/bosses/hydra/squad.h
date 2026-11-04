@@ -1,5 +1,6 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 namespace speed {class HydraSquad {public:
     static const HydraSquadDefinition &rule(const RunRuntime &,const BossBodyState &);
     static HydraSquadRole profile(const HydraNeckState &);

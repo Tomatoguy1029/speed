@@ -4,6 +4,7 @@
 #include "../../systems/boss_contact.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
 #include <godot_cpp/variant/transform2d.hpp>
 #include <algorithm>
 #include <cmath>

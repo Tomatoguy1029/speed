@@ -1,4 +1,5 @@
 #include "normal_attack.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 void HydraNormalAttack::step_headbutt(RunRuntime &r,TechniqueState &t,double dt) {

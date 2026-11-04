@@ -3,6 +3,7 @@
 #include "pounce.h"
 #include "roar.h"
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <algorithm>
@@ -25,7 +26,7 @@ double rear_travel(double t) {return curve(t,{{-.7,0},{-.18,2},{-.06,4},{.035,-7
 double front_angle(double t) {return curve(t,{{-.7,0},{-.16,.05},{-.06,.07},{.04,.01},{.17,.1},{.32,0},{.43,.025},{.53,.06},{.7,0}});}
 double rear_angle(double t) {return curve(t,{{-.7,0},{-.18,.06},{-.06,.12},{.04,.02},{.19,.055},{.4,.06},{.5,.11},{.7,0}});}
 const TechniqueState *active(const RunRuntime &r,EnemyHandle actor) {
-    for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,actor) && t.stage<TechniqueStage::Finished) return &t;
+    for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,actor) && t.stage<TechniqueStage::Finished) return &t;
     return nullptr;
 }
 const CanisPounceState *jump(const TechniqueState *t) {
@@ -100,7 +101,7 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
         c.nodes[6].rotation+=std::sin(b.clock*23)*.018;
         c.nodes[6].position=Vector2(0,42+std::sin(b.clock*16)*1.2);
     }
-    if (r.state.bosses.handles.contains(b.canis.nova)) {
+    if (r.state.bosses->handles.contains(b.canis.nova)) {
         const auto head=CanisNova::image_head_pose(r,b);c.nodes[6].position={0,head.x};c.nodes[6].rotation=head.y;
         const auto motion=CanisNova::image_brace_flash(r,b);const double brace=motion.x,flash=motion.y;
         c.nodes[5].position=Vector2(0,-5.0*brace-14.0*flash);c.nodes[5].rotation=0;c.nodes[5].scale=Vector2(1.0+0.04*brace,1.0-0.08*brace);

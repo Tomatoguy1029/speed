@@ -1,4 +1,5 @@
 #include "sweep_visual.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

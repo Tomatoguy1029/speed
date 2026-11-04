@@ -4,6 +4,7 @@
 #include "technique_common.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/field.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

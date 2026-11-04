@@ -3,6 +3,7 @@
 #include "../flow/phase_controller.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_system.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

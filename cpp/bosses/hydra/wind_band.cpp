@@ -4,6 +4,7 @@
 #include "squad.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 void HydraNormalAttack::step_wind(RunRuntime &r,TechniqueState &t,double dt,const HydraNormalContext *ctx) {
@@ -14,7 +15,7 @@ void HydraNormalAttack::step_wind(RunRuntime &r,TechniqueState &t,double dt,cons
     const auto previous_phase=n.normal_phase;n.normal_phase=time<p.warn?0:time<p.warn+p.active?1:2;if (free && n.normal_phase==2 && previous_phase!=2) {HydraSquad::watch_player(r,*b,n,HydraSquad::profile(n));AttackSystem::source_ended(r.state,t.actor,AttackEndReason::TechniqueEnd);}
     const auto emission=[&](godot::Vector2 at,double angle,double delay) {
         HazardState h;h.pos=at;h.delay=delay;h.duration=p.active;h.damage=0;h.shape=HydraShapeHazard{{at,at+godot::Vector2::from_angle(angle)*wind.length},wind.width};auto &shape=std::get<HydraShapeHazard>(h.shape);shape.life=p.active;shape.delay=delay;shape.wind_force=wind.force;
-        AttackSpec spec;spec.owner.live_source=t.actor;spec.owner.attached=true;spec.technique=ticket(r,t,ctx);spec.boss=r.state.bosses.body_handles.at(uint32_t(b-r.state.bosses.bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Wind;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;spec.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};n.emission=(context_spec(r,spec,ctx),AttackSystem::emit_hazard(r.state,h,spec));if (AttackSystem::get(r.state,n.emission)) r.state.attacks.records[n.emission.slot].ship_previous=t.previous_ship;
+        AttackSpec spec;spec.owner.live_source=t.actor;spec.owner.attached=true;spec.technique=ticket(r,t,ctx);spec.boss=r.state.bosses->body_handles.at(uint32_t(b-r.state.bosses->bodies.data()));spec.source_technique=t.definition;spec.cause=Cause::Wind;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::CancelWithTechnique;spec.policies|=policy(EndPolicy::CancelWithParticipant)|policy(EndPolicy::ClearWithBoss);spec.contact={DamageScale::AtkScale,HitPolicy::EveryTick,true,true};n.emission=(context_spec(r,spec,ctx),AttackSystem::emit_hazard(r.state,h,spec));if (AttackSystem::get(r.state,n.emission)) r.state.attacks.records[n.emission.slot].ship_previous=t.previous_ship;
     };
     const auto update_emission=[&](godot::Vector2 at,double angle) {if (const auto *record=AttackSystem::get(r.state,n.emission)) {auto &h=r.state.hazards[record->row];auto &shape=std::get<HydraShapeHazard>(h.shape);shape.points={at,at+godot::Vector2::from_angle(angle)*wind.length};h.pos=at;}};
     if (time<p.warn) {

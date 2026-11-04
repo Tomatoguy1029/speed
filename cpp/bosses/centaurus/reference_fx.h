@@ -1,4 +1,5 @@
 #pragma once
+#include "../../state/boss_states.h"
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector2.hpp>
 namespace speed {

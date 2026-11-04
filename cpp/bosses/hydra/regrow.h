@@ -1,5 +1,6 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 namespace speed {class HydraRegrow {public:
     static const HydraRegrowDefinition &rule(const RunRuntime &,const BossBodyState &);
     static bool alive(const RunRuntime &,const HydraNeckState &);

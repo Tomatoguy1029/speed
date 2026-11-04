@@ -4,6 +4,7 @@
 #include "../flow/phase_controller.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
 #include <algorithm>
 namespace speed {
 void HydraTechnique::pincer(RunRuntime &r,TechniqueState &t) {

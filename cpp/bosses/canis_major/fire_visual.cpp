@@ -1,6 +1,7 @@
 #include "fire_visual.h"
 #include "image_pose.h"
 #include "../../systems/attack_system.h"
+#include "../../state/boss_states.h"
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
@@ -14,7 +15,7 @@ const CanisFireFxDefinition *config(const ContentBundle &content,uint32_t techni
     return it==content.canis_fire_fx.end()?nullptr:&*it;
 }
 int64_t action(const RunRuntime &r,const BossBodyState &body,uint32_t technique) {
-    for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,body.actor) && t.definition==technique && t.stage<TechniqueStage::Finished) return t.id;
+    for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,body.actor) && t.definition==technique && t.stage<TechniqueStage::Finished) return t.id;
     return 0;
 }
 }
@@ -58,7 +59,7 @@ void CanisFireVisualSystem::tick(RunRuntime &r,BossBodyState &body) {
         if (sampled) jet.sample_age=body.clock-jet.started;
         const double age=jet.sample_age;
         if (sampled && jet.continuous && age<jet.duration) {
-            const bool active=std::any_of(r.state.bosses.techniques.begin(),r.state.bosses.techniques.end(),[&](const auto &t){return t.id==jet.action && same_handle(t.actor,body.actor) && t.stage==TechniqueStage::Active;});
+            const bool active=std::any_of(r.state.bosses->techniques.begin(),r.state.bosses->techniques.end(),[&](const auto &t){return t.id==jet.action && same_handle(t.actor,body.actor) && t.stage==TechniqueStage::Active;});
             if (!active) jet.duration=std::max(0.0,age);
         }
         if (sampled && !jet.continuous && age<jet.duration) {
