@@ -33,5 +33,9 @@ for _,entry in ipairs({{'unicorn','unicorn','unicorn'},{'centaurus','centeur','c
  export(find(entry[2]..'_stars',true),'preview_'..entry[1]..'_stars')
  export(find(entry[3],true),'preview_'..entry[1])
 end
+for phase=1,5 do
+ local name='stars_phase'..phase
+ export(find(name,false),name)
+end
 source:close()
-print('Exported selection icons, yellow highlight and four authored preview pairs.')
+print('Exported selection icons, yellow highlight, four authored preview pairs and five star layers.')

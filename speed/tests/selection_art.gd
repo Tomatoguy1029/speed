@@ -19,6 +19,16 @@ func _ready() -> void:
 	add_child(map)
 	map.set_transition(1.0)
 	map.navigation_enabled = false
+	var saved_progress: int = SaveManager.data.cleared_stage
+	for cleared in range(6):
+		SaveManager.data.cleared_stage = cleared
+		map.focus_selection()
+		for phase in map.STAR_PHASES.size():
+			var layer: TextureRect = map._star_phases[phase]
+			check(layer.visible == (phase <= cleared), "クリア進行%dで星レイヤー%dの表示を切り替える" % [cleared, phase + 1])
+			check(layer.texture == map.STAR_PHASES[phase] and layer.position == Vector2.ZERO, "星を原画の位置に重ねる")
+	SaveManager.data.cleared_stage = saved_progress
+	map.focus_selection()
 	var selection: Rect2 = map.SELECTION_RECT
 	check(map._selection_frame.position == selection.position and map._selection_frame.size == selection.size, "黄色枠はDecorationsの原寸位置")
 	check(map._preview.position == Vector2.ZERO and map._preview_stars.position == Vector2.ZERO, "絵と星の原点を一致させる")

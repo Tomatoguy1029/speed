@@ -11,6 +11,13 @@ const SELECTION_RECT := Rect2(141, 207, 112, 59)
 const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
 const DRAG_THRESHOLD := 4.0
 const REVEAL_SETTINGS := preload("res://data/map_reveal_settings.tres")
+const STAR_PHASES := [
+	preload("res://assets/ui/map/stars_phase1.png"),
+	preload("res://assets/ui/map/stars_phase2.png"),
+	preload("res://assets/ui/map/stars_phase3.png"),
+	preload("res://assets/ui/map/stars_phase4.png"),
+	preload("res://assets/ui/map/stars_phase5.png"),
+]
 const PREVIEW_ART := [
 	preload("res://assets/ui/map/preview_unicorn.png"),
 	preload("res://assets/ui/map/preview_centaurus.png"),
@@ -30,6 +37,7 @@ const SYMBOL_TEXTURES := [
 	preload("res://assets/ui/map/symbols/snake.tres"),
 ]
 var _stars: Array[TextureButton] = []
+var _star_phases: Array[TextureRect] = []
 var _inner1: Sprite2D
 var _inner2: Sprite2D
 var _preview: TextureRect
@@ -72,6 +80,9 @@ func _ready() -> void:
 	var frame_material := ShaderMaterial.new()
 	frame_material.shader = preload("res://assets/ui/map/selection_frame.gdshader")
 	frame.material = frame_material
+	for texture: Texture2D in STAR_PHASES:
+		_star_phases.append(_artwork(texture, self))
+	_update_star_phases()
 	var projection := Node2D.new()
 	_projection = projection
 	projection.position = ORIGIN
@@ -405,7 +416,14 @@ func set_transition(progress: float) -> void:
 	_projection.scale.y = _flatten
 	_apply_rotation(_angle)
 
+func _update_star_phases() -> void:
+	# 通常進行では最高クリア地点までがクリア済み。最終段階は5枚を重ねる。
+	var visible_count := clampi(int(SaveManager.data.cleared_stage) + 1, 1, _star_phases.size())
+	for i in _star_phases.size():
+		_star_phases[i].visible = i < visible_count
+
 func focus_selection() -> void:
+	_update_star_phases()
 	_launch_requested = false
 	_focus_selected()
 	_reveal_details()
