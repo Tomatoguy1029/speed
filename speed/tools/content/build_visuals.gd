@@ -8,6 +8,8 @@ static func validate() -> Error:
 	if not reference.valid():
 		push_error("攻撃FXの技別設定が不足しています。")
 		return ERR_INVALID_DATA
+	var reference_error := _validate_reference_assets()
+	if reference_error != OK: return reference_error
 	var profiles_error: Error = preload("res://tools/content/build_effect_profiles.gd").validate()
 	if profiles_error != OK: return profiles_error
 	var death_error := _validate_elite_death()
@@ -194,4 +196,16 @@ static func _validate_elite_death() -> Error:
 			if not FileAccess.file_exists(path) or FileAccess.get_sha256(path)!=baked.get_meta(group)[path]:
 				push_error("撃破マスクをtools/art/bake_elite_death.pyでベイクしてください: "+path)
 				return ERR_INVALID_DATA
+	return OK
+
+## 固定の影・部位マスク・輪郭の入力と出力を、通常の生成で照合する。
+static func _validate_reference_assets() -> Error:
+	for path in ["res://assets/effects/reference/phoenix_shadow.tres", "res://assets/effects/boss_contact/centaurus_masks.tres", "res://data/visuals/canis_nova_hull.tres"]:
+		var baked := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+		if baked == null or baked.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+		for group in ["inputs", "outputs"]:
+			for input: String in baked.get_meta(group, {}):
+				if not FileAccess.file_exists(input) or FileAccess.get_sha256(input) != baked.get_meta(group)[input]:
+					push_error("攻撃FXの固定素材を更新してください: " + input)
+					return ERR_INVALID_DATA
 	return OK

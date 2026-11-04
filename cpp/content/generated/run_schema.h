@@ -2067,6 +2067,14 @@ struct LynxDefinition {
     double slash_size{};
     double slash_range{};
     double damage{};
+    double fx_span{};
+    double fx_max_size{};
+    double fx_start{};
+    double fx_grow{};
+    double fx_cut{};
+    double fx_space0{};
+    double fx_space1{};
+    double fx_gap{};
 };
 inline bool read(BinaryReader &input, LynxDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2085,6 +2093,22 @@ inline bool read(BinaryReader &input, LynxDefinition &out) {
     if (out.slash_range < 0) return false;
     if (!input.read_f64(out.damage)) return false;
     if (out.damage < 0) return false;
+    if (!input.read_f64(out.fx_span)) return false;
+    if (out.fx_span < 0) return false;
+    if (!input.read_f64(out.fx_max_size)) return false;
+    if (out.fx_max_size < 0) return false;
+    if (!input.read_f64(out.fx_start)) return false;
+    if (out.fx_start < 0) return false;
+    if (!input.read_f64(out.fx_grow)) return false;
+    if (out.fx_grow < 0.001) return false;
+    if (!input.read_f64(out.fx_cut)) return false;
+    if (out.fx_cut < 0.001) return false;
+    if (!input.read_f64(out.fx_space0)) return false;
+    if (out.fx_space0 < 0) return false;
+    if (!input.read_f64(out.fx_space1)) return false;
+    if (out.fx_space1 < 0) return false;
+    if (!input.read_f64(out.fx_gap)) return false;
+    if (out.fx_gap < 0) return false;
     return true;
 }
 struct SoldierDefinition {
@@ -2208,6 +2232,7 @@ struct AquariusDefinition {
     double admission_duration{};
     double half_width{};
     uint32_t beams{};
+    double fx_size{};
 };
 inline bool read(BinaryReader &input, AquariusDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2234,6 +2259,8 @@ inline bool read(BinaryReader &input, AquariusDefinition &out) {
     if (out.half_width < 0) return false;
     if (!input.read_u32(out.beams)) return false;
     if (out.beams < 1) return false;
+    if (!input.read_f64(out.fx_size)) return false;
+    if (out.fx_size < 0) return false;
     return true;
 }
 struct CrossEnemyDefinition {
@@ -2439,6 +2466,8 @@ struct CrabDefinition {
     double turn_angle{};
     double damage{};
     double admission_duration{};
+    double fx_reach_r{};
+    double fx_hit_r{};
 };
 inline bool read(BinaryReader &input, CrabDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2457,6 +2486,10 @@ inline bool read(BinaryReader &input, CrabDefinition &out) {
     if (out.damage < 0) return false;
     if (!input.read_f64(out.admission_duration)) return false;
     if (out.admission_duration < 0) return false;
+    if (!input.read_f64(out.fx_reach_r)) return false;
+    if (out.fx_reach_r < 0) return false;
+    if (!input.read_f64(out.fx_hit_r)) return false;
+    if (out.fx_hit_r < 0) return false;
     return true;
 }
 struct CrowDefinition {
@@ -2687,6 +2720,7 @@ struct RulerDefinition {
     double beam_start_gap{};
     double damage{};
     double admission_duration{};
+    double fx_muzzle{};
 };
 inline bool read(BinaryReader &input, RulerDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2719,6 +2753,8 @@ inline bool read(BinaryReader &input, RulerDefinition &out) {
     if (out.damage < 0) return false;
     if (!input.read_f64(out.admission_duration)) return false;
     if (out.admission_duration < 0) return false;
+    if (!input.read_f64(out.fx_muzzle)) return false;
+    if (out.fx_muzzle < 0) return false;
     return true;
 }
 struct TriangleDefinition {
@@ -5768,6 +5804,51 @@ inline bool read(BinaryReader &input, CanisRelayDefinition &out) {
     if (out.final_turn < 0) return false;
     return true;
 }
+struct CanisNovaHullPoint {
+    uint32_t id{};
+    double x{};
+    double y{};
+};
+inline bool read(BinaryReader &input, CanisNovaHullPoint &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    return true;
+}
+struct CanisNovaFxDefinition {
+    uint32_t id{};
+    uint32_t source_width{};
+    uint32_t source_height{};
+    double gather_time{};
+    double hound_delay{};
+    double flash_delay{};
+    uint32_t roar_level{};
+    double roar_time{};
+    double timing{};
+};
+inline bool read(BinaryReader &input, CanisNovaFxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.source_width)) return false;
+    if (out.source_width < 1) return false;
+    if (!input.read_u32(out.source_height)) return false;
+    if (out.source_height < 1) return false;
+    if (!input.read_f64(out.gather_time)) return false;
+    if (out.gather_time < 0) return false;
+    if (!input.read_f64(out.hound_delay)) return false;
+    if (out.hound_delay < 0) return false;
+    if (!input.read_f64(out.flash_delay)) return false;
+    if (out.flash_delay < 0) return false;
+    if (!input.read_u32(out.roar_level)) return false;
+    if (out.roar_level < 1) return false;
+    if (out.roar_level > 3) return false;
+    if (!input.read_f64(out.roar_time)) return false;
+    if (out.roar_time < 0) return false;
+    if (!input.read_f64(out.timing)) return false;
+    if (out.timing < 0) return false;
+    return true;
+}
 struct CanisSiriusFlameDefinition {
     uint32_t id{};
     uint32_t technique{};
@@ -7484,6 +7565,8 @@ struct ContentRecords {
     std::vector<CanisHuntPounceDefinition> CanisHuntPounceDefinition_rows;
     std::vector<CanisNovaDefinition> CanisNovaDefinition_rows;
     std::vector<CanisRelayDefinition> CanisRelayDefinition_rows;
+    std::vector<CanisNovaHullPoint> CanisNovaHullPoint_rows;
+    std::vector<CanisNovaFxDefinition> CanisNovaFxDefinition_rows;
     std::vector<CanisSiriusFlameDefinition> CanisSiriusFlameDefinition_rows;
     std::vector<HydraBodyDefinition> HydraBodyDefinition_rows;
     std::vector<HydraRegrowDefinition> HydraRegrowDefinition_rows;
@@ -7994,7 +8077,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 69: {
         if (version != 1) return false;
-        if (count > input.remaining()/60) return false;
+        if (count > input.remaining()/124) return false;
         for (uint32_t i=0; i<count; ++i) { LynxDefinition row; if (!read(input,row)) return false; out.LynxDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8024,7 +8107,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 104: {
         if (version != 1) return false;
-        if (count > input.remaining()/88) return false;
+        if (count > input.remaining()/96) return false;
         for (uint32_t i=0; i<count; ++i) { AquariusDefinition row; if (!read(input,row)) return false; out.AquariusDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8066,7 +8149,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 130: {
         if (version != 1) return false;
-        if (count > input.remaining()/60) return false;
+        if (count > input.remaining()/76) return false;
         for (uint32_t i=0; i<count; ++i) { CrabDefinition row; if (!read(input,row)) return false; out.CrabDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8108,7 +8191,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 113: {
         if (version != 1) return false;
-        if (count > input.remaining()/116) return false;
+        if (count > input.remaining()/124) return false;
         for (uint32_t i=0; i<count; ++i) { RulerDefinition row; if (!read(input,row)) return false; out.RulerDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8620,6 +8703,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/60) return false;
         for (uint32_t i=0; i<count; ++i) { CanisRelayDefinition row; if (!read(input,row)) return false; out.CanisRelayDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 354: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisNovaHullPoint row; if (!read(input,row)) return false; out.CanisNovaHullPoint_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 355: {
+        if (version != 1) return false;
+        if (count > input.remaining()/56) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisNovaFxDefinition row; if (!read(input,row)) return false; out.CanisNovaFxDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 353: {
@@ -9264,6 +9359,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisNovaDefinition_rows) if (!CanisNovaDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisRelayDefinition_ids;
     for (const auto &row:data.CanisRelayDefinition_rows) if (!CanisRelayDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisNovaHullPoint_ids;
+    for (const auto &row:data.CanisNovaHullPoint_rows) if (!CanisNovaHullPoint_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisNovaFxDefinition_ids;
+    for (const auto &row:data.CanisNovaFxDefinition_rows) if (!CanisNovaFxDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisSiriusFlameDefinition_ids;
     for (const auto &row:data.CanisSiriusFlameDefinition_rows) if (!CanisSiriusFlameDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraBodyDefinition_ids;
@@ -9852,5 +9951,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=227;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=229;
 }

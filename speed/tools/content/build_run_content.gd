@@ -6,6 +6,16 @@ const AttackDefaults = preload("res://scripts/data_types/attack_defaults.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 const BossProgram = preload("res://tools/content/build_boss_program.gd")
 
+## 固定試作の値と輪郭を、通常ステージと単独試行の同じ入力へ通す。
+static func _prepare_reference_fx(data: Dictionary) -> Error:
+	var error := preload("res://tools/content/build_enemy_fx.gd").apply(data)
+	if error != OK: return error
+	return preload("res://tools/content/build_canis_fx.gd").apply(data)
+
+static func _write_reference_content(data: Dictionary, signature: PackedByteArray) -> PackedByteArray:
+	if _prepare_reference_fx(data) != OK: return PackedByteArray()
+	return Schema.write_content(data, signature)
+
 ## エディターの生成では実行中のAutoloadを使わず、保存済み制作資源を読む。
 ## ライブ編集は従来どおり、実行中の定義と索引を使う。
 static func _catalog() -> ContentCatalog:
@@ -170,6 +180,7 @@ static func draco_technique_package(definition: BossDef, move: BossTechnique, co
 	if move.technique==&"picaro_wall": append_draco_picaro_wall(package,move,config)
 	if move.technique==&"clones": append_draco_clones(package,move,config)
 	append_draco_style(package,move)
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 ## 通常隕石から独立した投石定義を、固定報酬の正規解決で生成する。
@@ -377,6 +388,7 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 			profile.external_id = str(move.technique)
 			for asset: Dictionary in package.visuals:
 				if int(asset.get("canis_flame",0))==phase: asset.path = move.flame_settings.resource_path
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 ## 全技で同じ子技を参照し、炎と表示もスキーマの参照先に合わせてまとめる。
@@ -453,6 +465,7 @@ static func canis_set_package(definition: BossDef, moves: Array, config: GameCon
 			asset.id = package.records.ResourceKey.size()+1
 			package.records.ResourceKey.append({"id":asset.id,"role":asset.role})
 			package.visuals.append(asset)
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 ## ケンタウルスの値から、型付きの段階と矢の外観を生成する。
@@ -646,6 +659,7 @@ static func centaurus_technique_package(definition: BossDef, move: BossTechnique
 		var asset: int = package.records.ResourceKey.size()+1
 		package.records.ResourceKey.append({"id":asset,"role":7})
 		package.visuals.append({"id":asset,"role":7,"path":scene.resource_path})
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 ## 複数の技を同じボスの定義表へまとめる。実行は既存の型付きフローへ任せる。
@@ -1035,6 +1049,7 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 	var key: int = data.ResourceKey.size()+1
 	data.ResourceKey.append({"id":key,"role":7})
 	package.visuals.append({"id":key,"role":7,"path":("res://scenes/bosses/hydra_frame.tscn" if definition.id==&"hydra" else "res://scenes/bosses/%s_presentation.tscn" % definition.id),"boss":String(definition.id),"appearance":definition.part_appearance.duplicate(true)})
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 ## 候補の順序と重複を保ち、生成済みの敵定義へ結ぶ。資源は既存のdraco用一覧を使う。
@@ -1147,6 +1162,7 @@ static func hydra_technique_package(definition: BossDef, move: BossTechnique, co
 		var key: int = package.records.ResourceKey.size()+1
 		package.records.ResourceKey.append({"id":key,"role":7})
 		package.visuals.append({"id":key,"role":7,"path":shot.resource_path,"hydra_move":String(move.technique)})
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 ## 実制作の技・条件・フローと、ラン共通の決着の値を同じ生成へまとめる。
@@ -1182,6 +1198,7 @@ static func hydra_set_package(definition: BossDef, rules: Resource, config: Game
 			if not original.has("hydra_move"): continue
 			var visual: Dictionary=original.duplicate(true);visual.id=package.records.ResourceKey.size()+1
 			package.records.ResourceKey.append({"id":visual.id,"role":visual.role});package.visuals.append(visual)
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
@@ -1249,6 +1266,7 @@ static func boss_package(definition: BossDef, config: GameConfig, stage: Runtime
 			value.id = key
 			value.role = Schema.ENUMS.VisualRole.BossFinish
 			package.visuals.append(value)
+	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
 static func _flow_condition(records: Dictionary, gate: Dictionary, hydra := false, draco := false) -> int:
@@ -2068,13 +2086,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 			"life":float(weapon.params.life),"spread":float(weapon.params.spread_step),"knock":float(weapon.params.knock),
 			"pierce":int(weapon.params.pierce_by_level[i])})
 	preload("res://tools/content/run_progression_data.gd").append(data,config,func(id: StringName): return _definition(&"weapons",id))
+	if _prepare_reference_fx(data) != OK: return {}
 	return {"records":data,"visuals":visuals}
 
 static func chase_records(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
 	return chase_package(definition,config,stage).get("records",{})
 
 static func compile_chase(definition: EnemyDef, config: GameConfig, input_sha256: PackedByteArray) -> PackedByteArray:
-	return Schema.write_content(chase_records(definition,config),input_sha256)
+	return _write_reference_content(chase_records(definition,config),input_sha256)
 
 ## 同じRuntimeStageから生成し、検査済みの版へ索引を最後に切り替える。
 static func encounter_records(data: Dictionary, profile: Dictionary, enemy_ids: PackedStringArray) -> Error:
@@ -2782,14 +2801,14 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	if manifest.is_empty(): return ERR_INVALID_DATA
 	paths = manifest.paths
 	var resolved_input := source_sha256.to_utf8_buffer()
-	resolved_input.append_array(Schema.write_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])))
+	resolved_input.append_array(_write_reference_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])))
 	resolved_input.append_array("\n".join(paths).to_utf8_buffer())
 	resolved_input.append_array(var_to_bytes(appearance_metadata))
 	resolved_input.append_array(var_to_bytes([stage.background_color,stage.backgrounds.map(func(item): return [item.texture_path,item.offset,item.scale,item.rotation_degrees,item.display_tint(),item.bounds(),item.parallax,item.fire_preset_path,item.fire_offset,item.fire_scale]),stage.fire_uses]))
 	resolved_input.append_array(var_to_bytes(manifest.hashes))
 	resolved_input.append_array(var_to_bytes([manifest.keys,manifest.equipment,manifest.order,manifest.signatures,visuals]))
 	input_sha256 = Schema.sha256(resolved_input).hex_encode()
-	var bytes := Schema.write_content(data,input_sha256.hex_decode())
+	var bytes := _write_reference_content(data,input_sha256.hex_decode())
 	if bytes.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
 	var validator = ClassDB.instantiate(&"SpeedRunCore")
 	if not validator.configure_content(bytes): return ERR_INVALID_DATA
