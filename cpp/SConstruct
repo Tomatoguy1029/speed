@@ -5,6 +5,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 import SCons
+import sys
+
+sys.path.insert(0, str(Path(Dir('.').abspath).parent / 'tools/build'))
+from runtime_id import runtime_id
 
 here = Path(Dir('.').abspath)
 locked = json.loads((here / 'dependencies.json').read_text())
@@ -45,22 +49,15 @@ else:
 name = 'speed_runtime' + env['suffix'] + ('.dylib' if env['platform'] == 'macos' else '.dll')
 sources = Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/heroes/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp') + Glob('bosses/flow/*.cpp') + Glob('bosses/monoceros/*.cpp') + Glob('bosses/centaurus/*.cpp') + Glob('bosses/canis_major/*.cpp') + Glob('bosses/hydra/*.cpp') + Glob('bosses/draco/*.cpp')
 objects = []
-# ロード済みC++の実装を、録画時にソース全体を走査せず識別する。
-implementation = hashlib.sha256()
-for path in sorted([here / 'SConstruct', here / 'dependencies.json'] + list(here.rglob('*.h')) + list(here.rglob('*.cpp'))):
-    if sdk == path or sdk in path.parents:
-        continue
-    implementation.update(str(path.relative_to(here)).encode())
-    implementation.update(b'\0')
-    implementation.update(path.read_bytes())
-    implementation.update(b'\0')
+# ロード済みC++の実装を、録画時と配布時にソース全体を走査せず識別する。
+implementation = runtime_id(here)
 for source in sources:
     relative = Path(source.abspath).relative_to(here.parent)
     target = build / env['platform'] / env['arch'] / relative.with_suffix('')
     object_env = env
     if relative == Path('cpp/output/metrics_builder.cpp'):
         object_env = env.Clone()
-        object_env.Append(CPPDEFINES=[('SPEED_IMPLEMENTATION_SHA256', '\\"' + implementation.hexdigest() + '\\"')])
+        object_env.Append(CPPDEFINES=[('SPEED_IMPLEMENTATION_SHA256', '\\"' + implementation + '\\"')])
     objects.extend(object_env.SharedObject(str(target), source))
 library = env.SharedLibrary(str(out / name), objects)
 Default(library)
