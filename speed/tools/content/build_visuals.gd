@@ -4,6 +4,10 @@ extends RefCounted
 const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 
 static func validate() -> Error:
+	var reference := preload("res://data/visuals/fx_reference.tres") as FxReferenceSettings
+	if not reference.valid():
+		push_error("攻撃FXの技別設定が不足しています。")
+		return ERR_INVALID_DATA
 	var profiles_error: Error = preload("res://tools/content/build_effect_profiles.gd").validate()
 	if profiles_error != OK: return profiles_error
 	var death_error := _validate_elite_death()
