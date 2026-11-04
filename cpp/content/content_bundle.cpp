@@ -735,8 +735,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (dolphin!=bundle->dolphins.end()) return {};
         const auto item_lynx=std::find_if(bundle->lynxes.begin(),bundle->lynxes.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==19) {
-            if (item_lynx==bundle->lynxes.end() || row.fire_interval<=0 || item_lynx->warn<=0) return {};
-            for (double value:{item_lynx->accel,item_lynx->keep,item_lynx->warn,item_lynx->slash_speed,item_lynx->slash_size,item_lynx->slash_range,item_lynx->damage}) if (!std::isfinite(float(value))) return {};
+            if (item_lynx==bundle->lynxes.end() || row.fire_interval<=0 || item_lynx->warn<=0 || item_lynx->fx_start<=0 || item_lynx->fx_max_size<=0) return {};
+            for (double value:{item_lynx->accel,item_lynx->keep,item_lynx->warn,item_lynx->slash_speed,item_lynx->slash_size,item_lynx->slash_range,item_lynx->damage,item_lynx->fx_span,item_lynx->fx_max_size,item_lynx->fx_start,item_lynx->fx_grow,item_lynx->fx_cut,item_lynx->fx_space0,item_lynx->fx_space1,item_lynx->fx_gap}) if (!std::isfinite(float(value))) return {};
             definition.lynx_definition=uint32_t(item_lynx-bundle->lynxes.begin()+1);definition.accel=item_lynx->accel;
         } else if (item_lynx!=bundle->lynxes.end()) return {};
         const auto triangle=std::find_if(bundle->triangles.begin(),bundle->triangles.end(),[&](const auto &p){return p.id==row.id;});
@@ -748,7 +748,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto ruler=std::find_if(bundle->rulers.begin(),bundle->rulers.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==33) {
             if (ruler==bundle->rulers.end() || ruler->warn<=0) return {};
-            for (double value:{ruler->accel,ruler->keep,ruler->split_delay,ruler->half_gap,ruler->emit_back,ruler->deploy_speed,ruler->deploy_time,ruler->warn,ruler->beam_len,ruler->beam_width,ruler->beam_time,ruler->beam_start_gap,ruler->damage,ruler->admission_duration}) if (!std::isfinite(float(value))) return {};
+            for (double value:{ruler->accel,ruler->keep,ruler->split_delay,ruler->half_gap,ruler->emit_back,ruler->deploy_speed,ruler->deploy_time,ruler->warn,ruler->beam_len,ruler->beam_width,ruler->beam_time,ruler->beam_start_gap,ruler->damage,ruler->admission_duration,ruler->fx_muzzle}) if (!std::isfinite(float(value))) return {};
             definition.ruler_definition=uint32_t(ruler-bundle->rulers.begin()+1);definition.accel=ruler->accel;
         } else if (ruler!=bundle->rulers.end()) return {};
         const auto king=std::find_if(bundle->cepheus.begin(),bundle->cepheus.end(),[&](const auto &p){return p.id==row.id;});
@@ -789,8 +789,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (pump!=bundle->pumps.end()) return {};
         const auto crab=std::find_if(bundle->crabs.begin(),bundle->crabs.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==34) {
-            if (crab==bundle->crabs.end()) return {};
-            for (double value:{crab->approach,crab->reach,crab->telegraph,crab->open_time,crab->turn_angle,crab->damage,crab->admission_duration}) if (!std::isfinite(float(value))) return {};
+            if (crab==bundle->crabs.end() || crab->fx_hit_r<=0) return {};
+            for (double value:{crab->approach,crab->reach,crab->telegraph,crab->open_time,crab->turn_angle,crab->damage,crab->admission_duration,crab->fx_reach_r,crab->fx_hit_r}) if (!std::isfinite(float(value))) return {};
             definition.crab_definition=uint32_t(crab-bundle->crabs.begin()+1);
         } else if (crab!=bundle->crabs.end()) return {};
         const auto aquila=std::find_if(bundle->aquilas.begin(),bundle->aquilas.end(),[&](const auto &p){return p.id==row.id;});
@@ -819,8 +819,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (cross!=bundle->cross_enemies.end()) return {};
         const auto aquarius=std::find_if(bundle->aquarius.begin(),bundle->aquarius.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==24) {
-            if (aquarius==bundle->aquarius.end() || aquarius->telegraph<=0) return {};
-            for (double value:{aquarius->accel,aquarius->approach,aquarius->telegraph,aquarius->beam_time,aquarius->beam_length,aquarius->half_width,aquarius->spread,aquarius->rest,aquarius->damage,aquarius->admission_duration}) if (!std::isfinite(float(value))) return {};
+            if (aquarius==bundle->aquarius.end() || aquarius->telegraph<=0 || aquarius->fx_size<=0) return {};
+            for (double value:{aquarius->accel,aquarius->approach,aquarius->telegraph,aquarius->beam_time,aquarius->beam_length,aquarius->half_width,aquarius->spread,aquarius->rest,aquarius->damage,aquarius->admission_duration,aquarius->fx_size}) if (!std::isfinite(float(value))) return {};
             definition.aquarius_definition=uint32_t(aquarius-bundle->aquarius.begin()+1);definition.accel=aquarius->accel;
         } else if (aquarius!=bundle->aquarius.end()) return {};
         const auto crow=std::find_if(bundle->crows.begin(),bundle->crows.end(),[&](const auto &p){return p.id==row.id;});
