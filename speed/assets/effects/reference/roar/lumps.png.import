@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/lumps.png-625a7d41dbcefcd8374d571ee586bf0b.ctex"
+
+[deps]
+source_file="res://assets/effects/reference/roar/lumps.png"
+dest_files=["res://.godot/imported/lumps.png-625a7d41dbcefcd8374d571ee586bf0b.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false
