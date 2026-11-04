@@ -31,7 +31,7 @@ const HoundOrder *GroupSystem::order(const godot::RunState &state,EnemyHandle ac
     return member && same_handle(member->actor,actor)?&member->order:nullptr;
 }
 bool GroupSystem::follow(godot::RunState &state,EnemyHandle actor,godot::Vector2 goal,double until,double scale) {
-    auto *o=order(state,actor);if (!o) return false;o->canis_howl_rest=false;o->follow=true;o->follow_goal=goal;o->follow_until=until;o->follow_scale=scale;return true;
+    auto *o=order(state,actor);if (!o) return false;if (o->canis_howl_rest) {o->quiet=false;o->quiet_velocity_set=false;}o->canis_howl_rest=false;o->follow=true;o->follow_goal=goal;o->follow_until=until;o->follow_scale=scale;return true;
 }
 bool GroupSystem::steer(godot::RunState &state,EnemyHandle actor,godot::Vector2 goal,godot::Vector2 face,double until,const HoundSteering &config) {
     auto *o=order(state,actor);if (!o || !std::isfinite(config.speed_rate) || config.speed_rate<=0) return false;
