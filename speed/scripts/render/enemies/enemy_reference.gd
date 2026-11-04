@@ -6,6 +6,7 @@ const BEAMER := preload("res://scripts/render/enemies/beamer_reference.gd")
 const LYNX := preload("res://scripts/render/enemies/lynx_reference.gd")
 const BITE := preload("res://scripts/render/enemies/bite_reference.gd")
 const CROSS := preload("res://scripts/render/enemies/cross_reference.gd")
+const CRAB := preload("res://scripts/render/enemies/crab_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -15,6 +16,7 @@ var _beamer = BEAMER.new()
 var _lynx = LYNX.new()
 var _bite = BITE.new()
 var _cross = CROSS.new()
+var _crab = CRAB.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -47,6 +49,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_bite.render(frame.bite_fx, normalized, canvas, world_time)
 	if frame.has("cross_actors") and frame.has("cross_beams"):
 		_cross.render(frame.cross_actors, frame.cross_beams, normalized, canvas, world_time)
+	if frame.has("crab_fx"):
+		_crab.render(frame.crab_fx, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -57,15 +61,20 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var lynx := frame.has("lynx_fx") and frame.has("lynx_actors")
 	var bite := frame.has("bite_fx")
 	var cross := frame.has("cross_actors") and frame.has("cross_beams")
+	var crab := frame.has("crab_fx")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
-	if beamer or lynx or bite or cross:
+	if beamer or lynx or bite or cross or crab:
 		var batches: Array = []
 		for source: Dictionary in frame.get("batches", []):
 			var row := source.duplicate()
 			if beamer: row.erase("beamer")
 			if lynx: row.erase("lynx")
 			if cross: row.erase("cross")
+			if crab and row.has("crab"):
+				var old_crab: PackedFloat32Array = row.crab.duplicate()
+				for index in range(0, old_crab.size(), 14): old_crab[index + 4] = 0.0
+				row["crab"] = old_crab
 			if bite and row.has("reference_bite_indices"):
 				var indices: PackedInt32Array = row.reference_bite_indices
 				var old: PackedFloat32Array = row.get("gunner", PackedFloat32Array())
@@ -75,7 +84,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 				row["gunner"] = kept
 			batches.append(row)
 		result.batches = batches
-	if phoenix or beamer or lynx or bite or cross:
+	if phoenix or beamer or lynx or bite or cross or crab:
 		var shapes: Array = []
 		for row: Dictionary in frame.get("shapes", []):
 			if phoenix and int(row.get("zone_style", -1)) == 5:
@@ -87,6 +96,8 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 			if bite and bool(row.get("reference_bite", false)):
 				continue
 			if cross and bool(row.get("reference_cross", false)):
+				continue
+			if crab and bool(row.get("reference_crab", false)):
 				continue
 			shapes.append(row)
 		result.shapes = shapes

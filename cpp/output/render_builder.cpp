@@ -93,7 +93,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         out.marks.clear();out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
     PackedFloat32Array comet_values,crow_values,petrified_enemies,enemy_health,enemy_weak;
-    Array lynx_actors,lynx_afterimages,lynx_fx,bite_fx,cross_actors,cross_beams;
+    Array lynx_actors,lynx_afterimages,lynx_fx,bite_fx,cross_actors,cross_beams,crab_fx;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -162,6 +162,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (definition.kind==EnemyDefinition::Kind::Crab) {
             const auto &p=run.content->crabs[definition.crab_definition-1];const auto c=definition.color;const auto &v=std::get<CrabState>(enemy.behavior_state);
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle+1.5707963267948966+(v.buds<0?3.141592653589793:0)),float(enemy.mode),float(enemy.charge),float(enemy.timer),float(p.open_time),float(p.reach),c.r,c.g,c.b,c.a,definition.polygon_visual?1.0f:0.0f}) enemy_batch.crab.push_back(value);
+            if (enemy.mode==EnemyMode::Windup || enemy.mode==EnemyMode::Recover) {Dictionary fx;fx["pos"]=pose.position;fx["angle"]=pose.angle;fx["radius"]=enemy.radius;fx["charge"]=enemy.charge;fx["windup"]=enemy.mode==EnemyMode::Windup;fx["age"]=std::max(0.0,p.open_time-enemy.timer);crab_fx.push_back(fx);}
         }
         if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode!=EnemyMode::Windup) {
             for (float v:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(0.7+0.3*std::sin(state.world_time*30.0+double(enemy.id)))}) enemy_batch.bomber.push_back(v);
@@ -387,6 +388,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
+    out["crab_fx"]=crab_fx;
     out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["cross_actors"]=cross_actors;out["cross_beams"]=cross_beams;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];
