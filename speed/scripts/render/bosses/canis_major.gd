@@ -4,6 +4,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const POUNCE_MOTION := preload("res://scripts/render/bosses/canis_motion.gd")
 const LANDING_DUST := preload("res://scripts/render/bosses/canis_landing.gd")
 const NOVA_DISPLAY := preload("res://scripts/render/bosses/canis_nova.gd")
+const NOVA_OVERLAY := preload("res://scripts/render/bosses/canis_nova_overlay.gd")
 const FX_SETTINGS := preload("res://data/visuals/fx_reference.tres")
 @export var pixel_size := 3.0
 @export var sirius_color := Color("#e8f6ff")
@@ -24,6 +25,7 @@ var _land_facing := 0.0
 var _land_feet: Array = []
 var _reference_canvas
 var _nova_params := {}
+var _nova_overlay
 @onready var parts: Node2D = $Parts
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self,"boss/body/canis_major")
@@ -125,12 +127,22 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
 
+func setup_reference_overlay(parent: Node2D) -> void:
+	if is_instance_valid(_nova_overlay): return
+	_nova_overlay = NOVA_OVERLAY.new()
+	parent.add_child(_nova_overlay)
+
+func _exit_tree() -> void:
+	if is_instance_valid(_nova_overlay): _nova_overlay.queue_free()
+
 func draw_reference(canvas, _real_dt: float) -> void:
 	if canvas!=_reference_canvas or state.is_empty(): return
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 	if not _nova.is_empty():
 		NOVA_DISPLAY.draw_field(canvas,_nova,_nova_params)
 		NOVA_DISPLAY.draw_flare(canvas,_nova,_nova_params)
+	if is_instance_valid(_nova_overlay):
+		_nova_overlay.update_overlay(_nova,_nova_params,float(state.facing),canvas.world_scale*get_viewport_rect().size.y/225.0)
 
 ## 描画専用の短い履歴。戦闘の猟犬位置へ書き戻さない。
 var _trails: Dictionary = {}
