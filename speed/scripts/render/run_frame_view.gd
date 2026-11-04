@@ -1072,6 +1072,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		boss_hit_feedback.clear()
 		ruler_shake=0.0
 		_queued_events.clear()
+		_reference_events.clear()
 		_elite_deaths.clear()
 		for display in _boss_body_displays.values():
 			if display.has_method("clear_flames"): display.clear_flames()

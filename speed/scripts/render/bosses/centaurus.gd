@@ -11,6 +11,8 @@ const PARTS = preload("res://scenes/bosses/centaurus_parts.tscn")
 var _shower_visual: Node2D
 var _rain_visual: Node2D
 var _parts: Node2D
+var _reference_canvas
+var _reference_overlay: Node2D
 var _reference_white := 0.0
 var _white_material: ShaderMaterial
 var _white_sprites: Array[Dictionary] = []
@@ -131,6 +133,21 @@ func _apply_image_parts(parts: Array) -> void:
 		sprite.visible = bool(value.get("visible",false))
 
 ## 同じ進路を本体全体に通し、現在の見た目の入口・出口を返す。
+func set_reference_canvas(canvas) -> void:
+	_reference_canvas = canvas
+
+func setup_reference_overlay(parent: Node2D) -> void:
+	if is_instance_valid(_reference_overlay): return
+	_reference_overlay = preload("res://scripts/render/bosses/centaurus_reference.gd").new()
+	parent.add_child(_reference_overlay)
+
+func _exit_tree() -> void:
+	if is_instance_valid(_reference_overlay): _reference_overlay.queue_free()
+
+func draw_reference(canvas, _real_dt: float) -> void:
+	if canvas!=_reference_canvas or state.is_empty() or not is_instance_valid(_reference_overlay): return
+	_reference_overlay.draw_reference(state,technique,canvas)
+
 func reference_cut(from: Vector2, direction: Vector2) -> Dictionary:
 	if state.is_empty() or _white_sprites.is_empty(): return {}
 	return REFERENCE_CUT.cut(_white_sprites, state.position, float(state.radius), from, direction)
@@ -214,7 +231,7 @@ func _draw_sail(open: float) -> void:
 	if StringName(technique.get("technique","")) == &"sail_run":
 		if _mode() == &"windup": fullness += 0.6 * float(state.charge)
 		elif _mode() == &"sail": fullness = 1.6
-		elif _mode() == &"recovery": fullness += 0.6 * float(technique.get("recovery_fraction",0.0))
+		elif _mode() == &"recovery" and (_reference_canvas==null or technique.get("technique","") not in ["power_shot","volley","rain","stomp"]): fullness += 0.6 * float(technique.get("recovery_fraction",0.0))
 	var belly := 34.0 * open * fullness
 	var yard := -14.0
 	var cloth := []
@@ -241,9 +258,9 @@ func draw_fraction() -> float:
 	return float(state.get("charge", 0.0))
 
 func _draw() -> void:
-	if leap_ring > 0.0: draw_arc(Vector2.ZERO, 30.0 + (0.3 - leap_ring) * 160.0, 0.0, TAU, 24, Color(BOW, leap_ring / 0.3), pixel_size)
+	if _reference_canvas==null and leap_ring > 0.0: draw_arc(Vector2.ZERO, 30.0 + (0.3 - leap_ring) * 160.0, 0.0, TAU, 24, Color(BOW, leap_ring / 0.3), pixel_size)
 	if state.is_empty(): return
-	if _mode()==&"windup" and technique.get("technique","")=="power_shot":
+	if _reference_canvas==null and _mode()==&"windup" and technique.get("technique","")=="power_shot":
 		var mouth: Vector2 = technique.aim_origin
 		var color := DANGER if bool(technique.alerting) else WARNING
 		for offset in technique.offsets:
@@ -255,7 +272,7 @@ func _draw() -> void:
 			draw_line(from,end,Color(color,0.12),8.0)
 			draw_line(from,end,Color(color,0.95 if bool(technique.alerting) else 0.6),2.0)
 			draw_line(from,end,Color(1.0,0.75 if bool(technique.alerting) else 0.95,0.6,0.8),0.8)
-	if technique.get("technique","")=="stomp" and int(technique.get("stage",5))<2:
+	if _reference_canvas==null and technique.get("technique","")=="stomp" and int(technique.get("stage",5))<2:
 		var points := PackedVector2Array([to_local(technique.center)])
 		for i in 25: points.append(to_local(technique.center+Vector2.from_angle(float(state.facing)+lerpf(-float(technique.half_angle),float(technique.half_angle),i/24.0))*float(technique.range_radius)))
 		var style := EFFECT_SETTINGS.resolved_values("boss/move/centaurus/stomp","res://scenes/bosses/centaurus/stomp_visual.tscn")
@@ -276,16 +293,16 @@ func _draw() -> void:
 	modulate = tint
 	_draw_sail(sail_fraction())
 	# 攻めどき（射終わりの硬直）は縁を光らせる。
-	if _mode() == &"recovery":
+	if _mode() == &"recovery" and (_reference_canvas==null or technique.get("technique","") not in ["power_shot","volley","rain","stomp"]):
 		var a := 0.45 + sin(float(state.clock) * 14.0) * 0.25
 		draw_arc(Vector2(-6, 0), 96.0, 0.0, TAU, 32, Color(open_color, a), pixel_size * 2.0)
 	# 帆を広げる間は、帆のまわりへ光の輪を広げる。
 	if _mode() == &"phase":
 		var grow := sail_fraction()
 		draw_arc(Vector2(-14, 0), 60.0 + grow * 90.0, 0.0, TAU, 32, Color(sail_star_color, 0.8 * (1.0 - grow)), pixel_size * 2.0)
-	if pulse > 0.0:
+	if pulse > 0.0 and (_reference_canvas==null or technique.get("technique","") not in ["power_shot","volley","rain","stomp"]):
 		draw_arc(Vector2(62, 0), 30.0 + (0.3 - pulse) * 80.0, 0.0, TAU, 20, Color(STRING, pulse * 2.5), pixel_size)
-	if _mode()==&"windup" and technique.get("technique","") in ["volley","rear_attack","rain","power_shot"]:
+	if _mode()==&"windup" and technique.get("technique","") in (["volley","rear_attack","rain","power_shot"] if _reference_canvas==null else ["rear_attack"]):
 		var pull := Vector2(62.0+cos(1.1)*26.0-float(state.charge)*34.0,0.0)
 		var power: bool = technique.get("technique","")=="power_shot"
 		var glow := DANGER if bool(technique.get("alerting",false)) else WARNING

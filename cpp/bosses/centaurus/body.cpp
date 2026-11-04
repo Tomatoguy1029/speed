@@ -71,6 +71,17 @@ bool CentaurusBody::validate(const godot::RunState &s,const ContentBundle &c,con
     if (!std::isfinite(v.guard_scan)) return false;
     for (const auto &entry:v.cooldowns) if (!entry.first || entry.first>c.boss_techniques.size() || c.boss_techniques[entry.first-1].phase!=1 || !std::isfinite(entry.second) || entry.second<0) return false;
     for (const auto &g:v.guards) if (!std::isfinite(g.scale) || !std::isfinite(g.phase) || g.scale<0 || (s.enemy_handles.contains(g.actor) && c.definitions[s.enemies[g.actor.slot].definition].kind!=EnemyDefinition::Kind::Defender)) return false;
+    const auto &fx=v.reference_fx;
+    if (fx.rain_id<0 || fx.stomp_id<0) return false;
+    for (auto emitted:fx.up_emitted) if (emitted>1) return false;
+    const auto valid_time=[&](double started){return std::isfinite(started) && started>=0 && started<=body.clock+1e-8;};
+    for (const auto &item:fx.releases) if (!item.position.is_finite() || !std::isfinite(item.angle) || !valid_time(item.started)) return false;
+    for (const auto &item:fx.landings) {
+        if (!item.position.is_finite() || !valid_time(item.started) || !std::isfinite(item.radius) || item.radius<=0 || item.feet.size()!=4) return false;
+        for (auto point:item.feet) if (!point.is_finite()) return false;
+    }
+    for (const auto &item:fx.stomps) if (!item.position.is_finite() || !valid_time(item.started) || !std::isfinite(item.angle) || !std::isfinite(item.half) || !std::isfinite(item.radius) || item.half<0 || item.radius<=0) return false;
+    for (const auto &item:fx.ups) if (!item.position.is_finite() || !valid_time(item.started) || !std::isfinite(item.angle) || !std::isfinite(item.radius) || !std::isfinite(item.length) || item.radius<=0 || item.length<0) return false;
     return true;
 }
 }

@@ -58,8 +58,25 @@ bool CentaurusImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
         const double progress=std::clamp(body.centaurus.leap_elapsed/std::max(0.001,found->leap_time),0.0,1.0);
         leap=std::sin(godot::Math::PI*progress);
     }
-    const double scale=enemy.radius/135.0*(1.0+0.12*leap);
-    const godot::Transform2D root(enemy.facing-godot::Math::PI*0.5,godot::Vector2(scale,scale),0.0,enemy.pos+godot::Vector2(0,-65.0*leap));
+    const auto smooth=[](double a,double b,double value){const double k=std::clamp((value-a)/(b-a),0.0,1.0);return k*k*(3-2*k);};
+    double scale_mul=1;godot::Vector2 lift;
+    if (technique=="stomp" && t) {
+        if (t->stage==TechniqueStage::Windup) {const double w=smooth(0,.5,enemy.charge);scale_mul=1+.07*w;lift=godot::Vector2::from_angle(enemy.facing)*(-enemy.radius*.1*w);}
+        else {
+            const double a=body.clock-t->started_at-content.boss_techniques[t->definition-1].warn;
+            if (a>=0 && a<.35) {const double f=a<.05?smooth(0,.05,a):1-smooth(.05,.35,a);scale_mul=a<.05?1.07+(.96-1.07)*a/.05:.96+.04*smooth(.05,.35,a);lift=godot::Vector2::from_angle(enemy.facing)*(enemy.radius*.08*f);}
+        }
+    } else if (technique=="rain" && t) {
+        double last=-1;
+        for (const auto &rule:content.centaurus_rains) if (rule.technique==t->definition)
+            for (uint32_t v=0;v<rule.traces;++v) for (uint32_t i=0;i<4;++i) {
+                const double at=t->started_at+.08+v*(content.boss_techniques[t->definition-1].warn-.16)/std::max(1u,rule.traces)+i*.035;
+                if (at<=body.clock) last=std::max(last,at);
+            }
+        if (last>=0) lift=godot::Vector2::from_angle(enemy.facing)*(-enemy.radius*.05*(1-smooth(0,.12,body.clock-last)));
+    }
+    const double scale=enemy.radius/135.0*(1.0+0.12*leap)*scale_mul;
+    const godot::Transform2D root(enemy.facing-godot::Math::PI*0.5,godot::Vector2(scale,scale),0.0,enemy.pos+godot::Vector2(0,-65.0*leap)+lift);
     auto clock=body.centaurus.image_pose;
     const double dt=clock.last_body_clock<0?0:std::max(0.0,body.clock-clock.last_body_clock);
     if (!CentaurusImagePoseEvaluator::step(content.centaurus_image_pose,clock,id,technique,mode(body,t,technique),enemy.charge,dt,pose_time,released,interval,root,body.image_parts)) return false;
