@@ -5461,6 +5461,53 @@ inline bool read(BinaryReader &input, CanisRoarDefinition &out) {
     if (out.burst_duration < 0) return false;
     return true;
 }
+struct CanisFireFxDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    std::string external_id{};
+    double size{};
+    double intensity{};
+    double timing{};
+    double jet_length{};
+    double jet_width{};
+    double jet_spikes{};
+    double ember_delay{};
+    bool has_hound_jet{};
+    double hound_jet_length{};
+    double hound_jet_width{};
+    bool has_hound_speed{};
+    double hound_speed{};
+};
+inline bool read(BinaryReader &input, CanisFireFxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (out.technique < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_f64(out.size)) return false;
+    if (out.size < 0) return false;
+    if (!input.read_f64(out.intensity)) return false;
+    if (out.intensity < 0) return false;
+    if (!input.read_f64(out.timing)) return false;
+    if (out.timing < 0) return false;
+    if (!input.read_f64(out.jet_length)) return false;
+    if (out.jet_length < 0) return false;
+    if (!input.read_f64(out.jet_width)) return false;
+    if (out.jet_width < 0) return false;
+    if (!input.read_f64(out.jet_spikes)) return false;
+    if (out.jet_spikes < 0) return false;
+    if (!input.read_f64(out.ember_delay)) return false;
+    if (out.ember_delay < 0) return false;
+    if (!input.read_bool(out.has_hound_jet)) return false;
+    if (!input.read_f64(out.hound_jet_length)) return false;
+    if (out.hound_jet_length < 0) return false;
+    if (!input.read_f64(out.hound_jet_width)) return false;
+    if (out.hound_jet_width < 0) return false;
+    if (!input.read_bool(out.has_hound_speed)) return false;
+    if (!input.read_f64(out.hound_speed)) return false;
+    if (out.hound_speed < 0) return false;
+    return true;
+}
 struct MonocerosImageNode {
     uint32_t id{};
     uint32_t parent{};
@@ -7994,6 +8041,7 @@ struct ContentRecords {
     std::vector<CentaurusImagePose> CentaurusImagePose_rows;
     std::vector<CanisImagePartDefinition> CanisImagePartDefinition_rows;
     std::vector<CanisRoarDefinition> CanisRoarDefinition_rows;
+    std::vector<CanisFireFxDefinition> CanisFireFxDefinition_rows;
     std::vector<MonocerosImageNode> MonocerosImageNode_rows;
     std::vector<MonocerosImageSprite> MonocerosImageSprite_rows;
     std::vector<MonocerosImageGait> MonocerosImageGait_rows;
@@ -9135,6 +9183,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CanisRoarDefinition row; if (!read(input,row)) return false; out.CanisRoarDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 365: {
+        if (version != 1) return false;
+        if (count > input.remaining()/94) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisFireFxDefinition row; if (!read(input,row)) return false; out.CanisFireFxDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 410: {
         if (version != 1) return false;
         if (count > input.remaining()/78) return false;
@@ -9897,6 +9951,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisImagePartDefinition_rows) if (!CanisImagePartDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisRoarDefinition_ids;
     for (const auto &row:data.CanisRoarDefinition_rows) if (!CanisRoarDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisFireFxDefinition_ids;
+    for (const auto &row:data.CanisFireFxDefinition_rows) if (!CanisFireFxDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MonocerosImageNode_ids;
     for (const auto &row:data.MonocerosImageNode_rows) if (!MonocerosImageNode_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MonocerosImageSprite_ids;
@@ -10208,6 +10264,7 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.first)) return false;
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.second)) return false;
     for (const auto &row:data.CanisRoarDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CanisFireFxDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!EnemyRecord_ids.count(row.hound)) return false;
     for (const auto &row:data.CanisFlameDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -10530,5 +10587,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=245;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=246;
 }

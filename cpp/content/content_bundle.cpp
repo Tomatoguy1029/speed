@@ -77,6 +77,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     if (bundle->boss_image_feedback.duration<=0 || bundle->boss_image_feedback.seed_modulo==0) return {};
     bundle->canis_image_parts=records.CanisImagePartDefinition_rows;
     bundle->canis_roars=records.CanisRoarDefinition_rows;
+    bundle->canis_fire_fx=records.CanisFireFxDefinition_rows;
     std::copy(bytes.ptr()+24,bytes.ptr()+56,bundle->input_sha256.begin());
     std::copy(bytes.ptr()+56,bytes.ptr()+88,bundle->payload_sha256.begin());
     bundle->config=records.RunConfig_rows[0];

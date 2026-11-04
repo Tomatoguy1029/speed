@@ -20,6 +20,8 @@ static func _prepare_reference_fx(data: Dictionary) -> Error:
 	if error != OK: return error
 	error = preload("res://tools/content/build_canis_roar_fx.gd").apply(data)
 	if error != OK: return error
+	error = preload("res://tools/content/build_canis_fire_fx.gd").apply(data)
+	if error != OK: return error
 	return preload("res://tools/content/build_centaurus_fx.gd").apply(data)
 
 static func _write_reference_content(data: Dictionary, signature: PackedByteArray) -> PackedByteArray:

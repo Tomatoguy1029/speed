@@ -26,6 +26,8 @@ static func signature() -> String:
 	files.append_array(preload("res://tools/content/build_canis_image_fx.gd").input_paths())
 	files.append_array(preload("res://tools/content/build_monoceros_image_fx.gd").input_paths())
 	files.append_array(preload("res://tools/content/build_canis_roar_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_canis_fire_fx.gd").input_paths())
+	files.append("res://tools/art/bake_canis_hound_edges.py")
 	for name in ["bake_reference_edges","bake_roar_textures"]: files.append("res://tools/art/"+name+".py")
 	files.append("res://tools/art/bake_canis_contact_masks.py")
 	files.append("res://tools/art/bake_monoceros_contact_masks.py")
