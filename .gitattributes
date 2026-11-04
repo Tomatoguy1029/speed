@@ -1,1 +1,6 @@
 cpp/** text eol=lf
+speed/**/*.import text eol=lf
+speed/**/*.tres text eol=lf
+speed/**/*.gd text eol=lf
+speed/**/*.gdshader text eol=lf
+speed/**/*.py text eol=lf

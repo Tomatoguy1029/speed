@@ -4,7 +4,7 @@
 
 [resource]
 metadata/bake_version = 1
-metadata/inputs = {"res://assets/effects/reference/phoenix_shadow.png.import": "86b84f8edbc1c8b4b6dd9039adf6d5a8bcb3027c26fd1e2a4368c0a640788ee9", "res://assets/pixel/phoenix/phoenix_armor.png": "7f3ae612cfdee14b97ef1c2eb1467fc422a0f78e22233d7ce827c7bff6e6e99c", "res://assets/pixel/phoenix/phoenix_base.png": "756114682401c5cfff378925ae5c12d7369664e2302d4b7c28428f6bbfeafead", "res://assets/pixel/phoenix/phoenix_decoration.png": "fa0bdb5d8c70fdb6f39c9ef95286ff438b32adb492c4089e72d875b5eb0acd47", "res://tools/art/bake_phoenix_fx.py": "88d1c4d9ae36245f1f3be883bb42fdd6d971798ffe65e761610ba1e3fc7d9259"}
+metadata/inputs = {"res://assets/effects/reference/phoenix_shadow.png.import": "21627bd0cab95513d167051af943b226c4f3821380b6a84b3220a56f92817aa3", "res://assets/pixel/phoenix/phoenix_armor.png": "7f3ae612cfdee14b97ef1c2eb1467fc422a0f78e22233d7ce827c7bff6e6e99c", "res://assets/pixel/phoenix/phoenix_base.png": "756114682401c5cfff378925ae5c12d7369664e2302d4b7c28428f6bbfeafead", "res://assets/pixel/phoenix/phoenix_decoration.png": "fa0bdb5d8c70fdb6f39c9ef95286ff438b32adb492c4089e72d875b5eb0acd47", "res://tools/art/bake_phoenix_fx.py": "88d1c4d9ae36245f1f3be883bb42fdd6d971798ffe65e761610ba1e3fc7d9259"}
 metadata/outputs = {"res://assets/effects/reference/phoenix_shadow.png": "ea9cddd74e6d657aee04311186681a34666839fc0ce1bae85a19d4734b6015c0"}
 metadata/texture = ExtResource("1")
 metadata/source_size = Vector2i(137, 94)
