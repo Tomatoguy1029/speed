@@ -74,7 +74,20 @@ struct CanisHuntState {CanisStreamState stream;CanisFlameAimState aim;bool aimin
 struct CanisHuntPounceState {CanisStreamState stream;CanisPounceState jump;bool jumping=false,combo_pending=true;};
 struct CanisNovaPair {EnemyHandle actor;uint32_t group=0;double angle=0,side=1;bool stationed=false;};
 struct CanisNovaShadow {double angle=0,half=0,near=0;};
-struct CanisNovaState {double started=0;std::vector<CanisNovaPair> pairs;std::vector<CanisNovaShadow> shadows;std::vector<bool> ring_hit;bool flashed=false,released=false;};
+struct CanisNovaState {
+    double started=0;
+    std::vector<CanisNovaPair> pairs;
+    std::vector<CanisNovaShadow> shadows;
+    std::vector<bool> ring_hit;
+    bool flashed=false,released=false;
+    // 判定と表示が同じワールド位置で参照する、24fps単位の遮光場。
+    std::vector<uint8_t> field_alpha;
+    godot::Vector2 field_origin;
+    double field_cell=0;
+    int64_t field_frame=-1;
+    uint32_t field_width=0,field_height=0;
+    uint64_t field_revision=0;
+};
 struct CanisRelayItem {EnemyHandle actor;double at=0,angle=0;godot::Vector2 from;bool marked=false,fired=false,released=false;};
 struct CanisRelayState {CanisFlameAimState aim;double started=0,last_fire=0,tint_until=0;std::vector<CanisRelayItem> items;bool ordered=false,aiming=false,cancelled=false;};
 struct DracoBiteState {godot::Vector2 origin,retracted,strike;std::vector<godot::Vector2> base,landed;};

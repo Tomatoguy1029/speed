@@ -10,6 +10,7 @@ namespace speed {class CanisNova {public:
     static double progress(const RunRuntime &,const TechniqueState &);
     static godot::Dictionary snapshot(const RunRuntime &,const TechniqueState &);
     static void effect_tick(RunRuntime &,BossBodyState &,double);
+    static void field_tick(RunRuntime &,BossBodyState &);
     static void clear(RunRuntime &,BossBodyState &);
     static bool tinted(const RunRuntime &,const BossBodyState &,EnemyHandle);
     static bool validate_body(const godot::RunState &,const ContentBundle &,const BossBodyState &);
