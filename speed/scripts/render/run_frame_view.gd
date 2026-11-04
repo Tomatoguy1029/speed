@@ -1380,7 +1380,12 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		if event.type==&"anchor_capture": captured[event.get("id",0)] = true
 	for event: Dictionary in _queued_events:
-		if event.type==&"kill" and not captured.has(event.id): _elite_deaths.add_event(event,frame.ui.world_time,death_view)
+		if event.type==&"kill" and not captured.has(event.id):
+			_elite_deaths.add_event(event,frame.ui.world_time,death_view)
+			var enemy_type := StringName(event.enemy_type)
+			if not event.has("death_visual") and enemy_type not in [&"pump", &"meteor", &"iron", &"saw", &"hydra_rubble"] and ContentManager.catalog.table(&"enemies").has(enemy_type) and death_view.grow(96.0).has_point(event.pos):
+				var radius: float = event.r
+				_burst(event.pos, event.color, 6 + roundi(radius / 3.0), 260.0 + radius * 4.0, event.dir)
 		if event.type==&"combat_damage" and event.get("target","")=="enemy" and float(event.get("applied",0.0))>0.0:
 			for display in _boss_body_displays.values():
 				if display.state.get("kind",-1) in [0,1,2] and display.state.get("actor",0)==event.get("target_id",0): display.frame_event(event)
