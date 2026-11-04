@@ -5,6 +5,8 @@ uniform sampler2D snapshot : hint_screen_texture, filter_nearest, repeat_disable
 // source_colorを付けず、Painterが作ったsRGBのバイト値をそのまま読む。
 uniform sampler2D color_pixels : filter_nearest, repeat_disable;
 uniform sampler2D light_pixels : filter_nearest, repeat_disable;
+uniform sampler2D linear_color_pixels : filter_linear, repeat_disable;
+uniform bool filter_color_linear = false;
 uniform bool linear_target = true;
 uniform bool has_light = false;
 uniform float opacity = 1.0;
@@ -16,7 +18,7 @@ vec3 to_linear(vec3 c) {
 }
 void fragment() {
 	vec4 under=texture(snapshot,SCREEN_UV);
-	vec4 color=texture(color_pixels,UV);
+	vec4 color=filter_color_linear?texture(linear_color_pixels,UV):texture(color_pixels,UV);
 	color.a*=opacity;
 	vec3 light=has_light?texture(light_pixels,UV).rgb:vec3(0.0);
 	if (color.a<=0.0 && all(equal(light,vec3(0.0)))) {
