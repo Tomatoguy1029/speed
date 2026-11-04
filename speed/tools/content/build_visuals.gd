@@ -200,9 +200,11 @@ static func _validate_elite_death() -> Error:
 
 ## 固定の影・部位マスク・輪郭の入力と出力を、通常の生成で照合する。
 static func _validate_reference_assets() -> Error:
-	for path in ["res://assets/effects/reference/phoenix_shadow.tres", "res://assets/effects/boss_contact/centaurus_masks.tres", "res://data/visuals/canis_nova_hull.tres"]:
+	for path in ["res://assets/effects/reference/phoenix_shadow.tres", "res://assets/effects/boss_contact/centaurus_masks.tres", "res://data/visuals/canis_nova_hull.tres", "res://data/visuals/canis_nova_emission.tres", "res://data/visuals/canis_contact_masks.tres"]:
 		var baked := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-		if baked == null or baked.get_meta("bake_version", 0) != 1: return ERR_INVALID_DATA
+		if baked == null or baked.get_meta("bake_version", baked.get_meta("version",0)) != 1:
+			push_error("攻撃FXの固定素材の版が不正です: " + path)
+			return ERR_INVALID_DATA
 		for group in ["inputs", "outputs"]:
 			for input: String in baked.get_meta(group, {}):
 				if not FileAccess.file_exists(input) or FileAccess.get_sha256(input) != baked.get_meta(group)[input]:
