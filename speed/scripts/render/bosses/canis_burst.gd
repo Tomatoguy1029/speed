@@ -22,7 +22,7 @@ func _start(id: int, at: Vector2, radius: float, started: float) -> void:
 	var reference_radius := float(SETTINGS.get_meta("reference_radius"))
 	var shader_radius := reference_radius/px*float(SETTINGS.get_meta("radius_scale"))
 	var half := ceilf(shader_radius*(float(SETTINGS.get_meta("reference_reach"))+17.0/shader_radius))+3.0
-	root.scale = Vector2.ONE*half*px*radius/reference_radius*float(_params.size)
+	root.scale = Vector2.ONE*half*px*radius/reference_radius*float(_params["size"])
 	root.modulate.a = minf(1.0,float(_params.intensity))
 	add_child(root)
 	var materials: Array[ShaderMaterial] = []
