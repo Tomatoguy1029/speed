@@ -8,6 +8,7 @@
 #include "../output/frame_builder.h"
 #include "../bosses/draco/finale.h"
 #include "../bosses/canis_major/nova.h"
+#include "../bosses/centaurus/image_pose_system.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
 #include "../behaviors/enemies/corona_vortex.h"
@@ -119,6 +120,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
             timed("field.gravity",[&]{FieldSystem::step_gravity(core.runtime,wd);});
             if (!timed("enemies",[&]{return core.advance_enemies(wd);})) return false;
             if (!timed("avoidance",[&]{return core.avoid_strong(wd);})) return false;
+            for (auto &body:state.bosses.bodies) CentaurusImagePoseSystem::refresh(core.runtime,body);
         }
         if (core.check_run_end()) return true;
         if (!timed("enemy_grid",[&]{return core.rebuild_enemy_grid(state.frame_grid_cell);})) return false;
@@ -192,6 +194,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     state.ship_pos=state.ship.pos;
     if ((control.lab_enemy_ai || !control.lab_mode) && state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
     camera(core,dt,size);
+    for (auto &body:state.bosses.bodies) CentaurusImagePoseSystem::refresh(core.runtime,body);
     if (world_step && state.phase==Phase::Play)
         for (auto &body:state.bosses.bodies) CanisNova::field_tick(core.runtime,body);
     if (!core.check_run_end()) {
