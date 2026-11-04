@@ -70,6 +70,7 @@ void WaveSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     if ((pulser && charging) || (!charging && (r<=0 || !view.grow(r+(pulser?w->half_width*4.8:0)).has_point(h.pos)))) return;
     const auto *record=AttackSystem::get(run.state,h.attack);if (!record) return;
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Wave);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    if (w->style==uint32_t(WaveStyle::Ripple)) shape["reference_dolphin"]=true;
     PackedVector2Array points;points.push_back(h.pos);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);
     PackedFloat32Array widths;widths.push_back(w->half_width*2);PackedColorArray colors;colors.push_back(h.color);
     shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;
