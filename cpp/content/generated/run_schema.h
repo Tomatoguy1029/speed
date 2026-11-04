@@ -5205,6 +5205,23 @@ inline bool read(BinaryReader &input, CentaurusComboDefinition &out) {
     if (out.gap < 0) return false;
     return true;
 }
+struct CentaurusReferenceFxDefinition {
+    uint32_t id{};
+    double release_life{};
+    double landing_life{};
+    double stomp_life{};
+};
+inline bool read(BinaryReader &input, CentaurusReferenceFxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.release_life)) return false;
+    if (out.release_life < 0) return false;
+    if (!input.read_f64(out.landing_life)) return false;
+    if (out.landing_life < 0) return false;
+    if (!input.read_f64(out.stomp_life)) return false;
+    if (out.stomp_life < 0) return false;
+    return true;
+}
 struct BossImageMaskRecord {
     uint32_t id{};
     uint32_t width{};
@@ -7967,6 +7984,7 @@ struct ContentRecords {
     std::vector<CentaurusShowerDefinition> CentaurusShowerDefinition_rows;
     std::vector<CentaurusSailDefinition> CentaurusSailDefinition_rows;
     std::vector<CentaurusComboDefinition> CentaurusComboDefinition_rows;
+    std::vector<CentaurusReferenceFxDefinition> CentaurusReferenceFxDefinition_rows;
     std::vector<BossImageMaskRecord> BossImageMaskRecord_rows;
     std::vector<CentaurusImageNode> CentaurusImageNode_rows;
     std::vector<CentaurusImageSprite> CentaurusImageSprite_rows;
@@ -9057,6 +9075,12 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CentaurusComboDefinition row; if (!read(input,row)) return false; out.CentaurusComboDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 451: {
+        if (version != 1) return false;
+        if (count > input.remaining()/28) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusReferenceFxDefinition row; if (!read(input,row)) return false; out.CentaurusReferenceFxDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 356: {
         if (version != 1) return false;
         if (count > input.remaining()/16) return false;
@@ -9853,6 +9877,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusSailDefinition_rows) if (!CentaurusSailDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusComboDefinition_ids;
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!CentaurusComboDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusReferenceFxDefinition_ids;
+    for (const auto &row:data.CentaurusReferenceFxDefinition_rows) if (!CentaurusReferenceFxDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BossImageMaskRecord_ids;
     for (const auto &row:data.BossImageMaskRecord_rows) if (!BossImageMaskRecord_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusImageNode_ids;
@@ -10504,5 +10530,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=244;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=245;
 }
