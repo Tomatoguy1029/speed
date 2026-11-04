@@ -89,8 +89,8 @@
 | 隕石の破片 | 必須 | 隕石の破壊時に回転しながら散り、薄れて消える破片 | `assets/pixel/meteor_1_pieces.png` の5片と `meteor_2_pieces.png` の8片。切り出し範囲は `data/visuals/meteor_pieces.tres`。組込済み |
 | 鉄のがれき | 必須 | フィールドに固定する鉄の塊。固い障害物として識別できる絵。被弾時も原画の色を保つ | `assets/pixel/iron.png`・`iron_debris_2.png`・`iron_debris_3.png` の3種類を配置ごとに使い分ける。縦横比を保ち、長辺を個体の直径に合わせる。組込済み |
 | 回る丸鋸 | 必須 | その場で回転し、機体が触れると飛んで敵を巻き込む丸鋸の刃 | サイズ・分割・差分・枚数は未決 |
-| 彗星 | 必須 | 画面を横切る障害物。隕石と区別できる、光る核と進行方向の反対へ長く伸びる尾 | サイズ・核と尾の分割・差分・枚数は未決 |
-| レアな彗星 | 必須 | 彗星限定の武器を持つ彗星。通常と見分けられる金色の核と尾 | サイズ・核と尾の分割・差分・枚数、周囲の光の粒を絵に含める範囲は未決 |
+| 彗星 | 必須 | 画面を横切る障害物。隕石と区別できる、光る核と進行方向の反対へ長く伸びる尾 | 組込済み。`speed/assets/fx/comets/normal_core.tres`・`normal_tail.png`。編集元は同フォルダの `source/comet.png`・`normal.aseprite`。尾は36コマ |
+| レアな彗星 | 必須 | 彗星限定の武器を持つ彗星。通常と見分けられる金色の核と尾 | 組込済み。`speed/assets/fx/comets/rare_core.tres`・`rare_tail.png`。編集元は同フォルダの `source/comet_rare.png`・`rare.aseprite`。尾は36コマ |
 
 障害物の用途は[敵一覧](enemies.md#障害物)、彗星の見た目は[アートスタイル](../art-style.md#36-彗星)を参照。隕石・惑星の基本絵は既存素材を使用。
 

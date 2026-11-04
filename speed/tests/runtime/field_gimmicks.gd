@@ -642,6 +642,7 @@ func check_cpp_comets() -> void:
 	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
 	var stage := RuntimeStage.new()
 	stage.index = 86
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["drifter"])
 	var output := "res://.content/dev/run_comets"
@@ -695,7 +696,7 @@ func check_cpp_comets() -> void:
 	check(ids.all(func(id): return id>0) and is_equal_approx(golden.hp,plain.hp*2.0),"同じ大きさのレア彗星だけHP倍率を掛ける")
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
-	check(frame.comets.values.size()==18 and frame.comets.values[5]==0.0 and frame.comets.values[11]==1.0 and presentation.frame_view.apply_frame(frame),"普通の白青の尾とレアの金色の尾を共通描画へ渡す")
+	check(frame.comets.values.size()==21 and frame.comets.values[5]==0.0 and frame.comets.values[12]==1.0 and is_zero_approx(frame.comets.values[6]) and presentation.frame_view.apply_frame(frame),"普通の白青の尾とレアの金色の尾を共通描画へ渡す")
 	var ui: Dictionary = bridge.read_frame().value.ui
 	check(ui.rare_comets.size()==3 and ui.view_half.x>0.0,"画面外を含むレア彗星の位置をHUDの端の矢印へ渡す")
 	await get_tree().process_frame

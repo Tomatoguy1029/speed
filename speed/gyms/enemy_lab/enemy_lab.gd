@@ -90,6 +90,7 @@ func _ready() -> void:
 	session.changed.connect(_refresh)
 	session.seek_progress.connect(func(v): _messages.text = TranslationServer.translate("lab.message_7591fff9f2") % roundi(v * 100))
 	await session.reset()
+	_fill_palette()
 	canvas.zoom = game_zoom()
 	_refresh()
 
@@ -315,6 +316,7 @@ func _fill_palette() -> void:
 		child.queue_free()
 	workspace.palette_buttons.clear()
 	var filter := _filter.text.to_lower()
+	var stage: StageDef = session.run.state.stage if is_instance_valid(session.run) else null
 	var definitions := ContentManager.sorted(ContentManager.enemies)
 	definitions.append_array(ContentManager.sorted(ContentManager.bosses))
 	definitions.append_array(field_items())
@@ -330,11 +332,18 @@ func _fill_palette() -> void:
 		if wanted_class > 0 and wanted_class != _palette_class(def): continue
 		# 星の数：1〜5 はその数、6 は 6〜10 をまとめて選ぶ。ボスは区分で選ぶ
 		if wanted_stars > 0 and not (def is EnemyDef and (def.rank >= 6 if wanted_stars == 6 else def.rank == wanted_stars)): continue
-		if not filter.is_empty() and not (id.to_lower().contains(filter) or def.display_name.to_lower().contains(filter)): continue
+		var name: String = def.display_name
+		var skin := String(stage.enemy_looks.get(id, id)) if stage != null else id
+		if skin != id:
+			var key := "lab.look." + skin
+			var skin_name := tr(key)
+			name = skin if skin_name == key else skin_name
+		if not filter.is_empty() and not (id.to_lower().contains(filter) or skin.to_lower().contains(filter) or name.to_lower().contains(filter) or def.display_name.to_lower().contains(filter)): continue
 		var button = PALETTE_ITEM.new()
 		button.definition = def
+		button.display_name = name
 		button.picture = canvas.texture_for(id)
-		button.tooltip_text = tr("lab.ui.enemy_tooltip") % [def.display_name, id]
+		button.tooltip_text = tr("lab.ui.enemy_tooltip") % [name, id]
 		button.pressed.connect(func():
 			canvas.spawn_type = id
 			_refresh_hitstop()
@@ -428,9 +437,14 @@ func _reset() -> void:
 	canvas.cancel_gesture()
 	_busy = true
 	await session.reset({"seed": int(_seed.value), "stage": _stage.selected + 1, "empty": _empty.button_pressed, "auto_spawn": _auto.button_pressed, "field": {"terrain": _terrain.button_pressed, "rocks": _rocks.button_pressed, "gimmicks": _gimmicks.button_pressed}})
+	_fill_palette()
 	canvas.route.clear()
 	canvas.selection.clear()
 	canvas.result.clear()
+	if not is_instance_valid(session.run):
+		_busy = false
+		_messages.text = String(session.last_error.get("message", ""))
+		return
 	canvas.center = session.run.state.ship_pos
 	canvas.zoom = game_zoom()
 	_busy = false
@@ -591,6 +605,7 @@ func _load_file(path: String) -> void:
 	await session.reset(data.spec)
 	_seed.value = int(session.spec.seed)
 	_stage.selected = int(session.spec.stage) - 1
+	_fill_palette()
 	_empty.button_pressed = session.spec.get("empty", true)
 	_auto.button_pressed = session.spec.get("auto_spawn", false)
 	var flags: Dictionary = session.spec.get("field", {})
@@ -814,7 +829,6 @@ func _reload_data() -> void:
 	if ContentManager.reload_experiment_data():
 		controls.refresh_appearance_baselines()
 		await _reset()
-		_fill_palette()
 		_messages.text = tr("lab.data_reloaded")
 	else:
 		_messages.text = tr("lab.reload_failed")

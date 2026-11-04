@@ -111,7 +111,12 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
         const bool iron=definition.kind==EnemyDefinition::Kind::Obstacle && definition.id==StringName("iron");
         if (meteor && state.field.rock_handles.contains(enemy.rock) && state.field.rocks[enemy.rock.slot].kind==RockKind::Comet) {
-            if (view.grow(enemy.radius*1.4142135623730951).has_point(pose.position)) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),enemy.vel.x,enemy.vel.y,float(state.field.rocks[enemy.rock.slot].rare_weapon!=0)}) comet_values.push_back(value);
+            const auto &rock=state.field.rocks[enemy.rock.slot];
+            // The tail extends 190 source pixels behind a core with a 15-pixel radius.
+            if (view.grow(enemy.radius*14.0).has_point(pose.position)) {
+                for (float value:{pose.position.x,pose.position.y,float(enemy.radius),enemy.vel.x,enemy.vel.y,
+                        float(rock.rare_weapon!=0),float(state.world_time-rock.born)}) comet_values.push_back(value);
+            }
             continue;
         }
         const double radius=meteor?FieldSystem::rock_sprite_radius(run,uint32_t(i)):enemy.radius*definition.sprite_scale;
@@ -235,7 +240,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         for (double value:{double(e.pos.x),double(e.pos.y),radius,p.width,1.0-std::clamp(e.timer/std::max(p.warn,0.001),0.0,1.0),double(e.id%4093)}) pulser.push_back(value);
     }
     Dictionary crows;crows["time"]=state.world_time;crows["values"]=crow_values;
-    Dictionary comets;comets["time"]=state.time;comets["values"]=comet_values;
+    Dictionary comets;comets["values"]=comet_values;
     Dictionary capsules;PackedFloat32Array capsule_values;for (const auto &cap:state.pickups.capsules) for (float value:{cap.pos.x,cap.pos.y,float(cap.kind)}) capsule_values.push_back(value);capsules["time"]=state.time;capsules["values"]=capsule_values;
     Dictionary warp;warp["position"]=state.field.warp_pos;warp["gone"]=state.field.warp_gone;warp["radius"]=run.content->warp.radius;warp["time"]=state.world_time;
     Dictionary gravity;PackedFloat64Array well_values;
