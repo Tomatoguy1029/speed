@@ -239,8 +239,9 @@ func _isolated(root: String) -> bool:
 	if not DirAccess.dir_exists_absolute(isolated): return false
 	if SaveManager.SAVE_PATH!=isolated.path_join("save.json") or SaveManager.SETTINGS_PATH!=isolated.path_join("settings.cfg"): return false
 	var launcher := FileAccess.get_file_as_string("res://addons/stage_launcher/launch_request.gd")
-	var recorder := FileAccess.get_file_as_string("res://scripts/dev/play_recorder.gd")
-	return launcher.contains('const PATH := "'+isolated.path_join("stage_launch.cfg")+'"') and recorder.contains('"'+isolated.path_join("recordings")+'"')
+	var recorder = load("res://scripts/dev/play_recorder.gd")
+	var lab := FileAccess.get_file_as_string("res://gyms/enemy_lab/lab_io.gd")
+	return launcher.contains('const PATH := "'+isolated.path_join("stage_launch.cfg")+'"') and recorder!=null and recorder.folder()==isolated.path_join("recordings") and lab.contains('const ROOT := "'+isolated.path_join("enemy_lab")+'"')
 
 func _valid_identity(root: String, identity: Dictionary) -> bool:
 	for key in ["source_sha256","dependencies_sha256","library_sha256"]:
