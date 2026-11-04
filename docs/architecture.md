@@ -83,7 +83,8 @@ speed/                    res://
   .content/               実行用データと制作中間データ（生成物）
     run/                  戦闘バイナリ・索引・RunResources
     dev/                  開発用の名前対応表・一時生成物
-tools/build/              共通スキーマ生成と拡張・配布ビルド
+tools/build/              共通スキーマ生成、識別子、開発用・配布用ビルド
+tools/dev/                一時作業場所の作成と片付け
 ```
 
 ステージは数値の `StageDef`（`data/stages/`）と配置シーン（`scenes/stages/`）で制作する。実行時の戦闘定義と表示資源への変換は[8.1](#81-定義データresource)に示す。
@@ -761,6 +762,14 @@ Macのexportは `shader_baker/enabled` を有効にし、描画デバイスを�
 `--verify` は隔離した保存先を持つ確認用パッケージで、配布エンジンによる最小ランとライブラリ欠落時の拒否を確認する。Macの `--rendered` は `--verify` と併用し、`godot-bg` で描画付きの起動を行う。性能や全種類の意味的な照合は別の確認範囲とする。
 
 `speed/export_presets.cfg` は通常ラン・導入に必要なC++拡張、`.content/run/`、Godotの表示・入力・UI・保存・音を含める。制作元の戦闘定義・生成器・生成用スキーマ・`gyms/`・`tests/`・開発用計測・編集用addon・`.content/dev/` を除外し、実行時の共通IDは含める。配布検査の入口は `speed/tests/integration/export_package.py`。Macのローカル実行用パッケージはGodot組み込みのad-hoc署名を使う。製品向け証明書・公証・ストア公開の設定は未決。
+
+### 15.4 開発用ライブラリの配布
+
+`tools/build/runtime_id.py` が `cpp/` の全ソースからOS共通の識別子を計算する。改行はLFへ正規化し、パスは `/` 区切りで並べる。`addons/runtime_library/runtime_id.gd` は同じ値を計算する。ライブラリの横の記録ファイルが配置済みの識別子と由来を持ち、F5は実行時に配置済みのライブラリを読むので、判定はこの記録とソースを比べる。
+
+`main` のC++が変わると `.github/workflows/runtime-library.yml` が対応する全OS・CPUのライブラリをビルドし、GitHub Releasesの `runtime-library` へ識別子付きの名前とSHA-256で置く。保持期間は30日で、`main` の最新は残す。開発用プラグインは起動時とエディターへ戻ったときに識別子を比べ、完全に一致するライブラリだけを取得する。手元でC++を編集している間は識別子が公開分と一致しないので、取得で上書きされない。
+
+手元ビルドは押したときだけ `tools/build/dev_build.py` を別プロセスで実行する。実行前処理は `addons/runtime_library/run_gate.gd` の判定を通し、古いライブラリは利用者の選択で起動する。C++のビルドを実行前に自動で始める経路は持たない。
 
 ## 16. demo との対応
 
