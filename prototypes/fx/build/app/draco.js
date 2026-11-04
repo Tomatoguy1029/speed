@@ -205,7 +205,13 @@ function dSpiralPull(S, pulled) {
   const sp = S.spiral, L = S.r.spiral_length, d = V(0, 1), coil = sp.coilPoints, total = pathLength(coil), tight = smooth(0, L * 0.7, pulled);
   S.points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const s = i / DCOUNT * L; if (s <= pulled) return add(sp.pullFrom, mul(d, pulled - s));
     const rest = s - pulled, at = pathAt(coil, Math.min(total, rest)).pos, k = lerp(1, 1 - 0.8 * tight, smooth(0, 260, rest)); return add(sp.center, mul(sub(at, sp.center), k)); });
-  S.trail = S.points; S.B.pos = S.points[0]; S.B.facing = Math.PI / 2;
+  dRound(S.points, Math.round(pulled / L * DCOUNT), 6, 14);
+  S.trail = S.points; S.B.pos = S.points[0]; S.B.facing = angOf(sub(S.points[0], S.points[1]));
+}
+// 折れた所をならす：at の前後 span 個の点を、隣の点の真ん中へ少しずつ寄せる（頭と尾の端は動かさない）
+function dRound(points, at, span, passes) {
+  const a = Math.max(1, at - span), b = Math.min(points.length - 2, at + span); if (b <= a) return;
+  for (let k = 0; k < passes; k++) for (let i = a; i <= b; i++) { const w = 0.5 * (1 - Math.abs(i - at) / (span + 1)); points[i] = lerpV(points[i], lerpV(points[i - 1], points[i + 1], 0.5), w); }
 }
 function dSpiralActive(S, dt) {
   const sp = S.spiral, t = S.elapsed, shrinkAt = sp.coil + sp.pause; dSpiralCamera(S, dt);
@@ -216,7 +222,7 @@ function dSpiralActive(S, dt) {
     let head = dSpiralHead(S, turns);
     // 巻き終わり：真上で左へ曲げて頭を下（中心）へ向ける。曲げた分だけ最後の4分の1周で右へ寄せて、真下の直進が中心を通るようにする
     const bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2; head = add(head, V(-sp.bendRadius * Math.sin(bend) + sp.bendRadius * smooth(1.75, 2, turns), sp.bendRadius * (1 - Math.cos(bend))));
-    dSetFollow(S, head, S.r.spiral_length); if (t >= sp.coil) S.tell = [[S.B.pos, add(S.B.pos, V(0, sp.extent * 2))]];
+    dSetFollow(S, head, S.r.spiral_length); if (t > sp.first + sp.second) { S.points = S.points.map(q => ({ ...q })); dRound(S.points, 4, 4, 10); } if (t >= sp.coil) S.tell = [[S.B.pos, add(S.B.pos, V(0, sp.extent * 2))]];
     return;
   }
   if (!sp.coilPoints) { sp.coilPoints = S.points.map(p => ({ ...p })); sp.pullFrom = { ...S.points[0] }; }
