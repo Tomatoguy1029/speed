@@ -140,12 +140,13 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             if (!native_sprite) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(definition.weak_arc)}) enemy_weak.push_back(value);
         }
         if (!meteor && !iron && enemy.radius>=25.0 && enemy.max_hp>0 && enemy.hp<enemy.max_hp) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(std::max(0.0,enemy.hp/enemy.max_hp))}) enemy_health.push_back(value);
+        const bool body_visible=!(enemy.corona && enemy.corona->thrown && !definition.polygon_visual);
         auto &enemy_batch=batch(FieldSystem::rock_visual(run,uint32_t(i)),meteor?7:8,int32_t(enemy.definition));
         if (definition.kind==EnemyDefinition::Kind::Crow) {
             const auto cargo=CrowBehavior::cargo(run,state.enemy_handles.at(uint32_t(i)));
             if (cargo.amount>0) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(cargo.amount),float(cargo.count)}) crow_values.push_back(value);
         }
-        if (definition.kind==EnemyDefinition::Kind::Biter) {
+        if (body_visible && definition.kind==EnemyDefinition::Kind::Biter) {
             enemy_batch.biter=true;enemy_batch.modes.push_back(int32_t(enemy.mode));enemy_batch.charges.push_back(enemy.charge);
             enemy_batch.timers.push_back(enemy.timer);enemy_batch.rests.push_back(definition.bite.rest);
         }
@@ -156,7 +157,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             if (definition.kind==EnemyDefinition::Kind::Defender) enemy_batch.reference_bite_indices.push_back(enemy_batch.gunner.size()/5);
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.gunner.push_back(value);
         }
-        if (definition.kind==EnemyDefinition::Kind::Pump) {
+        if (body_visible && definition.kind==EnemyDefinition::Kind::Pump) {
             const auto &p=run.content->pumps[definition.pump_definition-1];const double base=definition.radius*(enemy.elite?1.25:1.0);const double full=std::clamp((enemy.radius/std::max(base,0.001)-1.0)/std::max(p.grow,0.001),0.0,1.0);const auto &v=std::get<PumpState>(enemy.behavior_state);
             for (float value:{pose.position.x,pose.position.y,float(pose.angle+definition.sprite_angle),float(base*definition.sprite_scale/18.5),float(enemy.mode==EnemyMode::Windup?1.0:full),float(double(v.contents.size())/p.store_max),float(state.world_time),float(std::min(1.0,enemy.flash*10.0)),enemy.mode==EnemyMode::Move && v.contents.size()<p.store_max?1.0f:0.0f}) enemy_batch.pump.push_back(value);
         }
@@ -211,7 +212,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (definition.kind==EnemyDefinition::Kind::Beamer) {
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.mode),float(enemy.charge),definition.color.r,definition.color.g,definition.color.b,definition.color.a}) enemy_batch.beamer.push_back(value);
         }
-        if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) enemy_batch.ruler_sides.push_back(ruler->side);
+        if (body_visible) if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) enemy_batch.ruler_sides.push_back(ruler->side);
         const bool warning=definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {
             const auto *order=GroupSystem::order(state,state.enemy_handles.at(uint32_t(i)));const auto delta=state.ship_pos-pose.position;Dictionary fx;
@@ -219,7 +220,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             fx["progress"]=order?std::clamp((state.world_time-order->warning_started)/std::max(0.000001,order->warning_until-order->warning_started),0.0,1.0):0.0;
             fx["started_at"]=order?order->warning_started:state.world_time;fx["until"]=order?order->warning_until:state.world_time;fx["visual_id"]=FieldSystem::rock_visual(run,uint32_t(i));hound_warning.push_back(fx);continue;
         }
-        if (enemy.corona && enemy.corona->thrown && !definition.polygon_visual) continue;
+        if (!body_visible) continue;
         auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):CanisMajorBody::color(run,state.enemy_handles.at(i),definition.color)):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
         if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode==EnemyMode::Windup) color.g=std::fmod(enemy.charge*3.0,1.0)>=0.45?1.0:0.0;
         godot::Vector2 deform;double amount=0;bool flash=false;
