@@ -10,6 +10,7 @@ const NOVA_DISPLAY := preload("res://scripts/render/bosses/canis_nova.gd")
 const BURST_DISPLAY := preload("res://scripts/render/bosses/canis_burst.gd")
 const NOVA_OVERLAY := preload("res://scripts/render/bosses/canis_nova_overlay.gd")
 const FX_SETTINGS := preload("res://data/visuals/fx_reference.tres")
+const REFERENCE_WHITE := preload("res://shaders/fx_reference_white.gdshader")
 @export var pixel_size := 3.0
 @export var sirius_color := Color("#e8f6ff")
 @export var sirius_halo_color := Color("#9fe8ff")
@@ -31,12 +32,16 @@ var _reference_canvas
 var _nova_params := {}
 var _nova_overlay
 var _burst_overlay
+var _reference_white := 0.0
+var _white_material: ShaderMaterial
+var _white_sprites: Array[Dictionary] = []
 @onready var parts: Node2D = $Parts
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self,"boss/body/canis_major")
 	_nova_params = FX_SETTINGS.for_id("O-nova")
 	for name: String in ["RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg","Body","Head","Tail"]:
 		_part_origins[name] = (parts.get_node(name) as Node2D).position
+	_create_reference_white()
 	z_index = 1
 func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 	flames = preload("res://scripts/render/bosses/canis_flames.gd").new()
@@ -50,7 +55,7 @@ func frame_event(event: Dictionary) -> void:
 		_land_facing = float(event.angle)
 		if not state.is_empty(): _land_feet = POUNCE_MOTION.landing_feet(parts,_part_origins,event.position,_land_facing,float(state.radius)/100.0)
 		if not state.is_empty(): apply_frame(state,technique)
-	if event.get("type",&"")==&"combat_damage":
+	if event.get("type",&"")==&"combat_damage" and event.get("cause",&"")!=&"ram":
 		hit = 0.18
 		queue_redraw()
 	if event.get("type",&"")==&"canis_cue" and event.cue in ["aim_locked","pounce","command","sirius","phase_changed","howl","call","called","stream_windup","bay_windup","entrance_bark","nova_windup","nova_flash","relay_windup","relay_mark","relay_fire","flame_windup","flame_start"]:
@@ -142,6 +147,43 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 
 func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
+
+## 体当たり時の白は通常被弾とは別に、各部位の画像の上へ加算する。
+func set_reference_hit(white: float) -> void:
+	_reference_white = clampf(white,0.0,1.0)
+	_sync_reference_white()
+
+func _create_reference_white() -> void:
+	_white_material = ShaderMaterial.new()
+	_white_material.shader = REFERENCE_WHITE
+	for name: String in ["RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg","Body","Head","Tail"]:
+		var source := parts.get_node(name+"/Sprite") as Sprite2D
+		var overlay := Sprite2D.new()
+		overlay.material = _white_material
+		overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		source.add_child(overlay)
+		_white_sprites.append({"source":source,"overlay":overlay})
+	_sync_reference_white()
+
+func _sync_reference_white() -> void:
+	if _white_material==null: return
+	_white_material.set_shader_parameter("strength",_reference_white)
+	for entry: Dictionary in _white_sprites:
+		var source: Sprite2D = entry.source
+		var overlay: Sprite2D = entry.overlay
+		overlay.visible = _reference_white>0.0 and source.texture!=null
+		if not overlay.visible: continue
+		overlay.texture = source.texture
+		overlay.centered = source.centered
+		overlay.offset = source.offset
+		overlay.flip_h = source.flip_h
+		overlay.flip_v = source.flip_v
+		overlay.hframes = source.hframes
+		overlay.vframes = source.vframes
+		overlay.frame = source.frame
+		overlay.region_enabled = source.region_enabled
+		overlay.region_rect = source.region_rect
+		overlay.self_modulate.a = source.self_modulate.a
 
 func setup_reference_overlay(parent: Node2D) -> void:
 	if is_instance_valid(_nova_overlay): return
