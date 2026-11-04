@@ -442,6 +442,7 @@ static func canis_set_package(definition: BossDef, moves: Array, config: GameCon
 			if record.name in ["BossTechniqueDefinition","CanisBodyDefinition","CanisFlameDefinition"]: continue
 			if record.name!="BossTechniqueStage" and not String(record.name).begins_with("Canis"): continue
 			for original: Dictionary in source.package.records.get(record.name,[]):
+				if not original.has("technique"): continue
 				var move: String = source.package.records.BossTechniqueDefinition[original.technique-1].external_id
 				if move!=source.move and seen.has(StringName(move)): continue
 				var key := [record.name,references.BossTechniqueDefinition[original.technique],original.id if record.name=="BossTechniqueStage" else 0]

@@ -25,6 +25,7 @@ static func signature() -> String:
 	files.append_array(preload("res://tools/content/build_boss_image_fx.gd").input_paths())
 	files.append_array(preload("res://tools/content/build_canis_image_fx.gd").input_paths())
 	files.append("res://tools/art/bake_canis_contact_masks.py")
+	files.append("res://tools/art/bake_monoceros_contact_masks.py")
 	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
 		if not path in files and FileAccess.file_exists(path): files.append(path)
 	return _file_signature(files)
