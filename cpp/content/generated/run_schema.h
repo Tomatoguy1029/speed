@@ -5199,6 +5199,176 @@ inline bool read(BinaryReader &input, CentaurusComboDefinition &out) {
     if (out.gap < 0) return false;
     return true;
 }
+struct BossImageMaskRecord {
+    uint32_t id{};
+    uint32_t width{};
+    uint32_t height{};
+    std::string alpha_bits_hex{};
+};
+inline bool read(BinaryReader &input, BossImageMaskRecord &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.width)) return false;
+    if (!input.read_u32(out.height)) return false;
+    if (!input.read_string(out.alpha_bits_hex)) return false;
+    return true;
+}
+struct CentaurusImageNode {
+    uint32_t id{};
+    uint32_t parent{};
+    std::string path{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    bool visible{};
+    bool pivot{};
+    double pivot_x{};
+    double pivot_y{};
+};
+inline bool read(BinaryReader &input, CentaurusImageNode &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.parent)) return false;
+    if (!input.read_string(out.path)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_bool(out.pivot)) return false;
+    if (!input.read_f64(out.pivot_x)) return false;
+    if (!input.read_f64(out.pivot_y)) return false;
+    return true;
+}
+struct CentaurusImageSprite {
+    uint32_t id{};
+    uint32_t node{};
+    uint32_t mask{};
+    uint32_t region_x{};
+    uint32_t region_y{};
+    uint32_t region_w{};
+    uint32_t region_h{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    double offset_x{};
+    double offset_y{};
+    bool centered{};
+    bool flip_h{};
+    bool flip_v{};
+    bool visible{};
+    bool bow{};
+};
+inline bool read(BinaryReader &input, CentaurusImageSprite &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.node)) return false;
+    if (!input.read_u32(out.mask)) return false;
+    if (!input.read_u32(out.region_x)) return false;
+    if (!input.read_u32(out.region_y)) return false;
+    if (!input.read_u32(out.region_w)) return false;
+    if (!input.read_u32(out.region_h)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_f64(out.offset_x)) return false;
+    if (!input.read_f64(out.offset_y)) return false;
+    if (!input.read_bool(out.centered)) return false;
+    if (!input.read_bool(out.flip_h)) return false;
+    if (!input.read_bool(out.flip_v)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_bool(out.bow)) return false;
+    return true;
+}
+struct CentaurusImageBow {
+    uint32_t id{};
+    uint32_t region_x{};
+    uint32_t region_y{};
+    uint32_t region_w{};
+    uint32_t region_h{};
+    double grip_x{};
+    double grip_y{};
+};
+inline bool read(BinaryReader &input, CentaurusImageBow &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.region_x)) return false;
+    if (!input.read_u32(out.region_y)) return false;
+    if (!input.read_u32(out.region_w)) return false;
+    if (!input.read_u32(out.region_h)) return false;
+    if (!input.read_f64(out.grip_x)) return false;
+    if (!input.read_f64(out.grip_y)) return false;
+    return true;
+}
+struct CentaurusImageClip {
+    uint32_t id{};
+    std::string name{};
+};
+inline bool read(BinaryReader &input, CentaurusImageClip &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.name)) return false;
+    return true;
+}
+struct CentaurusImageKey {
+    uint32_t id{};
+    uint32_t clip{};
+    double duration{};
+    bool interpolate{};
+};
+inline bool read(BinaryReader &input, CentaurusImageKey &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.clip)) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (!input.read_bool(out.interpolate)) return false;
+    return true;
+}
+struct CentaurusImagePose {
+    uint32_t id{};
+    uint32_t key{};
+    uint32_t node{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    bool visible{};
+    int64_t bow{};
+    bool pivot_origin{};
+    double pivot_x{};
+    double pivot_y{};
+};
+inline bool read(BinaryReader &input, CentaurusImagePose &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.key)) return false;
+    if (!input.read_u32(out.node)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_i64(out.bow)) return false;
+    if (!input.read_bool(out.pivot_origin)) return false;
+    if (!input.read_f64(out.pivot_x)) return false;
+    if (!input.read_f64(out.pivot_y)) return false;
+    return true;
+}
 struct CanisBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -7552,6 +7722,13 @@ struct ContentRecords {
     std::vector<CentaurusShowerDefinition> CentaurusShowerDefinition_rows;
     std::vector<CentaurusSailDefinition> CentaurusSailDefinition_rows;
     std::vector<CentaurusComboDefinition> CentaurusComboDefinition_rows;
+    std::vector<BossImageMaskRecord> BossImageMaskRecord_rows;
+    std::vector<CentaurusImageNode> CentaurusImageNode_rows;
+    std::vector<CentaurusImageSprite> CentaurusImageSprite_rows;
+    std::vector<CentaurusImageBow> CentaurusImageBow_rows;
+    std::vector<CentaurusImageClip> CentaurusImageClip_rows;
+    std::vector<CentaurusImageKey> CentaurusImageKey_rows;
+    std::vector<CentaurusImagePose> CentaurusImagePose_rows;
     std::vector<CanisBodyDefinition> CanisBodyDefinition_rows;
     std::vector<CanisFlameDefinition> CanisFlameDefinition_rows;
     std::vector<CanisCommandDefinition> CanisCommandDefinition_rows;
@@ -8627,6 +8804,48 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CentaurusComboDefinition row; if (!read(input,row)) return false; out.CentaurusComboDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 356: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { BossImageMaskRecord row; if (!read(input,row)) return false; out.BossImageMaskRecord_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 357: {
+        if (version != 1) return false;
+        if (count > input.remaining()/78) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageNode row; if (!read(input,row)) return false; out.CentaurusImageNode_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 358: {
+        if (version != 1) return false;
+        if (count > input.remaining()/97) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageSprite row; if (!read(input,row)) return false; out.CentaurusImageSprite_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 359: {
+        if (version != 1) return false;
+        if (count > input.remaining()/36) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageBow row; if (!read(input,row)) return false; out.CentaurusImageBow_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 360: {
+        if (version != 1) return false;
+        if (count > input.remaining()/8) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageClip row; if (!read(input,row)) return false; out.CentaurusImageClip_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 361: {
+        if (version != 1) return false;
+        if (count > input.remaining()/17) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageKey row; if (!read(input,row)) return false; out.CentaurusImageKey_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 362: {
+        if (version != 1) return false;
+        if (count > input.remaining()/86) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImagePose row; if (!read(input,row)) return false; out.CentaurusImagePose_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 340: {
         if (version != 1) return false;
         if (count > input.remaining()/164) return false;
@@ -9333,6 +9552,20 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusSailDefinition_rows) if (!CentaurusSailDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusComboDefinition_ids;
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!CentaurusComboDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossImageMaskRecord_ids;
+    for (const auto &row:data.BossImageMaskRecord_rows) if (!BossImageMaskRecord_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageNode_ids;
+    for (const auto &row:data.CentaurusImageNode_rows) if (!CentaurusImageNode_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageSprite_ids;
+    for (const auto &row:data.CentaurusImageSprite_rows) if (!CentaurusImageSprite_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageBow_ids;
+    for (const auto &row:data.CentaurusImageBow_rows) if (!CentaurusImageBow_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageClip_ids;
+    for (const auto &row:data.CentaurusImageClip_rows) if (!CentaurusImageClip_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageKey_ids;
+    for (const auto &row:data.CentaurusImageKey_rows) if (!CentaurusImageKey_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImagePose_ids;
+    for (const auto &row:data.CentaurusImagePose_rows) if (!CentaurusImagePose_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisBodyDefinition_ids;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!CanisBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisFlameDefinition_ids;
@@ -9951,5 +10184,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=229;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=236;
 }

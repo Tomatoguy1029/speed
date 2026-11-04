@@ -47,6 +47,24 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         records.RunConfig_rows[0].aim_lag<=0 || records.RunConfig_rows[0].aim_speed<=0 ||
         records.DefinitionIndex_rows.size()!=records.EnemyRecord_rows.size()) return {};
     auto bundle=std::make_shared<ContentBundle>();
+    for (const auto &row:records.BossImageMaskRecord_rows) {
+        if (row.id!=bundle->boss_image_masks.size()+1 || row.width==0 || row.height==0 || row.width>16384 || row.height>16384) return {};
+        const uint64_t size=(uint64_t(row.width)*row.height+7)/8;
+        if (row.alpha_bits_hex.size()!=size*2) return {};
+        BossImageMask mask;mask.id=row.id;mask.width=row.width;mask.height=row.height;mask.bits.reserve(size);
+        const auto nibble=[](char c)->int {if (c>='0' && c<='9') return c-'0';if (c>='a' && c<='f') return c-'a'+10;return -1;};
+        for (size_t i=0;i<row.alpha_bits_hex.size();i+=2) {
+            const int a=nibble(row.alpha_bits_hex[i]),b=nibble(row.alpha_bits_hex[i+1]);if (a<0 || b<0) return {};
+            mask.bits.push_back(uint8_t(a*16+b));
+        }
+        bundle->boss_image_masks.push_back(std::move(mask));
+    }
+    bundle->centaurus_image_pose.nodes=records.CentaurusImageNode_rows;
+    bundle->centaurus_image_pose.sprites=records.CentaurusImageSprite_rows;
+    bundle->centaurus_image_pose.bows=records.CentaurusImageBow_rows;
+    bundle->centaurus_image_pose.clips=records.CentaurusImageClip_rows;
+    bundle->centaurus_image_pose.keys=records.CentaurusImageKey_rows;
+    bundle->centaurus_image_pose.poses=records.CentaurusImagePose_rows;
     std::copy(bytes.ptr()+24,bytes.ptr()+56,bundle->input_sha256.begin());
     std::copy(bytes.ptr()+56,bytes.ptr()+88,bundle->payload_sha256.begin());
     bundle->config=records.RunConfig_rows[0];
