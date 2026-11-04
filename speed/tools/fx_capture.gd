@@ -75,7 +75,7 @@ func _ready() -> void:
 		while next_command<commands.size() and int(commands[next_command].tick)==tick:
 			if not _action(commands[next_command]): return
 			next_command += 1
-		if not _present(frame,images): return
+		if not _present(spec.camera,frame,images): return
 		await RenderingServer.frame_post_draw
 		if not _save_frame(output,frame,images): return
 		if frame+1==int(spec.frames): break
@@ -102,13 +102,28 @@ func _ready() -> void:
 	print("撮影完了: ",output)
 	get_tree().quit(0)
 
-func _present(frame: int, images: Array) -> bool:
+func _present(camera: Dictionary, frame: int, images: Array) -> bool:
 	var state: Dictionary = session.bridge.read_frame()
 	if not state.ok:
 		_fail("撮影時刻を読めません")
 		return false
+	var center := Vector2(float(camera.center[0]),float(camera.center[1]))
+	if camera.get("mode","fixed")=="boss_ship_midpoint":
+		var bodies: Dictionary = session.bridge.command("dev_boss_body_state")
+		var actor := int(values.get(str(camera.get("boss_ref","")),-1))
+		var found := false
+		if bodies.ok:
+			for body: Dictionary in bodies.value:
+				if int(body.actor)==actor:
+					center = (body.position+state.value.ui.ship.ship_pos)*0.5
+					found = true
+					break
+		if not found:
+			_fail("追従カメラのボスを読めません")
+			return false
+	render.view_override.center = center
 	render._present_cpp(0.0 if frame==0 else 1.0/60.0)
-	images.append({"file":"%06d.png" % frame,"tick":frame*2,"seconds":frame/60.0,"world_time":state.value.ui.world_time})
+	images.append({"file":"%06d.png" % frame,"tick":frame*2,"seconds":frame/60.0,"world_time":state.value.ui.world_time,"camera_center":[center.x,center.y]})
 	return true
 
 func _save_frame(output: String, frame: int, images: Array) -> bool:
@@ -167,6 +182,8 @@ func _valid_spec(spec: Dictionary) -> bool:
 	if not spec.get("seed") is int and not spec.get("seed") is float: return false
 	if not spec.get("frames") is int and not spec.get("frames") is float: return false
 	if int(spec.frames)<1 or not spec.get("camera") is Dictionary or not spec.camera.get("center") is Array or spec.camera.center.size()!=2 or float(spec.camera.get("zoom",0))<=0.0: return false
+	if spec.camera.get("mode","fixed") not in ["fixed","boss_ship_midpoint"]: return false
+	if spec.camera.get("mode","fixed")=="boss_ship_midpoint" and not spec.camera.get("boss_ref") is String: return false
 	if not spec.get("commands") is Array or not spec.get("build_identity") is Dictionary or spec.build_identity.is_empty(): return false
 	var previous := -1
 	for item in spec.commands:
